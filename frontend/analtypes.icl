@@ -1,7 +1,7 @@
 implementation module analtypes
 
 import StdEnv
-import syntax, checksupport, checktypes, check, typesupport, utilities, RWSDebug
+import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes, RWSDebug
 
 ::	UnifyKindsInfo = 
 	{	uki_kind_heap	::!.KindHeap
@@ -470,7 +470,10 @@ analTypeDefs modules used_module_numbers heaps error
 				as_next_num = 0, as_deps = [], as_next_group_num = 0, as_error = error }
 
 	  {as_td_infos,as_heaps,as_error} = anal_type_defs modules 0 sizes as
-	= (as_td_infos, as_heaps, as_error)
+	  (as_td_infos, th_vars, as_error)
+	  		= foldSt (check_left_root_attribution_of_typedef_in_module modules)
+	  					[(s,i) \\ s<-sizes & i<-[0..]] (as_td_infos, as_heaps.th_vars, as_error)
+	= (as_td_infos, { as_heaps & th_vars = th_vars }, as_error)
 where
 	anal_type_defs modules mod_index [ size : sizes ] as
 		# as = iFoldSt (anal_type_def modules mod_index) 0 size as
@@ -484,6 +487,11 @@ where
 			= as
 			= as
 
+	check_left_root_attribution_of_typedef_in_module modules (siz,mod_index) (as_td_infos, th_vars, as_error)
+		= iFoldSt (checkLeftRootAttributionOfTypeDef modules mod_index)
+						0 siz (as_td_infos, th_vars, as_error)
+
+
 instance == AttributeVar
 where
 	(==) av1 av2 = av1.av_info_ptr == av2.av_info_ptr
@@ -491,3 +499,71 @@ where
 instance <<< DynamicType
 where
 	(<<<) file {dt_global_vars,dt_type} = file <<< dt_global_vars <<< dt_type
+
+
+checkLeftRootAttributionOfTypeDef :: !{# CommonDefs} !Index !Index !(!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+		-> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+checkLeftRootAttributionOfTypeDef common_defs mod_index type_index (td_infos, th_vars, error)
+	# {td_rhs, td_attribute, td_name, td_pos}
+			= common_defs.[mod_index].com_type_defs.[type_index]
+	| isUniqueAttr td_attribute
+		= (td_infos, th_vars, error)
+	# (is_unique, (td_infos, th_vars))
+			= isUniqueTypeRhs common_defs mod_index td_rhs (td_infos, th_vars)
+	| is_unique
+		= (td_infos, th_vars, checkErrorWithIdentPos (newPosition td_name td_pos) 
+								" left root * attribute expected" error)
+	= (td_infos, th_vars, error)
+		
+isUniqueTypeRhs common_defs mod_index (AlgType constructors) state
+	= one_constructor_is_unique common_defs mod_index constructors state
+isUniqueTypeRhs common_defs mod_index (SynType rhs) state
+	= isUnique common_defs rhs state
+isUniqueTypeRhs common_defs mod_index (RecordType {rt_constructor}) state
+	= one_constructor_is_unique common_defs mod_index [rt_constructor] state
+isUniqueTypeRhs common_defs mod_index _ state
+	= (False, state)
+
+one_constructor_is_unique common_defs mod_index [] state
+	= (False, state)
+one_constructor_is_unique common_defs mod_index [{ds_index}:constructors] state
+	# {cons_type}
+			= common_defs.[mod_index].com_cons_defs.[ds_index]
+	  (uniqueness_of_args, state)
+	  		= mapSt (isUnique common_defs) cons_type.st_args state
+	= (or uniqueness_of_args, state)
+
+class isUnique a :: !{# CommonDefs} !a !(!*TypeDefInfos, !*TypeVarHeap) -> (!Bool, !(!*TypeDefInfos, !*TypeVarHeap))
+
+instance isUnique AType
+  where
+	isUnique common_defs {at_attribute=TA_Unique} state
+		= (True, state)
+	isUnique common_defs {at_type} state
+		= isUnique common_defs at_type state
+		
+instance isUnique Type
+  where
+	isUnique common_defs (TA {type_index={glob_module, glob_object}} type_args) (td_infos, th_vars)
+		# type_def
+				= common_defs.[glob_module].com_type_defs.[glob_object]
+		| isUniqueAttr type_def.td_attribute
+			= (True, (td_infos, th_vars))
+		# (prop_classification, th_vars, td_infos)
+				= propClassification glob_object glob_module (repeatn type_def.td_arity 0)
+						common_defs th_vars td_infos
+		  (uniqueness_of_args, (td_infos, th_vars))
+		  		= mapSt (isUnique common_defs) type_args (td_infos, th_vars)
+		= (unique_if_arg_is_unique_and_propagating uniqueness_of_args prop_classification, (td_infos, th_vars))
+	  where
+		unique_if_arg_is_unique_and_propagating [] _
+			= False
+		unique_if_arg_is_unique_and_propagating [is_unique_argument:rest] prop_classification
+			| isOdd prop_classification /*MW:cool!*/ && is_unique_argument
+				= True
+			= unique_if_arg_is_unique_and_propagating rest (prop_classification>>1)
+	isUnique common_defs _ state
+		= (False, state)
+
+isUniqueAttr TA_Unique = True
+isUniqueAttr _ = False
