@@ -113,6 +113,13 @@ instance toString Ident
 
 ::	IndexRange	= { ir_from :: !Index, ir_to :: !Index }
 
+::	ArrayAndListInstances = {
+		ali_array_first_instance_indices :: ![Int],
+		ali_list_first_instance_indices :: ![Int],
+		ali_tail_strict_list_first_instance_indices :: ![Int],
+		ali_instances_range :: !IndexRange
+	}
+
 ::  Index	:== Int
 NoIndex		:== -1
 
@@ -541,7 +548,6 @@ cIsALocalVar	:== False
 				| VI_Labelled_Empty {#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
 
-
 ::	ExtendedVarInfo = EVI_VarType !AType
 
 ::	ArgumentPosition :== Int
@@ -686,8 +692,7 @@ cNonRecursiveAppl	:== False
 
 					| EI_Attribute !Int
 
-
-		/* EI_DictionaryType is used to store the instance type of a class. This type are used during fusion to generate proper types for 
+		/* EI_DictionaryType is used to store the instance type of a class. This type is used during fusion to generate proper types for 
 		   the fusion result (i.e. the resulting function after elimination of dictionaries) */
 
 					| EI_DictionaryType !Type
@@ -1010,7 +1015,8 @@ cNonUniqueSelection	:== False
 				| PE_Case !Ident !ParsedExpr [CaseAlt]
 				| PE_If !Ident !ParsedExpr !ParsedExpr !ParsedExpr
 				| PE_Let !Bool !LocalDefs !ParsedExpr
-				| PE_Compr !GeneratorKind !ParsedExpr ![Qualifier]
+				| PE_ListCompr /*predef_cons_index:*/ !Int /*predef_nil_index:*/ !Int !ParsedExpr ![Qualifier]
+				| PE_ArrayCompr !ParsedExpr ![Qualifier]
 				| PE_Sequ Sequence
 				| PE_WildCard
 				| PE_Field !ParsedExpr !(Global FieldSymbol) /* Auxiliary, used during checking */
@@ -1165,10 +1171,17 @@ cIsNotStrict	:== False
 	,	dyn_type_code	:: !TypeCodeExpression		/* filled after type checking */
 	}	
 
-::	CasePatterns = AlgebraicPatterns !(Global Index) ![AlgebraicPattern]
-				 | BasicPatterns !BasicType [BasicPattern]
-				 | DynamicPatterns [DynamicPattern]						/* auxiliary */
-				 | NoPattern											/* auxiliary */
+::	CasePatterns= AlgebraicPatterns !(Global Index) ![AlgebraicPattern]
+				| BasicPatterns !BasicType [BasicPattern]
+				| DynamicPatterns [DynamicPattern]						/* auxiliary */
+				| OverloadedListPatterns !OverloadedListType !Expression ![AlgebraicPattern]
+				| NoPattern											/* auxiliary */
+
+::	OverloadedListType	= UnboxedList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
+						| UnboxedTailStrictList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_uts index, nil_uts index
+						| OverloadedList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons index, nil index
+
+instance == OverloadedListType
 
 ::	Selection	= RecordSelection !(Global DefinedSymbol) !Int
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression

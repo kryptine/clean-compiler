@@ -111,6 +111,13 @@ where toString {import_module} = toString import_module
 
 ::	IndexRange	= { ir_from :: !Index, ir_to :: !Index }
 
+::	ArrayAndListInstances = {
+		ali_array_first_instance_indices :: ![Int],
+		ali_list_first_instance_indices :: ![Int],
+		ali_tail_strict_list_first_instance_indices :: ![Int],
+		ali_instances_range :: !IndexRange
+	}
+
 ::  Index	:== Int
 NoIndex		:== -1
 
@@ -525,7 +532,6 @@ cIsALocalVar	:== False
 // ... MdM
 				| VI_Labelled_Empty {#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
-
 
 ::	ExtendedVarInfo = EVI_VarType !AType
 
@@ -985,7 +991,8 @@ cNonUniqueSelection	:== False
 				| PE_Case !Ident !ParsedExpr [CaseAlt]
 				| PE_If !Ident !ParsedExpr !ParsedExpr !ParsedExpr
 				| PE_Let !Bool !LocalDefs !ParsedExpr
-				| PE_Compr !GeneratorKind !ParsedExpr ![Qualifier]
+				| PE_ListCompr /*predef_cons_index:*/ !Int /*predef_nil_index:*/ !Int !ParsedExpr ![Qualifier]
+				| PE_ArrayCompr !ParsedExpr ![Qualifier]
 				| PE_Sequ Sequence
 				| PE_WildCard
 				| PE_Field !ParsedExpr !(Global FieldSymbol) /* Auxiliary, used during checking */
@@ -1114,10 +1121,15 @@ cIsNotStrict	:== False
 	,	dyn_type_code	:: !TypeCodeExpression		/* filled after type checking */
 	}	
 
-::	CasePatterns = AlgebraicPatterns !(Global Index) ![AlgebraicPattern]
-				 | BasicPatterns !BasicType [BasicPattern]
-				 | DynamicPatterns [DynamicPattern]						/* auxiliary */
-				 | NoPattern											/* auxiliary */
+::	CasePatterns= AlgebraicPatterns !(Global Index) ![AlgebraicPattern]
+				| BasicPatterns !BasicType [BasicPattern]
+				| DynamicPatterns [DynamicPattern]						/* auxiliary */
+				| OverloadedListPatterns !OverloadedListType !Expression ![AlgebraicPattern]
+				| NoPattern											/* auxiliary */
+
+::	OverloadedListType	= UnboxedList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
+						| UnboxedTailStrictList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_uts index, nil_uts index
+						| OverloadedList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons index, nil index
 
 ::	Selection	= RecordSelection !(Global DefinedSymbol) !Int
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
@@ -1458,6 +1470,7 @@ where
 	(<<<) file (BasicPatterns type patterns) = file <<< " " <<<patterns
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
+	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< decons_expr <<< " " <<< patterns
 	(<<<) file NoPattern = file 
 
 instance <<< CheckedAlternative
@@ -1501,7 +1514,7 @@ where
 		write_binds x file []
 			= file
 		write_binds x file [bind : binds]
-			= write_binds x (file <<< x <<< " " <<< bind <<< '\n') binds
+			= write_binds x (file <<< x <<< " " <<< bind) binds
  	(<<<) file (Case {case_expr,case_guards,case_default=No})
 		//= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
 		= file <<< "case " <<< case_expr <<< " of" <<< case_guards
@@ -1628,8 +1641,8 @@ where
 	(<<<) file (PE_Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (PE_Record PE_Empty _ fields) = file <<< '{' <<< fields <<< '}'
 	(<<<) file (PE_Record rec _ fields) = file <<< '{' <<< rec <<< " & " <<< fields <<< '}'
-	(<<<) file (PE_Compr True expr quals) = file <<< '[' <<< expr <<< " \\ " <<< quals <<< ']'
-	(<<<) file (PE_Compr False expr quals) = file <<< '{' <<< expr <<< " \\ " <<< quals <<< '}'
+	(<<<) file (PE_ListCompr _ _ expr quals) = file <<< '[' <<< expr <<< " \\ " <<< quals <<< ']'
+	(<<<) file (PE_ArrayCompr expr quals) = file <<< '{' <<< expr <<< " \\ " <<< quals <<< '}'
 	(<<<) file (PE_Sequ seq) = file <<< '[' <<< seq <<< ']'
 	(<<<) file PE_Empty = file <<< "** E **"
 	(<<<) file (PE_Ident symb) = file <<< symb
@@ -1694,22 +1707,23 @@ instance <<< FunDef
 where
 	(<<<) file {fun_symb,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< ' ' <<< bodies 
 	(<<<) file {fun_symb,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
-			<<< "C " <<< cb_args <<< "\n= " <<< cb_rhs 
+			<<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}}
-		= file <<< fun_symb <<< '@' <<< fun_index <<< '.'
-			<<< "T "  <<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n= " <<< tb_rhs 
+	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
+		= file <<< fun_symb <<< '@' <<< fun_index <<< '.' <<< "T "  
+//			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
+			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '@' <<< fun_index <<< '.'
-			<<< body <<< '\n'
-	(<<<) file {fun_symb,fun_body=NoBody,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
-			<<< "Array function\n"
+	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
+			<<< fun_symb <<< '@' <<< fun_index <<< '.' <<< body <<< '\n'
+	(<<<) file {fun_symb,fun_body=NoBody,fun_type=Yes type} = file // <<< type <<< '\n'
+			<<< fun_symb <<< '.' <<< "Array function\n"
 
 instance <<< FunctionBody
 where
 	(<<<) file (ParsedBody bodies) = file <<< bodies 
-	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< "\n= " <<< cb_rhs 
-	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< "\n= " <<< tb_rhs 
+	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
+	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< " = " <<< tb_rhs <<< '\n'
 	(<<<) file (BackendBody body) = file <<< body <<< '\n'
 	(<<<) file NoBody = file <<< "Array function\n"
 
@@ -1890,7 +1904,7 @@ where
 
 instance <<< Rhs
 where
-	(<<<) file {rhs_alts,rhs_locals} = file <<< rhs_alts <<< rhs_locals
+	(<<<) file {rhs_alts,rhs_locals} = file <<< rhs_alts <<< rhs_locals <<< '\n'
 
 instance <<< OptGuardedAlts
 where
@@ -2049,10 +2063,20 @@ where
 
 readable :: !Ident -> String // somewhat hacky
 readable {id_name}
-	| id_name=="_cons" || id_name=="_nil"
-		= "list constructor"
 	| size id_name>0 && id_name.[0]=='_'
-		= id_name%(1, size id_name-1)
+		| id_name=="_Cons" || id_name=="_Nil"
+			= "list constructor"
+		| id_name=="_!Cons" || id_name=="_!Nil"
+			= "! list constructor"
+		| id_name=="_#Cons" || id_name=="_#Nil"
+			= "# list constructor"
+		| id_name=="_Cons!" || id_name=="_Nil!"
+			= "list constructor !"
+		| id_name=="_!Cons!" || id_name=="_!Nil!"
+			= "! list constructor !"
+		| id_name=="_#Cons!" || id_name=="_#Nil!"
+			= "# list constructor !"
+			= id_name%(1, size id_name-1)
 	= id_name
 
 instance <<< ImportedIdent
@@ -2071,6 +2095,10 @@ instance == Annotation
 where
 	(==) a1 a2 = equal_constructor a1 a2
 
+instance == OverloadedListType
+where
+	(==) a1 a2 = equal_constructor a1 a2
+	
 EmptySymbolTableEntry :== EmptySymbolTableEntryCAF.boxed_symbol_table_entry
 
 ::BoxedSymbolTableEntry = {boxed_symbol_table_entry::!SymbolTableEntry}
