@@ -9,6 +9,7 @@ import absmodule
 import rule
 import dnc
 import basic
+from syntax import SK_Function
 import general
 import StdEnv
 
@@ -168,9 +169,9 @@ clistrategy (CliAlias {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) m
         ---> ("cli.clistrategy.checkconstr",tcs)
      )
    ) (corestrategy matchable)                       // Checks rules for symbols in the language core (IF, _AP, ...)
-   where islocal rsym=:(SuclUser s) = isMember rsym (map fst rs)// User-defined symbols can be imported, so they're known if we have a list of rules for them
-         islocal rsym               = True                      // Symbols in the language core (the rest) are always completely known
-                                                                // This includes lifted case symbols; we lifted them ourselves, after all
+   where islocal rsym=:(SuclUser (SK_Function _)) = isMember rsym (map fst rs)  // User-defined function symbols can be imported, so they're known if we have a list of rules for them
+         islocal _                                = True                        // Symbols in the language core (the rest) are always completely known
+                                                                                // This includes lifted case symbols; we lifted them ourselves, after all
 
 typearity :: (Rule SuclTypeSymbol SuclTypeVariable) -> Int
 typearity ti = length (arguments ti)
