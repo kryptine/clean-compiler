@@ -14,6 +14,13 @@ import checksupport, transform, overloading
 		,	fe_globalFunctions :: !IndexRange
 		,	fe_arrayInstances :: !IndexRange
 		}
+:: FrontEndPhase
+	=	FrontEndPhaseCheck
+	|	FrontEndPhaseTypeCheck
+	|	FrontEndPhaseConvertDynamics
+	|	FrontEndPhaseTransformGroups
+	|	FrontEndPhaseConvertModules
+	|	FrontEndPhaseAll
 
-frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
-// name paths predefs files error io out
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
+// upToPhase name paths predefs files error io out

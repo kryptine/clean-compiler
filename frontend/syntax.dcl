@@ -464,7 +464,8 @@ cIsALocalVar	:== False
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
-				VI_Defined /* for marking type code variables during overloading */ | VI_LocallyDefined
+				VI_Defined /* for marking type code variables during overloading */ | VI_LocallyDefined |
+				VI_TheoremProverVariable !Int !Int /* MdM - first int is kind (0:parameter;1:case;2:let), second its index */
 
 ::	ExtendedVarInfo = EVI_VarType !AType
 

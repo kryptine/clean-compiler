@@ -2,7 +2,12 @@ definition module scanner
 
 import StdEnv, general
 
-::	SearchPaths	:== [String]
+// RWS Proof ... ::	SearchPaths	:== [String]
+:: SearchPaths = 
+	{ sp_locations   :: [(String, String)]       // (module, path)
+	, sp_paths       :: [String]
+	}
+// ... RWS
 
 ::	* ScanState
 

@@ -14,7 +14,12 @@ functions names starting with '->' require a ';' after the type. Solutions:
    actual context of the new token or/and have to take care of generating the right
    amount of offsides. 
 */
-::	SearchPaths	:== [String]
+// RWS Proof ... ::	SearchPaths	:== [String]
+:: SearchPaths = 
+	{ sp_locations   :: [(String, String)]       // (module, path)
+	, sp_paths       :: [String]
+	}
+// ... RWS
 
 ::	*ScanState = ScanState !RScanState
 
@@ -1662,6 +1667,7 @@ openScanner file_name searchPaths files
 				, files
 				)
 
+/* RWS Proof ...
 fopenInSearchPaths :: !{#Char} [!{#Char}] !Int !*f -> (Optional *File,!*f) | FileSystem f
 fopenInSearchPaths fileName [] mode f
 	=	(No, f)
@@ -1672,6 +1678,33 @@ fopenInSearchPaths fileName [path : paths] mode f
 		=	(Yes file, f)
 	// otherwise
 		=	fopenInSearchPaths fileName paths mode f
+*/
+fopenInSearchPaths :: !{#Char} SearchPaths !Int !*f -> (Optional *File,!*f) | FileSystem f
+fopenInSearchPaths fileName searchPaths mode f
+	# filtered_locations
+		=	filter (\(moduleName,path) -> moduleName == fileName) searchPaths.sp_locations
+	| isEmpty filtered_locations
+		=	fopenAnywhereInSearchPaths fileName searchPaths.sp_paths mode f
+	# (_, path)
+		=	hd filtered_locations
+	# (opened, file, f)
+		=	fopen (path + fileName) mode f
+	| opened
+		=	(Yes file, f)
+	| otherwise
+		=	(No, f)
+	where
+		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int *f -> (Optional *File, !*f) | FileSystem f
+		fopenAnywhereInSearchPaths fileName [] mode f
+			=	(No, f)
+		fopenAnywhereInSearchPaths fileName [path : paths] mode f
+			# (opened, file, f)
+				=	fopen (path + fileName) mode f
+			| opened
+				=	(Yes file, f)
+			// otherwise
+				=	fopenAnywhereInSearchPaths fileName paths mode f
+// ... RWS
 
 closeScanner :: !ScanState !*Files -> *Files
 closeScanner (ScanState scan_state) files = closeScanner_ scan_state files

@@ -19,8 +19,61 @@ import RWSDebug
 (-*->) value trace
 	:==	value // ---> trace
 
-frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
-frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
+frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances var_heap optional_dcl_icl_conversions
+	global_fun_range
+	:== (predef_symbols,hash_table,files,error,io,out,
+		Yes	{	fe_icl = {icl_mod & icl_functions=fun_defs }
+			,	fe_dcls = dcl_mods
+			,	fe_components = components
+			,	fe_varHeap = var_heap
+			,	fe_dclIclConversions =  optional_dcl_icl_conversions
+			,	fe_iclDclConversions =  build_optional_icl_dcl_conversions (size fun_defs) optional_dcl_icl_conversions
+			,	fe_globalFunctions = global_fun_range
+			,	fe_arrayInstances = array_instances
+			}
+		)
+
+build_optional_icl_dcl_conversions :: !Int !(Optional {# Index}) -> Optional {# Index}
+build_optional_icl_dcl_conversions size No
+	=	Yes (buildIclDclConversions size {})
+build_optional_icl_dcl_conversions size (Yes dcl_icl_conversions)
+	=	Yes (buildIclDclConversions size dcl_icl_conversions)
+
+buildIclDclConversions :: !Int !{# Index} -> {# Index}
+buildIclDclConversions table_size dcl_icl_conversions
+	# dcl_table_size = size dcl_icl_conversions
+	  icl_dcl_conversions = update_conversion_array 0 dcl_table_size dcl_icl_conversions (createArray table_size NoIndex)
+	= fill_empty_positions 0 table_size dcl_table_size icl_dcl_conversions
+
+where	
+	update_conversion_array	dcl_index dcl_table_size dcl_icl_conversions icl_conversions
+		| dcl_index < dcl_table_size
+			#  icl_index = dcl_icl_conversions.[dcl_index]
+			= update_conversion_array (inc dcl_index) dcl_table_size dcl_icl_conversions
+					{ icl_conversions & [icl_index] = dcl_index } 
+			= icl_conversions
+
+	fill_empty_positions next_index table_size next_new_index icl_conversions
+		| next_index < table_size
+			| icl_conversions.[next_index] == NoIndex
+				= fill_empty_positions (inc next_index) table_size (inc next_new_index) { icl_conversions & [next_index] = next_new_index }
+				= fill_empty_positions (inc next_index) table_size next_new_index icl_conversions
+			= icl_conversions
+
+:: FrontEndPhase
+	=	FrontEndPhaseCheck
+	|	FrontEndPhaseTypeCheck
+	|	FrontEndPhaseConvertDynamics
+	|	FrontEndPhaseTransformGroups
+	|	FrontEndPhaseConvertModules
+	|	FrontEndPhaseAll
+
+instance == FrontEndPhase where
+	(==) a b
+		=	equal_constructor a b
+
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
+frontEndInterface upToPhase mod_ident search_paths predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
 	| not ok
@@ -40,8 +93,16 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 
 	  dcl_mods = {{dcl_mod & dcl_declared={dcls_import=[],dcls_local=[],dcls_explicit=[]}}\\ dcl_mod<-:dcl_mods}
 
-	  (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error)
-		= typeProgram (components -*-> "Typing") icl_functions icl_specials icl_common icl_declared.dcls_import dcl_mods heaps predef_symbols error
+	  var_heap = heaps.hp_var_heap
+	  fun_defs = icl_functions
+	  array_instances = {ir_from=0, ir_to=0}
+
+	| upToPhase == FrontEndPhaseCheck
+		=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
+				var_heap optional_dcl_icl_conversions global_fun_range
+
+	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error)
+		= typeProgram (components -*-> "Typing") fun_defs icl_specials icl_common icl_declared.dcls_import dcl_mods heaps predef_symbols error
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
@@ -50,21 +111,37 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 //	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 //	  (fun_defs, error)	= showFunctions array_instances fun_defs error
 
-	  (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
+	| upToPhase == FrontEndPhaseTypeCheck
+		=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
+				heaps.hp_var_heap optional_dcl_icl_conversions global_fun_range
+
+	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components -*-> "convertDynamics") fun_defs predef_symbols
 					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap
 
+	| upToPhase == FrontEndPhaseConvertDynamics
+		=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
+				var_heap optional_dcl_icl_conversions global_fun_range
+
 //	  (components, fun_defs, error) = showComponents components 0 True fun_defs error
-	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
+	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups common_defs array_instances (components -*-> "Transform") fun_defs var_heap expression_heap
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  	= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics var_heap type_heaps expression_heap
-	  (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
+
+	| upToPhase == FrontEndPhaseTransformGroups
+		=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
+				var_heap optional_dcl_icl_conversions global_fun_range
+
+	# (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 
-//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+	| upToPhase == FrontEndPhaseConvertModules
+		=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
+				var_heap optional_dcl_icl_conversions global_fun_range
 
-	  (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctionsIntoPatterns components imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
 	  (dcl_types, type_heaps, var_heap)
@@ -72,44 +149,8 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
-	= (predef_symbols,hash_table,files,error,io,out,
-		Yes	{	fe_icl = {icl_mod & icl_functions=fun_defs }
-			,	fe_dcls = dcl_mods
-			,	fe_components = components
-			,	fe_varHeap = var_heap
-			,	fe_dclIclConversions =  optional_dcl_icl_conversions
-			,	fe_iclDclConversions =  build_optional_icl_dcl_conversions (size fun_defs) optional_dcl_icl_conversions
-			,	fe_globalFunctions = global_fun_range
-			,	fe_arrayInstances = array_instances
-			}
-		)
-	where
-
-		build_optional_icl_dcl_conversions :: !Int !(Optional {# Index}) -> Optional {# Index}
-		build_optional_icl_dcl_conversions size No
-			=	Yes (build_icl_dcl_conversions size {})
-		build_optional_icl_dcl_conversions size (Yes dcl_icl_conversions)
-			=	Yes (build_icl_dcl_conversions size dcl_icl_conversions)
-	
-		build_icl_dcl_conversions :: !Int !{# Index} -> {# Index}
-		build_icl_dcl_conversions table_size dcl_icl_conversions
-			# dcl_table_size = size dcl_icl_conversions
-			  icl_dcl_conversions = update_conversion_array 0 dcl_table_size dcl_icl_conversions (createArray table_size NoIndex)
-			= fill_empty_positions 0 table_size dcl_table_size icl_dcl_conversions
-
-		update_conversion_array	dcl_index dcl_table_size dcl_icl_conversions icl_conversions
-			| dcl_index < dcl_table_size
-				#  icl_index = dcl_icl_conversions.[dcl_index]
-				= update_conversion_array (inc dcl_index) dcl_table_size dcl_icl_conversions
-						{ icl_conversions & [icl_index] = dcl_index } 
-				= icl_conversions
-	
-		fill_empty_positions next_index table_size next_new_index icl_conversions
-			| next_index < table_size
-				| icl_conversions.[next_index] == NoIndex
-					= fill_empty_positions (inc next_index) table_size (inc next_new_index) { icl_conversions & [next_index] = next_new_index }
-					= fill_empty_positions (inc next_index) table_size next_new_index icl_conversions
-				= icl_conversions
+	=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
+				var_heap optional_dcl_icl_conversions global_fun_range
 
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
