@@ -505,7 +505,7 @@ where
 					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = dcl_index } cs
 				_
 					-> cs
-			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident dcl_pos) "(global definition) already defined" cs.cs_error} ---> entry.ste_kind
+			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident dcl_pos) "(global definition) already defined" cs.cs_error}
 
 retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);
 retrieveImportsFromSymbolTable [{import_module=import_module=:{id_info},import_symbols} : mods ] decls modules symbol_table
