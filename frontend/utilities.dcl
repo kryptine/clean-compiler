@@ -9,7 +9,9 @@ import _aconcat
 	For Strings
 */
 
-from StdString import String // 1.3
+//1.3
+from StdString import String
+//3.1
 
 stringToCharList	:: !String -> [Char]
 charListToString	:: ![Char] -> String

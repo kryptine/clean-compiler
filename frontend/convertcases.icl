@@ -1417,7 +1417,7 @@ where
 		mark_local_let_var_of_pattern_expr depth {cv_variable, cv_count} var_heap
 			# (VI_LetExpression lei, var_heap) = readPtr cv_variable var_heap
 			| depth == lei.lei_depth
-				= var_heap <:= (cv_variable, VI_LetExpression { lei & lei_count = cv_count, lei_status = LES_Untouched })
+				= (var_heap <:= (cv_variable, VI_LetExpression { lei & lei_count = cv_count, lei_status = LES_Untouched }))
 						==> ("mark_local_let_var_of_pattern_expr ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
 				= var_heap
 

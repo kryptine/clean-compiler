@@ -154,10 +154,14 @@ compareDefImp untransformed dcl_modules icl_module heaps error_admin
 compareWithConversions conversions dclDefs iclDefs tc_state error_admin 
 	= iFoldSt (compareWithConversion conversions dclDefs) 0 (size conversions) (iclDefs, tc_state, error_admin)
 
-// type definition for 1.3 (should be added for 2.0)
-compareWithConversion :: !w:(a x:Int) !.(b c) !Int !(!u:(d c), !*TypesCorrespondState, !*ErrorAdmin)
-						-> (!v:(d c), !.TypesCorrespondState, !.ErrorAdmin)
-						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c & Array .d & Array .a, [u <= v, w <= x];
+compareWithConversion :: !{#Int} !(b c) !Int !(!u:(b c), !*TypesCorrespondState, !*ErrorAdmin)
+						-> (!v:(b c), !.TypesCorrespondState, !.ErrorAdmin)
+//1.3
+						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c, [u <= v]
+//3.1
+/*2.0
+						| Array b c & t_corresponds, getIdentPos c, [u <= v]
+0.2*/
 compareWithConversion conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
 	# (iclDef, iclDefs) = iclDefs![conversions.[dclIndex]]
 	  (corresponds, tc_state) = t_corresponds dclDefs.[dclIndex] iclDef tc_state
@@ -169,10 +173,8 @@ compareFunctionTypesWithConversions conversions	dcl_fun_types icl_functions tc_s
 	= iFoldSt (compareTwoFunctionTypes conversions dcl_fun_types) 0 (size conversions)
 				(icl_functions, tc_state, error_admin)
 
-// type definition for 1.3 (should be added for 2.0)
-compareTwoFunctionTypes :: !w:(a x:Int) !.(b FunType) !.Int !(!u:(c FunDef),!*TypesCorrespondState,!*ErrorAdmin)
-						-> (!v:(c FunDef),!.TypesCorrespondState,!.ErrorAdmin)
-						| Array .b & Array .c & Array .a, [u <= v, w <= x];
+compareTwoFunctionTypes :: !{#Int} !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondState,!*ErrorAdmin) 
+						-> (!v:{#FunDef},!.TypesCorrespondState,!.ErrorAdmin) , [u <= v]
 compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
 	# (fun_def=:{fun_type}, icl_functions) = icl_functions![conversions.[dclIndex]]
 	= case fun_type of
@@ -335,9 +337,12 @@ instance t_corresponds [a] | t_corresponds a where
 		=	return False
 
 
-// instance t_corresponds {# a} | t_corresponds a & Array {#} a // 2.0
-
+/*2.0
+instance t_corresponds {# a} | t_corresponds a & Array {#} a
+0.2*/
+//1.3
 instance t_corresponds {# a} | ArrayElem , t_corresponds a
+//3.1
 where 
 	t_corresponds dclArray iclArray
 		# size_dclArray = size dclArray
@@ -345,7 +350,12 @@ where
 			= return False
 			= loop (size_dclArray-1) dclArray iclArray
 	  where
-//		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds a & Array {#} a // 2.0
+/*2.0
+		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds a & Array {#} a // 2.0
+0.2*/
+//1.3
+		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds, select_u a
+//3.1
 		loop i dclArray iclArray
 			| i<0
 				= return True
