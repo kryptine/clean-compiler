@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module compile
 
 import StdEnv
@@ -22,9 +19,6 @@ import portToNewSyntax
 // MV ...
 	,	compile_for_dynamics	:: !Bool
 // ... MV
-// AA ..
-	,	support_generics :: !Bool
-// .. AA 
 	}
 
 InitialCoclOptions =
@@ -38,9 +32,6 @@ InitialCoclOptions =
 // MV ...
 	,	compile_for_dynamics	= False
 // ... MV
-// AA ..
-	, 	support_generics = False
-// .. AA
 	}
 
 :: DclCache = {
@@ -94,12 +85,6 @@ parseCommandLine [arg1=:"-dynamics":args] options
 	# (args,modules,options)=	parseCommandLine args {options & compile_for_dynamics = True}
 	= (args,modules,options)
 // ... MV
-
-// AA ..
-parseCommandLine [arg1=:"-generics":args] options
-	= parseCommandLine args {options & support_generics = True}
-// .. AA
-
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -197,13 +182,8 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
-	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		=	frontEndInterface front_end_options moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
-		with 
-			front_end_options = 
-				{	feo_up_to_phase = FrontEndPhaseAll
-				,	feo_generics = options.support_generics
-				} 
+	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
+		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
 		= closeTclFile tcl_file files
@@ -220,10 +200,9 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	# var_heap=heaps.hp_var_heap
 	  hp_type_heaps=heaps.hp_type_heaps
 	  attrHeap=hp_type_heaps.th_attrs
-	# (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap,error, files)
+	# (success,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap,error, files)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
-				# dcl_modules=syntaxTree.fe_dcls
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
 				# (porting_ok, files)
 					 = switch_port_to_new_syntax (createPortedFiles options.moduleName options.searchPaths files) (False, files)
@@ -237,7 +216,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 				  			error
 				# (success, var_heap, attrHeap, error, files)
 					= backEndInterface outputPath (map appendRedirection commandLineArgs) predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
-				-> (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
+				-> (success,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
 				with
 					appendRedirection arg
 						= case arg of
@@ -248,7 +227,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 							arg
 								->	arg
 			No
-				-> (False,{},{},0,var_heap,attrHeap,error, files)
+				-> (False,{},0,var_heap,attrHeap,error, files)
 		with
 			outputPath
 	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
@@ -259,10 +238,10 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	| not closed
 		=	abort ("couldn't close error file \"" +++ options.errorPath +++ "\"\n")
 	| success
-		# dcl_modules={{dcl_module \\ dcl_module<-:dcl_modules} & [main_dcl_module_n].dcl_conversions=No}
+		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_conversions=No}
 		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
-		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
+		# cache={dcl_modules=cached_dcl_mods,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
 
 // MV ...
