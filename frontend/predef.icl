@@ -69,19 +69,19 @@ predefined_idents
 					[PD_ArraySizeFun] = i "size",
 					[PD_UnqArraySizeFun] = i "usize",
 				
-					[PD_StdStrictLists] = i "StdStrictLists",
-					[PD_cons] = i "cons",
-					[PD_decons] = i "decons",
-					[PD_nil] = i "nil",
+					[PD_StdStrictLists] = i "_SystemStrictLists",
+					[PD_cons] = i "_cons",
+					[PD_decons] = i "_decons",
+					[PD_nil] = i "_nil",
 				
-					[PD_cons_u] = i "cons_u",
-					[PD_decons_u] = i "decons_u",
-					[PD_nil_u] = i "nil_u",
+					[PD_cons_u] = i "_cons_u",
+					[PD_decons_u] = i "_decons_u",
+					[PD_nil_u] = i "_nil_u",
 				
-					[PD_cons_uts] = i "cons_uts",
-					[PD_decons_uts] = i "decons_uts",
-					[PD_nil_uts] = i "nil_uts",
-		
+					[PD_cons_uts] = i "_cons_uts",
+					[PD_decons_uts] = i "_decons_uts",
+					[PD_nil_uts] = i "_nil_uts",
+
 					[PD_ListClass] = i "List",
 					[PD_UListClass] = i "UList",
 					[PD_UTSListClass] = i "UTSList",

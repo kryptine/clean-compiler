@@ -1075,7 +1075,7 @@ where
 			| i<size members
 				# member=members.[i]
 				# member_name=member.ds_ident.id_name
-				| size member_name>0 && member_name.[0]=='c' // && trace_tn ("member: "+++member_name)
+				| size member_name>1 && member_name.[1]=='c' // && trace_tn ("member: "+++member_name)
 					# (ft_type,backEnd) = read_from_var_heap std_strict_lists.dcl_functions.[member.ds_index].ft_type_ptr backEnd
 					= case ft_type of
 						VI_ExpandedType _
