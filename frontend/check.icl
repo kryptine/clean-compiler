@@ -1050,7 +1050,10 @@ create_icl_to_dcl_index_table MK_Main icl_sizes icl_global_function_range main_d
 	= (No,No,modules,fun_defs)
 create_icl_to_dcl_index_table _ icl_sizes icl_global_function_range main_dcl_module_n old_conversions modules fun_defs
 	# (size_icl_functions,fun_defs) = usize fun_defs
-	# icl_sizes = {{icl_sizes.[i] \\ i<-[0..cMacroDefs-1]} & [cFunctionDefs]=size_icl_functions}
+	# icl_sizes = make_icl_sizes
+		with
+			make_icl_sizes :: *{#Int}
+			make_icl_sizes => {{icl_sizes.[i] \\ i<-[0..cMacroDefs-1]} & [cFunctionDefs]=size_icl_functions}
 	# (dcl_mod,modules) = modules![main_dcl_module_n]
 	# dictionary_info=dcl_mod.dcl_dictionary_info	
 	# (Yes conversion_table) = old_conversions
@@ -1901,6 +1904,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 						-> ({ pre_def_symbols & [predef_index] = { mod_symb & pds_module = cs_x.x_main_dcl_module_n, pds_def =  mod_entry.ste_index }}, symbol_table)
 					_
 						-> (pre_def_symbols, symbol_table)
+
 		add_modules_to_symbol_table [mod : mods] mod_index cs
 			# (mod_sizes_and_defs,dcl_macro_defs,cs) = add_module_to_symbol_table mod mod_index cs
 			  (mods, macro_defs, cs) = add_modules_to_symbol_table mods (inc mod_index) cs
@@ -2032,6 +2036,9 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 
 	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
 
+	  icl_imported
+	  		= { el \\ el<-dcls_import_list }
+
 	  icl_imported = { el \\ el<-dcls_import_list }
 	  
 	  (_,icl_common, dcl_modules, hp_type_heaps, hp_var_heap, cs)
@@ -2158,7 +2165,7 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 			= (first_free_index, modules, icl_functions, var_heap, type_var_heap, expr_heap)
  		collect_specialized_functions_in_dcl_module _ first_free_index main_dcl_module_n modules icl_functions var_heap type_var_heap expr_heap
 			# (dcl_mod, modules) = modules![main_dcl_module_n]
-			# {dcl_specials,dcl_functions,dcl_common,dcl_conversions} = dcl_mod
+			# {dcl_specials,dcl_functions,dcl_common} = dcl_mod
 			# (icl_functions, last_index, (var_heap, type_var_heap, expr_heap))
 					= collect_specialized_functions dcl_specials.ir_from dcl_specials.ir_to dcl_functions
 							(icl_functions, first_free_index, (var_heap, type_var_heap, expr_heap))

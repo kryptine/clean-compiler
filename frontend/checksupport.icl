@@ -519,9 +519,9 @@ where
 	remove_macro_defs_from_symbol_table level from_index to_index defs symbol_table
 		| from_index == to_index
 			= (defs, symbol_table)	
-			#! def = defs.[module_index,from_index]
-			   id_info = (toIdent def).id_info
-			   entry = sreadPtr id_info symbol_table
+			# (def,defs) = defs![module_index,from_index]
+			  id_info = (toIdent def).id_info
+			  (entry,symbol_table) = readPtr id_info symbol_table
 			| level == entry.ste_def_level
 				= remove_macro_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
 				= remove_macro_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
@@ -533,8 +533,8 @@ where
 	remove_fun_defs_from_symbol_table level from_index to_index defs symbol_table
 		| from_index == to_index
 			= (defs, symbol_table)	
-			#! def = defs.[from_index]
-			   id_info = (toIdent def).id_info
+			# (def,defs) = defs![from_index]
+			  id_info = (toIdent def).id_info
 			#  (entry, symbol_table) = readPtr id_info symbol_table
 			| level == entry.ste_def_level
 				= remove_fun_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
