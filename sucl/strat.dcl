@@ -56,6 +56,17 @@ STRATEGY TRANSFORMERS
 The funcions below tranform (simpler) strategies into more complicated ones
 ------------------------------------------------------------------------ */
 
+// A strategy transformer that checks for partial applications
+checkarity
+ :: !(sym -> Int)                         // Arity of function symbol
+    (Strategy sym var .pvar .result)      // Default strategy
+    (Substrategy sym var .pvar .result)   // Substrategy
+    .(Graph sym var)                      // Subject graph
+    ((Subspine sym var .pvar) -> .result) // Spine continuation
+    .result                               // RNF continuation
+    !.(Node sym var)                      // Subject node
+ -> .result
+
 // A strategy transformer that checks for constructor applications
 checkconstr
  :: (sym->.Bool)
@@ -106,16 +117,16 @@ checkrules
  &  == var
  &  == pvar
 
-// A strategy transformer that checks a type rule
-// for curried applications and strict arguments
-checktype
- :: !(sym -> (Rule .tsym tvar,[.Bool]))
-    (Strategy sym var .pvar .result)
-    (Substrategy sym var .pvar .result)
-    .(Graph sym var)
-    ((Subspine sym var .pvar) -> .result)
-    .result
-    !.(Node sym var)
+// A strategy transformer that checks a function application
+// for strict arguments
+checkstricts
+ :: !(sym -> [.Bool])                     // Strict arguments of function
+    (Strategy sym var .pvar .result)      // Default strategy
+    (Substrategy sym var .pvar .result)   // Substrategy
+    .(Graph sym var)                      // Subject graph
+    ((Subspine sym var .pvar) -> .result) // Spine continuation
+    .result                               // RNF continuation
+    !.(Node sym var)                      // Subject node
  -> .result
 
 /* ------------------------------------------------------------------------
