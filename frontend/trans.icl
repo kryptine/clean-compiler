@@ -1101,6 +1101,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 				 cc_args cc_linear_bits prods fun_def_ptr ro
 				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
 				 		ti_type_heaps,ti_cons_args,ti_cleanup_info, ti_type_def_infos}
+//	| False--->("generating new function",fd.fun_symb.id_name,"->",ti_next_fun_nr,prods)		= undef
 /*
 	| False-!->("generating new function",fd.fun_symb.id_name,"->",ti_next_fun_nr)		= undef
 	| False-!->("with type",fd.fun_type)												= undef
@@ -3401,6 +3402,7 @@ where
 			, prs_group_index		= group_nr
 			}
 		# (safe,prs)	= producerRequirements fun_body prs
+//		# prs = prs ---> ("producerRequirements",fun_def.fun_symb,fun,group_nr,safe,fun_body)
 		#! ti = {ti & ti_fun_defs = prs.prs_fun_defs, ti_fun_heap = prs.prs_fun_heap, ti_cons_args = prs.prs_cons_args}
 		// put back prs info into ti?
 		| safe //-!-> ("producerRequirements",fun_def.fun_symb,safe)
@@ -4024,19 +4026,23 @@ instance producerRequirements Expression where
 	producerRequirements (App {app_symb={symb_kind=(SK_Constructor _)},app_args}) prs
 		= producerRequirements app_args prs
 	producerRequirements app=:(App {app_symb,app_args}) prs
+/*
 		# (rec,prs)			= is_recursive_app app prs
 		| not rec
 			= producerRequirements app_args prs
+*/
 		// look up consumer class for app_symb args
 		#! (maybe_ca,prs)	= retrieve_consumer_args app_symb prs
 		// need to check for recursive call in safe arg...
 		= case maybe_ca of
 			No			// assuming that for functions that have no consumer info no unfolding will occur
 						// note that this means that generated functions must be visible this way...
+//						# prs = prs  ---> ("No cons info for",app_symb)
 						-> (True,prs)
 			Yes ca		// for each arg:
 						// if safe && top of arg is App of group member...
 						// else recurse into arg
+//						# prs = prs  ---> ("Yes cons info for",app_symb,ca.cc_args,ca.cc_linear_bits)
 						-> check_app_arguments ca.cc_args ca.cc_linear_bits app_args prs
 	where
 		check_app_arguments [cc_arg:cc_args] [cc_linear_bit:cc_bits] [app_arg:app_args] prs
@@ -4286,8 +4292,8 @@ where
 	(<<<) file (PR_Curried {symb_name, symb_kind} _) = file <<< "(Curried)" <<< symb_name <<< symb_kind
 	(<<<) file _ = file
 */
-/*
-instance <<< {!Producer}
+
+instance <<< {!a} | <<< a
 where
 	(<<<) file array
 		# file = file <<< "{"
@@ -4296,7 +4302,7 @@ where
 		showBody i m a f
 			| i >= m	= f <<< "}"
 						= showBody (inc i) m a (f <<< a.[i] <<< ", ")
-*/
+
 instance <<< Producer where
 	(<<<) file PR_Empty
 		= file <<< "(E)"
@@ -4359,12 +4365,12 @@ where
 		= file <<< symb.symb_name <<<  "[o]@" <<< symb_index
 	(<<<) file symb
 		= file <<< symb.symb_name 
-
+/*
 instance <<< {!Type}
 where
 	(<<<) file subst
 		= file <<< "{"<<<[s\\s<-:subst] <<< "}\n"
-
+*/
 // SPECIAL...
 instance <<< Specials
 where
