@@ -10,5 +10,5 @@ import syntax, hashtable, scanner, predef
 cWantIclFile :== True	
 cWantDclFile :== False	
 
-wantModule :: !Bool !Ident !Position !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
 	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)

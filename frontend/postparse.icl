@@ -1002,25 +1002,25 @@ transformArrayDenot exprs pi
 			[{bind_dst=toParsedExpr i pi, bind_src=expr} \\ expr <- exprs & i <- [0..]]
 			pi
 
-scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
-scanModules [] parsed_modules cached_modules searchPaths files ca
+scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
+scanModules [] parsed_modules cached_modules searchPaths support_generics files ca
 	= (True, parsed_modules, files, ca)
-scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths files ca
+scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths support_generics files ca
 	| in_cache import_module cached_modules
-		= scanModules mods parsed_modules cached_modules searchPaths files ca
+		= scanModules mods parsed_modules cached_modules searchPaths support_generics files ca
 	# (found_module,mod_type) = try_to_find import_module parsed_modules
 	| found_module
 		= case mod_type of
 			MK_NoMainDcl
 				# ca = postParseError import_file_position ("main module \'"+++import_module.id_name+++"\' does not have a definition module") ca
-				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths files ca
+				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths support_generics files ca
 				-> (False,parsed_modules,files,ca)
 			_
-				-> scanModules mods parsed_modules cached_modules searchPaths files ca
+				-> scanModules mods parsed_modules cached_modules searchPaths support_generics files ca
 		# (succ, parsed_modules, files, ca)
-				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths files ca
+				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths support_generics files ca
 		  (mods_succ, parsed_modules, files, ca)
-		  		= scanModules mods parsed_modules cached_modules searchPaths files ca
+		  		= scanModules mods parsed_modules cached_modules searchPaths support_generics files ca
 		= (succ && mods_succ, parsed_modules, files, ca)
 where
 	in_cache mod_id []
@@ -1043,15 +1043,15 @@ MakeEmptyModule name mod_type
 				{	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macros = { ir_from = 0, ir_to = 0 },
 					def_members = [], def_funtypes = [], def_instances = [], /* AA */ def_generics = [] } }
 
-parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !*Files !*CollectAdmin
+parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !Bool !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule], !*Files, !*CollectAdmin)
-parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths files ca
+parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_generics files ca
 	# {ca_error, ca_fun_count, ca_rev_fun_defs, ca_predefs, ca_u_predefs, ca_hash_table}
 		= ca
 	  hash_table = ca_hash_table
 	  pea_file = ca_error.pea_file
 	  predefs = ca_u_predefs
-	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module import_file_position hash_table pea_file searchPaths predefs files
+	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module import_file_position support_generics hash_table pea_file searchPaths predefs files
 	# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
 	| parse_ok
 		= scan_dcl_module mod parsed_modules searchPaths files ca
@@ -1070,12 +1070,12 @@ where
 		  mod
 		  	=	{ mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros = range }}
 		  (import_ok, parsed_modules, files, ca)
-		  		= scanModules imports [mod : parsed_modules] cached_modules searchPaths files ca
+		  		= scanModules imports [mod : parsed_modules] cached_modules searchPaths support_generics files ca
 		= (pea_ok && import_ok, parsed_modules, files, ca)
 
-scanModule :: !ParsedModule ![Ident] !Int !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+scanModule :: !ParsedModule ![Ident] !Int !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
 	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!Int,!*HashTable, !*File, !*PredefinedSymbols, !*Files)
-scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_function_or_macro_index hash_table err_file searchPaths predefs files
+scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_function_or_macro_index support_generics hash_table err_file searchPaths predefs files
 	# (predefIdents, predefs) = SelectPredefinedIdents predefs
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
 			,	ca_fun_count	= first_new_function_or_macro_index
@@ -1090,7 +1090,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
 	  		= scan_main_dcl_module mod_name mod_type files ca
 	  (import_dcls_ok, parsed_modules, files, ca)
-	  		= scanModules imports parsed_modules cached_modules searchPaths files ca
+	  		= scanModules imports parsed_modules cached_modules searchPaths support_generics files ca
 
 	  (pea_dcl_ok,optional_dcl_mod,ca) =  collect_main_dcl_module optional_parsed_dcl_mod dcl_module_n ca
 
@@ -1142,7 +1142,7 @@ where
 		  hash_table = ca_hash_table
 		  pea_file = ca_error.pea_file
 		  predefs = ca_u_predefs
-		# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile mod_name NoPos hash_table pea_file searchPaths predefs files
+		# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile mod_name NoPos support_generics hash_table pea_file searchPaths predefs files
 		# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
@@ -1150,7 +1150,7 @@ where
 			# (_, defs, imports, imported_objects, ca) =	reorganiseDefinitions False pdefs 0 0 0 0 ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_name:cached_modules]
-			# (import_ok, parsed_modules, files, ca) = scanModules imports [] cached_modules searchPaths files ca
+			# (import_ok, parsed_modules, files, ca) = scanModules imports [] cached_modules searchPaths support_generics files ca
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
 
 	collect_main_dcl_module (Yes mod=:{mod_defs=defs}) dcl_module_n ca

@@ -48,6 +48,7 @@ Conventions:
 	,	ps_skipping			:: !Bool
 	,	ps_hash_table		:: !*HashTable
 	,	ps_pre_def_symbols	:: !*PredefinedSymbols
+	,	ps_support_generics :: !Bool // AA: compiler option "-generics"
 	}
 /*
 appScanState :: (ScanState -> ScanState) !ParseState -> ParseState
@@ -288,9 +289,9 @@ isClassOrInstanceDefsContext context	:== context bitand cClassOrInstanceDefsCont
 cWantIclFile :== True	
 cWantDclFile :== False	
 
-wantModule :: !Bool !Ident !Position !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
 	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-wantModule iclmodule file_id=:{id_name} import_file_position hash_table error searchPaths pre_def_symbols files
+wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths pre_def_symbols files
 	= case openScanner file_name searchPaths files of
 		(Yes scanState, files)
 			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
@@ -312,6 +313,7 @@ where
 										, ps_skipping = False
 										, ps_hash_table = hash_table
 										, ps_pre_def_symbols = pre_def_symbols
+										, ps_support_generics = support_generics
 										}
 			  pState				= verify_name mod_name id_name file_name pState
 		  	  (mod_ident, pState)	= stringToIdent mod_name IC_Module pState
@@ -1336,7 +1338,7 @@ optionalCoercions pState
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition context pos pState
-	| SwitchGenerics False True
+	| not pState.ps_support_generics
 		= (PD_Erroneous, parseError "generic definition" No "support for generics is disabled in the compiler. " pState)
 	# (name, pState) = want_name pState
 	| name == "" 
@@ -3365,9 +3367,9 @@ wantBeginGroup msg pState
 			_	->	parseError msg (Yes token) "begin group without layout, {," pState
 
 // AA..
-wantKind :: !ParseState -> !(!TypeKind, ParseState)
+wantKind :: !ParseState -> !(!TypeKind, !ParseState)
 wantKind pState
-	| SwitchGenerics False True
+	| not pState.ps_support_generics
 		= (KindConst, parseError "kind" No "support for generics is disabled in the compiler. " pState)
 	# (token, pState) = nextToken TypeContext pState
 	# (kind, pState) = want_simple_kind token pState

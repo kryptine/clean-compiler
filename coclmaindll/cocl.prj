@@ -86,91 +86,7 @@ MainModule
 	LastModified:	No 0 0 0 0 0 0
 OtherModules
 	Module
-		Name:	thread_message
-		Dir:	{Project}\main\Windows
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	_SystemArray
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	checkKindCorrectness
+		Name:	mergecases
 		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
@@ -207,54 +123,12 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	891
-				SizeY:	408
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	compilerSwitches
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	914
-				SizeY:	352
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
 				SizeX:	500
-				SizeY:	302
+				SizeY:	300
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	type_io
+		Name:	convertimportedtypes
 		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
@@ -273,6 +147,48 @@ OtherModules
 				FontSize:	10
 				AutoIndent:	True
 				ShowTabs:	False
+				ShowLins:	True
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	True
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdDebug
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
 				ShowLins:	False
 			WindowPosition
 				X:	0
@@ -291,12 +207,12 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	934
-				SizeY:	387
+				SizeX:	500
+				SizeY:	300
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	portToNewSyntax
+		Name:	type_io_common
 		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
@@ -333,13 +249,13 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	917
+				SizeY:	363
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	coclmain
-		Dir:	{Project}\main
+		Name:	generics
+		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -359,978 +275,10 @@ OtherModules
 				ShowTabs:	False
 				ShowLins:	False
 			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-		NeededObjFiles
-			ObjectFile:	thread_message.obj
-	Module
-		Name:	StdEnv
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdBool
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdOverloaded
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdInt
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdReal
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdChar
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdArray
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	497
-				SizeY:	304
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdString
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdFile
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdClass
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdList
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	12
-				Y:	24
-				SizeX:	652
-				SizeY:	534
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	490
-				Y:	8
-				SizeX:	500
-				SizeY:	302
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdOrdList
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdTuple
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdCharList
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdFunc
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	301
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdMisc
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	645
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdEnum
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	_SystemEnum
-		Dir:	{Application}\StdEnv
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	10
-				Y:	10
+				X:	149
+				Y:	16
 				SizeX:	800
-				SizeY:	640
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	frontend
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	920
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	7
-				Y:	46
-				SizeX:	908
-				SizeY:	557
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	scanner
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	791
-				SizeY:	301
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	general
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	559
-				SizeY:	358
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	301
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	checksupport
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	866
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	941
-				SizeY:	454
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	syntax
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	12
-				Y:	149
-				SizeX:	919
-				SizeY:	415
+				SizeY:	540
 		DclOpen:	False
 		Icl
 			Editor
@@ -1342,1067 +290,13 @@ OtherModules
 				ShowLins:	False
 			WindowPosition
 				X:	29
-				Y:	8
-				SizeX:	891
-				SizeY:	508
+				Y:	5
+				SizeX:	966
+				SizeY:	535
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	typeproperties
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	737
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	943
-				SizeY:	322
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	Heap
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	844
-				SizeY:	527
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	predef
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	271
-				Y:	7
-				SizeX:	699
-				SizeY:	447
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	889
-				SizeY:	501
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	hashtable
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	828
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	627
-				SizeY:	301
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	containers
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	utilities
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	2
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	_aconcat
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	transform
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	618
-				SizeY:	450
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	10
-				Y:	10
-				SizeX:	800
-				SizeY:	640
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	overloading
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	674
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	982
-				SizeY:	480
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	check
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	838
-				SizeY:	348
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	16
-				Y:	26
-				SizeX:	957
-				SizeY:	579
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	typesupport
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	5
-				Y:	32
-				SizeX:	837
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	891
-				SizeY:	422
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	StdCompare
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	848
-				SizeY:	351
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	808
-				SizeY:	379
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	compare_constructor
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	301
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	unitype
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	977
-				SizeY:	302
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	analunitypes
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	828
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	974
-				SizeY:	494
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	ArgEnv
-		Dir:	{Project}\ArgEnvWindows
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-		NeededObjFiles
-			ObjectFile:	ArgEnvC.obj
-	Module
-		Name:	Version
-		Dir:	{Project}\main
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	set_return_code
-		Dir:	{Project}\main\Windows
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-		NeededObjFiles
-			ObjectFile:	set_return_code.obj
-	Module
-		Name:	compile
-		Dir:	{Project}\main
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	870
-				SizeY:	507
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	parse
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	-31
-				Y:	30
-				SizeX:	785
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	108
-				Y:	0
-				SizeX:	868
-				SizeY:	557
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	postparse
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	908
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	842
-				SizeY:	508
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	type
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	32
-				Y:	26
-				SizeX:	800
-				SizeY:	588
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	64
-				Y:	31
-				SizeX:	890
-				SizeY:	577
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	trans
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	983
-				SizeY:	409
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	11
-				Y:	0
-				SizeX:	800
-				SizeY:	652
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	convertcases
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	3
-				Y:	2
-				SizeX:	1000
-				SizeY:	586
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	convertDynamics
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	775
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	49
-				Y:	9
-				SizeX:	933
-				SizeY:	455
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	RWSDebug
+		Name:	ShowWrapped
 		Dir:	{Project}\WrapDebug
 		Compiler
 			NeverMemoryProfile:	False
@@ -2444,512 +338,8 @@ OtherModules
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	checktypes
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	1000
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	955
-				SizeY:	486
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	explicitimports
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	1000
-				SizeY:	303
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	comparedefimp
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	checkFunctionBodies
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	954
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	38
-				SizeX:	955
-				SizeY:	563
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	cheat
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	False
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	analtypes
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	73
-				Y:	34
-				SizeX:	949
-				SizeY:	309
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	936
-				SizeY:	394
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	backendinterface
-		Dir:	{Project}\backend
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	CoclSystemDependent
-		Dir:	{Project}\main\Windows
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	refmark
-		Dir:	{Project}\compiler
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	19
-				Y:	60
-				SizeX:	799
-				SizeY:	449
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	868
-				SizeY:	303
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	Debug
+		Name:	Wrap
 		Dir:	{Project}\WrapDebug
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	674
-				SizeY:	394
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	733
-				SizeY:	361
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	backend
-		Dir:	{Project}\backend
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	635
-				SizeY:	381
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	backendpreprocess
-		Dir:	{Project}\backend
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	AllTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	True
-			ReuseUniqueNodes:	True
-		Dcl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		DclOpen:	False
-		Icl
-			Editor
-				TabSize:	4
-				Font:	Courier New
-				FontSize:	10
-				AutoIndent:	True
-				ShowTabs:	False
-				ShowLins:	False
-			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
-		IclOpen:	False
-		LastModified:	No 0 0 0 0 0 0
-	Module
-		Name:	backendsupport
-		Dir:	{Project}\backend
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -3034,8 +424,8 @@ OtherModules
 		NeededLibraries
 			Library:	backend_library
 	Module
-		Name:	Wrap
-		Dir:	{Project}\WrapDebug
+		Name:	backendsupport
+		Dir:	{Project}\backend
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -3076,8 +466,8 @@ OtherModules
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	ShowWrapped
-		Dir:	{Project}\WrapDebug
+		Name:	backendpreprocess
+		Dir:	{Project}\backend
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -3118,7 +508,91 @@ OtherModules
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	generics
+		Name:	backend
+		Dir:	{Project}\backend
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	635
+				SizeY:	381
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	Debug
+		Dir:	{Project}\WrapDebug
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	674
+				SizeY:	394
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	733
+				SizeY:	361
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	refmark
 		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
@@ -3139,10 +613,1484 @@ OtherModules
 				ShowTabs:	False
 				ShowLins:	False
 			WindowPosition
-				X:	149
-				Y:	16
+				X:	19
+				Y:	60
+				SizeX:	799
+				SizeY:	449
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	868
+				SizeY:	303
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	CoclSystemDependent
+		Dir:	{Project}\main\Windows
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	backendinterface
+		Dir:	{Project}\backend
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	analtypes
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	73
+				Y:	34
+				SizeX:	949
+				SizeY:	309
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	936
+				SizeY:	394
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	cheat
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	checkFunctionBodies
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	954
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	38
+				SizeX:	955
+				SizeY:	563
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	comparedefimp
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	explicitimports
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	1000
+				SizeY:	303
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	checktypes
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	1000
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	955
+				SizeY:	486
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	RWSDebug
+		Dir:	{Project}\WrapDebug
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	convertDynamics
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	775
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	49
+				Y:	9
+				SizeX:	933
+				SizeY:	455
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	convertcases
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	3
+				Y:	2
+				SizeX:	1000
+				SizeY:	586
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	trans
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	983
+				SizeY:	409
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	11
+				Y:	0
 				SizeX:	800
-				SizeY:	540
+				SizeY:	652
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	type
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	32
+				Y:	26
+				SizeX:	800
+				SizeY:	588
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	64
+				Y:	31
+				SizeX:	890
+				SizeY:	577
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	postparse
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	908
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	842
+				SizeY:	508
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	parse
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	-31
+				Y:	30
+				SizeX:	785
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	108
+				Y:	0
+				SizeX:	868
+				SizeY:	557
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	compile
+		Dir:	{Project}\main
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	870
+				SizeY:	507
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	set_return_code
+		Dir:	{Project}\main\Windows
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+		NeededObjFiles
+			ObjectFile:	set_return_code.obj
+	Module
+		Name:	Version
+		Dir:	{Project}\main
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	ArgEnv
+		Dir:	{Project}\ArgEnvWindows
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+		NeededObjFiles
+			ObjectFile:	ArgEnvC.obj
+	Module
+		Name:	analunitypes
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	828
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	974
+				SizeY:	494
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	unitype
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	977
+				SizeY:	302
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	compare_constructor
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	301
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdCompare
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	848
+				SizeY:	351
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	808
+				SizeY:	379
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	typesupport
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	5
+				Y:	32
+				SizeX:	837
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	891
+				SizeY:	422
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	check
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	838
+				SizeY:	348
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	16
+				Y:	26
+				SizeX:	957
+				SizeY:	579
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	overloading
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	674
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	982
+				SizeY:	480
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	transform
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	618
+				SizeY:	450
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	10
+				Y:	10
+				SizeX:	800
+				SizeY:	640
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	_aconcat
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	utilities
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	2
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	containers
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	hashtable
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	828
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	627
+				SizeY:	301
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	predef
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	271
+				Y:	7
+				SizeX:	699
+				SizeY:	447
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	889
+				SizeY:	501
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	Heap
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	844
+				SizeY:	527
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	typeproperties
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	737
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	943
+				SizeY:	322
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	syntax
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	12
+				Y:	149
+				SizeX:	919
+				SizeY:	415
 		DclOpen:	False
 		Icl
 			Editor
@@ -3154,13 +2102,97 @@ OtherModules
 				ShowLins:	False
 			WindowPosition
 				X:	29
-				Y:	5
-				SizeX:	966
-				SizeY:	535
+				Y:	8
+				SizeX:	891
+				SizeY:	508
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	type_io_common
+		Name:	checksupport
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	866
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	941
+				SizeY:	454
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	general
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	559
+				SizeY:	358
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	301
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	scanner
 		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
@@ -3197,12 +2229,96 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	917
-				SizeY:	363
+				SizeX:	791
+				SizeY:	301
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	StdDebug
+		Name:	frontend
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	920
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	7
+				Y:	46
+				SizeX:	908
+				SizeY:	557
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	_SystemEnum
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	10
+				Y:	10
+				SizeX:	800
+				SizeY:	640
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdEnum
 		Dir:	{Application}\StdEnv
 		Compiler
 			NeverMemoryProfile:	False
@@ -3244,7 +2360,723 @@ OtherModules
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	convertimportedtypes
+		Name:	StdMisc
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	645
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdFunc
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	301
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdCharList
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdTuple
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdOrdList
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdList
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	12
+				Y:	24
+				SizeX:	652
+				SizeY:	534
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	490
+				Y:	8
+				SizeX:	500
+				SizeY:	302
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdClass
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdFile
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdString
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdArray
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	497
+				SizeY:	304
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdChar
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdReal
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdInt
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdOverloaded
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdBool
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	StdEnv
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	coclmain
+		Dir:	{Project}\main
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+		NeededObjFiles
+			ObjectFile:	thread_message.obj
+	Module
+		Name:	portToNewSyntax
 		Dir:	{Project}\compiler
 		Compiler
 			NeverMemoryProfile:	False
@@ -3263,7 +3095,7 @@ OtherModules
 				FontSize:	10
 				AutoIndent:	True
 				ShowTabs:	False
-				ShowLins:	True
+				ShowLins:	False
 			WindowPosition
 				X:	0
 				Y:	0
@@ -3277,7 +3109,7 @@ OtherModules
 				FontSize:	10
 				AutoIndent:	True
 				ShowTabs:	False
-				ShowLins:	True
+				ShowLins:	False
 			WindowPosition
 				X:	0
 				Y:	0
@@ -3286,8 +3118,176 @@ OtherModules
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
-		Name:	mergecases
+		Name:	type_io
 		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	True
+			ReuseUniqueNodes:	True
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	934
+				SizeY:	387
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	compilerSwitches
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	914
+				SizeY:	352
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	302
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	checkKindCorrectness
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	891
+				SizeY:	408
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	_SystemArray
+		Dir:	{Application}\StdEnv
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	False
+		Dcl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			Editor
+				TabSize:	4
+				Font:	Courier New
+				FontSize:	10
+				AutoIndent:	True
+				ShowTabs:	False
+				ShowLins:	False
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	thread_message
+		Dir:	{Project}\main\Windows
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -3329,184 +3329,184 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 Static
 	Mods
-		Path:	C:\Clean\generic\main\cocl.icl
-		Path:	C:\Clean\generic\main\Windows\thread_message.icl
-		Path:	C:\Clean\StdEnv\_SystemArray.icl
-		Path:	C:\Clean\generic\compiler\checkKindCorrectness.icl
-		Path:	C:\Clean\generic\compiler\compilerSwitches.icl
-		Path:	C:\Clean\generic\compiler\type_io.icl
-		Path:	C:\Clean\generic\compiler\portToNewSyntax.icl
-		Path:	C:\Clean\generic\main\coclmain.icl
-		Path:	C:\Clean\StdEnv\StdEnv.icl
-		Path:	C:\Clean\StdEnv\StdBool.icl
-		Path:	C:\Clean\StdEnv\StdOverloaded.icl
-		Path:	C:\Clean\StdEnv\StdInt.icl
-		Path:	C:\Clean\StdEnv\StdReal.icl
-		Path:	C:\Clean\StdEnv\StdChar.icl
-		Path:	C:\Clean\StdEnv\StdArray.icl
-		Path:	C:\Clean\StdEnv\StdString.icl
-		Path:	C:\Clean\StdEnv\StdFile.icl
-		Path:	C:\Clean\StdEnv\StdClass.icl
-		Path:	C:\Clean\StdEnv\StdList.icl
-		Path:	C:\Clean\StdEnv\StdOrdList.icl
-		Path:	C:\Clean\StdEnv\StdTuple.icl
-		Path:	C:\Clean\StdEnv\StdCharList.icl
-		Path:	C:\Clean\StdEnv\StdFunc.icl
-		Path:	C:\Clean\StdEnv\StdMisc.icl
-		Path:	C:\Clean\StdEnv\StdEnum.icl
-		Path:	C:\Clean\StdEnv\_SystemEnum.icl
-		Path:	C:\Clean\generic\compiler\frontend.icl
-		Path:	C:\Clean\generic\compiler\scanner.icl
-		Path:	C:\Clean\generic\compiler\general.icl
-		Path:	C:\Clean\generic\compiler\checksupport.icl
-		Path:	C:\Clean\generic\compiler\syntax.icl
-		Path:	C:\Clean\generic\compiler\typeproperties.icl
-		Path:	C:\Clean\generic\compiler\Heap.icl
-		Path:	C:\Clean\generic\compiler\predef.icl
-		Path:	C:\Clean\generic\compiler\hashtable.icl
-		Path:	C:\Clean\generic\compiler\containers.icl
-		Path:	C:\Clean\generic\compiler\utilities.icl
-		Path:	C:\Clean\generic\compiler\_aconcat.icl
-		Path:	C:\Clean\generic\compiler\transform.icl
-		Path:	C:\Clean\generic\compiler\overloading.icl
-		Path:	C:\Clean\generic\compiler\check.icl
-		Path:	C:\Clean\generic\compiler\typesupport.icl
-		Path:	C:\Clean\generic\compiler\StdCompare.icl
-		Path:	C:\Clean\generic\compiler\compare_constructor.icl
-		Path:	C:\Clean\generic\compiler\unitype.icl
-		Path:	C:\Clean\generic\compiler\analunitypes.icl
-		Path:	C:\Clean\generic\ArgEnvWindows\ArgEnv.icl
-		Path:	C:\Clean\generic\main\Version.icl
-		Path:	C:\Clean\generic\main\Windows\set_return_code.icl
-		Path:	C:\Clean\generic\main\compile.icl
-		Path:	C:\Clean\generic\compiler\parse.icl
-		Path:	C:\Clean\generic\compiler\postparse.icl
-		Path:	C:\Clean\generic\compiler\type.icl
-		Path:	C:\Clean\generic\compiler\trans.icl
-		Path:	C:\Clean\generic\compiler\convertcases.icl
-		Path:	C:\Clean\generic\compiler\convertDynamics.icl
-		Path:	C:\Clean\generic\WrapDebug\RWSDebug.icl
-		Path:	C:\Clean\generic\compiler\checktypes.icl
-		Path:	C:\Clean\generic\compiler\explicitimports.icl
-		Path:	C:\Clean\generic\compiler\comparedefimp.icl
-		Path:	C:\Clean\generic\compiler\checkFunctionBodies.icl
-		Path:	C:\Clean\generic\compiler\cheat.icl
-		Path:	C:\Clean\generic\compiler\analtypes.icl
-		Path:	C:\Clean\generic\backend\backendinterface.icl
-		Path:	C:\Clean\generic\main\Windows\CoclSystemDependent.icl
-		Path:	C:\Clean\generic\compiler\refmark.icl
-		Path:	C:\Clean\generic\WrapDebug\Debug.icl
-		Path:	C:\Clean\generic\backend\backend.icl
-		Path:	C:\Clean\generic\backend\backendpreprocess.icl
-		Path:	C:\Clean\generic\backend\backendsupport.icl
-		Path:	C:\Clean\generic\backend\backendconvert.icl
-		Path:	C:\Clean\generic\WrapDebug\Wrap.icl
-		Path:	C:\Clean\generic\WrapDebug\ShowWrapped.icl
-		Path:	C:\Clean\generic\compiler\generics.icl
-		Path:	C:\Clean\generic\compiler\type_io_common.icl
-		Path:	C:\Clean\StdEnv\StdDebug.icl
-		Path:	C:\Clean\generic\compiler\convertimportedtypes.icl
-		Path:	C:\Clean\generic\compiler\mergecases.icl
+		Path:	{Application}\generic\main\cocl.icl
+		Path:	{Application}\generic\compiler\mergecases.icl
+		Path:	{Application}\generic\compiler\convertimportedtypes.icl
+		Path:	{Application}\StdEnv\StdDebug.icl
+		Path:	{Application}\generic\compiler\type_io_common.icl
+		Path:	{Application}\generic\compiler\generics.icl
+		Path:	{Application}\generic\WrapDebug\ShowWrapped.icl
+		Path:	{Application}\generic\WrapDebug\Wrap.icl
+		Path:	{Application}\generic\backend\backendconvert.icl
+		Path:	{Application}\generic\backend\backendsupport.icl
+		Path:	{Application}\generic\backend\backendpreprocess.icl
+		Path:	{Application}\generic\backend\backend.icl
+		Path:	{Application}\generic\WrapDebug\Debug.icl
+		Path:	{Application}\generic\compiler\refmark.icl
+		Path:	{Application}\generic\main\Windows\CoclSystemDependent.icl
+		Path:	{Application}\generic\backend\backendinterface.icl
+		Path:	{Application}\generic\compiler\analtypes.icl
+		Path:	{Application}\generic\compiler\cheat.icl
+		Path:	{Application}\generic\compiler\checkFunctionBodies.icl
+		Path:	{Application}\generic\compiler\comparedefimp.icl
+		Path:	{Application}\generic\compiler\explicitimports.icl
+		Path:	{Application}\generic\compiler\checktypes.icl
+		Path:	{Application}\generic\WrapDebug\RWSDebug.icl
+		Path:	{Application}\generic\compiler\convertDynamics.icl
+		Path:	{Application}\generic\compiler\convertcases.icl
+		Path:	{Application}\generic\compiler\trans.icl
+		Path:	{Application}\generic\compiler\type.icl
+		Path:	{Application}\generic\compiler\postparse.icl
+		Path:	{Application}\generic\compiler\parse.icl
+		Path:	{Application}\generic\main\compile.icl
+		Path:	{Application}\generic\main\Windows\set_return_code.icl
+		Path:	{Application}\generic\main\Version.icl
+		Path:	{Application}\generic\ArgEnvWindows\ArgEnv.icl
+		Path:	{Application}\generic\compiler\analunitypes.icl
+		Path:	{Application}\generic\compiler\unitype.icl
+		Path:	{Application}\generic\compiler\compare_constructor.icl
+		Path:	{Application}\generic\compiler\StdCompare.icl
+		Path:	{Application}\generic\compiler\typesupport.icl
+		Path:	{Application}\generic\compiler\check.icl
+		Path:	{Application}\generic\compiler\overloading.icl
+		Path:	{Application}\generic\compiler\transform.icl
+		Path:	{Application}\generic\compiler\_aconcat.icl
+		Path:	{Application}\generic\compiler\utilities.icl
+		Path:	{Application}\generic\compiler\containers.icl
+		Path:	{Application}\generic\compiler\hashtable.icl
+		Path:	{Application}\generic\compiler\predef.icl
+		Path:	{Application}\generic\compiler\Heap.icl
+		Path:	{Application}\generic\compiler\typeproperties.icl
+		Path:	{Application}\generic\compiler\syntax.icl
+		Path:	{Application}\generic\compiler\checksupport.icl
+		Path:	{Application}\generic\compiler\general.icl
+		Path:	{Application}\generic\compiler\scanner.icl
+		Path:	{Application}\generic\compiler\frontend.icl
+		Path:	{Application}\StdEnv\_SystemEnum.icl
+		Path:	{Application}\StdEnv\StdEnum.icl
+		Path:	{Application}\StdEnv\StdMisc.icl
+		Path:	{Application}\StdEnv\StdFunc.icl
+		Path:	{Application}\StdEnv\StdCharList.icl
+		Path:	{Application}\StdEnv\StdTuple.icl
+		Path:	{Application}\StdEnv\StdOrdList.icl
+		Path:	{Application}\StdEnv\StdList.icl
+		Path:	{Application}\StdEnv\StdClass.icl
+		Path:	{Application}\StdEnv\StdFile.icl
+		Path:	{Application}\StdEnv\StdString.icl
+		Path:	{Application}\StdEnv\StdArray.icl
+		Path:	{Application}\StdEnv\StdChar.icl
+		Path:	{Application}\StdEnv\StdReal.icl
+		Path:	{Application}\StdEnv\StdInt.icl
+		Path:	{Application}\StdEnv\StdOverloaded.icl
+		Path:	{Application}\StdEnv\StdBool.icl
+		Path:	{Application}\StdEnv\StdEnv.icl
+		Path:	{Application}\generic\main\coclmain.icl
+		Path:	{Application}\generic\compiler\portToNewSyntax.icl
+		Path:	{Application}\generic\compiler\type_io.icl
+		Path:	{Application}\generic\compiler\compilerSwitches.icl
+		Path:	{Application}\generic\compiler\checkKindCorrectness.icl
+		Path:	{Application}\StdEnv\_SystemArray.icl
+		Path:	{Application}\generic\main\Windows\thread_message.icl
 	Objs
-		Path:	C:\Clean\StdEnv\Clean System Files\_startup0.o
-		Path:	C:\Clean\StdEnv\Clean System Files\_startup1Trace.o
-		Path:	C:\Clean\StdEnv\Clean System Files\_startup2.o
-		Path:	C:\Clean\StdEnv\Clean System Files\_system.o
-		Path:	C:\Clean\generic\WrapDebug\Clean System Files\ShowWrapped.o
-		Path:	C:\Clean\generic\WrapDebug\Clean System Files\Wrap.o
-		Path:	C:\Clean\generic\WrapDebug\Clean System Files\Debug.o
-		Path:	C:\Clean\generic\backend\Clean System Files\backendconvert.o
-		Path:	C:\Clean\generic\backend\Clean System Files\backendsupport.o
-		Path:	C:\Clean\generic\backend\Clean System Files\backendpreprocess.o
-		Path:	C:\Clean\generic\backend\Clean System Files\backend.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdDebug.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\type_io.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\type_io_common.o
-		Path:	C:\Clean\generic\WrapDebug\Clean System Files\RWSDebug.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\refmark.o
-		Path:	C:\Clean\generic\main\Windows\Clean System Files\CoclSystemDependent.o
-		Path:	C:\Clean\generic\backend\Clean System Files\backendinterface.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\cheat.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\portToNewSyntax.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\checkFunctionBodies.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\comparedefimp.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\explicitimports.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\mergecases.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\checktypes.o
-		Path:	C:\Clean\generic\main\Clean System Files\cocl.o
-		Path:	C:\Clean\generic\main\Clean System Files\coclmain.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdEnv.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdBool.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdOverloaded.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdInt.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdReal.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdChar.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdArray.o
-		Path:	C:\Clean\StdEnv\Clean System Files\_SystemArray.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdString.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdFile.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdClass.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdList.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdOrdList.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdTuple.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdCharList.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdFunc.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdMisc.o
-		Path:	C:\Clean\StdEnv\Clean System Files\StdEnum.o
-		Path:	C:\Clean\StdEnv\Clean System Files\_SystemEnum.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\frontend.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\scanner.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\general.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\checksupport.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\syntax.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\typeproperties.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\Heap.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\predef.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\hashtable.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\containers.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\utilities.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\_aconcat.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\transform.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\overloading.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\check.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\typesupport.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\StdCompare.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\compare_constructor.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\unitype.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\analunitypes.o
-		Path:	C:\Clean\generic\ArgEnvWindows\Clean System Files\ArgEnv.o
-		Path:	C:\Clean\generic\main\Clean System Files\Version.o
-		Path:	C:\Clean\generic\main\Windows\Clean System Files\set_return_code.o
-		Path:	C:\Clean\generic\main\Clean System Files\compile.o
-		Path:	C:\Clean\generic\main\Windows\Clean System Files\thread_message.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\parse.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\postparse.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\type.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\trans.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\convertcases.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\convertDynamics.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\convertimportedtypes.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\checkKindCorrectness.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\compilerSwitches.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\analtypes.o
-		Path:	C:\Clean\generic\compiler\Clean System Files\generics.o
-		Path:	C:\Clean\generic\ArgEnvWindows\Clean System Files\ArgEnvC.obj
-		Path:	C:\Clean\generic\main\Windows\Clean System Files\set_return_code.obj
-		Path:	C:\Clean\generic\main\Windows\Clean System Files\thread_message.obj
+		Path:	{Application}\StdEnv\Clean System Files\_startup0.o
+		Path:	{Application}\StdEnv\Clean System Files\_startup1Trace.o
+		Path:	{Application}\StdEnv\Clean System Files\_startup2.o
+		Path:	{Application}\StdEnv\Clean System Files\_system.o
+		Path:	{Application}\generic\WrapDebug\Clean System Files\ShowWrapped.o
+		Path:	{Application}\generic\WrapDebug\Clean System Files\Wrap.o
+		Path:	{Application}\generic\WrapDebug\Clean System Files\Debug.o
+		Path:	{Application}\generic\compiler\Clean System Files\type_io.o
+		Path:	{Application}\generic\compiler\Clean System Files\type_io_common.o
+		Path:	{Application}\generic\compiler\Clean System Files\refmark.o
+		Path:	{Application}\StdEnv\Clean System Files\StdDebug.o
+		Path:	{Application}\generic\WrapDebug\Clean System Files\RWSDebug.o
+		Path:	{Application}\generic\backend\Clean System Files\backendconvert.o
+		Path:	{Application}\generic\backend\Clean System Files\backendsupport.o
+		Path:	{Application}\generic\backend\Clean System Files\backendpreprocess.o
+		Path:	{Application}\generic\backend\Clean System Files\backend.o
+		Path:	{Application}\generic\compiler\Clean System Files\general.o
+		Path:	{Application}\generic\compiler\Clean System Files\syntax.o
+		Path:	{Application}\generic\main\Clean System Files\compile.o
+		Path:	{Application}\generic\main\Clean System Files\Version.o
+		Path:	{Application}\generic\main\Clean System Files\coclmain.o
+		Path:	{Application}\generic\main\Clean System Files\cocl.o
+		Path:	{Application}\StdEnv\Clean System Files\StdEnv.o
+		Path:	{Application}\StdEnv\Clean System Files\StdBool.o
+		Path:	{Application}\StdEnv\Clean System Files\StdOverloaded.o
+		Path:	{Application}\StdEnv\Clean System Files\StdInt.o
+		Path:	{Application}\StdEnv\Clean System Files\StdReal.o
+		Path:	{Application}\StdEnv\Clean System Files\StdChar.o
+		Path:	{Application}\StdEnv\Clean System Files\StdArray.o
+		Path:	{Application}\StdEnv\Clean System Files\_SystemArray.o
+		Path:	{Application}\StdEnv\Clean System Files\StdString.o
+		Path:	{Application}\StdEnv\Clean System Files\StdFile.o
+		Path:	{Application}\StdEnv\Clean System Files\StdClass.o
+		Path:	{Application}\StdEnv\Clean System Files\StdList.o
+		Path:	{Application}\StdEnv\Clean System Files\StdOrdList.o
+		Path:	{Application}\StdEnv\Clean System Files\StdTuple.o
+		Path:	{Application}\StdEnv\Clean System Files\StdCharList.o
+		Path:	{Application}\StdEnv\Clean System Files\StdFunc.o
+		Path:	{Application}\StdEnv\Clean System Files\StdMisc.o
+		Path:	{Application}\StdEnv\Clean System Files\StdEnum.o
+		Path:	{Application}\StdEnv\Clean System Files\_SystemEnum.o
+		Path:	{Application}\generic\ArgEnvWindows\Clean System Files\ArgEnv.o
+		Path:	{Application}\generic\main\Windows\Clean System Files\set_return_code.o
+		Path:	{Application}\generic\compiler\Clean System Files\checksupport.o
+		Path:	{Application}\generic\compiler\Clean System Files\scanner.o
+		Path:	{Application}\generic\compiler\Clean System Files\compare_constructor.o
+		Path:	{Application}\generic\compiler\Clean System Files\StdCompare.o
+		Path:	{Application}\generic\compiler\Clean System Files\typeproperties.o
+		Path:	{Application}\generic\compiler\Clean System Files\Heap.o
+		Path:	{Application}\generic\compiler\Clean System Files\compilerSwitches.o
+		Path:	{Application}\generic\compiler\Clean System Files\utilities.o
+		Path:	{Application}\generic\compiler\Clean System Files\_aconcat.o
+		Path:	{Application}\generic\compiler\Clean System Files\predef.o
+		Path:	{Application}\generic\compiler\Clean System Files\hashtable.o
+		Path:	{Application}\generic\compiler\Clean System Files\containers.o
+		Path:	{Application}\generic\compiler\Clean System Files\check.o
+		Path:	{Application}\generic\compiler\Clean System Files\transform.o
+		Path:	{Application}\generic\compiler\Clean System Files\typesupport.o
+		Path:	{Application}\generic\compiler\Clean System Files\unitype.o
+		Path:	{Application}\generic\compiler\Clean System Files\analunitypes.o
+		Path:	{Application}\generic\compiler\Clean System Files\frontend.o
+		Path:	{Application}\generic\compiler\Clean System Files\overloading.o
+		Path:	{Application}\generic\backend\Clean System Files\backendinterface.o
+		Path:	{Application}\generic\main\Windows\Clean System Files\CoclSystemDependent.o
+		Path:	{Application}\generic\compiler\Clean System Files\portToNewSyntax.o
+		Path:	{Application}\generic\main\Windows\Clean System Files\thread_message.o
+		Path:	{Application}\generic\compiler\Clean System Files\parse.o
+		Path:	{Application}\generic\compiler\Clean System Files\checktypes.o
+		Path:	{Application}\generic\compiler\Clean System Files\explicitimports.o
+		Path:	{Application}\generic\compiler\Clean System Files\comparedefimp.o
+		Path:	{Application}\generic\compiler\Clean System Files\checkFunctionBodies.o
+		Path:	{Application}\generic\compiler\Clean System Files\mergecases.o
+		Path:	{Application}\generic\compiler\Clean System Files\type.o
+		Path:	{Application}\generic\compiler\Clean System Files\cheat.o
+		Path:	{Application}\generic\compiler\Clean System Files\analtypes.o
+		Path:	{Application}\generic\compiler\Clean System Files\postparse.o
+		Path:	{Application}\generic\compiler\Clean System Files\trans.o
+		Path:	{Application}\generic\compiler\Clean System Files\convertcases.o
+		Path:	{Application}\generic\compiler\Clean System Files\convertDynamics.o
+		Path:	{Application}\generic\compiler\Clean System Files\convertimportedtypes.o
+		Path:	{Application}\generic\compiler\Clean System Files\checkKindCorrectness.o
+		Path:	{Application}\generic\compiler\Clean System Files\generics.o
+		Path:	{Application}\generic\ArgEnvWindows\Clean System Files\ArgEnvC.obj
+		Path:	{Application}\generic\main\Windows\Clean System Files\set_return_code.obj
+		Path:	{Application}\generic\main\Windows\Clean System Files\thread_message.obj
 	Dlib
-		Path:	C:\Clean\StdEnv\Clean System Files\kernel_library
-		Path:	C:\Clean\StdEnv\Clean System Files\comdlg_library
-		Path:	C:\Clean\StdEnv\Clean System Files\gdi_library
-		Path:	C:\Clean\StdEnv\Clean System Files\user_library
-		Path:	C:\Clean\generic\backend\Clean System Files\backend_library
+		Path:	{Application}\StdEnv\Clean System Files\kernel_library
+		Path:	{Application}\StdEnv\Clean System Files\comdlg_library
+		Path:	{Application}\StdEnv\Clean System Files\gdi_library
+		Path:	{Application}\StdEnv\Clean System Files\user_library
+		Path:	{Application}\generic\backend\Clean System Files\backend_library
 	Pths
-		Path:	C:\Clean\generic\compiler
-		Path:	C:\Clean\generic\ArgEnvWindows
-		Path:	C:\Clean\generic\WrapDebug
-		Path:	C:\Clean\generic\backend
-		Path:	C:\Clean\generic\backendCModules
-		Path:	C:\Clean\generic\main
-		Path:	C:\Clean\generic\main\Windows
-		Path:	C:\Clean\StdEnv
+		Path:	{Application}\generic\compiler
+		Path:	{Application}\generic\ArgEnvWindows
+		Path:	{Application}\generic\WrapDebug
+		Path:	{Application}\generic\backend
+		Path:	{Application}\generic\backendCModules
+		Path:	{Application}\generic\main
+		Path:	{Application}\generic\main\Windows
+		Path:	{Application}\StdEnv
 	AppP:	C:\Clean
 	PrjP:	C:\Clean\generic

@@ -1,7 +1,5 @@
 implementation module compilerSwitches
 
-SwitchGenerics on off :== on
-
 PA_BUG on off :== off
 
 switch_import_syntax one_point_three two_point_zero :== one_point_three

@@ -2071,7 +2071,6 @@ where
 
 		#! kinds = init ks
 		#! arity = length kinds
-		#! num_gen_vars = lengh gvs 
 		
 		// build lifting argumnents
 		#! (args, th) = mapSt (build_arg agvs st postfix) (zip2 kinds [1..arity]) th 
@@ -2113,7 +2112,6 @@ where
 	
 		# postfix = postfix +++ "_" +++ toString arg_num
 		#! gavs = [av \\ {atv_attribute=TA_Var av} <- agvs]
-		# num_gen_vars = lengh gvs 
 
 		#! th = clearSymbolType st th
 		#! th = foldSt subst_av_for_self (st.st_attr_vars ++ gavs) th
@@ -2377,17 +2375,6 @@ buildIsoRecord
 	# (iso_expr, gs_heaps) 		= buildISO to_expr from_expr gs_predefs gs_heaps
 	# fun_def = makeFunction def_sym group_index [] iso_expr No [] [from_fun.ds_index, to_fun.ds_index]	NoPos				
 	= (fun_def, {gs & gs_heaps = gs_heaps})
-where
-	build_fun_expr mod_index fun_def heaps=:{hp_expression_heap}
-		# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
-		# global_index = {glob_module = mod_index/*gs_maindcl_module_n???*/, glob_object = fun_def.fun_index}
-		# fun_symb = {
-			symb_name = fun_def.fun_symb, 
-			symb_kind = SK_Function global_index, 
-			symb_arity = 0 //fun_def.fun_arity 
-			}
-		# fun_expr = App {app_symb = fun_symb, app_args = [], app_info_ptr = expr_info_ptr}	
-		= (fun_expr, {heaps & hp_expression_heap = hp_expression_heap})
 
 // convert a type to ot's generic representation
 buildIsoTo :: !DefinedSymbol !Int !Int !CheckedTypeDef ![DefinedSymbol] !*GenericState

@@ -4,6 +4,11 @@ from scanner import SearchPaths
 from general import Optional, Yes, No
 import checksupport, transform, overloading
 
+:: FrontEndOptions 
+	=	{	feo_up_to_phase		:: !FrontEndPhase
+		,	feo_generics 		:: !Bool
+		}
+
 :: FrontEndSyntaxTree
 	=	{	fe_icl :: !IclModule
 		,	fe_dcls :: !{#DclModule}
@@ -22,5 +27,5 @@ import checksupport, transform, overloading
 	|	FrontEndPhaseConvertModules
 	|	FrontEndPhaseAll
 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File (!Optional !*File) !*Heaps
+frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File (!Optional !*File) !*Heaps
 	-> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
