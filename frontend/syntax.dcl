@@ -714,6 +714,7 @@ cNonRecursiveAppl	:== False
 				| PR_Constructor !SymbIdent !Int ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Int !Index
 				| PR_Curried !SymbIdent !Int
+				| PR_Unused
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
