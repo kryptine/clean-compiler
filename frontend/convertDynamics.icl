@@ -5,7 +5,7 @@ import syntax, transform, utilities, convertcases
 USE_TUPLES tuple b :== b;					// change also StdDynamic.icl and recompile all applications
 extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
 
-import pp;
+//import pp;
 
 APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== no
 import RWSDebug;
