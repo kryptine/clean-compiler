@@ -29,6 +29,12 @@ sfoldr op r l s
 		foldr [] = r
 		foldr [a:x] = op a (foldr x)
 
+::	FunctionPattern	= FP_Basic !BasicValue !(Optional FreeVar)
+					| FP_Algebraic !(Global DefinedSymbol) ![FunctionPattern] !(Optional FreeVar)
+					| FP_Variable !FreeVar
+					| FP_Dynamic ![VarInfoPtr] !FreeVar !TypeCodeExpression !(Optional FreeVar)
+					| FP_Empty
+
 :: BEMonad a :== *BackEndState -> *(!a,!*BackEndState)
 :: BackEnder :== *BackEndState -> *BackEndState
 

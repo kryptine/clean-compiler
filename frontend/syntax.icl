@@ -526,22 +526,6 @@ instance <<< ParsedBody
 where
 	(<<<) file {pb_args,pb_rhs} = file <<< pb_args <<< " = " <<< pb_rhs
 
-instance <<< FunctionPattern
-where
-	(<<<) file (FP_Basic val (Yes var))
-		= file <<< var <<< "=:" <<< val
-	(<<<) file (FP_Basic val No)
-		= file <<< val
-	(<<<) file (FP_Algebraic constructor vars (Yes var))
-		= file <<< var <<< "=:" <<< constructor <<< vars
-	(<<<) file (FP_Algebraic constructor vars No)
-		= file <<< constructor <<< vars
-	(<<<) file (FP_Variable var) = file <<< var 
-	(<<<) file (FP_Dynamic vars var type_code _)
-		= writeVarPtrs (file <<< var <<< " :: ") vars <<<  type_code
-	(<<<) file (FP_Empty) = file <<< '_' 
-
-
 instance <<< FunKind
 where
 	(<<<) file (FK_Function False) = file <<< "FK_Function"

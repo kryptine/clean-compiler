@@ -1277,13 +1277,6 @@ instance == OverloadedListType
 						| TCE_UnqType		!TypeCodeExpression
 
 ::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !SymbIdent | GTT_PredefTypeConstructor !(Global Index) | GTT_Function
-	
-
-::	FunctionPattern	= FP_Basic !BasicValue !(Optional FreeVar)
-					| FP_Algebraic !(Global DefinedSymbol) ![FunctionPattern] !(Optional FreeVar)
-					| FP_Variable !FreeVar
-					| FP_Dynamic ![VarInfoPtr] !FreeVar !TypeCodeExpression !(Optional FreeVar)
-					| FP_Empty
 
 ::	AlgebraicPattern =
 	{	ap_symbol	:: !(Global DefinedSymbol)
@@ -1346,7 +1339,7 @@ cNotALineNumber :== -1
 instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
-			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
+			 BasicValue, ATypeVar, TypeRhs, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
 			 TypeSymbIdent,

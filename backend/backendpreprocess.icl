@@ -175,17 +175,6 @@ instance sequence LetBind where
 	sequence bind
 		=	sequence bind.lb_dst
 
-instance sequence FunctionPattern where
-	sequence (FP_Algebraic _ subpatterns optionalVar)
-		=	sequence subpatterns
-		o`	sequence optionalVar
-	sequence (FP_Variable freeVar)
-		=	sequence freeVar
-	sequence (FP_Basic _ optionalVar)
-		=	sequence optionalVar
-	sequence FP_Empty
-		=	identity
-
 instance sequence (Ptr VarInfo) where
 	sequence varInfoPtr
 		=	assignSequenceNumber varInfoPtr
