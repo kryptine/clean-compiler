@@ -2080,18 +2080,18 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 		int field_number;
 		
 		lhs_root=NewNode (update_function_symbol,NULL,n_arguments);
-#if UPDATE_NODE_IN_STRICT_ENTRY
+# if UPDATE_NODE_IN_STRICT_ENTRY
 		lhs_root->node_state=StrictState;
-#else
+# else
 		lhs_root->node_state=record_state;
-#endif
+# endif
 
 		rhs_root=NewNode (node->node_symbol,NULL,n_arguments);
-#if UPDATE_NODE_IN_STRICT_ENTRY
+# if UPDATE_NODE_IN_STRICT_ENTRY
 		rhs_root->node_state=StrictState;
-#else
+# else
 		rhs_root->node_state=record_state;
-#endif
+# endif
 		rhs_root->node_number=0;
 
 		lhs_old_fields_arg_p=&lhs_root->node_arguments;
@@ -3425,12 +3425,8 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 									GenJmpTrue (&case_label);
 								} else
 									error_in_function ("generate_code_for_switch_node");
-							} else {
-								static char s[256];
-								
-								sprintf (s,"generate_code_for_switch_node %d %d",(int)symbol->symb_kind,(int)symbol);
-								error_in_function (s);
-							}
+							} else
+								error_in_function ("generate_code_for_switch_node");
 					}
 					
 					++NewLabelNr;
