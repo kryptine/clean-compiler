@@ -778,6 +778,7 @@ cNonRecursiveAppl	:== False
 					| EI_CaseType !CaseType
 					| EI_LetType ![AType]
 					| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
+					| EI_CaseTypeAndSplits !CaseType !SplitsInCase
 					| EI_LetTypeAndRefCounts ![AType] ![Int]
 
 		/* for converting case into function patterns the following auxiliary constuctors are used */
@@ -807,6 +808,28 @@ cNonRecursiveAppl	:== False
 ::	CountedVariable =
 	{	cv_variable	:: !VarInfoPtr
 	,	cv_count	:: !Int
+	}
+
+:: SplitCase =
+	{	sc_alt_nr	:: CaseAltNr			// the number of the alternative, before which
+											// the case should be split
+	,	sc_call		:: Optional Expression	// call to the function that was introduced for
+											// this split case
+	}
+
+:: NextAlt =
+	{	na_case		:: ExprInfoPtr	// the case_info_ptr of the case
+	,	na_alt_nr	:: CaseAltNr	// the number of the alternative
+	}
+
+:: CaseAltNr :== Int	// the sequence number of the alternative (zero based), the
+						// default alternative is indicated by the number of the last
+						// alternative + 1
+
+:: SplitsInCase =
+	{	sic_next_alt	:: Optional NextAlt	// the alternative of an outer default, to which
+											// control should pass
+	,	sic_splits		:: [SplitCase]		// the positions where this case should be split
 	}
 
 /*
