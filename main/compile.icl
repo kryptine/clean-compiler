@@ -10,7 +10,60 @@ import filesystem, CoclSystemDependent
 import portToNewSyntax
 import compilerSwitches
 //import RWSDebug
-from type_io import openTclFile, closeTclFile, baseName, directoryName, splitBy
+
+from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
+
+baseName :: {#Char} -> {#Char}
+baseName path
+	=	last (splitBy DirectorySeparator path)
+
+directoryName :: {#Char} -> {#Char}
+directoryName path
+	=	foldr (\p ps -> p +++ {DirectorySeparator} +++ ps) "" (init (splitBy DirectorySeparator path))
+	
+splitBy :: Char {#Char} -> [{#Char}]
+splitBy char string
+	=	splitBy` 0 0
+	where
+		splitBy` frm to
+			| to >= stringSize
+				=	[string % (frm, to-1)]
+			| string.[to] == char
+				=	[string % (frm, to-1) : splitBy` (to+1) (to+1)]
+			// otherwise
+				=	splitBy` frm (to+1)
+		stringSize
+			=	size string
+
+openTclFile :: !Bool !String !*Files -> (Optional .File, !*Files)
+openTclFile False icl_mod_pathname files
+	= (No,files)
+openTclFile compile_for_dynamics icl_mod_pathname files
+	# csf_path
+		= directoryName icl_mod_pathname +++ "Clean System Files"
+	# tcl_path
+		= csf_path +++ {DirectorySeparator} +++ baseName icl_mod_pathname +++ ".tcl"
+	# (opened, tcl_file, files)
+		= fopen tcl_path FWriteData files
+	| opened
+		= (Yes tcl_file, files)
+	// try again after creating Clean System Files folder
+	# (ok, files)
+		= ensureCleanSystemFilesExists csf_path files
+	| not ok
+		= abort ("can't create folder \"" +++ csf_path +++"\"\n")
+	# (opened, tcl_file, files)
+		= fopen tcl_path FWriteData files
+	| opened
+		=(Yes tcl_file, files)
+	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
+
+closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
+closeTclFile (Yes tcl_file) files
+	= fclose tcl_file files
+closeTclFile _ files
+	= (True,files);
+
 
 
 ::	CoclOptions =
