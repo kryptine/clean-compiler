@@ -3,7 +3,7 @@
 */
 implementation module mergecases
 
-import syntax, check, StdCompare, utilities; //, RWSDebug
+import syntax, check, StdCompare, utilities //, RWSDebug
 
 /*
 cContainsFreeVars 	:== True
@@ -325,11 +325,20 @@ where
 		merge_algebraic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
 			= ([new_pattern], var_heap, symbol_heap, error)
 	
+	merge_basic_patterns patterns [] var_heap symbol_heap error
+		= (patterns, var_heap, symbol_heap, error)
 	merge_basic_patterns patterns [alg_pattern : alg_patterns] var_heap symbol_heap error
 		# (patterns, var_heap, symbol_heap, error) = merge_basic_pattern_with_patterns alg_pattern patterns var_heap symbol_heap error
 		= merge_basic_patterns patterns alg_patterns var_heap symbol_heap error
-	merge_basic_patterns patterns [] var_heap symbol_heap error
-		= (patterns, var_heap, symbol_heap, error)
+	where
+		merge_basic_pattern_with_patterns new_pattern [pattern=:{bp_value,bp_expr} : patterns]  var_heap symbol_heap error
+			| new_pattern.bp_value == bp_value
+				# ((bp_expr, _), var_heap, symbol_heap, error) = mergeCases (bp_expr, NoPos) [(new_pattern.bp_expr, NoPos)] var_heap symbol_heap error
+				= ([{ pattern & bp_expr = bp_expr} : patterns], var_heap, symbol_heap, error)
+				# (patterns, var_heap, symbol_heap, error) = merge_basic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
+				= ([ pattern : patterns ], var_heap, symbol_heap, error)
+		merge_basic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
+			= ([new_pattern], var_heap, symbol_heap, error)
 	
 	replace_variables vars expr ap_vars var_heap symbol_heap
 		# var_heap = build_aliases vars ap_vars var_heap
@@ -345,15 +354,6 @@ where
 
 	merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
 		= (patterns1 ++ patterns2, var_heap, symbol_heap, error)
-
-	merge_basic_pattern_with_patterns new_pattern [pattern=:{bp_value,bp_expr} : patterns]  var_heap symbol_heap error
-		| new_pattern.bp_value == bp_value
-			# ((bp_expr, _), var_heap, symbol_heap, error) = mergeCases (bp_expr, NoPos) [(new_pattern.bp_expr, NoPos)] var_heap symbol_heap error
-			= ([{ pattern & bp_expr = bp_expr} : patterns], var_heap, symbol_heap, error)
-			# (patterns, var_heap, symbol_heap, error) = merge_basic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
-			= ([ pattern : patterns ], var_heap, symbol_heap, error)
-	merge_basic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
-		= ([new_pattern], var_heap, symbol_heap, error)
 	
 	replace_overloaded_symbols_in_patterns [] pd_cons_symbol pd_nil_symbol
 		= []
