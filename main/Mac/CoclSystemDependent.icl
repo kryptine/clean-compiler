@@ -2,7 +2,7 @@
 implementation module CoclSystemDependent
 
 // import for filesystem
-import code from "cDirectory.obj"; // this is the only platform dependent line in this module
+import code from "cDirectory."; // this is the only platform dependent line in this module
 
 import StdEnv
 import Clean2AppleEventHandler,compile,docommand,cache_variable
