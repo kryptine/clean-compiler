@@ -66,7 +66,7 @@ where
 		  cs = { cs & cs_expr_heap = cs_expr_heap }
 		= case let_info of
 			EI_LetType let_type
-				# bound_vars = addLetVars (let_strict_binds ++ let_lazy_binds) let_type bound_vars
+				# ci = {ci & ci_bound_vars=addLetVars (let_strict_binds ++ let_lazy_binds) let_type ci.ci_bound_vars}
 				# (let_strict_binds, cs) = convertCases ci let_strict_binds cs
 				# (let_lazy_binds, cs) = convertCases ci let_lazy_binds cs
 				# (let_expr, cs) = convertCases ci let_expr cs
