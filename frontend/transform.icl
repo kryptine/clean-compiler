@@ -1831,40 +1831,60 @@ where
 		= (expr @ exprs, free_vars, dynamics, cos)
 	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) free_vars dynamics cos=:{cos_var_heap}
 		# (let_info,cos_symbol_heap)	= readPtr let_info_ptr cos.cos_symbol_heap
-		  zipped_let_info = case let_info of
-		  	EI_LetType let_types	-> [(lb_dst.fv_info_ptr,type) \\ {lb_dst} <- let_strict_binds ++ let_lazy_binds & type <- let_types]
-		  	_						-> []
+		  let_types = case let_info of
+		  				EI_LetType let_types	-> let_types
+		  				_						-> repeat undef
 		  cos = {cos & cos_symbol_heap = cos_symbol_heap}
 		  cos_var_heap = cos.cos_var_heap
+
 		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
 		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+
+		  (let_strict_binds, let_types)	= combine let_strict_binds let_types
+			  	with
+			  		combine [] let_types
+			  			= ([],let_types)
+			  		combine [lb:let_binds] [tp:let_types]
+			  			# (let_binds,let_types)	= combine let_binds let_types
+			  			= ([(tp, lb) : let_binds], let_types)
+		  let_lazy_binds = zip2 let_types let_lazy_binds
+
 		  (is_cyclic_s, let_strict_binds, cos) 
 		  		= detect_cycles_and_handle_alias_binds True let_strict_binds
 		  											{ cos & cos_var_heap = cos_var_heap }
 		  (is_cyclic_l, let_lazy_binds, cos) 
 		  		= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
 		| is_cyclic_s || is_cyclic_l
+			# let_info = case let_info of
+				EI_LetType _	-> EI_LetType (map fst (let_strict_binds ++ let_lazy_binds))
+				_				-> let_info
+			  let_strict_binds = map snd let_strict_binds
+			  let_lazy_binds = map snd let_lazy_binds
+			  cos_symbol_heap = writePtr let_info_ptr let_info cos.cos_symbol_heap
+			  cos = {cos & cos_symbol_heap = cos_symbol_heap}
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars, dynamics,
 					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
 //		| otherwise
 			# (let_expr, free_vars, dynamics, cos) = collectVariables let_expr free_vars dynamics cos
-			  all_binds = mapAppend (\sb->(True, sb)) let_strict_binds [(False, lb) \\ lb<-let_lazy_binds]
+			  all_binds = combine let_strict_binds let_lazy_binds
+						  	with
+						  		combine [] let_lazy_binds
+						  			= [(False, tp, lb) \\ (tp,lb)<-let_lazy_binds]
+						  		combine [(tp,lb):let_strict_binds] let_lazy_binds
+						  			= [(True, tp, lb) : combine let_strict_binds let_lazy_binds]
 			  (collected_binds, free_vars, dynamics, cos) = collect_variables_in_binds all_binds [] free_vars dynamics cos
 			  (let_strict_binds, let_lazy_binds) = split collected_binds
 			| isEmpty let_strict_binds && isEmpty let_lazy_binds
 				= (let_expr, free_vars, dynamics, cos)
 				# let_info = case let_info of
-					EI_LetType _	-> EI_LetType (retrieve_types zipped_let_info (let_strict_binds ++ let_lazy_binds))
+					EI_LetType _	-> EI_LetType (map fst (let_strict_binds ++ let_lazy_binds))
 					_				-> let_info
+				  let_strict_binds = map snd let_strict_binds
+				  let_lazy_binds = map snd let_lazy_binds
 				  cos_symbol_heap = writePtr let_info_ptr let_info cos.cos_symbol_heap
 				  cos = {cos & cos_symbol_heap = cos_symbol_heap}
 				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, dynamics, cos)
 		where
-			retrieve_types _ [] = []
-			retrieve_types [(dst,type):zipped] binds=:[{lb_dst}:rest_binds]
-				| dst == lb_dst.fv_info_ptr	= [type : retrieve_types zipped rest_binds]
-								= retrieve_types zipped binds
-
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
 			this variable is an alias for 'var') or to 'VI_Count 0 cIsALocalVar' to initialise
 		   	the reference count info.
@@ -1884,7 +1904,7 @@ where
 			detect_cycles_and_handle_alias_binds is_strict [] cos
 				= (cContainsNoCycle, [], cos)
 //			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
-			detect_cycles_and_handle_alias_binds is_strict [bind=:{lb_dst={fv_info_ptr}} : binds] cos
+			detect_cycles_and_handle_alias_binds is_strict [(type,bind=:{lb_dst={fv_info_ptr}}) : binds] cos
 				# (var_info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
 				  cos = { cos & cos_var_heap = cos_var_heap }
 				= case var_info of
@@ -1897,11 +1917,11 @@ where
 							  								{ cos & cos_var_heap = cos_var_heap }
 							  (is_cyclic, binds, cos) 
 							  		= detect_cycles_and_handle_alias_binds is_strict binds cos
-							-> (is_cyclic, [{ bind & lb_src = new_bind_src } : binds], cos)
+							-> (is_cyclic, [(type,{ bind & lb_src = new_bind_src }) : binds], cos)
 						-> detect_cycles_and_handle_alias_binds is_strict binds cos
 					_
 						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
-						-> (is_cyclic, [bind : binds], cos)
+						-> (is_cyclic, [(type,bind) : binds], cos)
 			where
 				is_cyclic orig_info_ptr info_ptr var_heap
 					| orig_info_ptr == info_ptr
@@ -1932,25 +1952,25 @@ where
 					= collect_variables_in_binds binds collected_binds free_vars dynamics cos
 					= (collected_binds, free_vars, dynamics, cos)
 		
-			examine_reachable_binds bind_found [bind=:(is_strict, {lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
+			examine_reachable_binds bind_found [bind=:(is_strict, type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
 				# (bind_found, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds bind_found binds collected_binds free_vars dynamics cos
 				# (VI_Count count is_global, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
 				# cos = { cos & cos_var_heap = cos_var_heap }
 				| count > 0
 					# (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-					= (True, binds, [ (is_strict, { snd bind & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+					= (True, binds, [ (is_strict, type, { letb/*snd bind*/ & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 					= (bind_found, [bind : binds], collected_binds, free_vars, dynamics, cos)
 			examine_reachable_binds bind_found [] collected_binds free_vars dynamics cos
 				= (bind_found, [], collected_binds, free_vars, dynamics, cos)
 
-			split :: ![(Bool, x)] -> (![x], ![x])
+			split :: ![(Bool, AType, x)] -> (![(AType,x)], ![(AType,x)])
 			split []
 				= ([], [])
-			split [(p, x):xs]
+			split [(p, t, x):xs]
 				# (l, r) = split xs
 				| p
-					= ([x:l], r)
-				= (l, [x:r])
+					= ([(t,x):l], r)
+				= (l, [(t,x):r])
 
 	collectVariables (Case case_expr) free_vars dynamics cos
 		# (case_expr, free_vars, dynamics, cos) = collectVariables case_expr free_vars dynamics cos
