@@ -16,7 +16,7 @@ extern void AssertionFailed (char *conditionString, char *file, int line);
 	Memory management
 	=================
 */
-extern void FreeConvertBuffers (void);
-extern void	*ConvertAlloc (SizeT size);
+# define FreeConvertBuffers()
+# define ConvertAlloc(size) CompAlloc (size)
 # define ConvertAllocType(t) ((t*) ConvertAlloc (SizeOf (t)))
-# define	ArraySize(array)	((unsigned) (sizeof (array) / sizeof (array[0])))
+# define ArraySize(array)	((unsigned) (sizeof (array) / sizeof (array[0])))

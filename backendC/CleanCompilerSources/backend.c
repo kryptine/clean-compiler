@@ -2647,16 +2647,9 @@ BEInit (int argc)
 {
 	Assert (!gBEState.be_initialised);
 
-	CheckBEEnumTypes ();
-
 	CurrentPhase	= "Back End";
 	CurrentModule	= "<unknown module>";
 	CurrentExt		= "";
-
-	gBEState.be_argv		= ConvertAlloc ((argc+1) * sizeof (char *));
-	gBEState.be_argv [argc]	= NULL;
-	gBEState.be_argc		= argc;
-	gBEState.be_argi		= 0;
 
 	InitStorage ();
 	/* +++ remove symbol table from backend */
@@ -2684,6 +2677,13 @@ BEInit (int argc)
 	InitStatesGen ();
 	InitCoding ();
 	InitInstructions ();
+
+	CheckBEEnumTypes ();
+
+	gBEState.be_argv		= ConvertAlloc ((argc+1) * sizeof (char *));
+	gBEState.be_argv [argc]	= NULL;
+	gBEState.be_argc		= argc;
+	gBEState.be_argi		= 0;
 
 	gBEState.be_modules						= NULL;
 	gBEState.be_allSymbols					= NULL;
