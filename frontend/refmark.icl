@@ -258,6 +258,48 @@ where
 				-> var_heap
 
 refMarkOfCase free_vars sel def {case_expr, case_guards=AlgebraicPatterns type patterns, case_explicit, case_default} var_heap
+	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default var_heap
+
+refMarkOfCase free_vars sel def {case_expr,case_guards=BasicPatterns type patterns,case_default,case_explicit} var_heap
+	# var_heap = refMark free_vars NotASelector No case_expr var_heap
+	  (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
+	  (def, used_lets, var_heap) = refMarkOfDefault case_explicit free_vars sel def case_default local_lets var_heap
+	  (pattern_depth, used_lets, var_heap) = foldSt (ref_mark_of_basic_pattern free_vars sel local_lets def) patterns (0, used_lets, var_heap)
+	= addRefMarkOfDefault False pattern_depth free_vars def used_lets var_heap
+
+//	= refMarkOfDefault False pattern_depth free_vars sel defaul used_lets var_heap
+//		---> ("refMarkOfCase", expr, [ (bp_value, bp_expr) \\ {bp_value, bp_expr} <- patterns])
+where
+	ref_mark_of_basic_pattern free_vars sel local_lets def {bp_expr} (pattern_depth, used_lets, var_heap)
+		# pattern_depth = inc pattern_depth
+		  var_heap = saveOccurrences free_vars var_heap
+		  var_heap = refMark free_vars sel def bp_expr var_heap
+		  (used_lets, var_heap) = collectUsedLetVars local_lets (used_lets, var_heap)
+		= (pattern_depth, used_lets, var_heap)
+
+refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedListPatterns type _ patterns, case_explicit, case_default} var_heap
+	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default var_heap
+
+refMarkOfCase free_vars sel def {case_expr,case_guards=DynamicPatterns patterns,case_default,case_explicit} var_heap
+	# var_heap = saveOccurrences free_vars var_heap
+	  var_heap = refMark free_vars NotASelector No case_expr var_heap
+	  (used_free_vars, var_heap) = collectUsedFreeVariables free_vars var_heap
+	  var_heap = parCombine free_vars var_heap
+	  (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
+	  (def, used_lets, var_heap) = refMarkOfDefault case_explicit free_vars sel def case_default local_lets var_heap
+	  (pattern_depth, used_lets, var_heap) = foldSt (ref_mark_of_dynamic_pattern free_vars sel local_lets def) patterns (0, used_lets, var_heap)
+	= addRefMarkOfDefault True pattern_depth free_vars def used_lets var_heap
+//	= refMarkOfDefault True pattern_depth free_vars sel defaul used_lets var_heap
+where
+	ref_mark_of_dynamic_pattern free_vars sel local_lets def {dp_var, dp_rhs} (pattern_depth, used_lets, var_heap)
+		# pattern_depth = inc pattern_depth
+		  var_heap = saveOccurrences free_vars var_heap
+		  used_pattern_vars = collectPatternsVariables [dp_var]
+		  var_heap = refMark [ [ fv \\ (fv,_) <- used_pattern_vars ] : free_vars ] sel def dp_rhs var_heap
+		  (used_lets, var_heap) = collectUsedLetVars local_lets (used_lets, var_heap)
+		= (pattern_depth, used_lets, var_heap)
+
+refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default var_heap
 	= ref_mark_of_algebraic_case free_vars sel def case_expr patterns case_explicit case_default var_heap
 where
 	ref_mark_of_algebraic_case free_vars sel def (Var {var_name,var_info_ptr,var_expr_ptr}) patterns explicit defaul var_heap
@@ -345,43 +387,6 @@ where
 //			---> ("restore_binding_of_pattern_variable", occ_ref_count)
 	restore_binding_of_pattern_variable _ used_pattern_vars var_heap
 		= var_heap
-
-refMarkOfCase free_vars sel def {case_expr,case_guards=BasicPatterns type patterns,case_default,case_explicit} var_heap
-	# var_heap = refMark free_vars NotASelector No case_expr var_heap
-	  (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
-	  (def, used_lets, var_heap) = refMarkOfDefault case_explicit free_vars sel def case_default local_lets var_heap
-	  (pattern_depth, used_lets, var_heap) = foldSt (ref_mark_of_basic_pattern free_vars sel local_lets def) patterns (0, used_lets, var_heap)
-	= addRefMarkOfDefault False pattern_depth free_vars def used_lets var_heap
-
-//	= refMarkOfDefault False pattern_depth free_vars sel defaul used_lets var_heap
-//		---> ("refMarkOfCase", expr, [ (bp_value, bp_expr) \\ {bp_value, bp_expr} <- patterns])
-where
-	ref_mark_of_basic_pattern free_vars sel local_lets def {bp_expr} (pattern_depth, used_lets, var_heap)
-		# pattern_depth = inc pattern_depth
-		  var_heap = saveOccurrences free_vars var_heap
-		  var_heap = refMark free_vars sel def bp_expr var_heap
-		  (used_lets, var_heap) = collectUsedLetVars local_lets (used_lets, var_heap)
-		= (pattern_depth, used_lets, var_heap)
-
-refMarkOfCase free_vars sel def {case_expr,case_guards=DynamicPatterns patterns,case_default,case_explicit} var_heap
-	# var_heap = saveOccurrences free_vars var_heap
-	  var_heap = refMark free_vars NotASelector No case_expr var_heap
-	  (used_free_vars, var_heap) = collectUsedFreeVariables free_vars var_heap
-	  var_heap = parCombine free_vars var_heap
-	  (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
-	  (def, used_lets, var_heap) = refMarkOfDefault case_explicit free_vars sel def case_default local_lets var_heap
-	  (pattern_depth, used_lets, var_heap) = foldSt (ref_mark_of_dynamic_pattern free_vars sel local_lets def) patterns (0, used_lets, var_heap)
-	= addRefMarkOfDefault True pattern_depth free_vars def used_lets var_heap
-//	= refMarkOfDefault True pattern_depth free_vars sel defaul used_lets var_heap
-where
-	ref_mark_of_dynamic_pattern free_vars sel local_lets def {dp_var, dp_rhs} (pattern_depth, used_lets, var_heap)
-		# pattern_depth = inc pattern_depth
-		  var_heap = saveOccurrences free_vars var_heap
-		  used_pattern_vars = collectPatternsVariables [dp_var]
-		  var_heap = refMark [ [ fv \\ (fv,_) <- used_pattern_vars ] : free_vars ] sel def dp_rhs var_heap
-		  (used_lets, var_heap) = collectUsedLetVars local_lets (used_lets, var_heap)
-		= (pattern_depth, used_lets, var_heap)
-
 
 refMarkOfDefault case_explicit free_vars sel def (Yes expr) local_lets var_heap
 	# var_heap = saveOccurrences free_vars var_heap
@@ -608,11 +613,14 @@ where
 							-> (coercion_env, expr_heap, uniquenessError (CP_Expression (FreeVar free_var)) " demanded attribute cannot be offered by shared object" error)
 					_
 						-> abort ("make_shared_occurrence_non_unique" ---> ((free_var, var_expr_ptr) )) // <<- expr_info))
+
 		make_selection_non_unique fv {su_multiply} cee
 			= make_shared_occurrences_non_unique fv su_multiply cee
 
 /*
 	has_observing_type type_def_infos TE
+		= True
+	has_observing_type type_def_infos (TB basic_type)
 		= True
 */
 	has_observing_type (TB basic_type) type_def_infos subst
@@ -628,7 +636,6 @@ where
 		= foldSt (\ {at_type} ok -> ok && has_observing_type at_type type_def_infos subst) type_args (tdi_properties bitand cIsHyperStrict <> 0)
 	has_observing_type type type_def_infos subst
 		= False
-
 					
 instance <<< ReferenceCount
 where
