@@ -350,7 +350,6 @@ refMarkOfCase free_vars sel def {case_expr, case_guards=AlgebraicPatterns type p
 	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default rms 
 
 refMarkOfCase free_vars sel def {case_expr, case_guards=BasicPatterns type patterns,case_default,case_explicit} rms=:{rms_var_heap}
-//	# (case_expr_res, rms_var_heap) = partialRefMark free_vars case_expr rms_var_heap
 	# (def, all_closed_let_vars, rms) = refMarkOfDefault case_explicit free_vars sel def case_expr case_default [] { rms & rms_var_heap = rms_var_heap }
 	  (pattern_depth, all_closed_let_vars, rms) = foldSt (ref_mark_of_basic_pattern free_vars sel def case_expr) patterns (0, all_closed_let_vars, rms)
 	  (let_vars_in_default, rms_var_heap) = addRefMarkOfDefault pattern_depth free_vars def rms.rms_var_heap
@@ -361,26 +360,23 @@ where
 	ref_mark_of_basic_pattern free_vars sel def case_expr {bp_expr} (pattern_depth, all_closed_let_vars, rms)
 		# (all_closed_let_vars, rms) = refMarkOfAlternative free_vars [] sel def case_expr bp_expr all_closed_let_vars rms
 		= (inc pattern_depth, all_closed_let_vars, rms)
-/*
+
 refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedListPatterns type _ patterns, case_explicit, case_default} rms 
 	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default rms 
 
 refMarkOfCase free_vars sel def {case_expr, case_guards=DynamicPatterns patterns,case_default,case_explicit} rms=:{rms_var_heap}
-	# (local_lets, rms_var_heap) = collectOpenLetVars free_vars rms_var_heap
-	  (def, used_lets, rms) = refMarkOfDefault case_explicit free_vars sel def case_default local_lets { rms & rms_var_heap = rms_var_heap }
-	  (pattern_depth, used_lets, rms) = foldSt (ref_mark_of_dynamic_pattern free_vars sel local_lets def) patterns (0, used_lets, rms)
-	  rms_var_heap = addRefMarkOfDefault pattern_depth free_vars def used_lets rms.rms_var_heap
-	  rms_var_heap = caseCombine True free_vars rms_var_heap
+	# (def, all_closed_let_vars, rms) = refMarkOfDefault case_explicit free_vars sel def case_expr case_default [] { rms & rms_var_heap = rms_var_heap }
+	  (pattern_depth, used_lets, rms) = foldSt (ref_mark_of_dynamic_pattern free_vars sel def case_expr) patterns (0, all_closed_let_vars, rms)
+	  (let_vars_in_default, rms_var_heap) = addRefMarkOfDefault pattern_depth free_vars def rms.rms_var_heap
+	  rms_var_heap = setUsedLetVars [let_vars_in_default : all_closed_let_vars] rms_var_heap
+	  rms_var_heap = parCombine free_vars rms_var_heap
 	= { rms & rms_var_heap = rms_var_heap }
-
 where
-	ref_mark_of_dynamic_pattern free_vars sel local_lets def {dp_var, dp_rhs} (pattern_depth, used_lets, rms=:{rms_var_heap})
-		# rms_var_heap = saveOccurrences free_vars rms_var_heap
-		  used_pattern_vars = collectPatternsVariables [dp_var]
-		  rms  = refMark [ [ pv_var \\ {pv_var} <- used_pattern_vars ] : free_vars ] sel def dp_rhs { rms & rms_var_heap = rms_var_heap }
-		  (used_lets, rms_var_heap) = collectUsedLetVars local_lets (used_lets, rms.rms_var_heap)
-		= (inc pattern_depth, used_lets, { rms & rms_var_heap = rms_var_heap })
-*/
+	ref_mark_of_dynamic_pattern free_vars sel def case_expr {dp_var, dp_rhs} (pattern_depth, all_closed_let_vars, rms=:{rms_var_heap})
+		# used_pattern_vars = collectPatternsVariables [dp_var]
+		  new_free_vars = [ pv_var \\ {pv_var} <- used_pattern_vars ]
+		  (all_closed_let_vars, rms) = refMarkOfAlternative free_vars new_free_vars sel def case_expr dp_rhs all_closed_let_vars rms
+		= (inc pattern_depth, all_closed_let_vars, rms)	
 
 refMarkOfAlgebraicOrOverloadedListCase free_vars sel def (Var var=:{var_name,var_info_ptr,var_expr_ptr}) alternatives case_explicit case_default rms
 	# (def, all_closed_let_vars, rms) = ref_mark_of_default case_explicit free_vars sel def var case_default [] rms
@@ -477,14 +473,6 @@ refMarkOfDefault case_explicit free_vars sel def case_expr No all_closed_let_var
 	| case_explicit
 		= (No,	all_closed_let_vars, rms)
 		= (def, all_closed_let_vars, rms)
-
-
-refMarkOfAlternative2 free_vars pattern_vars sel def case_expr alt_expr all_closed_let_vars rms=:{rms_var_heap,rms_let_vars}
-	# rms_var_heap = saveOccurrences [pattern_vars : free_vars] rms_var_heap
-	  (closed_let_vars_in_alt, alt_rms)		= fullRefMark [pattern_vars : free_vars] sel def alt_expr rms_var_heap
-	  rms_var_heap = openLetVars closed_let_vars_in_alt alt_rms.rms_var_heap
-	= ([ closed_let_vars_in_alt  : all_closed_let_vars ],
-			{ alt_rms & rms_var_heap = rms_var_heap, rms_let_vars = alt_rms.rms_let_vars ++ rms_let_vars })
 
 
 refMarkOfAlternative free_vars pattern_vars sel def case_expr alt_expr all_closed_let_vars rms=:{rms_var_heap,rms_let_vars}
