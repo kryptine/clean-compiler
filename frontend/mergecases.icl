@@ -273,7 +273,7 @@ where
 		# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
 		= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error) 
 	merge_guards guards=:(AlgebraicPatterns type1 patterns1) (OverloadedListPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
-		| type1.glob_module==cPredefinedModuleIndex
+		| type1.glob_module==cPredefinedModuleIndex && isOverloaded type2
 			# index=type1.glob_object+FirstTypePredefinedSymbolIndex
 			| index==PD_ListType
 				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_ConsSymbol PD_NilSymbol
@@ -289,7 +289,7 @@ where
 				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
 				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 	merge_guards guards=:(OverloadedListPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2 patterns2) var_heap symbol_heap error
-		| type2.glob_module==cPredefinedModuleIndex
+		| type2.glob_module==cPredefinedModuleIndex && isOverloaded type1
 			# index=type2.glob_object+FirstTypePredefinedSymbolIndex
 			| index==PD_ListType
 				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_ConsSymbol PD_NilSymbol
@@ -403,3 +403,7 @@ mergeCaseWithCases nested (case_expr=:(Case first_case=:{case_default, case_defa
 mergeCaseWithCases _ expr_and_pos _ var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
 
+isOverloaded (OverloadedList _ _ _ _)
+	=	True
+isOverloaded _
+	=	False
