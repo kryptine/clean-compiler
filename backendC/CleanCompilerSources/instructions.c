@@ -259,6 +259,7 @@ static void TreatWaitListAfterFill (int offset, FillKind fkind)
 #define put_arguments_nnn_b(n1,n2,n3) FPrintF (OutFile,"%d %d %d",(n1),(n2),(n3))
 #define put_arguments_nnnn_b(n1,n2,n3,n4) FPrintF (OutFile,"%d %d %d %d",(n1),(n2),(n3),(n4))
 #define put_arguments_nnnnn_b(n1,n2,n3,n4,n5) FPrintF (OutFile,"%d %d %d %d %d",(n1),(n2),(n3),(n4),(n5))
+#define put_arguments_nnnnnnn_b(n1,n2,n3,n4,n5,n6,n7) FPrintF (OutFile,"%d %d %d %d %d %d %d",(n1),(n2),(n3),(n4),(n5),(n6),(n7))
 #define put_arguments_n__b(n1) FPrintF (OutFile,"%d ",(n1))
 #define put_arguments_nn__b(n1,n2) FPrintF (OutFile,"%d %d ",(n1),(n2))
 #define put_arguments__n_b(n1) FPrintF (OutFile," %d",(n1))
@@ -568,6 +569,7 @@ enum {
 #define Ipush_r_args_u "push_r_args_u"
 #define Ipush_r_args_a "push_r_args_a"
 #define Ipush_r_args_b "push_r_args_b"
+#define Ipush_r_arg_u "push_r_arg_u"
 #define Irepl_arg "repl_arg"
 #define Irepl_args "repl_args"
 #define Irepl_r_args "repl_r_args"
@@ -583,6 +585,7 @@ enum {
 #define Ifillh "fillh"
 #define Ifill1 "fill1"
 #define Ifill2 "fill2"
+#define Ifill3 "fill3"
 
 #define Ibuild "build"
 #define Ibuildh "buildh"
@@ -1744,7 +1747,7 @@ void GenPushRArgsU (int offset,int n_a_args,int n_b_args)
 	}
 }
 
-void GenPushRArgA (int offset, int tot_nr_a_args, int tot_nr_b_args, int args_nr, int nr_a_args)
+void GenPushRArgA (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_nr,int nr_a_args)
 {
 	if (nr_a_args > 0){
 		put_instruction_b (push_r_args_a);
@@ -1752,12 +1755,18 @@ void GenPushRArgA (int offset, int tot_nr_a_args, int tot_nr_b_args, int args_nr
 	}
 }
 
-void GenPushRArgB (int offset, int tot_nr_a_args, int tot_nr_b_args, int args_nr, int nr_b_args)
+void GenPushRArgB (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_nr,int nr_b_args)
 {
 	if (nr_b_args > 0){
 		put_instruction_b (push_r_args_b);
 		put_arguments_nnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_nr,nr_b_args);
 	}
+}
+
+void GenPushRArgU (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_a_nr,int nr_a_args,int args_b_nr,int nr_b_args)
+{
+	put_instruction_b (push_r_arg_u);
+	put_arguments_nnnnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_a_nr,nr_a_args,args_b_nr,nr_b_args);
 }
 
 void GenReplRArgs (int nr_a_args, int nr_b_args)
@@ -1901,6 +1910,13 @@ void GenFill2 (Label symblab,int arity,int offset,char bits[])
 	put_instruction_ (Ifill2);
 	GenLabel (symblab);
 	FPrintF (OutFile," %d %d %s",arity,offset,bits);
+}
+
+void GenFill3 (Label symblab,int arity,int offset,char bits[])
+{	
+	put_instruction_ (Ifill3);
+	GenLabel (symblab);	
+	FPrintF (OutFile, " %d %d %s",arity,offset,bits);
 }
 
 void GenBuild (Label symblab,int arity,Label contlab)

@@ -40,6 +40,7 @@ void GenPushRArgs (int offset,int nr_a_args,int nr_b_args);
 void GenPushRArgsU (int offset,int n_a_args,int n_b_args);
 void GenPushRArgA (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_nr,int nr_a_args);
 void GenPushRArgB (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_nr,int nr_b_args);
+void GenPushRArgU (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_a_nr,int nr_a_args,int args_b_nr,int nr_b_args);
 
 void GenReplArgs (int arity, int nrargs);
 void GenReplArg (int arity, int argnr);
@@ -57,6 +58,7 @@ void GenFillcpU (Label symblab,int a_size,int b_size,Label contlab,int offset,ch
 void GenFillh (Label symblab, int arity,int offset, FillKind fkind);
 void GenFill1 (Label symblab,int arity,int offset,char bits[]);
 void GenFill2 (Label symblab, int arity,int offset,char bits[]);
+void GenFill3 (Label symblab,int arity,int offset,char bits[]);
 void GenBuild (Label symblab,int arity,Label contlab);
 void GenBuildh (Label symblab,int arity);
 void GenBuildPartialFunctionh (Label symblab,int arity);
