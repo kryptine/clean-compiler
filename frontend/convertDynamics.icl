@@ -1,3 +1,6 @@
+/*
+	module owner: Martijn Vervoort
+*/
 implementation module convertDynamics
 
 import syntax, transform, utilities, convertcases /* MV ... */, compilerSwitches /* ... MV */

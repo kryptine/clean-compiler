@@ -1,3 +1,6 @@
+/*
+	module owner: Martijn Vervoort
+*/
 definition module convertDynamics
 
 import syntax, transform, convertcases

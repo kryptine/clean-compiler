@@ -1,3 +1,6 @@
+/*
+	module owner: Martijn Vervoort
+*/
 definition module type_io_common
 
 from StdChar import toChar
