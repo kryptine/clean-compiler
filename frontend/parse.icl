@@ -298,8 +298,10 @@ where
 			  , closeScanner ps_scanState files
 			  )
 		// otherwise // ~ succ
-		# mod = { mod_name = file_id, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
-		= (False, mod, hash_table, error <<< '[' <<< file_id <<< "]: " <<< "incorrect module header", pre_def_symbols, files)
+		# ({fp_line}, scanState) = getPosition scanState
+		  mod = { mod_name = file_id, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
+		= (False, mod, hash_table, error <<< '[' <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
+			pre_def_symbols, closeScanner scanState files)
 
 	try_module_header :: !Bool !ScanState -> (!Bool,!ModuleKind,!String,!ScanState)
 	try_module_header is_icl_mod scanState
@@ -332,10 +334,12 @@ where
 	try_module_name token mod_type scanState
 		= (False, mod_type, "", tokenBack scanState)
 	
-	verify_name name id_name file_name pState=:{ps_error={pea_file}}
+	verify_name name id_name file_name pState
 		| name == id_name
 	  		= pState
-	  		# pea_file = pea_file <<< "Module name \"" <<< name <<< "\" does not match file name \"" <<< file_name <<< "\"\n"
+			# ({fp_line}, pState=:{ps_error={pea_file}}) = getPosition pState
+ 			  pea_file = pea_file <<< '[' <<< file_name <<< ',' <<< fp_line <<< "]: module name \"" <<< name 
+	  						<<< "\" does not match file name\n"
 			= { pState & ps_error = { pea_file = pea_file, pea_ok = False }}
 
 	check_layout_rule pState
