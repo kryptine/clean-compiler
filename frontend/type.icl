@@ -300,6 +300,7 @@ unifyTypes tv=:(TempV tv_number) attr1 type2 attr2 modules subst heaps
 		unify_variable_with_type tv_number type subst
 			| containsTypeVariable tv_number type subst
 				= (False, subst)
+					---> "unify_variable_with_type"
 				= (True, { subst & [tv_number] = type})
 unifyTypes type attr1 tv=:(TempV _) attr2 modules subst heaps
 	= unifyTypes tv attr2 type attr1 modules subst heaps
@@ -323,6 +324,7 @@ unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2
 		| succ1 || succ2
 			= unifyTypes t1 attr1 t2 attr2 modules subst heaps
 			= (False, subst, heaps)
+				---> "unifyTypes1"
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
 	# (_, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
 	= unifyTypeApplications cons_var attr1 types type2 attr2 modules subst heaps
@@ -518,11 +520,15 @@ freshConsVariable {tv_info_ptr} type_var_heap
 
 instance freshCopy AType
 where 	
-	freshCopy type=:{at_type = CV tv :@: types, at_attribute} type_heaps=:{th_vars,th_attrs}
-		# (fresh_cons_var, th_vars)		= freshConsVariable tv th_vars
-		  (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
-		  (types, type_heaps)			= freshCopy types { type_heaps & th_attrs = th_attrs, th_vars = th_vars }
-		= ({type & at_type = fresh_cons_var :@: types, at_attribute = fresh_attribute }, type_heaps)
+	freshCopy type=:{at_type = cv :@: types, at_attribute} type_heaps=:{th_attrs}
+		# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
+		# (fresh_types, type_heaps)		= freshCopy types { type_heaps & th_attrs = th_attrs }
+		= case cv of
+			CV tv
+				# (fresh_cons_var, th_vars)	= freshConsVariable tv type_heaps.th_vars
+				-> ({type & at_type = fresh_cons_var :@: fresh_types, at_attribute = fresh_attribute }, { type_heaps & th_vars = th_vars })
+			_
+				-> ({type & at_type = cv :@: fresh_types, at_attribute = fresh_attribute}, type_heaps)
 	freshCopy type=:{at_type, at_attribute} type_heaps=:{th_attrs}
 		# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
 		  (fresh_type, type_heaps)		= freshCopy at_type { type_heaps & th_attrs = th_attrs }
@@ -1069,8 +1075,8 @@ where
 				-> (type, Yes var_expr_ptr, (reqs, ts))
 			VI_FAType vars type
 				# ts = foldSt bind_var_and_attr vars ts
-		  		  (type, ts_type_heaps) = freshCopy type ts.ts_type_heaps
-		  		-> (type, Yes var_expr_ptr, (reqs, { ts & ts_type_heaps = ts_type_heaps }))
+		  		  (fresh_type, ts_type_heaps) = freshCopy type ts.ts_type_heaps
+		  		-> (fresh_type, Yes var_expr_ptr, (reqs, { ts & ts_type_heaps = ts_type_heaps }))
 		  	_
 				-> abort "requirements BoundVar " // ---> (var_name <<- var_info))
 		where
@@ -1533,7 +1539,8 @@ unify_coercions [{tc_demanded,tc_offered,tc_position}:coercions] modules subst h
 		= unify_coercions coercions modules subst heaps err
 		# (_, subst_demanded, subst)	= arraySubst tc_demanded subst
 		  (_, subst_offered, subst)		= arraySubst tc_offered subst
-		= (subst, heaps, cannotUnify subst_demanded subst_offered tc_position err)		
+		= (subst, heaps, cannotUnify subst_demanded subst_offered tc_position err)
+//			---> ("unify_coercions", subst_demanded, subst_offered)
 unify_coercions [] modules subst heaps err
 	= (subst, heaps, err)
 
