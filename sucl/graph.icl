@@ -21,7 +21,7 @@ functions to manipulate them.
 
 // A mapping from variables to nodes (unrooted)
 :: Graph sym var
-   :== Pfun var (Node sym var)
+    = GraphAlias !(Pfun var (Node sym var))
 
 // A node, bearing the contents of a variable
 :: Node sym var
@@ -60,25 +60,25 @@ functions to manipulate them.
 
 // The empty set of bindings
 emptygraph :: Graph .sym .var
-emptygraph = emptypfun
+emptygraph = GraphAlias emptypfun
 
-updategraph :: .var (Node .sym .var) (Graph .sym .var) -> Graph .sym .var
-updategraph var node graph = extend var node graph
+updategraph :: var .(Node sym var) !.(Graph sym var) -> .Graph sym var
+updategraph var node graph = mapgraph (extend var node) graph
 
-prunegraph :: .var (Graph .sym .var) -> Graph .sym .var
-prunegraph var graph = restrict var graph
+prunegraph :: var !.(Graph sym var) -> .Graph sym var
+prunegraph var graph = mapgraph (restrict var) graph
 
-restrictgraph :: !.[var] .(Graph sym var) -> Graph sym var | == var
-restrictgraph vars graph = domres vars graph
+restrictgraph :: .[var] .(Graph sym var) -> .Graph sym var | == var
+restrictgraph vars graph = mapgraph (domres vars) graph
 
-redirectgraph :: (.var->.var) !(Graph .sym .var) -> Graph .sym .var | == var
+redirectgraph :: (var->var) !.(Graph sym var) -> .Graph sym var
 redirectgraph redirection graph
-= postcomp (mapsnd (map redirection)) graph
+= mapgraph (postcomp (mapsnd (map redirection))) graph
 
-overwritegraph :: !(Graph .sym .var) (Graph .sym .var) -> Graph .sym .var
-overwritegraph newgraph oldgraph = overwrite newgraph oldgraph
+overwritegraph :: !.(Graph sym var) !.(Graph sym var) -> .Graph sym var
+overwritegraph (GraphAlias newpf) oldgraph = mapgraph (overwrite newpf) oldgraph
 
-movegraph :: (var1->.var2) !.[var1] .(Graph sym var1) -> Graph sym .var2 | == var1
+movegraph :: (var1->var2) !.[var1] .(Graph sym var1) -> .Graph sym var2 | == var1
 movegraph movevar varspace oldgraph
 = foldr addvar emptygraph varspace
   where addvar var
@@ -87,17 +87,9 @@ movegraph movevar varspace oldgraph
         = id
           where (def,(sym,args)) = varcontents oldgraph var
 
-/*
->   nodecontents
->       = total (False,(nosym,noargs)).postcomp s
->         where s x = (True,x)
->               nosym = error "nodecontents: getting symbol of open node"
->               noargs = error "nodecontents: getting arguments of open node"
-*/
-
-varcontents :: !(Graph .sym var) var -> (.Bool,Node .sym var) | == var
-varcontents g v
-= (total (False,(nosym,noargs)) o postcomp found) g v
+varcontents :: !.(Graph sym var) var -> (.Bool,Node sym var) | == var
+varcontents (GraphAlias pfun) v
+= (total (False,(nosym,noargs)) o postcomp found) pfun v
   where found x = (True,x)
         nosym = abort "varcontents: getting symbol of free variable"
         noargs = abort "varcontents: getting arguments of free variable"
@@ -193,9 +185,6 @@ inccounter m f n = if (n==m) (f n+1) (f n)
 Compilegraph compiles a graph from parts.
 Uses in Miranda:
  * reading a parsed program from a file.
-
->   compilegraph :: [(**,(*,[**]))] -> graph * **
->   compilegraph = foldr (uncurry updategraph) emptygraph
 */
 
 compilegraph :: ![(var,Node sym var)] -> Graph sym var
@@ -385,3 +374,15 @@ but there doesn't seem to be any other definition of it.
 >                 where (sdef,scont) = nodecontents sgraph snode
 
 */
+
+mapgraph ::
+    !(  (Pfun var1 (sym1,[var1]))
+     -> Pfun .var2 (.sym2,[.var2])
+     )
+    !.(Graph sym1 var1)
+ -> Graph .sym2 .var2
+mapgraph f (GraphAlias pfun) = GraphAlias (f pfun)
+
+instance == (Graph sym var) | == sym & == var
+where (==) pf1 pf2
+       = pf1 == pf2
