@@ -2093,7 +2093,9 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  	# ok_non_rec_consumer	= non_rec_consumer && safe_args
 	  	# (producers, new_args, ti)
 	  		= determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_def.fun_type cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
-	  	| containsProducer cc_size producers
+		# (arity_changed,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+			= determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
+	  	| containsProducer cc_size producers || arity_changed
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
 	  			# ti = update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
@@ -2157,6 +2159,124 @@ where
 is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
 		  in type.st_arity>0 && not (isEmpty type.st_context);
+
+determineCurriedProducersInExtraArgs new_args [] is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
+	= (False,new_args,[],producers,cc_args,cc_linear_bits,fun_def,ti)
+determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
+	| not (SwitchExtraCurriedFusion ro.ro_transform_fusion is_applied_to_macro_fun)
+		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+	# n_extra_args													= length extra_args
+	# {fun_type = Yes symbol_type=:{st_args,st_result,st_arity}}	= fun_def
+	# (ok,new_args_types,new_result_type)							= get_new_args_types_from_result_type st_result n_extra_args
+	| not ok
+		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+	# symbol_type	= {symbol_type & st_result=new_result_type,st_args=st_args++new_args_types,st_arity=st_arity+n_extra_args}
+	# fun_def							= {fun_def & fun_type=Yes symbol_type}
+	# (form_args,act_args,var_heap)		= create_new_args n_extra_args ti.ti_var_heap
+	# ti								= {ti & ti_var_heap=var_heap}
+	# (fun_body,ti)						= add_args_to_fun_body form_args act_args fun_def.fun_body ro ti
+	# fun_def							= {fun_def & fun_body=fun_body}
+	# new_producers						= arrayPlusList producers [PR_Empty \\ i<-[0..n_extra_args-1]]
+	# new_cc_args						= cc_args ++ [CPassive \\ i<-[0..n_extra_args-1]]
+	# new_cc_linear_bits				= cc_linear_bits ++ [True \\ i<-[0..n_extra_args-1]]
+	= (True,new_args++extra_args,[],new_producers,new_cc_args,new_cc_linear_bits,fun_def,ti)
+where
+	get_new_args_types_from_result_type type 0
+		= (True,[],type)
+	get_new_args_types_from_result_type {at_type=a-->b} n
+		# (ok,args_types,result_type) = get_new_args_types_from_result_type b (n-1)
+		= (ok,[a:args_types],result_type)
+	get_new_args_types_from_result_type type _
+		= (False,[],type)
+
+	create_new_args n_new_args var_heap
+		| n_new_args==0
+			= ([], [], var_heap)            
+		# new_name				= { id_name = "_a", id_info = nilPtr }
+		  (info_ptr, var_heap)	= newPtr VI_Empty var_heap
+		  form_var				= { fv_name = new_name, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
+		  act_var				= { var_name = new_name, var_info_ptr = info_ptr, var_expr_ptr = nilPtr }
+		  (form_vars,act_vars,var_heap)
+		  						= create_new_args (n_new_args-1) var_heap
+		= ([form_var : form_vars],[Var act_var : act_vars],var_heap)
+
+	add_args_to_fun_body form_args act_args (TransformedBody {tb_args,tb_rhs}) ro ti
+		# tb_args		= tb_args ++ form_args
+		# (tb_rhs,ti)	= add_arguments tb_rhs act_args ro ti
+		= (TransformedBody {tb_args=tb_args,tb_rhs=tb_rhs},ti)
+
+	add_arguments (App app=:{app_symb,app_args}) extra_args ro ti
+		# (form_arity,fun_defs,fun_heap) = get_arity app_symb ro ti.ti_fun_defs ti.ti_fun_heap
+		# ti = {ti & ti_fun_defs=fun_defs,ti_fun_heap=fun_heap}
+		# ar_diff = form_arity - length app_args
+		| length extra_args <= ar_diff
+			= (App {app & app_args = app_args ++ extra_args }, ti)
+			= (App {app & app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
+	add_arguments (Case kees=:{case_guards,case_default}) extra_args ro ti
+		# (case_default, ti)	= add_arguments_opt case_default extra_args ro ti
+		# (case_guards, ti)		= add_arguments_guards case_guards extra_args ro ti
+		= (Case {kees & case_guards = case_guards, case_default = case_default}, ti)
+	add_arguments (Let lad=:{let_expr}) extra_args ro ti
+		# (let_expr, ti)		= add_arguments let_expr extra_args ro ti
+		= (Let {lad & let_expr = let_expr}, ti)
+	add_arguments (expr1 @ expr2) extra_args ro ti
+		= (expr1 @ (expr2++extra_args),ti)
+	add_arguments expr extra_args ro ti
+		= (expr @ extra_args,ti)
+	
+	add_arguments_opt No extra_args ro ti = (No,ti)
+	add_arguments_opt (Yes expr) extra_args ro ti
+		# (expr, ti)	= add_arguments expr extra_args ro ti
+		= (Yes expr,ti)
+	
+	add_arguments_guards (AlgebraicPatterns gindex apats) extra_args ro ti
+		# (apats, ti)	= add_arguments_apats apats extra_args ro ti
+		= (AlgebraicPatterns gindex apats, ti)
+	add_arguments_guards (BasicPatterns btype bpats) extra_args ro ti
+		# (bpats, ti)	= add_arguments_bpats bpats extra_args ro ti
+		= (BasicPatterns btype bpats, ti)
+	add_arguments_guards (DynamicPatterns dpats) extra_args ro ti
+		# (dpats, ti)	= add_arguments_dpats dpats extra_args ro ti
+		= (DynamicPatterns dpats, ti)
+	add_arguments_guards (OverloadedListPatterns type decons_expr apats) extra_args ro ti
+		# (apats, ti)	= add_arguments_apats apats extra_args ro ti
+		= (OverloadedListPatterns type decons_expr apats, ti)
+	add_arguments_guards NoPattern extra_args ro ti
+		= (NoPattern, ti)
+	
+	add_arguments_apats [] extra_args ro ti = ([],ti)
+	add_arguments_apats [ap=:{ap_expr}:aps] extra_args ro ti
+		# (ap_expr, ti)	= add_arguments ap_expr extra_args ro ti
+		# (aps, ti)	= add_arguments_apats aps extra_args ro ti
+		= ([{ap & ap_expr = ap_expr}:aps],ti)
+
+	add_arguments_bpats [] extra_args ro ti = ([],ti)
+	add_arguments_bpats [bp=:{bp_expr}:bps] extra_args ro ti
+		# (bp_expr, ti)	= add_arguments bp_expr extra_args ro ti
+		# (bps, ti)	= add_arguments_bpats bps extra_args ro ti
+		= ([{bp & bp_expr = bp_expr}:bps],ti)
+
+	add_arguments_dpats [] extra_args ro ti = ([],ti)
+	add_arguments_dpats [dp=:{dp_rhs}:dps] extra_args ro ti
+		# (dp_rhs, ti)	= add_arguments dp_rhs extra_args ro ti
+		# (dps, ti)	= add_arguments_dpats dps extra_args ro ti
+		= ([{dp & dp_rhs = dp_rhs}:dps],ti)
+
+	get_arity {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
+		| glob_module == ro.ro_main_dcl_module_n
+			# (fun_arity, fun_defs) = fun_defs![glob_object].fun_arity
+			= (fun_arity, fun_defs, fun_heap)
+		# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+		= (ft_arity + length ft_type.st_context, fun_defs, fun_heap)
+	get_arity {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
+		# (fun_arity, fun_defs) = fun_defs![glob_object].fun_arity
+		= (fun_arity, fun_defs, fun_heap)
+	get_arity {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
+		# (FI_Function {gf_fun_def={fun_arity}}, fun_heap) = readPtr fun_ptr fun_heap
+		= (fun_arity, fun_defs, fun_heap)
+	get_arity {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_defs fun_heap
+		# arity = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object].cons_type.st_arity
+		= (arity, fun_defs, fun_heap)
 
 //@ is_trivial_body
 
