@@ -194,7 +194,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  		= convertCasesOfFunctionsIntoPatterns components main_dcl_module_n imported_funs common_defs fun_defs (dcl_types -*-> "Convert cases") used_conses
+	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs (dcl_types -*-> "Convert cases") used_conses
 					var_heap type_heaps expression_heap
 	#!  (dcl_types, type_heaps, var_heap)
 			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs (dcl_types -*-> "Convert types") type_heaps var_heap		

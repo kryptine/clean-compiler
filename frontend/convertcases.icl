@@ -488,10 +488,10 @@ where
 		= ({ groups & [fi_group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
 				[ { gf_fun_def & fun_type = Yes ft }: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
 
-convertCasesOfFunctionsIntoPatterns :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
+convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!ImportedFunctions, !*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-convertCasesOfFunctionsIntoPatterns groups main_dcl_module_n dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
+convertCasesOfFunctions groups main_dcl_module_n dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
 	#! nr_of_funs = size fun_defs
 	# (groups, (fun_defs, collected_imports, {ci_new_functions, ci_var_heap, ci_expr_heap, ci_fun_heap}))
 			= convert_groups 0 groups dcl_functions common_defs
