@@ -180,6 +180,17 @@ foldrArraySt f a st
 		# (ai, a) = a![i]
 		= foldr_a_st (i-1) a (f ai st)
 
+
+firstIndex p l :== first_index l 0
+  where
+	first_index [] i
+		= (i-i)-1
+	first_index [h:t] i
+		| p h
+			= i
+		= first_index t (i+1)
+
+
 optCons :: !(Optional .a) !u:[.a] -> (!v:[.a], !Int) ,[u <= v]
 
 revAppend	:: ![a] ![a] -> [a]	//	Reverse the list using the second argument as accumulator.
