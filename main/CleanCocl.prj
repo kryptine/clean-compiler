@@ -1,0 +1,124 @@
+Version:	1.3
+Global
+	Built:	True
+	CodeGen
+		CheckStacks:	False
+		CheckIndexes:	False
+		KeepABC:	False
+		TargetProcessor:	CurrentProcessor
+	Application
+		HeapSize:	12582912
+		StackSize:	1048576
+		ExtraMemory:	4194304
+		IntialHeapSize:	4194304
+		HeapSizeMultiplier:	1024
+		ShowExecutionTime:	True
+		ShowGC:	False
+		ShowStackSize:	False
+		MarkingCollector:	True
+		Profile
+			Memory:	False
+			MemoryMinimumHeapSize:	0
+			Time601:	False
+			Time:	False
+		Output
+			Output:	NoConsole
+			Font:	Monaco
+			FontSize:	9
+			WriteStdErr:	False
+	Project
+		Verbose:	False
+	Link
+		DefaultSystemObjects:	True
+		DefaultLibraries:	True
+		ExtraObjects
+			Path:	{Project}:MacLibraries:MSL RuntimePPC.Lib
+			Path:	{Project}:MacLibraries:MSL SIOUX.PPC.Lib
+			Path:	{Project}:MacLibraries:MSL C.PPC.Lib
+		ExtraLibraries
+			Path:	{Project}:main:Mac:CodeGenImportLibrary
+	Paths
+		Path:	{Project}
+		Path:	{Project}:compiler
+		Path:	{Project}:main:Mac
+		Path:	{Project}:main
+		Path:	{Project}:backend
+MainModule
+	Name:	CleanCocl
+	Dir:	{Project}
+	IclOpen:	True
+	Compiler
+		NeverMemoryProfile:	False
+		NeverTimeProfile:	False
+		StrictnessAnalysis:	True
+		ListTypes:	NoTypes
+		ListAttributes:	False
+		Warnings:	False
+		Verbose:	False
+		ReadableABC:	False
+		ReuseUniqueNodes:	False
+	Dcl
+		Editor
+			TabSize:	4
+			Font:	Monaco
+			FontSize:	9
+			AutoIndent:	True
+		WindowPosition
+			X:	140
+			Y:	70
+			SizeX:	952
+			SizeY:	581
+	DclOpen:	False
+	Icl
+		Editor
+			TabSize:	4
+			Font:	Monaco
+			FontSize:	9
+			AutoIndent:	True
+		WindowPosition
+			X:	140
+			Y:	70
+			SizeX:	952
+			SizeY:	581
+	IclOpen:	True
+	LastModified:	Yes 2001 6 5 13 34 41
+	Dependencies
+		Module:	Clean2AppleEventHandler
+		Module:	CleanCocl
+		Module:	CoclSystemDependent
+		Module:	Heap
+		Module:	StdArray
+		Module:	StdBool
+		Module:	StdChar
+		Module:	StdCharList
+		Module:	StdClass
+		Module:	StdEnum
+		Module:	StdEnv
+		Module:	StdFile
+		Module:	StdFunc
+		Module:	StdInt
+		Module:	StdList
+		Module:	StdMisc
+		Module:	StdOrdList
+		Module:	StdOverloaded
+		Module:	StdReal
+		Module:	StdString
+		Module:	StdTuple
+		Module:	_SystemArray
+		Module:	_SystemEnum
+		Module:	_aconcat
+		Module:	cache_variable
+		Module:	checksupport
+		Module:	compile
+		Module:	compilerSwitches
+		Module:	containers
+		Module:	events
+		Module:	general
+		Module:	hashtable
+		Module:	mac_types
+		Module:	predef
+		Module:	scanner
+		Module:	syntax
+		Module:	typeproperties
+		Module:	utilities
+OtherModules
