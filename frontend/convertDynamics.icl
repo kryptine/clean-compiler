@@ -572,7 +572,7 @@ convertExprTypeCode cinp tce ci
 convertPatternTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 										-> (!Expression, ![LetBind], !*ConversionState)
 convertPatternTypeCode cinp tce ci
-	# (type_code, (has_var, binds, ci))
+	# (type_code, (_, binds, ci))
 		=	convertTypeCode True cinp tce (False, [], ci)
 	=	(type_code, binds, ci)
 
@@ -715,8 +715,8 @@ convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, c
 			# (type_scheme_sym, ci)
 				=	getSymbol PD_Dyn_TypeScheme SK_Constructor 2 ci
 			=	(App {	app_symb = type_scheme_sym,
-							app_args = [BasicExpr (BVInt count), type_code],
-							app_info_ptr = nilPtr }, (has_var, binds, ci))
+							app_args = [BasicExpr (BVInt (count - init_count)), type_code],
+							app_info_ptr = nilPtr }, (has_var || init_count <> 0, binds, ci))
 		// otherwise
 			=	(type_code, (has_var, binds, ci))
 
