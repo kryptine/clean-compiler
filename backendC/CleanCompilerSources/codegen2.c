@@ -24,11 +24,11 @@
 #include "sizes.h"
 #include "checker.h"
 #include "codegen_types.h"
+#include "statesgen.h"
 #include "codegen.h"
 #include "codegen1.h"
 #include "codegen2.h"
 #include "sa.h"
-#include "statesgen.h"
 #include "transform.h"
 #include "instructions.h"
 #include "typechecker.h"
@@ -1173,6 +1173,30 @@ Bool CopyNodeIdArgument (StateS demstate,NodeId node_id,int *asp_p,int *bsp_p)
 	return CopyArgument (demstate,node_id->nid_state,a_index,b_index,asp_p,bsp_p,a_size,b_size,True);
 }
 
+void PushField (StateS recstate,int fieldnr,int offset,int *asp_p,int *bsp_p,int *a_size_p,int *b_size_p)
+{
+	int apos,bpos,totasize,totbsize;
+
+	DetermineFieldSizeAndPositionAndRecordSize (fieldnr,a_size_p,b_size_p,&apos,&bpos,&totasize,&totbsize,&recstate);
+	
+	GenPushRArgB (offset, totasize, totbsize, bpos+1, *b_size_p);
+	GenPushRArgA (offset, totasize, totbsize, apos+1, *a_size_p);
+	*bsp_p += *b_size_p;
+	*asp_p += *a_size_p;
+}
+
+void ReplaceRecordByField (StateS recstate,int fieldnr,int *asp_p,int *bsp_p,int *a_size_p,int *b_size_p)
+{
+	int apos,bpos,totasize,totbsize;
+
+	DetermineFieldSizeAndPositionAndRecordSize (fieldnr,a_size_p,b_size_p,&apos,&bpos,&totasize,&totbsize,&recstate);
+	
+	GenPushRArgB (0, totasize, totbsize, bpos+1, *b_size_p);
+	GenReplRArgA (   totasize, totbsize, apos+1, *a_size_p);
+	*bsp_p += *b_size_p;
+	*asp_p += *a_size_p - 1;
+}
+
 static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	Node arg_node;
@@ -1209,9 +1233,16 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
 				
 				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
-				
+#if BOXED_RECORDS
+				if (arg->arg_state.state_type==SimpleState){
+					if (node->node_arity<SELECTOR_L)
+						PushField (*record_state_p,fieldnr,0,asp_p,bsp_p,&asize,&bsize);
+					else
+						ReplaceRecordByField (*record_state_p,fieldnr,asp_p,bsp_p,&asize,&bsize);
+				} else {
+#endif		
 				DetermineFieldSizeAndPosition (fieldnr,&asize,&bsize,&aindex,&bindex,record_state_p->state_record_arguments);
-				
+
 				if (node->node_arity<SELECTOR_L){
 					int n;
 					
@@ -1228,6 +1259,9 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 					DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 					ReplaceRecordOnTopOfStackByField (asp_p,bsp_p,aindex,bindex,asize,bsize,record_a_size,record_b_size);					
 				}
+#if BOXED_RECORDS
+				}
+#endif
 			} else {
 				int	a_size,b_size,apos,bpos,record_a_size,record_b_size,n;
 				StateS tuple_state,tuple_state_arguments[2],*record_state_p;
@@ -1237,9 +1271,24 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 
 				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
 
-				DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos,&bpos,&record_a_size,&record_b_size,record_state_p);
+				tuple_state.state_type=TupleState;
+				tuple_state.state_arity=2;
+				tuple_state.state_tuple_arguments=tuple_state_arguments;
 				
-				CopyNodeIdArgument (*record_state_p,arg_node_id,asp_p,bsp_p);
+				tuple_state_arguments[0]=record_state_p->state_record_arguments[fieldnr];
+
+				CopyNodeIdArgument (arg->arg_state,arg_node_id,asp_p,bsp_p);
+
+#if BOXED_RECORDS
+				if (arg->arg_state.state_type==SimpleState){
+					PushField (*record_state_p,fieldnr,0,asp_p,bsp_p,&a_size,&b_size);
+					
+					tuple_state_arguments[1]=arg->arg_state;
+					
+					CoerceArgumentOnTopOfStack (asp_p,bsp_p,tuple_state,node->node_state,1+a_size,b_size);
+				} else {
+#endif				
+				DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos,&bpos,&record_a_size,&record_b_size,record_state_p);
 			
 				for (n=0; n<a_size; ++n)
 					GenPushA (apos+a_size-1);
@@ -1249,15 +1298,12 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 					GenPushB (bpos+b_size-1);
 				*bsp_p+=b_size;
 				
-				tuple_state.state_type=TupleState;
-				tuple_state.state_arity=2;
-				tuple_state.state_tuple_arguments=tuple_state_arguments;
-				
-				tuple_state_arguments[0]=record_state_p->state_record_arguments[fieldnr];
 				tuple_state_arguments[1]=*record_state_p;
 				
 				CoerceArgumentOnTopOfStack (asp_p,bsp_p,tuple_state,node->node_state,record_a_size+a_size,record_b_size+b_size);
-
+#if BOXED_RECORDS
+				}
+#endif
 				decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
 			}
 		}
@@ -1297,14 +1343,19 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			BuildOrFillLazyFieldSelector (seldef,node->node_state.state_kind,asp_p,update_node_id);
 		} else {
 			int asize,bsize,apos,bpos,tot_asize,tot_bsize;
-
+			StateP record_state_p;
+#if 1
+			record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+#else
+			record_state_p=&arg->arg_state;
+#endif
 			Build (arg_node,asp_p,bsp_p,code_gen_node_ids_p);
 
-			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&asize,&bsize,&apos,&bpos,&tot_asize,&tot_bsize,&arg->arg_state);
-			CoerceArgumentOnTopOfStack (asp_p,bsp_p,arg->arg_state,arg_node->node_state,tot_asize,tot_bsize);
+			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&asize,&bsize,&apos,&bpos,&tot_asize,&tot_bsize,record_state_p);
+			CoerceArgumentOnTopOfStack (asp_p,bsp_p,*record_state_p,arg_node->node_state,tot_asize,tot_bsize);
 
 			ReplaceRecordOnTopOfStackByField (asp_p,bsp_p,apos,bpos,asize,bsize,tot_asize,tot_bsize);
-			CoerceArgumentOnTopOfStack (asp_p,bsp_p,node->node_state,arg->arg_state.state_record_arguments[fieldnr],asize,bsize);
+			CoerceArgumentOnTopOfStack (asp_p,bsp_p,node->node_state,record_state_p->state_record_arguments[fieldnr],asize,bsize);
 		}
 	} else {
 		StateS recstate;
@@ -1358,18 +1409,49 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 #ifdef DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
 			if ((recstate.state_kind==StrictOnA || recstate.state_kind==StrictRedirection) && update_node_id==NULL){
 				int asize,bsize,apos,bpos,tot_asize,tot_bsize,recindex;
+				SymbDef record_sdef;
 				StateP record_state_p,field_state_p;
 			
 				recindex = arg_node_id->nid_a_index;
-				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
+				record_state_p=&record_sdef->sdef_record_state;
 
 				if (record_state_p->state_type!=RecordState)
 					error_in_function ("FillOrReduceFieldSelection");
 
 				DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&asize,&bsize,&apos,&bpos,&tot_asize,&tot_bsize,record_state_p);
-				
-				GenPushRArgB (*asp_p-recindex,tot_asize,tot_bsize,bpos+1,bsize);
-				GenPushRArgA (*asp_p-recindex,tot_asize,tot_bsize,apos+1,asize);
+# if BOXED_RECORDS
+ 				if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
+					&&
+#  if 1
+					((
+					(arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
+/*
+					&&
+					(arg_node_id->nid_refcount==-2 || ((arg_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && arg_node_id->nid_number== -1))
+*/
+					)
+					||
+					((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
+					  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
+						 (arg_node_id->nid_node->node_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID)
+					  :	(arg_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
+					  )
+					)
+#  else
+					 ((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
+					  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
+						 (arg_node_id->nid_node->node_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
+					  :	(arg_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
+#  endif
+				){
+					GenPushRArgU (*asp_p-recindex,tot_asize,tot_bsize,apos+1,asize,bpos+1,bsize);
+				} else
+# endif
+				{
+					GenPushRArgB (*asp_p-recindex,tot_asize,tot_bsize,bpos+1,bsize);
+					GenPushRArgA (*asp_p-recindex,tot_asize,tot_bsize,apos+1,asize);
+				}
 				
 				*asp_p+=asize;
 				*bsp_p+=bsize;
@@ -1390,12 +1472,11 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			}
 		} else {
 			int a_size,b_size,apos, bpos, tot_asize, tot_bsize,recindex;
+			SymbDef record_sdef;
 
 			/* the selector is strict but the record is not */
 		
 			recindex = arg_node_id->nid_a_index;
-
-			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,&arg->arg_state);
 
 			if (ResultIsNotInRootNormalForm (recstate)){
 				GenJsrEval (*asp_p-recindex);
@@ -1404,15 +1485,54 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				recstate.state_kind = StrictOnA;
 			}
 
-			GenPushRArgB (*asp_p-recindex, tot_asize, tot_bsize, bpos+1,b_size);
-			GenPushRArgA (*asp_p-recindex, tot_asize, tot_bsize, apos+1,a_size);
+			record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
+			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,
+#if 1
+				&record_sdef->sdef_record_state);
+#else
+				&arg->arg_state);
+#endif
+# if BOXED_RECORDS
+			if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
+				&&
+#  if 1
+				((
+					(arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
+/*					&&
+					(arg_node_id->nid_refcount==-2 || ((arg_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && arg_node_id->nid_number== -1))
+*/
+				)
+				||
+				((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
+				  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
+						 (arg_node_id->nid_node->node_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID)
+					  :	(arg_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
+					  )
+				)
+#  else
+				((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
+				  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
+					 (arg_node_id->nid_node->node_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
+				  :	(arg_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
+#  endif
+			){
+				GenPushRArgU (*asp_p-recindex,tot_asize,tot_bsize,apos+1,a_size,bpos+1,b_size);
+			} else
+# endif
+			{
+				GenPushRArgB (*asp_p-recindex, tot_asize, tot_bsize, bpos+1,b_size);
+				GenPushRArgA (*asp_p-recindex, tot_asize, tot_bsize, apos+1,a_size);
+			}
 			
 			*asp_p+=a_size;
 			*bsp_p+=b_size;
 			
-			recstate =  arg->arg_state.state_record_arguments [fieldnr];
-			CoerceArgumentOnTopOfStack (asp_p,bsp_p, node->node_state, recstate,a_size,b_size);
-
+			CoerceArgumentOnTopOfStack (asp_p,bsp_p, node->node_state, 
+#if 1
+				record_sdef->sdef_record_state.state_record_arguments [fieldnr],a_size,b_size);			
+#else
+				arg->arg_state.state_record_arguments [fieldnr],a_size,b_size);			
+#endif
 			decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
 		}
 	}
@@ -2055,7 +2175,6 @@ void DetermineSizeOfArguments (ArgS *args,int *a_offset_p,int *b_offset_p)
 		AddSizeOfState (arg->arg_state,a_offset_p,b_offset_p);
 }
 
-static void BuildLazyArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
 static Bool BuildNonParArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
 static void BuildParArgs (ArgS* args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
 static void ReorderParallelAndNonParallelArgsWithResultNode (Args args,int *asize_p,int *bsize_p);
@@ -2522,8 +2641,11 @@ static void build_strict_then_or_else (Node then_or_else_node,Node else_node,int
 	} else {
 		NodeId nid;
 		int a_size,b_size;
-		
+
 		nid=then_or_else_node->node_node_id;
+#if BOXED_RECORDS
+		nid->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;		
+#endif
 		DetermineSizeOfState (nid->nid_state,&a_size,&b_size);
 		CopyArgument (result_state,nid->nid_state,nid->nid_a_index,nid->nid_b_index,asp_p,bsp_p,a_size,b_size,True);
 	}
@@ -3230,7 +3352,7 @@ void UpdateNodeAndAddSelectorsToUpdateNode
 #endif
 
 #ifdef DESTRUCTIVE_RECORD_UPDATES
-static void compute_bits_and_add_selectors_to_update_node
+void compute_bits_and_add_selectors_to_update_node
 	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,
 	char bits[],int *n_a_fill_bits_p,int *n_b_fill_bits_p)
 {
@@ -3284,19 +3406,11 @@ static void compute_bits_and_add_selectors_to_update_node
 
 	bits[0]='0';
 
-	for (n=0; n<record_a_size; ++n){
-		if (a_bits & (1<<n))
-			bits[n+1]='1';
-		else
-			bits[n+1]='0';
-	}
+	for (n=0; n<record_a_size; ++n)
+		bits[n+1]='0' + ((a_bits>>n) & 1);
 	
-	for (n=0; n<record_b_size; ++n){
-		if (b_bits & (1<<n))
-			bits[n+record_a_size+1]='1';
-		else
-			bits[n+record_a_size+1]='0';
-	}
+	for (n=0; n<record_b_size; ++n)
+		bits[n+record_a_size+1]='0' + ((b_bits>>n) & 1);
 
 	bits[record_a_size+record_b_size+1]='\0';
 
@@ -3373,6 +3487,127 @@ static void adjust_state_of_unbox_update_function_argument (ArgP call_arg_p,ArgP
 	}
 }
 #endif
+
+int is_unique_record_update (NodeIdP record_node_id,NodeP record_node)
+{
+	NodeP selector_node_p;
+	
+	if (!DoReuseUniqueNodes)
+		return 0;
+#if 0
+	printf ("is_unique_record_update\n");
+#endif
+
+	if ((record_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0 &&
+#if 1
+		(
+			((record_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE 
+			&& record_node_id->nid_refcount==-2)
+			||
+			((record_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && record_node_id->nid_number== -1)
+		) &&
+#else
+		(record_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 &&
+		record_node_id->nid_number== -1 &&
+#endif
+		record_node_id->nid_state.state_type==SimpleState &&
+		record_node_id->nid_state.state_kind==StrictOnA)
+	{
+		return 1;
+	}
+
+# if 1
+#  if 0
+	printf ("%d %d %d %d\n",record_node_id->nid_state.state_type==SimpleState,record_node_id->nid_mark2,record_node_id->nid_mark,record_node_id->nid_refcount);
+#  endif
+	if (record_node_id->nid_state.state_type==SimpleState && (record_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE){
+#  if 0
+		printf ("is_unique_record_update 2\n");
+#  endif
+		selector_node_p=record_node;
+		
+		if ((record_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0){
+			if (record_node_id->nid_refcount==1 && record_node_id->nid_node->node_kind==NodeIdNode){
+#  if 0
+				printf ("is_unique_record_update_3 %d %d %d\n",record_node_id->nid_mark2,record_node_id->nid_mark,record_node_id->nid_refcount);
+#  endif
+				selector_node_p=record_node_id->nid_node;
+				record_node_id=selector_node_p->node_node_id;
+#  if 0
+				printf ("is_unique_record_update 3 %d %d %d\n",record_node_id->nid_mark2,record_node_id->nid_mark,record_node_id->nid_refcount);
+#  endif
+			} else {
+#  if 0
+				printf ("is_unique_record_update 4 %d %d %d\n",record_node_id->nid_mark2,record_node_id->nid_mark,record_node_id->nid_refcount);
+#  endif
+				if (record_node_id->nid_refcount>=0 && record_node_id->nid_node->node_kind==NodeIdNode){
+					record_node_id=record_node_id->nid_node->node_node_id;
+#  if 0
+					printf ("is_unique_record_update_4 %d %d %d\n",record_node_id->nid_mark2,record_node_id->nid_mark,record_node_id->nid_refcount);					
+#  endif
+				}
+				return 0;
+			}
+		}
+		
+		if ((record_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
+			
+			&& ((record_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0 || record_node_id->nid_refcount==0)
+# if 0
+			&& (record_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0
+# endif
+			){
+# if 0
+			printf ("UpdateNode NodeId NID_UNSHARED_SELECTION_NODE_ID\n");
+# endif	
+			if (selector_node_p->node_arguments->arg_node->node_kind==NodeIdNode){
+				NodeIdP tuple_node_id;
+# if 0
+				printf ("UpdateNode sel NodeIdNode\n");
+# endif
+				tuple_node_id=selector_node_p->node_arguments->arg_node->node_node_id;
+
+# if 0
+				if (tuple_node_id->nid_node_def->def_node->node_kind==TupleSelectorsNode)
+					printf ("UpdateNode sel TupleSelectorsNode %d\n",record_node_id->nid_number);
+# endif
+				if (tuple_node_id->nid_node->node_kind==NormalNode && tuple_node_id->nid_node->node_symbol->symb_kind==definition){
+					StateP tuple_result_state_p;
+					
+					switch (tuple_node_id->nid_node->node_symbol->symb_def->sdef_kind){
+						case IMPRULE:
+# if 0
+							printf ("UpdateNode sel IMPRULE\n");
+# endif
+							tuple_result_state_p=&tuple_node_id->nid_node->node_symbol->symb_def->sdef_rule->rule_state_p[-1];
+							break;
+						case DEFRULE:
+						case SYSRULE:
+# if 0
+							printf ("UpdateNode sel DEFRULE or SYSRULE\n");
+# endif
+							tuple_result_state_p=&tuple_node_id->nid_node->node_symbol->symb_def->sdef_rule_type->rule_type_state_p[-1];
+							break;
+						default:
+							return 0;
+					}
+					
+					if (tuple_result_state_p->state_type==TupleState
+						&& (tuple_result_state_p->state_tuple_arguments[record_node_id->nid_number].state_mark & STATE_UNIQUE_MASK)!=0)
+					{
+# if 0
+						printf ("UpdateNode * sel RULE\n");
+# endif
+						return 1;
+					}
+				}
+			}
+		}
+	}
+#endif
+	
+	return 0;
+}
 
 static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
@@ -3482,24 +3717,25 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 		}
 
 		if (update_immediately){
-			if (node->node_state.state_kind==StrictOnA && record_node->node_kind==NodeIdNode){
+#if 1
+			BuildArgs (record_arg->arg_next,asp_p,bsp_p,code_gen_node_ids_p);
+#endif
+			if (record_node->node_kind==NodeIdNode){
 				NodeIdP record_node_id;
 				
 				record_node_id=record_node->node_node_id;
 
-				if ((record_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0 &&
-					(record_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 &&
-					record_node_id->nid_number== -1 &&
-					record_node_id->nid_state.state_type==SimpleState &&
-					record_node_id->nid_state.state_kind==StrictOnA &&
-					update_node_id==NULL)
-				{
+				if (is_unique_record_update (record_node_id,record_node) && update_node_id==NULL){
 					int n_a_fill_bits,n_b_fill_bits;
 					char bits[MaxNodeArity+2];
 					LabDef record_lab;
 
+#if BOXED_RECORDS
+					record_node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+#endif
+#if 0
 					BuildArgs (record_arg->arg_next,asp_p,bsp_p,code_gen_node_ids_p);
-
+#endif
 					DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 				
 					compute_bits_and_add_selectors_to_update_node (record_arg,first_field_arg,
@@ -3523,14 +3759,20 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					
 					return;
 				}
+# if BOXED_RECORDS
+				record_node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+# endif
 			}
 #else
 				if (update_immediately){
 #endif
+
 			record_arg->arg_state=*record_state_p;
-
+#if 1
+			BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+#else
 			BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-
+#endif
 			DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 
 #if UPDATE_RECORD_NOT_ON_TOP
@@ -3779,9 +4021,13 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 	} else {
 #if UPDATE_RECORD_NOT_ON_TOP
 		int n_a_elements_above_record,n_b_elements_above_record;
+#endif
+
+#if BOXED_RECORDS
+		node->node_arguments->arg_state=node->node_symbol->symb_def->sdef_record_state;
 #endif		
 		BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-	
+
 		DetermineSizeOfState (node->node_state,&record_a_size,&record_b_size);
 #if UPDATE_RECORD_NOT_ON_TOP
 		UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
@@ -4003,9 +4249,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 
 #ifdef REUSE_UNIQUE_NODES
 # if GENERATE_CODE_AGAIN
-extern int call_code_generator_again;
-
-static void restore_removed_arguments (ArgP *arg_h,ArgP removed_args,unsigned int argument_overwrite_bits,int node_arity)
+void restore_removed_arguments (ArgP *arg_h,ArgP removed_args,unsigned int argument_overwrite_bits,int node_arity)
 {
 	int arg_n;
 	ArgP not_removed_args;
@@ -4026,11 +4270,10 @@ static void restore_removed_arguments (ArgP *arg_h,ArgP removed_args,unsigned in
 }
 # endif
 
-static
 #if GENERATE_CODE_AGAIN
-	ArgP
+ ArgP
 #else
-	void
+ void
 #endif
 	compute_bits_and_remove_unused_arguments_for_strict_node (NodeP node,char bits[],unsigned int argument_overwrite_bits,
 															  int *a_size_p,int *b_size_p,int *n_a_fill_bits_p,int *n_b_fill_bits_p)
@@ -4103,12 +4346,10 @@ static
 #endif
 }
 
-
-static
 #if GENERATE_CODE_AGAIN
-	ArgP
+ ArgP
 #else
-	void
+ void
 #endif
 	compute_bits_and_remove_unused_arguments (NodeP node,char bits[],unsigned int argument_overwrite_bits,unsigned int *n_args_p)
 {
@@ -4543,7 +4784,9 @@ void BuildArg (Args arg,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_
 		NodeId arg_node_id;
 		
 		arg_node_id=node->node_node_id;
-				
+#if BOXED_RECORDS
+		arg_node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;		
+#endif
 		if (CopyNodeIdArgument (arg->arg_state,arg_node_id,asp_p,bsp_p))
 			ChangeEvalStatusKindToStrictOnA (arg_node_id,code_gen_node_ids_p->saved_nid_state_l);
 		
@@ -4692,6 +4935,9 @@ static Bool BuildNonParArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP cod
 			} else {
 				ArgComment (args);
 				
+#if BOXED_RECORDS
+				arg_node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;		
+#endif
 				if (CopyNodeIdArgument (args->arg_state,arg_node_id,asp_p,bsp_p))
 					ChangeEvalStatusKindToStrictOnA (arg_node_id,code_gen_node_ids_p->saved_nid_state_l);
 				
@@ -4902,7 +5148,7 @@ void BuildArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_id
 	}
 }
 
-static void BuildLazyArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
+void BuildLazyArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	if (args==NULL)
 		return;
@@ -5255,11 +5501,14 @@ static int FillNodeDefs (NodeDefs nds,int node_id_number,int *asp_p,int *bsp_p,N
 						NodeId node_id;
 						
 						node_id=tuple_node->node_node_id;
+#if BOXED_RECORDS
+						node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;		
+#endif
 						if (CopyNodeIdArgument (tuple_node->node_arguments->arg_state,node_id,asp_p,bsp_p))
 							ChangeEvalStatusKindToStrictOnA (node_id,code_gen_node_ids_p->saved_nid_state_l);
 						
 						tuple_state_p=&tuple_node->node_arguments->arg_state;
-						
+
 						decrement_reference_count_of_node_id (node_id,&code_gen_node_ids_p->free_node_ids);
 					}
 
@@ -5352,10 +5601,16 @@ static int FillNodeDefs (NodeDefs nds,int node_id_number,int *asp_p,int *bsp_p,N
 #ifdef DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
 						if (result_state_p->state_type==SimpleState && result_state_p->state_kind==OnA && !ResultIsNotInRootNormalForm (node_id->nid_state))
 							result_state_p->state_kind=StrictOnA;
-#endif						
+#endif					
+#if BOXED_RECORDS
+						if (node_id->nid_refcount>1)
+							node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+#endif
 						if (CopyNodeIdArgument (*result_state_p,node_id,asp_p,bsp_p))
 							ChangeEvalStatusKindToStrictOnA (node_id,code_gen_node_ids_p->saved_nid_state_l);
-						
+# if 0
+						printf ("decrement_reference_count_of_node_id %d\n",node_id->nid_refcount);
+# endif										
 						decrement_reference_count_of_node_id (node_id,&code_gen_node_ids_p->free_node_ids);
 					}
 				} else
@@ -5733,41 +5988,31 @@ static void AdjustStacksAndJumpToThenOrElseLabel
 	}
 
 	if (asp==else_asp && bsp - else_bsp - bsize == 0){
-#if 1
 		if (falselab==next_label && asp==then_asp && bsp-bsize==then_bsp){
 			GenJmpTrue (truelab);
 			truelab->lab_mod=NULL;		
-		} else
-#endif
-		{
+		} else {
 			GenJmpFalse (falselab);
 			falselab->lab_mod=NULL;
 			
 			UpdateStackPointers (asp, bsp-bsize, then_asp, then_bsp);
-#if 1			
-			if (truelab!=next_label)
-#endif
-			{
+
+			if (truelab!=next_label){
 				GenJmp	(truelab);
 				truelab->lab_mod=NULL;
 			}
 		}
 	} else if (asp==then_asp && bsp - then_bsp - bsize == 0){
-#if 1
 		if (truelab==next_label && asp==else_asp && bsp-bsize==else_bsp){
 			GenJmpTrue (falselab);
 			falselab->lab_mod=NULL;			
-		} else
-#endif
-		{
+		} else {
 			GenJmpTrue (truelab);
 			truelab->lab_mod=NULL;
 
 			UpdateStackPointers (asp, bsp-bsize, else_asp, else_bsp);
-#if 1
-			if (falselab!=next_label)
-#endif
-			{
+
+			if (falselab!=next_label){
 				GenJmp (falselab);
 				falselab->lab_mod=NULL;
 			}
@@ -5785,10 +6030,7 @@ static void AdjustStacksAndJumpToThenOrElseLabel
 		GenLabelDefinition	(&loclab);
 		UpdateStackPointers (asp, bsp-bsize, else_asp, else_bsp);
 
-#if 1
-		if (falselab!=next_label)
-#endif
-		{
+		if (falselab!=next_label){
 			GenJmp (falselab);
 			falselab->lab_mod=NULL;
 		}
@@ -5802,8 +6044,12 @@ void EvaluateCondition (Node cond_node,int *asp_p,int *bsp_p,CodeGenNodeIdsP cod
 		{
 			NodeId nid;
 			int boolean_b_size;
-	
+
 			nid=cond_node->node_node_id;
+			
+#if BOXED_RECORDS
+			nid->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;		
+#endif
 			CopyNodeIdArgument (resultstate,nid,asp_p,bsp_p);
 			
 			decrement_reference_count_of_node_id (nid,&code_gen_node_ids_p->free_node_ids);
@@ -5851,7 +6097,9 @@ void subtract_else_ref_counts (struct node_id_ref_count_list *else_node_id_ref_c
 		int ref_count;
 
 		node_id=else_node_id_ref_count->nrcl_node_id;
-
+#if BOXED_RECORDS
+		else_node_id_ref_count->nrcl_mark2=node_id->nid_mark2 & NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+#endif
 		ref_count=node_id->nid_refcount;
 		if (ref_count>=0){
 			ref_count -= else_node_id_ref_count->nrcl_ref_count;
@@ -5877,8 +6125,17 @@ void add_else_ref_counts (struct node_id_ref_count_list *else_node_id_ref_counts
 	
 	for_l (else_node_id_ref_count,else_node_id_ref_counts,nrcl_next){
 		struct node_id *node_id;
-		
+#if BOXED_RECORDS
+		unsigned int node_id_mark2;
+#endif		
 		node_id=else_node_id_ref_count->nrcl_node_id;
+		
+#if BOXED_RECORDS
+		node_id_mark2=node_id->nid_mark2;
+		node_id->nid_mark2=(node_id_mark2 & ~NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES) | else_node_id_ref_count->nrcl_mark2;
+		else_node_id_ref_count->nrcl_mark2=node_id_mark2 & NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+#endif
+
 		if (node_id->nid_refcount>=0)
 			node_id->nid_refcount += else_node_id_ref_count->nrcl_ref_count;
 		else
@@ -5886,10 +6143,20 @@ void add_else_ref_counts (struct node_id_ref_count_list *else_node_id_ref_counts
 	}
 }
 
+#if BOXED_RECORDS
+void or_then_record_update_marks (struct node_id_ref_count_list *else_node_id_ref_counts)
+{
+	struct node_id_ref_count_list *else_node_id_ref_count;
+	
+	for_l (else_node_id_ref_count,else_node_id_ref_counts,nrcl_next)
+		else_node_id_ref_count->nrcl_node_id->nid_mark2 |= else_node_id_ref_counts->nrcl_mark2;
+}
+#endif
+
 static void EvaluateThenOrElsePartOfCondition
 	(NodeDefs defs,Node node,int asp,int bsp,StateS resultstate, Label truelab, Label falselab,Label next_label,
 	 int then_asp,int then_bsp,int else_asp,int else_bsp,NodeIdListElementP a_node_ids,NodeIdListElementP b_node_ids,
-	 struct node_id_ref_count_list *else_node_id_ref_counts,NodeIdListElementP free_node_ids);
+	 NodeIdListElementP free_node_ids);
 
 void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_node_ids_p, StateS resultstate,
 						Label truelab,Label falselab,Label next_label,int then_asp,int then_bsp,int else_asp,int else_bsp)
@@ -5957,13 +6224,23 @@ void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_n
 								new_then_asp, new_then_bsp, new_else_asp, new_else_bsp);
 
 			if (!thenlabel){
+				NodeIdListElementP free_node_ids;
+				
 				if (thenlab.lab_mod==NULL)
 					GenLabelDefinition (&thenlab);
+
+				free_node_ids=code_gen_node_ids_p->free_node_ids;
+
+				if (condnode->node_else_node_id_ref_counts!=NULL)
+					subtract_else_ref_counts (condnode->node_else_node_id_ref_counts,&free_node_ids);
 
 				EvaluateThenOrElsePartOfCondition (condnode->node_then_node_defs,
 					condpart->arg_next->arg_node, asp,bsp,resultstate,truelab,falselab,!elselabel ? &elselab : next_label,
 					then_asp,then_bsp,else_asp,else_bsp,code_gen_node_ids_p->a_node_ids,code_gen_node_ids_p->b_node_ids,
-					condnode->node_else_node_id_ref_counts,code_gen_node_ids_p->free_node_ids);
+					free_node_ids);
+
+				if (condnode->node_else_node_id_ref_counts!=NULL)
+					add_else_ref_counts (condnode->node_else_node_id_ref_counts);
 			}
 
 			if (!elselabel){
@@ -5973,8 +6250,14 @@ void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_n
 				EvaluateThenOrElsePartOfCondition (condnode->node_else_node_defs,
 					condpart->arg_next->arg_next->arg_node,asp,bsp,resultstate,truelab,falselab,next_label,
 					then_asp,then_bsp,else_asp,else_bsp,code_gen_node_ids_p->a_node_ids,code_gen_node_ids_p->b_node_ids,
-					NULL,code_gen_node_ids_p->free_node_ids);
+					code_gen_node_ids_p->free_node_ids);
 			}
+
+#if BOXED_RECORDS
+			if (!thenlabel && condnode->node_else_node_id_ref_counts)
+
+				or_then_record_update_marks (condnode->node_else_node_id_ref_counts);
+#endif
 			break;
 		}
 		default:
@@ -5985,7 +6268,7 @@ void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_n
 static void EvaluateThenOrElsePartOfCondition
 	(NodeDefs defs,Node node,int asp,int bsp,StateS resultstate, Label truelab, Label falselab,Label next_label,
 	 int then_asp,int then_bsp,int else_asp,int else_bsp,NodeIdListElementP a_node_ids,NodeIdListElementP b_node_ids,
-	 struct node_id_ref_count_list *else_node_id_ref_counts,NodeIdListElementP free_node_ids)
+	 NodeIdListElementP free_node_ids)
 {
 	SavedNidStateP saved_node_id_states;
 	MovedNodeIdP moved_node_ids;
@@ -5993,9 +6276,6 @@ static void EvaluateThenOrElsePartOfCondition
 			
 	saved_node_id_states=NULL;
 	moved_node_ids=NULL;
-
-	if (else_node_id_ref_counts!=NULL)
-		subtract_else_ref_counts (else_node_id_ref_counts,&free_node_ids);
 
 	code_gen_node_ids.free_node_ids=free_node_ids;
 	code_gen_node_ids.saved_nid_state_l=&saved_node_id_states;
@@ -6011,9 +6291,6 @@ static void EvaluateThenOrElsePartOfCondition
 	BranchOnCondition (node,asp,bsp,&code_gen_node_ids,resultstate,truelab,falselab,next_label,then_asp,then_bsp,else_asp,else_bsp);
 
 	restore_saved_node_id_states (saved_node_id_states);
-
-	if (else_node_id_ref_counts!=NULL)
-		add_else_ref_counts (else_node_id_ref_counts);
 }
 
 void InitCoding (void)

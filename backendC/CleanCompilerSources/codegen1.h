@@ -111,9 +111,8 @@ extern SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node
 	,int unbox_record
 #endif
 );
-#if U_RECORD_SELECTORS
+
 extern SymbDef create_select_function (Symbol selector_symbol,int selector_kind);
-#endif
 extern SymbDef create_match_function (struct symbol *constructor_symbol,int constructor_arity,int strict_constructor);
 extern SymbDef create_select_and_match_function (struct symbol *constructor_symbol,int strict_constructor);
 

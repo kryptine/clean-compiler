@@ -1,4 +1,5 @@
 
+
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
 #define SHARE_UPDATE_CODE 0 /* also in codegen1.c */
@@ -1186,7 +1187,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 		OptimiseRules (imod->im_rules,imod->im_start);
 		ExitOnInterrupt();
 #if 0
-		PrintRules (imod->im_rules);
+		PrintRules (imod->im_rules,rules_file);
 #endif
 		if (DoCode && !CompilerError){
 			ImpRuleS *rule;

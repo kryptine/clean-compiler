@@ -3119,6 +3119,10 @@ void set_local_reference_counts_and_add_free_node_ids (NodeP case_node,NodeIdLis
 		node_id=node_id_ref_count_elem->nrcl_node_id;
 		local_ref_count=node_id_ref_count_elem->nrcl_ref_count;
 
+# if BOXED_RECORDS
+		node_id_ref_count_elem->nrcl_mark2=node_id->nid_mark2 & NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+# endif
+
 # if 0
 		printf ("global_to_local_ %s %d %d ",node_id_name (node_id),node_id->nid_refcount,node_id_ref_count_elem->nrcl_ref_count);
 # endif
@@ -3518,16 +3522,32 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 			{
 				need_next_alternative=1;
 			}
+#if BOXED_RECORDS
+			set_global_reference_counts_and_exchange_record_update_marks (case_node);
+#endif
 		} else {
+#if BOXED_RECORDS
+			ArgP arg2;
+			
+			for_l (arg2,node->node_arguments,arg_next){
+				if (arg2->arg_node->node_kind==CaseNode && arg2->arg_node->node_number)
+					or_then_record_update_marks (case_node->node_node_id_ref_counts);
+			}
+#endif
 			if (generate_code_for_root_node
 				(case_node->node_arguments->arg_node,asp,bsp,&old_esc,case_node->node_node_defs,
 					result_state_p,&saved_node_id_states,ab_node_ids_p))
 			{
 				need_next_alternative=1;
 			}
+#if BOXED_RECORDS
+			set_global_reference_counts (case_node);
+#endif
 		}
 
+#if !BOXED_RECORDS
 		set_global_reference_counts (case_node);
+#endif
 #if BUILD_FREE_NODE_ID_LIST_DURING_PATTER_MATCH
 		ab_node_ids_p->free_node_ids=old_free_node_ids;
 		}
@@ -3714,9 +3734,12 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 # ifdef DESTRUCTIVE_RECORD_UPDATES
 		else if (node->node_record_symbol->symb_kind==definition &&
 				node->node_record_symbol->symb_def->sdef_kind==RECORDTYPE &&
-				(node_id_p->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 &&
+				(((node_id_p->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 &&
 				node_id_p->nid_number==-2)
-		{
+#  if BOXED_RECORDS
+				|| (node_id_p->nid_mark2 & NID_RECORD_USED_BY_UPDATE)!=0
+#  endif
+		)){
 			node_id_p->nid_number=-1;
 			if (b_size==0)
 				GenPushArgsU (asp-node_id_p->nid_a_index,a_size,a_size);

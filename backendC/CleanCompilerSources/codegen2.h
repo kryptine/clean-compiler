@@ -6,6 +6,25 @@ typedef
 	{	NormalFill, ReleaseAndFill, PartialFill
 	} FillKind;
 
+typedef enum {
+	AToA, AToB, BToA, BToB, Reduce,AToRoot, MayBecomeCyclicSpine, CyclicSpine
+} Coercions;
+
+STRUCT (moved_node_id,MovedNodeId){
+	struct node_id *		mnid_node_id;
+	struct moved_node_id *	mnid_next;
+	int						mnid_a_stack_offset;
+};
+
+STRUCT (code_gen_node_ids,CodeGenNodeIds){
+	struct saved_nid_state **saved_nid_state_l;
+	struct node_id_list_element *free_node_ids;
+	struct moved_node_id **moved_node_ids_l;
+	struct node_id_list_element *a_node_ids;
+	struct node_id_list_element *b_node_ids;
+	int doesnt_fail;
+};
+
 extern StateS OnAState;
 extern LabDef BasicDescriptors [];
 extern unsigned NewLabelNr;
@@ -38,24 +57,29 @@ extern void PackArgument (StateS argstate,int aindex,int bindex,int asp,int bsp,
 extern void save_node_id_state (NodeId node_id,struct saved_nid_state **ifrule);
 extern void restore_saved_node_id_states (struct saved_nid_state *saved_node_id_states);
 
-typedef enum {
-	AToA, AToB, BToA, BToB, Reduce,AToRoot, MayBecomeCyclicSpine, CyclicSpine
-} Coercions;
+#if GENERATE_CODE_AGAIN
+extern ArgP
+#else
+extern void
+#endif
+	compute_bits_and_remove_unused_arguments (NodeP node,char bits[],unsigned int argument_overwrite_bits,unsigned int *n_args_p);
+#if GENERATE_CODE_AGAIN
+extern ArgP
+#else
+extern void
+#endif
+	compute_bits_and_remove_unused_arguments_for_strict_node (NodeP node,char bits[],unsigned int argument_overwrite_bits,
+															  int *a_size_p,int *b_size_p,int *n_a_fill_bits_p,int *n_b_fill_bits_p);
+#if GENERATE_CODE_AGAIN
+extern void restore_removed_arguments (ArgP *arg_h,ArgP removed_args,unsigned int argument_overwrite_bits,int node_arity);
+#endif
 
-STRUCT (moved_node_id,MovedNodeId){
-	struct node_id *		mnid_node_id;
-	struct moved_node_id *	mnid_next;
-	int						mnid_a_stack_offset;
-};
-
-STRUCT (code_gen_node_ids,CodeGenNodeIds){
-	struct saved_nid_state **saved_nid_state_l;
-	struct node_id_list_element *free_node_ids;
-	struct moved_node_id **moved_node_ids_l;
-	struct node_id_list_element *a_node_ids;
-	struct node_id_list_element *b_node_ids;
-	int doesnt_fail;
-};
+#ifdef DESTRUCTIVE_RECORD_UPDATES
+extern void compute_bits_and_add_selectors_to_update_node
+	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,
+	char bits[],int *n_a_fill_bits_p,int *n_b_fill_bits_p);
+#endif
+int is_unique_record_update (NodeIdP record_node_id,NodeP record_node);
 
 Coercions CoerceStateKind (StateKind dem_state_kind, StateKind off_state_kind);
 void GenReduceError (void);
@@ -69,6 +93,7 @@ int get_b_index_of_unpacked_lhs_node (ArgS *arg);
 void decrement_reference_count_of_node_id (struct node_id *node_id,NodeIdListElementS **free_node_ids_l);
 
 void BuildArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
+void BuildLazyArgs (Args args,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
 void build_and_cleanup (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
 
 #define RECORD_N_PREF c_pref
@@ -85,6 +110,9 @@ void Build (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
 Coercions CoerceSimpleStateArgument (StateS demstate,StateKind offkind,int aindex,int *asp_p,Bool leaveontop, Bool *ontop);
 void subtract_else_ref_counts (struct node_id_ref_count_list *else_node_id_ref_counts,NodeIdListElementS **free_node_ids_l);
 void add_else_ref_counts (struct node_id_ref_count_list *else_node_id_ref_counts);
+#if BOXED_RECORDS
+	void or_then_record_update_marks (struct node_id_ref_count_list *else_node_id_ref_counts);
+#endif
 void EvaluateCondition (Node cond_node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p,StateS resultstate);
 void DetermineFieldSizeAndPositionAndRecordSize
 	(int fieldnr,int *asize_p,int *bsize_p,int *apos_p,int *bpos_p,int *rec_asize_p,int *rec_bsize_p,StateS *record_state_p);
@@ -115,3 +143,5 @@ void ChangeEvalStatusKindToStrictOnA (NodeId node_id,SavedNidStateS **saved_nid_
 #if OPTIMIZE_LAZY_TUPLE_RECURSION
 void FillNodeOnACycle (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p);
 #endif
+void PushField (StateS recstate,int fieldnr,int offset,int *asp_p,int *bsp_p,int *a_size_p,int *b_size_p);
+void ReplaceRecordByField (StateS recstate,int fieldnr,int *asp_p,int *bsp_p,int *a_size_p,int *b_size_p);

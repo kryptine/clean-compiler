@@ -12,8 +12,8 @@
 #include "checker.h"
 #include "scanner.h"
 #include "buildtree.h"
-#include "optimisations.h"
 #include "codegen_types.h"
+#include "optimisations.h"
 #include "codegen1.h"
 #include "codegen2.h"
 #include "sa.h"
@@ -1804,8 +1804,6 @@ static int ChangeArgumentNodeStatesIfStricter (NodeP node_p,StateP demanded_stat
 
 #ifdef REUSE_UNIQUE_NODES
 
-
-
 static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int node_size)
 {
 	NodeP node_copy;
@@ -1836,7 +1834,20 @@ static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int no
 	return node_copy;
 }
 
-static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_size)
+void add_sizes_of_states_of_node_ids (NodeIdListElementP node_id_list,int *total_a_size_p,int *total_b_size_p)
+{
+	NodeIdListElementP node_id_list_elem_p;
+
+	for_l (node_id_list_elem_p,node_id_list,nidl_next){
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+		AddSizeOfState (*node_id_list_elem_p->nidl_node_id->nid_lhs_state_p,total_a_size_p,total_b_size_p);
+# else
+		AddSizeOfState (node_id_list_elem_p->nidl_node_id->nid_state,total_a_size_p,total_b_size_p);	
+# endif	
+	}	
+}
+
+static int compute_root_n_not_updated_words (NodeP push_node,NodeP node,int node_a_size)
 {
 	NodeIdListElementP node_id_list;
 	unsigned long n_not_updated_words;
@@ -1847,14 +1858,7 @@ static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_si
 	
 	total_a_size2=0;
 	total_b_size2=0;
-	
-	for_l (node_id_list,push_node->node_node_ids,nidl_next){
-# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-		AddSizeOfState (*node_id_list->nidl_node_id->nid_lhs_state_p,&total_a_size2,&total_b_size2);
-# else
-		AddSizeOfState (node_id_list->nidl_node_id->nid_state,&total_a_size2,&total_b_size2);	
-# endif	
-	}	
+	add_sizes_of_states_of_node_ids (push_node->node_node_ids,&total_a_size2,&total_b_size2);
 	
 	n_not_updated_words=0;
 	node_arg_p=node->node_arguments;
@@ -1867,22 +1871,79 @@ static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_si
 	b_size2=0;
 	
 	for (n=0; n<arity; ++n){
+		int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
+
+		DetermineSizeOfState (node_arg_p->arg_state,&e_a_size1,&e_b_size1);
+		
 		if (node_id_list!=NULL){
 			NodeIdP node_id_p;
-			StateP arg_node_id_state_p;
 			
 			node_id_p=node_id_list->nidl_node_id;
-			
-			if (node_arg_p->arg_node->node_kind==NodeIdNode && node_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
-				int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
-				
-				DetermineSizeOfState (node_arg_p->arg_state,&e_a_size1,&e_b_size1);
-
 # ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-				DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
+			DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
 # else
-				DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
+			DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
 # endif
+			if (node_arg_p->arg_node->node_kind==NodeIdNode && node_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
+				if (! (e_a_size1!=e_a_size2 || e_b_size1!=e_b_size2 ||
+					((e_a_size1 | e_a_size2)!=0 && a_size1!=a_size2 && a_size1!=0) ||
+					((e_b_size1 | e_b_size2)!=0 && b_size1+node_a_size!=b_size2+total_a_size2 && b_size1+node_a_size!=0)))
+				{
+					n_not_updated_words += e_a_size1+e_b_size1;
+				}
+			}
+			
+			a_size2+=e_a_size2;
+			b_size2+=e_b_size2;
+			node_id_list=node_id_list->nidl_next;
+		}
+
+		a_size1+=e_a_size1;
+		b_size1+=e_b_size1;
+		node_arg_p=node_arg_p->arg_next;
+	}
+	
+	return n_not_updated_words;
+}
+
+static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_size)
+{
+	NodeIdListElementP node_id_list;
+	unsigned long n_not_updated_words;
+	ArgP node_arg_p;
+	unsigned int n,arity;
+	int a_size1,b_size1,a_size2,b_size2;
+	int total_a_size2,total_b_size2;
+	
+	total_a_size2=0;
+	total_b_size2=0;
+	add_sizes_of_states_of_node_ids (push_node->node_node_ids,&total_a_size2,&total_b_size2);
+	
+	n_not_updated_words=0;
+	node_arg_p=node->node_arguments;
+	arity=node->node_arity;
+	node_id_list=push_node->node_node_ids;
+
+	a_size1=0;
+	b_size1=0;
+	a_size2=0;
+	b_size2=0;
+	
+	for (n=0; n<arity; ++n){
+		int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
+
+		DetermineSizeOfState (node_arg_p->arg_state,&e_a_size1,&e_b_size1);
+		
+		if (node_id_list!=NULL){
+			NodeIdP node_id_p;
+			
+			node_id_p=node_id_list->nidl_node_id;
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+			DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
+# else
+			DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
+# endif	
+			if (node_arg_p->arg_node->node_kind==NodeIdNode && node_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
 				if (! (e_a_size1!=e_a_size2 || e_b_size1!=e_b_size2 ||
 					((e_a_size1 | e_a_size2)!=0 && a_size1!=a_size2) ||
 					((e_b_size1 | e_b_size2)!=0 && b_size1+node_a_size!=b_size2+total_a_size2)))
@@ -1891,22 +1952,140 @@ static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_si
 				}
 			}
 			
-# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-			arg_node_id_state_p=node_id_p->nid_lhs_state_p;
-# else
-			arg_node_id_state_p=&node_id_p->nid_state;
-# endif	
-			AddSizeOfState (*arg_node_id_state_p,&a_size2,&b_size2);
-
+			a_size2+=e_a_size2;
+			b_size2+=e_b_size2;
 			node_id_list=node_id_list->nidl_next;
 		}
 
-		AddSizeOfState (node_arg_p->arg_state,&a_size1,&b_size1);
-		
+		a_size1+=e_a_size1;
+		b_size1+=e_b_size1;		
 		node_arg_p=node_arg_p->arg_next;
 	}
 	
 	return n_not_updated_words;
+}
+
+static Bool insert_root_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,int node_a_size,int node_b_size)
+{
+	FreeUniqueNodeIdsP f_node_id;
+	NodeP push_node,node_copy;
+	ArgP node_copy_arg_p;
+	unsigned long argument_overwrite_bits;
+	NodeIdListElementP node_id_list;
+	unsigned int n,arity;
+	int node_size;
+	
+	node_size=node_a_size+node_b_size;
+
+	arity=node->node_arity;
+
+	/* optimization: update node with fewest number of words to be updated */
+	{
+		FreeUniqueNodeIdsP *f_node_id_h,*found_f_node_id_h;
+		int found_size,found_n_not_updated_words;
+		
+		found_f_node_id_h=NULL;
+		f_node_id_h=f_node_ids;
+		
+		while ((f_node_id=*f_node_id_h)!=NULL){
+			int new_found_size;
+			
+			new_found_size=f_node_id->fnid_node_size;
+
+			if (new_found_size>=node_size){
+				int new_found_n_not_updated_words;
+				
+				new_found_n_not_updated_words=compute_root_n_not_updated_words (f_node_id->fnid_push_node,node,node_a_size);
+				
+				if (found_f_node_id_h==NULL || new_found_size<found_size || new_found_n_not_updated_words>found_n_not_updated_words){
+					found_f_node_id_h=f_node_id_h;
+					found_size=new_found_size;
+					found_n_not_updated_words=new_found_n_not_updated_words;
+				}
+			}
+
+			f_node_id_h=&f_node_id->fnid_next;
+		}
+		
+		if (found_f_node_id_h==NULL)
+			return False;
+		
+		f_node_id=*found_f_node_id_h;
+		*found_f_node_id_h=f_node_id->fnid_next;
+	}
+
+	push_node=f_node_id->fnid_push_node;
+	
+	node_copy=replace_node_by_unique_fill_node (node,push_node,f_node_id->fnid_node_size);
+
+	{
+	int a_size1,b_size1,a_size2,b_size2;
+	int total_a_size2,total_b_size2;
+	
+	total_a_size2=0;
+	total_b_size2=0;
+	add_sizes_of_states_of_node_ids (push_node->node_node_ids,&total_a_size2,&total_b_size2);
+	
+	argument_overwrite_bits=0;
+	node_copy_arg_p=node_copy->node_arguments;
+	node_id_list=push_node->node_node_ids;
+
+	a_size1=0;
+	b_size1=0;
+	a_size2=0;
+	b_size2=0;
+	
+	for (n=0; n<arity; ++n){
+		int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
+		
+		DetermineSizeOfState (node_copy_arg_p->arg_state,&e_a_size1,&e_b_size1);
+
+		if (node_id_list!=NULL){
+			NodeIdP node_id_p;
+			
+			node_id_p=node_id_list->nidl_node_id;
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+			DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
+# else
+			DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
+# endif
+			if (node_copy_arg_p->arg_node->node_kind==NodeIdNode && node_copy_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
+				if (e_a_size1!=e_a_size2 ||
+					e_b_size1!=e_b_size2 ||
+					(e_a_size1!=0 && (a_size1!=a_size2 ||
+						a_size1==0 ||
+						((a_size1==1 || (a_size1==0 && e_a_size1>1)) &&
+							((node_size==2) != (total_a_size2+total_b_size2==2)))
+						)) ||
+					(e_b_size1!=0 && (b_size1+node_a_size!=b_size2+total_a_size2 ||
+						b_size1+node_a_size==0 ||
+						((b_size1+node_a_size==1 || (b_size1+node_a_size==0 && e_b_size1>1)) &&
+							((node_size==2) != (total_a_size2+total_b_size2==2)))
+						)))
+				{
+					argument_overwrite_bits|=1<<n;
+				} else {
+					++node_id_p->nid_refcount;
+					node_id_p->nid_mark |= NID_EXTRA_REFCOUNT_MASK;
+				}
+			} else
+				argument_overwrite_bits|=1<<n;
+			
+			a_size2+=e_a_size2;
+			b_size2+=e_b_size2;
+			node_id_list=node_id_list->nidl_next;
+		} else
+			argument_overwrite_bits|=1<<n;
+
+		a_size1+=e_a_size1;
+		b_size1+=e_b_size1;
+		node_copy_arg_p=node_copy_arg_p->arg_next;
+	}
+	}
+	
+	node->node_arguments->arg_occurrence=argument_overwrite_bits;
+
+	return True;
 }
 
 static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,int node_a_size,int node_b_size)
@@ -1981,21 +2160,14 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 	push_node=f_node_id->fnid_push_node;
 	
 	node_copy=replace_node_by_unique_fill_node (node,push_node,f_node_id->fnid_node_size);
-		
+
 	{
 	int a_size1,b_size1,a_size2,b_size2;
 	int total_a_size2,total_b_size2;
 	
 	total_a_size2=0;
 	total_b_size2=0;
-	
-	for_l (node_id_list,push_node->node_node_ids,nidl_next){
-# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-		AddSizeOfState (*node_id_list->nidl_node_id->nid_lhs_state_p,&total_a_size2,&total_b_size2);
-# else
-		AddSizeOfState (node_id_list->nidl_node_id->nid_state,&total_a_size2,&total_b_size2);	
-# endif	
-	}	
+	add_sizes_of_states_of_node_ids (push_node->node_node_ids,&total_a_size2,&total_b_size2);
 	
 	argument_overwrite_bits=0;
 	node_copy_arg_p=node_copy->node_arguments;
@@ -2007,22 +2179,20 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 	b_size2=0;
 	
 	for (n=0; n<arity; ++n){
+		int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
+		
+		DetermineSizeOfState (node_copy_arg_p->arg_state,&e_a_size1,&e_b_size1);
+
 		if (node_id_list!=NULL){
 			NodeIdP node_id_p;
-			StateP arg_node_id_state_p;
 			
 			node_id_p=node_id_list->nidl_node_id;
-			
-			if (node_copy_arg_p->arg_node->node_kind==NodeIdNode && node_copy_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
-				int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
-				
-				DetermineSizeOfState (node_copy_arg_p->arg_state,&e_a_size1,&e_b_size1);
-
 # ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-				DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
+			DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
 # else
-				DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
-# endif
+			DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
+# endif	
+			if (node_copy_arg_p->arg_node->node_kind==NodeIdNode && node_copy_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
 				if (e_a_size1!=e_a_size2 ||
 					e_b_size1!=e_b_size2 ||
 					(e_a_size1!=0 && (a_size1!=a_size2 ||
@@ -2034,7 +2204,7 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 							((node_size==2) != (total_a_size2+total_b_size2==2)))
 						)))
 				{
-					argument_overwrite_bits|=1<<n;			
+					argument_overwrite_bits|=1<<n;
 				} else {
 					++node_id_p->nid_refcount;
 					node_id_p->nid_mark |= NID_EXTRA_REFCOUNT_MASK;
@@ -2042,19 +2212,14 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 			} else
 				argument_overwrite_bits|=1<<n;
 			
-# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-			arg_node_id_state_p=node_id_p->nid_lhs_state_p;
-# else
-			arg_node_id_state_p=&node_id_p->nid_state;
-# endif	
-			AddSizeOfState (*arg_node_id_state_p,&a_size2,&b_size2);
-
+			a_size2+=e_a_size2;
+			b_size2+=e_b_size2;
 			node_id_list=node_id_list->nidl_next;
 		} else
 			argument_overwrite_bits|=1<<n;
 
-		AddSizeOfState (node_copy_arg_p->arg_state,&a_size1,&b_size1);
-		
+		a_size1+=e_a_size1;
+		b_size1+=e_b_size1;
 		node_copy_arg_p=node_copy_arg_p->arg_next;
 	}
 	}
@@ -2113,6 +2278,55 @@ static Bool try_insert_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f
 				return insert_unique_fill_node (node,f_node_ids,2,0);
 			case tuple_symb:
 				return insert_unique_fill_node (node,f_node_ids,node->node_arity,0);
+		}
+	}
+
+	return False;
+}
+
+static Bool try_insert_root_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids)
+{
+	if (node->node_state.state_type==SimpleState && node->node_state.state_kind!=SemiStrict){
+		switch (node->node_symbol->symb_kind){
+			case definition:
+			{
+				SymbDef sdef;
+				
+				sdef=node->node_symbol->symb_def;
+				switch (sdef->sdef_kind){
+					case CONSTRUCTOR:
+						if (sdef->sdef_arity==node->node_arity){
+							if (sdef->sdef_strict_constructor){
+								int a_size,b_size;
+
+								DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+								
+								if (a_size+b_size>2)
+									return insert_root_unique_fill_node (node,f_node_ids,a_size,b_size);
+							} else {
+								if (node->node_arity>2)
+									return insert_root_unique_fill_node (node,f_node_ids,node->node_arity,0);
+							}
+						}
+						return False;
+					case RECORDTYPE:
+						if (sdef->sdef_boxed_record){
+							if (sdef->sdef_strict_constructor){
+								int a_size,b_size;
+
+								DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+								
+								if (a_size+b_size>2)
+									return insert_root_unique_fill_node (node,f_node_ids,a_size,b_size);							
+							} else {
+								if (node->node_arity>2)
+									return insert_root_unique_fill_node (node,f_node_ids,node->node_arity,0);
+							}
+						}
+						return False;
+				}
+				break;
+			}
 		}
 	}
 
@@ -2354,15 +2568,11 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 
 #ifdef REUSE_UNIQUE_NODES
 			if (*f_node_ids_l!=NULL && try_insert_constructor_update_node (node,f_node_ids_l)){
-				unsigned int n,arity,argument_overwrite_bits;
-				NodeP fill_node;
+				unsigned int n,argument_overwrite_bits;
 				
-				fill_node=node;
-				node=fill_node->node_arguments->arg_node;
+				argument_overwrite_bits=node->node_arguments->arg_occurrence;
+				node=node->node_arguments->arg_node;
 				
-				argument_overwrite_bits=fill_node->node_arguments->arg_occurrence;
-				arity=node->node_arity;
-
 				n=0;
 				for_l (arg,node->node_arguments,arg_next){
 					if (argument_overwrite_bits & (1<<n))
@@ -2409,6 +2619,10 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 				}
 			}
 #endif
+#if DESTRUCTIVE_RECORD_UPDATES
+			if (node->node_arguments->arg_node->node_kind==NodeIdNode && node->node_arity==1)
+				return;
+#endif
 		case MatchNode:
 			optimise_node_in_then_or_else (node->node_arguments->arg_node,f_node_ids_l,local_scope);
 			return;
@@ -2418,12 +2632,32 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 			
 #if DESTRUCTIVE_RECORD_UPDATES
 			arg=node->node_arguments;
-			if (arg->arg_node->node_kind==NodeIdNode && (arg->arg_node->node_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0
-				&& arg->arg_node->node_node_id->nid_refcount==-2)
-				++arg->arg_node->node_node_id->nid_number;
-#endif
+			if (arg->arg_node->node_kind==NodeIdNode){
+				NodeIdP node_id;
+				
+				node_id=arg->arg_node->node_node_id;
+				if ((node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && node_id->nid_refcount==-2)
+					++node_id->nid_number;
+
+				node_id->nid_mark2 |= NID_RECORD_USED_BY_UPDATE;
+
+				arg=arg->arg_next;
+			}
+# if BOXED_RECORDS
+			else {
+				optimise_node_in_then_or_else (arg->arg_node,f_node_ids_l,local_scope);
+				if (arg->arg_node->node_kind==NodeIdNode)
+					arg->arg_node->node_node_id->nid_mark2 |= NID_RECORD_USED_BY_UPDATE;
+				
+				arg=arg->arg_next;
+			}
+# endif
+			for (; arg!=NULL; arg=arg->arg_next)
+				optimise_node_in_then_or_else (arg->arg_node,f_node_ids_l,local_scope);
+#else
 			for_l (arg,node->node_arguments,arg_next)
 				optimise_node_in_then_or_else (arg->arg_node,f_node_ids_l,local_scope);
+#endif
 
 			return;
 		}
@@ -2522,7 +2756,7 @@ static void optimise_then_or_else (NodeP node,NodeDefP node_defs,FreeUniqueNodeI
 				NodeP node;
 				
 				node=node_def->def_node;
-
+   
 				optimise_normal_node (node);
 				
 				for_l (arg,node->node_arguments,arg_next)
@@ -2540,7 +2774,26 @@ static void optimise_then_or_else (NodeP node,NodeDefP node_defs,FreeUniqueNodeI
 #ifdef REUSE_UNIQUE_NODES
 	if (node->node_kind==NormalNode){
 		ArgP arg;
+
 		
+#if 1
+		if (f_node_ids!=NULL && try_insert_root_constructor_update_node (node,&f_node_ids)){
+			unsigned int n,argument_overwrite_bits;
+
+			argument_overwrite_bits=node->node_arguments->arg_occurrence;
+			node=node->node_arguments->arg_node;
+			
+			n=0;
+			for_l (arg,node->node_arguments,arg_next){
+				if (argument_overwrite_bits & (1<<n))
+					optimise_node_in_then_or_else (arg->arg_node,&f_node_ids,local_scope);
+
+				++n;
+			}
+		} else {
+#endif
+
+
 		optimise_normal_node (node);
 	
 #if OPTIMIZE_LAZY_TUPLE_RECURSION
@@ -2568,6 +2821,13 @@ static void optimise_then_or_else (NodeP node,NodeDefP node_defs,FreeUniqueNodeI
 			optimise_node_in_then_or_else (arg->arg_node,&f_node_ids,local_scope);
 
 		optimise_strict_constructor_in_lazy_context (node,&no_free_unique_node_ids);
+
+
+#if 1
+			}
+#endif
+
+
 	} else
 #endif
 	optimise_node_in_then_or_else (node,&f_node_ids,local_scope);
@@ -2584,15 +2844,11 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 				
 #ifdef REUSE_UNIQUE_NODES
 			if (*f_node_ids_l!=NULL && try_insert_constructor_update_node (node,f_node_ids_l)){
-				unsigned int n,arity,argument_overwrite_bits;
-				NodeP fill_node;
+				unsigned int n,argument_overwrite_bits;
 				
-				fill_node=node;
-				node=fill_node->node_arguments->arg_node;
+				argument_overwrite_bits=node->node_arguments->arg_occurrence;
+				node=node->node_arguments->arg_node;
 				
-				argument_overwrite_bits=fill_node->node_arguments->arg_occurrence;
-				arity=node->node_arity;
-
 				n=0;
 				for_l (arg,node->node_arguments,arg_next){
 					if (argument_overwrite_bits & (1<<n))
@@ -2639,22 +2895,47 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 				}
 			}
 #endif
+#if DESTRUCTIVE_RECORD_UPDATES
+			if (node->node_arguments->arg_node->node_kind==NodeIdNode && node->node_arity==1)
+				return;
+#endif
 		case MatchNode:
 			optimise_node (node->node_arguments->arg_node,f_node_ids_l);
 			return;
 		case UpdateNode:
 		{
-			ArgS *arg;
+			ArgP arg;
 
 #if DESTRUCTIVE_RECORD_UPDATES
 			arg=node->node_arguments;
-			if (arg->arg_node->node_kind==NodeIdNode && (arg->arg_node->node_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0
-				&& arg->arg_node->node_node_id->nid_refcount==-2)
-				++arg->arg_node->node_node_id->nid_number;
-#endif
+
+			if (arg->arg_node->node_kind==NodeIdNode){
+				NodeIdP node_id;
+				
+				node_id=arg->arg_node->node_node_id;
+				if ((node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && node_id->nid_refcount==-2)
+					++node_id->nid_number;
+
+				node_id->nid_mark2 |= NID_RECORD_USED_BY_UPDATE;
+
+				arg=arg->arg_next;
+			}
+# if BOXED_RECORDS
+			else {
+				optimise_node (arg->arg_node,f_node_ids_l);
+				if (arg->arg_node->node_kind==NodeIdNode)
+					arg->arg_node->node_node_id->nid_mark2 |= NID_RECORD_USED_BY_UPDATE;
+				
+				arg=arg->arg_next;
+			}
+# endif
+
+			for (; arg!=NULL; arg=arg->arg_next)
+				optimise_node (arg->arg_node,f_node_ids_l);
+#else
 			for_l (arg,node->node_arguments,arg_next)
 				optimise_node (arg->arg_node,f_node_ids_l);
-
+#endif
 			return;
 		}
 		case TupleSelectorsNode:
@@ -2853,6 +3134,25 @@ static void optimise_root_node (NodeP node,NodeDefP node_defs,FreeUniqueNodeIdsP
 			if (node->node_kind==NormalNode){
 				ArgS *arg;
 
+
+#if 1
+				if (f_node_ids!=NULL && try_insert_root_constructor_update_node (node,&f_node_ids)){
+					unsigned int n,argument_overwrite_bits;
+
+					argument_overwrite_bits=node->node_arguments->arg_occurrence;
+					node=node->node_arguments->arg_node;
+					
+					n=0;
+					for_l (arg,node->node_arguments,arg_next){
+						if (argument_overwrite_bits & (1<<n))
+							optimise_node (arg->arg_node,&f_node_ids);
+
+						++n;
+					}
+				} else {
+#endif
+
+
 				optimise_normal_node (node);
 				
 #if OPTIMIZE_LAZY_TUPLE_RECURSION
@@ -2880,6 +3180,13 @@ static void optimise_root_node (NodeP node,NodeDefP node_defs,FreeUniqueNodeIdsP
 					optimise_node (arg->arg_node,&f_node_ids);
 
 				optimise_strict_constructor_in_lazy_context (node,&no_free_unique_node_ids);
+
+
+#if 1
+			}
+#endif
+
+
 			} else
 				optimise_node (node,&f_node_ids);
 
@@ -3121,11 +3428,12 @@ static void MarkTupleSelectorsNode (NodeIdP node_id,NodeP tuple_node)
 				element_node_id->nid_number=element_n;
 				element_node_id->nid_node=select_node;
 				element_node_id->nid_scope = node_id->nid_scope;
+				element_node_id->nid_mark2 |= NID_SELECTION_NODE_ID;
 				select_nodes[element_n]=select_node;
 			}
 			
 			++element_node_id->nid_refcount;
-			
+						
 			select_node->node_kind=NodeIdNode;
 			select_node->node_node_id=element_node_id;
 			
@@ -3838,6 +4146,7 @@ void OptimiseRules (ImpRules rules,SymbDef start_sdef)
 													new_call_state_p = call_arg_state_p2;
 												
 												*lhs_arg_state_p = *new_call_state_p;
+												
 												*function_arg_state_p = *new_call_state_p;
 												
 												arg_p1->arg_state = *new_call_state_p;
@@ -3856,7 +4165,10 @@ void OptimiseRules (ImpRules rules,SymbDef start_sdef)
 														call_arg_node2->node_node_id->nid_refcount==1 &&
 														call_arg_node2->node_node_id->nid_node->node_kind==NodeIdNode)
 													{
-														call_arg_node2->node_node_id->nid_node->node_arguments->arg_state = *new_call_state_p;
+														StateP state_p;
+														
+														state_p=&call_arg_node2->node_node_id->nid_node->node_arguments->arg_state;
+														*state_p = *new_call_state_p;
 													}
 												}
 											} else {
