@@ -5,8 +5,6 @@ import scanner, syntax, hashtable, utilities, predef, compilerSwitches
 
 ParseOnly :== False
 
-//import RWSDebug
-
 toLineAndColumn {fp_line, fp_col}
 	=	{lc_line = fp_line, lc_column = fp_col}
 
@@ -554,8 +552,14 @@ where
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
 	want_rhs_of_def parseContext (Yes (name, False), []) token pos pState
+		# code_allowed  = token == EqualToken
 		| isIclContext parseContext && isLocalContext parseContext && (token == EqualToken || token == DefinesColonToken) &&
 		/* PK isLowerCaseName name.id_name && */ not (isClassOrInstanceDefsContext parseContext)
+		  	# (token, pState) = nextToken FunctionContext pState
+			| code_allowed && token == CodeToken
+				# (rhs, pState) = wantCodeRhs pState
+				= (PD_Function pos name False [] rhs (FK_Function cNameNotLocationDependent), pState)
+			# pState = tokenBack pState
 			# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact token) (tokenBack pState)
 			| token == EqualToken
 				= (PD_Function pos name False [] rhs FK_NodeDefOrFunction, pState)
@@ -1143,9 +1147,7 @@ wantClassDefinition parseContext pos pState
 		# (begin_members, pState) = begin_member_group token pState
 		| begin_members
 			# (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
-// RWS ...		 	  (members, pState) = wantDefinitions (SetLocalContext parseContext) pState
 		 	  (members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
-// ... RWS 
   		  	  class_def = { class_name = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex},
@@ -1245,9 +1247,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 	| isIclContext parseContext
 		# // PK pState = tokenBack pState // AA
 		  pState = want_begin_group token pState
-// RWS ...		  (pi_members, pState) = wantDefinitions (SetLocalContext parseContext) pState
 		  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
-// ... RWS
 		  pState = wantEndGroup "instance" pState
 
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
@@ -2862,7 +2862,7 @@ where
 	want_updates type token pState
 		# (updates, pState)
 			= parse_updates token pState
-// RWS +++ error message if updates == []
+// RWS FIXME error message if updates == []
 		= (updates, pState)
 	where
 		parse_updates :: Token ParseState -> ([NestedUpdate], ParseState)
