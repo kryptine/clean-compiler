@@ -3118,17 +3118,17 @@ void GenLazyRecordDescriptorAndExport (SymbDef sdef)
 
 		put_directive_ (Ddescn);
 		if (DoDebug){
-			FPrintF (OutFile,RECORD_D_PREFIX "%s ",name);
-			if (ExportLocalLabels)
+			if (ExportLocalLabels){
+				FPrintF (OutFile,"e_%s_" RECORD_D_PREFIX "%s ",CurrentModule,name);
 				FPrintF (OutFile,"e_%s_" RECORD_N_PREFIX "%s ",CurrentModule,name);
-			else
-				FPrintF (OutFile,RECORD_N_PREFIX "%s ",name);
+			} else
+				FPrintF (OutFile,RECORD_D_PREFIX "%s " RECORD_N_PREFIX "%s ",name,name);
 		} else {
-			FPrintF (OutFile,RECORD_D_PREFIX "%u ",sdef->sdef_number);
-			if (ExportLocalLabels)
+			if (ExportLocalLabels){
+				FPrintF (OutFile,"e_%s_" RECORD_D_PREFIX "%s ",CurrentModule,name);
 				FPrintF (OutFile,"e_%s_" RECORD_N_PREFIX "%s ",CurrentModule,name);
-			else
-				FPrintF (OutFile,RECORD_N_PREFIX "%u ",sdef->sdef_number);
+			} else
+				FPrintF (OutFile,RECORD_D_PREFIX "%u " RECORD_N_PREFIX "%u ",sdef->sdef_number,sdef->sdef_number);
 		}
 		
 		FPrintF (OutFile, "%d 1 \"%s\"",arity,name);
