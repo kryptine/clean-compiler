@@ -2160,10 +2160,20 @@ where
 				<=< adjust_predef_symbol PD_variablePlaceholder mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_unify				mod_index STE_DclFunction
 				<=< adjust_predef_symbol PD_coerce				mod_index STE_DclFunction
-				<=< adjust_predef_symbol PD_undo_indirections	mod_index STE_DclFunction)
+				<=< adjust_predef_symbol PD_undo_indirections	mod_index STE_DclFunction
+// MV ...
+				<=< adjust_predef_symbol PD_DynamicTemp			mod_index STE_Type
+				<=< adjust_predef_symbol PD_DynamicType			mod_index (STE_Field unused)
+				<=< adjust_predef_symbol PD_DynamicValue		mod_index (STE_Field unused))
+
+// ... MV
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})
 	where
-		
+// MV ...
+		unused
+			= { id_name = "unused", id_info = nilPtr }
+// ... MV
+					
 		adjust_predef_symbols next_symb last_symb mod_index symb_kind cs=:{cs_predef_symbols, cs_symbol_table, cs_error} 
 			| next_symb > last_symb
 				= cs

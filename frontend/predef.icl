@@ -32,7 +32,12 @@ PD_Arity32TupleSymbol		:== 69
 PD_TypeVar_a0				:== 70
 PD_TypeVar_a31				:== 101
 
+/* Dynamics */
+
 PD_TypeCodeMember			:== 123
+PD_DynamicTemp				:== 131
+PD_DynamicValue				:== 132
+PD_DynamicType				:== 133
 
 /* identifiers present in the hastable */
 
@@ -79,12 +84,12 @@ PD_variablePlaceholder		:== 128
 PD_StdDynamics				:== 129
 PD_undo_indirections		:== 130
 
-PD_Start					:== 131
+PD_Start					:== 134
 
 // MW..
-PD_DummyForStrictAliasFun	:== 132
+PD_DummyForStrictAliasFun	:== 135
 
-PD_NrOfPredefSymbols		:== 133
+PD_NrOfPredefSymbols		:== 136
 // ..MW
 
 
@@ -134,7 +139,8 @@ where
 				= build_variables (inc var_number) max_arity (tables <<= (var_name, PD_TypeVar_a0 + var_number))
 
 	fill_table_with_hashing tables
-		= tables	<<- ("StdArray", IC_Module, PD_StdArray) <<- ("StdEnum", IC_Module, PD_StdEnum) <<- ("StdBool", IC_Module, PD_StdBool)
+		# tables	= tables
+					<<- ("StdArray", IC_Module, PD_StdArray) <<- ("StdEnum", IC_Module, PD_StdEnum) <<- ("StdBool", IC_Module, PD_StdBool)
 					<<- ("&&", IC_Expression, PD_AndOp) <<- ("||", IC_Expression, PD_OrOp)
 					<<- ("Array", IC_Class, PD_ArrayClass)
 					<<- ("createArray", IC_Expression, PD_CreateArrayFun)
@@ -157,8 +163,21 @@ where
 					<<-	("_coerce",				IC_Expression, PD_coerce) /* MV */
 					<<- ("StdDynamic",			IC_Module, PD_StdDynamics)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
-					<<- ("Start",				IC_Expression, PD_Start)
+// MV ...
+					<<- ("DynamicTemp",			IC_Type, PD_DynamicTemp)
 
+		# (predef_symbol_table,hash_table)
+			= tables
+		# ({pds_ident},predef_symbol_table)
+			= predef_symbol_table![PD_DynamicTemp]
+			
+		# tables = (predef_symbol_table,hash_table)
+					<<- ("type",				IC_Field pds_ident, PD_DynamicType)
+					<<- ("value",				IC_Field pds_ident, PD_DynamicValue)
+					<<- ("Start",				IC_Expression, PD_Start)
+					
+		= tables
+// ... MV
 
 MakeTupleConsSymbIndex arity 	:== arity - 2 + cArity2TupleConsSymbIndex
 MakeTupleTypeSymbIndex arity 	:== arity - 2 + cArity2TupleTypeSymbIndex

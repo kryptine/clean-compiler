@@ -34,7 +34,14 @@ PD_Arity32TupleSymbol		:== 69
 PD_TypeVar_a0				:== 70
 PD_TypeVar_a31				:== 101
 
+/* Dynamics */
+
 PD_TypeCodeMember			:== 123
+// MV ...
+PD_DynamicTemp				:== 131
+PD_DynamicValue				:== 132
+PD_DynamicType				:== 133
+// ... MV
 
 /* identifiers present in the hastable */
 
@@ -75,17 +82,18 @@ PD_TypeCodeClass			:== 122
 PD_TypeObjectType			:== 124
 PD_TypeConsSymbol			:== 125
 PD_unify					:== 126
+// MV ..
 PD_coerce					:== 127
 PD_variablePlaceholder		:== 128
 PD_StdDynamics				:== 129
 PD_undo_indirections		:== 130
 
-PD_Start					:== 131
+PD_Start					:== 134
 
 // MW..
-PD_DummyForStrictAliasFun	:== 132
+PD_DummyForStrictAliasFun	:== 135
 
-PD_NrOfPredefSymbols		:== 133
+PD_NrOfPredefSymbols		:== 136
 // ..MW
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2

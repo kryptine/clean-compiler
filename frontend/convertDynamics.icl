@@ -1,6 +1,8 @@
 implementation module convertDynamics
 
 import syntax, transform, utilities, convertcases
+// Optional
+USE_TUPLES tuple b :== b;		// change also StdDynamic.icl and recompile all applications
 
 ::	*ConversionInfo =
 	{	ci_predef_symb		:: !*PredefinedSymbols
@@ -15,6 +17,9 @@ import syntax, transform, utilities, convertcases
 	,	ci_placeholders_and_tc_args		:: [(!BoundVar,Ptr VarInfo)]
 	,	ci_generated_global_tc_placeholders		:: !Bool
 	,	ci_used_tcs								:: [Ptr VarInfo]
+	,	ci_symb_ident		:: SymbIdent
+	,	ci_sel_type_field	:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_sel_value_field	:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
 	}
 
 ::	ConversionInput =
@@ -33,10 +38,109 @@ import syntax, transform, utilities, convertcases
 ::	BoundVariables :== [TypedVariable]
 
 :: IndirectionVar    :== BoundVar
+/*
+
+getSymbol :: Index ((Global Index) -> SymbKind) Int !*ConversionInfo -> (SymbIdent, !*ConversionInfo)
+getSymbol index symb_kind arity ci=:{ci_predef_symb}
+	# ({pds_module, pds_def, pds_ident}, ci_predef_symb) = ci_predef_symb![index]
+	  ci = {ci & ci_predef_symb = ci_predef_symb}
+	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+	= (symbol, ci)
+*/
+
 
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap
+	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamics]
+	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)
+		= case (pds_module == (-1) || pds_def == (-1)) of
+			True
+				-> (undef,undef,undef,predefined_symbols)
+			_	
+				 
+				-> case (USE_TUPLES True False) /*(pds_module == (-1) || pds_def == (-1))*/ of
+					True
+						# arity = 2
+						// get tuple arity 2 constructor
+						# ({pds_module, pds_def, pds_ident}, predefined_symbols)	= predefined_symbols![GetTupleConsIndex arity]
+						# twoTuple_symb	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+						
+						// get tuple, type and value selectors
+						# ({pds_def, pds_ident}, predefined_symbols) = predefined_symbols![GetTupleConsIndex arity]
+						# twotuple = {ds_ident = pds_ident, ds_arity = arity, ds_index = pds_def}
+						# type_selector	= TupleSelect twotuple 1
+						# value_selector = TupleSelect twotuple 0
+						-> (twoTuple_symb,value_selector,type_selector,predefined_symbols)
+					False
+					
+						# arity = 2
+		/*				// get tuple arity 2 constructor
+						# ({pds_module, pds_def, pds_ident}, predefined_symbols)	= predefined_symbols![GetTupleConsIndex arity]
+						# twoTuple_symb	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+		
+						  dynamic_temp_symb_ident = twoTuple_symb
+		*/
+		
+						# ({pds_module=pds_module1, pds_def=pds_def1} , predefined_symbols) = predefined_symbols![PD_DynamicTemp]
+						# {td_rhs=RecordType {rt_constructor,rt_fields}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
+							
+						# dynamic_temp_symb_ident
+							= { SymbIdent |
+								symb_name	= rt_constructor.ds_ident
+							,	symb_kind 	= SK_Constructor {glob_module = pds_module1, glob_object = rt_constructor.ds_index} 
+							,	symb_arity	= rt_constructor.ds_arity
+							}
+		
+						// type field
+						# ({pds_module=pds_module2, pds_def=pds_def2} , predefined_symbols) = predefined_symbols![PD_DynamicType]
+						# {sd_field,sd_field_nr}
+							= common_defs.[pds_module2].com_selector_defs.[pds_def2]
+		
+						#! type_defined_symbol
+							= { Global |
+								glob_object		= { DefinedSymbol |
+													ds_ident		= sd_field
+												,	ds_arity		= 0
+												,	ds_index		= pds_def2  //0
+												}
+							,	glob_module		= pds_module2    //pds_def //pds_module
+							}
+						#! ci_sel_type_field
+							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection type_defined_symbol sd_field_nr])
+							//= (sd_field_nr,type_defined_symbol) //---> ("Type expected:",pds_def2,sd_field)
+		
+						# ({pds_def, pds_ident}, predefined_symbols) = predefined_symbols![GetTupleConsIndex arity]
+						# twotuple = {ds_ident = pds_ident, ds_arity = arity, ds_index = pds_def}
+						# type_selector	= TupleSelect twotuple 1
+						
+		//				#! ci_sel_type_field
+		//					= type_selector
+		
+		/*					
+						// value field
+						# ({pds_module=pds_module3, pds_def=pds_def3} , predefined_symbols) = predefined_symbols![PD_DynamicValue]
+						# {sd_field=sd_field3,sd_field_nr=sd_field_nr3}
+							= common_defs.[pds_module3].com_selector_defs.[pds_def3]
+											
+						#! value_defined_symbol
+							= { Global |
+								glob_object		= { DefinedSymbol |
+													ds_ident		= sd_field3
+												,	ds_arity		= 0
+												,	ds_index		= pds_def3 //0
+												}
+							,	glob_module		= pds_module3 //pds_def //pds_module
+							}
+						#! ci_sel_value_field
+							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection value_defined_symbol sd_field_nr3])
+							//= (sd_field_nr3,value_defined_symbol) //---> ("Value expected:",pds_def3,sd_field3)
+		*/
+		
+						# value_selector = TupleSelect twotuple 0
+						  ci_sel_value_field = value_selector
+						-> (dynamic_temp_symb_ident, ci_sel_value_field, ci_sel_type_field,predefined_symbols) 
+
 	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_fun_heap, ci_new_functions}))
@@ -44,8 +148,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
 							ci_new_functions = [], ci_new_variables = [], ci_fun_heap = newHeap, ci_next_fun_nr = nr_of_funs, ci_placeholders_and_tc_args = [],
 							ci_generated_global_tc_placeholders = False,
-							ci_used_tcs = [] })
-
+							ci_used_tcs = [],ci_symb_ident = dynamic_temp_symb_ident , ci_sel_type_field =  ci_sel_type_field, ci_sel_value_field = ci_sel_value_field })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
 			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types [] type_heaps ci_var_heap
 	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap)
@@ -197,25 +300,25 @@ where
 	convertDynamics cinp bound_vars default_expr (MatchExpr opt_symb symb expression) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
 		= (MatchExpr opt_symb symb expression, ci)
-	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_uni_vars, dyn_type_code}) ci
-		# (twoTuple_symb, ci) 	= getSymbol (GetTupleConsIndex 2) SK_Constructor 2 ci
-		  (let_binds,     ci) 	= createVariables dyn_uni_vars [] ci
+	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_uni_vars, dyn_type_code}) ci=:{ci_symb_ident}
+//		# (twoTuple_symb, ci) 	= getSymbol (GetTupleConsIndex 2) SK_Constructor 2 ci
+		# (let_binds,     ci) 	= createVariables dyn_uni_vars [] ci
 		  (dyn_expr,      ci) 	= convertDynamics cinp bound_vars default_expr dyn_expr ci
 		  (_,dyn_type_code,_,_,ci) = convertTypecode2 cinp dyn_type_code False [] [] ci
 //		  (_,dyn_type_code, ci) = convertTypecode cinp dyn_type_code ci
 		= case let_binds of
-			[]	-> (App {	app_symb		= twoTuple_symb,
+			[]	-> (App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident, //twoTuple_symb,
 							app_args 		= [dyn_expr, dyn_type_code],
 							app_info_ptr	= nilPtr }, ci)
 			_ 	#  (let_info_ptr,  ci) = let_ptr ci
 				-> ( Let {	let_strict_binds	= [],
 							let_lazy_binds		= let_binds,
-							let_expr			= App {	app_symb		= twoTuple_symb,
+							let_expr			= App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident,
 														app_args 		= [dyn_expr, dyn_type_code],
 														app_info_ptr	= nilPtr },
 // MW0							let_info_ptr		= let_info_ptr,}, ci)
 							let_info_ptr		= let_info_ptr,
-							let_expr_position	= NoPos}, ci)
+							let_expr_position	= NoPos}, ci) 
 	convertDynamics cinp bound_vars default_expr (TypeCodeExpression type_code) ci
 		= abort "convertDynamics cinp bound_vars default_expr (TypeCodeExpression" //convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
@@ -367,17 +470,18 @@ where
 	bind_info_ptr var_info_ptr bound_vars
 		= [{ tv_free_var = {fv_def_level = NotALevel, fv_name = a_ij_var_name, fv_info_ptr = var_info_ptr, fv_count = 0}, tv_type = empty_attributed_type } : bound_vars]
 
-
 open_dynamic :: Expression !*ConversionInfo -> (OpenedDynamic, LetBind, !*ConversionInfo)
-open_dynamic dynamic_expr ci
+open_dynamic dynamic_expr ci=:{ci_sel_type_field, ci_sel_value_field}
 	# (twotuple, ci) = getTupleSymbol 2 ci
 	  (dynamicType_var, ci) = newVariable "dt" VI_Empty ci
 	  dynamicType_fv = varToFreeVar dynamicType_var 1
-	= (	{ opened_dynamic_expr = TupleSelect twotuple 0 dynamic_expr, opened_dynamic_type = Var dynamicType_var },
+//	  sel_type = Selection No dynamic_expr [RecordSelection type_defined_symbol sd_type_field_nr]
+//	  sel_value = Selection No dynamic_expr [RecordSelection value_defined_symbol sd_value_field_nr]
+	= (	{ opened_dynamic_expr = ci_sel_value_field dynamic_expr /*USE_TUPLES (TupleSelect twotuple 0 dynamic_expr) sel_value*/, opened_dynamic_type = Var dynamicType_var },
+//  RecordSelection !(Global DefinedSymbol) !Int
 // MW0	  	{ bind_src = TupleSelect twotuple 1 dynamic_expr, bind_dst = dynamicType_fv },
-	  	{ lb_src = TupleSelect twotuple 1 dynamic_expr, lb_dst = dynamicType_fv, lb_position = NoPos },
+	  	{ lb_src = ci_sel_type_field dynamic_expr /*USE_TUPLES (TupleSelect twotuple 1 dynamic_expr) sel_type*/, lb_dst = dynamicType_fv, lb_position = NoPos },
 	  	{ ci & ci_new_variables = [ dynamicType_fv : ci.ci_new_variables ]})
-
 /**************************************************************************************************/
 
 convertDynamicPatterns :: !ConversionInput !BoundVariables !Case *ConversionInfo -> (Expression, *ConversionInfo)
@@ -385,7 +489,12 @@ convertDynamicPatterns cinp bound_vars {case_guards = DynamicPatterns [], case_d
 	= case case_default of
 		(Yes expr)	-> (expr, ci)
 		No			-> abort "unexpected value in convertDynamics: 'convertDynamicPatterns'"
-convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards = DynamicPatterns patterns, case_default, case_info_ptr} ci=:{ci_placeholders_and_tc_args=old_ci_placeholders_and_tc_args,ci_generated_global_tc_placeholders}
+convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards = DynamicPatterns patterns, case_default, case_info_ptr} 
+			ci=:{ci_placeholders_and_tc_args=old_ci_placeholders_and_tc_args,ci_generated_global_tc_placeholders}
+//	| True
+//		= abort "convertDynamicPatterns";
+//	# sel = Selection No case_expr [RecordSelection type_defined_symbol sd_field_nr]
+
 	# (opened_dynamic, dt_bind, ci) = open_dynamic case_expr ci
 	  (ind_0, ci) = newVariable "ind_0" (VI_Indirection 0) ci
 	  (c_1,   ci) = newVariable "c_1!" (VI_Default 0) ci
@@ -523,7 +632,9 @@ where
 					-> expr
 				_
 					-> abort "!!!!"
-*/			
+*/		
+		# sel_type = Selection No (Var coerce_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
+	
 		# let_expr
 			= Let {
 					let_strict_binds	= []
@@ -536,7 +647,7 @@ where
 										   ,
 // MW0										 { bind_src = TupleSelect twotuple 0 (Var coerce_result_var),
 // MW0										   bind_dst = coerce_bool_fv } : let_binds
-										 { lb_src = TupleSelect twotuple 0 (Var coerce_result_var),
+										 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var coerce_result_var) /*) sel_type*/,
 										   lb_dst = coerce_bool_fv, lb_position = NoPos } : let_binds
 										],
 							let_expr =
@@ -633,6 +744,8 @@ where
 
 		  (let_binds, ci) 		= bind_indirection_var ind_var unify_result_var twotuple ci
 		  a_ij_binds			= add_x_i_bind opened_dynamic.opened_dynamic_expr dp_var a_ij_binds
+		  
+		  sel_type	= Selection No (Var unify_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
 
 		  let_expr = Let {	let_strict_binds = [],
 // MW0		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
@@ -641,7 +754,7 @@ where
 // MW0		  								   bind_dst = unify_bool_fv } : let_binds
 		  					let_lazy_binds = [{ lb_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
 		  								   lb_dst = unify_result_fv, lb_position = NoPos },
-		  								 { lb_src = TupleSelect twotuple 0 (Var unify_result_var),
+		  								 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var unify_result_var) /*) sel_type*/,
 		  								   lb_dst = unify_bool_fv, lb_position = NoPos } : let_binds
 		  								],
 		  					let_expr = Case {	case_expr 		= Var unify_bool_var,
@@ -705,7 +818,8 @@ bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_h
 	| ref_count > 0
 		# ind_fv = varToFreeVar var ref_count
 // MW0  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
-  		= ([{ lb_src = TupleSelect twotuple 1 (Var unify_result_var), lb_dst = ind_fv, lb_position = NoPos }],
+//		  sel_value = Selection No (Var unify_result_var) [RecordSelection value_defined_symbol sd_value_field_nr]
+  		= ([{ lb_src = /*USE_TUPLES (*/TupleSelect twotuple 1 (Var unify_result_var) /*) sel_value*/, lb_dst = ind_fv, lb_position = NoPos }],
 				{ ci & ci_var_heap = ci_var_heap, ci_new_variables = [ ind_fv : ci_new_variables ]})
 		= ([], {ci & ci_var_heap = ci_var_heap})
 		
