@@ -1012,7 +1012,7 @@ where
 		# (fis, fds, gs) = build_alg_cons_infos cons_def_syms (inc cons_num) type_info_def_sym group_index common_defs	gs
 		= ([fi:fis], [fd:fds], gs) 
 
-	build_cons_info {ds_index,ds_arity} cons_num type_info_def_sym group_index common_defs gs
+	build_cons_info {ds_index,ds_arity} cons_num type_info_def_sym group_index common_defs gs=:{gs_main_dcl_module_n}
 		# {cons_symb, cons_pos, cons_type} = common_defs.com_cons_defs.[ds_index]		
 		# (fun_index, gs) = newFunIndex gs		
 		# def_sym = 
@@ -1039,7 +1039,7 @@ where
 				,	cons_arg_types_expr
 				] 
 				gs_predefs gs_heaps
-		# fun_def = makeFunction def_sym group_index [] cons_info_expr No [] [] cons_pos				
+		# fun_def = makeFunction def_sym group_index [] cons_info_expr No [] gs_main_dcl_module_n cons_pos
 			
 		//# (fun_def, gs_heaps) = buildUndefFunction def_sym group_index gs_predefs gs_heaps
 		= (def_sym, fun_def, {gs & gs_heaps=gs_heaps})
@@ -1124,12 +1124,12 @@ where
 			type_info_def_sym 
 			group_index 
 			cons_info_def_syms 
-			gs
+			gs=:{gs_main_dcl_module_n}
 		
 		# type_vars = [ atv.atv_variable.tv_name.id_name \\ atv <- td_args]			
 		# (body_expr, gs) = build_type_def 
 			td_name.id_name	type_info_def_sym.ds_arity type_vars cons_info_def_syms gs 			
-		# fun_def = makeFunction type_info_def_sym group_index [] body_expr No [] [] td_pos				
+		# fun_def = makeFunction type_info_def_sym group_index [] body_expr No [] gs_main_dcl_module_n td_pos				
 		= (fun_def, gs)
 			
 buildIsomapsForTypeDefs :: ![Global Index] !*GenericState
@@ -1457,7 +1457,7 @@ where
 		= (ins_fun_def, {gs & gs_heaps = gs_heaps})
 			//---> ("created generic alterntaive for " +++ ins_fun_def.fun_symb.id_name)
 
-	move_instance instance_def=:{ins_members, ins_pos} gs
+	move_instance instance_def=:{ins_members, ins_pos} gs=:{gs_main_dcl_module_n}
 		# (new_fun_index, new_fun_group, gs=:{gs_fun_defs, gs_predefs, gs_heaps}) 
 			= newFunAndGroupIndex gs
 		# ins_fun_index = ins_members.[0].ds_index
@@ -1483,7 +1483,7 @@ where
 			,	ds_index = ins_fun_index
 			}
 		#! dummy_fun_def = 
-			makeFunction dummy_def_sym fun_info.fi_group_index arg_vars undef_expr fun_type [] [] fun_pos					
+			makeFunction dummy_def_sym fun_info.fi_group_index arg_vars undef_expr fun_type [] gs_main_dcl_module_n fun_pos					
 		#! gs_fun_defs = {gs_fun_defs & [ins_fun_index] = dummy_fun_def}
 				
 		= (instance_def, new_fun_index, new_ins_fun_def, {gs & gs_fun_defs = gs_fun_defs, gs_heaps = gs_heaps})
@@ -2561,7 +2561,7 @@ buildIsoRecord
 	# (from_expr, gs_heaps) 	= buildFunApp gs_main_dcl_module_n from_fun [] gs_heaps
 	# (to_expr, gs_heaps) 		= buildFunApp gs_main_dcl_module_n to_fun [] gs_heaps	
 	# (iso_expr, gs_heaps) 		= buildISO to_expr from_expr gs_predefs gs_heaps
-	# fun_def = makeFunction def_sym group_index [] iso_expr No [] [from_fun.ds_index, to_fun.ds_index]	NoPos				
+	# fun_def = makeFunction def_sym group_index [] iso_expr No [] gs_main_dcl_module_n	NoPos				
 	= (fun_def, {gs & gs_heaps = gs_heaps})
 
 // convert a type to ot's generic representation
@@ -2571,15 +2571,14 @@ buildIsoTo
 		def_sym group_index type_def_mod 
 		type_def=:{td_rhs, td_name, td_index, td_pos} 
 		cons_infos
-		gs=:{gs_heaps}
+		gs=:{gs_heaps,gs_main_dcl_module_n}
 	# (arg_expr, arg_var, gs_heaps) = buildVarExpr "x" gs_heaps 
 	# (body_expr, free_vars, gs=:{gs_error}) = 
 		build_body type_def_mod td_index td_rhs cons_infos arg_expr {gs&gs_heaps = gs_heaps}	
 	| not gs_error.ea_ok
-		#! fun_def = makeFunction {def_sym&ds_arity=0} NoIndex [] EE No [] [] NoPos
+		#! fun_def = makeFunction {def_sym&ds_arity=0} NoIndex [] EE No [] gs_main_dcl_module_n NoPos
 		= (fun_def, {gs & gs_error = gs_error})	
-	# fun_call_indexes = [] // [ds_index \\  {ds_index} <- cons_infos]		
-	# fun_def = makeFunction def_sym group_index [arg_var] body_expr No free_vars fun_call_indexes NoPos	
+	# fun_def = makeFunction def_sym group_index [arg_var] body_expr No free_vars gs_main_dcl_module_n NoPos	
 	= (fun_def, {gs & gs_error = gs_error})
 		//---> fun_def
 where
@@ -2673,12 +2672,12 @@ buildIsoFrom :: !DefinedSymbol !Int !Int !CheckedTypeDef !*GenericState
 buildIsoFrom 
 		def_sym group_index type_def_mod 
 		type_def=:{td_rhs, td_name, td_index, td_pos} 
-		gs=:{gs_predefs, gs_heaps, gs_error}
+		gs=:{gs_predefs, gs_heaps, gs_error,gs_main_dcl_module_n}
 	#! (body_expr, free_vars, gs_heaps, gs_error) = build_body type_def_mod td_rhs gs_predefs gs_heaps gs_error
 	| not gs_error.ea_ok
-		#! fun_def = makeFunction {def_sym&ds_arity=0} NoIndex [] EE No [] [] td_pos
+		#! fun_def = makeFunction {def_sym&ds_arity=0} NoIndex [] EE No [] gs_main_dcl_module_n td_pos
 		= (fun_def, {gs & gs_heaps = gs_heaps, gs_error = gs_error} )
-	#! fun_def = makeFunction def_sym group_index [hd free_vars] body_expr No (tl free_vars) []	td_pos
+	#! fun_def = makeFunction def_sym group_index [hd free_vars] body_expr No (tl free_vars) gs_main_dcl_module_n td_pos
 	= (fun_def, {gs & gs_heaps = gs_heaps, gs_error = gs_error} )
 		//---> fun_def
 where	
@@ -2755,7 +2754,7 @@ buildIsomapFromTo :: !IsoDirection !DefinedSymbol !Int !Int !Int !*GenericState
 	-> (!FunDef, !Index, !*GenericState)
 buildIsomapFromTo 
 		iso_dir def_sym group_index type_def_mod type_def_index 
-		gs=:{gs_heaps, gs_modules}
+		gs=:{gs_heaps, gs_modules,gs_main_dcl_module_n}
 	#! (type_def=:{td_name, td_index, td_arity, td_pos}, gs_modules) 
 		= getTypeDef type_def_mod type_def_index gs_modules
 	#! arg_names = [ "i" +++ toString n \\ n <- [1 .. td_arity]]
@@ -2766,7 +2765,7 @@ buildIsomapFromTo
 		build_body iso_dir type_def_mod td_index type_def arg_expr isomap_arg_vars gs	
 
 	#! (fun_type, gs) = build_type1 iso_dir type_def_mod type_def_index gs
-	#! fun_def = makeFunction def_sym group_index (isomap_arg_vars ++ [arg_var]) body_expr (Yes fun_type) free_vars [] td_pos	
+	#! fun_def = makeFunction def_sym group_index (isomap_arg_vars ++ [arg_var]) body_expr (Yes fun_type) free_vars gs_main_dcl_module_n td_pos	
 	= (fun_def, def_sym.ds_index, gs)
 		//---> ("isomap from/to", td_name, fun_def)
 where
@@ -2944,7 +2943,7 @@ buildIsomapForTypeDef
 	#! (iso_expr, gs_heaps) 	= buildISO to_expr from_expr gs_predefs gs_heaps
 	#! gs = {gs & gs_heaps = gs_heaps}
 	#! (fun_type, gs) = buildIsomapType type_def_mod td_index gs 
-	#! fun_def = makeFunction fun_def_sym group_index arg_vars iso_expr (Yes fun_type) [] [from_fun.ds_index, to_fun.ds_index] td_pos					
+	#! fun_def = makeFunction fun_def_sym group_index arg_vars iso_expr (Yes fun_type) [] gs_main_dcl_module_n td_pos					
 	= (fun_def, fun_def_sym.ds_index, gs)
 
 buildIsomapType :: !Int !Int !*GenericState -> (!SymbolType, !*GenericState)
@@ -3031,13 +3030,13 @@ where
 
 buildIsomapForGeneric :: !DefinedSymbol !Int !GenericDef !*GenericState
 	-> (!FunDef, !Index, !*GenericState)
-buildIsomapForGeneric def_sym group_index {gen_type, gen_name, gen_pos} gs=:{gs_heaps}
+buildIsomapForGeneric def_sym group_index {gen_type, gen_name, gen_pos} gs=:{gs_heaps,gs_main_dcl_module_n}
 	#! arg_names = [ "iso" +++ toString n \\ n <- [1 .. gen_type.gt_arity]]
 	#! (arg_vars, gs_heaps) = buildFreeVars arg_names gs_heaps
 	#! curried_gt_type = curry_symbol_type gen_type.gt_type
 	#! gs = {gs & gs_heaps = gs_heaps }
 	#! (body_expr, gs) = buildIsomapExpr curried_gt_type gen_type.gt_vars arg_vars gen_name gen_pos gs 	
-	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] gen_pos					
+	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] gs_main_dcl_module_n gen_pos					
 	= (fun_def, def_sym.ds_index, gs) 	
 where
 	// no uniqueness stuff is needed to build the
@@ -3124,7 +3123,7 @@ buildInstance
 		def_sym group_index 
 		instance_def=:{ins_type, ins_generic, ins_pos, ins_ident} 
 		generic_def=:{gen_name, gen_type, gen_isomap} 
-		gs=:{gs_heaps}	
+		gs=:{gs_heaps,gs_main_dcl_module_n}	
 
 	#! original_arity 	= gen_type.gt_type.st_arity
 	#! generated_arity 	= def_sym.ds_arity - original_arity // arity of kind
@@ -3158,7 +3157,7 @@ buildInstance
 		(adaptor_expr @ [instance_expr]) 
 		((adaptor_expr @ [instance_expr]) @ original_arg_exprs)
 
-	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] ins_pos					
+	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] gs_main_dcl_module_n ins_pos					
 	= (fun_def, gs) 	
 		//---> ("buildInstance", fun_def)
 where
@@ -3328,14 +3327,14 @@ buildKindConstInstance :: !DefinedSymbol !Int !Index !DefinedSymbol !TypeKind !G
 buildKindConstInstance 
 		def_sym group_index 
 		generic_module generic_def_sym kind=:(KindArrow kinds) 
-		gs=:{gs_heaps}
+		gs=:{gs_heaps,gs_main_dcl_module_n}
 	#! arg_names = ["x" +++ toString i \\ i <- [1 .. def_sym.ds_arity]]
 	#! (arg_exprs, arg_vars, gs_heaps) = buildVarExprs arg_names gs_heaps
 	
 	# (gen_exprs, gs_heaps) = mapSt build_gen_expr [1 .. (length kinds)/* - 1*/] gs_heaps
 	  
 	#! (body_expr, gs_heaps) = buildGenericApp generic_module generic_def_sym kind (gen_exprs ++ arg_exprs) gs_heaps
-	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] NoPos					
+	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] gs_main_dcl_module_n NoPos					
 	= (fun_def, {gs & gs_heaps = gs_heaps})	
 where
 	build_gen_expr _ heaps
@@ -3346,7 +3345,7 @@ buildKindConstInstance1 :: !DefinedSymbol !Int !Index !DefinedSymbol ![TypeKind]
 buildKindConstInstance1 
 		def_sym group_index 
 		generic_module generic_def_sym arg_kinds 
-		gs=:{gs_heaps}
+		gs=:{gs_heaps,gs_main_dcl_module_n}
 	#! arg_names = ["x" +++ toString i \\ i <- [1 .. def_sym.ds_arity]]
 	#! (arg_exprs, arg_vars, gs_heaps) = buildVarExprs arg_names gs_heaps
 	
@@ -3354,7 +3353,7 @@ buildKindConstInstance1
 	  
 	#! (body_expr, gs_heaps) 
 		= buildGenericApp generic_module generic_def_sym (KindArrow arg_kinds) (gen_exprs ++ arg_exprs) gs_heaps
-	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] NoPos					
+	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] gs_main_dcl_module_n NoPos					
 	= (fun_def, {gs & gs_heaps = gs_heaps})	
 where
 	build_gen_expr kind heaps
@@ -3592,9 +3591,9 @@ buildProductType types predefs
 // Functions 
 //===================================
 
-makeFunction :: !DefinedSymbol !Index ![FreeVar] Expression !(Optional SymbolType) [FreeVar] [Index] Position
+makeFunction :: !DefinedSymbol !Index ![FreeVar] !Expression !(Optional SymbolType) ![FreeVar] !Index !Position
 	-> FunDef
-makeFunction {ds_index, ds_arity, ds_ident} group_index arg_vars body_expr opt_sym_type local_vars fun_call_indexes fun_pos
+makeFunction {ds_index, ds_arity, ds_ident} group_index arg_vars body_expr opt_sym_type local_vars main_dcl_module_n fun_pos
 	| length arg_vars <> ds_arity 
 		= abort "length arg_vars <> ds_arity\n"  
 	= {
@@ -3610,13 +3609,12 @@ makeFunction {ds_index, ds_arity, ds_ident} group_index arg_vars body_expr opt_s
 		fun_kind  = FK_Function cNameNotLocationDependent,
 		fun_lifted = 0,
 		fun_info = {	
-			fi_calls = [FunCall ind NotALevel \\ ind <- fun_call_indexes],	
+			fi_calls = [FunCall ind NotALevel \\ ind <- collectCalls main_dcl_module_n body_expr],	
 			fi_group_index = group_index,
 			fi_def_level = NotALevel,
 			fi_free_vars =  [],
 			fi_local_vars = local_vars,
 			fi_dynamics = [],
-// Sjaak	fi_is_macro_fun = False
 			fi_properties = 0
 			}	
 		}
@@ -3628,7 +3626,7 @@ newFunAndGroupIndex gs=:{gs_last_fun, gs_last_group}
 
 addFunsAndGroups :: ![FunDef] ![Group] (!*GenericState) -> !*GenericState
 addFunsAndGroups new_fun_defs new_groups 
-		gs=:{gs_fun_defs, gs_groups, gs_first_fun, gs_last_fun, gs_first_group, gs_last_group}
+		gs=:{gs_fun_defs, gs_groups, gs_first_fun, gs_last_fun, gs_first_group, gs_last_group,gs_main_dcl_module_n}
 	# gs_fun_defs = add_funs new_fun_defs gs_fun_defs gs_first_fun gs_last_fun
 	# gs_groups = add_groups new_groups gs_groups gs_first_group gs_last_group
 	# (gs_groups, gs_fun_defs) = check_groups gs_first_group gs_groups gs_fun_defs
@@ -3640,7 +3638,7 @@ where
 		| n_new_fun_defs <> gs_last_fun - gs_first_fun
 			= abort "error in number of fun_defs" 	
 		# fun_defs = createArray (n_new_fun_defs + n_gs_fun_defs) 
-			(makeFunction EmptyDefinedSymbol NoIndex [] EE No [] [] NoPos)
+			(makeFunction EmptyDefinedSymbol NoIndex [] EE No [] gs_main_dcl_module_n NoPos)
 		#! fun_defs = { fun_defs & [i] = gs_fun_defs . [i] \\ i <- [0..(n_gs_fun_defs - 1)]}
 		#! fun_defs = { fun_defs & [i] = check_fun fun_def i \\ 
 			i <- [n_gs_fun_defs .. (n_gs_fun_defs + n_new_fun_defs - 1)] & 
@@ -3683,19 +3681,19 @@ where
 			= abort ("inconsistent group " +++ toString group_index +++ ": " +++ 
 				toString fun_index +++ " and " +++ toString fun.fun_info.fi_group_index)		 		
 
-buildIdFunction :: !DefinedSymbol Int !Ident !PredefinedSymbols !*Heaps-> (!FunDef, !*Heaps)
-buildIdFunction def_sym group_index name predefs heaps
+buildIdFunction :: !DefinedSymbol Int !Ident !PredefinedSymbols !Index !*Heaps-> (!FunDef, !*Heaps)
+buildIdFunction def_sym group_index name predefs gs_main_dcl_module_n heaps
 	# (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps 
-	# fun_def = makeFunction def_sym group_index [arg_var] arg_expr No [] [] NoPos	
+	# fun_def = makeFunction def_sym group_index [arg_var] arg_expr No [] gs_main_dcl_module_n NoPos	
 	= (fun_def, heaps)
 	
-buildUndefFunction :: !DefinedSymbol !Int !PredefinedSymbols !*Heaps-> (!FunDef, !*Heaps)
-buildUndefFunction def_sym group_index predefs heaps
+buildUndefFunction :: !DefinedSymbol !Int !PredefinedSymbols !Index !*Heaps-> (!FunDef, !*Heaps)
+buildUndefFunction def_sym group_index predefs gs_main_dcl_module_n heaps
 	# names = [ "x" +++ toString i \\ i <- [1 .. def_sym.ds_arity]]
 	# (arg_vars, heaps) = mapSt build_free_var names heaps
 	# (body_expr, heaps) = buildUndefFunApp [] predefs heaps
 	//# (body_expr, heaps) = buildUNIT predefs heaps
-	# fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] NoPos	
+	# fun_def = makeFunction def_sym group_index arg_vars body_expr No [] gs_main_dcl_module_n NoPos	
 	= (fun_def, heaps)
 where
 	build_free_var :: !String !*Heaps -> (!FreeVar, !*Heaps)
@@ -4117,6 +4115,54 @@ where
 			determineVariablesAndRefCounts fun_arg_vars body_expr cs
 		# heaps = { heaps & hp_var_heap = cos_var_heap, hp_expression_heap = cos_symbol_heap }
 		= (body_expr, fun_arg_vars, local_vars, heaps)
+
+// collect functions called in an expression 
+collectCalls :: !Index !Expression -> [Index]
+collectCalls current_module expr
+	# symbidents = collect_expr_calls expr []
+	= removeDup 
+		[glob_object \\ 
+			{symb_kind=SK_Function {glob_module,glob_object}} <- symbidents 
+			| glob_module == current_module]
+where
+		
+	collect_expr_calls (App app) rest = [app.app_symb:foldr collect_expr_calls rest app.app_args]
+	collect_expr_calls (expr@exprs) rest = collect_expr_calls expr (foldr collect_expr_calls rest exprs)
+	collect_expr_calls (Let li) rest = collect_expr_calls li.let_expr (foldr collect_letbind_calls (foldr collect_letbind_calls rest li.let_lazy_binds) li.let_strict_binds)
+	collect_expr_calls (Case ci) rest = collect_expr_calls ci.case_expr (collect_casepatterns_calls ci.case_guards (foldOptional id collect_expr_calls ci.case_default rest))
+	collect_expr_calls (Selection optgd expr sels) rest = collect_expr_calls expr (foldr collect_sel_calls rest sels)
+	collect_expr_calls (Update expr1 sels expr2) rest = collect_expr_calls expr1 (foldr collect_sel_calls (collect_expr_calls expr2 rest) sels)
+	collect_expr_calls (RecordUpdate gds expr binds) rest = collect_expr_calls expr (foldr collect_bind_calls rest binds)
+	collect_expr_calls (TupleSelect ds i expr) rest = collect_expr_calls expr rest
+	//collect_expr_calls (Lambda fvs expr) rest = collect_expr_calls expr rest
+	collect_expr_calls (Conditional cond) rest = collect_expr_calls cond.if_cond (collect_expr_calls cond.if_then (foldOptional id collect_expr_calls cond.if_else rest))
+	collect_expr_calls (MatchExpr ogds gds expr) rest = collect_expr_calls expr rest
+	collect_expr_calls (DynamicExpr dyn) rest = collect_expr_calls dyn.dyn_expr (collect_tce_calls dyn.dyn_type_code rest)
+	//collect_expr_calls (TypeCase tc) rest = collect_expr_calls tc.type_case_dynamic (foldr collect_dp_calls (foldOptional id collect_expr_calls rest) tc.type_case_patterns)
+	collect_expr_calls (TypeCodeExpression tce) rest = collect_tce_calls tce rest
+	collect_expr_calls _ rest = rest
+
+	collect_letbind_calls lb rest = collect_expr_calls lb.lb_src rest
+	
+	collect_casepatterns_calls (AlgebraicPatterns gi aps) rest = foldr collect_ap_calls rest aps
+	collect_casepatterns_calls (BasicPatterns gi bps) rest = foldr collect_bp_calls rest bps
+	collect_casepatterns_calls (DynamicPatterns dps) rest = foldr collect_dp_calls rest dps
+	collect_casepatterns_calls NoPattern rest = rest
+	
+	collect_ap_calls ap rest = collect_expr_calls ap.ap_expr rest
+	collect_bp_calls bp rest = collect_expr_calls bp.bp_expr rest
+	collect_dp_calls dp rest = collect_tce_calls dp.dp_type_code (collect_expr_calls dp.dp_rhs rest)
+	
+	collect_sel_calls (RecordSelection gds i) rest = rest
+	collect_sel_calls (ArraySelection gds eip expr) rest = collect_expr_calls expr rest
+	collect_sel_calls (DictionarySelection bv sels sip expr) rest = foldr collect_sel_calls (collect_expr_calls expr rest) sels
+	
+	collect_bind_calls b rest = collect_expr_calls b.bind_src rest
+	
+	collect_tce_calls (TCE_Constructor i tces) rest = foldr collect_tce_calls rest tces
+	collect_tce_calls (TCE_Selector sels vip) rest = foldr collect_sel_calls rest sels
+	collect_tce_calls _ rest = rest
+	
 	
 makeIdent :: String -> Ident
 makeIdent str = {id_name = str, id_info = nilPtr} 
@@ -4137,6 +4183,9 @@ makeListExpr [expr:exprs] predefs heaps
 	# (list_expr, heaps) = makeListExpr exprs predefs heaps 
 	= buildPredefConsApp PD_ConsSymbol [expr, list_expr] predefs heaps
 
+foldOptional no yes No = no
+foldOptional no yes (Yes x) = yes x
+
 transpose []             = []
 transpose [[] : xss]     = transpose xss
 transpose [[x:xs] : xss] = 
@@ -4146,8 +4195,6 @@ unzip3 [] = ([], [], [])
 unzip3 [(x1,x2,x3):xs]
 	# (x1s, x2s, x3s) = unzip3 xs
 	= ([x1:x1s], [x2:x2s], [x3:x3s])
-
-
  
 reportError name pos msg error
 	= checkErrorWithIdentPos (newPosition name pos) msg error
