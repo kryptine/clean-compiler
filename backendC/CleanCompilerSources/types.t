@@ -75,7 +75,7 @@ typedef struct
 # include <windef.h>
 # include <winbase.h>
 #else
-# ifdef KARBON
+# if defined (POWER) && defined (KARBON)
 #include <UTCUtils.h>
 typedef UTCDateTime FileTime;
 # else
