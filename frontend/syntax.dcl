@@ -380,9 +380,15 @@ cIsNonCoercible			:== 2
 	}
 
 ::	CheckedBody =
-	{	cb_args			:: ![FreeVar]
-	,	cb_rhs			:: ![Expression]
+	{	cb_args		:: ![FreeVar]
+	,	cb_rhs		:: ![CheckedAlternative]
 	}
+
+::	CheckedAlternative =
+	{	ca_rhs		:: !Expression
+	,	ca_position	:: !Position	// the position is NoPos iff the position information for this
+	}								// alternative is already stored in a case alternative
+									// (in ap_position, bp_position or dp_position)
 
 ::	TransformedBody =
 	{	tb_args			:: ![FreeVar]
@@ -1012,6 +1018,7 @@ cIsNotStrict	:== False
 	,	case_default	:: !Optional Expression
 	,	case_ident		:: !Optional Ident
 	,	case_info_ptr	:: !ExprInfoPtr
+	,	case_default_pos:: !Position
 	}
 
 ::	Let =

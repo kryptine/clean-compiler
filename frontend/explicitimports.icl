@@ -665,6 +665,10 @@ instance check_completeness CasePatterns where
 	check_completeness NoPattern _ ccs
 		= ccs
 
+instance check_completeness CheckedAlternative where
+	check_completeness {ca_rhs} cci ccs
+		= check_completeness ca_rhs cci ccs
+
 instance check_completeness CheckedBody where
 	check_completeness {cb_rhs} cci ccs
 		= check_completeness cb_rhs cci ccs

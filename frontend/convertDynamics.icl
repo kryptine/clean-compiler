@@ -400,7 +400,8 @@ where
 												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = NoPos }],
 												case_default	= default_expr,
 												case_ident		= No,
-												case_info_ptr	= case_info_ptr	},
+												case_info_ptr	= case_info_ptr,
+												case_default_pos= NoPos }, // MW4++
 		  					let_info_ptr = let_info_ptr	}
 		= (a_ij_binds ++ binds,  let_expr,  { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
 	where

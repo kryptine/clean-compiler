@@ -704,7 +704,8 @@ setExtendedVarInfo var_info_ptr extension var_heap
 	= case old_var_info of
 		VI_Extended _ original_var_info	-> writePtr var_info_ptr (VI_Extended extension original_var_info) var_heap
 		_								-> writePtr var_info_ptr (VI_Extended extension old_var_info) var_heap
-neverMatchingCase = { case_expr = EE, case_guards = NoPattern, case_default = No, case_ident = No, case_info_ptr = nilPtr }
+neverMatchingCase = { case_expr = EE, case_guards = NoPattern, case_default = No, case_ident = No,
+						case_info_ptr = nilPtr, case_default_pos = NoPos }
 
 instance transform DynamicExpr where
 	transform dyn=:{dyn_expr} ro ti

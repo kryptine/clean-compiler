@@ -1041,7 +1041,7 @@ newFreeVariable new_var []
 
 buildTypeCase type_case_dynamic type_case_patterns type_case_default type_case_info_ptr :==
 	Case {	case_expr = type_case_dynamic, case_guards = DynamicPatterns type_case_patterns, case_default = type_case_default, 
-			case_info_ptr = type_case_info_ptr, case_ident = No }
+			case_info_ptr = type_case_info_ptr, case_ident = No, case_default_pos = NoPos }
 
 
 consOptional (Yes thing) things
@@ -1427,16 +1427,18 @@ where
 				# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 				  (bound_var, expr_heap) = allocate_bound_var var expr_heap
 				  result = Case {case_expr = Var bound_var, case_guards = patterns, case_default = Yes result,
-								 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr}
+								 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr,
+								 case_default_pos = NoPos }
 				  (case_expression, expr_heap) = bind_default_variable expr var result expr_heap
 				-> (case_expression, expr_heap)
 			No
 				#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 				-> (Case {case_expr = expr, case_guards = patterns, case_default = Yes result,
-						case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
+						case_ident = Yes case_ident, case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
 	build_case patterns No expr case_ident expr_heap
 		# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
+		= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident,
+			case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
 
 	bind_default_variable bind_src bind_dst result_expr expr_heap
 		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -1869,13 +1871,15 @@ where
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
-		  		case_default = result_expr, case_ident = No, case_info_ptr = case_expr_ptr }
+		  		case_default = result_expr, case_ident = No, case_info_ptr = case_expr_ptr,
+		  		case_default_pos = NoPos }
 		= build_sequential_lets let_binds case_expr es_expr_heap
 	convert_guards_to_cases [(let_binds, guard, expr) : rev_guarded_exprs] result_expr es_expr_heap
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
-		  		case_default = result_expr, case_ident = No, case_info_ptr = case_expr_ptr }
+		  		case_default = result_expr, case_ident = No, case_info_ptr = case_expr_ptr,
+		  		case_default_pos = NoPos }
 		  (result_expr, es_expr_heap) = build_sequential_lets let_binds case_expr es_expr_heap
 		= convert_guards_to_cases rev_guarded_exprs (Yes result_expr) es_expr_heap
 	
@@ -2003,7 +2007,8 @@ convertSubPattern (AP_Algebraic cons_symbol type_index args opt_var) result_expr
 	  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
 		Case { case_expr = Var { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr },
-				case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr },
+				case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr,
+				case_default_pos = NoPos },
 		NoPos, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Basic basic_val opt_var) result_expr pattern_position var_store expr_heap opt_dynamics cs
 	# (basic_type, cs) = typeOfBasicValue basic_val cs
@@ -2013,7 +2018,8 @@ convertSubPattern (AP_Basic basic_val opt_var) result_expr pattern_position var_
 	  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
 		Case { case_expr = Var { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr },
-			  case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr},
+			  case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr,
+			  case_default_pos = NoPos},
 		NoPos, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Dynamic pattern type opt_var) result_expr pattern_position var_store expr_heap opt_dynamics cs
 	# (var_arg, result_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)
@@ -2140,10 +2146,10 @@ checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_posit
 	  (rhss, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
 	  		= check_function_bodies free_vars cb_args bodies e_input { e_state & es_dynamics = [], es_var_heap = es_var_heap } e_info
 	  								{ cs & cs_symbol_table = cs_symbol_table }
-	  (rhs, _, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
+	  (rhs, position, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
 	  		= transform_patterns_into_cases aux_patterns cb_args expr_with_array_selections pb_position es_var_heap es_expr_heap
 	  										dynamics_in_rhs cs
-	= (CheckedBody { cb_args = cb_args, cb_rhs = [rhs : rhss] }, free_vars,
+	= (CheckedBody { cb_args = cb_args, cb_rhs = [{ ca_rhs = rhs, ca_position = position } : rhss] }, free_vars,
 		{ e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap, es_dynamics = dynamics_in_patterns ++ es_dynamics }, e_info, cs)
 where
 	check_patterns [pattern : patterns] p_input accus var_store e_info cs
@@ -2182,11 +2188,12 @@ where
 	 	  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
 		  (rhs_exprs, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
 		  		= check_function_bodies free_vars fun_args bodies e_input { e_state & es_dynamics = [] } e_info { cs & cs_symbol_table = cs_symbol_table }
-		  (rhs_expr, _, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
+		  (rhs_expr, position, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
 		  		= transform_patterns_into_cases aux_patterns fun_args rhs_expr pb_position
 		  										 es_var_heap es_expr_heap dynamics_in_rhs cs
-		= ([rhs_expr : rhs_exprs], free_vars, { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap,
-				es_dynamics = dynamics_in_patterns ++ es_dynamics }, e_info, cs)
+		= ([{ ca_rhs = rhs_expr, ca_position = position } : rhs_exprs], free_vars,
+			{ e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap,
+			es_dynamics = dynamics_in_patterns ++ es_dynamics }, e_info, cs)
 	check_function_bodies free_vars fun_args [] e_input e_state e_info cs
 		= ([], free_vars, e_state, e_info, cs) 
 		
@@ -2253,14 +2260,16 @@ where
 		  alg_pattern = { ap_symbol = cons_symbol, ap_vars = var_args, ap_expr = result_expr, ap_position = pattern_position }
 	  	  case_guards = AlgebraicPatterns type_symbol [alg_pattern]
 		  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Case { case_expr = act_var, case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr },
+		= (Case { case_expr = act_var, case_guards = case_guards, case_default = No, case_ident = No,
+				case_info_ptr = case_expr_ptr, case_default_pos = NoPos },
 				NoPos, var_store, expr_heap, opt_dynamics, cs)	
 	transform_pattern_into_cases (AP_Basic basic_val opt_var) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
 		# (basic_type, cs) = typeOfBasicValue basic_val cs
 	  	  (act_var, result_expr, expr_heap) = transform_pattern_variable fun_arg opt_var result_expr expr_heap
 		  case_guards = BasicPatterns basic_type [{ bp_value = basic_val, bp_expr = result_expr, bp_position = pattern_position }]
 		  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Case { case_expr = act_var, case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr },
+		= (Case { case_expr = act_var, case_guards = case_guards, case_default = No, case_ident = No,
+					case_info_ptr = case_expr_ptr, case_default_pos = NoPos },
 			NoPos, var_store, expr_heap, opt_dynamics, cs)	
 	transform_pattern_into_cases (AP_Dynamic pattern type opt_var) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
 		# (var_arg, result_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)

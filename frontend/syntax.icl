@@ -355,9 +355,15 @@ cMayBeNonCoercible		:== 4
 	}
 
 ::	CheckedBody =
-	{	cb_args			:: ![FreeVar]
-	,	cb_rhs			:: ![Expression]
+	{	cb_args		:: ![FreeVar]
+	,	cb_rhs		:: ![CheckedAlternative]
 	}
+
+::	CheckedAlternative =
+	{	ca_rhs		:: !Expression
+	,	ca_position	:: !Position	// the position is NoPos iff the position information for this
+	}								// alternative is already stored in a case alternative
+									// (in ap_position, bp_position or dp_position)
 
 ::	TransformedBody =
 	{	tb_args			:: ![FreeVar]
@@ -972,6 +978,7 @@ cIsNotStrict	:== False
 	,	case_default	:: !Optional Expression
 	,	case_ident		:: !Optional Ident
 	,	case_info_ptr	:: !ExprInfoPtr
+	,	case_default_pos:: !Position
 	}
 
 ::	Let =
@@ -993,7 +1000,6 @@ cIsNotStrict	:== False
 				 | BasicPatterns !BasicType [BasicPattern]
 				 | DynamicPatterns [DynamicPattern]						/* auxiliary */
 				 | NoPattern											/* auxiliary */
-
 
 ::	Selection	= RecordSelection !(Global DefinedSymbol) !Int
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
@@ -1311,6 +1317,10 @@ where
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
 
+instance <<< CheckedAlternative
+where
+	(<<<) file {ca_rhs} = file <<< ca_rhs
+
 instance <<< Qualifier
 where
 	(<<<) file {qual_generators,qual_filter = Yes qual_filter} = file <<< qual_generators <<< "| " <<< qual_filter
@@ -1352,7 +1362,7 @@ where
  	(<<<) file (Case {case_expr,case_guards,case_default=No})
 		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
 	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr})
-		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t-> " <<< def_expr
+		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t->" <<< def_expr
 	(<<<) file (BasicExpr basic_value basic_type) = file <<< basic_value
 	(<<<) file (Conditional {if_cond,if_then,if_else}) =
 			else_part (file <<< "IF " <<< if_cond <<< "\nTHEN\n" <<< if_then) if_else

@@ -742,7 +742,7 @@ instance e_corresponds FunctionBody where
 		=	e_corresponds (from_body dclDef) (from_body iclDef)
 	  where
 		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
-		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, cb_rhs)
+		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, [ca_rhs \\ {ca_rhs} <- cb_rhs])
 		
 instance e_corresponds TransformedBody where
 	e_corresponds dclDef iclDef

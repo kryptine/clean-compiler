@@ -840,11 +840,13 @@ where
 
 instance requirements Case
 where
-	requirements ti {case_expr,case_guards,case_default,case_info_ptr} reqs_ts
+// MW4 was:	requirements ti {case_expr,case_guards,case_default,case_info_ptr} reqs_ts
+	requirements ti {case_expr,case_guards,case_default,case_info_ptr, case_default_pos} reqs_ts
 		# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti case_expr reqs_ts
 		  (fresh_v, ts) = freshAttributedVariable ts
 		  (cons_types, reqs_ts) = requirements_of_guarded_expressions ti case_guards case_expr expr_type opt_expr_ptr fresh_v (reqs, ts)
-		  (reqs, ts) = requirements_of_default ti case_default fresh_v reqs_ts
+// MW4 was:		  (reqs, ts) = requirements_of_default ti case_default fresh_v reqs_ts
+		  (reqs, ts) = requirements_of_default ti case_default case_default_pos fresh_v reqs_ts
 		  ts_expr_heap =  ts.ts_expr_heap <:= (case_info_ptr, EI_CaseType { ct_pattern_type = expr_type, ct_result_type = fresh_v, ct_cons_types = cons_types })
 		= (fresh_v, No, ({ reqs & req_case_and_let_exprs = [case_info_ptr : reqs.req_case_and_let_exprs]},
 				{ ts & ts_expr_heap = ts_expr_heap }))
@@ -977,6 +979,7 @@ where
 // ..MW4
 	
 	
+/* MW4 was:
 		requirements_of_default ti (Yes expr) goal_type reqs_ts
 			# (res_type, opt_expr_ptr, (reqs,  ts)) = requirements ti expr reqs_ts
 			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
@@ -984,6 +987,20 @@ where
 					{ ts & ts_expr_heap = ts_expr_heap })
 		requirements_of_default ti No goal_type reqs_ts
 			= reqs_ts
+*/
+		requirements_of_default ti (Yes expr) case_default_pos goal_type reqs_ts
+	  		= possibly_accumulate_reqs_in_new_group
+	  				case_default_pos
+					(reqs_of_default ti expr goal_type)
+					reqs_ts
+		requirements_of_default ti No _ goal_type reqs_ts
+			= reqs_ts
+
+		reqs_of_default ti expr goal_type reqs_ts
+			# (res_type, opt_expr_ptr, (reqs,  ts)) = requirements ti expr reqs_ts
+			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
+			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression expr, tc_coercible = True } : reqs.req_type_coercions] },
+					{ ts & ts_expr_heap = ts_expr_heap })
 
 instance requirements Let
 where

@@ -26,6 +26,12 @@ where
 	lift no ls
 		= (no, ls)
 	
+instance lift CheckedAlternative
+where
+	lift ca=:{ca_rhs} ls
+		# (ca_rhs, ls) = lift ca_rhs ls
+		= ({ ca & ca_rhs = ca_rhs }, ls)
+	
 instance lift Expression
 where
 	lift (FreeVar {fv_name,fv_info_ptr}) ls=:{ls_var_heap}
@@ -735,10 +741,15 @@ where
 		
 
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modules es=:{es_symbol_table}
-	# (prev_calls, fun_defs, es_symbol_table) = addFunctionCallsToSymbolTable fi_calls fun_defs es_symbol_table
-	  ([rhs:rhss], fun_defs, modules, (all_calls, es)) = expand cb_rhs fun_defs mod_index modules (prev_calls, { es & es_symbol_table = es_symbol_table })
-	  (fun_defs, es_symbol_table) = removeFunctionCallsFromSymbolTable all_calls fun_defs es.es_symbol_table
-	  (merged_rhs, es_var_heap, es_symbol_heap, es_error) = mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
+	# (prev_calls, fun_defs, es_symbol_table)
+			= addFunctionCallsToSymbolTable fi_calls fun_defs es_symbol_table
+	  ([rhs:rhss], (fun_defs, modules, (all_calls, es)) )
+	  		= mapSt (expandCheckedAlternative mod_index) cb_rhs 
+	  					(fun_defs, modules,	(prev_calls, { es & es_symbol_table = es_symbol_table }))
+	  (fun_defs, es_symbol_table)
+	  		= removeFunctionCallsFromSymbolTable all_calls fun_defs es.es_symbol_table
+	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
+	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
 	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
@@ -746,7 +757,11 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modu
 	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
-//		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
+//		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
+
+expandCheckedAlternative mod_index {ca_rhs, ca_position} (fun_defs, modules, es)
+	# (ca_rhs, fun_defs, modules, es) = expand ca_rhs fun_defs mod_index modules es
+	= ((ca_rhs, ca_position), (fun_defs, modules, es))
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
@@ -755,21 +770,25 @@ cMacroIsCalled 		:== True
 cNoMacroIsCalled 	:== False
 
 
-mergeCases :: !Expression ![Expression] !*VarHeap !*ExpressionHeap !*ErrorAdmin -> *(!Expression, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin);
-mergeCases expr [] var_heap symbol_heap error
-	= (expr, var_heap, symbol_heap, error)
-mergeCases (Let lad=:{let_expr}) exprs var_heap symbol_heap error
-	# (let_expr, var_heap, symbol_heap, error) = mergeCases let_expr exprs var_heap symbol_heap error
-	= (Let {lad & let_expr = let_expr}, var_heap,symbol_heap, error)
-mergeCases case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No}) [expr : exprs] var_heap symbol_heap error
+mergeCases :: !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
+			-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+mergeCases expr_and_pos [] var_heap symbol_heap error
+	= (expr_and_pos, var_heap, symbol_heap, error)
+mergeCases (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
+	# ((let_expr, _), var_heap, symbol_heap, error) = mergeCases (let_expr, NoPos) exprs var_heap symbol_heap error
+	= ((Let {lad & let_expr = let_expr}, pos), var_heap,symbol_heap, error)
+mergeCases (case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No}), case_pos)
+			[(expr, expr_pos) : exprs] var_heap symbol_heap error
 	# (split_result, var_heap, symbol_heap) = split_case var_info_ptr expr var_heap symbol_heap
 	= case split_result of
 		Yes {case_guards,case_default}
 			# (case_guards, var_heap, symbol_heap, error) = merge_guards first_case.case_guards case_guards var_heap symbol_heap error
-			-> mergeCases (Case { first_case & case_guards = case_guards, case_default = case_default }) exprs var_heap symbol_heap error
+			-> mergeCases (Case { first_case & case_guards = case_guards, case_default = case_default }, NoPos)
+						exprs var_heap symbol_heap error
 		No
-			# (case_default, var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
-			-> (Case { first_case & case_default = Yes case_default}, var_heap, symbol_heap, error)
+			# ((case_default, pos), var_heap, symbol_heap, error) = mergeCases (expr, expr_pos) exprs var_heap symbol_heap error
+			-> ((Case { first_case & case_default = Yes case_default, case_default_pos = pos }, case_pos),
+				var_heap, symbol_heap, error)
 
 where
 	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default}) var_heap symbol_heap
@@ -941,10 +960,10 @@ where
 	merge_algebraic_pattern_with_patterns new_pattern [pattern=:{ap_symbol,ap_vars,ap_expr} : patterns] var_heap symbol_heap error
 		| new_pattern.ap_symbol == ap_symbol
 			| isEmpty new_pattern.ap_vars
-				# (ap_expr, var_heap, symbol_heap, error) = mergeCases ap_expr [new_pattern.ap_expr] var_heap symbol_heap error
+				# ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_pattern.ap_expr, NoPos)] var_heap symbol_heap error
 				= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
 				# (new_expr, var_heap, symbol_heap) = replace_variables new_pattern.ap_vars new_pattern.ap_expr ap_vars var_heap symbol_heap
-				  (ap_expr, var_heap, symbol_heap, error) = mergeCases ap_expr [new_expr] var_heap symbol_heap error
+				  ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_expr, NoPos)] var_heap symbol_heap error
 				= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
 			# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
 			= ([ pattern : patterns ], var_heap, symbol_heap, error)
@@ -965,25 +984,27 @@ where
 	
 	merge_basic_pattern_with_patterns new_pattern [pattern=:{bp_value,bp_expr} : patterns]  var_heap symbol_heap error
 		| new_pattern.bp_value == bp_value
-			# (bp_expr, var_heap, symbol_heap, error) = mergeCases bp_expr [new_pattern.bp_expr] var_heap symbol_heap error
+			# ((bp_expr, _), var_heap, symbol_heap, error) = mergeCases (bp_expr, NoPos) [(new_pattern.bp_expr, NoPos)] var_heap symbol_heap error
 			= ([{ pattern & bp_expr = bp_expr} : patterns], var_heap, symbol_heap, error)
 			# (patterns, var_heap, symbol_heap, error) = merge_basic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
 			= ([ pattern : patterns ], var_heap, symbol_heap, error)
 	merge_basic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
 		= ([new_pattern], var_heap, symbol_heap, error)
 	
-mergeCases case_expr=:(Case first_case=:{case_default}) [expr : exprs] var_heap symbol_heap error
+mergeCases (case_expr=:(Case first_case=:{case_default, case_default_pos}), case_pos) [expr : exprs] var_heap symbol_heap error
 	= case case_default of
 		Yes default_expr
-			# (default_expr, var_heap, symbol_heap, error) = mergeCases default_expr [expr : exprs] var_heap symbol_heap error
-			-> (Case { first_case & case_default = Yes default_expr }, var_heap, symbol_heap, error)
+			# ((default_expr, case_default_pos), var_heap, symbol_heap, error) = mergeCases (default_expr, case_default_pos) [expr : exprs] var_heap symbol_heap error
+			-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = case_default_pos }, case_pos),
+				var_heap, symbol_heap, error)
 		No
-			# (default_expr, var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
-			-> (Case { first_case & case_default = Yes default_expr }, var_heap, symbol_heap, error)
-mergeCases expr _ var_heap symbol_heap error
-	= (expr, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
+			# ((default_expr, pos), var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
+			-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = pos }, case_pos),
+				var_heap, symbol_heap, error)
+mergeCases expr_and_pos _ var_heap symbol_heap error
+	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
 
- 
+
 liftFunctions min_level group group_index fun_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs)
 			= foldSt (add_free_vars_of_non_recursive_calls_to_function group_index) group (False, False, fun_defs)
