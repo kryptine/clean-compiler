@@ -244,10 +244,14 @@ convert_transformedbody main_dcl_module_n funsym {tb_args=args,tb_rhs=expression
    // Sanity check
  | not (isEmpty globals1) ---> ("convert.convert_transformedbody: arguments: "+++listToString (map fst bindings))
    = abort ("convert: convert_transformedbody: function rhs contains free variables: "+++listToString globals0)
- = [(funsym,(length args,[mkrule (map snd bindings) (hd rest) (compilegraph nodes0)])):fundefs1]
+ = fundefs2
    where globals1 = filter (not o flip isMember (map snd bindings)) globals0
-         (_,(nodes0,fundefs1,globals0,rest))
-          = (convert_expression--->"convert.convert_expression begins from convert.convert_transformedbody") main_dcl_module_n bindings expression (heap0,([],fundefs0,[],[]))
+         fundefs2
+         = if usedfunsym
+              fundefs1
+              [(funsym,(length args,[mkrule (map snd bindings) (hd rest) (compilegraph nodes0)])):fundefs1]
+         (_,(nodes0,fundefs1,globals0,rest,usedfunsym))
+          = (convert_expression--->"convert.convert_expression begins from convert.convert_transformedbody") main_dcl_module_n (Yes (funsym,args)) bindings expression (heap0,([],fundefs0,[],[],False))
          heap0 = heap
          bindings = map mkseen args
          mkseen fv = (fv.fv_info_ptr,SuclNamed fv.fv_info_ptr)
@@ -263,57 +267,99 @@ heap = map SuclAnonymous [0..]
          , [FunBinding SuclSymbol SuclVariable] // Lifted functions for case/lambda expressions
          , [SuclVariable]                       // Free Sucl variables in expression being built
          , [SuclVariable]                       // List of variables to which root of expression is prepended (accumulator)
+         , Bool                                 // Whether top level info was reused (ignored on input)
          )
        )
 
 convert_expressions main_dcl_module_n bounds exprs lrinfo
- = (foldlr ((convert_expression--->"convert.convert_expression begins from convert_expressions") main_dcl_module_n bounds) (heap0,(nodes0,fundefs0,globals0,[])) exprs <--- "convert.convert_expressions ends") ---> "convert.convert_expressions begins"
+ = (foldlr ((convert_expression--->"convert.convert_expression begins from convert_expressions") main_dcl_module_n No bounds) (heap0,(nodes0,fundefs0,globals0,[],False)) exprs <--- "convert.convert_expressions ends") ---> "convert.convert_expressions begins"
    where (heap0,(nodes0,fundefs0,globals0)) = lrinfo
 
 convert_expression ::
     Int                                         // Index of current DCL module
+    (Optional (SuclSymbol,[FreeVar]))           // Arguments and function symbol to use (to prevent lifted top-level cases)
     [(VarInfoPtr,SuclVariable)]                 // Variables bound in the environment
     Expression                                  // Expression to convert
     Econv_state                                 // Input expression conversion state
  -> Econv_state                                 // Resulting expression conversion state
 
-convert_expression main_dcl_module_n bindings (Var varinfo) lrinfo
-= (heap0,(nodes0,fundefs0,globals1,rest`))
+convert_expression main_dcl_module_n topinfo bindings (Var varinfo) lrinfo
+= (heap0,(nodes0,fundefs0,globals1,rest`,False))
   where (globals1,rest`) = foldmap bound free bindings vip
         bound node = ([node:globals0],[node:rest])
         free
         = (globals0,[nonode:rest])
           where nonode = abort ("convert.convert_expression.Var: expression contains free variable: "+++toString varinfo.var_info_ptr)
         vip = varinfo.var_info_ptr
-        (heap0,(nodes0,fundefs0,globals0,rest)) = lrinfo
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
-convert_expression main_dcl_module_n bindings (App appinfo) lrinfo
-= (heap2,(nodes2,fundefs1,globals1,[root:rest])) <--- "convert.convert_expression ends (for App expression)"
+convert_expression main_dcl_module_n topinfo bindings (App appinfo) lrinfo
+= (heap2,(nodes2,fundefs1,globals1,[root:rest],False)) <--- "convert.convert_expression ends (for App expression)"
   where [root:heap1] = heap0
-        (heap2,(nodes1,fundefs1,globals1,args0))
+        (heap2,(nodes1,fundefs1,globals1,args0,_))
         = convert_expressions main_dcl_module_n bindings appinfo.app_args (heap1,(nodes0,fundefs0,globals0))
         nodes2 = [(root,(SuclUser appinfo.app_symb.symb_kind,args0)):nodes1]
-        (heap0,(nodes0,fundefs0,globals0,rest)) = lrinfo
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
-convert_expression main_dcl_module_n bounds (expr @ exprs) lrinfo
-= (heap2,(nodes2,fundefs1,globals1,[root:rest])) <--- "convert.convert_expression ends (for (@) expression)"
+convert_expression main_dcl_module_n topinfo bounds (expr @ exprs) lrinfo
+= (heap2,(nodes2,fundefs1,globals1,[root:rest],False)) <--- "convert.convert_expression ends (for (@) expression)"
   where [root:heap1] = heap0
-        (heap2,(nodes1,fundefs1,globals1,args0))
+        (heap2,(nodes1,fundefs1,globals1,args0,_))
          = convert_expressions main_dcl_module_n bounds [expr:exprs] (heap1,(nodes0,fundefs0,globals0))
         nodes2 = [(root,(SuclApply (length exprs),args0)):nodes1]
-        (heap0,(nodes0,fundefs0,globals0,rest)) = lrinfo
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
-convert_expression main_dcl_module_n bindings0 (Let letinfo) lrinfo
-= (heap2,(nodes2,fundefs2,globals3,rest`)) <--- "convert.convert_expression ends (for Let expression)"
+convert_expression main_dcl_module_n topinfo bindings0 (Let letinfo) lrinfo
+= (heap2,(nodes2,fundefs2,globals3,rest`,False)) <--- "convert.convert_expression ends (for Let expression)"
   where globals3 = filter (not o flip isMember (map snd bindings1)) globals2
-        (heap2,(nodes2,fundefs2,globals2,rest`)) = convert_expression main_dcl_module_n bindings1 letinfo.let_expr (heap1,(nodes1,fundefs1,globals1,rest))
-        (heap1,(nodes1,fundefs1,globals1,_)) = convert_expressions main_dcl_module_n bindings1 [lb.lb_src \\ lb<-letinfo.let_lazy_binds] (heap0,(nodes0,fundefs0,globals0))
+        (heap2,(nodes2,fundefs2,globals2,rest`,_)) = convert_expression main_dcl_module_n No bindings1 letinfo.let_expr (heap1,(nodes1,fundefs1,globals1,rest,False))
+        (heap1,(nodes1,fundefs1,globals1,_,_)) = convert_expressions main_dcl_module_n bindings1 [lb.lb_src \\ lb<-letinfo.let_lazy_binds] (heap0,(nodes0,fundefs0,globals0))
         bindings1 = map (pairwith SuclNamed) boundvars++bindings0
         boundvars = [lb.lb_dst.fv_info_ptr \\ lb<-letinfo.let_lazy_binds]
-        (heap0,(nodes0,fundefs0,globals0,rest)) = lrinfo
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
-convert_expression main_dcl_module_n bindings (Case caseinfo) lrinfo
-= (heap4,(nodes9,fundefs9,globals9,[root:rest])) <--- "convert.convert_expression ends (for Case expression)"
+convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) bindings (Case caseinfo=:{case_expr=Var selvar}) lrinfo
+= (heap4,(nodes9,fundefs9,globals9,[root:rest],True)) <--- "convert.convert_expression ends (for Case expression/Yes)"
+  where // Plan: (0.5) convert selector
+        //       (1) convert branches
+        //       (1.5) convert default if present
+        //       (2) build rules/fundef from branches
+        //       (4) build closure node
+        // (4) Build closure node
+        closureargs = (map fv2sucl funargs <--- ("convert.convert_expression.Case.closureargs ends with "+++toString (length innerglobals1)+++" inner global(s), "+++toString (length defaultroots)+++" default root(s), and "+++toString (length selectorroots)+++" selector root")) ---> "convert.convert_expression.Case.closureargs begins"
+        fv2sucl fv = lookup bindings fv.fv_info_ptr
+        nodes9 = [(root,(introduced_function_symbol,closureargs)):nodes8]
+        // (2) build rules/fundef from branches
+        fundefs9
+        = [(introduced_function_symbol,(length closureargs,map mkalt alternatives++map mkdefaultalt defaultroots)):fundefs8]
+           where mkalt (patroot,reproot,nodes)
+                  = mkrule closureargs reproot (compilegraph nodes)
+                 mkdefaultalt defaultroot
+                  = mkrule closureargs defaultroot emptygraph
+        // (1.5) convert default if necessary
+        (heap4,(nodes7,fundefs6,globals7,defaultroots,_))
+         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,(nodes6,fundefs5,globals6,[],False))
+        // (1) convert branches
+        globals8 = innerglobals1++globals7
+        innerglobals1 = removeDup innerglobals0
+        (heap3,(innerglobals0,fundefs7,alternatives))
+         = case caseinfo.case_guards
+           of AlgebraicPatterns _ branches
+               -> foldlr (convert_algebraic_branch main_dcl_module_n patroot bindings) (heap2,([],fundefs6,[])) branches
+              BasicPatterns _ branches
+               -> foldlr (convert_basic_branch main_dcl_module_n patroot bindings) (heap2,([],fundefs6,[])) branches
+              _
+               -> (heap2,([],fundefs6,error "convert: convert_expression: unhandled CasePatterns constructor"))
+        patroot = lookup bindings selvar.var_info_ptr
+        // (0.5) Convert selector
+        (heap2,(nodes8,fundefs8,globals9,selectorroots,_))
+         = (convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case selector)") main_dcl_module_n No bindings caseinfo.case_expr (heap1,(nodes7,fundefs7,globals8,[],False))
+        // (0) Claim root node
+        [root:heap1] = heap0
+        (heap0,(nodes6,fundefs5,globals6,rest,_)) = lrinfo
+
+convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
+= (heap4,(nodes9,fundefs9,globals9,[root:rest],False)) <--- "convert.convert_expression ends (for Case expression/No)"
   where // Plan: (0.5) convert selector
         //       (1) convert branches
         //       (1.5) convert default if present
@@ -321,59 +367,62 @@ convert_expression main_dcl_module_n bindings (Case caseinfo) lrinfo
         //       (4) build closure node
         // (4) Build closure node
         closureargs = ((selectorroots++innerglobals1++defaultroots) <--- ("convert.convert_expression.Case.closureargs ends with "+++toString (length innerglobals1)+++" inner global(s), "+++toString (length defaultroots)+++" default root(s), and "+++toString (length selectorroots)+++" selector root")) ---> "convert.convert_expression.Case.closureargs begins"
-        nodes9 = [(root,(SuclCase caseinfo.case_info_ptr,closureargs)):nodes8]
+        nodes9 = [(root,(introduced_function_symbol,closureargs)):nodes8]
         // (2) build rules/fundef from branches
         fundefs9
-        = [(SuclCase caseinfo.case_info_ptr,(length closureargs,map mkalt alternatives++map mkdefaultalt defaultroots)):fundefs8]
+        = [(introduced_function_symbol,(length closureargs,map mkalt alternatives++map mkdefaultalt defaultroots)):fundefs8]
            where mkalt (patroot,reproot,nodes)
                   = mkrule ([patroot:innerglobals1++defaultroots]) reproot (compilegraph nodes)
                  mkdefaultalt defaultroot
                   = mkrule (selectorroots++innerglobals1++defaultroots) defaultroot emptygraph
+        introduced_function_symbol = SuclCase caseinfo.case_info_ptr
         // (1.5) convert default if necessary
-        (heap4,(nodes7,fundefs6,globals7,defaultroots))
-         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n bindings) caseinfo.case_default (heap3,(nodes6,fundefs5,globals6,[]))
+        (heap4,(nodes7,fundefs6,globals7,defaultroots,_))
+         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,(nodes6,fundefs5,globals6,[],False))
         // (1) convert branches
         globals8 = innerglobals1++globals7
         innerglobals1 = removeDup innerglobals0
         (heap3,(innerglobals0,fundefs7,alternatives))
          = case caseinfo.case_guards
            of AlgebraicPatterns _ branches
-               -> foldlr (convert_algebraic_branch main_dcl_module_n bindings) (heap2,([],fundefs6,[])) branches
+               -> foldlr (convert_algebraic_branch main_dcl_module_n patroot bindings) (heap25,([],fundefs6,[])) branches
               BasicPatterns _ branches
-               -> foldlr (convert_basic_branch main_dcl_module_n bindings) (heap2,([],fundefs6,[])) branches
+               -> foldlr (convert_basic_branch main_dcl_module_n patroot bindings) (heap25,([],fundefs6,[])) branches
               _
-               -> (heap2,([],fundefs6,error "convert: convert_expression: unhandled CasePatterns constructor"))
+               -> (heap25,([],fundefs6,error "convert: convert_expression: unhandled CasePatterns constructor"))
+        [patroot:heap25] = heap2
         // (0.5) Convert selector
-        (heap2,(nodes8,fundefs8,globals9,selectorroots))
-         = (convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case selector)") main_dcl_module_n bindings caseinfo.case_expr (heap1,(nodes7,fundefs7,globals8,[]))
+        (heap2,(nodes8,fundefs8,globals9,selectorroots,_))
+         = (convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case selector)") main_dcl_module_n No bindings caseinfo.case_expr (heap1,(nodes7,fundefs7,globals8,[],False))
         // (0) Claim root node
         [root:heap1] = heap0
-        (heap0,(nodes6,fundefs5,globals6,rest)) = lrinfo
+        (heap0,(nodes6,fundefs5,globals6,rest,_)) = lrinfo
 
-convert_expression main_dcl_module_n bindings (BasicExpr bv bt) lrinfo
-= (heap1,(nodes1,fundefs0,globals0,[root:rest])) <--- "convert.convert_expression ends (for BasicExpr expression)"
+convert_expression main_dcl_module_n topinfo bindings (BasicExpr bv bt) lrinfo
+= (heap1,(nodes1,fundefs0,globals0,[root:rest],False)) <--- "convert.convert_expression ends (for BasicExpr expression)"
   where [root:heap1] = heap0
         nodes1 = [(root,(convert_bvalue bv,[])):nodes0]
-        (heap0,(nodes0,fundefs0,globals0,rest)) = lrinfo
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
-convert_expression _ _ (Selection _ _ _)      _ = mstub "convert_expression" "Selection constructor not handled"
-convert_expression _ _ (Update _ _ _)         _ = mstub "convert_expression" "Update not handled"
-convert_expression _ _ (RecordUpdate _ _ _)   _ = mstub "convert_expression" "RecordUpdate constructor not handled"
-convert_expression _ _ (TupleSelect _ _ _)    _ = mstub "convert_expression" "TupleSelect constructor not handled"
-convert_expression _ _ (WildCard)             _ = mstub "convert_expression" "WildCard constructor not handled"
-convert_expression _ _ (AnyCodeExpr _ _ _)    _ = mstub "convert_expression" "AnyCodeExpr constructor not handled"
-convert_expression _ _ (ABCCodeExpr _ _)      _ = mstub "convert_expression" "ABCCodeExpr constructor not handled"
-convert_expression _ _ (MatchExpr _ _ _)      _ = mstub "convert_expression" "MatchExpr constructor not handled"
-convert_expression _ _ (FreeVar _)            _ = mstub "convert_expression" "FreeVar constructor not handled"
-convert_expression _ _ (Constant _ _ _ _)     _ = mstub "convert_expression" "Constant constructor not handled"
-convert_expression _ _ (ClassVariable _)      _ = mstub "convert_expression" "ClassVariable constructor not handled"
-convert_expression _ _ (DynamicExpr _)        _ = mstub "convert_expression" "DynamicExpr constructor not handled"
-convert_expression _ _ (TypeCodeExpression _) _ = mstub "convert_expression" "TypeCodeExpression constructor not handled"
-convert_expression _ _ (EE)                   _ = mstub "convert_expression" "EE constructor not handled"
-convert_expression _ _ (NoBind _)             _ = mstub "convert_expression" "NoBind constructor not handled"
+convert_expression _ _ _ (Selection _ _ _)      _ = mstub "convert_expression" "Selection constructor not handled"
+convert_expression _ _ _ (Update _ _ _)         _ = mstub "convert_expression" "Update not handled"
+convert_expression _ _ _ (RecordUpdate _ _ _)   _ = mstub "convert_expression" "RecordUpdate constructor not handled"
+convert_expression _ _ _ (TupleSelect _ _ _)    _ = mstub "convert_expression" "TupleSelect constructor not handled"
+convert_expression _ _ _ (WildCard)             _ = mstub "convert_expression" "WildCard constructor not handled"
+convert_expression _ _ _ (AnyCodeExpr _ _ _)    _ = mstub "convert_expression" "AnyCodeExpr constructor not handled"
+convert_expression _ _ _ (ABCCodeExpr _ _)      _ = mstub "convert_expression" "ABCCodeExpr constructor not handled"
+convert_expression _ _ _ (MatchExpr _ _ _)      _ = mstub "convert_expression" "MatchExpr constructor not handled"
+convert_expression _ _ _ (FreeVar _)            _ = mstub "convert_expression" "FreeVar constructor not handled"
+convert_expression _ _ _ (Constant _ _ _ _)     _ = mstub "convert_expression" "Constant constructor not handled"
+convert_expression _ _ _ (ClassVariable _)      _ = mstub "convert_expression" "ClassVariable constructor not handled"
+convert_expression _ _ _ (DynamicExpr _)        _ = mstub "convert_expression" "DynamicExpr constructor not handled"
+convert_expression _ _ _ (TypeCodeExpression _) _ = mstub "convert_expression" "TypeCodeExpression constructor not handled"
+convert_expression _ _ _ (EE)                   _ = mstub "convert_expression" "EE constructor not handled"
+convert_expression _ _ _ (NoBind _)             _ = mstub "convert_expression" "NoBind constructor not handled"
 
 convert_algebraic_branch ::
     Int
+    SuclVariable                    // Root of pattern
     [(VarInfoPtr,SuclVariable)]     // Locally bound variables, with the expressions they're bound to
     AlgebraicPattern
     ( [SuclVariable]
@@ -389,12 +438,12 @@ convert_algebraic_branch ::
       )
     )
 
-convert_algebraic_branch main_dcl_module_n bindings0 branch lrinfo
+convert_algebraic_branch main_dcl_module_n root bindings0 branch lrinfo
 = (heap2,(globals2,fundefs1,alternatives1)) ---> ("convert.convert_algebraic_branch: binding variables: "+++listToString (map fst argmap))
   where // Unpack conversion state
         (heap0,(globals0,fundefs0,alternatives0)) = lrinfo
-        // Claim root node of pattern
-        [root:heap1] = heap0
+        // DON'T Claim root node of pattern
+        heap1 = heap0
         // Determine constructor symbol
         conssym = SuclUser (SK_Constructor {glob_module=main_dcl_module_n,glob_object=branch.ap_symbol.glob_object.ds_index})
         // Determine constructor argument variables
@@ -406,7 +455,7 @@ convert_algebraic_branch main_dcl_module_n bindings0 branch lrinfo
         // Record pattern's arguments in environment
         bindings1 = argmap++bindings0
         // Convert branch expression
-        (heap2,(nodes0,fundefs1,globals1,rest)) = (convert_expression--->"convert.convert_expression begins from convert_algebraic_branch") main_dcl_module_n bindings1 branch.ap_expr (heap1,([],fundefs0,globals0,[]))
+        (heap2,(nodes0,fundefs1,globals1,rest,_)) = (convert_expression--->"convert.convert_expression begins from convert_algebraic_branch") main_dcl_module_n No bindings1 branch.ap_expr (heap1,([],fundefs0,globals0,[],False))
         // Mask pattern's arguments from globals
         globals2 = filter (not o flip isMember (map snd argmap)) globals1
         // Create root of pattern,root of replacement, defined node of alternative
@@ -414,6 +463,7 @@ convert_algebraic_branch main_dcl_module_n bindings0 branch lrinfo
 
 convert_basic_branch ::
     Int
+    SuclVariable                    // Root of pattern
     [(VarInfoPtr,SuclVariable)]     // Locally bound variables, with the expressions they're bound to
     BasicPattern
     ( [SuclVariable]
@@ -429,16 +479,16 @@ convert_basic_branch ::
       )
     )
 
-convert_basic_branch main_dcl_module_n bindings branch lrinfo
+convert_basic_branch main_dcl_module_n root bindings branch lrinfo
 = (heap2,(globals1,fundefs1,alternatives1))
   where // Unpack conversion state
         (heap0,(globals0,fundefs0,alternatives0)) = lrinfo
-        // Claim root node of pattern
-        [root:heap1] = heap0
+        // DON'T Claim root node of pattern
+        heap1 = heap0
         // Create pattern's root node definition
         nodes1 = [(root,(convert_bvalue branch.bp_value,[])):nodes0]
         // Convert branch expression
-        (heap2,(nodes0,fundefs1,globals1,rest)) = (convert_expression--->"convert.convert_expression begins from convert.convert_basic_branch") main_dcl_module_n [] branch.bp_expr (heap1,([],fundefs0,globals0,[]))
+        (heap2,(nodes0,fundefs1,globals1,rest,_)) = (convert_expression--->"convert.convert_expression begins from convert.convert_basic_branch") main_dcl_module_n No [] branch.bp_expr (heap1,([],fundefs0,globals0,[],False))
         alternatives1 = [(root,hd rest,nodes1):alternatives0]
 
 convert_bvalue :: BasicValue -> SuclSymbol

@@ -470,7 +470,8 @@ checkimport local defstrat substrat subject found rnf (ssym,sargs)
 // Check for constructors
 
 checkconstr
- :: (sym->.Bool)
+ :: (sym->String)
+    (sym->.Bool)
     (Strategy sym var pvar .result)
     (Substrategy sym var pvar .result)
     (Graph sym var)
@@ -479,7 +480,7 @@ checkconstr
     .(Node sym var)
  -> .result
 
-checkconstr isconstr defstrat substrat subject found rnf (ssym,sargs)
-| isconstr ssym
-= rnf
-= defstrat substrat subject found rnf (ssym,sargs)
+checkconstr showsym isconstr defstrat substrat subject found rnf (ssym,sargs)
+| isconstr ssym ---> ("strat.checkconstr begins for "+++showsym ssym)
+= rnf <--- ("strat.checkconstr ends (RNF)")
+= defstrat substrat subject found rnf (ssym,sargs) <--- ("strat.checkconstr ends (default strategy)")

@@ -8,6 +8,7 @@ from rule import Rule
 from graph import Graph,Node
 from StdOverloaded import ==
 from StdClass import Eq
+from cleanversion import String
 
 from history import HistoryAssociation,HistoryPattern,Link // for History
 from spine import Spine    // for Answer
@@ -71,7 +72,8 @@ checkarity
 
 // A strategy transformer that checks for constructor applications
 checkconstr
- :: (sym->.Bool)
+ :: (sym->String)
+    (sym->.Bool)
     (Strategy sym var pvar .result)
     (Substrategy sym var pvar .result)
     (Graph sym var)

@@ -164,7 +164,9 @@ clistrategy (CliAlias {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) m
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
    o checkimport islocal                            // Checks for delta symbols
-   o checkconstr (flip isMember (flatten (map snd tcs))) // Checks for constructors
+   o ( checkconstr toString (flip isMember (flatten (map snd tcs))) // Checks for constructors
+        ---> ("cli.clistrategy.checkconstr",tcs)
+     )
    ) (corestrategy matchable)                       // Checks rules for symbols in the language core (IF, _AP, ...)
    where islocal rsym=:(SuclUser s) = isMember rsym (map fst rs)// User-defined symbols can be imported, so they're known if we have a list of rules for them
          islocal rsym               = True                      // Symbols in the language core (the rest) are always completely known
