@@ -1,8 +1,10 @@
 module cocl
 
 import coclmain
-import StdString
+
 import StdEnv
+import frontend
+import code from library "backend_library"
 
 Start :: *World -> *World
 Start world
@@ -11,10 +13,7 @@ Start world
 		testArgs
 			=	[
 					// main module			
-//					"Dialog1"
-					"t"
-//					"typesupport.icl"
-//					"EdProject.icl"
+					"t.icl"
 					// list all types
 				,	"-lat"
 					// generate readable abc code
@@ -24,15 +23,9 @@ Start world
 					// redirect errors
 				,	"-RE", "errors.txt"
 					// paths
-				,	"-P", clean20Dir +++ "StdEnv" +++ ";" +++ clean20Dir +++ "IOInterface"
-					// test specific
-					+++ ";" +++ testDir
-//					+++ ";" +++ clean20Dir +++ "test\\Clean 2 Compiler Test"
-//					+++ ";" +++ ideDir +++ ";" +++ ideDir +++ "Windows\\" +++ ";" +++ ideDir +++ "Util\\"
+				,	"-P", testDir +++ ";" +++ clean20Dir +++ "StdEnv" +++ ";" +++ clean20Dir +++ "IOInterface"
 				]
 		testDir
 			=	"e:\\Users\\Ronny\\Develop\\Clean Programs\\"
 		clean20Dir
-			=	"e:\\Users\\Ronny\\Develop\\CleanSystem\\2.0\\"
-		ideDir
-			=	clean20Dir +++ "test\\Clean IDE\\"
+			=	"e:\\Users\\Ronny\\Develop\\Clean 2.0\\"
