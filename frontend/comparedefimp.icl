@@ -84,9 +84,11 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !{!FunctionBody} !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
+compareDefImp :: !{#Int} !{!FunctionBody} !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
 				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin)
-compareDefImp untransformed dcl_modules icl_module heaps error_admin
+compareDefImp size_uncopied_icl_defs untransformed dcl_modules icl_module heaps error_admin
+	// icl definitions with indices >= size_uncopied_icl_defs.[def_type] don't have to be compared,
+	// because they are copies of definitions that appear exclusively in the dcl module
 	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
 	= case main_dcl_module.dcl_conversions of
 		No	-> (dcl_modules, icl_module, heaps, error_admin)
@@ -110,22 +112,28 @@ compareDefImp untransformed dcl_modules icl_module heaps error_admin
 						, tc_visited_syn_types = createArray (size dcl_common.com_type_defs) False
 						}
 			  (icl_com_type_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cTypeDefs]
+					= compareWithConversions 
+						size_uncopied_icl_defs.[cTypeDefs] conversion_table.[cTypeDefs]
 						dcl_common.com_type_defs icl_com_type_defs tc_state error_admin
 			  (icl_com_cons_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cConstructorDefs]
+					= compareWithConversions 
+						size_uncopied_icl_defs.[cConstructorDefs] conversion_table.[cConstructorDefs]
 						dcl_common.com_cons_defs icl_com_cons_defs tc_state error_admin
 			  (icl_com_selector_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cSelectorDefs]
+					= compareWithConversions
+						size_uncopied_icl_defs.[cSelectorDefs] conversion_table.[cSelectorDefs]
 						dcl_common.com_selector_defs icl_com_selector_defs tc_state error_admin
 			  (icl_com_class_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cClassDefs]
+					= compareWithConversions
+						size_uncopied_icl_defs.[cClassDefs] conversion_table.[cClassDefs]
 						dcl_common.com_class_defs icl_com_class_defs tc_state error_admin
 			  (icl_com_member_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cMemberDefs]
+					= compareWithConversions
+						size_uncopied_icl_defs.[cMemberDefs] conversion_table.[cMemberDefs]
 						dcl_common.com_member_defs icl_com_member_defs tc_state error_admin
 			  (icl_com_instance_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cInstanceDefs]
+					= compareWithConversions
+						size_uncopied_icl_defs.[cInstanceDefs] conversion_table.[cInstanceDefs]
 						dcl_common.com_instance_defs icl_com_instance_defs tc_state error_admin
 			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
 					= compareMacrosWithConversion conversion_table.[cMacroDefs] dcl_macros untransformed
@@ -151,10 +159,11 @@ compareDefImp untransformed dcl_modules icl_module heaps error_admin
 		# new = createArray size (abort "don't make that array strict !")
 		= iFoldSt (\i (dst, src=:{[i]=src_i}) -> ({ dst & [i] = src_i }, src)) 0 size (new, original)
 
-compareWithConversions conversions dclDefs iclDefs tc_state error_admin 
-	= iFoldSt (compareWithConversion conversions dclDefs) 0 (size conversions) (iclDefs, tc_state, error_admin)
+compareWithConversions size_uncopied_icl_defs conversions dclDefs iclDefs tc_state error_admin 
+	= iFoldSt (compareWithConversion size_uncopied_icl_defs conversions dclDefs) 0 (size conversions)
+			(iclDefs, tc_state, error_admin)
 
-compareWithConversion :: !{#Int} !(b c) !Int !(!u:(b c), !*TypesCorrespondState, !*ErrorAdmin)
+compareWithConversion :: !Int !{#Int} !(b c) !Int !(!u:(b c), !*TypesCorrespondState, !*ErrorAdmin)
 						-> (!v:(b c), !.TypesCorrespondState, !.ErrorAdmin)
 //1.3
 						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c, [u <= v]
@@ -162,8 +171,11 @@ compareWithConversion :: !{#Int} !(b c) !Int !(!u:(b c), !*TypesCorrespondState,
 /*2.0
 						| Array b c & t_corresponds, getIdentPos c, [u <= v]
 0.2*/
-compareWithConversion conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
-	# (iclDef, iclDefs) = iclDefs![conversions.[dclIndex]]
+compareWithConversion size_uncopied_icl_defs conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
+	# icl_index = conversions.[dclIndex]
+	| icl_index>=size_uncopied_icl_defs
+		= (iclDefs, tc_state, error_admin)
+	# (iclDef, iclDefs) = iclDefs![icl_index]
 	  (corresponds, tc_state) = t_corresponds dclDefs.[dclIndex] iclDef tc_state
 	| corresponds
 		= (iclDefs, tc_state, error_admin)

@@ -2597,7 +2597,8 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 	  				{ cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_needed_modules = 0 }
 	  
 	  init_dcl_modules = [ initialDclModule scanned_module \\ scanned_module <- scanned_modules ]
-	  (dcl_modules, local_defs, cdefs, sizes, cs)
+	  (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
+	  (dcl_modules, local_defs, cdefs, _, cs)
 	  		= combineDclAndIclModule mod_type { dcl_module \\ dcl_module <- init_dcl_modules } local_defs cdefs sizes cs
 
 	  icl_common = createCommonDefinitions cdefs
@@ -2674,7 +2675,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 
 		  (dcl_modules, icl_mod, heaps, cs_error)
-		  		= compareDefImp untransformed_fun_bodies dcl_modules icl_mod heaps cs_error
+		  		= compareDefImp icl_sizes_without_added_dcl_defs untransformed_fun_bodies dcl_modules icl_mod heaps cs_error
 
 		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
 		# icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
@@ -2889,6 +2890,12 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 			#! size = size fun_defs
 			# new = createArray size NoBody
 			= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i.fun_body }, src)) 0 size (new, fun_defs)
+
+		memcpy :: !a:{#Int} -> (!.{#Int}, !a:{#Int})
+		memcpy src
+			#! size = size src
+			# new = createArray size 0
+			= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i }, src)) 0 size (new, src)
 
 check_needed_modules_are_imported mod_name extension cs=:{cs_needed_modules}
 	# cs = case cs_needed_modules bitand cNeedStdDynamics of
