@@ -764,7 +764,9 @@ fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol d
 			  (fun_type_copy,ts) = determineSymbolTypeOfFunction pos me_symb 1 me_type me_type_ptr common_defs ts
 			  {tst_args,tst_arity,tst_lifted,tst_result,tst_context,tst_attr_env}=fun_type_copy						  
 			# result_type = case tst_args of [t] -> t
-			# argument_types = case tst_result.at_type of (TA _ args=:[arg1,arg2]) ->args
+			# argument_types = case tst_result.at_type of
+									TA _ args=:[arg1,arg2] -> args
+									TAS _ args=:[arg1,arg2] _ -> args
 			= (argument_types,result_type,tst_context,tst_attr_env,ts)
 
 freshOverloadedListType :: !OverloadedListType !CoercionPosition ![AlgebraicPattern] !{#CommonDefs} !{#{#FunType }} !*TypeState -> (![[AType]],!AType,![TypeContext],![AttrCoercion],!*TypeState)
