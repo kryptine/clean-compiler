@@ -4,6 +4,7 @@
 #define SHARE_UPDATE_CODE 0 /* also in codegen1.c */
 #define SELECTORS_FIRST 1 /* also in codegen2.c */
 #define UNBOXED_RECORDS_IN_UNBOXED_CLOSURES 1 /* 1 if UNBOX_UPDATE_FUNCTION_ARGUMENTS */
+#define UNBOXED_TUPLES_IN_UNBOXED_CLOSURES 1 /* 1 if UNBOX_UPDATE_FUNCTION_ARGUMENTS */
 
 #include "compiledefines.h"
 #include "types.t"
@@ -400,9 +401,11 @@ static void EvaluateArgumentsForFunctionWithUnboxedArguments (int n_states,State
 		return;
 	else {
 #if UNBOXED_RECORDS_IN_UNBOXED_CLOSURES
-		if (call_arg->arg_state.state_type==SimpleState && call_arg->arg_state.state_kind==OnB){
-			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
-			return;
+		if (call_arg->arg_state.state_type==SimpleState){
+			if (call_arg->arg_state.state_kind==OnB){
+				EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
+				return;
+			}
 		} else if (call_arg->arg_state.state_type==RecordState){
 			int a_size,b_size;
 			
@@ -412,7 +415,18 @@ static void EvaluateArgumentsForFunctionWithUnboxedArguments (int n_states,State
 			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
 			return;
 		}
-		
+# if UNBOXED_TUPLES_IN_UNBOXED_CLOSURES
+		else if (call_arg->arg_state.state_type==TupleState){
+			int a_size,b_size;
+			
+			DetermineSizeOfStates (call_arg->arg_state.state_arity,call_arg->arg_state.state_tuple_arguments,&a_size,&b_size);
+			a_index -= a_size;
+
+			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
+			return;
+		}
+# endif
+
 		EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index-1,call_arg->arg_next);
 		EvaluateArgumentIfNecesary (*arg_state_p,asp_p,a_index,!IsLazyState (call_arg->arg_state) ? &call_arg->arg_state : state_of_node_or_node_id (call_arg->arg_node));
 #else
@@ -450,6 +464,19 @@ static void MoveArgumentsToBStack (StateS src_state,StateS dest_state,
 		
 				arity = dest_state.state_arity;
 				dest_states = dest_state.state_tuple_arguments;
+
+#if UNBOXED_TUPLES_IN_UNBOXED_CLOSURES
+				if (src_state.state_type==TupleState){
+					int asize,bsize,element_n;
+					
+					DetermineSizeOfStates (arity,dest_state.state_tuple_arguments,&asize,&bsize);
+
+					for (element_n=asize-1; element_n>=0; --element_n)
+						PutInAFrames (a_index-element_n,dest_asp_p);
+					PutInBFrames (b_index,dest_bsp_p,bsize);									
+					return;
+				}
+#endif
 
 				if (*old_asp_p==a_index)
 					--*old_asp_p;
@@ -516,14 +543,28 @@ static void MoveArgumentsForFunctionWithUnboxedArguments (int n_states,StateP st
 	else {
 		int next_a_index,next_b_index;
 		
-		if (call_arg->arg_state.state_type==SimpleState && call_arg->arg_state.state_kind==OnB){
-			next_a_index=a_index;
-			next_b_index=b_index-ObjectSizes[call_arg->arg_state.state_object];
+		if (call_arg->arg_state.state_type==SimpleState){
+			if (call_arg->arg_state.state_kind==OnB){
+				next_a_index=a_index;
+				next_b_index=b_index-ObjectSizes[call_arg->arg_state.state_object];
+			} else {
+				next_a_index=a_index-1;
+				next_b_index=b_index;
+			}
 #if UNBOXED_RECORDS_IN_UNBOXED_CLOSURES
 		} else if (call_arg->arg_state.state_type==RecordState){
 			int a_size,b_size;
 			
 			DetermineSizeOfStates (call_arg->arg_state.state_arity,call_arg->arg_state.state_record_arguments,&a_size,&b_size);
+
+			next_a_index=a_index-a_size;
+			next_b_index=b_index-b_size;
+#endif
+#if UNBOXED_TUPLES_IN_UNBOXED_CLOSURES
+		} else if (call_arg->arg_state.state_type==TupleState){
+			int a_size,b_size;
+			
+			DetermineSizeOfStates (call_arg->arg_state.state_arity,call_arg->arg_state.state_tuple_arguments,&a_size,&b_size);
 
 			next_a_index=a_index-a_size;
 			next_b_index=b_index-b_size;
