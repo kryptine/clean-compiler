@@ -2175,7 +2175,7 @@ where
 		| token == DotToken
 			# (token, pState) = nextToken FunctionContext pState
 			  (selectors, pState) = wantSelectors token pState
-			= (PE_Selection cNonUniqueSelection exp selectors, pState)
+			= (PE_Selection ParsedNormalSelector exp selectors, pState)
 		| token == ExclamationToken
 			# (token, pState) = nextToken FunctionContext pState
 // JVG added for strict lists:
@@ -2183,7 +2183,7 @@ where
 				= (exp, tokenBack (tokenBack pState))
 //			
 			#  (selectors, pState) = wantSelectors token pState
-			= (PE_Selection cUniqueSelection exp selectors, pState)
+			= (PE_Selection (ParsedUniqueSelector False) exp selectors, pState)
 		| otherwise
 			= (exp, tokenBack pState)
 
@@ -2869,7 +2869,7 @@ where
 						# (shareIdent, pState)
 							=	make_ident optionalIdent level pState
 						  select
-						  	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
+						  	=	PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
 						  (update_expr, pState)
 						  	=	transform_record_or_array_update No select (map sub_update updates) (level+1) pState
 						=	({bind_dst = fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
@@ -2941,7 +2941,7 @@ where
 								  select_def
 								  	=	buildNodeDef
 								  			(PE_Tuple [PE_Ident element_id, PE_Ident array_id])
-								  			(PE_Selection cUniqueSelection expr (reverse [PS_Array (PE_Ident index_id) : initial_selectors]))
+								  			(PE_Selection (ParsedUniqueSelector True) expr (reverse [PS_Array (PE_Ident index_id) : initial_selectors]))
 								  (updated_element, pState)
 									= transform_record_update No
 										(PE_Ident element_id)

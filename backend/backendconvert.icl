@@ -1796,6 +1796,8 @@ where
 		where
 			addKinds NormalSelector selections
 				=	[(BESelector, selection) \\ selection <- selections]
+			addKinds NormalSelectorUniqueElementResult selections
+				=	[(BESelector, selection) \\ selection <- selections]
 			addKinds _ [selection]
 				=	[(BESelector_U, selection)]
 			addKinds _ [selection : selections]

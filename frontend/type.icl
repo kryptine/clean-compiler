@@ -1470,9 +1470,9 @@ where
 	requirements ti (Selection selector_kind expr selectors) reqs_ts
 		# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
 		= case selector_kind of
-			UniqueSelector {glob_object={ds_ident,ds_index,ds_arity}, glob_module} _
+			UniqueSelector {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
 				# (var, ts) = freshAttributedVariable ts
-			  	  (_, result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False var expr (reqs, ts)
+			  	  (_, result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False False var expr (reqs, ts)
 				  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
 				  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
 				  req_type_coercions
@@ -1482,13 +1482,16 @@ where
 				  result_type = { at_type = TA tuple_type [non_unique_type_var,var], at_attribute = TA_Unique, at_annotation = AN_None }
 				-> (result_type, No, ({ reqs & req_type_coercions = req_type_coercions }, 
 						{ts & ts_var_store = inc ts.ts_var_store, ts_expr_heap = storeAttribute opt_expr_ptr TA_Multi ts.ts_expr_heap}))
-			_
-				# (_, result_type, reqs_ts) =  requirementsOfSelectors ti No expr selectors True expr_type expr (reqs, ts)
+			NormalSelectorUniqueElementResult
+				# (_, result_type, reqs_ts) =  requirementsOfSelectors ti No expr selectors True True expr_type expr (reqs, ts)
+				-> (result_type, opt_expr_ptr, reqs_ts)
+			NormalSelector
+				# (_, result_type, reqs_ts) =  requirementsOfSelectors ti No expr selectors True False expr_type expr (reqs, ts)
 				-> (result_type, opt_expr_ptr, reqs_ts)
 	requirements ti (Update composite_expr selectors elem_expr) reqs_ts
 		# (composite_expr_type, opt_composite_expr_ptr, reqs_ts) = requirements ti composite_expr reqs_ts
 		  (has_array_selection, result_type, (reqs, ts))
-		  		= requirementsOfSelectors ti (Yes elem_expr) composite_expr selectors True composite_expr_type composite_expr reqs_ts
+		  		= requirementsOfSelectors ti (Yes elem_expr) composite_expr selectors True False composite_expr_type composite_expr reqs_ts
 		| has_array_selection
 			# ts = { ts & ts_expr_heap = storeAttribute opt_composite_expr_ptr TA_Unique ts.ts_expr_heap }
 			= (composite_expr_type, No, (reqs, ts))
@@ -1560,21 +1563,29 @@ where
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
 
 
-requirementsOfSelectors ti opt_expr expr [selector] tc_coercible sel_expr_type sel_expr reqs_ts 
-	= requirementsOfSelector ti opt_expr expr selector tc_coercible sel_expr_type sel_expr reqs_ts
-requirementsOfSelectors ti opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs_ts 
-	# (has_array_selection, result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr reqs_ts
-	# (have_array_selection, result_type, reqs_ts) = requirementsOfSelectors ti opt_expr expr selectors tc_coercible result_type sel_expr reqs_ts 
+requirementsOfSelectors ti opt_expr expr [selector] tc_coercible change_uselect sel_expr_type sel_expr reqs_ts 
+	= requirementsOfSelector ti opt_expr expr selector tc_coercible change_uselect sel_expr_type sel_expr reqs_ts
+requirementsOfSelectors ti opt_expr expr [selector : selectors] tc_coercible change_uselect sel_expr_type sel_expr reqs_ts 
+	# (has_array_selection, result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible change_uselect sel_expr_type sel_expr reqs_ts
+	# (have_array_selection, result_type, reqs_ts) = requirementsOfSelectors ti opt_expr expr selectors tc_coercible False result_type sel_expr reqs_ts 
 	= (has_array_selection || have_array_selection, result_type, reqs_ts)
 
-requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible sel_expr_type sel_expr (reqs, ts )
+requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts )
 	# ({tst_args, tst_result, tst_attr_env}, ts) = standardFieldSelectorType (CP_Expression sel_expr) field ti ts
 	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
 	= (False, tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
-requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible sel_expr_type sel_expr (reqs, ts) 
+requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts) 
 	# {me_type} = ti.ti_common_defs.[glob_module].com_member_defs.[ds_index]
 	  ({tst_attr_env,tst_args,tst_result,tst_context}, ts) = freshSymbolType (Yes (CP_Expression expr)) cWithFreshContextVars me_type ti.ti_common_defs ts
+	# (tst_args, tst_result, ts)
+		=	case ds_ident.id_name of
+				// RWS FIXME: use predef symbols
+				"uselect"
+					| change_uselect
+						-> change_uselect_attributes tst_args tst_result ts
+				_
+					-> (tst_args, tst_result, ts)
 	  (dem_array_type, dem_index_type, rest_type) = array_and_index_type tst_args
 	  reqs ={ reqs & req_attr_coercions = tst_attr_env ++ reqs.req_attr_coercions}
 	  (index_type, opt_expr_ptr, (reqs, ts)) = requirements ti index_expr (reqs, ts)
@@ -1600,6 +1611,24 @@ where
 	      reqs = { reqs & req_type_coercions = [{ tc_demanded = elem_type, tc_offered = elem_expr_type,
 						tc_position = CP_Expression elem_expr, tc_coercible = True } : reqs.req_type_coercions ]}
 		= (reqs, ts)
+
+	/*
+		change
+			uselect	:: !u:(a  e) !Int -> ( e, !u:(a  e)) | uselect_u e
+		to
+			uselect	:: !u:(a .e) !Int -> (.e, !u:(a .e)) | uselect_u e
+		(necessary for uselects in updates)
+	*/
+	change_uselect_attributes :: [AType] AType u:TypeState  -> ([AType], AType, u:TypeState)
+	change_uselect_attributes args=:[arg_array=:{at_type=aa :@: [ae]}, arg_int]
+					result=:{at_type=TA tuple_symb [result_element, result_array=:{at_type=ra :@: [re]}]} ts
+		# (attribute, ts) =	freshAttribute ts
+		# args = [{arg_array & at_type = aa :@: [{ae & at_attribute = attribute}]}, arg_int]
+		# result = {result & at_type = TA tuple_symb [{result_element & at_attribute = attribute}, {result_array & at_type=ra :@: [{re & at_attribute = attribute}]}]}
+		= (args, result, ts)
+	change_uselect_attributes _ _ ts
+		= abort "type.icl, change_uselect_attributes: wrong type for uselect"
+
 
 possibly_accumulate_reqs_in_new_group position state_transition reqs_ts
 	:== possibly_accumulate_reqs position reqs_ts

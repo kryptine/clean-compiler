@@ -1020,8 +1020,10 @@ cNotVarNumber :== -1
 	
 :: LocalDef		:== ParsedDefinition
 
-cUniqueSelection	:== True
-cNonUniqueSelection	:== False
+::	ParsedSelectorKind
+		=	ParsedNormalSelector	// .
+		|	ParsedUniqueSelector	// !
+				!Bool					// 	is result element unique?
 
 :: ParsedExpr	= PE_List ![ParsedExpr]
 				| PE_Ident !Ident
@@ -1033,7 +1035,7 @@ cNonUniqueSelection	:== False
 				| PE_ArrayPattern ![ElemAssignment]
 				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
-				| PE_Selection !Bool !ParsedExpr ![ParsedSelection]
+				| PE_Selection !ParsedSelectorKind !ParsedExpr ![ParsedSelection]
 				| PE_Update !ParsedExpr [ParsedSelection] ParsedExpr
 				| PE_Case !Ident !ParsedExpr [CaseAlt]
 				| PE_If !Ident !ParsedExpr !ParsedExpr !ParsedExpr
@@ -1093,10 +1095,10 @@ cIsStrict		:== True
 cIsNotStrict	:== False
 
 ::	SelectorKind
-		=	NormalSelector			// .
+		=	NormalSelector
+		|	NormalSelectorUniqueElementResult
 		|	UniqueSelector			// !
 				(Global DefinedSymbol)	// 	tuple type
-				!Bool					// 	is result element unique?
 
 ::	Expression	= Var !BoundVar 
 				| App !App
@@ -1661,9 +1663,9 @@ where
 
 instance <<< SelectorKind
 where
- 	(<<<) file NormalSelector = file <<< "!"
- 	(<<<) file (UniqueSelector _ False) = file <<< "!"
- 	(<<<) file (UniqueSelector _ True) = file <<< "!*"
+ 	(<<<) file NormalSelector = file <<< "."
+ 	(<<<) file NormalSelectorUniqueElementResult = file <<< "!*"
+ 	(<<<) file (UniqueSelector _) = file <<< "!"
 
 instance <<< Selection
 where
@@ -1695,7 +1697,7 @@ where
 	(<<<) file (PE_List exprs) = file <<< exprs
 	(<<<) file (PE_Tuple args) = file <<< '(' <<< args <<< ')'
 	(<<<) file (PE_Basic basic_value) = file <<< basic_value
-	(<<<) file (PE_Selection is_unique expr selectors) =  file <<< expr <<< (if is_unique '!' '.') <<< selectors
+	(<<<) file (PE_Selection selector_kind expr selectors) =  file <<< expr <<< selector_kind <<< selectors
 	(<<<) file (PE_Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (PE_Record PE_Empty _ fields) = file <<< '{' <<< fields <<< '}'
 	(<<<) file (PE_Record rec _ fields) = file <<< '{' <<< rec <<< " & " <<< fields <<< '}'
@@ -1718,7 +1720,12 @@ where
 				-> file <<< "dynamic " <<< expr
 	(<<<) file _ = file <<< "some expression"
 
-
+instance <<< ParsedSelectorKind
+where
+	(<<<) file ParsedNormalSelector			= file <<< "."
+	(<<<) file (ParsedUniqueSelector False)	= file <<< "!"
+	(<<<) file (ParsedUniqueSelector True)	= file <<< "!*"
+	
 instance <<< ParsedSelection
 where
 	(<<<) file (PS_Record selector _)	= file <<< selector

@@ -1028,8 +1028,10 @@ instance toString 	KindInfo
 	
 :: LocalDef		:== ParsedDefinition
 
-cUniqueSelection	:== True
-cNonUniqueSelection	:== False
+::	ParsedSelectorKind
+		=	ParsedNormalSelector	// .
+		|	ParsedUniqueSelector	// !
+				!Bool					// 	is result element unique?
 
 ::	ParsedExpr	= PE_List ![ParsedExpr]
 				| PE_Ident !Ident
@@ -1041,7 +1043,7 @@ cNonUniqueSelection	:== False
 				| PE_ArrayPattern ![ElemAssignment]
 				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
-				| PE_Selection !Bool !ParsedExpr ![ParsedSelection]
+				| PE_Selection !ParsedSelectorKind !ParsedExpr ![ParsedSelection]
 				| PE_Update !ParsedExpr [ParsedSelection] ParsedExpr
 				| PE_Case !Ident !ParsedExpr [CaseAlt]
 				| PE_If !Ident !ParsedExpr !ParsedExpr !ParsedExpr
@@ -1100,10 +1102,10 @@ cIsStrict		:== True
 cIsNotStrict	:== False
 
 ::	SelectorKind
-		=	NormalSelector			// .
+		=	NormalSelector
+		|	NormalSelectorUniqueElementResult
 		|	UniqueSelector			// !
 				(Global DefinedSymbol)	// 	tuple type
-				!Bool					// 	is result element unique?
 
 /*
 ::	SelectorKind	= SEK_Normal | SEK_First | SEK_Next | SEK_Last
