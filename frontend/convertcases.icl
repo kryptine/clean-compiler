@@ -1752,26 +1752,6 @@ where
 	convertCases ci selector cs
 		= (selector, cs)
 
-convertDefault ci=:{ci_bound_vars, ci_group_index, ci_common_defs}
-	kees=:{case_ident, case_info_ptr, case_default=Yes defoult} cs
-	# (EI_CaseTypeAndSplits case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
-	  cs = { cs & cs_expr_heap = cs_expr_heap }
-
-	  (act_vars, form_vars, local_vars, defoult, old_fv_info_ptr_values,cs_var_heap)
-			= copy_case_expr ci_bound_vars defoult cs.cs_var_heap
-	  cs = { cs & cs_var_heap = cs_var_heap}
-
-	  (fun_ident, cs)
-	  	=	new_case_function case_ident case_type.ct_result_type defoult form_vars local_vars
-	  						ci_bound_vars ci_group_index ci_common_defs cs
-
-	# cs_var_heap=fold2St restore_old_fv_info_ptr_value old_fv_info_ptr_values ci_bound_vars cs.cs_var_heap
-		with
-			restore_old_fv_info_ptr_value old_fv_info_ptr_value ({fv_info_ptr},type) var_heap
-				=	writePtr fv_info_ptr old_fv_info_ptr_value var_heap
-	# cs = { cs & cs_var_heap = cs_var_heap}
-	= (App { app_symb = fun_ident, app_args = act_vars, app_info_ptr = nilPtr }, cs)
-
 convertNonRootFail ci=:{ci_bound_vars, ci_group_index, ci_common_defs} ident cs
 	# result_type
 		=	{	at_attribute = TA_None
@@ -1790,23 +1770,12 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 		  cs = { cs & cs_expr_heap = cs_expr_heap }
 		  (defoult, cs) = convertRootCases {ci & ci_case_level=CaseLevelRoot} defoult cs
 		  (act_vars, form_vars, local_vars, caseExpr, old_fv_info_ptr_values,cs_var_heap)
-				= copy_case_expr ci_bound_vars (defoult) cs.cs_var_heap
-	
+				= copy_case_expr ci_bound_vars defoult cs.cs_var_heap	
 		  cs = { cs & cs_var_heap = cs_var_heap}
 	
-		  (fun_ident, cs) = new_case_function case_ident case_type.ct_result_type caseExpr
+		  (fun_ident, cs) = new_case_function_and_restore_old_fv_info_ptr_values case_ident case_type.ct_result_type caseExpr
 		  							form_vars local_vars
-		  							ci_bound_vars ci_group_index ci_common_defs cs
-	
-		# cs_var_heap=restore_old_fv_info_ptr_values old_fv_info_ptr_values ci_bound_vars cs.cs_var_heap
-			with
-				restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [({fv_info_ptr},type):bound_vars] var_heap
-					# var_heap=writePtr fv_info_ptr old_fv_info_ptr_value var_heap
-					= restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars var_heap
-				restore_old_fv_info_ptr_values [] bound_vars var_heap
-					= var_heap
-		# cs = { cs & cs_var_heap = cs_var_heap}
-	
+		  							ci_bound_vars old_fv_info_ptr_values ci_group_index ci_common_defs cs
 		= (App { app_symb = fun_ident, app_args = act_vars, app_info_ptr = nilPtr }, cs)
 
 	// otherwise
@@ -1815,41 +1784,47 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 	  cs_expr_heap = writePtr case_info_ptr (EI_CaseTypeAndSplits case_type {splits & sic_case_kind=CaseKindLeave}) cs_expr_heap
 	  cs = { cs & cs_expr_heap = cs_expr_heap }
 
-	  (new_info_ptr, cs_var_heap) = newPtr (VI_LocalVar) cs.cs_var_heap
-	  var_id = {id_name = "_x", id_info = nilPtr}
-	  case_var = Var {var_ident = var_id, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr}
-	  case_free_var = {	fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
-
-	  kees = {kees & case_expr=case_var, case_explicit=False}
-
+	# (new_info_ptr, cs_var_heap) = newPtr (VI_LocalVar) cs.cs_var_heap
 	  cs = { cs & cs_var_heap = cs_var_heap}
+	= case case_expr of
+		Var var=:{var_ident,var_info_ptr}
+			# var_id = {id_name = var_ident.id_name, id_info = nilPtr}
+			  case_var = Var {var_ident = var_id, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr}
+			  case_free_var = {	fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
 
-	  (case_expr, cs) = convertCases ci case_expr cs
+			# kees = {kees & case_expr=case_var, case_explicit=False}
+			  (caseExpr, cs) = convertRootCases {ci & ci_case_level=CaseLevelRoot} (Case kees) cs
+			  (not__x_variable,act_vars, form_vars, local_vars, caseExpr, old_fv_info_ptr_values,cs_var_heap)
+				= copy_case_expr_and_use_new_var ci_bound_vars var new_info_ptr caseExpr cs.cs_var_heap
+			  cs = { cs & cs_var_heap = cs_var_heap}
+			| not__x_variable
+				# (fun_ident, cs) = new_case_function_and_restore_old_fv_info_ptr_values case_ident case_type.ct_result_type caseExpr
+				  							form_vars local_vars
+				  							ci_bound_vars old_fv_info_ptr_values ci_group_index ci_common_defs cs
+				= (App { app_symb = fun_ident, app_args = act_vars, app_info_ptr = nilPtr }, cs)
 
-	  (caseExpr, cs) = convertRootCases {ci & ci_case_level=CaseLevelRoot} (Case kees) cs
-	  (act_vars, form_vars, local_vars, caseExpr, old_fv_info_ptr_values,cs_var_heap)
-			= copy_case_expr ci_bound_vars caseExpr cs.cs_var_heap
+				# (fun_ident, cs) = new_case_function_and_restore_old_fv_info_ptr_values case_ident case_type.ct_result_type caseExpr
+				  							[(case_free_var, case_type.ct_pattern_type) : form_vars] local_vars
+				  							ci_bound_vars old_fv_info_ptr_values ci_group_index ci_common_defs cs
+				= (App { app_symb = fun_ident, app_args = [case_expr : act_vars], app_info_ptr = nilPtr }, cs)
+		_
+			# var_id = {id_name = "_x", id_info = nilPtr}
+			  case_var = Var {var_ident = var_id, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr}
+			  case_free_var = {	fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
 
-	  cs = { cs & cs_var_heap = cs_var_heap}
-
-	  (fun_ident, cs) = new_case_function case_ident case_type.ct_result_type caseExpr
-	  							[(case_free_var, case_type.ct_pattern_type) : form_vars] local_vars
-	  							ci_bound_vars ci_group_index ci_common_defs cs
-
-	# cs_var_heap=restore_old_fv_info_ptr_values old_fv_info_ptr_values ci_bound_vars cs.cs_var_heap
-		with
-			restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [({fv_info_ptr},type):bound_vars] var_heap
-				# var_heap=writePtr fv_info_ptr old_fv_info_ptr_value var_heap
-				= restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars var_heap
-			restore_old_fv_info_ptr_values [] bound_vars var_heap
-				= var_heap
-	# cs = { cs & cs_var_heap = cs_var_heap}
-
-	= (App { app_symb = fun_ident, app_args = [case_expr : act_vars], app_info_ptr = nilPtr }, cs)
+			# kees = {kees & case_expr=case_var, case_explicit=False}
+			  (case_expr, cs) = convertCases ci case_expr cs
+		
+			  (caseExpr, cs) = convertRootCases {ci & ci_case_level=CaseLevelRoot} (Case kees) cs
+			  (act_vars, form_vars, local_vars, caseExpr, old_fv_info_ptr_values,cs_var_heap)
+					= copy_case_expr ci_bound_vars caseExpr cs.cs_var_heap
+			  cs = { cs & cs_var_heap = cs_var_heap}
+		
+			# (fun_ident, cs) = new_case_function_and_restore_old_fv_info_ptr_values case_ident case_type.ct_result_type caseExpr
+			  							[(case_free_var, case_type.ct_pattern_type) : form_vars] local_vars
+			  							ci_bound_vars old_fv_info_ptr_values ci_group_index ci_common_defs cs
+			= (App { app_symb = fun_ident, app_args = [case_expr : act_vars], app_info_ptr = nilPtr }, cs)
 where
-	get_case_var (Var var)
-		=	var
-
 	case_is_degenerate {case_guards = AlgebraicPatterns _ [], case_default=Yes defoult}
 		=	(True, defoult)
 	case_is_degenerate {case_guards = BasicPatterns _ [], case_default=Yes defoult}
@@ -1859,27 +1834,55 @@ where
 	case_is_degenerate _
 		=	(False, undef)
 
+	copy_case_expr bound_vars guards_and_default var_heap
+	    # (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars [] var_heap
+		  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
+		  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
+		= (bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
+	//				-*-> ("copy_case_expr", length bound_vars, length free_typed_vars)
+	
+	copy_case_expr_and_use_new_var bound_vars {var_ident,var_info_ptr} new_info_ptr guards_and_default var_heap
+	    # (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars [] var_heap
+		# (var_info, var_heap) = readPtr var_info_ptr var_heap
+		= case var_info of
+			VI_BoundVar type
+				# var_heap = var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 0 type)
+				  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [(var_info_ptr, type)], cp_var_heap = var_heap, cp_local_vars = [] }
+				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
+				-> (True,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
+			VI_LocalVar
+				# (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
+				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
+				-> (False,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
+	
+	store_VI_BoundVar_in_bound_vars_and_save_old_values [({fv_info_ptr},type):bound_vars] old_fv_info_ptr_values var_heap
+		# (old_fv_info_ptr_value,var_heap)=readPtr fv_info_ptr var_heap
+		# var_heap=writePtr fv_info_ptr (VI_BoundVar type) var_heap
+		# (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars old_fv_info_ptr_values var_heap
+		= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
+	store_VI_BoundVar_in_bound_vars_and_save_old_values [] old_fv_info_ptr_values var_heap
+		= (old_fv_info_ptr_values,var_heap)
 
-copy_case_expr bound_vars guards_and_default var_heap
-//	    # var_heap = foldSt (\({fv_ident,fv_info_ptr},type) -> writePtr fv_info_ptr (VI_BoundVar type) -*-> (fv_ident,fv_info_ptr)) bound_vars var_heap
-    # (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars [] var_heap
-    	with
-    		store_VI_BoundVar_in_bound_vars_and_save_old_values [({fv_info_ptr},type):bound_vars] old_fv_info_ptr_values var_heap
-				# (old_fv_info_ptr_value,var_heap)=readPtr fv_info_ptr var_heap
-    			# var_heap=writePtr fv_info_ptr (VI_BoundVar type) var_heap
-    			# (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars old_fv_info_ptr_values var_heap
-    			= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
-    		store_VI_BoundVar_in_bound_vars_and_save_old_values [] old_fv_info_ptr_values var_heap
-    			= (old_fv_info_ptr_values,var_heap)
-	  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
-	  (bound_vars, free_typed_vars, var_heap) = foldSt retrieve_variable cp_free_vars ([], [], cp_var_heap)
-	= (bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
-//				-*-> ("copy_case_expr", length bound_vars, length free_typed_vars)
+	retrieve_variables cp_free_vars cp_var_heap
+		= foldSt retrieve_variable cp_free_vars ([], [], cp_var_heap)
 	where
 		retrieve_variable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
 			# (VI_FreeVar name new_ptr count type, var_heap) = readPtr var_info_ptr var_heap
 			= ( [Var { var_ident = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
 				[({ fv_def_level = NotALevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
+
+new_case_function_and_restore_old_fv_info_ptr_values opt_id result_type rhs free_vars local_vars
+	bound_vars old_fv_info_ptr_values group_index common_defs cs
+	# (fun_ident,cs) = new_case_function opt_id result_type rhs free_vars local_vars
+										bound_vars group_index common_defs cs
+	# cs_var_heap=restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars cs.cs_var_heap
+	= (fun_ident,{ cs & cs_var_heap = cs_var_heap});
+where
+	restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [({fv_info_ptr},type):bound_vars] var_heap
+		# var_heap=writePtr fv_info_ptr old_fv_info_ptr_value var_heap
+		= restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars var_heap
+	restore_old_fv_info_ptr_values [] bound_vars var_heap
+		= var_heap
 
 new_case_function opt_id result_type rhs free_vars local_vars
 	bound_vars group_index common_defs cs=:{cs_expr_heap}
