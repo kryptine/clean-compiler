@@ -146,18 +146,6 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_typ
 			  			hp_type_heaps = { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}}
 			-> ({ icl_module & icl_common = icl_common, icl_functions = icl_functions },
 					heaps, error_admin )
-  where
-	memcpy :: !u:{#CheckedTypeDef} -> (!.{#CheckedTypeDef}, !u:{#CheckedTypeDef})
-	memcpy original
-		| expand_syn_types_late_XXX True False
-			= abort "memcpy not used"
-		#! size = size original
-		| size==0
-			= ({}, original)
-		# (el0, original)
-				= original![0]
-		# new = createArray size el0
-		= iFoldSt (\i (dst, src=:{[i]=src_i}) -> ({ dst & [i] = src_i }, src)) 0 size (new, original)
 
 compareWithConversions size_uncopied_icl_defs conversions dclDefs iclDefs tc_state error_admin 
 	= iFoldSt (compareWithConversion size_uncopied_icl_defs conversions dclDefs) 0 (size conversions)
@@ -188,17 +176,17 @@ compareFunctionTypesWithConversions conversions	dcl_fun_types icl_functions tc_s
 compareTwoFunctionTypes :: !{#Int} !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondState,!*ErrorAdmin) 
 						-> (!v:{#FunDef},!.TypesCorrespondState,!.ErrorAdmin) , [u <= v]
 compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
-	# (fun_def=:{fun_type}, icl_functions) = icl_functions![conversions.[dclIndex]]
+	# (fun_def=:{fun_type, fun_priority}, icl_functions) = icl_functions![conversions.[dclIndex]]
 	= case fun_type of
 		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
 		Yes icl_symbol_type
-			# dcl_symbol_type = dcl_fun_types.[dclIndex].ft_type
+			# {ft_type=dcl_symbol_type, ft_priority} = dcl_fun_types.[dclIndex]
 			  tc_state = init_attr_vars (dcl_symbol_type.st_attr_vars++icl_symbol_type.st_attr_vars)
 			  							tc_state
 			  tc_state = init_type_vars (dcl_symbol_type.st_vars++icl_symbol_type.st_vars) tc_state
 			  (corresponds, tc_state)
 					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
-			| corresponds
+			| corresponds && fun_priority==ft_priority
 				-> (icl_functions, tc_state, error_admin)
 			-> generate_error error_message fun_def icl_functions tc_state error_admin
 
@@ -263,7 +251,12 @@ compareTwoMacroFuns dclIndex iclIndex
 	  			_	-> icl_function.fun_body
 	  ident_pos = getIdentPos dcl_function
 	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
-	  ec_state = e_corresponds dcl_function.fun_body adjusted_icl_body { ec_state & ec_error_admin = ec_error_admin }
+	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
+	| dcl_function.fun_info.fi_is_macro_fun<>icl_function.fun_info.fi_is_macro_fun ||
+	  dcl_function.fun_priority<>icl_function.fun_priority
+		# ec_state = give_error dcl_function.fun_symb ec_state
+		= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
+	# ec_state = e_corresponds dcl_function.fun_body adjusted_icl_body ec_state
 	= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
 
 instance getIdentPos (TypeDef a) where
