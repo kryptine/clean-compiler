@@ -1545,6 +1545,8 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps
 /* unify the two type arguments and generate new bindings. The resulting list of type variables should only
    contain variables that occur in the second type argument (the "demanded" type).
 */
+//	| False --->("createBindingsForUnifiedTypes", type_1, type_2, all_type_vars)
+//		= undef
 	# th_vars = foldSt (\tv th_vars -> th_vars <:= (tv.tv_info_ptr, TVI_Empty)) all_type_vars th_vars
 	  (type_heaps=:{th_vars}) = bind_and_unify_atypes type_1 type_2 common_defs { type_heaps & th_vars = th_vars }
 //	  th_vars = th_vars -!-> ""
@@ -1640,9 +1642,14 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps
 				-> case type of
 					(TV next_tv)
 						# (root_tvi, th_vars) = bind_to_root next_tv th_vars
-						  th_vars = th_vars <:= (this_tv.tv_info_ptr, root_tvi)
-						-> (root_tvi, th_vars)
-	
+						-> case root_tvi of
+							TVI_Empty
+								// this_tv is already bound to the root which is a type variable itself
+								-> (tv_info, th_vars)
+							_
+								// the root type is root_tvi
+							 	-> (root_tvi, th_vars <:= (this_tv.tv_info_ptr, root_tvi))
+
 	get_unbound_var tv=:{tv_info_ptr} (unbound_type_vars_accu, th_vars)
 		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
 		= case tv_info of
@@ -1862,9 +1869,6 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
-	  is_overloaded = length symbol_type.st_context>0
-	| is_overloaded // XXX this restriction (producers must not be overloaded) is just temporary 
-		= (producers, [App app : new_args ], ti)
 	| symb_arity<>fun_arity
 		| is_applied_to_macro_fun
 			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
