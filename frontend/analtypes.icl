@@ -26,7 +26,6 @@ import syntax, checksupport, checktypes, check, typesupport, utilities, analunit
 cNotPartitionated	:== -1
 cChecking 			:== -1
 
-
 partionateAndExpandTypes :: !NumberSet !Index !*CommonDefs !*{#DclModule} !*TypeHeaps !*ErrorAdmin
 	-> (!TypeGroups, !*{# CommonDefs}, !*TypeDefInfos, !*CommonDefs, !*{#DclModule}, !*TypeHeaps, !*ErrorAdmin)
 partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{com_type_defs,com_class_defs} dcl_modules type_heaps error
@@ -52,9 +51,9 @@ partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{
 		= (reverse pi_groups, common_defs, pi_type_def_infos, {icl_common & com_type_defs = icl_type_defs}, dcl_modules, type_heaps, error)
 where
 	copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod nr_of_modules  (icl_type_defs, dcl_modules)
-		# type_defs 		= { {}	\\ nr_of_types <- [0..nr_of_modules] }
-		  marks				= { {}	\\ nr_of_types <- [0..nr_of_modules] }
-	  	  type_def_infos	= { {}	\\ nr_of_types <- [0..nr_of_modules] }
+		# type_defs 		= { {}	\\ module_nr <- [0..nr_of_modules] }
+		  marks				= { {}	\\ module_nr <- [0..nr_of_modules] }
+	  	  type_def_infos	= { {}	\\ module_nr <- [0..nr_of_modules] }
 		= iFoldSt (copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod) 0 nr_of_modules
 				(icl_type_defs, dcl_modules, type_defs, marks, type_def_infos)
 	where
@@ -256,45 +255,53 @@ where
 					-> { uni_info & uki_kind_heap = uki_kind_heap, uki_error = kindError kind1 kind2 uni_info.uki_error }
 					-> { uni_info & uki_kind_heap = uki_kind_heap <:= (info_ptr1, kind2)  }
 		where
-			contains_kind_ptr info_ptr (KI_Arrow kinds) kind_heap
-				= kinds_contains_kind_ptr info_ptr kinds kind_heap
+			contains_kind_ptr info_ptr (KI_Arrow kind1 kind2) kind_heap				
+				# (kind1, kind_heap) = skipIndirections kind1 kind_heap
+				# (found, kind_heap) = contains_kind_ptr info_ptr kind1 kind_heap 		
+				| found
+					= (True, kind_heap)
+					# (kind2, kind_heap) = skipIndirections kind2 kind_heap
+					= contains_kind_ptr info_ptr kind2 kind_heap						
 			contains_kind_ptr info_ptr (KI_Var kind_info_ptr) kind_heap
 				= (info_ptr == kind_info_ptr, kind_heap)
 			contains_kind_ptr info_ptr (KI_Const) kind_heap
 				= (False, kind_heap)
 
-			kinds_contains_kind_ptr info_ptr [ kind : kinds ] kind_heap
-				# (kind, kind_heap) = skipIndirections kind kind_heap
-				  (found, kind_heap) = contains_kind_ptr info_ptr kind kind_heap
-				| found
-					= (True, kind_heap)
-					= kinds_contains_kind_ptr info_ptr kinds kind_heap
-			kinds_contains_kind_ptr info_ptr [] kind_heap
-				= (False, kind_heap)
 	unify_kinds kind k1=:(KI_Var info_ptr1) uni_info
 		= unify_kinds k1 kind  uni_info
-	unify_kinds kind1=:(KI_Arrow kinds1) kind2=:(KI_Arrow kinds2) uni_info=:{uki_error}
-		| length kinds1 == length kinds2
-			= fold2St unifyKinds kinds1 kinds2 uni_info
-			= { uni_info & uki_error = kindError kind1 kind2 uki_error }
+	unify_kinds kind1=:(KI_Arrow x1 y1) kind2=:(KI_Arrow x2 y2) uni_info
+		= unifyKinds x1 x2 (unifyKinds y1 y2 uni_info)
 	unify_kinds KI_Const KI_Const uni_info
 		= uni_info
 	unify_kinds kind1 kind2 uni_info=:{uki_error}
 		= { uni_info & uki_error = kindError kind1 kind2 uki_error }
 
 
-class toKindInfo a :: !a -> KindInfo
+kindToKindInfo (KindVar info_ptr)
+	= KI_Var info_ptr
+kindToKindInfo KindConst
+	= KI_Const
+kindToKindInfo (KindArrow ks)
+	= kindArrowToKindInfo ks
 
-instance toKindInfo TypeKind
-where
-	toKindInfo (KindVar info_ptr)
-		= KI_Var info_ptr
-	toKindInfo KindConst
-		= KI_Const
-	toKindInfo (KindArrow ks)
-		= KI_Arrow [ toKindInfo k \\ k <- ks]
-//			---> ("toKindInfo", arity)
+kindArrowToKindInfo []
+	= KI_Const
+kindArrowToKindInfo [k : ks]
+	= KI_Arrow (kindToKindInfo k) (kindArrowToKindInfo ks)
 
+kindInfoToKind kind_info kind_heap
+	# (kind_info, kind_heap) = skipIndirections kind_info kind_heap
+	= case kind_info of
+		KI_Arrow x y
+			# (x, kind_heap) = kindInfoToKind x kind_heap
+			# (y, kind_heap) = kindInfoToKind y kind_heap						
+			-> case y of
+				KindArrow ks
+					-> (KindArrow [x:ks], kind_heap)
+				_ 
+					-> (KindArrow [x], kind_heap)							
+		_
+			-> (KindConst, kind_heap)
 
 ::	VarBind =
 	{	vb_var 	::	!KindInfoPtr
@@ -306,9 +313,9 @@ where
 	,	con_var_binds		:: ![VarBind]
 	}
 	
-::	AnalState =
+::	AnalyseState =
 	{	as_td_infos			:: !.TypeDefInfos
-	,	as_heaps			:: !.TypeHeaps
+	,	as_type_var_heap	:: !.TypeVarHeap
 	,	as_kind_heap		:: !.KindHeap
 	,	as_error			:: !.ErrorAdmin
 	}
@@ -325,10 +332,13 @@ condCombineTypeProperties has_root_attr prop1 prop2
 combineCoercionProperties prop1 prop2	:== (prop1 bitor prop2) bitand cIsNonCoercible
 combineHyperstrictness prop1 prop2		:== (prop1 bitand prop2) bitand cIsHyperStrict
 
-class analTypes type :: !Bool !{#CommonDefs} ![KindInfoPtr] !type !(!Conditions, !*AnalState)
-	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalState))
+class analTypes type :: !Bool !{#CommonDefs} ![KindInfoPtr] !type !(!Conditions, !*AnalyseState)
+	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
 
-cDummyBool :== False
+freshKindVar kind_heap
+	# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+	# kind_var = KI_Var kind_info_ptr
+	= (kind_var, kind_heap <:= (kind_info_ptr, kind_var))
 
 instance analTypes AType
 where
@@ -340,14 +350,14 @@ where
 		
 instance analTypes TypeVar
 where
-	analTypes has_root_attr modules form_tvs {tv_info_ptr}  (conds=:{con_var_binds}, as=:{as_heaps, as_kind_heap})
-		# (TVI_TypeKind kind_info_ptr, th_vars) = readPtr tv_info_ptr as_heaps.th_vars
+	analTypes has_root_attr modules form_tvs {tv_info_ptr}  (conds=:{con_var_binds}, as=:{as_type_var_heap, as_kind_heap})
+		# (TVI_TypeKind kind_info_ptr, as_type_var_heap) = readPtr tv_info_ptr as_type_var_heap
 		  (kind_info, as_kind_heap) = readPtr kind_info_ptr as_kind_heap
 		  (kind_info, as_kind_heap) = skipIndirections kind_info as_kind_heap
 		| isEmpty form_tvs
-			= (kind_info, cIsHyperStrict, (conds, { as & as_heaps = { as_heaps & th_vars = th_vars }, as_kind_heap = as_kind_heap }))
+			= (kind_info, cIsHyperStrict, (conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap }))
 			= (kind_info, cIsHyperStrict, ({ conds & con_var_binds = [{vb_var = kind_info_ptr, vb_vars = form_tvs } : con_var_binds] },
-						 { as & as_heaps = { as_heaps & th_vars = th_vars }, as_kind_heap = as_kind_heap }))
+						 { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap }))
 
 instance analTypes Type
 where
@@ -356,12 +366,14 @@ where
 	analTypes has_root_attr modules form_tvs type=:(TA {type_name,type_index={glob_module,glob_object},type_arity} types) (conds, as)
 		# form_type_arity = modules.[glob_module].com_type_defs.[glob_object].td_arity
 		  ({tdi_kinds, tdi_properties}, as) = as!as_td_infos.[glob_module].[glob_object]
-		  kind = if (form_type_arity == type_arity) KI_Const (KI_Arrow [ toKindInfo tk \\ tk <- drop type_arity tdi_kinds ])
-		| tdi_properties bitand cIsAnalysed == 0
-			# (type_properties, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tdi_kinds (conds, as)
-			= (kind, type_properties, conds_as)
-			# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
-			= (kind, type_properties, conds_as)
+		| type_arity <= form_type_arity
+			# kind = kindArrowToKindInfo (drop type_arity tdi_kinds)
+			| tdi_properties bitand cIsAnalysed == 0
+				# (type_properties, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tdi_kinds (conds, as)
+				= (kind, type_properties, conds_as)
+				# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
+				= (kind, type_properties, conds_as)
+			= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_name type_appl_error as.as_error }))
 	where
 		anal_types_of_rec_type_cons modules form_tvs [] _ conds_as
 			= (cIsHyperStrict, conds_as)
@@ -386,7 +398,7 @@ where
 			= (cIsHyperStrict, conds_as)
 		anal_types_of_type_cons modules form_tvs [type : types] [tk : tks] conds_as
 			# (type_kind, type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs type conds_as
-			  {uki_kind_heap, uki_error} = unifyKinds type_kind (toKindInfo tk) {uki_kind_heap = as_kind_heap, uki_error = as_error}
+			  {uki_kind_heap, uki_error} = unifyKinds type_kind (kindToKindInfo tk) {uki_kind_heap = as_kind_heap, uki_error = as_error}
 			  as = { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
 			  (other_type_props, conds_as) =  anal_types_of_type_cons modules form_tvs types tks (conds, as)
 			= (combineTypeProperties type_props other_type_props, conds_as)
@@ -402,40 +414,45 @@ where
 							(combineCoercionProperties arg_type_props res_type_props)
 		= (KI_Const, type_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
 	analTypes has_root_attr modules form_tvs (CV tv :@: types) conds_as
-		# (type_kind, cv_props, conds_as) = analTypes has_root_attr modules form_tvs tv conds_as
-		  (type_kinds, is_non_coercible, (conds, as=:{as_kind_heap,as_error})) = check_type_list modules form_tvs types conds_as
-		  {uki_kind_heap, uki_error} = unifyKinds type_kind (KI_Arrow type_kinds) {uki_kind_heap = as_kind_heap, uki_error = as_error}
+		# (type_kind, cv_props, (conds, as)) = analTypes has_root_attr modules form_tvs tv conds_as
+		  (kind_var, as_kind_heap) = freshKindVar as.as_kind_heap	 
+		  (type_kinds, is_non_coercible, (conds, as=:{as_kind_heap,as_error}))
+		  		= check_type_list kind_var modules form_tvs types (conds, { as & as_kind_heap = as_kind_heap })
+		  {uki_kind_heap, uki_error} = unifyKinds type_kind type_kinds {uki_kind_heap = as_kind_heap, uki_error = as_error}
 		  type_props = if (is_non_coercible || has_root_attr) cIsNonCoercible (cv_props bitand cIsNonCoercible)
-		= (KI_Const, type_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
+		= (kind_var, type_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
 
 	where
-		check_type_list modules form_tvs [] conds_as
-			= ([], False, conds_as)
-		check_type_list modules form_tvs [type : types] conds_as
-			# (tk, type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs type conds_as
-			  {uki_kind_heap, uki_error} = unifyKinds tk KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
-			  (tks, is_non_coercible, conds_as) = check_type_list modules form_tvs types (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error })
-			= ([tk : tks], is_non_coercible || (type_props bitand cIsNonCoercible <> 0), conds_as)
-	analTypes has_root_attr modules form_tvs (TFA vars type) (conds, as=:{as_heaps,as_kind_heap})
-		# (th_vars, as_kind_heap) = new_local_kind_variables vars (as_heaps.th_vars, as_kind_heap)
-		= analTypes has_root_attr modules form_tvs type (conds, { as & as_heaps = { as_heaps & th_vars = th_vars}, as_kind_heap = as_kind_heap})
+		check_type_list kind_var modules form_tvs [] conds_as
+			= (kind_var, False, conds_as)
+		check_type_list kind_var modules form_tvs [type : types] conds_as
+			# (tk, type_props, conds_as) = analTypes has_root_attr modules form_tvs type conds_as
+//			  {uki_kind_heap, uki_error} = unifyKinds tk KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
+			  (tks, is_non_coercible, conds_as) = check_type_list kind_var modules form_tvs types conds_as
+			= (KI_Arrow tk tks, is_non_coercible || (type_props bitand cIsNonCoercible <> 0), conds_as)
+	analTypes has_root_attr modules form_tvs (TFA vars type) (conds, as=:{as_type_var_heap,as_kind_heap})
+		# (as_type_var_heap, as_kind_heap) = new_local_kind_variables vars as_type_var_heap as_kind_heap
+		= analTypes has_root_attr modules form_tvs type (conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap})
 	where
-		new_local_kind_variables :: [ATypeVar] !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
-		new_local_kind_variables td_args (type_var_heap, as_kind_heap)
-			= foldSt new_kind td_args (type_var_heap, as_kind_heap)
+		new_local_kind_variables :: [ATypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
+		new_local_kind_variables type_vars type_var_heap as_kind_heap
+			= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
 		where
 			new_kind :: !ATypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
-			new_kind {atv_variable={tv_info_ptr},atv_attribute} (type_var_heap, kind_heap)
+			new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
 				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 				= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
 	analTypes has_root_attr modules form_tvs type conds_as
 		= (KI_Const, cIsHyperStrict, conds_as)
 
-analTypesOfConstructor modules cons_defs [{ds_index}:conses] (conds, as=:{as_heaps,as_kind_heap})
+
+cDummyBool :== False
+
+analTypesOfConstructor modules cons_defs [{ds_index}:conses] (conds, as=:{as_type_var_heap,as_kind_heap})
 	# {cons_exi_vars,cons_type} = cons_defs.[ds_index ]
-	  (coercible, th_vars, as_kind_heap) = new_local_kind_variables cons_exi_vars (as_heaps.th_vars, as_kind_heap)
+	  (coercible, as_type_var_heap, as_kind_heap) = new_local_kind_variables cons_exi_vars (as_type_var_heap, as_kind_heap)
 	  (cons_properties, conds_as) = anal_types_of_cons modules cons_type.st_args
-			(conds, { as & as_heaps = { as_heaps & th_vars = th_vars }, as_kind_heap = as_kind_heap })
+			(conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap })
 	  (other_properties, conds_as) = analTypesOfConstructor modules cons_defs conses conds_as
 	  properties = combineTypeProperties cons_properties other_properties
 	= (if coercible properties (properties bitor cIsNonCoercible), conds_as)
@@ -473,6 +490,10 @@ where
 analTypesOfConstructor _ _ [] conds_as
 	= (cIsHyperStrict, conds_as)
 
+isATopConsVar cv		:== cv < 0
+encodeTopConsVar cv		:== dec (~cv)
+decodeTopConsVar cv		:== ~(inc cv)
+
 emptyIdent name :== { id_name = name, id_info = nilPtr }
 
 newKindVariables td_args (type_var_heap, as_kind_heap)
@@ -487,16 +508,16 @@ where
 is_abs (AbstractType _) = True
 is_abs _ = False
 
-analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeHeaps !*ErrorAdmin -> (!*TypeDefInfos, !*TypeHeaps, !*ErrorAdmin)
-analyseTypeDefs modules groups type_def_infos heaps error
-	# as = { as_kind_heap = newHeap, as_heaps = heaps, as_td_infos = type_def_infos, as_error = error }
-	  {as_td_infos,as_heaps,as_error} = foldSt (anal_type_defs_in_group modules) groups as
-	= check_left_root_attribution_of_typedefs modules groups as_td_infos as_heaps as_error
+analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin -> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+analyseTypeDefs modules groups type_def_infos type_var_heap error
+	# as = { as_kind_heap = newHeap, as_type_var_heap = type_var_heap, as_td_infos = type_def_infos, as_error = error }
+	  {as_td_infos,as_type_var_heap,as_error} = foldSt (anal_type_defs_in_group modules) groups as
+	= check_left_root_attribution_of_typedefs modules groups as_td_infos as_type_var_heap as_error
 where
-	anal_type_defs_in_group modules group as=:{as_td_infos,as_heaps,as_kind_heap}
-		# (is_abstract_type, as_td_infos, as_heaps, as_kind_heap)
-			= foldSt (init_type_def_infos modules) group (False, as_td_infos, as_heaps, as_kind_heap)
-		  as = { as & as_td_infos = as_td_infos, as_heaps = as_heaps, as_kind_heap = as_kind_heap }
+	anal_type_defs_in_group modules group as=:{as_td_infos,as_type_var_heap,as_kind_heap}
+		# (is_abstract_type, as_td_infos, as_type_var_heap, as_kind_heap)
+			= foldSt (init_type_def_infos modules) group (False, as_td_infos, as_type_var_heap, as_kind_heap)
+		  as = { as & as_td_infos = as_td_infos, as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap }
 		| is_abstract_type
 			= as
 			# (type_properties, conds, as) = foldSt (anal_type_def modules) group (cIsHyperStrict, { con_top_var_binds = [], con_var_binds = [] }, as)
@@ -506,7 +527,7 @@ where
 			  (as_kind_heap, as_td_infos) = update_type_def_infos type_properties normalized_top_vars group kinds_in_group  kind_var_store as_kind_heap as_td_infos
 			= { as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos }
 
-	init_type_def_infos modules gi=:{gi_module,gi_index} (is_abstract_type, type_def_infos, type_heaps, kind_heap)
+	init_type_def_infos modules gi=:{gi_module,gi_index} (is_abstract_type, type_def_infos, as_type_var_heap, kind_heap)
 		# {td_args,td_rhs} = modules.[gi_module].com_type_defs.[gi_index]
 		= case td_rhs of
 			AbstractType properties
@@ -514,10 +535,10 @@ where
 				  new_tdi = { tdi &	tdi_kinds = [ KindConst \\ _ <- td_args ],
 				  					tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]],
 				  					tdi_properties = properties bitor cIsAnalysed  }
-				-> (True, { type_def_infos & [gi_module].[gi_index] = new_tdi}, type_heaps, kind_heap)
+				-> (True, { type_def_infos & [gi_module].[gi_index] = new_tdi}, as_type_var_heap, kind_heap)
 			_
-				# (tdi_kinds, (th_vars, kind_heap)) = newKindVariables td_args (type_heaps.th_vars, kind_heap)
-				-> (is_abstract_type, { type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds }, { type_heaps & th_vars = th_vars }, kind_heap)
+				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindVariables td_args (as_type_var_heap, kind_heap)
+				-> (is_abstract_type, { type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds }, as_type_var_heap, kind_heap)
 
 	anal_type_def modules gi=:{gi_module,gi_index} (group_properties, conds, as=:{as_error})
 		# {com_type_defs,com_cons_defs} = modules.[gi_module]
@@ -542,16 +563,7 @@ where
 	where
 		retrieve_kind (KindVar kind_info_ptr) kind_heap
 			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
-			= determine_kind kind_info kind_heap
-		where
-			determine_kind kind kind_heap
-				# (kind, kind_heap) = skipIndirections kind kind_heap
-				= case kind of
-					KI_Arrow kinds
-						# (kinds, kind_heap) = mapSt determine_kind kinds kind_heap
-						-> (KindArrow kinds, kind_heap)
-					_
-						-> (KindConst, kind_heap)
+			= kindInfoToKind kind_info kind_heap
 
 	unify_var_binds :: ![VarBind] !*KindHeap -> *KindHeap
 	unify_var_binds binds kind_heap
@@ -625,10 +637,248 @@ where
 		is_a_top_var var_number []
 			= False
 
-	check_left_root_attribution_of_typedefs modules groups type_def_infos type_heaps error
-		# (type_def_infos, th_vars, error) = foldSt (foldSt (checkLeftRootAttributionOfTypeDef modules)) groups (type_def_infos, type_heaps.th_vars, error)
-		= (type_def_infos, { type_heaps & th_vars = th_vars }, error)
+	check_left_root_attribution_of_typedefs modules groups type_def_infos type_var_heap error
+		# (type_def_infos, type_var_heap, error) = foldSt (foldSt (checkLeftRootAttributionOfTypeDef modules)) groups (type_def_infos, type_var_heap, error)
+		= (type_def_infos, type_var_heap, error)
+
+cDummyConditions		=: { con_top_var_binds = [], con_var_binds = []}
+
+determineKind modules type as
+	# (type_kind, _, (_,as)) = analTypes cDummyBool modules [] type (cDummyConditions, as)
+	= (type_kind, as)
+
+determine_kinds_of_type_contexts :: !{#CommonDefs} ![TypeContext] !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
+determine_kinds_of_type_contexts modules type_contexts class_infos as
+	= foldSt (determine_kinds_of_type_context modules) type_contexts (class_infos, as)
+where
+	determine_kinds_of_type_context :: !{#CommonDefs} !TypeContext !(!*ClassDefInfos, !*AnalyseState) -> (!*ClassDefInfos, !*AnalyseState)
+	determine_kinds_of_type_context modules {tc_class={glob_module,glob_object={ds_ident,ds_index}},tc_types} (class_infos, as)
+//		# (class_kinds, class_infos) = myselect ds_ident class_infos glob_module ds_index
+		# (class_kinds, class_infos) = class_infos![glob_module,ds_index]
+		  as = fold2St (verify_kind_of_type modules) class_kinds tc_types as
+		= (class_infos, as)
+
+	verify_kind_of_type modules req_kind type as
+		# (kind_of_type, as=:{as_kind_heap,as_error}) = determineKind modules type as
+		  {uki_kind_heap, uki_error} = unifyKinds kind_of_type (kindToKindInfo req_kind) {uki_kind_heap = as_kind_heap, uki_error = as_error}
+		= { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
+
+/*
+import cheat
+
+myselect name array i j
+	# (copy, array) = uniqueCopy array
+	#! i_size = size copy
+	| i < i_size
+		#! j_size = size copy.[i]
+		| j < j_size
+			= array![i].[j]
+			= abort (("second index out of range " +++ toString j +++ ">=" +++ toString j_size) ---> ("myselect", name, i))
+		= abort (("first index out of range " +++ toString i +++ ">=" +++ toString i_size) ---> ("myselect", name, j))
+*/
+determine_kinds_type_list :: !{#CommonDefs} [AType] !*AnalyseState -> *AnalyseState
+determine_kinds_type_list modules types as
+	= foldSt (force_star_kind modules) types as
+where
+	force_star_kind modules type as
+		# (off_kind, as=:{as_kind_heap,as_error}) = determineKind modules type as
+		  {uki_kind_heap, uki_error} = unifyKinds off_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
+		= { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
 		
+
+class_def_error = "cyclic dependencies between type classes"
+type_appl_error = "type constructor has too many arguments"
+
+cyclicClassInfoMark =: [KindCycle]
+
+determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
+	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+determineKindsOfClasses used_module_numbers modules type_def_infos type_var_heap error
+	# nr_of_modules = size modules
+	  class_infos = {{} \\ module_nr <- [0..nr_of_modules] }
+	  class_infos = iFoldSt (initialyse_info_for_module used_module_numbers modules) 0 nr_of_modules class_infos
+	
+	  as =
+	  	{	as_td_infos			= type_def_infos
+		,	as_type_var_heap	= type_var_heap
+		,	as_kind_heap		= newHeap
+		,	as_error			= error
+		}
+
+	  (class_infos, {as_td_infos,as_type_var_heap,as_error}) = iFoldSt (determine_kinds_of_class_in_module modules) 0 nr_of_modules (class_infos, as)
+	= (class_infos, as_td_infos, as_type_var_heap, as_error)
+where
+	initialyse_info_for_module used_module_numbers modules module_index class_infos
+		| inNumberSet module_index used_module_numbers
+			# nr_of_classes = size modules.[module_index].com_class_defs
+			= { class_infos	& [module_index] = createArray nr_of_classes [] }
+			= class_infos
+
+	determine_kinds_of_class_in_module modules module_index (class_infos, as)
+		#! nr_of_classes = size class_infos.[module_index]
+		= iFoldSt (determine_kinds_of_class modules module_index) 0 nr_of_classes (class_infos, as)
+
+	determine_kinds_of_class :: !{#CommonDefs} !Index !Index !(!*ClassDefInfos, !*AnalyseState) -> (!*ClassDefInfos, !*AnalyseState)
+	determine_kinds_of_class modules class_module class_index (class_infos, as)
+		| isEmpty class_infos.[class_module,class_index]
+			# {com_class_defs,com_member_defs} = modules.[class_module]
+			  {class_args,class_context,class_members,class_arity,class_pos,class_name} = com_class_defs.[class_index]
+			  (class_kind_vars, as_kind_heap) = fresh_kind_vars class_arity [] as.as_kind_heap
+			  as_type_var_heap = bind_kind_vars class_args class_kind_vars as.as_type_var_heap
+			  as_error = pushErrorAdmin (newPosition class_name class_pos) as.as_error
+			  class_infos = { class_infos & [class_module,class_index] = cyclicClassInfoMark }
+			  (class_infos, as) = foldSt (determine_kinds_of_context_class modules) class_context (class_infos,
+			  								{ as & as_kind_heap = as_kind_heap, as_type_var_heap = as_type_var_heap, as_error = as_error })
+			| as.as_error.ea_ok
+				# (class_infos, as) = determine_kinds_of_type_contexts modules class_context class_infos as
+				  (class_infos, as) = determine_kinds_of_members modules class_members com_member_defs class_kind_vars (class_infos, as)
+				  (class_kinds, as_kind_heap) = retrieve_class_kinds class_kind_vars as.as_kind_heap
+				= ({class_infos & [class_module,class_index] = class_kinds }, { as & as_kind_heap = as_kind_heap, as_error = popErrorAdmin as.as_error})
+				= ({class_infos & [class_module,class_index] = [ KindConst \\ _ <- [1..class_arity]] }, { as & as_error = popErrorAdmin as.as_error })
+		| isCyclicClass class_infos.[class_module,class_index]
+			# class_name = modules.[class_module].com_class_defs.[class_index].class_name
+			= (class_infos, { as & as_error = checkError class_name class_def_error as.as_error })
+			= (class_infos, as)
+	where
+		fresh_kind_vars nr_of_vars fresh_vars kind_heap
+			| nr_of_vars > 0
+				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+				= fresh_kind_vars (dec nr_of_vars) [ kind_info_ptr : fresh_vars] (kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+				= (fresh_vars, kind_heap)
+	
+		determine_kinds_of_context_class modules {tc_class={glob_module,glob_object={ds_index}}} infos_and_as
+			= determine_kinds_of_class modules glob_module ds_index infos_and_as
+		
+		isCyclicClass [ KindCycle : _ ] = True 
+		isCyclicClass _					= False 
+
+	bind_kind_vars type_vars kind_ptrs type_var_heap
+		= fold2St bind_kind_var type_vars kind_ptrs type_var_heap
+	where
+		bind_kind_var {tv_info_ptr} kind_info_ptr type_var_heap
+			= type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr)
+			
+	clear_variables type_vars type_var_heap
+		= foldSt clear_variable type_vars type_var_heap
+	where
+		clear_variable {tv_info_ptr} type_var_heap
+			= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+
+	determine_kinds_of_members modules members member_defs class_kind_vars (class_infos, as)
+		= iFoldSt (determine_kind_of_member modules members member_defs class_kind_vars) 0 (size members) (class_infos, as)
+		
+	determine_kind_of_member modules members member_defs class_kind_vars loc_member_index (class_infos, as)
+		# glob_member_index = members.[loc_member_index].ds_index
+		  {me_class_vars,me_type={st_vars,st_args,st_result,st_context}} = member_defs.[glob_member_index]
+		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
+		  as_type_var_heap = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap
+		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as.as_kind_heap
+		  as = determine_kinds_type_list modules [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+		  (class_infos, as)	= determine_kinds_of_type_contexts modules (tl st_context) class_infos as
+		= (class_infos, as)
+	where
+		fresh_kind_vars_for_unbound_vars type_vars type_var_heap kind_heap
+			= foldSt fresh_kind_vars_for_unbound_var type_vars (type_var_heap, kind_heap)
+
+		fresh_kind_vars_for_unbound_var {tv_info_ptr} (type_var_heap, kind_heap)
+			# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
+			= case tv_info of
+				TVI_Empty
+					# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+					-> (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+				_
+					-> (type_var_heap, kind_heap)
+					
+	retrieve_class_kinds class_kind_vars kind_heap
+		= mapSt retrieve_kind class_kind_vars kind_heap
+	where
+		retrieve_kind kind_info_ptr kind_heap
+			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
+			= kindInfoToKind kind_info kind_heap
+
+bindFreshKindVariablesToTypeVars :: [TypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
+bindFreshKindVariablesToTypeVars type_vars type_var_heap as_kind_heap
+	= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
+where
+	new_kind :: !TypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
+	new_kind {tv_info_ptr} (type_var_heap, kind_heap)
+		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+		= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+
+checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet !IndexRange !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
+	!*TypeVarHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_module_numbers icl_fun_def_range common_defs icl_fun_defs dcl_modules
+			type_def_infos class_infos type_var_heap error
+	# as =
+	  	{	as_td_infos			= type_def_infos
+		,	as_type_var_heap	= type_var_heap
+		,	as_kind_heap		= newHeap
+		,	as_error			= error
+		}
+
+	# (icl_fun_defs, dcl_modules, class_infos, as)
+		= iFoldSt (check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_range common_defs)
+						0 (size common_defs) (icl_fun_defs, dcl_modules, class_infos, as)
+	= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, as.as_error)
+where
+	check_kinds_of_module first_uncached_module main_module_index used_module_numbers {ir_from,ir_to} common_defs module_index
+					(icl_fun_defs, dcl_modules, class_infos, as) 
+		| inNumberSet module_index used_module_numbers
+			| module_index == main_module_index
+				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
+				  (icl_fun_defs, class_infos, as) = iFoldSt (check_kinds_of_icl_fuction common_defs) ir_from ir_to (icl_fun_defs, class_infos, as)
+				= (icl_fun_defs, dcl_modules, class_infos, as)
+			| module_index >= first_uncached_module
+				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
+				# (dcl_modules, class_infos, as) = check_kinds_of_dcl_fuctions common_defs module_index dcl_modules class_infos as
+				= (icl_fun_defs, dcl_modules, class_infos, as)
+				= (icl_fun_defs, dcl_modules, class_infos, as)
+			= (icl_fun_defs, dcl_modules, class_infos, as)				
+
+	check_kinds_of_class_instances common_defs instance_index instance_defs class_infos as
+		| instance_index == size instance_defs
+			= (class_infos, as)
+			# (class_infos, as) = check_kinds_of_class_instance common_defs instance_defs.[instance_index] class_infos as
+			= check_kinds_of_class_instances common_defs (inc instance_index) instance_defs class_infos as
+	where	
+		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
+		check_kinds_of_class_instance common_defs {ins_class,ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
+					as=:{as_type_var_heap,as_kind_heap,as_error}
+			# as_error = pushErrorAdmin (newPosition ins_ident ins_pos) as_error
+			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
+			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }
+			  (class_infos, as) = determine_kinds_of_type_contexts common_defs
+			  		[{tc_class = ins_class, tc_types = it_types, tc_var = nilPtr} : it_context] class_infos as
+			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
+
+	check_kinds_of_icl_fuction common_defs fun_index (icl_fun_defs, class_infos, as)
+		# ({fun_type,fun_symb,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
+		= case fun_type of
+			Yes symbol_type
+				# as_error = pushErrorAdmin (newPosition fun_symb fun_pos) as.as_error
+				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos { as & as_error = as_error }
+				-> (icl_fun_defs, class_infos, { as & as_error = popErrorAdmin as.as_error })
+			No
+				-> (icl_fun_defs, class_infos, as)
+
+	check_kinds_of_dcl_fuctions common_defs module_index dcl_modules class_infos as
+		# ({dcl_functions,dcl_instances}, dcl_modules) = dcl_modules![module_index]
+		# nr_of_dcl_funs = dcl_instances.ir_from
+		# (class_infos, as) = iFoldSt (check_kinds_of_dcl_fuction common_defs dcl_functions) 0 nr_of_dcl_funs (class_infos, as)
+		= (dcl_modules, class_infos, as)
+	where
+		check_kinds_of_dcl_fuction common_defs dcl_functions fun_index (class_infos, as)
+			# {ft_type,ft_symb,ft_pos} = dcl_functions.[fun_index]
+			  as_error = pushErrorAdmin (newPosition ft_symb ft_pos) as.as_error
+			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos
+			  							{ as & as_error = as_error }			  								
+			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
+
+	check_kinds_of_symbol_type :: !{#CommonDefs} !SymbolType !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
+	check_kinds_of_symbol_type common_defs {st_vars,st_result,st_args,st_context} class_infos as=:{as_type_var_heap,as_kind_heap}
+		# (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars st_vars as_type_var_heap as_kind_heap
+		  as = determine_kinds_type_list common_defs [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+		= determine_kinds_of_type_contexts common_defs st_context class_infos as
 
 instance <<< DynamicType
 where

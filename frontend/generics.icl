@@ -232,18 +232,17 @@ convertGenerics
 			}
 		}
 
-	#! (gs_dcl_modules, gs_modules, gs_heaps, cs) = 
-		create_class_dictionaries 0 gs_dcl_modules gs_modules gs_heaps cs
+	#! (gs_dcl_modules, gs_modules, gs_heaps, cs_symbol_table) = 
+		create_class_dictionaries 0 gs_dcl_modules gs_modules gs_heaps cs.cs_symbol_table
 //		create_class_dictionaries1 main_dcl_module_n dcl_modules gs_modules gs_heaps cs
 			//---> "*** create class dictionaries"	
 
-	# {cs_symbol_table, cs_predef_symbols, cs_error} = cs
 	# hash_table = { hash_table & hte_symbol_heap = cs_symbol_table }	
 	
 	#! index_range = {ir_from = gs.gs_first_fun, ir_to = gs.gs_last_fun}
 		 			
 	= (	gs_groups, gs_modules, gs_fun_defs, index_range, gs_td_infos, gs_heaps, hash_table, 
-		cs_predef_symbols, gs_dcl_modules, gs_opt_dcl_icl_conversions, cs_error)
+		cs.cs_predef_symbols, gs_dcl_modules, gs_opt_dcl_icl_conversions, cs.cs_error)
 where
 	return {	gs_modules, gs_groups, gs_fun_defs, gs_td_infos, gs_gtd_infos, 
 				gs_heaps, gs_main_dcl_module_n, gs_dcl_modules, gs_opt_dcl_icl_conversions, gs_error} 
@@ -252,21 +251,21 @@ where
 			gs_td_infos, gs_heaps, hash_table, predefs, gs_dcl_modules, 
 			gs_opt_dcl_icl_conversions, gs_error)
 
-	create_class_dictionaries module_index dcl_modules  modules heaps cs 
+	create_class_dictionaries module_index dcl_modules  modules heaps symbol_table 
 		#! size_of_modules = size modules
 		| module_index == size_of_modules
-			= (dcl_modules, modules, heaps, cs)
-			#! (dcl_modules, modules, heaps, cs) = 
-				create_class_dictionaries1 module_index dcl_modules  modules heaps cs
-			= create_class_dictionaries (inc module_index) dcl_modules modules heaps cs		
+			= (dcl_modules, modules, heaps, symbol_table)
+			#! (dcl_modules, modules, heaps, symbol_table) = 
+				create_class_dictionaries1 module_index dcl_modules  modules heaps symbol_table
+			= create_class_dictionaries (inc module_index) dcl_modules modules heaps symbol_table		
 
 	create_class_dictionaries1
 			module_index dcl_modules modules 
 			heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}, hp_var_heap}
-			cs 
+			symbol_table 
 		#! (common_defs, modules) = modules![module_index]
 		#! class_defs = { x \\ x <-: common_defs.com_class_defs } // make unique copy		
-		#! (class_defs, dcl_modules, new_type_defs, new_selector_defs, new_cons_defs, th_vars, hp_var_heap, cs) =
+		#! (class_defs, dcl_modules, new_type_defs, new_selector_defs, new_cons_defs, th_vars, hp_var_heap, symbol_table) =
 				createClassDictionaries 
 					module_index 
 					class_defs 
@@ -274,7 +273,7 @@ where
 					(size common_defs.com_type_defs) 
 					(size common_defs.com_selector_defs) 
 					(size common_defs.com_cons_defs) 
-					th_vars hp_var_heap cs
+					th_vars hp_var_heap symbol_table
 
 		#! common_defs = { common_defs & 
 			com_class_defs = class_defs, 
@@ -284,7 +283,7 @@ where
 
 		#! heaps = {heaps & hp_var_heap = hp_var_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}} 
 		#! modules = { modules & [module_index] = common_defs } 		
-		= (dcl_modules, modules, heaps, cs)		
+		= (dcl_modules, modules, heaps, symbol_table)		
 	
 convertInstances :: !*GenericState	
 	-> (![Global Index], !*GenericState)

@@ -174,10 +174,6 @@ addToAttributeEnviron _ _ attr_env error
 
 emptyIdent name :== { id_name = name, id_info = nilPtr }
 
-isATopConsVar cv		:== cv < 0
-encodeTopConsVar cv		:== dec (~cv)
-decodeTopConsVar cv		:== ~(inc cv)
-
 checkTypeDef :: !Index !Index !*TypeSymbols !*TypeInfo !*CheckState -> (!*TypeSymbols, !*TypeInfo, !*CheckState);
 checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
 	# (type_def, ts_type_defs) = ts_type_defs![type_index]
@@ -1161,18 +1157,15 @@ removeVariablesFromSymbolTable scope vars symbol_table
 
 makeAttributedType attr annot type :== { at_attribute = attr, at_annotation = annot, at_type = type }
 
-createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*CheckState
-	-> (!*{#ClassDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*CheckState)
-createClassDictionaries mod_index class_defs modules first_type_index first_selector_index first_cons_index type_var_heap var_heap cs
-	| cs.cs_error.ea_ok
-		
-		# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs) = create_class_dictionaries mod_index 0  class_defs modules []
-				{ index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index } type_var_heap var_heap cs
-		  (type_defs, sel_defs, cons_defs, cs_symbol_table) = foldSt collect_type_def rev_dictionary_list  ([], [], [], cs.cs_symbol_table)
-		= (class_defs, modules, type_defs, sel_defs, cons_defs, type_var_heap, var_heap, {cs & cs_symbol_table = cs_symbol_table })
-		= (class_defs, modules, [], [], [], type_var_heap, var_heap, cs)
-where
-			
+createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*SymbolTable
+	-> (!*{#ClassDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*SymbolTable)
+createClassDictionaries mod_index class_defs modules first_type_index first_selector_index first_cons_index type_var_heap var_heap symbol_table
+	# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
+			= create_class_dictionaries mod_index 0  class_defs modules []
+				{ index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index } type_var_heap var_heap symbol_table
+	  (type_defs, sel_defs, cons_defs, symbol_table) = foldSt collect_type_def rev_dictionary_list  ([], [], [], symbol_table)
+	= (class_defs, modules, type_defs, sel_defs, cons_defs, type_var_heap, var_heap, symbol_table)
+where			
 	collect_type_def type_ptr (type_defs, sel_defs, cons_defs, symbol_table)
 		# ({ ste_kind = STE_DictType type_def }, symbol_table) = readPtr type_ptr symbol_table
 		  (RecordType {rt_constructor, rt_fields}) = type_def.td_rhs
@@ -1194,91 +1187,71 @@ where
 			= create_class_dictionaries mod_index (inc class_index) class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
 			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)			
 
-	create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !v:[SymbolPtr] !u:Indexes !*TypeVarHeap !*VarHeap !*CheckState 
-		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*CheckState)
+	create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !v:[SymbolPtr] !u:Indexes !*TypeVarHeap !*VarHeap !*SymbolTable 
+		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*SymbolTable)
 	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } modules rev_dictionary_list
-			indexes type_var_heap var_heap cs=:{cs_symbol_table,cs_error}
+			indexes type_var_heap var_heap symbol_table
 		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}}} = class_def
-		| isNilPtr id_info
-			# (type_id_info, cs_symbol_table) = newPtr EmptySymbolTableEntry cs_symbol_table
-			  nr_of_members = size class_members
-			  nr_of_fields = nr_of_members + length class_context
-			  rec_type_id = { class_name &  id_info = type_id_info}
-			  class_dictionary = { ds & ds_ident = rec_type_id }
-			  class_defs = { class_defs & [class_index] = { class_def & class_dictionary = class_dictionary}}
-			  (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)
-			  		= create_class_dictionaries_of_contexts mod_index class_context class_defs modules
-			  				rev_dictionary_list indexes type_var_heap var_heap { cs & cs_symbol_table = cs_symbol_table }
-			
-			  { index_type, index_cons, index_selector } = indexes
+		# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
+		  nr_of_members = size class_members
+		  nr_of_fields = nr_of_members + length class_context
+		  rec_type_id = { class_name &  id_info = type_id_info}
+		  class_dictionary = { ds & ds_ident = rec_type_id }
 
-			  type_symb = MakeTypeSymbIdent { glob_object = index_type, glob_module = mod_index } rec_type_id class_arity
+		  { index_type, index_cons, index_selector } = indexes
 
-			  rec_type		= makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
-			  field_type	= makeAttributedType TA_Multi AN_None TE
+		  type_symb = MakeTypeSymbIdent { glob_object = index_type, glob_module = mod_index } rec_type_id class_arity
 
-			  (rev_fields, var_heap, cs_symbol_table)
-		  			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] var_heap cs.cs_symbol_table
-			  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, cs_symbol_table)
-		  			= build_context_fields mod_index nr_of_members class_context rec_type index_type (index_selector + nr_of_members) rev_fields
-		  					[ { field_type & at_annotation = AN_Strict } \\ i <- [1..nr_of_members] ] class_defs modules var_heap cs_symbol_table
+		  rec_type		= makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
+		  field_type	= makeAttributedType TA_Multi AN_None TE
 
-			  (cons_id_info, cs_symbol_table) = newPtr EmptySymbolTableEntry cs_symbol_table
-			  rec_cons_id = { class_name & id_info = cons_id_info}
-			  cons_symbol = { ds_ident = rec_cons_id, ds_arity = nr_of_fields, ds_index = index_cons }
-			  (cons_type_ptr, var_heap) = newPtr VI_Empty var_heap
+		  (rev_fields, var_heap, symbol_table)
+	  			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] var_heap symbol_table
+		  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, symbol_table)
+	  			= build_context_fields mod_index nr_of_members class_context rec_type index_type (index_selector + nr_of_members) rev_fields
+	  					[ { field_type & at_annotation = AN_Strict } \\ i <- [1..nr_of_members] ] class_defs modules var_heap symbol_table
 
-			  (td_args, type_var_heap) = mapSt new_attributed_type_variable class_args type_var_heap
-			  
+		  (cons_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
+		  rec_cons_id = { class_name & id_info = cons_id_info}
+		  cons_symbol = { ds_ident = rec_cons_id, ds_arity = nr_of_fields, ds_index = index_cons }
+		  (cons_type_ptr, var_heap) = newPtr VI_Empty var_heap
 
-	  		  type_def =
-			 	{	td_name			= rec_type_id
-				,	td_index		= index_type
-				,	td_arity		= 0
-				,	td_args			= td_args
-				,	td_attrs		= []
-				,	td_context		= []
-				,	td_rhs			= RecordType {rt_constructor = cons_symbol, rt_fields = { field \\ field <- reverse rev_fields }}
-				,	td_attribute	= TA_None
-				,	td_pos			= NoPos
-				,	td_used_types	= []
-				}
-			
-			  cons_def = 	
-				{	cons_symb		= rec_cons_id
-				,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_result = rec_type,
-									    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
-				,	cons_priority	= NoPrio
-				,	cons_index		= 0
-				,	cons_type_index	= index_type
-				,	cons_exi_vars	= []
-				,	cons_arg_vars	= []
-				,	cons_type_ptr	= cons_type_ptr
-				,	cons_pos		= NoPos
-				}
-			= ({ class_defs & [class_index] = { class_def & class_dictionary = { class_dictionary & ds_index = index_type }}}, modules,
-					 [ type_id_info : rev_dictionary_list ], { index_type = inc index_type, index_cons = inc index_cons, index_selector = index_selector },
-						type_var_heap, var_heap, { cs & cs_symbol_table = cs_symbol_table
-							<:= (type_id_info, { ste_kind = STE_DictType type_def, ste_index = index_type,
-											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })
-							<:= (cons_id_info, { ste_kind = STE_DictCons cons_def, ste_index = index_cons,
-											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })})
-					
-		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
-		| ste_kind == STE_Empty
-			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap,
-				{ cs & cs_symbol_table = cs_symbol_table, cs_error = checkError class_name "cyclic dependencies between type classes" cs_error})
-			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, { cs & cs_symbol_table = cs_symbol_table })
+		  (td_args, type_var_heap) = mapSt new_attributed_type_variable class_args type_var_heap
+		  
 
-	create_class_dictionaries_of_contexts mod_index [{tc_class = {glob_module, glob_object={ds_index}}}:tcs] class_defs modules
-			rev_dictionary_list indexes type_var_heap var_heap cs
-		| mod_index == glob_module
-			# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)
-					= create_class_dictionary mod_index ds_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-			= create_class_dictionaries_of_contexts mod_index tcs class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-			= create_class_dictionaries_of_contexts mod_index tcs class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-	create_class_dictionaries_of_contexts mod_index [] class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-		= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)
+  		  type_def =
+		 	{	td_name			= rec_type_id
+			,	td_index		= index_type
+			,	td_arity		= 0
+			,	td_args			= td_args
+			,	td_attrs		= []
+			,	td_context		= []
+			,	td_rhs			= RecordType {rt_constructor = cons_symbol, rt_fields = { field \\ field <- reverse rev_fields }}
+			,	td_attribute	= TA_None
+			,	td_pos			= NoPos
+			,	td_used_types	= []
+			}
+		
+		  cons_def = 	
+			{	cons_symb		= rec_cons_id
+			,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_result = rec_type,
+								    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
+			,	cons_priority	= NoPrio
+			,	cons_index		= 0
+			,	cons_type_index	= index_type
+			,	cons_exi_vars	= []
+			,	cons_arg_vars	= []
+			,	cons_type_ptr	= cons_type_ptr
+			,	cons_pos		= NoPos
+			}
+
+		= ({ class_defs & [class_index] = { class_def & class_dictionary = { class_dictionary & ds_index = index_type }}}, modules,
+				 [ type_id_info : rev_dictionary_list ], { index_type = inc index_type, index_cons = inc index_cons, index_selector = index_selector },
+					type_var_heap, var_heap,
+						symbol_table <:= (type_id_info, { ste_kind = STE_DictType type_def, ste_index = index_type,
+												ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })
+										<:= (cons_id_info, { ste_kind = STE_DictCons cons_def, ste_index = index_cons,
+												ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }))
 	
 	new_attributed_type_variable tv type_var_heap
 		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
@@ -1313,7 +1286,6 @@ where
   		  	,	sd_type			= { st_vars	= [], st_args = [ rec_type ], st_result = field_type, st_arity = 1,
   		  	                        st_context = [], st_attr_vars = [], st_attr_env = [] }
 			,	sd_exi_vars		= []
-//			,	sd_exi_attrs	= []
 			,	sd_field_nr		= field_nr
 			,	sd_type_index	= rec_type_index
 			,	sd_type_ptr		= sd_type_ptr

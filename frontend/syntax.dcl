@@ -255,6 +255,8 @@ cNameLocationDependent :== True
 	,	class_arg_kinds		:: ![TypeKind] // filled in in checkKindCorrectness phase
 	}
 
+::	ClassDefInfos :== {# .{! [TypeKind]}}
+
 ::	MemberDef =
 	{	me_symb			:: !Ident
 	,	me_class		:: !Global Index
@@ -858,7 +860,7 @@ cNonRecursiveAppl	:== False
 ::	KindInfoPtr	:== Ptr KindInfo
 
 ::	KindInfo	= KI_Var !KindInfoPtr
-				| KI_Arrow ![KindInfo]
+				| KI_Arrow !KindInfo !KindInfo
 				| KI_Const
 				
 				| KI_ConsVar
@@ -932,7 +934,7 @@ cNonRecursiveAppl	:== False
 
 ::	BasicValue	= BVI !String | BVC !String | BVB !Bool | BVR !String | BVS !String
 
-::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind]
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
 
 instance toString 	TypeKind
 instance <<< 		TypeKind

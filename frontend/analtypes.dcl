@@ -7,4 +7,14 @@ partionateAndExpandTypes :: !NumberSet !Index !*CommonDefs !*{#DclModule} !*Type
 
 ::	TypeGroups :== [[GlobalIndex]]
 
-analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeHeaps !*ErrorAdmin -> (!*TypeDefInfos, !*TypeHeaps, !*ErrorAdmin)
+analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin -> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+
+determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
+	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+
+checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet !IndexRange !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
+	!*TypeVarHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+
+isATopConsVar cv		:== cv < 0
+encodeTopConsVar cv		:== dec (~cv)
+decodeTopConsVar cv		:== ~(inc cv)

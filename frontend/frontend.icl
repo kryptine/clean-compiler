@@ -4,7 +4,7 @@
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
-		convertimportedtypes, checkKindCorrectness, compilerSwitches, analtypes, generics
+		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics
 
 SwitchGenerics on off :== off
 
@@ -80,12 +80,12 @@ frontSyntaxTree cached_functions_and_macros cached_dcl_mods n_functions_and_macr
 			},cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
-//import StdDebug
+// import StdDebug
 
 frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File (!Optional !*File) !*Heaps
   	-> ( !Optional *FrontEndSyntaxTree,!*{# FunDef },!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
 frontEndInterface options mod_ident search_paths cached_dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
- //	# files = trace_n ("Compiling "+++mod_ident.id_name) files
+// 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
 
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths predef_symbols files
@@ -147,9 +147,18 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# (type_groups, ti_common_defs, td_infos, icl_common, dcl_mods, type_heaps, error_admin)
 			= partionateAndExpandTypes icl_used_module_numbers main_dcl_module_n icl_common dcl_mods type_heaps error_admin
 	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
-	# (td_infos, type_heaps, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps error_admin
+	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
+/*
 	  (fun_defs, dcl_mods, th_vars, td_infos, error_admin) 
       		= checkKindCorrectness main_dcl_module_n nr_of_chached_functions_and_macros icl_instances ti_common_defs n_cached_dcl_modules fun_defs dcl_mods type_heaps.th_vars td_infos error_admin
+*/
+	  (class_infos, td_infos, th_vars, error_admin)
+			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
+	#! nr_of_icl_functions = icl_mod.icl_instances.ir_from
+	# (fun_defs, dcl_mods, td_infos, th_vars, error_admin)
+			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers global_fun_range
+				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars error_admin
+
       type_heaps = { type_heaps & th_vars = th_vars }
 	# heaps = { heaps & hp_type_heaps = type_heaps }
 	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common

@@ -247,6 +247,8 @@ cNameLocationDependent :== True
 	,	class_arg_kinds		:: ![TypeKind] // filled in in checkKindCorrectness phase
 	}
 
+::	ClassDefInfos :== {# .{! [TypeKind]}}
+
 ::	MemberDef =
 	{	me_symb			:: !Ident
 	,	me_class		:: !Global Index
@@ -839,7 +841,7 @@ cNotVarNumber :== -1
 ::	KindInfoPtr	:== Ptr KindInfo
 
 ::	KindInfo	= KI_Var !KindInfoPtr
-				| KI_Arrow ![KindInfo]
+				| KI_Arrow !KindInfo !KindInfo
 				| KI_Const
 				
 				| KI_ConsVar
@@ -917,8 +919,7 @@ cNotVarNumber :== -1
 ::	BasicValue	= BVI !String | BVC !String | BVB !Bool | BVR !String | BVS !String
 
 
-//::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow !Int
-::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind]
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
 
 ::	Occurrence =
 	{	occ_ref_count	:: !ReferenceCount
@@ -935,7 +936,6 @@ cNotVarNumber :== -1
 
 ::	OccurrenceBinding	= OB_Empty | OB_OpenLet !Expression | OB_LockedLet !Expression
 						| OB_Pattern ![(FreeVar, Int)] !OccurrenceBinding
-//						| OB_Closed !LetOccurrences | OB_Marked !LetOccurrences
 
 ::	TypeDefInfo =
 	{	tdi_kinds			:: ![TypeKind]
@@ -1798,14 +1798,12 @@ where
 
 instance toString KindInfo
 where
-	toString (KI_Var ptr) 		= "*" +++ toString (ptrToInt ptr)
-	toString (KI_Const) 		= "*"
-	toString (KI_Arrow kinds)	= kind_list_to_string kinds
+	toString (KI_Var ptr) 				= "*" +++ toString (ptrToInt ptr)
+	toString (KI_Const) 				= "*"
+	toString (KI_Arrow kind1 kind2)		= withBrackets kind1 (toString kind1) +++ " -> " +++ toString kind2
 	where
-		kind_list_to_string [] = " ?????? "
-		kind_list_to_string [k] = "* -> *"
-		kind_list_to_string [k:ks] = "* -> " +++ kind_list_to_string ks
-
+		withBrackets (KI_Arrow _ _) kind_str	= "(" +++ kind_str +++ ")"
+		withBrackets _				kind_str	= kind_str
 
 instance <<< TypeDefInfo
 where
