@@ -6,6 +6,7 @@ import newtest
 import newfold
 import coreclean
 import rule
+import dnc
 import graph
 import basic
 import checksupport
@@ -905,7 +906,7 @@ Converting a function body:
 convert_graph stringtype patnodes mkexpr0 level srgraph varheap0 exprheap0
 = (exprheap4,varheap1,expression)
   where (exprheap4,refcount,closeds,_,mkexpr1)
-        = convert_graph_node stringtype mkexpr sgraph exprheap3 patnodes (const 0) [] mkexpr0 sroot
+        = (convert_graph_node--->"convert.convert_graph_node begins from convert.convert_graph") stringtype mkexpr (sgraph--->srgraph) exprheap3 patnodes (const 0) [] mkexpr0 sroot
         sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
         shareds = [(closed,n) \\ closed<-closeds, n<-[refcount closed] | n>1]
         (mkexpr,letbinds,varheap1,exprheap3)
@@ -971,13 +972,13 @@ convert_graph_nodes ::
     )
 
 convert_graph_nodes stringtype mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 []
-= (exprheap0,refcount0,closeds0,seen0,mkexpr0)
+= (exprheap0,refcount0,closeds0,seen0,mkexpr0) <--- "convert.convert_graph_nodes ends ([])"
 convert_graph_nodes stringtype mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 [snode:snodes]
-= (exprheap2,refcount3,closeds2,seen2,mkexpr2)
+= (exprheap2,refcount3,closeds2,seen2,mkexpr2) <--- "convert.convert_graph_nodes ends ([_:_])"
   where (exprheap2,refcount1,closeds1,seen2,mkexpr1)
-        = convert_graph_nodes stringtype mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 snodes
+        = (convert_graph_nodes--->"convert.convert_graph_nodes begins from convert.convert_graph_nodes") stringtype mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 snodes
         (exprheap1,refcount2,closeds2,seen1,mkexpr2)
-        = convert_graph_node stringtype mkexpr sgraph exprheap0 seen0 refcount1 closeds1 mkexpr1 snode
+        = (convert_graph_node--->"convert.convert_graph_node begins from convert.convert_graph_nodes") stringtype mkexpr sgraph exprheap0 seen0 refcount1 closeds1 mkexpr1 snode
         refcount3 = inccounter snode refcount2
 
 convert_graph_node ::
@@ -999,14 +1000,14 @@ convert_graph_node ::
 
 convert_graph_node stringtype mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 snode
 | isMember snode seen0
-  = (exprheap0,refcount0,closeds0,seen0,mkexpr0)
-= (exprheap2,refcount1,closeds2,seen2,mkexpr2)
+  = (exprheap0,refcount0,closeds0,seen0,mkexpr0) <--- "convert.convert_graph_node ends (already seen)"
+= (exprheap2,refcount1,closeds2,seen2,mkexpr2) <--- "convert.convert_graph_node ends (new node)"
   where seen1 = [snode:seen0]
-        (_,(ssym,sargs)) = varcontents sgraph snode  // Must be closed; open nodes already initially in "seen"
+        (_,(ssym,sargs)) = dnc toString sgraph snode  // Must be closed; open nodes already initially in "seen"
         (expr,exprheap1)
-        = convert_graph_symbol stringtype ssym (map mkexpr sargs) exprheap0
+        = convert_graph_symbol stringtype ((ssym<---"convert.convert_graph_node.ssym ends")--->"convert.convert_graph_node.ssym begins from convert.convert_graph_node") (map mkexpr ((sargs<---"convert.convert_graph_node.sargs ends")--->"convert.convert_graph_node.sargs begins from convert.convert_graph_node (convert_graph_symbol)")) exprheap0
         (exprheap2,refcount1,closeds1,seen2,mkexpr1)
-        = convert_graph_nodes stringtype mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 sargs
+        = (convert_graph_nodes--->"convert.convert_graph_nodes begins from convert.convert_graph_node") stringtype mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 ((sargs<---"convert.convert_graph_node.sargs ends")--->"convert.convert_graph_node.sargs begins from convert.convert_graph_node (convert_graph_nodes)")
         mkexpr2 = adjust snode expr mkexpr1
         closeds2 = [snode:closeds1]
 
@@ -1105,7 +1106,7 @@ collect_tce_calls _ rest = rest
 fold_funcbody ::
     ((Rgraph sym var) .result .result -> .result)
     ((Rgraph sym var) -> .result)
-    (FuncBody sym var)
+    !.(FuncBody sym var)
  -> .result
 
 fold_funcbody matchpattern buildgraph funcbody

@@ -314,11 +314,12 @@ tryinstantiate onode rpattern anode sargs
   where act continue history failinfo instdone stricts sroot subject heap
         | anode==sroot                                   // Check if strategy applied at root
           && goodorder strictargs sargs subject subject` // Check if order of arguments of rule ok
-        = Instantiate success fail
+        = Instantiate ipattern success fail
         = Stop
           where success = continue history failinfo True stricts` sroot subject` heap`
                 fail = continue history failinfo` True stricts` sroot subject heap
                 failinfo` = adjust onode [rpattern:failinfo onode] failinfo
+                ipattern = mkrgraph onode subject`
                 (heap`,subject`) = rewrinstantiate pgraph proot onode (heap,subject)
                 proot = rgraphroot rpattern; pgraph = rgraphgraph rpattern
 

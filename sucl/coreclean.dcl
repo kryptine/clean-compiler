@@ -77,7 +77,7 @@ instance toString (Ptr a)
 instance <<< (Ptr a)
 
 // Get the type rule and strictness of a built in core clean symbol
-coretyperule :: SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+coretyperule :: !SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 corestricts :: SuclSymbol -> [Bool]
 
 // Determine if a list of constructors completely covers a given type

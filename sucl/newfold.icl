@@ -202,11 +202,11 @@ foldtips foldarea foldcont
               -> (foldoptional exres (pair True o addstrict stricts o mapfst rule2body) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule) <--- "newfold.foldtips.ft ends (Stop)") ---> "newfold.foldtips.ft case = Stop"
                  where deltanodes = foldoptional [] getdeltanodes answer
                        rnfnodes = foldoptional [ruleroot rule] (const []) answer
-             Instantiate yestrace notrace
+             Instantiate ipattern yestrace notrace
               -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Instantiate.match") hist yestrace) ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Instantiate.fail") hist notrace)
                  where ft` (False,yessra) (False,nosra) = (exres <--- "newfold.foldtips.ft ends (Instantiate/no)") ---> "newfold.foldtips.ft case Instantiate/no"
                        ft` (yesfound,(yesstricts,yesbody,yesareas)) (nofound,(nostricts,nobody,noareas))
-                       = ((True,(stricts,matchpattern answer yesbody nobody,yesareas++noareas)) <--- "newfold.foldtips.ft ends (Instantiate/yes)") ---> "newfold.foldtips.ft case Instantiate/yes"
+                       = ((True,(stricts,MatchPattern ipattern yesbody nobody,yesareas++noareas)) <--- "newfold.foldtips.ft ends (Instantiate/yes)") ---> "newfold.foldtips.ft case Instantiate/yes"
              Reduce reductroot trace
               -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Reduce") (fst hist,fst hist) trace)
                  where ft` (False,sra) = (exres <--- "newfold.foldtips.ft ends (Reduce/no)") ---> "newfold.foldtips.ft case Reduce/no"
@@ -217,14 +217,6 @@ foldtips foldarea foldcont
                        ft` (found,sra) = ((True,sra) <--- "newfold.foldtips.ft ends (Annotate/yes)") ---> "newfold.foldtips.ft case Annotate/no"
           where (Trace stricts rule answer _ transf) = trace
                 exres = (False,newextract noetrc foldarea trace)
-
-matchpattern ::
-    (Answer sym var pvar)
-    (FuncBody sym var)
-    (FuncBody sym var)
- -> FuncBody sym var
-
-matchpattern _ _ _ = error "newfold: matchpattern: not yet implemented"
 
 rule2body rule = buildgraph (arguments rule) (ruleroot rule) (rulegraph rule)
 
@@ -277,8 +269,8 @@ newextract trc newname (Trace stricts rule answer history transf)
       -> newextract trc newname trace <--- "newfold.newextract ends (at Reduce transformation)"
      Annotate trace
       -> newextract trc newname trace <--- "newfold.newextract ends (at Annotate transformation)"
-     Instantiate yestrace notrace
-      -> (stricts,matchpattern answer yesbody nobody,yesareas++noareas) <--- "newfold.newextract ends (at Instantiate transformation)"
+     Instantiate ipattern yestrace notrace
+      -> (stricts,MatchPattern ipattern yesbody nobody,yesareas++noareas) <--- "newfold.newextract ends (at Instantiate transformation)"
          where (_,yesbody,yesareas) = newextract trc newname yestrace
                (_,nobody,noareas) = newextract trc newname notrace
      Stop
@@ -373,7 +365,7 @@ findpattern pattern thespinenodes residuroot (Reduce reductroot trace)
         fp residuroot trace = findpattern` pattern residuroot trace
         redirect = adjust (last thespinenodes) reductroot id
 
-findpattern pattern thespinenodes residuroot (Instantiate yestrace notrace)
+findpattern pattern thespinenodes residuroot (Instantiate ipattern yestrace notrace)
 = findpattern` pattern residuroot yestrace || findpattern` pattern residuroot notrace
 
 findpattern pattern thespinenodes residuroot (Annotate trace)
@@ -407,9 +399,9 @@ getdeltanodes spine
         partial _ _ _ nodes = (False,nodes)
         redex _ _ = none
 
-instance <<< FuncBody sym var | toString sym & ==,toString var
+instance <<< (FuncBody sym var) | toString sym & ==,toString var
 where (<<<) file (MatchPattern pat yesbody nobody)
-      = file <<< "?Match: " <<< pat <<< nl
+      = file <<< "?Match: " /* <<< toString (rgraphroot pat) <<< " =?= " */ <<< pat <<< nl
              <<< "Match succes:" <<< nl
              <<< yesbody
              <<< "Match failure:" <<< nl

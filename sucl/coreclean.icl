@@ -12,6 +12,9 @@ import syntax
 //import StdEnv
 import general
 
+mstub = stub "coreclean"
+block func = mstub func "blocked"
+
 :: SuclTypeSymbol
  = SuclUSER (Global Index)
  | SuclFN Int
@@ -185,22 +188,22 @@ corestricts sym
       -> maphd (const True) stricts
      _
       -> stricts
-  where stricts = map (const False) (arguments (coretyperule sym))
+  where stricts = map (const False) (arguments ((coretyperule--->"coreclean.coretyperule begins from coreclean.corestricts") sym))
 
-coretyperule :: SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+coretyperule :: !SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 coretyperule (SuclApply argc)
- = mkrule [infunctype,argtype] outfunctype` (updategraph infunctype (SuclFN argc,[argtype:argtypes]++[restype]) outfuncgraph)
+ = ((mkrule [infunctype,argtype] outfunctype` (updategraph infunctype (SuclFN ((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins"),[argtype:argtypes]++[restype]) outfuncgraph) <--- "coreclean.coretyperule.Apply ends") <--- "coreclean.coretyperule ends (Apply)") ---> "coreclean.coretyperule.Apply begins"
    where [infunctype,outfunctype,argtype,restype:sucltypeheap`] = sucltypeheap
-         argtypes = take argc sucltypeheap`
+         argtypes = take ((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins") sucltypeheap`
          (outfunctype`,outfuncgraph)
-          = if (argc==0)
+          = if (((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins")==0)
                (restype,emptygraph)
-               (outfunctype,updategraph outfunctype (SuclFN (argc-1),argtypes++[restype]) emptygraph)
-coretyperule (SuclInt _) = consttyperule SuclINT
-coretyperule (SuclChar _) = consttyperule SuclCHAR
-coretyperule (SuclReal _) = consttyperule SuclREAL
-coretyperule (SuclBool _) = consttyperule SuclBOOL
-coretyperule (SuclString _) = consttyperule SuclSTRING
+               (outfunctype,updategraph outfunctype (SuclFN (((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins")-1),argtypes++[restype]) emptygraph)
+coretyperule (SuclInt _) = consttyperule SuclINT <--- "coreclean.coretyperule ends (Int)"
+coretyperule (SuclChar _) = consttyperule SuclCHAR <--- "coreclean.coretyperule ends (Char)"
+coretyperule (SuclReal _) = consttyperule SuclREAL <--- "coreclean.coretyperule ends (Real)"
+coretyperule (SuclBool _) = consttyperule SuclBOOL <--- "coreclean.coretyperule ends (Bool)"
+coretyperule (SuclString _) = consttyperule SuclSTRING <--- "coreclean.coretyperule ends (String)"
 coretyperule sym = error ("coreclean: coretyperule: untyped user symbol: "+++toString sym)
 
 consttyperule tsym
