@@ -1,6 +1,9 @@
 // this is for the PowerMac
 implementation module CoclSystemDependent
 
+// import for filesystem
+import code from "cDirectory.obj",  library "directory_library" // this is the only platform dependent line in this module
+
 import StdEnv
 import Clean2AppleEventHandler,compile,docommand,cache_variable
 
