@@ -19,7 +19,7 @@ cEndWithSelection		:== False
 	,	es_fun_defs			:: !.{# FunDef}
  	,	es_dynamic_expr_count	:: !Int				// used to give each dynamic expr an unique id
 	}
-	
+
 ::	ExpressionInput =
 	{	ei_expr_level	:: !Level
 	,	ei_fun_index	:: !FunctionOrMacroIndex
@@ -902,7 +902,7 @@ where
 		# (let_expr, var_heap, expr_heap, error_admin) = merge_case let_expr var_heap expr_heap error_admin
 		= (Let {lad & let_expr = let_expr}, var_heap, expr_heap, error_admin)
 	merge_case (Case kees) var_heap expr_heap error_admin
-		# cases	= map (make_case kees.case_expr kees.case_explicit) (split_patterns kees.case_guards)
+		# cases	= map (make_case kees.case_expr) (split_patterns kees.case_guards)
 		  cases = init cases ++ [{last cases & case_default = kees.case_default}]
 		  [firstCase : otherCases] = [(Case kees, NoPos) \\ kees <- cases]
 		  ((Case {case_guards},_), var_heap, expr_heap, error_admin) =  mergeCases firstCase otherCases var_heap expr_heap error_admin
@@ -921,8 +921,8 @@ where
 			split_patterns NoPattern
 				=	[NoPattern]
 
-			make_case :: Expression Bool CasePatterns -> Case
-			make_case expr explicit guard
+			make_case :: Expression CasePatterns -> Case
+			make_case expr guard
 				=
 				{	case_expr		= expr
 				,	case_guards		= guard
@@ -930,7 +930,7 @@ where
 				,	case_ident		= No
 				,	case_info_ptr	= nilPtr
 				,	case_default_pos= NoPos
-				,	case_explicit	= explicit
+				,	case_explicit	= False
 				}
 	merge_case expr var_heap expr_heap error_admin
 		=	(expr, var_heap, expr_heap, error_admin)

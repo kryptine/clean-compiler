@@ -36,34 +36,26 @@ instance GetSetPatternRhs DynamicPattern
  
 mergeCases :: !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
 			-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-mergeCases expr_and_pos exprs var_heap symbol_heap error
-	=	mergeCaseWithCases False expr_and_pos exprs var_heap symbol_heap error
-
-mergeNestedCases
-	:==	mergeCaseWithCases True
-
-mergeCaseWithCases :: !Bool !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
-			-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-mergeCaseWithCases _ expr_and_pos [] var_heap symbol_heap error
+mergeCases expr_and_pos [] var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, error)
-mergeCaseWithCases nested (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
-	# ((let_expr, _), var_heap, symbol_heap, error) = mergeCaseWithCases nested (let_expr, NoPos) exprs var_heap symbol_heap error
+mergeCases (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
+	# ((let_expr, _), var_heap, symbol_heap, error) = mergeCases (let_expr, NoPos) exprs var_heap symbol_heap error
 	= ((Let {lad & let_expr = let_expr}, pos), var_heap,symbol_heap, error)
-mergeCaseWithCases nested (case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No, case_explicit}), case_pos)
+mergeCases (case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No, case_explicit}), case_pos)
 			[(expr, expr_pos) : exprs] var_heap symbol_heap error
-	| not (nested && case_explicit)
+	| not case_explicit
 		# (split_result, var_heap, symbol_heap) = split_case var_info_ptr expr var_heap symbol_heap
 		= case split_result of
-			Yes {case_guards,case_default}
+			Yes {case_guards,case_default, case_explicit, case_ident}
 				# (case_guards, var_heap, symbol_heap, error) = merge_guards first_case.case_guards case_guards var_heap symbol_heap error
-				-> mergeCaseWithCases nested (Case { first_case & case_guards = case_guards, case_default = case_default }, NoPos)
+				-> mergeCases (Case { first_case & case_guards = case_guards, case_default = case_default, case_explicit =  case_explicit, case_ident = case_ident}, NoPos)
 							exprs var_heap symbol_heap error
 			No
-				# ((case_default, pos), var_heap, symbol_heap, error) = mergeCaseWithCases nested (expr, expr_pos) exprs var_heap symbol_heap error
+				# ((case_default, pos), var_heap, symbol_heap, error) = mergeCases (expr, expr_pos) exprs var_heap symbol_heap error
 				-> ((Case { first_case & case_default = Yes case_default, case_default_pos = pos }, case_pos),
 					var_heap, symbol_heap, error)
 where
-	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default}) var_heap symbol_heap
+	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default, case_explicit}) var_heap symbol_heap
 		| split_var_info_ptr == skip_alias var_info_ptr var_heap
 			= (Yes this_case, var_heap, symbol_heap)
 		| has_no_default case_default
@@ -324,10 +316,10 @@ where
 		merge_algebraic_pattern_with_patterns new_pattern [pattern=:{ap_symbol,ap_vars,ap_expr} : patterns] var_heap symbol_heap error
 			| new_pattern.ap_symbol == ap_symbol
 				| isEmpty new_pattern.ap_vars
-					# ((ap_expr, _), var_heap, symbol_heap, error) = mergeNestedCases (ap_expr, NoPos) [(new_pattern.ap_expr, NoPos)] var_heap symbol_heap error
+					# ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_pattern.ap_expr, NoPos)] var_heap symbol_heap error
 					= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
 					# (new_expr, var_heap, symbol_heap) = replace_variables new_pattern.ap_vars new_pattern.ap_expr ap_vars var_heap symbol_heap
-					  ((ap_expr, _), var_heap, symbol_heap, error) = mergeNestedCases (ap_expr, NoPos) [(new_expr, NoPos)] var_heap symbol_heap error
+					  ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_expr, NoPos)] var_heap symbol_heap error
 					= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
 				# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
 				= ([ pattern : patterns ], var_heap, symbol_heap, error)
@@ -342,7 +334,7 @@ where
 	where
 		merge_basic_pattern_with_patterns new_pattern [pattern=:{bp_value,bp_expr} : patterns]  var_heap symbol_heap error
 			| new_pattern.bp_value == bp_value
-				# ((bp_expr, _), var_heap, symbol_heap, error) = mergeNestedCases (bp_expr, NoPos) [(new_pattern.bp_expr, NoPos)] var_heap symbol_heap error
+				# ((bp_expr, _), var_heap, symbol_heap, error) = mergeCases (bp_expr, NoPos) [(new_pattern.bp_expr, NoPos)] var_heap symbol_heap error
 				= ([{ pattern & bp_expr = bp_expr} : patterns], var_heap, symbol_heap, error)
 				# (patterns, var_heap, symbol_heap, error) = merge_basic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
 				= ([ pattern : patterns ], var_heap, symbol_heap, error)
@@ -389,18 +381,18 @@ where
 	incompatible_patterns_in_case_error error
 		= checkError "" "incompatible patterns in case" error
 
-mergeCaseWithCases nested (case_expr=:(Case first_case=:{case_default, case_default_pos, case_explicit}), case_pos) [expr : exprs] var_heap symbol_heap error
-	| not (nested && case_explicit)
+mergeCases (case_expr=:(Case first_case=:{case_default, case_default_pos, case_explicit}), case_pos) [expr : exprs] var_heap symbol_heap error
+	| not case_explicit
 		= case case_default of
 			Yes default_expr
-				# ((default_expr, case_default_pos), var_heap, symbol_heap, error) = mergeCaseWithCases nested (default_expr, case_default_pos) [expr : exprs] var_heap symbol_heap error
+				# ((default_expr, case_default_pos), var_heap, symbol_heap, error) = mergeCases (default_expr, case_default_pos) [expr : exprs] var_heap symbol_heap error
 				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = case_default_pos }, case_pos),
 					var_heap, symbol_heap, error)
 			No
-				# ((default_expr, pos), var_heap, symbol_heap, error) = mergeCaseWithCases nested expr exprs var_heap symbol_heap error
+				# ((default_expr, pos), var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
 				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = pos }, case_pos),
 					var_heap, symbol_heap, error)
-mergeCaseWithCases _ expr_and_pos _ var_heap symbol_heap error
+mergeCases expr_and_pos _ var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
 
 isOverloaded (OverloadedList _ _ _ _)
