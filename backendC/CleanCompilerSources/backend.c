@@ -1,4 +1,3 @@
-
 #define CODE_INLINE_FLAG
 #define DYNAMIC_TYPE 1
 
@@ -2632,7 +2631,8 @@ BEArg (CleanString arg)
 		char	*dummy;
 		extern	Bool ParseCommandArgs (int argc, char **argv, char **file_name_p, char **output_file_name_p);
 
-		(void) ParseCommandArgs (gBEState.be_argc, gBEState.be_argv, &dummy, &dummy);
+		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv, &dummy, &dummy))
+			FatalCompError ("backend", "BEInit", "compilation aborted");
 
 	/*	FatalCompError ("backend", "BEInit", "FatalCompError in backend"); */
 	/*	ErrorInCompiler ("backend", "BEInit", "ErrorInCompiler in backend"); */
