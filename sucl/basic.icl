@@ -71,6 +71,10 @@ eqlen [x:xs] [y:ys] = eqlen xs ys
 eqlen [] [] = True
 eqlen xs ys = False
 
+// Extend a function using the elements of a mapping
+extendfn :: [(src,dst)] (src->dst) src -> dst | == src
+extendfn mapping f x = foldmap id (f x) mapping x
+
 // `Foldlm' is a combination of foldl and map.
 foldlm :: ((.collect,.elem) -> (.collect,.elem`)) !(.collect,![.elem]) -> (.collect,[.elem`])
 foldlm f (l,[]) = (l,[])

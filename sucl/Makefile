@@ -6,7 +6,7 @@ COCL = cocl
 #COCLFLAGS = -lat
 SYS = Clean\ System\ Files
 
-MODULES = basic pretty pfun graph dnc rule trd rewr complete history spine trace absmodule spine strat loop law coreclean convert supercompile
+MODULES = basic pretty pfun graph dnc rule trd rewr complete history spine trace absmodule strat loop coreclean law canon cli extract newfold newtest convert supercompile
 
 ABC = $(patsubst %,$(SYS)/%.abc,$(MODULES))
 
@@ -25,10 +25,11 @@ tags: *.dcl *.icl ../compiler/*.dcl ../compiler/*.icl
 $(SYS)/%.abc: %.icl
 	$(COCL) $(COCLFLAGS) $*
 
-$(SYS)/supercompile.abc: supercompile.icl supercompile.dcl
-$(SYS)/convert.abc: convert.icl convert.dcl coreclean.dcl rule.dcl
-$(SYS)/coreclean.abc: coreclean.icl coreclean.dcl
-$(SYS)/law.abc: law.icl law.dcl
+$(SYS)/supercompile.abc: supercompile.icl supercompile.dcl convert.dcl
+$(SYS)/convert.abc: convert.icl convert.dcl coreclean.dcl rule.dcl graph.dcl basic.dcl
+$(SYS)/cli.abc: cli.icl cli.dcl absmodule.dcl coreclean.dcl law.dcl strat.dcl rule.dcl basic.dcl
+$(SYS)/coreclean.abc: coreclean.icl coreclean.dcl strat.dcl spine.dcl rule.dcl graph.dcl
+$(SYS)/law.abc: law.icl law.dcl coreclean.dcl strat.dcl spine.dcl rule.dcl graph.dcl dnc.dcl basic.dcl
 $(SYS)/loop.abc: loop.icl loop.dcl trace.dcl strat.dcl history.dcl rule.dcl graph.dcl basic.dcl
 $(SYS)/strat.abc: strat.icl strat.dcl history.dcl spine.dcl dnc.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/history.abc: history.icl history.dcl spine.dcl rule.dcl graph.dcl basic.dcl

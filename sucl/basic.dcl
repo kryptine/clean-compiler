@@ -53,6 +53,9 @@ disjoint :: .[elem] !.[elem] -> Bool | == elem
 // `Eqlen xs ys' determines whether `xs' and `ys' are equally long.
 eqlen :: ![.elem1] ![.elem2] -> .Bool
 
+// Extend a function using the elements of a mapping
+extendfn :: [(src,dst)] (src->dst) src -> dst | == src
+
 // `Foldlm' is a combination of foldl and map.
 foldlm :: ((.collect,.elem) -> (.collect,.elem`)) !(.collect,![.elem]) -> (.collect,[.elem`])
 

@@ -349,6 +349,9 @@ extendforce sgraph argno forcesub snode link extender0
          extender2 = adjust link histpat1 extender1
 
 // Extend history patterns according to an Open spine
+// FIXME: this should build TWO extended versions:
+//        one for succesful instantiation
+//        one for failed instantiation
 extendopen
  :: rgraph                      // Pattern to drive instantiation (not used)
     var                         // Node-id in subject graph that was open

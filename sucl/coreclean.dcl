@@ -2,9 +2,14 @@ definition module coreclean
 
 // $Id$
 
+from strat import Strategy
+from rule import Rule
 from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr
 
 // Transitive necessities
+from strat import Substrategy
+from spine import Spine,Subspine
+from graph import Graph,Node
 from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo
 from general import BITVECT
 from Heap import Ptr,PtrN,HeapN
@@ -12,10 +17,10 @@ from StdOverloaded import ==
 from StdString import String
 
 :: SuclTypeSymbol
- = SuclUSER TypeSymbIdent
- | SuclFN
- | SuclINT
- | SuclCHAR
+ = SuclUSER TypeSymbIdent   // A user-defined type symbol
+ | SuclFN Int               // THE function type for a function with specified arity
+ | SuclINT                  // Built-in integer
+ | SuclCHAR                 // Etc.
  | SuclREAL
  | SuclBOOL
  | SuclDYNAMIC
@@ -45,4 +50,10 @@ sucltypeheap :: [SuclTypeVariable]
  = SuclAnonymous Int
  | SuclNamed VarInfoPtr
 
+suclheap :: [SuclVariable]
+
+instance == SuclSymbol
 instance == SuclVariable
+
+// Get the type rule and strictness of a built in core clean symbol
+coretypeinfo :: SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])

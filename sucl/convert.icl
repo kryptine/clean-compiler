@@ -107,7 +107,7 @@ convert_atype atype (heap,(graph,rest,srest))
                   where (heap``,(graph``,fnargs,[_:_])) = convert_atype functype (heap`,(graph`,suclargtype,[])) // _ => forget annotations of subtypes
                         (heap```,(graph`,suclargtype,[_:_])) = convert_atype argtype (heap``,(graph,[],[])) // _ => forget annotations of subtypes
                         [suclrestype:heap`] = heap
-                        graph``` = updategraph suclrestype (SuclFN,fnargs) graph``
+                        graph``` = updategraph suclrestype (SuclFN 1,fnargs) graph``
 
               // A basic type, which is translated to an application of a basic type symbol to the empty list of arguments
               TB basictype

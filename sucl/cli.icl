@@ -2,6 +2,14 @@ implementation module cli
 
 // $Id$
 
+import absmodule
+import coreclean
+import law
+import strat
+import rule
+import basic
+import StdEnv
+
 /*
 
 cli.lit - Clean implementation modules
@@ -94,7 +102,11 @@ Abstype implementation.
 >        aliases :: cli -> [(typesymbol,rule typesymbol typenode)]
 >        macros :: cli -> [(symbol,rule symbol node)]
 >        stripexports :: [char] -> cli -> cli
+*/
 
+:: Cli :== Module SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable
+
+/*
 >   cli == module symbol node typesymbol typenode
 
 >   readcli = compilecli.readcleanparts
@@ -126,13 +138,26 @@ Abstype implementation.
 >       ) (corestrategy matchable)         ||  Checks rules for symbols in the language core (IF, _AP, ...)
 >       where islocal (User m i) = member (map fst rs) (User m i)
 >             islocal rsym = True ||  Symbols in the language core are always completely known
+*/
 
->   maxtypeinfo :: [(symbol,(rule typesymbol typenode,[bool]))] -> symbol -> (rule typesymbol typenode,[bool])
->   maxtypeinfo ts = extendfn ts coretypeinfo
+clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
+clistrategy cli=:{exportedtypesymbols=tes,typealias=tas,typeconstructors=tcs,exportedsymbols=es,aliases=as,typerules=ts,rules=rs} matchable
+ = ( checkarity (typearity o maxtypeinfo ts)        // Checks curried occurrences and strict arguments
+   o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
+   o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
+   o checkimport islocal                            // Checks for delta symbols
+   o checkconstr (flip isMember (flatten (map snd tcs))) // Checks for constructors
+   ) (corestrategy matchable)                       // Checks rules for symbols in the language core (IF, _AP, ...)
+   where islocal rsym=:(SuclUser s) = isMember rsym (map fst rs)
+         islocal rsym = True                        // Symbols in the language core are always completely known
 
->   extendfn :: [(*,**)] -> (*->**) -> * -> **
->   extendfn mapping f x = foldmap id (f x) mapping x
+typearity :: (Rule SuclTypeSymbol SuclTypeVariable,[Bool]) -> Int
+typearity ti = length (arguments (fst ti))
 
+maxtypeinfo :: [(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))] SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
+maxtypeinfo defs sym = extendfn defs coretypeinfo sym
+
+/*
 >   constrs ((tes,tas,tcs),defs) = tcs
 
 >   complete ((tes,tas,tcs),(es,as,ts,rs)) = mkclicomplete tcs (fst.maxtypeinfo ts)
