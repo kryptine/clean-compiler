@@ -151,7 +151,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials, generic_range]
 		
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
-	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
+//	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 //	  (fun_defs, error)	= showFunctions array_instances fun_defs error
 		
 	| upToPhase == FrontEndPhaseTypeCheck
