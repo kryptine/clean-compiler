@@ -2022,8 +2022,9 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 //		| False-!->("determineProducers",(app_symb.symb_name, cc_linear_bits,cc_args,app_args))
 //			= undef
 		# is_applied_to_macro_fun = fun_def.fun_info.fi_properties bitand FI_IsMacroFun <> 0
+	  	# consumer_is_curried = cc_size <> length app_args
 	  	# (producers, new_args, ti)
-	  		= determineProducers is_applied_to_macro_fun fun_def.fun_type cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
+	  		= determineProducers is_applied_to_macro_fun consumer_is_curried fun_def.fun_type cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
 //	  	| False-!->("results in",II_Node producers nilPtr II_Empty II_Empty)
 //	  		= undef
 	  	| containsProducer cc_size producers
@@ -2231,20 +2232,20 @@ transformSelection selector_kind selectors expr ro ti
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: Bool (Optional SymbolType) [Bool] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
-determineProducers _ _ _ _ [] _ producers _ ti
+determineProducers :: Bool Bool (Optional SymbolType) [Bool] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
+determineProducers _ _ _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
-determineProducers is_applied_to_macro_fun fun_type [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
+determineProducers is_applied_to_macro_fun consumer_is_curried fun_type [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
  	| cons_arg == CActive
-		# (producers, new_arg, ti) = determine_producer is_applied_to_macro_fun linear_bit arg [] prod_index producers ro ti
+		# (producers, new_arg, ti) = determine_producer is_applied_to_macro_fun consumer_is_curried linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
 			= (producers, new_arg++args, ti)
-		# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+		# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, new_arg++new_args, ti)
 	| SwitchUnusedFusion (ro.ro_transform_fusion && cons_arg == CUnused && isLazyArg fun_type prod_index) False
 		# producers = { producers & [prod_index] = PR_Unused }
 		= (producers, args, ti)
-	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 	= (producers, [arg : new_args], ti)
 where
 	isProducer PR_Empty	= False
@@ -2253,42 +2254,40 @@ where
 	isLazyArg No _ = True
 	isLazyArg (Yes {st_args_strictness}) index = not (arg_is_strict (inc index) st_args_strictness)
 	
-	determine_producer is_applied_to_macro_fun linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
+	determine_producer is_applied_to_macro_fun consumer_is_curried linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
-			= determineProducer is_applied_to_macro_fun linear_bit app EI_Empty new_args prod_index producers ro ti
+			= determineProducer is_applied_to_macro_fun consumer_is_curried linear_bit app EI_Empty new_args prod_index producers ro ti
 		# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
 		# ti = { ti & ti_symbol_heap = ti_symbol_heap }
-		= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers ro ti
-	determine_producer _ _ arg new_args _ producers _ ti
+		= determineProducer is_applied_to_macro_fun consumer_is_curried linear_bit app app_info new_args prod_index producers ro ti
+	determine_producer _ _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
 
-determineProducer :: Bool Bool App ExprInfo [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo)
+determineProducer :: Bool Bool Bool App ExprInfo [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo)
 // XXX check for linear_bit also in case of a constructor ?
-determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) new_args prod_index producers _ ti
+determineProducer _ _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type)
+				  new_args prod_index producers _ ti
 	# (app_args, (new_vars_and_types, free_vars, ti_var_heap)) 
 			= renewVariables app_args ti.ti_var_heap
-//	| False -!-> ("Produce0cc",symb.symb_name)
-//		= undef
 	= ( { producers & [prod_index] = PR_Class { app & app_args = app_args } new_vars_and_types type}
 	  , mapAppend Var free_vars new_args
 	  , { ti & ti_var_heap = ti_var_heap }
 	  )
-determineProducer _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructor _, symb_name}, app_args} _ new_args prod_index producers ro ti
-//	| False -!-> ("ProduceXcc",symb_name)
-//		= undef
+determineProducer _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructor _, symb_name}, app_args} _
+				  new_args prod_index producers ro ti
 	| SwitchConstructorFusion (ro.ro_transform_fusion && linear_bit) False
 		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
 	= ( producers, [App app : new_args ], ti)
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
+determineProducer is_applied_to_macro_fun consumer_is_curried linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
 				  new_args prod_index producers ro ti
-	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
 	| length app_args<>fun_arity
 		| is_applied_to_macro_fun
 			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc_macro",symb.symb_name)
-		| SwitchCurriedFusion ro.ro_transform_fusion False
+		| SwitchCurriedFusion (ro.ro_transform_fusion && cc_producer) False
 			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc_curried",symb.symb_name)
 		= (producers, [App app : new_args ], ti)
@@ -2301,8 +2300,18 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 	| cc_producer && is_good_producer
 		= ({ producers & [prod_index] = (PR_GeneratedFunction symb (length app_args) fun_index)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc",symb.symb_name)
+    # not_expanding_producer
+		= case fun_body of
+			Expanding _
+				-> False
+			_
+				-> True
+//				-> cc_producer
+    | (not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type
+		= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+				-!-> ("Produce1cc_ho",symb.symb_name)
 	= (producers, [App app : new_args ], ti)
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind}, app_args} _
+determineProducer is_applied_to_macro_fun consumer_is_curried linear_bit app=:{app_symb = symb=:{symb_kind}, app_args} _
 				  new_args prod_index producers ro ti
 	| is_SK_Function_or_SK_LocalMacroFunction symb_kind
 		# { glob_module, glob_object }
@@ -2314,7 +2323,8 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 			| is_applied_to_macro_fun
 				= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc_macro",symb.symb_name)
-			| SwitchCurriedFusion ro.ro_transform_fusion False
+			# ({cc_producer},ti) = ti!ti_cons_args.[glob_object]
+			| SwitchCurriedFusion (ro.ro_transform_fusion && cc_producer) False
 				= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc_curried",symb.symb_name)
 			= (producers, [App app : new_args ], ti)
@@ -2322,25 +2332,36 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 		| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
 			= (producers, [App app : new_args ], ti)
 					-!-> ("Produce2cc_array",symb.symb_name)
-		# ({fun_body}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
-		  ti = { ti & ti_fun_defs=ti_fun_defs }
+		# ({fun_body,fun_type}, ti) = ti!ti_fun_defs.[glob_object]
 		  (TransformedBody {tb_rhs}) = fun_body
 		  is_good_producer = SwitchFunctionFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 		  {cc_producer} = ti.ti_cons_args.[glob_object]
-		| is_good_producer && cc_producer
+		| is_good_producer && cc_producer && not consumer_is_curried
 			= ({ producers & [prod_index] = (PR_Function symb (length app_args) glob_object)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc",symb.symb_name)
+	    # not_expanding_producer
+			= case fun_body of
+				Expanding _
+					-> False
+				_
+					-> True
+//					-> cc_producer
+		| (not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type
+			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+					-!-> ("Produce2cc_ho",symb.symb_name)
 		= (producers, [App app : new_args ], ti)
 	= (producers, [App app : new_args ], ti)
-  where
+where
+	get_max_index ti=:{ti_cons_args}
+		#! (max_index, ti_cons_args)	= usize ti_cons_args
+		= (max_index, {ti & ti_cons_args = ti_cons_args})
 	get_fun_arity glob_module glob_object ro ti
 		| glob_module <> ro.ro_main_dcl_module_n
 			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
 			= (st_arity+length st_context, ti)
 		// for imported functions you have to add ft_arity and length st_context, but for unimported
 		// functions fun_arity alone is sufficient
-		# ({fun_arity}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
-		= (fun_arity, { ti & ti_fun_defs=ti_fun_defs })
+		= ti!ti_fun_defs.[glob_object].fun_arity
 	
 // when two function bodies have fusion with each other this only leads into satisfaction if one body
 // fulfills the following sexyness property
@@ -2354,6 +2375,11 @@ is_sexy_body (Let {let_strict_binds}) = isEmpty let_strict_binds
 	// -> Here is place for optimisation: Either the fusion algorithm or the code sharing elimination algorithm could be
 	// extended to generate new functions when a strict let ends up during fusion in a non top level position (MW)
 is_sexy_body _ = True	
+
+is_higher_order_function (Yes {st_result={at_type=_ --> _}})
+        = True
+is_higher_order_function _
+        = False
 
 containsProducer prod_index producers
 	| prod_index == 0
