@@ -82,3 +82,11 @@ idpfun :: !.[dom] .(Pfun dom dom) -> Bool | == dom
 idpfun domain pfun
 = all idelem domain
   where idelem x = total True (postcomp ((==) x) pfun) x
+
+instance == (Pfun dom ran) | == dom & == ran
+where (==) EmptyPfun EmptyPfun = True
+      (==) (Extend x1 y1 pf1) (Extend x2 y2 pf2)
+            = x1==x2 && y1==y2 && pf1==pf2
+      (==) (Restrict x1 pf1) (Restrict x2 pf2)
+            = x1==x2 && pf1==pf2
+      (==) _ _ = False
