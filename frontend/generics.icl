@@ -259,32 +259,29 @@ where
 				create_class_dictionaries1 module_index dcl_modules  modules heaps symbol_table
 			= create_class_dictionaries (inc module_index) dcl_modules modules heaps symbol_table		
 
+	create_class_dictionaries1 :: Index *{#DclModule} *{#u:CommonDefs} *Heaps *SymbolTable -> (.{#DclModule}, {#v:CommonDefs}, .Heaps, .SymbolTable), [u<=v]
 	create_class_dictionaries1
-			module_index dcl_modules modules 
-			heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}, hp_var_heap}
-			symbol_table 
-		#! (common_defs, modules) = modules![module_index]
-		#! class_defs = { x \\ x <-: common_defs.com_class_defs } // make unique copy		
-		#! (class_defs, dcl_modules, new_type_defs, new_selector_defs, new_cons_defs, th_vars, hp_var_heap, symbol_table) =
-				createClassDictionaries 
-					module_index 
-					class_defs 
-					dcl_modules 
-					(size common_defs.com_type_defs) 
-					(size common_defs.com_selector_defs) 
-					(size common_defs.com_cons_defs) 
-					th_vars hp_var_heap symbol_table
+			module_index dcl_modules oldmodules
+			heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
+			symbol_table
+		= (new_dcl_modules, newmodules, newheaps, new_symbol_table)
+			where
+				(oldcommons, newmodules) = replace oldmodules module_index newcommons
+				{com_type_defs,com_cons_defs,com_selector_defs,com_class_defs,com_member_defs,com_instance_defs,com_generic_defs} = oldcommons
+				copied_class_defs = {class_def \\ class_def <-: com_class_defs} // Make unique copy
+				(new_com_class_defs, new_com_member_defs, new_dcl_modules, new_com_type_defs, new_com_selector_defs, new_com_cons_defs, new_th_vars, new_th_attrs, new_hp_var_heap, new_symbol_table)
+				=	createClassDictionaries2 module_index copied_class_defs com_member_defs dcl_modules com_type_defs com_selector_defs com_cons_defs th_vars th_attrs hp_var_heap symbol_table
+				newcommons
+				=	{	com_type_defs = new_com_type_defs,
+						com_cons_defs = new_com_cons_defs,
+						com_selector_defs = new_com_selector_defs,
+						com_class_defs = new_com_class_defs,
+						com_member_defs = new_com_member_defs,
+						com_instance_defs = com_instance_defs,
+						com_generic_defs = com_generic_defs
+					}
+				newheaps = {hp_var_heap = new_hp_var_heap, hp_expression_heap = hp_expression_heap, hp_type_heaps = {th_vars = new_th_vars, th_attrs = new_th_attrs}}
 
-		#! common_defs = { common_defs & 
-			com_class_defs = class_defs, 
-			com_type_defs = arrayPlusList common_defs.com_type_defs new_type_defs,
-			com_selector_defs = arrayPlusList common_defs.com_selector_defs new_selector_defs,
-			com_cons_defs = arrayPlusList common_defs.com_cons_defs new_cons_defs}
-
-		#! heaps = {heaps & hp_var_heap = hp_var_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}} 
-		#! modules = { modules & [module_index] = common_defs } 		
-		= (dcl_modules, modules, heaps, symbol_table)		
-	
 convertInstances :: !*GenericState	
 	-> (![Global Index], !*GenericState)
 convertInstances gs

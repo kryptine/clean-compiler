@@ -68,7 +68,7 @@ updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*Ex
 
 class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 
-instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a,
+instance substitute AType, Type, TypeContext, AttributeVar, AttrInequality, CaseType, [a] | substitute a,
 			(a,b) | substitute a & substitute b
 
 substituteType :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !Type !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
