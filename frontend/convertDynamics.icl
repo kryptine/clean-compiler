@@ -39,49 +39,7 @@ import type_io;
 ::	BoundVariables :== [TypedVariable]
 
 :: IndirectionVar    :== BoundVar
-/*
 
-getSymbol :: Index ((Global Index) -> SymbKind) Int !*ConversionInfo -> (SymbIdent, !*ConversionInfo)
-getSymbol index symb_kind arity ci=:{ci_predef_symb}
-	# ({pds_module, pds_def, pds_ident}, ci_predef_symb) = ci_predef_symb![index]
-	  ci = {ci & ci_predef_symb = ci_predef_symb}
-	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
-	= (symbol, ci)
-*/
-/*
-//	| True
-//		= abort (toString main_dcl_module.dcl_name.id_name)
-	| True
-		= abort (toString main_dcl_module_n);
-		
-	// distinguish external/internal types
-	# dcl_conversions
-		= get_conversion_table (main_dcl_module.dcl_conversions)
-	# type_defs_conversions
-		= dcl_conversions.[cTypeDefs]
-	# s_type_defs_conversions
-		= size type_defs_conversions
-		
-		
-	# s_exported_com_type_defs
-		= size common_defs.com_type_defs
-	# exported_com_type_defs
-		= createArray s_exported_com_type_defs False
-
-	# exported_com_type_defs
-		= foldSt (\i exported_com_type_defs -> 
-		
-		{ exported_com_type_defs & [type_defs_conversions.[i]] = True }
-		
-		
-		
-		) [0..dec s_type_defs_conversions] exported_com_type_defs;
-		
-	# (s_exported_com_type_defs,exported_com_type_defs)
-		= usize exported_com_type_defs
-	| True
-		= abort (toString s_exported_com_type_defs);
-*/
 
 pl [] = ""
 pl [x:xs] = x +++ " , " +++ (pl xs)
@@ -91,17 +49,8 @@ F a b = b
 
 write_tcl_file :: !Int {#DclModule} CommonDefs !*File -> (.Bool,.File)
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file
-/*
-	#! tcl_file
-		= write_type_info dcl_mods tcl_file
-*/
 	#! tcl_file
 		= write_type_info common_defs tcl_file
-		
-//	#! (ok,common_defs,tcl_file)
-//		= read_type_info tcl_file
-//	| True
-//		= abort (toString (size common_defs.com_type_defs))
 	= (True,tcl_file)	
 			
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */!*File {# DclModule} !IclModule
@@ -138,13 +87,6 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 					False
 					
 						# arity = 2
-		/*				// get tuple arity 2 constructor
-						# ({pds_module, pds_def, pds_ident}, predefined_symbols)	= predefined_symbols![GetTupleConsIndex arity]
-						# twoTuple_symb	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
-		
-						  dynamic_temp_symb_ident = twoTuple_symb
-		*/
-		
 						# ({pds_module=pds_module1, pds_def=pds_def1} , predefined_symbols) = predefined_symbols![PD_DynamicTemp]
 						# {td_rhs=RecordType {rt_constructor,rt_fields}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
 							
@@ -165,22 +107,13 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 								glob_object		= { DefinedSymbol |
 													ds_ident		= sd_field
 												,	ds_arity		= 0
-												,	ds_index		= pds_def2  //0
+												,	ds_index		= pds_def2 
 												}
-							,	glob_module		= pds_module2    //pds_def //pds_module
+							,	glob_module		= pds_module2 
 							}
 						#! ci_sel_type_field
 							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection type_defined_symbol sd_field_nr])
-							//= (sd_field_nr,type_defined_symbol) //---> ("Type expected:",pds_def2,sd_field)
-		
-						# ({pds_def, pds_ident}, predefined_symbols) = predefined_symbols![GetTupleConsIndex arity]
-						# twotuple = {ds_ident = pds_ident, ds_arity = arity, ds_index = pds_def}
-						# type_selector	= TupleSelect twotuple 1
-						
-		//				#! ci_sel_type_field
-		//					= type_selector
-		
-		/*					
+							
 						// value field
 						# ({pds_module=pds_module3, pds_def=pds_def3} , predefined_symbols) = predefined_symbols![PD_DynamicValue]
 						# {sd_field=sd_field3,sd_field_nr=sd_field_nr3}
@@ -191,17 +124,12 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 								glob_object		= { DefinedSymbol |
 													ds_ident		= sd_field3
 												,	ds_arity		= 0
-												,	ds_index		= pds_def3 //0
+												,	ds_index		= pds_def3 
 												}
-							,	glob_module		= pds_module3 //pds_def //pds_module
+							,	glob_module		= pds_module3
 							}
 						#! ci_sel_value_field
 							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection value_defined_symbol sd_field_nr3])
-							//= (sd_field_nr3,value_defined_symbol) //---> ("Value expected:",pds_def3,sd_field3)
-		*/
-		
-						# value_selector = TupleSelect twotuple 0
-						  ci_sel_value_field = value_selector
 						-> (dynamic_temp_symb_ident, ci_sel_value_field, ci_sel_type_field,predefined_symbols) 
 
 	#! nr_of_funs = size fun_defs
@@ -554,10 +482,6 @@ convertDynamicPatterns cinp bound_vars {case_guards = DynamicPatterns [], case_d
 		No			-> abort "unexpected value in convertDynamics: 'convertDynamicPatterns'"
 convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards = DynamicPatterns patterns, case_default, case_info_ptr} 
 			ci=:{ci_placeholders_and_tc_args=old_ci_placeholders_and_tc_args,ci_generated_global_tc_placeholders}
-//	| True
-//		= abort "convertDynamicPatterns";
-//	# sel = Selection No case_expr [RecordSelection type_defined_symbol sd_field_nr]
-
 	# (opened_dynamic, dt_bind, ci) = open_dynamic case_expr ci
 	  (ind_0, ci) = newVariable "ind_0" (VI_Indirection 0) ci
 	  (c_1,   ci) = newVariable "c_1!" (VI_Default 0) ci
@@ -688,16 +612,6 @@ where
 		#! (opt_expr,ci)
 			= toExpression this_default ci
 
-/*
-		#! expr
-			= case opt_expr of
-				Yes expr
-					-> expr
-				_
-					-> abort "!!!!"
-*/		
-//		# sel_type = Selection No (Var coerce_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
-	
 		# let_expr
 			= Let {
 					let_strict_binds	= []
