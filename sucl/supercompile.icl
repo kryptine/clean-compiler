@@ -1,6 +1,6 @@
 implementation module supercompile
 
-// $Id$
+tm =: tracemodule "$Id$"
 
 import convert
 import expand
@@ -30,8 +30,8 @@ supercompile ::
     ,   !.File                  // Written log file
     )
 
-supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0
-  #  logfile = stderr
+supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile
+  #  debugfile = stderr
   #  logfile = logfile <<< "Running supercompile function - $Id$\n"
      // First of all, derive a representation for symbols in the program
   #  (showsuclsymbol,fun_defs1) = suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fun_defs0
@@ -47,16 +47,18 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  sucl_imports = cts_funtypes dcl_mods main_dcl_module_n
      // Build abstract CLI module
   #  sucl_module = mkcli showsuclsymbol sucl_typerules sucl_stricts sucl_exports sucl_imports sucl_constrs sucl_bodies
-  #! logfile = logfile <<< sucl_module
+  #! debugfile = debugfile <<< "Function definitions as input to the optimiser:\n"
+                           <<< sucl_module
+                           <<< "End of function definitions as input to the optimiser.\n"
      // Generate fresh function symbols
   #  (n_fun_defs,fun_defs3) = usize fun_defs2
   #  fresh_symbols = [SuclUser (SK_Function (mkglobal main_dcl_module_n i)) \\ i<-[n_fun_defs..]]
      // Do the job!
-  #  logfile = logfile <<< "Start fullsymred." <<< nl
+  #  debugfile = debugfile <<< "Start fullsymred." <<< nl
   #  symredresults = fullsymred fresh_symbols sucl_module
-  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults before macro expansion" <<< nl) symredresults
+  #  debugfile = sfoldl (<<<) (debugfile<<<"All symredresults before macro expansion" <<< nl) symredresults
   #  symredresults = expand_macros toString toString suclheap (flip isMember (exports sucl_module)) symredresults
-  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults after macro expansion" <<< nl) symredresults
+  #  debugfile = sfoldl (<<<) (debugfile<<<"All symredresults after macro expansion" <<< nl) symredresults
   #  n_symredresults = length symredresults
   #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
      // Create and fill new fundef array
@@ -68,6 +70,6 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  logfile = logfile <<< "New functions from " <<< n_fun_defs <<< " to " <<< newlimit <<< " (not included)" <<< nl
   #  logfile = logfile <<< "Remaining " <<< (n_symredresults-(newlimit-n_fun_defs)) <<< " should be exported" <<< nl
   #  (logfile,fun_defs6) = showfundefs (logfile,fun_defs5)
-= logfile $ (fun_defs6,var_heap`,expression_heap`,generated_range,predefs2,logfile0)
+= tm debugfile $ (fun_defs6,var_heap`,expression_heap`,generated_range,predefs2,logfile)
 
 mkglobal gmod gob = {glob_module = gmod, glob_object = gob}
