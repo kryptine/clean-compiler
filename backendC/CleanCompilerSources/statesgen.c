@@ -3595,7 +3595,7 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 		{
 			NodeDefs *guard_last;
 
-			CollectSharedNodeIdsInRootNode (&root_node->node_arguments->arg_node, parent_node_id, last);
+			last = CollectSharedNodeIdsInRootNode (&root_node->node_arguments->arg_node, parent_node_id, last);
 			guard_last=&root_node->node_node_defs;
 			guard_last=CollectSharedNodeIdsInRootNode (&root_node->node_arguments->arg_next->arg_node, parent_node_id, guard_last);
 			*guard_last=NULL;
