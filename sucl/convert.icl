@@ -400,10 +400,10 @@ convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) 
            where mkalt (patroot,reproot,nodes)
                   = mkrule closureargs reproot (compilegraph nodes)
                  mkdefaultalt defaultroot
-                  = mkrule closureargs defaultroot emptygraph
+                  = mkrule closureargs defaultroot (compilegraph defaultnodes)
         // (1.5) convert default if necessary
-        (heap4,(nodes7,fundefs6,globals7,defaultroots,_))
-         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,(nodes6,fundefs5,globals6,[],False))
+        (heap4,(defaultnodes,fundefs6,globals7,defaultroots,_))
+         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,([],fundefs5,globals6,[],False))
         // (1) convert branches
         globals8 = innerglobals1++globals7
         innerglobals1 = removeDup innerglobals0
@@ -421,7 +421,7 @@ convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) 
          = (convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case selector)") main_dcl_module_n No bindings caseinfo.case_expr (heap1,(nodes7,fundefs7,globals8,[],False))
         // (0) Claim root node
         [root:heap1] = heap0
-        (heap0,(nodes6,fundefs5,globals6,rest,_)) = lrinfo
+        (heap0,(nodes7,fundefs5,globals6,rest,_)) = lrinfo
 
 convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
 = (heap4,(nodes9,fundefs9,globals9,[root:rest],False)) <--- "convert.convert_expression ends (for Case expression/No)"
@@ -439,11 +439,11 @@ convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
            where mkalt (patroot,reproot,nodes)
                   = mkrule ([patroot:innerglobals1++defaultroots]) reproot (compilegraph nodes)
                  mkdefaultalt defaultroot
-                  = mkrule (selectorroots++innerglobals1++defaultroots) defaultroot emptygraph
+                  = mkrule (selectorroots++innerglobals1++defaultroots) defaultroot (compilegraph defaultnodes)
         introduced_function_symbol = SuclCase caseinfo.case_info_ptr
         // (1.5) convert default if necessary
-        (heap4,(nodes7,fundefs6,globals7,defaultroots,_))
-         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,(nodes6,fundefs5,globals6,[],False))
+        (heap4,(defaultnodes,fundefs6,globals7,defaultroots,_))
+         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,([],fundefs5,globals6,[],False))
         // (1) convert branches
         globals8 = innerglobals1++globals7
         innerglobals1 = removeDup innerglobals0
@@ -461,7 +461,7 @@ convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
          = (convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case selector)") main_dcl_module_n No bindings caseinfo.case_expr (heap1,(nodes7,fundefs7,globals8,[],False))
         // (0) Claim root node
         [root:heap1] = heap0
-        (heap0,(nodes6,fundefs5,globals6,rest,_)) = lrinfo
+        (heap0,(nodes7,fundefs5,globals6,rest,_)) = lrinfo
 
 convert_expression main_dcl_module_n topinfo bindings (BasicExpr bv bt) lrinfo
 = (heap1,(nodes1,fundefs0,globals0,[root:rest],False)) <--- "convert.convert_expression ends (for BasicExpr expression)"
