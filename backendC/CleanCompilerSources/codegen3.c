@@ -1365,7 +1365,7 @@ static Bool ExamineRootNodeOnACycle (NodeId rhsid,Node rhsroot,int *asp_p,StateS
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
 extern int tail_call_modulo_cons;
 
-static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_def_id,NodeP root_node,NodeP push_node,int asp,int bsp,struct code_gen_node_ids *code_gen_node_ids_p)
+static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_def_id,NodeP root_node,NodeP push_node,int asp,int bsp,MovedNodeIdP *moved_node_ids_p,struct code_gen_node_ids *code_gen_node_ids_p)
 {
 	LabDef name;
 	int a_size,b_size;
@@ -1443,6 +1443,11 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 			n_a_fill_bits=0;
 			n_b_fill_bits=0;
 
+			if (a_size>0)
+				a_bits|=1;
+			else
+				b_bits|=1;
+
 			arg_p=root_node->node_arguments;
 			node_arity=root_node->node_arity;
 			node_id_list=push_node->node_node_ids;
@@ -1452,7 +1457,7 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 																
 				DetermineSizeOfState (arg_p->arg_state,&arg_a_size,&arg_b_size); 
 				
-				if (arg_n==0 || !(arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_id_list->nidl_node_id)){
+				if (!(arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_id_list->nidl_node_id)){
 					a_bits |= (~((~0)<<arg_a_size))<<a_size;
 					b_bits |= (~((~0)<<arg_b_size))<<b_size;
 
@@ -1464,7 +1469,7 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 				a_size+=arg_a_size;
 				b_size+=arg_b_size;
 				node_id_list=node_id_list->nidl_next;
-			}
+			}				
 
 			for (n=0; n<a_size; ++n)
 				bits[n]='0' + ((a_bits>>n) & 1);
@@ -1518,6 +1523,16 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 		GenPopA	(asp);
 		GenPopB	(bsp);
 		GenRtn (1,0,OnAState);
+	}
+	{
+		MovedNodeIdP moved_node_ids;
+		
+		moved_node_ids=*moved_node_ids_p;
+		
+		while (moved_node_ids!=NULL){
+			moved_node_ids->mnid_node_id->nid_a_index_=moved_node_ids->mnid_a_stack_offset;
+			moved_node_ids=moved_node_ids->mnid_next;
+		}
 	}
 }
 
@@ -2016,7 +2031,6 @@ int CodeRhsNodeDefs
 		}
 #endif
 
-
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
 		if (OptimizeTailCallModuloCons && root_node->node_kind==NormalNode){
 			if ((root_node->node_symbol->symb_kind==cons_symb && root_node->node_arity==2) ||
@@ -2059,17 +2073,14 @@ int CodeRhsNodeDefs
 									node_p=node_p->node_arguments->arg_node;
 								}
 								
-								if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_p)){
+								if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_p)
+									&& (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK))
+								{
 									*last_node_def_h=NULL;
 									CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
 									*last_node_def_h=last_node_def_p;
 
-									generate_code_for_tail_call_modulo_cons (node_p,node_def_id,root_node,push_node,asp,bsp,&code_gen_node_ids);
-
-									while (moved_node_ids!=NULL){
-										moved_node_ids->mnid_node_id->nid_a_index_=moved_node_ids->mnid_a_stack_offset;
-										moved_node_ids=moved_node_ids->mnid_next;
-									}
+									generate_code_for_tail_call_modulo_cons (node_p,node_def_id,root_node,push_node,asp,bsp,&moved_node_ids,&code_gen_node_ids);
 
 									return 0;
 								}
@@ -2088,7 +2099,7 @@ int CodeRhsNodeDefs
 							node_p=node_p->node_arguments->arg_node;
 						}
 
-						if (is_tail_call_module_cons_node (node_p)){
+						if (is_tail_call_module_cons_node (node_p) && (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
 							NodeP old_arg_node_p;
 							
 							node_id_p=NewNodeId (NULL);
@@ -2099,12 +2110,7 @@ int CodeRhsNodeDefs
 							arg_p2->arg_node=NewNodeIdNode (node_id_p);
 
 							CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
-							generate_code_for_tail_call_modulo_cons (node_p,node_id_p,root_node,push_node_p,asp,bsp,&code_gen_node_ids);
-
-							while (moved_node_ids!=NULL){
-								moved_node_ids->mnid_node_id->nid_a_index_=moved_node_ids->mnid_a_stack_offset;
-								moved_node_ids=moved_node_ids->mnid_next;
-							}
+							generate_code_for_tail_call_modulo_cons (node_p,node_id_p,root_node,push_node_p,asp,bsp,&moved_node_ids,&code_gen_node_ids);
 							
 							arg_p2->arg_node=old_arg_node_p;
 

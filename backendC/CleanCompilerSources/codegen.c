@@ -591,6 +591,10 @@ int lazy_tuple_recursion=0;
 int call_code_generator_again;
 #endif
 
+#if TAIL_CALL_MODULO_CONS_OPTIMIZATION
+extern int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs);
+#endif
+
 int function_called_only_curried_or_lazy_with_one_return=0;
 
 #if 0
@@ -794,16 +798,12 @@ static void CodeRule (ImpRuleP rule)
 	struct saved_case_node_id_ref_counts *saved_case_node_id_ref_counts_p; 
 
 # if TAIL_CALL_MODULO_CONS_OPTIMIZATION
-	extern int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs);
+	if (OptimizeTailCallModuloCons && rule->rule_alts->alt_kind==Contractum && (rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
+		tail_call_modulo_cons=1;
 
-	if (OptimizeTailCallModuloCons && rule->rule_alts->alt_kind==Contractum){
-		tail_call_modulo_cons=does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs);
-
-		if (tail_call_modulo_cons){
-			if (ListOptimizations)
-				printf ("Optimize tail call modulo cons of %s\n",rule_sdef->sdef_ident->ident_name);				
-			call_code_generator_again=1;
-		}
+		if (ListOptimizations)
+			printf ("Optimize tail call modulo cons of %s\n",rule_sdef->sdef_ident->ident_name);				
+		call_code_generator_again=1;
 	} else
 		tail_call_modulo_cons=0;
 # endif
@@ -950,12 +950,12 @@ static void CodeRule (ImpRuleP rule)
 		if (rule->rule_mark & RULE_CALL_VIA_LAZY_SELECTIONS_ONLY){
 			int tuple_result_arity;
 			StateS result_state_struct[1];
-#if SELECTORS_FIRST
+# if SELECTORS_FIRST
 			LabDef reduce_error_label;
-#endif
+# endif
 
 			tuple_result_arity=rule->rule_type->type_alt_rhs->type_node_arity;
-#if TAIL_CALL_MODULO_TUPLE_CONS_OPTIMIZATION
+# if TAIL_CALL_MODULO_TUPLE_CONS_OPTIMIZATION
 			if (tail_call_modulo_tuple_cons){
 				int i,n;
 				
@@ -964,13 +964,13 @@ static void CodeRule (ImpRuleP rule)
 					if (global_same_select_vector & (1<<i))
 						--tuple_result_arity;
 			}
-#endif	
+# endif	
 
 			GenFunctionDescriptorForLazyTupleRecursion (rule_sdef,tuple_result_arity);
 						
 			result_state_struct[0]=OnAState;
 			
-#if SELECTORS_FIRST
+# if SELECTORS_FIRST
 			{
 			LabDef d_lab,n_lab;
 			int a_size,b_size;
@@ -1006,9 +1006,9 @@ static void CodeRule (ImpRuleP rule)
 			*/
 			ReduceError = &reduce_error_label;
 			}
-#else
+# else
 			ReduceError = &empty_lab;
-#endif
+# endif
 
 			ea_lab.lab_post=2;
 		
@@ -1025,7 +1025,7 @@ static void CodeRule (ImpRuleP rule)
 			else
 				ReduceError = &cycle_lab;
 			
-#if SELECTORS_FIRST
+# if SELECTORS_FIRST
 			if (rule_sdef->sdef_arity!=0){
 				int n;
 				
@@ -1040,7 +1040,7 @@ static void CodeRule (ImpRuleP rule)
 					
 				GenPopA (tuple_result_arity);
 			}
-#endif
+# endif
 
 			CurrentAltLabel.lab_pref = s_pref;
 			if (rule->rule_mark & RULE_UNBOXED_LAZY_CALL)
@@ -1206,6 +1206,13 @@ void CodeGeneration (ImpMod imod, char *fname)
 
 #if SHARE_UPDATE_CODE
 			create_result_state_database (imod->im_rules);
+#endif
+
+#if TAIL_CALL_MODULO_CONS_OPTIMIZATION
+			if (OptimizeTailCallModuloCons)
+				for_l (rule,imod->im_rules,rule_next)
+					if (rule->rule_alts->alt_kind==Contractum && does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs))
+						rule->rule_mark |= RULE_TAIL_MODULO_CONS_ENTRY_MASK;
 #endif
 
 			update_function_p=&first_update_function;
