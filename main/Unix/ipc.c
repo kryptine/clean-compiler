@@ -77,13 +77,13 @@ int open_pipes (CleanString commands_clean, CleanString results_clean)
 
     if ((commands = fopen(commands_name, "r")) == NULL)
     {
-		fprintf(stderr,"commands = %s\n",commands_name);
+		log("commands = %s\n",commands_name);
 		perror("fopen commands");
 		return -1;
     }
     if ((results = fopen(results_name, "w")) == NULL)
     {
-		fprintf(stderr,"results = %s\n",results_name);
+		log("results = %s\n",results_name);
 		perror("fopen results");
 		return -1;
     }
@@ -104,7 +104,7 @@ int get_command_length (void)
 
 int get_command (CleanString cleanString)
 {
-	fprintf (stderr, "%s\n", command_buffer);
+	log ("%s\n", command_buffer);
 	strncpy (cleanString->chars, command_buffer, cleanString->length);
 	cleanString->chars [cleanString->length]	= '\0';
 
