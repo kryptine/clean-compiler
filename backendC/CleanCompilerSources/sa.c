@@ -1575,6 +1575,26 @@ static void RemoveExpOfKind (Exp e, ExpKind kind)
 		RemoveExpOfKind (e, kind);
 }
 
+#define IsTupleExp(A) ((A)->e_kind==Value && ((A)->e_fun>=tuplesym[0] && (A)->e_fun<=tuplesym[MaxNodeArity-1]))
+
+/* JVG: added 16-8-2000 */
+static void remove_deps_from_tuple_arguments (Exp e)
+{
+	if (e->e_deps==NULL)
+		return;
+	
+	if (IsTupleExp(e)){
+		int n,arity;
+
+		arity=e->e_fun->fun_arity;
+		for (n=0; n<arity; ++n){
+			remove_deps_from_tuple_arguments (e->e_args[n]);
+			e->e_args[n]->e_deps=NULL;
+		}
+	}
+}
+/**/
+
 static void UpdateExp (Exp src, Exp dst);
 
 static void RemoveCycles (ExpP ep, ExpKind kind)
@@ -1625,22 +1645,30 @@ static void SortExpOfKind (Exp e, ExpKind kind)
 		n = i;
 	}
 	
-	for (i = 0; i+1 < n; )
-	{	if (LtExp (e->e_args[i], e->e_args[i+1]) == True)
-		{	remove = True;
-			e->e_args[i] = e->e_args[i+1];
-		}
-		else if (LtExp (e->e_args[i+1], e->e_args[i]) == True)
+	for (i = 0; i+1 < n; ){
+		if (LtExp (e->e_args[i], e->e_args[i+1]) == True){
 			remove = True;
-		else
+#if 1
+			/* JVG: added 16-8-2000 */
+			if (kind==Lub)
+				remove_deps_from_tuple_arguments (e->e_args[i]);
+#endif		
+			e->e_args[i] = e->e_args[i+1];
+		} else if (LtExp (e->e_args[i+1], e->e_args[i]) == True){
+#if 1
+			/* JVG: added 16-8-2000 */
+			if (kind==Lub)
+				remove_deps_from_tuple_arguments (e->e_args[i+1]);
+#endif		
+			remove = True;
+		} else
 			remove = False;
 		
-		if (remove)
-		{	for (j = i+1; j+1 < n; j++)
+		if (remove){
+			for (j = i+1; j+1 < n; j++)
 				e->e_args[j] = e->e_args[j+1];
 			n--;
-		}
-		else
+		} else
 			i++;
 	}
 	e->e_sym = n;
@@ -4733,6 +4761,11 @@ static Exp GetSelection (Exp tuple_exp, unsigned n, Path p, Context context)
 		case Value:
 		{	ExpP	argp;
 
+			/* JVG: added 14-8-2000 */
+			if (!tuple_exp->e_hnf)
+				return NewTop();
+			/* */
+
 			if (n >= tuple_exp->e_fun->fun_arity)
 				return & bottom;
 
@@ -5093,15 +5126,60 @@ static Bool ReduceInContext (ExpP ep, Path p, Context context)
 		unsigned i, arity = context->context_arity;
 		
 		if (IsTupleExp (e)){
-			for (i = 0; i < arity; i++){
-				if (ReduceInContext (& e->e_args[i], p, context->context_args[i])){
-					(*ep) = (*ep)->e_args[i] = & bottom;
-						return True;
+#if 1
+			/* JVG: added 15-8-2000 */
+			Dependency new_e_deps;
+			
+			new_e_deps=e->e_deps;
+			
+			for (i=0; i<arity; i++){
+				Context arg_context;
+				
+				arg_context=context->context_args[i];
+				
+				if (ReduceInContext (&e->e_args[i],p,arg_context)){
+					(*ep) = (*ep)->e_args[i] = &bottom;
+					return True;
+				}
+				
+				if (IsStrictContext (arg_context) && e->e_args[i]->e_kind!=Bottom){
+					Dependency from_dep;
+
+					for_l (from_dep,e->e_args[i]->e_deps,dep_next){
+						Dependency old_dep;
+						Exp from_dep_exp;
+						
+						from_dep_exp=from_dep->dep_exp;
+						
+						for_l (old_dep,new_e_deps,dep_next)
+							if (old_dep->dep_exp==from_dep_exp)
+								break;
+						
+						if (old_dep==NULL){
+							Dependency new_dep;
+
+							new_dep = SAllocType (DependencyRepr);
+							new_dep->dep_exp = from_dep_exp;
+
+							new_dep->dep_next = new_e_deps;
+							new_e_deps = new_dep;
+						}
+					}
 				}
 			}
+			
+			e->e_deps=new_e_deps;
+#else
+			for (i=0; i<arity; i++){
+				if (ReduceInContext (& e->e_args[i], p, context->context_args[i])){
+					(*ep) = (*ep)->e_args[i] = &bottom;
+					return True;
+				}
+			}
+#endif
 		} else {
-			if (e->e_kind == Lub){
-				for (i = 0; i < (*ep)->e_sym; i++){
+			if (e->e_kind==Lub){
+				for (i=0; i<(*ep)->e_sym; i++){
 					if (!ReduceInContext (& (*ep)->e_args[i], p, context))
 						return False;
 				 
