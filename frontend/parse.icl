@@ -620,8 +620,10 @@ optionalSpecials :: !ParseState -> (!Specials, !ParseState)
 optionalSpecials pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == SpecialToken
+		# (token, pState) = nextToken GeneralContext pState
+		  pState = begin_special_group token pState
 		# (specials, pState) = wantList "<special statement>" try_substitutions pState
-		= (SP_ParsedSubstitutions specials, wantEndGroup "specials" pState)
+		= (SP_ParsedSubstitutions specials, end_special_group pState)
 	// otherwise // token <> SpecialToken
 		= (SP_None, tokenBack pState)
 where
@@ -641,6 +643,39 @@ where
 			  (substs, pState) = want_rest_substitutions next_type_var pState
 			= ([{ bind_src = type, bind_dst = type_var } : substs], pState)
 			= ([{ bind_src = type, bind_dst = type_var }], tokenBack pState)
+
+	begin_special_group token pState // For JvG layout
+		# (token, pState)
+			= case token of
+				SemicolonToken	->	nextToken TypeContext pState
+				_				->	(token, pState)
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		| ss_useLayout
+			| token == CurlyOpenToken 
+				= parseError "substitution" (Yes CurlyOpenToken) "in layout mode the keyword where is" pState
+			// otherwise
+				= tokenBack pState
+		// not ss_useLayout
+			| token == CurlyOpenToken 
+				= pState
+			// otherwise
+				= tokenBack (parseError "substitution" (Yes token) "{" pState) 
+
+	end_special_group pState
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		  (token, pState) = nextToken FunctionContext pState
+		| token == EndOfFileToken && ss_useLayout
+			= tokenBack pState
+		| ss_useLayout
+			= case token of
+				EndGroupToken	->	pState
+				_				->	parseError "substitution" (Yes token) "end of substitution with layout" pState
+		// ~ ss_useLayout
+		| token == CurlyCloseToken
+			= pState
+		// otherwise // token <> CurlyCloseToken
+			= parseError "substitution" (Yes token) "end of substitution with layout, }," pState
+
 /*
 	For parsing right-hand sides of functions only
 */
