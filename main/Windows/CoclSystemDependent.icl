@@ -29,14 +29,11 @@ ensureCleanSystemFilesExists path env
 set_compiler_id :: Int -> Int
 set_compiler_id compiler_id = compiler_id
 
-:: CompileFun st
-	:== ([{#Char}] st -> (Bool, st))
-
 import thread_message;
 
 import code from "thread_message.obj";
 
-compiler_loop :: (CompileFun *st) *st -> (!Bool, !*st)
+compiler_loop :: ([{#Char}] *st -> *(Bool, *st)) *st -> (!Bool, !*st)
 compiler_loop compile compile_state
 	| length commandArgs==2 && commandArgs!!0=="-ide"
 		# wm_number=get_message_number;
