@@ -8,15 +8,19 @@ import cache_variable;
 f = SwitchFusion fusion_is_on 0;
 
 import CoclSystemDependent,Clean2AppleEventHandler;
-
+//1.3
 from events import KeyDownEvent,HighLevelEvent,GetNextEvent,WaitNextEvent,Toolbox,RgnHandle;
-
+//3.1
+/*2.0
+from events import KeyDownEvent,HighLevelEvent,GetNextEvent,WaitNextEvent,::Toolbox,::RgnHandle;
+0.2*/
 from predef import init_identifiers;
 
 DeviceMask :== -31361;		// HighLevelEventMask+UpdateMask+ActivMask+KeyboardMask+MouseMask+OsMask+1
 
 Start world
-	| install_apple_event_handlers==0 && store_state (empty_cache (init_identifiers newHeap))<>0
+	# (symbol_table,world)	= init_identifiers newHeap world;
+	| install_apple_event_handlers==0 && store_state (empty_cache symbol_table)<>0
 		= event_loop world;
 		= world;
 {}{
