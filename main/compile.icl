@@ -191,7 +191,7 @@ compileModule options commandLineArgs dcl_modules functions_and_macros predef_sy
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	#  list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
 	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,heaps)
-		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros No predef_symbols hash_table files error io out heaps
+		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out heaps
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
 		=	fclose io files
