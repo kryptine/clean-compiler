@@ -1328,8 +1328,10 @@ optionalCoercions pState
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition parseContext pos pState
+	| SwitchGenerics False True 
+		= (PD_Erroneous, parseError "generic definition" No "generics are not supported" pState)
 	| not pState.ps_support_generics
-		= (PD_Erroneous, parseError "generic definition" No "support for generics is disabled in the compiler. " pState)
+		= (PD_Erroneous, parseError "generic definition" No "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
 	| name == "" 
 		= (PD_Erroneous, pState)
@@ -3357,8 +3359,10 @@ wantBeginGroup msg pState
 // AA..
 wantKind :: !ParseState -> !(!TypeKind, !ParseState)
 wantKind pState
+	| SwitchGenerics False True 
+		= (KindConst, parseError "kind" No "generics are not supported" pState)
 	| not pState.ps_support_generics
-		= (KindConst, parseError "kind" No "support for generics is disabled in the compiler. " pState)
+		= (KindConst, parseError "kind" No "to enable generics use -generics command line flag" pState)
 	# (token, pState) = nextToken TypeContext pState
 	# (kind, pState) = want_simple_kind token pState
 	# (token, pState) = nextToken TypeContext pState
@@ -3368,7 +3372,7 @@ wantKind pState
 		want_simple_kind (IntToken str) pState
 			# n = toInt str
 			| n == 0	= (KindConst, pState)
-			| n > 0 	= (KindArrow (repeatn (n+1) KindConst), pState)
+			| n > 0 	= (KindArrow (repeatn n KindConst), pState)
 			| otherwise = (KindConst, parseError "invalid kind" No "positive integer expected" pState)
 		want_simple_kind OpenToken pState 			= wantKind pState
 		want_simple_kind GenericOpenToken pState 	= wantKind pState
@@ -3379,7 +3383,8 @@ wantKind pState
 			# (rhs, pState) = wantKind pState
 			= 	case rhs of
 				(KindArrow ks) 	-> (KindArrow [kind : ks], pState)
-				_				-> (KindArrow [kind, rhs], pState)
+				KindConst 		-> (KindArrow [kind], pState) 
+				//_				-> (KindArrow [kind, rhs], pState)
 		want_kind kind CloseToken pState 				= (kind, pState)
 		want_kind kind GenericCloseToken pState 		= (kind, pState)
 		want_kind kind token pState	

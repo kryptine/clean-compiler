@@ -75,12 +75,12 @@ instance toBool GenericTypeDefInfo where
 	toBool GTDI_Empty 		= False
 	toBool (GTDI_Generic _) = True
 
-convertGenerics :: !{!Group} !Int !{#CommonDefs} !*{# FunDef} !*TypeDefInfos !*Heaps !*HashTable !*PredefinedSymbols !u:{# DclModule} !(Optional {#Index}) !*ErrorAdmin 
-	-> (!{!Group}, !{#CommonDefs}, !*{# FunDef}, !IndexRange, !*TypeDefInfos, !*Heaps, !*HashTable, !*PredefinedSymbols, !u:{# DclModule}, !(Optional {#Index}), !*ErrorAdmin)
+convertGenerics :: !{!Group} !Int !{#CommonDefs} !*{# FunDef} !*TypeDefInfos !*Heaps !*HashTable !*PredefinedSymbols !u:{# DclModule} /*!(Optional {#Index})*/ !*ErrorAdmin 
+	-> (!{!Group}, !{#CommonDefs}, !*{# FunDef}, !IndexRange, !*TypeDefInfos, !*Heaps, !*HashTable, !*PredefinedSymbols, !u:{# DclModule}, /*!(Optional {#Index}),*/ !*ErrorAdmin)
 convertGenerics 
 		groups main_dcl_module_n modules fun_defs td_infos heaps
 		hash_table predefs dcl_modules 
-		opt_dcl_icl_conversions 
+		//opt_dcl_icl_conversions 
 		error
 
 	#! (fun_defs_size, fun_defs) = usize fun_defs 
@@ -116,10 +116,12 @@ convertGenerics
 		, 	gs_last_group = groups_size
 		,	gs_predefs = gs_predefs
 		,	gs_dcl_modules = { x \\ x <-: dcl_modules } // unique copy
-		,	gs_opt_dcl_icl_conversions = 
+		,	gs_opt_dcl_icl_conversions = No
+/*		
 				case opt_dcl_icl_conversions of
 				No -> No
 				Yes xs -> Yes {x \\ x <-: xs} 	// unique copy
+*/
 		,	gs_error = error
 		} 
 	
@@ -242,14 +244,14 @@ convertGenerics
 	#! index_range = {ir_from = gs.gs_first_fun, ir_to = gs.gs_last_fun}
 		 			
 	= (	gs_groups, gs_modules, gs_fun_defs, index_range, gs_td_infos, gs_heaps, hash_table, 
-		cs.cs_predef_symbols, gs_dcl_modules, gs_opt_dcl_icl_conversions, cs.cs_error)
+		cs.cs_predef_symbols, gs_dcl_modules, /*gs_opt_dcl_icl_conversions,*/ cs.cs_error)
 where
 	return {	gs_modules, gs_groups, gs_fun_defs, gs_td_infos, gs_gtd_infos, 
 				gs_heaps, gs_main_dcl_module_n, gs_dcl_modules, gs_opt_dcl_icl_conversions, gs_error} 
 				predefs hash_table  
 		= (	gs_groups, gs_modules, gs_fun_defs, {ir_from=0,ir_to=0}, 
 			gs_td_infos, gs_heaps, hash_table, predefs, gs_dcl_modules, 
-			gs_opt_dcl_icl_conversions, gs_error)
+			/*gs_opt_dcl_icl_conversions,*/ gs_error)
 
 	create_class_dictionaries module_index dcl_modules  modules heaps symbol_table 
 		#! size_of_modules = size modules
@@ -271,7 +273,7 @@ where
 		#  (size_type_defs,type_defs) = usize type_defs 
 		#! (new_type_defs, new_selector_defs, new_cons_defs,_,type_defs,selector_defs,cons_defs,class_defs, dcl_modules, th_vars, hp_var_heap, symbol_table) =
 				createClassDictionaries
-					(abort "create_class_dictionaries1 True or False ?")
+					False //(abort "create_class_dictionaries1 True or False ?")
 					module_index 
 					size_type_defs
 					(size common_defs.com_selector_defs) 
@@ -940,19 +942,19 @@ where
 		# gs = {gs & gs_modules = gs_modules}
 
 		# iso_def_sym = {
-			ds_ident  = {id_name="iso:"+++type_def.td_name.id_name, id_info = nilPtr },
+			ds_ident  = {id_name="iso_"+++type_def.td_name.id_name, id_info = nilPtr },
 			ds_index  = iso_fun_index,
 			ds_arity  = 0	
 			}
 	
 		# from_def_sym = {
-			ds_ident  = {id_name="iso_from:"+++type_def.td_name.id_name, id_info = nilPtr },
+			ds_ident  = {id_name="iso_from_generic_to_"+++type_def.td_name.id_name, id_info = nilPtr },
 			ds_index  = from_fun_index,
 			ds_arity  = 1	
 			}
 	
 		# to_def_sym = {
-			ds_ident  = {id_name="iso_to:"+++type_def.td_name.id_name, id_info = nilPtr },
+			ds_ident  = {id_name="iso_to_generic_from_"+++type_def.td_name.id_name, id_info = nilPtr },
 			ds_index  = to_fun_index,
 			ds_arity  = 1	
 			}
@@ -1162,17 +1164,17 @@ where
 
 		# gtd_info = GTDI_Generic {gt & 
 			gtr_isomap_from 	= { 
-				ds_ident = {id_name="isomap_from:"+++td_name.id_name, id_info=nilPtr}, 
+				ds_ident = {id_name="isomap_from_"+++td_name.id_name, id_info=nilPtr}, 
 				ds_index = from_fun_index, 
 				ds_arity = (td_arity + 1)
 				},
 			gtr_isomap_to 	= { 
-				ds_ident = {id_name="isomap_to:"+++td_name.id_name, id_info=nilPtr}, 
+				ds_ident = {id_name="isomap_to_"+++td_name.id_name, id_info=nilPtr}, 
 				ds_index = to_fun_index, 
 				ds_arity = (td_arity + 1)
 				},
 			gtr_isomap 		= { 
-				ds_ident = {id_name="isomap:"+++td_name.id_name, id_info=nilPtr}, 
+				ds_ident = {id_name="isomap_"+++td_name.id_name, id_info=nilPtr}, 
 				ds_index = rec_fun_index, 
 				ds_arity = td_arity
 				}
@@ -1293,7 +1295,7 @@ where
 		# (generic_def=:{gen_name, gen_type}, generic_defs) = generic_defs ! [generic_index] 		
 		# (fun_index, group_index, gs) = newFunAndGroupIndex gs 		
 		# def_sym = {
-			ds_ident = {id_name="isomap:"+++gen_name.id_name, id_info = nilPtr}, 
+			ds_ident = {id_name="isomap_"+++gen_name.id_name, id_info = nilPtr}, 
 			ds_index = fun_index, 
 			ds_arity = gen_type.gt_arity
 			}
@@ -1563,20 +1565,34 @@ where
 		| kind == KindConst
 			= ([], [], [], { gs & gs_td_infos = gs_td_infos, gs_modules = gs_modules, gs_heaps = gs_heaps})
 
+		# (KindArrow kind_args) = kind
 		# (generic_def, gs_modules) = getGenericDef ins_generic.glob_module ins_generic.glob_object gs_modules
-		# (ok, class_def_sym) = getGenericClassForKind generic_def KindConst
+		# (ok, kind_star_class_def_sym) = getGenericClassForKind generic_def KindConst
 		| not ok
-			= abort "no class for kind *"			
-		# (class_def, gs_modules) = getClassDef ins_generic.glob_module class_def_sym.ds_index gs_modules 
-		# (member_def, gs_modules) = getMemberDef ins_generic.glob_module class_def.class_members.[0].ds_index gs_modules 	
+			= abort "no class for kind *"
+		
+		# (oks, arg_class_def_syms) = unzip (map (getGenericClassForKind generic_def) kind_args)
+		| not (and oks)
+			= abort "no class for an agrument kind"
+			
+		# (kind_star_class_def, gs_modules) = getClassDef ins_generic.glob_module kind_star_class_def_sym.ds_index gs_modules 
+		# (member_def, gs_modules) = getMemberDef ins_generic.glob_module kind_star_class_def.class_members.[0].ds_index gs_modules 	
 
+		# glob_kind_star_class_def_sym = {glob_module=ins_generic.glob_module, glob_object=kind_star_class_def_sym}
+		# glob_arg_class_def_syms = [{glob_module=ins_generic.glob_module, glob_object=c} \\ c <- arg_class_def_syms]
+		
 		# (new_ins_type, gs_heaps) = 
-			build_instance_type ins_type kind {glob_module=ins_generic.glob_module, glob_object=class_def_sym} gs_heaps
+			//build_instance_type ins_type kind {glob_module=ins_generic.glob_module, glob_object=kind_star_class_def_sym} gs_heaps		
+			build_instance_type1 
+				ins_type 
+				glob_arg_class_def_syms 
+				glob_kind_star_class_def_sym 
+				gs_heaps
 
 		# gs = {gs & gs_modules=gs_modules, gs_td_infos = gs_td_infos, gs_heaps = gs_heaps}
 		# (fun_index, group_index, gs) = newFunAndGroupIndex gs
 		# fun_def_sym = {
-			ds_ident = class_def.class_name, // kind star name 
+			ds_ident = kind_star_class_def.class_name, // kind star name 
 			ds_index = fun_index, 
 			ds_arity = member_def.me_type.st_arity
 			}
@@ -1588,11 +1604,12 @@ where
 			ds_arity=0
 			}
 		# (fun_def, gs) = 
-			buildKindConstInstance fun_def_sym group_index ins_generic.glob_module generic_def_sym kind gs
+			//buildKindConstInstance fun_def_sym group_index ins_generic.glob_module generic_def_sym kind gs
+			buildKindConstInstance1 fun_def_sym group_index ins_generic.glob_module generic_def_sym kind_args gs
 
 		# new_instance_def = {
-			ins_class 		= {glob_module = ins_generic.glob_module, glob_object = class_def_sym},	
-			ins_ident 		= class_def.class_name,	
+			ins_class 		= {glob_module = ins_generic.glob_module, glob_object = kind_star_class_def_sym},	
+			ins_ident 		= kind_star_class_def.class_name,	
 			ins_type  		= new_ins_type,
 			ins_members 	= {fun_def_sym},
 			ins_specials 	= SP_None,
@@ -1611,7 +1628,7 @@ where
 		= (fun_def, {gs & gs_heaps = gs_heaps})
 		
 	build_instance_type ins_type=:{it_vars, it_types, it_context} (KindArrow kinds) class_glob_def_sym heaps		
-		#! type_var_names = ["a" +++ toString i \\ i <- [1 .. (length kinds) - 1]]
+		#! type_var_names = ["a" +++ toString i \\ i <- [1 .. (length kinds)]]
 		#! (type_vars, heaps) = mapSt buildTypeVar type_var_names heaps
 		#! type_var_types = [TV tv \\ tv <- type_vars] 	
 		#! new_type_args = [makeAType t TA_Multi \\ t <- type_var_types]
@@ -1628,6 +1645,34 @@ where
 					= arg_type --> res_type	 
 		
 		#! (new_contexts, heaps) = mapSt (build_type_context class_glob_def_sym) type_var_types heaps
+		
+		#! new_ins_type = { ins_type & 
+			it_vars = it_vars ++ type_vars,
+			it_types = [new_type],
+			it_context = it_context ++ new_contexts
+			}
+		= (new_ins_type, heaps)
+			//---> new_ins_type			
+
+	build_instance_type1 ins_type=:{it_vars, it_types, it_context} arg_class_def_syms class_glob_def_sym heaps		
+		#! type_var_names = ["a" +++ toString i \\ i <- [1 .. (length arg_class_def_syms)]]
+		#! (type_vars, heaps) = mapSt buildTypeVar type_var_names heaps
+		#! type_var_types = [TV tv \\ tv <- type_vars] 	
+		#! new_type_args = [makeAType t TA_Multi \\ t <- type_var_types]
+
+		#! new_type = fill_type_args (hd it_types) new_type_args
+			with 
+				fill_type_args (TA type_symb_ident=:{type_arity} type_args) new_type_args
+					#! type_arity = type_arity + length new_type_args 
+					#! type_args = type_args ++ new_type_args
+					= TA {type_symb_ident & type_arity = type_arity} type_args 
+				fill_type_args TArrow [arg_type, res_type]
+					= arg_type --> res_type
+				fill_type_args (TArrow1 arg_type) [res_type]
+					= arg_type --> res_type	 
+		
+		#! (new_contexts, heaps) 
+			= mapSt build_type_context1 (zip2 arg_class_def_syms type_var_types) heaps
 		
 		#! new_ins_type = { ins_type & 
 			it_vars = it_vars ++ type_vars,
@@ -1653,6 +1698,16 @@ where
 			,	tc_var	 = var_info_ptr
 			}
 		= (type_context, {heaps & hp_var_heap = hp_var_heap})	
+
+	build_type_context1 (class_def_sym, type) heaps=:{hp_var_heap}
+		# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
+		# type_context =		
+			{	tc_class = class_def_sym
+			,	tc_types = [type]
+			,	tc_var	 = var_info_ptr
+			}
+		= (type_context, {heaps & hp_var_heap = hp_var_heap})	
+
 									
 // for all generic instances determine and set types
 // of their functions
@@ -1767,7 +1822,7 @@ kindOfTypeDef module_index td_index td_infos
 	#! ({tdi_kinds}, td_infos) = td_infos![module_index, td_index] 
 	| isEmpty tdi_kinds
 		= (KindConst, td_infos)
-		= (KindArrow (tdi_kinds ++ [KindConst]), td_infos)
+		= (KindArrow (tdi_kinds/* ++ [KindConst]*/), td_infos)
 
 kindOfType :: !Type !*TypeDefInfos -> (!TypeKind, !*TypeDefInfos)
 kindOfType (TA type_cons args) td_infos
@@ -1776,11 +1831,11 @@ kindOfType (TA type_cons args) td_infos
 	#! kinds = drop (length args) tdi_kinds	
 	| isEmpty kinds 
 		= (KindConst, td_infos) 
-		= (KindArrow (kinds ++ [KindConst]), td_infos)
+		= (KindArrow (kinds/* ++ [KindConst]*/), td_infos)
 kindOfType TArrow td_infos
-	= (KindArrow [KindConst, KindConst, KindConst], td_infos)
+	= (KindArrow [KindConst, KindConst/*, KindConst*/], td_infos)
 kindOfType (TArrow1 _) td_infos 
-	= (KindArrow [KindConst, KindConst], td_infos)
+	= (KindArrow [KindConst/*, KindConst*/], td_infos)
 kindOfType (TV _) td_infos 
 	= (KindConst, td_infos)
 kindOfType (GTV _) td_infos 
@@ -1818,7 +1873,7 @@ where
 			,	tc_types = [ TV class_var ] 
 			,	tc_var = tc_var_ptr 
 			}
-		#! (member_type, class_contexts, hp_type_heaps, hp_var_heap) = buildMemberType1 generic_def kind class_var hp_type_heaps hp_var_heap
+		#! (member_type, class_contexts, hp_type_heaps, hp_var_heap) = buildMemberType2 generic_def kind class_var hp_type_heaps hp_var_heap
 		//#! member_type = { member_type & st_context = [type_context : gen_type.gt_type.st_context] }
 		#! member_type = { member_type & st_context = [type_context : member_type.st_context] }
 		#! member_def = {
@@ -1863,7 +1918,7 @@ currySymbolType1 {st_args=[], st_result} attr_var_name th
 	= (st_result, [], [], th)
 currySymbolType1 {st_args, st_result} attr_var_name th=:{th_attrs}
 	// TA_None indicates top-level attribute
-	#! (at, attr_vars, ais, index, th_attrs) = curry_type st_args st_result TA_None 2 th_attrs
+	#! (at, attr_vars, ais, index, th_attrs) = curry_type st_args st_result TA_None 0 th_attrs
 	= (at, attr_vars, ais, {th & th_attrs = th_attrs})
 where
 	curry_type [] type cum_attr index th_attrs 
@@ -1880,21 +1935,21 @@ where
 	combine_attributes TA_Unique cum_attr index th_attrs
 		= (TA_Unique, [], [], index, th_attrs)
 	combine_attributes (TA_Var av) (TA_Var cum_av) index th_attrs
-		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++ /*"_"+++*/ toString index)) th_attrs
 		#! ais = [
 			{ai_offered=new_av, ai_demanded=av},
 			{ai_offered=new_av, ai_demanded=cum_av}]
 		= (TA_Var new_av, [new_av], ais, (inc index), th_attrs)
 	combine_attributes (TA_Var av) TA_None index th_attrs
-		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++ /*"_"+++*/ toString index)) th_attrs
 		= (TA_Var new_av, [new_av], [{ai_offered=new_av, ai_demanded=av}], (inc index), th_attrs)		
 	combine_attributes (TA_Var _) cum_attr index th_attrs
 		= (cum_attr, [], [], index, th_attrs)
 	combine_attributes _ (TA_Var cum_av) index th_attrs
-		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++ /*"_"+++*/ toString index)) th_attrs
 		= (TA_Var new_av, [new_av], [{ai_offered=new_av, ai_demanded=cum_av}], (inc index), th_attrs)
 	combine_attributes _ TA_None index th_attrs
-		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++ /*"_"+++*/ toString index)) th_attrs
 		= (TA_Var new_av, [new_av], [], (inc index), th_attrs)
 	combine_attributes _ cum_attr index th_attrs
 		= (cum_attr, [], [], index, th_attrs)
@@ -1902,8 +1957,8 @@ where
 
 currySymbolType2 :: !SymbolType !String !*TypeHeaps 
 	-> (!SymbolType, !*TypeHeaps)
-currySymbolType2  st postfix th
-	#! (atype, avs, ais, th) = currySymbolType1 st postfix th
+currySymbolType2  st attr_var_name th
+	#! (atype, avs, ais, th) = currySymbolType1 st attr_var_name th
 	#! st = { st 
 		& st_args = []
 		, st_arity = 0
@@ -1913,18 +1968,100 @@ currySymbolType2  st postfix th
 		}
 	= (st, th)
 
-// MMM
-buildMemberType1 :: !GenericDef !TypeKind !TypeVar !*TypeHeaps !*VarHeap -> (!SymbolType, ![TypeContext], !*TypeHeaps, !*VarHeap)
-buildMemberType1 generic_def=:{gen_name,gen_type} kind class_var th var_heap
+buildCurriedType :: ![AType] !AType !TypeAttribute ![AttrInequality] ![AttributeVar] !String !Int !*AttrVarHeap 
+	-> (!AType, ![AttrInequality], ![AttributeVar], !Int, !*AttrVarHeap)
+buildCurriedType [] type cum_attr attr_env attr_vars attr_var_name attr_store th_attrs 
+	= (type, attr_env, attr_vars, attr_store, th_attrs)
+buildCurriedType [at=:{at_attribute}] type cum_attr attr_env attr_vars attr_var_name attr_store th_attrs
+	# atype = {at_annotation = AN_None, at_attribute = cum_attr , at_type = at --> type }
+	= (atype, attr_env, attr_vars, attr_store, th_attrs)
+buildCurriedType [at=:{at_attribute}:ats] type cum_attr attr_env attr_vars attr_var_name attr_store th_attrs
+	# (next_cum_attr, new_attr_env, attr_vars, attr_store, th_attrs) = combine_attributes at_attribute cum_attr attr_env attr_vars attr_store th_attrs
+	  (res_type, attr_env, attr_vars, attr_store, th_attrs) = buildCurriedType ats type next_cum_attr attr_env attr_vars attr_var_name attr_store th_attrs
+	# atype = {at_annotation = AN_None, at_attribute = cum_attr , at_type = at --> res_type }  
+	= (atype, attr_env, attr_vars, attr_store, th_attrs)
+where
+	combine_attributes TA_Unique cum_attr attr_env attr_vars attr_store th_attrs
+		= (TA_Unique, attr_env, attr_vars, attr_store, th_attrs)
+	combine_attributes (TA_Var attr_var) (TA_Var cum_attr_var) attr_env attr_vars attr_store th_attrs
+		#! (new_attr_var, th_attrs) 
+			= freshAttrVar (makeIdent (attr_var_name +++ toString attr_store)) th_attrs	
+		# attr_env = 
+			[	{ ai_demanded = cum_attr_var,ai_offered = new_attr_var }
+			, 	{ ai_demanded = attr_var, ai_offered = new_attr_var }
+			: 	attr_env
+			]
+		= (	TA_Var new_attr_var, attr_env, [new_attr_var:attr_vars], inc attr_store, th_attrs)
+	combine_attributes (TA_Var _) cum_attr attr_env attr_vars attr_store th_attrs
+		= (cum_attr, attr_env, attr_vars, attr_store, th_attrs)
+	combine_attributes _ (TA_Var cum_attr_var) attr_env attr_vars attr_store th_attrs
+		#! (new_attr_var, th_attrs) 
+			= freshAttrVar (makeIdent (attr_var_name +++ toString attr_store)) th_attrs		
+		# attr_env = [	{ ai_demanded = cum_attr_var,ai_offered = new_attr_var }: attr_env]
+		= (	TA_Var new_attr_var, attr_env, [new_attr_var:attr_vars], inc attr_store, th_attrs)
+	combine_attributes _ cum_attr attr_env attr_vars attr_store th_attrs
+		= (cum_attr, attr_env, attr_vars, attr_store, th_attrs)
+
+currySymbolType3 :: !SymbolType !String !*TypeHeaps 
+	-> (!SymbolType, !*TypeHeaps)
+currySymbolType3  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_var_name th=:{th_attrs}
+	
+	#! (cum_attr_var, th_attrs) = freshAttrVar (makeIdent (attr_var_name +++ "0")) th_attrs
+	
+	#! attr_env = foldSt (build_attr_env cum_attr_var) st_args st_attr_env
+				
+	#! (atype, attr_env, attr_vars, attr_store, th_attrs) 
+		= buildCurriedType st_args st_result (TA_Var cum_attr_var) attr_env st_attr_vars attr_var_name 1 th_attrs
+
+	# curried_st = 
+		{ st 
+		& st_args = []
+		, st_arity = 0
+		, st_result = atype
+		, st_attr_env = attr_env
+		, st_attr_vars = [cum_attr_var:attr_vars]
+		}
+	= (curried_st, {th & th_attrs = th_attrs})	
+		//---> ("currySymbolType3", st, curried_st)
+where
+	
+	build_attr_env cum_attr_var {at_attribute=(TA_Var attr_var)} attr_env
+		= [{ ai_demanded = attr_var, ai_offered = cum_attr_var } : attr_env ]
+	build_attr_env cum_attr_var _ attr_env
+		= attr_env
+
+
+currySymbolType4 :: !SymbolType !String !*TypeHeaps 
+	-> (!SymbolType, !*TypeHeaps)
+currySymbolType4  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_var_name th=:{th_attrs}
+	
+	#! (atype, attr_env, attr_vars, attr_store, th_attrs) 
+		= buildCurriedType st_args st_result TA_Multi st_attr_env st_attr_vars attr_var_name 1 th_attrs
+
+	# curried_st = 
+		{ st 
+		& st_args = []
+		, st_arity = 0
+		, st_result = atype
+		, st_attr_env = attr_env
+		, st_attr_vars = attr_vars
+		}
+	= (curried_st, {th & th_attrs = th_attrs})	
+		//---> ("currySymbolType4", st, curried_st)
+
+				
+// specialize generic (kind-indexed) type for a kind
+specializeGenericType :: !GenericDef !TypeKind !*TypeHeaps -> (!SymbolType, ![ATypeVar], ![AttributeVar], !*TypeHeaps) 
+specializeGenericType generic_def=:{gen_name,gen_type} kind th
+
+	//#! th = th ---> ("specializeSymbolType", kind, gen_type.gt_type)
+
 	#! (gen_type, th) = freshGenericType gen_type th
 	
 	#! (agvs, gavs, th) = collect_gtv_attrs gen_type th
 	
-	#! (st, th) = build_symbol_type gen_type.gt_type agvs kind "" th
+	#! (st, _, th) = build_symbol_type gen_type.gt_type agvs kind "" 1 th
 
-	#! (st, th) = replace_gvs_with_class_var st agvs class_var kind th
-	#! (st, th) = adjust_gavs st gavs kind th
-	
 	#! st = 
 		{ st 
 		& st_vars = removeDup st.st_vars
@@ -1932,14 +2069,11 @@ buildMemberType1 generic_def=:{gen_name,gen_type} kind class_var th var_heap
 		, st_attr_env = removeDup st.st_attr_env 
 		, st_context = removeDup st.st_context
 		}
-	
-	#! (st_context, class_contexts, var_heap) = adjust_contexts st.st_context class_var kind var_heap
-	#! st = {st & st_context = st_context} 
-		
+			
 	# th = clearSymbolType st th
 	
-	= (st, class_contexts, th, var_heap)
-	
+	= (st, agvs, gavs, th)
+		//---> ("specializeGenericType result", kind, st)
 where
 
 	// collect generic variables and withe attributes 
@@ -1960,6 +2094,146 @@ where
 			= (	{atv_attribute=attr, atv_variable=tv, atv_annotation=AN_None},
 				(avs, th))
 
+			 
+	build_symbol_type :: SymbolType ![ATypeVar] !TypeKind !String !Int !*TypeHeaps 
+		-> !(!SymbolType, ![ATypeVar], !*TypeHeaps)
+	build_symbol_type st agvs KindConst postfix order th	
+		#! st = { st & st_vars = [atv_variable \\ {atv_variable}<- agvs] ++ st.st_vars } 		
+		= (st, [], th)
+			//---> ("build_symbol_type KindConst", st, order)
+
+	build_symbol_type st agvs (KindArrow kinds) postfix order th
+
+		| order > 2
+			= abort "kinds of order higher then 2 are not supported"
+
+		//#! th = th ---> ("build_symbol_type for st", (KindArrow kinds, order, postfix), agvs, st)
+
+		#! gvs = [atv_variable \\ {atv_variable} <- agvs]
+		#! gavs = [av \\ {atv_attribute=TA_Var av} <- agvs]
+
+		#! arity = length kinds
+		
+		// build lifting argumnents
+		#! (args, th) = mapSt (build_arg agvs st postfix order) (zip2 kinds [1..arity]) th 
+		#! (curry_sts, atvss) = unzip args
+
+		#! th = clearSymbolType st th
+		#! th = foldSt build_gv_subst (zip2 gvs (transpose atvss)) th 
+		#! th = foldSt subst_av_for_self (st.st_attr_vars ++ gavs) th
+				 	
+		#! (new_st, th) = substituteInSymbolType st th
+		#! th = clearSymbolType st th
+		#! th = clearSymbolType new_st th
+		
+		#! new_st = 
+			{ new_st 
+			& st_vars = 
+				foldr (++) (new_st.st_vars ++ gvs) [st_vars \\ {st_vars} <- curry_sts]
+			, st_attr_vars = 
+				foldr (++) (new_st.st_attr_vars ++ gavs) [st_attr_vars \\ {st_attr_vars} <- curry_sts]
+			//, st_attr_env = 
+			//	foldr (++) new_st.st_attr_env [st_attr_env \\ {st_attr_env} <- curry_sts]
+			, st_args = 
+				[st_result \\ {st_result} <- curry_sts] ++ new_st.st_args
+			, st_arity = new_st.st_arity + arity	
+			, st_context = foldr (++) new_st.st_context [st_context \\ {st_context} <- curry_sts] 			
+			} 		
+		= (new_st, flatten atvss, th)
+			//---> ("build_symbol_type new st", (KindArrow kinds, order), new_st)
+		where
+			build_gv_subst (gv=:{tv_info_ptr}, atvs) th=:{th_vars}
+				#! type_args = [ makeAType (TV atv_variable) atv_attribute \\ {atv_variable, atv_attribute} <- atvs]
+				#! type = (CV gv) :@: type_args
+				#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type type)			
+				= {th & th_vars = th_vars}
+
+	build_arg :: ![ATypeVar] !SymbolType !String !Int !(!TypeKind, !Int) !*TypeHeaps
+		-> !(!(!SymbolType, ![ATypeVar]), !*TypeHeaps)
+	build_arg agvs st postfix order (kind, arg_num) th
+		
+		//#! th = th ---> ("build_arg for st", (kind, arg_num, order), st)  
+	
+		#! postfix = toString arg_num
+		#! gavs = [av \\ {atv_attribute=TA_Var av} <- agvs]
+
+		#! th = clearSymbolType st th
+		#! th = foldSt subst_av_for_self (st.st_attr_vars ++ gavs) th
+		#! (fresh_atvs, th) = mapSt (fresh_agv postfix) agvs th
+		#! (fresh_st, th) = substituteInSymbolType st th
+		#! th = clearSymbolType st th
+		#! th = clearSymbolType fresh_st th
+		
+		#! fresh_avs = [av \\ {atv_attribute=TA_Var av} <- fresh_atvs]
+		#! fresh_st = 
+			{ fresh_st 
+			& st_attr_vars = fresh_st.st_attr_vars ++ fresh_avs	
+			}	
+				
+		#! (fresh_st, forall_atvs, th) = build_symbol_type fresh_st fresh_atvs kind postfix (inc order) th		
+	
+		//#! (curry_st, th)	= currySymbolType2 fresh_st ("cur" +++ postfix) th 	
+		#! (curry_st, th)	= currySymbolType4 fresh_st ("cur" +++ toString order +++ postfix) th 	
+								
+		#! curry_st = case forall_atvs of
+			[] 	-> curry_st
+			forall_atvs 
+				# (atype=:{at_type}) = curry_st.st_result 
+				-> 
+			 	{ curry_st 
+				& st_result = {atype & at_type = TFA forall_atvs at_type}
+				, st_attr_vars = curry_st.st_attr_vars -- [av \\ {atv_attribute=TA_Var av} <- forall_atvs]
+				, st_vars = curry_st.st_vars -- [atv_variable \\ {atv_variable} <- forall_atvs]
+				} 					
+		
+		= ((curry_st, fresh_atvs), th)
+			//---> ("build_arg curry_st", (kind, arg_num, order), curry_st) 
+ 
+	where
+		
+		fresh_agv postfix agv=:{atv_attribute, atv_variable} th=:{th_attrs, th_vars}
+			#! (tv, th_vars) = fresh_tv atv_variable postfix th_vars
+			#! (attr, th_attrs) = fresh_attr atv_attribute postfix th_attrs
+			= ({agv & atv_attribute = attr, atv_variable = tv}, {th & th_vars = th_vars, th_attrs = th_attrs})					
+		where
+			fresh_tv {tv_name, tv_info_ptr} postfix th_vars
+				#! name = makeIdent (tv_name.id_name +++ postfix)
+				#! (tv, th_vars) = freshTypeVar name th_vars 					
+				#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv))	
+				= (tv, th_vars)
+				
+			fresh_attr (TA_Unique) postfix th_attrs = (TA_Unique, th_attrs)	
+			fresh_attr (TA_Multi) postfix th_attrs = (TA_Multi, th_attrs)	
+			fresh_attr (TA_Var av=:{av_name, av_info_ptr}) postfix th_attrs
+				#! (fresh_av, th_attrs) = freshAttrVar (makeIdent (av_name.id_name+++postfix)) th_attrs
+				#! attr = TA_Var fresh_av					
+				#! th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr attr)
+				= (attr, th_attrs)
+					
+	subst_av_for_self av=:{av_info_ptr} th=:{th_attrs}	
+		= {th & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr (TA_Var av))}
+
+buildMemberType2 :: !GenericDef !TypeKind !TypeVar !*TypeHeaps !*VarHeap -> (!SymbolType, ![TypeContext], !*TypeHeaps, !*VarHeap)
+buildMemberType2 generic_def=:{gen_name,gen_type} kind class_var th var_heap
+
+	# (st, agvs, gavs, th) = specializeGenericType generic_def kind th
+	
+	#! (st, th) = replace_gvs_with_class_var st agvs class_var kind th
+	#! (st, th) = adjust_gavs st gavs kind th
+	#! st = 
+		{ st 
+		& st_vars = removeDup st.st_vars
+		, st_attr_vars = removeDup st.st_attr_vars
+		, st_attr_env = removeDup st.st_attr_env 
+		, st_context = removeDup st.st_context
+		}
+	#! (st_context, class_contexts, var_heap) = adjust_contexts st.st_context class_var kind var_heap
+	#! st = {st & st_context = st_context} 
+		
+	# th = clearSymbolType st th
+	
+	= (st, class_contexts, th, var_heap)
+where		
 	replace_gvs_with_class_var :: !SymbolType ![ATypeVar] !TypeVar !TypeKind !*TypeHeaps 
 		-> (!SymbolType, !*TypeHeaps) 
 	replace_gvs_with_class_var st agvs class_var kind th
@@ -2032,6 +2306,7 @@ where
 		= (contexts, class_contexts, var_heap)	 
 	where
 	
+		// split contexts into involving and not invloving class variables
 		split_contexts [] var_heap
 			= ([], [], var_heap)
 		split_contexts [context:contexts] var_heap
@@ -2065,105 +2340,10 @@ where
 			| contains_class_var		
 				= ([], [type])	
 				= ([type], [])	
-			 
-	build_symbol_type :: SymbolType ![ATypeVar] !TypeKind !String !*TypeHeaps 
-		-> !(!SymbolType, !*TypeHeaps)
-	build_symbol_type st agvs KindConst postfix th	
-		#! st = { st & st_vars = [atv_variable \\ {atv_variable}<- agvs] ++ st.st_vars } 		
-		= (st, th)
 
-	build_symbol_type st agvs (KindArrow ks) postfix th
-
-		#! gvs = [atv_variable \\ {atv_variable} <- agvs]
-		#! gavs = [av \\ {atv_attribute=TA_Var av} <- agvs]
-
-		#! kinds = init ks
-		#! arity = length kinds
-		
-		// build lifting argumnents
-		#! (args, th) = mapSt (build_arg agvs st postfix) (zip2 kinds [1..arity]) th 
-		#! (curry_sts, atvss) = unzip args
-
-		#! th = clearSymbolType st th
-		#! th = foldSt build_gv_subst (zip2 gvs (transpose atvss)) th 
-		#! th = foldSt subst_av_for_self (st.st_attr_vars ++ gavs) th
-				 	
-		#! (new_st, th) = substituteInSymbolType st th
-		#! th = clearSymbolType st th
-		#! th = clearSymbolType new_st th
-		
-		#! new_st = 
-			{ new_st 
-			& st_vars = 
-				foldr (++) (new_st.st_vars ++ gvs) [st_vars \\ {st_vars} <- curry_sts]
-			, st_attr_vars = 
-				foldr (++) (new_st.st_attr_vars ++ gavs) [st_attr_vars \\ {st_attr_vars} <- curry_sts]
-			, st_attr_env = 
-				foldr (++) new_st.st_attr_env [st_attr_env \\ {st_attr_env} <- curry_sts]
-			, st_args = 
-				[st_result \\ {st_result} <- curry_sts] ++ new_st.st_args
-			, st_arity = new_st.st_arity + arity	
-			, st_context = 
-				foldr (++) new_st.st_context [st_context \\ {st_context} <- curry_sts] 			
-			} 		
-		= (new_st, th)
-		where
-			build_gv_subst (gv=:{tv_info_ptr}, atvs) th=:{th_vars}
-				#! type_args = [ makeAType (TV atv_variable) atv_attribute \\ {atv_variable, atv_attribute} <- atvs]
-				#! type = (CV gv) :@: type_args
-				#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type type)			
-				= {th & th_vars = th_vars}
-
-	build_arg :: ![ATypeVar] !SymbolType !String !(!TypeKind, !Int) !*TypeHeaps
-		-> !(!(!SymbolType, ![ATypeVar]), !*TypeHeaps)
-	build_arg agvs st postfix (kind, arg_num) th
-	
-		# postfix = postfix +++ "_" +++ toString arg_num
-		#! gavs = [av \\ {atv_attribute=TA_Var av} <- agvs]
-
-		#! th = clearSymbolType st th
-		#! th = foldSt subst_av_for_self (st.st_attr_vars ++ gavs) th
-		#! (fresh_atvs, th) = mapSt (fresh_agv postfix) agvs th
-		#! (fresh_st, th) = substituteInSymbolType st th
-		#! th = clearSymbolType st th
-		#! th = clearSymbolType fresh_st th
-		
-		#! fresh_avs = [av \\ {atv_attribute=TA_Var av} <- fresh_atvs]
-		#! fresh_st = 
-			{ fresh_st 
-			& st_attr_vars = fresh_st.st_attr_vars ++ fresh_avs	
-			}	
-				
-		#! (fresh_st, th) = build_symbol_type fresh_st fresh_atvs kind postfix th		
-	
-		#! (curry_st, th)	= currySymbolType2 fresh_st ("cur" +++ postfix) th 	
-	
-		= ((curry_st, fresh_atvs), th)
- 
-	where
-		
-		fresh_agv postfix agv=:{atv_attribute, atv_variable} th=:{th_attrs, th_vars}
-			#! (tv, th_vars) = fresh_tv atv_variable postfix th_vars
-			#! (attr, th_attrs) = fresh_attr atv_attribute postfix th_attrs
-			= ({agv & atv_attribute = attr, atv_variable = tv}, {th & th_vars = th_vars, th_attrs = th_attrs})					
-		where
-			fresh_tv {tv_name, tv_info_ptr} postfix th_vars
-				#! name = makeIdent (tv_name.id_name +++ postfix)
-				#! (tv, th_vars) = freshTypeVar name th_vars 					
-				#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv))	
-				= (tv, th_vars)
-				
-			fresh_attr (TA_Unique) postfix th_attrs = (TA_Unique, th_attrs)	
-			fresh_attr (TA_Multi) postfix th_attrs = (TA_Multi, th_attrs)	
-			fresh_attr (TA_Var av=:{av_name, av_info_ptr}) postfix th_attrs
-				#! (fresh_av, th_attrs) = freshAttrVar (makeIdent (av_name.id_name+++postfix)) th_attrs
-				#! attr = TA_Var fresh_av					
-				#! th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr attr)
-				= (attr, th_attrs)
-					
 	subst_av_for_self av=:{av_info_ptr} th=:{th_attrs}	
 		= {th & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr (TA_Var av))}
-
+	
 
 buildMemberType :: !GenericDef !TypeKind !TypeVar !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 buildMemberType generic_def=:{gen_name,gen_type} kind class_var th 
@@ -2237,7 +2417,7 @@ where
 	build_attr_var_substs avs [] KindConst th
 		= (avs, foldSt build_attr_var_subst avs th)
 	build_attr_var_substs avs generic_avs KindConst th		
-		# nongeneric_avs = removeMembers avs generic_avs
+		# nongeneric_avs = avs -- generic_avs
 		
 		# {th_attrs} = th
 		# (gen_av, th_attrs) = freshAttrVar (makeIdent "gav") th_attrs 
@@ -2267,7 +2447,7 @@ where
 		#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV class_var))
 		= {th & th_vars = th_vars}		
 	build_generic_var_subst {atv_variable={tv_info_ptr}} class_var atvs (KindArrow ks) th=:{th_vars}
-		#! arity = (length ks) - 1
+		#! arity = length ks
 		| arity <> length atvs = abort "sanity check: invalid number of type variables"
 
 		#! type_args = [ makeAType (TV atv_variable) atv_attribute \\ {atv_variable, atv_attribute} <- atvs]
@@ -2278,8 +2458,8 @@ where
 	build_args gen_type agvs KindConst th
 		= ([], [], [], [], th)
 	build_args gen_type agvs (KindArrow ks) th	
-		#! arity = (length ks) - 1
-		#! postfixes = ["_" +++ toString i \\ i <- [1..arity]]
+		#! arity = length ks
+		#! postfixes = [/*"_" +++*/ toString i \\ i <- [1..arity]]
 		#! (ats, atvss, new_avs, ais, th) = build_generic_args gen_type agvs postfixes th
 		= (ats, atvss, new_avs, ais, th)
 	
@@ -2578,16 +2758,17 @@ buildIsomapFromTo
 		gs=:{gs_heaps, gs_modules}
 	#! (type_def=:{td_name, td_index, td_arity, td_pos}, gs_modules) 
 		= getTypeDef type_def_mod type_def_index gs_modules
-	#! arg_names = [ "isomap" +++ toString n \\ n <- [1 .. td_arity]]
+	#! arg_names = [ "i" +++ toString n \\ n <- [1 .. td_arity]]
 	#! (isomap_arg_vars, gs_heaps) = buildFreeVars arg_names gs_heaps 
 	#! (arg_expr, arg_var, gs_heaps) = buildVarExpr "x" gs_heaps
 	#! gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
 	#! (body_expr, free_vars, gs) = 
 		build_body iso_dir type_def_mod td_index type_def arg_expr isomap_arg_vars gs	
 
-	#! (fun_type, gs) = build_type iso_dir type_def_mod type_def_index gs
+	#! (fun_type, gs) = build_type1 iso_dir type_def_mod type_def_index gs
 	#! fun_def = makeFunction def_sym group_index (isomap_arg_vars ++ [arg_var]) body_expr (Yes fun_type) free_vars [] td_pos	
 	= (fun_def, def_sym.ds_index, gs)
+		//---> ("isomap from/to", td_name, fun_def)
 where
 	build_body :: !IsoDirection !Int !Int !CheckedTypeDef !Expression ![FreeVar] !*GenericState
 		-> (Expression, [FreeVar], !*GenericState)
@@ -2672,6 +2853,28 @@ where
  		#! (cons_var_expr, _, gs_heaps) = buildBoundVarExpr cons_arg_var gs_heaps
 		= (sel_expr @ [cons_var_expr], {gs & gs_heaps = gs_heaps})
 
+	build_type1 :: !IsoDirection !Int !Int !*GenericState -> (!SymbolType, !*GenericState)
+	build_type1 iso_dir module_index type_def_index gs=:{gs_heaps, gs_modules, gs_predefs}
+
+		#! (st=:{st_result, st_args, st_arity}, gs) = buildIsomapType module_index type_def_index gs
+
+		# (type1, type2) = case st_result.at_type of
+			(TA _ [type1, type2]) -> (type1, type2)
+			_	-> abort "Must be ISO application" 
+
+		#! (argtype, restype) = case iso_dir of 
+			IsoTo	-> (type1, type2) 
+			IsoFrom -> (type2, type1)
+
+		#! st = 
+			{ st
+			& st_args = st_args ++ [argtype]
+			, st_arity = inc st_arity 
+			, st_result = restype 
+			}
+
+		= (st, gs)
+
 	build_type :: !IsoDirection !Int !Int !*GenericState
 		-> (!SymbolType, !*GenericState)
 	build_type 
@@ -2719,7 +2922,7 @@ where
 			}
 		#! gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
 		= (symbol_type, gs)
-			//---> ("isomap to/from type", symbol_type)
+			//---> ("isomap to/from type", td_name, symbol_type)
 	
 	build_type_var name heaps
 		#! (av, heaps) = buildAttrVar name heaps 
@@ -2739,8 +2942,92 @@ buildIsomapForTypeDef
 	#! (from_expr, gs_heaps) = buildFunApp gs_main_dcl_module_n from_fun arg_exprs gs_heaps
 	#! (to_expr, gs_heaps) 	= buildFunApp gs_main_dcl_module_n to_fun arg_exprs gs_heaps	
 	#! (iso_expr, gs_heaps) 	= buildISO to_expr from_expr gs_predefs gs_heaps
-	#! fun_def = makeFunction fun_def_sym group_index arg_vars iso_expr No [] [from_fun.ds_index, to_fun.ds_index] td_pos					
-	= (fun_def, fun_def_sym.ds_index, {gs & gs_heaps = gs_heaps})
+	#! gs = {gs & gs_heaps = gs_heaps}
+	#! (fun_type, gs) = buildIsomapType type_def_mod td_index gs 
+	#! fun_def = makeFunction fun_def_sym group_index arg_vars iso_expr (Yes fun_type) [] [from_fun.ds_index, to_fun.ds_index] td_pos					
+	= (fun_def, fun_def_sym.ds_index, gs)
+
+buildIsomapType :: !Int !Int !*GenericState -> (!SymbolType, !*GenericState)
+buildIsomapType module_index type_def_index
+			gs=:{gs_heaps, gs_modules, gs_predefs, gs_td_infos}
+
+	#! ({td_arity, td_name, td_pos}, gs_modules) = getTypeDef module_index type_def_index gs_modules 		
+	# ({tdi_kinds}, gs_td_infos) = gs_td_infos ! [module_index, type_def_index] 
+	# kind = case tdi_kinds of
+		[] -> KindConst
+		ks -> KindArrow (ks /*++ [KindConst]*/) 
+
+	// build generic type for isomap
+	# (t1, tv1, av1, gs_heaps) = build_type_var1 "a" gs_heaps
+	# (t2, tv2, av2, gs_heaps) = build_type_var1 "b" gs_heaps		
+	# generic_type = 
+		{ gt_type = 
+			{ st_vars = []
+			, st_args = []
+			, st_arity = 0
+			, st_result = buildATypeISO t1 t2 gs_predefs
+			, st_context = []
+			, st_attr_vars = [av1, av2]
+			, st_attr_env = []
+			}
+		, gt_vars = [tv1, tv2]
+		, gt_arity = 2
+		}
+	# dummy_generic_def = 
+		{ gen_name = td_name	
+		, gen_member_name = td_name
+		, gen_type = generic_type
+		, gen_pos = td_pos
+		, gen_kinds_ptr	= nilPtr 
+		, gen_cons_ptr = nilPtr
+	 	, gen_classes = []
+		, gen_isomap = EmptyDefinedSymbol
+		}
+
+	# (st, agvs, gavs, hp_type_heaps) = specializeGenericType dummy_generic_def kind gs_heaps.hp_type_heaps 
+
+	// substitute generic variables with the type
+	#! type_symb = {
+		type_name = td_name,
+		type_index = { glob_module = module_index, glob_object = type_def_index },
+		type_arity = td_arity,
+		type_prop = { 
+			tsp_sign = {sc_pos_vect=cAllBitsClear, sc_neg_vect=cAllBitsClear},
+			tsp_propagation = cAllBitsClear, 
+			tsp_coercible = False
+			}
+		}
+
+	# hp_type_heaps = foldSt subst_av_for_self st.st_attr_vars hp_type_heaps 
+		with 
+			subst_av_for_self av=:{av_info_ptr} th=:{th_attrs}	
+				= {th & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr (TA_Var av))}
+			
+	# hp_type_heaps = foldSt subst_with_the_type agvs hp_type_heaps
+		with 
+			subst_with_the_type	{atv_variable={tv_info_ptr}} th=:{th_vars}
+				= {th & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TA type_symb []))}
+				
+	# (ok, (st_args, st_result), hp_type_heaps) = substitute (st.st_args, st.st_result) hp_type_heaps	
+	
+	
+	# symbol_type = 
+		{ st 
+		& st_args = st_args
+		, st_result = st_result
+		, st_vars = st.st_vars -- [atv_variable \\ {atv_variable} <- agvs]
+		} 
+	
+	#! gs_heaps = { gs_heaps & hp_type_heaps = hp_type_heaps }
+	#! gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules, gs_td_infos = gs_td_infos}
+	= (symbol_type, gs)
+		//---> ("isomap to/from type", td_name, symbol_type)
+where
+	build_type_var1 name heaps
+		#! (av, heaps) = buildAttrVar name heaps 
+		#! (tv, heaps) = buildTypeVar name heaps
+		= (makeAType (TV tv) (TA_Var av), tv, av, heaps)	
+
 
 buildIsomapForGeneric :: !DefinedSymbol !Int !GenericDef !*GenericState
 	-> (!FunDef, !Index, !*GenericState)
@@ -2795,14 +3082,15 @@ where
 		= (expr, {gs & gs_heaps = gs_heaps})
 
 	build_expr ((CV type_var) :@: args) arg_type_vars arg_vars name pos gs=:{gs_error}
-/*
+
 		#! (arg_exprs, gs) = build_exprs args arg_type_vars arg_vars name pos gs
 		#! (cons_var_expr, gs) = build_expr_for_type_var type_var arg_type_vars arg_vars gs	
 		= (cons_var_expr @ arg_exprs, gs)
-*/
+
+/*
 		#! gs_error = reportError name pos "type constructor variables are not yet supported in generic types" gs_error
 		= (EE, {gs & gs_error = gs_error})
-
+*/
 	build_expr (TB baric_type) arg_type_vars arg_vars name pos gs=:{gs_predefs, gs_heaps}		
 		# (expr, gs_heaps) = buildIsomapIdApp gs_predefs gs_heaps
 		= (expr, {gs & gs_heaps = gs_heaps})
@@ -2872,6 +3160,7 @@ buildInstance
 
 	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] ins_pos					
 	= (fun_def, gs) 	
+		//---> ("buildInstance", fun_def)
 where
 	get_generic_type :: !InstanceType !*GenericState 
 		-> (GenericTypeRep, !*GenericState)
@@ -2880,7 +3169,7 @@ where
 		# {type_index} = case instance_type of 
 			TA type_symb_ident _ 	-> type_symb_ident
 			_ 						-> abort ("instance type is not a type application")
-				---> instance_type 
+				//---> ("get_generic_type", instance_type) 
 		# (gtd_info, gs_gtd_infos) = gs_gtd_infos ! [type_index.glob_module, type_index.glob_object]
 		# (GTDI_Generic gt) = gtd_info
 		= (gt, {gs & gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules, gs_error=gs_error})
@@ -2929,7 +3218,7 @@ where
 	build_instance_expr1 (arg_type --> res_type) cons_infos  type_vars vars gen_sym gs	
 		#! (arg_expr, cons_infos, gs) = build_instance_expr arg_type cons_infos type_vars vars gen_sym gs
 		#! (res_expr, cons_infos, gs) = build_instance_expr res_type cons_infos type_vars vars gen_sym gs
-		= build_generic_app gen_sym (KindArrow [KindConst,KindConst,KindConst]) [arg_expr, res_expr] cons_infos gs
+		= build_generic_app gen_sym (KindArrow [KindConst,KindConst/*,KindConst*/]) [arg_expr, res_expr] cons_infos gs
 	build_instance_expr1 ((CV type_var) :@: type_args) cons_infos  type_vars vars gen_sym gs=:{gs_error}	
 /*
 		# gs_error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) "application of type constructor variable is not yet supported in generic types" gs_error
@@ -2972,7 +3261,7 @@ where
 		= (make_kind td_info.tdi_kinds, {gs & gs_td_infos = gs_td_infos})
 	where	
 		make_kind [] = KindConst
-		make_kind ks = KindArrow (ks ++ [KindConst])
+		make_kind ks = KindArrow (ks /*++ [KindConst]*/)
 
 	is_cons_instance {glob_module, glob_object} gs=:{gs_predefs}
 		# {pds_def, pds_module} = gs_predefs.[PD_TypeCONS]
@@ -3043,7 +3332,7 @@ buildKindConstInstance
 	#! arg_names = ["x" +++ toString i \\ i <- [1 .. def_sym.ds_arity]]
 	#! (arg_exprs, arg_vars, gs_heaps) = buildVarExprs arg_names gs_heaps
 	
-	# (gen_exprs, gs_heaps) = mapSt build_gen_expr [1 .. (length kinds) - 1] gs_heaps
+	# (gen_exprs, gs_heaps) = mapSt build_gen_expr [1 .. (length kinds)/* - 1*/] gs_heaps
 	  
 	#! (body_expr, gs_heaps) = buildGenericApp generic_module generic_def_sym kind (gen_exprs ++ arg_exprs) gs_heaps
 	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] NoPos					
@@ -3051,6 +3340,26 @@ buildKindConstInstance
 where
 	build_gen_expr _ heaps
 		= buildGenericApp generic_module generic_def_sym KindConst [] heaps
+
+buildKindConstInstance1 :: !DefinedSymbol !Int !Index !DefinedSymbol [!TypeKind] !GenericState
+	-> (!FunDef, !*GenericState)
+buildKindConstInstance1 
+		def_sym group_index 
+		generic_module generic_def_sym arg_kinds 
+		gs=:{gs_heaps}
+	#! arg_names = ["x" +++ toString i \\ i <- [1 .. def_sym.ds_arity]]
+	#! (arg_exprs, arg_vars, gs_heaps) = buildVarExprs arg_names gs_heaps
+	
+	# (gen_exprs, gs_heaps) = mapSt build_gen_expr arg_kinds gs_heaps
+	  
+	#! (body_expr, gs_heaps) 
+		= buildGenericApp generic_module generic_def_sym (KindArrow arg_kinds) (gen_exprs ++ arg_exprs) gs_heaps
+	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] [] NoPos					
+	= (fun_def, {gs & gs_heaps = gs_heaps})	
+where
+	build_gen_expr kind heaps
+		= buildGenericApp generic_module generic_def_sym kind [] heaps
+
 										
 //===========================================
 // access to common definitions
@@ -3843,3 +4152,5 @@ unzip3 [(x1,x2,x3):xs]
 reportError name pos msg error
 	= checkErrorWithIdentPos (newPosition name pos) msg error
 
+(--) infixl 5 :: u:[a] .[a] -> u:[a] | Eq a
+(--) x y = removeMembers x y 

@@ -28,7 +28,7 @@ checkGenerics
 		// add * for kind-star instances and *->* for arrays
 		# kinds = 
 			[	KindConst
-			, 	KindArrow [KindConst, KindConst]
+			, 	KindArrow [KindConst]
 			]
 		# (kinds_ptr, th_vars) = newPtr (TVI_Kinds kinds) th_vars
 		# (cons_ptr, th_vars) = newPtr (TVI_Empty) th_vars

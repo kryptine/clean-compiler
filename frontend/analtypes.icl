@@ -419,6 +419,24 @@ where
 							(combineCoercionProperties arg_type_props res_type_props bitor cIsNonCoercible)
 							(combineCoercionProperties arg_type_props res_type_props)
 		= (KI_Const, type_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
+
+// AA..
+	analTypes has_root_attr modules form_tvs TArrow conds_as
+		# type_props = if has_root_attr
+			(cIsHyperStrict bitor cIsNonCoercible) 
+			cIsHyperStrict
+		= (KI_Arrow KI_Const (KI_Arrow KI_Const KI_Const), type_props, conds_as) 
+		
+	analTypes has_root_attr modules form_tvs (TArrow1 arg_type) conds_as
+		# (arg_kind, arg_type_props, conds_as) = analTypes has_root_attr modules form_tvs arg_type conds_as
+		# (conds, as=:{as_kind_heap,as_error}) = conds_as
+		# type_props = if has_root_attr 
+			(arg_type_props bitor cIsNonCoercible) 
+			arg_type_props
+		# {uki_kind_heap, uki_error} = unifyKinds arg_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}	
+		= (KI_Arrow KI_Const KI_Const, type_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error}))
+// ..AA
+
 	analTypes has_root_attr modules form_tvs (CV tv :@: types) conds_as
 		# (type_kind, cv_props, (conds, as)) = analTypes has_root_attr modules form_tvs tv conds_as
 		  (kind_var, as_kind_heap) = freshKindVar as.as_kind_heap	 
@@ -846,8 +864,11 @@ where
 			= check_kinds_of_class_instances common_defs (inc instance_index) instance_defs class_infos as
 	where	
 		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
-		check_kinds_of_class_instance common_defs {ins_class,ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
+		check_kinds_of_class_instance common_defs {ins_is_generic, ins_class,ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
 					as=:{as_type_var_heap,as_kind_heap,as_error}
+			| ins_is_generic
+				// generic instances are cheched in the generic phase
+				= (class_infos, as)		
 			# as_error = pushErrorAdmin (newPosition ins_ident ins_pos) as_error
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
 			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }

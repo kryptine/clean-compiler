@@ -6,7 +6,7 @@ implementation module frontend
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics
 
-SwitchGenerics on off :== off
+//import print
 
 :: FrontEndOptions 
 	=	{	feo_up_to_phase			:: !FrontEndPhase
@@ -129,6 +129,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars error_admin
 
       type_heaps = { type_heaps & th_vars = th_vars }
+
 	# heaps = { heaps & hp_type_heaps = type_heaps }
 	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
 		with 
@@ -142,7 +143,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 				True -> 
 					convertGenerics
 							components main_dcl_module_n ti_common_defs fun_defs td_infos 
-							heaps hash_table predef_symbols dcl_mods undef error_admin
+							heaps hash_table predef_symbols dcl_mods error_admin
 				False -> 
 					(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
 			)
@@ -157,6 +158,14 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# icl_mod = {icl_mod & icl_common = icl_common} 
 		
 	# error = error_admin.ea_file
+
+/*
+	# (_,genout,files) = fopen "c:\\Generics\\genout.icl" FWriteText files
+	# (fun_defs, genout) = printFunDefs fun_defs genout
+	# (ok,files) = fclose genout files
+	| not ok = abort "could not write genout.icl" 
+*/
+
 	#! ok = error_admin.ea_ok
 	| not ok
 		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)

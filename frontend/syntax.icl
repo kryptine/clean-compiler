@@ -1816,8 +1816,7 @@ instance toString TypeKind
 where
 	toString (KindVar _) 		= "**"
 	toString KindConst			= "*"
-//	toString (KindArrow args) 	= toString (length args) 
-	toString (KindArrow args) 	= "{" +++ (to_string args) +++ "}" 
+	toString (KindArrow args) 	= "{" +++ (to_string args) +++ "->*}" 
 	where
 		to_string []		= "??????" 
 		to_string [k]		= toString k  
@@ -2000,6 +1999,9 @@ where
 	(<<<) file (TVI_TypeKind _)			= file <<< "TVI_TypeKind"
 	(<<<) file (TVI_SignClass _ _ _) 	= file <<< "TVI_SignClass"
 	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
+	(<<<) file (TVI_TypeKind kind_info_ptr) = file <<< "TVI_TypeKind " <<< (ptrToInt kind_info_ptr)
+	(<<<) file (TVI_Kind kind) 			= file <<< "TVI_Kind" <<< kind
+	
 
 instance <<< (Import from_symbol) | <<< from_symbol
 where
