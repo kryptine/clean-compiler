@@ -1761,6 +1761,12 @@ where
 			  		= unify class_atype arg_type type_input subst type_heaps
 			| not succ
 				= abort ("sanity check nr 93 in module trans failed\n"--->(class_atype,"\n", arg_type))
+			# (free_vars_and_types,type_heaps) = mapSt subFVT free_vars_and_types type_heaps
+				with
+					subFVT (fv,ty) th
+						# (_,ty`,th`)		= substitute ty th
+						= ((fv,ty`),th`)
+
 			= ( mapAppend (\({var_info_ptr,var_name}, _)
 							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
 						  free_vars_and_types vars
@@ -2609,11 +2615,12 @@ renewVariables exprs var_heap
 	
 
 ::	ImportedConstructors	:== [Global Index]
-::	ImportedFunctions	:== [Global Index]
+::	ImportedFunctions		:== [Global Index]
+::	ImportedTypes			:== {#{# CheckedTypeDef}}
 
 transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
-		!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool
-			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
+		!*ImportedTypes !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool
+			-> (!*{! Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fun_defs cons_args common_defs imported_funs imported_types
 		collected_imports type_def_infos var_heap type_heaps symbol_heap compile_with_fusion
 	#! nr_of_funs = size fun_defs
@@ -2708,8 +2715,8 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 		get_root_case_mode {tb_rhs=Case _}	= RootCase
 		get_root_case_mode _ 				= NotRootCase
 
-	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap  !FunctionInfoPtr !(!*{! Group}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-		-> (!*{! Group}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap  !FunctionInfoPtr !(!*{! Group}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+		-> (!*{! Group}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 	add_new_function_to_group common_defs ti_fun_heap fun_ptr (groups, fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr ti_fun_heap
 // Sjaak
@@ -2742,8 +2749,8 @@ set_extended_expr_info expr_info_ptr extension expr_info_heap
 			-> expr_info_heap <:= (expr_info_ptr, EI_Extended extension ei)
 		ei	-> expr_info_heap <:= (expr_info_ptr, EI_Extended extension ei)
 		
-convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
-	-> (!SymbolType, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
+	-> (!SymbolType, !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 convertSymbolType  rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	# (st, {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypesInSymbolType rem_annots common_defs st
 		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps= type_heaps, ets_var_heap = var_heap,
