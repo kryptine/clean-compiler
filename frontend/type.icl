@@ -985,7 +985,7 @@ requirements (Selection result_type_symb expr selectors) reqs ti ts
 	= case result_type_symb of
 		Yes {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
 			# (var, ts) = freshAttributedVariable ts
-		  	  (result_type, reqs, ts) =  requirementsOfSelectors expr selectors False var expr opt_expr_ptr reqs ti ts
+		  	  (result_type, reqs, ts) =  requirementsOfSelectors No expr selectors False var expr opt_expr_ptr reqs ti ts
 			  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
 			  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
 			  req_type_coercions
@@ -996,18 +996,14 @@ requirements (Selection result_type_symb expr selectors) reqs ti ts
 			-> ({ reqs & req_type_coercions = req_type_coercions }, result_type, No,
 					{ts & ts_var_store = inc ts.ts_var_store, ts_expr_heap = storeAttribute opt_expr_ptr TA_Multi ts.ts_expr_heap})
 		_
-		  	# (result_type, reqs, ts) =  requirementsOfSelectors expr selectors True expr_type expr opt_expr_ptr reqs ti ts
+		  	# (result_type, reqs, ts) =  requirementsOfSelectors No expr selectors True expr_type expr opt_expr_ptr reqs ti ts
 			-> (reqs, result_type, No, { ts & ts_expr_heap = storeAttribute opt_expr_ptr result_type.at_attribute ts.ts_expr_heap })
 
-requirements (Update expr1 selectors expr2) reqs ti ts
-	# (reqs, expr1_type, opt_expr1_ptr, ts) = requirements expr1 reqs ti ts
-	  ts = { ts & ts_expr_heap = storeAttribute opt_expr1_ptr expr1_type.at_attribute ts.ts_expr_heap }
-	  (reqs, expr2_type, opt_expr2_ptr, ts) = requirements expr2 reqs ti ts
-	  ts = { ts & ts_expr_heap = storeAttribute opt_expr2_ptr expr2_type.at_attribute ts.ts_expr_heap }
-	  (result_type, reqs, ts) =  requirementsOfSelectors expr1 selectors True expr1_type expr1 opt_expr1_ptr reqs ti ts
-      reqs = { reqs & req_type_coercions = [
-		      			{ tc_demanded = expr2_type, tc_offered = result_type, tc_position = { cp_expression = expr2 }, tc_coercible = True /* RWS ??? */ } : reqs.req_type_coercions ]}
-	= (reqs, expr1_type, No, ts)
+requirements (Update composite_expr selectors elem_expr) reqs ti ts
+	# (reqs, composite_expr_type, opt_composite_expr_ptr, ts) = requirements composite_expr reqs ti ts
+//	  ts = { ts & ts_expr_heap = storeAttribute opt_expr1_ptr expr1_type.at_attribute ts.ts_expr_heap }
+	  (result_type, reqs, ts) =  requirementsOfSelectors (Yes elem_expr) composite_expr selectors True composite_expr_type composite_expr opt_composite_expr_ptr reqs ti ts
+	= (reqs, composite_expr_type, No, ts)
 
 requirements (RecordUpdate {glob_module,glob_object={ds_index,ds_arity}} expression expressions) reqs ti ts
 	# (lhs, ts) = standardLhsConstructorType ds_index glob_module ds_arity ti ts	
@@ -1069,34 +1065,36 @@ requirements (ABCCodeExpr _ _) reqs ti ts
 requirements expr reqs ti ts
 	= (reqs, abort ("Error in requirements\n" ---> expr), No, ts)
 
-requirementsOfSelectors expr [selector] tc_coercible sel_expr_type sel_expr opt_expr_ptr reqs ti ts 
+requirementsOfSelectors opt_expr expr [selector] tc_coercible sel_expr_type sel_expr opt_expr_ptr reqs ti ts 
 	# ts_expr_heap = storeAttribute opt_expr_ptr sel_expr_type.at_attribute ts.ts_expr_heap
-	= requirementsOfSelector expr selector tc_coercible sel_expr_type sel_expr reqs ti { ts & ts_expr_heap = ts_expr_heap }
-requirementsOfSelectors expr [selector : selectors] tc_coercible sel_expr_type sel_expr opt_expr_ptr reqs ti ts 
+	= requirementsOfSelector opt_expr expr selector tc_coercible sel_expr_type sel_expr reqs ti { ts & ts_expr_heap = ts_expr_heap }
+requirementsOfSelectors opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr opt_expr_ptr reqs ti ts 
 	# ts_expr_heap = storeAttribute opt_expr_ptr sel_expr_type.at_attribute ts.ts_expr_heap
-	  (result_type, reqs, ts) = requirementsOfSelector expr selector tc_coercible sel_expr_type sel_expr reqs ti { ts & ts_expr_heap = ts_expr_heap }
-	= requirements_of_remaining_selectors expr selectors tc_coercible result_type expr reqs ti ts
+	  (result_type, reqs, ts) = requirementsOfSelector No expr selector tc_coercible sel_expr_type sel_expr reqs ti { ts & ts_expr_heap = ts_expr_heap }
+	= requirements_of_remaining_selectors opt_expr expr selectors tc_coercible result_type expr reqs ti ts
 where
-	requirements_of_remaining_selectors expr [selector] tc_coercible sel_expr_type sel_expr reqs ti ts 
-		= requirementsOfSelector expr selector tc_coercible sel_expr_type sel_expr reqs ti ts 
-	requirements_of_remaining_selectors expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs ti ts 
-		# (result_type, reqs, ts) = requirementsOfSelector expr selector tc_coercible sel_expr_type sel_expr reqs ti ts 
-		= requirements_of_remaining_selectors expr selectors tc_coercible result_type sel_expr reqs ti ts 
+	requirements_of_remaining_selectors opt_expr expr [selector] tc_coercible sel_expr_type sel_expr reqs ti ts 
+		= requirementsOfSelector opt_expr expr selector tc_coercible sel_expr_type sel_expr reqs ti ts 
+	requirements_of_remaining_selectors opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs ti ts 
+		# (result_type, reqs, ts) = requirementsOfSelector No expr selector tc_coercible sel_expr_type sel_expr reqs ti ts 
+		= requirements_of_remaining_selectors opt_expr expr selectors tc_coercible result_type sel_expr reqs ti ts 
 		  
-requirementsOfSelector expr (RecordSelection field filed_nr) tc_coercible sel_expr_type sel_expr reqs ti ts 
+requirementsOfSelector _ expr (RecordSelection field filed_nr) tc_coercible sel_expr_type sel_expr reqs ti ts 
 	# ({tst_args, tst_result, tst_attr_env}, ts) = standardFieldSelectorType field ti ts
 	  req_type_coercions = [{ tc_demanded = sel_expr_type, tc_offered = hd tst_args, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
 	= (tst_result, { reqs & req_type_coercions = req_type_coercions }, ts)
-requirementsOfSelector expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible sel_expr_type sel_expr reqs ti ts 
+requirementsOfSelector opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible sel_expr_type sel_expr reqs ti ts 
 	# {me_type} = ti.ti_common_defs.[glob_module].com_member_defs.[ds_index]
 	  ({tst_attr_env,tst_args,tst_result,tst_context}, cons_variables, ts) = freshSymbolType me_type ti.ti_common_defs ts
-	  (dem_array_type, dem_index_type) = array_and_index_type tst_args
+	  (dem_array_type, dem_index_type, rest_type) = array_and_index_type tst_args
 	  reqs ={ reqs & req_attr_coercions = tst_attr_env ++ reqs.req_attr_coercions, req_cons_variables = [ cons_variables : reqs.req_cons_variables ]}
 	  (reqs, index_type, opt_expr_ptr, ts) = requirements index_expr reqs ti ts
       reqs = { reqs & req_type_coercions = [{ tc_demanded = dem_index_type, tc_offered = index_type, tc_position = { cp_expression = expr }, tc_coercible = True },
       			{ tc_demanded = dem_array_type, tc_offered = sel_expr_type, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : reqs.req_type_coercions ]}
-	  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr index_type.at_attribute ts.ts_expr_heap }
+	  (reqs, ts) = requirements_of_update opt_expr rest_type reqs ti ts
+
+//	  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr index_type.at_attribute ts.ts_expr_heap }
 	| isEmpty tst_context
 		= (tst_result, reqs, ts)
 		= (tst_result, { reqs & req_overloaded_calls = [expr_ptr : reqs.req_overloaded_calls ]}, { ts & ts_expr_heap =
@@ -1104,8 +1102,17 @@ requirementsOfSelector expr (ArraySelection {glob_object = {ds_ident,ds_index,ds
 					{ symb_name = ds_ident, symb_kind = SK_OverloadedFunction {glob_module = glob_module, glob_object = ds_index}, symb_arity = ds_arity },
 						oc_context = tst_context, oc_specials = [] })})
 where
-	array_and_index_type [array_type, index_type : _ ]
-		= (array_type, index_type)
+	array_and_index_type [array_type, index_type : rest_type ]
+		= (array_type, index_type, rest_type)
+
+	requirements_of_update No _ reqs _ ts
+		= (reqs, ts)
+	requirements_of_update (Yes elem_expr) [ elem_type : _ ] reqs _ ts
+		# (reqs, elem_expr_type, opt_elem_expr_ptr, ts) = requirements elem_expr reqs ti ts
+		  ts = { ts & ts_expr_heap = storeAttribute opt_elem_expr_ptr elem_type.at_attribute ts.ts_expr_heap }
+	      reqs = { reqs & req_type_coercions = [{ tc_demanded = elem_type, tc_offered = elem_expr_type,
+						tc_position = { cp_expression = elem_expr }, tc_coercible = True } : reqs.req_type_coercions ]}
+		= (reqs, ts)
 
 makeBase vars types ts_var_heap
 	= fold2St (\ {fv_info_ptr} type var_heap -> var_heap <:= (fv_info_ptr, VI_Type type)) vars types ts_var_heap
