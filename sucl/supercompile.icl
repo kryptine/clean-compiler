@@ -59,7 +59,8 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  generated_range = {ir_from=n_fun_defs,ir_to=newlimit}
   #  logfile = logfile <<< "New functions from " <<< n_fun_defs <<< " to " <<< newlimit <<< " (not included)" <<< nl
   #  logfile = logfile <<< "Remaining " <<< (n_symredresults-(newlimit-n_fun_defs)) <<< " should be exported" <<< nl
-= logfile $ (fundefs5,var_heap`,expression_heap`,generated_range,predefs2,logfile0)
+  #  (logfile,fundefs6) = showfundefs (logfile,fundefs5)
+= logfile $ (fundefs6,var_heap`,expression_heap`,generated_range,predefs2,logfile0)
 
 mkglobal gmod gob = {glob_module = gmod, glob_object = gob}
 

@@ -89,3 +89,5 @@ stc_funcdefs ::
     )
  |  Array c FunDef
 0.2*/
+
+showfundefs :: (*File,*{#FunDef}) -> (.File,.{#FunDef})
