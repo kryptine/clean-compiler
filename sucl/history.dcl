@@ -17,7 +17,7 @@ from spine import Subspine
 
 // An association between a node-id in the subject graph and a history pattern
 :: HistoryAssociation sym var
-   :== ( (Link var)             // Attachment point in the subject graph where the history pattern is "housed"
+   :== ( var                    // Attachment point in the subject graph where the history pattern is "housed"
        , HistoryPattern sym var // The pattern in the history
        )
 
@@ -40,11 +40,11 @@ extendhistory
  &  == pvar
 
 // Check the current subject graph in the history
-checkhistory
- :: (History sym var)
-    [Link var]
-    (Graph sym var)
-    var
- -> [HistoryPattern sym var]
+matchhistory
+ :: (History sym var)           // Complete history against which to check
+    [var]                       // Node-ids for which to include history patterns
+    (Graph sym var)             // Current subject graph
+    var                         // Current application point of strategy
+ -> [HistoryPattern sym var]    // Matching history patterns
  |  == sym
  &  == var

@@ -16,7 +16,7 @@ import StdEnv
 
 // An association between a node-id in the subject graph and a history pattern
 :: HistoryAssociation sym var
-   :== ( (Link var)             // Attachment point in the subject graph where the history pattern is "housed"
+   :== ( var                    // Attachment point in the subject graph where the history pattern is "housed"
        , HistoryPattern sym var // The pattern in the history
        )
 
@@ -143,10 +143,10 @@ extendopen
     )
  |  == var
 
-extendopen _ _ link extender0
+extendopen _ snode link extender0
  = (newpattern,histpat,extender1)
    where histpat = OpenHist
-         newpattern = (link,histpat)
+         newpattern = (snode,histpat)
          extender1 = adjust link histpat extender0
 
 extendpartial
@@ -228,7 +228,7 @@ extendfunction sgraph rule matching issub extendsub snode link extender0
          (sdef,(ssym,_)) = varcontents sgraph snode
          rgraph = rulegraph rule
          rargs = arguments rule
-         thisnewpattern = (link,thispat)
+         thisnewpattern = (snode,thispat)
 
 extendnodes
  :: (Graph sym var)             // Subject graph
@@ -309,20 +309,20 @@ extendnode sgraph rgraph matching issub extendsub (link,rnode) (newpattern0,rest
 * Verifying a subject graph against the history *
 ************************************************/
 
-checkhistory
- :: (History sym var)
-    [Link var]
-    (Graph sym var)
-    var
- -> [HistoryPattern sym var]
+matchhistory
+ :: (History sym var)           // Complete history against which to check
+    [var]                       // Node-ids for which to include history patterns
+    (Graph sym var)             // Current subject graph
+    var                         // Current application point of strategy
+ -> [HistoryPattern sym var]    // Matching history patterns
  |  == sym
  &  == var
 
-checkhistory hist spinelinks sgraph snode
- = foldr (checkassoc spinelinks sgraph snode) [] hist
+matchhistory hist spinenodes sgraph snode
+ = foldr (checkassoc spinenodes sgraph snode) [] hist
 
-checkassoc spinelinks sgraph snode (link,pat) rest
- | isMember link spinelinks && checkpat sgraph pat snode
+checkassoc spinenodes sgraph snode (var,pat) rest
+ | isMember var spinenodes && checkpat sgraph pat snode
    = [pat:rest]
  = rest
 
