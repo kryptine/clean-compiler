@@ -707,6 +707,10 @@ static int CodeRhsNodeDefsAndRestoreNodeIdStates (Node root_node,NodeDefs defs,i
 
 #define BETWEEN(l,h,v) ((unsigned)((v)-(l)) <= (unsigned)((h)-(l)))
 
+#if STRICT_LISTS
+extern int simple_expression_without_node_ids (NodeP node_p);
+#endif
+
 static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeIdsP code_gen_node_ids_p,StateS resultstate)
 {
 	Symbol rootsymb;
@@ -792,9 +796,11 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 		case nil_symb:
 #if STRICT_LISTS
 			if (rootsymb->symb_head_strictness & 1){
-				BuildArg (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
-				GenPopA (1);
-				--asp;
+				if (!simple_expression_without_node_ids (root->node_arguments->arg_node)){
+					BuildArg (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
+					GenPopA (1);
+					--asp;
+				}
 
 				if (resultstate.state_kind==StrictRedirection){
 					GenPopA	(asp);

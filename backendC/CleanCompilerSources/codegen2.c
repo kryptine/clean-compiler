@@ -2898,6 +2898,22 @@ LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
 }
 #endif
 
+#if STRICT_LISTS
+int simple_expression_without_node_ids (NodeP node_p)
+{
+	if (node_p->node_kind==NormalNode){
+		ArgP arg_p;
+		
+		for_l (arg_p,node_p->node_arguments,arg_next)
+			if (!simple_expression_without_node_ids (arg_p->arg_node))
+				return False;
+
+		return True;
+	}
+	return False;
+}
+#endif
+
 static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	Symbol symb;
@@ -3082,7 +3098,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			return;
 		case nil_symb:
 #if STRICT_LISTS
-			if (symb->symb_head_strictness & 1){
+			if ((symb->symb_head_strictness & 1) && !simple_expression_without_node_ids (node->node_arguments->arg_node)){
 				BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 				GenPopA (1);
 				--*asp_p;
