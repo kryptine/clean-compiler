@@ -30,6 +30,8 @@ Implementation
 //:: Optional t = Absent | Present t
 //Now using Optional from cocl's general module
 
+instance == (Optional a) | == a
+
 
 // Adjust a function for a single argument
 adjust :: !arg res (arg->res) !arg -> res | == arg
