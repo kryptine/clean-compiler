@@ -28,6 +28,9 @@ postcomp :: (.ran1 -> .ran2) !(Pfun .dom .ran1) -> Pfun .dom .ran2
 // Build a total function from a partial one by supplying a default value
 total :: .ran !(Pfun dom .ran) dom -> .ran | == dom
 
+// Apply partial function with a default value
+foldpfun :: (.ran1 -> .ran2) .ran2 !(Pfun dom .ran1) dom -> .ran2 | == dom
+
 // Domain restriction of a partial function
 domres :: !.[dom] .(Pfun dom ran) -> Pfun dom ran | == dom
 
