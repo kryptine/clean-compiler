@@ -2535,6 +2535,17 @@ wantExpression is_pattern pState
 				->	wantRhsExpressionT token pState
 
 wantRhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
+// FIXME, case, let and if expression should also be recognised here
+// and not in trySimpleNonLhsExpressionT, for example
+//     Start = id if True id id id 17
+// is currently allowed
+wantRhsExpressionT DynamicToken pState
+	# (dyn_expr, pState) = wantExpression cIsNotAPattern pState
+	  (token, pState) = nextToken FunctionContext pState
+	| token == DoubleColonToken
+		# (dyn_type, pState) = wantDynamicType pState
+		= (PE_Dynamic dyn_expr (Yes dyn_type), pState)
+		= (PE_Dynamic dyn_expr No, tokenBack pState)
 wantRhsExpressionT token pState
 	# (succ, expr, pState) = trySimpleRhsExpressionT token pState
 	| succ
@@ -2546,7 +2557,16 @@ wantRhsExpressionT token pState
 			_	-> (PE_Empty,  parseError "RHS expression" (Yes token) "<expression>" pState)
 
 wantLhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
-wantLhsExpressionT (IdentToken name) pState /* to make a=:C x equivalent to a=:(C x) */
+wantLhsExpressionT token pState
+	# (exp, pState)	= wantLhsExpressionT2 token pState
+	# (token, pState)	= nextToken FunctionContext pState
+	| token == DoubleColonToken
+		# (dyn_type, pState) = wantDynamicType pState
+		= (PE_DynamicPattern exp dyn_type, pState)
+		= (exp, tokenBack pState)
+
+wantLhsExpressionT2  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
+wantLhsExpressionT2 (IdentToken name) pState /* to make a=:C x equivalent to a=:(C x) */
 	| isLowerCaseName name
 		# (id, pState)		= stringToIdent name IC_Expression pState
 		  (token, pState)	= nextToken FunctionContext pState
@@ -2571,10 +2591,6 @@ wantLhsExpressionT (IdentToken name) pState /* to make a=:C x equivalent to a=:(
 		// token <> DefinesColonToken // token back and call to wantLhsExpressionT2 would do also.
 		# (exprs, pState) = parseList trySimpleLhsExpression (tokenBack pState)
 		= (combineExpressions (PE_Ident id) exprs, pState)
-wantLhsExpressionT token pState
-	= wantLhsExpressionT2 token pState
-
-wantLhsExpressionT2  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
 wantLhsExpressionT2 token pState
 	# (succ, expr, pState) = trySimpleLhsExpressionT token pState
 	| succ
@@ -2601,11 +2617,8 @@ trySimpleLhsExpressionT ::  !Token !ParseState -> (!Bool, !ParsedExpr, !ParseSta
 trySimpleLhsExpressionT token pState
 	# (succ, expr, pState) = trySimpleExpressionT token cIsAPattern pState
 	| succ
-		# (token, pState) = nextToken FunctionContext pState
-		| token == DoubleColonToken
-			# (dyn_type, pState) = wantDynamicType pState
-			= (True, PE_DynamicPattern expr dyn_type, pState)
-			= (True, expr, tokenBack pState)
+		# (token, pState) = nextToken FunctionContext pStates
+		= (True, expr, tokenBack pState)
 		= (False, PE_Empty, pState)
 
 trySimpleRhsExpression :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
@@ -2821,13 +2834,6 @@ where
 		| succ
 			= (expr, pState)
 			= (PE_Empty,  parseError error No "<expression>" pState)
-trySimpleNonLhsExpressionT DynamicToken pState
-	# (dyn_expr, pState) = wantExpression cIsNotAPattern pState
-	  (token, pState) = nextToken FunctionContext pState
-	| token == DoubleColonToken
-		# (dyn_type, pState) = wantDynamicType pState
-		= (True, PE_Dynamic dyn_expr (Yes dyn_type), pState)
-		= (True, PE_Dynamic dyn_expr No, tokenBack pState)
 trySimpleNonLhsExpressionT token pState
 	= (False, PE_Empty, tokenBack pState)
 
@@ -3203,6 +3209,8 @@ where
 
 //	caseSeperator t = t == EqualToken || t == ArrowToken // to enable Clean 1.3.x case expressions
 
+	// FIXME: it would be better if this would use (tryExpression cIsNotPattern)
+	// but there's no function tryExpression available yet
 	try_pattern :: !ParseState -> (!Bool, ParsedExpr, !ParseState)
 	try_pattern pState
 		# (succ, expr, pState) = trySimpleLhsExpression pState
@@ -3210,7 +3218,12 @@ where
 			# (succ, expr2, pState) = trySimpleLhsExpression pState
 			| succ
 				# (exprs, pState) = parseList trySimpleLhsExpression pState
-				= (True, PE_List [expr,expr2 : exprs], pState)
+				# list = PE_List [expr,expr2 : exprs]
+				# (token, pState)	= nextToken FunctionContext pState
+				| token == DoubleColonToken
+					# (dyn_type, pState) = wantDynamicType pState
+					= (True, PE_DynamicPattern list dyn_type, pState)
+					= (True, list, tokenBack pState)
 				= (True, expr, pState)
 			= (False, abort "no expression", pState)
 
