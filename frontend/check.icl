@@ -2675,8 +2675,10 @@ where
 				<=< adjust_predef_symbol PD_ConsARROW			mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_isomap_ARROW_		mod_index STE_DclFunction				
 				<=< adjust_predef_symbol PD_isomap_ID			mod_index STE_DclFunction				
-				<=< adjust_predef_symbol PD_TypeCONSInfo		mod_index STE_Type
-				<=< adjust_predef_symbol PD_ConsCONSInfo		mod_index STE_Constructor
+				<=< adjust_predef_symbol PD_TypeConsDefInfo		mod_index STE_Type
+				<=< adjust_predef_symbol PD_ConsConsDefInfo		mod_index STE_Constructor
+				<=< adjust_predef_symbol PD_TypeTypeDefInfo		mod_index STE_Type
+				<=< adjust_predef_symbol PD_ConsTypeDefInfo		mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_TypeCONS			mod_index STE_Type
 				<=< adjust_predef_symbol PD_ConsCONS			mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_cons_info			mod_index STE_DclFunction)

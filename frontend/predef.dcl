@@ -105,26 +105,28 @@ PD_ConsPAIR					:== 145
 PD_TypeARROW				:== 146
 PD_ConsARROW				:== 147
 
-PD_TypeCONSInfo				:== 148 
-PD_ConsCONSInfo				:== 149
-PD_cons_info				:== 150
-PD_TypeCONS					:== 151
-PD_ConsCONS					:== 152
+PD_TypeConsDefInfo			:== 148 
+PD_ConsConsDefInfo			:== 149
+PD_TypeTypeDefInfo			:== 150 
+PD_ConsTypeDefInfo			:== 151
+PD_cons_info				:== 152
+PD_TypeCONS					:== 153
+PD_ConsCONS					:== 154
 
-PD_isomap_ARROW_			:== 153
-PD_isomap_ID				:== 154
+PD_isomap_ARROW_			:== 155
+PD_isomap_ID				:== 156
 
 /* StdMisc */
-PD_StdMisc					:== 155
-PD_abort					:== 156
-PD_undef					:== 157
+PD_StdMisc					:== 157
+PD_abort					:== 158
+PD_undef					:== 159
 
-PD_Start					:== 158
+PD_Start					:== 160
 
 // MW..
-PD_DummyForStrictAliasFun	:== 159
+PD_DummyForStrictAliasFun	:== 161
 
-PD_NrOfPredefSymbols		:== 160
+PD_NrOfPredefSymbols		:== 162
 // ..MW
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
