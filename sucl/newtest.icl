@@ -148,14 +148,14 @@ these tuples.
 */
 
 :: Symredresult sym var tsym tvar
-   :== ( Rgraph sym var    // The initial area in canonical form
-       , sym               // The assigned symbol
-       , [Bool]            // Strictness annotations
-       , Rule tsym tvar    // Type rule
-       , Trace sym var var // Truncated and folded trace
-       , [Rule sym var]    // Resulting rewrite rules
-       , [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
-       )
+   = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
+     , srr_assigned_symbol :: sym               // The assigned symbol
+     , srr_strictness      :: [Bool]            // Strictness annotations
+     , srr_typerule        :: Rule tsym tvar    // Type rule
+     , srr_trace           :: Trace sym var var // Truncated and folded trace
+     , srr_rules           :: [Rule sym var]    // Resulting rewrite rules
+     , srr_areas           :: [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
+     }
 
 /*
 >   listopt :: [char] -> [[char]] -> [char]
@@ -315,10 +315,10 @@ initareas cli
                 targs = arguments (typerule cli symbol)
 
 getinit :: (Symredresult sym var tsym tvar) -> Rgraph sym var
-getinit (area,symbol,stricts,trule,trace,rules,areas) = area
+getinit srr = srr.srr_task_expression
 
 getareas :: (Symredresult sym var tsym tvar) -> [Rgraph sym var]
-getareas (area,symbol,stricts,trule,trace,rules,areas) = areas
+getareas srr = srr.srr_areas
 
 /*
 `Symredarea' is the function that does symbolic reduction  of  a  single
@@ -352,7 +352,14 @@ symredarea ::
  -> Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable
 
 symredarea foldarea cli area
-= (area,symbol,stricts,trule,trace,rules,areas)
+= { srr_task_expression = area
+  , srr_assigned_symbol = symbol
+  , srr_strictness      = stricts
+  , srr_typerule        = trule
+  , srr_trace           = trace
+  , srr_rules           = rules
+  , srr_areas           = areas
+  }
   where agraph = rgraphgraph area; aroot = rgraphroot area
         (symbol,aargs) = foldarea area
         arule = mkrule aargs aroot agraph
