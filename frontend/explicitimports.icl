@@ -252,7 +252,6 @@ instance == ConsequenceKind
 
 NoPosition :== -1
 
-//JVG: added type
 filter_decl :: [.Declaration] ([(Ident,AtomType)],[(Ident,StructureInfo,StructureType,Optional Int)]) Int *{#DclModule} *CheckState -> (!(!.[Declaration],!([(Ident,AtomType)],![(Ident,StructureInfo,StructureType,Optional Int)])),!.{#DclModule},!.CheckState);
 filter_decl [] unimported _ modules cs
 	= (([], unimported), modules, cs)
@@ -444,7 +443,6 @@ lookup_type dcl_index index modules cs
 		#	com_type_def	= dcl_module.dcl_common.com_type_defs.[dcl_index]
 		= (com_type_def.td_rhs, modules, cs)
 
-//JVG: added type:
 element_appears_in_stomm_struct :: .StructureType Ident .Int .Int .String *{#DclModule} *CheckState -> (!Bool,!.{#DclModule},!.CheckState)
 // MW remove this later CCC
 element_appears_in_stomm_struct imported_st element_ident dcl_index index type_name_string modules cs
@@ -608,21 +606,27 @@ check_completeness_of_module mod_index dcls_explicit file_name (f_consequences, 
 consequences_of :: String !Index
 					!(!.Declaration,Int) !(!*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap)
  				->	(![(!IdentWithKind, !IdentWithCKind, !(!String, !Int))], !(*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap))
-
-consequences_of file_name count ({dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index}, line_nr) (f_consequences, modules, icl_functions, expr_heap)
-	= case expl_imp_kind of
+consequences_of file_name count ({dcl_ident, dcl_index, dcl_kind}, line_nr) (f_consequences, modules, icl_functions, expr_heap)
+	= case dcl_kind of
 			STE_FunctionOrMacro _
-				# (consequences, (f_consequences, icl_functions, expr_heap)) = consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
-				-> (add_kind_and_error_info_to_consequences consequences, (f_consequences, modules, icl_functions, expr_heap))
-			_
-				# (modul, modules)	= modules![mod_index]
-				-> (add_kind_and_error_info_to_consequences (consequences_of_simple_symbol expl_imp_kind modul dcl_index), (f_consequences, modules, icl_functions, expr_heap))
-	where
+				# (consequences, (f_consequences, icl_functions, expr_heap)) 
+						= consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
+				-> (add_kind_and_error_info_to_consequences dcl_kind consequences, (f_consequences, modules, icl_functions, expr_heap))
+			STE_Imported expl_imp_kind mod_index
+				-> case expl_imp_kind of
+						STE_FunctionOrMacro _
+							# (consequences, (f_consequences, icl_functions, expr_heap))
+									= consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
+							-> (add_kind_and_error_info_to_consequences expl_imp_kind consequences, (f_consequences, modules, icl_functions, expr_heap))
+						_
+							# (modul, modules)	= modules![mod_index]
+							-> (add_kind_and_error_info_to_consequences expl_imp_kind (consequences_of_simple_symbol expl_imp_kind modul dcl_index), (f_consequences, modules, icl_functions, expr_heap))
+  where
+	errMsgInfo = (file_name, line_nr)
+	add_kind_and_error_info_to_consequences expl_imp_kind consequences
+		= [(expl_imp_ident_kind, conseq, errMsgInfo) \\ conseq<-removeDup consequences]
+	  where
 		expl_imp_ident_kind=(dcl_ident,expl_imp_kind)
-		errMsgInfo = (file_name, line_nr)
-
-		add_kind_and_error_info_to_consequences consequences
-			= [(expl_imp_ident_kind, conseq, errMsgInfo) \\ conseq<-removeDup consequences]
 	
 consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
 	#	(icl_function, icl_functions)	= icl_functions![dcl_index]
