@@ -2,11 +2,14 @@ implementation module convertDynamics
 
 import syntax, transform, utilities, convertcases
 // Optional
-USE_TUPLES tuple b :== b;		// change also StdDynamic.icl and recompile all applications
+USE_TUPLES tuple b :== b;					// change also StdDynamic.icl and recompile all applications
+extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
+
+import pp;
 
 APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== no
-
-import type_io;
+import RWSDebug;
+import type_io; 
 
 ::	*ConversionInfo =
 	{	ci_predef_symb		:: !*PredefinedSymbols
@@ -18,12 +21,13 @@ import type_io;
 	,	ci_next_fun_nr		:: !Index
 	
 	//	data needed to generate coercions
-	,	ci_placeholders_and_tc_args		:: [(!BoundVar,Ptr VarInfo)]
+	,	ci_placeholders_and_tc_args				:: [(!BoundVar,Ptr VarInfo)]
 	,	ci_generated_global_tc_placeholders		:: !Bool
 	,	ci_used_tcs								:: [Ptr VarInfo]
-	,	ci_symb_ident		:: SymbIdent
-	,	ci_sel_type_field	:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
-	,	ci_sel_value_field	:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_symb_ident							:: SymbIdent
+	,	ci_sel_type_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_sel_value_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_module_id_symbol						:: Expression
 	}
 
 ::	ConversionInput =
@@ -168,8 +172,16 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							}
 						#! ci_sel_value_field
 							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection value_defined_symbol sd_field_nr3])
-						-> (dynamic_temp_symb_ident, ci_sel_value_field, ci_sel_type_field,predefined_symbols) 
-
+						-> (dynamic_temp_symb_ident, ci_sel_value_field, ci_sel_type_field,predefined_symbols)
+						
+	// get module id symbol
+	# ({pds_module, pds_def, pds_ident}, predefined_symbols)	= predefined_symbols![PD_ModuleConsSymbol]
+	# module_symb = 
+		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 0 }
+		,	app_args 		= []
+		,	app_info_ptr	= nilPtr
+		}
+						
 	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_fun_heap, ci_new_functions}))
@@ -177,7 +189,8 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
 							ci_new_functions = [], ci_new_variables = [], ci_fun_heap = newHeap, ci_next_fun_nr = nr_of_funs, ci_placeholders_and_tc_args = [],
 							ci_generated_global_tc_placeholders = False,
-							ci_used_tcs = [],ci_symb_ident = dynamic_temp_symb_ident , ci_sel_type_field =  ci_sel_type_field, ci_sel_value_field = ci_sel_value_field })
+							ci_used_tcs = [],ci_symb_ident = dynamic_temp_symb_ident , ci_sel_type_field =  ci_sel_type_field, ci_sel_value_field = ci_sel_value_field, 
+							ci_module_id_symbol = App module_symb })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
 			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types [] type_heaps ci_var_heap
 	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
@@ -669,7 +682,7 @@ where
 			   
 	add_coercions [] _ _ bound_vars dp_rhs ci
 		= (bound_vars,dp_rhs,ci)
-	add_coercions [({var_info_ptr=a_ij},a_ij_tc):rest] this_default q bound_vars dp_rhs ci
+	add_coercions [({var_info_ptr=a_ij},a_ij_tc):rest] this_default q bound_vars dp_rhs ci=:{ci_module_id_symbol}
 		// extra
 		# a_ij_var = {var_name = a_ij_var_name, var_info_ptr = a_ij, var_expr_ptr = nilPtr}	
 		# a_ij_tc_var = {var_name = a_aij_tc_var_name, var_info_ptr = a_ij_tc, var_expr_ptr = nilPtr}
@@ -680,7 +693,7 @@ where
 		  new_default = newDefault c_inc_i ind_i
 		  
 		#		
-		  (coerce_symb, ci)		= getSymbol PD_coerce SK_Function 2 ci
+		  (coerce_symb, ci)		= getSymbol PD_coerce SK_Function (extended_unify_and_coerce 2 3) ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
 		  (let_info_ptr, ci) 	= let_ptr ci
 		  (case_info_ptr, ci)	= case_ptr ci
@@ -711,6 +724,9 @@ where
 		
 		#! (opt_expr,ci)
 			= toExpression this_default ci
+			
+		#! app_args2 = extended_unify_and_coerce [Var a_ij_var, Var a_ij_tc_var] [Var a_ij_var, Var a_ij_tc_var, ci_module_id_symbol ]
+
 
 		# let_expr
 			= Let {
@@ -719,7 +735,7 @@ where
 // MW0										  { bind_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
 // MW0										   bind_dst = coerce_result_fv }
 				,	let_lazy_binds		= (if (isNo this_default) [] [ {lb_src = opt opt_expr, lb_dst = c_inc_i_fv, lb_position = NoPos }]) ++ [
-										  { lb_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
+										  { lb_src = App { app_symb = coerce_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
 										   lb_dst = coerce_result_fv, lb_position = NoPos }
 										   ,
 // MW0										 { bind_src = TupleSelect twotuple 0 (Var coerce_result_var),
@@ -748,7 +764,8 @@ where
 /// MW0		-> (Env Expression FreeVar, Expression, *ConversionInfo)
 		-> ([LetBind], Expression, *ConversionInfo)
 	convert_dynamic_pattern cinp bound_vars this_default pattern_number opened_dynamic result_type last_default
-																			[{ dp_var, dp_type_patterns_vars, dp_type_code, dp_rhs } : patterns] ci
+																			[{ dp_var, dp_type_patterns_vars, dp_type_code, dp_rhs } : patterns] ci=:{ci_module_id_symbol}
+														
 		# /***  The last case may not have a default  ***/
 
 		  ind_var = getIndirectionVar this_default
@@ -806,7 +823,7 @@ where
 		// ... collect
 		#
 		  /***  generate the expression  ***/
-	 	  (unify_symb, ci) 		= getSymbol (if generate_coerce PD_coerce PD_unify ) SK_Function 2 ci
+	 	  (unify_symb, ci) 		= getSymbol (if generate_coerce PD_coerce PD_unify ) SK_Function (extended_unify_and_coerce 2 3) /*3 was 2 */ ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
 		  (let_info_ptr, ci) 	= let_ptr ci
 		  (case_info_ptr, ci)	= case_ptr ci
@@ -824,12 +841,35 @@ where
 		  
 //		  sel_type	= Selection No (Var unify_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
 
+
+/*
+// TIJDELIJK...
+
+		# (ci=:{ci_predef_symb})
+			= ci;
+		# ({pds_module, pds_def, pds_ident}, ci_predef_symb)	= ci_predef_symb![PD_ModuleConsSymbol]
+		# module_symb1	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 0 }
+		# ci
+			= { ci & ci_predef_symb = ci_predef_symb };
+
+		# module_symb = 
+			{	app_symb 		= module_symb1
+			,	app_args 		= []
+			,	app_info_ptr	= nilPtr
+			}
+		# module_symb =
+			App module_symb
+		// ...TIJDELIJK
+*/
+
+		  app_args2 = extended_unify_and_coerce [opened_dynamic.opened_dynamic_type, type_code] [opened_dynamic.opened_dynamic_type, type_code, ci_module_id_symbol ]
+		  
 		  let_expr = Let {	let_strict_binds = [],
 // MW0		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
 // MW0		  								   bind_dst = unify_result_fv },
 // MW0		  								 { bind_src = TupleSelect twotuple 0 (Var unify_result_var),
 // MW0		  								   bind_dst = unify_bool_fv } : let_binds
-		  					let_lazy_binds = [{ lb_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
+		  					let_lazy_binds = [{ lb_src = App { app_symb = unify_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
 		  								   lb_dst = unify_result_fv, lb_position = NoPos },
 		  								 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var unify_result_var) /*) sel_type*/,
 		  								   lb_dst = unify_bool_fv, lb_position = NoPos } : let_binds
@@ -917,7 +957,7 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 		# (saved_defaults, ci_var_heap) = foldSt save_default bound_vars ([], ci.ci_var_heap)
 		  (act_args, free_typed_vars, local_free_vars, tb_rhs, ci_var_heap) = copyExpression bound_vars bind_expr ci_var_heap
 		#
-		  (ci_new_variables, ci_var_heap) = foldSt remove_local_var ci.ci_new_variables ([], ci_var_heap)
+		  (ci_new_variables, ci_var_heap) = foldSt remove_local_var ci.ci_new_variables ([], ci_var_heap) //->> ("na copyExpression",local_free_vars,(InitPPState stderr) <#< bind_expr) 
 		  ci_var_heap = foldSt restore_default saved_defaults ci_var_heap
 		  tb_args = [ ftv.tv_free_var \\ ftv <- free_typed_vars ]
 		  arg_types = [ ftv.tv_type \\ ftv <- free_typed_vars ]
