@@ -158,6 +158,11 @@ isinstance
 /*
 >   compilegraph :: [(**,(*,[**]))] -> graph * **
 >   compilegraph = foldr (uncurry updategraph) emptygraph
+*/
+
+compilegraph :: ![(var,Node sym var)] -> Graph sym var
+
+/*
 
 ------------------------------------------------------------------------
 
