@@ -435,16 +435,18 @@ Scan c0=:'&' input co
 Scan c0=:'.' input co
 	= case co of
 		TypeContext
-
 						-> (DotToken, input)
 		_	# (eof, c1, input) = ReadChar input
 			| eof		-> (DotToken, input)
-			| c1 <> '.'	-> (DotToken, charBack input)
-			# (eof, c2, input) = ReadChar input
-			| eof		-> (DotDotToken, input)
-			| isSpecialChar c2
+			| c1 == '.'
+				# (eof, c2, input) = ReadChar input
+				| eof		-> (DotDotToken, input)
+				| isSpecialChar c2
 						-> ScanOperator 2 input [c2, c1, c0] co
 						-> (DotDotToken, charBack input)
+			| isSpecialChar c1
+						-> ScanOperator 1 input [c1, c0] co
+						-> (DotToken, charBack input)
 Scan '!' input TypeContext	= (ExclamationToken, input)
 Scan '\\' input co
 	# (eof, c, input)		= ReadChar input
