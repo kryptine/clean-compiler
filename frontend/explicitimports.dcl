@@ -8,9 +8,8 @@ temporary_import_solution_XXX yes no :== yes
 // This feature will be removed, when all programs are ported to Clean 2.0. The last Constructors of AtomType
 // and StructureType should then be removed also
 
-::	FunctionConsequence
-
-possibly_filter_decls :: .[ImportDeclaration] u:[w:(.Index,y:Declarations)] (.FileName,.LineNr) *{#.DclModule} *CheckState -> (v:[x:(Index,z:Declarations)],.{#DclModule},.CheckState), [y <= z, w <= x, u <= v];
-check_completeness_of_module :: .Index [(.Declaration,.Int)] .String *(*{!.FunctionConsequence},*{#.DclModule},*{#FunDef},*ExpressionHeap,*CheckState) -> (.{!FunctionConsequence},.{#DclModule},.{#FunDef},.ExpressionHeap,.CheckState);
-check_completeness_of_all_dcl_modules	:: !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
-									-> (!Int, !(!*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap, !*CheckState))
+possibly_filter_decls :: ![ImportDeclaration] ![(!Index,!Declarations)] !(!FileName,!LineNr) !*{#DclModule} !*CheckState 
+						-> (![(!Index,!Declarations)],!.{#DclModule},!.CheckState)
+checkExplicitImportCompleteness :: !String ![(!Declaration,!Int)]
+									!*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState 
+								-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)

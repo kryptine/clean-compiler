@@ -2621,19 +2621,17 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 
 	  (iinfo, heaps, cs) = check_dcl_module iinfo heaps cs
 
-	  (_, {ii_modules,ii_funs_and_macros = icl_functions}, heaps, cs) = checkImports mod_imports iinfo heaps cs
+	  (_, {ii_modules,ii_funs_and_macros = icl_functions}, heaps=:{hp_expression_heap}, cs) 
+	  		= checkImports mod_imports iinfo heaps cs
 
 	  cs = { cs & cs_needed_modules = 0 }
 	  
-	  (nr_of_modules, (f_consequences, ii_modules, icl_functions, hp_expression_heap, cs))
-	  	= check_completeness_of_all_dcl_modules ii_modules icl_functions heaps.hp_expression_heap cs
-
 	  (dcls_explicit, dcl_modules, cs)	= addImportsToSymbolTable mod_imports [] ii_modules cs
 	  cs			    				= addGlobalDefinitionsToSymbolTable local_defs cs
 
-	  (_, dcl_modules, icl_functions, hp_expression_heap, cs)
-		= check_completeness_of_module nr_of_modules dcls_explicit (mod_name.id_name+++".icl")
-							 (f_consequences, dcl_modules, icl_functions, hp_expression_heap, cs)
+	  (dcl_modules, icl_functions, hp_expression_heap, cs)
+		= checkExplicitImportCompleteness (mod_name.id_name+++".icl") dcls_explicit
+							 				dcl_modules icl_functions hp_expression_heap cs
 
 	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
 
@@ -2770,7 +2768,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (id_info, { entry & ste_kind = STE_ClosedModule })}
 			  {ste_kind = STE_Module mod, ste_index} = entry
 			  (modules, macro_and_fun_defs, heaps, cs)
-			  		= checkDclModule mod ste_index modules macro_and_fun_defs heaps cs
+			  		= checkDclModule False mod ste_index modules macro_and_fun_defs heaps cs
 			  ({dcl_declared={dcls_import,dcls_local}}, modules) = modules![ste_index]
 			= (modules, macro_and_fun_defs, heaps, addDeclaredSymbolsToSymbolTable cIsADclModule ste_index dcls_local dcls_import cs)
 
@@ -3001,19 +2999,38 @@ checkImport module_id_info entry=:{ste_kind = STE_Module mod, ste_index} iinfo=:
 	| ii_next_num <= min_mod_num
 		# {ii_deps,ii_modules,ii_funs_and_macros} = iinfo
 		  (ii_deps, ii_modules, ii_funs_and_macros, heaps, cs)
-		  		= check_component module_id_info ii_deps ii_modules ii_funs_and_macros heaps cs
+		  		= check_component [] module_id_info ii_deps ii_modules ii_funs_and_macros heaps cs
 		#! max_mod_num = size ii_modules
 		= (max_mod_num, { iinfo & ii_deps = ii_deps, ii_modules = ii_modules, ii_funs_and_macros = ii_funs_and_macros }, heaps, cs) 
 		= (min_mod_num, iinfo, heaps, cs)
 	where
-		check_component lowest_mod_info [mod_info : ds] modules macro_and_fun_defs heaps cs=:{cs_symbol_table}
+		check_component component lowest_mod_info [mod_info : ds] modules macro_and_fun_defs heaps 
+						cs=:{cs_symbol_table}
 			# (entry, cs_symbol_table) = readPtr mod_info cs_symbol_table
-			# {ste_kind=STE_OpenModule _ mod,ste_index} = entry
-		  	  (modules, macro_and_fun_defs, heaps, cs) = checkDclModule mod ste_index modules macro_and_fun_defs heaps { cs & cs_symbol_table = cs_symbol_table }
+			  {ste_kind=STE_OpenModule _ mod,ste_index} = entry
+			  is_on_cycle = lowest_mod_info<>mod_info || not (isEmpty component)
+		  	  (modules, macro_and_fun_defs, heaps=:{hp_expression_heap}, cs)
+		  	  		= checkDclModule is_on_cycle mod ste_index modules macro_and_fun_defs heaps { cs & cs_symbol_table = cs_symbol_table }
 		  	  cs = { cs & cs_symbol_table = cs.cs_symbol_table <:= (mod_info, { entry & ste_kind = STE_ClosedModule })}
 			| lowest_mod_info == mod_info
+				| is_on_cycle
+					# (modules, macro_and_fun_defs, hp_expression_heap, cs)
+						= foldSt check_explicit_import_completeness [ste_index:component] 
+									(modules, macro_and_fun_defs, hp_expression_heap, cs)
+					= (ds, modules, macro_and_fun_defs, { heaps & hp_expression_heap = hp_expression_heap }, cs)
 				= (ds, modules, macro_and_fun_defs, heaps, cs)
-				= check_component lowest_mod_info ds modules macro_and_fun_defs heaps cs
+				= check_component [ste_index:component] lowest_mod_info ds modules macro_and_fun_defs heaps cs
+			
+		check_explicit_import_completeness mod_index (modules, macro_and_fun_defs, hp_expression_heap, cs)
+			# ({dcl_name, dcl_declared}, modules) = modules![mod_index]
+			  ({dcls_local, dcls_import, dcls_explicit}) = dcl_declared
+			  cs = addDeclaredSymbolsToSymbolTable cIsADclModule mod_index dcls_local dcls_import cs
+			  (modules, macro_and_fun_defs, hp_expression_heap, cs=:{cs_symbol_table})
+			  		= checkExplicitImportCompleteness (dcl_name.id_name+++".dcl") dcls_explicit
+														modules macro_and_fun_defs hp_expression_heap cs
+			  (_, cs_symbol_table) = retrieveAndRemoveImportsFromSymbolTable [(mod_index, dcl_declared)] [] cs_symbol_table
+			  // XXX optimise by using version that does not allocate the first result value
+			= (modules, macro_and_fun_defs, hp_expression_heap, { cs & cs_symbol_table = cs_symbol_table })
 
 initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_type}, sizes, all_defs)
 	# dcl_common= createCommonDefinitions mod_defs
@@ -3036,9 +3053,9 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 								_			-> False
 		}
 
-checkDclModule :: !(Module (CollectedDefinitions ClassInstance IndexRange)) !Index !*{#DclModule} !*{#FunDef} !*Heaps !*CheckState
+checkDclModule :: !Bool !(Module (CollectedDefinitions ClassInstance IndexRange)) !Index !*{#DclModule} !*{#FunDef} !*Heaps !*CheckState
 	-> (!*{#DclModule}, !*{#FunDef}, !*Heaps, !*CheckState)
-checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions heaps=:{hp_var_heap, hp_type_heaps} cs
+checkDclModule is_on_cycle {mod_name,mod_imports,mod_defs} mod_index modules icl_functions heaps=:{hp_var_heap, hp_type_heaps} cs
 	# (dcl_mod, modules)			= modules![mod_index]
 	# dcl_defined 					= dcl_mod.dcl_declared.dcls_local
 	  dcl_common					= createCommonDefinitions mod_defs
@@ -3076,10 +3093,18 @@ checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions h
 	  			 ef_cons_defs = dcl_common.com_cons_defs, ef_member_defs = com_member_defs, ef_modules = modules,
 				 ef_is_macro_fun = False }
 
-	  (icl_functions, e_info, heaps, cs)
+	  (icl_functions, e_info=:{ef_modules=modules}, heaps=:{hp_expression_heap}, cs)
 			= checkMacros mod_index dcl_macros icl_functions e_info heaps cs
-
+	  
 	  cs = check_needed_modules_are_imported mod_name ".dcl" cs
+
+	  dcls_explicit	= flatten [dcls_explicit \\ (_,{dcls_explicit})<-imports]
+	  (modules, icl_functions, hp_expression_heap, cs)
+			= case is_on_cycle of
+				False 	-> checkExplicitImportCompleteness (mod_name.id_name+++".dcl") dcls_explicit
+											 				modules icl_functions hp_expression_heap cs
+				True	-> (modules, icl_functions, hp_expression_heap, cs)
+	  heaps = { heaps & hp_expression_heap = hp_expression_heap }
 
  	  first_special_class_index = size com_instance_defs
  	  last_special_class_index = first_special_class_index + length new_class_instances
@@ -3090,14 +3115,12 @@ checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions h
 	  (dcl_imported, cs_symbol_table) = retrieveAndRemoveImportsFromSymbolTable imports [] cs.cs_symbol_table
 	  cs_symbol_table = removeDeclarationsFromSymbolTable dcl_defined cModuleScope cs_symbol_table
 
-	  dcls_explicit	= flatten [dcls_explicit \\ (_,{dcls_explicit})<-imports]
-
 	  dcl_mod = { dcl_mod &  dcl_declared = { dcl_mod.dcl_declared & dcls_import = dcl_imported, dcls_explicit = dcls_explicit },
 	  			 dcl_common = dcl_common, dcl_functions = dcl_functions, 
 	  			 dcl_instances = { ir_from = nr_of_dcl_functions, ir_to = nr_of_dcl_functions_and_instances },
 	  			 dcl_specials = { ir_from = nr_of_dcl_functions_and_instances, ir_to = nr_of_dcl_funs_insts_and_specs },
 	  			 dcl_class_specials = { ir_from = first_special_class_index, ir_to = last_special_class_index }}
-	= ({ e_info.ef_modules & [ mod_index ] = dcl_mod }, icl_functions, heaps, { cs & cs_symbol_table = cs_symbol_table })
+	= ({ modules & [ mod_index ] = dcl_mod }, icl_functions, heaps, { cs & cs_symbol_table = cs_symbol_table })
 where
 	collect_imported_symbols [{import_module={id_info},import_symbols,import_file_position} : mods ] all_decls modules cs=:{cs_symbol_table}
 		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
