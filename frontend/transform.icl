@@ -391,9 +391,7 @@ writeVarInfo var_info_ptr new_var_info var_heap
 	}
 
 ::	UnfoldInfo =
-	{	ui_handle_aci_free_vars	:: !AciFreeVarHandleMode,
-		ui_convert_module_n :: !Int, // -1 if no conversion
-		ui_conversion_table :: !Optional {#Int}
+	{	ui_handle_aci_free_vars	:: !AciFreeVarHandleMode
 	}
 
 :: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem
@@ -471,24 +469,14 @@ where
 		= ({ fv & fv_info_ptr = new_info_ptr }, { us & us_var_heap = writePtr fv_info_ptr (VI_Variable fv_name new_info_ptr) us_var_heap })
 instance unfold App
 where
-	unfold app=:{app_symb={symb_kind}, app_args, app_info_ptr} ui=:{ui_convert_module_n,ui_conversion_table} us
+	unfold app=:{app_symb={symb_kind}, app_args, app_info_ptr} ui us
 		= case symb_kind of
 			SK_Function {glob_module,glob_object}
 				-> unfold_function_app app ui us
 			SK_IclMacro macro_index
-/*				| ui_convert_module_n<> (-1)
-					# (Yes conversion_table) = ui_conversion_table
-					# app={app & app_symb.symb_kind=SK_IclMacro (conversion_table.[macro_index])}
-					-> unfold_function_app app ui us
-*/
-					-> unfold_function_app app ui us
+				-> unfold_function_app app ui us
 			SK_DclMacro {glob_module,glob_object}
-/*				| ui_convert_module_n==glob_module
-					# (Yes conversion_table) = ui_conversion_table
-					# app={app & app_symb.symb_kind=SK_DclMacro {glob_module=glob_module,glob_object=conversion_table.[glob_object]}}
-					-> unfold_function_app app ui us
-*/
-					-> unfold_function_app app ui us
+				-> unfold_function_app app ui us
 			SK_OverloadedFunction {glob_module,glob_object}
 				-> unfold_function_app app ui us
 			SK_LocalMacroFunction local_macro_function_n
@@ -799,20 +787,17 @@ examineFunctionCall {id_info} fc=:(MacroCall macro_module_index fc_index _) (cal
 	,	es_error 		:: !.ErrorAdmin,
 		es_fun_defs :: !.{#FunDef},
 		es_macro_defs :: !.{#.{#FunDef}},
-		es_main_dcl_module_n :: !Int,
-		es_dcl_modules :: !.{# DclModule},
-		es_expand_in_imp_module :: !Bool,
 		es_new_fun_def_numbers :: ![Int]
 	}
 
-copy_macro_and_local_functions :: FunDef (Optional CopiedLocalFunctions) Bool *ExpandState -> (!FunDef,![(CopiedLocalFunction,FunDef)],!Optional CopiedLocalFunctions,!*ExpandState);
-copy_macro_and_local_functions macro=:{fun_kind} local_macro_functions is_def_macro es
-	# (macro,local_macro_functions,es) = copy_macro_or_local_macro_function is_def_macro macro local_macro_functions es
-	# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions is_def_macro [] es
+copy_macro_and_local_functions :: FunDef (Optional CopiedLocalFunctions) *ExpandState -> (!FunDef,![(CopiedLocalFunction,FunDef)],!Optional CopiedLocalFunctions,!*ExpandState);
+copy_macro_and_local_functions macro=:{fun_kind} local_macro_functions es
+	# (macro,local_macro_functions,es) = copy_macro_or_local_macro_function macro local_macro_functions es
+	# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions [] es
 	= (macro,new_functions,local_macro_functions,es)
 
-copy_local_functions_of_macro :: (Optional CopiedLocalFunctions) Bool [CopiedLocalFunction] *ExpandState -> (![(CopiedLocalFunction,FunDef)],!Optional CopiedLocalFunctions,!*ExpandState);
-copy_local_functions_of_macro local_macro_functions is_def_macro local_functions_to_be_copied es
+copy_local_functions_of_macro :: (Optional CopiedLocalFunctions) [CopiedLocalFunction] *ExpandState -> (![(CopiedLocalFunction,FunDef)],!Optional CopiedLocalFunctions,!*ExpandState);
+copy_local_functions_of_macro local_macro_functions local_functions_to_be_copied es
 	# (local_functions_to_be_copied,local_macro_functions) = add_new_local_functions_to_be_copied local_functions_to_be_copied local_macro_functions
 		with
 			add_new_local_functions_to_be_copied local_functions_to_be_copied local_macro_functions=:(Yes copied_local_macro_functions=:{new_copied_local_functions=[]})
@@ -839,8 +824,8 @@ copy_local_functions_of_macro local_macro_functions is_def_macro local_functions
 						# es = {es & es_macro_defs.[old_function_module_index].[old_function_index].fun_info.fi_group_index= if (function_group_index>NoIndex) (-2-function_group_index) function_group_index}
 						# function = {function & fun_info.fi_group_index=if (function_group_index<NoIndex) (-2-function_group_index) function_group_index}
 						-> (function,es)
-			# (function,local_macro_functions,es) = copy_macro_or_local_macro_function is_def_macro function local_macro_functions es
-			# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions is_def_macro local_functions_to_be_copied es
+			# (function,local_macro_functions,es) = copy_macro_or_local_macro_function function local_macro_functions es
+			# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions local_functions_to_be_copied es
 			-> ([(old_and_new_function_n,function):new_functions],local_macro_functions,es)
 
 update_calls calls No
@@ -886,8 +871,8 @@ where
 	add_new_calls [] calls
 		= calls
 
-copy_macro_or_local_macro_function :: !Bool !FunDef !(Optional CopiedLocalFunctions) !*ExpandState -> (!FunDef,!Optional CopiedLocalFunctions,!.ExpandState);
-copy_macro_or_local_macro_function is_def_macro macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls}} local_macro_functions es=:{es_var_heap,es_symbol_heap,es_expand_in_imp_module,es_main_dcl_module_n,es_dcl_modules}
+copy_macro_or_local_macro_function :: !FunDef !(Optional CopiedLocalFunctions) !*ExpandState -> (!FunDef,!Optional CopiedLocalFunctions,!.ExpandState);
+copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls}} local_macro_functions es=:{es_var_heap,es_symbol_heap}
 	# (tb_args,es_var_heap) = create_new_arguments tb_args es_var_heap
 		with
 			create_new_arguments [var=:{fv_name,fv_info_ptr} : vars] var_heap
@@ -899,18 +884,7 @@ copy_macro_or_local_macro_function is_def_macro macro=:{fun_body = TransformedBo
 				= ([],var_heap)
 	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = es_var_heap, us_opt_type_heaps = No,us_cleanup_info = [],
 			 us_local_macro_functions = local_macro_functions }
-	# (result_expr,dcl_modules,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold_and_convert es_dcl_modules us
-		with
-			unfold_and_convert dcl_modules us
-				| es_expand_in_imp_module && is_def_macro
-					# (dcl_mod,dcl_modules) = dcl_modules![es_main_dcl_module_n]					
-					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = es_main_dcl_module_n, ui_conversion_table=dcl_mod.dcl_macro_conversions }
-					# (expr,es) = unfold tb_rhs ui us
-					= (expr,dcl_modules,es)
-			
-					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = -1 ,ui_conversion_table=No }
-					# (expr,es) = unfold tb_rhs ui us
-					= (expr,dcl_modules,es)
+	# (result_expr,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold tb_rhs {ui_handle_aci_free_vars = RemoveThem} us
 	# (fi_local_vars,us_var_heap) = update_local_vars fi_local_vars us_var_heap
 		with
 			update_local_vars :: ![FreeVar] !*(Heap VarInfo) -> (![FreeVar],!*Heap VarInfo);
@@ -925,30 +899,18 @@ copy_macro_or_local_macro_function is_def_macro macro=:{fun_body = TransformedBo
 				= ([],var_heap)
 	# fi_calls = update_calls fi_calls us_local_macro_functions
 	= ({macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=result_expr},fun_info.fi_local_vars=fi_local_vars,fun_info.fi_calls=fi_calls},us_local_macro_functions,
-		{es & es_var_heap=us_var_heap, es_symbol_heap=us_symbol_heap, es_dcl_modules=dcl_modules})
+		{es & es_var_heap=us_var_heap, es_symbol_heap=us_symbol_heap})
 
-unfoldMacro :: !FunDef ![Expression] !Bool !*ExpandInfo -> (!Expression, !*ExpandInfo)
-unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_symb} args is_def_macro (calls, es=:{es_var_heap,es_symbol_heap,es_fun_defs,es_expand_in_imp_module,es_main_dcl_module_n,es_dcl_modules})
+unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
+unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_symb} args (calls, es=:{es_var_heap,es_symbol_heap,es_fun_defs})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
 	#! size_fun_defs = size es_fun_defs
 	# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=size_fun_defs}
 	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No,us_cleanup_info = [], us_local_macro_functions = copied_local_functions }
-	# (result_expr,dcl_modules,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold_and_convert es_dcl_modules us
-		with
-			unfold_and_convert dcl_modules us
-				| es_expand_in_imp_module && is_def_macro
-					# (dcl_mod,dcl_modules) = dcl_modules![es_main_dcl_module_n]
-					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = es_main_dcl_module_n, ui_conversion_table=dcl_mod.dcl_macro_conversions }
-					# (result_expr,us) = unfold tb_rhs ui us
-					= (result_expr,dcl_modules,us)
-
-					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = -1 ,ui_conversion_table=No }
-					# (result_expr,us) = unfold tb_rhs ui us
-					= (result_expr,dcl_modules,us)
-					
-	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_dcl_modules=dcl_modules}	
+	# (result_expr,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold tb_rhs {ui_handle_aci_free_vars = RemoveThem} us
+	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap}	
 	# fi_calls = update_calls fi_calls us_local_macro_functions
-	# (new_functions,us_local_macro_functions,es) = copy_local_functions_of_macro us_local_macro_functions is_def_macro [] es
+	# (new_functions,us_local_macro_functions,es) = copy_local_functions_of_macro us_local_macro_functions [] es
 	# {es_symbol_heap,es_symbol_table,es_fun_defs,es_new_fun_def_numbers} = es
 	# (es_fun_defs,es_new_fun_def_numbers) = case new_functions of
 		[]
@@ -1027,34 +989,32 @@ reset_body_of_rhs_macros pi_deps fun_defs macro_defs
 				_
 					-> (fun_defs,macro_defs)
 
-expand_simple_macro mod_index macro=:{fun_body = CheckedBody body, fun_info, fun_symb, fun_pos,fun_kind} expand_in_imp_module
-		predef_symbols_for_transform modules pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error}
+expand_simple_macro mod_index macro=:{fun_body = CheckedBody body, fun_info, fun_symb, fun_pos,fun_kind}
+		predef_symbols_for_transform pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error}
   	# identPos = newPosition fun_symb fun_pos
 	# es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
 			 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error,
-			 es_fun_defs=pi_fun_defs, es_macro_defs=pi_macro_defs, es_main_dcl_module_n = mod_index, es_dcl_modules=modules,
-			 es_expand_in_imp_module=expand_in_imp_module,es_new_fun_def_numbers=[]
+			 es_fun_defs=pi_fun_defs, es_macro_defs=pi_macro_defs, es_new_fun_def_numbers=[]
 		   }			
-	# (tb_args, tb_rhs, local_vars, fi_calls, fi_dynamics,{es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs,es_macro_defs})
+	# (tb_args, tb_rhs, local_vars, fi_calls, fi_dynamics,{es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_fun_defs,es_macro_defs})
 			= expandMacrosInBody [] body fun_info.fi_dynamics predef_symbols_for_transform es
 	# macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 	  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars, fi_dynamics=fi_dynamics }}
-	= ( macro, es_dcl_modules,
-			{ pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_fun_defs = es_fun_defs,pi_macro_defs=es_macro_defs,pi_error = es_error })
+	= ( macro, { pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_fun_defs = es_fun_defs,pi_macro_defs=es_macro_defs,pi_error = es_error })
 
 expand_dcl_macro_if_simple mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info}
-		predef_symbols_for_transform (modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error})
+		predef_symbols_for_transform pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error}
 	| macros_are_simple fun_info.fi_calls mod_index pi_fun_defs pi_macro_defs && has_no_curried_macro body.cb_rhs pi_fun_defs pi_macro_defs
-		# (macro,modules,pi) = expand_simple_macro mod_index macro False predef_symbols_for_transform modules pi
-		= (modules, { pi & pi_macro_defs.[mod_index,macro_index] = macro })
-		= (modules, { pi & pi_deps = [DclMacroIndex mod_index macro_index:pi.pi_deps], pi_macro_defs.[mod_index,macro_index] = { macro & fun_body = RhsMacroBody body }}) 
+		# (macro,pi) = expand_simple_macro mod_index macro predef_symbols_for_transform pi
+		= { pi & pi_macro_defs.[mod_index,macro_index] = macro }
+		= { pi & pi_deps = [DclMacroIndex mod_index macro_index:pi.pi_deps], pi_macro_defs.[mod_index,macro_index] = { macro & fun_body = RhsMacroBody body }} 
 
 expand_icl_macro_if_simple mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info}
-		predef_symbols_for_transform (modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error})
+		predef_symbols_for_transform pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error}
 	| macros_are_simple fun_info.fi_calls mod_index pi_fun_defs pi_macro_defs && has_no_curried_macro body.cb_rhs pi_fun_defs pi_macro_defs
-		# (macro,modules,pi) = expand_simple_macro mod_index macro True predef_symbols_for_transform modules pi
-		= (modules, { pi & pi_fun_defs.[macro_index] = macro })
-		= (modules, { pi & pi_deps = [FunctionOrIclMacroIndex macro_index:pi.pi_deps], pi_fun_defs.[macro_index] = { macro & fun_body = RhsMacroBody body }}) 
+		# (macro,pi) = expand_simple_macro mod_index macro predef_symbols_for_transform pi
+		= { pi & pi_fun_defs.[macro_index] = macro }
+		= { pi & pi_deps = [FunctionOrIclMacroIndex macro_index:pi.pi_deps], pi_fun_defs.[macro_index] = { macro & fun_body = RhsMacroBody body }}
 
 macros_are_simple :: [FunCall] Int {#FunDef} {#{#FunDef}} -> Bool;
 macros_are_simple [] mod_index fun_defs macro_defs
@@ -1073,68 +1033,68 @@ is_a_pattern_macro FK_Macro (TransformedBody {tb_args})
 is_a_pattern_macro _ _
 	= False
 
-visit_macro mod_index max_fun_nr predef_symbols_for_transform (FunCall fc_index _) modules_pi
-	= partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform fc_index modules_pi
-visit_macro mod_index max_fun_nr predef_symbols_for_transform (MacroCall macro_module_index fc_index _) modules_pi
-	= partitionate_dcl_macro macro_module_index max_fun_nr predef_symbols_for_transform fc_index modules_pi
-visit_macro mod_index max_fun_nr predef_symbols_for_transform (DclFunCall _ _) modules_pi
-	= modules_pi
+visit_macro mod_index max_fun_nr predef_symbols_for_transform (FunCall fc_index _) pi
+	= partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform fc_index pi
+visit_macro mod_index max_fun_nr predef_symbols_for_transform (MacroCall macro_module_index fc_index _) pi
+	= partitionate_dcl_macro macro_module_index max_fun_nr predef_symbols_for_transform fc_index pi
+visit_macro mod_index max_fun_nr predef_symbols_for_transform (DclFunCall _ _) pi
+	= pi
 
-partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index (modules, pi)
+partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index pi
 	# (macro_def, pi) = pi!pi_macro_defs.[mod_index,macro_index]
 	| case macro_def.fun_kind of FK_Macro->True ; _ -> False
 	 	= case macro_def.fun_body of
 	 		CheckedBody body
 	 			# pi={ pi & pi_macro_defs.[mod_index,macro_index] = { macro_def & fun_body = PartitioningMacro }}
-		  		# macros_modules_pi = foldSt (visit_macro mod_index max_fun_nr predef_symbols_for_transform) macro_def.fun_info.fi_calls (modules, pi)
-				-> expand_dcl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_modules_pi
+		  		# macros_pi = foldSt (visit_macro mod_index max_fun_nr predef_symbols_for_transform) macro_def.fun_info.fi_calls pi
+				-> expand_dcl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_pi
 	 		PartitioningMacro
 	  			# identPos = newPosition macro_def.fun_symb macro_def.fun_pos
-	 			-> (modules, { pi &  pi_error = checkError macro_def.fun_symb "recursive macro definition" (setErrorAdmin identPos pi.pi_error)  })
+	 			-> { pi &  pi_error = checkError macro_def.fun_symb "recursive macro definition" (setErrorAdmin identPos pi.pi_error)  }
 	 		_
-	 			-> (modules, pi)
-		= (modules, pi)
+	 			-> pi
+		= pi
 
-partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index (modules, pi)
+partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index pi
 	# (macro_def, pi) = pi!pi_fun_defs.[macro_index]
 	| case macro_def.fun_kind of FK_Macro->True; _ -> False
 	 	= case macro_def.fun_body of
 	 		CheckedBody body
 	 			# pi={ pi & pi_fun_defs.[macro_index] = { macro_def & fun_body = PartitioningMacro }}
-		  		# macros_modules_pi = foldSt (visit_macro mod_index max_fun_nr predef_symbols_for_transform) macro_def.fun_info.fi_calls (modules, pi)
-				-> expand_icl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_modules_pi
+		  		# macros_pi = foldSt (visit_macro mod_index max_fun_nr predef_symbols_for_transform) macro_def.fun_info.fi_calls pi
+				-> expand_icl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_pi
 	 		PartitioningMacro
 	  			# identPos = newPosition macro_def.fun_symb macro_def.fun_pos
-	 			-> (modules, { pi &  pi_error = checkError macro_def.fun_symb "recursive macro definition" (setErrorAdmin identPos pi.pi_error)  })
+	 			-> { pi &  pi_error = checkError macro_def.fun_symb "recursive macro definition" (setErrorAdmin identPos pi.pi_error)  }
 	 		_
-	 			-> (modules, pi)
-		= (modules, pi)
+	 			-> pi
+		= pi
 
-partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*{#DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-																   -> (!*{#FunDef},!*{#*{#FunDef}},!.{#DclModule},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
-partitionateDclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs macro_defs modules var_heap symbol_heap symbol_table error
+partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																   -> (!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
+partitionateDclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
 	#! max_fun_nr = cMAXINT
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
 							pi_symbol_table = symbol_table, pi_fun_defs=fun_defs, pi_macro_defs=macro_defs,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [],
 							pi_unexpanded_dcl_macros=[] }
-	  (modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error, pi_next_group, pi_groups, pi_deps})
-	  		= iFoldSt (partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to (modules, partitioning_info)
+	  {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error, pi_next_group, pi_groups, pi_deps}
+	  		= iFoldSt (partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to partitioning_info
 	  (fun_defs,macro_defs) = reset_body_of_rhs_macros pi_deps pi_fun_defs pi_macro_defs
-	= (fun_defs,macro_defs,modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
+	= (fun_defs,macro_defs, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 
-partitionateIclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*{#DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-																   -> (!*{#FunDef},!*{#*{#FunDef}},!.{#DclModule},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
-partitionateIclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs macro_defs modules var_heap symbol_heap symbol_table error
+partitionateIclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																   -> (!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
+partitionateIclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
 	#! max_fun_nr = cMAXINT
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
 							pi_symbol_table = symbol_table, pi_fun_defs=fun_defs, pi_macro_defs=macro_defs,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [],
 							pi_unexpanded_dcl_macros=[] }
-	  (modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error, pi_next_group, pi_groups, pi_deps})
-	  		= iFoldSt (partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to (modules, partitioning_info)
+	  {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error, pi_next_group, pi_groups, pi_deps}
+	  		= iFoldSt (partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to partitioning_info
 	  (fun_defs,macro_defs) = reset_body_of_rhs_macros pi_deps pi_fun_defs pi_macro_defs
-	= (fun_defs,macro_defs,modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
+	= (fun_defs,macro_defs, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 
 add_new_macros_to_groups :: ![Int] !Int Int  *{#FunDef}  [FunctionOrMacroIndex]  [[FunctionOrMacroIndex]]
 								   -> (!Int,!*{#FunDef},![FunctionOrMacroIndex],![[FunctionOrMacroIndex]]);
@@ -1282,15 +1242,15 @@ where
 	has_no_curried_macro_Selections []
 		= True
 
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*{#DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-																-> (!*{!Group}, !*{#FunDef},!*{#*{#FunDef}},!.{#DclModule},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
-partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transform fun_defs macro_defs modules var_heap symbol_heap symbol_table error
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																-> (!*{!Group}, !*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
+partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
 	#! max_fun_nr = cMAXINT
 	# partitioning_info = {	pi_var_heap = var_heap, pi_symbol_heap = symbol_heap, pi_symbol_table = symbol_table, pi_fun_defs=fun_defs, pi_macro_defs=macro_defs,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [],
 							pi_unexpanded_dcl_macros=[] }
-	  (modules, {pi_groups, pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error,pi_unexpanded_dcl_macros})
-	  		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr) ranges (modules, partitioning_info)
+	  {pi_groups, pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error,pi_unexpanded_dcl_macros}
+	  		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr) ranges partitioning_info
 	# (reversed_pi_groups,fun_defs) = remove_macros_from_groups_and_reverse pi_groups pi_fun_defs []
 	# groups = { {group_members = group} \\ group <- reversed_pi_groups }
 	# pi_macro_defs = restore_unexpanded_dcl_macros pi_unexpanded_dcl_macros pi_macro_defs
@@ -1300,7 +1260,7 @@ partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transfo
 				= restore_unexpanded_dcl_macros unexpanded_dcl_macros macro_defs
 			restore_unexpanded_dcl_macros [] macro_defs
 				= macro_defs
-	= (groups, fun_defs, pi_macro_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
+	= (groups, fun_defs, pi_macro_defs, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 where
 	remove_macros_from_groups_and_reverse [group:groups] fun_defs result_groups
 		# (group,fun_defs) = remove_macros_from_group group fun_defs
@@ -1320,82 +1280,82 @@ where
 	remove_macros_from_groups_and_reverse [] fun_defs result_groups
 		= (result_groups,fun_defs);
 
-	partitionate_functions mod_index max_fun_nr {ir_from,ir_to} modules_pi
-		= iFoldSt (partitionate_global_function mod_index max_fun_nr) ir_from ir_to modules_pi
+	partitionate_functions mod_index max_fun_nr {ir_from,ir_to} pi
+		= iFoldSt (partitionate_global_function mod_index max_fun_nr) ir_from ir_to pi
 		
-	partitionate_global_function mod_index max_fun_nr fun_index modules_pi
-		# (_, modules_pi) = partitionate_function mod_index max_fun_nr fun_index modules_pi
-		= modules_pi
+	partitionate_global_function mod_index max_fun_nr fun_index pi
+		# (_,pi) = partitionate_function mod_index max_fun_nr fun_index pi
+		= pi
 
-	partitionate_function mod_index max_fun_nr fun_index (modules, pi)
+	partitionate_function mod_index max_fun_nr fun_index pi
 		# (fun_def, pi) = pi!pi_fun_defs.[fun_index]
 		= case fun_def.fun_body of
 			CheckedBody body
 				# fun_number = pi.pi_next_num
-				# (min_dep, modules_pi) = foldSt (visit_function mod_index max_fun_nr) fun_def.fun_info.fi_calls
-						(max_fun_nr, (modules,
+				# (min_dep, pi) = foldSt (visit_function mod_index max_fun_nr) fun_def.fun_info.fi_calls
+						(max_fun_nr,
 							{ pi & pi_fun_defs={ pi.pi_fun_defs & [fun_index] = { fun_def & fun_body = PartitioningFunction body fun_number }},
-								   pi_next_num = inc fun_number, pi_deps = [FunctionOrIclMacroIndex fun_index : pi.pi_deps] }))
-				-> try_to_close_group mod_index max_fun_nr (-1) fun_index fun_number min_dep modules_pi
+								   pi_next_num = inc fun_number, pi_deps = [FunctionOrIclMacroIndex fun_index : pi.pi_deps] })
+				-> try_to_close_group max_fun_nr (-1) fun_index fun_number min_dep pi
 			PartitioningFunction _ fun_number
-				-> (fun_number, (modules, pi))
+				-> (fun_number, pi)
 			TransformedBody _
 				| fun_def.fun_info.fi_group_index == NoIndex
 					# pi =  add_called_macros fun_def.fun_info.fi_calls pi
-					-> (max_fun_nr, (modules,
-//					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = -2-pi.pi_next_group }}, modules,
+					-> (max_fun_nr,
+//					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = -2-pi.pi_next_group }},
 							{pi & pi_fun_defs.[fun_index] = {fun_def & fun_info.fi_group_index = pi.pi_next_group },
 								  pi_next_group = inc pi.pi_next_group, pi_groups = [ [FunctionOrIclMacroIndex fun_index] : pi.pi_groups]}
 //							{pi & pi_next_group = pi.pi_next_group}
-							))
-					-> (max_fun_nr, (modules, pi))
+							)
+					-> (max_fun_nr, pi)
 			GeneratedBody
 				/*	
 				// allocate a group that contains this and only this function		
 				| fun_def.fun_info.fi_group_index == NoIndex
 					# pi = { pi & pi_fun_defs.[fun_index] = { fun_def & fun_info.fi_group_index = pi.pi_next_group },
 								  pi_groups = [[FunctionOrIclMacroIndex fun_index] : pi.pi_groups] , pi_next_group = inc pi.pi_next_group }
-					-> (max_fun_nr, (modules, pi))
+					-> (max_fun_nr, pi)
 					-> abort ("generated function already has a group index: " +++ toString fun_def.fun_symb +++ " " +++ toString fun_index +++ "\n")
 				*/
 				// do not allocate a group, it will be allocated during generic phase
-				-> (max_fun_nr, (modules, pi))					
-	partitionate_macro mod_index max_fun_nr macro_module_index macro_index (modules, pi)
+				-> (max_fun_nr, pi)					
+	partitionate_macro mod_index max_fun_nr macro_module_index macro_index pi
 		# (fun_def, pi) = pi!pi_macro_defs.[macro_module_index,macro_index]
 		= case fun_def.fun_body of
 			CheckedBody body
 				# fun_number = pi.pi_next_num			
 				# pi={pi & pi_unexpanded_dcl_macros=[(macro_module_index,macro_index,fun_def):pi.pi_unexpanded_dcl_macros]}
-				# (min_dep, modules_pi) = foldSt (visit_function mod_index max_fun_nr) fun_def.fun_info.fi_calls
-						(max_fun_nr, (modules,
+				# (min_dep, pi) = foldSt (visit_function mod_index max_fun_nr) fun_def.fun_info.fi_calls
+						(max_fun_nr,
 							{ pi & pi_macro_defs.[macro_module_index,macro_index] = { fun_def & fun_body = PartitioningFunction body fun_number },
-								   pi_next_num = inc fun_number, pi_deps = [DclMacroIndex macro_module_index macro_index : pi.pi_deps] }))
-				-> try_to_close_group mod_index max_fun_nr macro_module_index macro_index fun_number min_dep modules_pi
+								   pi_next_num = inc fun_number, pi_deps = [DclMacroIndex macro_module_index macro_index : pi.pi_deps] })
+				-> try_to_close_group max_fun_nr macro_module_index macro_index fun_number min_dep pi
 			PartitioningFunction _ fun_number
-				-> (fun_number, (modules, pi))
+				-> (fun_number, pi)
 			TransformedBody _
 				| fun_def.fun_info.fi_group_index == NoIndex
 					# pi =  add_called_macros fun_def.fun_info.fi_calls pi
-					-> (max_fun_nr, (modules,
+					-> (max_fun_nr,
 							{pi & pi_macro_defs.[macro_module_index,macro_index] = {fun_def & fun_info.fi_group_index = pi.pi_next_group },
 								  pi_next_group = inc pi.pi_next_group, pi_groups = [ [DclMacroIndex macro_module_index macro_index] : pi.pi_groups]}
-							))
-					-> (max_fun_nr, (modules, pi))
+							)
+					-> (max_fun_nr, pi)
 						
-	visit_function mod_index max_fun_nr (FunCall fc_index _) (min_dep, modules_pi)
-		# (next_min, modules_pi) = partitionate_function mod_index max_fun_nr fc_index modules_pi
-		= (min next_min min_dep, modules_pi)
-	visit_function mod_index max_fun_nr (MacroCall macro_module_index fc_index _) (min_dep, modules_pi)
-		# (next_min, modules_pi) = partitionate_macro mod_index max_fun_nr macro_module_index fc_index modules_pi
-		= (min next_min min_dep, modules_pi)
-	visit_function mod_index max_fun_nr (DclFunCall dcl_fun_module_index dcl_fun_index) (min_dep, modules_pi)
+	visit_function mod_index max_fun_nr (FunCall fc_index _) (min_dep, pi)
+		# (next_min, pi) = partitionate_function mod_index max_fun_nr fc_index pi
+		= (min next_min min_dep, pi)
+	visit_function mod_index max_fun_nr (MacroCall macro_module_index fc_index _) (min_dep, pi)
+		# (next_min, pi) = partitionate_macro mod_index max_fun_nr macro_module_index fc_index pi
+		= (min next_min min_dep, pi)
+	visit_function mod_index max_fun_nr (DclFunCall dcl_fun_module_index dcl_fun_index) (min_dep, pi)
 		| mod_index==dcl_fun_module_index
-			# (next_min, modules_pi) = partitionate_function mod_index max_fun_nr dcl_fun_index modules_pi
-			= (min next_min min_dep, modules_pi)
-			= (min_dep, modules_pi)
+			# (next_min, pi) = partitionate_function mod_index max_fun_nr dcl_fun_index pi
+			= (min next_min min_dep, pi)
+			= (min_dep, pi)
 
-	try_to_close_group mod_index max_fun_nr macro_module_index fun_index fun_number min_dep (modules,
-					pi=:{pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs,pi_macro_defs,pi_deps, pi_groups, pi_next_group, pi_error,pi_unexpanded_dcl_macros})
+	try_to_close_group max_fun_nr macro_module_index fun_index fun_number min_dep 
+					pi=:{pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs,pi_macro_defs,pi_deps, pi_groups, pi_next_group, pi_error,pi_unexpanded_dcl_macros}
 		| fun_number <= min_dep
 			# (pi_deps, functions_in_group, macros_in_group, fun_defs,pi_macro_defs)
 					= close_group macro_module_index fun_index pi_deps [] [] max_fun_nr pi_next_group pi_fun_defs pi_macro_defs
@@ -1403,20 +1363,19 @@ where
 			  		= liftFunctions (functions_in_group ++ macros_in_group) pi_next_group main_dcl_module_n fun_defs pi_macro_defs pi_var_heap pi_symbol_heap		  
 			# es = expand_macros_in_group macros_in_group
 			  			{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
-			  				es_fun_defs=fun_defs, es_macro_defs=x_macro_defs, es_main_dcl_module_n=mod_index, es_dcl_modules=modules, es_new_fun_def_numbers=[],
-			  				es_expand_in_imp_module=False, // function expand_macros fills in correct value
+			  				es_fun_defs=fun_defs, es_macro_defs=x_macro_defs, es_new_fun_def_numbers=[],
 				  			es_error = pi_error }
-			# {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs,es_macro_defs,es_new_fun_def_numbers}
+			# {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_fun_defs,es_macro_defs,es_new_fun_def_numbers}
 			  		= expand_macros_in_group functions_in_group es
 			# (n_fun_defs_after_expanding_macros,es_fun_defs) = usize es_fun_defs
 			# (pi_next_group,es_fun_defs,functions_in_group,pi_groups)
 				= add_new_macros_to_groups (reverse es_new_fun_def_numbers) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
-			= (max_fun_nr, (es_dcl_modules, { pi & pi_deps = pi_deps, pi_var_heap = es_var_heap,
+			= (max_fun_nr, { pi & pi_deps = pi_deps, pi_var_heap = es_var_heap,
 						pi_symbol_table = es_symbol_table, pi_fun_defs=es_fun_defs, pi_macro_defs=es_macro_defs,
 						pi_error = es_error, pi_symbol_heap = es_symbol_heap, 
 						pi_next_group = inc pi_next_group, 
-						pi_groups = [ functions_in_group ++ macros_in_group : pi_groups ],pi_unexpanded_dcl_macros=pi_unexpanded_dcl_macros }))
-			= (min_dep, (modules, pi))
+						pi_groups = [ functions_in_group ++ macros_in_group : pi_groups ],pi_unexpanded_dcl_macros=pi_unexpanded_dcl_macros })
+			= (min_dep, pi)
 	where
 		close_group macro_module_index fun_index [index=:FunctionOrIclMacroIndex d:ds] functions_in_group macros_in_group nr_of_fun_defs group_number fun_defs macro_defs
 			# (fun_def, fun_defs) = fun_defs![d]
@@ -1453,7 +1412,7 @@ where
 				# (fun_def,es) = es!es_fun_defs.[fun_index]
 				  {fun_symb,fun_body = PartitioningFunction body _, fun_info, fun_pos,fun_kind} = fun_def
 			  	  identPos = newPosition fun_symb fun_pos
-				# es={ es & es_expand_in_imp_module=True, es_error = setErrorAdmin identPos es.es_error }
+				# es={ es & es_error = setErrorAdmin identPos es.es_error }
 				# (tb_args, tb_rhs, fi_local_vars, fi_calls,fi_dynamics, es)
 						= expandMacrosInBody fun_info.fi_calls body fun_info.fi_dynamics predef_symbols_for_transform es
 				  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
@@ -1463,7 +1422,7 @@ where
 				# (old_fun_def,es) = es!es_macro_defs.[macro_module_index,fun_index]
 				  {fun_symb,fun_body = PartitioningFunction body _, fun_info, fun_pos,fun_kind} = old_fun_def
 			  	  identPos = newPosition fun_symb fun_pos
-				#  es={ es & es_expand_in_imp_module=False, es_error = setErrorAdmin identPos es.es_error }
+				#  es={ es & es_error = setErrorAdmin identPos es.es_error }
 				# (tb_args, tb_rhs, fi_local_vars, fi_calls,fi_dynamics, es)
 						= expandMacrosInBody fun_info.fi_calls body fun_info.fi_dynamics predef_symbols_for_transform es
 				  fun_def = { old_fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
@@ -1562,13 +1521,13 @@ where
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_macro_defs.[glob_module,glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
 		| macro.fun_arity == length app_args
-			= unfoldMacro macro app_args True (calls, es)
+			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
 			#! new_function_index = size es.es_fun_defs
 			# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=new_function_index+1}
 
-			# (macro,new_functions,local_macro_functions,es) = copy_macro_and_local_functions macro copied_local_functions True es			
+			# (macro,new_functions,local_macro_functions,es) = copy_macro_and_local_functions macro copied_local_functions es			
 //			# new_function_index=trace ("new_function_index: "+++toString new_function_index+++"\n") new_function_index;
 			# last_function_index = case local_macro_functions of (Yes {next_local_function_n}) -> next_local_function_n-1
 			# es = add_new_fun_defs [({old_function_n=DclMacroIndex glob_module glob_object,new_function_n=new_function_index},macro):new_functions] new_function_index last_function_index es
@@ -1597,13 +1556,13 @@ where
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_fun_defs.[glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
 		| macro.fun_arity == length app_args
-			= unfoldMacro macro app_args False (calls, es)
+			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
 			#! new_function_index = size es.es_fun_defs
 			# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=new_function_index+1}
 
-			# (macro,new_functions,local_macro_functions,es) = copy_macro_and_local_functions macro copied_local_functions False es
+			# (macro,new_functions,local_macro_functions,es) = copy_macro_and_local_functions macro copied_local_functions es
 //			# new_function_index=trace ("new_function_index: "+++toString new_function_index+++"\n") new_function_index;
 			# last_function_index = case local_macro_functions of (Yes {next_local_function_n}) -> next_local_function_n-1
 			# es = add_new_fun_defs [({old_function_n=FunctionOrIclMacroIndex glob_object,new_function_n=new_function_index},macro):new_functions] new_function_index last_function_index es
