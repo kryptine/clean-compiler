@@ -565,7 +565,7 @@ instance reify BasicType where
 			predef BT_Int
 				=	PD_Dyn_TypeCodeConstructorInt
 			predef BT_Char
-				=	PD_Dyn_TypeCodeConstructorInt
+				=	PD_Dyn_TypeCodeConstructorChar
 			predef BT_Real
 				=	PD_Dyn_TypeCodeConstructorReal
 			predef BT_Bool
