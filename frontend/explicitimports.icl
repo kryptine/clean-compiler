@@ -790,7 +790,7 @@ instance check_completeness SymbIdent where
 			// otherwise the function was defined locally in a macro
 			// it is not a consequence, but it's type and body are consequences !
 			#! (already_visited, ccs) = ccs!box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
-			| already_visited
+			| /* ccs.box_ccs.ccs_set_of_visited_icl_funs.[glob_object] */ already_visited
 				= ccs
 			#! ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[glob_object] = True }
 			= check_completeness fun_def cci ccs

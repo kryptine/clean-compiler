@@ -1945,12 +1945,11 @@ where
 		determine_selector mod_index type_mod_index type_index [{glob_module, glob_object} : selectors] selector_defs modules
 			| type_mod_index == glob_module
 				| type_mod_index == mod_index
-					#! selector_def = selector_defs.[glob_object]
+					# (selector_def,selector_defs) = selector_defs![glob_object]
 					| selector_def.sd_type_index == type_index
 						= (glob_object, selector_def.sd_field_nr, selector_defs, modules)
 						= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
-					#! {dcl_common={com_selector_defs}} = modules.[glob_module]
-					#! selector_def = com_selector_defs.[glob_object]
+					# (selector_def, modules) = modules![glob_module].dcl_common.com_selector_defs.[glob_object]
 					| selector_def.sd_type_index == type_index
 						= (glob_object, selector_def.sd_field_nr, selector_defs, modules)
 						= determine_selector mod_index type_mod_index type_index selectors selector_defs modules

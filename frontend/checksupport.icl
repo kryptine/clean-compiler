@@ -289,9 +289,9 @@ where
 	remove_declared_symbols_in_array :: !Int !{!Declaration} !*SymbolTable -> !*SymbolTable
 	remove_declared_symbols_in_array symbol_index symbols symbol_table
 		| symbol_index<size symbols
-			#! (symbol,symbols) = symbols![symbol_index]
+			# symbol = symbols.[symbol_index]
 			# (Declaration {decl_ident={id_info}})=symbol
-			#! entry = sreadPtr id_info symbol_table
+			# (entry, symbol_table) = readPtr id_info symbol_table
 			# {ste_kind,ste_def_level} = entry
 			| ste_kind == STE_Empty || ste_def_level > cModuleScope
 				= remove_declared_symbols_in_array (symbol_index+1) symbols symbol_table
@@ -325,7 +325,7 @@ NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable level def_index def_ident=:{id_info} def_kind symbol_table error
-	#! entry = sreadPtr id_info symbol_table
+	# (entry, symbol_table) = readPtr id_info symbol_table
 	| entry.ste_kind == STE_Empty || entry.ste_def_level <> level
 		# entry = {ste_index = def_index, ste_kind = def_kind, ste_def_level = level, ste_previous = entry }
 		= (symbol_table <:= (id_info,entry), error)
@@ -373,7 +373,8 @@ addDeclarationsOfDclModToSymbolTable ste_index locals imported cs
 	
 addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*CheckState -> (!Bool, !.CheckState)
 addImportedFunctionOrMacro opt_dcl_macro_range ident=:{id_info} def_index cs=:{cs_symbol_table}
-	#! entry = sreadPtr id_info cs_symbol_table
+	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	= case entry.ste_kind of
 		STE_Empty
 			-> (True, { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_FunctionOrMacro []) 
@@ -432,7 +433,7 @@ addGlobalDefinitionsToSymbolTable decls cs
 	= foldSt add_global_definition decls cs
 where
 	add_global_definition (Declaration {decl_ident=ident=:{id_info},decl_pos,decl_kind,decl_index}) cs=:{cs_symbol_table}
-		#! entry = sreadPtr id_info cs_symbol_table
+		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 		| entry.ste_def_level < cGlobalScope
 			# cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info decl_kind decl_index cGlobalScope entry }
 			= case decl_kind of
@@ -440,7 +441,7 @@ where
 					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = decl_index } cs
 				_
 					-> cs
-			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident decl_pos) "multiply defined" cs.cs_error}
+			= { cs & cs_symbol_table = cs_symbol_table, cs_error = checkErrorWithIdentPos (newPosition ident decl_pos) "multiply defined" cs.cs_error}
 
 removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
 removeImportedSymbolsFromSymbolTable (Declaration {decl_ident=decl_ident=:{id_info}, decl_index}) symbol_table
@@ -495,7 +496,7 @@ removeLocalIdentsFromSymbolTable level idents symbol_table
 
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeIdentFromSymbolTable level {id_name,id_info} symbol_table
-	#! {ste_previous,ste_def_level} = sreadPtr id_info symbol_table
+	# ({ste_previous,ste_def_level}, symbol_table) = readPtr id_info symbol_table
 	| level <= ste_def_level 
 		= symbol_table <:= (id_info,ste_previous) // ---> ("removeIdentFromSymbolTable", id_name)
 		= symbol_table // ---> ("NO removeIdentFromSymbolTable", id_name)
@@ -510,7 +511,7 @@ where
 			= (defs, symbol_table)	
 			#! def = defs.[from_index]
 			   id_info = (toIdent def).id_info
-			   entry = sreadPtr id_info symbol_table
+			#  (entry, symbol_table) = readPtr id_info symbol_table
 			| level == entry.ste_def_level
 				= remove_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
 				= remove_defs_from_symbol_table level (inc from_index) to_index defs symbol_table

@@ -1114,10 +1114,10 @@ instance e_corresponds DynamicPattern where
 		o`	e_corresponds_dp_type dcl.dp_type icl.dp_type
 	  where
 		e_corresponds_dp_type dcl_expr_ptr icl_expr_ptr ec_state=:{ec_expr_heap, ec_tc_state}
-			#! dcl_type
-					= sreadPtr dcl_expr_ptr ec_expr_heap
-			   icl_type 
-			   		= sreadPtr icl_expr_ptr ec_expr_heap
+			#  (dcl_type, ec_expr_heap)
+					= readPtr dcl_expr_ptr ec_expr_heap
+			   (icl_type, ec_expr_heap) 
+			   		= readPtr icl_expr_ptr ec_expr_heap
 			# (EI_DynamicTypeWithVars _ dcl_dyn_type _)
 					= dcl_type
 			  (EI_DynamicTypeWithVars _ icl_dyn_type _)
@@ -1125,7 +1125,7 @@ instance e_corresponds DynamicPattern where
 			  (corresponds, ec_tc_state) 
 					= t_corresponds dcl_dyn_type icl_dyn_type ec_tc_state
 			  ec_state
-				  	= { ec_state & ec_tc_state = ec_tc_state }
+				  	= { ec_state & ec_tc_state = ec_tc_state, ec_expr_heap = ec_expr_heap }
 			| corresponds
 				= ec_state
 			= give_error "" ec_state

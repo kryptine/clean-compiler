@@ -949,32 +949,42 @@ instance toString 	KindInfo
 
 /* A few obscure type definitions */
 
+::	PatternVar =
+	{	pv_var		:: !FreeVar
+	,	pv_arg_nr	:: !Int
+	}
+
 ::	Occurrence =
-	{	occ_ref_count	:: !ReferenceCount
-//	,	occ_aliases		:: ![[(FreeVar,Int)]]
-//	,	occ_expression	:: !Expression
-	,	occ_bind		:: !OccurrenceBinding
-	,	occ_observing	:: !Bool
-//	,	occ_attribute	:: !ExprInfoPtr
-	,	occ_previous 	:: ![ReferenceCount]
+	{	occ_ref_count		:: !ReferenceCount
+	,	occ_bind			:: !OccurrenceBinding
+	,	occ_pattern_vars	:: ![[PatternVar]]
+	,	occ_observing		:: !Bool
+	,	occ_previous 		:: ![ReferenceCount]
 	}
 
 ::	ReferenceCount = RC_Used !RC_Used | RC_Unused 
 
-::	SelectiveUse = { su_field :: !Int, su_multiply :: ![ExprInfoPtr], su_uniquely :: ![ExprInfoPtr]  }
-
-::	RC_Used = { rcu_multiply :: ![ExprInfoPtr], rcu_selectively :: ![SelectiveUse], rcu_uniquely :: ![ExprInfoPtr] }
-
-::	OccurrenceBinding	= OB_Empty | OB_OpenLet !Expression | OB_LockedLet !Expression
-						| OB_Pattern ![(FreeVar, Int)] !OccurrenceBinding
-//						| OB_Closed !LetOccurrences | OB_Marked !LetOccurrences
-
-/*
-::	LetOccurrences =
-	{	lo_used_lets		:: ![FreeVar]
-	,	lo_free_variables	:: ![(FreeVar, ReferenceCount)]
+::	SelectiveUse =
+	{	su_field	:: !Int
+	,	su_multiply :: ![ExprInfoPtr]
+	,	su_uniquely :: ![ExprInfoPtr]
 	}
-*/
+
+::	RC_Used =
+	{ 	rcu_multiply	:: ![ExprInfoPtr]
+	,	rcu_selectively :: ![SelectiveUse]
+	,	rcu_uniquely	:: ![ExprInfoPtr]
+	}
+
+::	CountedFreeVar =
+	{	cfv_var		:: !FreeVar
+	,	cfv_count	:: !ReferenceCount
+	}
+
+::	OccurrenceBinding	= OB_Empty 
+						| OB_OpenLet	(Choice Expression [CountedFreeVar])
+						| OB_LockedLet	(Choice Expression [CountedFreeVar])
+
 ::	OptGuardedAlts	= GuardedAlts ![GuardedExpr] !(Optional ExprWithLocalDefs)
 				 	| UnGuardedExpr !ExprWithLocalDefs
 

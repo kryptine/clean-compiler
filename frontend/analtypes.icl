@@ -653,29 +653,17 @@ determine_kinds_of_type_contexts modules type_contexts class_infos as
 where
 	determine_kinds_of_type_context :: !{#CommonDefs} !TypeContext !(!*ClassDefInfos, !*AnalyseState) -> (!*ClassDefInfos, !*AnalyseState)
 	determine_kinds_of_type_context modules {tc_class={glob_module,glob_object={ds_ident,ds_index}},tc_types} (class_infos, as)
-//		# (class_kinds, class_infos) = myselect ds_ident class_infos glob_module ds_index
 		# (class_kinds, class_infos) = class_infos![glob_module,ds_index]
-		  as = fold2St (verify_kind_of_type modules) class_kinds tc_types as
-		= (class_infos, as)
-
+		| length class_kinds == length tc_types
+			# as = fold2St (verify_kind_of_type modules) class_kinds tc_types as
+			= (class_infos, as)
+			= abort ("determine_kinds_of_type_context" ---> (ds_ident, class_kinds, tc_types))
+			
 	verify_kind_of_type modules req_kind type as
 		# (kind_of_type, as=:{as_kind_heap,as_error}) = determineKind modules type as
 		  {uki_kind_heap, uki_error} = unifyKinds kind_of_type (kindToKindInfo req_kind) {uki_kind_heap = as_kind_heap, uki_error = as_error}
 		= { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
 
-/*
-import cheat
-
-myselect name array i j
-	# (copy, array) = uniqueCopy array
-	#! i_size = size copy
-	| i < i_size
-		#! j_size = size copy.[i]
-		| j < j_size
-			= array![i].[j]
-			= abort (("second index out of range " +++ toString j +++ ">=" +++ toString j_size) ---> ("myselect", name, i))
-		= abort (("first index out of range " +++ toString i +++ ">=" +++ toString i_size) ---> ("myselect", name, j))
-*/
 determine_kinds_type_list :: !{#CommonDefs} [AType] !*AnalyseState -> *AnalyseState
 determine_kinds_type_list modules types as
 	= foldSt (force_star_kind modules) types as
@@ -684,7 +672,6 @@ where
 		# (off_kind, as=:{as_kind_heap,as_error}) = determineKind modules type as
 		  {uki_kind_heap, uki_error} = unifyKinds off_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
 		= { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
-		
 
 class_def_error = "cyclic dependencies between type classes"
 type_appl_error = "type constructor has too many arguments"
@@ -727,13 +714,14 @@ where
 			  as_type_var_heap = bind_kind_vars class_args class_kind_vars as.as_type_var_heap
 			  as_error = pushErrorAdmin (newPosition class_name class_pos) as.as_error
 			  class_infos = { class_infos & [class_module,class_index] = cyclicClassInfoMark }
-			  (class_infos, as) = foldSt (determine_kinds_of_context_class modules) class_context (class_infos,
+			  (class_infos, as) = determine_kinds_of_context_classes class_context (class_infos,
 			  								{ as & as_kind_heap = as_kind_heap, as_type_var_heap = as_type_var_heap, as_error = as_error })
 			| as.as_error.ea_ok
 				# (class_infos, as) = determine_kinds_of_type_contexts modules class_context class_infos as
 				  (class_infos, as) = determine_kinds_of_members modules class_members com_member_defs class_kind_vars (class_infos, as)
 				  (class_kinds, as_kind_heap) = retrieve_class_kinds class_kind_vars as.as_kind_heap
 				= ({class_infos & [class_module,class_index] = class_kinds }, { as & as_kind_heap = as_kind_heap, as_error = popErrorAdmin as.as_error})
+//						---> ("determine_kinds_of_class", class_name, class_kinds)
 				= ({class_infos & [class_module,class_index] = [ KindConst \\ _ <- [1..class_arity]] }, { as & as_error = popErrorAdmin as.as_error })
 		| isCyclicClass class_infos.[class_module,class_index]
 			# class_name = modules.[class_module].com_class_defs.[class_index].class_name
@@ -746,11 +734,15 @@ where
 				= fresh_kind_vars (dec nr_of_vars) [ kind_info_ptr : fresh_vars] (kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
 				= (fresh_vars, kind_heap)
 	
-		determine_kinds_of_context_class modules {tc_class={glob_module,glob_object={ds_index}}} infos_and_as
-			= determine_kinds_of_class modules glob_module ds_index infos_and_as
 		
 		isCyclicClass [ KindCycle : _ ] = True 
 		isCyclicClass _					= False 
+
+	determine_kinds_of_context_classes contexts class_infos_and_as
+		= foldSt (determine_kinds_of_context_class modules) contexts class_infos_and_as
+	where
+		determine_kinds_of_context_class modules {tc_class={glob_module,glob_object={ds_index}}} infos_and_as
+			= determine_kinds_of_class modules glob_module ds_index infos_and_as
 
 	bind_kind_vars type_vars kind_ptrs type_var_heap
 		= fold2St bind_kind_var type_vars kind_ptrs type_var_heap
@@ -767,14 +759,16 @@ where
 	determine_kinds_of_members modules members member_defs class_kind_vars (class_infos, as)
 		= iFoldSt (determine_kind_of_member modules members member_defs class_kind_vars) 0 (size members) (class_infos, as)
 		
-	determine_kind_of_member modules members member_defs class_kind_vars loc_member_index (class_infos, as)
+	determine_kind_of_member modules members member_defs class_kind_vars loc_member_index class_infos_and_as
 		# glob_member_index = members.[loc_member_index].ds_index
 		  {me_class_vars,me_type={st_vars,st_args,st_result,st_context}} = member_defs.[glob_member_index]
+		  other_contexts = (tl st_context)
+		  (class_infos, as) = determine_kinds_of_context_classes other_contexts class_infos_and_as
 		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
 		  as_type_var_heap = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap
 		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as.as_kind_heap
 		  as = determine_kinds_type_list modules [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
-		  (class_infos, as)	= determine_kinds_of_type_contexts modules (tl st_context) class_infos as
+		  (class_infos, as)	= determine_kinds_of_type_contexts modules other_contexts class_infos as
 		= (class_infos, as)
 	where
 		fresh_kind_vars_for_unbound_vars type_vars type_var_heap kind_heap

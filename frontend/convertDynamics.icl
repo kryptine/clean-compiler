@@ -622,7 +622,7 @@ determine_defaults :: case_default default_expr varheap -> (this_case_default, n
 	2nd 	= directly surrounding default
 */
 determine_defaults No default_expr=:(Yes (var=:{var_info_ptr}, indirection_var_list)) ci=:{ci_var_heap}
-	#! var_info = sreadPtr var_info_ptr ci_var_heap
+	# (var_info, ci_var_heap) = readPtr var_info_ptr ci_var_heap
 	# (expression, ci) = toExpression default_expr {ci & ci_var_heap = ci_var_heap}
 	# expression
 		= expression// ---> expression

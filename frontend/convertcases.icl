@@ -123,7 +123,7 @@ convertCasesInBody (TransformedBody body) (Yes type) group_index common_defs cs
 
 checkImportedSymbol :: SymbKind VarInfoPtr ([SymbKind], *VarHeap) -> ([SymbKind], *VarHeap)
 checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
-	#! type_info = sreadPtr symb_type_ptr var_heap
+	# (type_info, var_heap) = readPtr symb_type_ptr var_heap
 	= case type_info of
 		VI_Used
 			-> (collected_imports, var_heap)
@@ -144,11 +144,12 @@ class weightedRefCount e :: RCInfo !e !*RCState -> *RCState
 
 instance weightedRefCount BoundVar
 where
-	weightedRefCount rci=:{rci_depth} {var_name,var_info_ptr} rs=:{rcs_var_heap,rcs_free_vars}
-		#! var_info = sreadPtr var_info_ptr rcs_var_heap
+	weightedRefCount rci=:{rci_depth} {var_name,var_info_ptr} rs=:{rcs_var_heap}
+		# (var_info, rcs_var_heap) = readPtr var_info_ptr rcs_var_heap
+		  rs = { rs & rcs_var_heap = rcs_var_heap }
 		= case var_info of
 			VI_LetVar lvi
-				# (is_new, lvi=:{lvi_expression}, rcs_free_vars) = weightedRefCountOfVariable rci_depth var_info_ptr lvi 1 rcs_free_vars
+				# (is_new, lvi=:{lvi_expression}, rcs_free_vars) = weightedRefCountOfVariable rci_depth var_info_ptr lvi 1 rs.rcs_free_vars
 				| is_new
 					# rs = weightedRefCount rci lvi_expression
 							{ rs & rcs_free_vars = rcs_free_vars,
@@ -234,7 +235,7 @@ where
 		= abort ("weightedRefCount [Expression] (convertcases, 864))" -*-> expr)
 
 addPatternVariable depth {cv_variable = var_info_ptr, cv_count = ref_count} (free_vars, var_heap)
- 	#! var_info = sreadPtr var_info_ptr var_heap
+ 	# (var_info, var_heap) = readPtr var_info_ptr var_heap
 	= case var_info of
 		VI_LetVar lvi
 			# (_, lvi, free_vars) = weightedRefCountOfVariable depth var_info_ptr lvi ref_count free_vars

@@ -1684,7 +1684,7 @@ where
 		= equalTypes atype1.at_type atype2.at_type type_var_heap
 
 equalTypeVars {tv_info_ptr}	temp_var_id type_var_heap
-	#! tv_info = sreadPtr tv_info_ptr type_var_heap
+	# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 	= case tv_info of
 		TVI_Forward forw_var_number
 			-> (forw_var_number == temp_var_id, type_var_heap)

@@ -391,7 +391,7 @@ where
 		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
 	where
 		determine_type_var var_index (all_vars, var_env)
-			#! type = var_env.[var_index]
+			# (type, var_env) = var_env![var_index]
 			= case type of
 				TV var
 					-> ([var : all_vars], { var_env & [var_index] = TLifted var})
@@ -471,7 +471,7 @@ where
 	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions attr_env attr_vars inequalities error
 		| attr_group_index == max_attr_nr
 			= (attr_env, attr_vars, inequalities, error)
-		#! attr = attr_env.[attr_group_index]
+		# (attr, attr_env) = attr_env![attr_group_index]
 		= case attr of
 			TA_Var attr_var
 				# (ok, attr_env, inequalities)
@@ -494,7 +494,7 @@ where
 				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var left coercions attr_env inequalities
 		  (ok2, attr_env, inequalities)
 		  		= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var right coercions attr_env inequalities
-		#! attr = attr_env.[dem_attr]
+		# (attr, attr_env) = attr_env![dem_attr]
 		= case attr of
 			TA_Var attr_var
 				| is_new_inequality attr_var off_var inequalities
@@ -889,7 +889,7 @@ where
 
 	where
 		equi_attrs attr=:(TA_Var {av_info_ptr}) (TA_TempVar av_number) attr_var_heap
-			#! av_info = sreadPtr av_info_ptr attr_var_heap
+			# (av_info, attr_var_heap) = readPtr av_info_ptr attr_var_heap
 			= case av_info of
 				AVI_Forward forw_var_number
 					-> (forw_var_number == av_number, attr_var_heap)

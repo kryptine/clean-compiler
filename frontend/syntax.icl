@@ -927,21 +927,44 @@ cNotVarNumber :== -1
 
 ::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
 
+::	PatternVar =
+	{	pv_var		:: !FreeVar
+	,	pv_arg_nr	:: !Int
+	}
+
 ::	Occurrence =
-	{	occ_ref_count	:: !ReferenceCount
-	,	occ_bind		:: !OccurrenceBinding
-	,	occ_observing	:: !Bool
-	,	occ_previous 	:: ![ReferenceCount]
+	{	occ_ref_count		:: !ReferenceCount
+	,	occ_bind			:: !OccurrenceBinding
+	,	occ_pattern_vars	:: ![[PatternVar]]
+	,	occ_observing		:: !Bool
+	,	occ_previous 		:: ![ReferenceCount]
 	}
 
 ::	ReferenceCount = RC_Used !RC_Used | RC_Unused 
 
-::	SelectiveUse = { su_field :: !Int, su_multiply :: ![ExprInfoPtr], su_uniquely :: ![ExprInfoPtr]  }
+::	SelectiveUse =
+	{	su_field	:: !Int
+	,	su_multiply :: ![ExprInfoPtr]
+	,	su_uniquely :: ![ExprInfoPtr]
+	}
 
-::	RC_Used = { rcu_multiply :: ![ExprInfoPtr], rcu_selectively :: ![SelectiveUse], rcu_uniquely :: ![ExprInfoPtr] }
+::	RC_Used =
+	{ 	rcu_multiply	:: ![ExprInfoPtr]
+	,	rcu_selectively :: ![SelectiveUse]
+	,	rcu_uniquely	:: ![ExprInfoPtr]
+	}
 
-::	OccurrenceBinding	= OB_Empty | OB_OpenLet !Expression | OB_LockedLet !Expression
-						| OB_Pattern ![(FreeVar, Int)] !OccurrenceBinding
+::	CountedFreeVar =
+	{	cfv_var		:: !FreeVar
+	,	cfv_count	:: !ReferenceCount
+	}
+
+::	OccurrenceBinding	= OB_Empty 
+						| OB_OpenLet	(Choice Expression [CountedFreeVar])
+						| OB_LockedLet	(Choice Expression [CountedFreeVar])
+//						| OB_OpenLet !Expression | OB_LockedLet !Expression
+//						| OB_Pattern ![PatternVar] !OccurrenceBinding
+//						| OB_Closed !LetOccurrences | OB_Marked !LetOccurrences
 
 ::	TypeDefInfo =
 	{	tdi_kinds			:: ![TypeKind]

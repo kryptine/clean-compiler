@@ -1677,15 +1677,16 @@ where
 					gs_heaps=gs_heaps=:{hp_var_heap, hp_type_heaps}, 
 					gs_dcl_modules, 
 					gs_main_dcl_module_n,
-					gs_opt_dcl_icl_conversions}
+					gs_opt_dcl_icl_conversions,
+					gs_error}
 		
 		#! (class_def, gs_modules) = getClassDef ins_class.glob_module ins_class.glob_object.ds_index gs_modules
 		#! (member_def, gs_modules) = getMemberDef ins_class.glob_module class_def.class_members.[0].ds_index gs_modules
 		#! {me_type, me_class_vars}  = member_def
 					
 		// determine type of the instance function		
-		#! (symbol_type, _, hp_type_heaps, _, _) = 
-			determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No No
+		#! (symbol_type, _, hp_type_heaps, _, gs_error) = 
+			determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No gs_error
 		#! (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
 		#! symbol_type = {symbol_type & st_context = st_context}			
 
@@ -1729,7 +1730,8 @@ where
 				,	gs_fun_defs = gs_fun_defs
 				,	gs_dcl_modules = gs_dcl_modules
 				,	gs_opt_dcl_icl_conversions = gs_opt_dcl_icl_conversions  
-				,	gs_heaps = {gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap} 
+				,	gs_heaps = {gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap}
+				,	gs_error = gs_error
 				}
 
 		| otherwise // dcl module
@@ -1739,6 +1741,7 @@ where
 				& 	gs_modules = gs_modules
 				,	gs_dcl_modules = gs_dcl_modules
 				,	gs_heaps = {gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap} 
+				,	gs_error = gs_error
 				}
 				
 	update_dcl_fun_type module_index fun_index symbol_type dcl_modules

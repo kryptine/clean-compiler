@@ -232,7 +232,7 @@ adjustPropClass prop_class arity :== prop_class >> arity
 liftTempTypeVariable :: !{# CommonDefs } !{# BOOLVECT } !TempVarId !*{! Type} !*LiftState
 	-> (!Bool, !Type, !*{! Type}, !*LiftState)
 liftTempTypeVariable modules cons_vars tv_number subst ls
-	#! type = subst.[tv_number]
+	# (type, subst) = subst![tv_number]
 	= case type of
 		TE
 			-> (False, TempV tv_number, subst, ls)
@@ -419,7 +419,7 @@ where
 	
 expandTempTypeVariable :: !TempVarId !*(!u:{! Type}, !*ExpansionState) -> (!Bool, !Type, !*(!u:{! Type}, !*ExpansionState))
 expandTempTypeVariable tv_number (subst, es)
-	#! type = subst.[tv_number]
+	# (type, subst) = subst![tv_number]
 	= case type of
 		TE
 			-> (False, TempV tv_number, (subst, es))

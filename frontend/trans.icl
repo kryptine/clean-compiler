@@ -86,7 +86,7 @@ where
 		close_group :: !Int ![Int] !*{# Int} ![Int] !Int !Int !*{# FunDef} -> (![Int], !*{# Int}, ![Int], !*{# FunDef})
 		close_group fun_index [d:ds] marks group max_fun_nr group_number fun_defs
 			# marks = { marks & [d] = max_fun_nr }
-			#! fd = fun_defs.[d]
+			# (fd,fun_defs) = fun_defs![d]
 			# fun_defs = { fun_defs & [d] = { fd & fun_info.fi_group_index = group_number }}
 			| d == fun_index
 				= (ds, marks, [d : group], fun_defs)
