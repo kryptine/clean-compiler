@@ -1992,6 +1992,9 @@ where
 	collectVariables (ArraySelection array_select expr_ptr index_expr) free_vars dynamics cos
 		# (index_expr, free_vars, dynamics, cos) = collectVariables index_expr free_vars dynamics cos
 		= (ArraySelection array_select expr_ptr index_expr, free_vars, dynamics, cos)
+	collectVariables (DictionarySelection dictionary_select selectors expr_ptr index_expr) free_vars dynamics cos
+		# ((index_expr,selectors), free_vars, dynamics, cos) = collectVariables (index_expr,selectors) free_vars dynamics cos
+		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, free_vars, dynamics, cos)
 	collectVariables record_selection free_vars dynamics cos
 		= (record_selection, free_vars, dynamics, cos)
 
