@@ -71,7 +71,7 @@ cHashTableSize	:==	1023
 
 hashValue :: !String -> Int
 hashValue name
-	# hash_val = hash_value name (size name) 0 mod cHashTableSize
+	# hash_val = hash_value name (size name) 0 rem cHashTableSize
 	| hash_val < 0
 		= hash_val + cHashTableSize
 		= hash_val
