@@ -124,11 +124,8 @@ makernfstrategy hist strat rnfnodes node graph
         = strat` (substrat spinenodes`) graph subspinecont rnfanswer cnt
           where (def,cnt) = dnc (const "in makernfstrategy") graph node
                 spinenodes` = [node:spinenodes]
-
                 subspinecont subspine = spinecont (node,subspine)
-
-                strat` = checkinstance (graph,node) histpatts strat
-                histpatts = foldr (foldmap (++) id hist) [] spinenodes`
+                strat` = checkhistory (graph,node) spinenodes hist strat
 
 /*
 
@@ -174,14 +171,14 @@ matchrule matchable substrat subject found sargs rule fail
         pattern = rulegraph rule
         pairs = zip2 pargs sargs
         matchable` = matchable pattern
-        foundsub matching spine = found (Partial rule matching spine)
+        foundsub matching rnode spine = found (Partial rule matching rnode spine)
         foundmatch matching = found (Redex rule matching)
 
 matchnodes
  :: (pvar var -> .Bool)
     .(Graph sym var)
     (Substrategy sym var pvar result)
-    ((Pfun pvar var) (Spine sym var pvar) -> result)
+    ((Pfun pvar var) pvar (Spine sym var pvar) -> result)
     result
     .(Graph sym pvar)
  -> ((Pfun pvar var) -> result)
@@ -200,8 +197,8 @@ matchnodes matchable subject substrat found fail pattern
         | not pdef
         = match (extend pnode snode matching)
         | not sdef
-        = found matching openspine
-        = substrat (found matching) rnfanswer snode
+        = found matching pnode openspine
+        = substrat (found matching pnode) rnfanswer snode
           where openspine = (snode,Open (mkrgraph pnode pattern))
                 rnfanswer
                 | psym==ssym && eqlen pargs sargs
@@ -331,9 +328,10 @@ forcenodes
  -> .result
 
 forcenodes substrat found rnf nodes
-= foldr forcenode rnf nodes
-  where forcenode nid rnfrest = substrat foundforce rnfrest nid
-        foundforce spine = found (Force spine)
+= foldr forcenode rnf (zip2 [0..] nodes)
+  where forcenode (argno,nid) rnfrest
+        = substrat foundforce rnfrest nid
+          where foundforce spine = found (Force argno spine)
 
 /*
 
@@ -344,22 +342,21 @@ Check for an instance in the termination history.
 
 */
 
-checkinstance
- :: (.Graph sym var,var)
-    [.Rgraph sym var]
-    (Strategy sym var .pvar result)
- -> Strategy sym var .pvar result
+checkhistory
+ :: (Graph sym var,var)
+    [var]
+    (History sym var)
+    (Strategy sym var pvar result)
+ -> Strategy sym var pvar result
  |  == sym
  &  == var
- &  == pvar
 
-checkinstance (graph,node) history defaultstrategy
-= foldr check defaultstrategy history
-  where check hrgraph defaultstrategy substrat subject found rnf (ssym,sargs)
-        | isinstance (hgraph,hroot) (graph,node)
-        = found (Unsafe hrgraph)
-        = defaultstrategy substrat subject found rnf (ssym,sargs)
-          where hgraph = rgraphgraph hrgraph; hroot = rgraphroot hrgraph
+checkhistory (sgraph,snode) spinenodes history defaultstrategy
+ = if (isEmpty histpats) defaultstrategy unsafestrategy
+   where histpats
+          = matchhistory history spinenodes sgraph snode
+         unsafestrategy _ _ found _ _
+          = found (Unsafe (hd histpats))
 
 
 // Check for curried applications

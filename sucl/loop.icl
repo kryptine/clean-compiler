@@ -132,7 +132,8 @@ transform
     [var]                  // Arguments of function to generate
     !(Answer sym var pvar) // Result of strategy
  -> Action sym var pvar
- |  == var
+ |  == sym
+ &  == var
  &  == pvar
 
 transform anode sargs (Yes spine)
@@ -209,7 +210,8 @@ tryunfold
     (Pfun pvar var)      // The matching from rule's pattern to subject
     (Spine sym var pvar) // The spine returned by the strategy
  -> Action sym var pvar
- |  == var
+ |  == sym
+ &  == var
  &  == pvar
 
 tryunfold redexroot rule matching spine
@@ -220,8 +222,7 @@ tryunfold redexroot rule matching spine
                 = xunfold redexroot rule (heap,sroot,subject,matching)
                 noredir = abort "transtree: no mapping foor root of replacement"
                 reductroot = total noredir matching` (ruleroot rule)
-                redirect = adjust redexroot reductroot id
-                history` = extendhistory subject redirect spine history
+                history` = extendhistory subject spine history
                 trace = continue history` failinfo instdone stricts sroot` subject` heap`
 
 tryannotate

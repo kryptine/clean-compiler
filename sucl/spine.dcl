@@ -2,9 +2,12 @@ definition module spine
 
 // $Id$
 
+from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
+from graph import Graph
 from pfun import Pfun
 from general import Optional
+from StdOverloaded import ==
 
 /*
 
@@ -163,7 +166,7 @@ in a graph.
    | MissingCase                                                        // All alternatives failed for a function symbol
    | Open (Rgraph sym pvar)                                             // Need root normal form of open node for matching
    | Partial (Rule sym pvar) (Pfun pvar var) pvar (Spine sym var pvar)  // A rule was strictly partially matched
-   | Unsafe (Rgraph sym var)                                            // Terminated due to immininent recursion
+   | Unsafe (HistoryPattern sym var)                                    // Terminated due to immininent recursion
    | Redex (Rule sym pvar) (Pfun pvar var)                              // Total match
    | Strict                                                             // Need root normal form due to strictness
 
@@ -176,7 +179,7 @@ foldspine
     .subresult                                                      // Fold a MissingCase subspine
     ((Rgraph sym pvar) -> .subresult)                               // Fold an Open subspine
     ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)    // Fold a Partial subspine
-    ((Rgraph sym var) -> .subresult)                                // Fold an Unsafe subspine
+    ((HistoryPattern sym var) -> .subresult)                        // Fold an Unsafe subspine
     ((Rule sym pvar) (Pfun pvar var) -> .subresult)                 // Fold a Redex subspine
     .subresult                                                      // Fold a Strict subspine
     .(Spine sym var pvar)                                           // The spine to fold
@@ -193,3 +196,13 @@ spinenodes :: .(Spine sym var pvar) -> [var]
 
 // Make a decision (continuation based) on whether a spine ends in Open
 ifopen :: result result !.(Answer sym var pvar) -> result
+
+// Extend the history according to a spine
+extendhistory
+ :: (Graph sym var)         // Subject graph
+    (Spine sym var pvar)    // Spine leading to the reduction operation
+    (History sym var)       // Old history
+ -> History sym var         // New history
+ |  == sym
+ &  == var
+ &  == pvar
