@@ -1615,7 +1615,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 					<=< adjust_predefined_module_symbol PD_StdArray
 					<=< adjust_predefined_module_symbol PD_StdEnum
 					<=< adjust_predefined_module_symbol PD_StdBool
-					<=< adjust_predefined_module_symbol PD_StdDynamics
+					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric	// AA
 					<=< adjust_predefined_module_symbol PD_StdMisc		// AA										
 					<=< adjust_predefined_module_symbol PD_PredefinedModule
@@ -2115,7 +2115,7 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 //..AA
 	# cs = case x_needed_modules bitand cNeedStdDynamics of
 			0 -> cs
-			_ -> check_it PD_StdDynamics mod_name "" extension cs
+			_ -> check_it PD_StdDynamic mod_name "" extension cs
 	# cs = case x_needed_modules bitand cNeedStdArray of
 			0 -> cs
 			_ -> check_it PD_StdArray mod_name " (needed for array denotations)" extension cs
@@ -2685,7 +2685,7 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjust_predef_symbol PD_AndOp mod_index STE_DclFunction
 				<=< adjust_predef_symbol PD_OrOp mod_index STE_DclFunction)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdDynamics]	
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdDynamic]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjust_predef_symbol PD_TypeObjectType		mod_index STE_Type
@@ -2697,8 +2697,10 @@ where
 // MV ...
 				<=< adjust_predef_symbol PD_DynamicTemp			mod_index STE_Type
 				<=< adjust_predef_symbol PD_DynamicType			mod_index (STE_Field unused)
-				<=< adjust_predef_symbol PD_DynamicValue		mod_index (STE_Field unused))
-
+				<=< adjust_predef_symbol PD_DynamicValue		mod_index (STE_Field unused)
+			
+				<=< adjust_predef_symbol PD_TypeID				mod_index STE_Type
+				<=< adjust_predef_symbol PD_ModuleID			mod_index STE_Constructor)
 // ... MV
 // AA..			
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]

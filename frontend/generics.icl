@@ -323,6 +323,8 @@ where
 	convert_instance 
 			module_index instance_index instance_defs 
 			gs=:{gs_td_infos, gs_modules, gs_error, gs_fun_defs, gs_predefs, gs_heaps}
+		= abort "generics; convert_instance"
+/*
 		#! (instance_def=:{ins_class,ins_ident}, instance_defs) = instance_defs ! [instance_index]
 		| not instance_def.ins_is_generic
 			# gs = { gs 
@@ -350,7 +352,7 @@ where
 			}
 		#! (is_partial, gs_fun_defs) = check_if_partial instance_def gs_predefs gs_fun_defs
 		 	
-		#! (ok, gs_modules, gs_error) = check_instance_args instance_def gs_modules gs_error
+		# (ok, gs_modules, gs_error) = check_instance_args instance_def gs_modules gs_error
 		| not ok
 			#! instance_defs = { instance_defs & [instance_index] = instance_def}
 			#! gs = { gs 
@@ -362,11 +364,11 @@ where
 				}	
 			= ([], instance_defs, gs)
 
-		#! gs_heaps = check_cons_instance generic_def instance_def it_type gs_predefs gs_heaps 
+		# gs_heaps = check_cons_instance generic_def instance_def it_type gs_predefs gs_heaps 
 	
-		#! (maybe_td_index, instance_def, gs_modules, gs_error) = 
+		# (maybe_td_index, instance_def, gs_modules, gs_error) = 
 			determine_type_def_index it_type instance_def is_partial gs_modules gs_error
-		#! gs = { gs 
+		# gs = { gs 
 			& 	gs_td_infos = gs_td_infos
 			, 	gs_modules = gs_modules
 			,	gs_fun_defs = gs_fun_defs
@@ -374,7 +376,7 @@ where
 			, 	gs_error = gs_error }	
 		#! instance_defs = { instance_defs & [instance_index] = instance_def}
 		= (maybe_td_index, instance_defs, gs)
-	
+*/
 	determine_type_def_index 
 			(TA {type_index, type_name} _) 
 			instance_def=:{ins_generate, ins_ident, ins_pos}
@@ -1863,7 +1865,8 @@ where
 
 buildMemberType :: !GenericDef !TypeKind !TypeVar !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 buildMemberType generic_def=:{gen_name,gen_type} kind class_var th 
-
+	= abort "generics; buildMemberType"
+/*
 	#! (gen_type, th) = freshGenericType gen_type th
 
 	// Collect attributes of generic variables. 
@@ -1879,10 +1882,10 @@ buildMemberType generic_def=:{gen_name,gen_type} kind class_var th
 	
 	// substitute generic variables for types
 	// all non-generic variables must be left intact
-	#! th = clearSymbolType gen_type.gt_type th	
- 	#! th = build_generic_var_substs gen_vars_with_attrs class_var atvss kind th
-	#! th = build_attr_var_substs gen_type.gt_type.st_attr_vars generic_avs kind th
-	#! (st, th) = substituteInSymbolType gen_type.gt_type th
+	# th = clearSymbolType gen_type.gt_type th	
+ 	# th = build_generic_var_substs gen_vars_with_attrs class_var atvss kind th
+	# th = build_attr_var_substs gen_type.gt_type.st_attr_vars generic_avs kind th
+	# (st, th) = substituteInSymbolType gen_type.gt_type th
 
 	// update generated fields
 	#! instantiation_tvs	 = [atv_variable \\ {atv_variable} <- (flatten atvss)]
@@ -1895,6 +1898,7 @@ buildMemberType generic_def=:{gen_name,gen_type} kind class_var th
 		}
 	= (st, th)
 		//---> ("member type", gen_name, kind, st)
+*/
 where
 
 	collect_generic_var_attrs {gt_type, gt_vars} th
@@ -1927,8 +1931,8 @@ where
 	build_generic_var_substs [] class_var [] kind th
 		= th
 	build_generic_var_substs [gv:gvs] class_var [tvs:tvss] kind th
-		#! th = build_generic_var_subst gv class_var tvs kind th
-		#! th = build_generic_var_substs gvs class_var tvss kind th
+		# th = build_generic_var_subst gv class_var tvs kind th
+		# th = build_generic_var_substs gvs class_var tvss kind th
 		= th	
 
 	build_generic_var_subst {atv_variable={tv_info_ptr}} class_var [] KindConst th=:{th_vars}

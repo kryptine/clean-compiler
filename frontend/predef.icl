@@ -85,52 +85,53 @@ PD_unify					:== 131
 // MV ..
 PD_coerce					:== 132
 PD_variablePlaceholder		:== 133
-PD_StdDynamics				:== 134
+PD_StdDynamic				:== 134
 PD_undo_indirections		:== 135
 
 // MV ...
-//PD_ModuleType				:== 136
-PD_ModuleConsSymbol			:== 137
+PD_TypeID					:== 136
+PD_ModuleID					:== 137
+PD_ModuleConsSymbol			:== 138
 // ... MV
 
 /* Generics */
-PD_StdGeneric				:== 138
-PD_TypeISO					:== 139
-PD_ConsISO					:== 140
-PD_iso_to					:== 141
-PD_iso_from					:== 142
+PD_StdGeneric				:== 139
+PD_TypeISO					:== 140
+PD_ConsISO					:== 141
+PD_iso_to					:== 142
+PD_iso_from					:== 143
 
-PD_TypeUNIT					:== 143
-PD_ConsUNIT					:== 144
-PD_TypeEITHER				:== 145
-PD_ConsLEFT					:== 146
-PD_ConsRIGHT				:== 147
-PD_TypePAIR					:== 148
-PD_ConsPAIR					:== 149
-PD_TypeARROW				:== 150
-PD_ConsARROW				:== 151
+PD_TypeUNIT					:== 144
+PD_ConsUNIT					:== 145
+PD_TypeEITHER				:== 146
+PD_ConsLEFT					:== 147
+PD_ConsRIGHT				:== 148
+PD_TypePAIR					:== 149
+PD_ConsPAIR					:== 150
+PD_TypeARROW				:== 151
+PD_ConsARROW				:== 152
 
-PD_TypeConsDefInfo			:== 152 
-PD_ConsConsDefInfo			:== 153
-PD_TypeTypeDefInfo			:== 154 
-PD_ConsTypeDefInfo			:== 155
-PD_cons_info				:== 156
-PD_TypeCONS					:== 157
-PD_ConsCONS					:== 158
+PD_TypeConsDefInfo			:== 153 
+PD_ConsConsDefInfo			:== 154
+PD_TypeTypeDefInfo			:== 155 
+PD_ConsTypeDefInfo			:== 156
+PD_cons_info				:== 157
+PD_TypeCONS					:== 158
+PD_ConsCONS					:== 159
 
-PD_isomap_ARROW_			:== 159
-PD_isomap_ID				:== 160
+PD_isomap_ARROW_			:== 160
+PD_isomap_ID				:== 161
 
 /* StdMisc */
-PD_StdMisc					:== 161
-PD_abort					:== 162
-PD_undef					:== 163
+PD_StdMisc					:== 162
+PD_abort					:== 163
+PD_undef					:== 164
 
-PD_Start					:== 164
+PD_Start					:== 165
 
-PD_DummyForStrictAliasFun	:== 165
+PD_DummyForStrictAliasFun	:== 166
 
-PD_NrOfPredefSymbols		:== 166
+PD_NrOfPredefSymbols		:== 167
 
 (<<=) infixl
 (<<=) state val
@@ -201,12 +202,13 @@ where
 					<<- ("P_laceholder",		IC_Expression, PD_variablePlaceholder)
 					<<- ("_unify",				IC_Expression, PD_unify)
 					<<-	("_coerce",				IC_Expression, PD_coerce) /* MV */
-					<<- ("StdDynamic",			IC_Module, PD_StdDynamics)
+					<<- ("_SystemDynamic",		IC_Module, PD_StdDynamic)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
 // MV..
 					<<- ("DynamicTemp",			IC_Type, PD_DynamicTemp)
-//					<<- ("Module",				IC_Type, PD_ModuleType)
 					<<- ("__Module",			IC_Expression, PD_ModuleConsSymbol)
+					<<- ("T_ypeID",				IC_Type, PD_TypeID)
+					<<- ("ModuleID",			IC_Expression, PD_ModuleID)
 // ..MV
 					
 // AA..

@@ -44,3 +44,6 @@ BT_StringCode			:== (toChar 24)
 ConsVariableCVCode		:== (toChar 25)	
 ConsVariableTempCVCode	:== (toChar 26)
 ConsVariableTempQCVCode	:== (toChar 27)
+
+// used by {compiler,dynamic rts}
+PredefinedModuleName	:== "_predefined"
