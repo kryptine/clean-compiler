@@ -94,13 +94,15 @@ where
 	,	ai_next_var						:: !Int
 	,	ai_next_var_of_fun				:: !Int
 	,	ai_cases_of_vars_for_function	:: ![Case]
-	, ai_main_dcl_module_n :: !Int
+//	, ai_main_dcl_module_n :: !Int
 	}
 
+/*
 ::	SharedAI =
 	{	sai_common_defs		:: !{# CommonDefs }
 	,	sai_imported_funs	:: !{# {# FunType} }
 	}
+*/
 
 ::	ConsClassSubst	:== {# ConsClass}
 
@@ -188,8 +190,11 @@ writeVarInfo var_info_ptr new_var_info var_heap
 		VI_Extended extensions _	-> writePtr var_info_ptr (VI_Extended extensions new_var_info) var_heap
 		_							-> writePtr var_info_ptr new_var_info var_heap
 
+:: ConsumerAnalysisRO = ConsumerAnalysisRO !ConsumerAnalysisRORecord;
 
-class consumerRequirements a :: !a !{# CommonDefs} !AnalyseInfo -> (!ConsClass, !UnsafePatternBool, !AnalyseInfo)
+:: ConsumerAnalysisRORecord = {common_defs::!{# CommonDefs},imported_funs::!{#{#FunType}},main_dcl_module_n::!Int,stdStrictLists_module_n::!Int}
+
+class consumerRequirements a :: !a !ConsumerAnalysisRO !AnalyseInfo -> (!ConsClass, !UnsafePatternBool, !AnalyseInfo)
 
 ::	UnsafePatternBool :== Bool
 
@@ -296,14 +301,27 @@ where
 		= ai
 			
 instance consumerRequirements App where
-	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name}, app_args} common_defs ai=:{ai_cons_class,ai_main_dcl_module_n}
-		| glob_module == ai_main_dcl_module_n
+	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
+		| glob_module == main_dcl_module_n//ai_main_dcl_module_n
 			| glob_object < size ai_cons_class
 				#! fun_class = ai_cons_class.[glob_object]
 				= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
 				= consumerRequirements app_args common_defs ai
+
+		| glob_module==stdStrictLists_module_n && symb_arity>0
+			# name=symb_name.id_name
+			| is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
+//				&& trace_tn ("consumerRequirements "+++name+++" "+++toString imported_funs.[glob_module].[glob_object].ft_type.st_arity)
+				# [app_arg:app_args]=app_args;
+				# (cc, _, ai) = consumerRequirements app_arg common_defs ai
+				# ai_class_subst = unifyClassifications cActive cc ai.ai_class_subst
+				# ai={ ai & ai_class_subst = ai_class_subst }
+				= consumerRequirements app_args common_defs ai
+
+				= consumerRequirements app_args common_defs ai
+
 			= consumerRequirements app_args common_defs ai
-	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name}, app_args} common_defs ai=:{ai_cons_class,ai_main_dcl_module_n}
+	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
 		| glob_object < size ai_cons_class
 			#! fun_class = ai_cons_class.[glob_object]
 			= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
@@ -320,16 +338,15 @@ reqs_of_args [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
 	  ai_class_subst = unifyClassifications form_cc act_cc ai.ai_class_subst
 	= reqs_of_args ccs args (combineClasses act_cc cumm_arg_class) common_defs { ai & ai_class_subst = ai_class_subst }
 
-
 instance consumerRequirements Case where
-	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr} common_defs ai
+	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr} common_defs=:(ConsumerAnalysisRO {common_defs=common_defs_parameter}) ai
 		# (cce, _, ai) = consumerRequirements case_expr common_defs ai
 		  (ccgs, unsafe_bits, ai) = consumer_requirements_of_guards case_guards common_defs ai
 		  has_default = case case_default of
 		  		Yes _ -> True
 		  		_ -> False
 		  (ccd, default_is_unsafe, ai) = consumerRequirements case_default common_defs ai
-		  (every_constructor_appears_in_safe_pattern, may_be_active) = inspect_patterns common_defs has_default case_guards unsafe_bits
+		  (every_constructor_appears_in_safe_pattern, may_be_active) = inspect_patterns common_defs_parameter has_default case_guards unsafe_bits
 		  safe = (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
 		  ai_class_subst = unifyClassifications (if may_be_active cActive cVarOfMultimatchCase) cce ai.ai_class_subst
 		  ai = { ai & ai_class_subst = ai_class_subst }
@@ -339,6 +356,17 @@ instance consumerRequirements Case where
 						-> { ai & ai_cases_of_vars_for_function=[kees:ai.ai_cases_of_vars_for_function] }
 						-> ai
 				_	-> ai
+		# ai = case case_guards of
+					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_arity=1,symb_kind=SK_Function _},app_args=[app_arg]}) patterns
+						// decons_expr will be optimized to a decons_u Selector in transform
+						# (cc, _, ai) = consumerRequirements app_arg common_defs ai
+						# ai_class_subst = unifyClassifications cActive cc ai.ai_class_subst
+						-> { ai & ai_class_subst = ai_class_subst }
+					OverloadedListPatterns _ decons_expr _
+						# (_,_,ai) = consumerRequirements decons_expr common_defs ai
+						-> ai
+					_
+						-> ai
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
 		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
@@ -351,18 +379,35 @@ instance consumerRequirements Case where
 			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
 			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
 			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, not (multimatch_loop has_default sorted_pattern_constructors))
-		  where
-			is_sorted [x]
-				= True
-			is_sorted [h1:t=:[h2:_]]
-				= h1 < h2 && is_sorted t
 		inspect_patterns common_defs has_default (BasicPatterns BT_Bool basic_patterns) unsafe_bits
 			# bools_indices = [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
 			  sorted_pattern_constructors = sort bools_indices unsafe_bits
 			= (appearance_loop [0,1] sorted_pattern_constructors,
 				not (multimatch_loop has_default sorted_pattern_constructors))
+//		inspect_patterns common_defs has_default (OverloadedListPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
+		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ algebraic_patterns) unsafe_bits
+			# type_def = case overloaded_list of
+							UnboxedList {glob_object, glob_module} _ _ _
+								-> common_defs.[glob_module].com_type_defs.[glob_object]
+							UnboxedTailStrictList {glob_object, glob_module} _ _ _
+								-> common_defs.[glob_module].com_type_defs.[glob_object]
+							OverloadedList {glob_object, glob_module} _ _ _
+								-> common_defs.[glob_module].com_type_defs.[glob_object]
+			  defined_symbols = case type_def.td_rhs of
+									AlgType defined_symbols		-> defined_symbols
+									RecordType {rt_constructor}	-> [rt_constructor]
+			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
+			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
+			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
+			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
+			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, not (multimatch_loop has_default sorted_pattern_constructors))
 		inspect_patterns _ _ _ _
 			= (False, False)
+
+		is_sorted [x]
+			= True
+		is_sorted [h1:t=:[h2:_]]
+			= h1 < h2 && is_sorted t
 
 		sort constr_indices unsafe_bits
 			= sortBy smaller (zip3 constr_indices [0..] unsafe_bits)
@@ -426,6 +471,12 @@ consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
 	# pattern_exprs = [ bp_expr \\ {bp_expr}<-patterns]
 	= independentConsumerRequirements pattern_exprs common_defs ai
+consumer_requirements_of_guards (OverloadedListPatterns type _ patterns) common_defs ai
+	# pattern_exprs = [ ap_expr \\ {ap_expr}<-patterns]
+	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
+	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
+	= independentConsumerRequirements pattern_exprs common_defs ai
 
 instance consumerRequirements BasicPattern where
 	consumerRequirements {bp_expr} common_defs ai
@@ -482,12 +533,13 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 	unify_ref_counts 1 x = if (x==0) 1 2
 	unify_ref_counts 2 _ = 2
 
-analyseGroups	:: !{# CommonDefs} !IndexRange !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
+analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
-analyseGroups common_defs {ir_from, ir_to} main_dcl_module_n groups fun_defs var_heap expr_heap
+analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdStrictLists_module_n groups fun_defs var_heap expr_heap
 	#! nr_of_funs = size fun_defs + ir_from - ir_to /* Sjaak */
 	   nr_of_groups = size groups
-	= iFoldSt (analyse_group common_defs) 0 nr_of_groups
+	# consumerAnalysisRO=ConsumerAnalysisRO {common_defs=common_defs,imported_funs=imported_funs,main_dcl_module_n=main_dcl_module_n,stdStrictLists_module_n=stdStrictLists_module_n}
+	= iFoldSt (analyse_group consumerAnalysisRO) 0 nr_of_groups
 				([], createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = []}, groups, fun_defs, var_heap, expr_heap)
 where	
 	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
@@ -501,8 +553,9 @@ where
 							ai_cur_ref_counts = {}, ai_class_subst = initial_subst,
 							ai_next_var = nr_of_vars,
 							ai_next_var_of_fun = 0,
-							ai_cases_of_vars_for_function = [],
-							ai_main_dcl_module_n=main_dcl_module_n } fun_defs
+							ai_cases_of_vars_for_function = [] //,
+//							ai_main_dcl_module_n=main_dcl_module_n
+							} fun_defs
 		  class_env = collect_classifications group_members ai.ai_cons_class ai.ai_class_subst
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap)
 				 = foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group) (cleanup_info,class_env, fun_defs, ai.ai_var_heap, expr_heap)
@@ -518,20 +571,23 @@ where
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 					set_extended_expr_info case_info_ptr (EEI_ActiveCase aci) expr_heap)
 			= (cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
+
 		get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
 			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
-		  where
-			get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
-				# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
-				= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
-			get_var_index {fv_info_ptr} var_heap
-				# (vi, var_heap) = readPtr fv_info_ptr var_heap
-				  index = case vi of
-							VI_AccVar _ index	-> index
-							VI_Count 0 False	-> cNope
-				= (index, var_heap) 
+		get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
+			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
 		get_linearity_info cc_linear_bits _ var_heap
 			= ([], var_heap)
+
+		get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
+			# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
+			= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
+		get_var_index {fv_info_ptr} var_heap
+			# (vi, var_heap) = readPtr fv_info_ptr var_heap
+			  index = case vi of
+						VI_AccVar _ index	-> index
+						VI_Count 0 False	-> cNope
+			= (index, var_heap) 
 
 	initial_cons_class [fun : funs] next_var_number nr_of_local_vars var_heap class_env fun_defs
 		#  (fun_def, fun_defs) = fun_defs![fun]
@@ -616,6 +672,7 @@ mapAndLength f []
 	,	ro_fun				:: !SymbIdent
 	,	ro_fun_args			:: ![FreeVar]
 	,	ro_main_dcl_module_n :: !Int
+	,	ro_stdStrictLists_module_n :: !Int
 	}
 
 ::	RootCaseMode = NotRootCase | RootCase | RootCaseOfZombie
@@ -661,6 +718,10 @@ where
 					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 				BasicPatterns _ _
 					-> ti // no variables occur
+				OverloadedListPatterns _ _ patterns
+					# (EI_CaseType {ct_cons_types},ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+					  ti_var_heap = foldSt store_type_info_of_alg_pattern (zip2 ct_cons_types patterns) ti.ti_var_heap
+					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 				NoPattern
 					-> ti
 		store_type_info_of_alg_pattern (var_types,{ap_vars}) var_heap
@@ -708,7 +769,7 @@ where
 		= (MatchExpr a1 a2 expr,ti)
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
-		= (DynamicExpr dynamic_expr, ti)
+		= (DynamicExpr dynamic_expr, ti)	
 	transform expr ro ti
 		= (expr, ti)
 
@@ -717,6 +778,7 @@ setExtendedVarInfo var_info_ptr extension var_heap
 	= case old_var_info of
 		VI_Extended _ original_var_info	-> writePtr var_info_ptr (VI_Extended extension original_var_info) var_heap
 		_								-> writePtr var_info_ptr (VI_Extended extension old_var_info) var_heap
+
 neverMatchingCase = { case_expr = EE, case_guards = NoPattern, case_default = No, case_ident = No, case_info_ptr = nilPtr, 
 // RWS ...
 						case_explicit = False,
@@ -852,6 +914,9 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 	
 		getAlgebraicPatterns (AlgebraicPatterns _ algebraicPatterns)
 			= algebraicPatterns
+		getAlgebraicPatterns (OverloadedListPatterns _ _ algebraicPatterns)
+			= algebraicPatterns
+
 		getBasicPatterns (BasicPatterns _ basicPatterns)
 			= basicPatterns
 		
@@ -881,6 +946,10 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			# guard_exprs	= [ bp_expr \\ {bp_expr} <- case_guards ]
 			# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 			= (BasicPatterns basic_type [ { case_guard & bp_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
+		lift_patterns default_exists (OverloadedListPatterns type decons_expr case_guards) outer_case ro ti
+			# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
+			# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
+			= (OverloadedListPatterns type decons_expr [ { case_guard & ap_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
 	
 		lift_patterns_2 False [guard_expr] outer_case ro ti
 			// if no default pattern exists, then the outer case expression does not have to be copied for the last pattern
@@ -1108,6 +1177,15 @@ removeNeverMatchingSubcases keesExpr=:(Case kees)
 			| is_default_only filtered_default filtered_case_guards
 				-> fromYes case_default
 			-> Case {kees & case_guards = BasicPatterns bt filtered_case_guards, case_default = filtered_default }
+		OverloadedListPatterns i decons_expr alg_patterns
+			| not (any (is_never_matching_case o get_alg_rhs) alg_patterns) && not (is_never_matching_default case_default)
+				-> keesExpr // frequent case: all subexpressions can't fail
+			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
+			| has_become_never_matching filtered_default filtered_case_guards
+				-> Case neverMatchingCase
+			| is_default_only filtered_default filtered_case_guards
+				-> fromYes case_default
+			-> Case {kees & case_guards = OverloadedListPatterns i decons_expr filtered_case_guards, case_default = filtered_default }
   where
 	get_filtered_default y=:(Yes c_default)
 		| is_never_matching_case c_default
@@ -1173,6 +1251,14 @@ where
 	transform (BasicPatterns type patterns) ro ti
 		# (patterns, ti) = transform patterns ro ti
 		= (BasicPatterns type patterns, ti)
+	transform (OverloadedListPatterns type=:(OverloadedList _ _ _ _) decons_expr patterns) ro ti
+		# (patterns, ti) = transform patterns ro ti
+		# (decons_expr, ti) = transform decons_expr ro ti
+		= (OverloadedListPatterns type decons_expr patterns, ti)
+	transform (OverloadedListPatterns type decons_expr patterns) ro ti
+		# (patterns, ti) = transform patterns ro ti
+		# (decons_expr, ti) = transform decons_expr ro ti
+		= (OverloadedListPatterns type decons_expr patterns, ti)
 
 instance transform (Optional a) | transform a
 where
@@ -2059,6 +2145,13 @@ where
 	build_application app extra_args
 		= App app @ extra_args
 		
+is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
+	:== let { type = imported_funs.[glob_module].[glob_object].ft_type;
+		} in type.st_arity>0 && not (isEmpty type.st_context);
+
+is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
+	:== not (isEmpty imported_funs.[glob_module].[glob_object].ft_type.st_context);
+
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
@@ -2073,10 +2166,29 @@ transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extr
 				   (instances, ti_instances) = ti_instances![glob_object]
 				   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
 				= transformFunctionApplication fun_def instances cons_class app extra_args ro { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
-		// It seems as if we have an array function 
+			// It seems as if we have an array function 
 				| isEmpty extra_args
 					= (App app, ti)
 					= (App { app & app_symb = { symb & symb_arity = symb_arity + length extra_args}, app_args = app_args ++ extra_args}, ti)
+
+		| glob_module==ro.ro_stdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && symb_arity>0
+//			&& trace_tn ("transformApplication "+++toString symb.symb_name)
+			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
+			# [{tc_class={glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
+			# member_n=find_member_n 0 symb.symb_name.id_name ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members
+			# cons_u_member_index=ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members.[member_n].ds_index
+			# {me_symb,me_offset}=ro.ro_common_defs.[glob_module].com_member_defs.[cons_u_member_index]
+			# select_symb= {glob_module=glob_module,glob_object={ds_ident=me_symb,ds_index=cons_u_member_index,ds_arity=1}}
+			# [first_arg:other_app_args] = app_args;
+			# args=other_app_args++extra_args
+			| isEmpty args
+				= select_member first_arg select_symb me_offset ti
+				# (expr,ti) = select_member first_arg select_symb me_offset ti
+				= case expr of
+					App app
+						-> transformApplication app args ro ti
+					_
+						-> (expr @ args,ti)
 		// This function is imported
 			| isEmpty extra_args
 				= (App app, ti)
@@ -2088,6 +2200,20 @@ transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extr
 					= (App {app  &  app_args = app_args ++ extra_args, app_symb = { symb & symb_arity = symb_arity + nr_of_extra_args }}, ti)
 					= (App {app  &  app_args = app_args ++ take ar_diff extra_args, app_symb = { symb & symb_arity = symb_arity + ar_diff }} @
 							drop ar_diff extra_args, ti)
+	where
+		find_member_n i member_string a
+			| i<size a
+				| a.[i].ds_ident.id_name % (0,size member_string-1)==member_string
+					= i
+					= find_member_n (i+1) member_string a
+
+		select_member (App {app_symb={symb_kind=SK_Constructor _},app_args,app_info_ptr}) select_symb me_offset ti
+			| not (isNilPtr app_info_ptr) && (case (sreadPtr app_info_ptr ti.ti_symbol_heap) of (EI_DictionaryType _) -> True; _ -> False)
+//			&& trace_tn ("select_member "+++toString select_symb.glob_object.ds_ident.id_name)
+				= (app_args !! me_offset,ti)
+		select_member exp select_symb me_offset ti
+			= (Selection No exp [RecordSelection select_symb me_offset],ti)
+
 // XXX linear_bits field has to be added for generated functions
 transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
@@ -2123,6 +2249,7 @@ transformSelection opt_type selectors expr ti
 
 // XXX store linear_bits and cc_args together ?
 
+determineProducers :: Bool [a] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
 determineProducers _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
 determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
@@ -2281,10 +2408,10 @@ renewVariables exprs var_heap
 ::	ImportedConstructors	:== [Global Index]
 ::	ImportedFunctions	:== [Global Index]
 
-transformGroups :: !CleanupInfo !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
+transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_defs imported_funs imported_types
+transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fun_defs cons_args common_defs imported_funs imported_types
 		collected_imports type_def_infos var_heap type_heaps symbol_heap
 	#! nr_of_funs = size fun_defs
 	# (groups, imported_types, collected_imports, ti)
@@ -2321,12 +2448,13 @@ transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_
 		  ti_var_heap = fold2St (\{fv_info_ptr} a_type ti_var_heap
 									-> setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap)
 								tb.tb_args st_args ti_var_heap
-		  ro =	{	ro_imported_funs	= imported_funs
-				,	ro_common_defs 		= common_defs
-				,	ro_root_case_mode	= get_root_case_mode tb
-				,	ro_fun				= fun_def_to_symb_ident fun fun_def
-				,	ro_fun_args			= tb.tb_args
+		  ro =	{ ro_imported_funs	= imported_funs
+				, ro_common_defs 	= common_defs
+				, ro_root_case_mode	= get_root_case_mode tb
+				, ro_fun			= fun_def_to_symb_ident fun fun_def
+				, ro_fun_args		= tb.tb_args
 				, ro_main_dcl_module_n = main_dcl_module_n
+				, ro_stdStrictLists_module_n = stdStrictLists_module_n
 				}
 		  (fun_rhs, ti) = transform tb.tb_rhs ro { ti & ti_fun_defs = ti_fun_defs, ti_var_heap = ti_var_heap }
 		= { ti & ti_fun_defs = {ti.ti_fun_defs & [fun] = { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}}}
@@ -2672,17 +2800,18 @@ freeVariablesOfCase {case_expr,case_guards,case_default, case_info_ptr} fvi=:{fv
 where
 	free_variables_of_guards (AlgebraicPatterns _ alg_patterns) fvi
 		= foldSt free_variables_of_alg_pattern alg_patterns fvi
-	where
-		free_variables_of_alg_pattern {ap_vars, ap_expr} fvi=:{fvi_variables}
-			# fvi = freeVariables ap_expr { fvi & fvi_variables = [] }
-			  (fvi_variables, fvi_var_heap) = removeLocalVariables ap_vars fvi.fvi_variables fvi_variables fvi.fvi_var_heap
-			= { fvi & fvi_var_heap = fvi_var_heap, fvi_variables = fvi_variables }
-
 	free_variables_of_guards (BasicPatterns _ basic_patterns) fvi
 		= foldSt free_variables_of_basic_pattern basic_patterns fvi
 	where
 		free_variables_of_basic_pattern {bp_expr} fvi
 			= freeVariables bp_expr fvi
+	free_variables_of_guards (OverloadedListPatterns _ _ alg_patterns) fvi
+		= foldSt free_variables_of_alg_pattern alg_patterns fvi
+
+	free_variables_of_alg_pattern {ap_vars, ap_expr} fvi=:{fvi_variables}
+		# fvi = freeVariables ap_expr { fvi & fvi_variables = [] }
+		  (fvi_variables, fvi_var_heap) = removeLocalVariables ap_vars fvi.fvi_variables fvi_variables fvi.fvi_var_heap
+		= { fvi & fvi_var_heap = fvi_var_heap, fvi_variables = fvi_variables }
 
 app_EEI_ActiveCase transformer expr_info_ptr expr_heap
 	# (expr_info, expr_heap) = readPtr expr_info_ptr expr_heap

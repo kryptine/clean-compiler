@@ -10,10 +10,10 @@ cAccumulating   :== -3
 
 ::	CleanupInfo
 
-analyseGroups	:: !{# CommonDefs} !IndexRange !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
+analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
 
-transformGroups :: !CleanupInfo !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
+transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 					!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap
 				-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 
