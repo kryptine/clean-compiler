@@ -58,7 +58,7 @@ cCaseNotExplicit	:== False
 	,	ums_error		:: !.ErrorAdmin
 	}
 
-::	RecordKind = RK_Constructor | RK_Update | RK_UpdateToConstructor ![AuxiliaryPattern]
+::	RecordKind = RK_Constructor | RK_Update
 
 get_unboxed_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
 get_unboxed_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
@@ -1020,34 +1020,7 @@ checkExpression free_vars rec=:(PE_Record record opt_type fields) e_input=:{ei_e
 					-> (App { app_symb = rec_cons, app_args = remove_fields exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
 				_
 					# (rec_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars record e_input e_state e_info cs
-					# (has_exi_vars,e_info) = record_has_exi_vars e_info
-						with
-							record_has_exi_vars e_info
-								| glob_module==ei_mod_index
-									# ({cons_exi_vars}, e_info) = e_info!ef_cons_defs.[ds_index];
-									= (case cons_exi_vars of [] -> False; _ -> True, e_info);
-									# ({cons_exi_vars}, e_info) = e_info!ef_modules.[glob_module].dcl_common.com_cons_defs.[ds_index];
-									= (case cons_exi_vars of [] -> False; _ -> True, e_info);
-					| has_exi_vars
-						-> case rec_expr of
-							Var {var_info_ptr,var_name}
-								# (var_info, es_var_heap) = readPtr var_info_ptr e_state.es_var_heap
-								  e_state = { e_state & es_var_heap = es_var_heap }
-								-> case var_info of
-									VI_Record fields
-										# (exprs, free_vars, e_state, e_info, cs) 
-												= check_field_exprs free_vars new_fields 0 (RK_UpdateToConstructor fields) e_input e_state e_info cs
-										-> (App { app_symb = rec_cons, app_args = remove_fields exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
-									_ 
-										# (exprs, free_vars, e_state, e_info, cs)
-												= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
-										-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
-							_ 
-								# (exprs, free_vars, e_state, e_info, cs)
-										= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
-								-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
-					# (exprs, free_vars, e_state, e_info, cs)
-									= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
+					# (exprs, free_vars, e_state, e_info, cs) = check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
 					-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
 		No
 			-> (EE, free_vars, e_state, e_info, cs)
@@ -1073,11 +1046,6 @@ where
 	check_field_expr free_vars field=:{bind_src = PE_WildCard} field_nr RK_Update e_input e_state=:{es_expr_heap} e_info cs
 		# (bind_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		= ({ field & bind_src = NoBind bind_expr_ptr }, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
-	check_field_expr free_vars field=:{bind_src = PE_WildCard} field_nr (RK_UpdateToConstructor fields) e_input e_state=:{es_expr_heap} e_info cs
-		# (var_name, var_info_ptr) = get_field_var (fields !! field_nr)
-		  (var_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-		= ({ field & bind_src = Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr }}, free_vars,
-				{ e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 	check_field_expr free_vars field=:{bind_src} field_nr upd_record e_input e_state e_info cs
 		# (expr, free_vars, e_state, e_info, cs)
 			= checkExpression free_vars bind_src e_input e_state e_info cs
