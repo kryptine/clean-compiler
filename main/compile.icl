@@ -7,10 +7,6 @@ import CoclSystemDependent
 import portToNewSyntax
 //import RWSDebug
 
-// MV ...
-generate_tcl_file :== False;
-// ... MV
-
 ::	CoclOptions =
 	{
 		moduleName:: {#Char}
@@ -46,10 +42,10 @@ InitialCoclOptions =
 	heaps::!.Heaps
  };
 
-empty_cache :: *DclCache
-empty_cache
+empty_cache :: *SymbolTable -> *DclCache
+empty_cache symbol_heap
 	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}}
-	# (predef_symbols, hash_table) = buildPredefinedSymbols newHashTable
+	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
 	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
 
 compile :: ![{#Char}] !*DclCache !*Files -> (!Bool,!*DclCache,!*Files)
@@ -63,17 +59,6 @@ compile args cache files
 parseCommandLine :: [{#Char}] CoclOptions -> ([{#Char}],[{#Char}],CoclOptions)
 parseCommandLine [] options
 	=	([],[],options)
-/*
-	// JVG: removed hack because the searchPaths list becomes too large when >1 file is compiled
-	=	prependModulePath options
-	where
-		// RWS +++ hack, both module name and file path should be passed to frontEndInterface
-		prependModulePath options=:{pathName, searchPaths}
-			=	{	options
-				&	moduleName = baseName pathName
-				,	searchPaths = {searchPaths & sp_paths = [directoryName pathName : searchPaths.sp_paths]}
-				}
-*/
 parseCommandLine [arg1=:"-P", searchPathsString : args] options=:{searchPaths}
 // RWS, voor Maarten +++	=	parseCommandLine args {options & searchPaths = {searchPaths & sp_paths = splitPaths searchPathsString}}
 	# (args,modules,options) =	parseCommandLine args {options & searchPaths.sp_paths = splitPaths searchPathsString}
@@ -90,13 +75,16 @@ parseCommandLine [arg1=:"-RE", errorPath : args] options
 parseCommandLine [arg1=:"-RAE", errorPath : args] options
 	# (args,modules,options)=	parseCommandLine args {options & errorPath = stripQuotes errorPath, errorMode = FAppendText}
 	= ([arg1,errorPath:args],modules,options)
+parseCommandLine ["-id",compiler_id_string : args] options
+	# compiler_id=toInt compiler_id_string
+	| set_compiler_id compiler_id==compiler_id
+		= parseCommandLine args options
 // MV ...
 parseCommandLine [arg1=:"-dynamics":args] options
 	// generates for each icl an tcl (which contains the type information for that module)
 	# (args,modules,options)=	parseCommandLine args {options & compile_for_dynamics = True}
 	= (args,modules,options)
 // ... MV
-
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -104,6 +92,11 @@ parseCommandLine [arg : args] options
 	// otherwise
 		# (args,modules,options) = parseCommandLine args options
 		= (args,[arg : modules],options);
+
+set_compiler_id :: !Int -> Int;
+set_compiler_id id = code {
+	ccall set_compiler_id "I:I"
+ };
 
 stripExtension :: {#Char} {#Char} -> {#Char}
 stripExtension extension string
@@ -189,7 +182,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (tcl_file, files)
 		= openTclFile options options.pathName files
-	# (io, files)
+ 	# (io, files)
 		=	stdio files
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
@@ -197,14 +190,10 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
 		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
-
-// MV ...
 	# (closed, files)
 		= closeTclFile tcl_file files
-// ... MV
 	| not closed
-		=	abort ("couldn't close tcl file \"" +++ options.pathName +++ "tcl\"\n")
-
+		=   abort ("couldn't close tcl file \"" +++ options.pathName +++ "tcl\"\n")
 	# (closed, files)
 		=	fclose io files
 	| not closed
@@ -222,9 +211,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 				# dcl_modules=syntaxTree.fe_dcls
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
 				# (porting_ok, files)
-					 = switch_port_to_new_syntax 
-							(createPortedFiles options.moduleName options.searchPaths files)
-							(False, files)
+					 = switch_port_to_new_syntax (createPortedFiles options.moduleName options.searchPaths files) (False, files)
 				  error = switch_port_to_new_syntax 
 				  			(case porting_ok of
 				  				True
@@ -286,10 +273,8 @@ openTclFile options icl_mod_pathname files
 	| opened
 		=(Yes tcl_file, files)
 	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
-	
+
 closeTclFile (Yes tcl_file) files
 	= fclose tcl_file files
 closeTclFile _ files
 	= (True,files);
-// ... MV
-
