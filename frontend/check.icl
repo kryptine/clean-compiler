@@ -2164,8 +2164,7 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 		  cs_error = pushErrorAdmin error_location cs.cs_error
 		  cs_error = checkError ident ("not supported"+++explanation) cs_error
 		  cs_error = popErrorAdmin cs_error
-		= { cs & cs_error = cs_error }
-
+		= { cs & cs_error = cs_error, cs_predef_symbols=cs_predef_symbols}
 // ... MV
 
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]
