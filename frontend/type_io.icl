@@ -359,6 +359,20 @@ where
 			= write_type_info type_var tcl_file wtis
 		= (tcl_file,wtis)	
 
+	// FIXME: the universally quantifier and type vars are ignored here
+	// this is really just a hack to prevent the compiler from crashing
+	// on rank>1 types
+	write_type_info (TFA uni_vars type) tcl_file wtis
+ 		# (th_vars,wtis)
+ 			= sel_type_var_heap wtis
+ 		# (_,(_,th_vars))
+ 			= mapSt normalize_type_var uni_vars (0,th_vars)
+  		# wtis
+ 			= { wtis & wtis_type_heaps.th_vars = th_vars }
+		# (tcl_file,wtis)
+			= write_type_info type tcl_file wtis
+		= (tcl_file,wtis)	
+
 	write_type_info TE tcl_file wtis
 		# tcl_file
 			= fwritec TypeTECode tcl_file
