@@ -171,7 +171,7 @@ FreeConvertBuffers (void)
 
 	gFirstBuffer	= NULL;
 	gCurrentBuffer	= NULL;
-	gBytesLeft	= NULL;
+	gBytesLeft	= 0;
 } /* FreeConvertBuffers */
 
 void *
