@@ -1,15 +1,15 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02010801
+# define	kBEVersionCurrent				0x02030407
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not upward compatible (for example when a function is added)
-# define	kBEVersionOldestDefinition		0x02000213
+# define	kBEVersionOldestDefinition		0x02030407
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02010801
+# define	kBEVersionOldestImplementation	0x02030407
 
 
 # define	kBEDebug	1
@@ -430,17 +430,11 @@ Clean (BENoTypes :: BackEnd -> (BETypeP, BackEnd))
 BEFlatTypeP BEFlatType (BESymbolP symbol, BETypeVarListP arguments);
 Clean (BEFlatType :: BESymbolP BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
 
-BEFlatTypeP BEFlatTypeX (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments);
-Clean (BEFlatTypeX :: BESymbolP BEAttribution BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
-
 void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
 Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
 
 void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields);
 Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP BEFieldListP BackEnd -> BackEnd)
-
-void BERecordTypeX (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields);
-Clean (BERecordTypeX :: Int BEFlatTypeP BETypeNodeP Int BEFieldListP BackEnd -> BackEnd)
 
 void BEAbsType (BEFlatTypeP lhs);
 Clean (BEAbsType :: BEFlatTypeP BackEnd -> BackEnd)
@@ -529,20 +523,17 @@ Clean (BEDefineRules :: BEImpRuleP BackEnd -> BackEnd)
 int BEGenerateCode (CleanString outputFile);
 Clean (BEGenerateCode :: String BackEnd -> (Bool, BackEnd))
 
-void BEExportType (int dclTypeIndex, int iclTypeIndex);
-Clean (BEExportType :: Int Int BackEnd -> BackEnd)
+void BEExportType (int isDictionary, int typeIndex);
+Clean (BEExportType :: Bool Int BackEnd -> BackEnd)
 
-void BESwapTypes (int frm, int to);
-Clean (BESwapTypes :: Int Int BackEnd -> BackEnd)
+void BEExportConstructor (int constructorIndex);
+Clean (BEExportConstructor :: Int BackEnd -> BackEnd)
 
-void BEExportConstructor (int dclConstructorIndex, int iclConstructorIndex);
-Clean (BEExportConstructor :: Int Int BackEnd -> BackEnd)
+void BEExportField (int isDictionaryField, int fieldIndex);
+Clean (BEExportField :: Bool Int BackEnd -> BackEnd)
 
-void BEExportField (int dclTypeIndex, int iclTypeIndex);
-Clean (BEExportField :: Int Int BackEnd -> BackEnd)
-
-void BEExportFunction (int dclFunctionIndex, int iclFunctionIndex);
-Clean (BEExportFunction :: Int Int BackEnd -> BackEnd)
+void BEExportFunction (int functionIndex);
+Clean (BEExportFunction :: Int BackEnd -> BackEnd)
 
 void BEDefineImportedObjsAndLibs (BEStringListP objs, BEStringListP libs);
 Clean (BEDefineImportedObjsAndLibs :: BEStringListP BEStringListP BackEnd -> BackEnd)

@@ -2733,7 +2733,7 @@ BENoTypeVars (void)
 } /* BENoTypeVars */
 
 BEFlatTypeP
-BEFlatTypeX (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments)
+BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
 {
 	FlatType	flatType;
 	int			i;
@@ -2749,15 +2749,9 @@ BEFlatTypeX (BESymbolP symbol, BEAttribution attribution, BETypeVarListP argumen
 
 	flatType->ft_cons_vars	= NULL;	/* used in PrintType */
 
-	flatType->ft_attribute = (AttributeKind) attribution;;
+	flatType->ft_attribute = NoUniAttr;
 
 	return (flatType);
-} /* BEFlatTypeX */
-
-BEFlatTypeP
-BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
-{
-	return BEFlatTypeX (symbol,NoUniAttr,arguments);
 } /* BEFlatType */
 
 void
@@ -2802,7 +2796,7 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 } /* BEAlgebraicType */
 
 void
-BERecordTypeX (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields)
+BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields)
 {
 	int					nFields;
 	Types				type;
@@ -2849,7 +2843,7 @@ BERecordTypeX (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, in
 	sdef->sdef_type			= type;
 	sdef->sdef_arity		= constructorType->type_node_arity;
 
-	sdef->sdef_boxed_record	= is_boxed_record;
+	sdef->sdef_boxed_record	= FALSE;
 	
 	// +++ change this
 	{
@@ -2866,12 +2860,6 @@ BERecordTypeX (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, in
 		module->bem_constructors [i]	= type->type_lhs->ft_symbol;
 	}
 } /* BERecordType */
-
-void
-BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields)
-{
-	BERecordTypeX (moduleIndex,lhs,constructorType,0,fields);
-}
 
 void
 BEAbsType (BEFlatTypeP lhs)
@@ -3301,7 +3289,7 @@ BEGenerateCode (CleanString outputFile)
 } /* BEGenerateCode */
 
 void
-BEExportType (int dclTypeIndex, int iclTypeIndex)
+BEExportType (int isDictionary, int typeIndex)
 {
 	BEModuleP	dclModule, iclModule;
 	SymbolP		typeSymbol;
@@ -3309,8 +3297,8 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
-	Assert ((unsigned int) iclTypeIndex < iclModule->bem_nTypes);
-	typeSymbol	= iclModule->bem_types [iclTypeIndex];
+	Assert ((unsigned int) typeIndex < iclModule->bem_nTypes);
+	typeSymbol	= iclModule->bem_types [typeIndex];
 	Assert (typeSymbol->symb_kind == definition);
 
 	iclDef	= typeSymbol->symb_def;
@@ -3318,13 +3306,12 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 
 	dclModule	= &gBEState.be_icl.beicl_dcl_module;
 
-	/* +++ remove -1 hack */
-	if (dclTypeIndex == -1)
+	if (isDictionary)
 		dclDef	= iclDef;
 	else
 	{
-		Assert ((unsigned int) dclTypeIndex < dclModule->bem_nTypes);
-		typeSymbol	= dclModule->bem_types [dclTypeIndex];
+		Assert ((unsigned int) typeIndex < dclModule->bem_nTypes);
+		typeSymbol	= dclModule->bem_types [typeIndex];
 		Assert (typeSymbol->symb_kind == definition);
 		dclDef	= typeSymbol->symb_def;
 	}
@@ -3337,50 +3324,22 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 } /* BEExportType */
 
 void
-BESwapTypes (int frm, int to)
+BEExportConstructor (int constructorIndex)
 {
-	BEModuleP	module;
-	SymbolP		save;
-
-	module	= &gBEState.be_modules [main_dcl_module_n];
-
-	Assert ((unsigned int) frm < module->bem_nTypes);
-	Assert ((unsigned int) to < module->bem_nTypes);
-
-	save					= module->bem_types [frm];
-	module->bem_types [frm]	= module->bem_types [to];
-	module->bem_types [to]	= save;
-} /* BESwapTypes */
-
-void
-BEExportConstructor (int dclConstructorIndex, int iclConstructorIndex)
-{
-	BEModuleP	dclModule, iclModule;
+	BEModuleP	iclModule;
 	SymbolP		constructorSymbol;
 	SymbDefP	iclDef, dclDef;
 
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
-	Assert ((unsigned int) iclConstructorIndex < iclModule->bem_nConstructors);
-	constructorSymbol	= iclModule->bem_constructors [iclConstructorIndex];
+	Assert ((unsigned int) constructorIndex < iclModule->bem_nConstructors);
+	constructorSymbol	= iclModule->bem_constructors [constructorIndex];
 	Assert (constructorSymbol->symb_kind == definition);
 
 	iclDef	= constructorSymbol->symb_def;
 	iclDef->sdef_exported	= True;
 
-	if (0)
-	{
-		dclModule	= &gBEState.be_icl.beicl_dcl_module;
-	
-		Assert ((unsigned int) dclConstructorIndex < dclModule->bem_nConstructors);
-		constructorSymbol	= dclModule->bem_constructors [dclConstructorIndex];
-		Assert (constructorSymbol->symb_kind == definition);
-		dclDef	= constructorSymbol->symb_def;
-	
-		Assert (strcmp (iclDef->sdef_ident->ident_name, dclDef->sdef_ident->ident_name) == 0);
-	}
-	else
-		dclDef	= iclDef;
+	dclDef	= iclDef;
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
@@ -3389,7 +3348,7 @@ BEExportConstructor (int dclConstructorIndex, int iclConstructorIndex)
 } /* BEExportConstructor */
 
 void
-BEExportField (int dclFieldIndex, int iclFieldIndex)
+BEExportField (int isDictionaryField, int fieldIndex)
 {
 	BEModuleP	dclModule, iclModule;
 	SymbolP		fieldSymbol;
@@ -3397,22 +3356,21 @@ BEExportField (int dclFieldIndex, int iclFieldIndex)
 
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
-	Assert ((unsigned int) iclFieldIndex < iclModule->bem_nFields);
-	fieldSymbol	= &iclModule->bem_fields [iclFieldIndex];
+	Assert ((unsigned int) fieldIndex < iclModule->bem_nFields);
+	fieldSymbol	= &iclModule->bem_fields [fieldIndex];
 	Assert (fieldSymbol->symb_kind == definition);
 
 	iclDef	= fieldSymbol->symb_def;
 	iclDef->sdef_exported	= True;
 
-	/* +++ remove -1 hack */
-	if (dclFieldIndex == -1)
+	if (isDictionaryField)
 		dclDef	= iclDef;
 	else
 	{
 		dclModule	= &gBEState.be_icl.beicl_dcl_module;
 	
-		Assert ((unsigned int) dclFieldIndex < dclModule->bem_nFields);
-		fieldSymbol	= &dclModule->bem_fields [dclFieldIndex];
+		Assert ((unsigned int) fieldIndex < dclModule->bem_nFields);
+		fieldSymbol	= &dclModule->bem_fields [fieldIndex];
 		Assert (fieldSymbol->symb_kind == definition);
 		dclDef	= fieldSymbol->symb_def;
 	}
@@ -3426,7 +3384,7 @@ BEExportField (int dclFieldIndex, int iclFieldIndex)
 } /* BEExportField */
 
 void
-BEExportFunction (int dclFunctionIndex, int iclFunctionIndex)
+BEExportFunction (int functionIndex)
 {
 	BEModuleP	dclModule, iclModule;
 	SymbolP		functionSymbol;
@@ -3434,8 +3392,8 @@ BEExportFunction (int dclFunctionIndex, int iclFunctionIndex)
 
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
-	Assert ((unsigned int) iclFunctionIndex < iclModule->bem_nFunctions);
-	functionSymbol	= &iclModule->bem_functions [iclFunctionIndex];
+	Assert ((unsigned int) functionIndex < iclModule->bem_nFunctions);
+	functionSymbol	= &iclModule->bem_functions [functionIndex];
 	Assert (functionSymbol->symb_kind == definition);
 
 	iclDef	= functionSymbol->symb_def;
@@ -3443,8 +3401,8 @@ BEExportFunction (int dclFunctionIndex, int iclFunctionIndex)
 
 	dclModule	= &gBEState.be_icl.beicl_dcl_module;
 
-	Assert ((unsigned int) dclFunctionIndex < dclModule->bem_nFunctions);
-	functionSymbol	= &dclModule->bem_functions [dclFunctionIndex];
+	Assert ((unsigned int) functionIndex < dclModule->bem_nFunctions);
+	functionSymbol	= &dclModule->bem_functions [functionIndex];
 	Assert (functionSymbol->symb_kind == definition);
 	dclDef	= functionSymbol->symb_def;
 
