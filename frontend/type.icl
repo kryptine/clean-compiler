@@ -300,7 +300,7 @@ unifyTypes tv=:(TempV tv_number) attr1 type2 attr2 modules subst heaps
 		unify_variable_with_type tv_number type subst
 			| containsTypeVariable tv_number type subst
 				= (False, subst)
-					---> "unify_variable_with_type"
+//					---> "unify_variable_with_type"
 				= (True, { subst & [tv_number] = type})
 unifyTypes type attr1 tv=:(TempV _) attr2 modules subst heaps
 	= unifyTypes tv attr2 type attr1 modules subst heaps
@@ -324,7 +324,7 @@ unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2
 		| succ1 || succ2
 			= unifyTypes t1 attr1 t2 attr2 modules subst heaps
 			= (False, subst, heaps)
-				---> "unifyTypes1"
+//				---> "unifyTypes1"
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
 	# (_, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
 	= unifyTypeApplications cons_var attr1 types type2 attr2 modules subst heaps
