@@ -73,7 +73,7 @@ frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fu
 frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !*Heaps -> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File,!*Heaps) 
 frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out heaps
 	# (ok, mod, hash_table, error, predef_symbols, files)
-		= wantModule cWantIclFile mod_ident NoPos (hash_table ---> ("Parsing:", mod_ident)) error search_paths predef_symbols files
+		= wantModule cWantIclFile mod_ident NoPos (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
 	| not ok
 		= (No,{},0,0,predef_symbols, hash_table, files, error, io, out,heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:dcl_modules]
