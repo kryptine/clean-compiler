@@ -1053,7 +1053,8 @@ cIsNotStrict	:== False
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| DictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
 
-::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
+//::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
+::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr /* MV */ | TCE_TypeTerm !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
 
 ::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent | GTT_Function
 	
@@ -1127,7 +1128,8 @@ instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
-			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification
+			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
+			 TypeCodeExpression
 
 instance == TypeAttribute
 instance == Annotation

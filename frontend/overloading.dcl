@@ -45,8 +45,8 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	}
 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
-	!*TypeCodeInfo !*VarHeap !*ErrorAdmin
-		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
+	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
+		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
 
-updateDynamics :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin
-	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
+updateDynamics :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
+	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})

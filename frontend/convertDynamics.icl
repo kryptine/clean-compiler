@@ -191,7 +191,7 @@ where
 														app_info_ptr	= nilPtr },
 							let_info_ptr		= let_info_ptr}, ci)
 	convertDynamics cinp bound_vars default_expr (TypeCodeExpression type_code) ci
-		= convertTypecode cinp type_code ci
+		= abort "convertDynamics cinp bound_vars default_expr (TypeCodeExpression" //convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
 		= (EE, ci)
 	convertDynamics cinp bound_vars default_expr expression ci
@@ -202,6 +202,11 @@ convertTypecode cinp TCE_Empty ci
 	= (EE, ci)
 convertTypecode cinp (TCE_Var var_info_ptr) ci
 	= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+// MV ..
+convertTypecode cinp (TCE_TypeTerm var_info_ptr) ci
+	= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+// .. MV
+
 convertTypecode cinp (TCE_Constructor index typecode_exprs) ci
 	# (typecons_symb,  ci) 	= getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
 	  constructor			= get_constructor cinp.cinp_glob_type_inst index
@@ -225,6 +230,58 @@ convertTypecodes cinp [typecode_expr : typecode_exprs] ci
 	= (App {	app_symb		= cons_symb,
 				app_args 		= [expr , exprs],
 				app_info_ptr	= nilPtr}, ci)
+
+
+/*
+// MV ..
+//mv_convertTypecode ::  !ConversionInput TypeCodeExpression !*ConversionInfo  -> (Expression,!*ConversionInfo)
+mv_convertTypecode cinp TCE_Empty ci
+	= (EE, ci)
+mv_convertTypecode cinp (TCE_Var var_info_ptr) ci
+	= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+mv_convertTypecode cinp (TCE_TypeTerm var_info_ptr) ci
+	= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+
+mv_convertTypecode cinp (TCE_Constructor index typecode_exprs) ci
+	# (typecons_symb,  ci) 	= mv_getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
+	  constructor			= mv_get_constructor cinp.cinp_glob_type_inst index
+	  (typecode_exprs, ci)	= mv_convertTypecodes cinp typecode_exprs ci
+	= (App {app_symb		= typecons_symb,
+			app_args 		= [constructor , typecode_exprs],
+			app_info_ptr	= nilPtr}, ci)
+
+mv_convertTypecodes _ [] ci
+	= abort "dummy"
+*/	
+/*
+mv_convertTypecode cinp (TCE_Selector selections var_info_ptr) ci
+	= (Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ci)
+
+mv_convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
+mv_convertTypecodes _ [] ci
+	# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
+	= (App {	app_symb		= nil_symb,
+				app_args 		= [],
+				app_info_ptr	= nilPtr}, ci)
+mv_convertTypecodes cinp [typecode_expr : typecode_exprs] ci
+	# (cons_symb, ci) = getSymbol PD_ConsSymbol SK_Constructor 2 ci
+	  (expr,      ci) = mv_convertTypecode  cinp typecode_expr  ci
+	  (exprs,     ci) = mv_convertTypecodes cinp typecode_exprs ci
+	= (App {	app_symb		= cons_symb,
+				app_args 		= [expr , exprs],
+				app_info_ptr	= nilPtr}, ci)
+*/
+// Aux
+
+
+mv_getSymbol :: Index ((Global Index) -> SymbKind) Int !*PredefinedSymbols -> (SymbIdent, !*PredefinedSymbols)
+mv_getSymbol index symb_kind arity predef_symb
+	# ({pds_module, pds_def, pds_ident}, predef_symb) = predef_symb![index]
+	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+	= (symbol,predef_symb)
+
+// .. MV
+
 
 
 determine_defaults :: (Optional Expression) DefaultExpression !*ConversionInfo -> (Optional Expression, DefaultExpression, !*ConversionInfo)
@@ -539,6 +596,7 @@ getConstructor index arity ci=:{ci_predef_symb}
 
 
 a_ij_var_name :== { id_name = "a_ij", id_info = nilPtr }
+v_tc_name	  :== { id_name = "convertDynamicsvTC", id_info = nilPtr }
 
 case_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 case_ptr ci=:{ci_expr_heap}

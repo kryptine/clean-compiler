@@ -1168,7 +1168,6 @@ InitFunEnv :: !Int -> *{! FunctionType}
 InitFunEnv nr_of_fun_defs
 	= createArray nr_of_fun_defs EmptyFunctionType
 
-//CreateInitialSymbolTypes :: ![Int] !u:{# FunDef} !{# CommonDefs } !*TypeState -> (!u:{# FunDef}, !*TypeState)
 CreateInitialSymbolTypes start_index common_defs [] defs_and_state
 	= defs_and_state
 CreateInitialSymbolTypes start_index common_defs [fun : funs] (fun_defs, pre_def_symbols, req_cons_variables, ts)
@@ -1254,7 +1253,7 @@ where
 				  tc_member_symb = { symb_name = pds_ident, symb_kind = SK_OverloadedFunction {glob_module = pds_module, glob_object = pds_def }, symb_arity = 0}
 		 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
 				  context = {tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
-		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap //---> ("^EI_Dynamic No=" +++ toString var_store)
 				-> (inc var_store, type_heaps, var_heap,
 						expr_heap <:= (dyn_ptr, EI_TempDynamicType No tdt_type [context] expr_ptr tc_member_symb), predef_symbols)
 			EI_DynamicTypeWithVars loc_type_vars dt=:{dt_type,dt_global_vars} loc_dynamics
@@ -1520,7 +1519,7 @@ where
 										
 		# (subst, ts_type_heaps, ts_error)
 		  		= unify_requirements_of_functions fun_reqs ti (createArray nr_of_type_variables TE) ts.ts_type_heaps ts.ts_error
-		| not ts_error.ea_ok
+		| not ts_error.ea_ok //---> (("begin\n" ---> subst.[2]) ---> "\nend")
 			= (True, fun_defs, predef_symbols, special_instances, create_erroneous_function_types comp
 				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar})
 		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_td_infos} = ts
@@ -1558,8 +1557,8 @@ where
 			# ts_type_heaps = ts.ts_type_heaps
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
 									tci_type_var_heap = ts_type_heaps.th_vars } 
-			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error)
-			  		= updateDynamics comp local_pattern_variables fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error
+			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
+			  		= updateDynamics comp local_pattern_variables fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok, 
 				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
@@ -1567,9 +1566,9 @@ where
 			# ts_type_heaps = ts.ts_type_heaps
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
 									tci_type_var_heap = ts_type_heaps.th_vars } 
-			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error)
+			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
 			  		= removeOverloadedFunctions comp local_pattern_variables fun_defs ts.ts_fun_env
-			  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error 
+			  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok,
 				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
@@ -1628,18 +1627,19 @@ where
 
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
+
 	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
-		# (context, subst) = arraySubst context subst
+		# (context, subst) = arraySubst context subst 
 		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_location, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 	
 	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
 		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_location, fe_index) : calls]
-				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 	
+				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 
 
 	expand_type_contexts over_info_ptr (subst, expr_heap)
 		# (EI_Overloaded info, expr_heap) = readPtr over_info_ptr expr_heap
 		  (oc_context, subst) = arraySubst info.oc_context subst
-		= (subst, expr_heap <:= (over_info_ptr, EI_Overloaded { info & oc_context = oc_context }))
+		= (subst, expr_heap <:= (over_info_ptr, EI_Overloaded { info & oc_context = oc_context })) ---> oc_context
 
 	expand_types_of_cases_and_lets [] heap_and_subst
 		= heap_and_subst
@@ -1787,20 +1787,20 @@ where
 
 instance <<< AttrCoercion
 where
-	(<<<) file {ac_demanded,ac_offered} = file <<< ac_demanded <<< '~' <<< ac_offered
+	(<<<) file {ac_demanded,ac_offered} = file <<< "AttrCoercion: " <<< ac_demanded <<< '~' <<< ac_offered
 
 instance <<< TypeCoercion
 where
-	(<<<) file {tc_demanded,tc_offered} = file <<< tc_demanded <<< '~' <<< tc_offered
+	(<<<) file {tc_demanded,tc_offered} = file <<< "TypeCoercion: " <<< tc_demanded <<< '~' <<< tc_offered
 
 instance <<< TypeContext
 where
-	(<<<) file co = file <<< co.tc_class <<< " <" <<< ptrToInt co.tc_var <<< '>' <<< " " <<< co.tc_types
+	(<<<) file co = file <<< "TypeContext:  (tc_class)=" <<< co.tc_class <<< " (tc_var)=" <<< ptrToInt co.tc_var <<< " (tc_types)=" <<< " " <<< co.tc_types
 	
 instance <<< DefinedSymbol
 where
 	(<<<) file {ds_ident}
-		= file <<< ds_ident
+		= file <<< "DefinedSymbol: " <<< ds_ident
 
 instance <<< FunctionType
 where

@@ -994,7 +994,7 @@ cIsNotStrict	:== False
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| DictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
 
-::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
+::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr /* MV */ | TCE_TypeTerm !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
 
 ::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent | GTT_Function
 
@@ -1365,7 +1365,7 @@ where
 	(<<<) file (MatchExpr _ cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
 	(<<<) file (NoBind _) = file <<< "** NB **"
-	(<<<) file (DynamicExpr {dyn_expr,dyn_uni_vars,dyn_type_code})     = writeVarPtrs (file <<< "dynamic " <<< dyn_expr <<< " :: ") dyn_uni_vars <<< dyn_type_code 
+	(<<<) file (DynamicExpr {dyn_expr,dyn_uni_vars,dyn_type_code})     = writeVarPtrs (file <<< "dynamic " <<< dyn_expr <<< " :: dyn_uni_vars") dyn_uni_vars <<< "dyn_type_code=" <<< dyn_type_code 
 //	(<<<) file (TypeCase type_case)      = file <<< type_case
 	(<<<) file (TypeCodeExpression type_code)      = file <<< type_code
 	(<<<) file (Constant symb _ _ _)         = file <<<  "** Constant **" <<< symb
@@ -1405,11 +1405,15 @@ where
 	(<<<) file TCE_Empty
 		= file
 	(<<<) file (TCE_Var info_ptr)
-		= file <<< "VAR " <<< ptrToInt info_ptr
+		= file <<< "TCE_Var " <<< ptrToInt info_ptr
+// MV ..
+	(<<<) file (TCE_TypeTerm info_ptr)
+		= file <<< "TCE_TypeTerm " <<< ptrToInt info_ptr
+// .. MV	
 	(<<<) file (TCE_Constructor index exprs)
-		= file <<< "CONS " <<< index <<< ' ' <<< exprs
+		= file <<< "TCE_Constructor " <<< index <<< ' ' <<< exprs
 	(<<<) file (TCE_Selector selectors info_ptr)
-		= file <<< "CONS " <<< selectors <<< "VAR " <<< ptrToInt info_ptr
+		= file <<< "TCE_Selector " <<< selectors <<< "VAR " <<< ptrToInt info_ptr
 
 instance <<< Selection
 where
@@ -1534,8 +1538,8 @@ instance <<< DynamicType
 where
 	(<<<) file {dt_uni_vars,dt_type}
 		| isEmpty dt_uni_vars
-			= file <<< dt_type
-			= file <<< "A." <<< dt_uni_vars <<< ":" <<< dt_type
+			= file <<< "DynamicType" <<< dt_type
+			= file <<< "DynamicType" <<< "A." <<< dt_uni_vars <<< ":" <<< dt_type
 			
 
 instance <<< SignClassification
