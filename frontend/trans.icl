@@ -726,7 +726,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 									_			-> transCase True (Yes aci) this_case ro ti
 							_	-> transCase False No this_case ro ti
 	  ti = { ti & ti_symbol_heap = remove_aci_free_vars_info case_info_ptr ti.ti_symbol_heap }
-	= (result_expr, ti)
+	= (removeNeverMatchingSubcases result_expr, ti)
   where
 	skip_over this_case=:{case_expr,case_guards,case_default} ro ti
 		# ro_lost_root = { ro & ro_root_case_mode = NotRootCase }
@@ -762,7 +762,6 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 								-> (match_expr, ti)
 							No
 								-> (Case neverMatchingCase, ti)
-
 					// otherwise it's a function application
 					_	-> case opt_aci of
 							Yes aci=:{ aci_params, aci_opt_unfolder }
@@ -1054,6 +1053,50 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		free_var_to_bound_var {fv_name, fv_info_ptr}
 			= Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
 
+removeNeverMatchingSubcases keesExpr=:(Case kees)
+	// remove those case guards whose right hand side is a never matching case
+	| is_never_matching_case keesExpr
+		= keesExpr
+	# {case_guards, case_default} = kees
+	  filtered_default = get_filtered_default case_default
+	= case case_guards of
+		AlgebraicPatterns i alg_patterns
+			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
+			| has_become_never_matching filtered_default filtered_case_guards
+				-> Case neverMatchingCase
+			| is_default_only filtered_default filtered_case_guards
+				-> fromYes case_default
+			-> Case {kees & case_guards = AlgebraicPatterns i filtered_case_guards, case_default = filtered_default }
+		BasicPatterns bt basic_patterns
+			# filtered_case_guards = filter (not o is_never_matching_case o get_basic_rhs) basic_patterns
+			| has_become_never_matching filtered_default filtered_case_guards
+				-> Case neverMatchingCase
+			| is_default_only filtered_default filtered_case_guards
+				-> fromYes case_default
+			-> Case {kees & case_guards = BasicPatterns bt filtered_case_guards, case_default = filtered_default }
+  where
+	get_filtered_default y=:(Yes c_default)
+		| is_never_matching_case c_default
+			= No
+		= y
+	get_filtered_default no
+		= no
+	has_become_never_matching No [] = True
+	has_become_never_matching _ _ = False
+	is_default_only (Yes _) [] = True
+	is_default_only _ _ = False
+	is_never_matching_case (Case {case_guards = NoPattern, case_default = No })
+		= True
+	is_never_matching_case _
+		= False
+	get_alg_rhs {ap_expr} = ap_expr
+	get_basic_rhs {bp_expr} = bp_expr
+removeNeverMatchingSubcases expr
+	= expr
+
+fromYes (Yes x) = x
+
+	
 readExprInfo expr_info_ptr symbol_heap
 	# (expr_info, symbol_heap) = readPtr expr_info_ptr symbol_heap
 	= case expr_info of
