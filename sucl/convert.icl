@@ -304,3 +304,13 @@ convert_kind (FK_ImpFunction b) = SuclFunction  // Function from a (the) impleme
 convert_kind  FK_DefMacro       = SuclFunction  // Macro from a definition module
 convert_kind  FK_ImpMacro       = SuclFunction  // Macro from an implementation module
 convert_kind _ = abort "convert: convert_kind: unhandled DefOrImpFunKind constructor"
+
+/****************************************************************
+**  Conversion of exported function symbols from cocl to sucl  **
+****************************************************************/
+
+cts_exports :: {#FunType} -> [SuclSymbol]
+cts_exports funtypes = [convert_funtype funtype\\funtype<-:funtypes]
+
+convert_funtype :: FunType -> SuclSymbol
+convert_funtype funtype = SuclUser funtype.ft_symb.id_info

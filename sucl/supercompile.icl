@@ -36,3 +36,4 @@ supercompile common_defs array_instances dcl_mods main_dcl_module_n components f
 = (components,fun_defs,dcl_types,used_conses,var_heap,type_heaps,expression_heap)
   where used_conses = abort "supercompile: not implemented"
         _ = cts_function fun_defs
+        _ = cts_exports dcl_mods[main_dcl_module_n].dcl_functions
