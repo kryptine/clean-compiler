@@ -4,12 +4,13 @@ implementation module rule
 
 import graph
 import basic
+import StdEnv
 
 :: Rule sym var
    :== ([var],var,Graph sym var)
 
 :: Rgraph sym var
-   :== (var,Graph sym var)
+    = RgraphAlias var (Graph sym var)
 
 /*
 
@@ -111,22 +112,26 @@ Rooted graphs
 */
 
 emptyrgraph :: .var -> Rgraph .sym .var
-emptyrgraph root = (root,emptygraph)
+emptyrgraph root = RgraphAlias root emptygraph
 
-updatergraph :: .var (Node .sym .var) !(Rgraph .sym .var) -> Rgraph .sym .var
-updatergraph var node rgraph = mapsnd (updategraph var node) rgraph
+updatergraph :: var .(Node sym var) !.(Rgraph sym var) -> .Rgraph sym var
+updatergraph var node rgraph = maprgraph (mapsnd (updategraph var node)) rgraph
 
-prunergraph :: .var !(Rgraph .sym .var) -> Rgraph .sym .var
-prunergraph var rgraph = mapsnd (prunegraph var) rgraph
+prunergraph  :: var !.(Rgraph sym var) -> .Rgraph sym var
+prunergraph var rgraph = maprgraph (mapsnd (prunegraph var)) rgraph
 
-rgraphroot :: !(Rgraph .sym .var) -> .var
-rgraphroot (root,_) = root
+rgraphroot   :: !.(Rgraph sym var) -> var
+rgraphroot (RgraphAlias root _) = root
 
-rgraphgraph :: !(Rgraph .sym .var) -> Graph .sym .var
-rgraphgraph (_,graph) = graph
+rgraphgraph  :: !.(Rgraph sym var) -> Graph sym var
+rgraphgraph (RgraphAlias _ graph) = graph
 
 mkrgraph :: .var (Graph .sym .var) -> Rgraph .sym .var
-mkrgraph root graph = (root,graph)
+mkrgraph root graph = RgraphAlias root graph
+
+maprgraph :: (.(var1,Graph sym1 var1) -> (.var2,Graph .sym2 .var2)) !.(Rgraph sym1 var1) -> Rgraph .sym2 .var2
+maprgraph f (RgraphAlias root1 graph1) = RgraphAlias root2 graph2
+   where (root2,graph2) = f (root1,graph1)
 
 /*
 >   showrgraph showfunc shownode (root,graph)
@@ -189,3 +194,7 @@ rulegraph (_,_,graph) = graph
 >   compilerule args root = mkrule args root.compilegraph
 
 */
+
+instance == (Rgraph sym var) | == sym & == var
+where (==) (RgraphAlias root1 graph1) (RgraphAlias root2 graph2)
+       = root1==root2 && graph1==graph2

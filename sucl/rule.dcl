@@ -3,6 +3,7 @@ definition module rule
 // $Id$
 
 from graph import Graph,Node
+from StdOverloaded import ==
 
 // --- Exported types
 
@@ -29,16 +30,18 @@ rulegraph :: !(Rule .sym .var) -> Graph .sym .var
 emptyrgraph  :: .var -> Rgraph .sym .var
 
 // Update the contents of a variable in a rooted graph
-updatergraph :: .var (Node .sym .var) !(Rgraph .sym .var) -> Rgraph .sym .var
+updatergraph :: var .(Node sym var) !.(Rgraph sym var) -> .Rgraph sym var
 
 // Prune a rooted graph at a variable (making it free)
-prunergraph  :: .var !(Rgraph .sym .var) -> Rgraph .sym .var
+prunergraph  :: var !.(Rgraph sym var) -> .Rgraph sym var
 
 // Get the root of a rooted graph
-rgraphroot   :: !(Rgraph .sym .var) -> .var
+rgraphroot   :: !.(Rgraph sym var) -> var
 
 // Get the graph part of a rooted graph
-rgraphgraph  :: !(Rgraph .sym .var) -> Graph .sym .var
+rgraphgraph  :: !.(Rgraph sym var) -> Graph sym var
 
 // Build a rooted graph from a root and a graph
 mkrgraph     :: .var (Graph .sym .var) -> Rgraph .sym .var
+
+instance == (Rgraph sym var) | == sym & == var
