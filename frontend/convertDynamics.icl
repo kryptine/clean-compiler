@@ -565,12 +565,15 @@ convertExprTypeCode cinp tce ci
 	| not (isEmpty binds)
 		=	abort "unexpected binds in expression type code"
 	// ... sanity check	
-	# (normalise_symb, ci) 
-		=	getSymbol PD_Dyn_normalise SK_Function 2 ci
-	# type_code
-		=	App { app_symb = normalise_symb,
-				app_args = [ BasicExpr (BVB has_var), Var cinp.cinp_subst_var, type_code],  app_info_ptr = nilPtr }
-	=	(type_code, ci)
+	| has_var
+		# (normalise_symb, ci) 
+			=	getSymbol PD_Dyn_normalise SK_Function 2 ci
+		# type_code
+			=	App { app_symb = normalise_symb,
+					app_args = [ Var cinp.cinp_subst_var, type_code],  app_info_ptr = nilPtr }
+		=	(type_code, ci)
+	// otherwise
+		=	(type_code, ci)
 
 convertPatternTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 										-> (!Expression, ![LetBind], !*ConversionState)
