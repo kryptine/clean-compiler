@@ -351,34 +351,65 @@ where
 
 	lift_patterns_2 False [guard_expr] outer_case ro ti
 		// if no default pattern exists, then the outer case expression does not have to be copied for the last pattern
-		# (guard_expr, ti) = transformCase {outer_case & case_expr = guard_expr} ro ti
+		# (guard_expr, ti)						= possiblyFoldOuterCase True guard_expr outer_case ro ti
 		= ([guard_expr], ti)
 	lift_patterns_2 default_exists [guard_expr : guard_exprs] outer_case ro ti
-		# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No
-				,us_cleanup_info=ti.ti_cleanup_info, us_local_macro_functions = No }
-		  ui = {ui_handle_aci_free_vars = LeaveThem }
-		  (outer_guards, us=:{us_cleanup_info})	= unfold outer_case.case_guards ui us
-		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr us.us_symbol_heap
-		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
-		  new_cleanup_info = case expr_info of 
-		  		EI_Extended _ _
-		  			-> [new_info_ptr:us_cleanup_info]
-		  		_ 	-> us_cleanup_info
-		  ti = { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
-		  new_case = { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
-		  (guard_expr, ti) = transformCase new_case ro ti
+		# (guard_expr, ti)						= possiblyFoldOuterCase False guard_expr outer_case ro ti
 		  (guard_exprs, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 		= ([guard_expr : guard_exprs], ti)
 	lift_patterns_2 _ [] _ _ ti
 		= ([], ti)
 		
 	lift_default (Yes default_expr) outer_case ro ti
-		# (default_expr, ti) = transformCase { outer_case & case_expr = default_expr } ro ti
+		# (default_expr, ti)					= possiblyFoldOuterCase True default_expr outer_case ro ti
 		= (Yes default_expr, ti)
 	lift_default No _ _ ti
 		= (No, ti)
 
-transCase is_active opt_aci this_case=:{case_expr = (App app=:{app_symb,app_args}),case_guards,case_default,case_explicit} ro ti
+	possiblyFoldOuterCase final guard_expr outer_case ro ti
+		| SwitchAutoFoldCaseInCase (isFoldExpression guard_expr) False // otherwise GOTO next alternative
+			= transformApplication { app_symb = folder, app_args = folder_args, app_info_ptr = nilPtr } [] ro ti
+	where
+		isFoldExpression (App app)	= isFoldSymbol app.app_symb.symb_kind
+		isFoldExpression (Var _)	= True
+//		isFoldExpression (Case _)	= True
+		isFoldExpression _			= False
+		
+		isFoldSymbol (SK_Function _)			= True
+		isFoldSymbol (SK_LocalMacroFunction _)	= True
+		isFoldSymbol (SK_GeneratedFunction _ _)	= True
+		isFoldSymbol _							= False
+		
+		folder		= ro.ro_fun_orig
+		folder_args = f_a_before` ++ [guard_expr:f_a_after`]
+		f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
+		f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
+		f_a_after	= dropWhile (\e -> isMember e aci.aci_params) f_a_help
+		f_a_before`	= [Var {var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr} \\ {fv_name,fv_info_ptr} <- f_a_before]
+		f_a_after`	= [Var {var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr} \\ {fv_name,fv_info_ptr} <- f_a_after]
+		(Yes aci)	= opt_aci
+
+		isMember x [hd:tl] = hd.fv_info_ptr==x.fv_info_ptr || isMember x tl
+		isMember x []	= False
+
+	possiblyFoldOuterCase final guard_expr outer_case ro ti
+		| final
+			= transformCase {outer_case & case_expr = guard_expr} ro ti
+		# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No
+				,us_cleanup_info=ti.ti_cleanup_info, us_local_macro_functions = No }
+		  ui									= {ui_handle_aci_free_vars = LeaveThem }
+		  (outer_guards, us=:{us_cleanup_info})	= unfold outer_case.case_guards ui us
+		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr us.us_symbol_heap
+		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
+		  new_cleanup_info 						= case expr_info of 
+		  		EI_Extended _ _
+		  			-> [new_info_ptr:us_cleanup_info]
+		  		_ 	-> us_cleanup_info
+		  ti = { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
+		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
+		= transformCase new_case ro ti
+	
+transCase is_active opt_aci this_case=:{case_expr = case_expr=:(App app=:{app_symb,app_args}),case_guards,case_default,case_explicit} ro ti
 	= case app_symb.symb_kind of
 		SK_Constructor cons_index
 			| not is_active
@@ -404,7 +435,7 @@ transCase is_active opt_aci this_case=:{case_expr = (App app=:{app_symb,app_args
 						Yes unfolder
 							| not (equal app_symb.symb_kind unfolder.symb_kind)
 								// in this case a third function could be fused in
-								-> skip_over this_case ro ti								//---> ("transCase","Diff opt unfolder",app_symb,unfolder)
+								-> possiblyFoldOuterCase this_case ro ti
 							# variables = [ Var {var_name=fv_name, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr}
 											\\ {fv_name, fv_info_ptr} <- ro.ro_fun_args ]
 							  (ti_next_fun_nr, ti) = ti!ti_next_fun_nr						//---> ("transCase","Yes opt unfolder")
@@ -428,6 +459,23 @@ transCase is_active opt_aci this_case=:{case_expr = (App app=:{app_symb,app_args
 							-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
 				No	-> skip_over this_case ro ti
 where
+	possiblyFoldOuterCase outer_case ro ti
+		| SwitchAutoFoldAppInCase True False
+			= transformApplication { app_symb = folder, app_args = folder_args, app_info_ptr = nilPtr } [] ro ti
+		= skip_over this_case ro ti
+	where
+		folder		= ro.ro_fun_orig
+		folder_args = f_a_before` ++ [case_expr:f_a_after`]
+		f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
+		f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
+		f_a_after	= dropWhile (\e -> isMember e aci.aci_params) f_a_help
+		f_a_before`	= [Var {var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr} \\ {fv_name,fv_info_ptr} <- f_a_before]
+		f_a_after`	= [Var {var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr} \\ {fv_name,fv_info_ptr} <- f_a_after]
+		(Yes aci)	= opt_aci
+
+		isMember x [hd:tl] = hd.fv_info_ptr==x.fv_info_ptr || isMember x tl
+		isMember x []	= False
+
 	equal (SK_Function glob_index1) (SK_Function glob_index2)
 		= glob_index1==glob_index2
 	equal (SK_LocalMacroFunction glob_index1) (SK_LocalMacroFunction glob_index2)
@@ -1002,8 +1050,8 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
  * GENERATE FUSED FUNCTION
  */
 
-generateFunction :: !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !*TransformInfo -> (!Index, !Int, !*TransformInfo)
-generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
+generateFunction :: !SymbIdent !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !*TransformInfo -> (!Index, !Int, !*TransformInfo)
+generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
 				 cc_args cc_linear_bits prods fun_def_ptr ro
 				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
 				 		ti_type_heaps,ti_cons_args,ti_cleanup_info, ti_type_def_infos}
@@ -1241,6 +1289,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	# ro 	=	{ ro &	ro_root_case_mode = ro_root_case_mode,
 						ro_fun_root = ro_fun,
 						ro_fun_case = ro_fun,
+						ro_fun_orig = app_symb,
 						ro_fun_args = new_fun_args
 				}
 //	| False ---> ("transform generated function:",ti_next_fun_nr,ro_root_case_mode)		= undef
@@ -2044,7 +2093,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
 	  			# ti = update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
-	  			# (fun_index, fun_arity, ti) = generateFunction fun_def cc_args cc_linear_bits producers fun_def_ptr ro ti
+	  			# (fun_index, fun_arity, ti) = generateFunction app_symb fun_def cc_args cc_linear_bits producers fun_def_ptr ro ti
 				| fun_index == (-1)
 					= (build_application { app & app_args = app_args } extra_args, ti)
 	  			# app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index }
