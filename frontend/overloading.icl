@@ -24,6 +24,7 @@ import genericsupport, compilerSwitches, type_io_common
 
 ::	TypeCodeInstance =
 	{	tci_index			:: !Index
+	,	tci_constructor		:: !GlobalTCType
 	,	tci_contexts		:: ![ClassApplication]
 	}
 
@@ -543,25 +544,25 @@ where
 			  		= addGlobalTCInstance type_constructor (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
-			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
+			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
 		reduce_tc_context type_code_class (TAS cons_id=:{type_index} cons_args _) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
 			# type_constructor = toTypeCodeConstructor type_index defs
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance type_constructor (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
-			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
+			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
 		reduce_tc_context type_code_class (TB basic_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance (GTT_Basic basic_type) (si_next_TC_member_index, si_TC_instances)
-			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = [] },
+			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = GTT_Basic basic_type, tci_contexts = [] },
 					(new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap))
 		reduce_tc_context type_code_class (arg_type --> result_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance GTT_Function (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class [arg_type, result_type]
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
-			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
+			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = GTT_Function, tci_contexts = rc_red_contexts }, instances)
 		reduce_tc_context type_code_class (TempQV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap)
 			# (inst_var, (type_pattern_vars, var_heap)) = addLocalTCInstance var_number (type_pattern_vars, var_heap)
 			= (CA_LocalTypeCode inst_var, (new_contexts, special_instances, type_pattern_vars, var_heap))
@@ -886,9 +887,9 @@ where
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
 		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
 				({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
-	adjust_member_application defs contexts  _ (CA_GlobalTypeCode {tci_index,tci_contexts}) _ heaps_and_ptrs
+	adjust_member_application defs contexts  _ (CA_GlobalTypeCode {tci_index,tci_constructor,tci_contexts}) _ heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
-		= (EI_TypeCode (TCE_Constructor tci_index (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
+		= (EI_TypeCode (TCE_Constructor tci_index tci_constructor (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
 	adjust_member_application defs contexts _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
 	
@@ -948,9 +949,9 @@ where
 			= (Selection NormalSelector (ClassVariable class_context.tc_var) (generateClassSelection context_address []), ({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
 	convert_class_appl_to_expression defs contexts (CA_LocalTypeCode new_var_ptr) heaps_and_ptrs
 		= (TypeCodeExpression (TCE_Var new_var_ptr), heaps_and_ptrs)
-	convert_class_appl_to_expression defs contexts (CA_GlobalTypeCode {tci_index,tci_contexts}) heaps_and_ptrs
+	convert_class_appl_to_expression defs contexts (CA_GlobalTypeCode {tci_index,tci_constructor,tci_contexts}) heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
-		= (TypeCodeExpression (TCE_Constructor tci_index (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
+		= (TypeCodeExpression (TCE_Constructor tci_index tci_constructor (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
 
 	convert_reduced_contexts_to_expression defs contexts {rcs_class_context,rcs_constraints_contexts} heaps_and_ptrs
 		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_reduced_contexts_to_expression defs contexts) rcs_constraints_contexts heaps_and_ptrs
@@ -1267,9 +1268,9 @@ where
 		= (new_var_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeCode (TCE_Var new_var_ptr)), var_heap))
 
 updateFreeVarsOfTCE :: !Ident !TypeCodeExpression (!*VarHeap, !*ErrorAdmin) -> (!TypeCodeExpression, !(!*VarHeap, *ErrorAdmin))
-updateFreeVarsOfTCE symb_name (TCE_Constructor type_index type_args) var_heap_and_error 
+updateFreeVarsOfTCE symb_name (TCE_Constructor type_index type_cons type_args) var_heap_and_error 
 	# (type_args, var_heap_and_error) = mapSt (updateFreeVarsOfTCE symb_name) type_args var_heap_and_error 
-	= (TCE_Constructor type_index type_args, var_heap_and_error)
+	= (TCE_Constructor type_index type_cons type_args, var_heap_and_error)
 updateFreeVarsOfTCE symb_name (TCE_Selector selections var_info_ptr) var_heap_and_error
 	# (var_info_ptr, var_heap_and_error) = getTCDictionary symb_name var_info_ptr var_heap_and_error
 	= (TCE_Selector selections var_info_ptr, var_heap_and_error)
@@ -1346,18 +1347,18 @@ instance toTypeCodeExpression Type where
 		  	=	addGlobalTCInstance type_constructor (tci_next_index, tci_instances)
 		  (type_code_args, tci)
 		  	=	mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
-		= (TCE_Constructor inst_index type_code_args, tci)
+		= (TCE_Constructor inst_index type_constructor type_code_args, tci)
 	toTypeCodeExpression symb_name (TAS cons_id type_args _) state
 		=	toTypeCodeExpression symb_name (TA cons_id type_args) state
 	toTypeCodeExpression symb_name (TB basic_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
 		# (inst_index, (tci_next_index, tci_instances))
 		  		= addGlobalTCInstance (GTT_Basic basic_type) (tci_next_index, tci_instances)
-		= (TCE_Constructor inst_index [], ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error))
+		= (TCE_Constructor inst_index (GTT_Basic basic_type) [], ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error))
 	toTypeCodeExpression symb_name (arg_type --> result_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
 		# (inst_index, (tci_next_index, tci_instances))
 				= addGlobalTCInstance GTT_Function (tci_next_index, tci_instances)
 		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) [arg_type, result_type] ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
-		= (TCE_Constructor inst_index type_code_args, tci)
+		= (TCE_Constructor inst_index GTT_Function type_code_args, tci)
 	toTypeCodeExpression symb_name (TV var) st
 		= toTypeCodeExpression symb_name var st
 	toTypeCodeExpression symb_name (TFA vars type) (tci=:{tci_type_var_heap}, var_heap, error)
@@ -1678,14 +1679,14 @@ where
 			# ui
 				=	{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error}
 			=	(TCE_TypeTerm var_info_ptr, ui)
-		adjust_type_code (TCE_Constructor index typecode_exprs)
+		adjust_type_code (TCE_Constructor index cons typecode_exprs)
 							ui=:{ui_x={x_type_code_info={tci_type_constructors_in_patterns} }}
 			# ui
 				= { ui & ui_x.x_type_code_info.tci_type_constructors_in_patterns =
 											[index:tci_type_constructors_in_patterns] }
 			# (typecode_exprs, ui)
 				=	mapSt adjust_type_code typecode_exprs ui
-			=	(TCE_Constructor index typecode_exprs, ui)
+			=	(TCE_Constructor index cons typecode_exprs, ui)
 		adjust_type_code (TCE_UniType uni_vars type_code) ui
 			# (type_code, ui)
 				=	adjust_type_code type_code ui

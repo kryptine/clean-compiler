@@ -623,11 +623,11 @@ convertTypeCode pattern cinp (TCE_App t arg) (has_var, binds, ci)
 	= (App {app_symb		= typeapp_symb,
 			app_args 		= [typecode_t, typecode_arg],
 			app_info_ptr	= nilPtr}, st)
-convertTypeCode pattern cinp (TCE_Constructor index []) (has_var, binds, ci)
+convertTypeCode pattern cinp (TCE_Constructor index cons []) (has_var, binds, ci)
 	# (typecons_symb, ci)
 		=	getSymbol PD_Dyn_TypeCons SK_Constructor 1 ci
 	# (constructor, ci)
-		=	typeConstructor cinp.cinp_glob_type_inst.[index] ci
+		=	typeConstructor cons /* cinp.cinp_glob_type_inst.[index]*/ ci
 	= (App {app_symb		= typecons_symb,
 			app_args 		= [constructor],
 			app_info_ptr	= nilPtr}, (has_var, binds, ci))
@@ -693,9 +693,9 @@ where
 			=	PD_Dyn_TypeCodeConstructor_UnboxedArray
 		// otherwise
 			=	fatal "predefinedType" "TC code from predef"
-convertTypeCode pattern cinp (TCE_Constructor index args) st
+convertTypeCode pattern cinp (TCE_Constructor index cons args) st
 	# curried_type
-		=	foldl TCE_App (TCE_Constructor index []) args
+		=	foldl TCE_App (TCE_Constructor index cons []) args
 	=	convertTypeCode pattern cinp curried_type st
 convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, ci)
 		# (tv_symb, ci)

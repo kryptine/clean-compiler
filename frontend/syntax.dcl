@@ -1301,7 +1301,7 @@ instance == OverloadedListType
 ::	TypeCodeExpression	= TCE_Empty
 						| TCE_Var 			!VarInfoPtr
 						| TCE_TypeTerm		!VarInfoPtr
-						| TCE_Constructor	!Index			![TypeCodeExpression]
+						| TCE_Constructor	!Index	!GlobalTCType		![TypeCodeExpression]
 						| TCE_App			!TypeCodeExpression !TypeCodeExpression
 						| TCE_Selector		![Selection]	!VarInfoPtr
 						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
