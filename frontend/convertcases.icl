@@ -1414,6 +1414,10 @@ where
 	distributeLets depth (ArraySelection selector expr_ptr expr) cp_info
 		# (expr, cp_info) = distributeLets depth expr cp_info
 		= (ArraySelection selector expr_ptr expr, cp_info)
+	distributeLets depth (DictionarySelection var selectors expr_ptr expr) cp_info
+		# (selectors, cp_info) = distributeLets depth selectors cp_info
+		# (expr, cp_info) = distributeLets depth expr cp_info
+		= (DictionarySelection var selectors expr_ptr expr, cp_info)
 	distributeLets depth selection cp_info
 		= (selection, cp_info)
 
