@@ -2642,7 +2642,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 	  (icl_functions, e_info, heaps, cs) = checkMacros cIclModIndex cdefs.def_macros icl_functions e_info heaps cs
 	  (icl_functions, e_info, heaps, cs) = checkFunctions cIclModIndex cGlobalScope icl_global_function_range.ir_from icl_global_function_range.ir_to icl_functions e_info heaps cs
 
-	  cs = check_start_rule mod_type icl_global_function_range cs
+	  cs = check_start_rule mod_type mod_name icl_global_function_range cs
 	  cs = check_needed_modules_are_imported mod_name ".icl" cs
 
 	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error})
@@ -2686,7 +2686,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 	    		  			icl_declared = {dcls_local = local_defs, dcls_import = icl_imported, dcls_explicit = dcls_explicit} }
 		= (False, icl_mod, dcl_modules, {}, No, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
 	where
-		check_start_rule mod_kind {ir_from, ir_to} cs=:{cs_predef_symbols,cs_symbol_table}
+		check_start_rule mod_kind mod_name {ir_from, ir_to} cs=:{cs_predef_symbols,cs_symbol_table}
 			# (pre_symb, cs_predef_symbols) = cs_predef_symbols![PD_Start]
 			  ({ste_kind, ste_index}, cs_symbol_table) = readPtr pre_symb.pds_ident.id_info cs_symbol_table
 			  cs = { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table }
@@ -2699,7 +2699,8 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 				_
 					-> case mod_kind of
 							MK_Main
-								-> { cs & cs_error = checkError "Start" " function not defined" cs.cs_error }
+								# pos = newPosition pre_symb.pds_ident (LinePos (mod_name.id_name+++".icl") 1)
+								-> { cs & cs_error = checkErrorWithIdentPos pos " has not been declared" cs.cs_error }
 							_
 								-> cs
 

@@ -894,7 +894,7 @@ cNonUniqueSelection	:== False
 				| PE_Ident !Ident
 				| PE_Basic !BasicValue
 				| PE_Bound !BoundExpr
-				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr
+				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr !Position
 				| PE_Tuple ![ParsedExpr]				
 				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
 				| PE_ArrayPattern ![ElemAssignment]

@@ -1944,7 +1944,13 @@ trySimpleNonLhsExpressionT BackSlashToken pState
 	  (lam_args, pState) 	= wantList "arguments" trySimpleLhsExpression pState
 	  pState				= want_lambda_sep pState
 	  (exp, pState)			= wantExpression cIsNotAPattern pState
-	= (True, PE_Lambda lam_ident lam_args exp, pState)
+// MW9..
+	  (file_name, line_nr, pState)	
+	  						= getFileAndLineNr pState
+	  position				= FunPos file_name line_nr lam_ident.id_name
+// ..MW9
+// MW9 was	= (True, PE_Lambda lam_ident lam_args exp, pState)
+	= (True, PE_Lambda lam_ident lam_args exp position, pState)
 	where
 		want_lambda_sep pState
 			# (token, pState) = nextToken FunctionContext pState

@@ -159,10 +159,8 @@ checkWarning id mess error=:{ea_file,ea_loc}
 	= { error & ea_file = ea_file <<< "Check Warning " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n' }
 
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
-checkErrorWithIdentPos ident_pos mess error_admin
-	# error_admin = pushErrorAdmin ident_pos error_admin
-	  error_admin = checkError ident_pos.ip_ident mess error_admin
-	= popErrorAdmin error_admin
+checkErrorWithIdentPos ident_pos mess error=:{ea_file}
+	= { error & ea_file = ea_file <<< "Check Error " <<< ident_pos <<< ":" <<< mess <<< '\n', ea_ok = False }
 
 class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 

@@ -129,9 +129,11 @@ where
 	collectFunctions (PE_Bound bound_expr) ca
 		# (bound_expr, ca) = collectFunctions bound_expr ca
 		= (PE_Bound bound_expr, ca)
-	collectFunctions (PE_Lambda lam_ident args res) ca
+// MW was:	collectFunctions (PE_Lambda lam_ident args res) ca
+	collectFunctions (PE_Lambda lam_ident args res pos) ca
 		# ((args,res), ca) = collectFunctions (args,res) ca
-		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res] ca
+// MW was:		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res] ca
+		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos] ca
 		= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = range, loc_nodes = [] })
 				(PE_Ident lam_ident), ca)
 	collectFunctions (PE_Record rec_expr type_name fields) ca
@@ -297,12 +299,15 @@ where
 
 NoCollectedLocalDefs :== CollectedLocalDefs { loc_functions = { ir_from = 0, ir_to = 0 }, loc_nodes = [] }
 
-transformLambda :: Ident [ParsedExpr] ParsedExpr -> FunDef
-transformLambda lam_ident args result
+// MW was:transformLambda :: Ident [ParsedExpr] ParsedExpr -> FunDef
+transformLambda :: Ident [ParsedExpr] ParsedExpr Position -> FunDef
+// MW was:transformLambda lam_ident args result
+transformLambda lam_ident args result pos
 	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs },
 	  			  rhs_locals = NoCollectedLocalDefs }
 	  lam_body = [{pb_args = args, pb_rhs = lam_rhs }]
-	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No NoPos
+// MW was:	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No NoPos
+	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 	= fun_def
 
 makeNilExpression :: *CollectAdmin -> (ParsedExpr,*CollectAdmin)

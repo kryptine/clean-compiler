@@ -516,10 +516,10 @@ cNotVarNumber :== -1
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
 ::	Producer	= PR_Empty
-				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application
+				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application (XXX possibly superfluous (already contained in SymbIdent))
 				| PR_Class !App ![BoundVar] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
-				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application
+				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application (XXX possibly superfluous (already contained in SymbIdent))
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
@@ -859,7 +859,7 @@ cNonUniqueSelection	:== False
 				| PE_Ident !Ident
 				| PE_Basic !BasicValue
 				| PE_Bound !BoundExpr
-				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr
+				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr !Position
 				| PE_Tuple ![ParsedExpr]				
 				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
 				| PE_ArrayPattern ![ElemAssignment]
@@ -1455,7 +1455,7 @@ where
 	(<<<) file PE_Empty = file <<< "** E **"
 	(<<<) file (PE_Ident symb) = file <<< symb
 	(<<<) file PE_WildCard = file <<< '_'
-	(<<<) file (PE_Lambda _ exprs expr) = file <<< '\\' <<< exprs <<< " -> " <<< expr
+	(<<<) file (PE_Lambda _ exprs expr _) = file <<< '\\' <<< exprs <<< " -> " <<< expr
 	(<<<) file (PE_Bound bind) = file <<< bind
 	(<<<) file (PE_Case _ expr alts) = file <<< "case " <<< expr <<< " of\n" <<< alts
 	(<<<) file (PE_Let _ defs expr) = file <<< "let " <<< defs <<< " in\n" <<< expr
