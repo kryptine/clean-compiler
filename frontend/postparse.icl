@@ -777,7 +777,8 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
-reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index *CollectAdmin -> ([FunDef],CollectedDefinitions (ParsedInstance FunDef) [FunDef], [ParsedImport], [ImportedObject], *CollectAdmin)
+//reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index *CollectAdmin -> ([FunDef],CollectedDefinitions (ParsedInstance FunDef) [FunDef], [ParsedImport], [ImportedObject], *CollectAdmin)
+reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject], !*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
