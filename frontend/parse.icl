@@ -896,7 +896,7 @@ want_2_0_import_declaration token pState
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, pState)
 			InstanceToken
 				#	(class_name, pState)	= want pState
-//					(ii_extended, pState)	= optional_extension pState // XXX fix this, Pieter
+//					(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
 					ii_extended				= False
 					(types, pState)			= wantList "instance types" tryBrackType pState
 					(class_id, pState)		= stringToIdent class_name IC_Class pState
