@@ -243,7 +243,9 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 			rs=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
 	# (local_vars, vars_and_heaps) = weighted_ref_count_in_case_patterns {rci & rci_depth=rci_depth+1} case_guards rcs_imports rcs_var_heap rcs_expr_heap
 	  (default_vars, (all_vars, rcs_imports, var_heap, expr_heap)) = weighted_ref_count_in_default {rci & rci_depth=rci_depth+1} case_default vars_and_heaps
-	  rs = weightedRefCount rci case_expr { rs & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports }
+	  rs = { rs & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports }
+	  rs = weighted_ref_count_of_decons_expr rci case_guards rs
+	  rs = weightedRefCount rci case_expr rs
 	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) all_vars (rs.rcs_free_vars, rs.rcs_var_heap)
 	  rcs_expr_heap = rs.rcs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type 
 	  		{ rcc_all_variables = all_vars, rcc_default_variables = default_vars, rcc_pattern_variables = local_vars })
@@ -257,27 +259,33 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 
 		weighted_ref_count_in_case_patterns rci (AlgebraicPatterns type patterns) collected_imports var_heap expr_heap
 			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], collected_imports, var_heap, expr_heap)
-		where
-			weighted_ref_count_in_algebraic_pattern rci=:{rci_imported} {ap_expr,ap_symbol} wrcs_state
-				# (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
-					= weightedRefCountInPatternExpr rci ap_expr wrcs_state
-				  (collected_imports, var_heap)
-					=	check_symbol rci_imported ap_symbol collected_imports var_heap
-				=	(free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
-				where
-					check_symbol {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} collected_imports var_heap
-						| glob_module <> cii_main_dcl_module_n
-							# {cons_type_ptr} = cii_common_defs.[glob_module].com_cons_defs.[ds_index]
-							  (collected_imports, var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
-									cons_type_ptr (collected_imports, var_heap)
-							= (collected_imports, var_heap)
-						// otherwise
-							= (collected_imports, var_heap)
-
 		weighted_ref_count_in_case_patterns rci (BasicPatterns type patterns) collected_imports var_heap expr_heap
 			= mapSt (\{bp_expr} -> weightedRefCountInPatternExpr rci bp_expr) patterns ([], collected_imports, var_heap, expr_heap)
+		weighted_ref_count_in_case_patterns rci (OverloadedListPatterns type _ patterns) collected_imports var_heap expr_heap
+			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns rci (DynamicPatterns patterns) collected_imports var_heap expr_heap
 			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr rci dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
+
+		weighted_ref_count_in_algebraic_pattern rci=:{rci_imported} {ap_expr,ap_symbol} wrcs_state
+			# (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
+				= weightedRefCountInPatternExpr rci ap_expr wrcs_state
+			  (collected_imports, var_heap)
+				=	check_symbol rci_imported ap_symbol collected_imports var_heap
+			=	(free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
+			where
+				check_symbol {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} collected_imports var_heap
+					| glob_module <> cii_main_dcl_module_n
+						# {cons_type_ptr} = cii_common_defs.[glob_module].com_cons_defs.[ds_index]
+						  (collected_imports, var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
+								cons_type_ptr (collected_imports, var_heap)
+						= (collected_imports, var_heap)
+					// otherwise
+						= (collected_imports, var_heap)
+
+	 	weighted_ref_count_of_decons_expr rci (OverloadedListPatterns _ decons_exp _) rs
+	 		= weightedRefCount rci decons_exp rs;
+	 	weighted_ref_count_of_decons_expr rci case_guards rs
+	 		= rs;
 
 weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseTypeAndRefCounts case_type {rcc_all_variables})
 			rs=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
@@ -537,12 +545,6 @@ where
 		distribute_lets_in_patterns depth ref_counts (AlgebraicPatterns conses patterns) ds
 			# (patterns, ds) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) ds
 			= (AlgebraicPatterns conses patterns, ds)
-		where
-			distribute_lets_in_alg_pattern depth (ref_counts,pattern) ds=:{ds_var_heap}
-				# (ap_vars, ds_var_heap) = mapSt refresh_variable pattern.ap_vars ds_var_heap
-				  ds = {ds & ds_var_heap = ds_var_heap}
-				  (ap_expr, ds) = distribute_lets_in_pattern_expr depth ref_counts pattern.ap_expr ds
-				= ({ pattern & ap_vars = ap_vars, ap_expr = ap_expr }, ds) 
 		distribute_lets_in_patterns depth ref_counts (BasicPatterns type patterns) ds
 			# (patterns, ds) = mapSt (distribute_lets_in_basic_pattern depth) (exactZip ref_counts patterns) ds
 			= (BasicPatterns type patterns, ds)
@@ -550,6 +552,15 @@ where
 			distribute_lets_in_basic_pattern depth (ref_counts,pattern) ds
 				# (bp_expr, ds) = distribute_lets_in_pattern_expr depth ref_counts pattern.bp_expr ds
 				= ({ pattern & bp_expr = bp_expr }, ds)
+		distribute_lets_in_patterns depth ref_counts (OverloadedListPatterns conses decons_expr patterns) heaps
+			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) heaps
+			= (OverloadedListPatterns conses decons_expr patterns, heaps)
+
+		distribute_lets_in_alg_pattern depth (ref_counts,pattern) ds=:{ds_var_heap}
+			# (ap_vars, ds_var_heap) = mapSt refresh_variable pattern.ap_vars ds_var_heap
+			  ds = {ds & ds_var_heap = ds_var_heap}
+			  (ap_expr, ds) = distribute_lets_in_pattern_expr depth ref_counts pattern.ap_expr ds
+			= ({ pattern & ap_vars = ap_vars, ap_expr = ap_expr }, ds) 
 
 		distribute_lets_in_default depth ref_counts_in_default (Yes expr) ds
 			# (expr, ds) = distribute_lets_in_pattern_expr depth ref_counts_in_default expr ds
@@ -751,29 +762,7 @@ where
 	,	cs_expr_heap		:: !.ExpressionHeap
 	,	cs_next_fun_nr		:: !Index
 	}
-/*
-class caseFree a :: !a -> Bool
 
-instance caseFree [a] | caseFree a where
-	caseFree l
-		=	and (map caseFree l)
-
-instance caseFree (Optional a) | caseFree a where
-	caseFree No
-		=	True
-	caseFree (Yes a)
-		=	caseFree a
-
-instance caseFree BasicPattern where
-	caseFree {bp_expr}
-		=	caseFree bp_expr
-
-instance caseFree Expression where
-	caseFree (Case _)
-		=	False
-	caseFree _
-		=	True
-*/
 markLocalLetVar :: LetBind *VarHeap -> *VarHeap
 markLocalLetVar {lb_dst={fv_info_ptr}} varHeap
 	=	varHeap <:= (fv_info_ptr, VI_LocalLetVar)
@@ -889,18 +878,16 @@ instance convertRootCases Expression where
 								VI_LocalLetVar
 									->	convertCases ci caseExpr cs // -*-> "convertRootCases, no guards"
 								_
-	//								| True <<- ("convertRootCases",varInfo)
+//									| True <<- ("convertRootCases",varInfo)
 							  		# (case_expr, cs)	= convertCases ci case_expr cs
 									# (case_guards, cs) = convertRootCasesCasePatterns ci case_guards case_type.ct_cons_types cs
 							  		# (case_default, cs)= convertRootCases ci case_default cs
 									-> (Case {kees & case_expr=case_expr, case_guards=case_guards, case_default=case_default}, cs)
-	
 						// otherwise
 							-> convertNonRootCase ci kees cs
 					expr
 //						->	convertCases ci caseExpr cs // -*-> "convertRootCases, no guards"
 						-> convertNonRootCase ci kees cs
-
 	where
 		isTruePattern [{bp_value=BVB True}:_]
 			= True
@@ -912,7 +899,7 @@ instance convertRootCases Expression where
 			# (guard, cs) = convert_guard guard ci cs
 //			# (EI_CaseTypeAndRefCounts case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
 //			# {cs &cs_expr_heap=cs_expr_heap}
-			# (then_part, cs) = convertRootCases {ci & ci_case_level = CaseLevelAfterGuardRoot} bp_expr cs
+			# (then_part, cs) = convertRootCases {ci & ci_case_level=CaseLevelAfterGuardRoot} bp_expr cs			
 			# (opt_else_part, cs) = convert_to_else_part ci sign_of_then_part alts case_default cs
 			= (build_conditional sign_of_then_part guard then_part opt_else_part, cs)
 		where
@@ -952,18 +939,22 @@ convertRootCasesCasePatterns ci (AlgebraicPatterns gi patterns) arg_types cs
 	# (patterns, cs)
 		=	convertRootCasesAlgebraicPatterns ci (exactZip patterns arg_types) cs
 	=	(AlgebraicPatterns gi patterns, cs)
-	where
-		convertRootCasesAlgebraicPatterns :: ConvertInfo [(AlgebraicPattern, [AType])] *ConvertState -> ([AlgebraicPattern], *ConvertState)
-		convertRootCasesAlgebraicPatterns ci l cs
-			=	mapSt (convertRootCasesAlgebraicPattern ci) l cs 
+convertRootCasesCasePatterns ci (OverloadedListPatterns type decons_expr patterns) arg_types cs
+	# (patterns, cs)
+		=	convertRootCasesAlgebraicPatterns ci (exactZip patterns arg_types) cs
+	=	(OverloadedListPatterns type decons_expr patterns, cs)
 
-		convertRootCasesAlgebraicPattern :: ConvertInfo (AlgebraicPattern, [AType]) *ConvertState -> (AlgebraicPattern, *ConvertState)
-		convertRootCasesAlgebraicPattern ci (pattern=:{ap_expr, ap_vars}, arg_types) cs
-			# ci
-				=	{ci & ci_bound_vars= exactZip ap_vars arg_types ++ ci.ci_bound_vars}
-			# (ap_expr, cs)
-				=	convertRootCases ci ap_expr cs
-			=	({pattern & ap_expr=ap_expr}, cs)
+convertRootCasesAlgebraicPatterns :: ConvertInfo [(AlgebraicPattern, [AType])] *ConvertState -> ([AlgebraicPattern], *ConvertState)
+convertRootCasesAlgebraicPatterns ci l cs
+	=	mapSt (convertRootCasesAlgebraicPattern ci) l cs 
+where
+	convertRootCasesAlgebraicPattern :: ConvertInfo (AlgebraicPattern, [AType]) *ConvertState -> (AlgebraicPattern, *ConvertState)
+	convertRootCasesAlgebraicPattern ci (pattern=:{ap_expr, ap_vars}, arg_types) cs
+		# ci
+			=	{ci & ci_bound_vars= exactZip ap_vars arg_types ++ ci.ci_bound_vars}
+		# (ap_expr, cs)
+			=	convertRootCases ci ap_expr cs
+		=	({pattern & ap_expr=ap_expr}, cs)
 
 instance convertRootCases (Optional a) | convertRootCases a where
 	convertRootCases ci (Yes expr) cs
@@ -1172,6 +1163,8 @@ splitGuards (AlgebraicPatterns index patterns)
 	=	[AlgebraicPatterns index [pattern] \\ pattern <- patterns]
 splitGuards (BasicPatterns basicType patterns)
 	=	[BasicPatterns basicType [pattern] \\ pattern <- patterns]
+splitGuards (OverloadedListPatterns type decons_expr patterns)
+	=	[OverloadedListPatterns type decons_expr [pattern] \\ pattern <- patterns]
 
 makeCase :: Expression CasePatterns -> Expression
 makeCase expr guard
@@ -1330,6 +1323,10 @@ where
 	copy (BasicPatterns type patterns) cp_info
 		# (patterns, cp_info) = copy patterns cp_info
 		= (BasicPatterns type patterns, cp_info) 
+	copy (OverloadedListPatterns type decons_expr patterns) cp_info
+		# (patterns, cp_info) = copy patterns cp_info
+		# (decons_expr, cp_info) = copy decons_expr cp_info
+		= (OverloadedListPatterns type decons_expr patterns, cp_info) 
 
 instance copy AlgebraicPattern
 where
@@ -1338,7 +1335,6 @@ where
 		# (ap_expr, cp_info) = copy ap_expr { cp_info & cp_local_vars = cp_local_vars, cp_var_heap = cp_var_heap}
 		= ({ pattern & ap_expr = ap_expr }, cp_info) 
 	where
-
 		bind_pattern_var pattern_var=:{fv_info_ptr} (local_vars, var_heap)
 			= ([pattern_var : local_vars], var_heap <:= (fv_info_ptr, VI_LocalVar))
 
@@ -1668,6 +1664,3 @@ mergeCases (case_expr=:(Case first_case=:{case_default, case_default_pos}), case
 				var_heap, symbol_heap, error)
 mergeCases expr_and_pos _ var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, /* checkWarning "" " alternative will never match" */ error)
-
-
-
