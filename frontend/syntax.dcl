@@ -540,6 +540,8 @@ cIsALocalVar	:== False
 // ... MdM
 				| VI_Labelled_Empty {#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
+				| VI_FreeTypeVarAtRuntime // MV (dynamics), mark type variables which continue to exist at run-time.
+
 
 ::	ExtendedVarInfo = EVI_VarType !AType
 

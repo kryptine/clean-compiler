@@ -446,7 +446,10 @@ where
 			= (CA_LocalTypeCode inst_var, (new_contexts, special_instances, type_pattern_vars, var_heap))
 
 		reduce_tc_context type_code_class (TempV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap)
-			# (tc_var, var_heap) = newPtr VI_Empty var_heap
+// MV ...
+// was:		# (tc_var, var_heap) = newPtr VI_Empty var_heap
+			# (tc_var, var_heap) = newPtr VI_FreeTypeVarAtRuntime var_heap
+// ... MV
 			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
 			| containsContext tc new_contexts
 				= (CA_Context tc, (new_contexts, special_instances, type_pattern_vars, var_heap))
@@ -1413,12 +1416,12 @@ where
 	adjustClassExpression symb_name (Selection opt_type expr selectors) ui
 		# (expr, ui) = adjustClassExpression symb_name expr ui
 		= (Selection opt_type expr selectors, ui)
-// MV .. 
+// MV ...
 	adjustClassExpression symb_name l=:(TypeCodeExpression type_code_expression) ui
-		# (expr,uni_vars,ui)
+		# (expr,free_type_vars_at_runtime,ui)
 			= convertTypecode type_code_expression [] ui
-		| False //not (isEmpty uni_vars)
-			# (let_binds,ui) = createVariables uni_vars ui
+		| not (isEmpty free_type_vars_at_runtime)
+			# (let_binds,ui) = createVariables free_type_vars_at_runtime ui
 			  (let_info_ptr,ui) = let_ptr ui
 			= ( Let {	let_strict_binds	= []
 					,	let_lazy_binds		= let_binds
@@ -1428,40 +1431,51 @@ where
 					, ui)
 			= (expr, ui)
 	where
+		add_free_type_var var_info_ptr free_type_vars_at_runtime ui=:{ui_var_heap}
+				# (var_info,ui_var_heap)
+					= readPtr var_info_ptr ui_var_heap
+				# ui
+					= { ui & ui_var_heap = ui_var_heap}
+				= case var_info of
+					VI_FreeTypeVarAtRuntime	
+						-> ([var_info_ptr:free_type_vars_at_runtime],ui)
+					_
+						-> (free_type_vars_at_runtime,ui)
+						
 		// similar to equally named function in convertDynamics.icl
-		convertTypecode TCE_Empty uni_vars ui
-			= (EE,uni_vars,ui)
-//		should not match
-		convertTypecode (TCE_Var var_info_ptr) uni_vars ui
-			= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},[var_info_ptr:uni_vars],ui)
-		convertTypecode (TCE_TypeTerm var_info_ptr) uni_vars ui
-//			# v_tc_name = { id_name = "overloadingvTC", id_info = nilPtr }
-			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},uni_vars,ui)
-// WAS		= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},[var_info_ptr:uni_vars],ui)
+		convertTypecode TCE_Empty free_type_vars_at_runtime ui
+			= (EE,free_type_vars_at_runtime,ui)
+		convertTypecode (TCE_Var var_info_ptr) free_type_vars_at_runtime ui=:{ui_var_heap}
+			# (free_type_vars_at_runtime,ui)
+				= add_free_type_var var_info_ptr free_type_vars_at_runtime ui
+			= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},free_type_vars_at_runtime,ui)
+		convertTypecode (TCE_TypeTerm var_info_ptr) free_type_vars_at_runtime ui=:{ui_var_heap}
+			# (free_type_vars_at_runtime,ui)
+				= add_free_type_var var_info_ptr free_type_vars_at_runtime ui
+			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},free_type_vars_at_runtime,ui)
 
-		convertTypecode (TCE_Constructor index typecode_exprs) uni_vars ui
+		convertTypecode (TCE_Constructor index typecode_exprs) free_type_vars_at_runtime ui
 			# (typecons_symb,ui) 			= getSymbol PD_TypeConsSymbol SK_Constructor 2 ui
 			  (constructor,ui)				= get_constructor index ui
-			  (typecode_exprs, uni_vars,ui)	= convertTypecodes typecode_exprs uni_vars ui
+			  (typecode_exprs, free_type_vars_at_runtime,ui)	= convertTypecodes typecode_exprs free_type_vars_at_runtime ui
 			= (App {app_symb				= typecons_symb,
 					app_args 				= [constructor , typecode_exprs ],
-					app_info_ptr			= nilPtr}, uni_vars, ui)
-		convertTypecode (TCE_Selector selections var_info_ptr) uni_vars ui
-			= (Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections,uni_vars,ui)
+					app_info_ptr			= nilPtr}, free_type_vars_at_runtime, ui)
+		convertTypecode (TCE_Selector selections var_info_ptr) free_type_vars_at_runtime ui
+			= (Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections,free_type_vars_at_runtime,ui)
 			
-		convertTypecodes [] uni_vars ui
+		convertTypecodes [] free_type_vars_at_runtime ui
 			# (nil_symb, ui) = getSymbol PD_NilSymbol SK_Constructor 0 ui
 			= (App {	app_symb		= nil_symb,
 						app_args 		= [],
-						app_info_ptr	= nilPtr}, uni_vars, ui)
-		convertTypecodes [typecode_expr : typecode_exprs] uni_vars ui
+						app_info_ptr	= nilPtr}, free_type_vars_at_runtime, ui)
+		convertTypecodes [typecode_expr : typecode_exprs] free_type_vars_at_runtime ui
 			# (cons_symb, ui) 		= getSymbol PD_ConsSymbol SK_Constructor 2 ui
-			  (expr,uni_vars, ui) 	= convertTypecode typecode_expr uni_vars ui
-			  (exprs,uni_vars,ui)	= convertTypecodes typecode_exprs uni_vars ui
+			  (expr,free_type_vars_at_runtime, ui) 	= convertTypecode typecode_expr free_type_vars_at_runtime ui
+			  (exprs,free_type_vars_at_runtime,ui)	= convertTypecodes typecode_exprs free_type_vars_at_runtime ui
 			= (App {	app_symb		= cons_symb,
 						app_args 		= [expr , exprs],
-						app_info_ptr	= nilPtr}, uni_vars, ui)
-
+						app_info_ptr	= nilPtr}, free_type_vars_at_runtime, ui)
 		createVariables var_info_ptrs ui
 			= mapSt create_variable var_info_ptrs ui
 		where
