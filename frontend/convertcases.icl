@@ -74,8 +74,8 @@ where
 			= weightedRefCount {rci_imported={cii_dcl_functions=dcl_functions, cii_common_defs=common_defs, cii_main_dcl_module_n=main_dcl_module_n}, rci_depth=1} tb_rhs
 				{ rcs_var_heap = cs_var_heap, rcs_expr_heap = cs_expr_heap, rcs_free_vars = [], rcs_imports = collected_imports} 
 //		  	---> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
-		  (tb_rhs, {di_lets,di_var_heap,di_expr_heap}) = distributeLets 1 tb_rhs { di_lets = [], di_var_heap = rcs_var_heap, di_expr_heap = rcs_expr_heap}
-		  (tb_rhs, (var_heap, expr_heap)) = buildLetExpr di_lets tb_rhs (di_var_heap,di_expr_heap)
+		  (tb_rhs, {ds_lets,ds_var_heap,ds_expr_heap}) = distributeLets 1 tb_rhs { ds_lets = [], ds_var_heap = rcs_var_heap, ds_expr_heap = rcs_expr_heap}
+		  (tb_rhs, (var_heap, expr_heap)) = buildLetExpr ds_lets tb_rhs (ds_var_heap,ds_expr_heap)
 		= (TransformedBody { body & tb_rhs = tb_rhs }, (rcs_imports, { cs & cs_var_heap = var_heap, cs_expr_heap = expr_heap }))
 		  	==> ("eliminate_code_sharing_in_function (distributeLets)", tb_rhs)
 
@@ -388,84 +388,84 @@ where
 	only if the expression is neither used in the pattern nor in a surrounding expression.
 */
 
-::	DistributeInfo =
-	{	di_lets			:: ![VarInfoPtr]
-	,	di_var_heap		:: !.VarHeap
-	,	di_expr_heap	:: !.ExpressionHeap
+::	DistributeState =
+	{	ds_lets			:: ![VarInfoPtr]
+	,	ds_var_heap		:: !.VarHeap
+	,	ds_expr_heap	:: !.ExpressionHeap
 	}
 
-class distributeLets e :: !Int !e !*DistributeInfo -> (!e, !*DistributeInfo)
+class distributeLets e :: !Int !e !*DistributeState -> (!e, !*DistributeState)
 
 
 instance distributeLets Expression
 where
-	distributeLets depth (Var var=:{var_name,var_info_ptr}) dl_info=:{di_var_heap}
-		#! var_info = sreadPtr var_info_ptr di_var_heap
+	distributeLets depth (Var var=:{var_name,var_info_ptr}) ds=:{ds_var_heap}
+		#! var_info = sreadPtr var_info_ptr ds_var_heap
 		= case var_info of
 			VI_LetExpression lei
 				| lei.lei_count == 1
 //						 ==> (var_name, var_info_ptr, lei.lei_count, (lei.lei_expression, lei.lei_depth, depth))
-					# (lei_updated_expr, dl_info) = distributeLets depth lei.lei_expression dl_info
-					-> (lei_updated_expr, { dl_info &  di_var_heap = dl_info.di_var_heap <:=
+					# (lei_updated_expr, ds) = distributeLets depth lei.lei_expression ds
+					-> (lei_updated_expr, { ds &  ds_var_heap = ds.ds_var_heap <:=
 							(var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_updated_expr }) })
 				| lei.lei_depth == depth
-					# dl_info = distributeLetsInLetExpression depth var_info_ptr lei dl_info
-					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, dl_info)
-					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, dl_info)
+					# ds = distributeLetsInLetExpression depth var_info_ptr lei ds
+					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, ds)
+					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, ds)
 			VI_CaseVar var_info_ptr
-				-> (Var { var & var_info_ptr = var_info_ptr }, dl_info)
+				-> (Var { var & var_info_ptr = var_info_ptr }, ds)
 			_
-				-> (Var var, dl_info)
-	distributeLets depth (Case kees) dl_info
-		# (kees, dl_info) = distributeLets depth kees dl_info
-		= (Case kees, dl_info)
-	distributeLets depth (App app=:{app_args}) dl_info
-		# (app_args, dl_info) = distributeLets depth app_args dl_info
-		= (App {app & app_args = app_args}, dl_info)
-	distributeLets depth (fun_expr @ exprs) dl_info
-		# (fun_expr, dl_info) = distributeLets depth fun_expr dl_info
-		  (exprs, dl_info) = distributeLets depth exprs dl_info
-		= (fun_expr @ exprs, dl_info)
-	distributeLets depth expr=:(BasicExpr _ _) dl_info
-		= (expr, dl_info)
-	distributeLets depth (MatchExpr opt_tuple constructor expr) dl_info
-		# (expr, dl_info) = distributeLets depth expr dl_info
-		= (MatchExpr opt_tuple constructor expr, dl_info)
-	distributeLets depth (Selection opt_tuple expr selectors) dl_info
-		# (expr, dl_info) = distributeLets depth expr dl_info
-		# (selectors, dl_info) = distributeLets depth selectors dl_info
-		= (Selection opt_tuple expr selectors, dl_info)
-	distributeLets depth (Update expr1 selectors expr2) dl_info
-		# (expr1, dl_info) = distributeLets depth expr1 dl_info
-		# (selectors, dl_info) = distributeLets depth selectors dl_info
-		# (expr2, dl_info) = distributeLets depth expr2 dl_info
-		= (Update expr1 selectors expr2, dl_info)
-	distributeLets depth (RecordUpdate cons_symbol expression expressions) dl_info
-		# (expression, dl_info) = distributeLets depth expression dl_info
-		# (expressions, dl_info) = distributeLets depth expressions dl_info
-		= (RecordUpdate cons_symbol expression expressions, dl_info)
-	distributeLets depth (TupleSelect tuple_symbol arg_nr expr) dl_info
-		# (expr, dl_info) = distributeLets depth expr dl_info
-		= (TupleSelect tuple_symbol arg_nr expr, dl_info)
-	distributeLets depth (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) dl_info=:{di_expr_heap,di_var_heap}
-		# (let_info, di_expr_heap) = readPtr let_info_ptr di_expr_heap
+				-> (Var var, ds)
+	distributeLets depth (Case kees) ds
+		# (kees, ds) = distributeLets depth kees ds
+		= (Case kees, ds)
+	distributeLets depth (App app=:{app_args}) ds
+		# (app_args, ds) = distributeLets depth app_args ds
+		= (App {app & app_args = app_args}, ds)
+	distributeLets depth (fun_expr @ exprs) ds
+		# (fun_expr, ds) = distributeLets depth fun_expr ds
+		  (exprs, ds) = distributeLets depth exprs ds
+		= (fun_expr @ exprs, ds)
+	distributeLets depth expr=:(BasicExpr _ _) ds
+		= (expr, ds)
+	distributeLets depth (MatchExpr opt_tuple constructor expr) ds
+		# (expr, ds) = distributeLets depth expr ds
+		= (MatchExpr opt_tuple constructor expr, ds)
+	distributeLets depth (Selection opt_tuple expr selectors) ds
+		# (expr, ds) = distributeLets depth expr ds
+		# (selectors, ds) = distributeLets depth selectors ds
+		= (Selection opt_tuple expr selectors, ds)
+	distributeLets depth (Update expr1 selectors expr2) ds
+		# (expr1, ds) = distributeLets depth expr1 ds
+		# (selectors, ds) = distributeLets depth selectors ds
+		# (expr2, ds) = distributeLets depth expr2 ds
+		= (Update expr1 selectors expr2, ds)
+	distributeLets depth (RecordUpdate cons_symbol expression expressions) ds
+		# (expression, ds) = distributeLets depth expression ds
+		# (expressions, ds) = distributeLets depth expressions ds
+		= (RecordUpdate cons_symbol expression expressions, ds)
+	distributeLets depth (TupleSelect tuple_symbol arg_nr expr) ds
+		# (expr, ds) = distributeLets depth expr ds
+		= (TupleSelect tuple_symbol arg_nr expr, ds)
+	distributeLets depth (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) ds=:{ds_expr_heap,ds_var_heap}
+		# (let_info, ds_expr_heap) = readPtr let_info_ptr ds_expr_heap
 		# (EI_LetTypeAndRefCounts let_type ref_counts) = let_info
 		  nr_of_strict_lets = length let_strict_binds
 		  let_binds = [(False, bind) \\ bind <- let_lazy_binds]
-		  di_var_heap = set_let_expression_info depth let_binds ref_counts (drop nr_of_strict_lets let_type) di_var_heap
-		  (let_expr, dl_info) = distributeLets depth let_expr { dl_info & di_var_heap = di_var_heap, di_expr_heap = di_expr_heap }
-		  (let_strict_binds, dl_info) = distributeLets depth let_strict_binds dl_info
-		  dl_info = foldSt (distribute_lets_in_non_distributed_let depth) let_lazy_binds dl_info
+		  ds_var_heap = set_let_expression_info depth let_binds ref_counts (drop nr_of_strict_lets let_type) ds_var_heap
+		  (let_expr, ds) = distributeLets depth let_expr { ds & ds_var_heap = ds_var_heap, ds_expr_heap = ds_expr_heap }
+		  (let_strict_binds, ds) = distributeLets depth let_strict_binds ds
+		  ds = foldSt (distribute_lets_in_non_distributed_let depth) let_lazy_binds ds
 		| nr_of_strict_lets == 0
-		    = (let_expr, dl_info)
+		    = (let_expr, ds)
 		    = case let_expr of
 		    	Let inner_let=:{let_info_ptr=inner_let_info_ptr}
-		    		# (EI_LetType strict_inner_types, di_expr_heap) = readPtr inner_let_info_ptr dl_info.di_expr_heap
-		    		  di_expr_heap = writePtr inner_let_info_ptr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) di_expr_heap
+		    		# (EI_LetType strict_inner_types, ds_expr_heap) = readPtr inner_let_info_ptr ds.ds_expr_heap
+		    		  ds_expr_heap = writePtr inner_let_info_ptr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) ds_expr_heap
 					-> (Let { inner_let & let_strict_binds = let_strict_binds++inner_let.let_strict_binds}, 
-						{dl_info & di_expr_heap = di_expr_heap})
+						{ds & ds_expr_heap = ds_expr_heap})
 				_	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
-						{dl_info & di_expr_heap = dl_info.di_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
+						{ds & ds_expr_heap = ds.ds_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
 	where
 		set_let_expression_info depth [(let_strict, {lb_src,lb_dst}):binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -475,22 +475,22 @@ where
 		set_let_expression_info depth [] _ _ var_heap
 			= var_heap
 		
-		distribute_lets_in_non_distributed_let depth {lb_dst={fv_name,fv_info_ptr}} dl_info=:{di_var_heap}
-			# (VI_LetExpression lei=:{lei_depth,lei_count,lei_status}, di_var_heap) = readPtr fv_info_ptr di_var_heap
+		distribute_lets_in_non_distributed_let depth {lb_dst={fv_name,fv_info_ptr}} ds=:{ds_var_heap}
+			# (VI_LetExpression lei=:{lei_depth,lei_count,lei_status}, ds_var_heap) = readPtr fv_info_ptr ds_var_heap
 			| lei_count > 0
 //			| not lei_moved && lei_count > 0
-				= distributeLetsInLetExpression depth fv_info_ptr lei { dl_info & di_var_heap = di_var_heap }
-				= { dl_info & di_var_heap = di_var_heap }
+				= distributeLetsInLetExpression depth fv_info_ptr lei { ds & ds_var_heap = ds_var_heap }
+				= { ds & ds_var_heap = ds_var_heap }
 					==> ("distribute_lets_in_non_distributed_let (moved or not used)", lei_count, fv_name)
 
 		is_moved LES_Moved	= True
 		is_moved _ 			= False
 
-	distributeLets depth expr=:(TypeCodeExpression _) dl_info
-		= (expr, dl_info)
-	distributeLets depth (AnyCodeExpr in_params out_params code_expr) dl_info=:{di_var_heap}
-		# (in_params, di_var_heap) = mapSt determineInputParameter in_params di_var_heap
-		= (AnyCodeExpr in_params out_params code_expr, { dl_info & di_var_heap = di_var_heap })
+	distributeLets depth expr=:(TypeCodeExpression _) ds
+		= (expr, ds)
+	distributeLets depth (AnyCodeExpr in_params out_params code_expr) ds=:{ds_var_heap}
+		# (in_params, ds_var_heap) = mapSt determineInputParameter in_params ds_var_heap
+		= (AnyCodeExpr in_params out_params code_expr, { ds & ds_var_heap = ds_var_heap })
 		where
 			determineInputParameter bind=:{bind_dst} var_heap
 				# (var_info, var_heap) = readPtr bind_dst.var_info_ptr var_heap
@@ -500,33 +500,33 @@ where
 					_
 						-> (bind, var_heap)
 
-	distributeLets depth expr=:(ABCCodeExpr _ _) dl_info
-		= (expr, dl_info)
-	distributeLets depth EE dl_info
-		= (EE, dl_info)
-	distributeLets depth (NoBind ptr) dl_info
-		= (NoBind ptr, dl_info)
+	distributeLets depth expr=:(ABCCodeExpr _ _) ds
+		= (expr, ds)
+	distributeLets depth EE ds
+		= (EE, ds)
+	distributeLets depth (NoBind ptr) ds
+		= (NoBind ptr, ds)
 
 instance distributeLets Case
 where 
-	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr} dl_info=:{di_var_heap, di_expr_heap}	
-		# (EI_CaseTypeAndRefCounts case_type { rcc_all_variables = tot_ref_counts , rcc_default_variables = ref_counts_in_default, rcc_pattern_variables = ref_counts_in_patterns }, di_expr_heap) = readPtr case_info_ptr di_expr_heap
-//		  di_expr_heap = di_expr_heap <:= (case_info_ptr, EI_CaseType case_type)
+	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr} ds=:{ds_var_heap, ds_expr_heap}	
+		# (EI_CaseTypeAndRefCounts case_type { rcc_all_variables = tot_ref_counts , rcc_default_variables = ref_counts_in_default, rcc_pattern_variables = ref_counts_in_patterns }, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
+//		  ds_expr_heap = ds_expr_heap <:= (case_info_ptr, EI_CaseType case_type)
 		  new_depth = inc depth
-		  (local_lets, di_var_heap) = foldSt (mark_local_let_var new_depth) tot_ref_counts ([], di_var_heap)
-		  (case_guards, heaps) = distribute_lets_in_patterns new_depth ref_counts_in_patterns case_guards (di_var_heap, di_expr_heap)
-		  (case_default, (di_var_heap, di_expr_heap)) = distribute_lets_in_default new_depth ref_counts_in_default case_default heaps
-		  di_var_heap = foldSt reset_local_let_var local_lets di_var_heap
-		  (case_expr, dl_info) = distributeLets depth case_expr { dl_info & di_var_heap = di_var_heap, di_expr_heap = di_expr_heap }
-		= ({ kees & case_guards = case_guards, case_expr = case_expr, case_default = case_default }, dl_info)
+		  (local_lets, ds_var_heap) = foldSt (mark_local_let_var new_depth) tot_ref_counts ([], ds_var_heap)
+		  (case_guards, heaps) = distribute_lets_in_patterns new_depth ref_counts_in_patterns case_guards (ds_var_heap, ds_expr_heap)
+		  (case_default, (ds_var_heap, ds_expr_heap)) = distribute_lets_in_default new_depth ref_counts_in_default case_default heaps
+		  ds_var_heap = foldSt reset_local_let_var local_lets ds_var_heap
+		  (case_expr, ds) = distributeLets depth case_expr { ds & ds_var_heap = ds_var_heap, ds_expr_heap = ds_expr_heap }
+		= ({ kees & case_guards = case_guards, case_expr = case_expr, case_default = case_default }, ds)
 	where
 		distribute_lets_in_patterns depth ref_counts (AlgebraicPatterns conses patterns) heaps
 			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) heaps
 			= (AlgebraicPatterns conses patterns, heaps)
 		where
-			distribute_lets_in_alg_pattern depth (ref_counts,pattern) (di_var_heap, di_expr_heap)
-				# (ap_vars, di_var_heap) = mapSt refresh_variable pattern.ap_vars di_var_heap
-				  (ap_expr, heaps) = distribute_lets_in_pattern_expr depth ref_counts pattern.ap_expr (di_var_heap, di_expr_heap)
+			distribute_lets_in_alg_pattern depth (ref_counts,pattern) (ds_var_heap, ds_expr_heap)
+				# (ap_vars, ds_var_heap) = mapSt refresh_variable pattern.ap_vars ds_var_heap
+				  (ap_expr, heaps) = distribute_lets_in_pattern_expr depth ref_counts pattern.ap_expr (ds_var_heap, ds_expr_heap)
 				= ({ pattern & ap_vars = ap_vars, ap_expr = ap_expr }, heaps) 
 		distribute_lets_in_patterns depth ref_counts (BasicPatterns type patterns) heaps
 			# (patterns, heaps) = mapSt (distribute_lets_in_basic_pattern depth) (exactZip ref_counts patterns) heaps
@@ -539,9 +539,9 @@ where
 			# (patterns, heaps) = mapSt (distribute_lets_in_dynamic_pattern depth) (exactZip ref_counts patterns) heaps
 			= (DynamicPatterns patterns, heaps)
 		where
-			distribute_lets_in_dynamic_pattern depth (ref_counts,pattern) (di_var_heap, di_expr_heap)
-				# (dp_var, di_var_heap) = refresh_variable pattern.dp_var di_var_heap
-				  (dp_rhs, heaps) = distribute_lets_in_pattern_expr depth ref_counts pattern.dp_rhs (di_var_heap, di_expr_heap)
+			distribute_lets_in_dynamic_pattern depth (ref_counts,pattern) (ds_var_heap, ds_expr_heap)
+				# (dp_var, ds_var_heap) = refresh_variable pattern.dp_var ds_var_heap
+				  (dp_rhs, heaps) = distribute_lets_in_pattern_expr depth ref_counts pattern.dp_rhs (ds_var_heap, ds_expr_heap)
 				= ({ pattern & dp_rhs = dp_rhs, dp_var = dp_var }, heaps) 
 				
 		distribute_lets_in_default depth ref_counts_in_default (Yes expr) heaps
@@ -567,10 +567,10 @@ where
 
 		distribute_lets_in_pattern_expr depth local_vars pattern_expr (var_heap, expr_heap)
 			# var_heap = foldSt (mark_local_let_var_of_pattern_expr depth) local_vars var_heap
-			  (pattern_expr, dl_info) = distributeLets depth pattern_expr { di_lets = [], di_var_heap = var_heap, di_expr_heap = expr_heap}
-			  dl_info = foldSt (reexamine_local_let_expressions depth) local_vars dl_info
-			= buildLetExpr dl_info.di_lets pattern_expr (dl_info.di_var_heap, dl_info.di_expr_heap)
-				==> ("distribute_lets_in_pattern_expr", dl_info.di_lets)
+			  (pattern_expr, ds) = distributeLets depth pattern_expr { ds_lets = [], ds_var_heap = var_heap, ds_expr_heap = expr_heap}
+			  ds = foldSt (reexamine_local_let_expressions depth) local_vars ds
+			= buildLetExpr ds.ds_lets pattern_expr (ds.ds_var_heap, ds.ds_expr_heap)
+				==> ("distribute_lets_in_pattern_expr", ds.ds_lets)
 	
 		mark_local_let_var_of_pattern_expr depth {cv_variable, cv_count} var_heap
 			# (VI_LetExpression lei, var_heap) = readPtr cv_variable var_heap
@@ -579,24 +579,24 @@ where
 						==> ("mark_local_let_var_of_pattern_expr ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
 				= var_heap
 
-		reexamine_local_let_expressions depth {cv_variable, cv_count} dl_info=:{di_var_heap}
+		reexamine_local_let_expressions depth {cv_variable, cv_count} ds=:{ds_var_heap}
 			| cv_count > 1
-				# (VI_LetExpression lei, di_var_heap) = readPtr cv_variable di_var_heap
+				# (VI_LetExpression lei, ds_var_heap) = readPtr cv_variable ds_var_heap
 				| depth == lei.lei_depth
-					= distributeLetsInLetExpression depth cv_variable lei { dl_info & di_var_heap = di_var_heap }
-					= { dl_info & di_var_heap = di_var_heap }
-				= dl_info
+					= distributeLetsInLetExpression depth cv_variable lei { ds & ds_var_heap = ds_var_heap }
+					= { ds & ds_var_heap = ds_var_heap }
+				= ds
 
 
-distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Moved} dl_info
-	= dl_info
-distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Updated _} dl_info
-	= dl_info
-distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Untouched} dl_info=:{di_var_heap}
-	# di_var_heap = di_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated EE}) /* to prevent doing this expression twice */
-      (lei_expression, dl_info) = distributeLets depth lei_expression { dl_info & di_var_heap = di_var_heap }
-	= { dl_info & di_lets = [ let_var_info_ptr : dl_info.di_lets ],
-		 di_var_heap = dl_info.di_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_expression })}
+distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Moved} ds
+	= ds
+distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Updated _} ds
+	= ds
+distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Untouched} ds=:{ds_var_heap}
+	# ds_var_heap = ds_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated EE}) /* to prevent doing this expression twice */
+      (lei_expression, ds) = distributeLets depth lei_expression { ds & ds_var_heap = ds_var_heap }
+	= { ds & ds_lets = [ let_var_info_ptr : ds.ds_lets ],
+		 ds_var_heap = ds.ds_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_expression })}
 
 	
 buildLetExpr :: ![VarInfoPtr] !Expression !*(!*VarHeap, !*ExpressionHeap) -> (!Expression, !(!*VarHeap, !*ExpressionHeap))
