@@ -2,68 +2,106 @@
 implementation module CoclSystemDependent
 
 import StdEnv
-import deltaIOSystem, deltaEventIO, deltaIOState
-import AppleEventDevice
-import compile
-import docommand
-import RWSDebug
+import Clean2AppleEventHandler,compile,docommand,cache_variable
+
+from Clean2AppleEventHandler import get_apple_event_string;
 
 PathSeparator
 	:==	','
 DirectorySeparator
 	:==	':'
 
-SystemDependentDevices :: [DeviceSystem .a (IOState .a)]
-SystemDependentDevices
-		=	[AppleEventSystem {openHandler = openDummy, quitHandler = Quit,
-								clipboardChangedHandler = clipboardDummy, scriptHandler = scriptHandler}];
+script_handler :: !{#Char} *Files -> (!Int,!*Files);
+script_handler script files
+	= case args of
+		["cocl":coclArgs]
+			# cache = load_state 0;
+			# (ok,cache,files) = compile coclArgs cache files;
+			->	(if ok 1 0,store_cache_or_clear_cache cache files)
+		["clear_cache"]
+			| store_state empty_cache>0
+				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+				-> (r,files)
+				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+				-> (r,files)
+		_
+			// +++ handle errors from docommand
+			# (r,s) = DoCommandNullTerminated (script +++ "\0") 0
+			-> (r,files)
+	where
+		args
+			=	filter ((<>) "") (map replace scriptArgs)
+		scriptArgs
+			=	splitArgs script
+
+		store_cache_or_clear_cache cache files
+			| isMember "-clear_cache" scriptArgs && store_state empty_cache>0
+				# (r,s)=DoCommandNullTerminated "clear_cache\0" 0
+				| r==0
+					= files
+					= files;
+			| store_state cache>0
+				=	files
+				=	files
+		replace s
+			| s == "\xb3" /* \xb3 == >= ligature */
+				=	"-RE"
+			| s == ">"
+				=	"-RO"
+			| s == "-clear_cache"
+				=	""
+			// otherwise
+				=	s
+
+		splitArgs s
+			=	split False 0 0 (size s) s
 		where
-			openDummy filePath s io
-				=	(s, io) <<- ("open", filePath)
-			clipboardDummy s io
-				=	(s, io) <<- "clipboard"
-
-		/*
-			scriptHandler script s io
-				# (result, env) = DoCommandNullTerminated (script +++ "\0") 17
-				| result >= 0
-					=	(s, io)
+			split quoted frm to n s
+				| to >= n
+					=	[s % (frm, to)]
+				| s.[to] == '\\' && to < n-1
+					=	split quoted frm (to+2) n s
+				| s.[to] == ' ' && not quoted 
+					=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
+				| s.[to] == '\'' && quoted
+					=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
+				| s.[to] == '\''
+					=	[s % (frm, to-1) : split True (to+1) (to+1) n s]
 				// otherwise
-					=	(s, io) <<- ("error in docommand", result, script)
-		*/
-			scriptHandler script s io
-				=	(s, appFiles (compile (processArgs script)) io) <<- ("script", processArgs script)
-				where
-					processArgs s
-						=	[replace arg \\ arg <- filter ((<>) "") (splitArgs s)]
+					=	split quoted frm (to+1) n s
 
-					replace s
-						| s == "\xb3" /* \xb3 == >= ligature */
-							=	"-RE"
-						| s == ">"
-							=	"-RO"
-						// otherwise
-							=	s
-					splitArgs s
-						=	split False 0 0 (size s) s
-					split quoted frm to n s
-						| to >= n
-							=	[s % (frm, to)]
-						| s.[to] == '\\' && to < n-1
-							=	split quoted frm (to+2) n s
-						| s.[to] == ' ' && not quoted 
-							=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
-						| s.[to] == '\'' && quoted
-							=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
-						| s.[to] == '\''
-							=	[s % (frm, to-1) : split True (to+1) (to+1) n s]
-						// otherwise
-							=	split quoted frm (to+1) n s
+//import StdDebug,StdString;
 
-SystemDependentInitialIO :: InitialIO *s
-SystemDependentInitialIO
-		=	[]
+clean2_compiler :: !Int !*Files -> (!Int,!*Files);
+clean2_compiler length files
+	# string=createArray length ' ';
+	# r=get_apple_event_string length string;
+//	| trace_t length && trace_t ':' && trace_t r && trace_t '\n'
+//		| trace_t string
+	= script_handler (string%(6,r-1)) files;
+//			= (0,files);
+//		= (0,files);
 
-Quit :: *s (IOState *s) -> (*s, IOState *s)
-Quit s io
-	=	(s, QuitIO io)
+clean2_compile :: !Int -> Int;
+clean2_compile length
+	# (r,files)=clean2_compiler length create_files;
+	= r;
+
+clean2_compile_c_entry :: !Int -> Int;
+clean2_compile_c_entry r = code {
+	.d 0 1 i
+	rtn
+	centry clean2_compile e_CoclSystemDependent_sclean2_compile "I:I"
+ }
+
+::	* MyFiles = MyFiles;
+
+create_myfiles = MyFiles;
+
+create_files :: *Files;
+create_files = cast create_myfiles;
+
+cast :: !*a -> *b;
+cast f = code {
+	pop_b 0
+ }
