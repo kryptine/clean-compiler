@@ -2,7 +2,7 @@ definition module trace
 
 // $Id$
 
-from history import History
+from history import History,HistoryAssociation,HistoryPattern
 from spine import Answer
 from rule import Rule
 from spine import Spine,Subspine // for Answer

@@ -2,14 +2,9 @@ definition module history
 
 // $Id$
 
-from spine import Spine
 from graph import Graph
 from general import Optional
 from StdOverloaded import ==
-
-// Transitive necessities
-
-from spine import Subspine
 
 // A history relates node-ids in the subject graph to patterns
 :: History sym var
@@ -23,21 +18,14 @@ from spine import Subspine
 
 // A pattern in the history, specifying the most general subject graph (footprint) for a reduction sequence
 :: HistoryPattern sym var
+   = Closed sym [HistoryPattern sym var]    // Indicates a closed node-id in the subject graph (created by a (partial) match)
+   | OpenHist                               // Indicates an open node-id in the subject graph (created by instantiation)
+   | Extensible (Link var)                  // Indicates a link to an untouched node-id in the subject graph, where this pattern can be extended
 
 // A link in a graph, indicated by its source node-id and the argument number
 // The root of a graph can be indicated by the No constructor
 :: Link var
    :== Optional (var,Int)
-
-// Extend the history according to a spine
-extendhistory
- :: (Graph sym var)         // Subject graph
-    (Spine sym var pvar)    // Spine leading to the reduction operation
-    (History sym var)       // Old history
- -> History sym var         // New history
- |  == sym
- &  == var
- &  == pvar
 
 // Check the current subject graph in the history
 matchhistory

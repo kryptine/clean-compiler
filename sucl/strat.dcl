@@ -8,6 +8,7 @@ from rule import Rule
 from graph import Graph,Node
 from StdOverloaded import ==
 
+from history import HistoryAssociation,HistoryPattern,Link // for History
 from spine import Spine    // for Answer
 from spine import Subspine // for Spine
 from rule import Rgraph    // for History

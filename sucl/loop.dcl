@@ -5,6 +5,7 @@ definition module loop
 from strat import Strategy
 from spine import Answer
 from trace import Trace
+from history import HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
 from graph import Graph
 from StdOverloaded import ==
