@@ -584,7 +584,7 @@ where
 	expand_simple_macro mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info, fun_symb, fun_pos}
 			(macro_defs, modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_error})
 		| macros_are_simple fun_info.fi_calls macro_defs
-		  	# identPos = newPosition fun_symb fun_pos ---> ("expanding", fun_symb)
+		  	# identPos = newPosition fun_symb fun_pos
 			  es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
 					 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error }
 			  (tb_args, tb_rhs, local_vars, fi_calls, macro_defs, modules, {es_symbol_table, es_var_heap, es_symbol_heap, es_error})
