@@ -29,8 +29,12 @@ nilPtr v = code {
 	pop_a 2
 };
 */
+
 nilPtr :: Ptr v;
-nilPtr = code {
+nilPtr =: make_nilPtr;
+
+make_nilPtr :: Ptr v;
+make_nilPtr = code {
 	build _Nil 0 _hnf
 	push_a 0
 	build_r e_Heap_kPtr 2 0 0 0
