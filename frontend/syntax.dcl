@@ -669,7 +669,7 @@ cNonRecursiveAppl	:== False
 
 		/* For handling dynamics */
 
-					| EI_Dynamic 				!(Optional DynamicType)
+					| EI_Dynamic 				!(Optional DynamicType) !Int
 					| EI_DynamicType			!DynamicType ![DynamicPtr]
 //					| EI_DynamicType			!DynamicType !(Optional ExprInfoPtr)
 

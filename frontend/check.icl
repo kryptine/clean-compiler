@@ -735,7 +735,7 @@ checkFunction mod_index fun_index def_level fun_defs
 			= check_function_type fun_type mod_index ef_type_defs ef_class_defs ef_modules hp_var_heap hp_type_heaps cs
 	  e_info  = { e_info & ef_type_defs = ef_type_defs, ef_class_defs = ef_class_defs, ef_modules = ef_modules }
 	  e_state = {   es_var_heap = hp_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,
-	  				es_dynamics = [], es_calls = [], es_fun_defs = fun_defs }
+	  				es_dynamics = [], es_calls = [], es_fun_defs = fun_defs, es_dynamic_expr_count = 0}
 	  e_input = { ei_expr_level = inc def_level, ei_fun_index = fun_index, ei_fun_level = inc def_level, ei_mod_index = mod_index }
 	  (fun_body, free_vars, e_state, e_info, cs) = checkFunctionBodies fun_body e_input e_state e_info cs
 

@@ -1686,7 +1686,7 @@ where
 	fresh_dynamic dyn_ptr (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
 		# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
 		= case dyn_info of
-			EI_Dynamic opt_dyn_type=:(Yes {dt_uni_vars,dt_type,dt_global_vars})
+			EI_Dynamic opt_dyn_type=:(Yes {dt_uni_vars,dt_type,dt_global_vars}) _
 				# (th_vars, var_store) = fresh_existential_attributed_variables dt_uni_vars (type_heaps.th_vars, var_store)
 				  (th_vars, var_store) = fresh_type_variables dt_global_vars (th_vars, var_store)
 				  (tdt_type, {copy_heaps}) = freshCopy dt_type { copy_heaps = { type_heaps & th_vars = th_vars }}
@@ -1694,7 +1694,7 @@ where
 				  		= determine_context_and_expr_ptr dt_global_vars (var_heap, expr_heap, copy_heaps.th_vars, predef_symbols)
 				-> (var_store, { copy_heaps & th_vars = type_var_heap }, var_heap,
 						expr_heap <:= (dyn_ptr, EI_TempDynamicType opt_dyn_type tdt_type contexts expr_ptr type_code_symbol), predef_symbols)
-			EI_Dynamic No
+			EI_Dynamic No _ 
 				# fresh_var = TempV var_store
 				  tdt_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = fresh_var }
 
@@ -1726,9 +1726,9 @@ where
 	clear_dynamic dyn_ptr (var_heap, expr_heap)
 		# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
 		= case dyn_info of
-			EI_Dynamic (Yes {dt_global_vars})
+			EI_Dynamic (Yes {dt_global_vars}) _
 				-> (clear_type_vars dt_global_vars var_heap, expr_heap)
-			EI_Dynamic No
+			EI_Dynamic No _
 				-> (var_heap, expr_heap)
 			EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} loc_dynamics
 				-> clear_local_dynamics loc_dynamics (clear_type_vars dt_global_vars var_heap, expr_heap)

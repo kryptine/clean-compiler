@@ -3286,6 +3286,9 @@ where
 	  		, cos_var_heap = hp_var_heap
 	  		, cos_symbol_heap = hp_expression_heap
 	  		, cos_alias_dummy = {pds_ident=makeIdent "dummy", pds_module=NoIndex,pds_def=NoIndex}
+// MV ...
+			, cos_removed_dynamic_expr = abort "error, please report to Martijn or Artem"
+// ... MV
 	  		}
 		#! (body_expr, fun_arg_vars, local_vars, {cos_symbol_heap, cos_var_heap}) = 
 			determineVariablesAndRefCounts fun_arg_vars body_expr cs

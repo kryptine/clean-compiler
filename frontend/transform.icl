@@ -855,8 +855,8 @@ where
 					 es_fun_defs=macro_defs, es_main_dcl_module_n = mod_index, es_dcl_modules=modules,
 					 es_expand_in_imp_module=expand_in_imp_module,es_new_fun_def_numbers=[]
 					  }			
-			# (tb_args, tb_rhs, local_vars, fi_calls, {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
-					= expandMacrosInBody [] body alias_dummy es
+			# (tb_args, tb_rhs, local_vars, fi_calls, /* MV ... */ fun_info, /* ... MV */ {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
+					= expandMacrosInBody [] body alias_dummy /* MV ... */ macro_index /* ... MV */ es
 			# macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
 			= ({ es_fun_defs & [macro_index] = macro }, es_dcl_modules,
@@ -1049,8 +1049,8 @@ where
 		  	  identPos = newPosition fun_symb fun_pos
 			# expand_in_imp_module=case fun_kind of FK_ImpFunction _->True; FK_ImpMacro->True; FK_ImpCaf->True; _ -> False
 			  es={ es & es_expand_in_imp_module=expand_in_imp_module, es_error = setErrorAdmin identPos es.es_error }
-			# (tb_args, tb_rhs, fi_local_vars, fi_calls, es)
-					= expandMacrosInBody fun_info.fi_calls body alias_dummy es
+			# (tb_args, tb_rhs, fi_local_vars, fi_calls, /* MV ... */ fun_info, /* ... MV */ es)
+					= expandMacrosInBody fun_info.fi_calls body alias_dummy /* MV ... */ fun_index /* ... MV */ es
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= {es & es_fun_defs.[fun_index] = fun_def }
@@ -1102,8 +1102,15 @@ where
 			_
 				-> (fun_defs, symbol_table)
 
-expandMacrosInBody :: [.FunCall] CheckedBody PredefinedSymbol *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],.ExpandState);
-expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy es=:{es_symbol_table,es_fun_defs}
+expandMacrosInBody :: [.FunCall] CheckedBody PredefinedSymbol /* MV ... */ !Int /* ... MV */ *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],/* MV ... */ !FunInfo, /* ... MV */ .ExpandState);
+expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current_fun_index /* ... MV */ es=:{es_symbol_table,es_fun_defs}
+// MV ...
+	# (fun_def=:{fun_info},es_fun_defs)
+		= es_fun_defs![es_current_fun_index]
+	# cos_removed_dynamic_expr
+		= createArray (length fun_info.fi_dynamics) False // means not removed
+// ... MV
+
 	# (prev_calls, fun_defs, es_symbol_table)
 			= addFunctionCallsToSymbolTable fi_calls es_fun_defs es_symbol_table
 	  ([rhs:rhss], (all_calls, es) )
@@ -1112,14 +1119,41 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy es=:{es_symbol_table,es
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
 	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap})
+	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap /* MV ... */, cos_removed_dynamic_expr /* ... MV */})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
-	  					cos_alias_dummy = alias_dummy }
-	= (new_args, new_rhs, local_vars, all_calls,
+	  					cos_alias_dummy = alias_dummy /* MV ... */, cos_removed_dynamic_expr = cos_removed_dynamic_expr /* ... MV */}
+	// MV ...
+	# (changed,fi_dynamics,_,cos_symbol_heap)
+		= foldSt remove_fi_dynamic fun_info.fi_dynamics (False,[],cos_removed_dynamic_expr,cos_symbol_heap)
+	# fun_info
+		= if changed { fun_info & fi_dynamics = fi_dynamics } fun_info
+	// ... MV
+	= (new_args, new_rhs, local_vars, all_calls, /* MV ... */ fun_info, /* ... MV */
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_fun_defs=fun_defs, es_symbol_table = symbol_table })
 //		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
+// MV ...
+where
+	remove_fi_dynamic dyn_expr_ptr (changed,accu,cos_removed_dynamic_expr,cos_symbol_heap)
+		# (expr_info,cos_symbol_heap)
+			= readPtr dyn_expr_ptr cos_symbol_heap
+		| not (isEI_Dynamic expr_info)
+			= (changed,[dyn_expr_ptr:accu],cos_removed_dynamic_expr,cos_symbol_heap)
+			
+		# (EI_Dynamic _ id)
+			= expr_info
+		| cos_removed_dynamic_expr.[id]
+			// cos_removed_dynamic means cos_used_dynamic
+			= (changed,[dyn_expr_ptr:accu],cos_removed_dynamic_expr,cos_symbol_heap)
+		
+		
+			// unused
+			= (True,accu,cos_removed_dynamic_expr,cos_symbol_heap)
+	where
+		isEI_Dynamic (EI_Dynamic _ _)	= True
+		isEI_Dynamic _					= False
+// ... MV
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
@@ -1701,6 +1735,9 @@ where
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
 	,	cos_alias_dummy	:: !PredefinedSymbol
+// MV ...
+	,	cos_removed_dynamic_expr	:: !.{#Bool}
+// ... MV
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
@@ -1889,8 +1926,18 @@ where
 	collectVariables (MatchExpr opt_tuple cons_symb expr) free_vars cos
 		# (expr, free_vars, cos) = collectVariables expr free_vars cos
 		= (MatchExpr opt_tuple cons_symb expr, free_vars, cos)
-	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr}) free_vars cos
-		#! (dyn_expr, free_vars, cos) = collectVariables dyn_expr free_vars cos
+	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr /* MV ... */ , dyn_info_ptr /* ... MV */}) free_vars cos
+		#! (dyn_expr, free_vars, cos /* MV ... */ =:{cos_symbol_heap} /* ... MV */) = collectVariables dyn_expr free_vars cos
+// MV ...
+		# (expr_info,cos_symbol_heap)
+			= readPtr dyn_info_ptr cos_symbol_heap
+		# cos
+			= { cos & cos_symbol_heap = cos_symbol_heap }
+		# cos
+			= case expr_info of 
+				EI_Dynamic _ id		->  { cos & cos_removed_dynamic_expr = { cos.cos_removed_dynamic_expr & [id] = True } }
+				_					-> cos
+// ... MV
 		= (DynamicExpr {dynamic_expr & dyn_expr = dyn_expr}, free_vars, cos);
 	collectVariables expr free_vars cos
 		= (expr, free_vars, cos)

@@ -1410,7 +1410,7 @@ where
 	adjustClassExpression symb_name l=:(TypeCodeExpression type_code_expression) ui
 		# (expr,uni_vars,ui)
 			= convertTypecode type_code_expression [] ui
-		| not (isEmpty uni_vars)
+		| False //not (isEmpty uni_vars)
 			# (let_binds,ui) = createVariables uni_vars ui
 			  (let_info_ptr,ui) = let_ptr ui
 			= ( Let {	let_strict_binds	= []
@@ -1425,12 +1425,12 @@ where
 		convertTypecode TCE_Empty uni_vars ui
 			= (EE,uni_vars,ui)
 //		should not match
-//		convertTypecode (TCE_Var var_info_ptr) uni_vars ui
-//			= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},[var_info_ptr:uni_vars],ui)
+		convertTypecode (TCE_Var var_info_ptr) uni_vars ui
+			= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},[var_info_ptr:uni_vars],ui)
 		convertTypecode (TCE_TypeTerm var_info_ptr) uni_vars ui
 //			# v_tc_name = { id_name = "overloadingvTC", id_info = nilPtr }
-//			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},uni_vars,ui)
-			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},[var_info_ptr:uni_vars],ui)
+			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},uni_vars,ui)
+// WAS		= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},[var_info_ptr:uni_vars],ui)
 
 		convertTypecode (TCE_Constructor index typecode_exprs) uni_vars ui
 			# (typecons_symb,ui) 			= getSymbol PD_TypeConsSymbol SK_Constructor 2 ui

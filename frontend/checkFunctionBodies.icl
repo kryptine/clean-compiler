@@ -16,6 +16,9 @@ cEndWithSelection		:== False
 	,	es_calls			:: ![FunCall]
 	,	es_dynamics			:: ![ExprInfoPtr]
 	,	es_fun_defs			:: !.{# FunDef}
+// MV ...
+ 	,	es_dynamic_expr_count	:: !Int				// used to give each dynamic expr an unique id
+// ... MV
 	}
 	
 ::	ExpressionInput =
@@ -812,12 +815,14 @@ where
 	get_field_var _
 		= ({ id_name = "** ERRONEOUS **", id_info = nilPtr }, nilPtr)
 
-checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expr_heap,es_dynamics} e_info cs=:{cs_x}
-	# (dyn_info_ptr, es_expr_heap) = newPtr (EI_Dynamic opt_type) es_expr_heap
+// MV ...
+checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expr_heap,es_dynamics, es_dynamic_expr_count } e_info cs=:{cs_x}
+	# (dyn_info_ptr, es_expr_heap) = newPtr (EI_Dynamic opt_type es_dynamic_expr_count) es_expr_heap
 	  (dyn_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input
-	  		{e_state & es_dynamics = [dyn_info_ptr : es_dynamics], es_expr_heap = es_expr_heap } e_info cs
+	  		{e_state & es_dynamics = [dyn_info_ptr : es_dynamics], es_expr_heap = es_expr_heap, es_dynamic_expr_count = inc es_dynamic_expr_count} e_info cs
 	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty, dyn_uni_vars = [] },
 			free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamics }) 
+// ... MV
 
 checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
 	# (basic_type, cs) = typeOfBasicValue basic_value cs

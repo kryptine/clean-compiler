@@ -904,9 +904,9 @@ where
 		remove_global_type_variables_in_dynamic dyn_info_ptr (expr_heap, symbol_table)
 			# (dyn_info, expr_heap) = readPtr dyn_info_ptr expr_heap
 			= case dyn_info of
-				EI_Dynamic (Yes {dt_global_vars})
+				EI_Dynamic (Yes {dt_global_vars}) _
 					-> (expr_heap, remove_global_type_variables dt_global_vars symbol_table)
-				EI_Dynamic No
+				EI_Dynamic No _
 					-> (expr_heap, symbol_table)
 				EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} loc_dynamics
 					-> remove_global_type_variables_in_dynamics loc_dynamics (expr_heap, remove_global_type_variables dt_global_vars symbol_table)
@@ -943,9 +943,9 @@ where
 		check_global_type_variables_in_dynamic dyn_info_ptr (expr_heap, cs)
 			# (dyn_info, expr_heap) = readPtr dyn_info_ptr expr_heap
 			= case dyn_info of
-				EI_Dynamic (Yes {dt_global_vars})
+				EI_Dynamic (Yes {dt_global_vars}) _
 					-> (expr_heap, check_global_type_variables dt_global_vars cs)
-				EI_Dynamic No
+				EI_Dynamic No _
 					-> (expr_heap, cs)
 				EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} loc_dynamics
 					-> check_global_type_variables_in_dynamics loc_dynamics (expr_heap, check_global_type_variables dt_global_vars cs)
@@ -967,15 +967,15 @@ where
 	check_dynamic mod_index scope dyn_info_ptr (type_defs, modules, type_heaps, expr_heap, cs)
 		# (dyn_info, expr_heap) = readPtr dyn_info_ptr expr_heap
 		= case dyn_info of
-			EI_Dynamic opt_type
+			EI_Dynamic opt_type ei_dynamic_id
 				-> case opt_type of
 					Yes dyn_type
 						# (dyn_type, loc_type_vars, type_defs, modules, type_heaps, cs) = check_dynamic_type mod_index scope dyn_type type_defs modules type_heaps cs
 						| isEmpty loc_type_vars
-							-> (type_defs, modules, type_heaps, expr_heap <:= (dyn_info_ptr, EI_Dynamic (Yes dyn_type)), cs)
+							-> (type_defs, modules, type_heaps, expr_heap <:= (dyn_info_ptr, EI_Dynamic (Yes dyn_type) ei_dynamic_id), cs)
 				  			# cs_symbol_table = removeVariablesFromSymbolTable scope loc_type_vars cs.cs_symbol_table
 							  cs_error = checkError loc_type_vars "type variable(s) not defined" cs.cs_error
-							-> (type_defs, modules, type_heaps, expr_heap <:= (dyn_info_ptr, EI_Dynamic (Yes dyn_type)),
+							-> (type_defs, modules, type_heaps, expr_heap <:= (dyn_info_ptr, EI_Dynamic (Yes dyn_type) ei_dynamic_id),
 									{ cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 					No
 						-> (type_defs, modules, type_heaps, expr_heap, cs)

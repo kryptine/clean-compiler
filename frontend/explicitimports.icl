@@ -856,9 +856,9 @@ check_completeness_of_dyn_expr_ptr dyn_expr_ptr cci ccs=:{box_ccs=box_ccs=:{ccs_
 	#! (expr_info, ccs_expr_heap) = readPtr dyn_expr_ptr ccs_expr_heap
 	   ccs = { ccs & box_ccs = { box_ccs & ccs_expr_heap = ccs_expr_heap }}
  	= case expr_info of
-		(EI_Dynamic No)	
+		(EI_Dynamic No _)
 			-> ccs
-		(EI_Dynamic (Yes dynamic_type))
+		(EI_Dynamic (Yes dynamic_type) _) 
 			-> check_completeness dynamic_type cci ccs
 		(EI_DynamicType dynamic_type further_dynamic_ptrs)
 			-> check_completeness dynamic_type cci

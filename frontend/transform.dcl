@@ -21,6 +21,9 @@ partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# Dcl
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
 	,	cos_alias_dummy	:: !PredefinedSymbol
+// MV ...
+	,	cos_removed_dynamic_expr	:: !.{#Bool}
+// ... MV
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
