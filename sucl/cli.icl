@@ -127,7 +127,7 @@ exports (CliAlias m) = m.exportedsymbols
 // Determine the arity of a core clean symbol
 arity :: Cli SuclSymbol -> Int
 arity (CliAlias m) sym
-= extendfn m.arities (length o arguments o (extendfn m.typerules coretyperule)) sym
+= extendfn m.arities (length o arguments o (extendfn m.typerules (coretyperule--->"coreclean.coretyperule begins from cli.arity"))) sym
 
 /*
 >   typerule (tdefs,(es,as,ts,rs)) = maxtyperule ts
@@ -177,7 +177,7 @@ typearity ti = length (arguments ti)
 //maxtypeinfo defs sym = extendfn defs coretypeinfo sym
 
 maxtyperule :: [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)] SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
-maxtyperule defs sym = extendfn defs coretyperule sym
+maxtyperule defs sym = extendfn defs (coretyperule--->"cli.coretyperule begins from cli.maxtyperule") sym
 
 maxstricts :: [(SuclSymbol,[Bool])] SuclSymbol -> [Bool]
 maxstricts defs sym = extendfn defs corestricts sym

@@ -163,7 +163,8 @@ Implementation
    = Reduce var (Trace sym var pvar)
    | Annotate (Trace sym var pvar)
    | Stop
-   | Instantiate (Trace sym var pvar)
+   | Instantiate (Rgraph sym var)
+                 (Trace sym var pvar)
                  (Trace sym var pvar)
 
 /* Disable the new abstraction node for now...
@@ -259,7 +260,7 @@ been applied; this has to be done afterwards.
 >   tips :: trace * ** *** -> [rule * **]
 
 >   tips
->   =   foldtrace reduce annotate stop instantiate
+>   =   oldtrace reduce annotate stop instantiate
 >       where reduce stricts rule answer history reductroot = id
 >             annotate stricts rule answer history = id
 >             stop stricts rule answer history = [rule]
@@ -283,7 +284,7 @@ foldtrace
  :: ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) var .result -> .result)
     ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) .result -> .result)
     ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) -> .result)
-    ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) .result .result -> .result)
+    ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) (Rgraph sym var) .result .result -> .result)
     !.(Trace sym var pvar)
  -> .result
 
@@ -292,7 +293,7 @@ foldtransformation
     (var .result -> .subresult)
     (.result -> .subresult)
     .subresult
-    (.result .result -> .subresult)
+    ((Rgraph sym var) .result .result -> .subresult)
     ([.absresult] -> .subresult)
     ((Rule sym var) -> .absresult)
     (.result -> .absresult)

@@ -129,7 +129,8 @@ Implementation
    = Reduce var (Trace sym var pvar)
    | Annotate (Trace sym var pvar)
    | Stop
-   | Instantiate (Trace sym var pvar)
+   | Instantiate (Rgraph sym var)
+                 (Trace sym var pvar)
                  (Trace sym var pvar)
 
 /* Disable the abstraction node for now...
@@ -227,7 +228,7 @@ foldtrace
  :: ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) var .result -> .result)
     ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) .result -> .result)
     ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) -> .result)
-    ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) .result .result -> .result)
+    ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) (Rgraph sym var) .result .result -> .result)
     !.(Trace sym var pvar)
  -> .result
 
@@ -238,7 +239,7 @@ foldtrace reduce annotate stop instantiate trace
         ftf stricts rule answer history (Reduce reductroot trace) = reduce stricts rule answer history reductroot (ftr trace)
         ftf stricts rule answer history (Annotate trace) = annotate stricts rule answer history (ftr trace)
         ftf stricts rule answer history Stop = stop stricts rule answer history
-        ftf stricts rule answer history (Instantiate yestrace notrace) = instantiate stricts rule answer history (ftr yestrace) (ftr notrace)
+        ftf stricts rule answer history (Instantiate ipattern yestrace notrace) = instantiate stricts rule answer history ipattern (ftr yestrace) (ftr notrace)
 //      ftf _ _ _ _ (Abstract _) = error "foldtrace not implemented for abstraction nodes"
 
 foldtransformation
@@ -246,7 +247,7 @@ foldtransformation
     (var .result -> .subresult)
     (.result -> .subresult)
     .subresult
-    (.result .result -> .subresult)
+    ((Rgraph sym var) .result .result -> .subresult)
     ([.absresult] -> .subresult)
     ((Rule sym var) -> .absresult)
     (.result -> .absresult)
@@ -258,7 +259,7 @@ foldtransformation ftr reduce annotate stop instantiate abstract knownabstractio
   where ftf (Reduce reductroot trace) = reduce reductroot (ftr trace)
         ftf (Annotate trace) = annotate (ftr trace)
         ftf Stop = stop
-        ftf (Instantiate yestrace notrace) = instantiate (ftr yestrace) (ftr notrace)
+        ftf (Instantiate ipattern yestrace notrace) = instantiate ipattern (ftr yestrace) (ftr notrace)
 //      ftf (Abstract as) = abstract (map fab as)
 //      fab (NewAbstraction t) = newabstraction (ftr t)
 //      fab (KnownAbstraction r) = knownabstraction r
@@ -286,12 +287,13 @@ where // (<<<) file trace = error "trace.<<<(Trace): blocked for debugging"
        <<< "Transformation:" <<< nl writeTransformation transf
   where (Trace stricts rule answer history transf) = trace
 
-instance <<< Transformation sym var pvar | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
+instance <<< (Transformation sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
 where (<<<) file (Reduce reductroot subtrace) = file <<< "Reduce; root of reduct: " <<< reductroot <<< nl <<< subtrace
       (<<<) file (Annotate subtrace) = file <<< "Annotate" <<< nl <<< subtrace
       (<<<) file Stop = file <<< "Stop" <<< nl
-      (<<<) file (Instantiate yestrace notrace)
+      (<<<) file (Instantiate ipattern yestrace notrace)
             = file <<< "Instantiate" <<< nl
+                   // <<< "Pattern: " <<< ipattern <<< nl
                    <<< "Successful match..." <<< nl
                    <<< yestrace
                    <<< "End of successful match." <<< nl
@@ -299,20 +301,28 @@ where (<<<) file (Reduce reductroot subtrace) = file <<< "Reduce; root of reduct
                    <<< notrace
                    <<< "End of failing match." <<< nl
 
-(writeTransformation) infixl :: *File .(Transformation sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
+(writeTransformation) infixl ::
+    *File
+    .(Transformation sym var pvar)
+ -> .File
+ |  toString sym
+ &  ==,toString,<<< var
+ // &  ==,toString,<<< pvar
+
 (writeTransformation) file (Reduce reductroot subtrace)
-                      = file <<< "Reduce; root of reduct: " <<< reductroot <<< nl
-                             writeTrace subtrace
+= file <<< "Reduce; root of reduct: " <<< reductroot <<< nl
+       writeTrace subtrace
 (writeTransformation) file (Annotate subtrace)
-                      = file <<< "Annotate" <<< nl
-                             writeTrace subtrace
+= file <<< "Annotate" <<< nl
+       writeTrace subtrace
 (writeTransformation) file Stop
-                      = file <<< "Stop" <<< nl
-(writeTransformation) file (Instantiate yestrace notrace)
-                      = file <<< "Instantiate" <<< nl
-                             <<< "Successful match..." <<< nl
-                             // writeTrace yestrace
-                             <<< "End of successful match." <<< nl
-                             <<< "Failing match..." <<< nl
-                             // writeTrace notrace
-                             <<< "End of failing match." <<< nl
+= file <<< "Stop" <<< nl
+(writeTransformation) file (Instantiate ipattern yestrace notrace)
+= file <<< "Instantiate" <<< nl
+       // <<< "Pattern: " <<< ipattern <<< nl
+       <<< "Successful match..." <<< nl
+       // writeTrace yestrace
+       <<< "End of successful match." <<< nl
+       <<< "Failing match..." <<< nl
+       // writeTrace notrace
+       <<< "End of failing match." <<< nl
