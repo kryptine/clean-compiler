@@ -517,7 +517,7 @@ where
 			  not_unfoldable = map not unfoldables
 			  non_unfoldable_args = filterWith not_unfoldable zipped
 			  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
-			  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module ds_index ro ti.ti_symbol_heap
+			  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type ro ti.ti_symbol_heap
 			  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
 			  				   us_local_macro_functions = No }
 			  ui= {ui_handle_aci_free_vars = LeaveThem }
@@ -527,44 +527,6 @@ where
 			  						{ ti & ti_var_heap = unfold_state.us_var_heap, ti_symbol_heap = unfold_state.us_symbol_heap,ti_cleanup_info=unfold_state.us_cleanup_info }
 			= (Yes final_expr, ti)
 		= match_and_instantiate linearities cons_index app_args guards case_default ro ti
-	  where
-	  	in_normal_form (Var _)			= True
-	  	in_normal_form (BasicExpr _)	= True
-	  	in_normal_form _				= False
-	  	
-		filterWith [True:t2] [h1:t1]
-			= [h1:filterWith t2 t1]
-		filterWith [False:t2] [h1:t1]
-			= filterWith t2 t1
-		filterWith _ _
-			= []
-		
-		possibly_add_let [] ap_expr _ _ _ _ ti_symbol_heap
-			= (ap_expr, ti_symbol_heap)
-		possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module glob_index ro ti_symbol_heap
-			# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_index]
-			  let_type = filterWith not_unfoldable cons_type.st_args
-			  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
-/* DvA... STRICT_LET
-			= ( Let	{	let_strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-												\\ (lb_dst,lb_src)<-non_unfoldable_args
-												& type <- let_type | type.at_annotation == AN_Strict
-												]
-					,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-												\\ (lb_dst,lb_src)<-non_unfoldable_args
-												& type <- let_type | type.at_annotation == AN_None
-												]
-...DvA */
-			= ( Let	{	let_strict_binds	= []
-					,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-												\\ (lb_dst,lb_src)<-non_unfoldable_args]
-					,	let_expr			= ap_expr
-					,	let_info_ptr		= new_info_ptr
-					,	let_expr_position	= NoPos
-					}
-			  , ti_symbol_heap
-			  ) 
-
 	match_and_instantiate [linearity:linearities] cons_index app_args [guard : guards] case_default ro ti
 		= match_and_instantiate linearities cons_index app_args guards case_default ro ti
 	match_and_instantiate _ cons_index app_args [] default_expr ro ti
@@ -600,6 +562,42 @@ transCase is_active opt_aci this_case=:{case_expr = (Let lad)} ro ti
 transCase is_active opt_aci this_case ro ti
 	= skip_over this_case ro ti
 	
+in_normal_form (Var _)			= True
+in_normal_form (BasicExpr _)	= True
+in_normal_form _				= False
+
+filterWith [True:t2] [h1:t1]
+	= [h1:filterWith t2 t1]
+filterWith [False:t2] [h1:t1]
+	= filterWith t2 t1
+filterWith _ _
+	= []
+
+possibly_add_let [] ap_expr _ _ _ ti_symbol_heap
+	= (ap_expr, ti_symbol_heap)
+possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type ro ti_symbol_heap
+	# let_type = filterWith not_unfoldable cons_type.st_args
+	  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
+/* DvA... STRICT_LET
+	= ( Let	{	let_strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+										\\ (lb_dst,lb_src)<-non_unfoldable_args
+										& type <- let_type | type.at_annotation == AN_Strict
+										]
+			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+										\\ (lb_dst,lb_src)<-non_unfoldable_args
+										& type <- let_type | type.at_annotation == AN_None
+										]
+...DvA */
+	= ( Let	{	let_strict_binds	= []
+			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+										\\ (lb_dst,lb_src)<-non_unfoldable_args]
+			,	let_expr			= ap_expr
+			,	let_info_ptr		= new_info_ptr
+			,	let_expr_position	= NoPos
+			}
+	  , ti_symbol_heap
+	  ) 
+
 possibly_generate_case_function :: !Case !ActiveCaseInfo !ReadOnlyTI !*TransformInfo -> *(!Expression, !*TransformInfo)
 possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 //	| False -!-> ("possibly_generate_case_function",ro.ro_fun_root.symb_name.id_name,ro.ro_fun_case.symb_name.id_name,ro.ro_root_case_mode)
