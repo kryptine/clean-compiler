@@ -382,7 +382,21 @@ convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args 
 		= (True,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args,ci)
 
 convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
-		= convertTypecode2 cinp t replace_tc_args binds placeholders_and_tc_args ci
+	#! cinp_st_args
+		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
+	| isEmpty cinp_st_args
+		#! (e,binds,placeholders_and_tc_args,ci)
+			= convertTypecode cinp t replace_tc_args binds placeholders_and_tc_args ci
+		= (False,e,binds,placeholders_and_tc_args,ci)
+		
+		/*
+		** the TCE_VAR is a TC argument and it is not part of a larger type expression. It
+		** later suffices to generate a coerce instead of an application. This is an 
+		** optimization.
+		*/
+		= (True,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args,ci)
+
+//		= convertTypecode2 cinp t replace_tc_args binds placeholders_and_tc_args ci
 
 convertTypecode2 cinp t replace_tc_args binds placeholders_and_tc_args ci
 	#! (e,binds,placeholders_and_tc_args,ci)
