@@ -353,7 +353,7 @@ unfoldVariable var=:{var_ident,var_info_ptr} ui us
 	substitute_class_types class_types No
 		= (class_types, No)
 	substitute_class_types class_types (Yes type_heaps)
-		# (_,new_class_types, type_heaps) = substitute class_types type_heaps
+		# (new_class_types, type_heaps) = substitute class_types type_heaps
 		= (new_class_types, Yes type_heaps)
 
 readVarInfo var_info_ptr us
@@ -549,7 +549,7 @@ where
 					-> unfold_function_app app ui us
 
 		substitute_EI_DictionaryType (EI_DictionaryType class_type) (Yes type_heaps)
-			# (_,new_class_type, type_heaps) = substitute class_type type_heaps
+			# (new_class_type, type_heaps) = substitute class_type type_heaps
 			= (EI_DictionaryType new_class_type, Yes type_heaps)
 		substitute_EI_DictionaryType x opt_type_heaps
 			= (x, opt_type_heaps)
@@ -662,10 +662,10 @@ substitute_let_or_case_type	(EI_Extended extensions expr_info) yes_type_heaps
 	# (new_expr_info, yes_type_heaps) = substitute_let_or_case_type expr_info yes_type_heaps
 	= (EI_Extended extensions new_expr_info, yes_type_heaps)
 substitute_let_or_case_type	(EI_CaseType case_type) (Yes type_heaps)
-	# (_,new_case_type, type_heaps) = substitute case_type type_heaps
+	# (new_case_type, type_heaps) = substitute case_type type_heaps
 	= (EI_CaseType new_case_type, Yes type_heaps)
 substitute_let_or_case_type	(EI_LetType let_type) (Yes type_heaps)
-	# (_,new_let_type, type_heaps) = substitute let_type type_heaps
+	# (new_let_type, type_heaps) = substitute let_type type_heaps
 	= (EI_LetType new_let_type, Yes type_heaps)
 
 instance unfold CasePatterns

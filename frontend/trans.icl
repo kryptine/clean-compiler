@@ -978,8 +978,8 @@ where
 		  (type_variables, th_vars)				= getTypeVars [ct_result_type:arg_types] th_vars
 		  (fresh_type_vars, th_vars)			= mapSt bind_to_fresh_type_variable type_variables th_vars
 		  ti_type_heaps							= { ti_type_heaps & th_vars = th_vars }
-		  (_, fresh_arg_types, ti_type_heaps)	= substitute arg_types ti_type_heaps
-		  (_, fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
+		  (fresh_arg_types, ti_type_heaps)	= substitute arg_types ti_type_heaps
+		  (fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
 		  fun_type =
 		  			{ st_vars					= fresh_type_vars
 		  			, st_args					= fresh_arg_types
@@ -1349,7 +1349,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  ti_type_heaps
 	  		= { ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars }
 //	| False-!->("before substitute", st_args, "->", st_result)		= undef
-	# (_, (st_args,st_result), ti_type_heaps)
+	# ((st_args,st_result), ti_type_heaps)
 	  		= substitute (st_args,st_result) ti_type_heaps
 //	| False-!->("after substitute", st_args, "->", st_result)		= undef
 // determine args...
@@ -1686,9 +1686,9 @@ where
 				= mapSt bind_to_fresh_type_variable st_vars th_vars
 		  (fresh_st_attr_vars, th_attrs)
 				= mapSt bind_to_fresh_attr_variable st_attr_vars th_attrs
-		  (_, [fresh_st_result:fresh_st_args], ti_type_heaps)
+		  ([fresh_st_result:fresh_st_args], ti_type_heaps)
 		  		= substitute [st_result:st_args] { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-		  (_, fresh_st_attr_env, ti_type_heaps)
+		  (fresh_st_attr_env, ti_type_heaps)
 		  		= substitute st_attr_env ti_type_heaps
 		= (Yes { symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
 				st_result = fresh_st_result, st_attr_env = fresh_st_attr_env}, ti_type_heaps)
@@ -1907,7 +1907,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			= das_arg_types![prod_index]
 	# {ats_types=[arg_type:_]}
 	  		= ws_arg_type
-	  (_, int_class_type, das_type_heaps)
+	  (int_class_type, das_type_heaps)
 	  		= substitute class_type das_type_heaps
 	  class_atype
 	  		= { empty_atype & at_type = int_class_type }
@@ -1941,7 +1941,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 	# (free_vars_and_types,das_type_heaps) = mapSt subFVT free_vars_and_types das_type_heaps
 		with
 			subFVT (fv,ty) th
-				# (_,ty`,th`)		= substitute ty th
+				# (ty`,th`)		= substitute ty th
 				= ((fv,ty`),th`)
 
 	# ws_ats_types = [ { empty_atype & at_type = at_type } \\ (_, at_type) <- free_vars_and_types]
@@ -1977,7 +1977,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  (das_next_attr_nr, th_attrs)
 	  		= foldSt bind_to_temp_attr_var st_attr_vars (das_next_attr_nr, th_attrs)
 	  		// prepare for substitute calls
-	  (_, (st_args, st_result), das_type_heaps)
+	  ((st_args, st_result), das_type_heaps)
 	  		= substitute (st_args, st_result) { das_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  nr_of_applied_args
 			= symbol_arity
@@ -3924,7 +3924,7 @@ where
 	bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets_type_heaps
 		# ets_type_heaps = bind_attr td_attribute attribute ets_type_heaps
 		  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
-		  (_, type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
+		  (type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
 		= (type, ets_type_heaps)
 		where
 			bind_var_and_attr {	atv_attribute = TA_Var {av_info_ptr},  atv_variable = {tv_info_ptr} } {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}

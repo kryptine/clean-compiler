@@ -117,11 +117,8 @@ where
 			# (used_td=:{td_rhs}, type_defs) = type_defs![glob_module, glob_object]
 			= case td_rhs of
 				SynType {at_type}
-					# (ok, subst_rhs, type_heaps) = substituteType used_td.td_attribute attribute used_td.td_args types at_type type_heaps
-					| ok
-						-> (Yes {type & at_type = subst_rhs }, type_defs, type_heaps, error)
-					  	# error = popErrorAdmin (typeSynonymError used_td.td_ident "kind conflict in argument of type synonym" (pushErrorAdmin pos error))
-						-> (No, type_defs, type_heaps, error)
+					# ( subst_rhs, type_heaps) = substituteType used_td.td_attribute attribute used_td.td_args types at_type type_heaps
+					-> (Yes {type & at_type = subst_rhs }, type_defs, type_heaps, error)
 				_
 					-> (No, type_defs, type_heaps, error)
 
