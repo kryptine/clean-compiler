@@ -49,7 +49,9 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare
 		,	ec_function_conversions
 				::	!Conversions
 		,	ec_main_dcl_module_n
-				:: !Int
+				::	!Int
+		,	ec_dcl_macro_range
+				::	!IndexRange
 		}
 		
 :: ExpressionsCorrespondMonad
@@ -225,7 +227,8 @@ compareMacrosWithConversion main_dcl_module_n conversions function_conversions m
 	  				ec_error_admin = error_admin, ec_tc_state = tc_state,
 	  				ec_untransformed = untransformed,
 	  				ec_function_conversions = function_conversions,
-					ec_main_dcl_module_n = main_dcl_module_n }
+					ec_main_dcl_module_n = main_dcl_module_n,
+					ec_dcl_macro_range = macro_range }
 	  ec_state = iFoldSt (compareMacroWithConversion conversions macro_range.ir_from) macro_range.ir_from macro_range.ir_to
 	  						ec_state
 	  {ec_icl_functions, ec_var_heap, ec_expr_heap, ec_error_admin, ec_tc_state} = ec_state
@@ -817,7 +820,13 @@ e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Function dcl_glob_
 					ec_state
 	#! main_dcl_module_n = ec_state.ec_main_dcl_module_n
 	| dcl_glob_index.glob_module==main_dcl_module_n && icl_glob_index.glob_module==main_dcl_module_n
-		| ec_state.ec_function_conversions.[dcl_glob_index.glob_object]<>icl_glob_index.glob_object
+		# dcl_glob_object = dcl_glob_index.glob_object
+		  is_indeed_a_macro =    ec_state.ec_dcl_macro_range.ir_from <= dcl_glob_object
+		                      && dcl_glob_object < ec_state.ec_dcl_macro_range.ir_to
+		| is_indeed_a_macro
+			= continuation_for_possibly_twice_defined_macros
+					dcl_app_symb dcl_glob_object icl_app_symb icl_glob_index.glob_object ec_state
+		| ec_state.ec_function_conversions.[dcl_glob_object]<>icl_glob_index.glob_object
 			= give_error symb_name ec_state
 		= ec_state
 	| dcl_glob_index<>icl_glob_index
@@ -924,4 +933,3 @@ do_nothing ec_state
 
 give_error s ec_state
 	= { ec_state & ec_error_admin = checkError s error_message ec_state.ec_error_admin }
-
