@@ -1492,3 +1492,36 @@ addAttrEnvInequalities st_attr_env coercions th_attrs
 		# (AVI_Attr (TA_TempVar offered), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
 		  (AVI_Attr (TA_TempVar demanded), th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
   		= (newInequality offered demanded coercions, th_attrs)
+
+optBeautifulizeIdent :: !String -> Optional (!String, !LineNr)
+optBeautifulizeIdent id_name
+	# fst_semicolon_index = searchlArrElt ((==) ';') id_name 0
+	| fst_semicolon_index < size id_name
+		# snd_semicolon_index = searchlArrElt ((==) ';') id_name (fst_semicolon_index+1)
+		  prefix = id_name % (0, fst_semicolon_index-1)
+		  line = toInt (id_name % (fst_semicolon_index+1, snd_semicolon_index-1))
+		= Yes (prefix_to_readable_name prefix, line)
+	= No
+  where
+	prefix_to_readable_name "_c"	= "case"
+	prefix_to_readable_name "_g"	= "guard"
+	prefix_to_readable_name "_f"	= "filter"
+	prefix_to_readable_name "\\"	= "lambda"
+	prefix_to_readable_name prefix
+		| prefix.[0] == 'c'
+			= "comprehension"
+		| prefix.[0] == 'g'
+			= "generator"
+	prefix_to_readable_name _		= abort "fatal error 21 in type.icl"
+
+// search for an element in an array
+searchlArrElt p s i
+	:== searchl s i
+  where
+	searchl s i
+		| i>=size s
+			= i
+		| p s.[i]
+			= i
+		= searchl s (i+1)
+// ..MW4

@@ -86,7 +86,9 @@ addAttrEnvInequalities :: ![AttrInequality] !*Coercions !u:AttrVarHeap
 						-> (!.Coercions, !u:AttrVarHeap)
 	// assertion: the attribute variables point to (AVI_Attr (TA_TempVar nr)) where
 	// nr corresponds to the attribute variable
-
+optBeautifulizeIdent :: !String -> Optional (!String, !LineNr)
+	// convert something like "c;8;2" to Yes ("comprehension", 8)
+	
 //accCoercionTree :: !.(u:CoercionTree -> (.a,u:CoercionTree)) !Int !*{!u:CoercionTree} -> (!.a,!{!u:CoercionTree})
 accCoercionTree f i coercion_trees
 	:== acc_coercion_tree i coercion_trees
