@@ -198,13 +198,6 @@ GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
 
 predefined_idents :: {!Ident}
 predefined_idents
-// RWS: work around for 2.0 compiler bug
-// predefined_idents is not parsed as a CAF because of the #-definitions
-	=:	build_predefined_idents
-
-build_predefined_idents :: {!Ident}
-build_predefined_idents
-// ... RWS
 	# idents = createArray PD_NrOfPredefSymbols {id_name="",id_info=nilPtr}
 	# idents = { idents &
 					[PD_ConsSymbol] = i PD_ConsSymbol_String,
