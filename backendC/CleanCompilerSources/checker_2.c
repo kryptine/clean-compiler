@@ -110,6 +110,10 @@ Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId,
 	DeltaBId, IfId, FailId, AndId, OrId,
 	StdArrayId, ArrayFunctionIds [NoArrayFun];
 
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+Ident StdMiscId,abort_id,undef_id;	
+#endif
+
 Symbol StartSymbol;
 
 SymbDef ArrayFunctionDefs [NoArrayFun],StdArrayAbortDef;
@@ -193,9 +197,18 @@ void InitChecker (void)
 	AndId		= PutStringInHashTable ("&&", SymbolIdTable);
 	OrId		= PutStringInHashTable ("||", SymbolIdTable);
 
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+	abort_id = PutStringInHashTable ("abort",SymbolIdTable);
+	undef_id = PutStringInHashTable ("undef",SymbolIdTable);
+#endif
+
 	SystemFunctionsId	= PutStringInHashTable ("StdEnum", ModuleIdTable);
 	DeltaBId 			= PutStringInHashTable ("StdBool", ModuleIdTable);
 	StdArrayId			= PutStringInHashTable ("_SystemArray", ModuleIdTable);
+
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+	StdMiscId = PutStringInHashTable ("StdMisc",ModuleIdTable);
+#endif
 
  	/* Predefined Array functions */
  	

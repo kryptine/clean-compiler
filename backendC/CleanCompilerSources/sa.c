@@ -2240,7 +2240,20 @@ static Exp ConvertNode (Node node, NodeId nid)
 						TypeArgs typeargs;
 						unsigned int i;
 						Exp exp;
-						
+
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+						if (sdef->sdef_module==StdMiscId->ident_name){
+							if ((sdef->sdef_ident==abort_id && node->node_arity==1) || sdef->sdef_ident==undef_id){
+								e->e_kind = Bottom;
+								e->e_sym = 0;
+								e->e_hnf = True;
+								e->e_spechnf= True;
+
+								return e;
+							}
+						}
+#endif
+
 						rule = sdef->sdef_rule_type->rule_type_rule;
 						typeargs = rule->type_alt_lhs->type_node_arguments;
 

@@ -13,6 +13,9 @@ extern Ident StrictListId,UnboxedListId,TailStrictListId,StrictTailStrictListId,
 #ifdef CLEAN2
 extern Ident DynamicId;
 #endif
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+extern Ident StdMiscId,abort_id,undef_id;
+#endif
 
 extern Symbol StartSymbol, UnboxedArrayClassSymbols [], UnboxedArrayFunctionSymbols [];
 extern SymbDef scc_dependency_list,ArrayFunctionDefs[], StdArrayAbortDef;
