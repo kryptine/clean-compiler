@@ -229,10 +229,10 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						decl_index = ds_index }, dcl_modules)
 			BS_Fields rt_fields
 				# {fs_ident, fs_index} = rt_fields.[belong_nr]
-				  ({sd__ident}, dcl_modules)
+				  ({sd_ident}, dcl_modules)
 						= dcl_modules![def_mod_index].dcl_common.com_selector_defs.[fs_index]
 				-> (Declaration { decl_ident = fs_ident, decl_pos = position, 
-						decl_kind = STE_Imported (STE_Field sd__ident) def_mod_index,
+						decl_kind = STE_Imported (STE_Field sd_ident) def_mod_index,
 						decl_index = fs_index }, dcl_modules)
 			BS_Members class_members
 				# {ds_ident, ds_index} = class_members.[belong_nr]

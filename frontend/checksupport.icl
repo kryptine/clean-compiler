@@ -619,7 +619,7 @@ where
 
 instance toIdent SelectorDef
 where
-	toIdent sd = sd.sd__ident
+	toIdent sd = sd.sd_ident
 
 /*
 instance toIdent DeltaRule

@@ -49,7 +49,7 @@ convertSelectorTypes selector_defs main_dcl_module_n common_defs types_and_heaps
 	= iFoldSt (convert_selector_type common_defs selector_defs) 0 (size selector_defs) types_and_heaps
 where
 	convert_selector_type common_defs selector_defs sel_index (imported_types, imported_conses, var_heap, type_heaps)  
-		#!{sd_type_ptr, sd_type, sd__ident} = selector_defs.[sel_index]
+		#!{sd_type_ptr, sd_type, sd_ident} = selector_defs.[sel_index]
 		  (sd_type, imported_types, imported_conses, type_heaps, var_heap)
 				= convertSymbolType cDontRemoveAnnotations common_defs sd_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type), type_heaps)
@@ -124,7 +124,7 @@ where
 		where
 			convert_type_of_imported_field module_index selector_defs fields field_index (imported_types, conses, type_heaps, var_heap)
 				#!field_index = fields.[field_index].fs_index
-				  {sd_type_ptr,sd_type,sd__ident} = selector_defs.[field_index]
+				  {sd_type_ptr,sd_type,sd_ident} = selector_defs.[field_index]
 				  (sd_type, imported_types, conses, type_heaps, var_heap)
 				  		= convertSymbolType cDontRemoveAnnotations common_defs sd_type main_dcl_module_n imported_types conses type_heaps var_heap
 				= (imported_types, conses, type_heaps, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type))

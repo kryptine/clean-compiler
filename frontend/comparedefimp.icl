@@ -614,8 +614,8 @@ instance getIdentPos ConsDef where
 		= newPosition cons_ident cons_pos
 
 instance getIdentPos SelectorDef where
-	getIdentPos {sd__ident, sd_pos}
-		= newPosition sd__ident sd_pos
+	getIdentPos {sd_ident, sd_pos}
+		= newPosition sd_ident sd_pos
 
 instance getIdentPos ClassDef where
 	getIdentPos {class_ident, class_pos}

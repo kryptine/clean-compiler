@@ -839,7 +839,7 @@ cNonRecursiveAppl	:== False
 	}
 
 ::	SelectorDef =
-	{	sd__ident			:: !Ident
+	{	sd_ident		:: !Ident
 	,	sd_field		:: !Ident
 	,	sd_type			:: !SymbolType
 	,	sd_exi_vars		:: ![ATypeVar]
@@ -1406,7 +1406,7 @@ MakeTypeSymbIdent type_index name arity
 	:== {	newTypeSymbIdentCAF & type_ident = name, type_arity = arity, type_index = type_index }
 
 ParsedSelectorToSelectorDef sd_type_index ps :==
-	{	sd__ident = ps.ps_selector_ident, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,
+	{	sd_ident = ps.ps_selector_ident, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,
 		sd_exi_vars = [], sd_type_ptr = nilPtr, sd_field = ps.ps_field_ident,
 		sd_type	= { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_result = ps.ps_field_type, st_arity = 0, st_context = [],
 				    st_attr_env = [], st_attr_vars = [] }}

@@ -414,13 +414,13 @@ backEndConvertModulesH predefs {fe_icl =
 				,	"dcl constructors"
 				,	[constructor.cons_ident.id_name \\ constructor <-: currentDcl.dcl_common.com_cons_defs]
 				,	"dcl selectors"
-				,	[selector.sd__ident.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
+				,	[selector.sd_ident.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
 				,	"dcl types"
 				,	[type.td_ident.id_name \\ type <-: currentDcl.dcl_common.com_type_defs]
 				,	"icl constructors"
 				,	[constructor.cons_ident.id_name \\ constructor <-: icl_common.com_cons_defs]
 				,	"icl selectors"
-				,	[selector.sd__ident.id_name \\ selector <-: icl_common.com_selector_defs]
+				,	[selector.sd_ident.id_name \\ selector <-: icl_common.com_selector_defs]
 				,	"icl types"
 				,	[type.td_ident.id_name \\ type <-: icl_common.com_type_defs]
 				)
@@ -875,7 +875,7 @@ convertSelectors moduleIndex selectors symbols strictness
 convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFieldListP
 convertSelector moduleIndex selectorDefs is_strict {fs_index}
 	= \be0 -> let (selectorType,be) = selectorTypeFunction be0 in
-		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd__ident.id_name)
+		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name)
 		o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) (selectorType.st_result))) be
 	where
 		selectorDef

@@ -735,7 +735,7 @@ where
 
 instance <<< SelectorDef
 where
-	(<<<) file {sd__ident} = file <<< sd__ident
+	(<<<) file {sd_ident} = file <<< sd_ident
 
 instance <<< ClassDef
 where

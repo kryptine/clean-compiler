@@ -1491,7 +1491,7 @@ where
 		  (sd_type_ptr, var_heap) = newPtr VI_Empty var_heap
   		  field_id = { id_name = field_name, id_info = id_info }
   		  sel_def =
-  		  	{	sd__ident			= field_id
+  		  	{	sd_ident			= field_id
   		  	,	sd_field		= field_id
   		  	,	sd_type			= { st_vars	= [], st_args = [ rec_type ], st_args_strictness=Strict 1, st_result = field_type, st_arity = 1,
   		  	                        st_context = [], st_attr_vars = [], st_attr_env = [] }

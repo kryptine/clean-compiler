@@ -1281,8 +1281,8 @@ where
 		= (inc decl_index, [Declaration { decl_ident = td_ident, decl_pos = td_pos, decl_kind = STE_Type, decl_index = decl_index } : decls]) 
 	cons_def_to_dcl {cons_ident, cons_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration { decl_ident = cons_ident, decl_pos = cons_pos, decl_kind = STE_Constructor, decl_index = decl_index } : decls]) 
-	selector_def_to_dcl {sd__ident, sd_field, sd_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = sd_field, decl_pos = sd_pos, decl_kind = STE_Field sd__ident, decl_index = decl_index } : decls]) 
+	selector_def_to_dcl {sd_ident, sd_field, sd_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = sd_field, decl_pos = sd_pos, decl_kind = STE_Field sd_ident, decl_index = decl_index } : decls]) 
 	class_def_to_dcl {class_ident, class_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration { decl_ident = class_ident, decl_pos = class_pos, decl_kind = STE_Class, decl_index = decl_index } : decls]) 
 	member_def_to_dcl {me_ident, me_pos} (decl_index, decls)
@@ -1468,7 +1468,7 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 									{td_ident=dummy_ident,td_index= -1,td_arity=0,td_args=[],td_attrs=[],td_context=[],td_rhs=UnknownType,td_attribute=TA_None,td_pos=NoPos,td_used_types=[]}
 				# dummy_symbol_type={st_vars=[],st_args=[],st_args_strictness=NotStrict,st_arity=0,st_result={at_attribute=TA_None,at_type=TE},st_context=[],st_attr_vars=[],st_attr_env=[]}
 				# com_selector_defs=reorder_and_enlarge_array com_selector_defs n_dictionary_selectors icl_to_dcl_index_table.[cSelectorDefs]
-					 				{sd__ident=dummy_ident,sd_field=dummy_ident,sd_type=dummy_symbol_type,sd_exi_vars=[],sd_field_nr=0,sd_type_index=0,sd_type_ptr=nilPtr,sd_pos=NoPos}
+					 				{sd_ident=dummy_ident,sd_field=dummy_ident,sd_type=dummy_symbol_type,sd_exi_vars=[],sd_field_nr=0,sd_type_index=0,sd_type_ptr=nilPtr,sd_pos=NoPos}
 				# com_cons_defs=reorder_and_enlarge_array com_cons_defs n_dictionary_constructors icl_to_dcl_index_table.[cConstructorDefs]
 									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_arg_vars=[],cons_priority=NoPrio,cons_index= -1,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}					
 				# com_class_defs=reorder_array com_class_defs icl_to_dcl_index_table.[cClassDefs]
@@ -2941,11 +2941,11 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 			= ([], dcl_modules, cs)
 
 		add_field importing_mod mod_index {fs_index} (declarations_accu, dcl_modules, cs)
-			# (sd=:{sd__ident, sd_field, sd_pos}, dcl_modules)
+			# (sd=:{sd_ident, sd_field, sd_pos}, dcl_modules)
 					= dcl_modules![mod_index].dcl_common.com_selector_defs.[fs_index]
 			  declaration
 					= Declaration { decl_ident = sd_field, decl_pos = sd_pos,
-						decl_kind = STE_Imported (STE_Field sd__ident) mod_index, decl_index = fs_index }
+						decl_kind = STE_Imported (STE_Field sd_ident) mod_index, decl_index = fs_index }
 			  (is_new, cs)
 			  		= add_declaration_to_symbol_table No declaration importing_mod cs
 			| is_new
