@@ -49,8 +49,8 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_
 
 // import StdDebug
 
-frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File (!Optional !*File) !*Heaps
-  	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
+frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
+  	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
 frontEndInterface options mod_ident search_paths cached_dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
 // 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
 	# (ok, mod, hash_table, error, files)
@@ -150,7 +150,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
 	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
 		with 
-			copied_ti_common_defs :: !.{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
+			copied_ti_common_defs :: .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
 			copied_ti_common_defs = {x \\ x <-: ti_common_defs}
 
 	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }

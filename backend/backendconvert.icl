@@ -33,9 +33,7 @@ sfoldr op r l s
 :: BackEndBody :== BackendBody
 BackEndBody x :== BackendBody x
 
-
-:: BEMonad a :== St !*BackEndState !a
-
+:: BEMonad a :== *BackEndState -> *(!a,!*BackEndState)
 :: BackEnder :== *BackEndState -> *BackEndState
 
 //
