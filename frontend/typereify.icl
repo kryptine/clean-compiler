@@ -428,16 +428,16 @@ instance reify TypeRhs where
 		=	cons PD_CTSynType
 
 instance reify (Int, ConsDef) where
-	reify (ds_index, {cons_ident, cons_type, cons_exi_vars})
+	reify (cons_index, {cons_ident, cons_type, cons_exi_vars})
 		=	(record PD_CTConsDef
-				` (function PD__CTToCons ` consSymbol cons_ident ds_index)
+				` (function PD__CTToCons ` consSymbol cons_ident cons_index)
 				` cons_type.st_args ` length cons_exi_vars)
 		o	numberTypeVariables cons_exi_vars
 		where
-			consSymbol cons_ident ds_index state=:{bs_main}
+			consSymbol cons_ident cons_index state=:{bs_main}
 				# cons_symb =
 					{	symb_ident = cons_ident
-					,	symb_kind = SK_Constructor { glob_module = bs_main, glob_object = ds_index}
+					,	symb_kind = SK_Constructor { glob_module = bs_main, glob_object = cons_index}
 					}
 				=	reify cons_symb state
 
