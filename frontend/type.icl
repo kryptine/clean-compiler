@@ -1,9 +1,11 @@
 implementation module type
 
 import StdEnv
-import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
+import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import cheat, compilerSwitches
 import generics // AA
+
+//import RWSDebug
 
 ::	TypeInput =
 	{	ti_common_defs	:: !{# CommonDefs }
@@ -927,7 +929,6 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 addPropagationAttributesToAType modules type=:{at_type} ps
 	# (at_type, ps) = addPropagationAttributesToType modules at_type ps
 	= ({ type & at_type = at_type }, NoPropClass, ps)
-// MW probably	= ({ type & at_type = at_type, at_annotation = AN_None }, NoPropClass, ps)
 
 addPropagationAttributesToType modules (arg_type --> res_type) ps
 	# (arg_type, prop_class, ps) = addPropagationAttributesToAType modules arg_type ps
@@ -1387,7 +1388,7 @@ where
 		= case result_type_symb of
 			Yes {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
 				# (var, ts) = freshAttributedVariable ts
-			  	  (result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False var expr (reqs, ts)
+			  	  (_,result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False var expr (reqs, ts)
 				  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
 				  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
 				  req_type_coercions
@@ -1398,12 +1399,16 @@ where
 				-> (result_type, No, ({ reqs & req_type_coercions = req_type_coercions }, 
 						{ts & ts_var_store = inc ts.ts_var_store, ts_expr_heap = storeAttribute opt_expr_ptr TA_Multi ts.ts_expr_heap}))
 			_
-				# (result_type, reqs_ts) =  requirementsOfSelectors ti No expr selectors True expr_type expr (reqs, ts)
+				# (_,result_type, reqs_ts) =  requirementsOfSelectors ti No expr selectors True expr_type expr (reqs, ts)
 				-> (result_type, opt_expr_ptr, reqs_ts)
 	requirements ti (Update composite_expr selectors elem_expr) reqs_ts
 		# (composite_expr_type, opt_composite_expr_ptr, reqs_ts) = requirements ti composite_expr reqs_ts
-		  (result_type, reqs_ts) = requirementsOfSelectors ti (Yes elem_expr) composite_expr selectors True composite_expr_type composite_expr reqs_ts
-		= (composite_expr_type, opt_composite_expr_ptr, reqs_ts)
+		  (has_array_selection, result_type, (reqs, ts))
+		  		= requirementsOfSelectors ti (Yes elem_expr) composite_expr selectors True composite_expr_type composite_expr reqs_ts
+		| has_array_selection
+			# ts = { ts & ts_expr_heap = storeAttribute opt_composite_expr_ptr TA_Unique ts.ts_expr_heap }
+			= (composite_expr_type, No, (reqs, ts))
+			= (composite_expr_type, opt_composite_expr_ptr, (reqs, ts))
 
 	requirements ti (RecordUpdate {glob_module,glob_object={ds_index,ds_arity}} expression expressions) (reqs, ts)
 		# (lhs, ts) = standardLhsConstructorType ds_index glob_module ds_arity ti ts	
@@ -1468,33 +1473,18 @@ where
 	requirements _ expr reqs_ts
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
 
-
 requirementsOfSelectors ti opt_expr expr [selector] tc_coercible sel_expr_type sel_expr reqs_ts 
 	= requirementsOfSelector ti opt_expr expr selector tc_coercible sel_expr_type sel_expr reqs_ts
 requirementsOfSelectors ti opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs_ts 
-	# (result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr reqs_ts
-	= requirementsOfSelectors ti opt_expr expr selectors tc_coercible result_type sel_expr reqs_ts 
+	# (has_array_selection, result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr reqs_ts
+	# (have_array_selection, result_type, reqs_ts) = requirementsOfSelectors ti opt_expr expr selectors tc_coercible result_type sel_expr reqs_ts 
+	= (has_array_selection || have_array_selection, result_type, reqs_ts)
 
-/*
-requirementsOfSelectors ti opt_expr expr [selector] tc_coercible sel_expr_type sel_expr opt_expr_ptr (reqs, ts)
-	# ts_expr_heap = storeAttribute opt_expr_ptr sel_expr_type.at_attribute ts.ts_expr_heap
-	= requirementsOfSelector ti opt_expr expr selector tc_coercible sel_expr_type sel_expr (reqs, { ts & ts_expr_heap = ts_expr_heap })
-requirementsOfSelectors ti opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr opt_expr_ptr (reqs, ts) 
-	# ts_expr_heap = storeAttribute opt_expr_ptr sel_expr_type.at_attribute ts.ts_expr_heap
-	  (result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr (reqs, { ts & ts_expr_heap = ts_expr_heap })
-	= requirements_of_remaining_selectors ti opt_expr expr selectors tc_coercible result_type expr reqs_ts
-where
-	requirements_of_remaining_selectors ti opt_expr expr [selector] tc_coercible sel_expr_type sel_expr reqs_ts 
-		= requirementsOfSelector ti opt_expr expr selector tc_coercible sel_expr_type sel_expr reqs_ts 
-	requirements_of_remaining_selectors ti opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs_ts 
-		# (result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr reqs_ts 
-		= requirements_of_remaining_selectors ti opt_expr expr selectors tc_coercible result_type sel_expr reqs_ts
-*/		  
 requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible sel_expr_type sel_expr (reqs, ts )
 	# ({tst_args, tst_result, tst_attr_env}, ts) = standardFieldSelectorType field ti ts
 	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
-	= (tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
+	= (False, tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
 requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible sel_expr_type sel_expr (reqs, ts) 
 	# {me_type} = ti.ti_common_defs.[glob_module].com_member_defs.[ds_index]
 	  ({tst_attr_env,tst_args,tst_result,tst_context}, cons_variables, ts) = freshSymbolType cWithFreshContextVars me_type ti.ti_common_defs ts
@@ -1506,8 +1496,8 @@ requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident
       			{ tc_demanded = dem_array_type, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : reqs.req_type_coercions ]}
 	  (reqs, ts) = requirements_of_update ti opt_expr rest_type (reqs, { ts & ts_expr_heap = ts_expr_heap })
 	| isEmpty tst_context
-		= (tst_result, (reqs, ts))
-		= (tst_result, ({ reqs & req_overloaded_calls = [expr_ptr : reqs.req_overloaded_calls ]}, { ts & ts_expr_heap =
+		= (True, tst_result, (reqs, ts))
+		= (True, tst_result, ({ reqs & req_overloaded_calls = [expr_ptr : reqs.req_overloaded_calls ]}, { ts & ts_expr_heap =
 				ts.ts_expr_heap <:= (expr_ptr, EI_Overloaded { oc_symbol = 
 					{ symb_name = ds_ident, symb_kind = SK_OverloadedFunction {glob_module = glob_module, glob_object = ds_index}, symb_arity = ds_arity },
 						oc_context = tst_context, oc_specials = [] })}))
