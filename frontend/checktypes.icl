@@ -1397,7 +1397,9 @@ where
 		# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 		  nr_of_members = size class_members
 		  nr_of_fields = nr_of_members + length class_context
-		  rec_type_id = { class_ident &  id_info = type_id_info}
+
+		  dictionary_record_name = class_ident.id_name+++";";
+		  rec_type_id = { id_name = dictionary_record_name, id_info = type_id_info }
 		  class_dictionary = { ds & ds_ident = rec_type_id }
 
 		  { index_type, index_cons, index_selector } = indexes
@@ -1414,7 +1416,8 @@ where
 	  					[ field_type \\ i <- [1..nr_of_members] ] class_defs modules var_heap symbol_table
 
 		  (cons_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
-		  rec_cons_id = { class_ident & id_info = cons_id_info}
+		  rec_cons_id = { id_name = dictionary_record_name, id_info = cons_id_info }
+
 		  cons_symbol = { ds_ident = rec_cons_id, ds_arity = nr_of_fields, ds_index = index_cons }
 		  (cons_type_ptr, var_heap) = newPtr VI_Empty var_heap
 
