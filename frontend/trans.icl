@@ -318,15 +318,15 @@ instance consumerRequirements Case where
 		  (ccgs, unsafe_bits, ai) = consumer_requirements_of_guards case_guards common_defs ai
 		  has_default = case case_default of { Yes _ -> True; _ -> False }
 		  (ccd, default_is_unsafe, ai) = consumerRequirements case_default common_defs ai
-		  (every_constructor_appears_in_safe_pattern, is_multimatch) = inspect_patterns common_defs has_default case_guards unsafe_bits
+		  (every_constructor_appears_in_safe_pattern, may_be_active) = inspect_patterns common_defs has_default case_guards unsafe_bits
 		  safe = (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
-		  ai_class_subst = unifyClassifications (if is_multimatch cVarOfMultimatchCase cActive) cce ai.ai_class_subst
+		  ai_class_subst = unifyClassifications (if may_be_active cActive cVarOfMultimatchCase) cce ai.ai_class_subst
 		  ai = { ai & ai_class_subst = ai_class_subst }
 		  ai = case case_expr of
-				(Var {var_info_ptr})
-					-> case is_multimatch of
-						False -> { ai & ai_cases_of_vars_for_function=[kees:ai.ai_cases_of_vars_for_function] }
-						True  -> ai
+				Var {var_info_ptr}
+					| may_be_active
+						-> { ai & ai_cases_of_vars_for_function=[kees:ai.ai_cases_of_vars_for_function] }
+						-> ai
 				_	-> ai
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
@@ -339,7 +339,7 @@ instance consumerRequirements Case where
 			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
 			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
 			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (quicksort (<) all_constructors)
-			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, multimatch_loop has_default sorted_pattern_constructors)
+			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, not (multimatch_loop has_default sorted_pattern_constructors))
 		  where
 			is_sorted [x]
 				= True
@@ -349,9 +349,9 @@ instance consumerRequirements Case where
 			# bools_indices = [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
 			  sorted_pattern_constructors = sort bools_indices unsafe_bits
 			= (appearance_loop [0,1] sorted_pattern_constructors,
-				multimatch_loop has_default sorted_pattern_constructors)
+				not (multimatch_loop has_default sorted_pattern_constructors))
 		inspect_patterns _ _ _ _
-			= (False, True)
+			= (False, False)
 
 		sort constr_indices unsafe_bits
 			= quicksort smaller (zip3 constr_indices [0..] unsafe_bits)
@@ -411,25 +411,28 @@ instance consumerRequirements DynamicPattern where
 	consumerRequirements {dp_rhs} common_defs ai
 		= consumerRequirements dp_rhs common_defs ai
 
+bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
+//	| fv_count > 0
+		= bindPatternVars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
+//		= bindPatternVars vars next_var next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
+bindPatternVars [] next_var next_var_of_fun var_heap
+	= (next_var, next_var_of_fun, var_heap)
+
 consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 	# pattern_exprs = [ ap_expr \\ {ap_expr}<-patterns]
 	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
-	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bind_pattern_vars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
 	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
 	= independentConsumerRequirements pattern_exprs common_defs ai
-  where
-	bind_pattern_vars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
-		| fv_count > 0
-			= bind_pattern_vars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
-			= bind_pattern_vars vars next_var next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
-	bind_pattern_vars [] next_var next_var_of_fun var_heap
-		= (next_var, next_var_of_fun, var_heap)
 consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
 	# pattern_exprs = [ bp_expr \\ {bp_expr}<-patterns]
 	= independentConsumerRequirements pattern_exprs common_defs ai
 consumer_requirements_of_guards (DynamicPatterns dyn_patterns) common_defs ai
-	= abort "compiler bug in trans.icl: consumer_requirements_of_guards DynamicPatterns case missing"
-// XXX was before adding reference counting		= consumerRequirements dyn_patterns ai
+	# pattern_exprs = [ dp_rhs \\ {dp_rhs}<-dyn_patterns]
+	  pattern_vars = [ dp_var \\ {dp_var}<-dyn_patterns]
+	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
+	= independentConsumerRequirements pattern_exprs common_defs ai
 
 instance consumerRequirements BasicPattern where
 	consumerRequirements {bp_expr} common_defs ai
@@ -662,12 +665,20 @@ where
 				BasicPatterns _ _
 					-> ti // no variables occur
 				DynamicPatterns dynamic_patterns
-					-> abort "case for DynamicPatterns not yet implemented in module trans (XXX)"
+					# (EI_CaseType {ct_cons_types},ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+					  ti_var_heap = foldSt store_type_info_of_dyn_pattern (zip2 ct_cons_types dynamic_patterns) ti.ti_var_heap
+					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
+
+//					-> abort "case for DynamicPatterns not yet implemented in module trans (XXX)"
 				NoPattern
 					-> ti
 		store_type_info_of_alg_pattern (var_types,{ap_vars}) var_heap
 			= foldSt (\(var_type, {fv_info_ptr}) var_heap
 						->setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap) (zip2 var_types ap_vars) var_heap
+
+		store_type_info_of_dyn_pattern ([var_type:_],{dp_var}) var_heap
+			= setExtendedVarInfo dp_var.fv_info_ptr (EVI_VarType var_type) var_heap
+
 	transform (Selection opt_type expr selectors) ro ti
 		# (expr, ti) = transform expr ro ti
 		= transformSelection opt_type selectors expr ti
@@ -1732,9 +1743,9 @@ where
 
 ::	ImportedConstructors	:== [Global Index]
 
-transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }  !*VarHeap !*TypeHeaps !*ExpressionHeap
+transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap
 	-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-transformGroups cleanup_info groups fun_defs cons_args common_defs imported_funs var_heap type_heaps symbol_heap
+transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs var_heap type_heaps symbol_heap
 	#! (nr_of_funs, fun_defs) = usize fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, imported_types, collected_imports, ti)
@@ -1750,6 +1761,7 @@ transformGroups cleanup_info groups fun_defs cons_args common_defs imported_funs
 	  ti_symbol_heap = foldSt cleanup ti_cleanup_info ti_symbol_heap
 	= ( groups, { fundef \\ fundef <- [ fundef \\ fundef <-: ti_fun_defs ] ++ new_fun_defs }, imported_types, collected_imports,
 			ti_var_heap, ti_type_heaps, ti_symbol_heap)
+
 where
 	transform_groups group_nr groups common_defs imported_funs imported_types collected_imports ti
 		| group_nr < size groups
