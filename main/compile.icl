@@ -91,6 +91,9 @@ parseCommandLine [arg1=:"-RE", errorPath : args] options
 parseCommandLine [arg1=:"-RAE", errorPath : args] options
 	# (args,modules,options)=	parseCommandLine args {options & errorPath = stripQuotes errorPath, errorMode = FAppendText}
 	= ([arg1,errorPath:args],modules,options)
+/* RWS FIXME: "-id" option is only used for the Mac version
+   and should be moved elsewhere
+*/
 parseCommandLine ["-id",compiler_id_string : args] options
 	# compiler_id=toInt compiler_id_string
 	| set_compiler_id compiler_id==compiler_id

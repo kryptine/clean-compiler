@@ -22,5 +22,10 @@ SystemDependentDevices :: [a]
 SystemDependentInitialIO :: [a]
 
 ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
-
 set_compiler_id :: Int -> Int
+
+:: CompileFun st
+    :== ([{#Char}] st -> (Bool, st))
+   
+compiler_loop :: (CompileFun *st) *st -> (!Bool, !*st)
+
