@@ -3,7 +3,7 @@ implementation module check
 import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
-import explicitimports, comparedefimp, checkFunctionBodies, containers, portToNewSyntax
+import explicitimports, comparedefimp, checkFunctionBodies, containers, portToNewSyntax, compilerSwitches
 
 cPredefinedModuleIndex 	:== 1
 cUndef :== (-1)
@@ -392,7 +392,6 @@ where
 				  cs_error = pushErrorAdmin (newPosition class_name ins_pos) cs.cs_error
 				  (instance_type, _, type_heaps, Yes (modules, type_defs), Yes cs_error)
 				  		= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, x_main_dcl_module_n)) (Yes cs_error)
-				  (type_defs, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n True me_symb instance_type type_defs modules cs_error
 				  cs_error = popErrorAdmin cs_error
 				  (st_context, var_heap) = initializeContextVariables instance_type.st_context var_heap
 				= check_member_instances module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_name ins_pos ins_type
@@ -630,7 +629,6 @@ where
 			  		= pushErrorAdmin (newPosition class_name ins_pos) cs_error
 			  (instance_type, new_ins_specials, type_heaps, Yes (modules, _), Yes cs_error)
 			  		= determineTypeOfMemberInstance me_type me_class_vars ins_type ins_specials type_heaps (Yes (modules, {}, cUndef)) (Yes cs_error)
-			  (_, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n False me_symb instance_type cDummyArray modules cs_error
 			  cs_error
 			  		= popErrorAdmin cs_error
 			  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -667,54 +665,6 @@ where
 		| hasTypeVariables tc_types
 			= (tc_types, checkError ds_ident.id_name "illegal specialization" error)
 			= (tc_types, error)
-
-
-checkTopLevelKinds :: !Index !Bool Ident !SymbolType n:{# CheckedTypeDef} !r:{# DclModule} !*ErrorAdmin
-					-> (!n:{# CheckedTypeDef}, !r:{# DclModule}, !*ErrorAdmin)
-checkTopLevelKinds x_main_dcl_module_n is_icl_module me_symb st=:{st_args, st_result} type_defs modules cs_error
-	#! first_wrong = firstIndex (\{at_type} -> not (kind_is_ok x_main_dcl_module_n is_icl_module type_defs modules 0 at_type)) [st_result:st_args]
-	# cs_error
-	  		= case first_wrong of
-	  			(-1)
-	  				-> cs_error
-	  			_ 
-	  				-> checkError "instance type has wrong kind" 
-	  				  			(   "(e.g. "
-	  				  			 +++arg_string first_wrong
-	  				  			 +++" of member "
-	  				  			 +++toString me_symb
-	  				  			 +++")"
-	  				  			) 
-	  				  			cs_error
-= (type_defs, modules, cs_error)
-  where
-	kind_is_ok x_main_dcl_module_n is_icl_module type_defs modules demanded_kind type=:(TA {type_index={glob_object,glob_module}} args)
-		# {td_arity}
-				= if (glob_module==x_main_dcl_module_n && is_icl_module) type_defs.[glob_object]
-				     modules.[glob_module].dcl_common.com_type_defs.[glob_object]
-		= demanded_kind == td_arity-length args
-	kind_is_ok _ _ _ modules 0 (_ --> _)
-		= True
-	kind_is_ok _ _ _ modules _ (_ :@: _)
-		= True
-	kind_is_ok _ _ _ _ 0 (TB _)
-		= True
-	kind_is_ok _ _ _ _ _ (GTV _)
-		= True
-	kind_is_ok _ _ _ _ _ (TV _)
-		= True
-	kind_is_ok _ _ _ _ _ (TQV _)
-		= True
-	kind_is_ok _ _ _ _ _ _
-		= False
-		
-
-
-consOptional (Yes thing) things
-	= [ thing : things]
-consOptional No things
-	= things
-
 
 
 initializeContextVariables :: ![TypeContext] !*VarHeap ->  (![TypeContext], !*VarHeap)

@@ -2,7 +2,7 @@ implementation module type
 
 import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
-import cheat
+import cheat, compilerSwitches
 import generics // AA
 
 ::	TypeInput =
@@ -863,17 +863,6 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
 	  (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
 	  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
-	  ({tdi_kinds}, prop_td_infos)
-	  		= prop_td_infos![glob_module,glob_object]
-	  prop_error
-	  		= case prop_error of
-	  			No
-	  				// this function is called after typechecking (during transformations)
-	  				-> No
-	  			Yes error_admin
-	  				# (_, error_admin)
-	  					= unsafeFold2St (check_kind type_name modules) tdi_kinds cons_args (1, error_admin)
-	  				-> Yes error_admin
 	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
 			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
 				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
@@ -934,39 +923,6 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 			= (TA_Unique, attr_var_heap, attr_vars, attr_env, ps_error)
 		combine_attributes cons_attr _ _ attr_var_heap attr_vars attr_env ps_error
 			= (cons_attr, attr_var_heap, attr_vars, attr_env, ps_error)
-
-		check_kind type_name modules type_kind {at_type} (arg_nr, error_admin)
-			# ok
-					= kind_is_ok modules (my_kind_to_int type_kind) at_type
-			| ok
-				= (arg_nr+1, error_admin)
-			# error_admin = errorHeading type_error error_admin
-			= (arg_nr+1, { error_admin & ea_file = error_admin.ea_file <<< " argument " <<< arg_nr <<< " of type " <<< type_name 
-													<<< " expected kind " <<< type_kind <<< "\n" })
-		  where
-			kind_is_ok modules demanded_kind (TA {type_index={glob_object,glob_module}} args)
-				# {td_arity}
-						= modules.[glob_module].com_type_defs.[glob_object]
-				= demanded_kind == td_arity-length args
-			kind_is_ok modules 0 (_ --> _)
-				= True
-			kind_is_ok modules _ (_ :@: _)
-				= True
-			kind_is_ok modules 0 (TB _)
-				= True
-			kind_is_ok modules _ (GTV _)
-				= True
-			kind_is_ok modules _ (TV _)
-				= True
-			kind_is_ok modules _ (TQV _)
-				= True
-			kind_is_ok modules _ _
-				= False
-		
-			my_kind_to_int KindConst
-				= 0
-			my_kind_to_int (KindArrow k)
-				= length k
 
 addPropagationAttributesToAType modules type=:{at_type} ps
 	# (at_type, ps) = addPropagationAttributesToType modules at_type ps

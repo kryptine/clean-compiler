@@ -1,9 +1,7 @@
 implementation module frontend
 
-import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics, convertimportedtypes
-//import RWSDebug
-import analtypes
-import generics
+import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
+		convertimportedtypes, checkKindCorrectness, compilerSwitches, analtypes, generics
 
 :: FrontEndSyntaxTree
 	=	{	fe_icl :: !IclModule
@@ -127,6 +125,10 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 	# ti_common_defs = {{dcl_common \\ {dcl_common} <-: dcl_mods } & [main_dcl_module_n] = icl_common }
 	# (td_infos, type_heaps, error_admin) = analTypeDefs ti_common_defs icl_used_module_numbers type_heaps error_admin
+      (fun_defs, th_vars, td_infos, error_admin) 
+      		= checkKindCorrectness icl_used_module_numbers main_dcl_module_n icl_instances 
+      				ti_common_defs dcl_mods fun_defs type_heaps.th_vars td_infos error_admin
+      type_heaps = { type_heaps & th_vars = th_vars }
 	# heaps = { heaps & hp_type_heaps = type_heaps }
 
 	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
