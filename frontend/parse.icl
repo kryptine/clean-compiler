@@ -2442,9 +2442,15 @@ determAttr attr1    attr2   type pState
 
 wantDynamicType :: !*ParseState -> *(!DynamicType,!*ParseState)
 wantDynamicType pState 
-	# (type_vars, pState) = optionalUniversalQuantifiedVariables pState
-	  (type, pState) = want pState
+	# (type, pState) = want pState
+	# (type_vars, type) = split_vars_and_type type
 	= ({ dt_uni_vars = type_vars, dt_type = type, dt_global_vars = [] }, pState)
+where
+	split_vars_and_type :: AType -> ([ATypeVar], AType)
+	split_vars_and_type atype=:{at_type=TFA vars type}
+		=	(vars, {atype & at_type=type})
+	split_vars_and_type atype
+		=	([], atype)
 
 optionalExistentialQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalExistentialQuantifiedVariables pState
