@@ -3411,10 +3411,18 @@ BEStrictPositions (int functionIndex, int *bits, int **positions)
 
 	strict_positions	= ruleType->type_alt_strict_positions;
 
-	Assert (strict_positions != NULL);
-
-	*bits		= strict_positions->sp_size;
-	*positions	= strict_positions->sp_bits;
+	if (strict_positions == NULL)
+	{
+		/*	this can happen if sa is turned of, or if the sa has failed
+			(for example when it's out of memory) */
+		*bits		= 0;
+		*positions	= NULL;
+	}
+	else
+	{
+		*bits		= strict_positions->sp_size;
+		*positions	= strict_positions->sp_bits;
+	}
 } /* BEStrictPositions */
 
 int

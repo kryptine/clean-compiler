@@ -2910,10 +2910,11 @@ static void StrictPositionsClear (void)
 	{
 		int	sizeBytes;
 
-		sizeInts = bits2ints(kMaxStrictPositions);
+		sizeInts = bits2ints(kMaxStrictBits);
 		sizeBytes = sizeof (StrictPositionsS) + (sizeInts-1) * sizeof (int);
 		strict_positions = CompAlloc (sizeBytes);
-
+		for (i = 0; i < sizeInts; i++)
+			strict_positions->sp_bits[i]	= 0;
 		strict_positions->sp_size = 0;
 	}
 
