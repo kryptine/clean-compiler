@@ -10,11 +10,13 @@ exactZip [] []
 exactZip [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
 
+getIdent :: (Optional Ident) Int -> Ident
 getIdent (Yes ident) fun_nr
 	= ident
 getIdent No fun_nr
 	= { id_name = "_f" +++ toString fun_nr, id_info = nilPtr }
 
+addLetVars :: [LetBind] [AType] [(FreeVar, AType)] -> [(FreeVar, AType)]
 addLetVars [{lb_dst} : binds] [bind_type : bind_types] bound_vars
 	= addLetVars binds bind_types [ (lb_dst, bind_type) : bound_vars ]
 addLetVars [] _ bound_vars
@@ -112,6 +114,7 @@ where
 	,	rcs_expr_heap	:: !.ExpressionHeap
 	}
 
+checkImportedSymbol :: SymbKind VarInfoPtr ([SymbKind], *VarHeap) -> ([SymbKind], *VarHeap)
 checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
 	#! type_info = sreadPtr symb_type_ptr var_heap
 	= case type_info of
@@ -119,8 +122,6 @@ checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
 			-> (collected_imports, var_heap)
 		_
 			-> ([symb_kind : collected_imports ], var_heap <:= (symb_type_ptr, VI_Used))
-
-
 
 weightedRefCountOfVariable depth var_info_ptr lvi=:{lvi_count,lvi_var,lvi_depth,lvi_previous,lvi_new} ref_count new_vars
 	| lvi_depth < depth 
@@ -319,7 +320,7 @@ where
 	this pointer contains VI_Empty. After the first occurrence the pointer will be set to 'VI_Used'.
 
 */
-
+checkImportOfDclFunction :: CheckImportedInfo Int Int *RCState -> *RCState
 checkImportOfDclFunction {cii_main_dcl_module_n, cii_dcl_functions} mod_index fun_index rcs=:{rcs_imports, rcs_var_heap}
 //	| mod_index <> cIclModIndex
 	| mod_index <> cii_main_dcl_module_n
@@ -587,7 +588,7 @@ where
 					= { ds & ds_var_heap = ds_var_heap }
 				= ds
 
-
+distributeLetsInLetExpression :: Int VarInfoPtr LetExpressionInfo *DistributeState -> *DistributeState
 distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Moved} ds
 	= ds
 distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Updated _} ds
