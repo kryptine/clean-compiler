@@ -97,7 +97,7 @@ where
 		
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
-	  format = { form_properties = cNoProperties, form_position = [] }
+	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type " <:: (format, types) <<< '\n' }
 
 contextError err
@@ -106,13 +106,13 @@ contextError err
 
 uniqueError symbol types err
 	# err = errorHeading "Overloading/Uniqueness error" err
-	  format = { form_properties = cAnnotated, form_position = [] }
+	  format = { form_properties = cAnnotated, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol
 			<<< "\" uniqueness specification of instance conflicts with current application " <:: (format, types) <<< '\n'}
 
 unboxError type err
 	# err = errorHeading "Overloading error of Array class" err
-	  format = { form_properties = cNoProperties, form_position = [] }
+	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type) <<< " instance cannot be unboxed\n"}
 
 get :: !a !(Env a b) -> b | == a 
