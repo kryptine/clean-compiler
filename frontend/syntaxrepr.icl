@@ -37,6 +37,18 @@ where
 	toString BT_World		= "World"
 	toString (BT_String _)	= "String"
 
+instance <<< ClassDef
+where (<<<) file {class_name, class_arity, class_args, class_context, class_members, class_dictionary, class_pos, class_cons_vars, class_arg_kinds}
+      = file <<< "Class name: " <<< toString class_name <<< nl
+             <<< "Class arity: " <<< toString class_arity <<< nl
+             <<< "Class arguments: " <<< listToString class_args <<< nl
+             <<< "Class context: " <<< listToString class_context <<< nl
+             <<< "Class members: " <<< arrayToString class_members <<< nl
+             <<< "Class dictionary: " <<< toString class_dictionary <<< nl
+             <<< "Class position: " <<< toString class_pos <<< nl
+             <<< "Class constructor variables: " <<< toString class_cons_vars <<< nl
+             <<< "Class argument kinds: " <<< listToString class_arg_kinds <<< nl
+
 instance toString ClassDef
 where toString {class_name, class_arity, class_args, class_context, class_members, class_dictionary, class_pos, class_cons_vars, class_arg_kinds}
       = "{class_name = "+++toString class_name+++
@@ -85,11 +97,36 @@ where toString {fs_name, fs_var, fs_index}
 		", fs_index = "+++toString fs_index+++
 		"}"
 
+instance <<< GenericDef
+where (<<<) file {gen_name, gen_member_name, gen_type, gen_pos, gen_kinds_ptr, gen_cons_ptr, gen_classes, gen_isomap}
+      = file <<< "<GenericDef>" <<< nl
+/*
+      = file <<< "Generic name: " <<< toString gen_name <<< nl
+             <<< "Generic member name: " <<< toString gen_member_name <<< nl
+             <<< "Generic type: " <<< toString gen_type <<< nl
+             <<< "Generic position: " <<< toString gen_pos <<< nl
+             <<< "Generic kinds pointer: " <<< toString gen_kinds_ptr <<< nl
+             <<< "Generic constructor pointer: " <<< toString gen_cons_ptr <<< nl
+             <<< "Generic classes: " <<< toString gen_classes <<< nl
+             <<< "Generic isomap: " <<< toString gen_isomap <<< nl
+*/
+
 instance toString (Global a) | toString a
 where toString {glob_module,glob_object} = toString glob_module+++"."+++toString glob_object
 
 instance toString GlobalIndex
 where toString {gi_module, gi_index} = "{gi_module = "+++toString gi_module+++", gi_index = "+++toString gi_index+++"}"
+
+instance <<< MemberDef
+where (<<<) file {me_symb, me_class, me_offset, me_type, me_type_ptr, me_class_vars, me_pos, me_priority}
+      = file <<< "Member symbol: " <<< toString me_symb <<< nl
+             <<< "Member class: " <<< toString me_class <<< nl
+             <<< "Member offset: " <<< toString me_offset <<< nl
+             <<< "Member type: " <<< toString me_type <<< nl
+             <<< "Member type pointer: " <<< toString me_type_ptr <<< nl
+             <<< "Member class variables: " <<< listToString me_class_vars <<< nl
+             <<< "Member position: " <<< toString me_pos <<< nl
+             <<< "Member priority: " <<< toString me_priority <<< nl
 
 instance toString MemberDef
 where toString {me_symb, me_class, me_offset, me_type, me_type_ptr, me_class_vars, me_pos, me_priority}
@@ -132,6 +169,19 @@ where toString SK_Unknown = "Unknown"
       toString (SK_Macro gi) = "Macro "+++toString gi
       toString (SK_GeneratedFunction fip i) = "GeneratedFunction "+++toString fip+++" "+++toString i
       toString SK_TypeCode = "TypeCode"
+
+/*
+instance <<< SelectorDef
+where (<<<) file {sd_symb, sd_field, sd_type, sd_exi_vars, sd_field_nr, sd_type_index, sd_type_ptr, sd_pos}
+      = file <<< "Selector symbol: " <<< toString sd_symb <<< nl
+             <<< "Selector field name: " <<< toString sd_field <<< nl
+             <<< "Selector type: " <<< toString sd_type <<< nl
+             <<< "Selector existential(?) variables: " <<< listToString sd_exi_vars <<< nl
+             <<< "Selector field number: " <<< toString sd_field_nr <<< nl
+             <<< "Selector type index: " <<< toString sd_type_index <<< nl
+             <<< "Selector type pointer: " <<< toString sd_type_ptr <<< nl
+             <<< "Selector position: " <<< toString sd_pos <<< nl
+*/
 
 instance toString SelectorDef
 where toString {sd_symb, sd_field, sd_type, sd_exi_vars, sd_field_nr, sd_type_index, sd_type_ptr, sd_pos}
@@ -201,12 +251,39 @@ where toString (AlgType dss) = "AlgType "+++listToString dss
 instance toString TypeSymbIdent
 where toString tsi = toString tsi.type_name+++"/"+++toString tsi.type_arity+++"@"+++toString tsi.type_index
 
+instance toString TypeVar
+where toString tv = toString tv.tv_info_ptr
+
+// FIXME: Partially implemented
+/*
+instance toString TypeVarInfo
+where
+    toString TVI_Empty                    = "TVI_Empty"
+    toString (TVI_Type type)              = "TVI_Type ("+++toString type+++")"
+    toString (TVI_TypeVar _)              = "TVI_TypeVar"
+    toString (TVI_Forward   _)            = "TVI_Forward"
+    toString (TVI_TypeKind _)             = "TVI_TypeKind"
+    toString (TVI_SignClass _ _ _)        = "TVI_SignClass"
+    toString (TVI_PropClass _ _ _)        = "TVI_PropClass"
+    toString (TVI_Attribute _)            = "TVI_Attribute"
+    toString (TVI_CorrespondenceNumber _) = "TVI_CorrespondenceNumber"
+    toString (TVI_AType _)                = "TVI_AType"
+    toString TVI_Used                     = "TVI_Used"
+    toString (TVI_TypeCode _)             = "TVI_TypeCode"
+    toString (TVI_CPSLocalTypeVar _)      = "TVI_CPSLocalTypeVar"
+    toString (TVI_Kinds _)                = "TVI_Kinds"
+    toString (TVI_Kind _)                 = "TVI_Kind"
+    toString (TVI_ConsInstance _)         = "TVI_ConsInstance"
+    toString (TVI_Normalized _)           = "TVI_Normalized"
+    toString _                            = "TVI_???"
+*/
+
 //arrayToString :: .{a} -> String | toString a
 //arrayToString :: .(a b) -> {#Char} | Array .a & select_u , size_u , toString b;
 arrayToString row
-= repr+++"}"
-  where (_,repr) = iFoldSt convelem 0 (size row) ("{", "")
+= "{"+++repr+++"}"
+  where (_,repr) = iFoldSt convelem 0 (size row) ("", "")
         convelem i (prefix, repr) = (",", repr+++prefix+++toString row.[i])
 
-instance toString TypeVar
-where toString tv = toString tv.tv_info_ptr
+// Just looks nicer
+nl =: '\n'
