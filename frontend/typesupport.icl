@@ -1225,12 +1225,12 @@ where
 	where
 			is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
 
-			is_list {id_name}				= id_name == "_list"
-			is_tuple {id_name} tup_arity	= id_name == "_tuple" +++ toString tup_arity
-			is_lazy_array {id_name} 		= id_name == "_array"
-			is_strict_array {id_name} 		= id_name == "_!array"
-			is_unboxed_array {id_name} 		= id_name == "_#array"
-			is_string_type {id_name}		= id_name == "_string"
+			is_list {id_name}				= id_name == "_List"
+			is_tuple {id_name} tup_arity	= id_name == "_Tuple" +++ toString tup_arity
+			is_lazy_array {id_name} 		= id_name == "_Array"
+			is_strict_array {id_name} 		= id_name == "_!Array"
+			is_unboxed_array {id_name} 		= id_name == "_#Array"
+			is_string_type {id_name}		= id_name == "_String"
 
 	writeType file opt_beautifulizer (form, arg_type --> res_type)
 		| checkProperty form cBrackets
