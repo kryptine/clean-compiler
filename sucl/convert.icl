@@ -494,6 +494,7 @@ stc_funcdefs ::
     PredefinedSymbol    // Compiler-predefined String symbol
     {#.DclModule}       // DCL for looking up constructor types
     Int                 // Index of current module
+    CommonDefs          // Common defs in icl module (excluding FunDefs)
     Int                 // Index of first new generated function
     *ExpressionHeap     // Fresh expression space
     *(Heap VarInfo)     // Fresh variable space
@@ -510,6 +511,7 @@ stc_funcdefs ::
     PredefinedSymbol
     {#.DclModule}
     Int
+    CommonDefs          // Common defs in icl module (excluding FunDefs)
     Int
     *ExpressionHeap
     *(Heap VarInfo)
@@ -522,12 +524,12 @@ stc_funcdefs ::
  |  Array c FunDef
 0.2*/
 
-// stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs0 = block "stc_funcdefs"
-stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs0
+// stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex exprheap0 varheap0 srrs oldfundefs0 = block "stc_funcdefs"
+stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex exprheap0 varheap0 srrs oldfundefs0
 = ((exprheap1,varheap1,new_fundefs)<---"convert.stc_funcdefs ends")--->"convert.stc_funcdefs begins"
   where new_fundef_limit = foldr max n_oldfundefs [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
         (exprheap1,varheap1,new_fundefs)
-        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs1 initialarray)
+        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype (getconsdef dcl_mods main_dcl_module_n icl_common) main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs1 initialarray)
         initialarray = {nofundef i\\i<-[0..new_fundef_limit-1]}
         nofundef funindex
         = { fun_symb     = noident
@@ -556,6 +558,13 @@ stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varhe
           }
         (n_oldfundefs,oldfundefs1) = usize oldfundefs0
 
+getconsdef dcl_mods main_dcl_module_n icl_common {glob_module,glob_object}
+= commondefs.com_cons_defs.[glob_object]
+  where commondefs
+        = if (glob_module==main_dcl_module_n)
+             icl_common
+             dcl_mods.[glob_module].dcl_common
+
 copy_oldfuns srcfundefs0 dstfundefs0
 = (foldlArrayStWithIndex copyone srcfundefs1 dstfundefs1<---"convert.copy_oldfuns ends")--->sizes
   where copyone i srcfundef dstfundefs
@@ -564,15 +573,15 @@ copy_oldfuns srcfundefs0 dstfundefs0
         (dstsize,dstfundefs1) = usize dstfundefs0
         sizes = "convert.copy_oldfuns begins (#srcfundefs="+++toString srcsize+++" #dstfundefs="+++toString dstsize+++")"
 
-store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [] fundefs0
+store_newfuns stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 varheap0 [] fundefs0
 = (exprheap0,varheap0,fundefs0)<---"convert.store_newfuns ends (no more srrs)"
-store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [srr:srrs] fundefs0
+store_newfuns stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 varheap0 [srr:srrs] fundefs0
 = case srr.srr_assigned_symbol
   of (SuclUser (SK_Function {glob_module=modi,glob_object=funindex}))
       | modi == main_dcl_module_n
-        -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap1 varheap1 srrs fundefs1<---"convert.store_newfuns ends (srr in main module)"
+        -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype getconsdef main_dcl_module_n firstnewindex exprheap1 varheap1 srrs fundefs1<---"convert.store_newfuns ends (srr in main module)"
            where (exprheap1,varheap1,funbody)
-                 = stc_funcdef stringtype dcl_mods exprheap0 varheap0 srr.srr_function_def
+                 = stc_funcdef stringtype getconsdef exprheap0 varheap0 srr.srr_function_def
                  funinfo
                  = { fi_calls       = collect_calls main_dcl_module_n funbody
                    , fi_group_index = 0
@@ -588,7 +597,7 @@ store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varh
                       (create_fundef srr.srr_arity)
                       update_fundef
      _
-      -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs fundefs0 <--- "convert.store_newfuns ends (srr in other module)"
+      -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 varheap0 srrs fundefs0 <--- "convert.store_newfuns ends (srr in other module)"
 
 create_fundef :: .Int Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
 create_fundef arity funindex funbody funinfo fundefs
@@ -618,7 +627,7 @@ update_fundef index newbody newinfo oldfundefs
 
 stc_funcdef ::
     PredefinedSymbol                    // Compiler-predefined String symbol
-    {#DclModule}                        // DCL for looking up constructor types
+    ((Global Index) -> ConsDef)         // Get constructor definition from environment
     *ExpressionHeap                     // Fresh expression space
     *(Heap VarInfo)                     // Fresh variable space
     (FuncDef SuclSymbol SuclVariable)   // Function definition to convert
@@ -627,15 +636,15 @@ stc_funcdef ::
     , FunctionBody                      // Converted function body
     )
 
-// stc_funcdef stringtype dcl_mods exprheap0 varheap0 (args,body) = block "stc_funcdef"
-stc_funcdef stringtype dcl_mods exprheap0 varheap0 (args,body)
+// stc_funcdef stringtype getconsdef exprheap0 varheap0 (args,body) = block "stc_funcdef"
+stc_funcdef stringtype getconsdef exprheap0 varheap0 (args,body)
 = (exprheap1,varheap2,TransformedBody tb)
   where tb
         = { tb_args = map freevarenv args
           , tb_rhs  = expr
           }
         (exprheap1,varheap2,expr)
-        = convert_funcbody stringtype dcl_mods 1 args freevarenv exprheap0 varheap1 body
+        = convert_funcbody stringtype getconsdef 1 args freevarenv exprheap0 varheap1 body
         (freevarenv,varheap1,patnodes)
         = allocate_freevars 0 noexpr varheap0 args
         noexpr = mstub "std_funcdef" "open variable in rhs but not lhs"
@@ -664,7 +673,7 @@ Converting a function body:
 
 convert_funcbody ::
     PredefinedSymbol                    // Compiler-predefined String symbol
-    {#DclModule}                        // Dcl modules for looking up constructor types
+    ((Global Index) -> ConsDef)         // Get constructor definition from environment
     Level                               // (Lexical?) level for new variables
     [SuclVariable]                      // Nodes from case variables in the environment
     (SuclVariable -> FreeVar)           // Mapping from free nodes to expressions
@@ -676,10 +685,10 @@ convert_funcbody ::
     , Expression                        // Resulting expression
     )
 
-convert_funcbody stringtype dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPattern pattern yesbody nobody)
+convert_funcbody stringtype getconsdef level patnodes freevarenv exprheap0 varheap0 (MatchPattern pattern yesbody nobody)
 = (exprheap4,varheap3,match_expression)
   where (exprheap1,varheap1,case_expression,default_refcount)
-        = convert_matchpatterns dcl_mods build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level [proot]
+        = convert_matchpatterns getconsdef build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level [proot]
         pgraph = rgraphgraph pattern
         proot = rgraphroot pattern
         default_boundvar
@@ -710,9 +719,9 @@ convert_funcbody stringtype dcl_mods level patnodes freevarenv exprheap0 varheap
         build_casebranch level` patnodes` freevarenv` exprheap0` varheap0`
         = (exprheap1`,varheap1`,expr`,0)
           where (exprheap1`,varheap1`,expr`)
-                = convert_funcbody stringtype dcl_mods level` patnodes` freevarenv` exprheap0` varheap0` yesbody
+                = convert_funcbody stringtype getconsdef level` patnodes` freevarenv` exprheap0` varheap0` yesbody
         (exprheap4,varheap3,match_failure_expression)
-        = convert_funcbody stringtype dcl_mods (level+1) patnodes freevarenv exprheap3 varheap2 nobody
+        = convert_funcbody stringtype getconsdef (level+1) patnodes freevarenv exprheap3 varheap2 nobody
         (default_expression,match_expression)
         = if (default_refcount==1)
              (match_failure_expression,case_expression)
@@ -720,11 +729,11 @@ convert_funcbody stringtype dcl_mods level patnodes freevarenv exprheap0 varheap
         let_expression = Let li
         match_failure_reference = Var default_boundvar
 
-convert_funcbody stringtype dcl_mods level patnodes freevarenv exprheap0 varheap0 (BuildGraph srgraph)
+convert_funcbody stringtype getconsdef level patnodes freevarenv exprheap0 varheap0 (BuildGraph srgraph)
 = convert_graph stringtype patnodes (FreeVar o freevarenv) level srgraph varheap0 exprheap0
 
 convert_matchpatterns ::
-    {#DclModule}                    // DCL modules
+    ((Global Index) -> ConsDef)     // Get ConsDef from environment
     (  Int                          // Level to assign to free variables
        [SuclVariable]               // List of pattern nodes
        (SuclVariable->FreeVar)      // Assigning FreeVars to variables from the environment
@@ -751,21 +760,21 @@ convert_matchpatterns ::
     , Int                           // Modified reference count to default expression
     )
 
-convert_matchpatterns dcl_mods build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level []
+convert_matchpatterns getconsdef build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level []
 = (exprheap1,varheap1,case_expression,refcount)
   where (exprheap1,varheap1,case_expression,refcount)
         = build_casebranch level patnodes freevarenv exprheap0 varheap0
 
-convert_matchpatterns dcl_mods build_casebranch0 patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level [pnode:pnodes]
+convert_matchpatterns getconsdef build_casebranch0 patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level [pnode:pnodes]
 | pdef
-  = convert_matchpattern dcl_mods build_remaining_matcher patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
+  = convert_matchpattern getconsdef build_remaining_matcher patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
 = build_remaining_matcher level patnodes0 freevarenv0 exprheap0 varheap0
   where (pdef,(psym,pargs)) = varcontents pgraph pnode
         build_remaining_matcher level` patnodes` freevarenv` exprheap` varheap`
-        = convert_matchpatterns dcl_mods build_casebranch0 patnodes` freevarenv` exprheap` varheap` default_expression pgraph level` pnodes
+        = convert_matchpatterns getconsdef build_casebranch0 patnodes` freevarenv` exprheap` varheap` default_expression pgraph level` pnodes
 
 convert_matchpattern ::
-    {#DclModule}                    // DCL modules
+    ((Global Index) -> ConsDef)     // Get ConsDef from environment
     (  Level                        // Level to assign to free variables
        [SuclVariable]               // List of pattern nodes
        (SuclVariable->FreeVar)      // Assigning FreeVars to variables from the environment
@@ -794,10 +803,10 @@ convert_matchpattern ::
     , Int                           // Modified reference count to default expression
     )
 
-convert_matchpattern dcl_mods build_casebranch patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
+convert_matchpattern getconsdef build_casebranch patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
 = (exprheap2,varheap2,case_expression,1+refcount)
   where (exprheap2,varheap2,branch_expression,refcount)
-        = convert_matchpatterns dcl_mods build_casebranch patnodes1 freevarenv1 exprheap1 varheap1 default_expression pgraph (level+1) pargs
+        = convert_matchpatterns getconsdef build_casebranch patnodes1 freevarenv1 exprheap1 varheap1 default_expression pgraph (level+1) pargs
         (cip,exprheap1) = newPtr EI_Empty exprheap0
         case_expression = Case ci
         ci
@@ -808,7 +817,7 @@ convert_matchpattern dcl_mods build_casebranch patnodes0 freevarenv0 exprheap0 v
           , case_info_ptr = cip
           , case_default_pos = NoPos
           }
-        cps = convert_constructor dcl_mods psym freevars branch_expression
+        cps = convert_constructor getconsdef psym freevars branch_expression
         (freevarenv1,varheap1,freevars)
         = allocate_freevars level freevarenv0 varheap0 pargs
         patnodes1 = pargs++patnodes0
@@ -842,17 +851,17 @@ allocate_freevars level freevarenv0 varheap0 [pnode:pnodes]
          = allocate_freevars level freevarenv0 varheap1 pnodes
         freevarenv2 = adjust pnode freevar freevarenv1
 
-convert_constructor :: {#DclModule} SuclSymbol [FreeVar] Expression -> CasePatterns
-convert_constructor dcl_mods (SuclInt    i) [] expr = mkbps BT_Int    (BVI (toString i)) expr
-convert_constructor dcl_mods (SuclChar   c) [] expr = mkbps BT_Char   (BVC (toString c)) expr
-convert_constructor dcl_mods (SuclReal   r) [] expr = mkbps BT_Real   (BVR (toString r)) expr
-convert_constructor dcl_mods (SuclBool   b) [] expr = mkbps BT_Bool   (BVB           b ) expr
-convert_constructor dcl_mods (SuclString s) [] expr = mkbps (BT_String notype) (BVS s) expr where notype = mstub "convert_constructor" "no argument for basic string type"
-convert_constructor dcl_mods (SuclUser (SK_Constructor consindex)) freevars expr
+convert_constructor :: ((Global Index) -> ConsDef) SuclSymbol [FreeVar] Expression -> CasePatterns
+convert_constructor getconsdef (SuclInt    i) [] expr = mkbps BT_Int    (BVI (toString i)) expr
+convert_constructor getconsdef (SuclChar   c) [] expr = mkbps BT_Char   (BVC (toString c)) expr
+convert_constructor getconsdef (SuclReal   r) [] expr = mkbps BT_Real   (BVR (toString r)) expr
+convert_constructor getconsdef (SuclBool   b) [] expr = mkbps BT_Bool   (BVB           b ) expr
+convert_constructor getconsdef (SuclString s) [] expr = mkbps (BT_String notype) (BVS s) expr where notype = mstub "convert_constructor" "no argument for basic string type"
+convert_constructor getconsdef (SuclUser (SK_Constructor consindex)) freevars expr
 = AlgebraicPatterns typedefindex [ap]
   where typedefindex = {glob_module=consmodule,glob_object=consdef.cons_type_index}
         consmodule = consindex.glob_module
-        consdef = dcl_mods.[consmodule].dcl_common.com_cons_defs.[consindex.glob_object]
+        consdef = getconsdef consindex
         defsymb
         = { ds_ident = consdef.cons_symb
           , ds_arity = consdef.cons_type.st_arity

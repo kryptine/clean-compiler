@@ -53,7 +53,7 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
      // Create and fill new fundef array
   #  (pds,predefs2) = predefs1![PD_StringType]
-  #  (expression_heap`,var_heap`,fundefs4) = stc_funcdefs pds dcl_mods main_dcl_module_n n_fun_defs expression_heap var_heap symredresults fun_defs3
+  #  (expression_heap`,var_heap`,fundefs4) = stc_funcdefs pds dcl_mods main_dcl_module_n icl_common n_fun_defs expression_heap var_heap symredresults fun_defs3
      // Determine which were the newly generated functions
   #  (newlimit,fundefs5) = usize fundefs4
   #  generated_range = {ir_from=n_fun_defs,ir_to=newlimit}

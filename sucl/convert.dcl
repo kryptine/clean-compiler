@@ -60,6 +60,7 @@ stc_funcdefs ::
     PredefinedSymbol    // Compiler-predefined String symbol
     {#.DclModule}       // DCL for looking up constructor types
     Int                 // Index of current module
+    CommonDefs          // Common defs in icl module (excluding FunDefs)
     Int                 // Index of first new generated function
     *ExpressionHeap     // Fresh expression space
     *(Heap VarInfo)     // Fresh variable space
@@ -76,6 +77,7 @@ stc_funcdefs ::
     PredefinedSymbol
     {#.DclModule}
     Int
+    CommonDefs          // Common defs in icl module (excluding FunDefs)
     Int
     *ExpressionHeap
     *(Heap VarInfo)
