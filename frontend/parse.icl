@@ -785,19 +785,24 @@ where
 		=	root_expression localsExpected token nodeDefs (reverse alts) sep pState
 	
 	root_expression :: !Bool !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
-	root_expression withExpected token nodeDefs [] sep pState
-		# (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
-		  (expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
-		=	case expr of
-				Yes expr -> ( UnGuardedExpr expr, pState)
-				No		 -> ( UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs [],
+	root_expression withExpected token nodeDefs alts sep pState
+		# (optional_expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
+		= build_root token optional_expr alts nodeDefs pState
+	where
+		build_root :: !Token !(Optional ExprWithLocalDefs) ![GuardedExpr] ![NodeDefWithLocals] !ParseState -> (!OptGuardedAlts, !ParseState)
+		build_root _ (Yes expr) [] _ pState
+			= ( UnGuardedExpr expr, pState)
+		build_root _ No alts=:[_:_] [] pState
+			= (GuardedAlts alts No, pState)
+		build_root _ optional_expr alts=:[_:_] _ pState
+			= (GuardedAlts alts optional_expr, pState)
+		build_root token _ _ _ pState
+			# (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
+			=	(UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs [],
 												ewl_position = LinePos file_name line_nr}
 							, parseError "RHS: root expression" (Yes token) "= <ExprWithLocals>" pState
 							)
-	root_expression withExpected token nodeDefs alts sep pState
-		# (expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
-		= (GuardedAlts alts expr, pState)
-	
+
 	default_found (GuardedAlts _ No)	= False
 	default_found _						= True
 
