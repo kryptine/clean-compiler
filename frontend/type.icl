@@ -1,13 +1,13 @@
 implementation module type
 
-
 import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import RWSDebug
 
 ::	TypeInput =
-	{	ti_common_defs	:: {# CommonDefs }
-	,	ti_functions	:: {# {# FunType }}
+	{	ti_common_defs	:: !{# CommonDefs }
+	,	ti_functions	:: !{# {# FunType }}
+	,	ti_main_dcl_module_n :: !Int
 	}
 
 ::	TypeState =
@@ -54,9 +54,9 @@ import RWSDebug
 instance toString BoundVar
 where
 	toString varid = varid.var_name.id_name
-	
-class arraySubst type :: !type !u:{!Type} -> (!type, !u:{! Type})
 
+class arraySubst type :: !type !u:{!Type} -> (!type, !u:{! Type})
+/*
 instance arraySubst AType
 where
 	arraySubst atype=:{at_type} subst
@@ -119,13 +119,13 @@ where
 		# (tc_types, subst) = arraySubst tc_types subst
 		= ({ tc & tc_types = tc_types}, subst)
 
-/*
-instance arraySubst OverloadedCall
-where
-	arraySubst oc=:{oc_context} subst
-		# (oc_context, subst) = arraySubst oc_context subst
-		= ({ oc & oc_context = oc_context },  subst)
-*/
+	/*
+	instance arraySubst OverloadedCall
+	where
+		arraySubst oc=:{oc_context} subst
+			# (oc_context, subst) = arraySubst oc_context subst
+			= ({ oc & oc_context = oc_context },  subst)
+	*/
 
 instance arraySubst CaseType
 where
@@ -134,6 +134,240 @@ where
 		  (ct_result_type, subst) = arraySubst ct_result_type subst
 		  (ct_cons_types, subst) = arraySubst ct_cons_types subst
 		= ({ ct & ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, ct_cons_types = ct_cons_types }, subst)
+
+*/
+
+instance arraySubst AType
+where
+	arraySubst atype=:{at_type} subst
+		# (changed,at_type, subst) = arraySubst2 at_type subst
+		| changed
+			= ({ atype & at_type = at_type }, subst)
+			= (atype, subst)
+		
+instance arraySubst Type
+where
+	arraySubst tv=:(TempV tv_number) subst
+		#! type = subst.[tv_number]
+		= case type of
+			TE	-> (tv, subst)
+			_	-> arraySubst type subst
+	arraySubst type=:(arg_type0 --> res_type0) subst
+		# (changed,arg_type, subst) = arraySubst2 arg_type0 subst
+		| changed
+			#  (changed,res_type, subst) = arraySubst2 res_type0 subst
+			| changed
+				= (arg_type --> res_type, subst)
+				= (arg_type --> res_type0, subst)
+			#  (changed,res_type, subst) = arraySubst2 res_type0 subst
+			| changed
+				= (arg_type0 --> res_type, subst)
+				= (type, subst)
+	arraySubst type=:(TA cons_id cons_args) subst
+		# (changed,cons_args, subst) = arraySubst2 cons_args subst
+		| changed
+			= (TA cons_id cons_args, subst) 
+			= (type, subst) 
+	arraySubst tcv=:(TempCV tv_number :@: types) subst
+		#! type = subst.[tv_number]
+		= case type of
+			TE
+				# (changed,types, subst) = arraySubst2 types subst
+				| changed
+					-> (TempCV tv_number :@: types, subst)
+					-> (tcv, subst)
+			_
+				# (type, subst) = arraySubst type subst
+				  (types, subst) = arraySubst types subst
+				-> (simplify_type_appl type types, subst)
+	where
+		simplify_type_appl :: !Type ![AType] -> Type
+		simplify_type_appl (TA type_cons=:{type_arity} cons_args) type_args
+			= TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args)
+		simplify_type_appl (cons_var :@: types) type_args
+			= cons_var :@: (types ++ type_args)
+		simplify_type_appl (TempV tv_number) type_args
+			= TempCV tv_number :@: type_args
+		simplify_type_appl (TempQV tv_number) type_args
+			= TempQCV tv_number :@: type_args
+	arraySubst type subst
+		= (type, subst)
+
+instance arraySubst [a] | arraySubst2 a
+where
+	arraySubst [] subst
+		= ([],subst)
+	arraySubst t=:[type0:types0] subst
+		# (changed,types,subst) = arraySubst2 types0 subst
+		| changed
+			# (changed,type,subst) = arraySubst2 type0 subst
+			| changed
+				= ([type:types],subst)
+				= ([type0:types],subst)
+			# (changed,type,subst) = arraySubst2 type0 subst
+			| changed
+				= ([type:types0],subst)
+				= (t,subst)
+	
+instance arraySubst TempSymbolType
+where
+	arraySubst tst=:{tst_args,tst_result,tst_context} subst
+		# (changed,tst_args, subst) = arraySubst2 tst_args subst
+		| changed
+			# (changed,tst_result, subst) = arraySubst2 tst_result subst
+			# (changed,tst_context, subst) = arraySubst2 tst_context subst
+			= ({tst & tst_args = tst_args,tst_result = tst_result,tst_context = tst_context}, subst)
+			# (changed,tst_result, subst) = arraySubst2 tst_result subst
+			| changed
+				# (changed,tst_context, subst) = arraySubst2 tst_context subst
+				= ({tst & tst_result = tst_result,tst_context = tst_context}, subst)
+				# (changed,tst_context, subst) = arraySubst2 tst_context subst
+				| changed
+					= ({tst & tst_context = tst_context}, subst)
+					= (tst, subst)
+
+instance arraySubst TypeContext
+where
+	arraySubst tc=:{tc_types} subst
+		# (changed,tc_types, subst) = arraySubst2 tc_types subst
+		| changed
+			= ({ tc & tc_types = tc_types}, subst)
+			= ( tc, subst)
+
+instance arraySubst CaseType
+where
+	arraySubst ct=:{ct_pattern_type,ct_result_type,ct_cons_types} subst
+		# (changed,ct_pattern_type, subst) = arraySubst2 ct_pattern_type subst
+		| changed
+			# (changed,ct_result_type, subst) = arraySubst2 ct_result_type subst
+			#  (changed,ct_cons_types, subst) = arraySubst2 ct_cons_types subst
+			= ({ ct & ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, ct_cons_types = ct_cons_types }, subst)
+			# (changed,ct_result_type, subst) = arraySubst2 ct_result_type subst
+			| changed
+				# (changed,ct_cons_types, subst) = arraySubst2 ct_cons_types subst
+				= ({ ct & ct_result_type = ct_result_type, ct_cons_types = ct_cons_types }, subst)
+				# (changed,ct_cons_types, subst) = arraySubst2 ct_cons_types subst
+				| changed
+					= ({ ct & ct_cons_types = ct_cons_types }, subst)
+					= (ct, subst)
+
+class arraySubst2 type :: !type !u:{!Type} -> (!Bool,!type, !u:{! Type})
+
+instance arraySubst2 AType
+where
+	arraySubst2 atype=:{at_type} subst
+		# (changed,at_type, subst) = arraySubst2 at_type subst
+		| changed
+			= (True,{ atype & at_type = at_type }, subst)
+			= (False,atype, subst)
+		
+instance arraySubst2 Type
+where
+	arraySubst2 tv=:(TempV tv_number) subst
+		#! type = subst.[tv_number]
+		= case type of
+			TE	-> (False,tv, subst)
+			_
+				# (t,s) = arraySubst type subst
+				-> (True,t,s)
+	arraySubst2 type=:(arg_type0 --> res_type0) subst
+		# (changed,arg_type, subst) = arraySubst2 arg_type0 subst
+		| changed
+			#  (changed,res_type, subst) = arraySubst2 res_type0 subst
+			| changed
+				= (True,arg_type --> res_type, subst)
+				= (True,arg_type --> res_type0, subst)
+			#  (changed,res_type, subst) = arraySubst2 res_type0 subst
+			| changed
+				= (True,arg_type0 --> res_type, subst)
+				= (False,type, subst)
+	arraySubst2 type=:(TA cons_id cons_args) subst
+		# (changed,cons_args, subst) = arraySubst2 cons_args subst
+		| changed
+			= (True,TA cons_id cons_args, subst) 
+			= (False,type, subst) 
+	arraySubst2 tcv=:(TempCV tv_number :@: types) subst
+		#! type = subst.[tv_number]
+		= case type of
+			TE
+				# (changed,types, subst) = arraySubst2 types subst
+				| changed
+					-> (True,TempCV tv_number :@: types, subst)
+					-> (False,tcv, subst)
+			_
+				# (type, subst) = arraySubst type subst
+				  (types, subst) = arraySubst types subst
+				-> (True,simplify_type_appl type types, subst)
+	where
+		simplify_type_appl :: !Type ![AType] -> Type
+		simplify_type_appl (TA type_cons=:{type_arity} cons_args) type_args
+			= TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args)
+		simplify_type_appl (cons_var :@: types) type_args
+			= cons_var :@: (types ++ type_args)
+		simplify_type_appl (TempV tv_number) type_args
+			= TempCV tv_number :@: type_args
+		simplify_type_appl (TempQV tv_number) type_args
+			= TempQCV tv_number :@: type_args
+	arraySubst2 type subst
+		= (False,type, subst)
+
+instance arraySubst2 [a] | arraySubst2 a
+where
+	arraySubst2 [] subst
+		= (False,[],subst)
+	arraySubst2 t=:[type0:types0] subst
+		# (changed,types,subst) = arraySubst2 types0 subst
+		| changed
+			# (changed,type,subst) = arraySubst2 type0 subst
+			| changed
+				= (True,[type:types],subst)
+				= (True,[type0:types],subst)
+			# (changed,type,subst) = arraySubst2 type0 subst
+			| changed
+				= (True,[type:types0],subst)
+				= (False,t,subst)
+	
+instance arraySubst2 TempSymbolType
+where
+	arraySubst2 tst=:{tst_args,tst_result,tst_context} subst
+		# (changed,tst_args, subst) = arraySubst2 tst_args subst
+		| changed
+			# (changed,tst_result, subst) = arraySubst2 tst_result subst
+			# (changed,tst_context, subst) = arraySubst2 tst_context subst
+			= (True,{tst & tst_args = tst_args,tst_result = tst_result,tst_context = tst_context}, subst)
+			# (changed,tst_result, subst) = arraySubst2 tst_result subst
+			| changed
+				# (changed,tst_context, subst) = arraySubst2 tst_context subst
+				= (True,{tst & tst_result = tst_result,tst_context = tst_context}, subst)
+				# (changed,tst_context, subst) = arraySubst2 tst_context subst
+				| changed
+					= (True,{tst & tst_context = tst_context}, subst)
+					= (False,tst, subst)
+
+instance arraySubst2 TypeContext
+where
+	arraySubst2 tc=:{tc_types} subst
+		# (changed,tc_types, subst) = arraySubst2 tc_types subst
+		| changed
+			= (True,{ tc & tc_types = tc_types}, subst)
+			= (False, tc, subst)
+
+instance arraySubst2 CaseType
+where
+	arraySubst2 ct=:{ct_pattern_type,ct_result_type,ct_cons_types} subst
+		# (changed,ct_pattern_type, subst) = arraySubst2 ct_pattern_type subst
+		| changed
+			# (changed,ct_result_type, subst) = arraySubst2 ct_result_type subst
+			#  (changed,ct_cons_types, subst) = arraySubst2 ct_cons_types subst
+			= (True,{ ct & ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, ct_cons_types = ct_cons_types }, subst)
+			# (changed,ct_result_type, subst) = arraySubst2 ct_result_type subst
+			| changed
+				# (changed,ct_cons_types, subst) = arraySubst2 ct_cons_types subst
+				= (True,{ ct & ct_result_type = ct_result_type, ct_cons_types = ct_cons_types }, subst)
+				# (changed,ct_cons_types, subst) = arraySubst2 ct_cons_types subst
+				| changed
+					= (True,{ ct & ct_cons_types = ct_cons_types }, subst)
+					= (False,ct, subst)
 
 class contains_var a :: !Int !a -> Bool
 
@@ -262,7 +496,8 @@ where
 	      = unify t1x t2x modules subst heaps
 	      = (False, subst, heaps)
 
-instance unify [a] | unify, arraySubst a
+//instance unify [a] | unify, arraySubst a
+instance unify [a] | unify, arraySubst, arraySubst2 a
 where
 	unify [t1 : ts1] [t2 : ts2] modules subst heaps
 		= unify (t1,ts1) (t2,ts2) modules subst heaps
@@ -564,9 +799,12 @@ freshSymbolType fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_
 	   { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = copy_heaps, ts_var_heap = ts_var_heap})
 //		---> ("freshSymbolType", tst_args, tst_result, tst_context)
 	where
+		fresh_type_variables :: .[TypeVar] *(*Heap TypeVarInfo,.Int) -> (!.Heap TypeVarInfo,!Int);
 		fresh_type_variables type_variables state
 			= foldr (\{tv_info_ptr} (var_heap, var_store) -> (writePtr tv_info_ptr (TVI_Type (TempV var_store)) var_heap, inc var_store))
 							state type_variables
+
+		fresh_attributes :: .[AttributeVar] *(*Heap AttrVarInfo,.Int) -> (!.Heap AttrVarInfo,!Int);
 		fresh_attributes attributes state
 			= foldr (\{av_info_ptr} (attr_heap, attr_store) -> (writePtr av_info_ptr (AVI_Attr (TA_TempVar attr_store)) attr_heap, inc attr_store))
 							state attributes
@@ -654,7 +892,9 @@ attribute_error type_attr err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
 
-addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module}} cons_args, at_attribute} ps
+addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);
+//addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module}} cons_args, at_attribute} ps
+addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module},type_name} cons_args, at_attribute} ps
 	# (cons_args, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
 			= add_propagation_attributes_to_atypes modules cons_args ps
 	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
@@ -847,8 +1087,11 @@ storeAttribute (Yes expt_ptr) type_attribute symbol_heap
 storeAttribute No type_attribute symbol_heap
 	= symbol_heap
 
-getSymbolType ti=:{ti_functions,ti_common_defs} {symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name} ts
-	| glob_module == cIclModIndex
+getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name} ts
+//	| glob_module == cIclModIndex
+	| glob_module == ti_main_dcl_module_n
+		| glob_object>=size ts.ts_fun_env
+			= abort symb_name.id_name;
 		# (fun_type, ts) = ts!ts_fun_env.[glob_object]
 		= case fun_type of
 			UncheckedType fun_type
@@ -864,9 +1107,11 @@ getSymbolType ti=:{ti_functions,ti_common_defs} {symb_kind = SK_Function {glob_m
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
 				-> (fun_type_copy, cons_variables, [], ts)
 			_
-				-> abort "getSymbolType (type.icl)" ---> (symb_name, fun_type)
+				-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
 		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
-		  (fun_type_copy, cons_variables, ts) = determineSymbolTypeOfFunction symb_name symb_arity ft_type ft_type_ptr ti_common_defs ts
+		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]
+			= abort (toString glob_module+++" "+++toString glob_object+++" "+++toString ti_main_dcl_module_n+++" "+++symb_name.id_name);
+		# (fun_type_copy, cons_variables, ts) = determineSymbolTypeOfFunction symb_name symb_arity ft_type ft_type_ptr ti_common_defs ts
 		= (fun_type_copy, cons_variables, get_specials ft_specials, ts)
 	where
 		get_specials (SP_ContextTypes specials) = specials
@@ -874,6 +1119,25 @@ getSymbolType ti=:{ti_functions,ti_common_defs} {symb_kind = SK_Function {glob_m
 getSymbolType ti {symb_kind = SK_Constructor {glob_module,glob_object}, symb_arity} ts
 	# (fresh_cons_type, ts) = standardRhsConstructorType glob_object glob_module symb_arity ti ts
 	= (fresh_cons_type, [], [], ts) 
+getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name} ts
+	| glob_object>=size ts.ts_fun_env
+		= abort symb_name.id_name;
+	# (fun_type, ts) = ts!ts_fun_env.[glob_object]
+	= case fun_type of
+		UncheckedType fun_type
+			# (fun_type_copy, ts) = currySymbolType fun_type symb_arity ts
+			-> (fun_type_copy, [], [], ts)
+		SpecifiedType fun_type lifted_arg_types _ 
+			# (fun_type_copy=:{tst_args,tst_arity}, cons_variables, ts) = freshSymbolType cWithoutFreshContextVars fun_type ti_common_defs ts
+			  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
+			  										  tst_arity = tst_arity + length lifted_arg_types } symb_arity ts
+			-> (fun_type_copy, cons_variables, [], ts)
+		CheckedType fun_type
+			# (fun_type_copy, cons_variables, ts) = freshSymbolType cWithFreshContextVars fun_type ti_common_defs ts
+			  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
+			-> (fun_type_copy, cons_variables, [], ts)
+		_
+			-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
 getSymbolType ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}, symb_arity} ts
 	# {me_symb, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
 	  (fun_type_copy, cons_variables, ts) = determineSymbolTypeOfFunction me_symb symb_arity me_type me_type_ptr ti_common_defs ts
@@ -1610,30 +1874,26 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	,	fe_location		:: !IdentPos
 	}
 
-// MW4 was:typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
-typeProgram ::!{! Group} !*{# FunDef} !IndexRange !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File !*File
-// MW4 was:	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
+typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !ModuleNumberSet !*Heaps !*PredefinedSymbols !*File !*File
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File, !*File)
-// MW4 was:typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
-typeProgram comps fun_defs specials list_inferred_types icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out
+typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out
 	#! fun_env_size = size fun_defs
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
-	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [cIclModIndex] = icl_defs }
+	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [main_dcl_module_n] = icl_defs }
 	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: modules }
 
 	  type_def_sizes =  [ size com_type_defs \\ {com_type_defs} <-: ti_common_defs ]
 	  class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
 	  class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
 	  
-	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs hp_type_heaps ts_error
+	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
 
 	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar,
-// MW4 was:	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error }
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
-	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions }
+	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
 // MW4 was:	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
@@ -1647,7 +1907,6 @@ typeProgram comps fun_defs specials list_inferred_types icl_defs imports modules
 	  (fun_defs, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs fun_defs predef_symbols ts_type_heaps
 	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
 	= (not type_error, fun_defs, { ir_from = fun_env_size, ir_to = si_next_array_member_index }, type_code_instances, ti_common_defs, ti_functions,
-// MW4 was:			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file)
 			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file, ts_out)
 //				---> ("typeProgram", array_inst_types)
 where
@@ -1660,7 +1919,8 @@ where
 		= state
 
 	collect_and_check_instances nr_of_instances common_defs state
-		= iFoldSt (update_instances_of_class common_defs cIclModIndex) 0 nr_of_instances state
+//		= iFoldSt (update_instances_of_class common_defs cIclModIndex) 0 nr_of_instances state
+		= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
 
 	update_instances_of_class common_defs mod_index ins_index (dummy, error, class_instances, type_var_heap, td_infos)
 		# {ins_class={glob_object={ds_index},glob_module},ins_type={it_types}} = common_defs.[mod_index].com_instance_defs.[ins_index]
@@ -1749,7 +2009,8 @@ where
 	
 	get_index_of_start_rule predef_symbols
 		# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
-		| pds_def <> NoIndex && pds_module == cIclModIndex
+//		| pds_def <> NoIndex && pds_module == cIclModIndex
+		| pds_def <> NoIndex && pds_module == main_dcl_module_n
 			= (pds_def, predef_symbols)
 			= (NoIndex, predef_symbols)
 	
@@ -1773,7 +2034,7 @@ where
 		  (over_info, (subst, ts_expr_heap)) = collect_and_expand_overloaded_calls fun_reqs [] (subst, ts_expr_heap)
 		  (contexts, coercion_env, local_pattern_variables, dict_types,
 		  	{ os_type_heaps, os_var_heap, os_symbol_heap, os_predef_symbols, os_special_instances, os_error })
-		  		= tryToSolveOverloading over_info ti_common_defs class_instances coercion_env
+		  		= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
 		  			{	os_type_heaps = {ts_type_heaps & th_vars = th_vars}, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap,
 		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances }
 		| not os_error.ea_ok
@@ -1800,7 +2061,7 @@ where
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
 									tci_type_var_heap = ts_type_heaps.th_vars } 
 			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
-			  		= updateDynamics comp local_pattern_variables fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
+			  		= updateDynamics comp local_pattern_variables main_dcl_module_n fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok, 
 				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
@@ -1809,7 +2070,7 @@ where
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
 									tci_type_var_heap = ts_type_heaps.th_vars } 
 			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
-			  		= removeOverloadedFunctions comp local_pattern_variables fun_defs ts.ts_fun_env
+			  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n fun_defs ts.ts_fun_env
 			  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok,
 				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
@@ -1868,15 +2129,7 @@ where
 			  (prev_vect, bitvects) = bitvects![bit_index]
 			= { bitvects & [bit_index] = prev_vect bitor (1 << BITNUMBER var_number) }
 
-/* MW4 was
-	build_coercion_env [{fe_requirements={req_type_coercions},fe_location} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		# error = setErrorAdmin fe_location error
-		  (subst, coercion_env, type_signs, type_var_heap, error)
-			= add_to_coercion_env req_type_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		= build_coercion_env reqs_list subst coercion_env common_defs cons_var_vects  type_signs type_var_heap error
-	build_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		= (subst, coercion_env, type_signs, type_var_heap, error)
-*/
+	build_coercion_env :: [.FunctionRequirements] v:{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!w:{!Type},!.Coercions,!u:{#u:{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin), [v <= w];
 	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (subst, coercion_env, type_signs, type_var_heap, error)
 			= foldSt (build_coercion_env_for_alternative ip_ident common_defs cons_var_vects)

@@ -461,9 +461,9 @@ toOptionalFreeVar No var_heap
 
 ::	ImportedFunctions 	:== [Global Index]
 
-addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !*{! Group} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
+addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !Int !*{! Group} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
 	-> (!*{! Group}, ![FunDef],  !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-addNewFunctionsToGroups common_defs fun_heap new_functions groups imported_types imported_conses type_heaps var_heap
+addNewFunctionsToGroups common_defs fun_heap new_functions main_dcl_module_n groups imported_types imported_conses type_heaps var_heap
 	= foldSt (add_new_function_to_group fun_heap common_defs) new_functions (groups, [], imported_types, imported_conses, type_heaps, var_heap)
 where
 
@@ -474,21 +474,21 @@ where
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
 		  group_index = gf_fun_def.fun_info.fi_group_index
 		  (Yes ft) = gf_fun_def.fun_type
-		  (ft, imported_types, imported_conses, type_heaps, var_heap) = convertSymbolType common_defs ft imported_types imported_conses type_heaps var_heap
+		  (ft, imported_types, imported_conses, type_heaps, var_heap) = convertSymbolType common_defs ft main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		# (group, groups) = groups![group_index]
 		= ({ groups & [group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
 				[ { gf_fun_def & fun_type = Yes ft }: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
 
-convertCasesOfFunctionsIntoPatterns :: !*{! Group} !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
+convertCasesOfFunctionsIntoPatterns :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!ImportedFunctions, !*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-convertCasesOfFunctionsIntoPatterns groups dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
+convertCasesOfFunctionsIntoPatterns groups main_dcl_module_n dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
 	#! nr_of_funs = size fun_defs
 	# (groups, (fun_defs, collected_imports, {ci_new_functions, ci_var_heap, ci_expr_heap, ci_fun_heap}))
 			= convert_groups 0 groups dcl_functions common_defs
 				(fun_defs, [], { ci_new_functions = [], ci_fun_heap = newHeap, ci_var_heap = var_heap, ci_expr_heap = expr_heap, ci_next_fun_nr = nr_of_funs })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
-			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions groups imported_types imported_conses type_heaps ci_var_heap
+			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types imported_conses type_heaps ci_var_heap
 //	  		= foldSt (add_new_function_to_group ci_fun_heap common_defs) ci_new_functions (groups, [], imported_types, imported_conses, type_heaps, ci_var_heap)
 	  (imported_functions, imported_conses) = foldSt split collected_imports ([], imported_conses)
 	= (imported_functions, groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs },
@@ -531,7 +531,7 @@ where
 
 	eliminate_code_sharing_in_function dcl_functions common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, ci=:{ci_expr_heap,ci_var_heap})
 		# {rc_var_heap, rc_expr_heap, rc_imports} = weightedRefCount dcl_functions common_defs 1 tb_rhs
-				{ rc_var_heap = ci_var_heap, rc_expr_heap = ci_expr_heap, rc_free_vars = [], rc_imports = collected_imports} 
+				{ rc_var_heap = ci_var_heap, rc_expr_heap = ci_expr_heap, rc_free_vars = [], rc_imports = collected_imports,rc_main_dcl_module_n=main_dcl_module_n} 
 //		  	---> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
 		  (tb_rhs, {di_lets,di_var_heap,di_expr_heap}) = distributeLets 1 tb_rhs { di_lets = [], di_var_heap = rc_var_heap, di_expr_heap = rc_expr_heap}
 		  (tb_rhs, (var_heap, expr_heap)) = buildLetExpr di_lets tb_rhs (di_var_heap,di_expr_heap)
@@ -543,19 +543,19 @@ where
 	split (SK_Constructor cons_symb) (collected_functions, collected_conses)
 		= (collected_functions, [ cons_symb : collected_conses])
 
-convertDclModule :: !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
+convertDclModule :: !Int !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
-convertDclModule dcl_mods common_defs imported_types imported_conses var_heap type_heaps
-	# {dcl_functions,dcl_common=dcl_common=:{com_type_defs,com_cons_defs,com_selector_defs},dcl_conversions} = dcl_mods.[cIclModIndex]
+convertDclModule main_dcl_module_n dcl_mods common_defs imported_types imported_conses var_heap type_heaps
+	# {dcl_functions,dcl_common=dcl_common=:{com_type_defs,com_cons_defs,com_selector_defs},dcl_conversions} = dcl_mods.[main_dcl_module_n]
 	= case dcl_conversions of
 		Yes conversion_table
-			# (icl_type_defs, imported_types) = imported_types![cIclModIndex]
+			# (icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
 			  common_defs = { common \\ common <-: common_defs }
-			  common_defs = { common_defs & [cIclModIndex] = dcl_common }
-			  types_and_heaps = convert_dcl_functions dcl_functions common_defs ( { imported_types & [cIclModIndex] = com_type_defs }, imported_conses, var_heap, type_heaps)
-			  types_and_heaps = convertConstructorTypes com_cons_defs common_defs types_and_heaps
-			  (imported_types, imported_conses, var_heap, type_heaps) = convertSelectorTypes com_selector_defs common_defs types_and_heaps
-			-> ({ imported_types & [cIclModIndex] = icl_type_defs}, imported_conses, var_heap, type_heaps)
+			  common_defs = { common_defs & [main_dcl_module_n] = dcl_common }
+			  types_and_heaps = convert_dcl_functions dcl_functions common_defs ( { imported_types & [main_dcl_module_n] = com_type_defs }, imported_conses, var_heap, type_heaps)
+			  types_and_heaps = convertConstructorTypes com_cons_defs main_dcl_module_n common_defs types_and_heaps
+			  (imported_types, imported_conses, var_heap, type_heaps) = convertSelectorTypes com_selector_defs main_dcl_module_n common_defs types_and_heaps
+			-> ({ imported_types & [main_dcl_module_n] = icl_type_defs}, imported_conses, var_heap, type_heaps)
 		No
 			-> (imported_types, imported_conses, var_heap, type_heaps)
 where
@@ -564,49 +564,50 @@ where
 
 	convert_dcl_function dcl_functions common_defs dcl_index (imported_types, imported_conses, var_heap, type_heaps)
 		# {ft_type, ft_type_ptr} = dcl_functions.[dcl_index]
-		  (ft_type, imported_types, imported_conses, type_heaps, var_heap) = convertSymbolType common_defs ft_type imported_types imported_conses type_heaps var_heap
+		  (ft_type, imported_types, imported_conses, type_heaps, var_heap)
+		  	= convertSymbolType common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (ft_type_ptr, VI_ExpandedType ft_type), type_heaps)
 
-convertConstructorTypes cons_defs common_defs types_and_heaps
+convertConstructorTypes cons_defs main_dcl_module_n common_defs types_and_heaps
 	= iFoldSt (convert_constructor_type common_defs cons_defs) 0 (size cons_defs) types_and_heaps
 where
 	convert_constructor_type common_defs cons_defs cons_index (imported_types, imported_conses, var_heap, type_heaps)  
 		# {cons_type_ptr, cons_type} = cons_defs.[cons_index]
 		  (cons_type, imported_types, imported_conses, type_heaps, var_heap)
-				= convertSymbolType common_defs cons_type imported_types imported_conses type_heaps var_heap
+				= convertSymbolType common_defs cons_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (cons_type_ptr, VI_ExpandedType cons_type), type_heaps)
 		
 
-convertSelectorTypes selector_defs common_defs types_and_heaps
+convertSelectorTypes selector_defs main_dcl_module_n common_defs types_and_heaps
 	= iFoldSt (convert_selector_type common_defs selector_defs) 0 (size selector_defs) types_and_heaps
 where
 	convert_selector_type common_defs selector_defs sel_index (imported_types, imported_conses, var_heap, type_heaps)  
 		# {sd_type_ptr, sd_type} = selector_defs.[sel_index]
 		  (sd_type, imported_types, imported_conses, type_heaps, var_heap)
-				= convertSymbolType common_defs sd_type imported_types imported_conses type_heaps var_heap
+				= convertSymbolType common_defs sd_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type), type_heaps)
 
-convertIclModule :: !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
+convertIclModule :: !Int !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
-convertIclModule common_defs imported_types imported_conses var_heap type_heaps
-	# types_and_heaps = convertConstructorTypes common_defs.[cIclModIndex].com_cons_defs common_defs (imported_types, imported_conses, var_heap, type_heaps)
-	= convertSelectorTypes common_defs.[cIclModIndex].com_selector_defs common_defs types_and_heaps
+convertIclModule main_dcl_module_n common_defs imported_types imported_conses var_heap type_heaps
+	# types_and_heaps = convertConstructorTypes common_defs.[main_dcl_module_n].com_cons_defs main_dcl_module_n common_defs (imported_types, imported_conses, var_heap, type_heaps)
+	= convertSelectorTypes common_defs.[main_dcl_module_n].com_selector_defs main_dcl_module_n common_defs types_and_heaps
 
-convertImportedTypeSpecifications :: !{# DclModule}  !{# {# FunType} } !{# CommonDefs} !ImportedConstructors !ImportedFunctions
+convertImportedTypeSpecifications :: !Int !{# DclModule}  !{# {# FunType} } !{# CommonDefs} !ImportedConstructors !ImportedFunctions
 	!*{# {#CheckedTypeDef}} !*TypeHeaps !*VarHeap -> (!*{#{#CheckedTypeDef}}, !*TypeHeaps, !*VarHeap)
-convertImportedTypeSpecifications dcl_mods dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
-	# {dcl_common={com_type_defs},dcl_conversions} = dcl_mods.[cIclModIndex]
+convertImportedTypeSpecifications main_dcl_module_n dcl_mods dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
+	# {dcl_common={com_type_defs},dcl_conversions} = dcl_mods.[main_dcl_module_n]
 	= case dcl_conversions of
 		Yes conversion_table
 			# abstract_type_indexes = iFoldSt (determine_abstract_type com_type_defs) 0 (size com_type_defs) []
 			| isEmpty abstract_type_indexes
 				-> convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
-				# (icl_type_defs, imported_types) = imported_types![cIclModIndex]
+				# (icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
 				  type_defs = foldSt (insert_abstract_type conversion_table.[cTypeDefs]) abstract_type_indexes { icl_type_def \\ icl_type_def <-: icl_type_defs }
 				  (imported_types, type_heaps, var_heap)
 				  		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions
-							{ imported_types & [cIclModIndex] = type_defs } type_heaps var_heap
-				-> ({ imported_types & [cIclModIndex] = icl_type_defs }, type_heaps, var_heap)
+							{ imported_types & [main_dcl_module_n] = type_defs } type_heaps var_heap
+				-> ({ imported_types & [main_dcl_module_n] = icl_type_defs }, type_heaps, var_heap)
 		No
 			-> convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
 			  
@@ -633,7 +634,7 @@ where
 	convert_imported_function dcl_functions common_defs {glob_object,glob_module} (imported_types, imported_conses, type_heaps, var_heap)
 		# {ft_type_ptr,ft_type} = dcl_functions.[glob_module].[glob_object]
 		  (ft_type, imported_types, imported_conses, type_heaps, var_heap)
-				= convertSymbolType common_defs ft_type imported_types imported_conses type_heaps var_heap
+				= convertSymbolType common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, type_heaps, var_heap <:= (ft_type_ptr, VI_ExpandedType ft_type))
 
 	convert_imported_constructors common_defs [] imported_types type_heaps var_heap
@@ -641,7 +642,7 @@ where
 	convert_imported_constructors common_defs [ {glob_module, glob_object} : conses ] imported_types type_heaps var_heap 
 		# {com_cons_defs,com_selector_defs} = common_defs.[glob_module]
 		  {cons_type_ptr,cons_type,cons_type_index,cons_symb} = common_defs.[glob_module].com_cons_defs.[glob_object]
-		  (cons_type, imported_types, conses, type_heaps, var_heap) = convertSymbolType common_defs cons_type imported_types conses type_heaps var_heap
+		  (cons_type, imported_types, conses, type_heaps, var_heap) = convertSymbolType common_defs cons_type main_dcl_module_n imported_types conses type_heaps var_heap
 		  var_heap = var_heap <:= (cons_type_ptr, VI_ExpandedType cons_type)
 		  ({td_rhs}, imported_types) = imported_types![glob_module].[cons_type_index]
 //				---> ("convert_imported_constructors", cons_symb, cons_type)
@@ -657,7 +658,7 @@ where
 			convert_type_of_imported_field module_index selector_defs fields field_index (imported_types, conses, type_heaps, var_heap)
 				# field_index = fields.[field_index].fs_index
 				  {sd_type_ptr,sd_type} = selector_defs.[field_index]
-				  (sd_type, imported_types, conses, type_heaps, var_heap) = convertSymbolType common_defs sd_type imported_types conses type_heaps var_heap
+				  (sd_type, imported_types, conses, type_heaps, var_heap) = convertSymbolType common_defs sd_type main_dcl_module_n imported_types conses type_heaps var_heap
 				= (imported_types, conses, type_heaps, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type))
 
 convertRootExpression bound_vars group_index common_defs default_ptr (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) ci=:{ci_expr_heap}
@@ -966,6 +967,7 @@ where
 	,	rc_imports		:: ![SymbKind]
 	,	rc_var_heap		:: !.VarHeap
 	,	rc_expr_heap	:: !.ExpressionHeap
+	,	rc_main_dcl_module_n :: !Int
 	}
 	
 
@@ -1083,7 +1085,7 @@ addPatternVariable depth {cv_variable = var_info_ptr, cv_count = ref_count} (fre
 			-> (free_vars, var_heap)
 
 weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseType case_type)
-			rc_info=:{ rc_var_heap, rc_expr_heap, rc_imports }
+			rc_info=:{ rc_var_heap, rc_expr_heap, rc_imports,rc_main_dcl_module_n }
 	# (local_vars, vars_and_heaps) = weighted_ref_count_in_case_patterns dcl_functions common_defs (inc depth) case_guards rc_imports rc_var_heap rc_expr_heap
 	  (default_vars, (all_vars, rc_imports, var_heap, expr_heap)) = weighted_ref_count_in_default dcl_functions common_defs (inc depth) case_default vars_and_heaps
 	  rc_info = weightedRefCount dcl_functions common_defs depth case_expr { rc_info & rc_var_heap = var_heap, rc_expr_heap = expr_heap, rc_imports = rc_imports }
@@ -1094,7 +1096,7 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 //			---> ("weightedRefCountOfCase", ptrToInt case_info_ptr, case_expr)
 	where
 		weighted_ref_count_in_default dcl_functions common_defs depth (Yes expr) info
-			= weightedRefCountInPatternExpr dcl_functions common_defs depth expr info
+			= weightedRefCountInPatternExpr rc_main_dcl_module_n dcl_functions common_defs depth expr info
 		weighted_ref_count_in_default dcl_functions common_defs depth No info
 			= ([], info)
 						
@@ -1103,8 +1105,9 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 		where
 			weighted_ref_count_in_algebraic_pattern dcl_functions common_defs depth {ap_expr,ap_symbol={glob_module, glob_object={ds_index}}} wrc_state
 				# (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
-						= weightedRefCountInPatternExpr dcl_functions common_defs depth ap_expr wrc_state
-				| glob_module <> cIclModIndex
+						= weightedRefCountInPatternExpr rc_main_dcl_module_n dcl_functions common_defs depth ap_expr wrc_state
+//				| glob_module <> cIclModIndex
+				| glob_module <> rc_main_dcl_module_n
 					# {cons_type_ptr} = common_defs.[glob_module].com_cons_defs.[ds_index]
 					  (collected_imports, var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
 							cons_type_ptr (collected_imports, var_heap)
@@ -1112,9 +1115,9 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 					= (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
 
 		weighted_ref_count_in_case_patterns dcl_functions common_defs depth (BasicPatterns type patterns) collected_imports var_heap expr_heap
-			= mapSt (\{bp_expr} -> weightedRefCountInPatternExpr dcl_functions common_defs depth bp_expr) patterns ([], collected_imports, var_heap, expr_heap)
+			= mapSt (\{bp_expr} -> weightedRefCountInPatternExpr rc_main_dcl_module_n dcl_functions common_defs depth bp_expr) patterns ([], collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns dcl_functions common_defs depth (DynamicPatterns patterns) collected_imports var_heap expr_heap
-			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr dcl_functions common_defs depth dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
+			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr rc_main_dcl_module_n dcl_functions common_defs depth dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
 
 weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseTypeAndRefCounts case_type {rcc_all_variables})
 			rc_info=:{ rc_var_heap, rc_expr_heap, rc_imports }
@@ -1124,7 +1127,8 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 //			---> ("weightedRefCountOfCase 2", ptrToInt case_info_ptr, case_expr)
 
 checkRecordSelector common_defs {glob_module, glob_object={ds_index}} rc_info=:{rc_imports,rc_var_heap}
-	| glob_module <> cIclModIndex
+//	| glob_module <> cIclModIndex
+	| glob_module <> rc_info.rc_main_dcl_module_n
 		# {com_selector_defs,com_cons_defs,com_type_defs} = common_defs.[glob_module]
 		  {sd_type_index} = com_selector_defs.[ds_index]
 		  {td_rhs = RecordType {rt_constructor={ds_index=cons_index}, rt_fields}} = com_type_defs.[sd_type_index]
@@ -1145,9 +1149,9 @@ where
 	weightedRefCount dcl_functions common_defs depth (RecordSelection selector _) rc_info
 		= checkRecordSelector common_defs selector rc_info
 
-weightedRefCountInPatternExpr dcl_functions common_defs depth pattern_expr (previous_free_vars, collected_imports, var_heap, expr_heap)
+weightedRefCountInPatternExpr main_dcl_module_n dcl_functions common_defs depth pattern_expr (previous_free_vars, collected_imports, var_heap, expr_heap)
 	# {rc_free_vars,rc_var_heap,rc_imports,rc_expr_heap} = weightedRefCount dcl_functions common_defs depth pattern_expr
-				{ rc_var_heap = var_heap, rc_expr_heap = expr_heap, rc_free_vars = [], rc_imports = collected_imports}
+				{ rc_var_heap = var_heap, rc_expr_heap = expr_heap, rc_free_vars = [], rc_imports = collected_imports,rc_main_dcl_module_n=main_dcl_module_n}
 	  (free_vars_with_rc, rc_var_heap) = mapSt get_ref_count rc_free_vars rc_var_heap
 	  (previous_free_vars, rc_var_heap) = foldSt (select_unused_free_variable depth) previous_free_vars ([], rc_var_heap)
 	  (all_free_vars, rc_var_heap) = foldSt (collect_free_variable depth) rc_free_vars (previous_free_vars, rc_var_heap)
@@ -1184,7 +1188,8 @@ where
 */
 
 checkImportOfDclFunction dcl_functions common_defs mod_index fun_index rc_info=:{rc_imports, rc_var_heap}
-	| mod_index <> cIclModIndex
+//	| mod_index <> cIclModIndex
+	| mod_index <> rc_info.rc_main_dcl_module_n
 		# {ft_type_ptr} = dcl_functions.[mod_index].[fun_index]
 		  (rc_imports, rc_var_heap) = checkImportedSymbol (SK_Function {glob_module=mod_index,glob_object=fun_index}) ft_type_ptr (rc_imports, rc_var_heap)
 		= { rc_info & rc_imports = rc_imports, rc_var_heap = rc_var_heap }
@@ -1199,7 +1204,8 @@ where
 		check_import dcl_functions common_defs {symb_kind=SK_Function {glob_module,glob_object}} rc_info=:{rc_imports, rc_var_heap}
 			= checkImportOfDclFunction dcl_functions common_defs glob_module glob_object rc_info
 		check_import dcl_functions common_defs {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rc_info=:{rc_imports, rc_var_heap}
-			| glob_module <> cIclModIndex
+//			| glob_module <> cIclModIndex
+			| glob_module <> rc_info.rc_main_dcl_module_n
 				# {cons_type_ptr} = common_defs.[glob_module].com_cons_defs.[glob_object]
 				  (rc_imports, rc_var_heap) = checkImportedSymbol symb_kind cons_type_ptr (rc_imports, rc_var_heap)
 				= { rc_info & rc_imports = rc_imports, rc_var_heap = rc_var_heap }

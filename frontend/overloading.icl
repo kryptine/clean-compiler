@@ -129,17 +129,17 @@ containsContext new_tc [tc : tcs]
 FoundObject object :== object.glob_module <> NotFound
 ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
-reduceContexts :: ![TypeContext] !{# CommonDefs} !ClassInstanceInfo ![TypeContext] !*SpecialInstances ![LocalTypePatternVariable]
+reduceContexts :: ![TypeContext] !Int !{# CommonDefs} !ClassInstanceInfo ![TypeContext] !*SpecialInstances ![LocalTypePatternVariable]
 	!(!*VarHeap, !*TypeHeaps) !*Coercions !*PredefinedSymbols !*ErrorAdmin
 		-> *(![ClassApplication],  ![TypeContext], !*SpecialInstances, ![LocalTypePatternVariable],
 				!(!*VarHeap, !*TypeHeaps), !*Coercions, !*PredefinedSymbols, !*ErrorAdmin)
-reduceContexts [] defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+reduceContexts [] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 	= ([], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-reduceContexts [tc : tcs] defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+reduceContexts [tc : tcs] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 	# (appl, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 			= try_to_reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 	  (appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-	  		= reduceContexts tcs defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+	  		= reduceContexts tcs main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 	= ([appl : appls], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 
 where		
@@ -179,7 +179,7 @@ where
 					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
 									special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
 					# (appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-							= reduceContexts contexts defs instance_info new_contexts special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
+							= reduceContexts contexts main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
 					  (constraints, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 					  		= reduce_contexts_in_constraints tc_types class_args class_context defs instance_info new_contexts special_instances type_pattern_vars
 					  				heaps coercion_env predef_symbols error
@@ -328,7 +328,8 @@ where
 			= case opt_record of
 				Yes record
 					# (ins_members, special_instances) = add_record_to_array_instances record class_members special_instances
-					-> ({ rc_class = ins_class, rc_inst_module = cIclModIndex, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
+//					-> ({ rc_class = ins_class, rc_inst_module = cIclModIndex, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
+					-> ({ rc_class = ins_class, rc_inst_module = main_dcl_module_n, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
 							special_instances, predef_symbols_type_heaps, error)
 				No
 					-> ({ rc_class = ins_class, rc_inst_module = ins_module, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
@@ -551,9 +552,9 @@ where
 
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
-tryToSolveOverloading ocs defs instance_info coercion_env os
+tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os
 	# (reduced_contexts, contexts, coercion_env, type_pattern_vars, os) = foldSt (reduce_contexts defs instance_info) ocs ([], [], coercion_env, [], os)
 	| os.os_error.ea_ok
 		# (contexts, os_var_heap) = foldSt add_spec_contexts ocs (contexts, os.os_var_heap)
@@ -591,7 +592,7 @@ where
 		| otherwise
 			# (class_applications, new_contexts, os_special_instances, type_pattern_vars,
 								(os_var_heap, os_type_heaps), coercion_env, os_predef_symbols, os_error)
-					= reduceContexts oc_context defs instance_info new_contexts os_special_instances type_pattern_vars
+					= reduceContexts oc_context main_dcl_module_n defs instance_info new_contexts os_special_instances type_pattern_vars
 							(os_var_heap, os_type_heaps) coercion_env os_predef_symbols os_error
 			= ([ (oc_symbol, fun_index, over_info_ptr, class_applications) : reduced_calls ], new_contexts, coercion_env, type_pattern_vars, 
 					{ os & os_type_heaps = os_type_heaps, os_symbol_heap = os_symbol_heap, os_var_heap = os_var_heap,
@@ -830,9 +831,9 @@ getClassVariable symb var_info_ptr var_heap error
 			-> (symb, var_info_ptr, var_heap, overloadingError symb error)
 
 
-updateDynamics :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
+updateDynamics :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
-updateDynamics funs type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
+updateDynamics funs type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
 	| error.ea_ok
 		= update_dynamics funs type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
 		= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)	
@@ -848,10 +849,11 @@ where
 		  	# (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 		  			= convertDynamicTypes fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error) /* MV */ []
 		  	  (TransformedBody tb) = fun_body
-		  	  (tb_rhs, {ui_instance_calls, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error /* MV */, ui_type_code_info = type_code_info, ui_predef_symbols = predef_symbols /*, ui_new_variables */}) = updateExpression fi_group_index tb.tb_rhs
+		  	  (tb_rhs, {ui_instance_calls, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error /* MV */, ui_x={x_type_code_info = type_code_info, x_predef_symbols = predef_symbols} /*, ui_new_variables */})
+		  	  	= updateExpression fi_group_index tb.tb_rhs
 					{ ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_fun_defs = fun_defs, ui_local_vars = [],
-					  ui_fun_env = fun_env, ui_var_heap = var_heap, ui_error = error 
-					  /* MV */, ui_type_code_info = type_code_info, ui_predef_symbols = predef_symbols} //, ui_new_variables = [] }
+					  ui_fun_env = fun_env, ui_var_heap = var_heap, ui_error = error , /*ui_new_variables = [],*/
+					  ui_x={x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
 		 	  fun_def = { fun_def & fun_body = TransformedBody {tb & tb_rhs = tb_rhs}
 		 	  					}
 //		 	  			/* MV */  , fun_info = { fun_info & fi_local_vars = ui_new_variables ++ fun_info.fi_local_vars }}
@@ -863,10 +865,10 @@ where
 			= update_dynamics funs type_pattern_vars ({ ui_fun_defs & [fun] = fun_def })
 				 ui_fun_env  ui_symbol_heap type_code_info ui_var_heap ui_error predef_symbols
 
-removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int!*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
-removeOverloadedFunctions group type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
+removeOverloadedFunctions group type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
 	| error.ea_ok
 		# (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 			= foldSt (remove_overloaded_function type_pattern_vars) group (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
@@ -882,10 +884,10 @@ where
 		  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 		  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error) /* MV */ rev_variables
 		 
-		  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error /* MV */, ui_type_code_info = type_code_info, ui_predef_symbols = predef_symbols}) //, ui_new_variables })
+		  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error /* MV */, ui_x={x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}) //, ui_new_variables })
 		  		= updateExpression fun_info.fi_group_index tb_rhs {  ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
 		  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error 
-		  				/* MV */, ui_type_code_info = type_code_info, ui_predef_symbols = predef_symbols}
+		  				/* MV */, ui_x={x_type_code_info = type_code_info, x_predef_symbols = predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
 		  (tb_args, var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap) 
 		  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
 		  						fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars } }
@@ -1087,10 +1089,13 @@ where
 	,	ui_fun_defs			:: !.{# FunDef}
 	,	ui_fun_env			:: !.{! FunctionType}
 	,	ui_error			:: !.ErrorAdmin
-// MV ..	
-	,	ui_type_code_info	:: !.TypeCodeInfo
-	,	ui_predef_symbols	:: !.{#PredefinedSymbol}
-// .. MV
+	,	ui_x :: !.UpdateInfoX
+	}
+
+:: UpdateInfoX = {
+		x_type_code_info	:: !.TypeCodeInfo
+	,	x_predef_symbols	:: !.{#PredefinedSymbol}
+	,	x_main_dcl_module_n :: !Int
 	}
 
 class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
@@ -1106,7 +1111,8 @@ where
 			  ui = { ui & ui_symbol_heap = ui_symbol_heap }
 			= case symb_info of
 				EI_Empty
-					#! fun_index = get_recursive_fun_index group_index symb_kind ui.ui_fun_defs
+					#! main_dcl_module_n = ui.ui_x.UpdateInfoX.x_main_dcl_module_n
+					#! fun_index = get_recursive_fun_index group_index symb_kind main_dcl_module_n ui.ui_fun_defs
 					| fun_index == NoIndex
 						-> (App { app & app_args = app_args }, ui)
 						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
@@ -1115,7 +1121,8 @@ where
 									{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_Context context_args
 					# (app_args, ui=:{ui_var_heap, ui_error}) = adjustClassExpressions symb_name context_args app_args ui
-					#! fun_index = get_recursive_fun_index group_index symb_kind ui.ui_fun_defs
+					#! main_dcl_module_n = ui.ui_x.UpdateInfoX.x_main_dcl_module_n
+					#! fun_index = get_recursive_fun_index group_index symb_kind main_dcl_module_n ui.ui_fun_defs
 					| fun_index == NoIndex
 						# app = { app & app_symb = { symb & symb_arity = length context_args + symb_arity }, app_args = app_args}
 						-> (App app, examine_calls context_args { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
@@ -1152,15 +1159,16 @@ where
 				_
 					-> abort "build_context_arg (overloading.icl)"
 
-		get_recursive_fun_index :: !Index !SymbKind !{# FunDef} -> Index
-		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) fun_defs
-			| glob_module == cIclModIndex
+		get_recursive_fun_index :: !Index !SymbKind Int !{# FunDef} -> Index
+		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) main_dcl_module_n fun_defs
+//			| glob_module == cIclModIndex
+			| glob_module == main_dcl_module_n
 				# {fun_info, fun_index} = fun_defs.[glob_object]
 				| fun_info.fi_group_index == group_index
 					= fun_index 
 					= NoIndex
 				= NoIndex
-		get_recursive_fun_index group_index _ fun_defs
+		get_recursive_fun_index group_index _ main_dcl_module_n fun_defs
 			= NoIndex
 
 		build_application def_symbol=:{glob_object} context_args orig_args nr_of_orig_args app_info_ptr
@@ -1175,7 +1183,8 @@ where
 			= ui
 			
 		new_call mod_index symb_index ui=:{ui_instance_calls,ui_fun_defs}
-			| mod_index == cIclModIndex && symb_index < size ui_fun_defs
+//			| mod_index == cIclModIndex && symb_index < size ui_fun_defs
+			| mod_index == ui.ui_x.UpdateInfoX.x_main_dcl_module_n && symb_index < size ui_fun_defs
 				# ui_instance_calls = add_call symb_index ui_instance_calls
 				= { ui & ui_instance_calls = ui_instance_calls }
 				= ui
@@ -1396,14 +1405,15 @@ where
 				   { ui & ui_local_vars = [cyclic_fv : ui.ui_local_vars]})	
 	
 		getSymbol :: !Int !(!(Global !Int) -> !SymbKind) !Int !*UpdateInfo -> (SymbIdent,*UpdateInfo)
-		getSymbol index symb_kind arity ui=:{ui_predef_symbols}
-			# ({pds_module, pds_def, pds_ident}, ui_predef_symbols) = ui_predef_symbols![index]
-			  ui = { ui & ui_predef_symbols = ui_predef_symbols}
+		getSymbol index symb_kind arity ui=:{ui_x=ui_x=:{x_predef_symbols}}
+			# ({pds_module, pds_def, pds_ident}, x_predef_symbols) = x_predef_symbols![index]
+			  ui_x = { ui_x & x_predef_symbols = x_predef_symbols}
+			  ui={ui & ui_x=ui_x}
 			  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
 			= (symbol,ui)
 			
 		get_constructor :: !Int !*UpdateInfo -> !(!Expression,!*UpdateInfo)
-		get_constructor index ui=:{ui_type_code_info={tci_instances}}
+		get_constructor index ui=:{ui_x={x_type_code_info={tci_instances}}}
 			/*
 			** MV
 			** Inefficiency. The correct gtci_type referred to by index has to be selected from the list of

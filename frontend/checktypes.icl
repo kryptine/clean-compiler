@@ -196,7 +196,11 @@ checkRhsOfTypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_cons
 	  						attr_vars type_lhs [rec_cons] ts_ti_cs
 	# (rec_cons_def, ts) = ts!ts_cons_defs.[ds_index]
 	# {cons_type = { st_vars,st_args,st_result,st_attr_vars }, cons_exi_vars} = rec_cons_def
-	  (ts_selector_defs, ti_var_heap, cs_error) = check_selectors 0 rt_fields cti_type_index st_args st_result st_vars st_attr_vars cons_exi_vars
+
+	| size rt_fields<>length st_args
+		= abort ("checkRhsOfTypeDef "+++rt_fields.[0].fs_name.id_name+++" "+++rec_cons_def.cons_symb.id_name+++toString ds_index)
+
+	# (ts_selector_defs, ti_var_heap, cs_error) = check_selectors 0 rt_fields cti_type_index st_args st_result st_vars st_attr_vars cons_exi_vars
 				ts.ts_selector_defs ti.ti_var_heap cs.cs_error
 	= (td_rhs, ({ ts & ts_selector_defs = ts_selector_defs }, { ti & ti_var_heap = ti_var_heap }, { cs & cs_error = cs_error}))
 where
@@ -582,7 +586,7 @@ where
 		= (TA_Multi, oti, cs)
 
 //JVG: added type
-checkOpenAType :: Int Int DemandedAttributeKind AType *(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState) -> *(!AType,!*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState));
+checkOpenAType :: Int Int DemandedAttributeKind AType !*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState) -> *(!AType,!*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState));
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
 	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
@@ -658,7 +662,11 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_typ
 	= ({ type & at_type = arg_type --> result_type, at_attribute = new_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, _, (oti, cs)) =  checkTypeVar scope DAK_None tv TA_Multi (oti, cs)
+// JVG
 	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
+//	  dak_None = DAK_None
+//	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope dak_None) types (ots, oti, cs)
+	
 	  (new_attr, oti, cs) = newAttribute dem_attr ":@:" at_attribute oti cs
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = new_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_attribute} (ots, oti, cs)
@@ -673,7 +681,10 @@ checkOpenType mod_index scope dem_attr type cot_state
 	= (at_type, cot_state)
 	
 checkOpenATypes mod_index scope types cot_state
+// JVG
 	= mapSt (checkOpenAType mod_index scope DAK_None) types cot_state
+//	# dak_None=DAK_None
+//	= mapSt (checkOpenAType mod_index scope dak_None) types cot_state
 
 checkInstanceType :: !Index !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!InstanceType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)

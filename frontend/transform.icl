@@ -4,10 +4,16 @@ import syntax, check, StdCompare, utilities, RWSDebug
 
 ::	LiftState =
 	{	ls_var_heap		:: !.VarHeap
-	,	ls_fun_defs		:: !.{#FunDef}
+//	,	ls_fun_defs		:: !.{#FunDef}
+	,	ls_x :: !.LiftStateX
 	,	ls_expr_heap	:: !.ExpressionHeap
 	}
 	
+::	LiftStateX = {
+		x_fun_defs :: !.{#FunDef},
+		x_main_dcl_module_n :: !Int
+	}
+
 class lift a :: !a !*LiftState -> (!a, !*LiftState)
 
 instance lift [a] | lift a
@@ -94,8 +100,10 @@ instance lift App
 where
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
 		# (app_args, ls) = lift app_args ls
-		| glob_module == cIclModIndex
-			#! fun_def = ls.ls_fun_defs.[glob_object]
+//		| glob_module == cIclModIndex
+		| glob_module == ls.ls_x.LiftStateX.x_main_dcl_module_n
+//			#! fun_def = ls.ls_fun_defs.[glob_object]
+			#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
 			# {fun_info={fi_free_vars}} = fun_def
 			  fun_lifted = length fi_free_vars
 			| fun_lifted > 0
@@ -103,6 +111,33 @@ where
 				= ({ app & app_args = app_args, app_symb = { app_symbol & symb_arity = symb_arity + fun_lifted }},
 						{ ls & ls_var_heap = ls_var_heap, ls_expr_heap = ls_expr_heap })
 				= ({ app & app_args = app_args }, ls)
+			= ({ app & app_args = app_args }, ls)
+	where
+		add_free_variables :: ![FreeVar] ![Expression] !u:VarHeap !*ExpressionHeap -> (![Expression],!u:VarHeap,!*ExpressionHeap)
+		add_free_variables [] app_args var_heap expr_heap
+			= (app_args, var_heap, expr_heap)
+		add_free_variables [{fv_name, fv_info_ptr} : free_vars] app_args var_heap expr_heap
+			#! var_info = sreadPtr fv_info_ptr var_heap
+			= case var_info of
+				VI_LiftedVariable var_info_ptr
+				 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+					-> add_free_variables free_vars [Var { var_name = fv_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
+							var_heap expr_heap
+				_
+				 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+					-> add_free_variables free_vars [Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
+							var_heap expr_heap
+
+	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_LocalMacroFunction glob_object}, app_args} ls
+		# (app_args, ls) = lift app_args ls
+//		#! fun_def = ls.ls_fun_defs.[glob_object]
+		#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
+		# {fun_info={fi_free_vars}} = fun_def
+		  fun_lifted = length fi_free_vars
+		| fun_lifted > 0
+			# (app_args, ls_var_heap, ls_expr_heap) = add_free_variables fi_free_vars app_args ls.ls_var_heap ls.ls_expr_heap
+			= ({ app & app_args = app_args, app_symb = { app_symbol & symb_arity = symb_arity + fun_lifted }},
+					{ ls & ls_var_heap = ls_var_heap, ls_expr_heap = ls_expr_heap })
 			= ({ app & app_args = app_args }, ls)
 	where
 		add_free_variables :: ![FreeVar] ![Expression] !u:VarHeap !*ExpressionHeap -> (![Expression],!u:VarHeap,!*ExpressionHeap)
@@ -329,6 +364,8 @@ where
 	where
 		is_function_or_macro (SK_Function _)
 			= True
+		is_function_or_macro (SK_LocalMacroFunction _)
+			= True
 		is_function_or_macro (SK_Macro _)
 			= True
 		is_function_or_macro (SK_OverloadedFunction _)
@@ -506,6 +543,7 @@ examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
 			-> ( [ fc : calls ], symbol_table <:=
 					(id_info, { ste_kind = STE_Called [fc_index], ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = entry }))
 
+
 //unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
 unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}} args fun_defs (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
@@ -624,12 +662,12 @@ where
 			
 partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{! Group}, !*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
-partitionateAndLiftFunctions ranges mod_index alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
+partitionateAndLiftFunctions ranges main_dcl_module_n alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap, pi_symbol_table = symbol_table,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
 	  (fun_defs, modules, {pi_groups, pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_error})
-	  		= foldSt (partitionate_functions mod_index max_fun_nr) ranges (fun_defs, modules, partitioning_info)
+	  		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr) ranges (fun_defs, modules, partitioning_info)
 	  groups = { {group_members = group} \\ group <- reverse pi_groups }
 	= (groups, fun_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 where
@@ -658,7 +696,9 @@ where
 					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = pi.pi_next_group }}, modules,
 							{pi & pi_next_group = inc pi.pi_next_group, pi_groups = [ [fun_index] : pi.pi_groups]}))
 					-> (max_fun_nr, (fun_defs, modules, pi))
-
+			BackendBody _
+				-> abort "partitionate_function BackendBody"
+			
 	visit_function mod_index max_fun_nr {fc_index} (min_dep, funs_modules_pi)
 		# (next_min, funs_modules_pi) = partitionate_function mod_index max_fun_nr fc_index funs_modules_pi
 		= (min next_min min_dep, funs_modules_pi)
@@ -668,8 +708,10 @@ where
 		| fun_number <= min_dep
 			# (pi_deps, group_without_macros, group_without_funs, fun_defs)
 					= close_group fun_index pi_deps [] [] max_fun_nr pi_next_group fun_defs
-			  (fun_defs, pi_var_heap, pi_symbol_heap)
-			  		= liftFunctions def_level (group_without_macros ++ group_without_funs) pi_next_group fun_defs pi_var_heap pi_symbol_heap
+//			  (fun_defs, pi_var_heap, pi_symbol_heap)
+			  {ls_x={x_fun_defs=fun_defs}, ls_var_heap=pi_var_heap, ls_expr_heap=pi_symbol_heap}
+//			  		= liftFunctions def_level (group_without_macros ++ group_without_funs) pi_next_group cIclModIndex fun_defs pi_var_heap pi_symbol_heap
+			  		= liftFunctions def_level (group_without_macros ++ group_without_funs) pi_next_group main_dcl_module_n fun_defs pi_var_heap pi_symbol_heap
 			  (fun_defs, modules, es)
 			  		= expand_macros_in_group mod_index group_without_funs (fun_defs, modules,
 			  				{ es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
@@ -707,7 +749,6 @@ where
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
-//					---> ("expand_macros", fun_symb, fi_local_vars)
 	 
 	add_called_macros calls macro_defs_and_pi
 		= foldSt add_called_macro calls macro_defs_and_pi
@@ -1013,16 +1054,17 @@ mergeCases (case_expr=:(Case first_case=:{case_default, case_default_pos}), case
 mergeCases expr_and_pos _ var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
 
-
-liftFunctions min_level group group_index fun_defs var_heap expr_heap
+liftFunctions min_level group group_index main_dcl_module_n fun_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs)
 			= foldSt (add_free_vars_of_non_recursive_calls_to_function group_index) group (False, False, fun_defs)
 	| contains_free_vars
 		# fun_defs = iterateSt (add_free_vars_of_recursive_calls_to_functions group_index group) fun_defs
-		= lift_functions group fun_defs var_heap expr_heap
+//		= lift_functions group fun_defs var_heap expr_heap
+		= lift_functions group {ls_x={x_fun_defs=fun_defs,x_main_dcl_module_n=main_dcl_module_n},ls_var_heap=var_heap,ls_expr_heap=expr_heap}
 	| lifted_function_called
-		= lift_functions group fun_defs var_heap expr_heap
-		= (fun_defs, var_heap, expr_heap)
+		= lift_functions group {ls_x={x_fun_defs=fun_defs,x_main_dcl_module_n=main_dcl_module_n},ls_var_heap=var_heap,ls_expr_heap=expr_heap}
+//		= (fun_defs, var_heap, expr_heap)
+		= {ls_x={x_fun_defs=fun_defs,x_main_dcl_module_n=main_dcl_module_n},ls_var_heap=var_heap, ls_expr_heap=expr_heap}
 where
 
 	add_free_vars_of_non_recursive_calls_to_function group_index fun (contains_free_vars, lifted_function_called, fun_defs)
@@ -1077,18 +1119,24 @@ where
 			# (free_var_added, free_vars) = newFreeVariable var free_vars
 			= add_free_global_variables vars (free_var_added || free_vars_added, free_vars)
 
-	lift_functions group fun_defs var_heap expr_heap
-		= foldSt lift_function group (fun_defs, var_heap, expr_heap)
+//	lift_functions group fun_defs var_heap expr_heap
+//		= foldSt lift_function group (fun_defs, var_heap, expr_heap)
+	lift_functions group lift_state
+		= foldSt lift_function group lift_state
 	where
-		lift_function fun (fun_defs=:{[fun] = fun_def}, var_heap, expr_heap)
+//		lift_function fun (fun_defs=:{[fun] = fun_def}, var_heap, expr_heap)
+		lift_function fun {ls_x=ls_x=:{x_fun_defs=fun_defs=:{[fun] = fun_def}}, ls_var_heap=var_heap, ls_expr_heap=expr_heap}
 			# {fi_free_vars} = fun_def.fun_info
 			  fun_lifted = length fi_free_vars
 			  (PartioningFunction {cb_args,cb_rhs} fun_number) = fun_def.fun_body
 			  (cb_args, var_heap) = add_lifted_args fi_free_vars cb_args var_heap
-			  (cb_rhs, {ls_fun_defs,ls_var_heap,ls_expr_heap}) = lift cb_rhs { ls_fun_defs = fun_defs, ls_var_heap = var_heap, ls_expr_heap = expr_heap }
+//			  (cb_rhs, {ls_fun_defs,ls_var_heap,ls_expr_heap}) = lift cb_rhs { ls_fun_defs = fun_defs, ls_var_heap = var_heap, ls_expr_heap = expr_heap }
+			  (cb_rhs, {ls_x,ls_var_heap,ls_expr_heap}) = lift cb_rhs { ls_x={ls_x & x_fun_defs = fun_defs}, ls_var_heap = var_heap, ls_expr_heap = expr_heap }
 			  ls_var_heap = remove_lifted_args fi_free_vars ls_var_heap
+			  ls_fun_defs = ls_x.x_fun_defs
 			  ls_fun_defs = { ls_fun_defs & [fun] = { fun_def & fun_lifted = fun_lifted, fun_body = PartioningFunction {cb_args = cb_args, cb_rhs = cb_rhs} fun_number}}
-			= (ls_fun_defs, ls_var_heap, ls_expr_heap)
+//			= (ls_fun_defs, ls_var_heap, ls_expr_heap)
+			= {ls_x={ls_x & x_fun_defs=ls_fun_defs}, ls_var_heap=ls_var_heap, ls_expr_heap= ls_expr_heap}
 //				 ---> ("lift_function", fun_def.fun_symb, fi_free_vars, cb_args, cb_rhs)
 
 		remove_lifted_args vars var_heap

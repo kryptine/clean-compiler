@@ -8,15 +8,12 @@ import checksupport, transform, overloading
 	=	{	fe_icl :: !IclModule
 		,	fe_dcls :: !{#DclModule}
 		,	fe_components :: !{!Group}
-		,	fe_varHeap :: !.VarHeap
-// MdM
-		,	fe_typeHeap :: !.TypeVarHeap
-// ... MdM
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
 		,	fe_globalFunctions :: !IndexRange
 		,	fe_arrayInstances :: !IndexRange
 		}
+
 :: FrontEndPhase
 	=	FrontEndPhaseCheck
 	|	FrontEndPhaseTypeCheck
@@ -25,5 +22,5 @@ import checksupport, transform, overloading
 	|	FrontEndPhaseConvertModules
 	|	FrontEndPhaseAll
 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
-// upToPhase name paths list_inferred_types predefs files error io out
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !*Heaps
+	-> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File,!*Heaps) 

@@ -11,4 +11,3 @@ signClassification :: !Index  !Index  ![SignClassification] !{# CommonDefs } !*T
 
 propClassification :: !Index !Index ![PropClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification, !*TypeVarHeap, !*TypeDefInfos)
-

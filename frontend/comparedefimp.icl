@@ -35,6 +35,8 @@ import RWSDebug
 				:: !Conversions
 		, 	tc_visited_syn_types	// to detect cycles in type synonyms
 				:: !.{#Bool}
+		, tc_main_dcl_module_n
+			:: !Int
 		}
 
 :: TypesCorrespondMonad
@@ -84,12 +86,13 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !{#Int} !{!FunctionBody} !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
+compareDefImp :: !{#Int} !{!FunctionBody} !Int !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
 				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin)
-compareDefImp size_uncopied_icl_defs untransformed dcl_modules icl_module heaps error_admin
+compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n dcl_modules icl_module heaps error_admin
 	// icl definitions with indices >= size_uncopied_icl_defs.[def_type] don't have to be compared,
 	// because they are copies of definitions that appear exclusively in the dcl module
-	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
+//	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
+	# (main_dcl_module, dcl_modules) = dcl_modules![main_dcl_module_n]
 	= case main_dcl_module.dcl_conversions of
 		No	-> (dcl_modules, icl_module, heaps, error_admin)
 		Yes conversion_table
@@ -110,6 +113,7 @@ compareDefImp size_uncopied_icl_defs untransformed dcl_modules icl_module heaps 
 						, tc_icl_type_defs = icl_type_defs
 						, tc_type_conversions = conversion_table.[cTypeDefs]
 						, tc_visited_syn_types = createArray (size dcl_common.com_type_defs) False
+						, tc_main_dcl_module_n = main_dcl_module_n
 						}
 			  (icl_com_type_defs, tc_state, error_admin)
 					= compareWithConversions 
@@ -474,7 +478,8 @@ instance t_corresponds AType where
 
 			corresponds_with_expanded_syn_type {glob_module, glob_object} dclArgs icl_atype
 												tc_state
-				# is_defined_in_main_dcl = glob_module==cIclModIndex
+//				# is_defined_in_main_dcl = glob_module==cIclModIndex
+				# is_defined_in_main_dcl = glob_module==tc_state.tc_main_dcl_module_n
 				| is_defined_in_main_dcl && tc_state.tc_visited_syn_types.[glob_object]
 					= (False, tc_state) // cycle in synonym types in main dcl
 				# ({dcl_common}, tc_state) = tc_state!tc_dcl_modules.[glob_module]
@@ -959,7 +964,9 @@ continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app
 											ec_state
 	| dcl_glob_index==icl_glob_index
 		= ec_state
-	| dcl_glob_index.glob_module<>cIclModIndex || icl_glob_index.glob_module<>cIclModIndex
+//	| dcl_glob_index.glob_module<>cIclModIndex || icl_glob_index.glob_module<>cIclModIndex
+	#! main_dcl_module_n=ec_state.ec_tc_state.tc_main_dcl_module_n
+	| dcl_glob_index.glob_module<>main_dcl_module_n || icl_glob_index.glob_module<>main_dcl_module_n
 		= give_error icl_app_symb.symb_name ec_state
 	// two different functions from the main module were referenced. Check their correspondence
 	# dcl_index = dcl_glob_index.glob_object

@@ -507,6 +507,7 @@ cNotVarNumber :== -1
 
 ::	SymbKind	= SK_Unknown
 				| SK_Function !(Global Index)
+				| SK_LocalMacroFunction !Index
 				| SK_OverloadedFunction !(Global Index)
 				| SK_Constructor !(Global Index)
 				| SK_Macro !(Global Index)
@@ -1293,6 +1294,7 @@ where
 instance <<< SymbIdent
 where
 	(<<<) file symb=:{symb_kind = SK_Function symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_LocalMacroFunction symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index } = file <<< symb.symb_name <<<  "[o]@" <<< symb_index
 	(<<<) file symb = file <<< symb.symb_name 
@@ -1455,7 +1457,7 @@ where
 instance <<< Selection
 where
 	(<<<) file (RecordSelection selector _) = file <<< selector
-	(<<<) file (ArraySelection _ _ index_expr) = file <<< '[' <<< index_expr <<< ']'
+	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
 	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
 
 instance <<< LocalDefs
@@ -1830,8 +1832,15 @@ instance == Annotation
 where
 	(==) a1 a2 = equal_constructor a1 a2
 
-EmptySymbolTableEntry :== 
-	{	ste_kind = STE_Empty, ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }
+EmptySymbolTableEntry :== EmptySymbolTableEntryCAF.boxed_symbol_table_entry
+
+::BoxedSymbolTableEntry = {boxed_symbol_table_entry::!SymbolTableEntry}
+
+EmptySymbolTableEntryCAF :: BoxedSymbolTableEntry
+EmptySymbolTableEntryCAF =: {boxed_symbol_table_entry = { ste_kind = STE_Empty, ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = abort_empty_SymbolTableEntry } }
+
+abort_empty_SymbolTableEntry :: a
+abort_empty_SymbolTableEntry = abort "empty SymbolTableEntry"
 
 cNotAGroupNumber :== -1
 
@@ -1853,10 +1862,23 @@ PostiveSignClass	:== { sc_pos_vect = bitnot 0, sc_neg_vect = 0 }
 NoPropClass			:== 0
 PropClass			:== bitnot 0
 
+newTypeSymbIdentCAF :: TypeSymbIdent;
+newTypeSymbIdentCAF =: MakeTypeSymbIdentMacro { glob_object = NoIndex, glob_module = NoIndex } {id_name="",id_info=nilPtr} 0
+
+//MakeNewTypeSymbIdent name arity
+//	:== MakeTypeSymbIdent { glob_object = NoIndex, glob_module = NoIndex } name arity
+
 MakeNewTypeSymbIdent name arity
-	:== MakeTypeSymbIdent { glob_object = NoIndex, glob_module = NoIndex } name arity
+	:== {newTypeSymbIdentCAF & type_name=name, type_arity=arity }
+
+//MakeTypeSymbIdent type_index name arity
+//	:== {	type_name = name, type_arity = arity, type_index = type_index,
+//			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
 
 MakeTypeSymbIdent type_index name arity
+	:== {	newTypeSymbIdentCAF & type_name = name, type_arity = arity, type_index = type_index }
+
+MakeTypeSymbIdentMacro type_index name arity
 	:== {	type_name = name, type_arity = arity, type_index = type_index,
 			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
 

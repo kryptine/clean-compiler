@@ -117,6 +117,7 @@ where
 			= compare_indexes  symb1 symb2
 		with
 			compare_indexes (SK_Function i1) (SK_Function i2)						= i1 =< i2
+			compare_indexes (SK_LocalMacroFunction i1) (SK_LocalMacroFunction i2) = i1 =< i2
 //			compare_indexes (SK_ClassRecord i1) (SK_ClassRecord i2)					= i1 =< i2
 			compare_indexes (SK_Constructor i1) (SK_Constructor i2)					= i1 =< i2
 //			compare_indexes (SK_DeltaFunction i1) (SK_DeltaFunction i2)				= i1 =< i2

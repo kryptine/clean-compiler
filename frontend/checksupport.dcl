@@ -3,8 +3,7 @@ definition module checksupport
 import StdEnv
 import syntax, predef
 
-
-cIclModIndex 	:== 0
+//cIclModIndex 	:== 0
 
 CS_NotChecked 	:== -1
 NotFound		:== -1
@@ -31,8 +30,9 @@ cNeedStdDynamics:== 4
 
 ::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![IdentPos], ea_ok :: !Bool }
 
-::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,
-					cs_needed_modules :: !BITVECT } // MW++
+::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,cs_x :: !CheckStateX }
+
+::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int }
 
 //	SymbolTable			:== {# SymbolTableEntry}
 
@@ -68,11 +68,14 @@ cConversionTableSize	:== 8
 	,	dcl_index	:: !Index
 	}
 
-::	Declarations =
-	{	dcls_import		::![Declaration]
+::	Declarations = {
+		dcls_import	::!{!Declaration}
 	,	dcls_local		::![Declaration]
-	,	dcls_explicit	::![(!Declaration, !LineNr)]
+	,	dcls_local_for_import ::!{!Declaration}
+	,	dcls_explicit	::!{!ExplicitImport}
 	}
+
+:: ExplicitImport = ExplicitImport !Declaration !LineNr;
 
 ::	IclModule  =
 	{	icl_name				:: !Ident
@@ -80,9 +83,15 @@ cConversionTableSize	:== 8
 	,	icl_instances			:: !IndexRange
 	,	icl_specials			:: !IndexRange
 	,	icl_common				:: !.CommonDefs
-	,	icl_declared			:: !Declarations
+//	,	icl_declared		:: !Declarations
+	,	icl_import		:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
+	,	icl_used_module_numbers :: !ModuleNumberSet
 	}
+
+:: ModuleNumberSet = ModuleNumbers !Int !ModuleNumberSet | EndModuleNumbers;
+
+in_module_number_set :: !Int !ModuleNumberSet -> Bool
 
 ::	DclModule =
 	{	dcl_name			:: !Ident
@@ -96,6 +105,7 @@ cConversionTableSize	:== 8
 	,	dcl_declared		:: !Declarations
 	,	dcl_conversions		:: !Optional ConversionTable
 	,	dcl_is_system		:: !Bool
+	,	dcl_imported_module_numbers :: !ModuleNumberSet
 	}
 
 class Erroradmin state
@@ -125,10 +135,13 @@ instance toInt STE_Kind
 instance <<< STE_Kind, IdentPos, Declaration
 
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
+//retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
+//retrieveAndRemoveImportsOfModuleFromSymbolTable :: !{!.Declaration} ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !u:{#FunDef} !*SymbolTable !*ErrorAdmin -> (!u:{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
-addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] ![.Declaration] !*CheckState -> .CheckState;
+//addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] ![.Declaration] !*CheckState -> .CheckState;
+addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] !{!.Declaration} !*CheckState -> .CheckState;
+addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!.Declaration} !{!.Declaration} !*CheckState -> .CheckState;
 //addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
 addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable :: ![.Declaration] !*CheckState -> .CheckState;
@@ -137,3 +150,4 @@ removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) 
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntry) -> *Heap SymbolTableEntry;
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
+removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry

@@ -71,7 +71,6 @@ instance toString Ident
 
 ::	ParsedModule	:== Module  [ParsedDefinition]
 ::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef) IndexRange)
-
 	
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None
 
@@ -79,7 +78,6 @@ instance toString Ident
 					| SelectorList !Ident ![ATypeVar] ![ParsedSelector]
 					| TypeSpec !AType
 					| EmptyRhs !BITVECT
-
 
 ::	CollectedDefinitions instance_kind macro_defs =
 	{	def_types 			:: ![TypeDef TypeRhs]
@@ -539,6 +537,7 @@ cNonRecursiveAppl	:== False
 
 ::	SymbKind	= SK_Unknown
 				| SK_Function !(Global Index)
+				| SK_LocalMacroFunction !Index
 				| SK_OverloadedFunction !(Global Index)
 				| SK_Constructor !(Global Index)
 				| SK_Macro !(Global Index)
@@ -1170,8 +1169,11 @@ ErrorToString :: Error -> String
 
 */
 
-EmptySymbolTableEntry :== 
-	{	ste_kind = STE_Empty, ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }
+EmptySymbolTableEntry :== EmptySymbolTableEntryCAF.boxed_symbol_table_entry
+
+::BoxedSymbolTableEntry = {boxed_symbol_table_entry::!SymbolTableEntry}
+
+EmptySymbolTableEntryCAF :: BoxedSymbolTableEntry
 
 cNotAGroupNumber :== -1
 
@@ -1193,12 +1195,20 @@ PostiveSignClass	:== { sc_pos_vect = bitnot 0, sc_neg_vect = 0 }
 NoPropClass			:== 0
 PropClass			:== bitnot 0
 
+newTypeSymbIdentCAF :: TypeSymbIdent;
+
+//MakeNewTypeSymbIdent name arity
+//	:== MakeTypeSymbIdent { glob_object = NoIndex, glob_module = NoIndex } name arity
+
 MakeNewTypeSymbIdent name arity
-	:== MakeTypeSymbIdent { glob_object = NoIndex, glob_module = NoIndex } name arity
+	:== {newTypeSymbIdentCAF & type_name=name, type_arity=arity }
+
+//MakeTypeSymbIdent type_index name arity
+//	:== {	type_name = name, type_arity = arity, type_index = type_index,
+//			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
 
 MakeTypeSymbIdent type_index name arity
-	:== {	type_name = name, type_arity = arity, type_index = type_index,
-			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
+	:== {	newTypeSymbIdentCAF & type_name = name, type_arity = arity, type_index = type_index }
 
 MakeSymbIdent name arity	:== { symb_name = name, symb_kind = SK_Unknown, symb_arity = arity  }
 MakeConstant name			:== MakeSymbIdent name 0
@@ -1214,7 +1224,6 @@ ParsedConstructorToConsDef pc :==
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_result = MakeAttributedType TE, 
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr, cons_arg_vars = [] }
-
 
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 

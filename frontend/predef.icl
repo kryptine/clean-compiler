@@ -73,6 +73,7 @@ PD_TypeCodeClass			:== 122
 PD_TypeObjectType			:== 124
 PD_TypeConsSymbol			:== 125
 PD_unify					:== 126
+// MV ..
 PD_coerce					:== 127
 PD_variablePlaceholder		:== 128
 PD_StdDynamics				:== 129
@@ -96,7 +97,8 @@ PD_NrOfPredefSymbols		:== 133
 
 (<<-) infixl
 (<<-) (array, hash_table) (name, table_kind, index)
-	# (id, hash_table) = putIdentInHashTable name table_kind hash_table
+//	# (id, hash_table) = putIdentInHashTable name table_kind hash_table
+	# ({boxed_ident=id}, hash_table) = putIdentInHashTable name table_kind hash_table
 	= ({ array & [index] = { pds_ident = id, pds_module = NoIndex, pds_def = NoIndex } }, hash_table)
 	
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
@@ -191,7 +193,6 @@ cTCMemberSymbIndex			:== 0
 
 cTCInstanceSymbIndex		:== 0
 
-
 buildPredefinedModule :: !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
 buildPredefinedModule pre_def_symbols 
 	# (type_var_id, pre_def_symbols)	= pre_def_symbols![PD_TypeVar_a0]
@@ -228,10 +229,9 @@ buildPredefinedModule pre_def_symbols
 	  (class_def, member_def, pre_def_symbols) = make_TC_class_def pre_def_symbols
 	= ({ mod_name = pre_mod_id, mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
 		 mod_defs = {
-			def_types = [string_def, list_def : type_defs],
-			def_constructors = [ParsedConstructorToConsDef cons_def, ParsedConstructorToConsDef nil_def : cons_defs],
-			def_selectors = [], def_classes = [class_def], def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def],
-			def_funtypes = [alias_dummy_type], def_instances = [] }}, pre_def_symbols)
+			def_types = [string_def, list_def : type_defs], def_constructors
+						= [ParsedConstructorToConsDef cons_def, ParsedConstructorToConsDef nil_def : cons_defs], def_selectors = [], def_classes = [class_def],
+			def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [] }}, pre_def_symbols)
 where
 	add_tuple_defs pre_mod_id tup_arity type_defs cons_defs pre_def_symbols
 		| tup_arity >= 2
@@ -290,6 +290,3 @@ where
 		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
 			ft_specials = SP_None, ft_type_ptr = nilPtr }
 // ..MW
-		
-
-

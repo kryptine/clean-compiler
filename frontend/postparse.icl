@@ -4,10 +4,6 @@ import StdEnv
 import syntax, parse, predef, utilities, StdCompare
 import RWSDebug
 
-/**
-	 
-**/
-
 :: *CollectAdmin =
 	{	ca_error		:: !*ParseErrorAdmin
 	,	ca_fun_count	:: !Int
@@ -56,8 +52,8 @@ exprToRhs expr
 
 prefixAndPositionToIdent :: !String !LineAndColumn !*CollectAdmin -> (!Ident, !*CollectAdmin)
 prefixAndPositionToIdent prefix {lc_line, lc_column} ca=:{ca_hash_table}
-	# (ident, ca_hash_table)
-		=	putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
+//	# (ident, ca_hash_table)	=	putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
+	# ({boxed_ident=ident}, ca_hash_table)	=	putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
 	=	(ident, { ca & ca_hash_table = ca_hash_table } )
 
 (`) infixl 9
@@ -658,45 +654,49 @@ transformArrayDenot exprs pi
 			[{bind_dst=toParsedExpr i pi, bind_src=expr} \\ expr <- exprs & i <- [0..]]
 			pi
 
-scanModules :: [ParsedImport] [ScannedModule] SearchPaths *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
-scanModules [] parsed_modules searchPaths files ca
+scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
+scanModules [] parsed_modules cached_modules searchPaths files ca
 	= (True, parsed_modules, files, ca)
-// MW3 was:scanModules [{import_module,import_symbols} : mods] parsed_modules searchPaths files ca
-scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules searchPaths files ca
-	# (found, mod) = try_to_find import_module parsed_modules
-	| found
-		= scanModules mods parsed_modules searchPaths files ca
+scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths files ca
+	| in_cache import_module cached_modules
+		= scanModules mods parsed_modules cached_modules searchPaths files ca
+	| try_to_find import_module parsed_modules
+		= scanModules mods parsed_modules cached_modules searchPaths files ca
 		# (succ, parsed_modules, files, ca)
-// MW3 was:				= parseAndScanDclModule import_module parsed_modules searchPaths files ca
-				= parseAndScanDclModule import_module import_file_position parsed_modules searchPaths files ca
+				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths files ca
 		  (mods_succ, parsed_modules, files, ca)
-		  		= scanModules mods parsed_modules searchPaths files ca
+		  		= scanModules mods parsed_modules cached_modules searchPaths files ca
 		= (succ && mods_succ, parsed_modules, files, ca)
 where
-	try_to_find :: Ident [ScannedModule] -> (Bool, ScannedModule)
+	in_cache mod_id []
+		= False
+	in_cache mod_id [cached_module_ident : pmods]
+		| mod_id==cached_module_ident
+			=True
+			= in_cache mod_id pmods
+
+ 	try_to_find :: Ident [ScannedModule] -> Bool
 	try_to_find mod_id []
-		= (False, abort "module not found")
+		= False
 	try_to_find mod_id [pmod : pmods]
 		| mod_id == pmod.mod_name
-			= (True, pmod)
+			=True
 			= try_to_find mod_id pmods
 
 MakeEmptyModule name :==  { mod_name = name, mod_type = MK_None, mod_imports = [], mod_imported_objects = [],
 	mod_defs = {	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macros = { ir_from = 0, ir_to = 0 },
 					def_members = [], def_funtypes = [], def_instances = [] } }
 
-//MW3 was:parseAndScanDclModule :: !Ident ![ScannedModule] !SearchPaths !*Files !*CollectAdmin
-parseAndScanDclModule :: !Ident !Position ![ScannedModule] !SearchPaths !*Files !*CollectAdmin
+parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule], !*Files, !*CollectAdmin)
-parseAndScanDclModule dcl_module import_file_position parsed_modules searchPaths files ca
+parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths files ca
 	# {ca_error, ca_fun_count, ca_rev_fun_defs, ca_predefs, ca_u_predefs, ca_hash_table}
 		= ca
 	  hash_table = ca_hash_table
 	  pea_file = ca_error.pea_file
 	  predefs = ca_u_predefs
 // MW3 was:	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module hash_table pea_file searchPaths predefs files
-	# (parse_ok, mod, hash_table, err_file, predefs, files)
-			= wantModule cWantDclFile dcl_module import_file_position hash_table pea_file searchPaths predefs files
+	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module import_file_position hash_table pea_file searchPaths predefs files
 	# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
 	| parse_ok
 		= scan_dcl_module mod parsed_modules searchPaths files ca
@@ -715,53 +715,94 @@ where
 		  mod
 		  	=	{ mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros = range }}
 		  (import_ok, parsed_modules, files, ca)
-		  		= scanModules imports [mod : parsed_modules] searchPaths files ca
+		  		= scanModules imports [mod : parsed_modules] cached_modules searchPaths files ca
 		= (pea_ok && import_ok, parsed_modules, files, ca)
 
-scanModule :: !ParsedModule !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
-	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !ScannedModule, !ScannedModule, ![ScannedModule], !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} hash_table err_file searchPaths predefs files
+scanModule :: !ParsedModule ![Ident] !Int !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!Int,!*HashTable, !*File, !*PredefinedSymbols, !*Files)
+scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_function_or_macro_index hash_table err_file searchPaths predefs files
 	# (predefIdents, predefs) = SelectPredefinedIdents predefs
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
-			,	ca_fun_count	= 0
+			,	ca_fun_count	= first_new_function_or_macro_index
 			,	ca_rev_fun_defs	= []
 			,	ca_predefs		= predefIdents
 			,	ca_u_predefs	= predefs
 			,	ca_hash_table	= hash_table
 			}
 	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitions True pdefs 0 0 0 ca
-	  fun_count	= length fun_defs
+
+	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
+	  		= scan_dcl_module mod_name mod_type files ca
+	  (import_dcls_ok, parsed_modules, files, ca)
+	  		= scanModules imports parsed_modules cached_modules searchPaths files ca
+
+	  (pea_dcl_ok,optional_dcl_mod,ca) =  collect_main_dcl_module optional_parsed_dcl_mod dcl_module_n ca
+
+	  (n_functions_and_macros_in_dcl_modules,ca) =ca!ca_fun_count
+
+	  modules = reverse parsed_modules
+
+	  import_dcl_ok = import_dcl_ok && pea_dcl_ok;
+
+	  ca = {ca & ca_hash_table=set_hte_mark 1 ca.ca_hash_table}
+
 	  (fun_defs, ca) = collectFunctions fun_defs ca
 	  (fun_range, ca) = addFunctionsRange fun_defs ca
 	  (macro_defs, ca) = collectFunctions defs.def_macros ca
 	  (macro_range, ca) = addFunctionsRange macro_defs ca
-	  (def_instances, ca)
-	  	=	collectFunctions defs.def_instances ca
+	  (def_instances, ca) = collectFunctions defs.def_instances ca
+
+	  ca = {ca & ca_hash_table=set_hte_mark 0 ca.ca_hash_table}
+
 	  (pea_ok, ca) = ca!ca_error.pea_ok
-	  (import_dcl_ok, parsed_modules, files, ca)
-	  		= scan_dcl_module mod_name mod_type searchPaths files ca
-	  (import_dcls_ok, parsed_modules, files, ca)
-	  		= scanModules imports parsed_modules searchPaths files ca
-	  {	ca_error = {pea_file = err_file}
-			,	ca_predefs		= predefs
-			,	ca_rev_fun_defs
-			,	ca_u_predefs
-			,	ca_hash_table	= hash_table
-			}
-	  	=	ca
+
+	  {	ca_error = {pea_file = err_file},	ca_predefs	= predefs, ca_rev_fun_defs, ca_u_predefs, ca_hash_table = hash_table } = ca
 	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_instances = def_instances,
 	  				def_macros = macro_range }}
-	  [dcl_mod : modules] = reverse parsed_modules
-	  (pre_def_mod, ca_u_predefs) = buildPredefinedModule ca_u_predefs
-	= (pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, reverse ca_rev_fun_defs, dcl_mod, pre_def_mod, modules, hash_table, err_file, ca_u_predefs, files)
+//	  (pre_def_mod, ca_u_predefs) = buildPredefinedModule ca_u_predefs
+	= (pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, reverse ca_rev_fun_defs, optional_dcl_mod, /*pre_def_mod,*/ modules, dcl_module_n,n_functions_and_macros_in_dcl_modules,hash_table, err_file, ca_u_predefs, files)
 where
-	scan_dcl_module :: Ident ModuleKind SearchPaths *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
-	scan_dcl_module mod_name MK_Main searchPaths files ca
-		= (True, [MakeEmptyModule mod_name], files, ca)
-	scan_dcl_module mod_name MK_None searchPaths files ca
-		= (True, [MakeEmptyModule mod_name], files, ca)
-	scan_dcl_module mod_name kind searchPaths files ca
-		= parseAndScanDclModule mod_name NoPos [] searchPaths files ca
+	scan_dcl_module :: Ident ModuleKind *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
+	scan_dcl_module mod_name MK_Main files ca
+		= (True, No,NoIndex,[], cached_modules,files, ca)
+	scan_dcl_module mod_name MK_None files ca
+		= (True, No,NoIndex,[], cached_modules,files, ca)
+	scan_dcl_module mod_name kind files ca
+		# module_n_in_cache = in_cache 0 cached_modules;
+			with
+			in_cache module_n []
+				= NoIndex
+			in_cache module_n [cached_module_ident : pmods]
+				| mod_name==cached_module_ident
+					= module_n
+					= in_cache (module_n+1) pmods
+		| module_n_in_cache<>NoIndex
+			= (True,No,module_n_in_cache,[],cached_modules,files,ca)
+		# {ca_error, ca_fun_count, ca_rev_fun_defs, ca_predefs, ca_u_predefs, ca_hash_table} = ca
+		  hash_table = ca_hash_table
+		  pea_file = ca_error.pea_file
+		  predefs = ca_u_predefs
+		# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile mod_name NoPos hash_table pea_file searchPaths predefs files
+		# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
+		| not parse_ok
+			= (False, No,NoIndex, [],cached_modules, files, ca)
+			# pdefs = mod.mod_defs
+			# (_, defs, imports, imported_objects, ca) =	reorganiseDefinitions False pdefs 0 0 0 ca
+			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
+			# cached_modules = [mod.mod_name:cached_modules]
+			# (import_ok, parsed_modules, files, ca) = scanModules imports [] cached_modules searchPaths files ca
+			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
+
+	collect_main_dcl_module (Yes mod=:{mod_defs=defs}) dcl_module_n ca
+	 #	(macro_defs, ca)  =	collectFunctions defs.def_macros ca
+		(range, ca)	=	addFunctionsRange macro_defs ca
+		(pea_ok,ca) =	ca!ca_error.pea_ok
+		mod  = { mod & mod_defs = { defs & def_macros = range }}
+	 = (pea_ok,Yes mod,ca)
+	collect_main_dcl_module No dcl_module_n ca
+		| dcl_module_n==NoIndex
+			 =	(True,Yes (MakeEmptyModule mod_name),ca)
+			 =	(True,No,ca)
 
 instance collectFunctions (ParsedInstance a) | collectFunctions a where
 	collectFunctions inst=:{pi_members} ca
@@ -1044,17 +1085,14 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 reorganiseLocalDefinitions [] ca
 	= ([], [], ca)
 
-
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix
-
 
 determineArity :: [ParsedExpr] (Optional SymbolType) -> Int
 determineArity args (Yes {st_arity})
 	=	st_arity
 determineArity args No
 	=	length args
-
 
 sameFixity :: Priority Bool -> Bool
 sameFixity (Prio _ _) is_infix

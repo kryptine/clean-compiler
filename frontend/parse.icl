@@ -107,13 +107,23 @@ makeConsExpression a1 a2 pState=:{ps_pre_def_symbols}
 class try a	 :: !Token !*ParseState -> (!Optional a, !*ParseState)
 class want a :: !*ParseState -> (!a, !*ParseState)
 
-stringToIdent :: !String !IdentClass !*ParseState -> (!Ident, !*ParseState)
-stringToIdent ident ident_class pState=:{ps_hash_table}
+stringToIdent s i p :== (ident,parse_state)
+	where
+		({boxed_ident=ident},parse_state) = stringToBoxedIdent s i p
+
+//stringToIdent :: !String !IdentClass !*ParseState -> (!Ident, !*ParseState)
+stringToBoxedIdent :: !String !IdentClass !*ParseState -> (!BoxedIdent, !*ParseState)
+stringToBoxedIdent ident ident_class pState=:{ps_hash_table}
 	# (ident, ps_hash_table) = putIdentInHashTable ident ident_class ps_hash_table
 	= (ident, { pState & ps_hash_table = ps_hash_table } )
 
-internalIdent :: !String !*ParseState -> (!Ident, !*ParseState)
-internalIdent prefix pState
+internalIdent s p :== (ident,parse_state)
+	where
+		({boxed_ident=ident},parse_state) = internaBoxedlIdent s p
+
+//internalIdent :: !String !*ParseState -> (!Ident, !*ParseState)
+internaBoxedlIdent :: !String !*ParseState -> (!BoxedIdent, !*ParseState)
+internaBoxedlIdent prefix pState
 	# ({fp_line,fp_col},pState=:{ps_hash_table})	= getPosition pState
 // MW4 was: (changed to make it compatible with conventions used in postparse)
 // 	  case_string									= prefix +++ toString fp_line +++ "_" +++ toString fp_col
@@ -246,17 +256,19 @@ isIclContext context	:== not (isDclContext context)
 cWantIclFile :== True	
 cWantDclFile :== False	
 
-// MW3 was:wantModule :: !Bool !Ident !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
 wantModule :: !Bool !Ident !Position !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
 	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
 wantModule iclmodule file_id=:{id_name} import_file_position hash_table error searchPaths pre_def_symbols files
 	# file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
 	= case openScanner file_name searchPaths files of
-		(Yes scanState, files) -> initModule file_name scanState hash_table error pre_def_symbols files
-		(No       , files) -> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
-// MW3 was:							  (False, mod, hash_table, error <<< "Could not open: " <<< file_name <<< "\n", pre_def_symbols, files)
-							  (False, mod, hash_table, error <<< import_file_position <<< ":could not open " <<< file_name <<< "\n",
-								pre_def_symbols, files)
+		(Yes scanState, files)
+			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
+			# (ok,mod,hash_table,file,pre_def_symbols,files) = initModule file_name scanState hash_table error pre_def_symbols files
+			# hash_table=set_hte_mark 0 hash_table
+			->(ok,mod,hash_table,file,pre_def_symbols,files)
+		(No, files)
+			-> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
+			  (False, mod, hash_table, error <<< import_file_position <<< ":could not open " <<< file_name <<< "\n", pre_def_symbols, files)
 where
 	initModule :: String ScanState !*HashTable !*File !*PredefinedSymbols *Files
 				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
@@ -1437,9 +1449,9 @@ adjustAttribute attr type pState
 
 stringToType :: !String !ParseState -> (!Type, !ParseState)
 stringToType name pState
-	# (id, pState) = stringToIdent name IC_Type pState
 	| isLowerCaseName name
 		= nameToTypeVar name pState
+		# (id, pState) = stringToIdent name IC_Type pState
 		= (TA (MakeNewTypeSymbIdent id 0) [], pState)
 /*	| isUpperCaseName name
 		= (TA (MakeNewTypeSymbIdent id 0) [], pState)

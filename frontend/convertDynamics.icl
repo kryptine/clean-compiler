@@ -34,9 +34,9 @@ import syntax, transform, utilities, convertcases
 
 :: IndirectionVar    :== BoundVar
 
-convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap
+convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs groups fun_defs predefined_symbols var_heap type_heaps expr_heap
+convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap
 	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_fun_heap, ci_new_functions}))
@@ -47,7 +47,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs groups fu
 							ci_used_tcs = [] })
 
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
-			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions groups imported_types [] type_heaps ci_var_heap
+			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types [] type_heaps ci_var_heap
 	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap)
 where
 	convert_groups group_nr groups global_type_instances fun_defs_and_ci

@@ -30,9 +30,7 @@ do_temporary_import_solution_XXX :== temporary_import_solution_XXX True False
 
 ::	OptimizeInfo	:==	Optional Index
 
-// XXX change !(!FileName,!LineNr) into Position
-possibly_filter_decls :: ![ImportDeclaration] ![(!Index,!Declarations)] !(!FileName,!LineNr) !*{#DclModule} !*CheckState 
-						-> (![(!Index,!Declarations)],!.{#DclModule},!.CheckState)
+possibly_filter_decls :: .[ImportDeclaration] u:[w:(.Index,y:Declarations)] (.FileName,.LineNr) *{#.DclModule} *CheckState -> (v:[x:(Index,z:Declarations)],.{#DclModule},.CheckState), [y <= z, w <= x, u <= v];
 possibly_filter_decls [] decls_of_imported_module	_ modules cs // implicit import can't go wrong
 	= (decls_of_imported_module, modules, cs)
 possibly_filter_decls listed_symbols decls_of_imported_module (file_name, line_nr) modules cs
@@ -55,21 +53,34 @@ filter_explicitly_imported_decl import_symbols [(index,{dcls_import,dcls_local,d
 		structures = flatten (map toStructure import_symbols)
 		(checked_atoms, cs)	= checkAtoms atoms cs
 		unimported = (checked_atoms, structures)
-		((dcls_import,unimported), modules, cs)	
-			= filter_decl dcls_import unimported undefined modules cs
+				
+		(dcls_import,unimported, modules, cs) = filter_decl_array 0 dcls_import unimported undefined modules cs
+
 		((dcls_local,unimported), modules, cs)	
 			= filter_decl dcls_local unimported index modules cs
 		cs_error = foldSt checkAtomError (fst unimported) cs.cs_error
 		cs_error = foldSt checkStructureError (snd unimported) cs_error
 		cs	= { cs & cs_error=cs_error }
-	|	(isEmpty dcls_import && isEmpty dcls_local && isEmpty dcls_explicit)
+	|	isEmpty dcls_import && isEmpty dcls_local && size dcls_explicit==0
 		= filter_explicitly_imported_decl import_symbols new_decls akku line_nr modules cs
-	#	local_imports	= [ { declaration & dcl_kind = STE_Imported declaration.dcl_kind index }
-							 \\ declaration <- dcls_local]
-		new_dcls_explicit	= [ (dcls, line_nr) \\ dcls<-dcls_import++local_imports ]
-		newAkku	= [(index, { dcls_import=dcls_import, dcls_local=dcls_local , dcls_explicit=new_dcls_explicit}) : akku]
+	#	local_imports	= [ { declaration & dcl_kind = STE_Imported declaration.dcl_kind index } \\ declaration <- dcls_local]
+		new_dcls_explicit	= [ ExplicitImport dcls line_nr \\ dcls<-dcls_import++local_imports ]
+
+		dcls_import = {dcls_import\\dcls_import<-dcls_import}
+
+		newAkku	= [(index, { dcls_import=dcls_import, dcls_local=dcls_local ,
+										dcls_local_for_import = {local_declaration_for_import decl index \\ decl<-dcls_local},
+//										 dcls_explicit=new_dcls_explicit}) : akku]
+										 dcls_explicit={new_dcls_explicit\\new_dcls_explicit<-new_dcls_explicit}}) : akku]
 	= filter_explicitly_imported_decl import_symbols new_decls newAkku line_nr modules cs
   where
+ 	local_declaration_for_import decl=:{dcl_kind=STE_FunctionOrMacro _} module_n
+		= decl
+	local_declaration_for_import decl=:{dcl_kind=STE_Imported _ _} module_n
+		= abort "local_declaration_for_import"
+	local_declaration_for_import decl=:{dcl_kind} module_n
+		= {decl & dcl_kind = STE_Imported dcl_kind module_n}
+
 	toAtom (ID_Function {ii_ident})				
 		= [(ii_ident, temporary_import_solution_XXX 
 							(AT_stomme_funktion_die_alle_symbolen_kann_importeren_omdat_niemand_zin_heft_oude_pragrammen_naar_de_nieuwe_syntax_te_vertalen False)
@@ -116,16 +127,16 @@ filter_explicitly_imported_decl import_symbols [(index,{dcls_import,dcls_local,d
 
 	checkAtoms l cs
 		#	groups	= grouped l
-			wrong	= filter isErrornous groups
+			wrong	= filter isErroneous groups
 			unique	= map hd groups
 		| isEmpty wrong
 			= (unique, cs)
 		= (unique, foldSt error wrong cs)
 	  where
-		isErrornous l=:[(_,AT_Type),_:_]		= True
-		isErrornous l=:[(_,AT_AlgType),_:_]		= True
-		isErrornous l=:[(_,AT_RecordType),_:_]	= True
-		isErrornous _							= False
+		isErroneous l=:[(_,AT_Type),_:_]		= True
+		isErroneous l=:[(_,AT_AlgType),_:_]		= True
+		isErroneous l=:[(_,AT_RecordType),_:_]	= True
+		isErroneous _							= False
 		
 		error [(ident, atomType):_] cs
 			= { cs & cs_error = checkError ("type "+++ident.id_name) "imported more than once in one from statement"
@@ -210,6 +221,17 @@ filter_decl [decl:decls] unimported index modules cs
 
 		= (([decl:recurs],unimported), modules, cs)
 	= 	filter_decl decls unimported index modules cs
+
+filter_decl_array :: !Int {!.Declaration} ([(Ident,AtomType)],[(Ident,StructureInfo,StructureType,Optional Int)]) Int *{#DclModule} *CheckState -> (!.[Declaration],!([(Ident,AtomType)],![(Ident,StructureInfo,StructureType,Optional Int)]),!.{#DclModule},!.CheckState);
+filter_decl_array decl_index decls unimported index modules cs
+	| decl_index<size decls
+		# (decl,decls) = decls![decl_index]
+		# ((appears,unimported), modules, cs) = decl_appears decl unimported index modules cs
+		| appears
+			# (recurs, unimported, modules, cs) = filter_decl_array (decl_index+1) decls unimported index modules cs
+			= ([decl:recurs],unimported, modules, cs)
+		= 	filter_decl_array (decl_index+1) decls unimported index modules cs
+		= ([], unimported, modules, cs)
 	
 decl_appears :: !Declaration !ExplicitImports !Index !*{#DclModule} !*CheckState
 			 -> (!(!Bool, !ExplicitImports), !*{#DclModule}, !*CheckState)
@@ -254,7 +276,6 @@ decl_appears {dcl_ident, dcl_kind, dcl_index} unimported index modules cs
 	isAtom STE_Class				= True
 	isAtom STE_Type					= True
 	isAtom STE_Instance				= True
-
 
 elementAppears :: .StructureType Ident !.Int !(.a,![(Ident,.StructureInfo,.StructureType,Optional .Int)]) !.Int !*{#.DclModule} !*CheckState -> (!(!Bool,(!.a,![(Ident,StructureInfo,StructureType,Optional Int)])),!.{#DclModule},!.CheckState);
 elementAppears imported_st dcl_ident dcl_index (atomicImports, structureImports) index modules cs
@@ -516,19 +537,21 @@ element_appears_in_struct imported_st element_ident dcl_index struct_ident index
 	,	ccs_error					:: !.ErrorAdmin
 	,	ccs_heap_changes_accu		:: ![SymbolPtr]
 	}
+
 :: *CheckCompletenessStateBox = { box_ccs :: !*CheckCompletenessState }
 
 :: CheckCompletenessInput =
 	{	cci_line_nr				:: !Int
 	,	cci_filename			:: !String
 	,	cci_expl_imported_ident	:: !Ident
+	,	cci_main_dcl_module_n::!Int
 	}
+
 :: CheckCompletenessInputBox = { box_cci :: !CheckCompletenessInput }
 
-checkExplicitImportCompleteness :: !String ![(!Declaration,!Int)]
-								!*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState 
-								-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
-checkExplicitImportCompleteness filename dcls_explicit dcl_modules icl_functions expr_heap 
+checkExplicitImportCompleteness :: !String !Int ![ExplicitImport] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState 
+				-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
+checkExplicitImportCompleteness filename main_dcl_module_n dcls_explicit dcl_modules icl_functions expr_heap 
 								cs=:{cs_symbol_table, cs_error}
 	#! nr_icl_functions = size icl_functions
 	   box_ccs = { ccs_dcl_modules = dcl_modules, ccs_icl_functions = icl_functions,
@@ -543,15 +566,15 @@ checkExplicitImportCompleteness filename dcls_explicit dcl_modules icl_functions
 	   cs = { cs & cs_symbol_table = ccs_symbol_table, cs_error = ccs_error }
 	= (ccs_dcl_modules, ccs_icl_functions, ccs_expr_heap, cs)
   where
-	checkCompleteness :: !String !(!Declaration, !Int) *CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompleteness filename ({dcl_ident, dcl_index, dcl_kind=STE_FunctionOrMacro _}, line_nr) ccs 
-		= checkCompletenessOfMacro filename dcl_ident dcl_index line_nr ccs
-	checkCompleteness filename ({dcl_ident, dcl_index, dcl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index}, line_nr) ccs 
-		= checkCompletenessOfMacro filename dcl_ident dcl_index line_nr ccs
-	checkCompleteness filename ({dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index}, line_nr) ccs 
+	checkCompleteness :: !String !ExplicitImport *CheckCompletenessStateBox -> *CheckCompletenessStateBox
+	checkCompleteness filename (ExplicitImport {dcl_ident, dcl_index, dcl_kind=STE_FunctionOrMacro _} line_nr) ccs 
+		= checkCompletenessOfMacro filename dcl_ident dcl_index main_dcl_module_n line_nr ccs
+	checkCompleteness filename (ExplicitImport {dcl_ident, dcl_index, dcl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index} line_nr) ccs 
+		= checkCompletenessOfMacro filename dcl_ident dcl_index main_dcl_module_n line_nr ccs
+	checkCompleteness filename (ExplicitImport {dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index} line_nr) ccs 
 		#! ({dcl_common,dcl_functions}, ccs) = ccs!box_ccs.ccs_dcl_modules.[mod_index]
-		   cci = { box_cci = { cci_line_nr = line_nr, cci_filename = filename, cci_expl_imported_ident = dcl_ident }}
-/* XXX
+		   cci = { box_cci = { cci_line_nr = line_nr, cci_filename = filename, cci_expl_imported_ident = dcl_ident,cci_main_dcl_module_n=main_dcl_module_n }}
+	/* XXX
 	this case expression causes the compiler to be not self compilable anymore (12.7.2000). The bug is probably
 	in module refmark. The corresponding continuation function can be compiled
 		= case expl_imp_kind of
@@ -562,7 +585,7 @@ checkExplicitImportCompleteness filename dcls_explicit dcl_modules icl_functions
 			STE_Member			-> check_completeness dcl_common.com_member_defs.[dcl_index] cci ccs
 			STE_Instance		-> check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
 			STE_DclFunction		-> check_completeness dcl_functions.[dcl_index] cci ccs
-*/
+	*/
 		= continuation expl_imp_kind dcl_common dcl_functions cci ccs
 	  where
 		continuation STE_Type dcl_common dcl_functions cci ccs
@@ -579,19 +602,19 @@ checkExplicitImportCompleteness filename dcls_explicit dcl_modules icl_functions
 			= check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
 		continuation STE_DclFunction dcl_common dcl_functions cci ccs
 			= check_completeness dcl_functions.[dcl_index] cci ccs
-	
-	checkCompletenessOfMacro :: !String !Ident !Index !Int *CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompletenessOfMacro filename dcl_ident dcl_index line_nr ccs
+
+	checkCompletenessOfMacro :: !String !Ident !Index !Int !Int *CheckCompletenessStateBox -> *CheckCompletenessStateBox
+	checkCompletenessOfMacro filename dcl_ident dcl_index main_dcl_module_n line_nr ccs
 		#! ({fun_body}, ccs) = ccs!box_ccs.ccs_icl_functions.[dcl_index]
 		   ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[dcl_index] = True }
-		   cci = { box_cci = { cci_line_nr = line_nr, cci_filename = filename, cci_expl_imported_ident = dcl_ident }}
+		   cci = { box_cci = { cci_line_nr = line_nr, cci_filename = filename, cci_expl_imported_ident = dcl_ident,cci_main_dcl_module_n=main_dcl_module_n }}
 		= check_completeness fun_body cci ccs
 
 	replace_ste_with_previous :: !SymbolPtr !*SymbolTable -> .SymbolTable
 	replace_ste_with_previous changed_ste_ptr symbol_table
 		#! ({ste_previous}, symbol_table) = readPtr changed_ste_ptr symbol_table
 		= writePtr changed_ste_ptr ste_previous symbol_table
-	
+
 instance toString STE_Kind where
 	toString (STE_FunctionOrMacro _)	= "function/macro"
 	toString STE_Type 					= "type"
@@ -807,16 +830,28 @@ instance check_completeness SymbIdent where
 				-> check_whether_ident_is_imported symb_name STE_Constructor cci ccs
 			SK_Function global_index
 				-> check_completeness_for_function symb_name global_index ste_fun_or_macro cci ccs
+			SK_LocalMacroFunction function_index
+				-> check_completeness_for_local_macro_function symb_name function_index ste_fun_or_macro cci ccs
 			SK_OverloadedFunction global_index
 				-> check_completeness_for_function symb_name global_index STE_Member cci ccs
   			SK_Macro global_index
   				-> check_completeness_for_function symb_name global_index ste_fun_or_macro cci ccs
   	  where
 		check_completeness_for_function symb_name {glob_object,glob_module} wanted_ste_kind cci ccs
-			| glob_module<>cIclModIndex	
+			| glob_module<>cci.box_cci.cci_main_dcl_module_n
 				// the function that is referred from within a macro is a DclFunction
 				// -> must be global -> has to be imported
 				= check_whether_ident_is_imported symb_name wanted_ste_kind cci ccs
+			#! (fun_def, ccs)	= ccs!box_ccs.ccs_icl_functions.[glob_object]
+			// otherwise the function was defined locally in a macro
+			// it is not a consequence, but it's type and body are consequences !
+			#! (already_visited, ccs) = ccs!box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
+			| already_visited
+				= ccs
+			#! ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[glob_object] = True }
+			= check_completeness fun_def cci ccs
+
+		check_completeness_for_local_macro_function symb_name glob_object wanted_ste_kind cci ccs
 			#! (fun_def, ccs)	= ccs!box_ccs.ccs_icl_functions.[glob_object]
 			// otherwise the function was defined locally in a macro
 			// it is not a consequence, but it's type and body are consequences !

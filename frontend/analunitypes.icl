@@ -60,7 +60,7 @@ removeTopClasses _ _
 	,	scs_rec_appls		:: ![RecTypeApplication (Sign, [SignClassification])]
 	}
 
-determineSignClassOfTypeDef :: !Int !Int ![ATypeVar] !TypeDefInfo ![SignClassification] {# CommonDefs} !*TypeVarHeap !*TypeDefInfos
+determineSignClassOfTypeDef :: !Int !Int ![ATypeVar] !TypeDefInfo ![SignClassification] !{# CommonDefs} !*TypeVarHeap !*TypeDefInfos
 	-> (!SignClassification, !*TypeVarHeap,!*TypeDefInfos)
 determineSignClassOfTypeDef type_index module_index td_args {tdi_classification,tdi_cons_vars,tdi_group_vars,tdi_group,tdi_group_nr}
 			hio_signs ci type_var_heap td_infos
@@ -309,8 +309,7 @@ propClassification type_index module_index hio_props defs type_var_heap td_infos
 	  (td_info, td_infos) = td_infos![module_index].[type_index]
 	= determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
 
-
-determinePropClassOfTypeDef :: !Int !Int ![ATypeVar] !TypeDefInfo ![PropClassification] {# CommonDefs} !*TypeVarHeap !*TypeDefInfos
+determinePropClassOfTypeDef :: !Int !Int ![ATypeVar] !TypeDefInfo ![PropClassification] !{# CommonDefs} !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification,!*TypeVarHeap, !*TypeDefInfos)
 determinePropClassOfTypeDef type_index module_index td_args {tdi_classification, tdi_kinds, tdi_group, tdi_group_vars, tdi_cons_vars, tdi_group_nr}
 			hio_props ci type_var_heap td_infos
