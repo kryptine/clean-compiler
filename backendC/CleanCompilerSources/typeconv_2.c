@@ -539,10 +539,7 @@ static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool p
 	{	TypeNode arg_type_node = node -> type_node_arguments -> type_arg_node;
 		if (brackets)
 			FPutC ('(', StdListTypes);
-		if ((! arg_type_node -> type_node_is_var) && arg_type_node -> type_node_symbol -> symb_kind == fun_type)
-			PrintArgument (node -> type_node_arguments, cPrintBrackets, cNotInAStrictContext, cDoPrintAttribute);
-		else
-			PrintArgument (node -> type_node_arguments, cDontPrintBrackets, cNotInAStrictContext, cDoPrintAttribute);
+		PrintArgument (node -> type_node_arguments, cPrintBrackets, cNotInAStrictContext, cDoPrintAttribute);
 		FPutS (" -> ", StdListTypes);
 		PrintArgument (node -> type_node_arguments -> type_arg_next, cDontPrintBrackets, cNotInAStrictContext, cDoPrintAttribute);
 		if (brackets)
