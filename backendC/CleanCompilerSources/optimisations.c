@@ -1421,6 +1421,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 			}
 		}
 #endif
+
 		if (arg_node->node_kind==NodeIdNode && (arg_node->node_node_id->nid_mark & NID_LIFTED_BY_OPTIMISE) && arg_node->node_node_id->nid_forward_node_id!=NULL){
 			arg_node_id=arg_node->node_node_id->nid_forward_node_id;
 			--arg_node_id->nid_refcount;
@@ -3283,8 +3284,15 @@ static void ExamineSymbolApplication (struct node *node)
 
 	symbol=node->node_symbol;
 
-	if (symbol->symb_kind!=definition)
+	if (symbol->symb_kind!=definition){
+		if (symbol->symb_kind==cons_symb && symbol->symb_head_strictness==4){
+			if (node->node_arity<2)
+				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_CURRIED_MASK;
+			else if (IsLazyState (node->node_state))
+				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_LAZILY_MASK;
+		}
 		return;
+	}
 		
 	sdef=symbol->symb_def;
 
