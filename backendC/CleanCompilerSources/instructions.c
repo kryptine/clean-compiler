@@ -1292,7 +1292,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			function_state_p = array_def->sdef_rule->rule_state_p;
 			break;
 		default:
-			error_in_function ("CallArrayFunction RWS");
+			error_in_function ("CallArrayFunction");
 			break;
 	}
 /* RWS */
@@ -3284,7 +3284,12 @@ void GenSystemImports (void)
 void GenParameters (Bool input, Parameters params, int asp, int bsp)
 {
 	int is_first_parameter;
-		
+
+/* RWS ... ??? */	
+	if (params==NULL)
+		return;
+/* ... RWS */	
+
 	if (input)
 		put_instruction_ (Iin);
 	else
