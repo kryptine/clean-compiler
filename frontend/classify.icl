@@ -204,11 +204,21 @@ add_dep_count (fi,ai) rc
 
 combine_counts :: !RefCounts !RefCounts -> .RefCounts
 combine_counts c1 c2
-	= {Seq 0 [|rc1,rc2] \\ rc1 <-: c1 & rc2 <-: c2}
+	= {combine rc1 rc2 \\ rc1 <-: c1 & rc2 <-: c2}
+where
+	combine (Seq 0 [|]) rc2 = rc2
+	combine rc1 (Seq 0 [|]) = rc1
+	combine (Seq i1 [|]) (Seq i2 l) = Seq (i1+i2) l
+	combine (Seq i1 l) (Seq i2 [|]) = Seq (i1+i2) l
+	combine rc1 rc2 = Seq 0 [|rc1,rc2]
 
 unify_counts :: !RefCounts !RefCounts -> RefCounts
 unify_counts c1 c2
-	= {Par 0 [|rc1,rc2] \\ rc1 <-: c1 & rc2 <-: c2}
+	= {unify rc1 rc2 \\ rc1 <-: c1 & rc2 <-: c2}
+where
+	unify (Seq 0 [|]) rc2 = rc2
+	unify rc1 (Seq 0 [|]) = rc1
+	unify rc1 rc2 = Par 0 [|rc1,rc2]
 
 show_counts group_members group_counts
 	# (_,group_counts) = foldSt show group_members (0,group_counts)
