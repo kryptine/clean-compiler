@@ -301,9 +301,7 @@ where
 		  (tb_rhs, ci) = convertDynamics {global_type_instances & cinp_st_args = tb_args} vars_with_types No tb_rhs ci
 		= (TransformedBody {tb_args = tb_args,tb_rhs = tb_rhs}, ci)
 	convert_dynamics_in_body global_type_instances other fun_type ci
-		| True <<- ("Martijn",other)
-		= abort "!!!unexpected value in 'convert dynamics.convert_dynamics_in_body'"
-import RWSDebug
+		= abort "unexpected value in 'convert dynamics.convert_dynamics_in_body'"
 
 bindVarsToTypes2 st_context vars types typed_vars common_defs
 	:== bindVarsToTypes vars (addTypesOfDictionaries common_defs st_context types) typed_vars
