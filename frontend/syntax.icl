@@ -1314,6 +1314,7 @@ cIsNotStrict	:== False
 ::	CoercionPosition
 	=	CP_Expression !Expression
 	|	CP_FunArg !Ident !Int // Function symbol, argument position (>=1)
+	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
 
 ::	IdentPos =
 	{	ip_ident	:: !Ident
@@ -2168,7 +2169,10 @@ where
 
 instance <<< CoercionPosition
 where
-	(<<<) file (CP_FunArg fun_name arg_nr) = file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_FunArg fun_name arg_nr)
+		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_LiftedFunArg fun_name arg_name)
+		= file <<< "lifted argument " <<< arg_name <<< " of " <<< readable fun_name
 	(<<<) file (CP_Expression expression) = show_expression file expression
 	where
 		show_expression file (Var {var_name})

@@ -1345,6 +1345,7 @@ instance == OverloadedListType
 ::	CoercionPosition
 	=	CP_Expression !Expression
 	|	CP_FunArg !Ident !Int // Function symbol, argument position (>=1)
+	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
 	
 ::	IdentPos =
 	{	ip_ident	:: !Ident
