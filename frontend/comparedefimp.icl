@@ -19,7 +19,7 @@ implementation module comparedefimp
 	(see type HeapWithNumber). The same happens with attribute variables and variables in macros/functions.
 */
 
-import syntax, checksupport, compare_constructor, utilities, StdCompare //, RWSDebug
+import syntax, checksupport, compare_constructor, utilities, StdCompare
 
 :: TypesCorrespondState =
 		{	tc_type_vars
@@ -34,8 +34,8 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare //, RWSD
 				:: !Conversions
 		, 	tc_visited_syn_types	// to detect cycles in type synonyms
 				:: !.{#Bool}
-		, tc_main_dcl_module_n
-			:: !Int
+		,	tc_main_dcl_module_n
+				:: !Int
 		}
 
 :: TypesCorrespondMonad
@@ -56,6 +56,8 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare //, RWSD
 				::	!.TypesCorrespondState
 		,	ec_untransformed
 				::	!{! FunctionBody }
+		,	ec_function_conversions
+				::	!Conversions
 		}
 		
 :: ExpressionsCorrespondMonad
@@ -139,7 +141,8 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n dcl_modules
 						size_uncopied_icl_defs.[cInstanceDefs] conversion_table.[cInstanceDefs]
 						dcl_common.com_instance_defs icl_com_instance_defs tc_state error_admin
 			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
-					= compareMacrosWithConversion conversion_table.[cMacroDefs] dcl_macros untransformed
+					= compareMacrosWithConversion conversion_table.[cMacroDefs] conversion_table.[cFunctionDefs]
+												 dcl_macros untransformed
 								 				 icl_functions hp_var_heap hp_expression_heap tc_state error_admin
 			  (icl_functions, tc_state, error_admin)
 			  		= compareFunctionTypesWithConversions conversion_table.[cFunctionDefs]
@@ -221,13 +224,14 @@ generate_error message iclDef iclDefs tc_state error_admin
 	  error_admin = checkError ident_pos.ip_ident message error_admin
 	= (iclDefs, tc_state, popErrorAdmin error_admin)
 
-compareMacrosWithConversion conversions macro_range untransformed icl_functions var_heap expr_heap tc_state error_admin
+compareMacrosWithConversion conversions function_conversions macro_range untransformed icl_functions var_heap expr_heap tc_state error_admin
 	#! nr_of_functions = size icl_functions
 	# correspondences = createArray nr_of_functions cNoCorrespondence
 	  ec_state = { ec_correspondences = correspondences, ec_var_heap = initial_hwn var_heap, 
 	  				ec_expr_heap = expr_heap, ec_icl_functions = icl_functions,
 	  				ec_error_admin = error_admin, ec_tc_state = tc_state,
-	  				ec_untransformed = untransformed }
+	  				ec_untransformed = untransformed,
+	  				ec_function_conversions = function_conversions }
 	  ec_state = iFoldSt (compareMacroWithConversion conversions macro_range.ir_from) macro_range.ir_from macro_range.ir_to
 	  						ec_state
 	  {ec_icl_functions, ec_var_heap, ec_expr_heap, ec_error_admin, ec_tc_state} = ec_state
@@ -938,6 +942,11 @@ e_corresponds_VarInfoPtr ident dclPtr iclPtr ec_state=:{ec_var_heap}
 e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Function dcl_glob_index} 
 					icl_app_symb=:{symb_kind=SK_Function icl_glob_index}
 					ec_state
+	#! main_dcl_module_n = ec_state.ec_tc_state.tc_main_dcl_module_n
+	| dcl_glob_index.glob_module==main_dcl_module_n && icl_glob_index.glob_module==main_dcl_module_n
+		| ec_state.ec_function_conversions.[dcl_glob_index.glob_object]<>icl_glob_index.glob_object
+			= give_error symb_name ec_state
+		= ec_state
 	| dcl_glob_index<>icl_glob_index
 		= give_error symb_name ec_state
 	= ec_state
