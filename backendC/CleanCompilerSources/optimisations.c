@@ -1847,6 +1847,7 @@ void add_sizes_of_states_of_node_ids (NodeIdListElementP node_id_list,int *total
 	}	
 }
 
+#if BOXED_RECORDS
 static int compute_root_n_not_updated_words (NodeP push_node,NodeP node,int node_a_size)
 {
 	NodeIdListElementP node_id_list;
@@ -1905,6 +1906,7 @@ static int compute_root_n_not_updated_words (NodeP push_node,NodeP node,int node
 	
 	return n_not_updated_words;
 }
+#endif
 
 static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_size)
 {
@@ -1965,6 +1967,7 @@ static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_si
 	return n_not_updated_words;
 }
 
+#if BOXED_RECORDS
 static Bool insert_root_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,int node_a_size,int node_b_size)
 {
 	FreeUniqueNodeIdsP f_node_id;
@@ -2087,6 +2090,7 @@ static Bool insert_root_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_
 
 	return True;
 }
+#endif
 
 static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,int node_a_size,int node_b_size)
 {
@@ -2284,6 +2288,7 @@ static Bool try_insert_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f
 	return False;
 }
 
+#if BOXED_RECORDS
 static Bool try_insert_root_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids)
 {
 	if (node->node_state.state_type==SimpleState && node->node_state.state_kind!=SemiStrict){
@@ -2332,6 +2337,7 @@ static Bool try_insert_root_constructor_update_node (NodeP node,FreeUniqueNodeId
 
 	return False;
 }
+#endif
 
 static NodeP try_insert_function_update_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 {
@@ -2776,7 +2782,7 @@ static void optimise_then_or_else (NodeP node,NodeDefP node_defs,FreeUniqueNodeI
 		ArgP arg;
 
 		
-#if 1
+#if BOXED_RECORDS
 		if (f_node_ids!=NULL && try_insert_root_constructor_update_node (node,&f_node_ids)){
 			unsigned int n,argument_overwrite_bits;
 
@@ -2822,8 +2828,7 @@ static void optimise_then_or_else (NodeP node,NodeDefP node_defs,FreeUniqueNodeI
 
 		optimise_strict_constructor_in_lazy_context (node,&no_free_unique_node_ids);
 
-
-#if 1
+#if BOXED_RECORDS
 			}
 #endif
 
@@ -3134,8 +3139,7 @@ static void optimise_root_node (NodeP node,NodeDefP node_defs,FreeUniqueNodeIdsP
 			if (node->node_kind==NormalNode){
 				ArgS *arg;
 
-
-#if 1
+#if BOXED_RECORDS
 				if (f_node_ids!=NULL && try_insert_root_constructor_update_node (node,&f_node_ids)){
 					unsigned int n,argument_overwrite_bits;
 
@@ -3151,7 +3155,6 @@ static void optimise_root_node (NodeP node,NodeDefP node_defs,FreeUniqueNodeIdsP
 					}
 				} else {
 #endif
-
 
 				optimise_normal_node (node);
 				
@@ -3181,11 +3184,9 @@ static void optimise_root_node (NodeP node,NodeDefP node_defs,FreeUniqueNodeIdsP
 
 				optimise_strict_constructor_in_lazy_context (node,&no_free_unique_node_ids);
 
-
-#if 1
+#if BOXED_RECORDS
 			}
 #endif
-
 
 			} else
 				optimise_node (node,&f_node_ids);
