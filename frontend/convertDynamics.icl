@@ -3,6 +3,9 @@ implementation module convertDynamics
 import syntax, transform, utilities, convertcases
 // Optional
 USE_TUPLES tuple b :== b;		// change also StdDynamic.icl and recompile all applications
+
+APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== no
+
 import type_io;
 
 ::	*ConversionInfo =
@@ -963,7 +966,7 @@ instance toString GlobalTCType
 where
 	toString (GTT_Basic basic_type)							= toString basic_type
 	toString GTT_Function									= " -> "
-	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ "'" +++ mod_name
+	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
 
 instance toString BasicType
 where

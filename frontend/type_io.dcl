@@ -1,5 +1,9 @@
 definition module type_io
 
+// WARNING: It is essential to report changes in this module to martijnv@cs.kun.nl
+//			because the binary format for type-files is used by the dynamic run-time
+//			system.
+
 import scanner, general, Heap, typeproperties, utilities, checksupport
 
 import StdEnv

@@ -1,76 +1,26 @@
 implementation module type_io
 
-import StdEnv, compare_constructor
+// WARNING: It is essential to report changes in this module to martijnv@cs.kun.nl
+//			because the binary format for type-files is used by the dynamic run-time
+//			system.
 
+import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities, checksupport
+
+// normal form:
+// -	type variables in type definitions are normalized by checkTypeDef in the
+//		module checktypes.icl. The position of a type variable in the left-hand
+//		side of a type constructor is used.
+// -	algebraic datatypes; constructors are alphabetically ordered in this 
+//		module
+//
+// unsupported:
+// - 	type synonyms
+// - 	ADTs
 
 //import DebugUtilities;
 F a b :== b;
 
-// Unsupported:
-// - type synonyms, expanded version must be stored. Which function in the compiler
-//   expands synonyms correctly.
-// - abstract data type, what should be written?
-//
-
-// Records:
-// - ordered fields
-//
-// Constructors:
-// - unordered
-
-
-/*
-::	TypeRhs	= AlgType ![DefinedSymbol]
-			| SynType !AType
-			| RecordType !RecordType
-			| AbstractType !BITVECT
-			| UnknownType
-			
-
-	{	ds_ident		:: !Ident
-	,	ds_arity		:: !Int
-	,	ds_index		:: !Index
-	}
-	
-	
-::	RecordType =
-	{	rt_constructor	:: !DefinedSymbol
-	,	rt_fields		:: !{# FieldSymbol}
-	}
-	
-::	FieldSymbol =
-	{	fs_name			:: !Ident
-	,	fs_var			:: !Ident
-	,	fs_index		:: !Index
-	}
-	
-::	ConsDef =
-	{	cons_symb			:: !Ident
-	,	cons_type			:: !SymbolType
-	,	cons_arg_vars		:: ![[ATypeVar]]
-	,	cons_priority		:: !Priority
-	,	cons_index			:: !Index
-	,	cons_type_index		:: !Index
-	,	cons_exi_vars		:: ![ATypeVar]
-//	,	cons_exi_attrs		:: ![AttributeVar]
-	,	cons_type_ptr		:: !VarInfoPtr
-	,	cons_pos			:: !Position
-	}
-	
-::	TypeDef type_rhs =
- 	{	td_name			:: !Ident
-	,	td_index		:: !Int
-	,	td_arity		:: !Int
-	,	td_args			:: ![ATypeVar]
-	,	td_attrs		:: ![AttributeVar]
-	,	td_context		:: ![TypeContext]
-	,	td_rhs			:: !type_rhs
-	,	td_attribute	:: !TypeAttribute
-	,	td_pos			:: !Position
-	}
-
-*/
 class NormaliseTypeDef a 
 where
 	normalise_type_def :: a -> a
@@ -90,42 +40,7 @@ instance NormaliseTypeDef TypeDef rhs | NormaliseTypeDef rhs
 where
 	normalise_type_def type_def=:{td_args,td_arity}
 		= type_def
-		
-			
-	
-	
-
-/*
-
-::	TypeVar =
-	{	tv_name				:: !Ident
-	,	tv_info_ptr			:: !TypeVarInfoPtr
-	}
-
-::	ATypeVar =
-	{	atv_attribute		:: !TypeAttribute
-	,	atv_annotation		:: !Annotation
-	,	atv_variable		:: !TypeVar
-	}
-	
-::	TypeDef type_rhs =
- 	{	td_name			:: !Ident
-	,	td_index		:: !Int
-	,	td_arity		:: !Int
-	,	td_args			:: ![ATypeVar]			// example Tree a b = ... field is [a,b]
-	,	td_attrs		:: ![AttributeVar]
-	,	td_context		:: ![TypeContext]
-	,	td_rhs			:: !type_rhs
-	,	td_attribute	:: !TypeAttribute
-	,	td_pos			:: !Position
-	}
-*/
-// CommonDefs
-// TypeDef
-loop []
-	= ""
-loop [{ds_ident={id_name}}:xs]
-	= id_name +++ ", " +++ (loop xs)			
+				
 	
 class WriteTypeInfo a 
 where
@@ -142,9 +57,11 @@ where
 	
 instance WriteTypeInfo ConsDef
 where 
-	write_type_info {cons_symb,cons_arg_vars,cons_priority,cons_index,cons_type_index,cons_exi_vars} tcl_file
+	write_type_info {cons_symb,cons_type,cons_arg_vars,cons_priority,cons_index,cons_type_index,cons_exi_vars} tcl_file
 		# tcl_file
 			= write_type_info cons_symb tcl_file
+		# tcl_file
+			= write_type_info cons_type tcl_file
 		# tcl_file
 			= write_type_info cons_arg_vars tcl_file
 		# tcl_file
@@ -303,7 +220,163 @@ where
 		# tcl_file
 			= write_type_info fs_index tcl_file
 		= tcl_file
-			
+		
+// NEW ->
+instance WriteTypeInfo SymbolType
+where
+	write_type_info {st_vars,st_args,st_arity,st_result} tcl_file
+		# tcl_file
+			= write_type_info st_vars tcl_file
+		# tcl_file
+			= write_type_info st_args tcl_file
+		# tcl_file
+			= write_type_info st_arity tcl_file
+		# tcl_file
+			= write_type_info st_result tcl_file
+		= tcl_file
+		
+instance WriteTypeInfo AType
+where
+	write_type_info {/*at_attribute,*/ at_annotation,at_type} tcl_file
+//		# tcl_file
+//			= write_type_info at_attribute tcl_file
+		# tcl_file
+			= write_type_info at_annotation tcl_file
+		# tcl_file
+			= write_type_info at_type tcl_file
+		= tcl_file
+
+
+TypeTACode			=: (toChar 9)		// TA
+TypeArrowCode 		=: (toChar 10)		// -->
+TypeConsApplyCode	=: (toChar 11)		// :@:
+TypeTBCode			=: (toChar 12)		// TB
+TypeGTVCode			=: (toChar 13)		// GTV
+TypeTVCode			=: (toChar 14)		// TV
+TypeTQVCode			=: (toChar 15)		// TempTQV
+TypeTECode			=: (toChar 16)		// TE
+
+BT_IntCode			=: (toChar 17)	
+BT_CharCode			=: (toChar 18)
+BT_RealCode			=: (toChar 19)
+BT_BoolCode			=: (toChar 20)
+BT_DynamicCode		=: (toChar 21)
+BT_FileCode			=: (toChar 22)
+BT_WorldCode		=: (toChar 23)
+BT_StringCode		=: (toChar 24)
+
+instance WriteTypeInfo Type
+where
+	write_type_info (TA type_symb_ident atypes) tcl_file
+		# tcl_file
+			= fwritec TypeTACode tcl_file
+		# tcl_file
+			= write_type_info type_symb_ident tcl_file
+		# tcl_file
+			= write_type_info atypes tcl_file
+		= tcl_file
+
+	write_type_info (atype1 --> atype2) tcl_file
+		# tcl_file
+			= fwritec TypeArrowCode tcl_file
+		# tcl_file
+			= write_type_info atype1 tcl_file
+		# tcl_file
+			= write_type_info atype2 tcl_file
+		= tcl_file
+		
+	write_type_info (cons_variable :@: atypes) tcl_file
+		# tcl_file
+			= fwritec TypeConsApplyCode tcl_file
+		# tcl_file
+			= write_type_info cons_variable tcl_file
+		# tcl_file
+			= write_type_info atypes tcl_file
+		= tcl_file
+		
+	write_type_info tb=:(TB basic_type) tcl_file
+		# tcl_file
+			= case basic_type of
+				BT_Int		-> fwritec BT_IntCode tcl_file
+				BT_Char		-> fwritec BT_CharCode tcl_file
+				BT_Real		-> fwritec BT_RealCode tcl_file
+				BT_Bool		-> fwritec BT_BoolCode tcl_file
+				BT_Dynamic	-> fwritec BT_DynamicCode tcl_file
+				BT_File		-> fwritec BT_FileCode tcl_file
+				BT_World	-> fwritec BT_WorldCode tcl_file
+				BT_String type
+					# tcl_file
+						= fwritec BT_StringCode tcl_file
+					# tcl_file
+						= write_type_info type tcl_file
+					-> tcl_file
+				_
+					-> abort "mismatch" ---> tb
+		= tcl_file
+	
+	write_type_info (GTV type_var) tcl_file
+		# tcl_file
+			= fwritec TypeGTVCode tcl_file
+		# tcl_file
+			= write_type_info type_var tcl_file
+		= tcl_file
+
+	write_type_info (TV type_var) tcl_file
+		# tcl_file
+			= fwritec TypeTVCode tcl_file
+		# tcl_file
+			= write_type_info type_var tcl_file
+		= tcl_file
+		
+	write_type_info (TQV type_var) tcl_file
+		# tcl_file
+			= fwritec TypeTQVCode tcl_file
+		# tcl_file
+			= write_type_info type_var tcl_file
+		= tcl_file	
+
+	write_type_info TE tcl_file
+		# tcl_file
+			= fwritec TypeTECode tcl_file
+		= tcl_file	
+	
+	
+ConsVariableCVCode		=: (toChar 25)	
+ConsVariableTempCVCode	=: (toChar 26)
+ConsVariableTempQCVCode	=: (toChar 27)
+
+instance WriteTypeInfo ConsVariable
+where
+	write_type_info (CV type_var) tcl_file
+		# tcl_file
+			= fwritec ConsVariableCVCode tcl_file
+		# tcl_file
+			= write_type_info type_var tcl_file
+		= tcl_file	
+
+	write_type_info (TempCV temp_var_id) tcl_file
+		# tcl_file
+			= fwritec ConsVariableTempCVCode tcl_file
+		# tcl_file
+			= write_type_info temp_var_id tcl_file
+		= tcl_file	
+		
+	write_type_info (TempQCV temp_var_id) tcl_file
+		# tcl_file
+			= fwritec ConsVariableTempQCVCode tcl_file
+		# tcl_file
+			= write_type_info temp_var_id tcl_file
+		= tcl_file	
+
+instance WriteTypeInfo TypeSymbIdent
+where
+	write_type_info {type_name,type_arity} tcl_file
+		# tcl_file
+			= write_type_info type_name tcl_file
+		# tcl_file
+			= write_type_info type_arity tcl_file
+		= tcl_file
+
 // basic and structural write_type_info's
 instance WriteTypeInfo Int 
 where
@@ -507,21 +580,27 @@ where
 	read_type_info tcl_file
 		# (ok1,cons_symb,tcl_file)
 			= read_type_info tcl_file
-		# (ok2,cons_arg_vars,tcl_file)
+		  ok2 = True
+		  cons_type = undef
+//		# (ok2,cons_type,tcl_file)
+//			= read_type_info tcl_file
+			
+		# (ok3,cons_arg_vars,tcl_file)
 			= read_type_info tcl_file
-		# (ok3,cons_priority,tcl_file)
+		# (ok4,cons_priority,tcl_file)
 			= read_type_info tcl_file
 
-		# (ok4,cons_index,tcl_file)
+		# (ok5,cons_index,tcl_file)
 			= read_type_info tcl_file
-		# (ok5,cons_type_index,tcl_file)
+		# (ok6,cons_type_index,tcl_file)
 			= read_type_info tcl_file
-		# (ok6,cons_exi_vars,tcl_file)
+		# (ok7,cons_exi_vars,tcl_file)
 			= read_type_info tcl_file
 			
 		# consdef
 			= { default_elem &
 				cons_symb			= cons_symb
+			,	cons_type			= cons_type
 			,	cons_arg_vars		= cons_arg_vars
 			,	cons_priority		= cons_priority
 			
@@ -529,7 +608,7 @@ where
 			,	cons_type_index		= cons_type_index
 			,	cons_exi_vars		= cons_exi_vars
 			}
-		= (ok1&&ok2&&ok3&&ok4&&ok5&&ok6,consdef,tcl_file)
+		= (ok1&&ok2&&ok3&&ok4&&ok5&&ok6&&ok7,consdef,tcl_file)
 		
 instance ReadTypeInfo Char
 where
@@ -615,6 +694,117 @@ where
 			,	fs_index		= fs_index
 			}
 		= (ok1&&ok2&&ok3,field_symbol,tcl_file)		
+	
+/*	
+instance ReadTypeInfo SymbolType
+where 
+	read_type_info tcl_file
+		# (ok1,st_vars,tcl_file)
+			= read_type_info tcl_file
+		# (ok2,st_args,tcl_file)
+			= read_type_info tcl_file
+		# (ok3,st_arity,tcl_file)
+			= read_type_info tcl_file
+		# (ok4,st_result,tcl_file)
+			= read_type_info tcl_file
+			
+		# symbol_type
+			= { default_elem &
+				st_vars			= st_vars
+			,	st_args			= st_args
+			,	st_arity		= st_arity
+			,	st_result		= st_result
+			}
+		= (ok1&&ok2&&ok3&&ok4,symbol_type,tcl_file)
+		
+instance ReadTypeInfo AType
+where 
+	read_type_info tcl_file
+		# (ok1,at_annotation,tcl_file)
+			= read_type_info tcl_file
+		# (ok2,at_type,tcl_file)
+			= read_type_info tcl_file
+			
+		# atype
+			= { default_elem &
+				at_annotation	= at_annotation
+			,	at_type			= at_type
+			}
+		= (ok1&&ok2,atype,tcl_file)
+		
+	
+instance ReadTypeInfo Type
+where 
+	read_type_info tcl_file
+		# (ok,c,tcl_file)
+			= freadc tcl_file
+		| not ok
+			= (False,default_elem,tcl_file)
+			
+		| c == TypeTACode
+			# (ok1,type_symb_ident,tcl_file)
+				= read_type_info tcl_file
+			# (ok2,atypes,tcl_file)
+				= read_type_info tcl_file
+			= (ok1&&ok2,TA type_symb_ident atypes,tcl_file)
+			
+		| c == TypeArrowCode
+			# (ok1,atype1,tcl_file)
+				= read_type_info tcl_file
+			# (ok2,atype2,tcl_file)
+				= read_type_info tcl_file
+			= (ok1&&ok2,atype1 --> atype2,tcl_file)
+			
+		| c == TypeConsApplyCode
+			# (ok1,cons_variable,tcl_file)
+				= read_type_info tcl_file
+			# (ok2,atypes,tcl_file)
+				= read_type_info tcl_file
+			= (ok1&&ok2,cons_variable :@: atypes,tcl_file)
+			
+		// TB BasicType
+		| c == BT_IntCode
+			= (True,TB BT_Int,tcl_file);
+		| c == BT_CharCode
+			= (True,TB BT_Char,tcl_file);
+		| c == BT_RealCode
+			= (True,TB BT_Real,tcl_file);
+		| c == BT_BoolCode
+			= (True,TB BT_Bool,tcl_file);
+		| c == BT_DynamicCode
+			= (True,TB BT_Dynamic,tcl_file);
+		| c == BT_FileCode
+			= (True,TB BT_File,tcl_file);
+		| c == BT_WorldCode
+			= (True,TB BT_World,tcl_file);
+		| c == BT_StringCode
+			# (ok,type,tcl_file)
+				= read_type_info tcl_file		
+			= (ok,TB (BT_String type),tcl_file);
+			
+		| c == TypeGTVCode
+			# (ok,type_var,tcl_file)
+				= read_type_info tcl_file		
+			= (ok,GTV type_var,tcl_file);
+			
+		| c == TypeTVCode
+			# (ok,type_var,tcl_file)
+				= read_type_info tcl_file		
+			= (ok,TV type_var,tcl_file)
+			
+		| c == TypeTQVCode
+			# (ok,type_var,tcl_file)
+				= read_type_info tcl_file		
+			= (ok,TQV type_var,tcl_file)
+			
+		| c == TypeTECode
+			= (True,TE,tcl_file)
+			
+//instance ReadTypeInfo ConsVariable
+//where
+	
+	*/	
+			
 		
 // basic and structural write_type_info's
 instance ReadTypeInfo Int
