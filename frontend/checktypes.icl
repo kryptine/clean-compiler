@@ -1033,18 +1033,31 @@ where
 	check_attribute attr error
 		= checkError attr "attribute not allowed in type of dynamic" error
 	
-	
 checkSpecialTypeVars :: !Specials !*CheckState -> (!Specials, !*CheckState)
 checkSpecialTypeVars (SP_ParsedSubstitutions env) cs
-	# (env, cs) = mapSt (mapSt check_type_var) env cs
+	# (env, cs) = mapSt check_type_vars env cs
 	= (SP_ParsedSubstitutions env, cs)
-where		
-	check_type_var bind=:{bind_dst=type_var=:{tv_name={id_name,id_info}}} cs=:{cs_symbol_table,cs_error}
+where
+	check_type_vars [] cs
+		= ([],cs)
+	check_type_vars [bind:binds] cs
+		# (bind,cs) = check_type_var bind binds cs
+		# (binds,cs) = check_type_vars binds cs
+		= ([bind:binds],cs)
+	
+	check_type_var bind=:{bind_dst=type_var=:{tv_name={id_name,id_info}}} binds cs=:{cs_symbol_table,cs_error}
 		# ({ste_kind,ste_def_level}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		| ste_kind <> STE_Empty && ste_def_level == cGlobalScope
 			# (STE_TypeVariable tv_info_ptr) = ste_kind
-			= ({ bind & bind_dst = { type_var & tv_info_ptr = tv_info_ptr}}, { cs & cs_symbol_table = cs_symbol_table })
-			= (bind, { cs & cs_symbol_table= cs_symbol_table, cs_error = checkError id_name "type variable not defined" cs_error })
+			| id_info_occurs_in_list id_info binds
+				= (bind, { cs & cs_symbol_table= cs_symbol_table, cs_error = checkError id_name "type variable is already defined" cs_error })
+				= ({ bind & bind_dst = { type_var & tv_info_ptr = tv_info_ptr}}, { cs & cs_symbol_table = cs_symbol_table })
+			= (bind, { cs & cs_symbol_table= cs_symbol_table, cs_error = checkError id_name "type variable not used in type" cs_error })
+	
+	id_info_occurs_in_list id_info [{bind_dst}:l]
+		= id_info==bind_dst.tv_name.id_info || id_info_occurs_in_list id_info l
+	id_info_occurs_in_list id_info []
+		= False
 checkSpecialTypeVars SP_None cs
 	= (SP_None, cs)
 
