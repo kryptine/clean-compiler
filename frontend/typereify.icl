@@ -454,7 +454,8 @@ instance reify FieldSymbol where
 						` ("\"" +++ def.sd_ident.id_name +++ "\"")
 						` length (def.sd_exi_vars)
 						` def.sd_type.st_result)
-					(numberTypeVariables def.sd_exi_vars st)
+					(numberTypeVariables def.sd_type.st_vars
+						(numberTypeVariables def.sd_exi_vars st))
 			where
 				def
 					=	bs_common_defs.[bs_main]
