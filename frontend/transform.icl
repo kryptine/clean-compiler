@@ -1520,16 +1520,16 @@ where
 			EI_UnmarkedDynamic _ _
 				-> (used_dynamics, symbol_heap)
 			EI_Dynamic opt_dyn_type ptrs
-				# (new_ptrs,cos_symbol_heap)
-					= foldSt collect_used_dynmic ptrs ([], cos_symbol_heap)
-				# cos_symbol_heap
-					= writePtr dyn_expr_ptr (EI_Dynamic opt_dyn_type new_ptrs)
+				# (new_ptrs,symbol_heap)
+					= foldSt collect_used_dynmic ptrs ([], symbol_heap)
+				# symbol_heap
+					= writePtr dyn_expr_ptr (EI_Dynamic opt_dyn_type new_ptrs) symbol_heap
 				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
 			EI_DynamicTypeWithVars type_vars dyn_type ptrs
-				# (new_ptrs,cos_symbol_heap)
-					= foldSt collect_used_dynmic ptrs ([], cos_symbol_heap)
-				# cos_symbol_heap
-					= writePtr dyn_expr_ptr (EI_DynamicTypeWithVars type_vars dyn_type new_ptrs)
+				# (new_ptrs,symbol_heap)
+					= foldSt collect_used_dynmic ptrs ([], symbol_heap)
+				# symbol_heap
+					= writePtr dyn_expr_ptr (EI_DynamicTypeWithVars type_vars dyn_type new_ptrs) symbol_heap
 				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
 
 
