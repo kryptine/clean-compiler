@@ -70,8 +70,8 @@ where
 		= (BackendBody [ { bb_args = map FP_Variable tb_args, bb_rhs = tb_rhs }], cs)
 
 	eliminate_code_sharing_in_function dcl_functions common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, cs=:{cs_expr_heap,cs_var_heap})
-		# {rcs_var_heap, rcs_expr_heap, rcs_imports} = weightedRefCount {rci_dcl_functions=dcl_functions, rci_common_defs=common_defs, rci_depth=1} tb_rhs
-				{ rcs_var_heap = cs_var_heap, rcs_expr_heap = cs_expr_heap, rcs_free_vars = [], rcs_imports = collected_imports,rcs_main_dcl_module_n=main_dcl_module_n} 
+		# {rcs_var_heap, rcs_expr_heap, rcs_imports} = weightedRefCount {rci_dcl_functions=dcl_functions, rci_common_defs=common_defs, rci_main_dcl_module_n=main_dcl_module_n, rci_depth=1} tb_rhs
+				{ rcs_var_heap = cs_var_heap, rcs_expr_heap = cs_expr_heap, rcs_free_vars = [], rcs_imports = collected_imports} 
 //		  	---> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
 		  (tb_rhs, {di_lets,di_var_heap,di_expr_heap}) = distributeLets 1 tb_rhs { di_lets = [], di_var_heap = rcs_var_heap, di_expr_heap = rcs_expr_heap}
 		  (tb_rhs, (var_heap, expr_heap)) = buildLetExpr di_lets tb_rhs (di_var_heap,di_expr_heap)
@@ -96,6 +96,7 @@ where
 ::	RCInfo =
 	{	rci_dcl_functions	:: !{# {# FunType} }
 	,	rci_common_defs		:: !{# CommonDefs}
+	,	rci_main_dcl_module_n :: !Int
 	,	rci_depth		:: !Int
 	}
 
@@ -104,7 +105,6 @@ where
 	,	rcs_imports		:: ![SymbKind]
 	,	rcs_var_heap		:: !.VarHeap
 	,	rcs_expr_heap	:: !.ExpressionHeap
-	,	rcs_main_dcl_module_n :: !Int
 	}
 
 checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
@@ -227,7 +227,7 @@ addPatternVariable depth {cv_variable = var_info_ptr, cv_count = ref_count} (fre
 			-> (free_vars, var_heap)
 
 weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseType case_type)
-			rcs_info=:{ rcs_var_heap, rcs_expr_heap, rcs_imports,rcs_main_dcl_module_n }
+			rcs_info=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
 	# (local_vars, vars_and_heaps) = weighted_ref_count_in_case_patterns {rci & rci_depth=rci_depth+1} case_guards rcs_imports rcs_var_heap rcs_expr_heap
 	  (default_vars, (all_vars, rcs_imports, var_heap, expr_heap)) = weighted_ref_count_in_default {rci & rci_depth=rci_depth+1} case_default vars_and_heaps
 	  rcs_info = weightedRefCount rci case_expr { rcs_info & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports }
@@ -237,28 +237,28 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 	= { rcs_info & rcs_var_heap = rcs_var_heap, rcs_expr_heap = rcs_expr_heap, rcs_free_vars = rcs_free_vars   }
 //			---> ("weightedRefCountOfCase", ptrToInt case_info_ptr, case_expr)
 	where
-		weighted_ref_count_in_default rci (Yes expr) info
-			= weightedRefCountInPatternExpr rcs_main_dcl_module_n rci expr info
+		weighted_ref_count_in_default rci=:{rci_main_dcl_module_n} (Yes expr) info
+			= weightedRefCountInPatternExpr rci_main_dcl_module_n rci expr info
 		weighted_ref_count_in_default rci No info
 			= ([], info)
 		
 		weighted_ref_count_in_case_patterns rci (AlgebraicPatterns type patterns) collected_imports var_heap expr_heap
 			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], collected_imports, var_heap, expr_heap)
 		where
-			weighted_ref_count_in_algebraic_pattern rci=:{rci_common_defs} {ap_expr,ap_symbol={glob_module, glob_object={ds_index}}} wrcs_state
+			weighted_ref_count_in_algebraic_pattern rci=:{rci_common_defs, rci_main_dcl_module_n} {ap_expr,ap_symbol={glob_module, glob_object={ds_index}}} wrcs_state
 				# (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
-						= weightedRefCountInPatternExpr rcs_main_dcl_module_n rci ap_expr wrcs_state
-				| glob_module <> rcs_main_dcl_module_n
+						= weightedRefCountInPatternExpr rci_main_dcl_module_n rci ap_expr wrcs_state
+				| glob_module <> rci_main_dcl_module_n
 					# {cons_type_ptr} = rci_common_defs.[glob_module].com_cons_defs.[ds_index]
 					  (collected_imports, var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
 							cons_type_ptr (collected_imports, var_heap)
 					= (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
 					= (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
 
-		weighted_ref_count_in_case_patterns rci (BasicPatterns type patterns) collected_imports var_heap expr_heap
-			= mapSt (\{bp_expr} -> weightedRefCountInPatternExpr rcs_main_dcl_module_n rci bp_expr) patterns ([], collected_imports, var_heap, expr_heap)
-		weighted_ref_count_in_case_patterns rci (DynamicPatterns patterns) collected_imports var_heap expr_heap
-			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr rcs_main_dcl_module_n rci dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
+		weighted_ref_count_in_case_patterns rci=:{rci_main_dcl_module_n} (BasicPatterns type patterns) collected_imports var_heap expr_heap
+			= mapSt (\{bp_expr} -> weightedRefCountInPatternExpr rci_main_dcl_module_n rci bp_expr) patterns ([], collected_imports, var_heap, expr_heap)
+		weighted_ref_count_in_case_patterns  rci=:{rci_main_dcl_module_n} (DynamicPatterns patterns) collected_imports var_heap expr_heap
+			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr rci_main_dcl_module_n rci dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
 
 weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseTypeAndRefCounts case_type {rcc_all_variables})
 			rcs_info=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
@@ -269,18 +269,18 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 
 instance weightedRefCount Selection
 where
-	weightedRefCount rci=:{rci_dcl_functions, rci_common_defs} (ArraySelection {glob_module,glob_object={ds_index}} _ index_expr) rcs_info
+	weightedRefCount rci=:{rci_dcl_functions, rci_common_defs, rci_main_dcl_module_n} (ArraySelection {glob_module,glob_object={ds_index}} _ index_expr) rcs_info
 		# rcs_info = weightedRefCount rci index_expr rcs_info
-		= checkImportOfDclFunction rci_dcl_functions rci_common_defs glob_module ds_index rcs_info
+		= checkImportOfDclFunction rci_dcl_functions rci_common_defs rci_main_dcl_module_n glob_module ds_index rcs_info
 	weightedRefCount rci (DictionarySelection _ selectors _ index_expr) rcs_info
 		# rcs_info = weightedRefCount rci index_expr rcs_info
 		= weightedRefCount rci selectors rcs_info
-	weightedRefCount rci=:{rci_common_defs} (RecordSelection selector _) rcs_info
-		= checkRecordSelector rci_common_defs selector rcs_info
+	weightedRefCount rci=:{rci_common_defs, rci_main_dcl_module_n} (RecordSelection selector _) rcs_info
+		= checkRecordSelector rci_common_defs rci_main_dcl_module_n selector rcs_info
 
 weightedRefCountInPatternExpr main_dcl_module_n rci=:{rci_depth} pattern_expr (previous_free_vars, collected_imports, var_heap, expr_heap)
 	# {rcs_free_vars,rcs_var_heap,rcs_imports,rcs_expr_heap} = weightedRefCount rci pattern_expr
-				{ rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_free_vars = [], rcs_imports = collected_imports,rcs_main_dcl_module_n=main_dcl_module_n}
+				{ rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_free_vars = [], rcs_imports = collected_imports}
 	  (free_vars_with_rc, rcs_var_heap) = mapSt get_ref_count rcs_free_vars rcs_var_heap
 	  (previous_free_vars, rcs_var_heap) = foldSt (select_unused_free_variable rci_depth) previous_free_vars ([], rcs_var_heap)
 	  (all_free_vars, rcs_var_heap) = foldSt (collect_free_variable rci_depth) rcs_free_vars (previous_free_vars, rcs_var_heap)
@@ -315,15 +315,15 @@ where
 
 */
 
-checkImportOfDclFunction dcl_functions common_defs mod_index fun_index rcs_info=:{rcs_imports, rcs_var_heap}
+checkImportOfDclFunction dcl_functions common_defs main_dcl_module_n mod_index fun_index rcs_info=:{rcs_imports, rcs_var_heap}
 //	| mod_index <> cIclModIndex
-	| mod_index <> rcs_info.rcs_main_dcl_module_n
+	| mod_index <> main_dcl_module_n
 		# {ft_type_ptr} = dcl_functions.[mod_index].[fun_index]
 		  (rcs_imports, rcs_var_heap) = checkImportedSymbol (SK_Function {glob_module=mod_index,glob_object=fun_index}) ft_type_ptr (rcs_imports, rcs_var_heap)
 		= { rcs_info & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
 		= rcs_info
-checkRecordSelector common_defs {glob_module, glob_object={ds_index}} rcs_info=:{rcs_imports,rcs_var_heap}
-	| glob_module <> rcs_info.rcs_main_dcl_module_n
+checkRecordSelector common_defs main_dcl_module_n {glob_module, glob_object={ds_index}} rcs_info=:{rcs_imports,rcs_var_heap}
+	| glob_module <> main_dcl_module_n
 		# {com_selector_defs,com_cons_defs,com_type_defs} = common_defs.[glob_module]
 		  {sd_type_index} = com_selector_defs.[ds_index]
 		  {td_rhs = RecordType {rt_constructor={ds_index=cons_index}, rt_fields}} = com_type_defs.[sd_type_index]
@@ -337,19 +337,19 @@ checkRecordSelector common_defs {glob_module, glob_object={ds_index}} rcs_info=:
 
 instance weightedRefCount App
 where
-	weightedRefCount rci=:{rci_dcl_functions, rci_common_defs} {app_symb,app_args} rcs_info
+	weightedRefCount rci=:{rci_dcl_functions, rci_common_defs, rci_main_dcl_module_n} {app_symb,app_args} rcs_info
 		# rcs_info = weightedRefCount rci app_args rcs_info
-		= check_import rci_dcl_functions rci_common_defs app_symb rcs_info
+		= check_import rci_dcl_functions rci_common_defs rci_main_dcl_module_n app_symb rcs_info
 	where
-		check_import dcl_functions common_defs {symb_kind=SK_Function {glob_module,glob_object}} rcs_info=:{rcs_imports, rcs_var_heap}
-			= checkImportOfDclFunction dcl_functions common_defs glob_module glob_object rcs_info
-		check_import dcl_functions common_defs {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rcs_info=:{rcs_imports, rcs_var_heap}
-			| glob_module <> rcs_info.rcs_main_dcl_module_n
+		check_import dcl_functions common_defs main_dcl_module_n {symb_kind=SK_Function {glob_module,glob_object}} rcs_info=:{rcs_imports, rcs_var_heap}
+			= checkImportOfDclFunction dcl_functions common_defs main_dcl_module_n glob_module glob_object rcs_info
+		check_import dcl_functions common_defs main_dcl_module_n {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rcs_info=:{rcs_imports, rcs_var_heap}
+			| glob_module <> main_dcl_module_n
 				# {cons_type_ptr} = common_defs.[glob_module].com_cons_defs.[glob_object]
 				  (rcs_imports, rcs_var_heap) = checkImportedSymbol symb_kind cons_type_ptr (rcs_imports, rcs_var_heap)
 				= { rcs_info & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
 				= rcs_info
-		check_import dcl_functions common_defs _ rcs_info
+		check_import dcl_functions common_defs _ _ rcs_info
 			= rcs_info
 
 
