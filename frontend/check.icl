@@ -1316,12 +1316,18 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 
 	  cs = addGlobalDefinitionsToSymbolTable icl_decl_symbols cs
 
-	  (moved_dcl_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
-			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local ([], { createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
-	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
-			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], ([], []), cs)
-	  cs_symbol_table
-	  		= removeDeclarationsFromSymbolTable icl_decl_symbols cGlobalScope cs.cs_symbol_table
+	  (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_decl_symbols, cs)
+			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local ([],[],{ createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
+	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
+			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], ([], []), conversion_table, icl_sizes, icl_decl_symbols, cs)
+	  (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,symbol_table)
+	  		= foldSt (add_all_dcl_cons_and_members_to_conversion_table dcl_common) dcl_cons_and_member_defs (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs.cs_symbol_table)
+
+	  new_cons_defs = reverse new_cons_defs
+	  new_member_defs = reverse new_member_defs
+
+	  symbol_table = removeDeclarationsFromSymbolTable icl_decl_symbols cGlobalScope symbol_table
+
 	# n_dcl_classes		= dcl_sizes.[cClassDefs]
 	# n_dcl_types		= dcl_sizes.[cTypeDefs]
 	# copied_type_defs	= mark_copied_definitions n_dcl_types	cop_td_indexes
@@ -1339,7 +1345,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 				, def_generics		= my_append icl_definitions.def_generics new_generic_defs
 		  }
 		,  icl_sizes
-		, { cs & cs_symbol_table = cs_symbol_table }
+		, { cs & cs_symbol_table = symbol_table }
 		)
 where
 
@@ -1351,30 +1357,31 @@ where
 		mark_def index marks = { marks & [index] = True }
 
 	add_to_conversion_table first_macro_index dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
-			(moved_dcl_defs, conversion_table, icl_sizes, icl_defs, cs)
+			(moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		| ste_kind == STE_Empty
 			# def_index = toInt decl_kind
+			| def_index == cConstructorDefs || def_index == cMemberDefs
+				= (moved_dcl_defs,[decl:dcl_cons_and_member_defs],conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
  			| can_be_only_in_dcl def_index && not (def_index==cTypeDefs && is_abstract_type dcl_common.com_type_defs decl_index)
 				# (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 					= add_dcl_declaration id_info entry decl def_index decl_index (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
-				= ([ decl : moved_dcl_defs ], conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+				= ([ decl : moved_dcl_defs ],dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
 			| def_index == cMacroDefs
 				# (conversion_table, icl_defs, cs_symbol_table)
 					= add_macro_declaration id_info entry decl (decl_index - first_macro_index) /*decl_index*/ (conversion_table, icl_defs, cs_symbol_table)
-				= (moved_dcl_defs /* [ decl : moved_dcl_defs ] */, conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+				= (moved_dcl_defs /* [ decl : moved_dcl_defs ] */,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
 				# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
-				= (moved_dcl_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
+				= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 		| ste_def_level == cGlobalScope && ste_kind == decl_kind
 			# def_index = toInt decl_kind
-			# decl_index = if (def_index == cMacroDefs) (decl_index - first_macro_index) decl_index			
-			= (moved_dcl_defs, { conversion_table & [def_index].[decl_index] = ste_index },  icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+			# decl_index = if (def_index == cMacroDefs) (decl_index - first_macro_index) decl_index
+			= (moved_dcl_defs,dcl_cons_and_member_defs,{ conversion_table & [def_index].[decl_index] = ste_index },  icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
 			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
-			= (moved_dcl_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
+			= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
 	can_be_only_in_dcl def_kind
-		=	def_kind == cTypeDefs	|| def_kind == cConstructorDefs || def_kind == cSelectorDefs
-		||	def_kind == cClassDefs	|| def_kind == cMemberDefs || def_kind == cGenericDefs 
+		= def_kind == cTypeDefs || def_kind == cSelectorDefs || def_kind == cClassDefs || def_kind == cGenericDefs 
 
  	is_abstract_type com_type_defs decl_index
  		= case com_type_defs.[decl_index].td_rhs of (AbstractType _) -> True ; _ -> False
@@ -1392,27 +1399,36 @@ where
 			,	[ decl /* Declaration { dcl & decl_index = icl_index } */ : icl_defs ]
 			,	NewEntry symbol_table info_ptr dcl.decl_kind dcl.decl_index /*icl_index*/ cGlobalScope entry
 			)
-	
-	add_dcl_definition {com_type_defs} dcl=:(Declaration {decl_kind = STE_Type, decl_index})
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
+
+	add_dcl_definition {com_type_defs,com_cons_defs} dcl=:(Declaration {decl_kind = STE_Type, decl_index})
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 		# type_def = com_type_defs.[decl_index]
-		  (new_type_defs, cs) = add_type_def type_def new_type_defs cs
+		  (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) = add_type_def type_def new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 		  cop_td_indexes = [decl_index : cop_td_indexes] 
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 	where
-		add_type_def td=:{td_pos, td_rhs = AlgType conses} new_type_defs cs
-			# (conses, cs) = mapSt (redirect_defined_symbol STE_Constructor td_pos) conses cs
-			= ([ { td & td_rhs = AlgType conses} : new_type_defs ], cs)
-		add_type_def td=:{td_pos, td_rhs = RecordType rt=:{rt_constructor,rt_fields}} new_type_defs cs
-			# (rt_constructor, cs) = redirect_defined_symbol STE_Constructor td_pos rt_constructor cs
-			  (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
-			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ], cs)
-		add_type_def td=:{td_name, td_pos, td_rhs = AbstractType _} new_type_defs cs
+		add_type_def td=:{td_pos, td_rhs = AlgType conses} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs		
+			# (conses,(new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_cons_symbols com_cons_defs td_pos conses (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			= ([ { td & td_rhs = AlgType conses} : new_type_defs ],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			where
+				copy_and_redirect_cons_symbols com_cons_defs td_pos [cons:conses] (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+					# (dcl_cons_index,cons,(conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_symbol STE_Constructor td_pos cons (conversion_table,icl_sizes,icl_decl_symbols,cs)
+					# new_cons_defs = if (dcl_cons_index==(-1)) new_cons_defs [ com_cons_defs.[dcl_cons_index] : new_cons_defs ]
+					# (conses,st) = copy_and_redirect_cons_symbols com_cons_defs td_pos conses (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+					= ([cons:conses],st)
+				copy_and_redirect_cons_symbols com_cons_defs td_pos [] (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+					= ([],(new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs))
+		add_type_def td=:{td_pos, td_rhs = RecordType rt=:{rt_constructor,rt_fields}} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
+			# (dcl_cons_index,rt_constructor,(conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_symbol STE_Constructor td_pos rt_constructor (conversion_table,icl_sizes,icl_decl_symbols,cs)
+			# new_cons_defs = if (dcl_cons_index==(-1)) new_cons_defs [ com_cons_defs.[dcl_cons_index] : new_cons_defs ]
+			# (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
+			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+		add_type_def td=:{td_name, td_pos, td_rhs = AbstractType _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 			# cs_error = checkError "abstract type not defined in implementation module" ""
 					(setErrorAdmin (newPosition td_name td_pos) cs.cs_error)
-			= (new_type_defs, { cs & cs_error = cs_error })
-		add_type_def td new_type_defs cs
-			= ([td : new_type_defs], cs) 
+			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
+		add_type_def td new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
+			= ([td : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) 
 
 		redirect_field_symbols pos fields cs
 			# new_fields = { field \\ field <-: fields }
@@ -1423,46 +1439,68 @@ where
 				  ({ste_kind,ste_index}, cs_symbol_table) = readPtr field.fs_name.id_info cs.cs_symbol_table
 				| is_field ste_kind
 					= ({ new_fields & [field_nr] = { field & fs_index = ste_index }}, { cs & cs_symbol_table = cs_symbol_table })
-					# cs_error = checkError "conflicting definition in implementation module" ""
-									(setErrorAdmin (newPosition field.fs_name pos) cs.cs_error)
+					# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition field.fs_name pos) cs.cs_error)
 					= (new_fields, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
 			is_field (STE_Field _)	= True
 			is_field _				= False
-
-	add_dcl_definition {com_cons_defs} dcl=:(Declaration {decl_kind = STE_Constructor, decl_index}) 
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
-		= (new_type_defs, new_class_defs, [ com_cons_defs.[decl_index] : new_cons_defs ], new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
 	add_dcl_definition {com_selector_defs} dcl=:(Declaration {decl_kind = STE_Field _, decl_index})
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
-		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[decl_index] : new_selector_defs ], new_member_defs, new_generic_defs, copied_defs, cs)
-	add_dcl_definition {com_class_defs} dcl=:(Declaration {decl_kind = STE_Class, decl_index, decl_pos})
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
+		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[decl_index] : new_selector_defs ], new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
+	add_dcl_definition {com_class_defs,com_member_defs} dcl=:(Declaration {decl_kind = STE_Class, decl_index, decl_pos})
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 		# class_def = com_class_defs.[decl_index]
 		  cop_cd_indexes = [decl_index : cop_cd_indexes] 
-		  (new_class_defs, cs) = add_class_def decl_pos class_def new_class_defs cs
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
+		  (new_class_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) = add_class_def decl_pos class_def new_class_defs new_member_defs conversion_table icl_sizes icl_decl_symbols cs
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 	  where
-		add_class_def decl_pos cd=:{class_members} new_class_defs cs
-			# (new_class_members, cs) = mapSt (redirect_defined_symbol STE_Member decl_pos) [ cm \\ cm<-:class_members ] cs
-			= ([{cd & class_members={cm \\ cm<-new_class_members}}:new_class_defs], cs)
-	add_dcl_definition {com_member_defs} dcl=:(Declaration {decl_kind = STE_Member, decl_index, decl_pos})
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
-		# member_def = com_member_defs.[decl_index]
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, [member_def:new_member_defs], new_generic_defs, copied_defs, cs)
+		add_class_def decl_pos cd=:{class_members} new_class_defs new_member_defs conversion_table icl_sizes icl_decl_symbols cs
+			# (new_class_members,(new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_member_symbols 0 com_member_defs decl_pos (new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			= ([{cd & class_members={cm \\ cm<-new_class_members}}:new_class_defs],new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			where
+				copy_and_redirect_member_symbols member_index com_member_defs td_pos (new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+					| member_index<size class_members
+						# member=class_members.[member_index]
+						# (dcl_member_index,member,(conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_symbol STE_Member td_pos member (conversion_table,icl_sizes,icl_decl_symbols,cs)
+						# new_member_defs = if (dcl_member_index==(-1)) new_member_defs [ com_member_defs.[dcl_member_index] : new_member_defs ]
+						# (members,st) = copy_and_redirect_member_symbols (member_index+1) com_member_defs td_pos (new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+						= ([member:members],st)
+						= ([],(new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs))
 	add_dcl_definition {com_generic_defs} dcl=:(Declaration {decl_kind = STE_Generic, decl_index, decl_pos}) 
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 		# generic_def = com_generic_defs.[decl_index]
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, [generic_def:new_generic_defs], copied_defs, cs)	
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, [generic_def:new_generic_defs], copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)	
 	add_dcl_definition _ _ result = result
 
-	redirect_defined_symbol req_kind pos ds=:{ds_ident} cs
-		# ({ste_kind,ste_index}, cs_symbol_table) = readPtr ds_ident.id_info cs.cs_symbol_table
-		| ste_kind == req_kind
-			= ({ ds & ds_index = ste_index }, { cs & cs_symbol_table = cs_symbol_table })
-			# cs_error = checkError "conflicting definition in implementation module" ""
-							(setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
-			= ({ ds & ds_index = ste_index }, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
+	copy_and_redirect_symbol req_kind pos ds=:{ds_ident=ds_ident=:{id_info},ds_index} (conversion_table,icl_sizes,icl_defs,cs)
+		# (entry=:{ste_kind,ste_index}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+		| ste_kind == STE_Empty
+			# def_index = toInt req_kind
+			# (icl_index, icl_sizes) = icl_sizes![def_index]
+			# conversion_table = { conversion_table & [def_index].[ds_index] = icl_index }
+			# icl_sizes = { icl_sizes & [def_index] = inc icl_index }
+			# icl_defs = [ Declaration { decl_ident=ds_ident,decl_index=icl_index,decl_kind=req_kind,decl_pos=pos} : icl_defs ]
+			# cs_symbol_table = NewEntry cs_symbol_table id_info req_kind icl_index cGlobalScope entry
+			= (ds_index,{ ds & ds_index = icl_index }, (conversion_table,icl_sizes,icl_defs,{ cs & cs_symbol_table = cs_symbol_table }))
+			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
+			= (-1,{ ds & ds_index = ste_index }, (conversion_table,icl_sizes,icl_defs,{ cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }))
+
+	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident={id_info},decl_kind=STE_Constructor,decl_index}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+		| conversion_table.[cConstructorDefs].[decl_index]>=0
+			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+		# (entry=:{ste_kind,ste_index}, symbol_table) = readPtr id_info symbol_table
+		| ste_kind == STE_Empty
+			# (conversion_table,icl_sizes,icl_defs,symbol_table)
+				= add_dcl_declaration id_info entry decl cConstructorDefs decl_index (conversion_table,icl_sizes,icl_defs,symbol_table)
+			= ([dcl_common.com_cons_defs.[decl_index] : new_cons_defs],new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident={id_info},decl_kind=STE_Member,decl_index}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+		| conversion_table.[cMemberDefs].[decl_index]>=0
+			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+		# (entry=:{ste_kind,ste_index}, symbol_table) = readPtr id_info symbol_table
+		| ste_kind == STE_Empty
+			# (conversion_table,icl_sizes,icl_defs,symbol_table)
+				= add_dcl_declaration id_info entry decl cMemberDefs decl_index (conversion_table,icl_sizes,icl_defs,symbol_table)
+			= (new_cons_defs,[dcl_common.com_member_defs.[decl_index] :  new_member_defs],conversion_table,icl_sizes,icl_defs,symbol_table)
 
 	my_append front []
 		= front
