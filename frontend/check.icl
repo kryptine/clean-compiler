@@ -2476,18 +2476,19 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 	  (icl_functions, e_info, heaps, cs) = checkGlobalFunctionsInRanges icl_global_functions_ranges main_dcl_module_n local_functions_index_offset icl_functions e_info heaps cs
 
 	  cs = check_start_rule mod_type mod_name icl_global_functions_ranges cs
-	  cs = check_needed_modules_are_imported mod_name ".icl" cs
 
 	  (icl_functions, e_info, heaps, cs) 
 	  	= checkGlobalFunctionsInRanges icl_generic_ranges main_dcl_module_n local_functions_index_offset icl_functions e_info heaps cs
 
-	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error,cs_x })
+	  (icl_functions, e_info, heaps, cs)
 	  	= checkInstanceBodies icl_instances_ranges local_functions_index_offset icl_functions e_info heaps cs
 
+	  cs = check_needed_modules_are_imported mod_name ".icl" cs
+	  {cs_symbol_table, cs_predef_symbols, cs_error,cs_x } = cs
+
 	  (icl_functions, hp_type_heaps, cs_error)
-	  		= foldSt checkSpecifiedInstanceType instance_types (icl_functions, heaps.hp_type_heaps, cs_error)
+	  	= foldSt checkSpecifiedInstanceType instance_types (icl_functions, heaps.hp_type_heaps, cs_error)
 	  	  
-	  
 	  heaps = { heaps & hp_type_heaps = hp_type_heaps }
 	  
 	  cs_symbol_table = removeDeclarationsFromSymbolTable local_defs cGlobalScope cs_symbol_table
