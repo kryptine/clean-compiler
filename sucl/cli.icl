@@ -2,11 +2,12 @@ implementation module cli
 
 // $Id$
 
-import absmodule
-import coreclean
 import law
+import coreclean
 import strat
+import absmodule
 import rule
+import dnc
 import basic
 import StdEnv
 
@@ -117,12 +118,18 @@ Abstype implementation.
 >   stripexports main (tdefs,(es,as,ts,rs)) = (tdefs,([User m i|User m i<-es;m=main],as,ts,rs))
 
 >   exports (tdefs,(es,as,ts,rs)) = es
+*/
 
+exports :: Cli -> [SuclSymbol]
+exports m = m.exportedsymbols
+
+/*
 >   typerule (tdefs,(es,as,ts,rs)) = fst.maxtypeinfo ts
 */
 
 typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
-typerule _ _ = undef
+typerule m sym
+= fst (maxtypeinfo m.typerules sym)
 
 /*
 >   rules (tdefs,(es,as,ts,rs)) = foldmap Present Absent rs
@@ -166,7 +173,12 @@ maxtypeinfo defs sym = extendfn defs coretypeinfo sym
 >   constrs ((tes,tas,tcs),defs) = tcs
 
 >   complete ((tes,tas,tcs),(es,as,ts,rs)) = mkclicomplete tcs (fst.maxtypeinfo ts)
+*/
 
+complete :: Cli -> [SuclSymbol] -> Bool
+complete m = mkclicomplete m.typeconstructors (fst o maxtypeinfo m.typerules)
+
+/*
 >   showcli = printcli
 
 >   mkclicomplete
@@ -181,7 +193,24 @@ maxtypeinfo defs sym = extendfn defs coretypeinfo sym
 >   =   foldmap superset (corecomplete tsym) tcs tsym syms, otherwise
 >       where trule = typerule (hd syms)
 >             (tdef,(tsym,targs)) = dnc (const "in mkclicomplete") (rulegraph trule) (rhs trule)
+*/
 
+mkclicomplete ::
+    [(SuclTypeSymbol,[SuclSymbol])]
+    (SuclSymbol->Rule SuclTypeSymbol tvar)
+    [SuclSymbol]
+ -> Bool
+ |  == tvar
+
+mkclicomplete tcs typerule [] = False
+mkclicomplete tcs typerule syms
+| not tdef
+  = False
+= foldmap superset (corecomplete tsym) tcs tsym syms
+  where trule = typerule (hd syms)
+        (tdef,(tsym,_)) = dnc (const "in mkclicomplete") (rulegraph trule) (ruleroot trule)
+
+/*
 ------------------------------------------------------------------------
 
 >   printcli :: module symbol node typesymbol typenode -> [char]

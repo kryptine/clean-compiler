@@ -2,10 +2,10 @@ implementation module strat
 
 // $Id$
 
-import history
 import spine
-import dnc
+import history
 import rule
+import dnc
 import graph
 import pfun
 import basic

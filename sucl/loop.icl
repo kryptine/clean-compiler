@@ -2,10 +2,10 @@ implementation module loop
 
 // $Id$
 
-import trace
 import strat
-import history
+import trace
 import spine
+import history
 import rewr
 import rule
 import graph
@@ -245,7 +245,9 @@ loop strategy matchable (initheap,rule)
         sargs = arguments rule; initsroot = ruleroot rule; initsubject = rulegraph rule
 
 listselect :: [.Bool] [.elem] -> [.elem]
-listselect _ _ = undef
+listselect [True:bs] [x:xs] = [x:listselect bs xs]
+listselect [False:bs] [x:xs] = listselect bs xs
+listselect _ _ = []
 
 initrule
  :: ![var]

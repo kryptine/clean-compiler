@@ -2,9 +2,12 @@ definition module trace
 
 // $Id$
 
-from history import History,HistoryAssociation,HistoryPattern
 from spine import Answer
+from history import History,HistoryAssociation,HistoryPattern
 from rule import Rule
+
+// Transitive necessities
+
 from spine import Spine,Subspine // for Answer
 from rule import Rgraph          // for History
 from basic import Optional       // for Answer
