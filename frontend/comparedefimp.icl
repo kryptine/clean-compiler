@@ -797,7 +797,7 @@ instance t_corresponds TypeAttribute where
 	t_corresponds (TA_Var dclDef) (TA_Var iclDef)
 		=	t_corresponds dclDef iclDef
 	t_corresponds (TA_RootVar dclDef) (TA_RootVar iclDef)
-		= PA_BUG (return True) (t_corresponds dclDef iclDef)
+		= t_corresponds dclDef iclDef
 	t_corresponds TA_None icl
 		= case icl of
 			TA_Multi-> return True

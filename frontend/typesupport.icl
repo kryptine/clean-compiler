@@ -133,10 +133,7 @@ where
 		= attr_and_cus
 		
 cleanUpTypeAttribute _ cui av=:(TA_Var _) cus
-	= (av, cus)
-cleanUpTypeAttribute _ cui TA_PA_BUG cus
-	= PA_BUG (TA_Multi, cus) (abort "clean_up cui (TA_PA_BUG)")
-			
+	= (av, cus)			
 			
 instance clean_up Type
 where
@@ -1283,8 +1280,6 @@ instance writeType TypeAttribute
 		= writeBeautifulAttrVarAndColon file beautifulizer ta
 	writeType file yes_beautifulizer=:(Yes _) (form, TA_Multi)
 		= (file, yes_beautifulizer)
-	writeType file opt_beautifulizer (form, TA_PA_BUG)
-		= PA_BUG (file <<< "(E)", opt_beautifulizer) (abort "writeType (TypeAttribute) TA_PA_BUG")
 	writeType file opt_beautifulizer (_, ta)
 		= (file <<< ta, opt_beautifulizer)
 

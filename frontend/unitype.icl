@@ -594,8 +594,6 @@ where
 	 toInt (TA_TempVar av_number)	= av_number
 	 toInt TA_Multi 				= AttrMulti
 	 toInt TA_None 					= AttrMulti
-	 toInt TA_PA_BUG 				= PA_BUG AttrExi (abort "toInt TA_PA_BUG")
-
 
 ::	CoercionState =
 	{	crc_type_heaps	:: !.TypeHeaps
@@ -613,16 +611,6 @@ offered_attribute according to sign. Failure is indicated by returning False as 
 */
 
 coerceAttributes :: !.TypeAttribute !.TypeAttribute !.Sign *Coercions -> (!Bool,.Coercions);
-
-/* Just Temporary */
-
-coerceAttributes TA_PA_BUG dem_attr _ coercions
-	= PA_BUG (True, coercions) (abort "coerceAttributes TA_PA_BUG")
-coerceAttributes _ TA_PA_BUG _ coercions
-	= PA_BUG (True, coercions) (abort "coerceAttributes TA_PA_BUG")
-
-/* ... remove this !!!! */
-
 coerceAttributes TA_Unique dem_attr {neg_sign} coercions
 	| not neg_sign
 		= (True, coercions)

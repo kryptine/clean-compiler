@@ -1399,7 +1399,7 @@ convertAttribution TA_Anonymous
 convertAttribution (TA_Var attrVar)
 	=	convertAttributeVar attrVar
 convertAttribution (TA_RootVar attrVar)
-	=	PA_BUG (return BENoUniAttr) (convertAttributeVar attrVar)
+	=	convertAttributeVar attrVar
 convertAttribution TA_MultiOfPropagatingConsVar
 	=	return BENoUniAttr
 // FIXME

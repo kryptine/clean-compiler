@@ -984,7 +984,6 @@ cNonRecursiveAppl	:== False
 					| TA_Anonymous | TA_None
 					| TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 					| TA_MultiOfPropagatingConsVar // only filled in after type checking, semantically equal to TA_Multi
-					| TA_PA_BUG
 							
 ::	AttributeVar =
 	{	av_ident			:: !Ident

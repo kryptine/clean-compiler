@@ -138,8 +138,6 @@ where
 		= "@@ "
 	toString (TA_List _ _)
 		= "??? "
-	toString TA_PA_BUG
-		= PA_BUG "(E)" (abort "toString TA_PA_BUG")
 
 instance <<< Annotation
 where
