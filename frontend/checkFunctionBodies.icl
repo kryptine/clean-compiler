@@ -528,12 +528,7 @@ checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info 
 	# (pattern_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
 	  (pattern_expr, binds, es_expr_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expr_heap
-
-// RWS... only merge tuples for now
-	  (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
-// ... RWS
-
-	  (case_expr, es_var_heap, es_expr_heap, cs_error) = build_and_merge_case guards defaul pattern_expr case_ident True tuple_type e_state.es_var_heap es_expr_heap cs.cs_error
+	  (case_expr, es_var_heap, es_expr_heap, cs_error) = build_and_merge_case guards defaul pattern_expr case_ident True e_state.es_var_heap es_expr_heap cs.cs_error
 	  cs = {cs & cs_error = cs_error}
 	  (result_expr, es_expr_heap) = buildLetExpression [] binds case_expr NoPos es_expr_heap
 	= (result_expr, free_vars, { e_state & es_var_heap = es_var_heap,  es_expr_heap = es_expr_heap }, e_info, cs)
@@ -636,10 +631,7 @@ where
 		  (new_bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  case_ident = { id_name = case_name, id_info = nilPtr }
 
-// RWS... only merge tuples for now
-		  (tuple_symbol, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
-// ... RWS
-		  (new_case, var_store, expr_heap, cs_error) = build_and_merge_case patterns defaul (Var new_bound_var) case_ident False tuple_symbol var_store expr_heap cs.cs_error
+		  (new_case, var_store, expr_heap, cs_error) = build_and_merge_case patterns defaul (Var new_bound_var) case_ident False var_store expr_heap cs.cs_error
 
 		  cs = {cs & cs_error = cs_error}
 		  new_defaul = insert_as_default new_case result_expr
@@ -667,20 +659,10 @@ where
 			Yes defaul	-> Case { kees & case_default = Yes (insert_as_default to_insert defaul)}
 	insert_as_default _ expr = expr // checkWarning "pattern won't match"
 
-	build_and_merge_case patterns defaul expr case_ident explicit tuple_type var_heap expr_heap error_admin
+	build_and_merge_case patterns defaul expr case_ident explicit var_heap expr_heap error_admin
 		# (expr, expr_heap)= build_case patterns defaul expr case_ident explicit expr_heap
 		# (expr, var_heap, expr_heap) = share_case_expr expr var_heap expr_heap
-//		| is_tuple_case patterns tuple_type
 		=  merge_case expr var_heap expr_heap error_admin
-		// otherwise
-//			= (expr, var_heap, expr_heap, error_admin)
-		where
-			is_tuple_case (AlgebraicPatterns type _) tuple_type
-				=	type.glob_module == tuple_type.glob_module
-				&&	tuple_type.glob_object.ds_index <= type.glob_object
-				&&	type.glob_object <= tuple_type.glob_object.ds_index + 30
-			is_tuple_case _ _
-				=	False
 
 	share_case_expr (Let lad=:{let_expr}) var_heap expr_heap
 		# (let_expr, var_heap, expr_heap) = share_case_expr let_expr var_heap expr_heap
