@@ -369,6 +369,8 @@ BESetMainDclModuleN (int main_dcl_module_n_parameter)
 	main_dcl_module_n=main_dcl_module_n_parameter;
 }
 
+static DefMod im_def_module;
+
 void
 BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctions, int nTypes, int nConstructors, int nFields)
 {
@@ -403,7 +405,7 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	iclModule	= icl->beicl_module;
 	iclModule->im_name			= moduleNameSymbol;
 	iclModule->im_modification_time	= ConvertCleanString (modificationTime);
-	iclModule->im_def_module	= NULL;
+	iclModule->im_def_module	= im_def_module;
 	iclModule->im_rules			= NULL;
 	iclModule->im_start			= NULL;
 	iclModule->im_symbols		= gBEState.be_allSymbols;
@@ -463,8 +465,10 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 
 	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
 
-	if (moduleIndex == main_dcl_module_n)
+	if (moduleIndex == main_dcl_module_n){
 		gBEState.be_allSymbols	= saveSymbols;
+		im_def_module=dclModule;
+	}
 } /* BEDeclareDclModule */
 
 void
@@ -3748,6 +3752,8 @@ BEInit (int argc)
 	gBEState.be_dictionaryUpdateFunSymbol	= NULL;
 
 	gBEState.be_initialised	= True;
+
+	im_def_module = NULL;
 
 	return ((BackEnd) &gBEState);
 } /* BEInit */
