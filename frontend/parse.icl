@@ -151,20 +151,20 @@ erroneousIdent = { id_name = "", id_info = nilPtr }
 	Some general overloaded parsing routines
 */
 
-wantSequence :: !Token !Context !*ParseState -> (!.[a],!*ParseState) | want a
-wantSequence separator context pState
+wantSequence :: !Token !ScanContext !*ParseState -> (!.[a],!*ParseState) | want a
+wantSequence separator scanContext pState
 	# (first, pState) = want pState
-	  (token, pState) = nextToken context pState
+	  (token, pState) = nextToken scanContext pState
 	| separator == token
-		# (rest, pState) = wantSequence separator context pState
+		# (rest, pState) = wantSequence separator scanContext pState
 		= ([first : rest], pState)
 	// otherwise // separator <> token
 	= ([first], tokenBack pState)
 /*
-optionalSequence start_token separator context pState
-	# (token, pState) = nextToken context pState
+optionalSequence start_token separator scanContext pState
+	# (token, pState) = nextToken scanContext pState
 	| token == start_token
-		= wantSequence separator context pState
+		= wantSequence separator scanContext pState
 		= ([], tokenBack pState)
 */
 parseList try_fun pState :== parse_list pState // try_fun *
@@ -178,28 +178,28 @@ parseList try_fun pState :== parse_list pState // try_fun *
 				= ([tree : trees], pState)
 			= ([], pState)
 
-//wantSepList msg sep_token context try_fun pState = want_list msg pState
-wantSepList msg sep_token context try_fun pState :== want_list msg pState // try_fun (sep_token tryfun)*
+//wantSepList msg sep_token scanContext try_fun pState = want_list msg pState
+wantSepList msg sep_token scanContext try_fun pState :== want_list msg pState // try_fun (sep_token tryfun)*
 	where
 		want_list msg pState
 			# (succ, tree, pState) = try_fun pState
 			| succ
-			 	# (token, pState) = nextToken context pState
+			 	# (token, pState) = nextToken scanContext pState
 			 	| token == sep_token
-					# (trees, pState) = optSepList sep_token context try_fun pState
+					# (trees, pState) = optSepList sep_token scanContext try_fun pState
 					= ([tree : trees], pState)
 				// otherwise // token <> sep_token
 					= ([tree], tokenBack pState)
 				# (token, pState) = nextToken GeneralContext pState
 				= ([tree], parseError ("wantList of "+msg) (Yes token) msg pState)
 
-//optSepList sep_token context try_fun pState = want_list msg pState
-optSepList sep_token context try_fun pState :== want_list pState // [ try_fun (sep_token tryfun)* ]
+//optSepList sep_token scanContext try_fun pState = want_list msg pState
+optSepList sep_token scanContext try_fun pState :== want_list pState // [ try_fun (sep_token tryfun)* ]
 	where
 		want_list pState
 			# (succ, tree, pState) = try_fun pState
 			| succ
-			 	# (token, pState) = nextToken context pState
+			 	# (token, pState) = nextToken scanContext pState
 			 	| token == sep_token
 					# (trees, pState) = want_list pState
 					= ([tree : trees], pState)
@@ -225,13 +225,13 @@ where
 		  (y, pState) = want pState
 		= ((x,y), pState)
 */
-wantModuleIdents :: !Context !IdentClass !ParseState -> (![Ident], !ParseState)
-wantModuleIdents context ident_class pState
+wantModuleIdents :: !ScanContext !IdentClass !ParseState -> (![Ident], !ParseState)
+wantModuleIdents scanContext ident_class pState
 	# (first_name, pState) = wantModuleName pState
 	  (first_ident, pState) = stringToIdent first_name ident_class pState
-	  (token, pState) = nextToken context pState
+	  (token, pState) = nextToken scanContext pState
 	| token == CommaToken
-		# (rest, pState) = wantModuleIdents context ident_class pState
+		# (rest, pState) = wantModuleIdents scanContext ident_class pState
 		= ([first_ident : rest], pState)
 	= ([first_ident], tokenBack pState)
 
@@ -270,20 +270,20 @@ SetGlobalContext iclmodule
 		= cICLContext bitor cGlobalContext
 		= cDCLContext bitor cGlobalContext
 
-SetLocalContext context 	:== context bitand (bitnot cGlobalContext)
+SetLocalContext parseContext 	:== parseContext bitand (bitnot cGlobalContext)
 
 // RWS ...
-SetClassOrInstanceDefsContext context :== SetLocalContext (context bitor cClassOrInstanceDefsContext)
+SetClassOrInstanceDefsContext parseContext :== SetLocalContext (parseContext bitor cClassOrInstanceDefsContext)
 // ... RWS
 
-isLocalContext context	:== context bitand cGlobalContext == 0
-isGlobalContext context	:== not (isLocalContext context)
+isLocalContext parseContext	:== parseContext bitand cGlobalContext == 0
+isGlobalContext parseContext	:== not (isLocalContext parseContext)
 
-isDclContext context	:== context bitand cICLContext == 0
-isIclContext context	:== not (isDclContext context)
+isDclContext parseContext	:== parseContext bitand cICLContext == 0
+isIclContext parseContext	:== not (isDclContext parseContext)
 
 // RWS ...
-isClassOrInstanceDefsContext context	:== context bitand cClassOrInstanceDefsContext <> 0
+isClassOrInstanceDefsContext parseContext	:== parseContext bitand cClassOrInstanceDefsContext <> 0
 // ... RWS
 
 cWantIclFile :== True	
@@ -397,9 +397,9 @@ where
 			= (False, mod_type, "", tokenBack scanState)
 
 	try_module_name (IdentToken name) mod_type scanState
-		= (True, mod_type, name, scanState) //-->> ("module",name)
+		= (True, mod_type, name, scanState)
 	try_module_name (UnderscoreIdentToken name) mod_type scanState
-		= (True, mod_type, name, setUseUnderscoreIdents True scanState) //-->> ("module",name)
+		= (True, mod_type, name, setUseUnderscoreIdents True scanState)
 	try_module_name token mod_type scanState
 		= (False, mod_type, "", tokenBack scanState)
 	
@@ -418,12 +418,12 @@ where
 							= appScanState (setUseLayout use_layout) pState
 
 	want_definitions :: !ParseContext !ParseState -> (![ParsedDefinition], !ParseState)
-	want_definitions context pState
+	want_definitions parseContext pState
 		= want_acc_definitions [] pState
 	where
 		want_acc_definitions :: ![ParsedDefinition] !ParseState -> (![ParsedDefinition], !ParseState)
 		want_acc_definitions acc pState
-			# (defs, pState)	= wantDefinitions context pState
+			# (defs, pState)	= wantDefinitions parseContext pState
 			  acc				= acc ++ defs
 			  pState			= wantEndModule pState
 			  (token, pState)	= nextToken FunctionContext pState
@@ -437,8 +437,8 @@ where
 */
 
 wantDefinitions :: !ParseContext !ParseState -> (![ParsedDefinition], !ParseState)
-wantDefinitions context pState
-	= parseList (tryDefinition context) pState
+wantDefinitions parseContext pState
+	= parseList (tryDefinition parseContext) pState
 
 DummyPriority	:== Prio LeftAssoc 9
 
@@ -446,29 +446,29 @@ cHasPriority 	:== True
 cHasNoPriority	:== False
 
 tryDefinition :: !ParseContext !ParseState -> (!Bool, ParsedDefinition, !ParseState)
-tryDefinition context pState
+tryDefinition parseContext pState
 	# (token, pState)			= nextToken GeneralContext pState
 	  (fname, linenr, pState)	= getFileAndLineNr pState
-	= try_definition context token (LinePos fname linenr) pState
+	= try_definition parseContext token (LinePos fname linenr) pState
 where
 	try_definition :: !ParseContext !Token !Position !ParseState -> (!Bool, ParsedDefinition, !ParseState)
-	try_definition context DoubleColonToken pos pState
-		| ~(isGlobalContext context)
+	try_definition parseContext DoubleColonToken pos pState
+		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "type definitions only at the global level" (tokenBack pState))
-			# (def, pState) = wantTypeDef context pos pState
+			# (def, pState) = wantTypeDef parseContext pos pState
 			= (True, def, pState)
 	try_definition _ ImportToken pos pState
-		| ~(isGlobalContext context)
+		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 		# (token, pState) = nextToken FunctionContext pState
-		| token == CodeToken && isIclContext context
+		| token == CodeToken && isIclContext parseContext
 		# (importedObjects, pState) = wantCodeImports pState
 		= (True, PD_ImportedObjects importedObjects, pState)
 		# pState = tokenBack pState
 		# (imports, pState) = wantImports pState
    		= (True, PD_Import imports, pState)
 	try_definition _ FromToken pos pState
-		| ~(isGlobalContext context)
+		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 			# (imp, pState) = wantFromImports pState
 	   		= (True, PD_Import [imp], pState) -->> imp
@@ -477,28 +477,28 @@ where
    		= (True, PD_Export exports, pState)
 	try_definition _ ExportAllToken pos pState
    		= (True, PD_Export ExportAll, pState)
-*/	try_definition context ClassToken pos pState
-		| ~(isGlobalContext context)
+*/	try_definition parseContext ClassToken pos pState
+		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
-	   		# (classdef, pState) = wantClassDefinition context pos pState
+	   		# (classdef, pState) = wantClassDefinition parseContext pos pState
 	   		= (True, classdef, pState)
 	// AA..
-	try_definition context GenericToken pos pState
-		| ~(isGlobalContext context)
+	try_definition parseContext GenericToken pos pState
+		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
-	   		# (gendef, pState) = wantGenericDefinition context pos pState
+	   		# (gendef, pState) = wantGenericDefinition parseContext pos pState
 	   		= (True, gendef, pState)	 
 	// ..AA  		
-	try_definition context InstanceToken pos pState
-		| ~(isGlobalContext context)
+	try_definition parseContext InstanceToken pos pState
+		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
-	   		# (instdef, pState) = wantInstanceDeclaration context pos pState
+	   		# (instdef, pState) = wantInstanceDeclaration parseContext pos pState
 	   		= (True, instdef, pState)
-	try_definition context token pos pState
+	try_definition parseContext token pos pState
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState
 		      (token, pState) = nextToken FunctionContext pState
-		      (def, pState) = want_rhs_of_def context lhs token (determine_position lhs pos) pState //-->> token
+		      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
 			= (True, def, pState) -->>  def
 			with
 				determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
@@ -533,30 +533,29 @@ where
 			= (False, abort "name", False, tokenBack pState)
 
 	want_rhs_of_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
-	want_rhs_of_def context (opt_name, args) DoubleColonToken pos pState
+	want_rhs_of_def parseContext (opt_name, args) DoubleColonToken pos pState
 		# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
 		  (tspec, pState) = want pState		//	SymbolType
-		| isDclContext context
+		| isDclContext parseContext
 			# (specials, pState) = optionalSpecials pState
 			= (PD_TypeSpec pos name (if is_infix DummyPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition (1)" pState)
 			= (PD_TypeSpec pos name (if is_infix DummyPriority NoPrio) (Yes tspec) SP_None, wantEndOfDefinition "type definition (2)" pState)
-	want_rhs_of_def context (opt_name, args) (PriorityToken prio) pos pState
+	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == DoubleColonToken
 		  	# (tspec, pState) = want pState
-			| isDclContext context
+			| isDclContext parseContext
 				# (specials, pState) = optionalSpecials pState
 				= (PD_TypeSpec pos name prio (Yes tspec) specials, wantEndOfDefinition "type definition (3)" pState)
 				= (PD_TypeSpec pos name prio (Yes tspec) SP_None, wantEndOfDefinition "type definition (4)" pState)
 			= (PD_TypeSpec pos name prio No SP_None, wantEndOfDefinition "type defenition (5)" (tokenBack pState))
-	want_rhs_of_def context (No, args) token pos pState
+	want_rhs_of_def parseContext (No, args) token pos pState
 		# pState			= want_node_def_token pState token
 		# (ss_useLayout, pState) = accScanState UseLayout pState
-//		  localsExpected	= isNotEmpty args || isGlobalContext context
-//		  (rhs, pState)		= wantRhs isEqualToken False (tokenBack pState) // PK localsExpected -> False
-		  (rhs, pState)		= wantRhs isEqualToken (~ ss_useLayout) (tokenBack pState) // PK localsExpected -> ~ ss_useLayout
-		| isGlobalContext context
+		  localsExpected	= ~ ss_useLayout
+		  (rhs, pState)		= wantRhs isEqualToken localsExpected (tokenBack pState)
+		| isGlobalContext parseContext
  			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
  			= (PD_NodeDef pos (combine_args args) rhs, pState)
 	where		
@@ -566,36 +565,27 @@ where
 
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
-/*	want_rhs_of_def context (Yes (name, False), []) token pos pState
-		| isIclContext context && isLocalContext context && (token == DefinesColonToken || token == EqualToken) && isLowerCaseName name.id_name
+	want_rhs_of_def parseContext (Yes (name, False), []) token pos pState
+		| isIclContext parseContext && isLocalContext parseContext && token == EqualToken &&
+		  isLowerCaseName name.id_name && not (isClassOrInstanceDefsContext parseContext)
 			# (rhs, pState) = wantRhs (\_ -> True) False (tokenBack pState)
 			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
-*/ // PK ..
-	want_rhs_of_def context (Yes (name, False), []) token pos pState
-		| isIclContext context && isLocalContext context && (token == DefinesColonToken || token == EqualToken) &&
-		  isLowerCaseName name.id_name
-// RWS ...
-			&& not (isClassOrInstanceDefsContext context)
-// ... RWS
-			# (rhs, pState) = wantRhs (\_ -> True) False (tokenBack pState)
-			= (PD_NodeDef pos (PE_Ident name) rhs, pState) // ..PK
 
-	want_rhs_of_def context (Yes (name, is_infix), args) token pos pState
+	want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
 		# (fun_kind, code_allowed, pState)  = token_to_fun_kind pState token
 		  (token, pState) = nextToken FunctionContext pState
-		| isIclContext context && token == CodeToken
+		| isIclContext parseContext && token == CodeToken
 			# (rhs, pState) = wantCodeRhs pState
 			| code_allowed
   				= (PD_Function pos name is_infix args rhs fun_kind, pState)
   			// otherwise // ~ code_allowed
   				= (PD_Function pos name is_infix args rhs fun_kind, parseError "rhs of def" No "no code" pState)
 		# pState = tokenBack (tokenBack pState)
-//		  localsExpected = isNotEmpty args || isGlobalContext context
 		  (ss_useLayout, pState) = accScanState UseLayout pState
-		  localsExpected = isNotEmpty args || isGlobalContext context || ~ ss_useLayout
-		  (rhs, pState) = wantRhs isRhsStartToken localsExpected pState
+		  localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
+		  (rhs, pState) = wantRhs (isRhsStartToken parseContext) localsExpected pState
 		= case fun_kind of
-			FK_Function _  | isDclContext context
+			FK_Function _  | isDclContext parseContext
 				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
 			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
@@ -620,11 +610,11 @@ isEqualToken :: !Token -> Bool
 isEqualToken EqualToken			= True
 isEqualToken _					= False
 
-isRhsStartToken :: !Token -> Bool
-isRhsStartToken EqualToken			= True
-isRhsStartToken ColonDefinesToken	= True
-isRhsStartToken DefinesColonToken	= True
-isRhsStartToken _					= False
+isRhsStartToken :: !ParseContext !Token -> Bool
+isRhsStartToken parseContext EqualToken			= True
+isRhsStartToken parseContext ColonDefinesToken	= isGlobalContext parseContext
+isRhsStartToken parseContext DefinesColonToken	= isGlobalContext parseContext
+isRhsStartToken parseContext _					= False
 
 optionalSpecials :: !ParseState -> (!Specials, !ParseState)
 optionalSpecials pState
@@ -1092,7 +1082,7 @@ cIsNotAClass			:== False
 
 		
 wantClassDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
-wantClassDefinition context pos pState
+wantClassDefinition parseContext pos pState
 	# (might_be_a_class, class_or_member_name, prio, pState) = want_class_or_member_name pState
 	  (class_variables, pState) = wantList "class variable(s)" try_class_variable pState
 	  (class_arity, class_args, class_cons_vars) = convert_class_variables class_variables 0 0
@@ -1104,8 +1094,8 @@ wantClassDefinition context pos pState
 		# (begin_members, pState) = begin_member_group token pState
 		| begin_members
 			# (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
-// RWS ...		 	  (members, pState) = wantDefinitions (SetLocalContext context) pState
-		 	  (members, pState) = wantDefinitions (SetClassOrInstanceDefsContext context) pState
+// RWS ...		 	  (members, pState) = wantDefinitions (SetLocalContext parseContext) pState
+		 	  (members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
 // ... RWS 
   		  	  class_def = { class_name = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
@@ -1191,7 +1181,7 @@ wantClassDefinition context pos pState
 				= (arity, [var : class_vars], cons_vars)
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
-wantInstanceDeclaration context pi_pos pState
+wantInstanceDeclaration parseContext pi_pos pState
 	# (class_name, pState) = want pState
 	  (pi_class, pState) = stringToIdent class_name IC_Class pState
 	  ((pi_types, pi_context), pState) = want_instance_type pState
@@ -1203,17 +1193,17 @@ wantInstanceDeclaration context pi_pos pState
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
 							pi_members = [], pi_specials = SP_None, pi_pos = pi_pos, pi_generate = True}, pState)
 // ..AA
-	| isIclContext context
+	| isIclContext parseContext
 		# // PK pState = tokenBack pState // AA
 		  pState = want_begin_group token pState
-// RWS ...		  (pi_members, pState) = wantDefinitions (SetLocalContext context) pState
-		  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext context) pState
+// RWS ...		  (pi_members, pState) = wantDefinitions (SetLocalContext parseContext) pState
+		  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
 // ... RWS
 		  pState = wantEndGroup "instance" pState
 
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
 						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos, pi_generate = False }, pState)
-	// otherwise // ~ (isIclContext context)
+	// otherwise // ~ (isIclContext parseContext)
 		| token == CommaToken
 			// AA: # (token, pState) = nextToken TypeContext pState 		
 			# (pi_types_and_contexts, pState)	= want_instance_types pState
@@ -1337,7 +1327,7 @@ optionalCoercions pState
 */
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
-wantGenericDefinition context pos pState
+wantGenericDefinition parseContext pos pState
 	| not pState.ps_support_generics
 		= (PD_Erroneous, parseError "generic definition" No "support for generics is disabled in the compiler. " pState)
 	# (name, pState) = want_name pState
@@ -1416,10 +1406,10 @@ where
 	no_type_var = abort "tryAttributedTypeVar: No type var"
 
 wantTypeDef ::  !ParseContext !Position !ParseState -> (ParsedDefinition, !ParseState)
-wantTypeDef context pos pState
+wantTypeDef parseContext pos pState
 	# (type_lhs, annot, pState)	= want_type_lhs pos pState
 	  (token, pState)			= nextToken TypeContext pState
-	  (def, pState)				= want_type_rhs context type_lhs token annot pState
+	  (def, pState)				= want_type_rhs parseContext type_lhs token annot pState
   	  pState					= wantEndOfDefinition "type definition (6)" pState
   	= (def, pState)
 where
@@ -1433,7 +1423,7 @@ where
 		= (MakeTypeDef ident args (ConsList []) attr contexts pos, annot, pState)
 
 	want_type_rhs :: !ParseContext !ParsedTypeDef !Token !Annotation !ParseState -> (ParsedDefinition, !ParseState)
-	want_type_rhs context td=:{td_name,td_attribute} EqualToken annot pState
+	want_type_rhs parseContext td=:{td_name,td_attribute} EqualToken annot pState
 		# name					= td_name.id_name
 		  pState				= verify_annot_attr annot td_attribute name pState
 		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
@@ -1453,7 +1443,7 @@ where
 				|	annot == AN_None
 	 		  		->	(PD_Type td, pState)
 	 		  		->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
-	want_type_rhs context td=:{td_attribute} ColonDefinesToken annot pState // type Macro
+	want_type_rhs parseContext td=:{td_attribute} ColonDefinesToken annot pState // type Macro
 		# name				= td.td_name.id_name
 		  pState			= verify_annot_attr annot td_attribute name pState
 		  (atype, pState)	= want pState // Atype
@@ -1461,8 +1451,8 @@ where
 		|	annot == AN_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
-	want_type_rhs context td=:{td_attribute} token annot pState
-		| isIclContext context
+	want_type_rhs parseContext td=:{td_attribute} token annot pState
+		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
 			| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
 				# (td_attribute, properties) = determine_properties annot td_attribute
@@ -1477,7 +1467,7 @@ where
 			= parseError "type definition" No ("No annotation, "+toString annot+", in the lhs of type "+name) pState
 		| attr == TA_None || attr == TA_Unique
 			= pState
-			= parseError "ty[e definition" No ("No attribute, "+toString attr+", in the lhs of type "+name) pState
+			= parseError "type definition" No ("No attribute, "+toString attr+", in the lhs of type "+name) pState
 
 	determine_properties :: !Annotation !TypeAttribute -> (!TypeAttribute, !BITVECT)
 	determine_properties annot attr
@@ -2156,17 +2146,15 @@ cIsNotAPattern	:== False
 wantExpression :: !Bool !ParseState -> (!ParsedExpr, !ParseState)
 wantExpression is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
-// PK ... To produce a better error message
 	= case token of
-		CharListToken charList 
+		CharListToken charList // To produce a better error message
 			->	(PE_Empty,  parseError "Expression" No ("List brackets, [ and ], around charlist '"+charList+"'") pState)
-// ... PK
 		_	| is_pattern
 				->	wantLhsExpressionT token pState
 				->	wantRhsExpressionT token pState
 
 wantRhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
-wantRhsExpressionT  token pState
+wantRhsExpressionT token pState
 	# (succ, expr, pState) = trySimpleRhsExpressionT token pState
 	| succ
 		# (exprs, pState) = parseList trySimpleRhsExpression pState
@@ -2177,7 +2165,7 @@ wantRhsExpressionT  token pState
 			_	-> (PE_Empty,  parseError "RHS expression" (Yes token) "<expression>" pState)
 
 wantLhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
-wantLhsExpressionT (IdentToken name) pState /* PK: to make a=:C x equivalent to a=:(C x) */
+wantLhsExpressionT (IdentToken name) pState /* to make a=:C x equivalent to a=:(C x) */
 	| isLowerCaseName name
 		# (id, pState)		= stringToIdent name IC_Expression pState
 		  (token, pState)	= nextToken FunctionContext pState
@@ -3423,11 +3411,11 @@ where
 
 instance nextToken ParseState
 where
-	nextToken :: !Context !ParseState -> (!Token, !ParseState)
-	nextToken context pState
+	nextToken :: !ScanContext !ParseState -> (!Token, !ParseState)
+	nextToken scanContext pState
 		| pState.ps_skipping // in error recovery from parse error
 			= (ErrorToken "Skipping", pState)
-			= accScanState (nextToken context) pState
+			= accScanState (nextToken scanContext) pState
 
 instance getPosition ParseState
 where
@@ -3485,9 +3473,9 @@ getFileAndLineNr pState =: {ps_scanState}
 	Simple parse functions
 */
 
-wantToken :: !Context !{#Char} !Token !ParseState ->  ParseState
-wantToken context act dem_token pState
-	# (token, pState) = nextToken context pState
+wantToken :: !ScanContext !{#Char} !Token !ParseState ->  ParseState
+wantToken scanContext act dem_token pState
+	# (token, pState) = nextToken scanContext pState
 	| dem_token == token
 		= pState // -->> (token,"wanted and consumed")
 		= parseError act (Yes token) (toString dem_token) pState
