@@ -1016,26 +1016,23 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 */
 	#!(fi_group_index, ti_cons_args, ti_fun_defs, ti_fun_heap)
 			= max_group_index 0 prods ro.ro_main_dcl_module_n fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
-	# opt_consumer_symbol_type 
-			= fd.fun_type
 
+	# (Yes consumer_symbol_type)
+			= fd.fun_type
 	  (function_producer_types, ti_fun_defs, ti_fun_heap)
 	  		= iFoldSt (accum_function_producer_type prods ro) 0 (size prods) 
 	  				([], ti_fun_defs, ti_fun_heap)
-	  (fresh_function_producer_types, ti_type_heaps)
-	  		= mapSt copy_opt_symbol_type function_producer_types
+	  (sound_consumer_symbol_type, (ti_type_heaps, ti_type_def_infos))
+	  		= add_propagation_attributes` ro.ro_common_defs consumer_symbol_type (ti_type_heaps, ti_type_def_infos)
+	  (opt_sound_function_producer_types, (ti_type_heaps, ti_type_def_infos))
+	  		= mapSt (add_propagation_attributes ro.ro_common_defs) function_producer_types (ti_type_heaps, ti_type_def_infos)
+	  (opt_sound_function_producer_types, ti_type_heaps)
+	  		= mapSt copy_opt_symbol_type opt_sound_function_producer_types
 	  				ti_type_heaps
-	  ([opt_sound_consumer_symbol_type:opt_sound_function_producer_types], (ti_type_heaps, ti_type_def_infos))
-	  		= mapSt (add_propagation_attributes ro.ro_common_defs) [opt_consumer_symbol_type: fresh_function_producer_types]
-	  				(ti_type_heaps, ti_type_def_infos)
-
-	  (Yes sound_consumer_symbol_type)
-	  		= opt_sound_consumer_symbol_type
-
-	  sound_function_producer_types
+	  sound_function_producer_types		// nog even voor determine args....
 	  		= [x \\ Yes x <- opt_sound_function_producer_types]
 
-	  ({st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env})
+	# ({st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env})
 	  		= sound_consumer_symbol_type
 
 	  (class_types, ti_fun_defs, ti_fun_heap)
@@ -1316,7 +1313,11 @@ where
 
 	add_propagation_attributes common_defs No state
 		= (No, state)
-	add_propagation_attributes common_defs (Yes st=:{st_args, st_result, st_attr_env, st_attr_vars})
+	add_propagation_attributes common_defs (Yes st) state
+		# (st, state)	= add_propagation_attributes` common_defs st state
+		= (Yes st, state)
+
+	add_propagation_attributes` common_defs st=:{st_args, st_result, st_attr_env, st_attr_vars}
 				(type_heaps, type_def_infos)
 		# ps	=
 					{ prop_type_heaps	= type_heaps
@@ -1335,7 +1336,7 @@ where
 						  		, st_attr_vars	= ps.prop_attr_vars
 						  		}
 		  state = (ps.prop_type_heaps, ps.prop_td_infos)
-		= (Yes sound_symbol_type, state)
+		= (sound_symbol_type, state)
 
 	add_propagation_attributes_to_atype modules type ps
 		| is_dictionary type ps.prop_td_infos
