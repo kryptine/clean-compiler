@@ -147,8 +147,8 @@ compileModule mod_name ms
 
 loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
 	# heaps = { hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = { th_vars = newHeap, th_attrs = newHeap }}
-	# (optional_syntax_tree,_,_,_,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_)
-		=	frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} {} {} No predef_symbols hash_table ms_files ms_error ms_io ms_out heaps
+	# (optional_syntax_tree,_,_,_,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,_)
+		=	frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} {} {} No predef_symbols hash_table ms_files ms_error ms_io ms_out stderr heaps
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
 		Yes {fe_icl={icl_functions}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
