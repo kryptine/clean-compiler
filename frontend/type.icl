@@ -2079,10 +2079,10 @@ where
 specification_error type type1 err
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cAttributed, form_attr_position = No}
-	= { err & ea_file = err.ea_file <<< " specified type " 	 
-									<:: (format, type1, Yes initialTypeVarBeautifulizer) 
-									<<< " conflicts with derived type "
+	= { err & ea_file = err.ea_file <<< " derived type " 	 
 									<:: (format, type, Yes initialTypeVarBeautifulizer) 
+									<<< " conflicts with specified type "
+									<:: (format, type1, Yes initialTypeVarBeautifulizer) 
 									<<< '\n' }
 
 cleanUpAndCheckFunctionTypes [] _ _ start_index _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (out, ts)
