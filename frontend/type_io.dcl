@@ -8,7 +8,7 @@ class WriteTypeInfo a
 where
 	write_type_info :: a !*File -> !*File
 	
-instance WriteTypeInfo CommonDefs 
+instance WriteTypeInfo CommonDefs, Char, [a] | WriteTypeInfo a
 
 //1.3
 instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 

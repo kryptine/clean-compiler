@@ -34,7 +34,7 @@ where toString {import_module} = toString import_module
 	,	ste_previous	:: SymbolTableEntry
 	}
 
-::	STE_BoundTypeVariable	= { stv_count :: !Int, stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr}
+::	STE_BoundTypeVariable	= { stv_count :: !Int, stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr /* TD */, stv_position :: Int }
 
 ::	STE_Kind	= STE_FunctionOrMacro ![Index]
 				| STE_Type

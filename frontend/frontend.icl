@@ -89,7 +89,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	| not ok
 		= (No,{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
   	# symbol_table = hash_table.hte_symbol_heap
-  	  (ok, icl_mod, dcl_mods, components, optional_dcl_icl_conversions,cached_functions_and_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error)
+  	  (ok, icl_mod, dcl_mods, components, optional_dcl_icl_conversions,cached_functions_and_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error /* TD */, directly_imported_dcl_modules)
   	  	= checkModule mod global_fun_range mod_functions n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod modules dcl_modules functions_and_macros predef_symbols (symbol_table -*-> "Checking") error heaps
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 
@@ -137,7 +137,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 
 	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, tcl_file)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
-					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod
+					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod  /* TD */ directly_imported_dcl_modules
 //	#  (components, fun_defs, error) = showComponents3 components 0 False fun_defs error
 //	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 

@@ -580,7 +580,7 @@ checkCommonDefinitions :: !Bool !Index !*CommonDefs !*{# DclModule} !*TypeHeaps 
 checkCommonDefinitions is_dcl module_index common modules type_heaps var_heap cs
 	#! is_main_dcl_mod = is_dcl && module_index == cs.cs_x.x_main_dcl_module_n
 	# (com_type_defs, com_cons_defs, com_selector_defs, modules, var_heap, type_heaps, cs)
-			= checkTypeDefs is_main_dcl_mod common.com_type_defs module_index
+			= checkTypeDefs /* TD */ is_dcl is_main_dcl_mod common.com_type_defs module_index
 							common.com_cons_defs common.com_selector_defs modules var_heap type_heaps cs
 	  (com_class_defs, com_member_defs, com_type_defs, modules, type_heaps, cs)
 	  		= checkTypeClasses 0 module_index common.com_class_defs common.com_member_defs com_type_defs modules type_heaps cs
@@ -893,6 +893,18 @@ where
 (<=<) infixl 
 (<=<) state fun :== fun state 
 
+// TD ...
+retrieve_directly_imported_dcl_modules dependencies_of_icl_mod dcl_modules
+	# (directly_imported_dcl_modules,dcl_modules)
+		= mapSt retrieve_directly_import_dcl_module dependencies_of_icl_mod dcl_modules
+	= (directly_imported_dcl_modules,dependencies_of_icl_mod,dcl_modules)
+where
+	retrieve_directly_import_dcl_module index dcl_modules=:{[index] = dcl_module}
+		# directly_imported_dcl_module
+			= dcl_module.dcl_name.id_name
+		= (directly_imported_dcl_module,dcl_modules)
+// ... TD
+
 checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbol_table}
 	#! nr_of_dcl_modules
 			= size dcl_modules
@@ -904,13 +916,17 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 	  		= nr_of_dcl_modules
 	  (dependencies_of_icl_mod, (_, cs_symbol_table))
 			= mapFilterYesSt get_opt_dependency imports_of_icl_mod (bitvect, cs_symbol_table)
+// TD ...			
+	  (directly_imported_dcl_modules,dependencies_of_icl_mod,dcl_modules)
+			= retrieve_directly_imported_dcl_modules dependencies_of_icl_mod dcl_modules
+// ... TD
 	  dependencies
 	  		= { dependencies & [index_of_icl_module] = dependencies_of_icl_mod }
 	  module_dag
 	  		= { dag_nr_of_nodes = nr_of_dcl_modules+1, dag_get_children = select dependencies }
 	  components
 	  		= partitionateDAG module_dag [cs.cs_x.x_main_dcl_module_n,index_of_icl_module]
-//	| False--->("biggest component:", maxList (map length components))
+//	| False--->("biggest component:", m axList (map length components))
 //		= undef
 	# (nr_of_components, component_numbers)
 	  		= getComponentNumbers components module_dag.dag_nr_of_nodes
@@ -934,7 +950,7 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 	  			\\ expl_imp_symbols_in_component<-expl_imp_symbols_in_components }
 	  		// eii_declaring_modules will be updated later
 	  cs
-	  		= { cs & cs_symbol_table = cs_symbol_table } // --->("expl_imp_symbols_in_components", expl_imp_symbols_in_components)
+	  		= { cs & cs_symbol_table = cs_symbol_table /* TD ... */ ,cs_x = { cs.cs_x & directly_imported_dcl_modules = directly_imported_dcl_modules} /* ... TD */ } // --->("expl_imp_symbols_in_components", expl_imp_symbols_in_components)
 	  nr_of_icl_component
 	  		= component_numbers.[index_of_icl_module]
 	  (_, expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
@@ -1228,8 +1244,8 @@ checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cyc
   	  				{ cs & cs_symbol_table = cs_symbol_table }
 
 
-checkModule :: !ScannedModule !IndexRange ![FunDef] !Int  !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !{#FunDef} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
-	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef}, !Int,!*Heaps, !*PredefinedSymbols, !*SymbolTable, *File)
+checkModule :: !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !{#FunDef} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
+	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File /* TD */, [String])
 checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod scanned_modules dcl_modules functions_and_macros predef_symbols symbol_table err_file heaps
 //	| False--->("checkModule", m.mod_name)
 //		= undef
@@ -1241,6 +1257,8 @@ checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_m
 	# (mod_name,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,local_defs,icl_functions,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 		= check_module1 m icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules functions_and_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# icl_instance_range = {ir_from = first_inst_index, ir_to = nr_of_functions}
+	
+	// llslsls CheckState
 	= check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 
 check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs} icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules functions_and_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
@@ -1261,7 +1279,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 	  (icl_functions, (sizes, local_defs)) = collectMacros cdefs.def_macros icl_functions sizes_and_local_defs
 
 	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache (size dcl_modules)
-	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n}}
+	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n /* TD */, x_is_dcl_module = False, x_type_var_position = 0, directly_imported_dcl_modules = []}}
 
 	  (scanned_modules, icl_functions, cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules (size dcl_modules) icl_functions cs
 
@@ -1395,7 +1413,7 @@ check_module2 :: Ident [.ImportedObject] .[Import ImportDeclaration] .ModuleKind
 				(Optional (Module a)) [Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState 
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},
-				!.Heap SymbolTableEntry,!.File);
+				!.Heap SymbolTableEntry,!.File,[String]);
 check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 	  (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
@@ -1416,7 +1434,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  		= checkDclModules mod_imports dcl_modules icl_functions heaps cs
 
 	| not cs.cs_error.ea_ok
-		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file)
+		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file /* TD */, [])
 	# (imported_module_numbers, dcl_modules)
 	  		= foldSt compute_used_module_nrs
 			  		expl_imp_indices
@@ -1496,7 +1514,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  cs = check_start_rule mod_type mod_name icl_global_function_range cs
 	  cs = check_needed_modules_are_imported mod_name ".icl" cs
 
-	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error,cs_x})
+	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error,cs_x })
 	  	= checkInstanceBodies icl_instance_range icl_functions e_info heaps cs
 
 	  cs_symbol_table = removeDeclarationsFromSymbolTable local_defs cGlobalScope cs_symbol_table
@@ -1541,7 +1559,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 		  		= compareDefImp icl_sizes_without_added_dcl_defs untransformed_fun_bodies main_dcl_module_n
 		  				unexpanded_icl_type_defs main_dcl_module icl_mod heaps cs_error
 
-		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, cached_functions_and_macros, cs_x.x_main_dcl_module_n, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
+		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, cached_functions_and_macros, cs_x.x_main_dcl_module_n, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file /* TD */, cs_x.directly_imported_dcl_modules)
 		# icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
 			  	 			  com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs }	  			  
 		  icl_mod		= { icl_name = mod_name, icl_functions = icl_functions, icl_common = icl_common,
@@ -1549,7 +1567,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 		  					icl_specials = {ir_from = nr_of_functions, ir_to = nr_of_functions},
 							icl_imported_objects = mod_imported_objects, icl_used_module_numbers = imported_module_numbers,
 	    		  			icl_import = icl_imported }
-		= (False, icl_mod, dcl_modules, {}, No, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
+		= (False, icl_mod, dcl_modules, {}, No, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file /* TD */, cs_x.directly_imported_dcl_modules)
 	where
 		check_start_rule mod_kind mod_name {ir_from, ir_to} cs=:{cs_predef_symbols,cs_symbol_table,cs_x}
 			# (pre_symb, cs_predef_symbols) = cs_predef_symbols![PD_Start]

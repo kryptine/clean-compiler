@@ -13,6 +13,120 @@ F a b :== b;
 // - abstract data type, what should be written?
 //
 
+// Records:
+// - ordered fields
+//
+// Constructors:
+// - unordered
+
+
+/*
+::	TypeRhs	= AlgType ![DefinedSymbol]
+			| SynType !AType
+			| RecordType !RecordType
+			| AbstractType !BITVECT
+			| UnknownType
+			
+
+	{	ds_ident		:: !Ident
+	,	ds_arity		:: !Int
+	,	ds_index		:: !Index
+	}
+	
+	
+::	RecordType =
+	{	rt_constructor	:: !DefinedSymbol
+	,	rt_fields		:: !{# FieldSymbol}
+	}
+	
+::	FieldSymbol =
+	{	fs_name			:: !Ident
+	,	fs_var			:: !Ident
+	,	fs_index		:: !Index
+	}
+	
+::	ConsDef =
+	{	cons_symb			:: !Ident
+	,	cons_type			:: !SymbolType
+	,	cons_arg_vars		:: ![[ATypeVar]]
+	,	cons_priority		:: !Priority
+	,	cons_index			:: !Index
+	,	cons_type_index		:: !Index
+	,	cons_exi_vars		:: ![ATypeVar]
+//	,	cons_exi_attrs		:: ![AttributeVar]
+	,	cons_type_ptr		:: !VarInfoPtr
+	,	cons_pos			:: !Position
+	}
+	
+::	TypeDef type_rhs =
+ 	{	td_name			:: !Ident
+	,	td_index		:: !Int
+	,	td_arity		:: !Int
+	,	td_args			:: ![ATypeVar]
+	,	td_attrs		:: ![AttributeVar]
+	,	td_context		:: ![TypeContext]
+	,	td_rhs			:: !type_rhs
+	,	td_attribute	:: !TypeAttribute
+	,	td_pos			:: !Position
+	}
+
+*/
+class NormaliseTypeDef a 
+where
+	normalise_type_def :: a -> a
+	
+import RWSDebug
+
+instance NormaliseTypeDef TypeRhs
+where
+	normalise_type_def (AlgType defined_symbols)
+		// algebraic data types are further normalized by an alphabetical sort on the
+		// constructor names.
+		= AlgType (sortBy (\{ds_ident={id_name=id_name1}} {ds_ident={id_name=id_name2}} -> id_name1 < id_name2) defined_symbols)
+	normalise_type_def i
+		= i
+		
+instance NormaliseTypeDef TypeDef rhs | NormaliseTypeDef rhs
+where
+	normalise_type_def type_def=:{td_args,td_arity}
+		= type_def
+		
+			
+	
+	
+
+/*
+
+::	TypeVar =
+	{	tv_name				:: !Ident
+	,	tv_info_ptr			:: !TypeVarInfoPtr
+	}
+
+::	ATypeVar =
+	{	atv_attribute		:: !TypeAttribute
+	,	atv_annotation		:: !Annotation
+	,	atv_variable		:: !TypeVar
+	}
+	
+::	TypeDef type_rhs =
+ 	{	td_name			:: !Ident
+	,	td_index		:: !Int
+	,	td_arity		:: !Int
+	,	td_args			:: ![ATypeVar]			// example Tree a b = ... field is [a,b]
+	,	td_attrs		:: ![AttributeVar]
+	,	td_context		:: ![TypeContext]
+	,	td_rhs			:: !type_rhs
+	,	td_attribute	:: !TypeAttribute
+	,	td_pos			:: !Position
+	}
+*/
+// CommonDefs
+// TypeDef
+loop []
+	= ""
+loop [{ds_ident={id_name}}:xs]
+	= id_name +++ ", " +++ (loop xs)			
+	
 class WriteTypeInfo a 
 where
 	write_type_info :: a !*File -> !*File
@@ -86,7 +200,10 @@ where
 		
 instance WriteTypeInfo TypeDef TypeRhs
 where 
-	write_type_info {td_name,td_arity,td_args,td_rhs} tcl_file
+	write_type_info /*{td_name,td_arity,td_args,td_rhs}*/ type_def tcl_file
+		# {td_name,td_arity,td_args,td_rhs}
+			= normalise_type_def type_def
+	
 		|  F ("TypeDef '" +++ td_name.id_name +++ "'") True
  		#! tcl_file
  			= write_type_info td_name tcl_file
@@ -117,7 +234,10 @@ where
 instance WriteTypeInfo TypeVar
 where
 	write_type_info {tv_name} tcl_file
+		// writing tv_name as number suffices
+		| F ("TypeVar: " +++ tv_name.id_name) True
 		= write_type_info tv_name tcl_file
+
 		
 AlgTypeCode			=: (toChar 5)
 SynTypeCode 		=: (toChar 6)
@@ -638,7 +758,7 @@ where
 instance DefaultElem Int
 where
 	default_elem
-		= abort "instance DefaultElem Int"
+		= 0 //abort "instance DefaultElem Int"
 		
 instance DefaultElem DefinedSymbol
 where

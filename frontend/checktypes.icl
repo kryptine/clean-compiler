@@ -59,19 +59,18 @@ where
 			= True
 		try_to_combine_attributes _ _
 			= False
-				
+
 instance bindTypes TypeVar
 where
-	bindTypes cti tv=:{tv_name=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table})
+	bindTypes cti tv=:{tv_name=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table /* TD ... */, cs_x={x_type_var_position,x_is_dcl_module} /* ... TD */ })
 		# (var_def, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case var_def.ste_kind of
-			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count}
+			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count /* TD */, stv_position}
 				# cs = { cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, { var_def & ste_kind = STE_BoundTypeVariable { bv & stv_count = inc stv_count }})}
-				-> ({ tv & tv_info_ptr = stv_info_ptr }, stv_attribute, (ts, ti, cs))
+				-> ({ tv & tv_info_ptr = stv_info_ptr /* TD ... */, tv_name = if x_is_dcl_module tv.tv_name { tv.tv_name & id_name = toString stv_position } /* ... TD */ }, stv_attribute, (ts, ti, cs))
 			_
 				-> (tv, TA_Multi, (ts, ti, { cs & cs_error = checkError var_id "undefined" cs.cs_error }))
-
 
 instance bindTypes [a] | bindTypes a
 where
@@ -162,17 +161,18 @@ where
 		# (types, local_vars_list, attr_env, ts_ti_cs)
 				= bind_types_of_cons types cti free_vars attr_env ts_ti_cs
 		  (type, type_attr, (ts, ti, cs)) = bindTypes cti type ts_ti_cs
-		  (local_vars, cs_symbol_table) = foldSt retrieve_local_vars free_vars ([], cs.cs_symbol_table)
+		  (local_vars, cs_symbol_table /* TD ... */, _ /* ... TD */ ) = foldSt retrieve_local_vars free_vars ([], cs.cs_symbol_table /* TD ...*/, cs.cs_x /* ... TD */ )
 		  (attr_env, cs_error) = addToAttributeEnviron type_attr cti.cti_lhs_attribute attr_env cs.cs_error
 		= ([type : types], [local_vars : local_vars_list], attr_env, (ts, ti , { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
 	where 
-		retrieve_local_vars tv=:{tv_name={id_info}} (local_vars, symbol_table)
-			# (ste=:{ste_kind = STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count}}, symbol_table) = readPtr id_info symbol_table
+		retrieve_local_vars tv=:{tv_name={id_info}} (local_vars, symbol_table /* TD ... */, cs_x=:{x_is_dcl_module} /* ... TD */ )
+			# (ste=:{ste_kind = STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count /* TD ... */,stv_position  /* ... TD */ }}, symbol_table) = readPtr id_info symbol_table
 			| stv_count == 0
-				= (local_vars, symbol_table)
-				= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr }, atv_attribute = stv_attribute, atv_annotation = AN_None } : local_vars],
-						symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
-
+				= (local_vars, symbol_table /* TD ... */, cs_x /* ... TD */)
+				
+				= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr /* TD ... */, tv_name = if x_is_dcl_module tv.tv_name { tv.tv_name & id_name = toString stv_position } /* ... TD */ }, atv_attribute = stv_attribute, atv_annotation = AN_None } : local_vars],
+						symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}})/* TD ... */, cs_x /* ... TD */)
+						
 //
 checkRhsOfTypeDef :: !CheckedTypeDef ![AttributeVar] !CurrentTypeInfo !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 	-> (!TypeRhs, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
@@ -227,10 +227,20 @@ isATopConsVar cv		:== cv < 0
 encodeTopConsVar cv		:== dec (~cv)
 decodeTopConsVar cv		:== ~(inc cv)
 
-checkTypeDef :: !Index !Index !*TypeSymbols !*TypeInfo !*CheckState -> (!*TypeSymbols, !*TypeInfo, !*CheckState);
-checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
+checkTypeDef :: /* TD */ !Bool !Index !Index !*TypeSymbols !*TypeInfo !*CheckState -> (!*TypeSymbols, !*TypeInfo, !*CheckState);
+checkTypeDef /* TD */ is_dcl_module type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
 	# (type_def, ts_type_defs) = ts_type_defs![type_index]
 	# {td_name,td_pos,td_args,td_attribute} = type_def
+	
+	// TD ...
+	// in case of an icl-module, the arguments i.e. the type variables of type constructors are normalized which makes
+	// comparison by the static linker easier.
+	# (cs=:{cs_error})
+		= { cs & cs_x = { cs.cs_x & x_is_dcl_module = is_dcl_module, x_type_var_position = 0 } }
+// 	| FB (not is_dcl_module)  ("checkTypeDef: " +++ td_name.id_name) True
+	#
+ 	// ... TD
+ 	
 	  position = newPosition td_name td_pos
 	  cs_error = pushErrorAdmin position cs_error
 	  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_name.id_name ti_type_heaps.th_attrs
@@ -242,7 +252,10 @@ checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:
 				({ ts & ts_type_defs = ts_type_defs },{ ti & ti_type_heaps = ti_type_heaps}, cs)
 	= ({ ts & ts_type_defs = { ts.ts_type_defs & [type_index] = { type_def & td_rhs = td_rhs }}}, ti,
 				{ cs &	cs_error = popErrorAdmin cs.cs_error,
-						cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cOuterMostLevel type_vars cs.cs_symbol_table })
+						cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cOuterMostLevel type_vars cs.cs_symbol_table
+	// TD ...
+						, cs_x = { cs.cs_x & x_is_dcl_module = False}      })
+	// ... TD 
 where
 	determine_root_attribute TA_None name attr_var_heap
 		# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
@@ -406,9 +419,9 @@ where
 		kind_list_to_string [k:ks] = " -> " +++ toString k +++ kind_list_to_string ks
 */
 
-checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
+checkTypeDefs :: /* TD */ !Bool !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
-checkTypeDefs is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
+checkTypeDefs /* TD */ is_dcl_module is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
 	   ti = { ti_type_heaps = type_heaps, ti_var_heap = var_heap  }
@@ -417,7 +430,7 @@ where
 	check_type_defs is_main_dcl type_index nr_of_types module_index ts ti=:{ti_type_heaps,ti_var_heap} cs
 		| type_index == nr_of_types
 			= (ts.ts_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, ts.ts_modules, ti_var_heap, ti_type_heaps, cs)
-			# (ts, ti, cs) = checkTypeDef type_index module_index ts ti cs
+			# (ts, ti, cs) = checkTypeDef /* TD */ is_dcl_module type_index module_index ts ti cs
 			= check_type_defs is_main_dcl (inc type_index) nr_of_types module_index ts ti cs
 
 expand_syn_types module_index type_index nr_of_types expst
@@ -983,26 +996,54 @@ cOuterMostLevel :== 0
 
 addTypeVariablesToSymbolTable :: ![ATypeVar] ![AttributeVar] !*TypeHeaps !*CheckState
 	-> (![ATypeVar], !(![AttributeVar], !*TypeHeaps, !*CheckState))
-addTypeVariablesToSymbolTable type_vars attr_vars heaps cs
-	= mapSt (add_type_variable_to_symbol_table) type_vars (attr_vars, heaps, cs)
+addTypeVariablesToSymbolTable type_vars attr_vars heaps cs /* TD */ =:{cs_x={x_type_var_position,x_is_dcl_module}}
+// TD ...
+	| x_type_var_position <> 0	= abort "addTypeVariablesToSymbolTable: x_type_var_position must be zero-initialized"
+
+	# ((a_type_vars,t=:(attribute_vars, type_heaps, check_state)))
+		= mapSt (add_type_variable_to_symbol_table) type_vars (attr_vars, heaps, cs)
+	| x_is_dcl_module
+		= (a_type_vars,t)
+		
+		// in case of an icl-module, the type variables of the type definition need to be normalized by storing its
+		// argument number for later use. To avoid incomprehensible error messages the constructor's type variables
+		// are changed below.
+		# (a_type_vars,check_state)
+			= mapSt change_type_variables_into_their_type_constructor_position a_type_vars check_state
+		= (a_type_vars,(attribute_vars, type_heaps, check_state))		
+// ... TD	
 where
+// TD ...
+	change_type_variables_into_their_type_constructor_position :: !ATypeVar !*CheckState -> (!ATypeVar, !*CheckState)
+	change_type_variables_into_their_type_constructor_position	atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute} cs=:{cs_symbol_table}
+		# tv_info = tv_name.id_info
+		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table	  
+		# stv_position
+			= case entry.ste_kind of
+				STE_BoundTypeVariable {stv_position}
+					-> stv_position
+		# atv
+			= { atv & atv_variable.tv_name.id_name = toString stv_position }
+		= (atv,{cs & cs_symbol_table = cs_symbol_table})		
+// ... TD
+
 	add_type_variable_to_symbol_table :: !ATypeVar !(![AttributeVar], !*TypeHeaps, !*CheckState)
 		-> (!ATypeVar, !(![AttributeVar], !*TypeHeaps, !*CheckState))
 	add_type_variable_to_symbol_table atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
-		(attr_vars, heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error })
+		(attr_vars, heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error /* TD ... */, cs_x={x_type_var_position} /* ... TD */})
 		# tv_info = tv_name.id_info
-		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table
+		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table	  
 		| entry.ste_def_level < cOuterMostLevel
 			# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
 		      (atv_attribute, attr_vars, th_attrs, cs_error) = check_attribute atv_attribute tv_name.id_name attr_vars th_attrs cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr, stv_count = 0 }, ste_def_level = cOuterMostLevel, ste_previous = entry })
+			  						stv_info_ptr = tv_info_ptr, stv_count = 0 /* TD */, stv_position = x_type_var_position}, ste_def_level = cOuterMostLevel, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
-					(attr_vars, heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
+					(attr_vars, heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
 			= (atv, (attr_vars, { heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error}))
+					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
 
 	check_attribute :: !TypeAttribute !String ![AttributeVar] !*AttrVarHeap !*ErrorAdmin
 		-> (!TypeAttribute, ![AttributeVar], !*AttrVarHeap, !*ErrorAdmin)
@@ -1028,7 +1069,7 @@ where
 	add_type_variable_to_symbol_table :: !TypeAttribute !ATypeVar !(!*TypeHeaps, !*CheckState)
 		-> (!ATypeVar, !(!*TypeHeaps, !*CheckState))
 	add_type_variable_to_symbol_table root_attr atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
-		(heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error })
+		(heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error /* TD ... */, cs_x={x_type_var_position} /* ... TD */})
 		# tv_info = tv_name.id_info
 		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table
 		| entry.ste_def_level < cOuterMostLevel
@@ -1036,12 +1077,12 @@ where
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
 		      (atv_attribute, cs_error) = check_attribute atv_attribute root_attr tv_name.id_name cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr, stv_count = 0 }, ste_def_level = cOuterMostLevel, ste_previous = entry })
+			  						stv_info_ptr = tv_info_ptr, stv_count = 0 /* TD */, stv_position = x_type_var_position }, ste_def_level = cOuterMostLevel, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
-					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
+					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */ }))
 			= (atv, ({ heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error}))
+					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
 
 	check_attribute :: !TypeAttribute !TypeAttribute !String !*ErrorAdmin
 		-> (!TypeAttribute, !*ErrorAdmin)

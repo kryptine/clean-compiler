@@ -47,23 +47,27 @@ pl [x:xs] = x +++ " , " +++ (pl xs)
 F :: !a .b -> .b
 F a b = b
 
-write_tcl_file :: !Int {#DclModule} CommonDefs !*File -> (.Bool,.File)
-write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file
+write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
+write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules
 	#! tcl_file
 		= write_type_info common_defs tcl_file
-	= (True,tcl_file)	
+	#! tcl_file
+		= write_type_info directly_imported_dcl_modules tcl_file
+	#! tcl_file
+		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
+	= (True,tcl_file) 
+//---> ("dcl",size main_dcl_module.dcl_common.com_type_defs, "icl", size common_defs.com_type_defs);
 			
-convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */!*File {# DclModule} !IclModule
+convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */!*File {# DclModule} !IclModule /* TD */ [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, /* TD */ !*File)
-convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap /* TD */ tcl_file dcl_mods icl_mod
+convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap /* TD */ tcl_file dcl_mods icl_mod  /* TD */ directly_imported_dcl_modules
 	// TD ...
-/*
 	# (ok,tcl_file)
-		= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file
+		= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file /* TD */ directly_imported_dcl_modules
 	| not ok
 		= abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
-*/
 	// ... TD
+	
 	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamics]
 	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)
 		= case (pds_module == (-1) || pds_def == (-1)) of
