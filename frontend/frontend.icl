@@ -10,7 +10,7 @@ import RWSDebug
 		,	fe_varHeap :: !.VarHeap
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
-		,	fe_arrayInstances :: !{!(Index, SymbolType)}
+		,	fe_arrayInstances :: !IndexRange
 		}
 
 // trace macro

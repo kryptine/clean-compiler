@@ -1370,7 +1370,7 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars} nr_of
 	}
 
 typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
-	-> (!Bool, !*{# FunDef}, !{! (!Index, !SymbolType)}, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
+	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
 typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
 	#! fun_env_size = size fun_defs
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
@@ -1396,10 +1396,10 @@ typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_ex
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
 			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
 				{ ts & ts_fun_env = ts_fun_env })
-	  {si_array_instances, si_next_TC_member_index, si_TC_instances}= special_instances
-	  (array_inst_types, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs predef_symbols ts_type_heaps
+	  {si_array_instances, si_next_array_member_index, si_next_TC_member_index, si_TC_instances}= special_instances
+	  (fun_defs, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs fun_defs predef_symbols ts_type_heaps
 	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
-	= (not type_error, fun_defs, { array_inst_type \\ array_inst_type <- array_inst_types }, type_code_instances, ti_common_defs, ti_functions,
+	= (not type_error, fun_defs, { ir_from = fun_env_size, ir_to = si_next_array_member_index }, type_code_instances, ti_common_defs, ti_functions,
 			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file)
 where
 
@@ -1704,25 +1704,41 @@ where
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
 			
-	convert_array_instances si_array_instances common_defs predef_symbols type_heaps
+	convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps
 		| isEmpty si_array_instances
-			= ([], predef_symbols, type_heaps)
+			= (fun_defs, predef_symbols, type_heaps)
 			# ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
 			  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
 			  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
 			  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
 			  array_members = common_defs.[pds_module].com_member_defs
-			  (rev_instances, type_heaps) = foldSt (convert_array_instance class_members array_members unboxed_array_type) si_array_instances ([], type_heaps)
-			= (reverse rev_instances, predef_symbols, type_heaps)
+			  (offset_table, _, predef_symbols) = arrayFunOffsetToPD_IndexTable array_members predef_symbols
+			  (rev_instances, type_heaps) = foldSt (convert_array_instance class_members array_members unboxed_array_type offset_table) si_array_instances
+			  	([], type_heaps)
+			= (arrayPlusRevList fun_defs rev_instances, predef_symbols, type_heaps)
 	where
-		convert_array_instance class_members array_members unboxed_array_type {ai_record} types_and_heaps
-			= iFoldSt (create_instance_type class_members array_members unboxed_array_type (TA ai_record [])) 0 (size class_members) types_and_heaps
+		convert_array_instance class_members array_members unboxed_array_type offset_table {ai_record} funs_and_heaps
+			= iFoldSt (create_instance_type class_members array_members unboxed_array_type offset_table (TA ai_record [])) 0 (size class_members) funs_and_heaps
 
-		create_instance_type members array_members unboxed_array_type record_type member_index (inst_types, type_heaps)
-			# {me_type,me_class_vars} = array_members.[members.[member_index].ds_index]
-			# (instance_type, _, type_heaps) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
+		create_instance_type members array_members unboxed_array_type offset_table record_type member_index (array_defs, type_heaps)
+			# {me_type,me_symb,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
+			  (instance_type, _, type_heaps) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
 													it_types = [unboxed_array_type, record_type]} SP_None type_heaps
-			= ([(member_index,instance_type) : inst_types], type_heaps)
+			  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
+			  fun = 
+				{	fun_symb		= me_symb
+				,	fun_arity		= me_type.st_arity
+				,	fun_priority	= NoPrio
+				,	fun_body		= NoBody
+				,	fun_type		= Yes instance_type
+				,	fun_pos			= me_pos
+				,	fun_index		= member_index
+				,	fun_kind		= FK_Unknown
+				,	fun_lifted		= 0
+				,	fun_info		= EmptyFunInfo
+				}
+
+			= ([fun : array_defs], type_heaps)
 	
 	create_erroneous_function_types group ts
 		= foldSt create_erroneous_function_type group ts

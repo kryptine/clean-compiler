@@ -2708,6 +2708,7 @@ check_needed_modules_are_imported mod_name extension e_info cs=:{cs_needed_modul
 		  cs_error = popErrorAdmin cs_error
 		= (e_info, { cs & cs_error = cs_error })
 
+arrayFunOffsetToPD_IndexTable :: !{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !{#MemberDef}, !v:{#PredefinedSymbol})
 arrayFunOffsetToPD_IndexTable member_defs predef_symbols
 	# nr_of_array_functions = size member_defs
 	= iFoldSt offset_to_PD_index PD_CreateArrayFun (PD_CreateArrayFun + nr_of_array_functions)
@@ -2722,6 +2723,7 @@ elemTypeIsStrict [TA {type_index={glob_object,glob_module}} _ : _] predef_symbol
 	= glob_module == predef_symbols.[PD_PredefinedModule].pds_def &&
 		(glob_object == predef_symbols.[PD_StrictArrayType].pds_def || glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def)
 
+makeElemTypeOfArrayFunctionStrict :: !SymbolType !Index !{# Index} -> SymbolType
 makeElemTypeOfArrayFunctionStrict st=:{st_args,st_result} me_offset offset_table
 	# array_fun_kind = offset_table.[me_offset]
 	| array_fun_kind == PD_UnqArraySelectFun

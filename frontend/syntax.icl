@@ -370,6 +370,7 @@ cMayBeNonCoercible		:== 4
 					| TransformedBody !TransformedBody
 					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| BackendBody ![BackendBody]
+					| NoBody
 					
 ::	BackendBody =
 	{	bb_args	:: ![FunctionPattern]

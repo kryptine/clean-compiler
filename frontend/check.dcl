@@ -18,3 +18,6 @@ convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps -> (!SymbolType, !Specials, !*TypeHeaps)
 
 
+arrayFunOffsetToPD_IndexTable :: !{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !{#MemberDef}, !v:{#PredefinedSymbol})
+
+makeElemTypeOfArrayFunctionStrict :: !SymbolType !Index !{# Index} -> SymbolType

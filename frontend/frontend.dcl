@@ -11,7 +11,7 @@ import checksupport, transform, overloading
 		,	fe_varHeap :: !.VarHeap
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
-		,	fe_arrayInstances :: !{!(Index, SymbolType)}
+		,	fe_arrayInstances :: !IndexRange
 		}
 
 frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 

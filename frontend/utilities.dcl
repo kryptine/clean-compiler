@@ -4,6 +4,8 @@ from StdString import String
 from StdEnv import Eq, not, Ord, IncDec
 import StdMisc, general
 
+import _aconcat
+   
 /*
 	For Strings
 */
