@@ -9,7 +9,7 @@ import typesupport
 
 typeFunName :: Ident -> {#Char}
 typeFunName {id_name}
-	=	"TD_" +++ id_name
+	=	"TD;" +++ id_name
 
 class makeTypeFun a :: Ident Position SymbolType *VarHeap *SymbolTable
 	-> (a, *VarHeap, *SymbolTable)
