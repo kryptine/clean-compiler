@@ -38,6 +38,7 @@ from type_io_common import class toString (..),instance toString GlobalTCType;
 	,	ci_module_id_symbol						:: Expression
 	,	ci_internal_type_id						:: Expression
 	,	ci_module_id							:: Optional LetBind
+	,	ci_type_id								:: !TypeSymbIdent
 	}
 
 ::	ConversionInput =
@@ -199,6 +200,81 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 						
 	# (module_symb,module_id_app,predefined_symbols)
 		= get_module_id_app predefined_symbols
+
+// new...
+	# ({pds_module=pds_type_id_module, pds_def=pds_type_id_def} , predefined_symbols) = predefined_symbols![PD_TypeID]
+	# {td_name} = common_defs.[pds_type_id_module].com_type_defs.[pds_type_id_def]
+	# ci_type_id
+		= {
+			type_name	= td_name
+		,	type_arity	= 0
+		,	type_index	= { glob_object = pds_type_id_def, glob_module = pds_type_id_module}
+		,	type_prop	= { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }
+		};	
+	
+
+// TE TA !TypeSymbIdent ![AType]
+/*
+MakeTypeSymbIdentMacro type_index name arity
+	:== {	type_name = name, type_arity = arity, type_index = type_index,
+			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
+
+*/
+/*
+::	Global object =
+	{	glob_object	:: !object
+	,	glob_module	:: !Index
+	}
+::	Type	=	TA !TypeSymbIdent ![AType]
+
+::	TypeSymbIdent =
+	{	type_name		:: !Ident
+	,	type_arity		:: !Int
+	,	type_index		:: !Global Index
+	,	type_prop		:: !TypeSymbProperties
+	}
+# ({pds_module=pds_module1, pds_def=pds_def1} , predefined_symbols) = predefined_symbols![PD_DynamicTemp]
+# {td_rhs=RecordType {rt_constructor,rt_fields}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
+
+::	TypeDef type_rhs =
+ 	{	td_name			:: !Ident
+	,	td_index		:: !Int
+	,	td_arity		:: !Int
+	,	td_args			:: ![ATypeVar]
+	,	td_attrs		:: ![AttributeVar]
+	,	td_context		:: ![TypeContext]
+	,	td_rhs			:: !type_rhs
+	,	td_attribute	:: !TypeAttribute
+	,	td_pos			:: !Position
+	,	td_used_types	:: ![GlobalIndex]
+	}
+	
+::	*ConversionInfo =
+	{	ci_predef_symb		:: !*PredefinedSymbols
+	,	ci_var_heap			:: !*VarHeap
+	,	ci_expr_heap		:: !*ExpressionHeap
+	,	ci_new_variables 	:: ![FreeVar]
+	,	ci_new_functions 	:: ![FunctionInfoPtr]
+	,	ci_fun_heap			:: !*FunctionHeap
+	,	ci_next_fun_nr		:: !Index
+	
+	//	data needed to generate coercions
+	,	ci_placeholders_and_tc_args				:: [(!BoundVar,Ptr VarInfo)]
+	,	ci_generated_global_tc_placeholders		:: !Bool
+	,	ci_used_tcs								:: [Ptr VarInfo]
+	,	ci_symb_ident							:: SymbIdent
+	,	ci_sel_type_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_sel_value_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_module_id_symbol						:: Expression
+	,	ci_internal_type_id						:: Expression
+	,	ci_module_id							:: Optional LetBind
+	}
+
+*/
+
+
+// ...new
+
 						
 	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
@@ -210,7 +286,8 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							ci_used_tcs = [],ci_symb_ident = dynamic_temp_symb_ident , ci_sel_type_field =  ci_sel_type_field, ci_sel_value_field = ci_sel_value_field, 
 							ci_module_id_symbol = App module_symb,
 							ci_internal_type_id = module_id_app,
-							ci_module_id		  = No })
+							ci_module_id		  = No,
+							ci_type_id		      = ci_type_id })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
 			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types [] type_heaps ci_var_heap
 	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
@@ -274,7 +351,7 @@ where
 			build_type_identification dyn_type_code ci=:{ci_module_id=No}
 				= abort "no ptr"; //(dyn_type_code,ci)
 			build_type_identification dyn_type_code ci=:{ci_module_id=Yes let_bind}
-				# (let_info_ptr,  ci)	= let_ptr 1 ci
+				# (let_info_ptr,  ci)	= typed_let_ptr ci
 				# letje
 					= Let {	let_strict_binds	= [],
 							let_lazy_binds		= [let_bind],
@@ -785,9 +862,9 @@ where
 			   },
 			   { ci & ci_new_variables = [ cyclic_fv : ci.ci_new_variables ]} /*ci*/)
 			   
-	add_coercions [] _ _ bound_vars dp_rhs ci
+	add_coercions _ [] _ _ bound_vars dp_rhs ci
 		= (bound_vars,dp_rhs,ci)
-	add_coercions [({var_info_ptr=a_ij},a_ij_tc):rest] this_default q bound_vars dp_rhs ci=:{ci_module_id_symbol}
+	add_coercions result_type [({var_info_ptr=a_ij},a_ij_tc):rest] this_default q bound_vars dp_rhs ci=:{ci_module_id_symbol}
 		// extra
 		# a_ij_var = {var_name = a_ij_var_name, var_info_ptr = a_ij, var_expr_ptr = nilPtr}	
 		# a_ij_tc_var = {var_name = a_aij_tc_var_name, var_info_ptr = a_ij_tc, var_expr_ptr = nilPtr}
@@ -824,7 +901,7 @@ where
 		  			
 		// extra
 		# (bound_vars,new_dp_rhs,ci)
-			= add_coercions rest (if (isNo this_default) No new_default2) q bound_vars dp_rhs ci 
+			= add_coercions result_type rest (if (isNo this_default) No new_default2) q bound_vars dp_rhs ci 
 		
 		#! (opt_expr,ci)
 			= toExpression this_default ci
@@ -840,7 +917,7 @@ where
 										   lb_dst = coerce_bool_fv, lb_position = NoPos } : let_binds
 										]
 		  (let_info_ptr, ci) 	= let_ptr (length let_lazy_binds) ci
-		  (case_info_ptr, ci)	= bool_case_ptr ci
+		  (case_info_ptr, ci)	= bool_case_ptr result_type ci
 /* ... Sjaak */
 
 		# let_expr
@@ -922,7 +999,7 @@ where
 	 				#! used_ci_placeholders_and_tc_args
 	 					= filter (\(_,ci_placeholders_and_tc_arg) -> isMember ci_placeholders_and_tc_arg ci_used_tcs) ci_placeholders_and_tc_args
 					#! (bound_vars,dp_rhs,ci)
-						= add_coercions used_ci_placeholders_and_tc_args this_default binds bound_vars dp_rhs ci
+						= add_coercions result_type used_ci_placeholders_and_tc_args this_default binds bound_vars dp_rhs ci
 	 				-> (dp_rhs,ci)
 	 			False
 	 				-> (dp_rhs,ci)
@@ -948,7 +1025,7 @@ where
 
 /* Sjaak ... */
 		  (let_info_ptr, ci) 	= let_ptr (2 + length let_binds) ci
-		  (case_info_ptr, ci)	= bool_case_ptr ci
+		  (case_info_ptr, ci)	= bool_case_ptr result_type ci
 /* ... Sjaak */
 
 		  app_args2 = extended_unify_and_coerce [opened_dynamic.opened_dynamic_type, type_code] [opened_dynamic.opened_dynamic_type, type_code, ci_module_id_symbol ]
@@ -1237,17 +1314,32 @@ let_ptr ci=:{ci_expr_heap}
 REPLACED BY:
 Sjaak ... */
 
-bool_case_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
-bool_case_ptr ci=:{ci_expr_heap}
+
+bool_case_ptr :: !AType !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
+bool_case_ptr result_type ci=:{ci_expr_heap}
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = toAType (TB BT_Bool),
-															ct_result_type = empty_attributed_type,
+															ct_result_type = result_type, //empty_attributed_type,
 															ct_cons_types = [[toAType (TB BT_Bool)]]}) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
 
+
+//  bool_case_ptrNEW result_type ci
 let_ptr :: !Int !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 let_ptr nr_of_binds ci=:{ci_expr_heap}
-	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ci_expr_heap
-	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ci_expr_heap
+//	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ci_expr_heap
+//	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
+	= let_ptr2 (repeatn nr_of_binds empty_attributed_type) ci
+
+// 
+typed_let_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
+typed_let_ptr ci=:{ci_expr_heap,ci_type_id}
+//	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType [toAType (TA ci_type_id [])]) ci_expr_heap
+//	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
+	= let_ptr2 [toAType (TA ci_type_id [])] ci
+
+let_ptr2 :: [AType] !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
+let_ptr2 let_types ci=:{ci_expr_heap}
+	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType let_types) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
 
 /* Sjaak ... */
