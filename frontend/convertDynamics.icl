@@ -301,7 +301,9 @@ where
 		  (tb_rhs, ci) = convertDynamics {global_type_instances & cinp_st_args = tb_args} vars_with_types No tb_rhs ci
 		= (TransformedBody {tb_args = tb_args,tb_rhs = tb_rhs}, ci)
 	convert_dynamics_in_body global_type_instances other fun_type ci
-		= abort "unexpected value in 'convert dynamics.convert_dynamics_in_body'"
+		| True <<- ("Martijn",other)
+		= abort "!!!unexpected value in 'convert dynamics.convert_dynamics_in_body'"
+import RWSDebug
 
 bindVarsToTypes2 st_context vars types typed_vars common_defs
 	:== bindVarsToTypes vars (addTypesOfDictionaries common_defs st_context types) typed_vars
@@ -480,9 +482,8 @@ where
 		= abort "convertDynamics cinp bound_vars default_expr (TypeCodeExpression" //convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
 		= (EE, ci)
-	convertDynamics cinp bound_vars default_expr expression ci
-		= abort "unexpected value in convertDynamics: 'convertDynamics.Expression'"
-	
+	convertDynamics cinp bound_vars default_expr expr=:(NoBind _) ci
+		= (expr,ci)
 /*
 	replace all references in a type code expression which refer to an argument i.e. the argument contains a
 	type to their placeholders. Return is a list of (placeholder,argument) list. Each tuple is used later as
