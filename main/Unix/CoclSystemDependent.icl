@@ -31,10 +31,8 @@ ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
 ensureCleanSystemFilesExists path env
 	= ensureDirectoryExists path env
 
-:: CompileFun st
-	:==	([{#Char}] st -> (Bool, st))
 	
-compiler_loop :: (CompileFun *st) *st -> (!Bool, !*st)
+compiler_loop :: ([{#Char}] *st -> *(Bool, *st)) *st -> (!Bool, !*st)
 compiler_loop compile compile_state
 	| length commandArgs==3 && commandArgs!!0=="--pipe"
 		# commands_name= (commandArgs!!1);
@@ -93,14 +91,14 @@ string_to_args string
 				= skip_to_double_quote (i+1);
 
 
-compile_loop :: (CompileFun *st) {#Char} {#Char} *st -> *st
+compile_loop :: ([{#Char}] *st -> *(Bool, *st)) {#Char} {#Char} *st -> *st
 compile_loop compile commands results compile_state
 	# r=open_pipes commands results;
 	| r<>0
 		= abort ("compile_loop\n");
 	=	compile_files compile compile_state
 
-compile_files :: (CompileFun *st) *st -> *st
+compile_files :: ([{#Char}] *st -> *(Bool, *st)) *st -> *st
 compile_files compile compile_state
 	# n = get_command_length;
 	| n==(-1)
