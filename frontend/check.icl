@@ -517,6 +517,9 @@ checkFields mod_index field_ass opt_type e_info=:{ef_selector_defs,ef_type_defs,
 			Yes ({td_index,td_rhs = RecordType {rt_constructor,rt_fields}}, type_mod_index)
 				# (field_exprs, cs_error) = check_and_rearrange_fields type_mod_index 0 rt_fields field_ass cs.cs_error
 				-> (Yes ({ glob_object = rt_constructor, glob_module = type_mod_index }, td_index, field_exprs), e_info, { cs & cs_error = cs_error })
+			Yes _
+				# (Yes type_ident) = opt_type
+				-> (No, e_info, { cs & cs_error = checkError type_ident "not a record constructor" cs.cs_error })
 			No
 				-> (No, e_info, cs)
 		= (No, e_info, cs)
