@@ -11,6 +11,8 @@ import checksupport
 import syntax
 import StdEnv
 
+mstub = stub "convert"
+
 // Cocl to Sucl for functions
 cts_function
  :: Int                                                 // Index of current module
@@ -356,7 +358,7 @@ stc_funcdef dcl_mods (args,body)
           , tb_rhs  = convert_funcbody dcl_mods body
           }
 
-convert_symbol :: SuclSymbol -> FreeVar
+convert_symbol :: SuclSymbol ->Expression
 
 */
 
@@ -382,36 +384,36 @@ Converting a function body:
 
 */
 
-/*
 convert_funcbody ::
-    {#DclModule}                        // DCL modules
-    Level                               // Level for newly introduced freevars (cases)
-    (SuclVariable -> FreeVar)           // Mapping variables to freevars
-    u:ExpressionHeap                    // Supply of ExprInfoPtrs
-    (v:Heap VarInfo)                    // Supply of FreeVars and BoundVars
-    (FuncBody SuclSymbol SuclVariable)  // Function body to convert
- -> ( u:ExpressionHeap
-    , v:Heap VarInfo
-    , Expression
+    {#DclModule}                        // Dcl modules for looking up constructor types
+    Level                               // (Lexical?) level for new variables
+    [SuclVariable]                      // Nodes from case variables in the environment
+    (SuclVariable -> Expression)        // Mapping from free nodes to expressions
+    *ExpressionHeap                     // Fresh expression space
+    *(Heap VarInfo)                     // Fresh variable space
+    !(FuncBody SuclSymbol SuclVariable) // Function body to convert
+ -> ( *ExpressionHeap                   // Modified expression space
+    , *(Heap VarInfo)                   // Modified variable space
+    , Expression                        // Resulting expression
     )
-*/
 
-convert_funcbody dcl_mods level freevarenv exprheap0 varheap0 (MatchPattern pattern yesbody nobody)
-= (exprheap2,varheap2,Let li)
+convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPattern pattern yesbody nobody)
+= (exprheap4,varheap3,match_expression)
   where (exprheap1,varheap1,case_expression,default_refcount)
-        = convert_matchpatterns dcl_mods build_casebranch freevarenv exprheap0 varheap0 (Var default_boundvar) pgraph level [proot]
+        = convert_matchpatterns dcl_mods build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level [proot]
         pgraph = rgraphgraph pattern
         proot = rgraphroot pattern
         default_boundvar
         = { var_name = default_ident
           , var_info_ptr = default_info_ptr
-          , var_expr_ptr = default_expression
+          , var_expr_ptr = default_expr_ptr
           }
         (default_info_ptr,varheap2) = newPtr VI_Empty varheap1
         (letinfoptr,exprheap2) = newPtr EI_Empty exprheap1
+        (default_expr_ptr,exprheap3) = newPtr EI_Empty exprheap2
         li
         = { let_strict_binds = []
-          , let_lazy_binds = [{lb_dst=default_freevar,lb_src=default_expression,lb_position=NoPos}]
+          , let_lazy_binds = [{lb_dst=default_freevar,lb_src=match_failure_expression,lb_position=NoPos}]
           , let_expr = case_expression
           , let_info_ptr = letinfoptr
           , let_expr_position = NoPos
@@ -426,68 +428,81 @@ convert_funcbody dcl_mods level freevarenv exprheap0 varheap0 (MatchPattern patt
         = { id_name="_anonymous_shared_case_default"
           , id_info=nilPtr
           }
-        build_casebranch level` freevarenv` exprheap0` varheap0`
+        build_casebranch level` patnodes` freevarenv` exprheap0` varheap0`
         = (exprheap1`,varheap1`,expr`,0)
           where (exprheap1`,varheap1`,expr`)
-                = convert_funcbody dcl_mods level` freevarenv` exprheap0` varheap0` yesbody
+                = convert_funcbody dcl_mods level` patnodes` freevarenv` exprheap0` varheap0` yesbody
+        (exprheap4,varheap3,match_failure_expression)
+        = convert_funcbody dcl_mods (level+1) patnodes freevarenv exprheap3 varheap2 nobody
+        (default_expression,match_expression)
+        = if (default_refcount==1)
+             (match_failure_expression,case_expression)
+             (match_failure_reference,let_expression)
+        let_expression = Let li
+        match_failure_reference = Var default_boundvar
 
-default_expression = undef
+convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (BuildGraph srgraph)
+= convert_graph patnodes freevarenv level srgraph varheap0 exprheap0
 
 convert_matchpatterns ::
     {#DclModule}                    // DCL modules
     (  Int                          // Level to assign to free variables
-       (SuclVariable->FreeVar)      // Assigning FreeVars to variables from the environment
+       [SuclVariable]               // List of pattern nodes
+       (SuclVariable->Expression)   // Assigning FreeVars to variables from the environment
        *ExpressionHeap              // Initial expression heap for case branch
-    ->*(  (*Heap VarInfo)           // Initial variable heap for case branch
+    ->*(  *(Heap VarInfo)           // Initial variable heap for case branch
        -> ( *ExpressionHeap         // Modified expression heap from case branch
-          , *Heap VarInfo           // Modified variable heap from case branch
+          , *(Heap VarInfo)         // Modified variable heap from case branch
           , Expression              // Resulting branch expression
           , Int                     // Reference count to default expression
           )
        )
     )
-    (SuclVariable->FreeVar)         // Assigning FreeVars to variables from the environment
+    [SuclVariable]                  // List of pattern nodes
+    (SuclVariable->Expression)      // Assigning FreeVars to variables from the environment
     *ExpressionHeap                 // Initial expression heap
-    (*Heap VarInfo)                 // Initial variable heap
+    *(Heap VarInfo)                 // Initial variable heap
     Expression                      // Default expression
     (Graph SuclSymbol SuclVariable) // Case pattern to convert
     Level                           // Level to assign to fresh free variables
     [SuclVariable]                  // Subsequent variables in pattern to match
  -> ( *ExpressionHeap               // Modified expression heap
-    , *Heap VarInfo                 // Modified variable heap
+    , *(Heap VarInfo)               // Modified variable heap
     , Expression                    // Resulting (case) expression
     , Int                           // Modified reference count to default expression
     )
 
-convert_matchpatterns dcl_mods build_casebranch freevarenv exprheap0 varheap0 default_expression pgraph level []
+convert_matchpatterns dcl_mods build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level []
 = (exprheap1,varheap1,case_expression,refcount)
   where (exprheap1,varheap1,case_expression,refcount)
-        = build_casebranch level freevarenv exprheap0 varheap0
+        = build_casebranch level patnodes freevarenv exprheap0 varheap0
 
-convert_matchpatterns dcl_mods build_casebranch0 freevarenv0 exprheap0 varheap0 default_expression pgraph level [pnode:pnodes]
+convert_matchpatterns dcl_mods build_casebranch0 patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level [pnode:pnodes]
 | pdef
-  = convert_matchpattern dcl_mods build_remaining_matcher freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
-= build_remaining_matcher level freevarenv0 exprheap0 varheap0
+  = convert_matchpattern dcl_mods build_remaining_matcher patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
+= build_remaining_matcher level patnodes0 freevarenv0 exprheap0 varheap0
   where (pdef,(psym,pargs)) = varcontents pgraph pnode
-        build_remaining_matcher level` freevarenv` exprheap` varheap`
-        = convert_matchpatterns dcl_mods build_casebranch0 freevarenv` exprheap` varheap` default_expression pgraph level` pnodes
+        build_remaining_matcher level` patnodes` freevarenv` exprheap` varheap`
+        = convert_matchpatterns dcl_mods build_casebranch0 patnodes` freevarenv` exprheap` varheap` default_expression pgraph level` pnodes
 
 convert_matchpattern ::
     {#DclModule}                    // DCL modules
     (  Level                        // Level to assign to free variables
-       (SuclVariable->FreeVar)      // Assigning FreeVars to variables from the environment
+       [SuclVariable]               // List of pattern nodes
+       (SuclVariable->Expression)   // Assigning FreeVars to variables from the environment
        *ExpressionHeap              // Initial expression heap for case branch
-    ->*(  (*Heap VarInfo)           // Initial variable heap for case branch
+    ->*(  *(Heap VarInfo)           // Initial variable heap for case branch
        -> ( *ExpressionHeap         // Modified expression heap from case branch
-          , *Heap VarInfo           // Modified variable heap from case branch
+          , *(Heap VarInfo)         // Modified variable heap from case branch
           , Expression              // Resulting branch expression
           , Int                     // Reference count to default expression
           )
        )
     )
-    (SuclVariable->FreeVar)         // Assigning FreeVars to variables from the environment
+    [SuclVariable]                  // List of pattern nodes
+    (SuclVariable->Expression)      // Assigning FreeVars to variables from the environment
     *ExpressionHeap                 // Initial expression heap
-    (*Heap VarInfo)                 // Initial variable heap
+    *(Heap VarInfo)                 // Initial variable heap
     Expression                      // Default expression
     (Graph SuclSymbol SuclVariable) // Case pattern to convert
     Level                           // Level to assign to fresh free variables
@@ -495,32 +510,65 @@ convert_matchpattern ::
     SuclSymbol
     [SuclVariable]                  // Subsequent variables in pattern to match
  -> ( *ExpressionHeap               // Modified expression heap
-    , *Heap VarInfo                 // Modified variable heap
+    , *(Heap VarInfo)               // Modified variable heap
     , Expression                    // Resulting (case) expression
     , Int                           // Modified reference count to default expression
     )
 
-convert_matchpattern dcl_mods build_casebranch freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
-= (exprheap2,varheap1,case_expression,1+refcount)
-  where (exprheap2,varheap1,branch_expression,refcount)
-        = convert_matchpatterns dcl_mods build_casebranch freevarenv1 exprheap1 varheap0 default_expression pgraph (level+1) pargs
+convert_matchpattern dcl_mods build_casebranch patnodes0 freevarenv0 exprheap0 varheap0 default_expression pgraph level pnode psym pargs
+= (exprheap2,varheap2,case_expression,1+refcount)
+  where (exprheap2,varheap2,branch_expression,refcount)
+        = convert_matchpatterns dcl_mods build_casebranch patnodes1 freevarenv1 exprheap1 varheap1 default_expression pgraph (level+1) pargs
         (cip,exprheap1) = newPtr EI_Empty exprheap0
         case_expression = Case ci
         ci
-        = { case_expr = FreeVar (freevarenv0 pnode)
+        = { case_expr = freevarenv0 pnode
           , case_guards = cps
           , case_default = Yes default_expression
           , case_ident = No
           , case_info_ptr = cip
           , case_default_pos = NoPos
           }
-        cps = convert_constructor dcl_mods psym pargs branch_expression
+        cps = convert_constructor dcl_mods psym freevars branch_expression
+        (freevarenv1,varheap1,freevars)
+        = allocate_freevars level freevarenv0 varheap0 pargs
+        patnodes1 = pargs++patnodes0
 
-default_refcount1 = undef
-freevarenv1 = undef
+allocate_freevars ::
+    Level
+    (SuclVariable->Expression)
+    *(Heap VarInfo)
+    .[SuclVariable]
+ -> ( (SuclVariable->Expression)
+    , .Heap VarInfo
+    , .[FreeVar]
+    )
 
-convert_constructor :: {#DclModule} SuclSymbol [SuclVariable] Expression -> CasePatterns
-convert_constructor dcl_mods (SuclUser (SK_Constructor consindex)) pargs expr
+allocate_freevars level freevarenv0 varheap0 []
+= (freevarenv0,varheap0,[])
+allocate_freevars level freevarenv0 varheap0 [pnode:pnodes]
+= (freevarenv2,varheap2,[freevar:freevars])
+  where freevar
+        = { fv_def_level = level
+          , fv_name      = ident
+          , fv_info_ptr  = varinfoptr
+          , fv_count     = mstub "allocate_freevars" "reference counting for case pattern argument not yet implemented"
+          }
+        ident
+        = { id_name = "_anonymous_case_pattern_argument_variable"
+          , id_info = nilPtr
+          }
+        (varinfoptr,varheap1) = newPtr VI_Empty varheap0
+        (freevarenv1,varheap2,freevars)
+         = allocate_freevars level freevarenv0 varheap1 pnodes
+        freevarenv2 = adjust pnode (FreeVar freevar) freevarenv1
+
+convert_constructor :: {#DclModule} SuclSymbol [FreeVar] Expression -> CasePatterns
+convert_constructor dcl_mods (SuclInt  i) [] expr = mkbps BT_Int  (BVI (toString i)) expr
+convert_constructor dcl_mods (SuclChar c) [] expr = mkbps BT_Char (BVC (toString c)) expr
+convert_constructor dcl_mods (SuclReal r) [] expr = mkbps BT_Real (BVR (toString r)) expr
+convert_constructor dcl_mods (SuclBool b) [] expr = mkbps BT_Bool (BVB           b ) expr
+convert_constructor dcl_mods (SuclUser (SK_Constructor consindex)) freevars expr
 = AlgebraicPatterns typedefindex [ap]
   where typedefindex = {glob_module=consmodule,glob_object=consdef.cons_type_index}
         consmodule = consindex.glob_module
@@ -536,10 +584,184 @@ convert_constructor dcl_mods (SuclUser (SK_Constructor consindex)) pargs expr
 		  }
 		ap
 		= { ap_symbol   = globdefsymb
-		  , ap_vars     = abort "allocate fresh freevars"
+		  , ap_vars     = freevars
 		  , ap_expr	    = expr
 		  , ap_position = NoPos
 		  }
+convert_constructor _ _ _ _
+= mstub "convert_constructor" "unexpected SUCL pattern form"
+
+mkbps bt bv expr
+= BasicPatterns bt [bp]
+  where bp
+        = { bp_value = bv
+          , bp_expr  = expr
+          , bp_position = NoPos
+          }
+
+/*
+
+Converting a function body:
+
+ Take a heap of ExprInfo (for some expression forms)
+ Return reduced heap of ExprInfo
+ Take a level for fresh free variables for case patterns
+
+ For the leaf graphs:
+     Take a list of encountered variables with usage counts
+     Return extended list of encountered variables with their usage counts
+     Take a sharing indication function
+     Take list of let-bindings for shared variables
+     Return extended list of let-bindings for shared variables
+     Take complete list of let-bindings
+     Take mapping from free variables to freevars
+     Take a heap of ExprInfo (for some expression forms)
+     Return reduced heap of ExprInfo
+     Return main expression
+
+*/
+
+:: ExpressionMaker :== SuclVariable -> Expression
+
+convert_graph patnodes mkexpr0 level srgraph varheap0 exprheap0
+= (exprheap4,varheap1,expression)
+  where (exprheap4,refcount,closeds,_,mkexpr1)
+        = convert_graph_node mkexpr sgraph exprheap3 patnodes (const 0) [] mkexpr0 sroot
+        sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
+        shareds = [(closed,n) \\ closed<-closeds, n<-[refcount closed] | n>1]
+        (mkexpr,letbinds,varheap1,exprheap3)
+        = foldr (allocate_shared_variable level) (mkexpr1,[],varheap0,exprheap2) shareds
+        root_expression = mkexpr sroot
+        (expression,exprheap2) = mkletexpr letbinds root_expression exprheap0
+
+mkletexpr letbinds letbody exprheap0
+| isEmpty letbinds
+  = (letbody,exprheap0)
+= (letexpr,exprheap1)
+  where letexpr
+        = Let letinfo
+        letinfo
+        = { let_strict_binds = []
+          , let_lazy_binds = letbinds
+          , let_expr = letbody
+          , let_info_ptr = letinfoptr
+          , let_expr_position = NoPos
+          }
+        (letinfoptr,exprheap1) = newPtr EI_Empty exprheap0
+
+allocate_shared_variable level (pnode,refcount) (mkexpr,letbinds,varheap0,exprheap0)
+= (adjust pnode (Var boundvar) mkexpr,[letbind:letbinds],varheap1,exprheap1)
+  where boundvar
+        = { var_name = ident
+          , var_info_ptr = varinfoptr
+          , var_expr_ptr = exprinfoptr
+          }
+        ident
+        = { id_name = "_anonymous_share_breaking_variable"
+          , id_info = nilPtr
+          }
+        letbind
+        = { lb_dst = freevar
+          , lb_src = mkexpr pnode
+          , lb_position = NoPos
+          }
+        freevar
+        = { fv_def_level = level
+          , fv_name = ident
+          , fv_info_ptr = varinfoptr
+          , fv_count = refcount
+          }
+        (varinfoptr,varheap1) = newPtr VI_Empty varheap0
+        (exprinfoptr,exprheap1) = newPtr EI_Empty exprheap0
+
+convert_graph_nodes ::
+    ExpressionMaker                 // Final expression maker
+    (Graph SuclSymbol SuclVariable) // Subject graph to transform
+    *ExpressionHeap                 // Input expression heap for generated expressions
+    u:[SuclVariable]                // Input list of seen nodes
+    (SuclVariable->Int)             // Input reference count
+    v:[SuclVariable]                // Input defined nodes
+    ExpressionMaker                 // Input expression maker
+    [SuclVariable]                  // Nodes to examine
+ -> ( *ExpressionHeap               // Resulting expression heap
+    , SuclVariable->Int             // Output reference count
+    , v:[SuclVariable]              // Output defined nodes
+    , u:[SuclVariable]              // Output list of seen nodes
+    , ExpressionMaker               // Output expression maker
+    )
+
+convert_graph_nodes mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 []
+= (exprheap0,refcount0,closeds0,seen0,mkexpr0)
+convert_graph_nodes mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 [snode:snodes]
+= (exprheap2,refcount3,closeds2,seen2,mkexpr2)
+  where (exprheap2,refcount1,closeds1,seen2,mkexpr1)
+        = convert_graph_nodes mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 snodes
+        (exprheap1,refcount2,closeds2,seen1,mkexpr2)
+        = convert_graph_node mkexpr sgraph exprheap0 seen0 refcount1 closeds1 mkexpr1 snode
+        refcount3 = inccounter snode refcount2
+
+convert_graph_node ::
+    ExpressionMaker                 // Final expression builder
+    (Graph SuclSymbol SuclVariable) // Graph to convert
+    *ExpressionHeap                 // Heap from which to allocate new expression info
+    u:[SuclVariable]                // Already encountered nodes
+    (SuclVariable->Int)             // Input reference count
+    v:[SuclVariable]                // Input closed variables
+    ExpressionMaker                 // Input expression builder
+    SuclVariable                    // Node in graph to convert
+ -> ( *ExpressionHeap               // Modified expression heap
+    , SuclVariable -> Int           // Output reference count
+    , v:[SuclVariable]              // Output closed variables
+    , u:[SuclVariable]              // Output seen variables
+    , ExpressionMaker               // Output expression builder
+    )
+
+convert_graph_node mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 snode
+| isMember snode seen0
+  = (exprheap0,refcount0,closeds0,seen0,mkexpr0)
+= (exprheap2,refcount1,closeds2,seen2,mkexpr2)
+  where seen1 = [snode:seen0]
+        (_,(ssym,sargs)) = varcontents sgraph snode  // Must be closed; open nodes already initially in "seen"
+        (expr,exprheap1)
+        = convert_graph_symbol ssym (map mkexpr sargs) exprheap0
+        (exprheap2,refcount1,closeds1,seen2,mkexpr1)
+        = convert_graph_nodes mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 sargs
+        mkexpr2 = adjust snode expr mkexpr1
+        closeds2 = [snode:closeds1]
+
+convert_graph_symbol ::
+    !SuclSymbol
+    [Expression]
+    *ExpressionHeap
+ -> ( Expression
+    , *ExpressionHeap
+    )
+
+convert_graph_symbol (SuclInt  i) [] exprheap = (BasicExpr (BVI (toString i)) BT_Int ,exprheap)
+convert_graph_symbol (SuclChar c) [] exprheap = (BasicExpr (BVC (toString c)) BT_Char,exprheap)
+convert_graph_symbol (SuclReal r) [] exprheap = (BasicExpr (BVR (toString r)) BT_Real,exprheap)
+convert_graph_symbol (SuclBool b) [] exprheap = (BasicExpr (BVB           b ) BT_Bool,exprheap)
+convert_graph_symbol (SuclApply arity) [argexpr:argexprs] exprheap = (argexpr @ argexprs,exprheap)
+convert_graph_symbol (SuclUser symbkind) argexprs exprheap0
+= (App app,exprheap1)
+  where app
+        = { app_symb = symbident
+          , app_args = argexprs
+          , app_info_ptr = appinfoptr
+          }
+        symbident
+        = { symb_name = ident
+          , symb_kind = symbkind
+          , symb_arity = length argexprs    // FIXME: Can this be different from the actual number of function arguments?
+          }
+        ident
+        = { id_name = "_anonymous_sucl_generated_function"
+          , id_info = nilPtr
+          }
+        (appinfoptr,exprheap1) = newPtr EI_Empty exprheap0
+convert_graph_symbol _ _ _ = mstub "convert_graph_symbol" "unexpected application form in graph node"
+
+mkbe bv bt = BasicExpr bv bt
 
 fold_funcbody ::
     ((Rgraph sym var) .result .result -> .result)
