@@ -2027,8 +2027,11 @@ BEUpdateNode (BEArgP args)
 {
 	NodeP	node;
 	SymbolP	recordSymbol;
+	int n_args;
+	
+	n_args = CountArgs (args);
 
-	Assert (CountArgs (args) == 2);
+	Assert (n_args >= 2);
 	Assert (args->arg_next->arg_node->node_kind == SelectorNode);
 	Assert (args->arg_next->arg_node->node_arity == BESelector);
 
@@ -2039,7 +2042,7 @@ BEUpdateNode (BEArgP args)
 	node->node_annotation	= NoAnnot;
 	node->node_kind			= UpdateNode;
 	node->node_symbol		= recordSymbol;
-	node->node_arity		= 2;
+	node->node_arity		= n_args;
 	node->node_arguments	= args;
 	node->node_number=0;
 
@@ -3190,6 +3193,10 @@ RemoveSpecialArrayFunctionsFromSymbolList (SymbolP *symbolH)
 	}
 } /* RemoveSpecialArrayFunctionsFromSymbolList */
 
+#if 0
+File rules_file;
+#endif
+û
 int
 BEGenerateCode (CleanString outputFile)
 {
@@ -3214,24 +3221,26 @@ BEGenerateCode (CleanString outputFile)
 
 #if 0
 	{
-		File f;
-		
-		f=fopen ("Rules","w");
-		if (f){
+		rules_file=fopen ("Rules","w");
+		if (rules_file){
 			ImpRuleS *rule;
 
 			for (rule=gBEState.be_icl.beicl_module->im_rules; rule!=NULL; rule=rule->rule_next){
-				PrintImpRule (rule,4,f);
+				PrintImpRule (rule,4,rules_file);
 				
 				if (rule->rule_next!=NULL)
-					FPutC ('\n',f);
+					FPutC ('\n',rules_file);
 			}
-			fclose (f);
 		}
 	}
 #endif
 
 	CodeGeneration (gBEState.be_icl.beicl_module, outputFileName);
+
+#if 0
+	if (rules_file)
+		fclose (rules_file);
+#endif
 
 	return (!CompilerError);
 } /* BEGenerateCode */
