@@ -2003,6 +2003,8 @@ where
 	copy (TupleSelect tuple_symbol arg_nr expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
 		= (TupleSelect tuple_symbol arg_nr expr, cp_info)
+	copy fail=:(FailExpr _) cp_info
+		= (fail, cp_info)
 	copy EE cp_info
 		= (EE, cp_info)
 	copy (NoBind ptr) cp_info
@@ -2112,9 +2114,7 @@ where
 
 (-*->) infixl
 (-*->) a b :== a // ---> b
-
 //import RWSDebug
-
 (->>) infixl
 (->>) a b :== a // ---> b
 (<<-) infixl
