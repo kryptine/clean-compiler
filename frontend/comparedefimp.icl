@@ -28,13 +28,11 @@ where
 		| not copied_from_dcl.[type_index]
 			# dcl_type_def = dcl_type_defs.[type_index]
 			  (icl_type_def, icl_type_defs) = icl_type_defs![type_index]
-			  comp_type_var_heap = initialyseATypeVars dcl_type_def.td_args comp_type_var_heap
-			  comp_type_var_heap = initialyseATypeVars icl_type_def.td_args comp_type_var_heap
-			  comp_attr_var_heap = initialyseAttributeVars dcl_type_def.td_attrs comp_attr_var_heap
-			  comp_attr_var_heap = initialyseAttributeVars icl_type_def.td_attrs comp_attr_var_heap
+			  comp_type_var_heap = initialyseATypeVars dcl_type_def.td_args icl_type_def.td_args comp_type_var_heap
+			  comp_attr_var_heap = initialyseAttributeVars dcl_type_def.td_attrs icl_type_def.td_attrs comp_attr_var_heap
 			  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 			  (ok, icl_cons_defs, comp_st) = compare_rhs_of_types dcl_type_def.td_rhs icl_type_def.td_rhs dcl_cons_defs icl_cons_defs comp_st
-			| ok
+			| ok && dcl_type_def.td_arity==icl_type_def.td_arity
 				= (icl_type_defs, icl_cons_defs, comp_st)
 				# comp_error = compareError type_def_error (newPosition icl_type_def.td_name icl_type_def.td_pos) comp_st.comp_error
 				= (icl_type_defs, icl_cons_defs, { comp_st & comp_error = comp_error })
@@ -66,6 +64,7 @@ where
 		compare_records dcl_rec icl_rec dcl_cons_defs icl_cons_defs comp_st
 			# nr_of_dcl_fields = size dcl_rec.rt_fields
 			| nr_of_dcl_fields == size icl_rec.rt_fields && compare_fields nr_of_dcl_fields dcl_rec.rt_fields icl_rec.rt_fields
+//				&& icl_rec.rt_is_boxed_record==dcl_rec.rt_is_boxed_record
 				= compare_constructors True dcl_rec.rt_constructor.ds_index dcl_cons_defs icl_cons_defs comp_st
 				= (False, icl_cons_defs, comp_st)
 		
@@ -88,8 +87,7 @@ where
 		  (icl_cons_def, icl_cons_defs) = icl_cons_defs![cons_index]
 		  dcl_cons_type = dcl_cons_def.cons_type
 		  icl_cons_type = icl_cons_def.cons_type
-		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars comp_type_var_heap
-		  comp_type_var_heap = initialyseATypeVars icl_cons_def.cons_exi_vars comp_type_var_heap
+		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars icl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		  (ok, comp_st) = compare (dcl_cons_type.st_args,dcl_cons_type.st_args_strictness) (icl_cons_type.st_args,icl_cons_type.st_args_strictness) comp_st
 		| dcl_cons_def.cons_priority == icl_cons_def.cons_priority
@@ -120,8 +118,7 @@ where
 			= (icl_class_defs, icl_member_defs, comp_st)
 
 	compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseTypeVars dcl_class_def.class_args comp_type_var_heap
-		  comp_type_var_heap = initialyseTypeVars icl_class_def.class_args comp_type_var_heap
+		# comp_type_var_heap = initialyseTypeVars dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		# (ok, comp_st) = compare dcl_class_def.class_context icl_class_def.class_context comp_st
 		| ok
@@ -304,10 +301,8 @@ where
 instance compare SymbolType
 where
 	compare dcl_st icl_st comp_st=:{comp_type_var_heap,comp_attr_var_heap}
-		# comp_type_var_heap = initialyseTypeVars dcl_st.st_vars comp_type_var_heap
-		  comp_type_var_heap = initialyseTypeVars icl_st.st_vars comp_type_var_heap
-		  comp_attr_var_heap = initialyseAttributeVars dcl_st.st_attr_vars comp_attr_var_heap
-		  comp_attr_var_heap = initialyseAttributeVars icl_st.st_attr_vars comp_attr_var_heap
+		# comp_type_var_heap = initialyseTypeVars dcl_st.st_vars icl_st.st_vars comp_type_var_heap
+		  comp_attr_var_heap = initialyseAttributeVars dcl_st.st_attr_vars icl_st.st_attr_vars comp_attr_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 		= compare	(dcl_st.st_args, (dcl_st.st_args_strictness, (dcl_st.st_result, (dcl_st.st_context, dcl_st.st_attr_env))))
 					(icl_st.st_args, (icl_st.st_args_strictness, (icl_st.st_result, (icl_st.st_context, icl_st.st_attr_env)))) comp_st
@@ -316,10 +311,8 @@ where
 instance compare InstanceType
 where
 	compare dcl_it icl_it comp_st=:{comp_type_var_heap,comp_attr_var_heap}
-		# comp_type_var_heap = initialyseTypeVars dcl_it.it_vars comp_type_var_heap
-		  comp_type_var_heap = initialyseTypeVars icl_it.it_vars comp_type_var_heap
-		  comp_attr_var_heap = initialyseAttributeVars dcl_it.it_attr_vars comp_attr_var_heap
-		  comp_attr_var_heap = initialyseAttributeVars icl_it.it_attr_vars comp_attr_var_heap
+		# comp_type_var_heap = initialyseTypeVars dcl_it.it_vars icl_it.it_vars comp_type_var_heap
+		  comp_attr_var_heap = initialyseAttributeVars dcl_it.it_attr_vars icl_it.it_attr_vars comp_attr_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 		= compare (dcl_it.it_types, dcl_it.it_context) (icl_it.it_types, icl_it.it_context) comp_st
 //						---> ("compare InstanceType", dcl_it, icl_it)
@@ -331,24 +324,35 @@ where
 			= compare dcl_tc.tc_types icl_tc.tc_types comp_st
 			= (False, comp_st)
 
+initialyseTypeVars [{tv_info_ptr=dcl_tv_info_ptr}:dcl_type_vars] [{tv_info_ptr=icl_tv_info_ptr}:icl_type_vars] type_var_heap
+	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
+	= initialyseTypeVars dcl_type_vars icl_type_vars type_var_heap
+initialyseTypeVars [{tv_info_ptr}:dcl_type_vars] [] type_var_heap
+	= initialyseTypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialyseTypeVars [] [{tv_info_ptr}:icl_type_vars] type_var_heap
+	= initialyseTypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialyseTypeVars [] [] type_var_heap
+	= type_var_heap
 
-initialyseTypeVars type_vars type_var_heap
-	= foldSt init_type_var type_vars type_var_heap
-where
-	init_type_var {tv_info_ptr} type_var_heap
-		= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+initialyseATypeVars [{atv_variable={tv_info_ptr=dcl_tv_info_ptr}}:dcl_type_vars] [{atv_variable={tv_info_ptr=icl_tv_info_ptr}}:icl_type_vars] type_var_heap
+	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
+	= initialyseATypeVars dcl_type_vars icl_type_vars type_var_heap
+initialyseATypeVars [{atv_variable={tv_info_ptr}}:dcl_type_vars] [] type_var_heap
+	= initialyseATypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialyseATypeVars [] [{atv_variable={tv_info_ptr}}:icl_type_vars] type_var_heap
+	= initialyseATypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialyseATypeVars [] [] type_var_heap
+	= type_var_heap
 
-initialyseATypeVars atype_vars type_var_heap
-	= foldSt init_atype_var atype_vars type_var_heap
-where
-	init_atype_var {atv_variable={tv_info_ptr}} type_var_heap
-		= type_var_heap <:= (tv_info_ptr, TVI_Empty)
-
-initialyseAttributeVars attr_vars attr_var_heap
-	= foldSt init_attr_var attr_vars attr_var_heap
-where
-	init_attr_var {av_info_ptr} attr_var_heap
-		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+initialyseAttributeVars [{av_info_ptr=dcl_av_info_ptr}:dcl_type_vars] [{av_info_ptr=icl_av_info_ptr}:icl_type_vars] type_var_heap
+	# type_var_heap = type_var_heap <:= (icl_av_info_ptr, AVI_AttrVar dcl_av_info_ptr) <:= (dcl_av_info_ptr, AVI_AttrVar icl_av_info_ptr)
+	= initialyseAttributeVars dcl_type_vars icl_type_vars type_var_heap
+initialyseAttributeVars [{av_info_ptr}:dcl_type_vars] [] type_var_heap
+	= initialyseAttributeVars dcl_type_vars [] (type_var_heap <:= (av_info_ptr, AVI_Empty));
+initialyseAttributeVars [] [{av_info_ptr}:icl_type_vars] type_var_heap
+	= initialyseAttributeVars [] icl_type_vars (type_var_heap <:= (av_info_ptr, AVI_Empty));
+initialyseAttributeVars [] [] type_var_heap
+	= type_var_heap
 	
 :: TypesCorrespondState =
 		{	tc_type_vars :: !.HeapWithNumber TypeVarInfo
@@ -866,9 +870,13 @@ instance t_corresponds TypeRhs where
 	t_corresponds _ _
 		=	return False
 
+instance t_corresponds Bool where
+	t_corresponds b1 b2 = return (b1==b2)
+
 instance t_corresponds RecordType where
 	t_corresponds dclRecord iclRecord
-		=	t_corresponds dclRecord.rt_constructor iclRecord.rt_constructor
+		=	t_corresponds dclRecord.rt_constructor dclRecord.rt_constructor
+//		&&&	t_corresponds dclRecord.rt_is_boxed_record dclRecord.rt_is_boxed_record
 		&&& t_corresponds dclRecord.rt_fields iclRecord.rt_fields
 
 instance t_corresponds FieldSymbol where
