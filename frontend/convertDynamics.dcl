@@ -1,5 +1,5 @@
 /*
-	module owner: Martijn Vervoort
+	module owner: Ronny Wichers Schreur
 */
 definition module convertDynamics
 
