@@ -173,7 +173,7 @@ where toString srr
 instance <<< (Symredresult sym var tsym tvar) | toString sym & <<<,==,toString var
 where (<<<) file srr
       = file <<< "==[BEGIN]==" <<< nl
-             <<< "Task expression: " <<< ((srr.srr_task_expression <--- "newtest.<<<(Symredresult).srr_task_expression ends") ---> "newtest.<<<(Symredresult).srr_task_expression begins") <<< nl
+             <<< "Task expression: " <<< srr.srr_task_expression <<< nl
              <<< "Assigned symbol: " <<< toString (srr.srr_assigned_symbol) <<< nl
              <<< "Strictness: " <<< srr.srr_strictness <<< nl
              //<<< "Type rule: ..." <<< nl
@@ -306,13 +306,13 @@ fullsymred ::
 
 fullsymred freshsymbols cli
  = results
-   where results = (depthfirst generate process (initareas cli) <--- "newtest.fullsymred.results ends") ---> "newtest.fullsymred.results begins"
-         generate result = (map canonise` (getareas result) <--- "newtest.fullsymred.generate begins") ---> "newtest.fullsymred.generate begins"
-         process area = (symredarea foldarea` cli area <--- "newtest.fullsymred.process ends") ---> "newtest.fullsymred.process begins"
+   where results = depthfirst generate process (initareas cli)
+         generate result = map canonise` (getareas result)
+         process area = symredarea foldarea` cli area
 
-         foldarea` = ((foldarea (labelarea` o canonise`)) <--- "newtest.fullsymred.foldarea` ends") ---> "newtest.fullsymred.foldarea` begins"
-         labelarea` = (labelarea isSuclUserSym (map getinit results) freshsymbols <--- "newtest.fullsymred.labelarea` ends") ---> "newtest.fullsymred.labelarea` begins"
-         canonise` = (canonise (arity cli) suclheap <--- "newtest.fullsymred.canonise` ends") ---> "newtest.fullsymred.canonise` begins"
+         foldarea` = foldarea (labelarea` o canonise`)
+         labelarea` = labelarea isSuclUserSym (map getinit results) freshsymbols
+         canonise` = canonise (arity cli) suclheap
 
 isSuclUserSym (SuclUser _) = True
 isSuclUserSym _ = False
@@ -349,11 +349,11 @@ initareas cli
 
 getinit :: (Symredresult sym var tsym tvar) -> Rgraph sym var
 getinit srr
-= (srr.srr_task_expression <--- "newtest.getinit ends") ---> "newtest.getinit begins"
+= srr.srr_task_expression
 
 getareas :: (Symredresult sym var tsym tvar) -> [Rgraph sym var]
 getareas srr
-= (srr.srr_areas <--- "newtest.getareas ends") ---> "newtest.getareas begins"
+= srr.srr_areas
 
 /*
 `Symredarea' is the function that does symbolic reduction  of  a  single
@@ -387,21 +387,21 @@ symredarea ::
  -> Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable
 
 symredarea foldarea cli area
-= { srr_task_expression = (area <--- "newtest.symredarea.srr_task_expression ends") ---> "newtest.symredarea.srr_task_expression begins"
-  , srr_assigned_symbol = (symbol <--- "newtest.symredarea.srr_assigned_symbol ends") ---> "newtest.symredarea.srr_assigned_symbol begins"
-  , srr_strictness      = (stricts <--- "newtest.symredarea.srr_strictness ends") ---> "newtest.symredarea.srr_strictness begins"
+= { srr_task_expression = area
+  , srr_assigned_symbol = symbol
+  , srr_strictness      = stricts
   , srr_arity           = length aargs
   , srr_typerule        = trule
-  , srr_trace           = (trace <--- "newtest.symredarea.srr_trace ends") ---> "newtest.symredarea.srr_trace begins"
-  , srr_function_def    = (rules <--- "newtest.symredarea.srr_function_def ends") ---> "newtest.symredarea.srr_function_def begins"
-  , srr_areas           = (areas <--- "newtest.symredarea.srr_areas ends") ---> "newtest.symredarea.srr_areas begins"
+  , srr_trace           = trace
+  , srr_function_def    = rules
+  , srr_areas           = areas
   }
   where agraph = rgraphgraph area; aroot = rgraphroot area
         (symbol,aargs) = foldarea area
         arule = mkrule aargs aroot agraph
-        trule = (ruletype sucltypeheap (ctyperule SuclFN sucltypeheap (typerule cli)) arule <--- "newtest.symredarea.trule.ruletype ends") ---> "newtest.symredarea.trule.ruletype begins"
-        trace = (loop strategy` matchable` (suclheap--varlist agraph [aroot],arule) <--- "newtest.symredarea.trace.loop ends") ---> "newtest.symredarea.trace.loop begins"
-        (stricts,rules,areas) = (fullfold (trc symbol) foldarea symbol trace <--- "newtest.symredarea.(,,).fullfold ends") ---> "newtest.symredarea.(,,).fullfold begins"
+        trule = ruletype sucltypeheap (ctyperule SuclFN sucltypeheap (typerule cli)) arule
+        trace = loop strategy` matchable` (suclheap--varlist agraph [aroot],arule)
+        (stricts,rules,areas) = fullfold (trc symbol) foldarea symbol trace
         matchable` = matchable (complete cli)
         strategy` = clistrategy cli
 
@@ -549,7 +549,7 @@ ctyperule fn typeheap typerule (sym,args)
 = mkrule targs` troot` tgraph`
   where targs = arguments trule; troot = ruleroot trule; tgraph = rulegraph trule
         trule = typerule sym
-        (targs`,targs``) = (claim--->"basic.claim begins from newtest.ctyperule") args targs
+        (targs`,targs``) = claim args targs
         (troot`,tgraph`,_) = foldr build (troot,tgraph,typeheap--varlist tgraph [troot:targs]) targs``
         build targ (troot,tgraph,[tnode:tnodes])
         = (tnode,updategraph tnode (fn 1,[targ,troot]) tgraph,tnodes)
