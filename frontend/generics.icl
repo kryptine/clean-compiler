@@ -145,8 +145,7 @@ convertGenerics
 			x_needed_modules = 0,
 			x_main_dcl_module_n = main_dcl_module_n, 
 			x_is_dcl_module = False,
-			x_type_var_position = 0, 
-			directly_imported_dcl_modules = []
+			x_type_var_position = 0
 			}
 		}
 

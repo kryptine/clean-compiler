@@ -34,7 +34,7 @@ cNeedStdGeneric	:== 8 // AA
 
 ::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin, cs_x :: !CheckStateX }
 
-::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int /* TD */, x_is_dcl_module :: !Bool, x_type_var_position :: !Int, directly_imported_dcl_modules :: [String] }
+::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int /* TD */, x_is_dcl_module :: !Bool, x_type_var_position :: !Int }
 
 ::	ConversionTable		:== {# .{# Int }}
 
@@ -159,20 +159,20 @@ newPosition id NoPos
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b // PK
 checkError id mess error=:{ea_file,ea_loc=[]}
-	= { error & ea_file = ea_file <<< "Check Error " <<< "\"" <<< id <<< "\" " <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< "\"" <<< id <<< "\" " <<< mess <<< '\n', ea_ok = False }
 checkError id mess error=:{ea_file,ea_loc}
-	= { error & ea_file = ea_file <<< "Check Error " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n', ea_ok = False }
 
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b // PK
 checkWarning id mess error=:{ea_file,ea_loc=[]}
-	= { error & ea_file = ea_file <<< "Check Warning " <<< "\"" <<< id <<< "\" " <<< mess <<< '\n' }
+	= { error & ea_file = ea_file <<< "Warning " <<< "\"" <<< id <<< "\" " <<< mess <<< '\n' }
 checkWarning id mess error=:{ea_file,ea_loc}
-	= { error & ea_file = ea_file <<< "Check Warning " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n' }
+	= { error & ea_file = ea_file <<< "Warning " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n' }
 
 
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorWithIdentPos ident_pos mess error=:{ea_file}
-	= { error & ea_file = ea_file <<< "Check Error " <<< ident_pos <<< ":" <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ":" <<< mess <<< '\n', ea_ok = False }
 
 class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 

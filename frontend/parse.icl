@@ -300,7 +300,7 @@ where
 		// otherwise // ~ succ
 		# ({fp_line}, scanState) = getPosition scanState
 		  mod = { mod_name = file_id, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
-		= (False, mod, hash_table, error <<< '[' <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
+		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
 			pre_def_symbols, closeScanner scanState files)
 
 	try_module_header :: !Bool !ScanState -> (!Bool,!ModuleKind,!String,!ScanState)

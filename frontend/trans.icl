@@ -187,6 +187,7 @@ writeVarInfo var_info_ptr new_var_info var_heap
 		VI_Extended extensions _	-> writePtr var_info_ptr (VI_Extended extensions new_var_info) var_heap
 		_							-> writePtr var_info_ptr new_var_info var_heap
 
+
 class consumerRequirements a :: !a !{# CommonDefs} !AnalyseInfo -> (!ConsClass, !UnsafePatternBool, !AnalyseInfo)
 
 ::	UnsafePatternBool :== Bool
@@ -1448,8 +1449,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 			= transform tb_rhs ro ti
 	  new_fd
 	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
-//	| (False--->("generated function", new_fd, '\n', new_fd.fun_type, new_cons_args))
-//		= undef
+//	| (False--->("generated function", new_fd.fun_symb, '\n', new_fd.fun_type, new_cons_args))
+//`		= undef
 	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
 where
 	is_dictionary {at_type=TA {type_index} _} es_td_infos
@@ -1512,7 +1513,7 @@ where
 			  		  , ti_functions = ro.ro_imported_funs
 					  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
 					  }
-			  (succ, subst, type_heaps)
+			# (succ, subst, type_heaps)
 /*
 			  		= case isEmptyType int_class_type || isEmptyType (hd arg_type).at_type of
 			  			True
@@ -1580,7 +1581,7 @@ where
 			  (succ, subst, type_heaps)
 			  		= unify application_type (hd arg_type) type_input subst type_heaps
 			| not succ
-				= abort "sanity check nr 94 in module trans failed"
+				= abort ("sanity check nr 94 in module trans failed"--->(application_type, (hd arg_type)))
 			# (attr_inequalities, type_heaps)
 					= accAttrVarHeap (mapSt substitute_attr_inequality st_attr_env) type_heaps
 			  new_uniqueness_requirement
@@ -1884,24 +1885,28 @@ where
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
 	ro_main_dcl_module_n = ro.ro_main_dcl_module_n
 
-	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
+	max_group_index_of_member fun_defs fun_heap cons_args current_max 
+				(App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
 		| mod_index == ro_main_dcl_module_n
 			| fun_index < size cons_args
 				# {fun_info = {fi_group_index}} = fun_defs.[fun_index]
 				= max fi_group_index current_max
 			= current_max
 		= current_max
-	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_name, symb_kind = SK_LocalMacroFunction fun_index}}) 
+	max_group_index_of_member fun_defs fun_heap cons_args current_max 
+				(App {app_symb = {symb_name, symb_kind = SK_LocalMacroFunction fun_index}}) 
 		| fun_index < size cons_args
 			# {fun_info = {fi_group_index}} = fun_defs.[fun_index]
 			= max fi_group_index current_max
 		= current_max
-	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_kind = SK_GeneratedFunction fun_ptr _ }})
+	max_group_index_of_member fun_defs fun_heap cons_args current_max 
+				(App {app_symb = {symb_kind = SK_GeneratedFunction fun_ptr _ }})
 		# (FI_Function {gf_fun_def={fun_info = {fi_group_index}}}) = sreadPtr fun_ptr fun_heap
 		= max fi_group_index current_max
-	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_kind = SK_Constructor _}, app_args}) 
+	max_group_index_of_member fun_defs fun_heap cons_args current_max 
+				(App {app_symb = {symb_kind = SK_Constructor _}, app_args}) 
 		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
-	
+
 	max_group_index_of_members members current_max fun_defs fun_heap cons_args
 		= foldl (max_group_index_of_member fun_defs fun_heap cons_args) current_max members
 			
@@ -2005,15 +2010,15 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	| cc_size > 0
 	  	# (producers, new_args, ti) = determineProducers fun_def.fun_info.fi_is_macro_fun cc_linear_bits cc_args app_args
 														 0 (createArray cc_size PR_Empty) ro ti
-//		| False--->("determineProducers",(cc_linear_bits,cc_args,app_args),("results in",II_Node producers nilPtr II_Empty II_Empty))
-//			= undef
 	  	| containsProducer cc_size producers
+//			| False--->("determineProducers",(cc_linear_bits,cc_args,app_symb.symb_name, app_args),("\nresults in",II_Node producers nilPtr II_Empty II_Empty))
+//				= undef
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
 	  			# (fun_index, fun_arity, ti) = generateFunction fun_def cc producers fun_def_ptr ro
 	  					(update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap, ti_trace = False })
 	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index, symb_arity = length new_args}
-				  (app_symb, app_args, extra_args) = complete_application app_symb fun_arity new_args extra_args
+				# (app_symb, app_args, extra_args) = complete_application app_symb fun_arity new_args extra_args
 	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 	  			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 				  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index, symb_arity = length new_args}
@@ -2129,14 +2134,12 @@ determineProducer _ _ app=:{app_symb = {symb_arity}, app_args} _ new_args prod_i
 	| symb_arity<>length app_args
 		= abort "sanity check 98765 failed in module trans"
 determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) new_args prod_index producers _ ti
-	# (app_args, (new_vars_and_types, ti_var_heap)) = renewVariables app_args ([], ti.ti_var_heap)
-	  (new_args, ti_var_heap) = mapAppendSt retrieve_old_var new_vars_and_types new_args ti_var_heap
-	= ({ producers & [prod_index] = PR_Class { app & app_args = app_args } new_vars_and_types type}, new_args, { ti & ti_var_heap = ti_var_heap })
-  where
-	retrieve_old_var ({var_info_ptr}, _) var_heap
-		# (var_info, var_heap) = readVarInfo var_info_ptr var_heap
-		  (VI_Forward var) = var_info
-		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
+	# (app_args, (new_vars_and_types, free_vars, ti_var_heap)) 
+			= renewVariables app_args ti.ti_var_heap
+	= ( { producers & [prod_index] = PR_Class { app & app_args = app_args } new_vars_and_types type}
+	  , mapAppend Var free_vars new_args
+	  , { ti & ti_var_heap = ti_var_heap }
+	  )
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index, symb_arity}, app_args} _
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
@@ -2212,34 +2215,58 @@ where
 	is_a_producer PR_Empty	= False
 	is_a_producer _ 		= True
 
-class renewVariables a :: !a !(![(BoundVar, Type)], !*VarHeap) -> (!a, !(![(BoundVar, Type)], !*VarHeap))
+:: *RenewState :== (![(BoundVar, Type)], ![BoundVar], !*VarHeap)
 
-instance renewVariables Expression
-where
-	renewVariables (Var var=:{var_info_ptr}) (new_vars, var_heap)
+renewVariables :: ![Expression] !*VarHeap
+				-> (![Expression], !RenewState)
+renewVariables exprs var_heap
+	# (exprs, (new_vars, free_vars, var_heap))
+			= mapSt (mapExprSt map_expr preprocess_free_var postprocess_free_var)
+					exprs ([], [], var_heap)
+	  var_heap
+	  		= foldSt (\{var_info_ptr} var_heap -> writeVarInfo var_info_ptr VI_Empty var_heap)
+	  				free_vars var_heap
+	= (exprs, (new_vars, free_vars, var_heap))
+  where
+	map_expr :: !Expression !RenewState -> (!Expression, !RenewState)
+	map_expr (Var var=:{var_info_ptr, var_name}) (new_vars_accu, free_vars_accu, var_heap)
 		# (var_info, var_heap)
 				= readPtr var_info_ptr var_heap
 		= case var_info of
 			VI_Extended _ (VI_Forward new_var)
-				-> (Var { var & var_info_ptr = new_var.var_info_ptr }, (new_vars, var_heap))
+				-> ( Var new_var
+				   , (new_vars_accu, free_vars_accu, var_heap))
 			VI_Extended evi=:(EVI_VarType var_type) _
-				# (new_info_ptr, var_heap)
-						= newPtr (VI_Extended (EVI_VarType var_type) (VI_Forward var)) var_heap
-				  new_var
-				  		= { var & var_info_ptr = new_info_ptr }
-				  var_heap
-				  		= writePtr var_info_ptr (VI_Extended evi (VI_Forward new_var)) var_heap
-				-> (Var new_var, ([(new_var, var_type.at_type) : new_vars], var_heap))
-	renewVariables (App app=:{app_args}) state
-		# (app_args, state) = renewVariables app_args state
-		= (App { app & app_args = app_args }, state)
-	renewVariables (Selection x1 expr x2) state
-		# (expr, state) = renewVariables expr state
-		= (Selection x1 expr x2, state)
+				# (new_var, var_heap)
+						= allocate_and_bind_new_var var_name var_info_ptr evi var_heap
+				-> ( Var new_var
+				   , ( [(new_var, var_type.at_type) : new_vars_accu]
+				     , [var:free_vars_accu]
+				     , var_heap
+				     )
+				   )
+	map_expr x st = (x, st)
 
-instance renewVariables [a] | renewVariables a
-where
-	renewVariables l state = mapSt renewVariables l state
+	preprocess_free_var :: !FreeVar !RenewState -> (!FreeVar, !RenewState)
+	preprocess_free_var fv=:{fv_name, fv_info_ptr} (new_vars_accu, free_vars_accu, var_heap)
+		# (VI_Extended evi _, var_heap)
+				= readPtr fv_info_ptr var_heap
+		  (new_var, var_heap)
+				= allocate_and_bind_new_var fv_name fv_info_ptr evi var_heap
+		= ( { fv & fv_info_ptr = new_var.var_info_ptr}
+		  , (new_vars_accu, free_vars_accu, var_heap))
+	allocate_and_bind_new_var var_name var_info_ptr evi var_heap
+		# (new_info_ptr, var_heap)
+				= newPtr (VI_Extended evi VI_Empty) var_heap
+		  new_var
+		  		= { var_name = var_name, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr }
+		  var_heap
+		  		= writeVarInfo var_info_ptr (VI_Forward new_var) var_heap
+		= (new_var, var_heap)
+	postprocess_free_var :: !FreeVar !RenewState -> RenewState
+	postprocess_free_var {fv_info_ptr} (a, b, var_heap)
+		= (a, b, writeVarInfo fv_info_ptr VI_Empty var_heap)
+	
 
 ::	ImportedConstructors	:== [Global Index]
 
@@ -2278,7 +2305,8 @@ transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_
 
 	transform_function common_defs imported_funs fun ti=:{ti_fun_defs, ti_var_heap}
 		# (fun_def, ti_fun_defs) = ti_fun_defs![fun]
-		  (Yes {st_args}) = fun_def.fun_type
+//		| False--->("TRANSFORMING", fun_def.fun_symb, '\n') = undef
+		# (Yes {st_args}) = fun_def.fun_type
 		  {fun_body = TransformedBody tb} = fun_def
 		  ti_var_heap = fold2St (\{fv_info_ptr} a_type ti_var_heap
 									-> setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap)
@@ -2708,3 +2736,39 @@ isYes (Yes _) = True
 isYes _ = False
 
 empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
+
+mapExprSt map_expr map_free_var postprocess_free_var expr st :== map_expr_st expr st
+  where
+	map_expr_st expr=:(Var bound_var) st
+		= map_expr expr st
+	map_expr_st (App app=:{app_args}) st
+		# (app_args, st) = mapSt map_expr_st app_args st
+		= map_expr (App { app & app_args = app_args }) st
+	map_expr_st (Let lad=:{let_lazy_binds, let_strict_binds, let_expr}) st
+		# (lazy_free_vars, st)
+				= mapSt (\{lb_dst} st -> map_free_var lb_dst st) let_lazy_binds st
+		  (strict_free_vars, st)
+				= mapSt (\{lb_dst} st -> map_free_var lb_dst st) let_strict_binds st
+		  (lazy_rhss, st)
+		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_lazy_binds st
+		  (strict_rhss, st)
+		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_strict_binds st
+		  (let_expr, st)
+		  		= map_expr let_expr st
+		  st = foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_lazy_binds st
+		  st = foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_strict_binds st
+		= ( Let { lad & let_lazy_binds = combine lazy_free_vars lazy_rhss let_lazy_binds,
+						let_strict_binds = combine strict_free_vars strict_rhss let_strict_binds,
+						let_expr = let_expr
+				}
+		  , st
+		  )
+	map_expr_st (Selection a expr b) st
+		# (expr, st) = map_expr expr st
+		= (Selection a expr b, st)
+
+combine :: [FreeVar] [Expression] [LetBind] -> [LetBind]
+combine free_vars rhss original_binds
+	= [{ original_bind & lb_dst = lb_dst, lb_src = lb_src}
+		\\ lb_dst <- free_vars & lb_src <- rhss & original_bind <- original_binds]
+

@@ -87,7 +87,7 @@ instance toParsedExpr Int where
 postParseError :: Position {#Char} *CollectAdmin -> *CollectAdmin
 postParseError pos msg ps=:{ca_error={pea_file}}
 	# (filename, line, funname) = get_file_and_line_nr pos
-	  pea_file	= pea_file <<< "Post Parse Error [" <<< filename <<< "," <<< line
+	  pea_file	= pea_file <<< "Error [" <<< filename <<< "," <<< line
 	  pea_file	= case funname of
 	  				Yes name	-> pea_file <<< "," <<< name
 	  				No			-> pea_file

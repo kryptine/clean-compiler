@@ -29,7 +29,7 @@ cNeedStdGeneric	:== 8 // AA
 
 ::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,cs_x :: !CheckStateX }
 
-::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int /* TD */, x_is_dcl_module :: !Bool, x_type_var_position :: !Int, directly_imported_dcl_modules :: [String] }
+::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int /* TD */, x_is_dcl_module :: !Bool, x_type_var_position :: !Int }
 
 //	SymbolTable			:== {# SymbolTableEntry}
 
