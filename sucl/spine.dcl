@@ -10,6 +10,7 @@ from general import Optional
 from StdOverloaded import ==
 from StdFile import <<<
 from StdString import toString
+from cleanversion import String
 
 /*
 
@@ -91,6 +92,18 @@ that the node was in root normal form.
 
 :: Answer sym var pvar
    :== Optional (Spine sym var pvar)
+
+// Write a strategy answer to a file
+printanswer ::
+    (sym->String)
+    (var->String)
+    (pvar->String)
+    String
+ -> (Answer sym var pvar)
+    *File
+ -> .File
+ |  == var
+ &  == pvar
 
 /*
 

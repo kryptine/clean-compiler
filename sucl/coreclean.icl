@@ -114,7 +114,7 @@ where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
 
 instance toString SuclSymbol
 where toString (SuclUser  sk  ) = toString sk
-      toString (SuclCase  eptr) = "<anonymous lifted case function for expression "+++toString eptr+++">"
+      toString (SuclCase  eptr) = "_lift"+++toString eptr
       toString (SuclApply int ) = "Apply/"+++toString int
       toString (SuclInt   int ) = toString int
       toString (SuclReal  real) = toString real

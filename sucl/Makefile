@@ -37,7 +37,7 @@ $(SYS)/coreclean.abc: coreclean.icl coreclean.dcl strat.dcl spine.dcl rule.dcl g
 $(SYS)/loop.abc: loop.icl loop.dcl strat.dcl trace.dcl spine.dcl history.dcl rewr.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/strat.abc: strat.icl strat.dcl spine.dcl history.dcl rule.dcl dnc.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/absmodule.abc: absmodule.icl absmodule.dcl rule.dcl
-$(SYS)/trace.abc: trace.icl trace.dcl spine.dcl history.dcl rule.dcl basic.dcl
+$(SYS)/trace.abc: trace.icl trace.dcl spine.dcl history.dcl rule.dcl graph.dcl basic.dcl
 $(SYS)/spine.abc: spine.icl spine.dcl history.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/history.abc: history.icl history.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/complete.abc: complete.icl complete.dcl graph.dcl

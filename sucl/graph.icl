@@ -161,23 +161,26 @@ prefix graph without vars
 */
 
 printgraph :: .(Graph sym var) .[var] -> .[String] | toString sym & toString var & == var
-printgraph graph nodes
-= prntgrph (refcount graph nodes) graph nodes
+printgraph graph nodes = printgraphBy toString toString graph nodes
 
-prntgrph count graph nodes
+printgraphBy :: (sym->String) (var->String) .(Graph sym var) .[var] -> .[String] | == var
+printgraphBy showsym showvar graph nodes
+= prntgrph showsym showvar (refcount graph nodes) graph nodes
+
+prntgrph showsym showvar count graph nodes
 = snd (foldlr pg ([],[]) nodes)
   where pg node (seen,reprs)
         = (seen2,[repr3:reprs])
           where repr3
                 = if (not (isMember node seen) && def && count node>1)
-                     (toString node+++":"+++repr2)
+                     (showvar node+++":"+++repr2)
                      repr2
                 (seen2,repr2)
                 = if (isMember node seen || not def)
-                     (seen,toString node)
+                     (seen,showvar node)
                      (if (args==[])
-                         (seen1,toString func)
-                         (seen1,"("+++toString func+++foldr (+++) ")" (map ((+++)" ") repr1)))
+                         (seen1,showsym func)
+                         (seen1,"("+++showsym func+++foldr (+++) ")" (map ((+++)" ") repr1)))
                 (seen1,repr1) = foldlr pg ([node:seen],[]) args
                 (def,(func,args)) = varcontents graph node
 

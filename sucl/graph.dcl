@@ -143,6 +143,7 @@ prefix :: .(Graph sym var) .[var] !.[var] -> .([var],[var]) | == var
 
 // Determine a multiline representation of a graph with multiple roots
 printgraph :: .(Graph sym var) .[var] -> .[String] | toString sym & toString var & == var
+printgraphBy :: (sym->String) (var->String) .(Graph sym var) .[var] -> .[String] | == var
 
 // Do reference counting in a graph for the outer bindings.
 // References from case branches are counted once only.

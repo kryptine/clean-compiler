@@ -30,6 +30,22 @@ rulegraph :: !.(Rule sym var) -> Graph sym var
 instance toString (Rule sym var) | toString sym & toString var & == var
 ruleToString :: (sym->.String) .(Rule sym var) -> String | Eq,toString var
 
+showrule ::
+    (sym->String)
+    (var->String)
+    (Rule sym var)
+ -> String
+ |  == var
+
+showruleanch ::
+    (sym->String)
+    (var->String)
+    [Bool]
+    (Rule sym var)
+    [var]
+ -> String
+ |  == var
+
 // --- Functions on rooted graphs
 
 // The empty rooted graph with a given root
@@ -52,6 +68,14 @@ mkrgraph     :: var (Graph sym var) -> .Rgraph sym var
 
 instance == (Rgraph sym var) | == sym & == var
 instance toString (Rgraph sym var) | toString sym & toString var & Eq var
+
+showrgraph ::
+    (sym->String)
+    (var->String)
+    (Rgraph sym var)
+ -> String
+ |  == var
+
 instance <<< (Rgraph sym var) | toString sym & toString var & == var
 instance <<< (Rule sym var) | toString sym & toString,== var
 

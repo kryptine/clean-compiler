@@ -4,6 +4,7 @@ definition module pfun
 
 from StdString import toString
 from StdOverloaded import ==
+from cleanversion import String
 
 // Partial function abstract type
 :: Pfun dom ran
@@ -41,6 +42,13 @@ apply :: !(Pfun dom .ran) dom -> (.Bool,.ran) | == dom
 // Partial functions are printable
 instance toString (Pfun dom ran) | toString dom & toString ran & == dom
 (writepfun) infixl :: *File .(Pfun dom ran) -> .File | ==,toString dom & toString ran
+
+showpfun ::
+    (dom->String)
+    (ran->String)
+    (Pfun dom ran)
+ -> String
+ |  == dom
 
 /* `Idpfun dom pfun' checks whether partial function `pfun' is the identity
    on the nodes in `dom' for which it is defined.

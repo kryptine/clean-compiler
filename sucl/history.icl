@@ -75,3 +75,31 @@ historyToString history
 
 (writeHistoryAssociation) infixl :: *File (HistoryAssociation sym var) -> .File | toString sym & toString,== var
 (writeHistoryAssociation) file ha = file <<< "<historyassociation>" // showpair toString (showlist toString) ha <<< nl
+
+printhistory ::
+    (sym->String)
+    (var->String)
+    String
+    (History sym var)
+    *File
+ -> .File
+ |  == var
+
+printhistory showsym showvar indent history file
+= foldl (flip (printhistoryassociation showsym showvar indent)) file history
+
+printhistoryassociation showsym showvar indent vargraphs file
+= printlist (myshowrgraph showsym showvar) (indent+++"   ") rgraphs (file <<< indent <<< showvar var <<< " <=" <<< nl)
+//= file <<< indent <<< showvar var <<< " <=" <<< showlist (showrgraph showsym showvar) rgraphs <<< nl
+//= file <<< indent <<< showpair showvar (showlist toString) vargraphs <<< nl
+//= file <<< "<history>" <<< nl
+  where (var,rgraphs) = vargraphs
+
+myshowrgraph showsym showvar rgraph
+= hd (printgraphBy showsym showvar (rgraphgraph rgraph) [rgraphroot rgraph])
+
+printlist :: (elem->String) String [elem] *File -> .File
+printlist showelem indent [] file
+= file
+printlist showelem indent [x:xs] file
+= printlist showelem indent xs (file <<< indent <<< showelem x <<< nl)

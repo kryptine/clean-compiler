@@ -8,7 +8,7 @@ import dnc
 import graph
 import pfun
 import basic
-from general import No,Yes,--->
+from general import No,Yes
 import StdEnv
 
 /*
@@ -92,6 +92,22 @@ that the node was in root normal form.
 :: Answer sym var pvar
    :== Optional (Spine sym var pvar)
 
+printanswer ::
+    (sym->String)
+    (var->String)
+    (pvar->String)
+    String
+ -> (Answer sym var pvar)
+    *File
+ -> .File
+ |  == var
+ &  == pvar
+
+printanswer showsym showvar showpvar indent
+= foldoptional (printrnf indent) (printspine showsym showvar showpvar indent)
+
+printrnf indent file = file <<< indent <<< "RNF" <<< nl
+
 /*
 
 Spine  describes the spine returned by a strategy.  It contains the node
@@ -118,6 +134,30 @@ at which the strategy was applied, and the result for that node.
 
 :: Spine sym var pvar
    :== (var,Subspine sym var pvar)
+
+printspine ::
+    (sym->String)
+    (var->String)
+    (pvar->String)
+    String
+ -> (Spine sym var pvar)
+    *File
+ -> .File
+ |  == var
+ &  == pvar
+
+printspine showsym showvar showpvar indent
+= foldspine pair cycle delta force missingcase open partial unsafe redex strict
+  where pair node (line,printrest) file = printrest (file <<< indent <<< showvar node <<< ": " <<< line <<< nl)
+        cycle = ("Cycle",id)
+        delta = ("Delta",id)
+        force argno printrest = ("Force argument "+++toString argno,printrest)
+        missingcase = ("MissingCase",id)
+        open rgraph = ("Open "+++hd (printgraphBy showsym showpvar (rgraphgraph rgraph) [rgraphroot rgraph]),id)
+        partial rule matching pvar printrest = ("Partial <fn> "+++showruleanch showsym showpvar (repeat False) rule [pvar]+++" <"+++showpvar pvar+++"> "+++showpfun showpvar showvar matching,printrest)
+        unsafe rgraph = ("Unsafe "+++hd (printgraphBy showsym showvar (rgraphgraph rgraph) [rgraphroot rgraph]),id)
+        redex rule matching = ("Redex <fn> "+++showruleanch showsym showpvar (repeat False) rule []+++" "+++showpfun showpvar showvar matching,id)
+        strict = ("Strict",id)
 
 /*
 
@@ -239,7 +279,7 @@ spinetip spine = spine
 
 spinenodes :: .(Spine sym var pvar) -> [var]
 spinenodes spine
-= ((nodes<---"spine.spinenodes ends") ---> ("spine.spinenodes number of spine nodes is "+++toString (length nodes))) ---> "spine.spinenodes begins"
+= nodes
   where partial _ _ _ = id
         redex _ _ = []
         nodes = foldspine cons [] [] (const id) [] (const []) partial (const []) redex [] spine
