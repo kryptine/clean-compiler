@@ -376,7 +376,7 @@ checkarity funarity defaultstrategy substrat subject found rnf (ssym,sargs)
 = rnf
 | eqlenn arity sargs
 = defaultstrategy substrat subject found rnf (ssym,sargs)
-= abort "checktype: symbol occurrence with arity greater than its type"
+= abort ("checktype: symbol occurrence with actual arity "+++toString (length sargs)+++" greater than its type arity "+++toString arity)
   where arity = funarity ssym
 
 shortern n _      | n<=0 = False
