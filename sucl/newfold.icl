@@ -204,25 +204,25 @@ foldtips ::
 foldtips foldarea foldcont
 = ft
   where ft hist trace
-        = ft` transf
+        = case transf
+          of Stop
+              -> foldoptional exres (pair True o addstrict stricts) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule)
+                 where deltanodes = foldoptional [] getdeltanodes answer
+                       rnfnodes = foldoptional [ruleroot rule] (const []) answer
+             Instantiate yestrace notrace
+              -> ft`` (ft hist yestrace) (ft hist notrace)
+                 where ft`` (False,yessra) (False,nosra) = exres
+                       ft`` (yesfound,(yesstricts,yesrules,yesareas)) (nofound,(nostricts,norules,noareas))
+                       = (True,(stricts,yesrules++norules,yesareas++noareas))
+             Reduce reductroot trace
+              -> ft`` (ft (fst hist,fst hist) trace)
+                 where ft`` (False,sra) = exres
+                       ft`` (found,sra) = (True,sra)
+             Annotate trace
+              -> ft`` (ft hist trace)
+                 where ft`` (False,sra) = exres
+                       ft`` (found,sra) = (True,sra)
           where (Trace stricts rule answer history transf) = trace
-                ft` Stop
-                = foldoptional exres (pair True o addstrict stricts) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule)
-                  where deltanodes = foldoptional [] getdeltanodes answer
-                        rnfnodes = foldoptional [ruleroot rule] (const []) answer
-                ft` (Instantiate yestrace notrace)
-                = ft`` (ft hist yestrace) (ft hist notrace)
-                  where ft`` (False,yessra) (False,nosra) = exres
-                        ft`` (yesfound,(yesstricts,yesrules,yesareas)) (nofound,(nostricts,norules,noareas))
-                        = (True,(stricts,yesrules++norules,yesareas++noareas))
-                ft` (Reduce reductroot trace)
-                = ft`` (ft (fst hist,fst hist) trace)
-                  where ft`` (False,sra) = exres
-                        ft`` (found,sra) = (True,sra)
-                ft` (Annotate trace)
-                = ft`` (ft hist trace)
-                  where ft`` (False,sra) = exres
-                        ft`` (found,sra) = (True,sra)
                 exres = (False,newextract noetrc foldarea trace)
 
 addstrict stricts (rule,areas) = (stricts,[rule],areas)
