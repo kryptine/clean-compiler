@@ -63,11 +63,11 @@ where
 ::	* RScanState =
 	{	ss_input		::	ScanInput
 	,	ss_offsides		::	! [(Int, Bool) ]	// (column, defines newDefinition)
-	,	ss_useLayout	::	! Int
+	,	ss_scanOptions	::	! Int
 	,	ss_tokenBuffer	::	! Buffer LongToken
 	}
 
-UseLayoutBit :== 1
+ScanOptionUseLayoutBit :== 1
 
 ::	* ScanInput
 	=	Input			Input
@@ -281,7 +281,7 @@ class nextToken state :: !Context !*state -> (!Token, !*state)
 
 instance nextToken RScanState
 where
-	nextToken newContext (scanState=:{ss_input=inp=:PushedToken token=:{lt_position,lt_token,lt_context,lt_index} rest_inp,ss_tokenBuffer,ss_offsides,ss_useLayout})
+	nextToken newContext (scanState=:{ss_input=inp=:PushedToken token=:{lt_position,lt_token,lt_context,lt_index} rest_inp,ss_tokenBuffer,ss_offsides,ss_scanOptions})
 		| lt_context == newContext || notContextDependent lt_token
 		=	(	lt_token
 			,	{ scanState & ss_input = rest_inp , ss_tokenBuffer	= store token ss_tokenBuffer }
@@ -296,16 +296,16 @@ where
 						, inp_pos		= lt_position
 						, inp_tabsize	= inp_tabsize
 						} -->> ("token_back in input", lt_token)
-				=	nextToken newContext {ss_input = Input old_input, ss_offsides=ss_offsides, ss_useLayout=ss_useLayout, ss_tokenBuffer=ss_tokenBuffer}
+				=	nextToken newContext {ss_input = Input old_input, ss_offsides=ss_offsides, ss_scanOptions=ss_scanOptions, ss_tokenBuffer=ss_tokenBuffer}
 				=	(	lt_token
-					,	{ss_input = input , ss_tokenBuffer	= store token ss_tokenBuffer, ss_offsides=ss_offsides, ss_useLayout=ss_useLayout}
+					,	{ss_input = input , ss_tokenBuffer	= store token ss_tokenBuffer, ss_offsides=ss_offsides, ss_scanOptions=ss_scanOptions}
 					) -->> ("unable to push token_back in input; line is lost",(inp_pos.fp_line,lt_position.fp_line), lt_token)
 			token_back input
 				=	(	lt_token
-					,	{ss_input = input , ss_tokenBuffer	= store token ss_tokenBuffer, ss_offsides=ss_offsides, ss_useLayout=ss_useLayout}
+					,	{ss_input = input , ss_tokenBuffer	= store token ss_tokenBuffer, ss_offsides=ss_offsides, ss_scanOptions=ss_scanOptions}
 					) -->> ("unable to push token_back in input; generated token", lt_token)
 
-	nextToken context {ss_input=Input inp,ss_tokenBuffer,ss_offsides,ss_useLayout}
+	nextToken context {ss_input=Input inp,ss_tokenBuffer,ss_offsides,ss_scanOptions}
 		# (error, c, inp) 	= SkipWhites inp
 		  (pos, inp)		= inp!inp_pos
 		  (index,inp)		= getIndex inp
@@ -320,7 +320,7 @@ where
 												}
 												ss_tokenBuffer,
 									ss_input=Input inp,
-									ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout
+									ss_offsides=ss_offsides,	ss_scanOptions=ss_scanOptions
 								}
 							) -->> ("Error token generated",string)
 			no
@@ -336,7 +336,7 @@ where
 													}
 													ss_tokenBuffer
 							, ss_input = Input inp,
-							ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout
+							ss_offsides=ss_offsides,	ss_scanOptions=ss_scanOptions
 							} // -->> ("Token", EndOfFileToken,pos)
 				// otherwise // ~ (eof && c == NewLineChar)
 					#	(token, inp)	= Scan c inp context
@@ -349,7 +349,7 @@ where
 												,	lt_context		= context
 												}
 												ss_tokenBuffer,
-							ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout
+							ss_offsides=ss_offsides,	ss_scanOptions=ss_scanOptions
 						}	 //-->> (token,pos)
 	where
 		mark_position {inp_stream=input=:(OldLine i _ _),inp_filename,inp_pos,inp_tabsize}
@@ -1439,7 +1439,7 @@ openScanner file_name searchPaths files
 											//	, inp_curToken		= []
 												}
 						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
-						,	ss_useLayout	=	0
+						,	ss_scanOptions	=	0
 						,	ss_tokenBuffer	=	Buffer0
 						})
 				, files
@@ -1514,8 +1514,8 @@ isNewLine _      = False
 //------------------------//
 
 UseLayout_ :: !RScanState -> (!Bool, !RScanState)
-UseLayout_ scanState=:{ss_useLayout}
-	= ((ss_useLayout bitand UseLayoutBit) <> 0, scanState)
+UseLayout_ scanState=:{ss_scanOptions}
+	= ((ss_scanOptions bitand ScanOptionUseLayoutBit) <> 0, scanState)
 
 UseLayout :: !ScanState -> (!Bool, !ScanState)
 UseLayout (ScanState scanState)
@@ -1526,11 +1526,11 @@ setUseLayout :: !Bool !ScanState -> ScanState
 setUseLayout b (ScanState ss) = ScanState  (setUseLayout_ b ss)
 
 setUseLayout_ :: !Bool !RScanState -> RScanState
-setUseLayout_ b ss=:{ss_useLayout} = { ss & ss_useLayout = if b (ss_useLayout bitor UseLayoutBit) (ss_useLayout bitand (bitnot UseLayoutBit)) } // -->> ("uselayout set to ",b)
+setUseLayout_ b ss=:{ss_scanOptions} = { ss & ss_scanOptions = if b (ss_scanOptions bitor ScanOptionUseLayoutBit) (ss_scanOptions bitand (bitnot ScanOptionUseLayoutBit)) } // -->> ("uselayout set to ",b)
 
 checkOffside :: !FilePosition !Int !Token !RScanState -> (Token,RScanState)
-checkOffside pos index token scanState=:{ss_offsides,ss_useLayout,ss_input}
-	| (ss_useLayout bitand UseLayoutBit) == 0
+checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
+	| (ss_scanOptions bitand ScanOptionUseLayoutBit) == 0
 		=	(token, scanState)  //-->> (token,pos,"No layout rule applied")
 	| isEmpty ss_offsides
 		=	newOffside token scanState  //-->> "Empty offside stack"
