@@ -4,7 +4,7 @@ import syntax, check, StdCompare, utilities, mergecases; //, RWSDebug
 
 ::	LiftState =
 	{	ls_var_heap		:: !.VarHeap
-	,	ls_x :: !.LiftStateX
+	,	ls_x 			:: !.LiftStateX
 	,	ls_expr_heap	:: !.ExpressionHeap
 	}
 	
@@ -40,7 +40,8 @@ where
 instance lift Expression
 where
 	lift (FreeVar {fv_name,fv_info_ptr}) ls=:{ls_var_heap}
-		#! var_info = sreadPtr fv_info_ptr ls_var_heap
+		# (var_info, ls_var_heap) = readPtr fv_info_ptr ls_var_heap
+		  ls = { ls & ls_var_heap = ls_var_heap }
 		= case var_info of
 			 VI_LiftedVariable var_info_ptr
 			 	# (var_expr_ptr, ls_expr_heap) = newPtr EI_Empty ls.ls_expr_heap
@@ -100,7 +101,7 @@ where
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
 		# (app_args, ls) = lift app_args ls
 		| glob_module == ls.ls_x.LiftStateX.x_main_dcl_module_n
-			#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
+			# (fun_def, ls) = ls!ls_x.x_fun_defs.[glob_object]
 			# {fun_info={fi_free_vars}} = fun_def
 			  fun_lifted = length fi_free_vars
 			| fun_lifted > 0
@@ -111,7 +112,7 @@ where
 			= ({ app & app_args = app_args }, ls)
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_LocalMacroFunction glob_object}, app_args} ls
 		# (app_args, ls) = lift app_args ls
-		#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
+		# (fun_def, ls) = ls!ls_x.x_fun_defs.[glob_object]
 		# {fun_info={fi_free_vars}} = fun_def
 		  fun_lifted = length fi_free_vars
 		| fun_lifted > 0
@@ -127,7 +128,7 @@ add_free_variables_in_app :: ![FreeVar] ![Expression] !u:VarHeap !*ExpressionHea
 add_free_variables_in_app [] app_args var_heap expr_heap
 	= (app_args, var_heap, expr_heap)
 add_free_variables_in_app [{fv_name, fv_info_ptr} : free_vars] app_args var_heap expr_heap
-	#! var_info = sreadPtr fv_info_ptr var_heap
+	# (var_info, var_heap) = readPtr fv_info_ptr var_heap
 	= case var_info of
 		VI_LiftedVariable var_info_ptr
 		 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -192,7 +193,7 @@ where
 
 unfoldVariable :: !BoundVar UnfoldInfo !*UnfoldState -> (!Expression, !*UnfoldState)
 unfoldVariable var=:{var_name,var_info_ptr} ui us
-	#! (var_info, us) = readVarInfo var_info_ptr us
+	# (var_info, us) = readVarInfo var_info_ptr us
 	= case var_info of 
 		VI_Expression expr
 			-> (expr, us)
@@ -221,7 +222,8 @@ unfoldVariable var=:{var_name,var_info_ptr} ui us
 
 
 readVarInfo var_info_ptr us
-	#! var_info = sreadPtr var_info_ptr us.us_var_heap
+	# (var_info, us_var_heap) = readPtr var_info_ptr us.us_var_heap
+	  us = { us & us_var_heap = us_var_heap }
 	= case var_info of
 		VI_Extended _ original	-> (original, us)
 		_						-> (var_info, us)
@@ -458,7 +460,7 @@ where
 			  us = { us & us_symbol_heap = us_symbol_heap }
 			= case case_info of
 				EI_Extended (EEI_ActiveCase aci=:{aci_free_vars}) ei
-					#!(new_aci_free_vars, us) = case ui.ui_handle_aci_free_vars of
+					# (new_aci_free_vars, us) = case ui.ui_handle_aci_free_vars of
 													LeaveThem		-> (aci_free_vars, us)
 													RemoveThem		-> (No, us)
 													SubstituteThem	-> case aci_free_vars of
@@ -1673,7 +1675,8 @@ where
 				= (cContainsNoCycle, [], cos)
 //			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
 			detect_cycles_and_handle_alias_binds is_strict [bind=:{lb_dst={fv_info_ptr}} : binds] cos
-				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
+				# (var_info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
+				  cos = { cos & cos_var_heap = cos_var_heap }
 				= case var_info of
 					VI_Alias {var_info_ptr}
 						| is_cyclic fv_info_ptr var_info_ptr cos.cos_var_heap
@@ -1722,8 +1725,8 @@ where
 		
 			examine_reachable_binds bind_found [bind=:(is_strict, {lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars cos
 				# (bind_found, binds, collected_binds, free_vars, cos) = examine_reachable_binds bind_found binds collected_binds free_vars cos
-				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
-				# (VI_Count count is_global) = var_info
+				# (VI_Count count is_global, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
+				# cos = { cos & cos_var_heap = cos_var_heap }
 				| count > 0
 					# (lb_src, free_vars, cos) = collectVariables lb_src free_vars cos
 					= (True, binds, [ (is_strict, { snd bind & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, cos)
