@@ -1629,7 +1629,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  all_type_vars
 	  		=   flatten [st_vars \\ {st_vars} <- [sound_consumer_symbol_type:sound_function_producer_types]]
 	  		  ++flatten type_vars_in_class_types
-	| False ---> ("all_type_vars",all_type_vars)	= undef
+	| False -!-> ("all_type_vars",all_type_vars)	= undef
 	# (nr_of_all_type_vars, th_vars)
 	  		=  foldSt bind_to_temp_type_var all_type_vars (0, th_vars)
 	  subst
@@ -1638,10 +1638,10 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  		= foldSt bind_to_temp_attr_var st_attr_vars (FirstAttrVar, ti_type_heaps.th_attrs)
 	  ti_type_heaps
 	  		= { ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars }
-	| False--->("before substitute", st_args, "->", st_result)		= undef
+	| False-!->("before substitute", st_args, "->", st_result)		= undef
 	# (_, (st_args,st_result), ti_type_heaps)
 	  		= substitute (st_args,st_result) ti_type_heaps
-	| False--->("after substitute", st_args, "->", st_result)		= undef
+	| False-!->("after substitute", st_args, "->", st_result)		= undef
 // determine args...
 	# das =
 			{ das_vars						= []
@@ -1713,8 +1713,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	# ([st_result:new_arg_types], (coercions, subst, ti_type_heaps, ti_type_def_infos))
 	  		= mapSt (expand_type ro.ro_common_defs cons_vars) [st_result:new_arg_types]
 	  				(coercions, subst, ti_type_heaps, ti_type_def_infos)
-	| False--->("unified type", new_arg_types, "->", st_result)		= undef
-	| False--->("coercions", readableCoercions coercions)			= undef
+	| False-!->("unified type", new_arg_types, "->", st_result)		= undef
+	| False-!->("coercions", readableCoercions coercions)			= undef
 
 	# (fresh_type_vars_array,ti_type_heaps)
 	  		= accTypeVarHeap (create_fresh_type_vars nr_of_all_type_vars) ti_type_heaps
@@ -2807,7 +2807,7 @@ add_let_binds free_vars rhss original_binds
 
 transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool
-			-> (!*{! Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
+			-> (!*{! Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*{!ConsClasses})
 transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fun_defs cons_args common_defs imported_funs
 		imported_types collected_imports type_def_infos var_heap type_heaps symbol_heap compile_with_fusion
 	#! nr_of_funs = size fun_defs
@@ -2833,7 +2833,7 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 	  				(groups, [], imported_types, collected_imports, ti.ti_type_heaps, ti.ti_var_heap)
 	  symbol_heap = foldSt cleanup_attributes ti.ti_cleanup_info ti.ti_symbol_heap
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: ti.ti_fun_defs ] ++ new_fun_defs }
-	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap)
+	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, ti.ti_cons_args)
   where
 	transform_groups group_nr groups common_defs imported_funs imported_types collected_imports ti
 		| group_nr < size groups
