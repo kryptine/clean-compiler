@@ -259,7 +259,7 @@ cIsNotAFunction :== False
 ::	Import from_symbol =
 	{	import_module		:: !Ident
 	,	import_symbols		:: ![from_symbol]
-	,	import_file_position:: !(!FileName, !Int)	// for error messages // MW++
+	,	import_file_position:: !(!FileName, !Int)	// for error messages
 	}
 
 instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation

@@ -130,7 +130,8 @@ where
 
 			bind_variable {bind_src,bind_dst={fv_info_ptr}} var_heap
 				# (VI_Occurrence occ, var_heap) = readPtr fv_info_ptr var_heap
-				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_bind = OB_OpenLet bind_src })
+//				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_bind = OB_OpenLet bind_src })
+				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_bind = OB_OpenLet bind_src })
 
 	refMark free_vars sel (Case {case_expr,case_guards,case_default}) var_heap
 		= refMarkOfCase free_vars sel case_expr case_guards case_default var_heap

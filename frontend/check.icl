@@ -883,7 +883,6 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input var_env ps e_info cs
 
 checkPattern (PE_DynamicPattern pattern type) opt_var p_input var_env ps e_info cs
 	# (dyn_pat, var_env, ps, e_info, cs) = checkPattern pattern No p_input var_env ps e_info cs
-// MW was	= (AP_Dynamic dyn_pat type opt_var, var_env, ps, e_info, cs)
 	= (AP_Dynamic dyn_pat type opt_var, var_env, ps, e_info, { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdDynamics })
 
 checkPattern (PE_Basic basic_value) opt_var p_input var_env ps e_info cs
@@ -1048,7 +1047,8 @@ where
 		# index = { glob_object = ste_index, glob_module = cIclModIndex }
 		| is_called_before ei_fun_index calls
 			| fun_kind == FK_Macro
-				= (SK_Macro index, fun_arity, fun_priority, cIsNotAFunction, e_state, e_info, cs)
+//				= (SK_Macro index, fun_arity, fun_priority, cIsNotAFunction, e_state, e_info, cs)
+				= (SK_Macro index, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
 				= (SK_Function index, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
 			  e_state = { e_state & es_calls = [{ fc_index = ste_index, fc_level = ste_def_level} : es_calls ]}
@@ -1308,21 +1308,7 @@ where
 			_
 				-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
 						{ cs & cs_error = checkError basic_val "illegal combination of patterns" cs.cs_error})
-/*
-		= case patterns of
-			BasicPatterns basic_type basic_patterns
-				| type_symbol == basic_type
-					-> (BasicPatterns basic_type [pattern : basic_patterns], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-					-> (patterns, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-							{ cs & cs_error = checkError basic_val "incompatible types of patterns" cs.cs_error })
-			NoPattern
-				-> (BasicPatterns type_symbol [pattern], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-			_
-				-> (patterns, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-						{ cs & cs_error = checkError basic_val "illegal combination of patterns" cs.cs_error})
-*/
 	transform_pattern (AP_Dynamic pattern type opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ var_store expr_heap opt_dynamics cs
-		// # cs = { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdDynamics } // MW++
 		# (var_arg, result_expr, var_store, expr_heap, opt_dynamics, cs) = convertSubPattern pattern result_expr var_store expr_heap opt_dynamics cs
 		  (dynamic_info_ptr, expr_heap) = newPtr (EI_DynamicType type opt_dynamics) expr_heap
 		  pattern = { dp_var = var_arg, dp_type	= dynamic_info_ptr,	dp_rhs = result_expr, dp_type_patterns_vars = [], dp_type_code = TCE_Empty }
@@ -1336,16 +1322,6 @@ where
 			_
 				-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
 						{ cs & cs_error = checkError "<dynamic pattern>" "illegal combination of patterns" cs.cs_error })
-/*
-		= case patterns of
-			DynamicPatterns dyn_patterns
-				-> (DynamicPatterns [pattern : dyn_patterns], pattern_variables, defaul, var_store, expr_heap, [dynamic_info_ptr], cs)
-			NoPattern
-				-> (DynamicPatterns [pattern], pattern_variables, defaul, var_store, expr_heap, [dynamic_info_ptr], cs)
-			_
-				-> (patterns, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-						{ cs & cs_error = checkError "<dynamic pattern>" "illegal combination of patterns" cs.cs_error })
-*/
 	transform_pattern (AP_Variable name var_info opt_var) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
 		= ( NoPattern, pattern_scheme, cons_optional opt_var pattern_variables, 
 		  	Yes ([{ fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }], result_expr),
@@ -1361,29 +1337,15 @@ where
 		// if (!has_been_inserted) checkWarning("pattern won't match");
 		= (NoPattern, pattern_scheme, (cons_optional opt_var pattern_variables), Yes (cons_opt free_var vars_as_patterns, new_defaul),
 			var_store, expr_heap, opt_dynamics, cs)
-/*
-	transform_pattern (AP_Variable name var_info opt_var) patterns pattern_variables defaul result_expr var_store expr_heap opt_dynamics cs
-		= (patterns, cons_optional opt_var pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-				{ cs & cs_error = checkError name "illegal combination of patterns" cs.cs_error })
-*/
-// MW added the following alternative
 	transform_pattern (AP_WildCard (Yes opt_var)) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
 		= transform_pattern (AP_Variable opt_var.bind_src opt_var.bind_dst No) patterns pattern_scheme pattern_variables defaul
 							result_expr case_name var_store expr_heap opt_dynamics cs
 	transform_pattern (AP_WildCard no) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
 		= (NoPattern, pattern_scheme, pattern_variables, Yes ([], result_expr), var_store, expr_heap, opt_dynamics, cs)
-/*
-	transform_pattern (AP_WildCard _) NoPattern pattern_variables No result_expr var_store expr_heap opt_dynamics cs
-		= (NoPattern, pattern_variables, Yes ([], result_expr), var_store, expr_heap, opt_dynamics, cs)
-*/
 	transform_pattern (AP_WildCard _) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
 		# (new_info_ptr, var_store) = newPtr VI_Empty var_store
 		= transform_pattern (AP_Variable (newVarId "wc") new_info_ptr No) patterns pattern_scheme pattern_variables defaul
 							result_expr case_name var_store expr_heap opt_dynamics cs
-/*
-	transform_pattern (AP_WildCard _) patterns pattern_variables defaul result_expr var_store expr_heap opt_dynamics cs
-		= (patterns, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, { cs & cs_error = checkError "_" "illegal combination of patterns" cs.cs_error })		
-*/
 	transform_pattern (AP_Empty name) patterns pattern_scheme pattern_variables defaul result_expr _ var_store expr_heap opt_dynamics cs
 		= (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 
@@ -1406,19 +1368,6 @@ where
 				-> (let_expression, expr_heap)
 			No
 				-> (EE, expr_heap)
-/*
-	build_case NoPattern defaul expr case_ident expr_heap
-		= case defaul of
-			Yes (opt_var, result)
-				-> case opt_var of
-					Yes var
-						# (let_expression, expr_heap) = bind_default_variable expr var result expr_heap
-						-> (let_expression, expr_heap)
-					No
-						-> (result, expr_heap)
-			No
-				-> (abort "incorrect case expression in build_case", expr_heap)
-*/
 	build_case (DynamicPatterns patterns) defaul expr case_ident expr_heap
 		= case defaul of
 			Yes (vars, result)
@@ -1434,25 +1383,6 @@ where
 			No
 				# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
 				-> (buildTypeCase expr patterns No type_case_info_ptr, expr_heap)
-/*
-	build_case (DynamicPatterns patterns) defaul expr case_ident expr_heap
-		= case defaul of
-			Yes (opt_var, result)
-				-> case opt_var of
-					Yes var
-						# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-						  (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-						  bound_var = { var_name = var.fv_name, var_info_ptr = var.fv_info_ptr, var_expr_ptr = var_expr_ptr }
-						  result = buildTypeCase (Var bound_var) patterns (Yes result) type_case_info_ptr
-						  (case_expression, expr_heap) = bind_default_variable expr var result expr_heap
-					 	-> (case_expression, expr_heap)
-					No
-						# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-						-> (buildTypeCase expr patterns (Yes result) type_case_info_ptr, expr_heap)
-			No
-				# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				-> (buildTypeCase expr patterns No type_case_info_ptr, expr_heap)
-*/
 	build_case patterns (Yes (vars,result)) expr case_ident expr_heap
 		= case vars of
 			[]	#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -1465,31 +1395,9 @@ where
 								 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr}
 				  (case_expression, expr_heap) = bind_default_variables expr (reverse vars) result expr_heap
 				-> (case_expression, expr_heap)
-/*
-	build_case patterns (Yes (defaul,result)) expr case_ident expr_heap
-		= case defaul of
-			Yes var
-				# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				  bound_var = { var_name = var.fv_name, var_info_ptr = var.fv_info_ptr, var_expr_ptr = var_expr_ptr }
-				  result = Case {case_expr = Var bound_var, case_guards = patterns, case_default = Yes result,
-								 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr}
-				  (case_expression, expr_heap) = bind_default_variable expr var result expr_heap
-				-> (case_expression, expr_heap)
-			No
-				#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				-> (Case {case_expr = expr, case_guards = patterns, case_default = Yes result,
-						case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
-*/
 	build_case patterns No expr case_ident expr_heap
 		# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
-
-/*
-	bind_default_variable bind_src bind_dst result_expr expr_heap
-		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Let {let_strict = cIsNotStrict, let_binds = [{ bind_src = bind_src, bind_dst = bind_dst }], let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
-*/
 	bind_default_variables expr vars result_expr expr_heap
 		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		   (var_binds, expr_heap) = build_binds vars [] expr_heap
@@ -1506,7 +1414,7 @@ where
 		= (pattern_expr, [], expr_heap)
 	bind_pattern_variables [{bind_src,bind_dst} : variables] this_pattern_expr expr_heap
 		# free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
-		  (bound_var, expr_heap) = allocate_bound_var free_var expr_heap // MW
+		  (bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  (pattern_expr, binds, expr_heap) = bind_pattern_variables variables (Var bound_var) expr_heap
 		= (pattern_expr, [{bind_src = this_pattern_expr, bind_dst = free_var} : binds], expr_heap)
 
@@ -1641,7 +1549,6 @@ checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expres
 	  (dyn_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input
 	  		{e_state & es_dynamics = [dyn_info_ptr : es_dynamics], es_expression_heap = es_expression_heap } e_info cs
 	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty, dyn_uni_vars = [] },
-// MW was			free_vars, e_state, e_info, cs) 
 			free_vars, e_state, e_info, { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdDynamics }) 
 
 checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
@@ -1956,14 +1863,15 @@ where
 		  (binds, let_vars_list, rhs_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars ewl_nodes [] { e_input & ei_expr_level = this_expr_level } e_state e_info cs
 	  	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars ewl_expr { e_input & ei_expr_level = rhs_expr_level } e_state e_info cs
 		  cs = { cs & cs_symbol_table = remove_seq_let_vars rhs_expr_level let_vars_list cs.cs_symbol_table }
-	  	  (expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs expr e_input e_state e_info cs
+		  (seq_let_expr, es_expression_heap) = build_sequential_lets binds expr e_state.es_expression_heap
+	  	  (expr, free_vars, e_state, e_info, cs)
+				= checkRhssAndTransformLocalDefs free_vars loc_defs seq_let_expr e_input { e_state & es_expression_heap = es_expression_heap} e_info cs
 	  	  (es_fun_defs, e_info, heaps, cs)
-	  	  	= checkLocalFunctions ei_mod_index rhs_expr_level ewl_locals e_state.es_fun_defs e_info 
+	  	  		= checkLocalFunctions ei_mod_index rhs_expr_level ewl_locals e_state.es_fun_defs e_info 
 	  	  		{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expression_heap, hp_type_heaps = e_state.es_type_heaps } cs
 		  (es_fun_defs, cs_symbol_table) = removeLocalsFromSymbolTable this_expr_level var_env ewl_locals es_fun_defs cs.cs_symbol_table
-		  (seq_let_expr, es_expression_heap) = build_sequential_lets binds expr heaps.hp_expression_heap
-	  	= (seq_let_expr, free_vars, {e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap,
-	  			es_expression_heap = es_expression_heap, es_type_heaps = heaps.hp_type_heaps }, e_info, { cs & cs_symbol_table = cs_symbol_table} )
+	  	= (expr, free_vars, {e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap,
+	  			es_expression_heap = heaps.hp_expression_heap, es_type_heaps = heaps.hp_type_heaps }, e_info, { cs & cs_symbol_table = cs_symbol_table} )
 	
 	remove_seq_let_vars level [] symbol_table
 		= symbol_table
@@ -2064,10 +1972,6 @@ convertSubPattern (AP_WildCard opt_var) result_expr var_store expr_heap opt_dyna
 	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0  }, result_expr, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Empty _) result_expr var_store expr_heap opt_dynamics cs
 	= convertSubPattern (AP_WildCard No) EE var_store expr_heap opt_dynamics cs
-/* MW was
-convertSubPattern ap result_expr var_store expr_heap opt_dynamics cs
-	= abort ("convertSubPattern: unknown pattern " ---> ap) 
-*/
 
 typeOfBasicValue :: !BasicValue !*CheckState -> (!BasicType, !*CheckState)
 typeOfBasicValue (BVI _) cs = (BT_Int, cs)
@@ -2197,7 +2101,6 @@ where
 		= (Case { case_expr = act_var, case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr },
 			var_store, expr_heap, opt_dynamics, cs)	
 	transform_pattern_into_cases (AP_Dynamic pattern type opt_var) fun_arg result_expr var_store expr_heap opt_dynamics cs
-		//# cs = { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdDynamics } // MW++
 		# (var_arg, result_expr, var_store, expr_heap, opt_dynamics, cs) = convertSubPattern pattern result_expr var_store expr_heap opt_dynamics cs
 		  (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		  (dynamic_info_ptr, expr_heap) = newPtr (EI_DynamicType type opt_dynamics) expr_heap
@@ -2564,7 +2467,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 
 	  (scanned_modules, icl_functions, cs)
 	  		= add_modules_to_symbol_table [ dcl_mod, pre_def_mod : scanned_modules ] 0 icl_functions
-	  				{ cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, /*MW*/ cs_needed_modules = 0 }
+	  				{ cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_needed_modules = 0 }
 	  
 	  init_dcl_modules = [ initialDclModule scanned_module \\ scanned_module <- scanned_modules ]
 	  (dcl_modules, local_defs, cdefs, sizes, cs)
@@ -2583,7 +2486,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 
 	  (_, {ii_modules,ii_funs_and_macros = icl_functions}, heaps, cs) = checkImports mod_imports iinfo heaps cs
 
-	  cs = { cs & cs_needed_modules = 0 } // MW++
+	  cs = { cs & cs_needed_modules = 0 }
 	  
 	  (nr_of_modules, (f_consequences, ii_modules, icl_functions, hp_expression_heap, cs))
 	  	= check_completeness_of_all_dcl_modules ii_modules icl_functions heaps.hp_expression_heap cs
@@ -2614,7 +2517,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 	  (icl_functions, e_info, heaps, cs) = checkMacros cIclModIndex cdefs.def_macros icl_functions e_info heaps cs
 	  (icl_functions, e_info, heaps, cs) = checkFunctions cIclModIndex cGlobalScope 0 nr_of_global_funs icl_functions e_info heaps cs
 
-	  (e_info, cs) = check_needed_modules_are_imported mod_name ".icl" e_info cs // MW ++
+	  (e_info, cs) = check_needed_modules_are_imported mod_name ".icl" e_info cs
 
 	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error})
 	  	= checkInstanceBodies {ir_from = first_inst_index, ir_to = nr_of_functions} icl_functions e_info heaps cs
@@ -2829,7 +2732,6 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 				  (Yes symbol_type) = inst_def.fun_type
 				= { instance_defs & [ds_index] = { inst_def & fun_type = Yes (makeElemTypeOfArrayFunctionStrict symbol_type ins_offset offset_table) } }
 
-// MW..
 check_needed_modules_are_imported mod_name extension e_info cs=:{cs_needed_modules}
 	# (e_info, cs) = case cs_needed_modules bitand cNeedStdDynamics of
 						0 -> (e_info, cs)
@@ -2852,7 +2754,6 @@ check_needed_modules_are_imported mod_name extension e_info cs=:{cs_needed_modul
 		  cs_error = checkError pds_ident "not imported" cs_error
 		  cs_error = popErrorAdmin cs_error
 		= (e_info, { cs & cs_error = cs_error })
-// ..MW
 
 arrayFunOffsetToPD_IndexTable member_defs predef_symbols
 	# nr_of_array_functions = size member_defs
@@ -2963,7 +2864,6 @@ checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions h
   
 	  dcl_common				= createCommonDefinitions mod_defs
 	  dcl_macros				= mod_defs.def_macros
-// MW was	  (imports, modules, cs)	= collect_imported_symbols mod_imports [] modules cs
 	  (imports, modules, cs)	= collect_imported_symbols mod_imports [] modules { cs & cs_needed_modules = 0 }
 
   // imports :: [(Index,Declarations)]
@@ -2997,7 +2897,7 @@ checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions h
 	  (icl_functions, e_info, heaps, cs)
 			= checkMacros mod_index dcl_macros icl_functions e_info heaps { cs & cs_error = cs_error }
 
-	  (e_info, cs) = check_needed_modules_are_imported mod_name ".dcl" e_info cs // MW ++
+	  (e_info, cs) = check_needed_modules_are_imported mod_name ".dcl" e_info cs
 
 	  com_instance_defs = dcl_common.com_instance_defs
 	  com_instance_defs = { inst_def \\ inst_def <- [ inst_def \\ inst_def <-: com_instance_defs ] ++ new_class_instances }

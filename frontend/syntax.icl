@@ -253,7 +253,7 @@ cIsNotAFunction :== False
 ::	Import from_symbol =
 	{	import_module		:: !Ident
 	,	import_symbols		:: ![from_symbol]
-	,	import_file_position:: !(!FileName, !Int)	// for error messages // MW++
+	,	import_file_position:: !(!FileName, !Int)	// for error messages
 	}
 
 ::	ParsedImport		:== Import ImportDeclaration
@@ -1328,8 +1328,9 @@ where
 instance <<< Expression
 where
 	(<<<) file (Var ident) = file <<< ident
-	(<<<) file (App {app_symb, app_args})
-		= file <<< app_symb <<< ' ' <<< app_args
+	(<<<) file (App {app_symb, app_args, app_info_ptr})
+//		= file <<< app_symb <<< ' ' <<< app_args
+		= file <<< app_symb <<< " <" <<< ptrToInt app_info_ptr <<< "> " <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
 	(<<<) file (Let {let_info_ptr, let_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') let_binds <<< "in\n" <<< let_expr
 	where

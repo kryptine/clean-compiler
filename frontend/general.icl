@@ -49,15 +49,17 @@ where
 
 (--->) infix :: .a !b -> .a | <<< b
 (--->) val message
-  | file_to_true (stderr <<< message <<< '\n')
-      = val
-      = abort "Internal error in --->"
+	| file_to_true (stderr <<< message <<< '\n')
+		= val
+		= abort "Internal error in --->"
 
 (-?->) infix :: .a !(!Bool, !b) -> .a | <<< b
 (-?->) val (cond, message)  
-  | cond && file_to_true (stderr <<< message <<< '\n')
-      = val
-      = abort "Internal error in --->"
+	| cond
+		| file_to_true (stderr <<< message <<< '\n')
+			= val
+      		= abort "Internal error in --->"
+		= val
 
 file_to_true :: !File -> Bool
 file_to_true file = code {

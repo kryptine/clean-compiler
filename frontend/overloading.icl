@@ -2,7 +2,7 @@ implementation module overloading
 
 import StdEnv
 
-import syntax, check, type, typesupport, utilities, unitype, predef // , RWSDebug
+import syntax, check, type, typesupport, utilities, unitype, predef, RWSDebug
 
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
@@ -178,8 +178,8 @@ where
 				# {ins_members, ins_class} = defs.[glob_module].com_instance_defs.[glob_object]
 				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_ArrayClass predef_symbols &&
 				  is_unboxed_array tc_types predef_symbols
-					# (rcs_class_context, special_instances, predef_symbols, error)
-							= check_unboxed_type glob_module ins_class ins_members tc_types class_members defs special_instances predef_symbols error
+					# (rcs_class_context, special_instances, (predef_symbols, type_heaps), error)
+							= check_unboxed_type glob_module ins_class ins_members tc_types class_members defs special_instances (predef_symbols, type_heaps) error
 					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []},
 									special_instances, type_pattern_vars, type_heaps, coercion_env, predef_symbols, error)
 					# (appls, special_instances, type_pattern_vars, type_heaps, coercion_env, predef_symbols, error)
@@ -293,39 +293,40 @@ where
 	is_unboxed_array _ predef_symbols
 		= False
 
-
-	check_unboxed_type ins_module ins_class ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols error
-		# (unboxable, opt_record, predef_symbols) = try_to_unbox elem_type defs predef_symbols
+	check_unboxed_type ins_module ins_class ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols_type_heaps error
+		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
 		| unboxable
 			= case opt_record of
 				Yes record
 					# (ins_members, special_instances) = add_record_to_array_instances record class_members special_instances
 					-> ({ rc_class = ins_class, rc_inst_module = cIclModIndex, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
-							special_instances, predef_symbols, error)
+							special_instances, predef_symbols_type_heaps, error)
 				No
 					-> ({ rc_class = ins_class, rc_inst_module = ins_module, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
-							special_instances, predef_symbols, error)
+							special_instances, predef_symbols_type_heaps, error)
 			= ({ rc_class = ins_class, rc_inst_module = ins_module, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
-					special_instances, predef_symbols, unboxError elem_type error)
+					special_instances, predef_symbols_type_heaps, unboxError elem_type error)
 	where
-		try_to_unbox (TB _) _ predef_symbols
-			= (True, No, predef_symbols)
-		try_to_unbox (TA type_symb=:{type_index={glob_module,glob_object},type_arity} _) defs predef_symbols
-			# {td_arity,td_rhs} = defs.[glob_module].com_type_defs.[glob_object]
+		try_to_unbox (TB _) _ predef_symbols_type_heaps
+			= (True, No, predef_symbols_type_heaps)
+		try_to_unbox (TA type_symb=:{type_index={glob_module,glob_object},type_arity} type_args) defs (predef_symbols, type_heaps)
+			# {td_arity,td_rhs, td_args} = defs.[glob_module].com_type_defs.[glob_object]
 			= case td_rhs of
 				RecordType _
-					-> (True, (Yes type_symb), predef_symbols)
+					-> (True, (Yes type_symb), (predef_symbols, type_heaps))
 				AbstractType _
 					#! unboxable =
 						   is_predefined_symbol glob_module glob_object PD_LazyArrayType predef_symbols ||
 						   is_predefined_symbol glob_module glob_object PD_StrictArrayType predef_symbols ||
 						   is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols
-					-> (unboxable, No, predef_symbols)
+					-> (unboxable, No, (predef_symbols, type_heaps))
+				SynType {at_type}
+					# (expanded_type, type_heaps) = expandTypeSyn td_args type_args at_type type_heaps
+					-> try_to_unbox expanded_type defs (predef_symbols, type_heaps)
 				_
-					-> (False, No, predef_symbols)
-				
-		try_to_unbox type _ predef_symbols
-			= (True, No, predef_symbols)
+					-> (False, No, (predef_symbols, type_heaps))				
+		try_to_unbox type _ predef_symbols_type_heaps
+			= (True, No, predef_symbols_type_heaps)
 
 		add_record_to_array_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#DefinedSymbol},!*SpecialInstances)
 		add_record_to_array_instances record members special_instances=:{si_next_array_member_index,si_array_instances}
@@ -411,18 +412,23 @@ addGlobalTCInstance type_of_TC (next_member_index, [])
 
 tryToExpandTypeSyn defs cons_id=:{type_name,type_index={glob_object,glob_module}} type_args type_heaps
 	# {td_name,td_rhs,td_args} = defs.[glob_module].com_type_defs.[glob_object]
-	| is_synonym_type td_rhs
-		# (SynType {at_type}) = td_rhs
-		  type_heaps = fold2St bind_var td_args type_args type_heaps
-		  (expanded_type, type_heaps) = substitute at_type type_heaps
-		= (True, expanded_type, type_heaps)
-		= (False, TA cons_id type_args, type_heaps)
+	= case td_rhs of
+		SynType {at_type}
+			# (expanded_type, type_heaps) = expandTypeSyn td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps) 
+		_
+			-> (False, TA cons_id type_args, type_heaps)
 where
 	is_synonym_type (SynType _)
 		= True
 	is_synonym_type type_rhs
 		= False
 
+expandTypeSyn td_args type_args td_rhs type_heaps
+	# type_heaps = fold2St bind_var td_args type_args type_heaps
+	  (expanded_type, type_heaps) = substitute td_rhs type_heaps
+	= (expanded_type, type_heaps)
+where
 	bind_var {atv_attribute = TA_Var {av_info_ptr}, atv_variable={tv_info_ptr}} {at_attribute, at_type} type_heaps=:{th_vars,th_attrs}
 		= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }
 	bind_var {atv_variable={tv_info_ptr}} {at_type} type_heaps=:{th_vars}
@@ -529,6 +535,7 @@ where
 		| isEmpty call_ptrs
 			= (contexts, coercion_env, type_pattern_vars, os)
 			# os = { os & os_error = setErrorAdmin location os_error }
+//							---> ("try_to_solve_overloading", call_ptrs)
 			= case fun_context of
 				Yes specified_context
 					# (_, coercion_env, type_pattern_vars, os)
@@ -542,7 +549,10 @@ where
 	reduce_and_simplify_contexts :: ![ExprInfoPtr] !{# CommonDefs } !ClassInstanceInfo !Bool ![TypeContext] !*Coercions ![LocalTypePatternVariable]
 			!*OverloadingState -> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
 	reduce_and_simplify_contexts [over_info_ptr : ocs] defs instance_info has_context contexts coercion_env type_pattern_vars os=:{os_symbol_heap, os_type_heaps}
-		# (EI_Overloaded {oc_symbol, oc_context, oc_specials}, os_symbol_heap) = readPtr over_info_ptr os_symbol_heap
+		# (expr_info, os_symbol_heap) = readPtr over_info_ptr os_symbol_heap
+		  {oc_symbol, oc_context, oc_specials} = case expr_info of
+														EI_Overloaded over_info -> over_info
+														_						-> abort ("reduce_and_simplify_contexts" <<- expr_info)
 		  (glob_fun, os_type_heaps) = trySpecializedInstances oc_context oc_specials os_type_heaps
 		| FoundObject glob_fun
 			# os_symbol_heap = os_symbol_heap <:= (over_info_ptr, EI_Instance {glob_module = glob_fun.glob_module, glob_object =
@@ -1199,7 +1209,7 @@ where
 
 instance <<< (Ptr x)
 where
-	(<<<) file _ = file
+	(<<<) file ptr = file <<< '<' <<< ptrToInt ptr <<< '>'
 	
 instance <<< TypeCodeExpression
 where

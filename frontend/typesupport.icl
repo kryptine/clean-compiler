@@ -136,7 +136,7 @@ instance cleanUpClosed AType
 where
 	cleanUpClosed atype=:{at_type} env
 		# (ok, at_type, env) = cleanUpClosed at_type env
-		= (ok, { atype & at_type = at_type}, env)
+		= (ok, { atype & at_attribute = TA_Multi, at_type = at_type}, env)
 
 instance cleanUpClosed Type
 where
@@ -310,8 +310,8 @@ where
 
 	update_expression_types :: !CleanUpInput ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
 	update_expression_types cui expr_ptrs expr_heap cus
-		= (expr_heap, cus)
-//		= foldSt (update_expression_type cui) expr_ptrs (expr_heap, cus)
+//		= (expr_heap, cus)
+		= foldSt (update_expression_type cui) expr_ptrs (expr_heap, cus)
 
 	update_expression_type cui expr_ptr (expr_heap, cus)
 		# (info, expr_heap) = readPtr expr_ptr expr_heap

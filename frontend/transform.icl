@@ -267,24 +267,28 @@ where
 	unfold expr us
 		= (expr, us)
 
+/* Sjaak ... */
 instance unfold Selection
 where
-	unfold (ArraySelection array_select expr_ptr index_expr) us
-		# (index_expr, us) = unfold index_expr us
-		= (ArraySelection array_select expr_ptr index_expr, us)
-	unfold (DictionarySelection var selectors expr_ptr index_expr) us
-		# (index_expr, us) = unfold index_expr us
+	unfold (ArraySelection array_select expr_ptr index_expr) us=:{us_symbol_heap}
+		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
+		  (index_expr, us) = unfold index_expr { us & us_symbol_heap = us_symbol_heap}
+		= (ArraySelection array_select new_ptr index_expr, us)
+	unfold (DictionarySelection var selectors expr_ptr index_expr) us=:{us_symbol_heap}
+		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
+		  (index_expr, us) = unfold index_expr { us & us_symbol_heap = us_symbol_heap}
 		  (var_expr, us) = unfoldVariable var us
 		= case var_expr of 
 			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
 				# [RecordSelection _ field_index:_] = selectors
 				  (App { app_symb = {symb_name, symb_kind = SK_Function array_select}}) =  app_args !! field_index
 				-> (ArraySelection { array_select & glob_object = { ds_ident = symb_name, ds_arity = 2, ds_index = array_select.glob_object}}
-							expr_ptr index_expr, us)
+							new_ptr index_expr, us)
 			Var var
-				-> (DictionarySelection var selectors expr_ptr index_expr, us)
+				-> (DictionarySelection var selectors new_ptr index_expr, us)
 	unfold record_selection ls
 		= (record_selection, ls)
+/* ... Sjaak */
 
 instance unfold FreeVar
 where
@@ -308,20 +312,6 @@ where
 								_	-> (nilPtr, us)
 		  (app_args, us) = unfold app_args us
 		= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, us) 
-/*
-	unfold app=:{app_symb, app_args, app_info_ptr} us=:{us_symbol_heap}
-		# (new_info_ptr, us_symbol_heap)
-				= case is_function_or_macro app_symb.symb_kind of
-					True	-> newPtr EI_Empty us_symbol_heap
-					_		-> case (app_symb.symb_kind, isNilPtr app_info_ptr) of
-								(SK_Constructor _, False)
-									# (app_info, us_symbol_heap) = readPtr app_info_ptr us_symbol_heap
-									-> newPtr app_info us_symbol_heap
-								_	-> (nilPtr, us_symbol_heap)
-		  us = { us & us_symbol_heap = us_symbol_heap }
-		  (app_args, us) = unfold app_args us
-		= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, us) 
-*/
 	where
 		is_function_or_macro (SK_Function _)
 			= True
@@ -331,6 +321,7 @@ where
 			= True
 		is_function_or_macro _
 			= False
+
 		substitute_EI_ClassTypes (EI_ClassTypes class_types) (Yes type_heaps)
 			# (new_class_types, type_heaps) = substitute class_types type_heaps
 			= (EI_ClassTypes new_class_types, Yes type_heaps)
@@ -694,7 +685,8 @@ where
 					= expandMacrosInBody fun_info.fi_calls body fun_and_macro_defs mod_index modules { es & es_error = setErrorAdmin identPos es.es_error }
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
-			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es) 
+			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
+//				---> ("expand_macros", fun_symb, tb_args, tb_rhs)
 
 addFunctionCallsToSymbolTable calls fun_defs symbol_table
 	= foldSt add_function_call_to_symbol_table calls ([], fun_defs, symbol_table)
@@ -721,12 +713,12 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index modules es=:{es_
 	  ([rhs:rhss], fun_defs, modules, (all_calls, es)) = expand cb_rhs fun_defs mod_index modules (prev_calls, { es & es_symbol_table = es_symbol_table })
 	  (fun_defs, es_symbol_table) = removeFunctionCallsFromSymbolTable all_calls fun_defs es.es_symbol_table
 	  (merge_rhs, es_var_heap, es_symbol_heap, es_error) = mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (merge_rhs, cb_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap}) = determineVariablesAndRefCounts cb_args merge_rhs // (merge_rhs ---> (cb_args, merge_rhs))
+	  (merge_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap}) = determineVariablesAndRefCounts cb_args merge_rhs
 	  		{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap }
-	= (cb_args, merge_rhs, local_vars, all_calls, fun_defs, modules,
+	= (new_args, merge_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
-//		---> (cb_args, local_vars, merge_rhs)
+//		---> (cb_args, cb_rhs, new_args, local_vars, merge_rhs)
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False

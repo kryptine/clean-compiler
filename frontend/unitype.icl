@@ -14,7 +14,7 @@ AttrUni			:== 0
 AttrMulti		:== 1
 FirstAttrVar	:== 2
 
-::	CoercionTree	= CT_Node !Int !CoercionTree !CoercionTree | CT_Empty | CT_Unique | CT_NonUnique /* | CT_Existential !Int */
+::	CoercionTree	= CT_Node !Int !CoercionTree !CoercionTree | CT_Empty | CT_Unique | CT_NonUnique
 
 ::	Coercions		= { coer_demanded :: !.{! .CoercionTree}, coer_offered :: !.{! .CoercionTree }}
 
@@ -74,6 +74,7 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 				-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
 				-> undef
 */
+
 NotChecked :== -1	
 DummyAttrNumber :== -1
 ::	AttributeGroups	:== {! [Int]}
@@ -152,9 +153,7 @@ where
 	combine_coercion_trees group_index [ attr : attrs ] partition merged_tree coer_offered coer_demanded
 		| isNonUnique coer_offered.[attr]
 			= (CT_NonUnique, coer_demanded)
-/*		| isExistential coer_offered.[attr]
-			= (CT_Existential DummyAttrNumber, coer_demanded)
-*/		# (next_tree, coer_demanded) = replace coer_demanded attr CT_Empty
+		# (next_tree, coer_demanded) = replace coer_demanded attr CT_Empty
 		| isUnique next_tree
 			= (CT_Unique, coer_demanded)
 			# merged_tree = rebuild_tree group_index partition next_tree merged_tree
@@ -206,7 +205,7 @@ adjustSignClass :: !SignClassification !Int -> SignClassification
 adjustSignClass {sc_pos_vect,sc_neg_vect} arity
 	= { sc_pos_vect = sc_pos_vect >> arity, sc_neg_vect = sc_neg_vect >> arity }
 
-// adjustPropClass :: !PropClassification !Int -> PropClassification
+//adjustPropClass :: !PropClassification !Int -> PropClassification
 adjustPropClass prop_class arity :== prop_class >> arity
 
 ::	LiftState = 
@@ -372,7 +371,6 @@ instance toInt TypeAttribute
 where
 	 toInt TA_Unique 				= AttrUni
 	 toInt (TA_TempVar av_number)	= av_number
-//	 toInt (TA_TempExVar av_number)	= av_number
 	 toInt TA_Multi 				= AttrMulti
 	 toInt TA_None 					= AttrMulti
 
@@ -526,7 +524,7 @@ where
 
 tryToMakeUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 tryToMakeUnique attr coercions=:{coer_offered}
-	| isNonUnique coer_offered.[attr] // || isExistential coer_offered.[attr]
+	| isNonUnique coer_offered.[attr]
 		= (False, coercions)
 		= (True, makeUnique attr coercions)
 
@@ -547,7 +545,9 @@ where
 
 tryToMakeNonUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 tryToMakeNonUnique attr coercions=:{coer_demanded}
-	| isUnique coer_demanded.[attr] // || isExistential coer_demanded.[attr]
+	#! s = size coer_demanded
+	| isUnique coer_demanded.[attr
+		-?-> (s <= attr, ("tryToMakeNonUnique", s, attr))]
 		= (False, coercions)
 		= (True, makeNonUnique attr coercions)
 //				---> ("tryToMakeNonUnique", attr)
@@ -697,7 +697,6 @@ where
 	(<<<) file (CT_Node attr left right) = file <<< left <<< ' ' <<< attr <<< ' ' <<< right
 	(<<<) file CT_Unique = file <<< "CT_Unique"
 	(<<<) file CT_NonUnique = file <<< "CT_NonUnique"
-//	(<<<) file (CT_Existential int) = file <<< "CT_Existential:" <<< int
 	(<<<) file CT_Empty = file <<< "##"
 
 instance <<< CoercionPosition

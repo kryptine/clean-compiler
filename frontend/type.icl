@@ -809,9 +809,14 @@ class requirements a :: !TypeInput !a !(!u:Requirements, !*TypeState) -> (!AType
 
 instance requirements BoundVar
 where
-	requirements ti {var_info_ptr,var_expr_ptr} (reqs, ts)
-		# (VI_Type type, ts_var_heap) = readPtr var_info_ptr ts.ts_var_heap
-		= (type, Yes var_expr_ptr, (reqs, { ts & ts_var_heap = ts_var_heap }))
+	requirements ti {var_name,var_info_ptr,var_expr_ptr} (reqs, ts)
+		# (var_info, ts_var_heap) = readPtr var_info_ptr ts.ts_var_heap
+		  ts = { ts & ts_var_heap = ts_var_heap }
+		= case var_info of
+			VI_Type type
+				-> (type, Yes var_expr_ptr, (reqs, ts))
+			_
+				-> abort ("requirements BoundVar" ---> (var_name <<- var_info))
 
 instance requirements App
 where
@@ -1480,10 +1485,20 @@ where
 			# funs_and_state = type_component comp.group_members  class_instances ti funs_and_state
 			= type_components (inc group_index) comps class_instances ti funs_and_state
 
+	show_component comp fun_defs
+		= foldSt show_fun comp ([], fun_defs)
+	where
+		show_fun fun_index (names, fun_defs)
+			# ({fun_symb}, fun_defs) = fun_defs![fun_index]
+			= ([fun_symb : names], fun_defs)
+	
+
 	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes ti_common_defs comp (fun_defs, predef_symbols, [], ts)
-		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
+		  (names, fun_defs) = show_component comp fun_defs
+		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs (ts ---> names)
 		#! nr_of_type_variables = ts.ts_var_store
+										
 		# (subst, ts_type_heaps, ts_error)
 		  		= unify_requirements_of_functions fun_reqs ti (createArray nr_of_type_variables TE) ts.ts_type_heaps ts.ts_error
 		| not ts_error.ea_ok
@@ -1680,7 +1695,7 @@ where
 		= ({fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No,
 			fe_requirements = { rhs_reqs & req_type_coercions = req_type_coercions, req_cons_variables = [] }}, (rhs_reqs.req_cons_variables, fun_defs,
 				{ ts & ts_expr_heap = ts_expr_heap }))
-					//  ---> ("type_function", fun_symb)
+//					 ---> ("type_function", fun_symb, tb_args, tb_rhs, fun_info.fi_local_vars)
 	where
 		has_option (Yes _)	= True
 		has_option No 		= False
