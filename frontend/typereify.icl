@@ -365,6 +365,10 @@ record type_index bs=:{bs_common_defs, bs_predefs}
 		=	predefRecordConstructor type_index bs_common_defs bs_predefs
 	=	lift symbol {bs & bs_predefs=bs_predefs}
 
+quote :: {#Char} -> {#Char}
+quote string
+	=	"\"" +++ string +++ "\""
+
 function :: Index  *BuildTypeFunState
 			-> *(Expression, *BuildTypeFunState)
 function fun_index bs=:{bs_predefs}
@@ -403,15 +407,13 @@ instance reify {#Char} where
 
 instance reify CheckedTypeDef where
 	reify {td_ident, td_arity, td_attribute, td_rhs}
-		=	record PD_CTTypeDef ` name ` td_arity ` is_unq_attribute td_attribute ` td_rhs
+		=	record PD_CTTypeDef ` quote td_ident.id_name ` td_arity
+					` is_unq_attribute td_attribute ` td_rhs
 	where
 		is_unq_attribute (TA_Var _)
 			=	False
 		is_unq_attribute TA_Unique
 			=	True
-
-		name
-			=	("\"" +++ td_ident.id_name +++ "\"")
 
 instance reify TypeRhs where
 	reify (AlgType constructors)
@@ -451,7 +453,7 @@ instance reify FieldSymbol where
 		where
 			selector fs_index st=:{bs_main, bs_common_defs}
 				=	(record PD_CTFieldDef
-						` ("\"" +++ def.sd_ident.id_name +++ "\"")
+						` quote def.sd_ident.id_name
 						` length (def.sd_exi_vars)
 						` def.sd_type.st_result)
 					(numberTypeVariables def.sd_type.st_vars
