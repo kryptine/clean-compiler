@@ -10,21 +10,21 @@ exactZip [] []
 exactZip [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
 
-::	*ConversionInfo =
+::	*ConvertState =
 	{	ci_new_functions 	:: ![FunctionInfoPtr]
 	,	ci_fun_heap			:: !*FunctionHeap
 	,	ci_var_heap			:: !*VarHeap
 	,	ci_expr_heap		:: !*ExpressionHeap
 	,	ci_next_fun_nr		:: !Index
 	}
-	 
+
 getIdent (Yes ident) fun_nr
 	= ident
 getIdent No fun_nr
 	= { id_name = "_f" +++ toString fun_nr, id_info = nilPtr }
 
 
-class convertCases a :: ![(FreeVar, AType)] !Index !{# CommonDefs } !a  !*ConversionInfo -> (!a, !*ConversionInfo)
+class convertCases a :: ![(FreeVar, AType)] !Index !{# CommonDefs } !a  !*ConvertState -> (!a, !*ConvertState)
 
 instance convertCases [a] | convertCases a
 where
@@ -337,7 +337,7 @@ optionalToListofLists No
 hasOption (Yes _)	= True
 hasOption No		= False
 
-convertPatterns :: CasePatterns [[AType]] (Optional (FreeVar,AType)) [.(FreeVar,AType)] [(FreeVar,AType)] (Ptr ExprInfo) Index {#CommonDefs} *ConversionInfo -> *(!.[BackendBody],!*ConversionInfo);
+convertPatterns :: CasePatterns [[AType]] (Optional (FreeVar,AType)) [.(FreeVar,AType)] [(FreeVar,AType)] (Ptr ExprInfo) Index {#CommonDefs} *ConvertState -> *(!.[BackendBody],!*ConvertState);
 convertPatterns (AlgebraicPatterns algtype patterns) cons_types opt_var left_vars right_vars default_ptr group_index common_defs ci
 	# (guarded_exprs_list, ci) = mapSt (convert_algebraic_guard_into_function_pattern opt_var left_vars right_vars
 			group_index common_defs default_ptr) (exactZip patterns cons_types) ci
@@ -366,8 +366,8 @@ where
 			# bb_args = mapAppend selectFreeVar left_vars [FP_Basic value optional_var : right_patterns ]
 			= { bb_args = bb_args, bb_rhs = bb_rhs }
 
-convertPatternExpression :: ![(FreeVar,AType)] ![[(FreeVar,AType)]] !Index !{#CommonDefs} !ExprInfoPtr !Expression !*ConversionInfo
-	-> *(![([[FunctionPattern]], !Expression)], !*ConversionInfo)
+convertPatternExpression :: ![(FreeVar,AType)] ![[(FreeVar,AType)]] !Index !{#CommonDefs} !ExprInfoPtr !Expression !*ConvertState
+	-> *(![([[FunctionPattern]], !Expression)], !*ConvertState)
 convertPatternExpression left_vars right_vars group_index common_defs default_ptr
 		case_expr=:(Case {case_expr = Var var=:{var_info_ptr}, case_guards, case_default, case_info_ptr}) ci
 	| list_contains_variable var_info_ptr right_vars
