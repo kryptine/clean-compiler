@@ -527,4 +527,8 @@ where
 		STE_Empty 
 			= file <<< "STE_Empty"
 
+instance <<< Declaration
+  where
+	(<<<) file { dcl_ident } 
+		= file <<< dcl_ident
 

@@ -1021,7 +1021,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 					,	fun_type = Yes fun_type
 					,	fun_pos = NoPos
 					,	fun_index = fun_index
-					,	fun_kind = FK_Function cFunctionGenerated
+					,	fun_kind = FK_Function cNameNotLocationDependent
 					,	fun_lifted = undeff
 					,	fun_info = 	{	fi_calls = []
 									,	fi_group_index = outer_fun_def.fun_info.fi_group_index
@@ -2328,10 +2328,6 @@ instance <<< InstanceInfo
 			  file = foldSt (\pr file -> file<<<pr<<<",") [el \\ el<-:producers] file
 			= write_ii r (file<<<")")
 
-instance <<< FreeVar
-where
-	(<<<) file { fv_name,fv_info_ptr } = file <<< fv_name <<< "<" <<< fv_info_ptr <<< ">"
-	
 instance <<< Ptr a
 where
 	(<<<) file p = file <<< ptrToInt p

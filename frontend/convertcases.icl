@@ -280,7 +280,7 @@ newFunction opt_id fun_bodies local_vars arg_types result_type group_index (ci_n
 			,	fun_type		= Yes fun_type
 			,	fun_pos			= NoPos
 			,	fun_index		= NoIndex
-			,	fun_kind		= FK_Function cFunctionGenerated
+			,	fun_kind		= FK_Function cNameNotLocationDependent
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}
@@ -1480,10 +1480,6 @@ where
 instance <<< Ptr a
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  
-
-instance <<< FreeVar
-where
-	(<<<) file {fv_name,fv_info_ptr} = file <<< fv_name <<< '[' <<< fv_info_ptr <<< ']'
 
 instance <<< BoundVar
 where

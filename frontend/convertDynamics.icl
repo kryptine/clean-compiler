@@ -568,10 +568,6 @@ zipAppend2   xs       []     zs = zs
 zipAppend2 [x : xs] [y : ys] zs = [ (x,y)  :  zipAppend2 xs ys zs ]
 
 
-instance <<< FreeVar
-where
-	(<<<) file {fv_name,fv_info_ptr} = file <<< fv_name <<< '[' <<< fv_info_ptr <<< ']'
-
 instance <<< Ptr a
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  

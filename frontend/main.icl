@@ -19,6 +19,16 @@ Start world
 					(ms.ms_out, ms.ms_files))) world
 	= fclose ms_out world
 
+
+CommandLoop proj ms=:{ms_io}
+	# answer = "c t5\n"
+	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
+	| command == []
+		= CommandLoop proj { ms & ms_io = ms_io}
+		# (ready, proj, ms) = DoCommand command argument proj { ms & ms_io = ms_io}
+		= ms
+
+/*
 CommandLoop proj ms=:{ms_io}
 	# (answer, ms_io)		= freadline (ms_io <<< "> ")
 	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
@@ -28,6 +38,7 @@ CommandLoop proj ms=:{ms_io}
 		| ready
 			= ms
 			= CommandLoop proj ms
+*/
 
 ::	MainStateDefs funs funtypes types conses classes instances members selectors =
 	{	msd_funs		:: !funs

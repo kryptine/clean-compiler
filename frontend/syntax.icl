@@ -138,8 +138,8 @@ cIsNotAFunction :== False
 	|	PD_Erroneous
 
 ::	FunKind	= FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
-cFunctionNotGenerated :== False
-cFunctionGenerated :== True
+cNameNotLocationDependent :== False
+cNameLocationDependent :== True
 
 ::	ParsedSelector =
 	{	ps_field_name		:: !Ident
@@ -749,7 +749,7 @@ cNotVarNumber :== -1
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
 
-::	AttrVarInfo  	=	AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId
+::	AttrVarInfo  	= AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo
@@ -1123,12 +1123,10 @@ where
 
 instance <<< TypeVar
 where
-//	(<<<) file varid = file <<< varid.tv_name <<< '[' <<< ptrToInt varid.tv_info_ptr <<< ']'
 	(<<<) file varid = file <<< varid.tv_name 
 
 instance <<< AttributeVar
 where
-//	(<<<) file {av_name,av_info_ptr} = file <<< av_name <<< '[' <<< ptrToInt av_info_ptr <<< ']'
 	(<<<) file {av_name,av_info_ptr} = file <<< av_name 
 
 instance toString AttributeVar
@@ -1325,10 +1323,9 @@ instance <<< Expression
 where
 	(<<<) file (Var ident) = file <<< ident
 	(<<<) file (App {app_symb, app_args, app_info_ptr})
-//		= file <<< app_symb <<< ' ' <<< app_args
-		= file <<< app_symb <<< " <" <<< ptrToInt app_info_ptr <<< "> " <<< app_args
+		= file <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
-	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') (let_strict_binds ++ let_lazy_binds) <<< "in\n" <<< let_expr
+	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') (let_strict_binds++let_lazy_binds) <<< "in\n" <<< let_expr
 	where
 		write_binds file []
 			= file
@@ -1370,7 +1367,7 @@ where
 	(<<<) file (ABCCodeExpr code_sequence do_inline)      = file <<< (if do_inline "code inline\n" "code\n") <<< code_sequence
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
 
-	(<<<) file (FreeVar {fv_name})         	= file <<< "FREEVAR " <<< fv_name
+	(<<<) file (FreeVar {fv_name})         	= file <<< fv_name
 	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< ptrToInt info_ptr
 
 	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
@@ -1496,6 +1493,14 @@ where
 	(<<<) file (FP_Empty) = file <<< '_' 
 
 
+instance <<< FunKind
+where
+	(<<<) file (FK_Function False) = file <<< "FK_Function"
+	(<<<) file (FK_Function True) = file <<< "Lambda"
+	(<<<) file FK_Macro = file <<< "FK_Macro"
+	(<<<) file FK_Caf = file <<< "FK_Caf"
+	(<<<) file FK_Unknown = file <<< "FK_Unknown"
+
 instance <<< FunDef
 where
 	(<<<) file {fun_symb,fun_index,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< fun_index <<< ' ' <<< bodies 
@@ -1507,6 +1512,7 @@ where
 //			<<< fun_index <<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
 	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
 			<<< fun_index <<< body <<< '\n'
+
 instance <<< FunCall
 where
 	(<<<) file { fc_level,fc_index }

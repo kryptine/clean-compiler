@@ -13,7 +13,8 @@ instance =< Int, Expression, {# Char}, Ident, [a] | =< a, BasicType //, Global a
 
 instance =< Type
 
-instance == BasicType, TypeVar, TypeSymbIdent, DefinedSymbol, TypeContext , BasicValue, FunKind, Global a | == a
+instance == BasicType, TypeVar, TypeSymbIdent, DefinedSymbol, TypeContext , BasicValue,
+			FunKind, Global a | == a, Priority, Assoc
 
 export == Int
 

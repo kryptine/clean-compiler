@@ -1375,13 +1375,8 @@ where
 					-> (var, [{fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ],
 								{ cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
 			_
-				-> abort "collectVariables [BoundVar] (transform, 1227)" // <<- (var_info ---> var_name)
+				-> abort "collectVariables [BoundVar] (transform, 1227)"  <<- (var_info ---> var_name)
 
-// XXX
-instance <<< FreeVar
-where
-	(<<<) file { fv_name,fv_info_ptr } = file <<< fv_name <<< "<" <<< fv_info_ptr <<< ">"
-	
 instance <<< Ptr a
 where
 	(<<<) file p = file <<< ptrToInt p

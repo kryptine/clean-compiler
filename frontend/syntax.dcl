@@ -135,8 +135,8 @@ cIsNotAFunction :== False
 	|	PD_Erroneous
 
 ::	FunKind	= FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
-cFunctionNotGenerated :== False
-cFunctionGenerated :== True
+cNameNotLocationDependent :== False
+cNameLocationDependent :== True
 
 ::	ParsedSelector =
 	{	ps_field_name		:: !Ident
@@ -276,6 +276,7 @@ instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False
+
 :: ImportedObject =
 	{	io_is_library :: !Bool
 	,	io_name    :: !{#Char}
@@ -789,7 +790,7 @@ cNonRecursiveAppl	:== False
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
 
-::	AttrVarInfo  	=	AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId
+::	AttrVarInfo  	= AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId 
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo
@@ -1132,7 +1133,7 @@ instance == ModuleKind, Ident
 instance <<< Module a | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, Global object | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, Bind a b | <<< a & <<< b, ParsedConstructor, TypeDef a | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
-			 Optional a | <<< a, ConsVariable, BasicType, Annotation, Selection, SignClassification
+			 Optional a | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance
 
 instance == TypeAttribute
 instance == Annotation

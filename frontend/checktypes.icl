@@ -256,7 +256,7 @@ CS_Checking	:== 0
 	}
 
 
-class expand a :: !Index !a !*SynTypeInfo !*CheckState -> (!a, !TypeAttribute, !*SynTypeInfo, !*CheckState)
+class expand a :: !Index !a !*SynTypeInfo !*CheckState -> (!a, !*SynTypeInfo, !*CheckState)
 
 expandTypeVariable :: TypeVar !*SynTypeInfo !*CheckState -> (!Type, !TypeAttribute, !*SynTypeInfo, !*CheckState)
 expandTypeVariable {tv_name={id_info}} sti cs=:{cs_symbol_table}
@@ -267,29 +267,30 @@ expandTypeVariable {tv_name={id_info}} sti cs=:{cs_symbol_table}
 instance expand Type
 where
 	expand module_index (TV tv) sti cs
-		= expandTypeVariable tv sti cs
+		# (type, _, sti, cs) = expandTypeVariable tv sti cs
+		= (type, sti, cs)
 	expand module_index type=:(TA type_cons=:{type_name,type_index={glob_object,glob_module}} types) sti=:{sti_marks}  cs=:{cs_error,cs_symbol_table}
 		| module_index == glob_module
 			#! mark = sti_marks.[glob_object]
 			| mark == CS_NotChecked
 				# (sti, cs) = expandSynType module_index glob_object sti cs
-				  (types, attr, sti, cs) = expand module_index types sti cs
-				= (TA type_cons types, attr, sti, cs)
+				  (types, sti, cs) = expand module_index types sti cs
+				= (TA type_cons types, sti, cs)
 			| mark == CS_Checked
-				# (types, attr, sti, cs) = expand module_index types sti cs
-				= (TA type_cons types, attr, sti, cs)
+				# (types, sti, cs) = expand module_index types sti cs
+				= (TA type_cons types, sti, cs)
 //			| mark == CS_Checking
-				= (type, TA_None, sti, { cs & cs_error = checkError type_name "cyclic dependency between type synonyms" cs_error })
-			# (types, attr, sti, cs) = expand module_index types sti cs
-			= (TA type_cons types, attr, sti, cs)
+				= (type, sti, { cs & cs_error = checkError type_name "cyclic dependency between type synonyms" cs_error })
+			# (types, sti, cs) = expand module_index types sti cs
+			= (TA type_cons types, sti, cs)
 	expand module_index (arg_type --> res_type) sti cs
-		# (arg_type, _, sti, cs) = expand module_index arg_type sti cs
-		  (res_type, _, sti, cs) = expand module_index res_type sti cs
-		= (arg_type --> res_type, TA_None, sti, cs)
+		# (arg_type, sti, cs) = expand module_index arg_type sti cs
+		  (res_type, sti, cs) = expand module_index res_type sti cs
+		= (arg_type --> res_type, sti, cs)
 	expand module_index (CV tv :@: types) sti cs
-		# (type, type_attr, sti, cs) = expandTypeVariable tv sti cs
-		  (types, _, sti, cs) = expand module_index types sti cs
-		= (simplify_type_appl type types, type_attr, sti, cs) 
+		# (type, _, sti, cs) = expandTypeVariable tv sti cs
+		  (types, sti, cs) = expand module_index types sti cs
+		= (simplify_type_appl type types, sti, cs) 
 		where
 			simplify_type_appl :: !Type ![AType] -> Type
 			simplify_type_appl (TA type_cons=:{type_arity} cons_args) type_args
@@ -297,22 +298,25 @@ where
 			simplify_type_appl (TV tv) type_args
 				= CV tv :@: type_args
 	expand module_index type sti cs
-		= (type, TA_None, sti, cs)
+		= (type, sti, cs)
 
 instance expand [a] | expand a
 where
 	expand module_index [x:xs] sti cs
-		# (x, _, sti, cs) = expand module_index x sti cs
-		  (xs, _, sti, cs) = expand module_index xs sti cs
-		= ([x:xs], TA_None, sti, cs)
+		# (x, sti, cs) = expand module_index x sti cs
+		  (xs, sti, cs) = expand module_index xs sti cs
+		= ([x:xs], sti, cs)
 	expand module_index [] sti cs
-		= ([], TA_None, sti, cs)
+		= ([], sti, cs)
 
 instance expand AType
 where
+	expand module_index atype=:{at_type=(TV tv)} sti cs
+		# (at_type, attr, sti, cs) = expandTypeVariable tv sti cs
+		= ({ atype & at_type = at_type, at_attribute = attr }, sti, cs)
 	expand module_index atype=:{at_type} sti cs
-		# (at_type, attr, sti, cs) = expand module_index at_type sti cs
-		= ({ atype & at_type = at_type, at_attribute = attr }, attr, sti, cs)
+		# (at_type, sti, cs) = expand module_index at_type sti cs
+		= ({ atype & at_type = at_type }, sti, cs)
 
 class look_for_cycles a :: !Index !a !(!*SynTypeInfo, !*CheckState) -> (!*SynTypeInfo, !*CheckState)
 
@@ -357,7 +361,7 @@ expandSynType mod_index type_index sti=:{sti_type_defs,sti_marks,sti_modules} cs
 					  position = newPosition type_def.td_name type_def.td_pos
 					  cs_error = pushErrorAdmin position cs.cs_error
 	  		  		  sti_marks = { sti_marks & [type_index] = CS_Checking }			  
-					  (exp_type, _, sti, cs) = expand mod_index  rhs_type.at_type
+					  (exp_type, sti, cs) = expand mod_index  rhs_type.at_type
 									{ sti_type_defs = sti_type_defs, sti_modules = sti_modules, sti_marks = sti_marks }
 									{ cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }
 					-> ({sti & sti_type_defs = { sti.sti_type_defs & [type_index] = { type_def & td_rhs = SynType { type & at_type = exp_type }}},
@@ -924,9 +928,11 @@ checkSpecialTypes mod_index SP_None type_defs modules heaps cs
 	= (SP_None, type_defs, modules, heaps, cs)
 
 
+/* MW: already defined in module syntax
 instance <<< SelectorDef
 where
 	(<<<) file {sd_symb} = file <<< sd_symb
+*/
 
 instance <<< AttrInequality
 where

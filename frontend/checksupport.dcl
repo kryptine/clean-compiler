@@ -120,8 +120,7 @@ instance toIdent ConsDef, TypeDef a, ClassDef, MemberDef, FunDef, SelectorDef //
 instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
-instance <<< STE_Kind
-instance <<< IdentPos
+instance <<< STE_Kind, IdentPos, Declaration
 
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);

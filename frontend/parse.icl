@@ -476,11 +476,11 @@ where
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
   			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
 	where
-		token_to_fun_kind s BarToken			= (FK_Function cFunctionNotGenerated, False,  s)
-		token_to_fun_kind s (SeqLetToken _)		= (FK_Function cFunctionNotGenerated, False,  s)
-		token_to_fun_kind s EqualToken			= (FK_Function cFunctionNotGenerated, True,  s)
+		token_to_fun_kind s BarToken			= (FK_Function cNameNotLocationDependent, False,  s)
+		token_to_fun_kind s (SeqLetToken _)		= (FK_Function cNameNotLocationDependent, False,  s)
+		token_to_fun_kind s EqualToken			= (FK_Function cNameNotLocationDependent, True,  s)
 		token_to_fun_kind s ColonDefinesToken	= (FK_Macro, False, s)
-		token_to_fun_kind s DoubleArrowToken	= (FK_Function cFunctionNotGenerated, True, s)
+		token_to_fun_kind s DoubleArrowToken	= (FK_Function cNameNotLocationDependent, True, s)
 		token_to_fun_kind s DefinesColonToken	= (FK_Caf, False, s)
 		token_to_fun_kind s token 				= (FK_Unknown, False, parseError "RHS" (Yes token) "defines token (=, => or =:) or argument" s)
 
@@ -1808,7 +1808,7 @@ wantSelectors token pState
 where
 	want_selector :: !Token !*ParseState -> *(![ParsedSelection], !*ParseState)
 	want_selector SquareOpenToken pState
-			# (array_selectors, pState) = want_array_selectors pState
+		# (array_selectors, pState) = want_array_selectors pState
 		= (array_selectors, wantToken FunctionContext "array selector" SquareCloseToken pState)
 		where
 			want_array_selectors :: !*ParseState -> *(![ParsedSelection], !*ParseState)
@@ -2153,9 +2153,9 @@ wantRecordOrArrayExp is_pattern pState
 		= (PE_ArrayDenot [], pState)
 	| is_pattern
 		| token == SquareOpenToken
-		//	# (elems, pState) =  want_array_assignments cIsAPattern pState // currently no array selections in pattern PK
-		//	= (PE_Array PE_Empty elems [], wantToken FunctionContext "array selections in pattern" CurlyCloseToken pState)
-			= (PE_Empty, parseError "array selection" No "No array selection in pattern" pState)
+			# (elems, pState) =  want_array_assignments cIsAPattern pState
+			= (PE_ArrayPattern elems, wantToken FunctionContext "array selections in pattern" CurlyCloseToken pState)
+// MW was	= (PE_Empty, parseError "array selection" No "No array selection in pattern" pState)
 		// otherwise // is_pattern && token <> SquareOpenToken
 			= want_record_pattern token pState
 	// otherwise // ~ is_pattern

@@ -1762,10 +1762,6 @@ instance <<< AttrCoercion
 where
 	(<<<) file {ac_demanded,ac_offered} = file <<< ac_demanded <<< '~' <<< ac_offered
 
-instance <<< FreeVar
-where
-	(<<<) file {fv_name} = file <<< fv_name
-
 instance <<< TypeCoercion
 where
 	(<<<) file {tc_demanded,tc_offered} = file <<< tc_demanded <<< '~' <<< tc_offered

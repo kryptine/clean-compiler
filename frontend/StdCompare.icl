@@ -70,14 +70,21 @@ where
 			= tc1 == tc2 && types1 == types2
 		equal_constructor_args (TB tb1) (TB tb2)
 			= tb1 == tb2
-		equal_constructor_args (TA tc1 types1) (TA tc2 types2)
-			= tc1 == tc2 && types1 == types2
 		equal_constructor_args (type1 :@: types1) (type2 :@: types2)
 			= type1 == type2 && types1 == types2
 		equal_constructor_args (TQV varid1) (TQV varid2)
 			= varid1 == varid2
 		equal_constructor_args type1 type2
 			= True
+
+instance == Priority
+where
+	(==) NoPrio NoPrio = True
+	(==) (Prio assoc1 prio1) (Prio assoc2 prio2) = assoc1==assoc2 && prio1==prio2
+	
+instance == Assoc
+where
+	(==) a1 a2 = equal_constructor a1 a2
 
 ::	CompareValue :== Int
 Smaller :== -1

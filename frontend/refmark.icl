@@ -577,11 +577,6 @@ where
 	(<<<) file ptr = file <<< '[' <<< ptrToInt ptr <<< ']'
 
 
-instance <<< FreeVar
-where
-	(<<<) file {fv_name,fv_info_ptr} = file <<< fv_name <<< fv_info_ptr
-
-
 import Debug
 
 show

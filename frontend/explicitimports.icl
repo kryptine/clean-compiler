@@ -73,8 +73,7 @@ possibly_filter_decls [] decls_of_imported_module	_ modules cs // implicit impor
 	= (decls_of_imported_module, modules, cs)
 possibly_filter_decls listed_symbols decls_of_imported_module (file_name, line_nr) modules cs
 	// explicit import
-	#!	
-		ident_pos	=	{	ip_ident= { id_name="", id_info=nilPtr }
+	#!	ident_pos	=	{	ip_ident= { id_name="", id_info=nilPtr }
 						,	ip_line	= line_nr
 						,	ip_file	= file_name
 						}
@@ -87,17 +86,17 @@ filter_explicitly_imported_decl _ [] akku _ modules cs
 	= (akku, modules, cs)
 filter_explicitly_imported_decl import_symbols [(index,{dcls_import,dcls_local,dcls_explicit}):new_decls] akku
 								line_nr modules cs
-	#	undefined	= -1
-		atoms	= flatten (map toAtom import_symbols)
+	#	undefined = -1
+		atoms = flatten (map toAtom import_symbols)
 		structures = flatten (map toStructure import_symbols)
 		(checked_atoms, cs)	= checkAtoms atoms cs
-		unimported	= (checked_atoms, structures)
+		unimported = (checked_atoms, structures)
 		((dcls_import,unimported), modules, cs)	
-			= filter_decl dcls_import [] unimported undefined modules cs
+			= filter_decl dcls_import unimported undefined modules cs
 		((dcls_local,unimported), modules, cs)	
-			= filter_decl dcls_local [] unimported index modules cs
-		cs_error	= foldSt checkAtomError (fst unimported) cs.cs_error
-		cs_error	= foldSt checkStructureError (snd unimported) cs_error
+			= filter_decl dcls_local unimported index modules cs
+		cs_error = foldSt checkAtomError (fst unimported) cs.cs_error
+		cs_error = foldSt checkStructureError (snd unimported) cs_error
 		cs	= { cs & cs_error=cs_error }
 	|	(isEmpty dcls_import && isEmpty dcls_local && isEmpty dcls_explicit)
 		= filter_explicitly_imported_decl import_symbols new_decls akku line_nr modules cs
@@ -146,16 +145,16 @@ filter_explicitly_imported_decl import_symbols [(index,{dcls_import,dcls_local,d
 	to_structure _ No _
 		= []
 	to_structure ident (Yes []) structureType
-		=	[(ident, SI_DotDot, structureType, No)]
+		= [(ident, SI_DotDot, structureType, No)]
 	to_structure ident (Yes elements) structureType
-		#	element_idents	= removeDup [ ii_ident \\ {ii_ident}<-elements]
-		=	[(ident, (SI_Elements element_idents True),structureType, No)]
+		# element_idents	= removeDup [ ii_ident \\ {ii_ident}<-elements]
+		= [(ident, (SI_Elements element_idents True),structureType, No)]
 
 	checkAtoms l cs
 		#	groups	= grouped l
-		#	wrong	= filter isErrornous groups
+			wrong	= filter isErrornous groups
 			unique	= map hd groups
-		|	isEmpty wrong
+		| isEmpty wrong
 			= (unique, cs)
 		= (unique, foldSt error wrong cs)
 	  where
@@ -252,12 +251,17 @@ instance == ConsequenceKind
 	(==) CK_Macro		c = case c of	CK_Macro-> True
 										_		-> False
 
-filter_decl [] akku unimported _ modules cs
-	= ((akku, unimported), modules, cs)
-filter_decl [decl:decls] akku unimported index modules cs
-	#	((appears,unimported), modules, cs)	= decl_appears decl unimported index modules cs
-	= filter_decl decls (if appears [decl:akku] akku) unimported index modules cs
+NoPosition :== -1
 
+filter_decl [] unimported _ modules cs
+	= (([], unimported), modules, cs)
+filter_decl [decl:decls] unimported index modules cs
+	# ((appears,unimported), modules, cs) = decl_appears decl unimported index modules cs
+	  (r=:((recurs, unimported), modules, cs)) = filter_decl decls unimported index modules cs
+	| appears
+		= (([decl:recurs],unimported), modules, cs)
+	= r
+	
 decl_appears :: !Declaration !ExplicitImports !Index !*{#DclModule} !*CheckState
 			 -> (!(!Bool, !ExplicitImports), !*{#DclModule}, !*CheckState)
 decl_appears dec=:{dcl_kind=STE_Imported ste_Kind def_index} unimported _ modules cs
@@ -303,32 +307,30 @@ decl_appears {dcl_ident, dcl_kind, dcl_index} unimported index modules cs
 	isAtom STE_Instance				= True
 
 
-// CommonDefs CollectedDefinitions
-
 elementAppears imported_st dcl_ident dcl_index (atomicImports, structureImports) index modules cs
 	#	((result, structureImports), modules, cs)
-			=  element_appears imported_st dcl_ident dcl_index structureImports [] index modules cs
+			=  element_appears imported_st dcl_ident dcl_index structureImports structureImports 0 index modules cs
 	= ((result, (atomicImports, structureImports)), modules, cs)
 
 atomAppears dcl_ident dcl_index (atomicImports, structureImports) index modules cs
 	#	((result, atomicImports), modules, cs)
-			= atom_appears dcl_ident dcl_index atomicImports [] index modules cs
+			= atom_appears dcl_ident dcl_index atomicImports atomicImports 0 index modules cs
 	= ((result, (atomicImports, structureImports)), modules, cs)
 
 
-atom_appears _ _ [] akku _ modules cs
-  	= ((False, akku), modules, cs)
-atom_appears ident dcl_index [h=:(import_ident, atomType):t] akku index modules cs
+atom_appears _ _ [] atomic_imports _ _ modules cs
+  	= ((False, atomic_imports), modules, cs)
+atom_appears ident dcl_index [h=:(import_ident, atomType):t] atomic_imports unimp_index index modules cs
 // MW2..
 	|		do_temporary_import_solution_XXX
 		&&	ident.id_name==import_ident.id_name 
 		&&	atomType==(AT_stomme_funktion_die_alle_symbolen_kann_importeren_omdat_niemand_zin_heft_oude_pragrammen_naar_de_nieuwe_syntax_te_vertalen True) // True or False doesn't matter in this line
 		#	new_h = (import_ident, AT_stomme_funktion_die_alle_symbolen_kann_importeren_omdat_niemand_zin_heft_oude_pragrammen_naar_de_nieuwe_syntax_te_vertalen True)
-		=  ((True, [new_h:t]++akku), modules, cs)
+		=  ((True, [new_h: removeAt unimp_index atomic_imports]), modules, cs)
 // ..MW2
 	|	ident==import_ident
-		#	(modules, cs)	=  checkRecordError atomType import_ident dcl_index index modules cs
-		= ((True, t++akku), modules, cs)
+		# (modules, cs) = checkRecordError atomType import_ident dcl_index index modules cs
+		= ((True, removeAt unimp_index atomic_imports), modules, cs)
 	// goes further with next alternative
   where
 	checkRecordError atomType import_ident dcl_index index modules cs
@@ -345,8 +347,8 @@ atom_appears ident dcl_index [h=:(import_ident, atomType):t] akku index modules 
 									_				-> checkError import_ident "imported as an algebraic type" cs_error
 							_	-> cs_error
 		= (modules, { cs & cs_error=cs_error })
-atom_appears ident dcl_index [h:t] akku index modules cs
-	= atom_appears ident dcl_index t [h:akku] index modules cs
+atom_appears ident dcl_index [h:t] atomic_imports unimp_index index modules cs
+	= atom_appears ident dcl_index t atomic_imports (inc unimp_index) index modules cs
 
 instance == StructureType
   where
@@ -355,55 +357,58 @@ instance == StructureType
 	(==) ST_Class		ST_Class		= True
 	(==) _ _							= False
 
-element_appears _ _ _ [] akku _ modules cs
-	= ((False, akku), modules, cs)
-// MW remove this later ..
+element_appears _ _ _ [] atomic_imports _ _ modules cs
+	= ((False, atomic_imports), modules, cs)
+// MW2 remove this later ..
 element_appears imported_st element_ident dcl_index
-				[h=:(_, SI_DotDot, ST_stomm_stomm_stomm type_name_string, optInfo):t] akku
+				[h=:(_, SI_DotDot, ST_stomm_stomm_stomm type_name_string, optInfo):t] atomic_imports unimp_index
 				index modules cs
 	| do_temporary_import_solution_XXX
 		#	(appears, modules, cs)
 			= element_appears_in_stomm_struct imported_st element_ident dcl_index index type_name_string modules cs
 		| appears
-			= ((appears,[h:t]++akku), modules, cs)
-		= element_appears imported_st element_ident dcl_index t [h:akku] index modules cs
+			= ((appears, atomic_imports), modules, cs)
+		= element_appears imported_st element_ident dcl_index t atomic_imports (inc unimp_index) index modules cs
 	// otherwise go further with next alternative
-// ..MW
+// ..MW2
 element_appears imported_st element_ident dcl_index
-				[h=:(_, _, st, _):t] akku
+				[h=:(_, _, st, _):t] atomic_imports unimp_index
 				index modules cs
 	|	imported_st<>st
-		= element_appears imported_st element_ident dcl_index t [h:akku] index modules cs
+		= element_appears imported_st element_ident dcl_index t atomic_imports (inc unimp_index) index modules cs
 	// goes further with next alternative
 element_appears imported_st element_ident dcl_index
-				[h=:(_, _, _, (Yes notDefinedHere)):t] akku
+				[h=:(_, _, _, (Yes notDefinedHere)):t] atomic_imports unimp_index
 				index modules cs
 	|	notDefinedHere==dcl_index 
-		= element_appears imported_st element_ident dcl_index t [h:akku] index modules cs
+		= element_appears imported_st element_ident dcl_index t atomic_imports (inc unimp_index) index modules cs
 	// goes further with next alternative
 element_appears	imported_st element_ident dcl_index
-				[h=:(struct_id, (SI_Elements elements explicit), st, optInfo):t] akku
+				[h=:(struct_id, (SI_Elements elements explicit), st, optInfo):t] atomic_imports unimp_index
 				index modules cs
+	| not (isMember element_ident elements)
+		= element_appears imported_st element_ident dcl_index t atomic_imports (inc unimp_index) index modules cs
 	#	(l,r)	= span ((<>) element_ident) elements
-	|	isEmpty r
-		= element_appears imported_st element_ident dcl_index t [h:akku] index modules cs
-	#	oneLess	= l++(tl r)
-		newStructure	= (struct_id, (SI_Elements oneLess explicit), st, optInfo)
+		oneLess	= l++(tl r)
+		newStructure = (struct_id, (SI_Elements oneLess explicit), st, optInfo)
+		atomic_imports_1 = removeAt unimp_index atomic_imports
 	|	not explicit
-		= ((True, [newStructure: t]++akku), modules, cs)
+		= ((True, [newStructure: atomic_imports_1]), modules, cs)
 	// the found element was explicitly specified by the programmer: check it
 	#	(appears, _, _, modules, cs)
 			= element_appears_in_struct imported_st element_ident dcl_index struct_id index modules cs
 	|	appears
-		= ((True, [newStructure: t]++akku), modules, cs)
+		= ((True, [newStructure: atomic_imports_1]), modules, cs)
 	#	message	= "does not belong to specified "+++(case st of
 														ST_Class	-> "class."
 														_			-> "type.")
 		cs	= { cs & cs_error= checkError element_ident message  cs.cs_error}
-	= ((False, t++akku), modules, cs)
+	= ((False, atomic_imports_1), modules, cs)
 element_appears imported_st element_ident dcl_index
-				[h=:(struct_id, SI_DotDot, st, optInfo):t] akku
+				[h=:(struct_id, SI_DotDot, st, optInfo):t] atomic_imports unimp_index
 				index modules cs
+	| (case st of {ST_stomm_stomm_stomm _ -> True; _ -> False}) && (False->>"element_appears weird case")
+		= undef
 	#	(appears, defined, opt_element_idents, modules, cs)
 			= element_appears_in_struct imported_st element_ident dcl_index struct_id index modules cs
 	|	not appears
@@ -411,17 +416,19 @@ element_appears imported_st element_ident dcl_index
 								No					-> SI_DotDot
 								Yes element_idents	-> (SI_Elements element_idents False)
 			newStructure	= (struct_id, structureInfo, st, (if defined No (Yes dcl_index)))
-		= element_appears imported_st element_ident dcl_index t [newStructure:akku] index modules cs
+			new_atomic_imports = [newStructure : removeAt unimp_index atomic_imports]
+		= element_appears imported_st element_ident dcl_index t new_atomic_imports (inc unimp_index) index modules cs
 	#	(Yes element_idents)	= opt_element_idents
 		oneLess	= filter ((<>) element_ident) element_idents
-		newStructure	= (struct_id, (SI_Elements oneLess False), st, No)
-	= ((True,[newStructure:t]++akku), modules, cs)
-element_appears imported_st element_ident dcl_index [h:t] akku index modules cs
-	= element_appears imported_st element_ident dcl_index t [h:akku] index modules cs
+		newStructure = (struct_id, (SI_Elements oneLess False), st, No)
+		new_atomic_imports = [newStructure : removeAt unimp_index atomic_imports]
+	= ((True,new_atomic_imports), modules, cs)
+element_appears imported_st element_ident dcl_index [h:t] atomic_imports unimp_index index modules cs
+	= element_appears imported_st element_ident dcl_index t atomic_imports (inc unimp_index) index modules cs
 
 lookup_type dcl_index index modules cs
-	#	(dcl_module=:{dcl_name=dcl_name=:{id_info}}, modules)		= modules ! [index]
-		(module_entry, cs_symbol_table)				= readPtr id_info cs.cs_symbol_table
+	#	(dcl_module=:{dcl_name=dcl_name=:{id_info}}, modules) = modules ! [index]
+		(module_entry, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		cs	= { cs & cs_symbol_table=cs_symbol_table }
 	= continuation module_entry.ste_kind dcl_module modules cs
   where

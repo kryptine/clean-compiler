@@ -2,8 +2,6 @@ definition module check
 
 import syntax, transform, checksupport, typesupport, predef
 
-//MOVE
-//cIclModIndex 			:== 0
 cPredefinedModuleIndex 		:== 1
 
 checkModule :: !ScannedModule !Int ![FunDef] !ScannedModule !ScannedModule ![ScannedModule] !*PredefinedSymbols !*SymbolTable !*File
