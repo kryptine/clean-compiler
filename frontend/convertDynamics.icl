@@ -701,14 +701,17 @@ convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, c
 		# (tv_symb, ci)
 			=	getSymbol PD_Dyn_TypeVar SK_Constructor 1 ci
 		# init_count
-			=	if pattern ci.ci_type_var_count 0
+			=	if pattern ci.ci_type_var_count ci.ci_type_pattern_var_count
 		# (count, ci_var_heap)
 			=	foldSt (mark_uni_var pattern (build_tv tv_symb)) uni_vars (init_count, ci.ci_var_heap)
 		# ci
-			=	{ci & ci_type_var_count = if pattern count ci.ci_type_var_count, ci_var_heap = ci_var_heap}
+			=	{	ci
+				&	ci_type_var_count = if pattern count ci.ci_type_var_count
+				,	ci_type_pattern_var_count = if pattern ci.ci_type_pattern_var_count count
+				,	ci_var_heap = ci_var_heap}
 		# (type_code, (has_var, binds, ci))
 	  		=	convertTypeCode pattern cinp type_code (has_var, binds, ci)
-	  	| count > 0
+	  	| count > init_count
 			# (type_scheme_sym, ci)
 				=	getSymbol PD_Dyn_TypeScheme SK_Constructor 2 ci
 			=	(App {	app_symb = type_scheme_sym,
