@@ -109,6 +109,9 @@ forget :: val -> .(![.(val,res)] -> .[(val,res)]) | == val
 forget x = filter (neq x o fst)
 neq x y = x <> y
 
+inccounter :: a (a->b) a -> b | == a & +,one b
+inccounter m f n = if (n==m) (f n+one) (f n)
+
 indent :: .String -> .([.String] -> .[String])
 indent first = map2 (+++) [first:repeat (createArray (size first) ' ')]
 

@@ -82,6 +82,9 @@ indent :: .String -> .([.String] -> .[String])
 // `Identifiers' is the list of all identifiers
 identifiers :: [String]
 
+// `Inccounter m f' increments counting function f by one at point m.
+inccounter :: a (a->b) a -> b | == a & +,one b
+
 // `Intersect xs ys' is the intersection of list `ys' with list `xs'.
 intersect :: ![elem] [elem] -> .[elem] | == elem
 
