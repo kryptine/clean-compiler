@@ -1,16 +1,23 @@
 
 #include <AppleEvents.h>
 #include <AERegistry.h>
+#include <Files.h>
+
+#undef DEBUG_FILE
+
+#ifdef DEBUG_FILE
+#include <LowMem.h>
+#endif
 
 static char *result_string;
 static int n_free_result_string_characters;
 
-static pascal OSErr DoAEOpenApplication (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,long refCon)
+static pascal OSErr DoAEOpenApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	return noErr;
 }
 
-static int has_required_parameters (AppleEvent *theAppleEvent)
+static int has_required_parameters (const AppleEvent *theAppleEvent)
 {
 	Size actual_size;
 	DescType returned_type;
@@ -24,7 +31,7 @@ static int has_required_parameters (AppleEvent *theAppleEvent)
 	return r;
 }
 
-static pascal OSErr DoAEOpenDocuments (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent, long refCon)
+static pascal OSErr DoAEOpenDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	OSErr r;
 	AEDescList document_list;
@@ -60,7 +67,6 @@ static pascal OSErr DoAEOpenDocuments (AppleEvent *theAppleEvent,AppleEvent *rep
 					DescType returned_type;
 					FSSpec fss;
 					Size actual_size;
-					int n;
 
 					r=AEGetNthPtr (&document_list,i,typeFSS,&keyword,&returned_type,&fss,sizeof (FSSpec),&actual_size);
 					
@@ -92,12 +98,12 @@ static pascal OSErr DoAEOpenDocuments (AppleEvent *theAppleEvent,AppleEvent *rep
 	return r;
 }
  
-static pascal OSErr DoAEPrintDocuments (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,long refCon)
+static pascal OSErr DoAEPrintDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	return errAEEventNotHandled;
 }
  
-static pascal OSErr DoAEQuitApplication (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,long refCon)
+static pascal OSErr DoAEQuitApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	if (n_free_result_string_characters>=4){
 		result_string[0]='Q';
@@ -110,15 +116,23 @@ static pascal OSErr DoAEQuitApplication (AppleEvent *theAppleEvent,AppleEvent *r
 	return noErr;
 }
 
-extern pascal OSErr do_script_apple_event (AppleEvent *apple_event,AppleEvent *replyAppleEvent,long refCon);
+extern pascal OSErr do_script_apple_event (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,unsigned long refCon);
 
 extern int clean2_compile (int);
 
-static pascal OSErr DoAEScript (AppleEvent *apple_event,AppleEvent *replyAppleEvent,long refCon)
+static int compiler_id=-1;
+
+static int last_exit_code=0;
+
+#ifdef DEBUG_FILE
+static short debug_file_ref_num=0;
+#endif
+
+static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	DescType returned_type;
 	long actual_size;
-	int error;
+	int error,exit_code;
 	char *result_string_begin;
 
 	result_string_begin=result_string;
@@ -141,13 +155,34 @@ static pascal OSErr DoAEScript (AppleEvent *apple_event,AppleEvent *replyAppleEv
 		n_free_result_string_characters=0;
 	} else
 
+#ifdef DEBUG_FILE
+	{
+		long count;
+		ParamBlockRec parameter_block;
+
+		count=actual_size;
+		FSWrite (debug_file_ref_num,&count,result_string);
+
+		count=1;
+		FSWrite (debug_file_ref_num,&count,"\n");
+
+		parameter_block.ioParam.ioRefNum=debug_file_ref_num;
+		PBFlushFileSync (&parameter_block);
+	}
+#endif
+
+#if 1
 	/* RWS ... : ugly, special case for Clean IDE / cg combo */
 	if (strncmp (result_string, "cg ", 3) == 0)
 	{
-		return do_script_apple_event (apple_event, replyAppleEvent, refCon);
+		exit_code=do_script_apple_event (apple_event, replyAppleEvent, refCon);
+
+		last_exit_code = exit_code;
 	}
 	/* ... RWS */
-	else if (strncmp (result_string,"cocl ",5)==0){
+	else
+#endif
+	if (strncmp (result_string,"cocl ",5)==0){
 		int string_length;
 		
 		result_string += actual_size;
@@ -155,17 +190,135 @@ static pascal OSErr DoAEScript (AppleEvent *apple_event,AppleEvent *replyAppleEv
 
 		result_string=NULL;
 
-		return clean2_compile (string_length);
+#if 0
+		{
+			int n;
+
+			exit_code=clean2_compile (string_length);
+			
+			n=5;
+			while (n<string_length-5){
+				if (   result_string_begin[n]=='-'
+					&& result_string_begin[n+1]=='i'
+					&& result_string_begin[n+2]=='d'
+					&& result_string_begin[n+3]==' ')
+				{
+					compiler_id=result_string_begin[n+4]-'0';
+					break;
+				}
+				
+				++n;
+			}
+		}
+		exit_code=1;
+#else
+		exit_code=clean2_compile (string_length);
+#endif
+
+		if (compiler_id>=0){
+			exit_code += (compiler_id+1)<<1;
+			compiler_id=-1;
+		}
+		
+		last_exit_code = exit_code;
+	} else if (strncmp (result_string,"repeat_result",13)==0){
+		result_string=NULL;
+		n_free_result_string_characters=0;
+
+		exit_code=last_exit_code;
+	} else {
+		result_string += actual_size;
+
+		return 1;
+	}
+	
+	{
+		int error_code1;
+		
+		error_code1 = AEPutParamPtr (replyAppleEvent,keyErrorNumber,typeLongInteger,&exit_code,4);
+
+#ifdef DEBUG_FILE
+		{
+			long count;
+			ParamBlockRec parameter_block;
+			char hex_number[20];
+			int i;
+		
+			for (i=0; i<8; ++i){
+				unsigned int d;
+				
+				d=exit_code<<(i<<2);
+				d>>=28;
+				hex_number[i]= d<10 ? '0'+d : 'A'+(d-10);
+			}
+		
+			count=8;
+			FSWrite (debug_file_ref_num,&count,hex_number);
+		
+			for (i=0; i<8; ++i){
+				unsigned int d;
+				
+				d=error_code1<<(i<<2);
+				d>>=28;
+				hex_number[i]= d<10 ? '0'+d : 'A'+(d-10);
+			}
+		
+			count=8;
+			FSWrite (debug_file_ref_num,&count,hex_number);
+		
+			count=1;
+			FSWrite (debug_file_ref_num,&count,"\n");
+		
+			parameter_block.ioParam.ioRefNum=debug_file_ref_num;
+			PBFlushFileSync (&parameter_block);
+		}
+#endif			
 	}
 
-	result_string	+= actual_size;
+	return exit_code;
+}
 
-	return 1;
+int set_compiler_id (int id)
+{
+	compiler_id=id;
+
+	return id;
 }
 
 int install_apple_event_handlers (void)
 {
 	OSErr r;
+
+#ifdef DEBUG_FILE
+	unsigned char *file_name_p,*app_file_name_p,*p,file_name[64];
+	int n,l;
+
+	app_file_name_p=LMGetCurApName();
+	n=*app_file_name_p;
+	p=&app_file_name_p[1];
+
+	file_name_p=&file_name[1];
+	l=0;
+	
+	while (n!=0){
+		*file_name_p++ = *p++;
+		++l;
+		--n;
+	}
+	
+	p=(unsigned char*)" debug";
+	
+	while (*p){
+		*file_name_p++ = *p++;
+		++l;	
+	}
+	
+	file_name[0]=l;
+	
+	HCreate (0,0,file_name,'3PRM','TEXT');
+
+	HOpen (0,0,file_name,fsWrPerm,&debug_file_ref_num);
+#endif
 
 	r=AEInstallEventHandler (kCoreEventClass,kAEOpenApplication,NewAEEventHandlerProc (DoAEOpenApplication),0,false);
 
@@ -180,7 +333,7 @@ int install_apple_event_handlers (void)
 
 	if (r==noErr)
 		r=AEInstallEventHandler (kAEMiscStandards,kAEDoScript,NewAEEventHandlerProc (DoAEScript),0,false);
-	
+		
 	return r;
 }
 
@@ -260,3 +413,4 @@ int get_apple_event_string (int length,long *clean_string)
 
 	return string_length;
 }
+
