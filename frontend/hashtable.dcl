@@ -10,7 +10,7 @@ import syntax
 	,	hte_mark	:: !Int // 1 for .icl modules, otherwise 0
 	}
 
-newHashTable :: *HashTable
+newHashTable :: *SymbolTable -> *HashTable
 
 set_hte_mark :: !Int !*HashTable -> *HashTable
 
