@@ -211,9 +211,12 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 						exported_functions
 						main_dcl_module_n def_min def_max predef_symbols var_heap expression_heap error_admin
 			_ 
-				# (fun_defs,predef_symbols,var_heap,expression_heap,error_admin)
-						= stripStrictLets fun_defs predef_symbols var_heap expression_heap error_admin
-				-> (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin)
+				-> case options.feo_fusion of
+					True
+						# (fun_defs,predef_symbols,var_heap,expression_heap,error_admin)
+								= stripStrictLets fun_defs predef_symbols var_heap expression_heap error_admin
+						-> (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin)
+					_	-> (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin)
 
 	# error = error_admin.ea_file
 	| not error_admin.ea_ok

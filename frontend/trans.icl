@@ -3192,6 +3192,10 @@ where
 			# ti = foldSt (transform_function common_defs imported_funs) group_members ti
 			// partitionate group: need to know added functions for this...
 			# (after,ti) = ti!ti_next_fun_nr
+
+			| not (compile_with_fusion || after > before)
+				= (inc group_nr,[{group_members=group_members}:acc_groups],ti)
+			 
 			# (new_groups,ti) = partition_group group_nr (group_members++[before..after-1]) ti
 			// reanalyse consumers
 			# (cleanup,ti_fun_defs,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_cons_args,same)
