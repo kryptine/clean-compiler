@@ -1,7 +1,7 @@
 implementation module checkFunctionBodies
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef //, RWSDebug
-import explicitimports, comparedefimp, mergecases
+import explicitimports, comparedefimp
 from check import checkFunctions,checkDclMacros
 
 cIsInExpressionList		:== True
@@ -616,7 +616,7 @@ checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info 
 	# (pattern_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
 	  (pattern_expr, binds, es_expr_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expr_heap
-	  (case_expr, es_var_heap, es_expr_heap, cs_error) = build_and_merge_case guards defaul pattern_expr case_ident True e_state.es_var_heap es_expr_heap cs.cs_error
+	  (case_expr, es_var_heap, es_expr_heap, cs_error) = build_and_share_case guards defaul pattern_expr case_ident True e_state.es_var_heap es_expr_heap cs.cs_error
 	  cs = {cs & cs_error = cs_error}
 	  (result_expr, es_expr_heap) = buildLetExpression [] binds case_expr NoPos es_expr_heap
 	= (result_expr, free_vars, { e_state & es_var_heap = es_var_heap,  es_expr_heap = es_expr_heap }, e_info, cs)
@@ -853,7 +853,7 @@ where
 		# free_var = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
 		  (new_bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  case_ident = { id_name = case_name, id_info = nilPtr }
-		  (new_case, var_store, expr_heap, cs_error) = build_and_merge_case patterns defaul (Var new_bound_var) case_ident False var_store expr_heap cs.cs_error
+		  (new_case, var_store, expr_heap, cs_error) = build_and_share_case patterns defaul (Var new_bound_var) case_ident False var_store expr_heap cs.cs_error
 		  cs = {cs & cs_error = cs_error}
 		  new_defaul = insert_as_default new_case result_expr
 		= (NoPattern, pattern_scheme, (cons_optional opt_var pattern_variables), Yes (Yes free_var, new_defaul),
@@ -880,11 +880,15 @@ where
 			Yes defaul	-> Case { kees & case_default = Yes (insert_as_default to_insert defaul)}
 	insert_as_default _ expr = expr // checkWarning "pattern won't match"
 
-	build_and_merge_case patterns defaul expr case_ident explicit var_heap expr_heap error_admin
+	build_and_share_case patterns defaul expr case_ident explicit var_heap expr_heap error_admin
 		# (expr, expr_heap)= build_case patterns defaul expr case_ident explicit expr_heap
 		# (expr, var_heap, expr_heap) = share_case_expr expr var_heap expr_heap
-		=  merge_case expr var_heap expr_heap error_admin
+		=  (expr, var_heap, expr_heap, error_admin)
 
+	// make sure that the case_expr is a variable, because that's needed for merging
+	// the alternatives in cases (in transform.icl)
+	// FIXME: this should be represented in the syntax tree: change case_expr to
+	// case_var :: BoundVar in Case
 	share_case_expr (Let lad=:{let_expr}) var_heap expr_heap
 		# (let_expr, var_heap, expr_heap) = share_case_expr let_expr var_heap expr_heap
 		= (Let {lad & let_expr = let_expr}, var_heap, expr_heap)
@@ -896,45 +900,7 @@ where
 		  (case_expression, expr_heap) = bind_default_variable case_expr free_var (Case {kees & case_expr = Var bound_var}) expr_heap
 	 	= (case_expression, var_heap, expr_heap)
 	share_case_expr expr var_heap expr_heap
-		=  (expr, var_heap, expr_heap)
-
-	merge_case (Let lad=:{let_expr}) var_heap expr_heap error_admin
-		# (let_expr, var_heap, expr_heap, error_admin) = merge_case let_expr var_heap expr_heap error_admin
-		= (Let {lad & let_expr = let_expr}, var_heap, expr_heap, error_admin)
-	merge_case (Case kees) var_heap expr_heap error_admin
-		# cases	= map (make_case kees.case_expr) (split_patterns kees.case_guards)
-		  cases = init cases ++ [{last cases & case_default = kees.case_default}]
-		  [firstCase : otherCases] = [(Case kees, NoPos) \\ kees <- cases]
-		  ((Case {case_guards},_), var_heap, expr_heap, error_admin) =  mergeCases firstCase otherCases var_heap expr_heap error_admin
-		  kees = {kees & case_guards = case_guards}
-		=	(Case kees, var_heap, expr_heap, error_admin)
-		where
-			split_patterns :: CasePatterns -> [CasePatterns]
-			split_patterns (AlgebraicPatterns index patterns)
-				=	[AlgebraicPatterns index [pattern] \\ pattern <- patterns]
-			split_patterns (BasicPatterns basicType patterns)
-				=	[BasicPatterns basicType [pattern] \\ pattern <- patterns]
-			split_patterns (OverloadedListPatterns  overloaded_list_type decons_expr patterns)
-				=	[OverloadedListPatterns overloaded_list_type decons_expr [pattern] \\ pattern <- patterns]
-			split_patterns (DynamicPatterns patterns)
-				=	[DynamicPatterns [pattern] \\ pattern <- patterns]
-			split_patterns NoPattern
-				=	[NoPattern]
-
-			make_case :: Expression CasePatterns -> Case
-			make_case expr guard
-				=
-				{	case_expr		= expr
-				,	case_guards		= guard
-				,	case_default	= No
-				,	case_ident		= No
-				,	case_info_ptr	= nilPtr
-				,	case_default_pos= NoPos
-				,	case_explicit	= False
-				}
-	merge_case expr var_heap expr_heap error_admin
-		=	(expr, var_heap, expr_heap, error_admin)
-			
+		=  (expr, var_heap, expr_heap)			
 
 	build_case NoPattern defaul expr case_ident explicit expr_heap
 		= case defaul of
