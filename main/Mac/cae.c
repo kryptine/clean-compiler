@@ -2,6 +2,13 @@
 #include <AppleEvents.h>
 #include <AERegistry.h>
 #include <Files.h>
+#include <Events.h>
+
+#if TARGET_API_MAC_CARBON
+/* for gcc */
+#define NewAEEventHandlerProc(a) NewAEEventHandlerUPP(a)
+/* */
+#endif
 
 #undef DEBUG_FILE
 
@@ -24,7 +31,9 @@ static int string_begins_with (char *s1,char *s2)
 	return 1;
 }
 
-static pascal OSErr DoAEOpenApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
+#define RefConType /*unsigned*/ long
+
+static pascal OSErr DoAEOpenApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,RefConType refCon)
 {
 	return noErr;
 }
@@ -43,7 +52,7 @@ static int has_required_parameters (const AppleEvent *theAppleEvent)
 	return r;
 }
 
-static pascal OSErr DoAEOpenDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
+static pascal OSErr DoAEOpenDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,RefConType refCon)
 {
 	OSErr r;
 	AEDescList document_list;
@@ -110,12 +119,12 @@ static pascal OSErr DoAEOpenDocuments (const AppleEvent *theAppleEvent,AppleEven
 	return r;
 }
  
-static pascal OSErr DoAEPrintDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
+static pascal OSErr DoAEPrintDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,RefConType refCon)
 {
 	return errAEEventNotHandled;
 }
  
-static pascal OSErr DoAEQuitApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
+static pascal OSErr DoAEQuitApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,RefConType refCon)
 {
 	if (n_free_result_string_characters>=4){
 		result_string[0]='Q';
@@ -128,7 +137,7 @@ static pascal OSErr DoAEQuitApplication (const AppleEvent *theAppleEvent,AppleEv
 	return noErr;
 }
 
-extern pascal OSErr do_script_apple_event (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,unsigned long refCon);
+extern pascal OSErr do_script_apple_event (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,RefConType refCon);
 
 extern int clean2_compile (int);
 
@@ -140,7 +149,7 @@ static int last_exit_code=0;
 static short debug_file_ref_num=0;
 #endif
 
-static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,unsigned long refCon)
+static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,RefConType refCon)
 {
 	DescType returned_type;
 	long actual_size;
@@ -185,7 +194,10 @@ static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyA
 
 #if 1
 	/* RWS ... : ugly, special case for Clean IDE / cg combo */
-	if (string_begins_with (result_string, "cg "))
+	if (string_begins_with (result_string, "cg ")
+		|| string_begins_with (result_string, "cg_o ")
+		|| string_begins_with (result_string, "cg_xo ")
+		|| string_begins_with (result_string, "cg_cxo "))
 	{
 		exit_code=do_script_apple_event (apple_event, replyAppleEvent, refCon);
 
