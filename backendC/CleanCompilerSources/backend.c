@@ -367,7 +367,7 @@ BESetMainDclModuleN (int main_dcl_module_n_parameter)
 }
 
 void
-BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstructors, int nFields)
+BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctions, int nTypes, int nConstructors, int nFields)
 {
 	int		i;
 	char	*cName;
@@ -399,6 +399,7 @@ BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstruct
 
 	iclModule	= icl->beicl_module;
 	iclModule->im_name			= moduleNameSymbol;
+	iclModule->im_modification_time	= ConvertCleanString (modificationTime);
 	iclModule->im_def_module	= NULL;
 	iclModule->im_rules			= NULL;
 	iclModule->im_start			= NULL;
@@ -431,7 +432,7 @@ BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstruct
 } /* BEDeclareIclModule */
 
 void
-BEDeclareDclModule (int moduleIndex, CleanString name, int isSystemModule, int nFunctions, int nTypes, int nConstructors, int nFields)
+BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationTime, int isSystemModule, int nFunctions, int nTypes, int nConstructors, int nFields)
 {
 	char	*cName;
 	SymbolP	moduleNameSymbol;
@@ -453,6 +454,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, int isSystemModule, int n
 
 	dclModule	= ConvertAllocType (DefRepr);
 	dclModule->dm_name			= moduleNameSymbol;
+	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
 

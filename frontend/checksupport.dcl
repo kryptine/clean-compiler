@@ -98,6 +98,9 @@ cConversionTableSize	:== 9 // AA
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_used_module_numbers :: !NumberSet
 	,	icl_copied_from_dcl 	:: !CopiedDefinitions
+// RWS ...
+	,	icl_modification_time	:: !{#Char}
+// ... RWS
 	}
 
 ::	DclModule =
@@ -112,6 +115,7 @@ cConversionTableSize	:== 9 // AA
 	,	dcl_conversions		:: !Optional ConversionTable
 // RWS ...	,	dcl_is_system		:: !Bool
 	,	dcl_module_kind		:: !ModuleKind
+	,	dcl_modification_time:: !{#Char}
 // ... RWS
 	,	dcl_imported_module_numbers :: !NumberSet
 	}

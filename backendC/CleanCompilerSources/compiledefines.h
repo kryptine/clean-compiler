@@ -1,5 +1,5 @@
 
-#define CLEAN2
+#define CLEAN2 1
 
 #define SHORT_CLASS_NAMES
 #define U_RECORD_SELECTORS 1

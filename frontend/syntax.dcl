@@ -83,6 +83,7 @@ instance toString Ident
 	
 ::	Module defs = 
 	{	mod_name		:: !Ident
+	,	mod_modification_time		:: {#Char}
 	,	mod_type		:: !ModuleKind
 	, 	mod_imports		:: ![ParsedImport]
 	,	mod_imported_objects :: ![ImportedObject]

@@ -3,10 +3,15 @@ definition module scanner
 import StdEnv, general
 
 // RWS Proof ... ::	SearchPaths	:== [String]
+
 :: SearchPaths = 
 	{ sp_locations   :: [(String, String)]       // (module, path)
 	, sp_paths       :: [String]
 	}
+
+:: ModTimeFunction f
+	:== ({#Char} !f -> *(!{#Char}, !f))
+
 // ... RWS
 
 ::	* ScanState
@@ -139,7 +144,7 @@ instance replaceToken ScanState
 class getPosition state :: !*state -> (!FilePosition,!*state)  // Position of current Token (or Char)
 instance getPosition ScanState
 
-openScanner :: !String !SearchPaths !*Files -> (!Optional ScanState, !*Files)
+openScanner :: !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
 closeScanner :: !ScanState !*Files -> *Files
 
 setUseLayout :: !Bool !ScanState -> ScanState

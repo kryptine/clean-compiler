@@ -3,7 +3,7 @@ implementation module compile
 import StdEnv
 import frontend
 import backendinterface
-import CoclSystemDependent
+import filesystem, CoclSystemDependent
 import portToNewSyntax
 //import RWSDebug
 
@@ -195,7 +195,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False,feo_fusion=options.compile_with_fusion} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
+		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False,feo_fusion=options.compile_with_fusion} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
 		= closeTclFile tcl_file files

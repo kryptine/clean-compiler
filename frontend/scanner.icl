@@ -9,6 +9,10 @@ from utilities import revCharListToString, isSpecialChar
 	{ sp_locations   :: [(String, String)]       // (module, path)
 	, sp_paths       :: [String]
 	}
+
+:: ModTimeFunction f
+	:== ({#Char} !f -> *(!{#Char}, !f))
+
 // ... RWS
 
 ::	*ScanState = ScanState !RScanState
@@ -1467,12 +1471,12 @@ where
 	toString NoAssoc	= "infix "
 	
 
-openScanner :: !String !SearchPaths !*Files -> (!Optional ScanState, !*Files)
-openScanner file_name searchPaths files
-	= case fopenInSearchPaths file_name searchPaths FReadData files of
+openScanner :: !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
+openScanner file_name searchPaths modtimefunction files
+	= case fopenInSearchPaths file_name searchPaths FReadData modtimefunction files of
 		(No, files)
 			->	(No, files)
-		(Yes file, files)
+		(Yes (file, time), files)
 			->  (Yes (ScanState {	ss_input 		= Input
 												{ inp_stream		= InFile file
 									 			, inp_filename		= file_name
@@ -1482,48 +1486,41 @@ openScanner file_name searchPaths files
 						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
 						,	ss_scanOptions	=	0
 						,	ss_tokenBuffer	=	Buffer0
-						})
+						}, time)
 				, files
 				)
 
-/* RWS Proof ...
-fopenInSearchPaths :: !{#Char} [!{#Char}] !Int !*f -> (Optional *File,!*f) | FileSystem f
-fopenInSearchPaths fileName [] mode f
-	=	(No, f)
-fopenInSearchPaths fileName [path : paths] mode f
-	# (opened, file, f)
-		=	fopen (path + fileName) mode f
-	| opened
-		=	(Yes file, f)
-	// otherwise
-		=	fopenInSearchPaths fileName paths mode f
-*/
-fopenInSearchPaths :: !{#Char} SearchPaths !Int !*f -> (Optional *File,!*f) | FileSystem f
-fopenInSearchPaths fileName searchPaths mode f
+fopenInSearchPaths :: !{#Char} SearchPaths !Int (ModTimeFunction *f) !*f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+fopenInSearchPaths fileName searchPaths mode modtimefunction f
 	# filtered_locations
 		=	filter (\(moduleName,path) -> moduleName == fileName) searchPaths.sp_locations
 	| isEmpty filtered_locations
-		=	fopenAnywhereInSearchPaths fileName searchPaths.sp_paths mode f
+		=	fopenAnywhereInSearchPaths fileName searchPaths.sp_paths mode modtimefunction f
 	# (_, path)
 		=	hd filtered_locations
 	# (opened, file, f)
 		=	fopen (path + fileName) mode f
 	| opened
-		=	(Yes file, f)
+		=	getModificationTime file path modtimefunction f
 	| otherwise
 		=	(No, f)
 	where
-		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int *f -> (Optional *File, !*f) | FileSystem f
-		fopenAnywhereInSearchPaths fileName [] mode f
+		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+		fopenAnywhereInSearchPaths fileName [] _ _ f
 			=	(No, f)
-		fopenAnywhereInSearchPaths fileName [path : paths] mode f
+		fopenAnywhereInSearchPaths fileName [path : paths] mode modtimefunction f
 			# (opened, file, f)
 				=	fopen (path + fileName) mode f
 			| opened
-				=	(Yes file, f)
+				=	getModificationTime file path modtimefunction f
 			// otherwise
-				=	fopenAnywhereInSearchPaths fileName paths mode f
-// ... RWS
+				=	fopenAnywhereInSearchPaths fileName paths mode modtimefunction f
+
+		getModificationTime :: *File {#Char} (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+		getModificationTime file path modtimefunction f
+			# (time, f)
+				=	modtimefunction (path + fileName) f
+			=	(Yes (file, time), f)
 
 closeScanner :: !ScanState !*Files -> *Files
 closeScanner (ScanState scan_state) files = closeScanner_ scan_state files

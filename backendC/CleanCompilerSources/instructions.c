@@ -3200,7 +3200,7 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 
 void GenModuleDescriptor (
 #if WRITE_DCL_MODIFICATION_TIME
-						FileTime file_time
+						ModuleFileTime file_time
 #else
 						void
 #endif
@@ -3213,7 +3213,11 @@ void GenModuleDescriptor (
 	if (WriteModificationTimes){
 		FPutC (' ',OutFile);
 		FPutC ('\"',OutFile);
+# if CLEAN2
+		FPutS (file_time,OutFile);
+# else
 		FWriteFileTime (file_time,OutFile);
+# endif
 		FPutC ('\"',OutFile);
 	}
 #endif
@@ -3221,7 +3225,7 @@ void GenModuleDescriptor (
 
 void GenDepend (char *modname
 #if WRITE_DCL_MODIFICATION_TIME
-				,FileTime file_time
+				,ModuleFileTime file_time
 #endif
 				)
 {
@@ -3235,7 +3239,11 @@ void GenDepend (char *modname
 	if (WriteModificationTimes){
 		FPutC (' ',OutFile);
 		FPutC ('\"',OutFile);
+# if CLEAN2
+		FPutS (file_time,OutFile);
+# else
 		FWriteFileTime (file_time,OutFile);
+# endif
 		FPutC ('\"',OutFile);
 	}
 #endif

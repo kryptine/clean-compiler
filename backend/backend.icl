@@ -680,17 +680,17 @@ BEAnyCodeBlock a0 a1 a2 a3 = code {
 };
 // BECodeBlockP BEAnyCodeBlock (BECodeParameterP inParams,BECodeParameterP outParams,BEStringListP instructions);
 
-BEDeclareIclModule :: !String !Int !Int !Int !Int !BackEnd -> BackEnd;
-BEDeclareIclModule a0 a1 a2 a3 a4 a5 = code {
-	ccall BEDeclareIclModule "SIIII:V:I"
+BEDeclareIclModule :: !String !String !Int !Int !Int !Int !BackEnd -> BackEnd;
+BEDeclareIclModule a0 a1 a2 a3 a4 a5 a6 = code {
+	ccall BEDeclareIclModule "SSIIII:V:I"
 };
-// void BEDeclareIclModule (CleanString name,int nFunctions,int nTypes,int nConstructors,int nFields);
+// void BEDeclareIclModule (CleanString name,CleanString modificationTime,int nFunctions,int nTypes,int nConstructors,int nFields);
 
-BEDeclareDclModule :: !Int !String !Bool !Int !Int !Int !Int !BackEnd -> BackEnd;
-BEDeclareDclModule a0 a1 a2 a3 a4 a5 a6 a7 = code {
-	ccall BEDeclareDclModule "ISIIIII:V:I"
+BEDeclareDclModule :: !Int !String !String !Bool !Int !Int !Int !Int !BackEnd -> BackEnd;
+BEDeclareDclModule a0 a1 a2 a3 a4 a5 a6 a7 a8 = code {
+	ccall BEDeclareDclModule "ISSIIIII:V:I"
 };
-// void BEDeclareDclModule (int moduleIndex,CleanString name,int systemModule,int nFunctions,int nTypes,int nConstructors,int nFields);
+// void BEDeclareDclModule (int moduleIndex,CleanString name,CleanString modificationTime,int systemModule,int nFunctions,int nTypes,int nConstructors,int nFields);
 
 BEDeclarePredefinedModule :: !Int !Int !BackEnd -> BackEnd;
 BEDeclarePredefinedModule a0 a1 a2 = code {
@@ -763,9 +763,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 };
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02000212;
-kBEVersionOldestDefinition:==0x02000212;
-kBEVersionOldestImplementation:==0x02000212;
+kBEVersionCurrent:==0x02000213;
+kBEVersionOldestDefinition:==0x02000213;
+kBEVersionOldestImplementation:==0x02000213;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;

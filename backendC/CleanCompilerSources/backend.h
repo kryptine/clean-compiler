@@ -1,15 +1,15 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02000212
+# define	kBEVersionCurrent				0x02000213
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // upward compatible (for example when a function is added)
-# define	kBEVersionOldestDefinition		0x02000212
+# define	kBEVersionOldestDefinition		0x02000213
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02000212
+# define	kBEVersionOldestImplementation	0x02000213
 
 
 # define	kBEDebug	1
@@ -491,11 +491,11 @@ Clean (BEAbcCodeBlock:: Bool BEStringListP BackEnd -> (BECodeBlockP, BackEnd))
 BECodeBlockP BEAnyCodeBlock (BECodeParameterP inParams, BECodeParameterP outParams, BEStringListP instructions);
 Clean (BEAnyCodeBlock:: BECodeParameterP BECodeParameterP BEStringListP BackEnd -> (BECodeBlockP, BackEnd))
 
-void BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstructors, int nFields);
-Clean (BEDeclareIclModule ::  String Int Int Int Int BackEnd -> BackEnd)
+void BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctions, int nTypes, int nConstructors, int nFields);
+Clean (BEDeclareIclModule ::  String String Int Int Int Int BackEnd -> BackEnd)
 
-void BEDeclareDclModule (int moduleIndex, CleanString name, int systemModule, int nFunctions, int nTypes, int nConstructors, int nFields);
-Clean (BEDeclareDclModule :: Int String Bool Int Int Int Int BackEnd -> BackEnd)
+void BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationTime, int systemModule, int nFunctions, int nTypes, int nConstructors, int nFields);
+Clean (BEDeclareDclModule :: Int String String Bool Int Int Int Int BackEnd -> BackEnd)
 
 void BEDeclarePredefinedModule (int nTypes, int nConstructors);
 Clean (BEDeclarePredefinedModule :: Int Int BackEnd -> BackEnd)

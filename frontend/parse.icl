@@ -289,23 +289,23 @@ isClassOrInstanceDefsContext context	:== context bitand cClassOrInstanceDefsCont
 cWantIclFile :== True	
 cWantDclFile :== False	
 
-wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols (ModTimeFunction *Files) !*Files
 	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths pre_def_symbols files
-	= case openScanner file_name searchPaths files of
-		(Yes scanState, files)
+wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths pre_def_symbols modtimefunction files
+	= case openScanner file_name searchPaths modtimefunction files of
+		(Yes (scanState, modification_time), files)
 			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
-			# (ok,mod,hash_table,file,pre_def_symbols,files) = initModule file_name scanState hash_table error pre_def_symbols files
+			# (ok,mod,hash_table,file,pre_def_symbols,files) = initModule file_name modification_time scanState hash_table error pre_def_symbols files
 			# hash_table=set_hte_mark 0 hash_table
 			->(ok,mod,hash_table,file,pre_def_symbols,files)
 		(No, files)
-			-> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
+			-> let mod = { mod_name = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
 			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", pre_def_symbols, files)
 where
 	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
-	initModule :: String ScanState !*HashTable !*File !*PredefinedSymbols *Files
+	initModule :: String String ScanState !*HashTable !*File !*PredefinedSymbols *Files
 				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-	initModule file_name scanState hash_table error pre_def_symbols files
+	initModule file_name modification_time scanState hash_table error pre_def_symbols files
 		# (succ, mod_type, mod_name, scanState) = try_module_header iclmodule scanState
 		| succ
 			# pState				=	{ ps_scanState = scanState
@@ -327,7 +327,7 @@ where
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
 						[PD_Import imports \\ PD_Import imports <- defs]
 						defs
-			  mod					= { mod_name = mod_ident, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
+			  mod					= { mod_name = mod_ident, mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
 			= ( ps_error.pea_ok
 			  , mod, ps_hash_table
 			  , ps_error.pea_file
@@ -336,7 +336,7 @@ where
 			  )
 		// otherwise // ~ succ
 		# ({fp_line}, scanState) = getPosition scanState
-		  mod = { mod_name = file_id, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
+		  mod = { mod_name = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
 		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
 			pre_def_symbols, closeScanner scanState files)
 	where

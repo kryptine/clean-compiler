@@ -1582,7 +1582,7 @@ checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_m
 	# icl_instance_range = {ir_from = first_inst_index, ir_to = nr_of_functions}
 	
 	// llslsls CheckState
-	= check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
+	= check_module2 mod_name m.mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 
 check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs} icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules functions_and_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
@@ -1750,12 +1750,12 @@ add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n 
 			# dcl_modules = {dcl_modules & [main_dcl_module_n].dcl_conversions=Yes conversion_table}
 			-> dcl_modules
 
-check_module2 :: Ident [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int 
+check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int 
 				(Optional (Module a)) [Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState 
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},
 				!.Heap SymbolTableEntry,!.File,[String]);
-check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
+check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 	  (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
 	  (copied_dcl_defs, dcl_modules, local_defs, cdefs, icl_sizes, cs)
@@ -1910,7 +1910,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 			  	 			  com_instance_defs = class_instances }	  			  
 		  icl_mod		= { 	icl_name = mod_name, icl_functions = icl_functions, icl_common = icl_common, icl_instances = icl_instances, icl_specials = icl_specials,
 								icl_imported_objects = mod_imported_objects, icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-	  			  				icl_import = icl_imported }
+	  			  				icl_import = icl_imported,  icl_modification_time = mod_modification_time}
 
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 
@@ -1929,7 +1929,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 		  					icl_instances = icl_instance_range,
 		  					icl_specials = {ir_from = nr_of_functions, ir_to = nr_of_functions},
 							icl_imported_objects = mod_imported_objects, icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-	    		  			icl_import = icl_imported }
+	    		  			icl_import = icl_imported, icl_modification_time = mod_modification_time}
 		= (False, icl_mod, dcl_modules, {}, No, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
 	where
 		check_start_rule mod_kind mod_name {ir_from, ir_to} cs=:{cs_predef_symbols,cs_symbol_table,cs_x}
@@ -2204,7 +2204,7 @@ makeElemTypeOfArrayFunctionStrict st=:{st_args,st_result} me_offset offset_table
 					st_result = { st_result &  at_type = TA tuple [{ elem & at_annotation = AN_Strict } : res_array]}}
 		= st
 
-initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_type}, sizes, all_defs) module_n
+initialDclModule ({mod_name, mod_modification_time, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_type}, sizes, all_defs) module_n
 	# dcl_common= createCommonDefinitions mod_defs
 	= 	{	dcl_name			= mod_name
 		,	dcl_functions		= { function \\ function <- mod_defs.def_funtypes }
@@ -2226,6 +2226,7 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 								_			-> False
 */
 		,	dcl_module_kind	= mod_type
+		,	dcl_modification_time = mod_modification_time
 // ... RWS
 		,	dcl_imported_module_numbers = EndNumbers
 		}

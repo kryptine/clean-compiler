@@ -83,20 +83,20 @@ frontSyntaxTree cached_functions_and_macros cached_dcl_mods n_functions_and_macr
 
 // import StdDebug
 
-frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File (!Optional !*File) !*Heaps
+frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File (!Optional !*File) !*Heaps
   	-> ( !Optional *FrontEndSyntaxTree,!*{# FunDef },!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
-frontEndInterface options mod_ident search_paths cached_dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
+frontEndInterface options mod_ident search_paths cached_dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
 // 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
 
 	# (ok, mod, hash_table, error, predef_symbols, files)
-		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths predef_symbols files
+		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths predef_symbols modtimefunction files
 	| not ok
 		= (No,{},{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
 	# (nr_of_chached_functions_and_macros, functions_and_macros) = usize functions_and_macros
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, predef_symbols, files)
-		= scanModule (mod -*-> "Scanning") cached_module_idents nr_of_chached_functions_and_macros options.feo_generics hash_table error search_paths predef_symbols files
+		= scanModule (mod -*-> "Scanning") cached_module_idents nr_of_chached_functions_and_macros options.feo_generics hash_table error search_paths predef_symbols modtimefunction files
 	/* JVG: */
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
@@ -275,11 +275,11 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 //	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps}
-	#! 	fe ={	fe_icl =
+	# 	fe ={	fe_icl =
 //							 {icl_mod & icl_functions=fun_defs }
 							 {icl_functions=fun_defs,icl_instances=icl_instances,icl_specials=icl_specials,icl_common=icl_common,icl_import=icl_import,
 							 icl_name=icl_name,icl_imported_objects=icl_imported_objects,icl_used_module_numbers=icl_used_module_numbers,
-							 icl_copied_from_dcl=icl_copied_from_dcl}
+							 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time}
 
 			,	fe_dcls = dcl_mods
 			,	fe_components = components

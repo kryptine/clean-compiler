@@ -383,7 +383,7 @@ backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
 backEndConvertModulesH predefs {fe_icl = 
-	fe_icl =: {icl_name, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers},
+	fe_icl =: {icl_name, icl_modification_time, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers},
 	fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions}
 	main_dcl_module_n backEnd
 	// sanity check ...
@@ -448,7 +448,7 @@ backEndConvertModulesH predefs {fe_icl =
 		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers (backEnd -*-> "defineOtherDclModules")
 
 	#! backEnd
-		=	appBackEnd (BEDeclareIclModule icl_name.id_name (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
+		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
 	#! backEnd
 		=	declareFunctionSymbols icl_functions (getConversions fe_iclDclConversions) functionIndices fe_globalFunctions (backEnd -*-> "declareFunctionSymbols")
 		with
@@ -522,12 +522,12 @@ isSystem _
 declareCurrentDclModule :: IclModule DclModule Int -> BackEnder
 declareCurrentDclModule _ {dcl_module_kind=MK_None} _
 	=	identity
-declareCurrentDclModule {icl_common} {dcl_name, dcl_functions, dcl_module_kind, dcl_common} main_dcl_module_n
-	=	appBackEnd (BEDeclareDclModule main_dcl_module_n dcl_name.id_name (isSystem dcl_module_kind) (size dcl_functions) (size icl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
+declareCurrentDclModule {icl_common} {dcl_name, dcl_modification_time, dcl_functions, dcl_module_kind, dcl_common} main_dcl_module_n
+	=	appBackEnd (BEDeclareDclModule main_dcl_module_n dcl_name.id_name dcl_modification_time  (isSystem dcl_module_kind) (size dcl_functions) (size icl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 
 declareDclModule :: ModuleIndex DclModule -> BackEnder
-declareDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_module_kind}
-	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
+declareDclModule moduleIndex {dcl_name, dcl_modification_time, dcl_common, dcl_functions, dcl_module_kind}
+	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name dcl_modification_time (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 /*
 defineCurrentDclModule :: IclModule DclModule {#Int} -> BackEnder
 defineCurrentDclModule {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions

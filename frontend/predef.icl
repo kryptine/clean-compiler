@@ -440,7 +440,7 @@ buildPredefinedModule pre_def_symbols
 	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_id MaxTupleArity [array_def,strict_def,unboxed_def] [] pre_def_symbols
 	  alias_dummy_type = make_identity_fun_type alias_dummy_symb.pds_ident type_var // MW++
 	  (class_def, member_def, pre_def_symbols) = make_TC_class_def pre_def_symbols
-	= ({ mod_name = pre_mod_id, mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
+	= ({ mod_name = pre_mod_id, mod_modification_time = "", mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
 		 mod_defs = {
 			def_types = [string_def, list_def,strict_list_def,unboxed_list_def,tail_strict_list_def,strict_tail_strict_list_def,unboxed_tail_strict_list_def,overloaded_list_def : type_defs],
 						def_constructors = [cons_def,strict_cons_def,unboxed_cons_def,tail_strict_cons_def,strict_tail_strict_cons_def,unboxed_tail_strict_cons_def,overloaded_cons_def,

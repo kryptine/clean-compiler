@@ -935,6 +935,12 @@ struct string_list {
 };
 #endif
 
+#if CLEAN2
+typedef char * ModuleFileTime;
+#else
+typedef FileTime ModuleFileTime;
+#endif
+
 typedef struct {
 	Symbol				im_name;
 	Symbol				im_symbols;
@@ -957,7 +963,7 @@ typedef struct {
 	struct string_list *	im_imported_libs;
 #endif
 #if WRITE_DCL_MODIFICATION_TIME
-	FileTime			im_modification_time;
+	ModuleFileTime		im_modification_time;
 #endif
 } *ImpMod, ImpRepr;
 
@@ -979,6 +985,6 @@ struct def_repr {
 	struct module_info *	dm_module_info;
 #endif
 #if WRITE_DCL_MODIFICATION_TIME
-	FileTime	dm_modification_time;
+	ModuleFileTime	dm_modification_time;
 #endif
 };

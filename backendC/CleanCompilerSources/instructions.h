@@ -173,8 +173,8 @@ void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_state_p
 void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity);
 
 #if defined(WRITE_DCL_MODIFICATION_TIME) && WRITE_DCL_MODIFICATION_TIME
-void GenModuleDescriptor (FileTime file_time);
-void GenDepend (char *modname,FileTime file_time);
+void GenModuleDescriptor (ModuleFileTime file_time);
+void GenDepend (char *modname,ModuleFileTime file_time);
 #else
 void GenModuleDescriptor (void);
 void GenDepend (char *modname);
