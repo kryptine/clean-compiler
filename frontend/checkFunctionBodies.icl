@@ -1774,7 +1774,7 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 		= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident "constant not allowed in a node pattern" cs.cs_error})
 	# (is_tuple, cs) = is_tuple_symbol glob_module ds_index cs
 	| is_tuple
-		# (tuple_var, tuple_bind, var_store, expr_heap) = bind_match_expr src_expr opt_var_bind position var_store expr_heap
+		# (tuple_var, tuple_bind, var_store, expr_heap) = bind_match_expr src_expr opt_var_bind position def_level var_store expr_heap
 		= transform_sub_patterns mod_index def_level args ds_cons 0 tuple_var tuple_bind position var_store expr_heap e_info cs
 		# ({td_rhs}, ef_type_defs, ef_modules) = get_type_def mod_index glob_module type_index ef_type_defs ef_modules
 		  e_info = { e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules }
@@ -1784,7 +1784,7 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 					-> transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0
 							src_expr opt_var_bind position var_store expr_heap e_info cs
 					# (record_var, record_bind, var_store, expr_heap)
-						= bind_match_expr src_expr opt_var_bind position var_store expr_heap
+						= bind_match_expr src_expr opt_var_bind position def_level var_store expr_heap
 					-> transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0
 							record_var record_bind position var_store expr_heap e_info cs
 			_
@@ -1794,97 +1794,149 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 								position var_store expr_heap e_info cs
 					-> (opt_var_bind ++ binds, var_store, expr_heap, e_info, cs)
 					# (tuple_cons, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex ds_arity) PD_PredefinedModule STE_Constructor ds_arity cs
-					# (src_expr,expr_heap,cs) = add_decons_call_for_overloaded_lists src_expr expr_heap cs
-						with
-							add_decons_call_for_overloaded_lists src_expr expr_heap cs
-								| glob_module==cPredefinedModuleIndex
-									# pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
-									| pd_cons_index==PD_UnboxedConsSymbol			
-										# (stdStrictLists_index,_,decons_u_index,_,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
-										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-										# decons_u_expr = App {app_symb={symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}			
-										= (decons_u_expr,expr_heap,cs)
-									| pd_cons_index==PD_UnboxedTailStrictConsSymbol
-										# (stdStrictLists_index,_,decons_uts_index,_,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
-										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-										# decons_uts_expr = App {app_symb={symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
-										= (decons_uts_expr,expr_heap,cs)
-									| pd_cons_index==PD_OverloadedConsSymbol
-										# (stdStrictLists_index,_,decons_index,_,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
-										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-										# decons_expr = App {app_symb={symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
-										= (decons_expr,expr_heap,cs)
-										= (src_expr,expr_heap,cs)
-									= (src_expr,expr_heap,cs)
+					# (src_expr,expr_heap,cs) = add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
 					# (match_var, match_bind, var_store, expr_heap)
-						=  bind_match_expr (MatchExpr cons_symbol src_expr) opt_var_bind position var_store expr_heap
+						=  bind_match_expr (MatchExpr cons_symbol src_expr) opt_var_bind position def_level var_store expr_heap
 					-> transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind
 							position var_store expr_heap e_info cs
-where
-	get_type_def mod_index type_mod_index type_index ef_type_defs ef_modules
-		| mod_index == type_mod_index
-			# (type_def, ef_type_defs) = ef_type_defs![type_index]
-			= (type_def, ef_type_defs, ef_modules)
-			# ({dcl_common},  ef_modules) = ef_modules![type_mod_index]
-			= (dcl_common.com_type_defs.[type_index], ef_type_defs, ef_modules)
-		
-	is_tuple_symbol cons_module cons_index cs
-		# (tuple_2_symbol, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex 2) PD_PredefinedModule STE_Constructor 2 cs
-		= (tuple_2_symbol.glob_module == cons_module &&
-		   tuple_2_symbol.glob_object.ds_index <= cons_index && cons_index <= tuple_2_symbol.glob_object.ds_index + 30, cs)
-
-	transform_sub_patterns mod_index def_level [pattern : patterns] tup_id tup_index arg_var all_binds position var_store expr_heap e_info cs
-		# (this_arg_var, expr_heap)
-				= adjust_match_expression arg_var expr_heap
-		  match_expr
-		  		= TupleSelect tup_id tup_index this_arg_var
-		  (binds, var_store, expr_heap, e_info, cs)
-		  		= transfromPatternIntoBind mod_index def_level pattern match_expr position var_store expr_heap e_info cs
-		= transform_sub_patterns mod_index def_level patterns tup_id (inc tup_index) arg_var (binds ++ all_binds)
-				position var_store expr_heap e_info cs
-	transform_sub_patterns mod_index _ [] _ _ _ binds _ var_store expr_heap e_info cs
-		= (binds, var_store, expr_heap, e_info, cs)
-
-	transform_sub_patterns_of_record mod_index def_level [pattern : patterns] fields field_module field_index record_expr
-			all_binds position var_store expr_heap e_info cs
-		# {fs_ident, fs_index} = fields.[field_index]
-		  selector = { glob_module = field_module, glob_object = MakeDefinedSymbol fs_ident fs_index 1}
-		  (this_record_expr, expr_heap) = adjust_match_expression record_expr expr_heap
-		  (binds, var_store, expr_heap, e_info, cs)
-				= transfromPatternIntoBind mod_index def_level pattern (Selection NormalSelector this_record_expr [ RecordSelection selector field_index ])
-						position var_store expr_heap e_info cs
-		= transform_sub_patterns_of_record mod_index def_level patterns fields field_module (inc field_index) record_expr
-				(binds ++ all_binds) position var_store expr_heap e_info cs
-	transform_sub_patterns_of_record mod_index _ [] _ _ _ _ binds _ var_store expr_heap e_info cs
-		= (binds, var_store, expr_heap, e_info, cs)
-
-	bind_opt_var (Yes {bind_src,bind_dst}) src_expr position var_heap expr_heap
-		# free_var = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
-		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		  bound_var = { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
-		= (Var bound_var, [{lb_src = src_expr, lb_dst = free_var, lb_position = position}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
-	bind_opt_var No src_expr _ var_heap expr_heap
-		= (src_expr, [], var_heap, expr_heap)
-		
-	bind_match_expr var_expr=:(Var var) opt_var_bind _ var_heap expr_heap
-		= (var_expr, opt_var_bind, var_heap, expr_heap)
-	bind_match_expr match_expr opt_var_bind position var_heap expr_heap
-		# new_name = newVarId "_x"
-		  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
-//		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		  bound_var = { var_ident = new_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
-		  free_var = { fv_ident = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
-		= (Var bound_var, [{lb_src = match_expr, lb_dst = free_var, lb_position = position } : opt_var_bind], var_heap, expr_heap)
-
-	adjust_match_expression (Var var) expr_heap
-		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Var { var & var_expr_ptr = var_expr_ptr }, expr_heap)
-	adjust_match_expression match_expr expr_heap
-		= (match_expr, expr_heap)
 transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind _ _ pattern src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" "illegal node pattern" cs.cs_error})
+
+transfromPatternIntoStrictBind :: !Index !Level !AuxiliaryPattern !Expression !Position !*VarHeap !*ExpressionHeap !*ExpressionInfo !*CheckState
+	-> *(![LetBind],![LetBind],!*VarHeap, !*ExpressionHeap,  !*ExpressionInfo, !*CheckState)
+transfromPatternIntoStrictBind mod_index def_level (AP_Variable name var_info _) src_expr position var_store expr_heap e_info cs
+	# bind = {lb_src = src_expr, lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = def_level, fv_count = 0 }, lb_position = position }
+	= ([],[bind], var_store, expr_heap, e_info, cs)
+transfromPatternIntoStrictBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_module,glob_object=ds_cons=:{ds_arity, ds_index, ds_ident}} type_index args opt_var)
+		src_expr position var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
+	# (src_expr, src_bind, var_store, expr_heap) = bind_opt_var_or_create_new_var opt_var src_expr position def_level var_store expr_heap
+	| ds_arity == 0
+		= ([],[],var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident "constant not allowed in a node pattern" cs.cs_error})
+	# (is_tuple, cs) = is_tuple_symbol glob_module ds_index cs
+	| is_tuple
+		# (lazy_binds,var_store,expr_heap,e_info,cs) = transform_sub_patterns mod_index def_level args ds_cons 0 src_expr [] position var_store expr_heap e_info cs
+		= (lazy_binds,src_bind,var_store,expr_heap,e_info,cs)
+		# ({td_rhs}, ef_type_defs, ef_modules) = get_type_def mod_index glob_module type_index ef_type_defs ef_modules
+		  e_info = { e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules }
+		= case td_rhs of
+			RecordType {rt_fields}
+				# (lazy_binds,var_store,expr_heap,e_info,cs) = transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0
+																								src_expr [] position var_store expr_heap e_info cs
+				-> (lazy_binds,src_bind,var_store,expr_heap,e_info,cs)
+			_
+				| ds_arity == 1
+		  			# (binds, var_store, expr_heap, e_info, cs)
+						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr cons_symbol src_expr)
+								position var_store expr_heap e_info cs
+					-> (binds,src_bind, var_store, expr_heap, e_info, cs)
+					# (tuple_cons, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex ds_arity) PD_PredefinedModule STE_Constructor ds_arity cs
+					# (src_expr,expr_heap,cs) = add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
+					# (match_var, match_bind, var_store, expr_heap)
+						=  bind_match_expr (MatchExpr cons_symbol src_expr) [] position def_level var_store expr_heap
+					# (lazy_binds,var_store,expr_heap,e_info,cs) = transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind
+																		position var_store expr_heap e_info cs
+					-> (lazy_binds,src_bind,var_store,expr_heap,e_info,cs)
+transfromPatternIntoStrictBind mod_index def_level (AP_WildCard _) src_expr _ var_store expr_heap e_info cs
+	= ([],[],var_store, expr_heap, e_info, cs)
+transfromPatternIntoStrictBind _ _ pattern src_expr _ var_store expr_heap e_info cs
+	= ([],[],var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" "illegal node pattern" cs.cs_error})
+
+get_type_def mod_index type_mod_index type_index ef_type_defs ef_modules
+	| mod_index == type_mod_index
+		# (type_def, ef_type_defs) = ef_type_defs![type_index]
+		= (type_def, ef_type_defs, ef_modules)
+		# ({dcl_common},  ef_modules) = ef_modules![type_mod_index]
+		= (dcl_common.com_type_defs.[type_index], ef_type_defs, ef_modules)
+	
+is_tuple_symbol cons_module cons_index cs
+	# (tuple_2_symbol, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex 2) PD_PredefinedModule STE_Constructor 2 cs
+	= (tuple_2_symbol.glob_module == cons_module &&
+	   tuple_2_symbol.glob_object.ds_index <= cons_index && cons_index <= tuple_2_symbol.glob_object.ds_index + 30, cs)
+
+transform_sub_patterns mod_index def_level [pattern : patterns] tup_id tup_index arg_var all_binds position var_store expr_heap e_info cs
+	# (this_arg_var, expr_heap)
+			= adjust_match_expression arg_var expr_heap
+	  match_expr
+	  		= TupleSelect tup_id tup_index this_arg_var
+	  (binds, var_store, expr_heap, e_info, cs)
+	  		= transfromPatternIntoBind mod_index def_level pattern match_expr position var_store expr_heap e_info cs
+	= transform_sub_patterns mod_index def_level patterns tup_id (inc tup_index) arg_var (binds ++ all_binds)
+			position var_store expr_heap e_info cs
+transform_sub_patterns mod_index _ [] _ _ _ binds _ var_store expr_heap e_info cs
+	= (binds, var_store, expr_heap, e_info, cs)
+
+transform_sub_patterns_of_record mod_index def_level [pattern : patterns] fields field_module field_index record_expr
+		all_binds position var_store expr_heap e_info cs
+	# {fs_ident, fs_index} = fields.[field_index]
+	  selector = { glob_module = field_module, glob_object = MakeDefinedSymbol fs_ident fs_index 1}
+	  (this_record_expr, expr_heap) = adjust_match_expression record_expr expr_heap
+	  (binds, var_store, expr_heap, e_info, cs)
+			= transfromPatternIntoBind mod_index def_level pattern (Selection NormalSelector this_record_expr [ RecordSelection selector field_index ])
+					position var_store expr_heap e_info cs
+	= transform_sub_patterns_of_record mod_index def_level patterns fields field_module (inc field_index) record_expr
+			(binds ++ all_binds) position var_store expr_heap e_info cs
+transform_sub_patterns_of_record mod_index _ [] _ _ _ _ binds _ var_store expr_heap e_info cs
+	= (binds, var_store, expr_heap, e_info, cs)
+
+bind_opt_var (Yes {bind_src,bind_dst}) src_expr position var_heap expr_heap
+	# free_var = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
+	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	  bound_var = { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
+	= (Var bound_var, [{lb_src = src_expr, lb_dst = free_var, lb_position = position}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
+bind_opt_var No src_expr _ var_heap expr_heap
+	= (src_expr, [], var_heap, expr_heap)
+
+bind_opt_var_or_create_new_var (Yes {bind_src,bind_dst}) src_expr position def_level var_heap expr_heap
+	# free_var = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
+	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	  bound_var = { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
+	= (Var bound_var, [{lb_dst = free_var, lb_src = src_expr, lb_position = position}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
+bind_opt_var_or_create_new_var No src_expr position def_level var_heap expr_heap
+	# new_name = newVarId "_x"
+	  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
+	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	  bound_var = { var_ident = new_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr }
+	  free_var = { fv_ident = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
+	= (Var bound_var, [{lb_dst = free_var, lb_src = src_expr, lb_position = position }], var_heap, expr_heap)
+
+bind_match_expr var_expr=:(Var var) opt_var_bind _ def_level var_heap expr_heap
+	= (var_expr, opt_var_bind, var_heap, expr_heap)
+bind_match_expr match_expr opt_var_bind position def_level var_heap expr_heap
+	# new_name = newVarId "_x"
+	  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
+//	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	  bound_var = { var_ident = new_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
+	  free_var = { fv_ident = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
+	= (Var bound_var, [{lb_src = match_expr, lb_dst = free_var, lb_position = position } : opt_var_bind], var_heap, expr_heap)
+
+adjust_match_expression (Var var) expr_heap
+	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	= (Var { var & var_expr_ptr = var_expr_ptr }, expr_heap)
+adjust_match_expression match_expr expr_heap
+	= (match_expr, expr_heap)
+
+add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
+	| glob_module==cPredefinedModuleIndex
+		# pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
+		| pd_cons_index==PD_UnboxedConsSymbol			
+			# (stdStrictLists_index,_,decons_u_index,_,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
+			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+			# decons_u_expr = App {app_symb={symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}			
+			= (decons_u_expr,expr_heap,cs)
+		| pd_cons_index==PD_UnboxedTailStrictConsSymbol
+			# (stdStrictLists_index,_,decons_uts_index,_,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
+			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+			# decons_uts_expr = App {app_symb={symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+			= (decons_uts_expr,expr_heap,cs)
+		| pd_cons_index==PD_OverloadedConsSymbol
+			# (stdStrictLists_index,_,decons_index,_,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
+			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+			# decons_expr = App {app_symb={symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+			= (decons_expr,expr_heap,cs)
+			= (src_expr,expr_heap,cs)
+		= (src_expr,expr_heap,cs)
 
 unfoldPatternMacro macro=:{fun_body=TransformedBody {tb_args,tb_rhs}} mod_index all_macro_args opt_var ps=:{ps_var_heap} modules cons_defs error
 	| no_sharing tb_args
@@ -2152,16 +2204,15 @@ addArraySelections [] rhs_expr free_vars e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	# (let_strict_binds, let_lazy_binds, free_vars, e_state, e_info, cs)
-			= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
+			= buildArraySelections e_input array_patterns free_vars e_state e_info cs
 	  (let_expr_ptr, es_expr_heap)
 	  		= newPtr EI_Empty e_state.es_expr_heap
 	= ( Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds,
 				let_expr = rhs_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }
-	  , free_vars
-	  , { e_state & es_expr_heap = es_expr_heap}
-	  , e_info
-	  , cs
-	  )
+	  , free_vars , { e_state & es_expr_heap = es_expr_heap} , e_info, cs )
+
+buildArraySelections e_input array_patterns free_vars e_state e_info cs
+	= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
 
 buildSelections e_input {ap_selections=[]}
 	  (strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
