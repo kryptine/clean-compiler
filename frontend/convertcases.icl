@@ -65,8 +65,8 @@ where
 		  (tb_rhs, ds) = distributeLets {di_depth=1,di_explicit_case_depth=0} tb_rhs ds -*-> "dis"
 		  (tb_rhs, {ds_var_heap, ds_expr_heap}) = buildLetExpr tb_rhs ds -*-> "build"
 
-		  (_, {ss_expr_heap, ss_var_heap})
-		  	= findSplitCases {si_moved = False, si_next_alt=No} tb_rhs
+		  {ss_expr_heap, ss_var_heap}
+		  	= findSplitCases {si_next_alt=No} tb_rhs
 		  						{ss_var_heap=ds_var_heap, ss_expr_heap = ds_expr_heap}
 
 		= (TransformedBody {body & tb_rhs = tb_rhs }, (rcs_imports, { cs & cs_var_heap = ss_var_heap, cs_expr_heap = ss_expr_heap}))
@@ -1075,10 +1075,9 @@ instance == CaseKind where
 
 ::	SplitInfo =
 	{	si_next_alt	:: !Optional NextAlt
-	,	si_moved	:: !Bool
 	}
 
-class findSplitCases e :: !SplitInfo !e !*SplitState -> (Bool, *SplitState)
+class findSplitCases e :: !SplitInfo !e !*SplitState -> *SplitState
 
 (:-) infixl
 (:-) a f
@@ -1086,7 +1085,7 @@ class findSplitCases e :: !SplitInfo !e !*SplitState -> (Bool, *SplitState)
 
 instance findSplitCases (Optional a) | findSplitCases a  where
 	findSplitCases _  No ss
-		=	(False, ss) <<- "findSplitCases (Opt No)"
+		=	ss <<- "findSplitCases (Opt No)"
 	findSplitCases si (Yes x) ss
 		=	findSplitCases si x ss <<- "findSplitCases (Opt No)"
 
@@ -1096,17 +1095,17 @@ instance findSplitCases Expression where
 	findSplitCases si (Case kees) ss
 		=	findSplitCases si kees ss <<- "findSplitCases (Exp Case)"
 	findSplitCases _ _ ss
-		=	(False, ss) <<- "findSplitCases (Exp _)"
+		=	ss <<- "findSplitCases (Exp _)"
 
 instance findSplitCases Case where
 	findSplitCases si kees=:{case_info_ptr, case_guards, case_default, case_explicit} ss
-		# (f2, ss)
-			=	split_guards {si & si_next_alt = first_next_alt, si_moved = False} use_outer_alt case_guards (False, ss)
-		# (split, ss)
-			=	nextAlts {si & si_moved = f2} kees ss
-		# (f3, ss)
+		# ss
+			=	split_guards {si & si_next_alt = first_next_alt} use_outer_alt case_guards ss
+		# ss
+			=	nextAlts si kees ss
+		# ss
 			=	findSplitCases si case_default ss
-		=	(split || f3, ss) ->> ("findSplitCases (Case)" +++ toString split +++ toString f2 +++ toString f3)
+		=	ss
 		where
 			first_next_alt
 				=	Yes {na_case = case_info_ptr, na_alt_nr = 1}
@@ -1122,19 +1121,19 @@ instance findSplitCases Case where
 				=	split_alts si use_outer_alt alts ss
 
 //			split_alts :: SplitInfo (Optional (Optional NextAlt)) [a] *SplitState -> (Bool, *SplitState) | findSplitCases a
-			split_alts _ _ [] (s, ss)
-				=	(s, ss)
-			split_alts _ (Yes si) [last] (f1, ss)
-				# (f2, ss)
+			split_alts _ _ [] ss
+				=	ss
+			split_alts _ (Yes si) [last] ss
+				# ss
 					=	findSplitCases si last ss
-				=	(f1 || f2, ss)
-			split_alts si last_next_alt [pattern : patterns] (f1, ss)
-				# (f2, ss)
+				=	ss
+			split_alts si last_next_alt [pattern : patterns] ss
+				# ss
 					=	findSplitCases si pattern ss
-				=	split_alts (incAltNr si) last_next_alt patterns (f1 || f2, ss)
+				=	split_alts (incAltNr si) last_next_alt patterns ss
 
 //			use_outer_alt_for_last_alt :: (Optional Expression) ExprInfoPtr SplitInfo -> Optional (Optional NextAlt)
-			use_outer_alt_for_last_alt No si =: {si_next_alt, si_moved}
+			use_outer_alt_for_last_alt No si
 				/*
 					This case has no default. If the last alternative fails,
 					control is passed to the outer case.
@@ -1183,16 +1182,18 @@ instance findSplitCases Let where
 	findSplitCases si {let_expr} ss
 		=	findSplitCases si let_expr ss <<- "findSplitCases (Let)"
 
-nextAlts :: SplitInfo Case *SplitState -> (Bool, *SplitState)
-nextAlts si=:{si_next_alt=Yes next_alt, si_moved} kees=:{case_info_ptr} ss
+nextAlts :: SplitInfo Case *SplitState -> *SplitState
+nextAlts si=:{si_next_alt=Yes next_alt} kees=:{case_info_ptr} ss
 	# (EI_CaseTypeAndSplits type splits, ss_expr_heap)
 		=	readPtr case_info_ptr ss.ss_expr_heap
-	# (jumps, ss=:{ss_expr_heap})
-		=	jumps_to_next_alt si_moved splits.sic_case_kind kees {ss & ss_expr_heap = ss_expr_heap}
+	# ss
+		=	{ss & ss_expr_heap = ss_expr_heap}
+	# jumps
+		=	jumps_to_next_alt splits kees
 	| jumps
 		// update the info for this case
 	  	# ss_expr_heap
-	  	  	=	ss_expr_heap <:= (case_info_ptr,
+	  	  	=	ss.ss_expr_heap <:= (case_info_ptr,
 	  	  			EI_CaseTypeAndSplits type {splits & sic_next_alt = Yes next_alt})
 		// update the info for the outer case
 		# (EI_CaseTypeAndSplits type splits, ss_expr_heap)
@@ -1207,9 +1208,9 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_moved} kees=:{case_info_ptr} ss
 						->> (toString kees.case_ident, ptrToInt case_info_ptr,
 								"jumps to ", ptrToInt next_alt.na_case, next_alt.na_alt_nr)
 
-		=	(True, {ss & ss_expr_heap = ss_expr_heap})
+		=	{ss & ss_expr_heap = ss_expr_heap}
 	// otherwise
-		= (False, ss)
+		=	ss
 
 
 	where
@@ -1221,15 +1222,14 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_moved} kees=:{case_info_ptr} ss
 		jumps_to_next_alt _ {case_default = No, case_explicit = True, case_expr}
 			=	 (True, ss)	->> (toString (ptrToInt case_info_ptr) +++ " jumps, because explicit")
 */
-		jumps_to_next_alt True _ {case_default = No} ss
-			=	(True, ss)	->> (toString (ptrToInt case_info_ptr) +++ " jumps, because alt was moved")
-		jumps_to_next_alt _ CaseKindTransform {case_default = No, case_explicit = False, case_expr} ss
-			=	(True, ss) ->> (toString (ptrToInt case_info_ptr) +++ " jumps, because implicit no lhs var")
-		jumps_to_next_alt moved _ _ ss
-			=	(False, ss) 	->> (toString (ptrToInt case_info_ptr) +++ " doesn't jumps" +++ toString moved +++ toString kees.case_explicit)
-
-nextAlts {si_moved} kees ss
-	=	(False, ss) ->> ("nextAlts no outerdefault" +++ toString si_moved +++ toString kees.case_explicit)
+		jumps_to_next_alt {sic_splits=[_:_]} {case_default = No}
+			=	True	->> (toString (ptrToInt case_info_ptr) +++ " jumps, because alt was moved")
+		jumps_to_next_alt {sic_case_kind=CaseKindTransform} {case_default = No, case_explicit = False}
+			=	True ->> (toString (ptrToInt case_info_ptr) +++ " jumps, because implicit no lhs var")
+		jumps_to_next_alt _ _
+			=	False 	->> (toString (ptrToInt case_info_ptr) +++ " doesn't jumps " +++ toString kees.case_explicit)
+nextAlts _ kees ss
+	=	ss ->> ("nextAlts no outerdefault" +++ toString kees.case_explicit)
 
 newFunction :: !(Optional Ident) !FunctionBody ![FreeVar] ![AType] !AType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
 	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
@@ -1725,8 +1725,8 @@ where
 		= (TupleSelect tuple_symbol arg_nr expr, cs)
 	convertCases ci (Case case_expr) cs
 		// this is a case on a non-root position
-		# (_, {ss_expr_heap, ss_var_heap})
-		  	= findSplitCases {si_moved=False, si_next_alt=No} case_expr
+		# {ss_expr_heap, ss_var_heap}
+		  	= findSplitCases {si_next_alt=No} case_expr
 		  				{ss_var_heap=cs.cs_var_heap,ss_expr_heap = cs.cs_expr_heap}
 		  cs
 		  	=	{cs & cs_var_heap=ss_var_heap, cs_expr_heap = ss_expr_heap}
