@@ -3,7 +3,7 @@ definition module type
 import StdArray
 import syntax, check
 
-typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*Heaps !*PredefinedSymbols !*File !*File
+typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule}
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !.TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
 
 addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);

@@ -1118,7 +1118,7 @@ cIsNotStrict	:== False
 //::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
 ::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr /* MV */ | TCE_TypeTerm !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
 
-::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent | GTT_Function
+::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent !String | GTT_Function
 	
 /*	
 ::	PatternExpression =

@@ -3,6 +3,7 @@ implementation module convertDynamics
 import syntax, transform, utilities, convertcases
 // Optional
 USE_TUPLES tuple b :== b;		// change also StdDynamic.icl and recompile all applications
+import type_io;
 
 ::	*ConversionInfo =
 	{	ci_predef_symb		:: !*PredefinedSymbols
@@ -47,11 +48,73 @@ getSymbol index symb_kind arity ci=:{ci_predef_symb}
 	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
 	= (symbol, ci)
 */
+/*
+//	| True
+//		= abort (toString main_dcl_module.dcl_name.id_name)
+	| True
+		= abort (toString main_dcl_module_n);
+		
+	// distinguish external/internal types
+	# dcl_conversions
+		= get_conversion_table (main_dcl_module.dcl_conversions)
+	# type_defs_conversions
+		= dcl_conversions.[cTypeDefs]
+	# s_type_defs_conversions
+		= size type_defs_conversions
+		
+		
+	# s_exported_com_type_defs
+		= size common_defs.com_type_defs
+	# exported_com_type_defs
+		= createArray s_exported_com_type_defs False
 
+	# exported_com_type_defs
+		= foldSt (\i exported_com_type_defs -> 
+		
+		{ exported_com_type_defs & [type_defs_conversions.[i]] = True }
+		
+		
+		
+		) [0..dec s_type_defs_conversions] exported_com_type_defs;
+		
+	# (s_exported_com_type_defs,exported_com_type_defs)
+		= usize exported_com_type_defs
+	| True
+		= abort (toString s_exported_com_type_defs);
+*/
 
-convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap
-			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap
+pl [] = ""
+pl [x:xs] = x +++ " , " +++ (pl xs)
+
+F :: !a .b -> .b
+F a b = b
+
+write_tcl_file :: !Int {#DclModule} CommonDefs !*File -> (.Bool,.File)
+write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file
+/*
+	#! tcl_file
+		= write_type_info dcl_mods tcl_file
+*/
+	#! tcl_file
+		= write_type_info common_defs tcl_file
+		
+//	#! (ok,common_defs,tcl_file)
+//		= read_type_info tcl_file
+//	| True
+//		= abort (toString (size common_defs.com_type_defs))
+	= (True,tcl_file)	
+			
+convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */!*File {# DclModule} !IclModule
+			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, /* TD */ !*File)
+convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap /* TD */ tcl_file dcl_mods icl_mod
+	// TD ...
+/*
+	# (ok,tcl_file)
+		= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file
+	| not ok
+		= abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
+*/
+	// ... TD
 	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamics]
 	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)
 		= case (pds_module == (-1) || pds_def == (-1)) of
@@ -151,7 +214,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							ci_used_tcs = [],ci_symb_ident = dynamic_temp_symb_ident , ci_sel_type_field =  ci_sel_type_field, ci_sel_value_field = ci_sel_value_field })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
 			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types [] type_heaps ci_var_heap
-	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap)
+	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
 where
 	convert_groups group_nr groups global_type_instances fun_defs_and_ci
 		| group_nr == size groups
@@ -980,9 +1043,9 @@ get_constructor glob_type_inst index
 
 instance toString GlobalTCType
 where
-	toString (GTT_Basic basic_type)				= toString basic_type
-	toString GTT_Function						= " -> "
-	toString (GTT_Constructor type_symb_indent)	= type_symb_indent.type_name.id_name
+	toString (GTT_Basic basic_type)							= toString basic_type
+	toString GTT_Function									= " -> "
+	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ "'" +++ mod_name
 
 instance toString BasicType
 where

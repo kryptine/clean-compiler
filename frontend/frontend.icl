@@ -57,7 +57,7 @@ instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
 
-frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions
+frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions
 	global_fun_range heaps
 	:== (Yes {
 				fe_icl = {icl_mod & icl_functions=fun_defs }
@@ -67,15 +67,18 @@ frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_module
 			,	fe_iclDclConversions =  build_optional_icl_dcl_conversions (size fun_defs) optional_dcl_icl_conversions
 			,	fe_globalFunctions = global_fun_range
 			,	fe_arrayInstances = array_instances
-			},cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,heaps
+			},cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !*Heaps -> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File,!*Heaps) 
-frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out heaps
+//frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !*File !*Heaps -> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File !*File, !*File, !*File, !*Heaps) 
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !*File !*Heaps
+	-> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !*File, !*Heaps) 
+
+frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident NoPos (hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths predef_symbols files
 	| not ok
-		= (No,{},0,0,predef_symbols, hash_table, files, error, io, out,heaps)
+		= (No,{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:dcl_modules]
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, predef_symbols, files)
 		= scanModule (mod -*-> "Scanning") cached_module_idents (size functions_and_macros) hash_table error search_paths predef_symbols files
@@ -84,14 +87,14 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
 	/**/
 	| not ok
-		= (No,{},0,0,predef_symbols, hash_table, files, error, io, out,heaps)
+		= (No,{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
   	# symbol_table = hash_table.hte_symbol_heap
   	  (ok, icl_mod, dcl_mods, components, optional_dcl_icl_conversions,cached_functions_and_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error)
   	  	= checkModule mod global_fun_range mod_functions n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod modules dcl_modules functions_and_macros predef_symbols (symbol_table -*-> "Checking") error heaps
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 
 	| not ok
-		= (No,{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, heaps)
+		= (No,{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	#! (icl_functions,icl_mod) = select_and_remove_icl_functions_from_record icl_mod
 		with
@@ -116,13 +119,13 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	  array_instances = {ir_from=0, ir_to=0}
 
 	| upToPhase == FrontEndPhaseCheck
-		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
+		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
 	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram (components -*-> "Typing") main_dcl_module_n icl_functions icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers heaps predef_symbols error out
+		= typeProgram (components -*-> "Typing") main_dcl_module_n icl_functions icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers heaps predef_symbols error out dcl_mods
 
 	| not ok
-		= (No,{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,heaps)
+		= (No,{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials]
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
@@ -130,15 +133,17 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 //	  (fun_defs, error)	= showFunctions array_instances fun_defs error
 
 	| upToPhase == FrontEndPhaseTypeCheck
-		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
+		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
-	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
+	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, tcl_file)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
-					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap
+					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod
+//	#  (components, fun_defs, error) = showComponents3 components 0 False fun_defs error
+//	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 
 	| upToPhase == FrontEndPhaseConvertDynamics
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
-		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
+		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
 //	  (components, fun_defs, error) = showComponents components 0 True fun_defs error
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
@@ -149,7 +154,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 
 	| upToPhase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
-		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
+		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
 	# (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule main_dcl_module_n common_defs (dcl_types -*-> "Convert icl") used_conses var_heap type_heaps
 	# (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs (dcl_types -*-> "Convert dcl") used_conses var_heap type_heaps
@@ -158,7 +163,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 
 	| upToPhase == FrontEndPhaseConvertModules
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
-		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
+		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
@@ -181,7 +186,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 			,	fe_iclDclConversions =  build_optional_icl_dcl_conversions (size fun_defs) optional_dcl_icl_conversions
 			,	fe_arrayInstances = array_instances,fe_globalFunctions=global_fun_range
 			}
-	= (Yes fe,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,heaps)
+	= (Yes fe,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps)
 	where
 		build_optional_icl_dcl_conversions :: !Int !(Optional {# Index}) -> Optional {# Index}
 		build_optional_icl_dcl_conversions size No

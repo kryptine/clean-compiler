@@ -83,7 +83,7 @@ where
 	where
 		compare_types (GTT_Basic bt1) (GTT_Basic bt2)
 			= bt1 =< bt2
-		compare_types (GTT_Constructor cons1) (GTT_Constructor cons2) 
+		compare_types (GTT_Constructor cons1 _) (GTT_Constructor cons2 _) 
 			= cons1 =< cons2
 		compare_types _ _
 			= Equal
@@ -134,16 +134,16 @@ FoundObject object :== object.glob_module <> NotFound
 ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
 reduceContexts :: ![TypeContext] !Int !{# CommonDefs} !ClassInstanceInfo ![TypeContext] !*SpecialInstances ![LocalTypePatternVariable]
-	!(!*VarHeap, !*TypeHeaps) !*Coercions !*PredefinedSymbols !*ErrorAdmin
+	!(!*VarHeap, !*TypeHeaps) !*Coercions !*PredefinedSymbols !*ErrorAdmin !{# DclModule}
 		-> *(![ClassApplication],  ![TypeContext], !*SpecialInstances, ![LocalTypePatternVariable],
 				!(!*VarHeap, !*TypeHeaps), !*Coercions, !*PredefinedSymbols, !*ErrorAdmin)
-reduceContexts [] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+reduceContexts [] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error dcl_modules
 	= ([], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-reduceContexts [tc : tcs] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+reduceContexts [tc : tcs] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error dcl_modules
 	# (appl, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 			= try_to_reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 	  (appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-	  		= reduceContexts tcs main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+	  		= reduceContexts tcs main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error dcl_modules
 	= ([appl : appls], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 
 where		
@@ -183,7 +183,7 @@ where
 					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
 									special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
 					# (appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-							= reduceContexts contexts main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
+							= reduceContexts contexts main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error dcl_modules
 					  (constraints, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 					  		= reduce_contexts_in_constraints tc_types class_args class_context defs instance_info new_contexts special_instances type_pattern_vars
 					  				heaps coercion_env predef_symbols error
@@ -416,9 +416,13 @@ where
 	reduce_TC_context type_code_class tc_type new_contexts special_instances type_pattern_vars var_heap
 		= reduce_tc_context type_code_class tc_type (new_contexts, special_instances, type_pattern_vars, var_heap)
 	where							
-		reduce_tc_context type_code_class (TA cons_id cons_args) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+		reduce_tc_context type_code_class (TA cons_id=:{type_index={glob_module}} cons_args) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+// MV ...
+			# defining_module_name
+				= dcl_modules.[glob_module].dcl_name.id_name
+// ... MV
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
-			  		= addGlobalTCInstance (GTT_Constructor cons_id) (si_next_TC_member_index, si_TC_instances)
+			  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
@@ -582,9 +586,9 @@ where
 
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
-tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os
+tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os dcl_modules
 	# (reduced_contexts, contexts, coercion_env, type_pattern_vars, os) = foldSt (reduce_contexts defs instance_info) ocs ([], [], coercion_env, [], os)
 	| os.os_error.ea_ok
 		# (contexts, os_var_heap) = foldSt add_spec_contexts ocs (contexts, os.os_var_heap)
@@ -623,7 +627,7 @@ where
 			# (class_applications, new_contexts, os_special_instances, type_pattern_vars,
 								(os_var_heap, os_type_heaps), coercion_env, os_predef_symbols, os_error)
 					= reduceContexts oc_context main_dcl_module_n defs instance_info new_contexts os_special_instances type_pattern_vars
-							(os_var_heap, os_type_heaps) coercion_env os_predef_symbols os_error
+							(os_var_heap, os_type_heaps) coercion_env os_predef_symbols os_error dcl_modules
 			= ([ (oc_symbol, fun_index, over_info_ptr, class_applications) : reduced_calls ], new_contexts, coercion_env, type_pattern_vars, 
 					{ os & os_type_heaps = os_type_heaps, os_symbol_heap = os_symbol_heap, os_var_heap = os_var_heap,
 						   os_special_instances = os_special_instances, os_error = os_error, os_predef_symbols = os_predef_symbols })
@@ -1085,15 +1089,22 @@ retrieve_var symb_name var_info_ptr (free_vars, var_heap, rev_variables, error)
 	{	tci_next_index			:: !Index
 	,	tci_instances			:: ![GlobalTCInstance]
 	,	tci_type_var_heap		:: !.TypeVarHeap
+// MV ...	
+	,	tci_dcl_modules			:: !{# DclModule}
+// ... MV
 	}
 	
 class toTypeCodeExpression type :: !Ident ![Ptr VarInfo] type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
 
 instance toTypeCodeExpression Type
 where
-	toTypeCodeExpression symb_name rev_variables (TA cons_id type_args) (tci=:{tci_next_index,tci_instances},var_heap,error)
+	toTypeCodeExpression symb_name rev_variables (TA cons_id=:{type_index={glob_module}} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules},var_heap,error)
+// MV ...
+		# defining_module_name
+			= tci_dcl_modules.[glob_module].dcl_name.id_name
+// ... MV
 		# (inst_index, (tci_next_index, tci_instances))
-		  		= addGlobalTCInstance (GTT_Constructor cons_id) (tci_next_index, tci_instances)
+		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (tci_next_index, tci_instances)
 		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name rev_variables) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
 		= (TCE_Constructor inst_index type_code_args, tci)
 	toTypeCodeExpression symb_name rev_variables (TB basic_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
