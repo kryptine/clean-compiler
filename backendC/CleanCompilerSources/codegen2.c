@@ -2879,10 +2879,15 @@ LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
 	if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==SimpleState && BETWEEN (IntObj,FileObj,cons_symbol_p->symb_unboxed_cons_state_p->state_object))
 		return &unboxed_cons_labels[cons_symbol_p->symb_unboxed_cons_state_p->state_object-IntObj][cons_symbol_p->symb_tail_strictness];
 	else if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==RecordState){
-		unboxed_record_cons_lab.lab_mod=ExportLocalLabels ? CurrentModule : NULL;
+		if (ExportLocalLabels){
+			unboxed_record_cons_lab.lab_mod=CurrentModule;
+			unboxed_record_cons_lab.lab_symbol=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol;			
+			unboxed_record_cons_lab.lab_issymbol=True;
+		} else {
+			unboxed_record_cons_lab.lab_name=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_ident->ident_name;
+			unboxed_record_cons_lab.lab_issymbol=False;
+		}
 		unboxed_record_cons_lab.lab_pref=cons_symbol_p->symb_tail_strictness ? "r_Cons#!" : "r_Cons#";
-		unboxed_record_cons_lab.lab_issymbol=False;
-		unboxed_record_cons_lab.lab_name=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_ident->ident_name;
 		unboxed_record_cons_lab.lab_post='\0';
 
 		return &unboxed_record_cons_lab;

@@ -1179,12 +1179,17 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
 			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
 			
-			unboxed_record_cons_lab.lab_mod=ExportLocalLabels ? CurrentModule : NULL;
+			if (ExportLocalLabels){
+				unboxed_record_cons_lab.lab_mod=CurrentModule;
+				unboxed_record_cons_lab.lab_symbol=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def;
+				unboxed_record_cons_lab.lab_issymbol=True;
+			} else {
+				unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_ident->ident_name;
+				unboxed_record_cons_lab.lab_issymbol=False;			
+			}
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
-			unboxed_record_cons_lab.lab_issymbol=False;
-			unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_ident->ident_name;
 			unboxed_record_cons_lab.lab_post='\0';
-							
+			
 			GenFillR (&unboxed_record_cons_lab,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
 
 			GenRtn (1,0,OnAState);
@@ -2386,8 +2391,6 @@ SymbDef create_match_function (SymbolP constructor_symbol,int constructor_arity,
 
 #if STRICT_LISTS
 		if (constructor_symbol->symb_kind==cons_symb && (constructor_symbol->symb_head_strictness>1 || constructor_symbol->symb_tail_strictness)){
-			constructor_symbol->symb_def->sdef_constructor->cl_state_p;
-			
 			if (constructor_symbol->symb_head_strictness>1){
 				if (constructor_symbol->symb_head_strictness==4)
 					head_and_tail_states[0]=*constructor_symbol->symb_state_p;
