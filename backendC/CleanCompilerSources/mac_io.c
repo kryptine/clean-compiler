@@ -805,11 +805,10 @@ extern char *clean_abc_path; /* imported from clm.c */
 #endif
 
 #if defined (GNU_C)
-static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
+char *convert_file_name (char *file_name,char *buffer)
 {
 	CFURLRef hfs_url;
 	CFStringRef	hfs_string, posix_string;
-	char buffer[512+1];
 	
 	hfs_string = CFStringCreateWithCString (NULL/*kCFAllocatorDefault*/,file_name,kCFStringEncodingMacRoman);
 	hfs_url = CFURLCreateWithFileSystemPath (NULL/*kCFAllocatorDefault*/,hfs_string,kCFURLHFSPathStyle,/*isDirectory*/false);
@@ -820,7 +819,16 @@ static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
 		CFRelease (posix_string);
 		return NULL;
 	}
-	file_name=buffer;
+	return buffer;
+}
+
+static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
+{
+	char buffer[512+1];
+
+	file_name=convert_file_name (file_name,buffer);
+	if (file_name==NULL)
+		return NULL;
 
 	return fopen (file_name,mode);
 }
