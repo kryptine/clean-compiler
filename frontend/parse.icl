@@ -959,13 +959,11 @@ want_2_0_import_declaration token pState
 // ..MW5
 		= case token of
 			DoubleColonToken
-// PK				# (name, pState)				= wantConstructorName "import type" pState
-				# (name, pState)				= wantUpperCaseName "import type" pState
+				# (name, pState)				= wantConstructorName "import type" pState
 				  (type_id, pState)				= stringToIdent name IC_Type pState
 				  (ii_extended, token, pState)	= optional_extension_with_next_token pState
 				| token == OpenToken
-// PK				  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
-				  	#	(conses, pState)			= want_names (wantUpperCaseName "import type (..)") IC_Expression CloseToken pState
+				  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
 				  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } (Yes conses), pState)
 				| token == CurlyOpenToken
 				  	#	(fields, pState) = want_names (wantLowerCaseName "import record fields") (IC_Field type_id) CurlyCloseToken pState
