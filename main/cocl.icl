@@ -10,13 +10,11 @@ import coclmain
 import frontend
 import StdDebug
 
-// Start :: *World -> *World
+Start :: *World -> *World
 Start world
-	# world = trace_n "hello from cocl!\n" world
-	# world
-		=	coclMain testArgs world
-	= trace_n "bye from cocl!\n" world
+	=	coclMain []/*testArgs*/ world
 	where
+	/*
 		testArgs
 			=	[
 					// main module
@@ -79,3 +77,4 @@ Start world
 					[	stdenvDir
 					]
 				)
+	*/
