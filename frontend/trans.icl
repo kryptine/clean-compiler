@@ -1390,6 +1390,8 @@ where
 				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
 			PR_Class _ _ class_type
 				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
+			PR_Unused
+				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
 			producer
 				# (symbol,_) = get_producer_symbol producer
 				  (symbol_type, ti_fun_defs, ti_fun_heap)
@@ -1510,7 +1512,11 @@ where
 determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes]
 				[form : forms] input das
 	# das = determine_args linear_bits cons_args (inc prod_index) producers prod_atypes forms input das
-	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
+//	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
+	# producer	= case cons_arg of
+					CActive		-> producers.[prod_index]
+					CUnused		-> producers.[prod_index]
+					_			-> PR_Empty
 	= determine_arg producer prod_atype form prod_index ((linear_bit,cons_arg), input) das
 
 determine_arg
@@ -1525,6 +1531,12 @@ determine_arg PR_Empty _ form=:{fv_name,fv_info_ptr} _ ((linear_bit,cons_arg), _
 		, das_new_linear_bits	= [ linear_bit : das.das_new_linear_bits ]
 		, das_new_cons_args		= [ cons_arg : das.das_new_cons_args ]
 		, das_var_heap			= das_var_heap
+		}
+
+determine_arg PR_Unused _ form=:{fv_name,fv_info_ptr} prod_index (_,ro) das=:{das_var_heap}
+	# no_arg_type				= { ats_types= [], ats_strictness = NotStrict }
+	=	{ das
+		& das_arg_types.[prod_index] = no_arg_type
 		}
 
 determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr,fv_name} prod_index (_,ro)
@@ -1711,16 +1723,28 @@ where
 						-> (No, fun_heap, ti_cons_args)
 		= case opt_cons_classes of
 			Yes cons_classes
-				-> ({ cc_size = symbol_arity, cc_args = take symbol_arity cons_classes.cc_args, 
-		  				cc_linear_bits = if curried (repeatn symbol_arity linear_bit) 
-		  									(take symbol_arity cons_classes.cc_linear_bits),
-		  				cc_producer = False}
+				# cc_args = copy_classes symbol_arity cons_classes.cc_args
+				-> ({ cc_size			= symbol_arity
+					, cc_args			= cc_args
+					, cc_linear_bits	= if curried
+											(repeatn symbol_arity linear_bit)
+											(take symbol_arity cons_classes.cc_linear_bits)
+					, cc_producer		= False
+					}
 		  			, fun_heap, ti_cons_args)
 			No
-				-> ({cc_size = symbol_arity, cc_args = repeatn symbol_arity CPassive,
-						cc_linear_bits = repeatn symbol_arity linear_bit,
-						cc_producer = False}, fun_heap, ti_cons_args)
+				-> ({ cc_size			= symbol_arity
+					, cc_args			= repeatn symbol_arity CPassive
+					, cc_linear_bits	= repeatn symbol_arity linear_bit
+					, cc_producer		= False
+					}
+					, fun_heap, ti_cons_args)
 
+	copy_classes 0 _ = []
+	copy_classes n [cc:ccs]
+		= case cc of
+			CUnused		-> [CActive:copy_classes (dec n) ccs]
+			cc			-> [cc:copy_classes (dec n) ccs]
 
 	build_application_type st_arity nr_context_args st_result st_args nr_of_applied_args
 		| st_arity+nr_context_args==nr_of_applied_args
@@ -1748,6 +1772,8 @@ max_group_index prod_index producers ro_main_dcl_module_n current_max fun_defs f
 		= max_group_index (inc prod_index) producers ro_main_dcl_module_n current_max fun_defs fun_heap cons_args
 where
 	max_group_index_of_producer PR_Empty current_max fun_defs fun_heap cons_args
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer PR_Unused current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
 		= foldSt (foldrExprSt max_group_index_of_member) app_args (current_max, cons_args, fun_defs, fun_heap)
@@ -3197,6 +3223,8 @@ where
 instance <<< Producer where
 	(<<<) file PR_Empty
 		= file <<< "(E)"
+	(<<<) file PR_Unused
+		= file <<< "(U)"
 	(<<<) file (PR_Function ident int index)
 		= file <<< "(F:" <<< ident <<< ")"
 	(<<<) file (PR_Class app binds type)
