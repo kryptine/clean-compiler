@@ -436,8 +436,8 @@ where
 		= file <<< "TCE_Var " <<< info_ptr
 	(<<<) file (TCE_TypeTerm info_ptr)
 		= file <<< "TCE_TypeTerm " <<< info_ptr
-	(<<<) file (TCE_Constructor index cons exprs)
-		= file <<< "TCE_Constructor " <<< index <<< ' ' <<< exprs
+	(<<<) file (TCE_Constructor cons exprs)
+		= file <<< "TCE_Constructor " <<< ' ' <<< exprs
 	(<<<) file (TCE_Selector selectors info_ptr)
 		= file <<< "TCE_Selector " <<< selectors <<< "VAR " <<< info_ptr
 	(<<<) file (TCE_UniType vars type_code)

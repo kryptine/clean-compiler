@@ -150,7 +150,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	| not ok
 		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
-	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
+	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
 		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs/*icl_functions*/ icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
 
 	| not ok
@@ -166,7 +166,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
 	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, tcl_file)
-	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
+	  		= convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
 					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 
 	| options.feo_up_to_phase == FrontEndPhaseConvertDynamics

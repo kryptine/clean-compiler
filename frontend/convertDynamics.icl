@@ -102,9 +102,9 @@ f (Yes tcl_file)
 	= tcl_file;
 0.2*/
 			
-convertDynamicPatternsIntoUnifyAppls :: {!GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
+convertDynamicPatternsIntoUnifyAppls :: !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
-convertDynamicPatternsIntoUnifyAppls _ common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
+convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	#! (dynamic_representation,predefined_symbols)
 		=	create_dynamic_and_selector_idents common_defs predefined_symbols
 
@@ -620,7 +620,7 @@ convertTypeCode pattern cinp (TCE_App t arg) (has_var, binds, ci)
 	= (App {app_symb		= typeapp_symb,
 			app_args 		= [typecode_t, typecode_arg],
 			app_info_ptr	= nilPtr}, st)
-convertTypeCode pattern cinp (TCE_Constructor index cons []) (has_var, binds, ci)
+convertTypeCode pattern cinp (TCE_Constructor cons []) (has_var, binds, ci)
 	# (typecons_symb, ci)
 		=	getSymbol PD_Dyn_TypeCons SK_Constructor 1 ci
 	# (constructor, ci)
@@ -647,7 +647,7 @@ where
 			# predef_type_index
 				=	type_index + FirstTypePredefinedSymbolIndex
 			=	constructorExp (predefinedTypeConstructor predef_type_index) SK_Function 0 ci
-	typeConstructor (GTT_Constructor cons_ident _) ci
+	typeConstructor (GTT_Constructor cons_ident) ci
 		=	(App {app_symb = cons_ident, app_args = [], app_info_ptr = nilPtr}, ci)
 	typeConstructor (GTT_Basic basic_type) ci
 		=	constructorExp (basicTypeConstructor basic_type) SK_Function 0 ci
@@ -690,9 +690,9 @@ where
 			=	PD_Dyn_TypeCodeConstructor_UnboxedArray
 		// otherwise
 			=	fatal "predefinedType" "TC code from predef"
-convertTypeCode pattern cinp (TCE_Constructor index cons args) st
+convertTypeCode pattern cinp (TCE_Constructor cons args) st
 	# curried_type
-		=	foldl TCE_App (TCE_Constructor index cons []) args
+		=	foldl TCE_App (TCE_Constructor cons []) args
 	=	convertTypeCode pattern cinp curried_type st
 convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, ci)
 		# (tv_symb, ci)

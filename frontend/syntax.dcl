@@ -1273,12 +1273,12 @@ instance == OverloadedListType
 ::	TypeCodeExpression	= TCE_Empty
 						| TCE_Var 			!VarInfoPtr
 						| TCE_TypeTerm		!VarInfoPtr
-						| TCE_Constructor	!Index	!GlobalTCType		![TypeCodeExpression]
+						| TCE_Constructor	!GlobalTCType		![TypeCodeExpression]
 						| TCE_App			!TypeCodeExpression !TypeCodeExpression
 						| TCE_Selector		![Selection]	!VarInfoPtr
 						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
 
-::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !SymbIdent !Bool | GTT_PredefTypeConstructor !(Global Index) | GTT_Function
+::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !SymbIdent | GTT_PredefTypeConstructor !(Global Index) | GTT_Function
 	
 
 ::	FunctionPattern	= FP_Basic !BasicValue !(Optional FreeVar)
