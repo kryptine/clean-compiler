@@ -285,7 +285,7 @@ where
 										//	,	lt_context		= context
 											}
 											ss_tokenBuffer
-					}	// -->> (token,pos)
+					}	 //-->> (token,pos)
 	nextToken _ _ = abort "Scanner: Error in nextToken"
 
 class tokenBack state :: !*state -> !*state
@@ -1330,8 +1330,8 @@ checkOffside pos token scanState=:{ss_offsides,ss_useLayout,ss_input}
 			}
 		  )	-->> (token,"NewDefinitionToken generated col==os && canBeOffside",pos,ss_offsides)
 	| col < os_col && token <> InToken
-		# (n,os_col,offsides) = scan_offsides 0 col os_col ss_offsides
-		  scanState	= { scanState & ss_offsides = offsides } -->> (n,"end groups",offsides,new_def)
+		# (n,os_col,new_def,offsides) = scan_offsides 0 col os_col new_def ss_offsides
+		  scanState	= { scanState & ss_offsides = offsides } //-->> (n,"end groups",offsides,new_def)
 		  scanState	= snd (newOffside token scanState)
 		  scanState	= case new_def && col == os_col && canBeOffside token of
   						True
@@ -1352,12 +1352,12 @@ checkOffside pos token scanState=:{ss_offsides,ss_useLayout,ss_input}
 		= gen_end_groups n scanState
 		with
 			newToken		= EndGroupToken
-			scan_offsides n col os_col []
-				= (n, os_col, [])
-			scan_offsides n col _ offsides=:[(os_col,b):r]
+			scan_offsides n col os_col new_def []
+				= (n, os_col, new_def, [])
+			scan_offsides n col _ new_def offsides=:[(os_col,b):r]
 				| col < os_col
-					= scan_offsides (inc n) col os_col r
-					= (n, os_col, offsides)
+					= scan_offsides (inc n) col os_col b r
+					= (n, os_col, new_def, offsides)
 			gen_end_groups n scanState
 		  	  #	scanState	= tokenBack scanState	// push current token back
 		  		scanState	=	{ scanState
@@ -1369,7 +1369,7 @@ checkOffside pos token scanState=:{ss_offsides,ss_useLayout,ss_input}
 									//	,	lt_context		= FunctionContext
 										}
 										scanState.ss_tokenBuffer
-								} // insert EndGroupToken 
+								} -->> ("end group generated",pos) // insert EndGroupToken 
 			  | n == 1
 			// 	# (new_offsides, scanState) = scanState!ss_offsides // for tracing XXX
 			  	= (newToken, scanState) // -->> ("new offsides",new_offsides)
