@@ -14,6 +14,10 @@ where
 	
 instance WriteTypeInfo CommonDefs, Char, [a] | WriteTypeInfo a
 
+/*2.0
+instance WriteTypeInfo String
+0.2*/
+
 //1.3
 instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 
 //3.1

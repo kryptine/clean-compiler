@@ -50,6 +50,8 @@ pl [x:xs] = x +++ " , " +++ (pl xs)
 F :: !a .b -> .b
 F a b = b
 
+
+//write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
 write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules
 	#! tcl_file

@@ -35,8 +35,13 @@ where
 		= AlgType (sortBy (\{ds_ident={id_name=id_name1}} {ds_ident={id_name=id_name2}} -> id_name1 < id_name2) defined_symbols)
 	normalise_type_def i
 		= i
-		
+
+//1.3		
 instance NormaliseTypeDef TypeDef rhs | NormaliseTypeDef rhs
+//3.1
+/*2.0
+instance NormaliseTypeDef (TypeDef rhs) | NormaliseTypeDef rhs
+0.2*/
 where
 	normalise_type_def type_def=:{td_args,td_arity}
 		= type_def
@@ -115,7 +120,12 @@ where
 			= fwritec NoAssocCode tcl_file
 		= tcl_file	
 		
+//1.3
 instance WriteTypeInfo TypeDef TypeRhs
+//3.1
+/*2.0
+instance WriteTypeInfo (TypeDef TypeRhs)
+0.2*/
 where 
 	write_type_info /*{td_name,td_arity,td_args,td_rhs}*/ type_def tcl_file
 		# {td_name,td_arity,td_args,td_rhs}
@@ -152,9 +162,7 @@ instance WriteTypeInfo TypeVar
 where
 	write_type_info {tv_name} tcl_file
 		// writing tv_name as number suffices
-		| F ("TypeVar: " +++ tv_name.id_name) True
 		= write_type_info tv_name tcl_file
-
 		
 AlgTypeCode			=: (toChar 5)
 SynTypeCode 		=: (toChar 6)
@@ -208,7 +216,6 @@ where
 		# tcl_file
 			= fwritei (size id_name) tcl_file
 		= fwrites id_name tcl_file
-//		= write_type_info id_name tcl_file;
 		
 instance WriteTypeInfo FieldSymbol
 where
@@ -237,15 +244,12 @@ where
 		
 instance WriteTypeInfo AType
 where
-	write_type_info {/*at_attribute,*/ at_annotation,at_type} tcl_file
-//		# tcl_file
-//			= write_type_info at_attribute tcl_file
+	write_type_info {at_annotation,at_type} tcl_file
 		# tcl_file
 			= write_type_info at_annotation tcl_file
 		# tcl_file
 			= write_type_info at_type tcl_file
 		= tcl_file
-
 
 TypeTACode			=: (toChar 9)		// TA
 TypeArrowCode 		=: (toChar 10)		// -->
@@ -310,8 +314,6 @@ where
 					# tcl_file
 						= write_type_info type tcl_file
 					-> tcl_file
-				_
-					-> abort "mismatch" ---> tb
 		= tcl_file
 	
 	write_type_info (GTV type_var) tcl_file
@@ -376,6 +378,18 @@ where
 		# tcl_file
 			= write_type_info type_arity tcl_file
 		= tcl_file
+		
+/*2.0
+instance WriteTypeInfo String
+where
+	write_type_info s tcl_file
+		# tcl_file
+			= fwritei (size s) tcl_file
+		= fwrites s tcl_file
+	// warning:
+	// Should be identical to the code in Ident
+
+0.2*/
 
 // basic and structural write_type_info's
 instance WriteTypeInfo Int 
@@ -383,7 +397,12 @@ where
 	write_type_info i tcl_file
 		= fwritei i tcl_file
 
-instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 
+//1.3
+instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b
+//3.1
+/*2.0
+instance WriteTypeInfo {#b} | WriteTypeInfo b & Array {#} b
+0.2*/
 where
 	write_type_info unboxed_array tcl_file
 		# s_unboxed_array
@@ -393,6 +412,7 @@ where
 			
 		= write_type_info_loop 0 s_unboxed_array tcl_file
 	where 
+
 		write_type_info_loop i limit tcl_file
 			| i == limit
 				= tcl_file
@@ -445,10 +465,14 @@ where
 			}
 		= (ok1&&ok2,common_defs,tcl_file)
 
+//1.3
 instance ReadTypeInfo TypeDef TypeRhs
+//3.1
+/*2.0
+instance ReadTypeInfo (TypeDef a) | ReadTypeInfo a & DefaultElem a
+0.2*/
 where
-	read_type_info tcl_file
-		
+	read_type_info tcl_file	
 		// td_name
 		#! (ok1,td_name,tcl_file)
 			= read_type_info tcl_file
@@ -467,21 +491,25 @@ where
 		| not ok2
 			= (False,default_elem,tcl_file)
 
+
 		// td_rhs
 		#! (ok2,td_rhs,tcl_file)
 			= read_type_info tcl_file
 		| not ok2
 			= (False,default_elem,tcl_file)
+
 	
 		# type_def
-			= { default_elem &
+			= updateTypeDefRhs { default_elem &
 				td_name 	= td_name
 			,	td_arity	= td_arity
 			,	td_args		= td_args
-			,	td_rhs		= td_rhs
-			}
-		
+			} td_rhs
 		= (ok1,type_def,tcl_file)
+
+updateTypeDefRhs :: (TypeDef a) a -> (TypeDef a)
+updateTypeDefRhs type_def rhs
+	=	{type_def & td_rhs = rhs}
 
 instance ReadTypeInfo TypeRhs
 where
@@ -695,7 +723,6 @@ where
 			}
 		= (ok1&&ok2&&ok3,field_symbol,tcl_file)		
 	
-/*	
 instance ReadTypeInfo SymbolType
 where 
 	read_type_info tcl_file
@@ -800,12 +827,27 @@ where
 		| c == TypeTECode
 			= (True,TE,tcl_file)
 			
-//instance ReadTypeInfo ConsVariable
-//where
-	
-	*/	
-			
+instance ReadTypeInfo ConsVariable
+where
+	read_type_info tcl_file
+		= abort "instance ReadTypeInfo ConsVariable"
 		
+instance ReadTypeInfo TypeSymbIdent
+where
+	read_type_info tcl_file
+		# (ok1,type_name,tcl_file)
+			= read_type_info tcl_file
+		# (ok2,type_arity,tcl_file)
+			= read_type_info tcl_file
+			
+		# type_symb_ident
+			= { default_elem &
+				type_name	= type_name
+			,	type_arity	= type_arity
+			}
+			
+		= (ok1&&ok2,type_symb_ident,tcl_file)
+					
 // basic and structural write_type_info's
 instance ReadTypeInfo Int
 where 
@@ -813,7 +855,12 @@ where
 	read_type_info tcl_file
 		= freadi tcl_file			
 	
+//1.3
 instance ReadTypeInfo {#b} | ReadTypeInfo b & DefaultElem b & ArrayElem b
+//3.1
+/*2.0
+instance ReadTypeInfo {#b} | ReadTypeInfo b & DefaultElem b & Array {#} b
+0.2*/
 where 
 	read_type_info tcl_file
 
@@ -864,7 +911,12 @@ class DefaultElem a
 where
 	default_elem :: a
 	
+//1.3
 instance DefaultElem (TypeDef TypeRhs)
+//3.1
+/*2.0
+instance DefaultElem (TypeDef a) | DefaultElem a
+0.2*/
 where 	
 	default_elem
 	 	= { TypeDef |
@@ -948,7 +1000,7 @@ where
 instance DefaultElem Int
 where
 	default_elem
-		= 0 //abort "instance DefaultElem Int"
+		= 0 
 		
 instance DefaultElem DefinedSymbol
 where
@@ -1039,9 +1091,52 @@ where
 		,	fs_index		= default_elem
 		}						
 
+//1.3
 instance DefaultElem {#a}	| ArrayElem, DefaultElem a
+//3.1
+/*2.0
+instance DefaultElem {#a}	| Array {#} a & DefaultElem a
+0.2*/
 where
 	default_elem
 		= {default_elem}
-
-
+	
+instance DefaultElem TypeSymbIdent
+where
+	default_elem
+		= { TypeSymbIdent |
+			type_name		= default_elem
+		,	type_arity		= default_elem
+		,	type_index		= default_elem
+		,	type_prop		= default_elem
+		}
+		
+instance DefaultElem TypeSymbProperties
+where
+	default_elem
+		= { TypeSymbProperties |
+			tsp_sign			= default_elem
+		,	tsp_propagation		= default_elem
+		,	tsp_coercible		= default_elem
+		}
+		
+instance DefaultElem (Global a) | DefaultElem a
+where 
+	default_elem
+		= {	Global |
+			glob_object	= default_elem
+		,	glob_module	= default_elem
+		}
+		
+instance DefaultElem Bool
+where
+	default_elem 
+		= False
+		
+instance DefaultElem SignClassification
+where
+	default_elem
+		= { SignClassification |
+			sc_pos_vect	= default_elem
+		,	sc_neg_vect	= default_elem
+		}
