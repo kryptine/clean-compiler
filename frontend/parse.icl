@@ -612,7 +612,7 @@ isEqualToken _					= False
 
 isRhsStartToken :: !ParseContext !Token -> Bool
 isRhsStartToken parseContext EqualToken			= True
-isRhsStartToken parseContext ColonDefinesToken	= isGlobalContext parseContext
+isRhsStartToken parseContext ColonDefinesToken	= True
 isRhsStartToken parseContext DefinesColonToken	= isGlobalContext parseContext
 isRhsStartToken parseContext _					= False
 
