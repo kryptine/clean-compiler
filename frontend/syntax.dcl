@@ -833,8 +833,8 @@ cNonRecursiveAppl	:== False
 	,	atv_variable		:: !TypeVar
 	}
 
-::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar !AttributeVar | TA_TempVar !Int  /* | TA_TempExVar !Int */
-				  | TA_Anonymous | TA_None | TA_List !Int !TypeAttribute | TA_Omega
+::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int  | TA_TempExVar
+				  | TA_Anonymous | TA_None | TA_List !Int !TypeAttribute
 
 ::	AttributeVar =
 	{	av_name			:: !Ident

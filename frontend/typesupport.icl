@@ -66,6 +66,8 @@ varIsDefined _ 		= True
 
 instance clean_up TypeAttribute
 where
+	clean_up cui TA_TempExVar cus
+		= (TA_Multi, cus)
 	clean_up cui TA_Unique cus
 		= (TA_Unique, cus)
 	clean_up cui TA_Multi cus

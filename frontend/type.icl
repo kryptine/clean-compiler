@@ -32,7 +32,7 @@ import RWSDebug
 	}
 
 ::	SharedAttribute = 
-	{	sa_attr_nr	::	!Int
+	{	sa_attr_nr	:: !Int
 	,	sa_position	:: !Expression
 	}
 
@@ -316,7 +316,7 @@ unifyTypeApplications cons_var type_args type modules subst heaps
 
 
 ::	CopyState =
-	{	copy_heaps			:: !.TypeHeaps
+	{	copy_heaps		:: !.TypeHeaps
 	}
 	
 instance fromInt TypeAttribute
@@ -352,16 +352,23 @@ freshCopyOfAttributeVar {av_name,av_info_ptr} attr_var_heap
 		_
 			-> abort ("freshCopyOfAttributeVar (type,icl)" ---> av_name)
 
+
 freshCopyOfTypeAttribute (TA_Var avar) attr_var_heap
 	= freshCopyOfAttributeVar avar attr_var_heap
+
+/* A temporary hack to handle the new Object IO lib */
+/* Should be removed !!!!!!!!!! */
+
 freshCopyOfTypeAttribute (TA_RootVar avar) attr_var_heap
-	= freshCopyOfAttributeVar avar attr_var_heap
+//	= freshCopyOfAttributeVar avar attr_var_heap
+	= (TA_TempExVar, attr_var_heap)
 freshCopyOfTypeAttribute TA_None attr_var_heap
 	= (TA_Multi, attr_var_heap)
 freshCopyOfTypeAttribute TA_Unique attr_var_heap
 	= (TA_Unique, attr_var_heap)
 freshCopyOfTypeAttribute attr attr_var_heap
 	= (attr, attr_var_heap)
+
 
 cIsExistential 		:== True
 cIsNotExistential	:== False
@@ -418,30 +425,27 @@ freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_s
 	# {td_rhs,td_args,td_attrs,td_name,td_attribute} = common_defs.[glob_module].com_type_defs.[glob_object]
 	# (th_vars, ts_var_store)		= fresh_type_variables td_args (ts_type_heaps.th_vars, ts_var_store)
 	  (th_attrs, ts_attr_store)		= fresh_attributes td_attrs (ts_type_heaps.th_attrs, ts_attr_store)
-	  cs = { copy_heaps = { ts_type_heaps & th_vars = th_vars, th_attrs = th_attrs }}
-	  (cons_types, alg_type, ts_var_store, ts_attr_store, attr_env, cs)
-	  		= fresh_symbol_types patterns common_defs.[glob_module].com_cons_defs ts_var_store ts_attr_store cs
-	= (cons_types, alg_type, attr_env, { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = cs.copy_heaps })
+	  copy_heaps = { ts_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
+	  (cons_types, alg_type, ts_var_store, attr_env, copy_heaps)
+	  		= fresh_symbol_types patterns common_defs.[glob_module].com_cons_defs ts_var_store copy_heaps
+	= (cons_types, alg_type, attr_env, { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = copy_heaps })
 //		---> ("freshAlgebraicType", alg_type, cons_types)
 where
-	fresh_symbol_types [{ap_symbol={glob_object}}] cons_defs var_store attr_store cs=:{copy_heaps}
+	fresh_symbol_types [{ap_symbol={glob_object}}] cons_defs var_store copy_heaps
 		# {cons_type = {st_args,st_attr_env,st_result}, cons_index, cons_exi_vars, cons_exi_attrs} = cons_defs.[glob_object.ds_index]
 		  (th_vars, var_store)		= freshExistentialVariables  cons_exi_vars (copy_heaps.th_vars, var_store)
-//	  	  (th_attrs, attr_store)	= fresh_existential_attributes cons_exi_attrs (copy_heaps.th_attrs, attr_store)
 	  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env ([], copy_heaps.th_attrs)
-	  	  (result_type, cs)			= freshCopy st_result { cs & copy_heaps = { copy_heaps & th_attrs = th_attrs, th_vars = th_vars } }
+	  	  (result_type, cs)			= freshCopy st_result { copy_heaps = { copy_heaps & th_attrs = th_attrs, th_vars = th_vars } }
 	  	  (fresh_args, cs)			= freshCopy st_args cs
-		= ([fresh_args], result_type, var_store, attr_store, attr_env, cs)
-	fresh_symbol_types [{ap_symbol={glob_object}} : patterns] cons_defs var_store attr_store cs
-		# (cons_types, result_type, var_store, attr_store, attr_env, cs=:{copy_heaps})
-				= fresh_symbol_types patterns cons_defs var_store attr_store cs
-//		  {cons_type = {st_args,st_attr_env}, cons_index, cons_exi_vars, cons_exi_attrs} = cons_defs.[glob_object.ds_index]
+		= ([fresh_args], result_type, var_store, attr_env, cs.copy_heaps)
+	fresh_symbol_types [{ap_symbol={glob_object}} : patterns] cons_defs var_store copy_heaps
+		# (cons_types, result_type, var_store, attr_env, copy_heaps)
+				= fresh_symbol_types patterns cons_defs var_store copy_heaps
 		  {cons_type = {st_args,st_attr_env}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
 		  (th_vars, var_store)		= freshExistentialVariables cons_exi_vars (copy_heaps.th_vars, var_store)
-//	  	  (th_attrs, attr_store)	= fresh_existential_attributes cons_exi_attrs (copy_heaps.th_attrs, attr_store)
 		  (attr_env, th_attrs) 		= fresh_environment st_attr_env (attr_env, copy_heaps.th_attrs)
-	  	  (fresh_args, cs) 			= freshCopy st_args { cs & copy_heaps = { copy_heaps & th_attrs = th_attrs, th_vars = th_vars }}
-		= ([fresh_args : cons_types], result_type, var_store, attr_store, attr_env, cs)
+	  	  (fresh_args, cs) 			= freshCopy st_args  { copy_heaps = { copy_heaps & th_attrs = th_attrs, th_vars = th_vars }}
+		= ([fresh_args : cons_types], result_type, var_store, attr_env, cs.copy_heaps)
 
 	
 	fresh_type_variables type_variables state
@@ -450,11 +454,6 @@ where
 	fresh_attributes attributes state
 		= foldSt (\{av_info_ptr} (attr_heap, attr_store) -> (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store))
 						attributes state
-/*
-	fresh_existential_attributes attributes state
-		= foldSt (\{av_info_ptr} (attr_heap, attr_store) -> (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempExVar attr_store)), inc attr_store))
-						attributes state
-*/
 	fresh_environment inequalities (attr_env, attr_heap)
 		= foldSt fresh_inequality inequalities (attr_env, attr_heap)
 
@@ -480,8 +479,8 @@ where
 		
 freshSymbolType st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_env,st_arity} common_defs
 				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_td_infos}
-	# (th_vars, var_store)		= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
-	  (th_attrs, attr_store)	= fresh_attributes st_attr_vars (ts_type_heaps.th_attrs, ts_attr_store)
+	# (th_vars, ts_var_store)		= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
+	  (th_attrs, ts_attr_store)	= fresh_attributes st_attr_vars (ts_type_heaps.th_attrs, ts_attr_store)
 	  (attr_env, th_attrs)		= freshEnvironment st_attr_env th_attrs 
 	  cs = { copy_heaps = { ts_type_heaps & th_vars = th_vars, th_attrs = th_attrs }}
 	  (tst_args, cs)				= freshCopy st_args  cs
@@ -489,7 +488,7 @@ freshSymbolType st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_e
 	  (tst_context, {copy_heaps}) 	= freshTypeContexts st_context cs
 	  cons_variables				= foldSt (collect_cons_variables_in_tc common_defs) tst_context []
 	= ({ tst_args = tst_args, tst_result = tst_result, tst_context = tst_context, tst_attr_env = attr_env, tst_arity = st_arity, tst_lifted = 0 }, cons_variables,
-	   { ts & ts_var_store = var_store, ts_attr_store = attr_store, ts_type_heaps = copy_heaps})
+	   { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = copy_heaps})
 //		---> ("freshSymbolType", tst_args, tst_result)
 	where
 		fresh_type_variables type_variables state
@@ -1507,7 +1506,8 @@ where
 			= (True, fun_defs, predef_symbols, special_instances, create_erroneous_function_types comp
 				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar})
 		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_td_infos} = ts
-		  (subst, nr_of_attr_vars, th_vars, ts_td_infos) = liftSubstitution subst ti_common_defs ts_attr_store ts_type_heaps.th_vars ts_td_infos
+		  (cons_var_vects, subst) = determine_cons_variables cons_variables (createArray (inc (BITINDEX nr_of_type_variables)) 0, subst)
+		  (subst, nr_of_attr_vars, th_vars, ts_td_infos) = liftSubstitution subst ti_common_defs cons_var_vects ts_attr_store ts_type_heaps.th_vars ts_td_infos
 		  coer_demanded ={{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrUni] = CT_Unique }
 		  coer_offered = {{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrMulti] = CT_NonUnique }
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }
@@ -1524,7 +1524,6 @@ where
 					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap })
 		# (fun_defs, coercion_env, subst, os_var_heap, os_symbol_heap, os_error)
 		  		= makeSharedReferencesNonUnique comp fun_defs coercion_env subst ti_common_defs os_var_heap os_symbol_heap os_error
-		  (cons_var_vects, subst) = determine_cons_variables cons_variables (createArray (inc (BITINDEX nr_of_type_variables)) 0, subst)
 		  (subst, {coer_offered,coer_demanded}, ts_td_infos, ts_type_heaps, ts_error)
 		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
 		  (attr_partition, coer_demanded) = partitionateAttributes coer_offered coer_demanded

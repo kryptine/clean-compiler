@@ -246,7 +246,7 @@ determinePropClassOfTypeDef type_index module_index td_args {tdi_classification,
 			  (ts_type_prop, type_var_heap, td_infos) = newPropClassOfTypeDefGroup type_index module_index tdi_group hio_props
 			  		tdi_group_nr ci type_var_heap td_infos
 			-> (ts_type_prop, foldSt restore_binds_of_type_var td_args type_var_heap, td_infos)
-//					---> ("determinePropClassOfTypeDef", ci.[module_index].com_type_defs.[type_index].td_name, ts_type_prop)
+//					---> ("determinePropClassOfTypeDef", ci.[module_index].com_type_defs.[type_index].td_name, ts_type_prop, hio_props)
 where
 	bind_type_vars_to_props [{atv_variable={tv_info_ptr}} : tvs] [gv : gvs] cons_vars hio_props type_var_heap
 		#! old_info = sreadPtr tv_info_ptr type_var_heap

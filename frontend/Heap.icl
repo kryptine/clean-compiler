@@ -1,6 +1,6 @@
 implementation module Heap;
 
-import StdOverloaded;
+import StdOverloaded,StdMisc;
 
 :: Heap v = {heap::!.(HeapN v)};
 :: HeapN v = Heap !Int;
@@ -78,7 +78,13 @@ sreadPtr p h = code {
 };
 
 writePtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
-writePtr p v h = code {
+writePtr p v h
+	| isNilPtr p
+		= abort "writePtr: Nil pointer encountered\n";
+		= writePtr2 p v h;
+
+writePtr2 :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+writePtr2 p v h = code {
 	push_a_b 2
 	push_r_args_b 0 1 1 1 1
 	eqI
@@ -101,7 +107,13 @@ writePtr p v h = code {
 }
 
 ptrToInt :: !(Ptr v) -> Int;
-ptrToInt p = code {
+ptrToInt p
+	| isNilPtr p
+		= 0;
+		= ptrToInt2 p;
+
+ptrToInt2 :: !(Ptr v) -> Int;
+ptrToInt2 p = code {
 	push_a_b 0
 	pop_a 1
 	build _Nil 0 _hnf

@@ -772,8 +772,8 @@ cNotVarNumber :== -1
 	,	atv_variable		:: !TypeVar
 	}
 
-::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar !AttributeVar | TA_TempVar !Int
-				  | TA_Anonymous | TA_None | TA_List !Int !TypeAttribute | TA_Omega
+::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int | TA_TempExVar
+				  | TA_Anonymous | TA_None | TA_List !Int !TypeAttribute
 
 ::	AttributeVar =
 	{	av_name			:: !Ident
@@ -1152,11 +1152,8 @@ where
 		= "u" + toString tav_number + ": "
 	toString (TA_Var avar)
 		= toString avar + ": "
-/*	toString (TA_TempExVar tav_number)
-		= "e" + toString tav_number + ": "
-	toString (TA_ExVar avar)
-		= toString avar + "': "
-*/
+	toString TA_TempExVar
+		= "E"
 	toString (TA_RootVar avar)
 		= toString avar + ": "
 	toString (TA_Anonymous)
@@ -1165,8 +1162,6 @@ where
 		= ""
 	toString TA_Multi
 		= "o "
-	toString TA_Omega
-		= "w "
 	toString (TA_List _ _)
 		= "??? "
 

@@ -9,7 +9,8 @@ import syntax, analunitypes
 
 AttrUni			:== 0
 AttrMulti		:== 1
-FirstAttrVar	:== 2
+AttrExi			:== 2
+FirstAttrVar	:== 3
 
 instance toInt TypeAttribute
 
@@ -44,7 +45,7 @@ tryToMakeUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 
 uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
 
-liftSubstitution :: !*{! Type} !{# CommonDefs } !Int !*TypeVarHeap !*TypeDefInfos -> (*{! Type}, !Int, !*TypeVarHeap, !*TypeDefInfos)
+liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeVarHeap !*TypeDefInfos -> (*{! Type}, !Int, !*TypeVarHeap, !*TypeDefInfos)
 
 instance <<< CoercionPosition
 

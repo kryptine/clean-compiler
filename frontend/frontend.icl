@@ -16,7 +16,7 @@ import RWSDebug
 // trace macro
 (-*->) infixl
 (-*->) value trace
-	:==	value // ---> trace
+	:==	value ---> trace
 
 frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
@@ -41,8 +41,8 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
-	# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
-//	  (components, fun_defs, io)		= showTypes components 0 fun_defs io
+	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
+	  (components, fun_defs, io)	= showTypes components 0 fun_defs io
 //	  (components, fun_defs, out)	= showComponents components 0 True fun_defs out
 
 
