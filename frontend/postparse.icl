@@ -2,7 +2,7 @@ implementation module postparse
 
 import StdEnv
 import syntax, parse, predef, utilities, StdCompare
-import RWSDebug
+// import RWSDebug
 
 :: *CollectAdmin =
 	{	ca_error		:: !*ParseErrorAdmin
@@ -730,6 +730,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 			,	ca_hash_table	= hash_table
 			}
 	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitions True pdefs 0 0 0 ca
+	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
 	  		= scan_dcl_module mod_name mod_type files ca
@@ -760,7 +761,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_instances = def_instances,
 	  				def_macros = macro_range }}
 //	  (pre_def_mod, ca_u_predefs) = buildPredefinedModule ca_u_predefs
-	= (pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, reverse ca_rev_fun_defs, optional_dcl_mod, /*pre_def_mod,*/ modules, dcl_module_n,n_functions_and_macros_in_dcl_modules,hash_table, err_file, ca_u_predefs, files)
+	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, reverse ca_rev_fun_defs, optional_dcl_mod, /*pre_def_mod,*/ modules, dcl_module_n,n_functions_and_macros_in_dcl_modules,hash_table, err_file, ca_u_predefs, files)
 where
 	scan_dcl_module :: Ident ModuleKind *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
 	scan_dcl_module mod_name MK_Main files ca
@@ -991,7 +992,7 @@ where
 		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = fun_pos } : bodies] FK_Macro prio No fun_pos
 		= (mem_defs, [macro : mem_macros], ca)
 	check_symbols_of_class_members [def : _] type_context ca
-		= abort "postparse.check_symbols_of_class_members: unknown def"  <<- def
+		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
 	check_symbols_of_class_members [] type_context ca
 		= ([], [], ca)
 	
