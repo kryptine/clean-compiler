@@ -466,7 +466,8 @@ where
 		# (token, pState) = nextToken FunctionContext pState
 		= case token of
 			GenericOpenToken // generic function
-				# (type, pState) = wantType pState
+				//# (type, pState) = wantType pState
+				# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 				# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
 				# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
 				# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState

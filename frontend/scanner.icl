@@ -849,7 +849,7 @@ CheckTypeContext s input
 	"Dynamic"	->	(DynamicTypeToken	, input)
 	"special"	->	(SpecialToken		, input)
 	"from" 		->	(FromToken			, input)
-	"of"		->  (GenericOfToken		, input) // AA
+	"of"		->  (OfToken			, input) // AA
 	s			->	CheckEveryContext s input
 
 CheckFunctContext :: !String !Input -> (!Token, !Input)
