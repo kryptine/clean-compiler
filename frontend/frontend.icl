@@ -20,7 +20,7 @@ import scanner, parse, postparse, check, type, trans, convertcases, overloading,
 // trace macro
 (-*->) infixl
 (-*->) value trace
-	:==	value // ---> trace
+	:==	value ---> trace
 
 build_optional_icl_dcl_conversions :: !Int !(Optional {# Index}) -> Optional {# Index}
 build_optional_icl_dcl_conversions size No
@@ -392,8 +392,8 @@ do_fusion fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used
  			= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
 	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
 	FS_online
-		# (fun_defs,var_heap,expression_heap,supercompile_range) = supercompile dcl_mods main_dcl_module_n fun_defs var_heap expression_heap
-		# (components, fun_defs) = partitionateFunctions fun_defs [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
+		# (fun_defs,var_heap,expression_heap,supercompile_range) = supercompile dcl_mods main_dcl_module_n (fun_defs -*-> "Supercompile") var_heap expression_heap
+		# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "Repartition functions") [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
 		# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error, out)
 			= typeProgram (components -*-> "Re-typing after supercompilation") main_dcl_module_n fun_defs icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers type_def_infos heaps predef_symbols error out dcl_mods
@@ -406,4 +406,5 @@ do_fusion fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used
 		  expression_heap = heaps.hp_expression_heap
 	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
 	FS_none
+		#! _ = 0 -*-> "No fusion"
 	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)

@@ -27,6 +27,9 @@ generate_tcl_file :== False;
 // MV ...
 	,	compile_for_dynamics	:: !Bool
 // ... MV
+// VZ ...
+	,	supercompilation :: !Bool
+// ... VZ
 	}
 
 InitialCoclOptions =
@@ -40,6 +43,9 @@ InitialCoclOptions =
 // MV ...
 	,	compile_for_dynamics	= False
 // ... MV
+// VZ ...
+	,	supercompilation = False
+// ... VZ
 	}
 
 :: DclCache = {
@@ -100,6 +106,13 @@ parseCommandLine [arg1=:"-dynamics":args] options
 	# (args,modules,options)=	parseCommandLine args {options & compile_for_dynamics = True}
 	= (args,modules,options)
 // ... MV
+
+// VZ ...
+	// Select supercompilation instead of standard fusion
+parseCommandLine [arg1=:"-SC":args] options
+	# (args,modules,options) = parseCommandLine args {options & supercompilation = True}
+	= (args,modules,options)
+// ... VZ
 
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
@@ -202,7 +215,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	{	feo_upToPhase		= FrontEndPhaseAll
 			,	feo_search_paths	= options.searchPaths
 			,	feo_typelisting		= if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
-			,	feo_fusionstyle		= if (isMember "-sc" commandLineArgs) FS_online FS_offline
+			,	feo_fusionstyle		= (if options.supercompilation FS_online FS_offline) ---> ("Read supercompilation option: "+++toString options.supercompilation)
 			}
 	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
 		=	frontEndInterface feopts moduleIdent dcl_modules functions_and_macros predef_symbols hash_table files error io out tcl_file heaps
