@@ -2729,7 +2729,7 @@ BENoTypeVars (void)
 } /* BENoTypeVars */
 
 BEFlatTypeP
-BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
+BEFlatTypeX (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments)
 {
 	FlatType	flatType;
 	int			i;
@@ -2745,7 +2745,15 @@ BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
 
 	flatType->ft_cons_vars	= NULL;	/* used in PrintType */
 
+	flatType->ft_attribute = (AttributeKind) attribution;;
+
 	return (flatType);
+} /* BEFlatTypeX */
+
+BEFlatTypeP
+BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
+{
+	return BEFlatTypeX (symbol,NoUniAttr,arguments);
 } /* BEFlatType */
 
 void
@@ -2790,7 +2798,7 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 } /* BEAlgebraicType */
 
 void
-BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields)
+BERecordTypeX (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields)
 {
 	int					nFields;
 	Types				type;
@@ -2837,6 +2845,8 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEF
 	sdef->sdef_type			= type;
 	sdef->sdef_arity		= constructorType->type_node_arity;
 
+	sdef->sdef_boxed_record	= is_boxed_record;
+	
 	// +++ change this
 	{
 		int	i;
@@ -2852,6 +2862,12 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEF
 		module->bem_constructors [i]	= type->type_lhs->ft_symbol;
 	}
 } /* BERecordType */
+
+void
+BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields)
+{
+	BERecordTypeX (moduleIndex,lhs,constructorType,0,fields);
+}
 
 void
 BEAbsType (BEFlatTypeP lhs)
@@ -3218,7 +3234,9 @@ AddExtension (char *name)
 /* ... copied from compiler.c */
 
 
- 
+#if 0
+File rules_file;
+#endif
 
 int
 BEGenerateCode (CleanString outputFile)
@@ -3263,9 +3281,17 @@ BEGenerateCode (CleanString outputFile)
 	}
 #endif
 
+#if 0
+	rules_file=fopen ("Rules","w");
+#endif
+
 	CodeGeneration (gBEState.be_icl.beicl_module, outputFileName);
 	if (hadExtension)
 		AddExtension (outputFileName);
+
+#if 0
+	fclose (rules_file);
+#endif
 
 	return (!CompilerError);
 } /* BEGenerateCode */
@@ -3302,7 +3328,6 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
-
 	iclDef->sdef_exported = True;
 	dclDef->sdef_exported = True;
 } /* BEExportType */

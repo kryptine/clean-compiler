@@ -430,11 +430,17 @@ Clean (BENoTypes :: BackEnd -> (BETypeP, BackEnd))
 BEFlatTypeP BEFlatType (BESymbolP symbol, BETypeVarListP arguments);
 Clean (BEFlatType :: BESymbolP BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
 
+BEFlatTypeP BEFlatTypeX (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments);
+Clean (BEFlatTypeX :: BESymbolP BEAttribution BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
+
 void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
 Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
 
 void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields);
 Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP BEFieldListP BackEnd -> BackEnd)
+
+void BERecordTypeX (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields);
+Clean (BERecordTypeX :: Int BEFlatTypeP BETypeNodeP Int BEFieldListP BackEnd -> BackEnd)
 
 void BEAbsType (BEFlatTypeP lhs);
 Clean (BEAbsType :: BEFlatTypeP BackEnd -> BackEnd)
