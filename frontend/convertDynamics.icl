@@ -1,8 +1,6 @@
 implementation module convertDynamics
 
 import syntax, transform, utilities, convertcases
-// XXX
-import RWSDebug
 
 ::	*ConversionInfo =
 	{	ci_predef_symb		:: !*PredefinedSymbols

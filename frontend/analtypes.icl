@@ -23,7 +23,6 @@ where
 		kind_list_to_string [] = " ?????? "
 		kind_list_to_string [k] = "* -> *"
 		kind_list_to_string [k:ks] = "* -> " +++ kind_list_to_string ks
-	toString ki	= "PPPP" //abort ("instance toString KindInfo matcht niet"->>ki)
 
 
 kindError kind1 kind2 error

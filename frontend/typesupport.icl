@@ -380,8 +380,6 @@ instance bindInstances Type
 		= type_var_heap
 	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances (TV l1) (TV l2) type_var_heap)
-	bindInstances a b  tvh
-		= abort ("abort"--->(a,b))
 
 instance bindInstances [a] | bindInstances a
   where
