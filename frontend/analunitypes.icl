@@ -385,7 +385,7 @@ where
 			# (pc, _, type_var_heap, td_infos) = propClassOfType at_type group_nr ci type_var_heap td_infos
 			= prop_classes_of_type_list types tks pcs prop_class_of_type (inc type_index) group_nr ci (cumm_class bitor pc) type_var_heap td_infos
 			= prop_classes_of_type_list types tks pcs prop_class_of_type (inc type_index) group_nr ci cumm_class type_var_heap td_infos
-	prop_classes_of_type_list [] [] _ _ _ _ _ cumm_class type_var_heap td_infos
+	prop_classes_of_type_list [] _ _ _ _ _ _ cumm_class type_var_heap td_infos
 		= (cumm_class, type_var_heap, td_infos)
 
 propClassOfType (CV tv :@: types) group_nr ci type_var_heap td_infos

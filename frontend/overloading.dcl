@@ -1,7 +1,7 @@
 definition module overloading
 
 import StdEnv
-import syntax, check
+import syntax, check, typesupport
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 
@@ -44,9 +44,9 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	,	tci_type_var_heap		:: !.TypeVarHeap
 	}
 
-removeOverloadedFunctions :: ![(Optional [TypeContext], IdentPos, Index)] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap
+removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin
-		-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
+		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
 
-updateDynamics :: ![Int] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin
-	-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
+updateDynamics :: ![Index] ![LocalTypePatternVariable] !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin
+	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)

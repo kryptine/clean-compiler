@@ -497,10 +497,10 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 	unify_ref_counts 2 _ = 2
 
 
-analyseGroups	:: !{# CommonDefs} !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
+analyseGroups	:: !{# CommonDefs} !IndexRange !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
-analyseGroups common_defs groups fun_defs var_heap expr_heap
-	#! nr_of_funs = size fun_defs
+analyseGroups common_defs {ir_from, ir_to} groups fun_defs var_heap expr_heap
+	#! nr_of_funs = size fun_defs + ir_from - ir_to /* Sjaak */
 	   nr_of_groups = size groups
 	= iFoldSt (analyse_group common_defs) 0 nr_of_groups
 				([], createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = []}, groups, fun_defs, var_heap, expr_heap)
@@ -1242,6 +1242,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  th_attrs = foldSt (\av attr_var_heap -> attr_var_heap <:= (av.av_info_ptr, SwitchFusion AVI_Empty (AVI_Attr (TA_Var av)))) st_attr_vars ti_type_heaps.th_attrs 
 
 	  (new_fun_args, new_arg_types, new_linear_bits, new_cons_args, th_vars, ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
+//			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args ---> ("generateFunction", fd.fun_symb, fd.fun_index, fun_type)) (st_vars, ti_cons_args, tb_rhs) th_vars
 			= determine_args cc_linear_bits cc_args 0 prods tb_args st_args (st_vars, ti_cons_args, tb_rhs) th_vars
 							 ti_symbol_heap ti_fun_defs ti_fun_heap ti_var_heap
 	  (fresh_arg_types, ti_type_heaps) = substitute new_arg_types { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
@@ -1309,6 +1310,7 @@ where
 			  , mapAppend (\_ -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }) free_vars types
 			  , mapAppend (\_ -> True) free_vars new_linear_bits
 			  , mapAppend (\_ -> cActive) free_vars new_cons_args
+//			  , bind_class_types type.at_type (class_types ---> ("determine_arg", (class_app.app_symb.symb_name, class_app.app_args), type.at_type, class_types)) type_var_heap
 			  , bind_class_types type.at_type class_types type_var_heap
 			  , symbol_heap
 			  , fun_defs
@@ -1379,8 +1381,14 @@ where
 			
 		bind_type (TV {tv_info_ptr}) type type_var_heap
 			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
-		bind_type (TA _ arg_types1) (TA _ arg_types2) type_var_heap
-			= bind_types arg_types1 arg_types2 type_var_heap
+		bind_type (TA {type_name} arg_types1) (TA _ arg_types2) type_var_heap
+			| length arg_types1 == length arg_types2
+				= bind_types arg_types1 arg_types2 type_var_heap
+				= abort ("bind_type (trans.icl)" ---> (type_name, arg_types1, arg_types2))
+		bind_type (CV {tv_info_ptr} :@: arg_types1) (TA type_cons arg_types2) type_var_heap
+			# type_arity = type_cons.type_arity - length arg_types1
+			  type_var_heap = type_var_heap <:= (tv_info_ptr, TVI_Type (TA {type_cons & type_arity = type_arity} (take type_arity arg_types2)))
+			= bind_types arg_types1 (drop type_arity arg_types2) type_var_heap
 		bind_type _ _ type_var_heap
 			= type_var_heap
 		
@@ -1729,7 +1737,8 @@ where
 		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }}, app_args} _
 				  new_args prod_index producers ti
-	| glob_module <> cIclModIndex
+	#! max_index = size ti.ti_cons_args
+	| glob_module <> cIclModIndex || glob_object >= max_index /* Sjaak, to skip array functions */
 		= (producers, [App app : new_args ], ti)
 	# (fun_def, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
 	  ti = { ti & ti_fun_defs=ti_fun_defs }
@@ -1932,7 +1941,6 @@ convertSymbolType  common_defs st imported_types collected_imports type_heaps va
 		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps= type_heaps, ets_var_heap = var_heap }
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
-
 ::	ExpandTypeState =
 	{	ets_type_defs			:: !.{#{#CheckedTypeDef}}
 	,	ets_collected_conses	:: !ImportedConstructors
@@ -1961,24 +1969,54 @@ where
 
 instance expandSynTypes Type
 where
-	expandSynTypes common_defs (TA type_symb=:{type_index={glob_object,glob_module},type_name} types) ets=:{ets_type_defs}
-		# ({td_rhs,td_name,td_args},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
-		  ets = { ets & ets_type_defs = ets_type_defs }
-		= case td_rhs of
-			SynType rhs_type
-				# (type, ets_type_heaps) = substitute rhs_type.at_type (fold2St bind_var_and_attr td_args types ets.ets_type_heaps)
-						// ---> (td_name, td_args, rhs_type.at_type))
-				-> expandSynTypes common_defs type { ets & ets_type_heaps = ets_type_heaps }
-			_
-				# (types, ets) = expandSynTypes common_defs types ets
-				| glob_module == cIclModIndex
-					-> (TA type_symb types, ets)
-					-> (TA type_symb types, collect_imported_constructors common_defs glob_module td_rhs ets)
-	where	
+	expandSynTypes common_defs (arg_type --> res_type) ets
+		# ((arg_type, res_type), ets) = expandSynTypes common_defs (arg_type, res_type) ets
+		= (arg_type --> res_type, ets)
+	expandSynTypes common_defs type=:(TB _) ets
+		= (type, ets)
+	expandSynTypes common_defs (cons_var :@: types) ets
+		# (types, ets) = expandSynTypes common_defs types ets
+		= (cons_var :@: types, ets) 
+	expandSynTypes common_defs type=:(TA type_symb types) ets
+		= expand_syn_types_in_TA common_defs type_symb types TA_Multi ets
+	expandSynTypes common_defs type ets
+		= (type, ets)
+
+instance expandSynTypes [a] | expandSynTypes a
+where
+	expandSynTypes common_defs list ets
+		= mapSt (expandSynTypes common_defs) list ets
+
+
+instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b
+where
+	expandSynTypes common_defs tuple ets
+		= app2St (expandSynTypes common_defs, expandSynTypes common_defs) tuple ets
+
+expand_syn_types_in_TA common_defs type_symb=:{type_index={glob_object,glob_module},type_name} types attribute ets=:{ets_type_defs}
+	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
+	  ets = { ets & ets_type_defs = ets_type_defs }
+	= case td_rhs of
+		SynType rhs_type
+			# ets_type_heaps = bind_attr td_attribute attribute ets.ets_type_heaps
+			  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
+			  (type, ets_type_heaps) = substitute rhs_type.at_type ets_type_heaps
+			-> expandSynTypes common_defs type { ets & ets_type_heaps = ets_type_heaps }
+		_
+			# (types, ets) = expandSynTypes common_defs types ets
+			| glob_module == cIclModIndex
+				-> ( TA type_symb types, ets)
+				-> ( TA type_symb types, collect_imported_constructors common_defs glob_module td_rhs ets)
+where
 		bind_var_and_attr {	atv_attribute = TA_Var {av_info_ptr},  atv_variable = {tv_info_ptr} } {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}
 			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }
 		bind_var_and_attr { atv_variable  = {tv_info_ptr}} {at_type} type_heaps=:{th_vars}
 			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type) }
+
+		bind_attr (TA_Var {av_info_ptr}) attribute type_heaps=:{th_attrs}
+			= { type_heaps & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr attribute) }
+		bind_attr _ attribute type_heaps
+			= type_heaps
 
 		collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}
 			# (ets_collected_conses, ets_var_heap)
@@ -2003,32 +2041,17 @@ where
 		has_been_collected _					= False
 
 
-	expandSynTypes common_defs (arg_type --> res_type) ets
-		# ((arg_type, res_type), ets) = expandSynTypes common_defs (arg_type, res_type) ets
-		= (arg_type --> res_type, ets)
-	expandSynTypes common_defs (cons_var :@: types) ets
-		# (types, ets) = expandSynTypes common_defs types ets
-		= (cons_var :@: types, ets) 
-	expandSynTypes common_defs type ets
-		= (type, ets)
-
-instance expandSynTypes [a] | expandSynTypes a
-where
-	expandSynTypes common_defs list ets
-		= mapSt (expandSynTypes common_defs) list ets
-
-
-instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b
-where
-	expandSynTypes common_defs tuple ets
-		= app2St (expandSynTypes common_defs, expandSynTypes common_defs) tuple ets
-
 instance expandSynTypes AType
 where
-	expandSynTypes common_defs atype=:{at_type} ets
-		# (at_type, ets) = expandSynTypes common_defs at_type ets
-		= ({ atype & at_type = at_type }, ets)
-
+	expandSynTypes common_defs atype ets
+		= expand_syn_types_in_a_type common_defs atype ets
+	where
+		expand_syn_types_in_a_type common_defs atype=:{at_type = TA type_symb types, at_attribute} ets
+			# (at_type, ets) = expand_syn_types_in_TA common_defs type_symb types at_attribute ets
+			= ({ atype & at_type = at_type }, ets)
+		expand_syn_types_in_a_type common_defs atype ets
+			# (at_type, ets) = expandSynTypes common_defs atype.at_type ets
+			= ({ atype & at_type = at_type }, ets)
 
 ::	FreeVarInfo =
 	{	fvi_var_heap	:: !.VarHeap

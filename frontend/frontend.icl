@@ -1,6 +1,6 @@
 implementation module frontend
 
-import scanner, parse, postparse, check, type, trans, convertcases, overloading, convertDynamics
+import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics
 import RWSDebug
 
 :: FrontEndSyntaxTree
@@ -21,7 +21,7 @@ import RWSDebug
 frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
-		= wantModule cWantIclFile mod_ident (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
+		= wantModule cWantIclFile mod_ident (hash_table ---> ("Parsing:", mod_ident)) error search_paths predef_symbols files
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 	# (ok, mod, nr_of_global_funs, mod_functions, dcl_mod, predef_mod, modules, hash_table, error, predef_symbols, files)
@@ -42,8 +42,9 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
 	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
-//	  (components, fun_defs, io)	= showTypes components 0 fun_defs io
-//	  (components, fun_defs, out)	= showComponents components 0 True fun_defs out
+//	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
+//	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
+//	  (fun_defs, error)	= showFunctions array_instances fun_defs error
 
 	  (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components -*-> "convertDynamics") fun_defs predef_symbols
@@ -51,7 +52,7 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 
 //	  (components, fun_defs, error) = showComponents components 0 True fun_defs error
 	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups common_defs (components -*-> "Transform") fun_defs var_heap expression_heap
+		 = analyseGroups common_defs array_instances (components -*-> "Transform") fun_defs var_heap expression_heap
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  	= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics var_heap type_heaps expression_heap
 /*
@@ -116,6 +117,13 @@ newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
 	= createArray size {  ste_index = NoIndex, ste_def_level = -1, ste_kind = STE_Empty, ste_previous = abort "PreviousPlaceholder"}
 
+showFunctions :: !IndexRange !*{# FunDef} !*File  -> (!*{# FunDef},!*File)
+showFunctions {ir_from, ir_to} fun_defs file
+	= iFoldSt show_function ir_from ir_to (fun_defs, file)
+where
+	show_function fun_index (fun_defs, file)
+		# (fd, fun_defs) = fun_defs![fun_index]
+		= (fun_defs, file <<< fun_index <<< fd <<< '\n')
 
 showComponents :: !*{! Group} !Int !Bool !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
 showComponents comps comp_index show_types fun_defs file
@@ -130,7 +138,7 @@ where
 	show_component [fun:funs] show_types fun_defs file
 		#! fun_def = fun_defs.[fun]
 		| show_types
-			= show_component funs show_types fun_defs (file <<< '\n' <<< fun_def)
+			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
 			= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
 

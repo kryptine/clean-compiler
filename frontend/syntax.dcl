@@ -447,7 +447,8 @@ cIsALocalVar	:== False
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
-				VI_ClassVar !Ident !VarInfoPtr !Int /* used to hold dictionary variables during overloading */ |
+				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
+				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo | VI_CaseVar !VarInfoPtr |
 				VI_CorrespondenceNumber !Int | VI_SequenceNumber !Int |
 				VI_Used | /* for indicating that an imported function has been used */
@@ -812,7 +813,8 @@ cNonRecursiveAppl	:== False
 	}
 
 ::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int  | TA_TempExVar
-				  | TA_Anonymous | TA_None | TA_List !Int !TypeAttribute
+				  | TA_Anonymous | TA_None
+				  | TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 
 ::	AttributeVar =
 	{	av_name			:: !Ident

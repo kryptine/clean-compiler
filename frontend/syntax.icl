@@ -424,7 +424,8 @@ cIsALocalVar	:== False
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
-				VI_ClassVar !Ident !VarInfoPtr !Int /* used to hold dictionary variables during overloading */ |
+				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
+				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo | VI_CaseVar !VarInfoPtr |
 				VI_CorrespondenceNumber !Int | VI_SequenceNumber !Int |
 				VI_Used | /* for indicating that an imported function has been used */
@@ -772,7 +773,8 @@ cNotVarNumber :== -1
 	}
 
 ::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int | TA_TempExVar
-				  | TA_Anonymous | TA_None | TA_List !Int !TypeAttribute
+				  | TA_Anonymous | TA_None
+				  | TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 
 ::	AttributeVar =
 	{	av_name			:: !Ident
@@ -1153,7 +1155,7 @@ where
 	toString (TA_Var avar)
 		= toString avar + ": "
 	toString TA_TempExVar
-		= "E"
+		= "(E)"
 	toString (TA_RootVar avar)
 		= toString avar + ": "
 	toString (TA_Anonymous)
@@ -1256,14 +1258,14 @@ where
 
 instance <<< SymbIdent
 where
-	(<<<) file symb=:{symb_kind = SK_Function symb_index } = file <<< symb.symb_name <<<  '.' <<< symb_index
-	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = file <<< symb.symb_name <<<  '.' <<< symb_index
-	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index } = file <<< symb.symb_name <<<  "OL"
+	(<<<) file symb=:{symb_kind = SK_Function symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index } = file <<< symb.symb_name <<<  "[o]@" <<< symb_index
 	(<<<) file symb = file <<< symb.symb_name 
 
 instance <<< TypeSymbIdent
 where
-	(<<<) file symb	= file <<< symb.type_name <<< '.' <<< symb.type_arity
+	(<<<) file symb	= file <<< symb.type_name <<< '.' <<< symb.type_index
 
 instance <<< ClassSymbIdent
 where
@@ -1272,7 +1274,7 @@ where
 instance <<< BoundVar
 where
 	(<<<) file {var_name,var_info_ptr,var_expr_ptr}
-		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr /*<<< ',' <<< ptrToInt var_expr_ptr*/ <<< '>'
+		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr <<< ',' <<< ptrToInt var_expr_ptr <<< '>'
 
 instance <<< Bind a b | <<< a & <<< b 
 where
@@ -1513,6 +1515,8 @@ where
 //			<<< fun_index <<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
 	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
 			<<< fun_index <<< body <<< '\n'
+	(<<<) file {fun_symb,fun_index,fun_body=NoBody,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
+			<<< fun_index <<< "Array function\n"
 
 instance <<< FunCall
 where
@@ -1698,7 +1702,7 @@ where
 
 instance <<< Global a | <<< a
 where
-	(<<<) file {glob_object,glob_module} = file <<< glob_object <<< '.' <<< glob_module
+	(<<<) file {glob_object,glob_module} = file <<< glob_object <<< "M:" <<< glob_module
 
 instance <<< Position
 where

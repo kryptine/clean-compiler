@@ -335,6 +335,7 @@ refMarkOfCase free_vars sel expr (BasicPatterns type patterns) defaul var_heap
 	  (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
 	  (pattern_depth, used_lets, var_heap) = foldSt (ref_mark_of_basic_pattern free_vars sel local_lets) patterns (0, [], var_heap)
 	= refMarkOfDefault False pattern_depth free_vars sel defaul used_lets var_heap
+//		---> ("refMarkOfCase", expr, [ (bp_value, bp_expr) \\ {bp_value, bp_expr} <- patterns])
 where
 	ref_mark_of_basic_pattern free_vars sel local_lets {bp_expr} (pattern_depth, used_lets, var_heap)
 		# pattern_depth = inc pattern_depth
@@ -394,10 +395,10 @@ where
 		| do_par_combine
 			# new_comb_ref_count = parCombineRefCount comb_ref_count occ_ref_count
 			= (new_comb_ref_count, occ_previous)
-	//				---> ("parCombineRefCount", comb_ref_count, occ_ref_count, new_comb_ref_count)
+//					---> ("parCombineRefCount", comb_ref_count, occ_ref_count, new_comb_ref_count)
 			# new_comb_ref_count = seqCombineRefCount comb_ref_count occ_ref_count
 			= (new_comb_ref_count, occ_previous)
-	//				---> ("seqCombineRefCount", comb_ref_count, occ_ref_count, new_comb_ref_count)
+//					---> ("seqCombineRefCount", comb_ref_count, occ_ref_count, new_comb_ref_count)
 	case_combine_ref_counts do_par_combine comb_ref_count [occ_ref_count:occ_previous] depth
 		# new_comb_ref_count = case_combine_ref_count comb_ref_count occ_ref_count
 		= case_combine_ref_counts do_par_combine new_comb_ref_count occ_previous (dec depth)
