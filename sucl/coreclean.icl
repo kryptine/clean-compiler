@@ -18,6 +18,7 @@ block func = mstub func "blocked"
 :: SuclTypeSymbol
  = SuclUSER (Global Index)
  | SuclFN
+ | SuclTUPLE Int            // The tuple type of the specified size
  | SuclINT
  | SuclCHAR
  | SuclREAL
@@ -38,6 +39,7 @@ sucltypeheap =: map SuclANONYMOUS [0..]
 :: SuclSymbol
  = SuclUser SymbKind
  | SuclCase ExprInfoPtr
+ | SuclTupleSelect Int Int	// tuple's size and element's index in that order
  | SuclFieldSelect (Global DefinedSymbol) Int
  | SuclArraySelect (Global DefinedSymbol)
  | SuclDictSelect BoundVar // [Selection] // FIXME: from DictionarySelection; what to do with these?
@@ -63,6 +65,7 @@ suclheap =: map SuclAnonymous [0..]
 instance == SuclTypeSymbol
 where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
       (==)  SuclFN            SuclFN           = True
+      (==) (SuclTUPLE m)     (SuclTUPLE n)     = m==n
       (==)  SuclINT           SuclINT          = True
       (==)  SuclCHAR          SuclCHAR         = True
       (==)  SuclREAL          SuclREAL         = True
@@ -77,6 +80,7 @@ where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
 instance toString SuclTypeSymbol
 where toString (SuclUSER tsid ) = toString tsid
       toString  SuclFN          = "Arrow/2"
+      toString (SuclTUPLE n)    = "("+++toString (repeatn (dec n) ',')+++")"
       toString  SuclINT         = "Int"
       toString  SuclCHAR        = "Char"
       toString  SuclREAL        = "Real"
@@ -203,6 +207,10 @@ coretyperule (SuclApply argc)
         mkfuncargtypes [functype,argtype:typeheap] n rat
         = (functype,[argtype:argtypes],updategraph functype (SuclFN,[argtype,restype]) typegraph)
           where (restype,argtypes,typegraph) = mkfuncargtypes typeheap (n-1) rat
+coretyperule (SuclTupleSelect tuplesize elemindex)
+= mkrule [tupletype] (elemtypes!!elemindex) (updategraph tupletype (SuclTUPLE tuplesize,elemtypes) emptygraph)
+  where [tupletype:theap1] = sucltypeheap
+        elemtypes = take tuplesize theap1
 coretyperule (SuclInt _) = consttyperule SuclINT <--- "coreclean.coretyperule ends (Int)"
 coretyperule (SuclChar _) = consttyperule SuclCHAR <--- "coreclean.coretyperule ends (Char)"
 coretyperule (SuclReal _) = consttyperule SuclREAL <--- "coreclean.coretyperule ends (Real)"
@@ -218,6 +226,7 @@ corecomplete :: SuclTypeSymbol -> [SuclSymbol] -> Bool
 
 corecomplete (SuclUSER tsid) = const False  // Must be an abstype...
 corecomplete SuclFN = const False
+corecomplete (SuclTUPLE n) = not o isEmpty  // If there's anything in the list, it's the only tuple constructor
 corecomplete SuclINT = const False
 corecomplete SuclCHAR = superset (map (SuclChar o toChar) [0..255]) // 256 alternatives... doubtful is this is useful, but hey...
 corecomplete SuclREAL = const False

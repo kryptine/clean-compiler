@@ -20,6 +20,7 @@ from cleanversion import String
 :: SuclTypeSymbol
  = SuclUSER (Global Index)  // A user-defined type symbol (index into com_type_def array)
  | SuclFN                   // THE function type for a function with specified arity
+ | SuclTUPLE Int            // The tuple type of the specified size
  | SuclINT                  // Built-in integer
  | SuclCHAR                 // Etc.
  | SuclREAL
@@ -39,6 +40,7 @@ sucltypeheap :: [SuclTypeVariable]
 :: SuclSymbol
  = SuclUser SymbKind
  | SuclCase ExprInfoPtr
+ | SuclTupleSelect Int Int	// tuple's size and element's index in that order
  | SuclFieldSelect (Global DefinedSymbol) Int
  | SuclArraySelect (Global DefinedSymbol)
  | SuclDictSelect BoundVar // [Selection] // FIXME: from DictionarySelection; what to do with these?
