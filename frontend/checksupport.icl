@@ -6,49 +6,7 @@ import utilities
 
 //import RWSDebug
 
-::	VarHeap :== Heap VarInfo
-
 cUndef			:== -1
-CS_NotChecked 	:== -1
-NotFound		:== -1
-	
-cModuleScope	:== 0
-cGlobalScope	:== 1
-cRankTwoScope	:== 2
-
-cNeedStdArray	:== 1
-cNeedStdEnum	:== 2
-cNeedStdDynamic :== 4
-cNeedStdGeneric	:== 8 // AA
-cNeedStdStrictLists :== 16
-
-::	Heaps =
-	{	hp_var_heap			::!.VarHeap
-	,	hp_expression_heap	::!.ExpressionHeap
-	,	hp_type_heaps		::!.TypeHeaps
-	,	hp_generic_heap		::!.GenericHeap
-	}
-
-::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![IdentPos], ea_ok :: !Bool }
-
-::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin, cs_x :: !CheckStateX }
-
-::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int, x_check_dynamic_types :: !Bool }
-
-::	ConversionTable		:== {# .{# Int }}
-
-cTypeDefs				:== 0
-cConstructorDefs		:== 1
-cSelectorDefs			:== 2
-cClassDefs				:== 3
-cMemberDefs				:== 4
-cGenericDefs			:== 5
-cGenericCaseDefs		:== 6
-cInstanceDefs			:== 7
-cFunctionDefs			:== 8
-cMacroDefs				:== 9
-
-cConversionTableSize	:== 10
 
 instance toInt STE_Kind
 where
@@ -64,87 +22,6 @@ where
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
 	toInt (STE_DclMacroOrLocalMacroFunction _)= cMacroDefs
 	toInt _							= NoIndex
-
-::	CommonDefs =
-	{	com_type_defs 		:: !.{# CheckedTypeDef}
-//	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
-	,	com_cons_defs		:: !.{# ConsDef}
-	,	com_selector_defs	:: !.{# SelectorDef}
-	,	com_class_defs		:: !.{# ClassDef}
-	,	com_member_defs		:: !.{# MemberDef}
-	,	com_instance_defs	:: !.{# ClassInstance}
-	,	com_generic_defs	:: !.{# GenericDef} // AA
-	,	com_gencase_defs 	:: !.{# GenericCaseDef} // AA
-	}
-
-::	Declarations = {
-		dcls_import		::!{!Declaration}
-	,	dcls_local		::![Declaration]
-	,	dcls_local_for_import ::!{!Declaration}
-	}
-
-::	*ExplImpInfos :== *{!*{!*ExplImpInfo}}
-
-::	ExplImpInfo
-		= ExplImpInfo Ident !.DeclaringModulesSet
-		| TemporarilyFetchedAway
-
-::	DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
-
-::	DeclarationInfo =
-	{	di_decl			::	!Declaration
-	,	di_instances	::	![Declaration]
-	,	di_belonging	::	!NumberSet
-	}
-
-::	CopiedDefinitions =
-	{	copied_type_defs	:: {#Bool}
-	,	copied_class_defs	:: {#Bool}
-	,	copied_generic_defs :: {#Bool}
-	}
-	
-::	FunDefIndex:==Int
-
-::	IclModule  =
-	{	icl_name				:: !Ident
-	,	icl_functions			:: !.{# FunDef }
-	,	icl_global_functions	:: ![IndexRange]
-	,	icl_instances			:: ![IndexRange]
-	,	icl_specials			:: !IndexRange
-	,	icl_gencases			:: ![IndexRange]
-	,	icl_common				:: !.CommonDefs
-	,	icl_import				:: !{!Declaration}
-	,	icl_imported_objects	:: ![ImportedObject]
-	,	icl_foreign_exports		:: ![FunDefIndex]
-	,	icl_used_module_numbers :: !NumberSet
-	,	icl_copied_from_dcl 	:: !CopiedDefinitions
-	,	icl_modification_time	:: !{#Char}
-	}
-
-::	DclModule =
-	{	dcl_name			:: !Ident
-	,	dcl_functions		:: !{# FunType }
-	,	dcl_instances		:: !IndexRange
-	,	dcl_macros			:: !IndexRange
-	,	dcl_specials		:: !IndexRange
-	,	dcl_gencases		:: !IndexRange
-	,	dcl_common			:: !CommonDefs
-	,	dcl_sizes			:: !{# Int}
-	,	dcl_dictionary_info	:: !DictionaryInfo
-	,	dcl_declared		:: !Declarations
-	,	dcl_macro_conversions :: !Optional {#Index}
-	,	dcl_module_kind		:: !ModuleKind
-	,	dcl_modification_time:: !{#Char}
-	,	dcl_imported_module_numbers :: !NumberSet
-	}
-
-::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
-
-class Erroradmin state // PK...
-where
-	pushErrorAdmin :: !IdentPos *state -> *state
-	setErrorAdmin :: !IdentPos *state -> *state
-	popErrorAdmin  :: *state -> *state
 
 instance Erroradmin ErrorAdmin
 where
@@ -228,19 +105,6 @@ where
 	envLookUp var []
 		= (False, abort "illegal value")
 
-
-::	ExpressionInfo =
-	{	ef_type_defs		:: !.{# CheckedTypeDef}
-	,	ef_selector_defs	:: !.{# SelectorDef}
-	,	ef_cons_defs		:: !.{# ConsDef}
-	,	ef_member_defs		:: !.{# MemberDef}
-	,	ef_class_defs		:: !.{# ClassDef}
-	,	ef_generic_defs		:: !.{# GenericDef}
-	,	ef_modules			:: !.{# DclModule}
-	,	ef_macro_defs		:: !.{#.{#FunDef}}
-	,	ef_is_macro_fun		:: !Bool
-	}
-
 /*
 convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 convertIndex index table_index (Yes tables)
@@ -286,13 +150,6 @@ nrOfBelongingSymbols (BS_Members members)
 	= size members
 nrOfBelongingSymbols BS_Nothing
 	= 0
-
-:: BelongingSymbols
-	=	BS_Constructors ![DefinedSymbol]
-	|	BS_Fields !{#FieldSymbol}
-	|	BS_Members !{#DefinedSymbol}
-	|	BS_Nothing
-
 
 removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
 removeImportsAndLocalsOfModuleFromSymbolTable {dcls_import,dcls_local_for_import} symbol_table
@@ -573,8 +430,6 @@ local_declaration_for_import decl=:(Declaration {decl_kind=STE_Imported _ _}) mo
 	= abort "local_declaration_for_import"
 local_declaration_for_import decl=:(Declaration declaration_record=:{decl_kind}) module_n
 	= Declaration {declaration_record & decl_kind = STE_Imported decl_kind module_n}
-
-class toIdent a :: !a -> Ident
 
 instance toIdent SymbIdent
 where
