@@ -3318,6 +3318,9 @@ instance producerRequirements CasePatterns where
 		// name shadowing...
 		# (safe,prs)	= producerRequirements patterns prs
 		= (safe,prs)
+	producerRequirements (OverloadedListPatterns _ _ _) prs
+		//...disallow for now...
+		= (False,prs)
 	producerRequirements (DynamicPatterns patterns) prs
 		//...disallow for now...
 		= (False,prs)
