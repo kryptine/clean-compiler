@@ -509,7 +509,7 @@ cIsALocalVar	:== False
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo | VI_CaseVar !VarInfoPtr |
 				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
-				VI_SequenceNumber !Int |
+				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
 				VI_Used | /* for indicating that an imported function has been used */
 				VI_PropagationType !SymbolType | /* for storing the type with propagation environment of an imported function */
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */

@@ -159,8 +159,8 @@ instance sequence LetBind where
 						# (vi, ss_varHeap) = readPtr var_info_ptr sequenceState.ss_varHeap
 						  non_alias_bound_var = case vi of
 													VI_SequenceNumber _		-> bound_var
-													VI_Alias alias_bound_var-> alias_bound_var
-						  ss_varHeap = writePtr lb_dst.fv_info_ptr (VI_Alias non_alias_bound_var) ss_varHeap
+													VI_AliasSequenceNumber alias_bound_var-> alias_bound_var
+						  ss_varHeap = writePtr lb_dst.fv_info_ptr (VI_AliasSequenceNumber non_alias_bound_var) ss_varHeap
 						-> { sequenceState & ss_varHeap = ss_varHeap }
 					_
 						-> sequence lb_dst sequenceState

@@ -1878,7 +1878,7 @@ getVariableSequenceNumber varInfoPtr be
 	= case vi of
 		VI_SequenceNumber sequenceNumber
 			-> (sequenceNumber,be)
-		VI_Alias {var_info_ptr}
+		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
 		vi
 			-> abort "getVariableSequenceNumber" <<- vi
