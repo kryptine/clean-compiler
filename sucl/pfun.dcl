@@ -45,3 +45,5 @@ instance toString Pfun dom ran | toString dom & toString ran
    on the nodes in `dom' for which it is defined.
 */
 idpfun :: !.[dom] .(Pfun dom dom) -> Bool | == dom
+
+instance == (Pfun dom ran) | == dom & == ran
