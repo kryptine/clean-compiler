@@ -46,7 +46,6 @@ Conventions:
 	{	ps_scanState		:: !ScanState
 	,	ps_error			:: !*ParseErrorAdmin
 	,	ps_skipping			:: !Bool
-	,	ps_underscoreModule	:: !Bool
 	,	ps_hash_table		:: !*HashTable
 	,	ps_pre_def_symbols	:: !*PredefinedSymbols
 	}
@@ -303,7 +302,6 @@ where
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
 										, ps_skipping = False
-										, ps_underscoreModule = file_name.[0] == '_'
 										, ps_hash_table = hash_table
 										, ps_pre_def_symbols = pre_def_symbols
 										}
@@ -563,9 +561,9 @@ where
 			# (rhs, pState) = wantRhs (\_ -> True) False (tokenBack pState)
 			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 */ // PK ..
-	want_rhs_of_def context (Yes (name, False), []) token pos pState=:{ps_underscoreModule}
+	want_rhs_of_def context (Yes (name, False), []) token pos pState
 		| isIclContext context && isLocalContext context && (token == DefinesColonToken || token == EqualToken) &&
-		  isLowerCaseName name.id_name ps_underscoreModule
+		  isLowerCaseName name.id_name
 // RWS ...
 			&& not (isClassOrInstanceDefsContext context)
 // ... RWS
@@ -1273,7 +1271,7 @@ optionalCoercions pState
 				= (inequals ++ more_inequals, pState)
 				= (inequals, tokenBack pState)
 		want_attr_inequality (IdentToken var_name) pState
-			| isLowerCaseName var_name NoUnderscores
+			| isLowerCaseName var_name
 				# (off_ident, pState) = stringToIdent var_name IC_TypeAttr pState
 				  (token, pState) = nextToken  TypeContext pState
 				| token == LessThanOrEqualToken
@@ -1367,7 +1365,7 @@ tryAttributedTypeVar pState
 	// otherwise
 		= (False, no_type_var, tokenBack pState)
 where	
-	is_type_arg_token (IdentToken t)	= isLowerCaseName t NoUnderscores
+	is_type_arg_token (IdentToken t)	= isLowerCaseName t
 	is_type_arg_token DotToken       	= True
 	is_type_arg_token AsteriskToken  	= True
 	is_type_arg_token t              	= False
@@ -1467,12 +1465,12 @@ where
 			= ([cons], tokenBack pState)
 	where
 		want_cons_name_and_prio :: !Token !ParseState -> (Ident, !Priority, !Position, !ParseState)
-		want_cons_name_and_prio tok=:(IdentToken name) pState=:{ps_underscoreModule}
+		want_cons_name_and_prio tok=:(IdentToken name) pState
 			# (ident, pState) = stringToIdent name IC_Expression pState
 		 	  (fname, linenr, pState) = getFileAndLineNr pState
 		  	  (token, pState) = nextToken TypeContext pState
 		  	  (prio,  pState) = optionalPriority cIsNotInfix token pState
-		  	| isLowerCaseName name ps_underscoreModule
+		  	| isLowerCaseName name
 				= (ident, prio, LinePos fname linenr, parseError "Algebraic type: constructor definitions" (Yes tok) "constructor name" pState)
 				= (ident, prio, LinePos fname linenr, pState)
 		want_cons_name_and_prio OpenToken pState
@@ -1518,7 +1516,7 @@ where
 	optional_attribute DotToken           pState = (True, TA_Anonymous,    pState)
 	optional_attribute AsteriskToken      pState = (True, TA_Unique, pState)
 	optional_attribute (IdentToken id) pState
-		| isLowerCaseName id NoUnderscores
+		| isLowerCaseName id
 	  	# (token, pState) = nextToken TypeContext pState
 		| ColonToken == token
 			# (ident, pState) = stringToIdent id IC_TypeAttr pState
@@ -1611,7 +1609,7 @@ where
 		# (token, pState) = nextToken TypeContext pState
 		= case token of
 			IdentToken name
-				| isLowerCaseName name NoUnderscores
+				| isLowerCaseName name
 					# (ident, pState) = stringToIdent name IC_Type pState
 					-> (MakeTypeVar ident, pState)
 					-> (MakeTypeVar erroneousIdent, parseError "Type variable" (Yes token) "<type variable>" pState)
@@ -1629,8 +1627,8 @@ adjustAttribute attr type pState
 	= (attr, pState)
 
 stringToType :: !String !ParseState -> (!Type, !ParseState)
-stringToType name pState=:{ps_underscoreModule}
-	| isLowerCaseName name ps_underscoreModule
+stringToType name pState
+	| isLowerCaseName name
 		= nameToTypeVar name pState
 		# (id, pState) = stringToIdent name IC_Type pState
 		= (TA (MakeNewTypeSymbIdent id 0) [], pState)
@@ -1781,7 +1779,7 @@ trySimpleType annot attr pState
 
 trySimpleTypeT :: !Token !Annotation !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
 trySimpleTypeT (IdentToken id) annot attr pState
-	| isLowerCaseName id NoUnderscores
+	| isLowerCaseName id
 		# (typevar, pState)	= nameToTypeVar id pState
 		  (attr, pState)	= adjustAttribute attr typevar pState
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = typevar}, pState)
@@ -2054,15 +2052,15 @@ wantRhsExpressionT  token pState
 			_	-> (PE_Empty,  parseError "RHS expression" (Yes token) "<expression>" pState)
 
 wantLhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
-wantLhsExpressionT (IdentToken name) pState=:{ps_underscoreModule} /* PK: to make a=:C x equivalent to a=:(C x) */
-	| isLowerCaseName name ps_underscoreModule
+wantLhsExpressionT (IdentToken name) pState /* PK: to make a=:C x equivalent to a=:(C x) */
+	| isLowerCaseName name
 		# (id, pState)		= stringToIdent name IC_Expression pState
 		  (token, pState)	= nextToken FunctionContext pState
 		| token == DefinesColonToken 
 			# (token, pState)	= nextToken FunctionContext pState
 			= case token of
 				IdentToken ident
-					| ~ (isLowerCaseName ident ps_underscoreModule)
+					| ~ (isLowerCaseName ident)
 						#	(constructor, pState) = stringToIdent ident IC_Expression pState
 							(args, pState)	= parseList trySimpleLhsExpression pState
 						->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
@@ -2173,8 +2171,8 @@ where
 					= ([selector : selectors], pState)
 					= ([selector], tokenBack pState)
 
-	want_selector (IdentToken name) pState=:{ps_underscoreModule}
-		| isUpperCaseName name ps_underscoreModule
+	want_selector (IdentToken name) pState
+		| isUpperCaseName name
 	  		# (field, pState) = want (wantToken FunctionContext "array selector" DotToken pState)
 	  		  (field_id, pState) = stringToIdent field IC_Selector pState
 	  		  (type_id, pState) = stringToIdent name IC_Type pState
@@ -2191,8 +2189,8 @@ trySimpleExpression is_pattern pState
 		= trySimpleRhsExpression pState
 
 trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
-trySimpleExpressionT (IdentToken name) is_pattern pState=:{ps_underscoreModule}
-	| isLowerCaseName name ps_underscoreModule
+trySimpleExpressionT (IdentToken name) is_pattern pState
+	| isLowerCaseName name
 	# (id, pState) = stringToIdent name IC_Expression pState
 	| is_pattern
 		# (token, pState) = nextToken FunctionContext pState
@@ -2581,8 +2579,8 @@ where
 	want_array_elems token pState
 		= ([], parseError "array elements" (Yes token) "<array denotation>" pState)
 	
-	want_record_pattern (IdentToken ident) pState=:{ps_underscoreModule}
-		| isUpperCaseName ident ps_underscoreModule
+	want_record_pattern (IdentToken ident) pState
+		| isUpperCaseName ident
 			# pState = wantToken FunctionContext "record pattern" BarToken pState
 			  (type_id, pState) = stringToIdent ident IC_Type pState
 			  (token, pState) = nextToken FunctionContext pState
@@ -2592,8 +2590,8 @@ where
 		# (fields, pState) =  want_field_assignments cIsAPattern token pState
 		= (PE_Record PE_Empty No fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
 
-	try_type_specification (IdentToken ident) pState=:{ps_underscoreModule}
-		| isUpperCaseName ident ps_underscoreModule || isFunnyIdName ident
+	try_type_specification (IdentToken ident) pState
+		| isUpperCaseName ident || isFunnyIdName ident
 			# (token, pState) = nextToken FunctionContext pState
 			| token == BarToken
 				# (type_id, pState) = stringToIdent ident IC_Type pState
@@ -2791,8 +2789,8 @@ where
 										(LocalParsedDefs [index_def, select_def])
 										(PE_Update (PE_Ident array_id) (reverse [PS_Array (PE_Ident index_id) : initial_selectors]) updated_element), pState)
 
-	want_field_assignments is_pattern token=:(IdentToken ident) pState=:{ps_underscoreModule}
-		| isLowerCaseName ident ps_underscoreModule
+	want_field_assignments is_pattern token=:(IdentToken ident) pState
+		| isLowerCaseName ident
 			# (field, pState) = want_field_expression is_pattern ident pState
 			  (token, pState) = nextToken FunctionContext pState
 			| token == CommaToken
@@ -2811,8 +2809,8 @@ where
 	want_field_assignments is_pattern token pState
 		= ([], parseError "record or array field assignments" (Yes token) "field name" pState)
 
-	try_field_assignment (IdentToken ident) pState=:{ps_underscoreModule}
-		| isLowerCaseName ident ps_underscoreModule
+	try_field_assignment (IdentToken ident) pState
+		| isLowerCaseName ident
 			# (token, pState) = nextToken FunctionContext pState
 			| token == EqualToken
 				# (field_expr, pState) = wantExpression cIsNotAPattern pState
@@ -3268,7 +3266,7 @@ tryTypeVar pState
 
 tryTypeVarT :: !Token !ParseState -> (!Bool, TypeVar, !ParseState)
 tryTypeVarT (IdentToken name) pState
-	| isLowerCaseName name NoUnderscores
+	| isLowerCaseName name
 		# (id, pState) = stringToIdent name IC_Type pState
 		= (True, MakeTypeVar id, pState)
 		= (False, abort "no UC ident", tokenBack pState)
@@ -3276,11 +3274,11 @@ tryTypeVarT token pState
 		= (False, abort "no type variable", tokenBack pState)
 
 wantUpperCaseName :: !String !ParseState -> (!String, !ParseState)
-wantUpperCaseName string pState=:{ps_underscoreModule}
+wantUpperCaseName string pState
 	# (token, pState) = nextToken GeneralContext pState
 	= case token of
 		IdentToken name 
-			| isUpperCaseName name ps_underscoreModule
+			| isUpperCaseName name
 				-> (name, pState)
 		_	-> ("dummy uppercase name", parseError string (Yes token) "upper case ident" pState)
 /*
@@ -3294,21 +3292,21 @@ wantNonUpperCaseName string pState
 		_	-> ("dummy non uppercase name", parseError string (Yes token) "non upper case ident" pState)
 */
 wantLowerCaseName :: !String !ParseState -> (!String, !ParseState)
-wantLowerCaseName string pState=:{ps_underscoreModule}
+wantLowerCaseName string pState
 	# (token, pState) = nextToken GeneralContext pState
 	= case token of
 		IdentToken name 
-			| isLowerCaseName name ps_underscoreModule
+			| isLowerCaseName name
 				-> (name, pState)
 		_
 			-> ("dummy lowercase name", parseError string (Yes token) "lower case ident" pState)
 
 wantConstructorName :: !String !ParseState -> (!String, !ParseState)
-wantConstructorName string pState=:{ps_underscoreModule}
+wantConstructorName string pState
 	# (token, pState) = nextToken GeneralContext pState
 	= case token of
 		IdentToken name 
-			| isUpperCaseName name ps_underscoreModule || isFunnyIdName name
+			| isUpperCaseName name || isFunnyIdName name
 				-> (name, pState)
 		_
 			-> ("", parseError string (Yes token) "upper case ident" pState)

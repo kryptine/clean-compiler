@@ -157,9 +157,9 @@ where
 	fill_table_without_hashing tables
 		= build_variables 0 32 (build_tuples 2 32 tables)
 			<<= ("_predefined", PD_PredefinedModule)
-			<<= ("_string", PD_StringType)
-			<<= ("_list", PD_ListType) <<= ("_cons", PD_ConsSymbol) <<= ("_nil", PD_NilSymbol)
-			<<= ("_array", PD_LazyArrayType) <<= ("_!array", PD_StrictArrayType) <<= ("_#array", PD_UnboxedArrayType)
+			<<= ("_String", PD_StringType)
+			<<= ("_List", PD_ListType) <<= ("_Cons", PD_ConsSymbol) <<= ("_Nil", PD_NilSymbol)
+			<<= ("_Array", PD_LazyArrayType) <<= ("_!Array", PD_StrictArrayType) <<= ("_#Array", PD_UnboxedArrayType)
 			<<= ("_type_code", PD_TypeCodeMember)
 			<<= ("_dummyForStrictAlias", PD_DummyForStrictAliasFun) // MW++
 	where
@@ -167,7 +167,7 @@ where
 		build_tuples tup_arity max_arity tables
 			| tup_arity > max_arity
 				= tables
-				# tup_name = "_tuple" +++ toString tup_arity
+				# tup_name = "_Tuple" +++ toString tup_arity
 				= build_tuples (inc tup_arity) max_arity (tables <<= (tup_name, GetTupleTypeIndex tup_arity)
 						<<= (tup_name, GetTupleConsIndex tup_arity))
 

@@ -937,7 +937,7 @@ where
 		= mapSt (check_out_parameter expr_level) params es_cs
 
 	check_out_parameter expr_level bind=:{ bind_src, bind_dst } (e_state, cs)
-		| isLowerCaseName bind_dst.id_name NoUnderscores
+		| isLowerCaseName bind_dst.id_name
 			# (entry, cs_symbol_table) = readPtr bind_dst.id_info cs.cs_symbol_table
 			# (new_info_ptr, es_var_heap) = newPtr VI_Empty e_state.es_var_heap
 			  cs = checkPatternVariable expr_level entry bind_dst new_info_ptr { cs & cs_symbol_table = cs_symbol_table }
@@ -1336,7 +1336,7 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 		= check_rhs def_level bind (foldSt check_index_expr bind_dst states)
 		
 	check_index_expr (PE_Ident {id_name}) states
-		| isLowerCaseName id_name NoUnderscores
+		| isLowerCaseName id_name
 			= states
 		// further with next alternative
 	check_index_expr (PE_Basic (BVI _)) states
@@ -1345,7 +1345,7 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 		= (var_env, ap_selections, var_heap, { cs & cs_error = checkError "variable or integer constant expected as index expression" "" cs.cs_error })
 
 	check_rhs def_level {bind_src=PE_Ident ident, bind_dst} (var_env, ap_selections, var_heap, cs)
-		| isLowerCaseName ident.id_name NoUnderscores
+		| isLowerCaseName ident.id_name
 			# (entry,cs_symbol_table) = readPtr ident.id_info cs.cs_symbol_table
 			# (rhs_var, var_heap) = allocate_free_var ident var_heap
 			  cs = checkPatternVariable def_level entry ident rhs_var.fv_info_ptr { cs & cs_symbol_table = cs_symbol_table }
@@ -1400,7 +1400,7 @@ where
 
 
 checkBoundPattern {bind_src,bind_dst} opt_var p_input (var_env, array_patterns) ps e_info cs=:{cs_symbol_table}
-	| isLowerCaseName bind_dst.id_name NoUnderscores
+	| isLowerCaseName bind_dst.id_name
 		# (entry, cs_symbol_table) = readPtr bind_dst.id_info cs_symbol_table
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
 		  cs = checkPatternVariable p_input.pi_def_level entry bind_dst new_info_ptr { cs & cs_symbol_table = cs_symbol_table }
@@ -1427,7 +1427,7 @@ checkIdentPattern :: !Bool !Ident !(Optional (Bind Ident VarInfoPtr)) !PatternIn
 checkIdentPattern is_expr_list id=:{id_name,id_info} opt_var {pi_def_level, pi_mod_index} accus=:(var_env, array_patterns)
 					ps e_info cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-	| isLowerCaseName id_name NoUnderscores
+	| isLowerCaseName id_name
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
 		  cs = checkPatternVariable pi_def_level entry id new_info_ptr { cs & cs_symbol_table = cs_symbol_table }
 		= (AP_Variable id new_info_ptr opt_var, ([ id : var_env ], array_patterns), { ps & ps_var_heap = ps_var_heap}, e_info, cs)
