@@ -1179,6 +1179,7 @@ BENormalNode (BESymbolP symbol, BEArgP args)
 	node->node_symbol		= symbol;
 	node->node_arity		= CountArgs (args);
 	node->node_arguments	= args;
+	node->node_number=0;
 
 	/* +++ hackerdiehack */
 	if (symbol->symb_kind == definition)
@@ -1202,6 +1203,7 @@ BEMatchNode (int arity, BESymbolP symbol, BENodeP node)
 	matchNode->node_symbol		= symbol;
 	matchNode->node_arity		= arity;
 	matchNode->node_arguments	= BEArgs (node, NULL);
+	matchNode->node_number=0;
 
 	return (matchNode);
 } /* BEMatchNode */
@@ -1315,6 +1317,7 @@ BEUpdateNode (BEArgP args)
 	node->node_symbol		= recordSymbol;
 	node->node_arity		= 2;
 	node->node_arguments	= args;
+	node->node_number=0;
 
 	return (node);
 } /* BEUpdateNode */
@@ -1819,6 +1822,7 @@ BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int modul
 	BEModule	module;
 
 	module	= &gBEState.be_modules [moduleIndex];
+
 	functionSymbol	= &module->bem_functions [functionIndex];
 
 	sdef	= functionSymbol->symb_def;
