@@ -2291,7 +2291,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 
 	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache nr_of_cached_modules
 
-	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n}}
+	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n, x_check_dynamic_types = False}}
 	  
 	  (scanned_modules,macro_defs,cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules nr_of_cached_modules cs
 	  macro_defs = make_macro_def_array cached_dcl_macros macro_defs

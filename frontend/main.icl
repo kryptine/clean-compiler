@@ -11,7 +11,7 @@ import frontend
 from type_io import openTclFile, closeTclFile
 // ... MV
 
-write_tcl_file yes no :== no;
+write_tcl_file yes no :== yes;
 
 Start world
 	# (std_io, world) = stdio world
@@ -27,14 +27,16 @@ Start world
 	= fclose ms_out world
 
 CommandLoop symbol_heap ms=:{ms_io}
-	# (answer, ms_io)		= freadline (ms_io <<< "> ")
+//	# (answer, ms_io)		= freadline (ms_io <<< "> ")
+	# (answer, ms_io)		= ("c abstract",ms_io)
 	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
 	| command == []
 		= CommandLoop symbol_heap { ms & ms_io = ms_io}
 		# (ready, symbol_heap, ms) = DoCommand command argument symbol_heap { ms & ms_io = ms_io}
 		| ready
 			= ms
-			= CommandLoop symbol_heap ms
+			= ms
+//			= CommandLoop symbol_heap ms
 
 ::	MainStateDefs funs funtypes types conses classes instances members selectors =
 	{	msd_funs		:: !funs
@@ -101,7 +103,7 @@ addModule _ mod NoModules
 
 empty_cache :: *SymbolTable -> *DclCache
 empty_cache symbol_heap
-	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}}
+	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}, hp_generic_heap = newHeap}
 	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
 	= {dcl_modules={},cached_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
 
@@ -183,7 +185,7 @@ loadModule mod_ident {dcl_modules,cached_macros,predef_symbols,hash_table,heaps}
 		= write_tcl_file (WrapopenTclFile ms) (No,ms);
 // ... MV
 	# (optional_syntax_tree,cached_cached_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,tcl_file,heaps)
-		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules cached_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out tcl_file heaps
+		= frontEndInterface { feo_dump_core = False, feo_strip_unused = False,feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules cached_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out tcl_file heaps
 // MV ...
 	# (_,ms_files)
 		= closeTclFile tcl_file ms_files 

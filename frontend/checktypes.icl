@@ -432,6 +432,10 @@ checkArityOfType act_arity form_arity (SynType _)
 checkArityOfType act_arity form_arity _
 	= form_arity >= act_arity
 
+checkAbstractType (AbstractType _)			= True
+checkAbstractType (AbstractSynType _ _)		= True
+checkAbstractType _							= False
+
 getClassDef :: !Index !Index !Index !u:{# ClassDef} !v:{# DclModule} -> (!ClassDef, !Index , !u:{# ClassDef}, !v:{# DclModule})
 getClassDef class_index type_module module_index class_defs modules
 	| type_module == module_index
@@ -573,19 +577,22 @@ where
 			= (var, global_vars, var_heap, { entry & ste_previous = ste_previous })
 //
 checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type_name=type_name=:{id_name,id_info}} types, at_attribute}
-		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
+		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table,cs_x={x_check_dynamic_types}})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	  (type_index, type_module) = retrieveGlobalDefinition entry STE_Type mod_index
 	| type_index <> NotFound
 		# ({td_arity,td_args,td_attribute,td_rhs},type_index,ots_type_defs,ots_modules) = getTypeDef type_index type_module mod_index ots_type_defs ots_modules
 		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
-		| checkArityOfType type_cons.type_arity td_arity td_rhs
-			# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
-			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr_kind types td_args (ots, oti, cs)
-			  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr_kind td_attribute) id_name at_attribute oti cs
-			= ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs)) 
-			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
+		| x_check_dynamic_types && checkAbstractType td_rhs
+			= (type, (ots, oti, {cs & cs_error = checkError type_name "(abstract type) not permitted in a dynamic type" cs.cs_error}))
+
+			| checkArityOfType type_cons.type_arity td_arity td_rhs
+				# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
+				  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr_kind types td_args (ots, oti, cs)
+				  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr_kind td_attribute) id_name at_attribute oti cs
+				= ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs))
+				= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
 checkOpenAType mod_index scope dem_attr type=:{ at_type=TAS type_cons=:{type_name=type_name=:{id_name,id_info}} types strictness, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
@@ -1029,7 +1036,8 @@ where
 		  ots = { ots_type_defs = type_defs, ots_modules = modules }
 		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
 		  (dt_type, ( {ots_type_defs, ots_modules}, {oti_heaps,oti_all_vars,oti_all_attrs, oti_global_vars}, cs))
-		  		= checkOpenAType mod_index scope DAK_Ignore dt_type (ots, oti, cs)
+		  		= checkOpenAType mod_index scope DAK_Ignore dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
+		# cs = { cs & cs_x = {cs.cs_x & x_check_dynamic_types = False} }
 		  th_vars = foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) oti_global_vars oti_heaps.th_vars
 	  	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable scope dt_uni_vars cs.cs_symbol_table
 		| isEmpty oti_all_attrs
