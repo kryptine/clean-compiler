@@ -12,8 +12,6 @@ import frontend
 import backend
 import backendsupport, backendpreprocess
 
-import RWSDebug
-
 // trace macro
 (-*->) infixl
 (-*->) value trace
@@ -384,8 +382,6 @@ backEndConvertModules p s main_dcl_module_n v be
 backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
 	# {bes_varHeap,bes_attrHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n {bes_varHeap=var_heap,bes_attrHeap=attr_var_heap,bes_backEnd=be, bes_attr_number = 0}
 	= (bes_varHeap,bes_attrHeap,bes_backEnd)
-
-import RWSDebug
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
 backEndConvertModulesH predefs {fe_icl = 
@@ -1436,7 +1432,7 @@ convertTypeNode TE
 convertTypeNode (TFA vars type)
 	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
 convertTypeNode typeNode
-	=	abort "convertTypeNode"  <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
+	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 
 consVariableToType :: ConsVariable -> Type
 consVariableToType (CV typeVar)
