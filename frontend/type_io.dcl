@@ -8,9 +8,15 @@ import scanner, general, Heap, typeproperties, utilities, checksupport
 
 import StdEnv
 
+:: WriteTypeInfoState
+	= { 
+		wtis_type_heaps			:: !.TypeHeaps
+	,	wtis_n_type_vars		:: !Int
+	};
+
 class WriteTypeInfo a 
 where
-	write_type_info :: a !*File -> !*File
+	write_type_info :: a !*File !*WriteTypeInfoState -> (!*File,!*WriteTypeInfoState)
 	
 instance WriteTypeInfo CommonDefs, Char, [a] | WriteTypeInfo a
 

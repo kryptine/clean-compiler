@@ -3,6 +3,7 @@ implementation module type_io_common
 // common between compiler and static linker
 from StdChar import toChar
 
+/*
 // Priority
 PrioCode				:== toChar 0
 NoPrioCode				:== toChar 1
@@ -11,6 +12,7 @@ NoPrioCode				:== toChar 1
 LeftAssocCode			:== toChar 2
 RightAssocCode			:== toChar 3
 NoAssocCode				:== toChar 4
+*/
 
 // TypeRhs
 AlgTypeCode				:== (toChar 5)
