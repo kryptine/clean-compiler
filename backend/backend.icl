@@ -36,7 +36,6 @@ from StdString import String;
 :: BESymbKind :== Int;
 :: BEArrayFunKind :== Int;
 :: BESelectorKind :== Int;
-:: BEUpdateKind :== Int;
 :: BESpecialIdentIndex :== Int;
 
 BEGetVersion :: (!Int,!Int,!Int);
@@ -537,11 +536,11 @@ BENoTypes a0 = code {
 }
 // BETypeP BENoTypes ();
 
-BEFlatType :: !BESymbolP !BETypeVarListP !BackEnd -> (!BEFlatTypeP,!BackEnd);
-BEFlatType a0 a1 a2 = code {
-	ccall BEFlatType "II:I:I"
+BEFlatType :: !BESymbolP !BEAttribution !BETypeVarListP !BackEnd -> (!BEFlatTypeP,!BackEnd);
+BEFlatType a0 a1 a2 a3 = code {
+	ccall BEFlatType "III:I:I"
 }
-// BEFlatTypeP BEFlatType (BESymbolP symbol,BETypeVarListP arguments);
+// BEFlatTypeP BEFlatType (BESymbolP symbol,BEAttribution attribution,BETypeVarListP arguments);
 
 BEAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
 BEAlgebraicType a0 a1 a2 = code {
@@ -549,11 +548,11 @@ BEAlgebraicType a0 a1 a2 = code {
 }
 // void BEAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
 
-BERecordType :: !Int !BEFlatTypeP !BETypeNodeP !BEFieldListP !BackEnd -> BackEnd;
-BERecordType a0 a1 a2 a3 a4 = code {
-	ccall BERecordType "IIII:V:I"
+BERecordType :: !Int !BEFlatTypeP !BETypeNodeP !Int !BEFieldListP !BackEnd -> BackEnd;
+BERecordType a0 a1 a2 a3 a4 a5 = code {
+	ccall BERecordType "IIIII:V:I"
 }
-// void BERecordType (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,BEFieldListP fields);
+// void BERecordType (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,int is_boxed_record,BEFieldListP fields);
 
 BEAbsType :: !BEFlatTypeP !BackEnd -> BackEnd;
 BEAbsType a0 a1 = code {
@@ -788,9 +787,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 }
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02100400;
-kBEVersionOldestDefinition:==0x02030407;
-kBEVersionOldestImplementation:==0x02030407;
+kBEVersionCurrent:==0x02100401;
+kBEVersionOldestDefinition:==0x02100401;
+kBEVersionOldestImplementation:==0x02100401;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;
@@ -860,9 +859,6 @@ BESelector_U:==2;
 BESelector_F:==3;
 BESelector_L:==4;
 BESelector_N:==5;
-BEUpdateDummy:==0;
-BEUpdate:==1;
-BEUpdate_U:==2;
 BESpecialIdentStdMisc:==0;
 BESpecialIdentAbort:==1;
 BESpecialIdentUndef:==2;
