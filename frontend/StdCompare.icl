@@ -246,7 +246,7 @@ smallerOrEqual t1 t2
 instance =< AType
 where
 	(=<) {at_type=at_type_1} {at_type=at_type_2}
-		= at_type_1 =< at_type_2
+		= smallerOrEqual at_type_1 at_type_2
 
 instance =< BasicType
 where
