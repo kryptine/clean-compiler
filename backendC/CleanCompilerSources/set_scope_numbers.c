@@ -83,6 +83,11 @@ static void set_root_scope_numbers (NodeP node_p,int local_scope)
 				}
 			}
 			break;
+		case GuardNode:
+			set_root_scope_numbers (node_p->node_arguments->arg_node,local_scope);
+			set_root_scope_numbers (node_p->node_arguments->arg_next->arg_node,local_scope);
+			set_node_id_scope_numbers (node_p->node_node_defs,local_scope);
+			break;
 	}
 }
 
