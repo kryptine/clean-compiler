@@ -85,3 +85,4 @@ create_type_string type_name module_name
 			(type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) ""))
 
 get_type_name_and_module_name_from_type_string :: !String -> (!String,!String)
+

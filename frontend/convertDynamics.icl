@@ -13,7 +13,6 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 import type_io;
 //import pp;
 
-
 :: TypeCodeVariableInfo = TCI_TypeVar !Expression | TCI_TypePatternVar !Expression
 :: DynamicValueAliasInfo :== BoundVar
 
@@ -49,22 +48,27 @@ fatal :: {#Char} {#Char} -> .a
 fatal function_name message
 	=	abort ("convertDynamics, " +++ function_name +++ ": " +++ message)
 
-//write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
-//write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] _ _ !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
-// write_tcl_file ({#},{!},{#},[{#Char}],CommonDefs,{#}) :: !.Int !{#y:DclModule} CommonDefs !*File [{#Char}] !{!x:GlobalTCType} {#w:Bool} !*TypeHeaps !{#v:PredefinedSymbol} -> (.Bool,.File,.TypeHeaps,{#PredefinedSymbol}), [u <= 
-write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps predefined_symbols
+write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} icl_common_defs tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps 
+			   predefined_symbols imported_types var_heap common_defs icl_mod
 	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
 		= { WriteTypeInfoState |
-			wtis_type_heaps				= type_heaps
-		,	wtis_n_type_vars			= 0
-		,	wtis_predefined_module_def	= pre_mod.pds_module
+			wtis_n_type_vars				= 0
+		,	wtis_predefined_module_def		= pre_mod.pds_module
+		,	wtis_common_defs				= common_defs
+		,	wtis_type_defs					= imported_types
+	  	, 	wtis_collected_conses			= []
+	  	, 	wtis_type_heaps					= type_heaps
+	  	, 	wtis_var_heap					= var_heap
+	  	, 	wtis_main_dcl_module_n			= main_dcl_module_n
 		};
+
 	# (j,tcl_file)
 		= fposition tcl_file
 
 	#! (tcl_file,write_type_info_state)
-		= write_type_info common_defs tcl_file write_type_info_state2
+		= write_type_info icl_common_defs tcl_file write_type_info_state2
+
 	#! (tcl_file,write_type_info_state)
 		= write_type_info directly_imported_dcl_modules tcl_file write_type_info_state
 
@@ -80,31 +84,29 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 				help_20_compiler :: {#{#Char}} -> {#{#Char}}
 				help_20_compiler l = l
 		
-	#! (type_heaps,_)
-		= f write_type_info_state;	
-		
+		 
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
 	#! tcl_file
-		= fwritei (size main_dcl_module.dcl_common.com_cons_defs) tcl_file
+	 	= fwritei (size main_dcl_module.dcl_common.com_cons_defs) tcl_file
+	 
+	#! (type_heaps,imported_types,var_heap)
+		= f write_type_info_state;	
 				
-	= (True,tcl_file,type_heaps,predefined_symbols) 
+	= (True,tcl_file,type_heaps,predefined_symbols,imported_types,var_heap) 
 where
 
 	collect_type_constructors_in_dynamic_patterns :: !Int !Int [TypeSymbIdent] -> [TypeSymbIdent]
 	collect_type_constructors_in_dynamic_patterns i limit type_constructors_in_dynamic_patterns
 		=	[]
 
-	f write_type_info_state=:{wtis_type_heaps}
-		= (wtis_type_heaps,{write_type_info_state & wtis_type_heaps = abort "convertDynamics.icl"});
-
-
+	f write_type_info_state=:{wtis_type_heaps,wtis_type_defs,wtis_var_heap}
+		= (wtis_type_heaps,wtis_type_defs,wtis_var_heap)
 
 /*2.0
 f (Yes tcl_file)
 	= tcl_file;
 0.2*/
-
 			
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
@@ -125,17 +127,18 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							})
 			
 	// store type info			
-	# (tcl_file,type_heaps,ci_predef_symb)
+	# (tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
 		= case tcl_file of
 			No
-				-> (No,type_heaps,ci_predef_symb)
+				-> (No,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
 			_ 
 				# tcl_file = f tcl_file;
-				# (ok,tcl_file,type_heaps,ci_predef_symb)
-					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps ci_predef_symb
+				# (ok,tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
+					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps ci_predef_symb 
+									 imported_types ci_var_heap common_defs icl_mod
 				| not ok
 					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
-					-> (Yes tcl_file,type_heaps,ci_predef_symb)
+					-> (Yes tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
 
 	= (groups, fun_defs, ci_predef_symb, imported_types, [], ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
 where

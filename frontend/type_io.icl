@@ -9,6 +9,7 @@ implementation module type_io
 
 import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities, checksupport
+import trans
 
 import type_io_common
 // normal form:
@@ -19,18 +20,20 @@ import type_io_common
 //		module
 //
 // unsupported:
-// - 	type synonyms
 // - 	ADTs
 
-//import DebugUtilities;
 F a b :== b;
 
 :: WriteTypeInfoState
 	= { 
-		wtis_type_heaps				:: !.TypeHeaps
-	,	wtis_n_type_vars			:: !Int
-	,	wtis_predefined_module_def	:: !Index
-
+		wtis_n_type_vars						:: !Int
+	,	wtis_predefined_module_def				:: !Index
+	,	wtis_common_defs						:: !{#CommonDefs}	
+	,	wtis_type_defs							:: !.{#{#CheckedTypeDef}}
+	,	wtis_collected_conses					:: !ImportedConstructors
+	,	wtis_type_heaps							:: !.TypeHeaps
+	,	wtis_var_heap							:: !.VarHeap
+	,	wtis_main_dcl_module_n 					:: !Int
 	};
 	
 class WriteTypeInfo a 
@@ -64,63 +67,25 @@ where
  		# (_,(_,th_vars))
  			= mapSt normalize_type_var cons_exi_vars (wtis_n_type_vars,th_vars)
   		# wtis
- 			= { wtis &
- 				wtis_type_heaps		=  { wtis.wtis_type_heaps & th_vars = th_vars }
- 			}
+ 			= { wtis & wtis_type_heaps.th_vars = th_vars }
  		// ... normalize
 
 		# (tcl_file,wtis)
 			= write_type_info cons_symb tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info cons_type tcl_file wtis
+		
 		# (tcl_file,wtis)
 			= write_type_info cons_arg_vars tcl_file wtis
-//		# (tcl_file,wtis)
-//			= write_type_info cons_priority tcl_file wtis
-
 		# (tcl_file,wtis)
 			= write_type_info cons_index tcl_file wtis
+						
 		# (tcl_file,wtis)
 			= write_type_info cons_type_index tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info cons_exi_vars tcl_file wtis
-	
 		= (tcl_file,wtis)
-		
-/*
-instance WriteTypeInfo Priority
-where 
-	write_type_info (Prio assoc i) tcl_file wtis
-		# tcl_file
-			= fwritec PrioCode tcl_file
-		# (tcl_file,wtis)
-			= write_type_info assoc tcl_file wtis
-		# (tcl_file,wtis)
-			= write_type_info i tcl_file wtis
-		= (tcl_file,wtis)
-	write_type_info NoPrio tcl_file wtis
-		# tcl_file
-			= fwritec NoPrioCode tcl_file 
-		= (tcl_file,wtis)
-		
-instance WriteTypeInfo Assoc
-where 
-	write_type_info LeftAssoc tcl_file wtis
-		# tcl_file
-			= fwritec LeftAssocCode tcl_file 
-		= (tcl_file,wtis)
-
-	write_type_info RightAssoc tcl_file wtis
-		# tcl_file
-			= fwritec RightAssocCode tcl_file
-		= (tcl_file,wtis)	
-
-	write_type_info NoAssoc tcl_file wtis
-		# tcl_file
-			= fwritec NoAssocCode tcl_file 
-		= (tcl_file,wtis)	
-*/
-		
+			
 //1.3
 instance WriteTypeInfo TypeDef TypeRhs
 //3.1
@@ -136,7 +101,7 @@ where
  			= mapSt normalize_type_var td_args (0,th_vars)
   		# wtis
  			= { wtis &
- 				wtis_type_heaps		=  { wtis.wtis_type_heaps & th_vars = th_vars }
+ 				wtis_type_heaps.th_vars = th_vars
  			,	wtis_n_type_vars		= n_type_vars
  			}
  		// ... normalize
@@ -146,7 +111,7 @@ where
 		# (tcl_file,wtis)
  			= write_type_info td_arity tcl_file wtis 				
  		# (tcl_file,wtis)
- 			= write_type_info td_args tcl_file wtis
+ 			= write_type_info td_args tcl_file wtis	
 		# (tcl_file,wtis)
  			= write_type_info td_rhs tcl_file wtis
  			
@@ -157,16 +122,15 @@ normalize_type_var td_arg=:{atv_variable={tv_info_ptr}} (id,th_vars)
 	# th_vars
 		= writePtr tv_info_ptr (TVI_Normalized id) th_vars
 	= (id,(inc id,th_vars));
-		
+
 sel_type_var_heap :: !*WriteTypeInfoState -> (!*TypeVarHeap,!*WriteTypeInfoState)
 sel_type_var_heap wtis=:{wtis_type_heaps}
 	# (th_vars,wtis_type_heaps)
 		= sel wtis_type_heaps
 	= (th_vars,{ wtis & wtis_type_heaps = wtis_type_heaps} )
-	
-	where
-		sel wtis_type_heaps=:{th_vars}
-			= (th_vars,{ wtis_type_heaps & th_vars = newHeap } )
+where
+	sel wtis_type_heaps=:{th_vars}
+		= (th_vars,{ wtis_type_heaps & th_vars = newHeap } )
  
 instance WriteTypeInfo ATypeVar
 where 
@@ -187,7 +151,7 @@ where
 
   		# wtis 
  			= { wtis &
- 				wtis_type_heaps		=  { wtis.wtis_type_heaps & th_vars = th_vars }
+ 				wtis_type_heaps.th_vars = th_vars
  			}
  		= (tcl_file,wtis)	
  	where 
@@ -209,9 +173,7 @@ where
 	write_type_info (SynType _) tcl_file wtis
 		# tcl_file
  			= fwritec SynTypeCode tcl_file;
- 			
- 		// unimplemented
- 		= (tcl_file,wtis) 
+  		= (tcl_file,wtis) 
 		
 	write_type_info (RecordType {rt_constructor,rt_fields}) tcl_file wtis
  		#! tcl_file
@@ -258,10 +220,12 @@ where
 			= write_type_info fs_index tcl_file wtis
 		= (tcl_file,wtis)
 		
-// NEW ->
 instance WriteTypeInfo SymbolType
 where
-	write_type_info {st_vars,st_args,st_args_strictness,st_arity,st_result} tcl_file wtis
+	write_type_info symbol_type tcl_file wtis
+		#! ({st_vars,st_args,st_args_strictness,st_arity,st_result},wtis)
+			= expand_symbol_type symbol_type wtis
+
 		# (tcl_file,wtis)
 			= write_type_info st_vars tcl_file wtis
 		# (tcl_file,wtis)
@@ -273,7 +237,18 @@ where
 		# (tcl_file,wtis)
 			= write_type_info st_result tcl_file wtis
 		= (tcl_file,wtis)
-	
+	where
+		expand_symbol_type symbol_type wtis=:{wtis_common_defs,wtis_type_defs,wtis_main_dcl_module_n,wtis_collected_conses,wtis_type_heaps,wtis_var_heap}
+			# (expanded_symbol_type,wtis_type_defs,wtis_collected_conses,wtis_type_heaps,wtis_var_heap)
+				= convertSymbolType False wtis_common_defs symbol_type wtis_main_dcl_module_n wtis_type_defs [] /* ? */ wtis_type_heaps wtis_var_heap;
+			# wtis
+				= { wtis &
+					wtis_type_defs							= wtis_type_defs
+				,	wtis_type_heaps							= wtis_type_heaps
+				,	wtis_var_heap							= wtis_var_heap
+				};
+			= (expanded_symbol_type,wtis)
+				
 instance WriteTypeInfo StrictnessList
 where
 	write_type_info NotStrict tcl_file wtis
@@ -311,8 +286,6 @@ where
 			= write_type_info atypes tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info NotStrict tcl_file wtis			
-//		# (tcl_file,wtis)
-//			= write_annotated_type_info atypes strictness tcl_file wtis
 		= (tcl_file,wtis)
 
 	write_type_info (TAS type_symb_ident atypes strictness) tcl_file wtis
@@ -324,8 +297,6 @@ where
 			= write_type_info atypes tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info strictness tcl_file wtis			
-//		# (tcl_file,wtis)
-//			= write_annotated_type_info atypes strictness tcl_file wtis
 		= (tcl_file,wtis)
 
 	write_type_info (atype1 --> atype2) tcl_file wtis
@@ -415,7 +386,7 @@ where
 
 instance WriteTypeInfo TypeSymbIdent
 where
-	write_type_info tsi=:{type_name,type_arity,type_index={glob_module}} tcl_file wtis=:{wtis_predefined_module_def}
+	write_type_info tsi=:{type_name,type_arity,type_index={glob_module,glob_object}} tcl_file wtis=:{wtis_predefined_module_def}
 		# is_type_without_definition
 			= glob_module == wtis_predefined_module_def
 		# tcl_file
@@ -423,12 +394,13 @@ where
 
 		# (tcl_file,wtis)
 			= write_type_info type_name tcl_file wtis
-		# (tcl_file,wtis)
+		# (tcl_file,wtis)		 
 			= write_type_info type_arity tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info tsi.type_index tcl_file wtis
+
 		= (tcl_file,wtis)
-	
+
 instance WriteTypeInfo (Global object) | WriteTypeInfo object
 where
 	write_type_info {glob_object,glob_module} tcl_file wtis
@@ -437,7 +409,7 @@ where
 		# (tcl_file,wtis)
 			= write_type_info glob_module tcl_file wtis
 		= (tcl_file,wtis)
-
+ 
 // basic and structural write_type_info's
 instance WriteTypeInfo Int 
 where
@@ -497,7 +469,6 @@ where
 			= write_type_info c2 tcl_file wtis
 		= (tcl_file,wtis)
 
-// MV ...
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
 openTclFile :: !Bool !String !*Files -> (Optional .File, !*Files)
@@ -551,6 +522,4 @@ splitBy char string
 				=	splitBy` frm (to+1)
 		stringSize
 			=	size string
-
 // ... copy from compile.icl
-// ... MV
