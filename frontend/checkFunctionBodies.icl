@@ -1064,12 +1064,12 @@ where
 	get_field_var _
 		= ({ id_name = "** ERRONEOUS **", id_info = nilPtr }, nilPtr)
 
-checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_dynamics=outer_dynamics} e_info cs=:{cs_x}
+checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_dynamics=outer_dynamics} e_info cs
 	# (dyn_expr, free_vars, e_state=:{es_dynamics, es_expr_heap}, e_info, cs) = checkExpression free_vars expr e_input {e_state & es_dynamics = []} e_info cs
 	  (dyn_info_ptr, es_expr_heap) = newPtr (EI_UnmarkedDynamic opt_type es_dynamics) es_expr_heap
 	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty},
 			free_vars, { e_state & es_expr_heap = es_expr_heap, es_dynamics = [dyn_info_ptr : outer_dynamics]},
-			e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamic }) 
+			e_info, { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdDynamic }) 
 
 checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
 	= (BasicExpr basic_value, free_vars, e_state, e_info, cs)
@@ -1112,7 +1112,7 @@ where
 
 checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 	= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
-checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_state e_info cs=:{cs_symbol_table, cs_x}
+checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_state e_info cs=:{cs_symbol_table}
 	//= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	= check_generic_expr free_vars entry id kind e_input e_state e_info {cs & cs_symbol_table = cs_symbol_table}
@@ -1161,7 +1161,7 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 			#! app = { app_symb = symbol, app_args = app_args, app_info_ptr = new_info_ptr }
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
-			#! cs = { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric }
+			#! cs = { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdGeneric }
 			= (App app, free_vars, e_state, e_info, cs)
 		where
 			// adds NoGenericInfo argument to each generic call
@@ -1479,9 +1479,9 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 		combine_patterns mod_index opt_var [rev_arg : rev_args] args arity ps e_info cs
 			= combine_patterns mod_index opt_var rev_args [rev_arg : args] (inc arity) ps e_info cs
 
-checkPattern (PE_DynamicPattern pattern type) opt_var p_input accus ps e_info cs=:{cs_x}
+checkPattern (PE_DynamicPattern pattern type) opt_var p_input accus ps e_info cs
 	# (dyn_pat, accus, ps, e_info, cs) = checkPattern pattern No p_input accus ps e_info cs
-	= (AP_Dynamic dyn_pat type opt_var, accus, ps, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamic })
+	= (AP_Dynamic dyn_pat type opt_var, accus, ps, e_info, { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdDynamic })
 
 checkPattern (PE_Basic basic_value) opt_var p_input accus ps e_info cs
 	= (AP_Basic basic_value opt_var, accus, ps, e_info, cs)
