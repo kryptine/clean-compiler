@@ -39,6 +39,7 @@ simplifyTypeApplication (TB _) _
 ::	CleanUpState =
 	{	cus_var_env		:: !.VarEnv
 	,	cus_attr_env	:: !.AttributeEnv
+	,	cus_appears_in_lifted_part	:: !.LargeBitvect
 	,	cus_heaps		:: !.TypeHeaps
 	,	cus_var_store	:: !Int
 	,	cus_attr_store	:: !Int
@@ -49,6 +50,7 @@ simplifyTypeApplication (TB _) _
 	{	cui_coercions	:: !{! CoercionTree}
 	,	cui_attr_part	:: !AttributePartition
 	,	cui_top_level	:: !Bool
+	,	cui_is_lifted_part	:: !Bool
 	}
 
 class clean_up a ::  !CleanUpInput !a !*CleanUpState -> (!a, !*CleanUpState)
@@ -69,7 +71,7 @@ where
 		= (TA_Unique, cus)
 	clean_up cui TA_Multi cus
 		= (TA_Multi, cus)
-	clean_up cui tv=:(TA_TempVar av_number) cus=:{cus_attr_env,cus_heaps,cus_attr_store,cus_error}
+	clean_up cui tv=:(TA_TempVar av_number) cus=:{cus_attr_env,cus_appears_in_lifted_part,cus_heaps,cus_attr_store,cus_error}
 		| cui.cui_top_level
 			# av_group_nr = cui.cui_attr_part.[av_number]
 			  coercion_tree = cui.cui_coercions.[av_group_nr]
@@ -78,12 +80,30 @@ where
 			| isUnique coercion_tree
 				= (TA_Unique, cus)
 			#! attr = cus_attr_env.[av_group_nr]
+			# (cus_appears_in_lifted_part, cus_error)
+					= case cui.cui_is_lifted_part of
+						True
+							-> (cus_appears_in_lifted_part, cus_error)
+						_
+							| bitvectSelect av_group_nr cus_appears_in_lifted_part
+								-> ( bitvectResetAll cus_appears_in_lifted_part // to prevent repetition of error message
+								   , checkError "attribute variable of lifted argument appears in the specified type" "" cus_error)
+							-> (cus_appears_in_lifted_part, cus_error)
 			| attrIsUndefined attr
 				# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
 				  new_attr_var = TA_Var { av_name = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
+				  cus_appears_in_lifted_part
+				  		= case cui.cui_is_lifted_part of
+				  			False
+				  				-> cus_appears_in_lifted_part
+				  			_
+				  				-> bitvectSet av_group_nr cus_appears_in_lifted_part
 				= (new_attr_var, { cus & cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
-						 cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})
-				= (attr, cus)
+						cus_appears_in_lifted_part = cus_appears_in_lifted_part,
+						 cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store,
+						 cus_error = cus_error})
+				= (attr, { cus & cus_appears_in_lifted_part = cus_appears_in_lifted_part,
+								cus_error = cus_error })
 			= (TA_Multi, cus)
 	clean_up cui TA_TempExVar cus
 		= PA_BUG (TA_Multi, cus) (abort "clean_up cui (TA_TempExVar)")
@@ -266,18 +286,22 @@ cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,ts
 		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
-	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_heaps = heaps,
-			  cus_var_store = 0, cus_attr_store = 0, cus_error = error }
-	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_top_level = True }
+	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
+				cus_heaps = heaps, cus_var_store = 0, cus_attr_store = 0, cus_error = error }
+	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_top_level = True, cui_is_lifted_part = True }
 	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
+	  cui = { cui & cui_is_lifted_part = False }
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
 	  (st_args, cus) = clean_up cui (drop tst_lifted tst_args) { cus & cus_var_env = cus_var_env }
 	  (st_result, cus) = clean_up cui tst_result cus
 	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
-	  (cus_attr_env, st_attr_vars, st_attr_env) = build_attribute_environment 0 max_attr_nr coercions cus.cus_attr_env [] []
+	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
+	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions cus.cus_attr_env [] [] cus_error
 	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = update_expression_types { cui & cui_top_level = False } case_and_let_exprs
-				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env, cus_error = cus_error }
+				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
+							 cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
+							 cus_error = cus_error }
 	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
@@ -339,32 +363,48 @@ where
 		| otherwise
 			= (collected_contexts, env, error)
 				
-	build_attribute_environment :: !Index !Index !{! CoercionTree} !*AttributeEnv ![AttributeVar] ![AttrInequality]
-		-> (!*AttributeEnv, ![AttributeVar], ![AttrInequality])
-	build_attribute_environment attr_group_index max_attr_nr coercions attr_env attr_vars inequalities
+	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
+		-> (!*AttributeEnv, ![AttributeVar], ![AttrInequality], !*ErrorAdmin)
+	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions attr_env attr_vars inequalities error
 		| attr_group_index == max_attr_nr
-			= (attr_env, attr_vars, inequalities)
+			= (attr_env, attr_vars, inequalities, error)
 		#! attr = attr_env.[attr_group_index]
 		= case attr of
 			TA_Var attr_var
-				# (attr_env, inequalities) = build_inequalities attr_var coercions.[attr_group_index] coercions attr_env inequalities
-				-> build_attribute_environment (inc attr_group_index) max_attr_nr coercions attr_env [attr_var : attr_vars] inequalities
+				# (ok, attr_env, inequalities)
+						= build_inequalities appears_in_lifted_part (bitvectSelect attr_group_index appears_in_lifted_part)
+								attr_var coercions.[attr_group_index] coercions attr_env inequalities
+				  error
+				  		= case ok of
+				  			True
+				  				-> error
+				  			_
+				  				-> checkError "attribute variable of lifted argument appears in derived attribute inequality"
+										"" error
+				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions attr_env [attr_var : attr_vars] inequalities error
 			TA_None
-				-> build_attribute_environment (inc attr_group_index) max_attr_nr coercions attr_env attr_vars inequalities
+				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions attr_env attr_vars inequalities error
 	
-	build_inequalities off_var (CT_Node dem_attr left right) coercions attr_env inequalities
-		# (attr_env, inequalities) = build_inequalities off_var left coercions attr_env inequalities
-		  (attr_env, inequalities) = build_inequalities off_var right coercions attr_env inequalities
+	build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var (CT_Node dem_attr left right)
+				coercions attr_env inequalities
+		# (ok1, attr_env, inequalities)
+				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var left coercions attr_env inequalities
+		  (ok2, attr_env, inequalities)
+		  		= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var right coercions attr_env inequalities
 		#! attr = attr_env.[dem_attr]
 		= case attr of
 			TA_Var attr_var
 				| is_new_inequality attr_var off_var inequalities
-					-> (attr_env, [{ ai_demanded = attr_var, ai_offered = off_var } : inequalities]) 
-					-> (attr_env, inequalities)
+					# ok3 = off_appears_in_lifted_part == bitvectSelect dem_attr appears_in_lifted_part
+					-> (ok1 && ok2 && ok3, attr_env, [{ ai_demanded = attr_var, ai_offered = off_var } : inequalities]) 
+					-> (ok1 && ok2, attr_env, inequalities)
 			TA_None
-				-> build_inequalities off_var coercions.[dem_attr] coercions attr_env inequalities
-	build_inequalities off_var tree coercions attr_env inequalities
-		= (attr_env, inequalities)
+				# (ok3, attr_env, inequalities)
+						= build_inequalities appears_in_lifted_part off_appears_in_lifted_part 
+								off_var coercions.[dem_attr] coercions attr_env inequalities
+				-> (ok1 && ok2 && ok3, attr_env, inequalities)
+	build_inequalities _ _ off_var tree coercions attr_env inequalities
+		= (True, attr_env, inequalities)
 
 	is_new_inequality dem_var off_var []
 		= True
