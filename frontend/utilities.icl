@@ -135,16 +135,12 @@ mapSt f l s :== map_st l s
 where
 	map_st [x : xs] s
 	 	# (x, s) = f x s
-		  mapSt_result = map_st xs s
-		  (xs, _) = mapSt_result
-		#! s = second_of_2_tuple mapSt_result
+		  (xs, s) = map_st xs s
+		#! s = s
 		= ([x : xs], s)
 	map_st [] s
+		#! s = s
 	 	= ([], s)
-
-second_of_2_tuple t :== e2
-	where
-		(_,e2) = t
 
 map2St f l1 l2 st :== map2_st l1 l2 st
   where
