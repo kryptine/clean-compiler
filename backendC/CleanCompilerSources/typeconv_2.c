@@ -13,17 +13,14 @@ Author: Sjaak Smetsers
 #include "syntaxtr.t"
 #include "comsupport.h"
 
-#include "tctypes.t"
 #include "scanner.h"
 #include "comparser.h"
 #include "sizes.h"
 #include "checker.h"
 #include "transform.h"
 #include "sa.h"
-#include "typechecker.h"
-#include "typechecker2.h"
+#include "tcsupport.h"
 #include "typeconv.h"
-#include "overloading.h"
 #include "checksupport.h"
 #include "statesgen.h"
 #include "buildtree.h"
@@ -451,6 +448,24 @@ static void PrintTypeVarList (TypeVarList type_vars)
 }
 #endif
 
+static FlatType RetrieveLhsOfTypeDefinition (SymbDef tdef)
+{
+	switch (tdef -> sdef_kind)
+	{
+	case TYPE:
+	case RECORDTYPE:
+		return tdef -> sdef_type != NULL ? tdef -> sdef_type -> type_lhs : NULL;
+	case TYPESYN:
+		return tdef -> sdef_syn_type -> syn_lhs;
+		break;
+	case ABSTYPE:
+		return tdef -> sdef_abs_type -> abs_graph;
+		break;
+	default:
+		return NULL;
+	}
+} /* RetrieveLhsOfTypeDefinition */
+
 static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool print_annot)
 {
 
@@ -698,6 +713,21 @@ void PrintType (SymbDef tdef, TypeAlts type)
 	
 
 } /* PrintType */
+
+void ListTypes (ImpMod imod)
+{
+	if (DoListAllTypes)
+	{	ImpRules irule;
+		for (irule = imod -> im_rules; irule; irule = irule -> rule_next)
+		{	SymbDef imp_sdef = irule -> rule_root -> node_symbol -> symb_def;
+		
+#ifdef CLEAN2
+			if (strncmp (imp_sdef->sdef_ident->ident_name, "_dictionary", 11) != 0 || imp_sdef->sdef_isused)
+#endif
+			PrintType (imp_sdef, irule -> rule_type);
+		}
+	}
+} /* ListTypes */
 
 /******
 
