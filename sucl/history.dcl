@@ -49,3 +49,12 @@ historyToString ::
 
 (writeHistory) infixl :: *File (History sym var) -> .File | toString sym & toString,== var
 (writeHistoryAssociation) infixl :: *File (HistoryAssociation sym var) -> .File | toString sym & toString,== var
+
+printhistory ::
+    (sym->String)
+    (var->String)
+    String
+    (History sym var)
+    *File
+ -> .File
+ |  == var

@@ -71,9 +71,17 @@ apply pfun arg
         baddomain = abort "apply: partial function applied outside domain"
 
 instance toString Pfun dom ran | toString dom & toString ran & == dom
-where toString pfun
-      = toString ['{':drop 1 (flatten (map ((cons ',') o printlink) (pfunlist pfun)))++['}']]
-        where printlink (arg,res) = fromString (toString arg)++['|->']++fromString (toString res)
+where toString pfun = showpfun toString toString pfun
+
+showpfun ::
+    (dom->String)
+    (ran->String)
+    (Pfun dom ran)
+ -> String
+ |  == dom
+showpfun showdom showran pfun
+= toString ['{':drop 1 (flatten (map ((cons ',') o printlink) (pfunlist pfun)))++['}']]
+  where printlink (arg,res) = fromString (showdom arg)++['|->']++fromString (showran res)
 
 pfunlist :: (Pfun dom res) -> [(dom,res)] | == dom
 pfunlist EmptyPfun = []

@@ -133,32 +133,26 @@ maprgraph :: (.(var1,Graph sym1 var1) -> .(var2,Graph sym2 var2)) !.(Rgraph sym1
 maprgraph f (RgraphAlias root1 graph1) = RgraphAlias root2 graph2
    where (root2,graph2) = f (root1,graph1)
 
-/*
->   showrgraph showfunc shownode (root,graph)
->       = '(':snd (showsubgraph root ([],"emptyrgraph) "))++shownode root
->         where showsubgraph node (seen,repr)
->                   = (seen,repr), if ~def \/ member seen node
->                   = (seen'',repr''), otherwise
->                     where (def,(f,args)) = nodecontents graph node
->                           (seen'',repr') = foldlr showsubgraph (seen',repr) args
->                           seen' = node:seen
->                           repr''
->                               = "updatergraph "++shownode node++" ("++
->                                 showfunc f++',':showlist shownode args++")."++
->                                 repr'
-*/
-
 instance toString (Rgraph sym var) | toString sym & toString var & Eq var
-where toString (RgraphAlias root graph)
-      = "("+++snd (showsubgraph root ([],"emptyrgraph) "))+++toString root
-        where showsubgraph node (seen,repr)
-              | not def || isMember node seen
-                = (seen,repr)
-              = (seen``,repr``)
-                where (def,(f,args)) = varcontents graph node
-                      (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
-                      seen` = [node:seen]
-                      repr`` = "updatergraph "+++toString node+++" ("+++toString f+++","+++listToString args+++") o "+++repr`
+where toString rgraph = showrgraph toString toString rgraph
+
+showrgraph ::
+    (sym->String)
+    (var->String)
+    (Rgraph sym var)
+ -> String
+ |  == var
+
+showrgraph showsym showvar (RgraphAlias root graph)
+= "("+++snd (showsubgraph root ([],"emptyrgraph) "))+++showvar root
+  where showsubgraph node (seen,repr)
+        | not def || isMember node seen
+          = (seen,repr)
+        = (seen``,repr``)
+          where (def,(f,args)) = varcontents graph node
+                (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
+                seen` = [node:seen]
+                repr`` = "updatergraph "+++showvar node+++" ("+++showsym f+++","+++showlist showvar args+++") o "+++repr`
 
 /*
 >   printrgraph showfunc shownode (root,graph)
@@ -191,20 +185,6 @@ rulegraph :: !.(Rule sym var) -> Graph sym var
 rulegraph (RuleAlias _ _ graph) = graph
 
 /*
->   showrule showfunc shownode (lroots,rroot,graph)
->       = "((mkrule "++showlist shownode lroots++' ':shownode rroot++repr'++") emptygraph)"
->         where (seen,repr') = showsubgraph rroot ([],repr)
->               (seen',repr) = foldlr showsubgraph (seen,"") lroots
->               showsubgraph node (seen,repr)
->                   = (seen,repr), if ~def \/ member seen node
->                   = (seen'',repr''), otherwise
->                     where (def,(f,args)) = nodecontents graph node
->                           (seen'',repr') = foldlr showsubgraph (seen',repr) args
->                           seen' = node:seen
->                           repr''
->                               = ".updategraph "++shownode node++" ("++
->                                 showfunc f++',':showlist shownode args++')':repr'
-
 >   printrule showfunc shownode (lroots,rroot,graph)
 >       = (concat.map (++" ").init) reprs++"-> "++last reprs
 >         where reprs = printgraph showfunc shownode graph (lroots++[rroot])
@@ -219,19 +199,27 @@ where (==) (RgraphAlias root1 graph1) (RgraphAlias root2 graph2)
        = root1==root2 && graph1==graph2
 
 instance toString (Rule sym var) | toString sym & toString var & == var
-where //toString rule = "<rule>"
-      toString (RuleAlias lroots rroot graph)
-      = "((mkrule "+++listToString lroots+++" "+++toString rroot+++repr`+++") emptygraph)"
-        where (seen,repr`) = foldlr showsubgraph ([],repr) lroots
-              (seen`,repr) = showsubgraph rroot (seen,"")
-              showsubgraph node (seen,repr)
-              | not def || isMember node seen
-                = (seen,repr)
-              = (seen``,repr``)
-                where (def,(f,args)) = varcontents graph node
-                      (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
-                      seen` = [node:seen]
-                      repr`` = " o updategraph "+++toString node+++" ("+++toString f+++","+++listToString args+++")"+++repr`
+where toString rule = showrule toString toString rule
+
+showrule ::
+    (sym->String)
+    (var->String)
+    (Rule sym var)
+ -> String
+ |  == var
+
+showrule showsym showvar (RuleAlias lroots rroot graph)
+= "((mkrule "+++showlist showvar lroots+++" "+++showvar rroot+++repr`+++") emptygraph)"
+  where (seen,repr`) = foldlr showsubgraph ([],repr) lroots
+        (seen`,repr) = showsubgraph rroot (seen,"")
+        showsubgraph node (seen,repr)
+        | not def || isMember node seen
+          = (seen,repr)
+        = (seen``,repr``)
+          where (def,(f,args)) = varcontents graph node
+                (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
+                seen` = [node:seen]
+                repr`` = " o updategraph "+++showvar node+++" ("+++showsym f+++","+++showlist showvar args+++")"+++repr`
 
 ruleToString :: (sym->.String) .(Rule sym var) -> String | Eq,toString var
 ruleToString symToString (RuleAlias lroots rroot graph)
@@ -259,3 +247,19 @@ where (<<<) file rule = file <<< toString rule
 
 (writerule) infixl :: *File .(Rule sym var) -> .File | toString sym & ==,toString var
 (writerule) file rule = file <<< rule
+
+showruleanch ::
+    (sym->String)
+    (var->String)
+    [Bool]
+    (Rule sym var)
+    [var]
+ -> String
+ |  == var
+
+showruleanch showsym showvar stricts rule anchors
+= foldr (+++) "" (map2 annot stricts argreprs)+++"-> "+++rootrepr
+  where graph = rulegraph rule; args = arguments rule; root = ruleroot rule
+        (argreprs,[rootrepr:anchorreprs]) = claim args reprs
+        reprs = printgraphBy showsym showvar graph (args++[root:anchors])
+        annot strict repr = (if strict ((+++) "!") id) (repr+++" ")

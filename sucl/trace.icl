@@ -5,6 +5,7 @@ implementation module trace
 import spine
 import history
 import rule
+import graph
 import basic
 import syntax
 import StdEnv
@@ -193,8 +194,55 @@ Implementation
 >             (args',root':anchors') = claim args reprs
 >             reprs = printgraph printa printb graph (args++root:anchors)
 >             annot strict repr = cond strict ('!':) id (repr++" ")
+*/
 
+printtrace ::
+    sym                     // LHS function symbol
+    (sym->String)           // Symbol representation
+    (var->String)           // Variable representation for transformed program
+    (pvar->String)          // Variable representation for consulted program
+    String                  // Indent
+    (Trace sym var pvar)    // Trace
+    *File                   // File before writing
+ -> .File                   // File after writing
+ |  == var
+ &  == pvar
 
+printtrace sym showsym showvar showpvar indent trace file0
+= file4
+  where (Trace stricts rule answer history transf) = trace
+        file1 = file0 <<< indent <<< showsym sym <<< " " <<< showruleanch showsym showvar stricts rule (map fst history++answernodes answer) <<< nl
+        file2 = printanswer showsym showvar showpvar (indent+++"    ") answer file1
+        file3 = printhistory showsym showvar (indent+++"    ") history file2
+        file4 = printtransf sym showsym showvar showpvar indent transf file3
+
+printtransf ::
+    sym                             // LHS function symbol
+    (sym->String)                   // Symbol representation
+    (var->String)                   // Variable representation for transformed program
+    (pvar->String)                  // Variable representation for consulted program
+    String                          // Indent
+    (Transformation sym var pvar)   // Transformation to print
+    *File                           // File before writing
+ -> .File                           // File after writing
+ |  == var
+ &  == pvar
+
+printtransf sym showsym showvar showpvar indent transf file0
+= case transf
+  of Reduce reductroot trace
+      -> ptr indent trace (file0 <<< indent <<< "Reduce to " <<< showvar reductroot <<< nl)
+     Annotate trace
+      -> ptr indent trace (file0 <<< indent <<< "Annotate" <<< nl)
+     Stop
+      -> file0 <<< indent <<< "Stop" <<< nl
+     Instantiate rgraph yestrace notrace
+      -> ptr indent notrace (ptr (indent+++"   ") yestrace (file0 <<< indent <<< "Instantiate " <<< showrgraph showsym showvar rgraph <<< nl))
+  where ptr = printtrace sym showsym showvar showpvar
+
+answernodes = foldoptional [] spinenodes
+
+/*
 Tips traverses a finite trace and produces the  list  of  rewrite  rules
 that  are  found  at the leaves of the tree.  This list of rewrite rules
 precisely constitutes the result of symbolic reduction of  the  original

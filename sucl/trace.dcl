@@ -8,6 +8,7 @@ from rule import Rule
 from StdFile import <<<
 from StdOverloaded import ==
 from StdString import toString
+from cleanversion import String
 
 // Transitive necessities
 
@@ -249,8 +250,22 @@ Implementation
 >             (args',root':anchors') = claim args reprs
 >             reprs = printgraph printa printb graph (args++root:anchors)
 >             annot strict repr = cond strict ('!':) id (repr++" ")
+*/
+
+printtrace ::
+    sym                     // LHS function symbol
+    (sym->String)           // Symbol representation
+    (var->String)           // Variable representation for transformed program
+    (pvar->String)          // Variable representation for consulted program
+    String                  // Indent
+    (Trace sym var pvar)    // Trace
+    *File                   // File before writing
+ -> .File                   // File after writing
+ |  == var
+ &  == pvar
 
 
+/*
 Tips traverses a finite trace and produces the  list  of  rewrite  rules
 that  are  found  at the leaves of the tree.  This list of rewrite rules
 precisely constitutes the result of symbolic reduction of  the  original

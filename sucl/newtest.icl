@@ -171,18 +171,29 @@ where toString srr
         "\nAreas: "+++listToString srr.srr_areas+++"\n"
 
 instance <<< (Symredresult sym var tsym tvar) | toString sym & <<<,==,toString var
-where (<<<) file srr
-      = file <<< "==[BEGIN]==" <<< nl
-             <<< "Task expression: " <<< srr.srr_task_expression <<< nl
-             <<< "Assigned symbol: " <<< toString (srr.srr_assigned_symbol) <<< nl
-             <<< "Strictness: " <<< srr.srr_strictness <<< nl
-             //<<< "Type rule: ..." <<< nl
-             <<< srr.srr_trace <<< nl
-             //<<< "Function definition:" <<< nl
-             //<<< srr.srr_function_def
-             <<< "Areas:" <<< nl
-             writeareas srr.srr_areas
-             <<< "==[END]==" <<< nl
+where (<<<) file0 srr
+      = file5
+        where file1
+              = file0 <<< "==[BEGIN]==" <<< nl
+                      <<< "Task expression: " <<< srr.srr_task_expression <<< nl
+                      <<< "Assigned symbol: " <<< toString (srr.srr_assigned_symbol) <<< nl
+                      <<< "Strictness: " <<< srr.srr_strictness <<< nl
+                      //<<< "Type rule: ..." <<< nl
+              file2 = printtrace srr.srr_assigned_symbol toString toString toString "" srr.srr_trace file1
+              file3
+              = file2 //<<< "Function definition:" <<< nl
+                      //<<< srr.srr_function_def
+                      <<< "Areas:" <<< nl
+              file4 = printareas toString toString "    " srr.srr_areas file3
+              file5
+              = file4 <<< "==[END]==" <<< nl
+
+printareas :: (sym->String) (var->String) String [Rgraph sym var] *File -> .File | == var
+printareas showsym showvar indent areas file
+= foldl (flip (printarea showsym showvar indent)) file areas
+
+printarea showsym showvar indent area file
+= file <<< indent <<< hd (printgraphBy showsym showvar (rgraphgraph area) [rgraphroot area]) <<< nl
 
 (writeareas) infixl :: *File [Rgraph sym var] -> .File | toString sym & toString,== var
 (writeareas) file xs = sfoldl (<<<) file xs
