@@ -1502,7 +1502,7 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_tran
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
 	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap, cos_used_dynamics})
+	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
 	  					cos_predef_symbols_for_transform = predef_symbols_for_transform }
