@@ -805,6 +805,7 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 	   				ts_cons_variables = cons_variables ++ ts_cons_variables, ts_exis_variables = ts_exis_variables })
 		//---> ("freshSymbolType", st, tst_args, tst_result, tst_context)
 	where
+		
 		fresh_type_variables :: [TypeVar] !(!*TypeVarHeap, !Int) -> (!*TypeVarHeap, !Int)
 		fresh_type_variables type_variables state
 			= foldSt fresh_type_variable type_variables state
@@ -1168,6 +1169,7 @@ standardRhsConstructorType pos index mod arity {ti_common_defs} ts
 	  cons_type = { ct & st_vars = st_vars, st_attr_vars = st_attr_vars }
 	  (fresh_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars cons_type ti_common_defs ts
 	= currySymbolType fresh_type arity ts
+//		---> ("standardRhsConstructorType", fresh_type)
 where
 	add_vars_and_attr {atv_variable, atv_attribute} (type_variables, attr_variables)
 		= ([ atv_variable : type_variables ], add_attr_var atv_attribute attr_variables)
@@ -1280,7 +1282,9 @@ where
 			VI_FAType vars type _
 				# ts = foldSt bind_var_and_attr vars ts
 		  		  (fresh_type, ts_type_heaps) = freshCopy type ts.ts_type_heaps
+				  ts_type_heaps = foldSt clear_var_and_attr vars ts_type_heaps
 		  		-> (fresh_type, Yes var_expr_ptr, (reqs, { ts & ts_type_heaps = ts_type_heaps }))
+		  				---> ("requirements [BoundVar]", fresh_type)
 		  	_
 				-> abort "requirements BoundVar " // ---> (var_ident <<- var_info))
 		where
@@ -1293,6 +1297,15 @@ where
 				bind_attr (TA_Var {av_info_ptr}) (attr_store, attr_heap)
 					= (inc attr_store, attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)))
 				bind_attr attr attr_heap
+					= attr_heap
+			
+			clear_var_and_attr {atv_attribute, atv_variable = {tv_info_ptr}} th=:{th_vars,th_attrs}
+				# th_attrs = clear_attr atv_attribute th_attrs				
+				= { th & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = th_attrs }
+			where
+				clear_attr (TA_Var {av_info_ptr}) attr_heap
+					= attr_heap <:= (av_info_ptr, AVI_Empty)
+				clear_attr attr attr_heap
 					= attr_heap
 
 instance requirements App
