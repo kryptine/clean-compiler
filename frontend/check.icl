@@ -688,8 +688,6 @@ where
 	unfold_pattern_macro mod_index macro_ident opt_var expr ums=:{ums_error}
 		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident " illegal rhs for a pattern macro" ums_error })
 	
-	
-			
 checkPatternVariable :: !Level !SymbolTableEntry !Ident !VarInfoPtr !*CheckState -> !*CheckState
 checkPatternVariable def_level entry=:{ste_def_level,ste_kind} ident=:{id_info} var_info cs=:{cs_symbol_table,cs_error}
 	| ste_kind == STE_Empty || def_level > ste_def_level
@@ -2659,7 +2657,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 	  cs = addGlobalDefinitionsToSymbolTable icl_decl_symbols cs
 
 	  (moved_dcl_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
-			= foldSt (add_to_conversion_table dcl_macros.ir_from) dcls_local ([], { createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
+			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local ([], { createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
 
 	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], cs)
@@ -2678,12 +2676,12 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		, { cs & cs_symbol_table = cs_symbol_table }
 		)
 where
-	add_to_conversion_table first_macro_index decl=:{dcl_ident=dcl_ident=:{id_info},dcl_kind,dcl_index,dcl_pos}
+	add_to_conversion_table first_macro_index dcl_common decl=:{dcl_ident=dcl_ident=:{id_info},dcl_kind,dcl_index,dcl_pos}
 			(moved_dcl_defs, conversion_table, icl_sizes, icl_defs, cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		| ste_kind == STE_Empty
 			# def_index = toInt dcl_kind
-			| can_be_only_in_dcl def_index
+			| can_be_only_in_dcl def_index && not (def_index==cTypeDefs && is_abstract_type dcl_common.com_type_defs dcl_index)
 				# (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 					= add_dcl_declaration id_info entry decl def_index dcl_index (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 				= ([ decl : moved_dcl_defs ], conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
@@ -2701,12 +2699,15 @@ where
 			# cs_error = checkError "definition module" "conflicting definition in implementation module"
 					(setErrorAdmin (newPosition dcl_ident dcl_pos) cs.cs_error)
 			= (moved_dcl_defs, conversion_table,  icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
-
+ 
 /* To be done : cClassDefs and cMemberDefs */
 
 	can_be_only_in_dcl def_kind
 		=	def_kind == cTypeDefs	|| def_kind == cConstructorDefs || def_kind == cSelectorDefs
 		||	def_kind == cClassDefs	|| def_kind == cMemberDefs
+
+	is_abstract_type com_type_defs dcl_index
+		= case com_type_defs.[dcl_index].td_rhs of (AbstractType _) -> True ; _ -> False
 
 	add_dcl_declaration info_ptr entry dcl def_index dcl_index (conversion_table, icl_sizes, icl_defs, symbol_table)
 		# (icl_index, icl_sizes) = icl_sizes![def_index]
@@ -2721,7 +2722,7 @@ where
 			,	[ { dcl & dcl_index = icl_index } : icl_defs ]
 			,	NewEntry symbol_table info_ptr dcl.dcl_kind icl_index cGlobalScope entry
 			)
-	
+
 	add_dcl_definition {com_type_defs} dcl=:{dcl_kind = STE_Type, dcl_index}
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 		# type_def = com_type_defs.[dcl_index]
