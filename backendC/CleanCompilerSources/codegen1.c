@@ -3668,6 +3668,25 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 #endif
 }
 
+#ifdef CLEAN2
+int contains_fail (NodeP node_p)
+{
+	while (node_p->node_kind==IfNode){
+		NodeP else_node_p;
+	
+		else_node_p=node_p->node_arguments->arg_next->arg_next->arg_node;
+		while (else_node_p->node_kind==IfNode)
+			else_node_p=else_node_p->node_arguments->arg_next->arg_next->arg_node;
+		
+		if (else_node_p->node_kind==NormalNode && else_node_p->node_symbol->symb_kind==fail_symb)
+			return 1;
+
+		node_p=node_p->node_arguments->arg_next->arg_node;
+	}
+	return 0;
+}
+#endif
+
 int generate_code_for_root_node (NodeP node,int asp,int bsp,struct esc *esc_p,NodeDefP defs,StateP result_state_p,
 								 SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
 {
@@ -3719,11 +3738,13 @@ int generate_code_for_root_node (NodeP node,int asp,int bsp,struct esc *esc_p,No
 			return generate_code_for_root_node (node,asp,bsp,esc_p,defs,result_state_p,save_states_p,ab_node_ids_p);
 		default:
 		{
+#ifndef CLEAN2
 			NodeP else_node;	
 
 			else_node=node;
 			while (else_node->node_kind==IfNode)
 				else_node=else_node->node_arguments->arg_next->arg_next->arg_node;
+#endif
 
 			return CodeRhsNodeDefs (node,defs,asp,bsp,save_states_p,*result_state_p,esc_p,ab_node_ids_p->a_node_ids,
 					ab_node_ids_p->b_node_ids,
@@ -3732,7 +3753,11 @@ int generate_code_for_root_node (NodeP node,int asp,int bsp,struct esc *esc_p,No
 #else
 					NULL,
 #endif
+#ifdef CLEAN2
+					!contains_fail (node));
+#else
 					!(else_node->node_kind==NormalNode && else_node->node_symbol->symb_kind==fail_symb));
+#endif
 		}
 	}
 }

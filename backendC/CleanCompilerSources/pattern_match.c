@@ -1719,6 +1719,10 @@ static NodeIdRefCountListP duplicate_node_id_ref_count_list (NodeIdRefCountListP
 	return new_node_id_ref_count_list;
 }
 
+#ifdef CLEAN2
+extern int contains_fail (NodeP node_p);
+#endif
+
 static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCountListP *node_id_ref_count_list_p)
 {
 	switch (node->node_kind){
@@ -1864,6 +1868,9 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 		case GuardNode:
 			return determine_failing_cases_and_adjust_ref_counts (node->node_arguments->arg_next->arg_node,node_id_ref_count_list_p);
 		case IfNode:
+#ifdef CLEAN2
+			return contains_fail (node);
+#else
 		{
 			NodeP else_node;
 			
@@ -1873,6 +1880,7 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 			
 			return else_node->node_kind==NormalNode && else_node->node_symbol->symb_kind==fail_symb;
 		}
+#endif
 		default:
 			return False;
 	}

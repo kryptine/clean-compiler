@@ -1130,6 +1130,10 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 	}
 }
 
+#ifdef CLEAN2
+extern int contains_fail (NodeP node_p);
+#endif
+
 static int CodeRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeIdsP code_gen_node_ids_p,StateS resultstate,struct esc *esc_p)
 {
 	switch (root->node_kind){
@@ -1166,11 +1170,20 @@ static int CodeRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeIdsP
 	
 			if (thenlab.lab_mod==NULL)
 				GenLabelDefinition (&thenlab);
-
+#ifdef CLEAN2
+			{
+			int needs_next_alt;
+			
+			needs_next_alt=
+#endif
 			CodeRhsNodeDefsAndRestoreNodeIdStates (then_arg->arg_node,root->node_then_node_defs,asp,bsp,resultstate,esc_p,
 				code_gen_node_ids_p->a_node_ids,code_gen_node_ids_p->b_node_ids,
 				root->node_else_node_id_ref_counts,
+#ifdef CLEAN2
+				!contains_fail (then_arg->arg_node)
+#else
 				True
+#endif
 /*
 				code_gen_node_ids_p->doesnt_fail
 */
@@ -1186,9 +1199,18 @@ static int CodeRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeIdsP
 				
 				return 1;
 			} else
-				return CodeRhsNodeDefsAndRestoreNodeIdStates (else_node,root->node_else_node_defs,asp,bsp,resultstate,esc_p,
+#ifdef CLEAN2
+				needs_next_alt = needs_next_alt |
+#else
+				return 
+#endif
+				CodeRhsNodeDefsAndRestoreNodeIdStates (else_node,root->node_else_node_defs,asp,bsp,resultstate,esc_p,
 								 						code_gen_node_ids_p->a_node_ids,code_gen_node_ids_p->b_node_ids,
 								 						NULL,code_gen_node_ids_p->doesnt_fail);
+#ifdef CLEAN2
+				return needs_next_alt;
+			}
+#endif
 		}
 		case NodeIdNode:
 			if (rootid==NULL){
