@@ -3277,6 +3277,8 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
+
+	iclDef->sdef_exported = True;
 } /* BEExportType */
 
 void
