@@ -90,3 +90,4 @@
 /EXPORT: BEGetVersion
 /EXPORT: BEAbsType
 /EXPORT: BESwapTypes
+/EXPORT: BESetMainDclModuleN
