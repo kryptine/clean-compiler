@@ -448,7 +448,6 @@ element_appears_in_stomm_struct imported_st element_ident dcl_index index type_n
 		= abort "element_appears_in_stomm_struct will be never called, when the above guard holds. This statement is only to remind people to remove this function."
 	#	(dcl_module=:{dcl_name=dcl_name=:{id_info}}, modules)		= modules ! [index]
 		(module_entry, cs_symbol_table)				= readPtr id_info cs.cs_symbol_table
-//JVG: add #!		
 	#!	cs	= { cs & cs_symbol_table=cs_symbol_table }
 	= continuation imported_st module_entry.ste_kind dcl_module modules cs
   where
@@ -559,17 +558,9 @@ check_completeness_of_module mod_index dcls_explicit file_name (f_consequences, 
 	#	dcls_imp	= [((dcl_ident, kind), (dcl_index, mod_index), (file_name, line_nr))
 						\\ ({dcl_ident, dcl_index, dcl_kind=STE_Imported kind mod_index}, line_nr) <- dcls_explicit]
 		(conseqs, (f_consequences, modules, icl_functions, expr_heap))
-/* JVG:
-				= seqList (map (consequences_of mod_index) dcls_imp) (f_consequences, modules, icl_functions, expr_heap)
-*/
 				= mapSt (consequences_of mod_index) dcls_imp (f_consequences, modules, icl_functions, expr_heap)
-/**/
 		conseqs	= flatten conseqs
-/*JVG:
-	#!	(modules, cs)	= seq (map checkConsequenceError conseqs) (modules, cs)
-*/
 	#!	(modules, cs)	= foldr checkConsequenceError (modules, cs) conseqs
-/**/
 	= (f_consequences, modules, icl_functions, expr_heap, cs)
 
 consequences_of ::	!Index
@@ -577,17 +568,6 @@ consequences_of ::	!Index
  				->	(![(!IdentWithKind, !IdentWithCKind, !(!String, !Int))], !(*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap))
 consequences_of count (expl_imp_ident_kind=:(_,expl_imp_kind), (dcl_index, mod_index), errMsgInfo) 
 				(f_consequences, modules, icl_functions, expr_heap)
-/* JVG:
-	#	(modul, modules)	= modules![mod_index]
-		(consequences, (f_consequences, icl_functions, expr_heap))
-			= case expl_imp_kind of
-					STE_FunctionOrMacro _
-						-> consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
-					_
-						-> (consequences_of_simple_symbol expl_imp_kind modul dcl_index, (f_consequences, icl_functions,expr_heap))
-		conseqs	= removeDup consequences
-	= ([(expl_imp_ident_kind, conseq, errMsgInfo) \\ conseq<-conseqs], (f_consequences, modules, icl_functions, expr_heap))
-*/
 	= case expl_imp_kind of
 			STE_FunctionOrMacro _
 				# (consequences, (f_consequences, icl_functions, expr_heap)) = consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
@@ -598,7 +578,6 @@ consequences_of count (expl_imp_ident_kind=:(_,expl_imp_kind), (dcl_index, mod_i
 	where
 		add_kind_and_error_info_to_consequences consequences
 			= [(expl_imp_ident_kind, conseq, errMsgInfo) \\ conseq<-removeDup consequences]
-/**/
 	
 consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
 	#	(icl_function, icl_functions)	= icl_functions![dcl_index]
@@ -688,9 +667,7 @@ consequences_of_simple_symbol STE_Member {dcl_common} dcl_index
 consequences_of_simple_symbol STE_Instance {dcl_common} dcl_index
 	= consequences dcl_common.com_instance_defs.[dcl_index]
 
-// JVG added type:
 checkConsequenceError :: !((Ident,.STE_Kind),!.(Ident,ConsequenceKind),!(.{#Char},.Int)) !*(*{#DclModule},!*CheckState) -> (!*{#DclModule},!.CheckState)
-
 checkConsequenceError (expl_imp_ident_kind, conseq_ident_kind=:(conseq_ident, conseq_kind), (file_name, line_nr))
 					 (modules, cs=:{cs_symbol_table, cs_error})
 	#	(c_ident, modules)

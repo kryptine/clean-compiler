@@ -1154,8 +1154,7 @@ determineVariablesAndRefCounts free_vars expr cos=:{cos_var_heap}
 retrieveRefCounts free_vars var_heap
 	= mapSt retrieveRefCount free_vars var_heap
 
-// JVG: added type:
-retrieveRefCount :: FreeVar *(Heap VarInfo) -> (!FreeVar,!.Heap VarInfo);
+retrieveRefCount :: FreeVar *VarHeap -> (!FreeVar,!.VarHeap)
 retrieveRefCount fv=:{fv_info_ptr} var_heap
 	# (VI_Count count _, var_heap) = readPtr fv_info_ptr var_heap
 	= ({ fv & fv_count = count }, var_heap)
