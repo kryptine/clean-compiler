@@ -351,6 +351,7 @@ cMayBeNonCoercible		:== 4
 ::	ParsedBody =
 	{	pb_args	:: ![ParsedExpr]
 	,	pb_rhs	:: !Rhs
+	,	pb_position	:: !Position
 	}
 
 ::	CheckedBody =
@@ -1012,11 +1013,13 @@ cIsNotStrict	:== False
 	{	ap_symbol	:: !(Global DefinedSymbol)
 	,	ap_vars		:: ![FreeVar]
 	,	ap_expr		:: !Expression
+	,	ap_position	:: !Position
 	}
 	
 ::	BasicPattern =
 	{	bp_value	:: !BasicValue
 	,	bp_expr		:: !Expression
+	,	bp_position	:: !Position
 	}
 
 ::	TypeCase =
@@ -1032,6 +1035,7 @@ cIsNotStrict	:== False
 	,	dp_type_patterns_vars	:: ![VarInfoPtr]			/* filled after type checking */
 	,	dp_type_code			:: !TypeCodeExpression		/* filled after type checking */
 	,	dp_rhs					:: !Expression
+	,	dp_position				:: !Position
 	}
 	
 	
@@ -1293,7 +1297,8 @@ where
 
 instance <<< AlgebraicPattern
 where
-	(<<<) file g = file <<< g.ap_symbol <<< g.ap_vars <<< " -> " <<< g.ap_expr
+//	(<<<) file g = file <<< g.ap_symbol <<< g.ap_vars <<< " -> " <<< g.ap_expr
+	(<<<) file g = file <<< g.ap_symbol <<< g.ap_vars <<< " " <<< g.ap_position <<< "-> " <<< g.ap_expr
 
 instance <<< BasicPattern
 where

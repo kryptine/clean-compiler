@@ -36,11 +36,20 @@ import RWSDebug
 ::	Requirements =
 	{	req_overloaded_calls	:: ![ExprInfoPtr]
 	,	req_type_coercions		:: ![TypeCoercion]
+	,	req_type_coercion_groups:: ![TypeCoercionGroup] // MW4++
 	,	req_attr_coercions		:: ![AttrCoercion]
 	,	req_cons_variables		:: ![[TempVarId]]
 	,	req_case_and_let_exprs	:: ![ExprInfoPtr]
 	}
-	
+
+// MW4 added..
+// one TypeCoercionGroup collects coercions for one function alternative
+::	TypeCoercionGroup =
+	{	tcg_type_coercions	:: ![TypeCoercion]
+	,	tcg_position		:: !Position
+	}
+// ..MW4
+
 instance toString BoundVar
 where
 	toString varid = varid.var_name.id_name
@@ -863,6 +872,7 @@ where
 			= (reverse used_dyn_types, ({ reqs & req_type_coercions = [{tc_demanded = dyn_type, tc_offered = pattern_type, tc_position = CP_Expression match_expr, tc_coercible = True} :
 						reqs.req_type_coercions] }, { ts & ts_expr_heap = ts_expr_heap }))
 	
+/* MW4 was:
 		requirements_of_algebraic_patterns ti [] cons_types goal_type used_cons_types reqs_ts
 			= (used_cons_types, reqs_ts)
 		requirements_of_algebraic_patterns ti=:{ti_common_defs} [{ap_symbol, ap_vars, ap_expr }:gs] [ cons_arg_types : cons_types] goal_type used_cons_types (reqs, ts)
@@ -872,7 +882,29 @@ where
 			= requirements_of_algebraic_patterns ti gs cons_types goal_type [ cons_arg_types : used_cons_types ]
 				({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression ap_expr, tc_coercible = True } : reqs.req_type_coercions] },
 					  { ts & ts_expr_heap = ts_expr_heap })
+*/
+
+		requirements_of_algebraic_patterns ti [] cons_types goal_type used_cons_types reqs_ts
+			= (used_cons_types, reqs_ts)
+		requirements_of_algebraic_patterns ti [alg_pattern=:{ap_position}:alg_patterns] [ cons_arg_types : cons_types] 
+											goal_type used_cons_types reqs_ts
+			= requirements_of_algebraic_patterns ti alg_patterns cons_types goal_type [ cons_arg_types : used_cons_types ]
+					(possibly_accumulate_reqs_in_new_group 
+						ap_position
+						(requirements_of_algebraic_pattern ti alg_pattern cons_arg_types goal_type) 
+						reqs_ts
+					) 
+
+// MW4++..
+		requirements_of_algebraic_pattern ti {ap_symbol, ap_vars, ap_expr} cons_arg_types goal_type (reqs, ts)
+			# (res_type, opt_expr_ptr, (reqs, ts)) 
+					= requirements ti ap_expr (reqs, { ts & ts_var_heap = makeBase ap_symbol.glob_object.ds_ident 1 ap_vars cons_arg_types ts.ts_var_heap})
+			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
+			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression ap_expr, tc_coercible = True } : reqs.req_type_coercions] },
+					  { ts & ts_expr_heap = ts_expr_heap })
+// ..MW4
 	
+/*
 		requirements_of_basic_patterns _ [] goal_type reqs_ts
 			= reqs_ts
 		requirements_of_basic_patterns ti=:{ti_common_defs} [{bp_expr }:gs] goal_type reqs_ts
@@ -881,7 +913,26 @@ where
 			= requirements_of_basic_patterns ti gs goal_type
 				({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression bp_expr, tc_coercible = True } : reqs.req_type_coercions] },
 						 { ts & ts_expr_heap = ts_expr_heap })
+*/	
+		requirements_of_basic_patterns _ [] goal_type reqs_ts
+			= reqs_ts
+		requirements_of_basic_patterns ti [{bp_expr, bp_position}:gs] goal_type reqs_ts
+			= requirements_of_basic_patterns ti gs goal_type
+				(possibly_accumulate_reqs_in_new_group
+					bp_position
+					(requirements_of_basic_pattern ti bp_expr goal_type)
+					reqs_ts
+				)
+
+// MW4++..
+		requirements_of_basic_pattern ti bp_expr goal_type reqs_ts
+		  	# (res_type, opt_expr_ptr, (reqs, ts)) = requirements ti bp_expr reqs_ts
+			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
+			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression bp_expr, tc_coercible = True } : reqs.req_type_coercions] },
+						 { ts & ts_expr_heap = ts_expr_heap })
+// ..MW4
 	
+/* MW4 was
 		requirements_of_dynamic_patterns ti goal_type [{dp_var={fv_info_ptr},dp_type,dp_rhs} : dps] used_dyn_types (reqs, ts=:{ts_expr_heap, ts_var_heap})
 			# (EI_TempDynamicPattern _ _ _ _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dp_type ts_expr_heap
 			  ts_var_heap = ts_var_heap <:= (fv_info_ptr, VI_Type dyn_type No)
@@ -896,6 +947,34 @@ where
 						(dyn_expr_ptr,  EI_Overloaded {  oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = [] }) })
 		requirements_of_dynamic_patterns ti goal_type [] used_dyn_types reqs_ts
 			= (used_dyn_types, reqs_ts)
+*/
+	
+		requirements_of_dynamic_patterns ti goal_type [] used_dyn_types reqs_ts
+			= (used_dyn_types, reqs_ts)
+		requirements_of_dynamic_patterns ti goal_type [dp=:{dp_position, dp_type} : dps] used_dyn_types (reqs, ts=:{ts_expr_heap})
+			# (EI_TempDynamicPattern _ _ _ _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap)
+					= readPtr dp_type ts_expr_heap
+			  (reqs_ts) 
+			  		= possibly_accumulate_reqs_in_new_group
+			  				dp_position
+							(requirements_of_dynamic_pattern dyn_type dyn_context dyn_expr_ptr type_code_symbol ti goal_type dp)
+							(reqs, { ts & ts_expr_heap = ts_expr_heap})
+			= requirements_of_dynamic_patterns ti goal_type dps [ [dyn_type] : used_dyn_types ] reqs_ts
+	
+// MW4++..
+		requirements_of_dynamic_pattern dyn_type dyn_context dyn_expr_ptr type_code_symbol 
+										ti goal_type {dp_var={fv_info_ptr},dp_rhs} (reqs, ts=:{ts_expr_heap, ts_var_heap})
+			# ts_var_heap = ts_var_heap <:= (fv_info_ptr, VI_Type dyn_type No)
+			  (dp_rhs_type, opt_expr_ptr, (reqs, ts)) = requirements ti dp_rhs (reqs, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
+			  ts_expr_heap = storeAttribute opt_expr_ptr dp_rhs_type.at_attribute ts.ts_expr_heap
+			  type_coercion = { tc_demanded = goal_type, tc_offered = dp_rhs_type, tc_position = CP_Expression dp_rhs, tc_coercible = True }
+			| isEmpty dyn_context
+				# reqs = {reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions]}
+				= (reqs, { ts &  ts_expr_heap = ts_expr_heap })
+				# reqs = { reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions], req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls ]}
+				= (reqs, { ts & ts_expr_heap = ts_expr_heap <:=
+						(dyn_expr_ptr,  EI_Overloaded {  oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = [] }) })
+// ..MW4
 	
 	
 		requirements_of_default ti (Yes expr) goal_type reqs_ts
@@ -1139,6 +1218,27 @@ where
 						tc_position = CP_Expression elem_expr, tc_coercible = True } : reqs.req_type_coercions ]}
 		= (reqs, ts)
 
+// MW4..
+possibly_accumulate_reqs_in_new_group position state_transition reqs_ts
+	:== possibly_accumulate_reqs position reqs_ts
+  where
+	possibly_accumulate_reqs position=:(FunPos _ _ _) (reqs=:{req_type_coercions=old_req_type_coercions}, ts)
+		# reqs_with_empty_accu
+				= { reqs & req_type_coercions = [] }
+		  (reqs_with_new_group_in_accu, ts)
+		  		= state_transition (reqs_with_empty_accu, ts)
+		  new_group 
+		  		= { tcg_type_coercions = reqs_with_new_group_in_accu.req_type_coercions,
+		  			tcg_position = position }
+		  reqs_with_new_group
+		  		= { reqs_with_new_group_in_accu & 
+		  				req_type_coercion_groups = [new_group:reqs_with_new_group_in_accu.req_type_coercion_groups],
+			  			req_type_coercions = old_req_type_coercions }
+		= (reqs_with_new_group, ts)
+	possibly_accumulate_reqs _ reqs_ts
+		= state_transition reqs_ts
+
+// ..MW4
 makeBase _ _ [] [] ts_var_heap
 	= ts_var_heap
 makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr}:vars] [type:types] ts_var_heap
@@ -1524,8 +1624,7 @@ where
 		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (fun_defs, predef_symbols, [], ts)
 		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
-		#! nr_of_type_variables = ts.ts_var_store
-										
+		#! nr_of_type_variables = ts.ts_var_store 
 		# (subst, ts_type_heaps, ts_error)
 		  		= unify_requirements_of_functions fun_reqs ti (createArray nr_of_type_variables TE) ts.ts_type_heaps ts.ts_error
 		| not ts_error.ea_ok //---> (("begin\n" ---> subst.[2]) ---> "\nend")
@@ -1582,6 +1681,7 @@ where
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 					  ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env})
 
+/* MW4 was
 	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
 	unify_requirements_of_functions [{fe_requirements={req_type_coercions},fe_location} : reqs_list] modules subst heaps ts_error
 		# ts_error = setErrorAdmin fe_location ts_error
@@ -1589,6 +1689,21 @@ where
 		= unify_requirements_of_functions reqs_list modules subst heaps ts_error
 	unify_requirements_of_functions [] modules subst heaps ts_error
 		= (subst, heaps, ts_error)
+*/
+	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
+	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
+		# (subst, heaps, ts_error) = foldSt (unify_requirements_of_alternative ip_ident ti) req_type_coercion_groups (subst, heaps, ts_error)
+		= unify_requirements_of_functions reqs_list ti subst heaps ts_error
+	unify_requirements_of_functions [] ti subst heaps ts_error
+		= (subst, heaps, ts_error)
+
+// MW4 added..
+  	unify_requirements_of_alternative :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
+ 						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
+	unify_requirements_of_alternative fun_symb ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
+		# ts_error = setErrorAdmin (newPosition fun_symb tcg_position) ts_error
+		= unify_coercions tcg_type_coercions ti subst heaps ts_error
+// ..MW4
 
 	build_initial_coercion_env [{fe_requirements={req_attr_coercions},fe_location} : reqs_list] coercion_env
 		= build_initial_coercion_env reqs_list (add_to_initial_coercion_env req_attr_coercions coercion_env)
@@ -1618,6 +1733,7 @@ where
 			  (prev_vect, bitvects) = bitvects![bit_index]
 			= { bitvects & [bit_index] = prev_vect bitor (1 << BITNUMBER var_number) }
 
+/* MW4 was
 	build_coercion_env [{fe_requirements={req_type_coercions},fe_location} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# error = setErrorAdmin fe_location error
 		  (subst, coercion_env, type_signs, type_var_heap, error)
@@ -1625,6 +1741,22 @@ where
 		= build_coercion_env reqs_list subst coercion_env common_defs cons_var_vects  type_signs type_var_heap error
 	build_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		= (subst, coercion_env, type_signs, type_var_heap, error)
+*/
+	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+		# (subst, coercion_env, type_signs, type_var_heap, error)
+			= foldSt (build_coercion_env_for_alternative ip_ident common_defs cons_var_vects)
+					req_type_coercion_groups
+					(subst, coercion_env, type_signs, type_var_heap, error)
+		= build_coercion_env reqs_list subst coercion_env common_defs cons_var_vects  type_signs type_var_heap error
+	build_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+		= (subst, coercion_env, type_signs, type_var_heap, error)
+
+// MW4 added..
+	build_coercion_env_for_alternative fun_symb common_defs cons_var_vects {tcg_position, tcg_type_coercions}
+										(subst, coercion_env, type_signs, type_var_heap, error)
+		# error = setErrorAdmin (newPosition fun_symb tcg_position) error
+		= add_to_coercion_env tcg_type_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+// MW4
 
 	add_to_coercion_env [{tc_offered,tc_demanded,tc_coercible,tc_position} : attr_coercions] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (subst, coercion_env, type_signs, type_var_heap, error)
@@ -1714,15 +1846,21 @@ where
 		  ts_var_heap = makeBase fun_symb 1 tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_symb fun_pos
 		  ts_error = setErrorAdmin fe_location ts_error
-		  reqs = { req_overloaded_calls = [], req_type_coercions = [], req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
+// MW4 was:		  reqs = { req_overloaded_calls = [], req_type_coercions = [], req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
+		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],
+		  			 req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
 		  ( rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs,
 		  		{ ts & ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error, ts_fun_env = ts_fun_env })
 		  req_type_coercions = [{tc_demanded = temp_fun_type.tst_result,tc_offered = rhs_type, tc_position = CP_Expression tb_rhs, tc_coercible = True} :
 		  		rhs_reqs.req_type_coercions ]
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap
-		= ({fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
-			fe_requirements = { rhs_reqs & req_type_coercions = req_type_coercions, req_cons_variables = [] }}, (rhs_reqs.req_cons_variables, fun_defs,
-				{ ts & ts_expr_heap = ts_expr_heap }))
+		  type_coercion_group_from_accu = { tcg_type_coercions = req_type_coercions, tcg_position = fun_pos }
+		  req_type_coercion_groups = [type_coercion_group_from_accu:rhs_reqs.req_type_coercion_groups]
+		= ( { fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
+// MW4 was:			fe_requirements = { rhs_reqs & req_type_coercions = req_type_coercions, req_cons_variables = [] }}, (rhs_reqs.req_cons_variables, fun_defs,
+			  fe_requirements = { rhs_reqs & req_type_coercions = [], req_type_coercion_groups = req_type_coercion_groups, req_cons_variables = [] }
+		    },
+		    (rhs_reqs.req_cons_variables, fun_defs, { ts & ts_expr_heap = ts_expr_heap }))
 //					 ---> ("type_function", fun_symb, tb_args, tb_rhs, fun_info.fi_local_vars)
 	where
 		has_option (Yes _)	= True

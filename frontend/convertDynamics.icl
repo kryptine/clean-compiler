@@ -396,7 +396,8 @@ where
 		  								   bind_dst = unify_bool_fv } : let_binds
 		  								],
 		  					let_expr = Case {	case_expr 		= Var unify_bool_var,
-												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs}],
+// MW was:												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs}],
+												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = NoPos }],
 												case_default	= default_expr,
 												case_ident		= No,
 												case_info_ptr	= case_info_ptr	},

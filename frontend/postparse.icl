@@ -306,7 +306,8 @@ transformLambda :: Ident [ParsedExpr] ParsedExpr Position -> FunDef
 transformLambda lam_ident args result pos
 	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs },
 	  			  rhs_locals = NoCollectedLocalDefs }
-	  lam_body = [{pb_args = args, pb_rhs = lam_rhs }]
+// MW4 was:	  lam_body = [{pb_args = args, pb_rhs = lam_rhs }]
+	  lam_body = [{pb_args = args, pb_rhs = lam_rhs, pb_position = pos }]
 // MW was:	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No NoPos
 	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 	= fun_def
@@ -789,8 +790,10 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 		  (bodies, new_fun_kind, rest_defs, ca) = collectFunctionBodies fun_name fun_arity fun_prio new_fun_kind defs ca
 		  act_arity	= length args
 		| fun_arity == act_arity
-			= ([{ pb_args = args, pb_rhs = rhs } : bodies ], new_fun_kind, rest_defs, ca)
-			= ([{ pb_args = args, pb_rhs = rhs } : bodies ], new_fun_kind, rest_defs, 
+// MW4 was:			= ([{ pb_args = args, pb_rhs = rhs } : bodies ], new_fun_kind, rest_defs, ca)
+			= ([{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ], new_fun_kind, rest_defs, ca)
+// MW4 was:			= ([{ pb_args = args, pb_rhs = rhs } : bodies ], new_fun_kind, rest_defs, 
+			= ([{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ], new_fun_kind, rest_defs, 
 			    postParseError pos	("This alternative has " + toString act_arity +
 			  						 (if (act_arity == 1)" argument instead of " " arguments instead of ") + toString fun_arity
 			  						) ca
@@ -814,7 +817,8 @@ reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kin
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count ca
-	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] fun_kind prio No pos
+// MW4 was:	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] fun_kind prio No pos
+	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies] fun_kind prio No pos
 	| fun_kind == FK_Macro
 		= (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros ]}, imports, imported_objects, ca)
 		= ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
@@ -829,7 +833,8 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  			  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count ca
-				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
+// MW4 was:				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
+				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 				| fun_kind == FK_Macro
 					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects, ca)
 					-> ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
@@ -932,7 +937,8 @@ where
 		  fun_arity = length args
 		  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
-		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] FK_Macro prio No fun_pos
+// MW4 was:		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] FK_Macro prio No fun_pos
+		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = fun_pos } : bodies] FK_Macro prio No fun_pos
 		= (mem_defs, [macro : mem_macros], ca)
 	check_symbols_of_class_members [def : _] type_context ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  <<- def
@@ -966,7 +972,8 @@ where
 		  prio = if is_infix (Prio NoAssoc 9) NoPrio
 		  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  (fun_defs, ca) = collect_member_instances defs ca
-		  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
+// MW4 was:		  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
+		  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 		= ([ fun : fun_defs ], ca)
 	collect_member_instances [PD_TypeSpec fun_pos fun_name prio type specials : defs] ca
 		= case defs of
@@ -1005,7 +1012,8 @@ reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : de
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
+// MW4 was:	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
+	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 	= ([ fun : fun_defs ], node_defs, ca)
 reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 	= case defs of

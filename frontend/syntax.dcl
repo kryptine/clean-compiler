@@ -374,8 +374,9 @@ cIsNonCoercible			:== 2
 	}
 
 ::	ParsedBody =
-	{	pb_args	:: ![ParsedExpr]
-	,	pb_rhs	:: !Rhs
+	{	pb_args		:: ![ParsedExpr]
+	,	pb_rhs		:: !Rhs
+	,	pb_position	:: !Position
 	}
 
 ::	CheckedBody =
@@ -1081,11 +1082,13 @@ cIsNotStrict	:== False
 	{	ap_symbol	:: !(Global DefinedSymbol)
 	,	ap_vars		:: ![FreeVar]
 	,	ap_expr		:: !Expression
+	,	ap_position	:: !Position
 	}
 	
 ::	BasicPattern =
 	{	bp_value	:: !BasicValue
 	,	bp_expr		:: !Expression
+	,	bp_position	:: !Position
 	}
 
 ::	TypeCase =
@@ -1101,6 +1104,7 @@ cIsNotStrict	:== False
 	,	dp_type_patterns_vars	:: ![VarInfoPtr]			/* filled after type checking */
 	,	dp_type_code			:: !TypeCodeExpression		/* filled after type checking */
 	,	dp_rhs					:: !Expression
+	,	dp_position				:: !Position
 	}
 	
 /*
