@@ -3,6 +3,7 @@ implementation module checksupport
 import StdEnv, compare_constructor
 import syntax, predef
 import utilities
+from check import checkFunctions
 
 ::	VarHeap :== Heap VarInfo
 
@@ -205,6 +206,41 @@ where
 			= envLookUp var binds
 	envLookUp var []
 		= (False, abort "illegal value")
+
+
+::	ExpressionInfo =
+	{	ef_type_defs		:: !.{# CheckedTypeDef}
+	,	ef_selector_defs	:: !.{# SelectorDef}
+	,	ef_cons_defs		:: !.{# ConsDef}
+	,	ef_member_defs		:: !.{# MemberDef}
+	,	ef_class_defs		:: !.{# ClassDef}
+	,	ef_modules			:: !.{# DclModule}
+	,	ef_is_macro_fun		:: !Bool
+	}
+
+checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
+					-> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
+checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) fun_defs e_info heaps cs
+	= checkFunctions mod_index level ir_from ir_to fun_defs e_info heaps cs
+
+
+convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
+convertIndex index table_index (Yes tables)
+	= tables.[table_index].[index]
+convertIndex index table_index No
+	= index
+
+
+
+retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
+retrieveGlobalDefinition {ste_kind = STE_Imported kind dcl_index, ste_def_level, ste_index} requ_kind mod_index
+	| kind == requ_kind
+		= (ste_index, dcl_index)
+		= (NotFound, mod_index)
+retrieveGlobalDefinition {ste_kind,ste_def_level,ste_index} requ_kind mod_index
+	| ste_kind == requ_kind && ste_def_level == cGlobalScope
+		= (ste_index, mod_index)
+		= (NotFound, mod_index)
 
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsFromSymbolTable [(_, {dcls_import,dcls_local,dcls_local_for_import}) : imports] all_decls symbol_table
@@ -562,6 +598,38 @@ removeIdentFromSymbolTable level {id_name,id_info} symbol_table
 		= symbol_table <:= (id_info,ste_previous) // ---> ("removeIdentFromSymbolTable", id_name)
 		= symbol_table // ---> ("NO removeIdentFromSymbolTable", id_name)
 
+removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap SymbolTableEntry)
+			-> (!u:{# FunDef}, !.Heap SymbolTableEntry)
+removeLocalsFromSymbolTable level loc_vars (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) defs symbol_table
+	= remove_defs_from_symbol_table level ir_from ir_to defs (removeLocalIdentsFromSymbolTable level loc_vars symbol_table)
+where
+	remove_defs_from_symbol_table level from_index to_index defs symbol_table
+		| from_index == to_index
+			= (defs, symbol_table)	
+			#! def = defs.[from_index]
+			   id_info = (toIdent def).id_info
+			   entry = sreadPtr id_info symbol_table
+			| level == entry.ste_def_level
+				= remove_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
+				= remove_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
+
+
+newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
+newFreeVariable new_var vars=:[free_var=:{fv_def_level,fv_info_ptr}: free_vars]
+	| new_var.fv_def_level > fv_def_level
+		= (True, [new_var : vars])
+	| new_var.fv_def_level == fv_def_level
+		| new_var.fv_info_ptr == fv_info_ptr
+			= (False, vars)
+			#! (free_var_added, free_vars) = newFreeVariable new_var free_vars
+			= (free_var_added, [free_var : free_vars])
+		#! (free_var_added, free_vars) = newFreeVariable new_var free_vars
+		= (free_var_added, [free_var : free_vars])
+newFreeVariable new_var []
+	= (True, [new_var])
+
+
+	
 class toIdent a :: !a -> Ident
 
 instance toIdent SymbIdent

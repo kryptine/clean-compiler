@@ -134,15 +134,27 @@ instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 instance toInt STE_Kind
 instance <<< STE_Kind, IdentPos, Declaration
 
+::	ExpressionInfo =
+	{	ef_type_defs		:: !.{# CheckedTypeDef}
+	,	ef_selector_defs	:: !.{# SelectorDef}
+	,	ef_cons_defs		:: !.{# ConsDef}
+	,	ef_member_defs		:: !.{# MemberDef}
+	,	ef_class_defs		:: !.{# ClassDef}
+	,	ef_modules			:: !.{# DclModule}
+	,	ef_is_macro_fun		:: !Bool
+	}
+
+checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
+					-> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
+
+convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
+
+retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-//retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-//retrieveAndRemoveImportsOfModuleFromSymbolTable :: !{!.Declaration} ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !u:{#FunDef} !*SymbolTable !*ErrorAdmin -> (!u:{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
-//addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] ![.Declaration] !*CheckState -> .CheckState;
 addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] !{!.Declaration} !*CheckState -> .CheckState;
 addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!.Declaration} !{!.Declaration} !*CheckState -> .CheckState;
-//addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
 addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable :: ![.Declaration] !*CheckState -> .CheckState;
 retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);
@@ -151,3 +163,7 @@ removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntr
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
+removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap SymbolTableEntry)
+			-> (!u:{# FunDef}, !.Heap SymbolTableEntry)
+
+newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
