@@ -870,11 +870,23 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			-> (!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
 		check_generic_expr 
 				free_vars entry=:{ste_kind=STE_Generic,ste_index} id  kind  
-				e_input=:{ei_mod_index}  e_state e_info cs
+				e_input=:{ei_mod_index}  e_state 
+				e_info=:{ef_generic_defs} cs
+			//#! e_info = {e_info & ef_generic_defs = add_kind ef_generic_defs ste_index kind}	
 			= check_it free_vars ei_mod_index ste_index id kind e_input e_state e_info cs	
 		check_generic_expr 
 				free_vars entry=:{ste_kind=STE_Imported STE_Generic mod_index, ste_index} id kind  
-				e_input e_state e_info cs
+				e_input e_state 
+				e_info=:{ef_modules} cs
+			
+			//#! (dcl_module, ef_modules) = ef_modules ! [mod_index]
+			//#! (dcl_common, dcl_module) = dcl_module ! dcl_common 
+			//#! (com_generic_defs, dcl_common) = dcl_common ! com_generic_defs
+			//#! dcl_common = {dcl_common & com_generic_defs = add_kind com_generic_defs ste_index kind}
+			//#! dcl_module = {dcl_module & dcl_common = dcl_common}
+			//#! ef_modules = {ef_modules & [mod_index] = dcl_module} 
+			//#! e_info = { e_info & ef_modules = ef_modules }
+
 			= check_it free_vars mod_index ste_index id kind e_input e_state e_info cs	
 		check_generic_expr free_vars  entry=:{ste_kind=STE_Empty} id kind  e_input e_state e_info cs=:{cs_error}
 			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined generic" cs_error })
@@ -889,7 +901,12 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
 			#! cs = { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric }
 			= (App app, free_vars, e_state, e_info, cs)
-		 
+
+		add_kind :: !*{#GenericDef} !Index !TypeKind -> !*{#GenericDef}			
+		add_kind generic_defs generic_index kind
+			# (generic_def, generic_defs) = generic_defs ! [generic_index]		
+			= {generic_defs & [generic_index] = addGenericKind generic_def kind}
+			 									 
 // ..AA
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl, line 868)" // <<- expr

@@ -260,9 +260,36 @@ cNameLocationDependent :== True
 	,	gen_arity		:: !Int 		// number of gen_args 
 	,	gen_type		:: !SymbolType
 	, 	gen_pos			:: !Position
-	, 	gen_classes		:: ![DefinedSymbol] // generated classes
-	,	gen_isomap		:: !DefinedSymbol	// isomap function
+	, 	gen_classes		:: !GenericClassInfos 	// generated classes
+	,	gen_isomap		:: !DefinedSymbol		// isomap function
 	}
+
+:: GenericClassInfo = 
+	{	gci_kind 	:: !TypeKind
+	,	gci_class	:: !DefinedSymbol
+	}
+:: GenericClassInfos :== [GenericClassInfo] 	 
+
+getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
+getGenericClassForKind	{gen_classes} kind
+	= get_class gen_classes kind
+where
+	get_class [] kind 
+		= (False, undef)
+	get_class [{gci_kind, gci_class}:gcis] kind
+		| gci_kind == kind	= (True, gci_class)	 
+		| otherwise			= get_class gcis kind
+	
+addGenericKind :: !GenericDef !TypeKind -> !GenericDef
+addGenericKind generic_def=:{gen_name, gen_classes} kind 
+	#(ok, _) = getGenericClassForKind generic_def kind
+	| ok = generic_def
+	# class_ds = 
+		{	ds_ident = {id_name = gen_name.id_name +++ ":" +++ toString kind, id_info = nilPtr}
+		, 	ds_index = NoIndex
+		,	ds_arity = 1
+		}
+	= {generic_def & gen_classes = [{gci_kind = kind, gci_class = class_ds}:gen_classes]} 	
 
 // ..AA
 

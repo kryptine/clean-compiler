@@ -270,17 +270,27 @@ cNameLocationDependent :== True
 	}
 
 // AA ... 
+
 ::	GenericDef = 
-	{	gen_name		:: !Ident	// the generics name in the IC_Class
-	,	gen_member_name	:: !Ident	// the generics name in the IC_Member
+	{	gen_name		:: !Ident				// the generics name in the IC_Class
+	,	gen_member_name	:: !Ident				// the generics name in the IC_Member
 	,	gen_args		:: ![TypeVar]
-	, 	gen_arity 		:: !Int		// number of gen_args
+	, 	gen_arity 		:: !Int					// number of gen_args
 	,	gen_type		:: !SymbolType
 	, 	gen_pos			:: !Position
-	, 	gen_classes		:: ![DefinedSymbol] // generated classes
-	,	gen_isomap		:: !DefinedSymbol	// isomap function
+	, 	gen_classes		:: !GenericClassInfos 	// generated classes
+	,	gen_isomap		:: !DefinedSymbol		// isomap function
 	}
-	
+
+:: GenericClassInfo = 
+	{	gci_kind 	:: !TypeKind
+	,	gci_class	:: !DefinedSymbol
+	}
+:: GenericClassInfos :== [GenericClassInfo] 	 
+
+getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
+addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
+
 // ... AA
 
 ::	InstanceType =
