@@ -926,7 +926,7 @@ where
 		// ...TIJDELIJK
 */
 /* Sjaak ... */
-		  (let_info_ptr, ci) 	= let_ptr 2 ci
+		  (let_info_ptr, ci) 	= let_ptr (2 + length let_binds) ci
 		  (case_info_ptr, ci)	= bool_case_ptr ci
 /* ... Sjaak */
 
@@ -1242,6 +1242,7 @@ bool_case_ptr ci=:{ci_expr_heap}
 
 let_ptr :: !Int !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 let_ptr nr_of_binds ci=:{ci_expr_heap}
+	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ci_expr_heap
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
 
