@@ -147,7 +147,7 @@ in a graph.
     =   pr
         where pr Cycle = "Cycle"
               pr Delta = "Delta"
-              pr (Force spine) = "(Force "++printspine printa printb printc spine++")"
+              pr (Force argno spine) = "(Force <argno> "++printspine printa printb printc spine++")"
               pr MissingCase = "MissingCase"
               pr (Open rgraph) = "(Open "++printrgraph printa printc rgraph++")"
               pr (Partial rule matching spine) = "(Partial "++printrule printa printc rule++' ':printpfun printc printb matching++' ':printspine printa printb printc spine++")"
@@ -160,7 +160,7 @@ in a graph.
 :: Subspine sym var pvar
    = Cycle                                                              // The spine contains a cycle
    | Delta                                                              // An imported (delta) rule was found
-   | Force (Spine sym var pvar)                                         // Global strictness annotation forced evaluation of a subgraph
+   | Force Int (Spine sym var pvar)                                     // Global strictness annotation forced evaluation of a subgraph at specified argument position
    | MissingCase                                                        // All alternatives failed for a function symbol
    | Open (Rgraph sym pvar)                                             // Need root normal form of open node for matching
    | Partial (Rule sym pvar) (Pfun pvar var) pvar (Spine sym var pvar)  // A rule was strictly partially matched
@@ -203,7 +203,7 @@ foldspine
  :: !(var .subresult -> .result)
     .subresult
     .subresult
-    (.result -> .subresult)
+    (Int .result -> .subresult)
     .subresult
     ((Rgraph sym pvar) -> .subresult)
     ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)
@@ -220,7 +220,7 @@ foldspine pair cycle delta force missingcase open partial unsafe redex strict sp
           where (node,subspine) = spine
         foldsub Cycle = cycle
         foldsub Delta = delta
-        foldsub (Force spine) = force (fold spine)
+        foldsub (Force argno spine) = force argno (fold spine)
         foldsub MissingCase = missingcase
         foldsub (Open rgraph) = open rgraph
         foldsub (Partial rule matching rnode spine) = partial rule matching rnode (fold spine)
@@ -229,13 +229,13 @@ foldspine pair cycle delta force missingcase open partial unsafe redex strict sp
         foldsub Strict = strict
 
 spinetip :: !(Spine sym var pvar) -> Spine sym var pvar
-spinetip (_,Force spine) = spinetip spine
+spinetip (_,Force argno spine) = spinetip spine
 spinetip (_,Partial _ _ pnode spine) = spinetip spine
 spinetip spine = spine
 
 spinenodes :: .(Spine sym var pvar) -> [var]
 spinenodes spine
-= foldspine cons [] [] id [] (const []) partial (const []) redex [] spine
+= foldspine cons [] [] (const id) [] (const []) partial (const []) redex [] spine
   where partial _ _ _ = id
         redex _ _ = []
 

@@ -159,7 +159,7 @@ in a graph.
 :: Subspine sym var pvar
    = Cycle                                                              // The spine contains a cycle
    | Delta                                                              // An imported (delta) rule was found
-   | Force (Spine sym var pvar)                                         // Global strictness annotation forced evaluation of a subgraph
+   | Force Int (Spine sym var pvar)                                     // Global strictness annotation forced evaluation of a subgraph at specified argument position
    | MissingCase                                                        // All alternatives failed for a function symbol
    | Open (Rgraph sym pvar)                                             // Need root normal form of open node for matching
    | Partial (Rule sym pvar) (Pfun pvar var) pvar (Spine sym var pvar)  // A rule was strictly partially matched
@@ -169,18 +169,18 @@ in a graph.
 
 // Fold up a spine using a function for each constructor
 foldspine
- :: !(var .subresult -> .result)
-    .subresult
-    .subresult
-    (.result -> .subresult)
-    .subresult
-    ((Rgraph sym pvar) -> .subresult)
-    ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)
-    ((Rgraph sym var) -> .subresult)
-    ((Rule sym pvar) (Pfun pvar var) -> .subresult)
-    .subresult
-    .(Spine sym var pvar)
- -> .result
+ :: !(var .subresult -> .result)                                    // Fold the spine itself
+    .subresult                                                      // Fold a Cycle subspine
+    .subresult                                                      // Fold a Delta subspine
+    (Int .result -> .subresult)                                     // Fold a Force subspine
+    .subresult                                                      // Fold a MissingCase subspine
+    ((Rgraph sym pvar) -> .subresult)                               // Fold an Open subspine
+    ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)    // Fold a Partial subspine
+    ((Rgraph sym var) -> .subresult)                                // Fold an Unsafe subspine
+    ((Rule sym pvar) (Pfun pvar var) -> .subresult)                 // Fold a Redex subspine
+    .subresult                                                      // Fold a Strict subspine
+    .(Spine sym var pvar)                                           // The spine to fold
+ -> .result                                                         // The final result
 
 // Get the tip of a spine,
 // i.e. the last part when all Partial's and Force's are stripped.
