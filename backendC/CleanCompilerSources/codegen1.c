@@ -1619,7 +1619,7 @@ Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args
 
 void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_label_follows)
 {
-	CurrentAltLabel.lab_pref  = l_pref;
+	CurrentAltLabel.lab_pref = l_pref;
 
 	if (arity==0){
 		GenOAStackLayout (1);
@@ -1635,6 +1635,30 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 			GenPL();
 	}
 
+#ifdef NEW_APPLY
+	if (arity>=2){
+		if (IsSimpleState (function_state_p[-1])){
+			if (function_state_p[-1].state_kind==OnB){
+				LabDef a_lab;	
+				
+				a_lab=*ea_lab;
+				a_lab.lab_pref="a";
+				GenApplyEntryDirective (0,&a_lab);
+			} else if (function_state_p[-1].state_kind==StrictRedirection || function_state_p[-1].state_kind==LazyRedirection){
+				GenApplyEntryDirective (0,ea_lab);
+			} else {
+				GenApplyEntryDirective (arity,ea_lab);
+			}
+		} else {
+			LabDef a_lab;
+			
+			a_lab=*ea_lab;
+			a_lab.lab_pref="a";
+			GenApplyEntryDirective (0,&a_lab);		
+		}
+	}
+#endif
+
 	GenOAStackLayout (2);
 	GenLabelDefinition (&CurrentAltLabel);
 	
@@ -1645,17 +1669,26 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 #endif
 			GenReplArgs (arity-1,arity-1);
 
+#ifdef NEW_APPLY
+			if (arity>=2){
+				LabDef a_lab;	
+				
+				a_lab=*ea_lab;
+				a_lab.lab_pref="a";
+				GenOAStackLayout (arity);
+				if (DoTimeProfiling)
+					GenPN();
+				GenLabelDefinition (&a_lab);
+			}
+#endif
+
 			if (function_called_only_curried_or_lazy_with_one_return)
 				return;
-			
+
 			CallEvalArgsEntry (arity,function_state_p,0,ObjectSizes [function_state_p[-1].state_object],ea_lab);
 
 #if SHARE_UPDATE_CODE
-# if 1
 			result=get_label_number_from_result_state_database (&function_state_p[-1],2,&label_number);
-# else
-			result=get_label_number_from_result_state_database (type,2,&label_number);
-# endif
 			if (result==2){
 				LabDef update_label;
 
@@ -1699,6 +1732,19 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 #endif
 		GenReplArgs (arity-1, arity-1);
 
+#ifdef NEW_APPLY
+		if (arity>=2){
+			LabDef a_lab;	
+			
+			a_lab=*ea_lab;
+			a_lab.lab_pref="a";
+			GenOAStackLayout (arity);
+			if (DoTimeProfiling)
+				GenPN();
+			GenLabelDefinition (&a_lab);
+		}
+#endif
+
 		if (function_called_only_curried_or_lazy_with_one_return)
 			return;
 
@@ -1706,11 +1752,7 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 		CallEvalArgsEntry (arity,function_state_p,asize,bsize,ea_lab);
 
 #if SHARE_UPDATE_CODE
-# if 1
 		result=get_label_number_from_result_state_database (&function_state_p[-1],2,&label_number);
-# else
-		result=get_label_number_from_result_state_database (type,2,&label_number);
-# endif
 		if (result==2){
 			LabDef update_label;
 

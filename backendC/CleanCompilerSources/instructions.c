@@ -2648,12 +2648,14 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 	}
 }
 
+#ifdef NEW_APPLY
 void GenApplyEntryDirective (int arity,Label label)
 {
 	put_directive_b (a);
 	put_arguments_n__b (arity);
 	GenLabel (label);
 }
+#endif
 
 void GenLazyRecordNodeEntryDirective (int arity,Label label)
 {

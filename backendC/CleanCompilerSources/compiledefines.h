@@ -23,4 +23,6 @@
 #define STRICT_LISTS 1
 #define BOXED_RECORDS 1
 
+#undef NEW_APPLY
+
 #define KARBON

@@ -159,6 +159,9 @@ void GenNodeEntryDirective (int arity,Label label,Label label2);
 void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label label2);
 void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label2);
 void GenApplyEntryDirective (int arity,Label label);
+#ifdef NEW_APPLY
+void GenApplyEntryDirective (int arity,Label label);
+#endif
 void GenLazyRecordNodeEntryDirective (int arity,Label label);
 void GenFieldNodeEntryDirective (int arity, Label label, Label label2,char *record_name);
 void GenConstructorDescriptorAndExport (SymbDef sdef);

@@ -2166,6 +2166,14 @@ static void SubSizeOfArguments (ArgS *args,int *a_offset_p,int *b_offset_p)
 		SubSizeOfState (arg->arg_state,a_offset_p,b_offset_p);
 }
 
+static void AddSizeOfArguments (ArgS *args,int *a_offset_p,int *b_offset_p)
+{
+	ArgS *arg;
+	
+	for_l (arg,args,arg_next)
+		AddSizeOfState (arg->arg_state,a_offset_p,b_offset_p);
+}
+
 void DetermineSizeOfArguments (ArgS *args,int *a_offset_p,int *b_offset_p)
 {
 	ArgS *arg;
@@ -2368,7 +2376,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 
 						BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 						
-						*asp_p-=a_size+1; /* changed 20-7-1999, was a_size */
+						*asp_p-=a_size+1;
 						*bsp_p-=b_size;
 
 						if (! (sdef->sdef_kind==SYSRULE
@@ -2565,6 +2573,93 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 		}
 	}
 }
+
+#ifdef NEW_APPLY
+int build_apply_arguments (ArgP node_args,int *a_size_p,int *b_size_p,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
+{
+	if (node_args->arg_node->node_kind==NormalNode && node_args->arg_node->node_symbol->symb_kind==apply_symb){
+		ArgP next_arg;
+		
+		next_arg=node_args->arg_next;
+		AddSizeOfState (next_arg->arg_state,a_size_p,b_size_p);
+		BuildArg (next_arg,asp_p,bsp_p,code_gen_node_ids_p);
+		
+		return 1+build_apply_arguments (node_args->arg_node->node_arguments,a_size_p,b_size_p,asp_p,bsp_p,code_gen_node_ids_p);
+	} else {
+		AddSizeOfArguments (node_args,a_size_p,b_size_p);
+		BuildArgs (node_args,asp_p,bsp_p,code_gen_node_ids_p);	
+		return 1;
+	}
+}
+
+static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
+{
+	int a_size,b_size,n_apply_args;
+	ArgP node_args;
+
+	node_args=node->node_arguments;
+	a_size=0;
+	b_size=0;
+	n_apply_args=build_apply_arguments (node_args,&a_size,&b_size,asp_p,bsp_p,code_gen_node_ids_p);
+	
+	*asp_p-=a_size;
+	*bsp_p-=b_size;
+	cleanup_stack (asp_p,bsp_p,a_size,b_size,&code_gen_node_ids_p->a_node_ids,&code_gen_node_ids_p->b_node_ids,
+					&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,
+					code_gen_node_ids_p->doesnt_fail);
+
+	GenJsrAp (n_apply_args);
+
+	AddSizeOfState (node->node_state,asp_p,bsp_p);						
+}
+
+static void FillApply (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
+{
+	LabDef name;
+	
+	if (IsLazyState (node->node_state)){
+		LabDef codelab;
+
+		ConvertSymbolToDandNLabel (&name,&codelab,ApplyDef);
+
+		BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+		
+		if (update_node_id==NULL){
+			*asp_p += 1-2;
+			GenBuild (&name,2,&codelab);
+		} else {
+			GenFill (&name,2,&codelab,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill);
+			*asp_p -= 2;
+		}
+	} else {
+		if (update_node_id!=NULL && update_node_id->nid_a_index!=*asp_p){
+			int a_size,b_size;
+			
+			DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+			
+			GenPushA (*asp_p-update_node_id->nid_a_index);
+			*asp_p += SizeOfAStackElem;
+
+			BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+			
+			*asp_p-=a_size+1;
+			*bsp_p-=b_size;
+
+			cleanup_stack (asp_p,bsp_p,a_size+1,b_size,&code_gen_node_ids_p->a_node_ids,&code_gen_node_ids_p->b_node_ids,
+							&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,
+							code_gen_node_ids_p->doesnt_fail);
+
+			GenJsrAp (1);
+			
+			AddSizeOfState (node->node_state,asp_p,bsp_p);						
+			
+			GenPopA (1);
+			*asp_p-=1;
+		} else
+			generate_code_for_apply_in_strict_context (node,asp_p,bsp_p,code_gen_node_ids_p);
+	}
+}
+#endif
 
 void GenTypeError (void)
 {
@@ -2927,7 +3022,11 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			FillOrReduceSelectSymbol (node,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
 			return;
 		case apply_symb:
+#ifdef NEW_APPLY
+			FillApply (node,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
+#else
 			FillSymbol (node,ApplyDef,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
+#endif
 			return;
 		case if_symb:
 #ifdef FASTER_STRICT_IF
@@ -4734,8 +4833,16 @@ void build_and_cleanup (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen
 				sdef=node->node_symbol->symb_def;
 				break;
 			case apply_symb:
+#ifdef NEW_APPLY
+				if (!IsLazyState (node->node_state))
+					generate_code_for_apply_in_strict_context (node,asp_p,bsp_p,code_gen_node_ids_p);
+				else
+					Build (node,asp_p,bsp_p,code_gen_node_ids_p);
+				return;
+#else
 				sdef=ApplyDef;
 				break;
+#endif
 #ifndef FASTER_STRICT_IF
 			case if_symb:
 				sdef=IfDef;
@@ -4760,17 +4867,11 @@ void build_and_cleanup (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen
 
 			node_args=node->node_arguments;
 			DetermineSizeOfArguments (node_args,&a_size,&b_size);
-#if 1
+
 			if (ExpectsResultNode (node->node_state))
 				BuildArgsWithNewResultNode (node_args,asp_p,bsp_p,code_gen_node_ids_p,&a_size,&b_size);
 			else
-#else
-			if (ExpectsResultNode (node->node_state)){
-				NewEmptyNode (asp_p,-1);
-				++a_size;
-			}
-#endif
-			BuildArgs (node_args,asp_p,bsp_p,code_gen_node_ids_p);
+				BuildArgs (node_args,asp_p,bsp_p,code_gen_node_ids_p);
 
 			*asp_p-=a_size;
 			*bsp_p-=b_size;

@@ -597,6 +597,43 @@ static void CodeRootSymbolApplication (Node root,NodeId rootid,SymbDef def,int a
 	}
 }
 
+#ifdef NEW_APPLY
+extern int build_apply_arguments (ArgP node_args,int *a_size_p,int *b_size_p,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
+
+static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeIdsP code_gen_node_ids_p,StateS resultstate)
+{
+	if (IsSemiStrictState (root->node_state)){
+		LabDef name,codelab;
+
+		ConvertSymbolToDandNLabel (&name,&codelab,ApplyDef);
+
+		CreateSemiStrictRootNode (&name,&codelab,root,rootid,asp,bsp,code_gen_node_ids_p,resultstate);
+	} else {
+		int a_size,b_size,n_apply_args;
+
+		a_size=0;
+		b_size=0;
+		n_apply_args=build_apply_arguments (root->node_arguments,&a_size,&b_size,&asp,&bsp,code_gen_node_ids_p);
+
+		UpdateAAndBStack (asp,bsp,a_size,b_size,&asp,&bsp);
+
+		if (!IsSimpleState (resultstate) || resultstate.state_kind!=StrictRedirection){
+			int result_a_size,result_b_size;
+
+			GenJsrAp (n_apply_args);
+
+			DetermineSizeOfState (root->node_state,&result_a_size,&result_b_size);
+
+			asp+=result_a_size-a_size;
+			bsp+=result_b_size-b_size;
+			
+			RedirectResultAndReturn (asp,bsp,asp,bsp,root->node_state,resultstate,result_a_size,result_b_size);
+		} else
+			GenJmpAp (n_apply_args);
+	}
+}
+#endif
+
 static void CodeRootSelection (Node root, NodeId rootid,int asp,int bsp,CodeGenNodeIdsP code_gen_node_ids_p,StateS demstate)
 {
 	Args args;
@@ -844,7 +881,11 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			FillRhsRoot (&nil_lab, root, asp, bsp,code_gen_node_ids_p);
 			return;
 		case apply_symb:
+#ifdef NEW_APPLY
+			CodeRootApply (root, rootid, asp, bsp,code_gen_node_ids_p,resultstate);
+#else
 			CodeRootSymbolApplication (root, rootid, ApplyDef, asp, bsp,code_gen_node_ids_p,resultstate);
+#endif
 			return;
 		case if_symb:
 #ifdef FASTER_STRICT_IF
