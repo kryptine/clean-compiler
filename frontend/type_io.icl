@@ -1,11 +1,17 @@
 implementation module type_io
 
-//import DebugUtilities;
-F a b :== b
-
-import StdEnv, compare_constructor // ,RWSDebug
+import StdEnv, compare_constructor
 
 import scanner, general, Heap, typeproperties, utilities, checksupport
+
+//import DebugUtilities;
+F a b :== b;
+
+// Unsupported:
+// - type synonyms, expanded version must be stored. Which function in the compiler
+//   expands synonyms correctly.
+// - abstract data type, what should be written?
+//
 
 class WriteTypeInfo a 
 where
@@ -81,6 +87,7 @@ where
 instance WriteTypeInfo TypeDef TypeRhs
 where 
 	write_type_info {td_name,td_arity,td_args,td_rhs} tcl_file
+		|  F ("TypeDef '" +++ td_name.id_name +++ "'") True
  		#! tcl_file
  			= write_type_info td_name tcl_file
 		#! tcl_file
@@ -161,10 +168,10 @@ where
 instance WriteTypeInfo Ident 
 where
 	write_type_info {id_name} tcl_file
-//		# tcl_file
-//			= fwritei (size id_name) tcl_file
-//		= fwrites id_name tcl_file
-		= write_type_info id_name tcl_file;
+		# tcl_file
+			= fwritei (size id_name) tcl_file
+		= fwrites id_name tcl_file
+//		= write_type_info id_name tcl_file;
 		
 instance WriteTypeInfo FieldSymbol
 where
@@ -220,8 +227,7 @@ where
 		# tcl_file
 			= fwritec c tcl_file;
 		= tcl_file;
-	
-	
+
 // read
 class ReadTypeInfo a
 where
@@ -231,11 +237,9 @@ instance ReadTypeInfo CommonDefs
 where
 	read_type_info tcl_file
 		# (ok1,com_type_defs,tcl_file)
-//			= (True,{},tcl_file);
 			= read_type_info tcl_file
 		# (ok2,com_cons_defs,tcl_file)
-			= (True,{},tcl_file);
-//			= read_type_info tcl_file
+			= read_type_info tcl_file
 			
 		# common_defs
 			= { CommonDefs |
@@ -302,7 +306,15 @@ where
 		| c == SynTypeCode
 			= (True,UnknownType,tcl_file)
 		| c == RecordTypeCode
-			= (True,UnknownType,tcl_file)
+			# (ok,rt_fields,tcl_file)
+				= read_type_info tcl_file
+				
+			# record_type
+				= { default_elem &
+					rt_fields	= rt_fields
+				};
+			= (True,RecordType record_type,tcl_file)
+			
 		| c == AbstractTypeCode
 			= (True,UnknownType,tcl_file)
 			
@@ -403,51 +415,18 @@ instance ReadTypeInfo Char
 where
 	read_type_info :: !*File -> (!Bool,Char,!*File)
 	read_type_info tcl_file
-		= freadc1 tcl_file
-	where
-		//	Input. The boolean output parameter reports success or failure of the operations.
-		
-		freadc1::!*File -> (!Bool,!Char,!*File)
-		/*	Reads a character from a text file or a byte from a datafile. */
-		freadc1 f
-			= code {
-				.inline freadc
-				.d 0 2 f
-					jsr	readFC
-				.o 0 4 b c f
-				.end
-			}
-/*
-		# (_,i,tcl_file)
-			= freadi tcl_file
-
-		# (q,tcl_file)
-			= freads tcl_file i;
-
-
-		| True
-			= abort ("dkskksdkdsksdkfklsklklsgfdklsdgfklgklklgklgkl " +++ toString q);
-	*/			
+		= freadc tcl_file
 
 instance ReadTypeInfo Ident
 where 
 	read_type_info :: !*File -> (!Bool,Ident,!*File)
 	read_type_info tcl_file
-
-/*
-		# (ok1,id_name,tcl_file)
-			= read_type_info tcl_file
-*/		
 		# (ok1,i,tcl_file)
 			= freadi tcl_file
-
-		
 		# (id_name,tcl_file)
 			= freads tcl_file i;
 		| F ("Ident " +++ toString i +++ " - " +++ id_name) True
-		
-			
-		
+				
 		# ident
 			= { default_elem &
 				id_name		= id_name
@@ -499,30 +478,32 @@ where
 			= if (c == '!') AN_Strict AN_None
 		= (ok1,annotation,tcl_file)
 		
+instance ReadTypeInfo FieldSymbol
+where
+	read_type_info tcl_file
+		# (ok1,fs_name,tcl_file)
+			= read_type_info tcl_file
+		# (ok2,fs_var,tcl_file)	
+			= read_type_info tcl_file
+		# (ok3,fs_index,tcl_file)
+			= read_type_info tcl_file
+		
+		# field_symbol
+			= { FieldSymbol | 
+				fs_name			= fs_name
+			,	fs_var			= fs_var
+			,	fs_index		= fs_index
+			}
+		= (ok1&&ok2&&ok3,field_symbol,tcl_file)		
+		
 // basic and structural write_type_info's
 instance ReadTypeInfo Int
 where 
 	read_type_info :: !*File -> (!Bool,Int,!*File)
 	read_type_info tcl_file
-		= freadi_new tcl_file
-	where
-		// copy from StdEnv. The only difference is the dot before the Int in the type
-		// of freadi_new.
-		freadi_new ::!*File -> (!Bool,!Int,!*File)
-		/*	Reads an integer from a textfile by skipping spaces, tabs and newlines and
-			then reading digits, which may be preceeded by a plus or minus sign.
-			From a datafile freadi will just read four bytes (a Clean Int). */
-		freadi_new f		
-			= code {
-				.inline freadi
-				.d 0 2 f
-					jsr	readFI
-				.o 0 4 b i f
-				.end
-			}
-			
+		= freadi tcl_file			
 	
-instance ReadTypeInfo {#b} | ReadTypeInfo b & DefaultElem b & ArrayElem b //| DefaultElem,  createArray_u, select_u, size_u, update_u, ReadTypeInfo b
+instance ReadTypeInfo {#b} | ReadTypeInfo b & DefaultElem b & ArrayElem b
 where 
 	read_type_info tcl_file
 
@@ -567,10 +548,6 @@ where
 			| not ok 
 				= (False,[],tcl_file)
 				= read_type_info_loop (inc i) limit tcl_file [elem:elems]
-				
-		
-
-		
 	
 // defaults
 class DefaultElem a
@@ -591,8 +568,6 @@ where
 		,	td_attribute	= default_elem
 		,	td_pos			= default_elem
 		}
-
-//		= abort "aa";
 		
 instance DefaultElem Position
 where
@@ -620,24 +595,16 @@ where
 
 instance DefaultElem TypeVar
 where
-//	default_elem :: TypeVar
 	default_elem
 		= { TypeVar |
 			tv_name				= default_elem
 		,	tv_info_ptr			= default_elem
 		}
 	
-/*	
-instance DefaultElem Ptr TypeVarInfo
+instance DefaultElem (Ptr a)
 where
 	default_elem
 		= nilPtr
-*/
-
-instance DefaultElem (Ptr a) // | DefaultElem a
-where
-	default_elem
-		= nilPtr //default_elem
 		
 instance DefaultElem Ident
 where 
@@ -743,51 +710,24 @@ instance DefaultElem Assoc
 where
 	default_elem
 		= NoAssoc
-			
-
-/*
-instance DefaultElem CommonDefs
+	
+	
+instance DefaultElem RecordType
 where
-	default_elem
-		= { CommonDefs |
-			com_type_defs 		= default_elem
-		,	com_cons_defs		= default_elem
-		,	com_selector_defs	= undef //default_elem
-		,	com_class_defs		= undef
-		,	com_member_defs		= undef
-		,	com_instance_defs	= undef
-		}			
-*/		
-
-/*
-instance DefaultElem ClassInstance
-where
-	default_elem
-		= {	ClassInstance |
-			ins_class		= default_elem 
-		,	ins_ident		= default_elem
-		,	ins_type		= default_elem
-		,	ins_members		= default_elem
-		,	ins_specials	= default_elem
-		,	ins_pos			= default_elem
+	default_elem 
+		= { RecordType |
+			rt_constructor	= default_elem
+		,	rt_fields		= {}
 		}
-	*/	
 		
-/*
-instance DefaultElem SelectorDef
+instance DefaultElem FieldSymbol
 where
 	default_elem
-		= { SelectorDef |
-			sd_symb			= default_elem
-		,	sd_field		= default_elem
-		,	sd_type			= default_elem
-		,	sd_exi_vars		= default_elem
-		,	sd_field_nr		= default_elem
-		,	sd_type_index	= default_elem
-		,	sd_type_ptr		= default_elem
-		,	sd_pos			= default_elem
-		}		
-*/			
+		= { FieldSymbol |
+			fs_name			= default_elem
+		,	fs_var			= default_elem
+		,	fs_index		= default_elem
+		}						
 
 instance DefaultElem {#a}	| ArrayElem, DefaultElem a
 where
