@@ -218,3 +218,12 @@ compilegraph :: ![(var,Node sym var)] -> Graph sym var
 extgraph :: (Graph sym var) (Graph sym pvar) [pvar] (Pfun pvar var) (Graph sym var) -> Graph sym var | == var & == pvar
 
 instance == (Graph sym var) | == sym & == var
+
+instantiate ::
+    (Graph sym pvar,Graph sym var)
+    (pvar,var)
+    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ |  == sym
+ &  == var
+ &  == pvar

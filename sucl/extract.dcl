@@ -14,7 +14,8 @@ actualfold ::
     [(pvar,Graph sym pvar)]
     (Rule sym var)
  -> Optional (Rule sym var,[Rgraph sym var])
- |  == var
+ |  == sym
+ &  == var
  &  == pvar
 
 splitrule ::

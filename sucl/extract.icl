@@ -70,7 +70,8 @@ actualfold ::
     [(pvar,Graph sym pvar)]
     (Rule sym var)
  -> Optional (Rule sym var,[Rgraph sym var])
- |  == var
+ |  == sym
+ &  == var
  &  == pvar
 
 actualfold deltanodes rnfnodes foldarea self foldcont hist rule
@@ -100,7 +101,8 @@ findoccs ::
     (Rule sym var)
     var
  -> [[(pvar,var)]]
- |  == var
+ |  == sym
+ &  == var
  &  == pvar
 
 findoccs hist rule rnode
@@ -119,8 +121,6 @@ findoccs hist rule rnode
         = disjoint inner outer
           where inner = map (lookup mapping) (fst (graphvars hgraph [hroot]))
                 outer = removeMembers (varlist (prunegraph rnode rgraph) [rroot:rargs]) [rnode]
-
-instantiate = undef
 
 /*
 ------------------------------------------------------------------------

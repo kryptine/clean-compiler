@@ -304,7 +304,7 @@ tryinstantiate onode rpattern anode sargs
           where success = continue history failinfo True stricts` sroot subject` heap`
                 fail = continue history failinfo` True stricts` sroot subject heap
                 failinfo` = adjust onode [rpattern:failinfo onode] failinfo
-                (heap`,subject`) = instantiate pgraph proot onode (heap,subject)
+                (heap`,subject`) = rewrinstantiate pgraph proot onode (heap,subject)
                 proot = rgraphroot rpattern; pgraph = rgraphgraph rpattern
 
                 stricts` = if instdone stricts (map2 ((||) o (==) onode) sargs stricts)
@@ -359,7 +359,8 @@ tryunfold redexroot rule matching spine
                 = xunfold redexroot rule (heap,sroot,subject,matching)
                 noredir = abort "transtree: no mapping foor root of replacement"
                 reductroot = total noredir matching` (ruleroot rule)
-                history` = extendhistory subject spine history
+                history` = extendhistory subject redirect spine history
+                redirect = adjust redexroot reductroot id
                 trace = continue history` failinfo instdone stricts sroot` subject` heap`
 
 tryannotate

@@ -2,6 +2,7 @@ definition module history
 
 // $Id$
 
+from rule import Rgraph
 from graph import Graph
 from general import Optional
 from StdOverloaded import ==
@@ -12,15 +13,13 @@ from StdOverloaded import ==
 
 // An association between a node-id in the subject graph and a history pattern
 :: HistoryAssociation sym var
-   :== ( var                    // Attachment point in the subject graph where the history pattern is "housed"
-       , HistoryPattern sym var // The pattern in the history
+   :== ( var                        // Attachment point in the subject graph where the history pattern is "housed"
+       , [HistoryPattern sym var]   // The pattern in the history
        )
 
 // A pattern in the history, specifying the most general subject graph (footprint) for a reduction sequence
 :: HistoryPattern sym var
-   = Closed sym [HistoryPattern sym var]    // Indicates a closed node-id in the subject graph (created by a (partial) match)
-   | OpenHist                               // Indicates an open node-id in the subject graph (created by instantiation)
-   | Extensible (Link var)                  // Indicates a link to an untouched node-id in the subject graph, where this pattern can be extended
+   :== Rgraph sym var
 
 // A link in a graph, indicated by its source node-id and the argument number
 // The root of a graph can be indicated by the No constructor

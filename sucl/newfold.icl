@@ -140,8 +140,6 @@ recurse foldarea fnsymbol
           where rroot = ruleroot rule; rgraph = rulegraph rule
                 newhist` = [(rroot,rgraph):newhist]
 
-foldtips = undef
-
 
 /*
 `Foldtips foldarea foldcont hist trace' folds all occurrences of (rooted
@@ -149,8 +147,6 @@ graphs  in  hist)  in the tips of the trace. It returns a list of rules,
 which are the results  of  folding,  and  a  list  of  areas  for  which
 functions  must  be  introduced. If no occurrences were found, Absent is
 returned.
-
->   addstrict stricts (rule,areas) = (stricts,[rule],areas)
 
 >   foldtips ::
 >       (rgraph * **->(*,[**])) ->
@@ -184,6 +180,8 @@ returned.
 >                    || exres = (False,mapfst3 only (extract noetrc foldarea trace ([],[],[])))
 >                       exres = (False,newextract noetrc foldarea trace)
 
+>   addstrict stricts (rule,areas) = (stricts,[rule],areas)
+
 >   noetrc trace area = id
 
 >   pair x y = (x,y)
@@ -191,7 +189,53 @@ returned.
 >   only :: [*] -> *
 >   only [x] = x
 >   only xs = error "only: not a singleton list"
+*/
 
+foldtips ::
+    ((Rgraph sym var)->(sym,[var]))
+    (sym,[var])
+ -> ([(var,Graph sym var)],[(var,Graph sym var)])
+    (Trace sym var pvar)
+ -> (Bool,([Bool],[Rule sym var],[Rgraph sym var]))
+ |  == sym
+ &  == var
+ &  == pvar
+
+foldtips foldarea foldcont
+= ft
+  where ft hist trace
+        = ft` transf
+          where (Trace stricts rule answer history transf) = trace
+                ft` Stop
+                = foldoptional exres (pair True o addstrict stricts) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule)
+                  where deltanodes = foldoptional [] getdeltanodes answer
+                        rnfnodes = foldoptional [ruleroot rule] (const []) answer
+                ft` (Instantiate yestrace notrace)
+                = ft`` (ft hist yestrace) (ft hist notrace)
+                  where ft`` (False,yessra) (False,nosra) = exres
+                        ft`` (yesfound,(yesstricts,yesrules,yesareas)) (nofound,(nostricts,norules,noareas))
+                        = (True,(stricts,yesrules++norules,yesareas++noareas))
+                ft` (Reduce reductroot trace)
+                = ft`` (ft (fst hist,fst hist) trace)
+                  where ft`` (False,sra) = exres
+                        ft`` (found,sra) = (True,sra)
+                ft` (Annotate trace)
+                = ft`` (ft hist trace)
+                  where ft`` (False,sra) = exres
+                        ft`` (found,sra) = (True,sra)
+                exres = (False,newextract noetrc foldarea trace)
+
+addstrict stricts (rule,areas) = (stricts,[rule],areas)
+
+noetrc trace area = id
+
+pair x y = (x,y)
+
+only :: [.elem] -> .elem
+only [x] = x
+only xs = abort "only: not a singleton list"
+
+/*
 ------------------------------------------------------------------------
 
 `Extract foldarea trace (rules,areas)' folds the trace,  creating  rules
