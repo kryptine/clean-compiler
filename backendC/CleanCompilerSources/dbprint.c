@@ -8,7 +8,6 @@
 #include "sizes.h"
 #include "checker.h"
 #include "checksupport.h"
-#include "overloading.h"
 #include "dbprint.h"
 #include "codegen_types.h"
 

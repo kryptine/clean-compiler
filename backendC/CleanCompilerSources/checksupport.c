@@ -5,7 +5,6 @@
 #include "comsupport.h"
 #include "scanner.h"
 #include "checksupport.h"
-#include "overloading.h"
 #include "settings.h"
 #include "buildtree.h"
 #include "checker.h"
