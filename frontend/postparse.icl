@@ -164,16 +164,15 @@ where
 	collectFunctions (PE_Let strict locals in_expr) icl_module ca
 		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) icl_module ca
 		= (PE_Let strict node_defs in_expr, ca)
-	collectFunctions (PE_Compr gen_kind expr qualifiers) icl_module ca
-		# (compr, ca)
-			= transformComprehension gen_kind expr qualifiers ca
-//		| fst (ferror (stderr <<< compr))
-//		=	collectFunctions compr icl_module ca
+	collectFunctions (PE_ListCompr predef_cons_index predef_nil_index expr qualifiers) icl_module ca
+		# (compr, ca) = transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
+		= collectFunctions compr icl_module ca
+	collectFunctions (PE_ArrayCompr expr qualifiers) icl_module ca
+		# (compr, ca) = transformArrayComprehension expr qualifiers ca
 		=	collectFunctions compr icl_module ca
 	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) icl_module ca
-		# (compr, ca)
-			= transformUpdateComprehension [expr] [updateExpr] [identExpr] identExpr qualifiers ca
-		=	collectFunctions compr icl_module ca
+		# (compr, ca) = transformUpdateComprehension [expr] [updateExpr] [identExpr] identExpr qualifiers ca
+		= collectFunctions compr icl_module ca
 	collectFunctions (PE_Sequ sequence) icl_module ca=:{ca_predefs}
 		= collectFunctions (transformSequence sequence ca_predefs) icl_module ca
 	collectFunctions (PE_ArrayDenot exprs) icl_module ca=:{ca_predefs}
@@ -377,15 +376,19 @@ transformLambda lam_ident args result pos icl_module
 	  lam_body = [{pb_args = args, pb_rhs = lam_rhs, pb_position = pos }]
 	= MakeNewImpOrDefFunction icl_module lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 
-makeNilExpression :: *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeNilExpression ca=:{ca_predefs}
-	#! nil_id = ca_predefs.[PD_NilSymbol]
-	= (PE_Ident nil_id, ca)
-//	= (PE_List [PE_Ident nil_id], ca)
-
-makeConsExpression :: ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeConsExpression a1 a2 ca=:{ca_predefs}
+makeLazyConsExpression :: ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
+makeLazyConsExpression a1 a2 ca=:{ca_predefs}
 	#! cons_id = ca_predefs.[PD_ConsSymbol]
+	= (PE_List [PE_Ident cons_id, a1, a2], ca)
+
+makeNilExpression :: Int *CollectAdmin -> (ParsedExpr,*CollectAdmin)
+makeNilExpression predef_nil_index ca=:{ca_predefs}
+	#! nil_id = ca_predefs.[predef_nil_index]
+	= (PE_Ident nil_id, ca)
+
+makeConsExpression :: Int ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
+makeConsExpression predef_cons_index a1 a2 ca=:{ca_predefs}
+	#! cons_id = ca_predefs.[predef_cons_index]
 	= (PE_List [PE_Ident cons_id, a1, a2], ca)
 
 // +++ change to accessor functions
@@ -527,7 +530,7 @@ transformGenerator {gen_kind=IsListGenerator, gen_expr, gen_pattern, gen_positio
 	  (tl, ca) = prefixAndPositionToIdentExp "g_t" gen_position ca
 	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
 	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
-	  (cons, ca) = makeConsExpression hd tl ca
+	  (cons, ca) = makeLazyConsExpression hd tl ca
 	# transformed_generator
 	  	=	{	tg_expr = ([],[gen_expr])
 	  		,	tg_lhs_arg = [list]
@@ -745,11 +748,11 @@ CreateTransformedQualifierFromTransformedGenerators transformedGenerators array 
 		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line
 		}, ca)
 
-transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-transformComprehension IsListGenerator expr qualifiers ca
+transformListComprehension :: Int Int ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
 	# (transformed_qualifiers, ca) = mapSt transformQualifier qualifiers ca
-	  (success, ca) = makeConsExpression expr (last transformed_qualifiers).tq_continue ca
-	  (nil, ca) = makeNilExpression ca
+	  (success, ca) = makeConsExpression predef_cons_index expr (last transformed_qualifiers).tq_continue ca
+	  (nil, ca) = makeNilExpression predef_nil_index ca
 	  transformed_qualifiers
 	  	=	[	{qual & tq_success = success, tq_end = end}
 	  		\\	qual <- transformed_qualifiers
@@ -757,7 +760,9 @@ transformComprehension IsListGenerator expr qualifiers ca
 	  		&	end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
 	  		]
 	= makeComprehensions transformed_qualifiers success [] ca
-transformComprehension IsArrayGenerator expr qualifiers ca
+
+transformArrayComprehension :: ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+transformArrayComprehension expr qualifiers ca
 	# [hd_qualifier:_] = qualifiers
 	  qual_position = hd_qualifier.qual_position
 	  (c_i_ident_exp, ca) = prefixAndPositionToIdentExp "c_i" qual_position ca
