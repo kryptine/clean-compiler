@@ -802,9 +802,9 @@ where
 		collect_classifications class_subst fun class_env
 			# (fun_class, class_env)	= class_env![fun]
 			  fun_class					= determine_classification fun_class class_subst
-	 		= { class_env & [fun] = fun_class
+	 		= { class_env & [fun] = fun_class }
 
-		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
+		set_case_expr_info ({case_expr=(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
 			# (VI_AccVar _ arg_position, var_heap)				= readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
