@@ -271,7 +271,7 @@ where
 												}
 												scanState.ss_tokenBuffer
 						, ss_input = Input inp
-						} // -->> (EndOfFileToken,pos)
+						} // -->> ("Token", EndOfFileToken,pos)
 			// otherwise // ~ (eof && c == NewLineChar)
 				#	(token, inp)	= Scan c inp /* {inp & inp_curToken = [c]}*/ context
 			//	#	(chars, inp)	= inp!inp_curToken
@@ -354,6 +354,7 @@ SkipWhites input
 
 TryScanComment :: !Char !Input -> (!Optional String, !Char, !Input)
 TryScanComment c1=:'/' input
+	#! pos = input.inp_pos // MW++
 	# (eof,c2, input)		= ReadChar input
 	| eof					= (No, c1, input)
 	= case c2 of
@@ -361,7 +362,13 @@ TryScanComment c1=:'/' input
 		'*' -> case ScanComment input of
 				(No,input)	-> SkipWhites input
 				(er,input)	-> (er, c1, input)
+// MW..
+		NewLineChar
+			# input = charBack input
+			-> (No, c1, { input & inp_pos = pos })
+// ..MW
 		_   -> (No, c1, charBack input)
+			
 TryScanComment c input
 	= (No, c, input)
 
