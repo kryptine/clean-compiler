@@ -207,8 +207,8 @@ frontEndInterface opts mod_ident dcl_modules functions_and_macros predef_symbols
 					= analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
 	  			-> transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
 			FS_online
-				# (fun_defs,var_heap,expression_heap)
-					= supercompile dcl_mods main_dcl_module_n fun_defs var_heap expression_heap
+				# (fun_defs,var_heap,expression_heap,supercompile_range) = supercompile dcl_mods main_dcl_module_n fun_defs var_heap expression_heap
+				# (components, fun_defs) = partitionateFunctions fun_defs [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
 				-> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
 			FS_none
 			    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)

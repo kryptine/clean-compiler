@@ -27,4 +27,5 @@ supercompile ::
  -> (   !*{#FunDef}             // fun_defs
     ,   !*VarHeap               // var_heap
     ,   !*ExpressionHeap        // expression_heap
+    ,   IndexRange              // Range of newly generated functions (already existing functions are overwritten)
     )
