@@ -283,6 +283,20 @@ instance consumerRequirements App where
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
 			# ai = aiUnifyClassifications CActive cc ai
 			= consumerRequirements app_args common_defs ai
+// SPECIAL...
+		# num_specials = case imported_funs.[glob_module].[glob_object].ft_specials of
+			(SP_ContextTypes [sp:_])	-> length sp.spec_types
+			_	-> 0
+		| num_specials > 0 && num_specials <= length app_args
+			= activeArgs num_specials app_args common_defs ai
+			with
+				activeArgs 0 app_args common_defs ai
+					= consumerRequirements app_args common_defs ai			// treat remaining args normally...
+				activeArgs n [app_arg:app_args] common_defs ai
+					# (cc, _, ai)	= consumerRequirements app_arg common_defs ai
+					# ai			= aiUnifyClassifications CActive cc ai	// make args for which specials exist active...
+					= activeArgs (n-1) app_args common_defs ai
+// ...SPECIAL
 			= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_name}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
