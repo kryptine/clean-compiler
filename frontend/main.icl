@@ -143,7 +143,7 @@ compileModule mod_name ms
 
 loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
 	# (ok, mod, hash_table, ms_error, predef_symbols, ms_files)
-		= wantModule cWantIclFile mod_ident (hash_table ---> "Parsing") ms_error ms_paths predef_symbols ms_files
+		= wantModule cWantIclFile mod_ident (hash_table ---> ("Parsing:", mod_ident)) ms_error ms_paths predef_symbols ms_files
 	| not ok
 		= (No,  predef_symbols, hash_table, { ms & ms_files = ms_files, ms_io = ms_io, ms_error = ms_error })
 	# (ok, mod, nr_of_global_funs, mod_functions, dcl_mod, predef_mod, modules, hash_table, ms_error, predef_symbols, ms_files)
@@ -252,10 +252,6 @@ where
 			= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
 
-instance <<< Optional a | <<< a
-where
-	(<<<) file (Yes x)	= file <<< x
-	(<<<) file No		= file
 	
 showComponents2 :: !{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{# FunDef},!*File)
 showComponents2 comps comp_index fun_defs acc_args file
