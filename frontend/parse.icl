@@ -1697,6 +1697,7 @@ where
 				|	annot == AN_None
 	 		  		->	(PD_Type td, pState)
 	 		  		->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
+
 	want_type_rhs parseContext td=:{td_attribute} ColonDefinesToken annot pState // type Macro
 		# name				= td.td_name.id_name
 		  pState			= verify_annot_attr annot td_attribute name pState
@@ -1705,7 +1706,7 @@ where
 		|	annot == AN_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
-/*
+
 	want_type_rhs parseContext td=:{td_attribute} token=:DefinesColonToken annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
@@ -1718,7 +1719,7 @@ where
 		| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
-*/
+
 	want_type_rhs parseContext td=:{td_attribute} token annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
