@@ -709,9 +709,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 };
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02000210;
-kBEVersionOldestDefinition:==0x02000210;
-kBEVersionOldestImplementation:==0x02000210;
+kBEVersionCurrent:==0x02000211;
+kBEVersionOldestDefinition:==0x02000211;
+kBEVersionOldestImplementation:==0x02000211;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;
