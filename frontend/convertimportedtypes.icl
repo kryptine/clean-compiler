@@ -2,7 +2,7 @@ implementation module convertimportedtypes
 
 import syntax, trans
 
-cDontRemoveAnnatations :== False
+cDontRemoveAnnotations :== False
 
 convertDclModule :: !Int !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
@@ -26,7 +26,7 @@ where
 	convert_dcl_function dcl_functions common_defs dcl_index (imported_types, imported_conses, var_heap, type_heaps)
 		# {ft_type, ft_type_ptr} = dcl_functions.[dcl_index]
 		  (ft_type, imported_types, imported_conses, type_heaps, var_heap)
-		  	= convertSymbolType cDontRemoveAnnatations common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
+		  	= convertSymbolType cDontRemoveAnnotations common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (ft_type_ptr, VI_ExpandedType ft_type), type_heaps)
 
 convertConstructorTypes cons_defs main_dcl_module_n common_defs types_and_heaps
@@ -35,7 +35,7 @@ where
 	convert_constructor_type common_defs cons_defs cons_index (imported_types, imported_conses, var_heap, type_heaps)  
 		# {cons_type_ptr, cons_type} = cons_defs.[cons_index]
 		  (cons_type, imported_types, imported_conses, type_heaps, var_heap)
-				= convertSymbolType cDontRemoveAnnatations common_defs cons_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
+				= convertSymbolType cDontRemoveAnnotations common_defs cons_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (cons_type_ptr, VI_ExpandedType cons_type), type_heaps)
 
 convertSelectorTypes selector_defs main_dcl_module_n common_defs types_and_heaps
@@ -44,7 +44,7 @@ where
 	convert_selector_type common_defs selector_defs sel_index (imported_types, imported_conses, var_heap, type_heaps)  
 		# {sd_type_ptr, sd_type} = selector_defs.[sel_index]
 		  (sd_type, imported_types, imported_conses, type_heaps, var_heap)
-				= convertSymbolType cDontRemoveAnnatations common_defs sd_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
+				= convertSymbolType cDontRemoveAnnotations common_defs sd_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type), type_heaps)
 
 convertIclModule :: !Int !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
@@ -94,7 +94,7 @@ where
 	convert_imported_function dcl_functions common_defs {glob_object,glob_module} (imported_types, imported_conses, type_heaps, var_heap)
 		# {ft_type_ptr,ft_type} = dcl_functions.[glob_module].[glob_object]
 		  (ft_type, imported_types, imported_conses, type_heaps, var_heap)
-				= convertSymbolType cDontRemoveAnnatations common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
+				= convertSymbolType cDontRemoveAnnotations common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, type_heaps, var_heap <:= (ft_type_ptr, VI_ExpandedType ft_type))
 
 	convert_imported_constructors common_defs [] imported_types type_heaps var_heap
@@ -103,7 +103,7 @@ where
 		# {com_cons_defs,com_selector_defs} = common_defs.[glob_module]
 		  {cons_type_ptr,cons_type,cons_type_index,cons_symb} = common_defs.[glob_module].com_cons_defs.[glob_object]
 		  (cons_type, imported_types, conses, type_heaps, var_heap)
-		  		= convertSymbolType cDontRemoveAnnatations common_defs cons_type main_dcl_module_n imported_types conses type_heaps var_heap
+		  		= convertSymbolType cDontRemoveAnnotations common_defs cons_type main_dcl_module_n imported_types conses type_heaps var_heap
 		  var_heap = var_heap <:= (cons_type_ptr, VI_ExpandedType cons_type)
 		  ({td_rhs}, imported_types) = imported_types![glob_module].[cons_type_index]
 //				---> ("convert_imported_constructors", cons_symb, cons_type)
@@ -120,6 +120,6 @@ where
 				# field_index = fields.[field_index].fs_index
 				  {sd_type_ptr,sd_type} = selector_defs.[field_index]
 				  (sd_type, imported_types, conses, type_heaps, var_heap)
-				  		= convertSymbolType cDontRemoveAnnatations common_defs sd_type main_dcl_module_n imported_types conses type_heaps var_heap
+				  		= convertSymbolType cDontRemoveAnnotations common_defs sd_type main_dcl_module_n imported_types conses type_heaps var_heap
 				= (imported_types, conses, type_heaps, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type))
 
