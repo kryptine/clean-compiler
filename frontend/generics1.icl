@@ -332,8 +332,8 @@ buildGenericTypeRep type_index funs_and_groups
 	# (cons_infos, funs_and_groups, gs_modules, heaps, gs_error) 
 		= buildTypeDefInfo type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups gs_modules heaps gs_error
 
-	# (atype, gs_modules, gs_td_infos, gs_error) 
-		= buildStructType type_index cons_infos gs_predefs gs_modules gs_td_infos gs_error
+	# (atype, (gs_modules, gs_td_infos, heaps, gs_error)) 
+		= buildStructType type_index cons_infos gs_predefs (gs_modules, gs_td_infos, heaps, gs_error)
 	
 	# (from_fun_ds, funs_and_groups, heaps, gs_error)
 		= buildConversionFrom type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups heaps gs_error
@@ -363,15 +363,15 @@ buildGenericTypeRep type_index funs_and_groups
 //	the structure type
 //========================================================================================
 
-convertATypeToGenTypeStruct :: !Ident !Position !AType (!*TypeDefInfos, !*ErrorAdmin) 
-	-> (GenTypeStruct, (!*TypeDefInfos, !*ErrorAdmin))
+convertATypeToGenTypeStruct :: !Ident !Position !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
+	-> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
 convertATypeToGenTypeStruct ident pos type st
 	= convert type st	
 where	
-	convert {at_type=TA type_symb args} st
-		= convert_type_app type_symb args st
-	convert {at_type=TAS type_symb args _} st
-		= convert_type_app type_symb args st
+	convert {at_type=TA type_symb args, at_attribute} st
+		= convert_type_app type_symb at_attribute args st
+	convert {at_type=TAS type_symb args _, at_attribute} st
+		= convert_type_app type_symb at_attribute args st
 	convert {at_type=(CV tv) :@: args} st
 		#! (args, st) = mapSt convert args st
 		= (GTSAppVar tv args, st)  
@@ -383,49 +383,53 @@ where
 		= (GTSVar tv, st)  
 	convert {at_type=TB _} st
 		= (GTSAppCons KindConst [], st)  
-	convert {at_type=type} (td_infos, error) 
+	convert {at_type=type} (modules, td_infos, heaps, error) 
 		# error = reportError ident pos ("can not build generic representation for this type", type) error
-		= (GTSE, (td_infos, error))
+		= (GTSE, (modules, td_infos, heaps, error))
 
-	convert_type_app {type_index} args (td_infos, error)
-		#! ({tdi_kinds}, td_infos) = td_infos ! [type_index.glob_module,type_index.glob_object]
-		#! kind = if (isEmpty tdi_kinds) KindConst (KindArrow tdi_kinds)
-		#! (args, st) = mapSt  convert args (td_infos, error)
-		= (GTSAppCons kind args, st)  
+	convert_type_app {type_index} attr args (modules, td_infos, heaps, error)	
+		# (type_def, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+		= case type_def.td_rhs of 
+			SynType atype
+				# (expanded_type, th) = expandSynonymType type_def attr args heaps.hp_type_heaps 
+				-> convert {at_type = expanded_type, at_attribute = attr} 
+					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
+			_ 	 	
+				#! ({tdi_kinds}, td_infos) = td_infos ! [type_index.glob_module,type_index.glob_object]
+				#! kind = if (isEmpty tdi_kinds) KindConst (KindArrow tdi_kinds)
+				#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
+				->  (GTSAppCons kind args, st)  
+
+
 
 buildStructType ::
 		!GlobalIndex				// type def global index 
 		![ConsInfo]					// constructor and field info symbols
 		!PredefinedSymbols
-		!*{#CommonDefs}
-		!*TypeDefInfos
-		!*ErrorAdmin
+		(!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 	-> 	( !GenTypeStruct			// the structure type
-		, !*{#CommonDefs}
-		, !*TypeDefInfos
-		, !*ErrorAdmin
+		, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 		)
-buildStructType {gi_module,gi_index} cons_infos predefs modules td_infos error
+buildStructType {gi_module,gi_index} cons_infos predefs (modules, td_infos, heaps, error)
 	# (type_def=:{td_name}, modules) = modules![gi_module].com_type_defs.[gi_index]	
-	# (common_defs, modules) = modules ! [gi_module]	
-	# (stype, (td_infos, error)) = build_type type_def cons_infos common_defs (td_infos, error)	
-	= (stype, modules, td_infos, error)
+	//# (common_defs, modules) = modules ! [gi_module]	
+	= build_type type_def cons_infos (modules, td_infos, heaps, error)	
 		//---> ("buildStructureType", td_name, atype)	
 where
-	build_type {td_rhs=AlgType alts, td_name, td_pos} cons_infos common_defs st
-		# (cons_args, st) = zipWithSt (build_alt td_name td_pos common_defs) alts cons_infos st
+	build_type {td_rhs=AlgType alts, td_name, td_pos} cons_infos st
+		# (cons_args, st) = zipWithSt (build_alt td_name td_pos) alts cons_infos st
 		= (build_sum_type cons_args, st) 
 
 /*
-	build_type {td_rhs=RecordType {rt_constructor}, td_name, td_pos} [cdi] common_defs st		
-		= build_alt td_name td_pos common_defs rt_constructor cdi st
+	build_type {td_rhs=RecordType {rt_constructor}, td_name, td_pos} [cdi] st		
+		= build_alt td_name td_pos rt_constructor cdi st
 */
 	build_type 
 			{td_rhs=RecordType {rt_constructor}, td_name, td_pos} 
 			[{ci_cons_info, ci_field_infos}] 
-			common_defs st		
-		# ({cons_type={st_args}}) = common_defs.com_cons_defs.[rt_constructor.ds_index]	
-		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos) st_args st
+			(modules, td_infos, heaps, error)		
+		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]	
+		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos) st_args (modules, td_infos, heaps, error)
 		
 		# args = SwitchGenericInfo [GTSField fi arg \\ arg <- args & fi <- ci_field_infos] args
 			
@@ -433,17 +437,20 @@ where
 		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type		
 		= (type, st)		
 
-		
+/*		
 	build_type {td_rhs=SynType type,td_name, td_pos} cons_infos common_defs st
-		// ???
 		= convertATypeToGenTypeStruct td_name td_pos type st
-	build_type td=:{td_rhs=(AbstractType _),td_name, td_arity, td_args, td_pos} cdis common_defs (td_infos, error)
+*/
+	build_type {td_rhs=SynType type,td_name, td_pos} cons_infos (modules, td_infos, heaps, error)
+		# error = reportError td_name td_pos "cannot build a generic representation of a synonym type" error
+		= (GTSE, (modules, td_infos, heaps, error))
+	build_type td=:{td_rhs=(AbstractType _),td_name, td_arity, td_args, td_pos} cdis (modules, td_infos, heaps, error)
 		# error = reportError td_name td_pos "cannot build a generic representation of an abstract type" error
-		= (GTSE, (td_infos, error))
+		= (GTSE, (modules, td_infos, heaps, error))
 		
-	build_alt td_name td_pos common_defs cons_def_sym=:{ds_index} {ci_cons_info} st
-		# ({cons_type={st_args}}) = common_defs.com_cons_defs.[ds_index]	
-		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos) st_args st	
+	build_alt td_name td_pos cons_def_sym=:{ds_index} {ci_cons_info} (modules, td_infos, heaps, error)
+		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[ds_index]	
+		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos) st_args (modules, td_infos, heaps, error)	
 		# prod_type = build_prod_type args		
 		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type		
 		= (type, st)		
@@ -1164,11 +1171,17 @@ where
 
 		// To generate all partially applied shorthand instances we need
 		// classes for all partial applications of the gc_kind and for
-		// all the argument kinds
+		// all the argument kinds.
+		// Additionally, we always need classes for base cases *, *->* and *->*->* 
 
 		#! gs = {gs & gs_modules = gs_modules, gs_td_infos = gs_td_infos}
-		#! subkinds = determine_subkinds kind 
-		#! (st, gs) = foldSt (build_class_if_needed gen_def) subkinds (st, gs) 
+		#! subkinds = determine_subkinds kind 		
+		#! kinds = 
+			[ KindConst
+			, KindArrow [KindConst]
+			, KindArrow [KindConst, KindConst] 
+			: subkinds]
+		#! (st, gs) = foldSt (build_class_if_needed gen_def) kinds (st, gs) 
 		
 /*
 		#! (st, gs) = build_class_if_needed gen_def kind
@@ -1931,8 +1944,8 @@ buildGenericCaseBody main_module_index gc=:{gc_name, gc_pos, gc_generic, gc_type
 	# (generic_info_var, heaps) = build_generic_info_arg heaps
 	#! arg_vars = SwitchGenericInfo [generic_info_var:arg_vars] arg_vars  
 
-	#! (adaptor_expr, (td_infos, heaps, error))
-		= build_adaptor_expr gc gen_def gen_type_rep (td_infos, heaps, error)
+	#! (adaptor_expr, (modules, td_infos, heaps, error))
+		= build_adaptor_expr gc gen_def gen_type_rep (modules, td_infos, heaps, error)
 	
 	#! (specialized_expr, (td_infos, heaps, error))
 		= build_specialized_expr gc gtr_type td_args generated_arg_exprs (td_infos, heaps, error)
@@ -1965,7 +1978,7 @@ where
 
 	// adaptor that converts a function for the generic representation into a 
 	// function for the type itself
-	build_adaptor_expr {gc_name, gc_pos} {gen_type, gen_vars, gen_info_ptr} {gtr_iso} (td_infos, heaps, error)
+	build_adaptor_expr {gc_name, gc_pos} {gen_type, gen_vars, gen_info_ptr} {gtr_iso} (modules, td_infos, heaps, error)
 		#! (var_kinds, heaps) = get_var_kinds gen_info_ptr heaps		
 		#! non_gen_var_kinds = drop (length gen_vars) var_kinds  
 		
@@ -1977,13 +1990,14 @@ where
 		#! spec_env = gen_env ++ non_gen_env	
 		#! curried_gen_type = curry_symbol_type gen_type
 
-		#! (struct_gen_type, (td_infos, error)) = convertATypeToGenTypeStruct bimap_ident gc_pos curried_gen_type (td_infos, error)  
-		#! (bimap_expr, state) 
+		#! (struct_gen_type, (modules, td_infos, heaps, error)) = convertATypeToGenTypeStruct 
+				bimap_ident gc_pos curried_gen_type (modules, td_infos, heaps, error)  
+		#! (bimap_expr, (td_infos, heaps, error)) 
 			= specializeGeneric {gi_module=bimap_module,gi_index=bimap_index} struct_gen_type spec_env bimap_ident gc_pos main_module_index predefs (td_infos, heaps, error)
 
 		#! adaptor_expr 
 			= buildRecordSelectionExpr bimap_expr PD_map_from predefs
-		= (adaptor_expr, state)		
+		= (adaptor_expr, (modules, td_infos, heaps, error))		
 	where
 		{pds_module = bimap_module, pds_def=bimap_index} 
 			= predefs.[PD_GenericBimap]
@@ -2027,7 +2041,6 @@ where
 	// generic function specialzied to the generic representation of the type
 	build_specialized_expr {gc_name, gc_pos, gc_generic} gtr_type td_args generated_arg_exprs state
 		#! spec_env = [(atv_variable, expr) \\ {atv_variable} <- td_args & expr <- generated_arg_exprs] 		
-		//= buildSpecializedExpr1 gc_generic.gi_module gc_generic.gi_index gtr_type spec_env gc_name gc_pos state
 		= specializeGeneric gc_generic gtr_type spec_env gc_name gc_pos main_module_index predefs state
 			
 	// the body expression
@@ -3147,6 +3160,35 @@ where
 		#! th_attrs = foldSt (\{av_info_ptr} h->writePtr av_info_ptr AVI_Empty h) avs th_attrs
 		= {th & th_attrs = th_attrs}				
 
+
+expandSynonymType :: !CheckedTypeDef !TypeAttribute ![AType] !*TypeHeaps -> (!Type, !*TypeHeaps)
+expandSynonymType {td_rhs=SynType {at_type}, td_args, td_attribute} ta_attr ta_args th
+	#! th_attrs = bind_attribute td_attribute ta_attr th.th_attrs
+	#! th = fold2St bind_type_and_attr td_args ta_args { th & th_attrs = th_attrs }
+	#! (at_type, th) = applySubst at_type th
+	#! th_attrs = clear_attribute td_attribute th.th_attrs
+	#! th = foldSt clear_type_and_attr td_args { th & th_attrs = th_attrs }
+	= (at_type, th)   
+where
+	bind_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} {at_type,at_attribute} type_heaps=:{th_vars,th_attrs}
+		= { type_heaps &	th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type),
+							th_attrs = bind_attribute atv_attribute at_attribute th_attrs }
+		
+	bind_attribute (TA_Var {av_info_ptr}) attr th_attrs
+		= th_attrs <:= (av_info_ptr, AVI_Attr attr)
+	bind_attribute _ _ th_attrs
+		= th_attrs
+
+	clear_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+		= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attribute atv_attribute th_attrs }
+		
+	clear_attribute (TA_Var {av_info_ptr}) th_attrs
+		= th_attrs <:= (av_info_ptr, AVI_Empty)
+	clear_attribute _ th_attrs
+		= th_attrs
+expandSynonymType td ta_attr ta_args th = abort "expanding not a synonym type\n" 
+
+	
 //****************************************************************************************
 //	Function Helpers
 //****************************************************************************************
@@ -3159,7 +3201,8 @@ makeFunction ident fun_index group_index arg_vars body_expr opt_sym_type main_dc
 	| not (isEmpty free_vars)
 		= abort "makeFunction: free_vars is not empty\n"  
 				
-	=	{ fun_symb = ident
+	#! fun_def =	
+		{ fun_symb = ident
 		, fun_arity = length arg_vars
 		, fun_priority = NoPrio
 		, fun_body = TransformedBody {tb_args = arg_vars, tb_rhs = body_expr }
@@ -3176,8 +3219,9 @@ makeFunction ident fun_index group_index arg_vars body_expr opt_sym_type main_dc
 			, fi_dynamics = []
 			, fi_properties = 0
 			}	
-		}	
-		//---> ("makeFunction", ident, fun_index, collectCalls main_dcl_module_n body_expr)
+		}
+	= fun_def				
+		//---> ("makeFunction", ident, fun_index, main_dcl_module_n, fun_def.fun_info.fi_calls)
 
 // build function and
 buildFunAndGroup :: 
@@ -3260,7 +3304,13 @@ makeIntExpr value = BasicExpr (BVI (toString value))
 
 makeStringExpr :: String -> Expression
 makeStringExpr str
-	=  BasicExpr (BVS ("\"" +++ str +++ "\""))
+	=  BasicExpr (BVS (adjust_string str))
+where
+	adjust_string str
+		= { ch \\ ch <- ['\"'] ++ adjust_chars [ch \\ ch <-: str] ++ ['\"'] }
+	adjust_chars [] = []
+	adjust_chars ['\\':cs] 	= ['\\','\\' : adjust_chars cs]
+	adjust_chars [c:cs] 	= [c : adjust_chars cs]
 		
 makeListExpr :: [Expression] !PredefinedSymbols !*Heaps -> (Expression, !*Heaps)
 makeListExpr [] predefs heaps
@@ -3425,6 +3475,8 @@ foldExpr ::
 		.st 							// state
 	-> 
 		.st								// updated state 
+foldExpr f expr=:(Var _) st 
+	= f expr st
 foldExpr f expr=:(App {app_args}) st 
 	# st = f expr st
 	= foldSt (foldExpr f) app_args st
@@ -3449,6 +3501,9 @@ where
 	fold_guards f (BasicPatterns gi bps) st = foldSt (foldExpr f) [bp_expr\\{bp_expr}<-bps] st
 	fold_guards f (DynamicPatterns dps) st = foldSt (foldExpr f) [dp_rhs\\{dp_rhs}<-dps] st
 	fold_guards f NoPattern st = st
+foldExpr f expr=:(Selection _ expr1 _) st
+	# st = f expr st
+  	= foldExpr f expr1 st 	
 foldExpr f expr=:(Update expr1 sels expr2) st
 	# st = f expr st
 	# st = foldExpr f expr1 st 
@@ -3467,6 +3522,10 @@ foldExpr f expr=:(RecordUpdate _ expr1 binds) st
 foldExpr f expr=:(TupleSelect _ _ expr1) st 
 	# st = f expr st
 	= foldExpr f expr1 st
+foldExpr f expr=:(BasicExpr _) st
+	= f expr st	
+foldExpr f expr=:WildCard st
+	= f expr st	
 foldExpr f expr=:(Conditional {if_cond,if_then,if_else}) st
 	# st = f expr st
 	# st = foldExpr f if_cond st	
@@ -3480,7 +3539,8 @@ foldExpr f expr=:(DynamicExpr {dyn_expr}) st
 	# st = f expr st
 	= foldExpr f dyn_expr st
 foldExpr f expr st 
-	= f expr st
+	= abort "generic.icl: foldExpr does not match\n"//f expr st
+		---> ("foldExpr does not match", expr)
 
 //-----------------------------------------------------------------------------
 // map expression applies a function to each node of an expression
@@ -3599,10 +3659,12 @@ instance == FunCall where (==) (FunCall x _) (FunCall y _) = x == y
 collectCalls :: !Index !Expression -> 	[FunCall]
 collectCalls current_module expr = removeDup (foldExpr get_call expr [])
 where
-	get_call (App {app_symb={symb_kind=SK_Function {glob_module,glob_object}}}) indexes
+	get_call (App {app_symb={symb_kind=SK_Function {glob_module,glob_object}, symb_name}}) indexes
 		| glob_module == current_module
 			= [FunCall glob_object NotALevel : indexes]
+				//---> ("collect call ", symb_name, glob_object)
 			= indexes
+				//---> ("do not collect call ", symb_name, glob_module, glob_object)
 	get_call _ indexes = indexes
 
 // collects variables and computes the refernce counts

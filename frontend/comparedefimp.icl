@@ -1195,6 +1195,12 @@ e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_OverloadedFunction
 	| dcl_glob_index<>icl_glob_index
 		= give_error symb_name ec_state
 	= ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Generic dcl_glob_index dcl_kind} 
+					icl_app_symb=:{symb_kind=SK_Generic icl_glob_index icl_kind}
+					ec_state
+	| dcl_glob_index<>icl_glob_index || dcl_kind <> icl_kind
+		= give_error symb_name ec_state
+	= ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_IclMacro icl_index} ec_state
 	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_name,symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_DclMacro icl_glob_index} ec_state

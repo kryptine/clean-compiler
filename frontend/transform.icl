@@ -479,6 +479,8 @@ where
 				-> unfold_function_app app ui us
 			SK_OverloadedFunction {glob_module,glob_object}
 				-> unfold_function_app app ui us
+			SK_Generic {glob_module,glob_object} kind
+				-> unfold_function_app app ui us
 			SK_LocalMacroFunction local_macro_function_n
 				-> unfold_local_macro_function (FunctionOrIclMacroIndex local_macro_function_n)
 			SK_LocalDclMacroFunction {glob_module,glob_object}
