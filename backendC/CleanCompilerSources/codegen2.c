@@ -3074,9 +3074,9 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 									GenBuildh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size);									
 							} else {
 								if (symb->symb_head_strictness==4)
-									GenFillR (strict_cons_lab_p,a_size,b_size,*asp_p+a_size-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
+									GenFillR (strict_cons_lab_p,a_size,b_size,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
 								else
-									GenFillh (strict_cons_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
+									GenFillh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
 								*asp_p-=a_size;
 							}
 						}
