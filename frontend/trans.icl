@@ -2054,27 +2054,14 @@ transformFunctionApplication :: FunDef InstanceInfo !ConsClasses !App [Expressio
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_args, extra_args) = complete_application fun_def.fun_arity app_args extra_args
 //	| False -!-> ("transformFunctionApplication",app_symb,app_args,extra_args,fun_def.fun_arity,cc_size) = undef
-	| cc_size == 0 && not_expanding_consumer
-		# (fun_def,ti_fun_defs,ti_fun_heap)	= get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
-		# ti = {ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap}
+	| expanding_consumer
+	 	= (build_application { app & app_args = app_args } extra_args, ti)
+	| cc_size == 0
 		# {fun_body=fun_body=:TransformedBody {tb_rhs}, fun_kind} = fun_def
 		| SwitchTransformConstants (ro.ro_transform_fusion && is_not_caf fun_kind && is_sexy_body tb_rhs) False
-			# us 	=	{ us_var_heap				= ti.ti_var_heap
-			  			, us_symbol_heap			= ti.ti_symbol_heap
-			  			, us_opt_type_heaps			= Yes ti.ti_type_heaps
-			  			, us_cleanup_info			= ti.ti_cleanup_info
-			  			, us_local_macro_functions	= No 
-			  			}
-		 	  ui	=	{ ui_handle_aci_free_vars	= RemoveThem
-		 	  			}
-			  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
-			  		= unfold tb_rhs ui us
-			  ti	= { ti & ti_var_heap = us_var_heap, ti_symbol_heap = us_symbol_heap, ti_type_heaps = ti_type_heaps, ti_cleanup_info = us_cleanup_info}
-			| isEmpty extra_args
-				= (tb_rhs, ti)
-			= (tb_rhs @ extra_args, ti)
+			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
-	| cc_size > 0 && not_expanding_consumer
+	| cc_size >= 0
 		# is_applied_to_macro_fun = fun_def.fun_info.fi_properties bitand FI_IsMacroFun <> 0
 	  	# consumer_is_curried = cc_size <> length app_args
 		# non_rec_consumer
@@ -2113,9 +2100,9 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	= (build_application { app & app_args = app_args } extra_args, ti)
 where
-	not_expanding_consumer = case fun_def.fun_body of
-								Expanding _	-> False
-								_			-> True
+	expanding_consumer = case fun_def.fun_body of
+								Expanding _	-> True
+								_			-> False
 
 	is_not_caf FK_Caf	= False
 	is_not_caf _		= True
