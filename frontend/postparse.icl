@@ -120,6 +120,10 @@ addFunctionsRange fun_defs ca
 					, ca_rev_fun_defs = [fun_def : ca.ca_rev_fun_defs]
 				}
 
+MakeNewImpOrDefFunction icl_module name arity body kind prio opt_type pos
+	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = fun_kind_to_def_or_imp_fun_kind icl_module kind,
+		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_index = NoIndex, fun_info = EmptyFunInfo }
+
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
 
 instance collectFunctions ParsedExpr
@@ -298,7 +302,6 @@ where
 			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 			= ([ fun : fun_defs ], node_defs, ca)
-
 		reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 			= case defs of
 				[PD_Function pos name is_infix args rhs fun_kind : _]
@@ -306,7 +309,7 @@ where
 						# fun_arity = determineArity args type
 						# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
 						  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-						  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type pos
+						  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type pos1
 						-> ([fun : fun_defs], node_defs, ca)
 						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
 				[PD_NodeDef pos pattern=:(PE_Ident id) rhs : defs]
@@ -317,7 +320,7 @@ where
 					# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 					  fun = MakeNewImpOrDefFunction icl_module id 0 
 					  				[{ pb_args = [], pb_rhs = rhs, pb_position = pos }]
-					  				(FK_Function cNameNotLocationDependent) prio type pos
+					  				(FK_Function cNameNotLocationDependent) prio type pos1
 					-> ([fun : fun_defs], node_defs, ca)
 				_
 					-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
@@ -1156,10 +1159,6 @@ where
 			 =	(True,Yes (MakeEmptyModule mod_name MK_None),ca)
 			 =	(True,No,ca)
 
-MakeNewImpOrDefFunction icl_module name arity body kind prio opt_type pos
-	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = fun_kind_to_def_or_imp_fun_kind icl_module kind,
-		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_index = NoIndex, fun_info = EmptyFunInfo }
-
 fun_kind_to_def_or_imp_fun_kind icl_module (FK_Function b)
 	| icl_module
 		= FK_ImpFunction b
@@ -1221,7 +1220,7 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  			  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
-				  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
+				  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No fun_pos
 				| fun_kind == FK_Macro
 					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects, ca)
 					-> ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
@@ -1314,7 +1313,7 @@ where
   					# fun_arity = length args
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
-					  macro = MakeNewImpOrDefFunction icl_module name fun_arity bodies FK_Macro prio No pos
+					  macro = MakeNewImpOrDefFunction icl_module name fun_arity bodies FK_Macro prio No fun_pos
 					-> (mem_defs, [macro : mem_macros], ca)
 					-> check_symbols_of_class_members defs type_context (postParseError fun_pos "macro body expected" ca)
 			_
