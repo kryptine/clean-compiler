@@ -2849,50 +2849,182 @@ static void ConvertStateInfoToStrictInfos (TypeAlts rule_type_alts, unsigned ari
 		InitStrictInfo (result, HnfStrict);
 }
 
-static void UpdateStateInfoWithStrictInfo (TypeNode node, StrictInfo *s,Bool *strict_added_p,Bool *warning)
-{
-	Bool is_strict_annotated;
-#ifndef SHOW_STRICT_EXPORTED_TUPLE_ELEMENTS
-	Bool local_strict_added;
+#if CLEAN2
 
-	local_strict_added = False;
+/*
+	Encoding for strictness information:
+
+	The strictness information that is found by the strictness
+	analyser is encoded in a bit string. There are two encodings
+
+	compact (but fragile):
+		0 a (s)*     trailing zeros are removed
+
+	robust (but long):
+		1 a (w s t)*
+
+		a	any strictness added
+		()* repeated for each argument position, recursively
+			for strict (after sa) tuples
+		w	argument was strict
+		s	argument strictness added
+		t	argument is tuple
+
+	Example:
+				f ::  ! a   (   a,   [a]) -> a // before sa
+				f ::  ! a ! ( ! a,   [a]) -> a // after sa
+
+	compact		0 1   0   1   1    0	=> 01011 (trailing zeros removed)
+
+	robust		1 1  100 011 010  000   => 11100011010000
+
+	The bit string is represented by a bit count and an array of
+	ints (each 32 bits), where the least significant bit of an int
+	is the first bit in the bit string.
+*/
+
+#define StrictPositionsRobustEncoding 1
+
+#define kMaxStrictPositions 1024
+
+#if StrictPositionsRobustEncoding
+# define	kBitsPerStrictPosition 3
+#else
+# define	kBitsPerStrictPosition 1
+# endif
+
+#define kMaxStrictBits (2+kMaxStrictPositions*kBitsPerStrictPosition)
+#define kBitsPerInt (sizeof (int)*8)
+#define ceilingdiv(a, b) (((a)+(b)-1)/(b)) /* ceiling (a/b) */
+#define bits2ints(n) ceilingdiv(n, kBitsPerInt)
+
+static int strict_positions_last_one;
+static StrictPositionsP strict_positions;
+
+
+static void StrictPositionsClear (void)
+{
+	int	i, sizeInts;
+
+	if (strict_positions == NULL)
+	{
+		int	sizeBytes;
+
+		sizeInts = bits2ints(kMaxStrictPositions);
+		sizeBytes = sizeof (StrictPositionsS) + (sizeInts-1) * sizeof (int);
+		strict_positions = CompAlloc (sizeBytes);
+
+		strict_positions->sp_size = 0;
+	}
+
+	sizeInts = bits2ints (strict_positions->sp_size);
+	for (i = 0; i < sizeInts; i++)
+		strict_positions->sp_bits[i]	= 0;
+
+	strict_positions->sp_size = 0;
+	strict_positions_last_one = 0;
+}
+
+static void StrictPositionsAddBit (Bool bit)
+{
+	int size;
+	StrictPositionsP positions;
+
+	positions = strict_positions;
+	size = positions->sp_size;
+
+	if (bit)
+	{
+		Assume (size < kMaxStrictPositions, "too many strict positions", "AddStrictPositions");
+
+		positions->sp_bits [size/kBitsPerInt] |= 1 << (size % kBitsPerInt);
+		strict_positions_last_one = size+1;
+	}
+
+	positions->sp_size = size+1;
+}
+
+
+static StrictPositionsP StrictPositionsCopy (void)
+{
+	StrictPositionsP positions;
+	int sizeBits;
+
+#if StrictPositionsRobustEncoding
+	sizeBits = strict_positions->sp_size;
+#else
+	sizeBits = strict_positions_last_one;
 #endif
 
+	Assume (size < kMaxStrictPositions, "too many strict positions", "StrictPositionsToInts");
+
+	if (sizeBits == 0)
+	{
+		static StrictPositionsS no_strict_postions = {0, {0}};
+
+		positions = &no_strict_postions;
+	}
+	else
+	{
+		int	sizeInts, sizeBytes;
+
+		sizeInts = bits2ints(sizeBits);
+		sizeBytes = sizeof (StrictPositionsS) + (sizeInts-1) * sizeof (int);
+		positions = CompAlloc (sizeBytes);
+		memcpy (positions, strict_positions, sizeBytes);
+	}
+
+	return positions;
+}
+
+#define StrictPositionsStrictAdded(is_strict) StrictPositionsAddBit (is_strict)
+
+#if StrictPositionsRobustEncoding
+# define StrictPositionsWasStrict(is_strict_annotated) StrictPositionsAddBit (is_strict_annotated)
+# define StrictPositionsType(is_tuple) StrictPositionsAddBit (is_tuple)
+#else
+# define StrictPositionsWasStrict(is_strict_annotated)
+# define StrictPositionsType(is_tuple)
+#endif
+
+#endif /* CLEAN2 */
+
+static void UpdateStateInfoWithStrictInfo (TypeNode node, StrictInfo *s,Bool *strict_added_p,Bool *warning)
+{
+	Bool is_strict_annotated, is_strict, is_tuple, strict_added;
+
 	is_strict_annotated = node->type_node_annotation==StrictAnnot;
-	
-	if (IsTupleInfo (s)){
+	is_tuple = IsTupleInfo (s);
+	is_strict = (is_tuple ? GetTupleStrictKind (s) : GetStrictKind (s, 0)) != NotStrict;
+	strict_added = !is_strict_annotated && is_strict;
+
+#if CLEAN2
+	StrictPositionsWasStrict (is_strict_annotated);
+	StrictPositionsStrictAdded (strict_added);
+	StrictPositionsType (is_tuple);
+#endif
+
+	if (strict_added) {
+		node->type_node_annotation=StrictAnnot;
+		*strict_added_p = True;
+	}
+
+	if (is_strict_annotated && !is_strict && StrictChecks)
+		*warning = True;
+
+	if (is_tuple && (is_strict || is_strict_annotated)){
 		unsigned	arity = s->strict_arity;
 		unsigned	i;
 		TypeArgs	args  = node->type_node_arguments;
-		
-		if (GetTupleStrictKind (s) == NotStrict){
-			if (StrictChecks && is_strict_annotated)
-				*warning = True;
-			return;
-		}
-		
-		if (! is_strict_annotated){
-			node->type_node_annotation=StrictAnnot;
-			*strict_added_p = True;
-		}
-		
-		for (i = 0; i < arity; i++, args = args->type_arg_next)
-#ifdef SHOW_STRICT_EXPORTED_TUPLE_ELEMENTS
+
+		for (i = 0; i < arity; i++, args = args->type_arg_next) {
+#ifndef SHOW_STRICT_EXPORTED_TUPLE_ELEMENTS
+			Bool local_strict_added;
+
+			local_strict_added = False;
+			strict_added_p = &local_strict_added;
+#endif
 			UpdateStateInfoWithStrictInfo (args->type_arg_node,&GetTupleInfo (s,i),strict_added_p,warning);
-#else
-			UpdateStateInfoWithStrictInfo (args->type_arg_node,&GetTupleInfo (s,i),&local_strict_added,warning);
-#endif
-	} else {
-#if 0
-		printf ("%d %d %d\n",GetStrictKind (s, 0),GetStrictKind (s, 1),GetStrictKind (s, 2));
-#endif
-		if (GetStrictKind (s, 0) != NotStrict){
-			if (!is_strict_annotated){
-				node->type_node_annotation=StrictAnnot;
-				*strict_added_p = True;
-			}
-		} else if (StrictChecks && GetStrictKind (s, 0) == NotStrict && is_strict_annotated){
-			*warning = True;
 		}
 	}
 }
@@ -2908,8 +3040,26 @@ static void UpdateStateInfosWithStrictInfos (TypeAlts rule, unsigned arity, Stri
 	/* do the arguments */
 	args = rule->type_alt_lhs->type_node_arguments;
 
-	for (i = 0; i < arity; i++, args = args->type_arg_next)
+#if CLEAN2
+	StrictPositionsClear ();
+	StrictPositionsAddBit (StrictPositionsRobustEncoding);
+	StrictPositionsAddBit (False);
+#endif
+
+	for (i = 0; i < arity; i++, args = args->type_arg_next) {
 		UpdateStateInfoWithStrictInfo (args->type_arg_node,&strict_args[i], strict_added, warning);
+	}
+
+#if CLEAN2
+	if (*strict_added)
+	{
+		Assume (strict_positions->sp_size > 2, "not enough bits", "UpdateStateInfosWithStrictInfos");
+		Assume (strict_positions_last_one > 2, "not enough bits", "UpdateStateInfosWithStrictInfos");
+		strict_positions->sp_bits [0] |= 1 << 1;
+	}
+
+	rule->type_alt_strict_positions = StrictPositionsCopy ();
+#endif
 
 	/* the result has no sense at the moment */	
 }

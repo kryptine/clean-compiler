@@ -396,4 +396,21 @@ where
 	show_dcl_function {ft_symb, ft_type} file
 		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"			
 		
+
+:: ListTypesKind = ListTypesNone | ListTypesInferred | ListTypesStrictExports | ListTypesAll
+:: ListTypesOption =
+	{	lto_showAttributes :: Bool
+	,	lto_listTypesKind :: ListTypesKind
+	}
+instance == ListTypesKind where
+	(==) ListTypesNone ListTypesNone
+		=	True
+	(==) ListTypesInferred ListTypesInferred
+		=	True
+	(==) ListTypesStrictExports ListTypesStrictExports
+		=	True
+	(==) ListTypesAll ListTypesAll
+		=	True
+	(==) _ _
+		=	False
 		  			

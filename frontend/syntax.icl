@@ -888,6 +888,7 @@ cNotVarNumber :== -1
 					| AVI_Used
 					| AVI_Count !Int /* auxiliary used in module typesupport */
 					| AVI_SequenceNumber !Int // RWS
+					| AVI_Collected // RWS
 
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo

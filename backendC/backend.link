@@ -1,5 +1,6 @@
 /EXPORT: BEGetVersion
 /EXPORT: BEInit
+/EXPORT: BECloseFiles
 /EXPORT: BEFree
 /EXPORT: BEArg
 /EXPORT: BEDeclareModules
@@ -119,5 +120,7 @@
 /EXPORT: BEExportFunction
 /EXPORT: BEDefineImportedObjsAndLibs
 /EXPORT: BESetMainDclModuleN
+/EXPORT: BEStrictPositions
+/EXPORT: BECopyInts
 /EXPORT: BEDeclareDynamicTypeSymbol
 /EXPORT: BEDynamicTempTypeSymbol

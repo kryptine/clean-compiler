@@ -14,7 +14,7 @@
 # define kFileFlags VS_FF_DEBUG | VS_FF_PRERELEASE
 
 # define kFileFlagsMask VS_FF_DEBUG | VS_FF_PRERELEASE
-# define kFileVersionString "2.0.d.12"
+# define kFileVersionString "2.0.d.16"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION kFileVersion

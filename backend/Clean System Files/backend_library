@@ -1,6 +1,7 @@
 backend.dll
 BEGetVersion
 BEInit
+BECloseFiles
 BEFree
 BEArg
 BEDeclareModules
@@ -120,5 +121,7 @@ BEExportField
 BEExportFunction
 BEDefineImportedObjsAndLibs
 BESetMainDclModuleN
+BEStrictPositions
+BECopyInts
 BEDeclareDynamicTypeSymbol
 BEDynamicTempTypeSymbol

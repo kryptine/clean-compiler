@@ -731,6 +731,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 
 			newTypeAlt->type_alt_lhs	= BENormalTypeNode (newFunctionSymbol, lhsArgs);
 			newTypeAlt->type_alt_rhs	= rhs;
+			newTypeAlt->type_alt_strict_positions	= NULL;
 
 			newIdent->ident_symbol	= newFunctionSymbol;
 			newIdent->ident_name	= functionName;
@@ -820,6 +821,7 @@ CreateLocallyDefinedFunction (int index, char ** abcCode, TypeArgs lhsArgs, Type
 	typeAlt->type_alt_attr_equations	= NULL; /* used in PrintType */
 	typeAlt->type_alt_lhs	= BENormalTypeNode (functionSymbol, lhsArgs);
 	typeAlt->type_alt_rhs	= rhsType;
+	typeAlt->type_alt_strict_positions	= NULL;
 
 	BERule (functionIndex, BEIsNotACaf, typeAlt, ruleAlt);
 	
@@ -1509,6 +1511,7 @@ BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquation
 
 	alt->type_alt_type_context		= NULL;	/* used in PrintType */
 	alt->type_alt_attr_equations	= attributeEquations; /* used in PrintType */
+	alt->type_alt_strict_positions	= NULL;
 
 	return (alt);
 } /* BETypeAlt */
@@ -3381,6 +3384,57 @@ BEExportFunction (int dclFunctionIndex, int iclFunctionIndex)
 	dclDef->sdef_dcl_icl	= iclDef;
 } /* BEExportFunction */
 
+void
+BEStrictPositions (int functionIndex, int *bits, int **positions)
+{
+	BEModuleP			module;
+	SymbolP				functionSymbol;
+	SymbDef				functionDefinition;
+	ImpRules			rule;
+	TypeAlts			ruleType;
+	StrictPositionsP	strict_positions;
+
+	Assert ((unsigned int) main_dcl_module_n < gBEState.be_nModules);
+	module	= &gBEState.be_modules [main_dcl_module_n];
+
+	Assert ((unsigned int) functionIndex < module->bem_nFunctions);
+	functionSymbol	= &module->bem_functions [functionIndex];
+
+	Assert (functionSymbol->symb_kind == definition);
+	functionDefinition	= functionSymbol->symb_def;
+
+	Assert (functionDefinition->sdef_kind == IMPRULE);
+	rule	= functionDefinition->sdef_rule;
+
+	ruleType	= rule->rule_type;
+	Assert (ruleType != NULL);
+
+	strict_positions	= ruleType->type_alt_strict_positions;
+
+	Assert (strict_positions != NULL);
+
+	*bits		= strict_positions->sp_size;
+	*positions	= strict_positions->sp_bits;
+} /* BEStrictPositions */
+
+int
+BECopyInts  (int cLength, int *ints, int *cleanArray)
+{
+    int	cleanLength, truncate;
+
+	cleanLength	= cleanArray [-2];
+
+	truncate	= cleanLength < cLength;
+	if (truncate)
+		cLength	= cleanLength;
+
+	memcpy (cleanArray, ints, cLength * sizeof (int));
+
+	Assert (!truncate);
+
+	return (!truncate);
+} /* BECopyInts */
+
 static void
 CheckBEEnumTypes (void)
 {
@@ -3623,6 +3677,17 @@ BEInit (int argc)
 } /* BEInit */
 
 void
+BECloseFiles (void)
+{
+	if (StdErrorReopened)
+		fclose (StdError);
+	StdErrorReopened = False;
+	if (StdOutReopened)
+		fclose (StdOut);
+	StdOutReopened = False;
+} /* BECloseFiles */
+
+void
 BEFree (BackEnd backEnd)
 {
 	Assert (backEnd == (BackEnd) &gBEState);
@@ -3633,10 +3698,7 @@ BEFree (BackEnd backEnd)
 	Assert (gBEState.be_initialised);
 	gBEState.be_initialised	= False;
 
-	if (StdErrorReopened)
-		fclose (StdError);
-	if (StdOutReopened)
-		fclose (StdOut);
+	BECloseFiles ();
 } /* BEFree */
 
 // temporary hack

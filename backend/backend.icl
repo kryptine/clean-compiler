@@ -51,6 +51,12 @@ BEInit a0 a1 = code {
 };
 // BackEnd BEInit (int argc);
 
+BECloseFiles :: !BackEnd -> BackEnd;
+BECloseFiles a0 = code {
+	ccall BECloseFiles ":V:I"
+};
+// void BECloseFiles ();
+
 BEFree :: !BackEnd !UWorld -> UWorld;
 BEFree a0 a1 = code {
 	ccall BEFree "I:V:I"
@@ -765,6 +771,18 @@ BESetMainDclModuleN a0 a1 = code {
 };
 // void BESetMainDclModuleN (int main_dcl_module_n_parameter);
 
+BEStrictPositions :: !Int !BackEnd -> (!Int,!Int,!BackEnd);
+BEStrictPositions a0 a1 = code {
+	ccall BEStrictPositions "I:VII:I"
+};
+// void BEStrictPositions (int functionIndex,int* bits,int** positions);
+
+BECopyInts :: !Int !Int !Int -> Int;
+BECopyInts a0 a1 a2 = code {
+	ccall BECopyInts "III:I"
+};
+// int BECopyInts (int cLength,int* ints,int* cleanArray);
+
 BEDeclareDynamicTypeSymbol :: !Int !Int !BackEnd -> BackEnd;
 BEDeclareDynamicTypeSymbol a0 a1 a2 = code {
 	ccall BEDeclareDynamicTypeSymbol "II:V:I"
@@ -776,9 +794,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 };
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02000215;
+kBEVersionCurrent:==0x02000216;
 kBEVersionOldestDefinition:==0x02000213;
-kBEVersionOldestImplementation:==0x02000215;
+kBEVersionOldestImplementation:==0x02000216;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;

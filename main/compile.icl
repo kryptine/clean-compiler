@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 implementation module compile
 
 import StdEnv
@@ -8,6 +11,7 @@ import portToNewSyntax
 import compilerSwitches
 //import RWSDebug
 
+
 ::	CoclOptions =
 	{	moduleName:: {#Char}
 	,	pathName ::{#Char}
@@ -16,6 +20,7 @@ import compilerSwitches
 	,	outPath:: {#Char}
 	,	outMode::	Int
 	,	searchPaths:: SearchPaths
+	,	listTypes :: ListTypesOption
 	,	compile_for_dynamics	:: !Bool
 	,	support_generics :: !Bool
 	,	compile_with_fusion		:: !Bool
@@ -30,6 +35,7 @@ InitialCoclOptions =
 	,	outPath=	"out"
 	,	outMode=	FWriteText
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
+	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
 	,	compile_for_dynamics	= False
 	, 	support_generics = False
 	,	compile_with_fusion		= False
@@ -90,6 +96,14 @@ parseCommandLine [arg1=:"-fusion":args] options
 parseCommandLine ["-generics":args] options
 	// enable generics
 	= parseCommandLine args (SwitchGenerics {options & compile_with_generics = True} options)
+parseCommandLine ["-lattr":args] options
+	= parseCommandLine args {options & listTypes.lto_showAttributes = False}
+parseCommandLine ["-lt":args] options
+	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesInferred}
+parseCommandLine ["-lset":args] options
+	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
+parseCommandLine ["-lat":args] options
+	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -159,19 +173,14 @@ compile_modules [module_:modules] n_compiles cocl_options args_without_modules c
 	# (ok,cache,files)
 		= compileModule cocl_options (args_without_modules++[module_]) cache files;
 	| ok
-/*
-		# heaps = { hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = { th_vars = newHeap, th_attrs = newHeap }}
-		# (predef_symbols, hash_table) = buildPredefinedSymbols newHashTable
-		= compile_modules modules 0 cocl_options args_without_modules {} {} predef_symbols hash_table heaps files;
-*/
 		= compile_modules modules (n_compiles+1) cocl_options args_without_modules cache files;
-
+	// otherwise
 		= (ok,cache,files);
 compile_modules [] n_compiles cocl_options args_without_modules cache files
 	= (True,cache,files);
 
 compileModule :: CoclOptions [{#Char}] *DclCache *Files -> (!Bool,!*DclCache,!*Files)
-compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files
+compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files
 	# (opened, error, files)
 		=	fopen options.errorPath options.errorMode files
 	| not opened
@@ -184,9 +193,11 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		= openTclFile options options.pathName files
  	# (io, files)
 		=	stdio files
-//	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
-	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
+	# list_inferred_types
+		=	if (options.listTypes.lto_listTypesKind == ListTypesInferred)
+				(Yes options.listTypes.lto_showAttributes)
+				No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
 		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=options.compile_with_generics,feo_fusion=options.compile_with_fusion} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
@@ -220,7 +231,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 				  							 <<< options.moduleName <<< '\n')
 				  			error
 				# (success, var_heap, attrHeap, error, files)
-					= backEndInterface outputPath (map appendRedirection commandLineArgs) predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
+					= backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
 				-> (success,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
 				with
 					appendRedirection arg

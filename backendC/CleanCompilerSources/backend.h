@@ -1,7 +1,7 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02000215
+# define	kBEVersionCurrent				0x02000216
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not upward compatible (for example when a function is added)
@@ -9,7 +9,7 @@
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02000215
+# define	kBEVersionOldestImplementation	0x02000216
 
 
 # define	kBEDebug	1
@@ -177,6 +177,9 @@ Clean (BEGetVersion :: (Int, Int, Int))
 
 BackEnd BEInit (int argc);
 Clean (BEInit :: Int UWorld -> (BackEnd, UWorld))
+
+void BECloseFiles (void);
+Clean (BECloseFiles :: BackEnd -> BackEnd)
 
 void BEFree (BackEnd backEnd);
 Clean (BEFree :: BackEnd UWorld -> UWorld)
@@ -540,6 +543,11 @@ Clean (BEDefineImportedObjsAndLibs :: BEStringListP BEStringListP BackEnd -> Bac
 
 void BESetMainDclModuleN (int main_dcl_module_n_parameter);
 Clean (BESetMainDclModuleN :: Int BackEnd -> BackEnd)
+
+void BEStrictPositions (int functionIndex, int *bits, int **positions);
+Clean (BEStrictPositions :: Int BackEnd -> (Int, Int, BackEnd))
+
+int BECopyInts  (int cLength, int *ints, int *cleanArray);
 
 // temporary hack
 void BEDeclareDynamicTypeSymbol (int typeIndex, int moduleIndex);

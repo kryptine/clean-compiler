@@ -427,16 +427,26 @@ typedef struct uni_var_equats
 	struct uni_var_equats *	uve_next;
 } * UniVarEquations;
 
+#if CLEAN2
+STRUCT (strict_positions, StrictPositions)
+{
+	int sp_size;		/* size in bits */
+	int sp_bits [1];	/* variable size */
+};
+#endif
+
 typedef struct type_alt
 {
 	TypeNode				type_alt_lhs;
 	TypeNode				type_alt_rhs;
 	UniVarEquations			type_alt_attr_equations;
 	TypeContext				type_alt_type_context;
-	
 	struct uni_var_admin *	type_alt_attr_vars;
 
 	unsigned				type_alt_line;
+#ifdef CLEAN2
+	StrictPositionsP		type_alt_strict_positions;
+#endif
 } TypeAlt;
 
 typedef struct cons_var_list
