@@ -2761,7 +2761,7 @@ checkForeignExports [] icl_global_functions_ranges fun_defs cs
 
 checkForeignExportedFunctionTypes :: !*ErrorAdmin ![Int] !*{#FunDef} -> (!*ErrorAdmin,!*{#FunDef})
 checkForeignExportedFunctionTypes error_admin [fun_def_index:icl_foreign_exports] fun_defs
-	# error_admin = if (check_foreign_export_result_type st_result.at_type)
+	# error_admin = if (check_foreign_export_type st_result.at_type)
 						error_admin
 						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin)
 	# error_admin = if (check_foreign_export_types st_args)
@@ -2770,11 +2770,6 @@ checkForeignExportedFunctionTypes error_admin [fun_def_index:icl_foreign_exports
 	= checkForeignExportedFunctionTypes error_admin icl_foreign_exports fun_defs2
 	where
 		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fun_def_index]
-
-		check_foreign_export_result_type (TB BT_Int)
-			= True
-		check_foreign_export_result_type _
-			= False
 
 		check_foreign_export_types [{at_type}:argument_types]
 			= check_foreign_export_type at_type && check_foreign_export_types argument_types 
