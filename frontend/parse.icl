@@ -1147,12 +1147,12 @@ where
 				#	(fields, pState)			= wantFields td_name pState
 					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
 				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
-   				->	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars fields }, pState)
-   			ColonToken
-   				| isEmpty exi_vars
+				->	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars fields }, pState)
+			ColonToken
+				| isEmpty exi_vars
 				->	(PD_Erroneous, parseError "Algebraic type" No "no colon, :," pState)
 				->	(PD_Erroneous, parseError "Algebraic type" No "in this version of Clean no colon, :, after quantified variables" pState)
-  			_
+			_
 				#	(condefs, pState)	= want_constructor_list exi_vars token pState
 					td					= { td & td_rhs = ConsList condefs }
 				|	annot == AN_None
@@ -2737,7 +2737,7 @@ tryTypeVar pState
 tryTypeVarT :: !Token !ParseState -> (!Bool, TypeVar, !ParseState)
 tryTypeVarT (IdentToken name) pState
 	| isUpperCaseName name
-		= (False, abort "no UC ident", pState)
+		= (False, abort "no UC ident", tokenBack pState)
 		# (id, pState) = stringToIdent name IC_Type pState
 		= (True, MakeTypeVar id, pState)
 tryTypeVarT token pState
