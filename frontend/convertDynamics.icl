@@ -646,14 +646,12 @@ where
 			# predef_type_index
 				=	type_index + FirstTypePredefinedSymbolIndex
 			=	constructorExp (predefinedTypeConstructor predef_type_index) SK_Function 0 ci
-	typeConstructor (GTT_Constructor cons_ident fun_ident) ci
-		# type_cons
-			=	App {app_symb = cons_ident, app_args = [], app_info_ptr = nilPtr}
+	typeConstructor (GTT_Constructor fun_ident) ci
 		# type_fun
 			=	App {app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr}
 		# (to_tc_symb, ci)
 			=	getSymbol PD_Dyn__to_TypeCodeConstructor SK_Function 2 ci 
-		=	(App {app_symb = to_tc_symb, app_args = [type_cons, type_fun], app_info_ptr = nilPtr}, ci)
+		=	(App {app_symb = to_tc_symb, app_args = [type_fun], app_info_ptr = nilPtr}, ci)
 	typeConstructor (GTT_Basic basic_type) ci
 		=	constructorExp (basicTypeConstructor basic_type) SK_Function 0 ci
 	typeConstructor GTT_Function ci

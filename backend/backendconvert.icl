@@ -383,7 +383,8 @@ backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
 backEndConvertModulesH predefs {fe_icl = 
-	fe_icl =: {icl_name, icl_functions, icl_common,icl_global_functions,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers, icl_modification_time},
+	fe_icl =: {icl_name, icl_functions, icl_common,icl_global_functions,
+				icl_type_funs, icl_imported_objects,icl_foreign_exports,icl_used_module_numbers, icl_modification_time},
 	fe_components, fe_dcls, fe_arrayInstances}
 	main_dcl_module_n backEnd
 	// sanity check ...
@@ -398,7 +399,8 @@ backEndConvertModulesH predefs {fe_icl =
 					=	backEnd
 	#  backEnd
 		=	abort "front end abort" backEnd
-*/	#! backEnd = appBackEnd (BESetMainDclModuleN main_dcl_module_n) backEnd
+*/
+	#! backEnd = appBackEnd (BESetMainDclModuleN main_dcl_module_n) backEnd
 	#! backEnd
 		=	appBackEnd (BEDeclareModules (size fe_dcls)) backEnd
 	#! backEnd
@@ -442,7 +444,8 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
 	#! backEnd
-		=	declareFunctionSymbols icl_functions functionIndices icl_global_functions (backEnd -*-> "declareFunctionSymbols")
+		=	declareFunctionSymbols icl_functions functionIndices
+				(icl_type_funs ++ icl_global_functions) (backEnd -*-> "declareFunctionSymbols")
 	#! backEnd
 		=	declare main_dcl_module_n icl_common (backEnd -*-> "declare (main_dcl_module_n)")
 	#! backEnd
@@ -470,6 +473,16 @@ backEndConvertModulesH predefs {fe_icl =
 			with
 				dcl_common
 					=	currentDcl.dcl_common
+	# backEnd
+		=	foldSt beExportFunction exported_local_type_funs backEnd
+
+		with	
+			exported_local_type_funs
+				| False && currentDcl.dcl_module_kind == MK_None
+					=	[]
+				// otherwise
+					=	flatten [[r.ir_from .. r.ir_to-1]
+									\\ r <- [icl_type_funs!!1]]
 	# backEnd = bindSpecialIdents predefs icl_used_module_numbers backEnd
 	#! backEnd = removeExpandedTypesFromDclModules fe_dcls icl_used_module_numbers backEnd
 	=	(backEnd -*-> "backend done")
@@ -483,7 +496,9 @@ declareOtherDclModules dcls main_dcl_module_n used_module_numbers
 where
 	declareOtherDclModule :: ModuleIndex DclModule -> BackEnder
 	declareOtherDclModule moduleIndex dclModule
-		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
+		| moduleIndex == main_dcl_module_n
+		|| moduleIndex == cPredefinedModuleIndex
+		|| not (inNumberSet moduleIndex used_module_numbers)
 			=	identity
 		// otherwise
 			=	declareDclModule moduleIndex dclModule
@@ -494,7 +509,9 @@ defineOtherDclModules dcls main_dcl_module_n used_module_numbers
 where
 	defineOtherDclModule :: ModuleIndex DclModule -> BackEnder
 	defineOtherDclModule moduleIndex dclModule
-		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
+		| moduleIndex == main_dcl_module_n
+		|| moduleIndex == cPredefinedModuleIndex
+		|| not (inNumberSet moduleIndex used_module_numbers)
 			=	identity		
 		// otherwise
 			=	defineDclModule moduleIndex dclModule
@@ -518,9 +535,11 @@ declareDclModule moduleIndex {dcl_name, dcl_modification_time, dcl_common, dcl_f
 	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name dcl_modification_time (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 
 defineDclModule :: ModuleIndex DclModule -> BackEnder
-defineDclModule moduleIndex {dcl_name, dcl_common, dcl_functions,dcl_instances}
+defineDclModule moduleIndex
+		{dcl_name, dcl_common, dcl_functions, dcl_type_funs, dcl_instances}
 	=	declare moduleIndex dcl_common
-	o`	declareFunTypes moduleIndex dcl_functions dcl_instances.ir_from
+	o`	declareFunTypes moduleIndex dcl_functions
+			[{ir_from = 0, ir_to = dcl_instances.ir_from}, dcl_type_funs]
 
 removeExpandedTypesFromDclModules :: {#DclModule} NumberSet -> BackEnder
 removeExpandedTypesFromDclModules dcls used_module_numbers
@@ -654,7 +673,6 @@ declareFunctionSymbols functions functionIndices globalFunctions backEnd
 			where
 				functionName :: {#Char} Int [IndexRange] -> {#Char}
 				functionName name functionIndex icl_global_functions
-//					| trace_t ("|"+++toString functionIndex)
 					| index_in_ranges functionIndex icl_global_functions
 						=	name
 						=	(name +++ ";" +++ toString functionIndex)
@@ -744,28 +762,30 @@ instance declareWithIndex (TypeDef a) where
 	declareWithIndex typeIndex moduleIndex {td_ident}
 		=	appBackEnd (BEDeclareType typeIndex moduleIndex td_ident.id_name)
 
-declareFunTypes :: ModuleIndex {#FunType} Int -> BackEnder
-declareFunTypes moduleIndex funTypes nrOfDclFunctions
-		=	foldStateWithIndexA (declareFunType moduleIndex nrOfDclFunctions) funTypes
+declareFunTypes :: ModuleIndex {#FunType} [IndexRange] -> BackEnder
+declareFunTypes moduleIndex funTypes ranges
+		=	foldStateWithIndexA (declareFunType moduleIndex ranges) funTypes
 
-declareFunType :: ModuleIndex Index Int FunType -> BackEnder
-declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_ident, ft_type_ptr}
+declareFunType :: ModuleIndex [IndexRange] Int FunType -> BackEnder
+declareFunType moduleIndex ranges functionIndex {ft_ident, ft_type_ptr}
 	= \be0 -> let (vi,be) = read_from_var_heap ft_type_ptr be0 in
 					(case vi of
 						VI_ExpandedType expandedType
-							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex nrOfDclFunctions)
+							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges)
 							o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
 						_
 							->	identity) be
 		where
-			functionName :: {#Char} Int Int -> {#Char}
-			functionName name functionIndex nrOfDclFunctions 
-//				| trace_tn (name+++(if (functionIndex < nrOfDclFunctions) "" (";" +++ toString functionIndex)))
-
-				| functionIndex < nrOfDclFunctions
+			functionName :: {#Char} Int [IndexRange] -> {#Char}
+			functionName name functionIndex ranges 
+				| index_in_ranges functionIndex ranges
 					=	name
-				// otherwise
-					=	name +++ ";" +++ toString functionIndex
+					=	(name +++ ";" +++ toString functionIndex)
+				where
+					index_in_ranges index [{ir_from, ir_to}:ranges]
+						= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
+					index_in_ranges index []
+						= False
 
 defineTypes :: ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} -> BackEnder
 defineTypes moduleIndex constructors selectors types

@@ -1293,35 +1293,19 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 	| module_index == cPredefinedModuleIndex
 		= GTT_PredefTypeConstructor type
 	// otherwise
-		# tc_type_index
-			=	type_index + 1
-		# types
-			=	common_defs.[module_index].com_type_defs
-		// sanity check ...
-		# type_ident
-			=	types.[type_index].td_ident.id_name
+		# type
+			=	common_defs.[module_index].com_type_defs.[type_index]
 		# td_fun_index
-			=	types.[type_index].td_fun_index
-		# tc_type_name
-			=	types.[tc_type_index].td_ident.id_name
-		| "TC;" +++ type_ident <> tc_type_name
-			=	fatal "toTypeCodeConstructor" ("name mismatch (" +++ type_ident +++ ", " +++ tc_type_name +++ ")")
-		// ... sanity check
-		# ({td_rhs=AlgType [{ds_ident, ds_index}:_]})
-				=	types.[tc_type_index]
-		# type_constructor
-			=	{	symb_ident = ds_ident
-				,	symb_kind = SK_Constructor {glob_module = module_index, glob_object = ds_index}
-				}
+			=	type.td_fun_index
 		// sanity check ...
 		| td_fun_index == NoIndex
-			=	fatal "toTypeCodeConstructor" ("no function (" +++ type_ident +++ ")")
+			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")
 		// ... sanity check
 		# type_fun
-			=	{	symb_ident = {ds_ident & id_info = nilPtr} // this is wrong but let's give it a try
+			=	{	symb_ident = {type.td_ident & id_info = nilPtr} // this is wrong but let's give it a try
 				,	symb_kind = SK_Function {glob_module = module_index, glob_object = td_fun_index}
 				}
-		= GTT_Constructor type_constructor type_fun
+		= GTT_Constructor type_fun
 
 fatal :: {#Char} {#Char} -> .a
 fatal function_name message

@@ -1477,54 +1477,9 @@ reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 			,	import_file_position = NoPos
 			}
 		# imports = if (mod_ident == clean_types_module_ident) [] [clean_types_module]
-		# (rev_defs, ca)
-			=	addTypeConstructors defs [PD_Import imports] ca
-		= reorganiseDefinitions icl_module (reverse rev_defs) 0 0 0 0 ca
+		= reorganiseDefinitions icl_module [PD_Import imports : defs] 0 0 0 0 ca
+	// otherwise
 		= reorganiseDefinitions icl_module defs 0 0 0 0 ca
-	where
-		addTypeConstructors [] rev_defs ca
-			=	(rev_defs, ca)
-		addTypeConstructors [PD_Type type_def : defs] rev_defs ca
-			# (type_def, tc_def, ca)
-				=	addTypeConstructor type_def ca
-			= addTypeConstructors defs [PD_Type tc_def, PD_Type type_def : rev_defs] ca
-		addTypeConstructors [def : defs] rev_defs ca
-			=	addTypeConstructors defs [def : rev_defs] ca
-
-addTypeConstructor def=:{td_ident, td_attribute, td_attrs, td_args, td_arity, td_pos} ca=:{ca_hash_table}
-	# tc_name = "TC;" +++ td_ident.id_name
-	# ({boxed_ident=tc_cons_ident}, ca_hash_table) = putIdentInHashTable tc_name IC_Expression ca_hash_table
-	# ({boxed_ident=tc_type_ident}, ca_hash_table) = putIdentInHashTable tc_name IC_Type ca_hash_table
-	=	(def, type_tc_def tc_type_ident tc_cons_ident td_ident td_attribute td_attrs td_args
-												td_arity td_pos, { ca & ca_hash_table = ca_hash_table })
-	where
-		type_tc_def ident cons_ident type_ident attr attrs args arity position
-			= 	{	td_ident	= ident
-				,	td_index = NoIndex
-				,	td_arity = arity
-				,	td_args	= args
-				,	td_attrs = attrs
-				,	td_context = []
-				,	td_rhs = ConsList [type_tc_cons cons_ident type_ident args arity position]
-				,	td_attribute = attr
-				,	td_pos = position
-				,	td_used_types = []
-				,	td_fun_index = NoIndex
-				}
-		type_tc_cons cons_ident type_ident args arity position
-			=	{	pc_cons_ident = cons_ident
-				,	pc_cons_arity = 1
-				,	pc_exi_vars	= []
-				,	pc_arg_types = [type type_ident args arity]
-				,	pc_args_strictness	= NotStrict
-				,	pc_cons_prio = NoPrio
-				,	pc_cons_pos	= position
-				}
-		type type_ident args arity
-			=	{	at_attribute = TA_None
-				,	at_type = TA (MakeNewTypeSymbIdent type_ident arity)
-						[{at_attribute = TA_None, at_type = TV arg.atv_variable} \\ arg <- args]
-				}
 
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix

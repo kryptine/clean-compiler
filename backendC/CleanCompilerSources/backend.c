@@ -502,7 +502,10 @@ BEDeclareModules (int nModules)
 	gBEState.be_modules		= (BEModuleP) ConvertAlloc (nModules * sizeof (BEModuleS));
 
 	for (i = 0; i < nModules; i++)
+	{
 		gBEState.be_modules [i].bem_name	= NULL;
+		gBEState.be_modules [i].bem_nFunctions	= 0;
+	}
 } /* BEDeclareModules */
 
 BESymbolP
@@ -3431,15 +3434,21 @@ BEExportFunction (int functionIndex)
 
 	dclModule	= &gBEState.be_icl.beicl_dcl_module;
 
-	Assert ((unsigned int) functionIndex < dclModule->bem_nFunctions);
-	functionSymbol	= &dclModule->bem_functions [functionIndex];
-	Assert (functionSymbol->symb_kind == definition);
-	dclDef	= functionSymbol->symb_def;
+	if (((unsigned int) functionIndex < dclModule->bem_nFunctions))
+	{
+		functionSymbol	= &dclModule->bem_functions [functionIndex];
+		Assert (functionSymbol->symb_kind == definition);
+		dclDef	= functionSymbol->symb_def;
+	
+		dclDef->sdef_dcl_icl	= iclDef;
 
-	Assert (strcmp (iclDef->sdef_ident->ident_name, dclDef->sdef_ident->ident_name) == 0);
+		Assert (strcmp (iclDef->sdef_ident->ident_name, dclDef->sdef_ident->ident_name) == 0);
+	}
+	else
+		dclDef	= NULL;
+
 
 	iclDef->sdef_dcl_icl	= dclDef;
-	dclDef->sdef_dcl_icl	= iclDef;
 
 	iclDef->sdef_exported = True;
 } /* BEExportFunction */

@@ -1289,7 +1289,7 @@ instance == OverloadedListType
 
 ::	GlobalTCType
 	=	GTT_Basic !BasicType
-	|	GTT_Constructor !SymbIdent !SymbIdent // type_cons type_fun
+	|	GTT_Constructor !SymbIdent
 	|	GTT_PredefTypeConstructor !(Global Index)
 	|	GTT_Function
 
