@@ -2374,6 +2374,9 @@ SymbDef create_match_function (SymbolP constructor_symbol,int constructor_arity,
 	if (strict_constructor){
 		struct arg **rhs_arg_p,*lhs_arg;
 		StateP constructor_arg_state_p;
+#if STRICT_LISTS
+		StateS head_and_tail_states[2];
+#endif
 
 		lhs_function_arg=NewArgument (constructor_node);
 		lhs_function_arg->arg_state=StrictState;
@@ -2381,6 +2384,26 @@ SymbDef create_match_function (SymbolP constructor_symbol,int constructor_arity,
 		rhs_root=NewNode (TupleSymbol,NULL,constructor_arity);
 		rhs_arg_p=&rhs_root->node_arguments;
 
+#if STRICT_LISTS
+		if (constructor_symbol->symb_kind==cons_symb && constructor_symbol->symb_head_strictness>1 || constructor_symbol->symb_tail_strictness){
+			constructor_symbol->symb_def->sdef_constructor->cl_state_p;
+			
+			if (constructor_symbol->symb_head_strictness>1){
+				if (constructor_symbol->symb_head_strictness==4)
+					head_and_tail_states[0]=*constructor_symbol->symb_state_p;
+				else
+					head_and_tail_states[0]=StrictState;
+			} else
+				head_and_tail_states[0]=LazyState;
+			
+			if (constructor_symbol->symb_tail_strictness)
+				head_and_tail_states[1]=StrictState;
+			else
+				head_and_tail_states[1]=LazyState;
+			
+			constructor_arg_state_p=head_and_tail_states;
+		} else
+#endif
 		constructor_arg_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p;
 
 		for_l (lhs_arg,constructor_node->node_arguments,arg_next){

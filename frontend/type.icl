@@ -1547,17 +1547,23 @@ where
 		attributedBasicType {box=type} ts=:{ts_attr_store}
 			= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = type}, {ts & ts_attr_store = inc ts_attr_store})
 
-	requirements ti (MatchExpr {glob_object={ds_arity, ds_index},glob_module} expr) (reqs, ts)
-		# cp = CP_Expression expr
-		  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ds_arity ti ts	
-		  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
-		  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
-		  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
-		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap }
-		| ds_arity<>1
-			# tuple_type = MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex+(ds_arity-2), glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType+(ds_arity-2)] ds_arity
-			= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique, at_annotation = AN_None }, No, (reqs, ts))
-			= ( hd tst_args, No, (reqs, ts))
+	requirements ti (MatchExpr {glob_object={ds_arity, ds_index},glob_module} expr) reqs_ts=:(reqs, ts)
+		| glob_module==cPredefinedModuleIndex
+			&& (let
+					pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
+				in
+					pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_OverloadedConsSymbol)
+			= requirements ti expr reqs_ts
+			# cp = CP_Expression expr
+			  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ds_arity ti ts	
+			  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
+			  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
+			  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
+			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap }
+			| ds_arity<>1
+				# tuple_type = MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex+(ds_arity-2), glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType+(ds_arity-2)] ds_arity
+				= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique, at_annotation = AN_None }, No, (reqs, ts))
+				= ( hd tst_args, No, (reqs, ts))
 
 	requirements _ (AnyCodeExpr _ _ _) (reqs, ts)
 		# (fresh_v, ts) = freshAttributedVariable ts

@@ -58,9 +58,9 @@ get_unboxed_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!In
 get_unboxed_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	# (cons_u_index,cs_predef_symbols)=cs_predef_symbols![PD_cons_u].pds_def
+	# (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
 	# (decons_u_symbol,cs_predef_symbols)=cs_predef_symbols![PD_decons_u]
 	# decons_u_index=decons_u_symbol.pds_def
-	# (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
 	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,predefined_idents.[PD_decons_u],cs)
 
@@ -71,18 +71,18 @@ make_unboxed_list type_symbol expr_heap cs
 	# decons_expr = App {app_symb={symb_name=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
-get_unboxed_tail_strict_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
-get_unboxed_tail_strict_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_tail_strict_list_indices_and_decons_uts_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
+get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	# (cons_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_cons_uts].pds_def
+	# (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
 	# (decons_uts_symbol,cs_predef_symbols)=cs_predef_symbols![PD_decons_uts]
 	# decons_uts_index=decons_uts_symbol.pds_def
-	# (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
 	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,predefined_idents.[PD_decons_uts],cs)
 
 make_unboxed_tail_strict_list type_symbol expr_heap cs
-	# (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_u_ident cs
+	# (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
 	# unboxed_list=UnboxedTailStrictList type_symbol stdStrictLists_index decons_uts_index nil_uts_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 	# decons_expr = App {app_symb={symb_name=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
@@ -92,9 +92,9 @@ get_overloaded_list_indices_and_decons_ident :: *CheckState -> (!Index,!Index,!I
 get_overloaded_list_indices_and_decons_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	# (cons_index,cs_predef_symbols)=cs_predef_symbols![PD_cons].pds_def
+	# (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
 	# (decons_symbol,cs_predef_symbols)=cs_predef_symbols![PD_decons]
 	# decons_index=decons_symbol.pds_def
-	# (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
 	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,cons_index,decons_index,nil_index,predefined_idents.[PD_decons],cs)
 
@@ -1808,7 +1808,28 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 								position var_store expr_heap e_info cs
 					-> (opt_var_bind ++ binds, var_store, expr_heap, e_info, cs)
 					# (tuple_cons, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex ds_arity) PD_PredefinedModule STE_Constructor ds_arity cs
-					  (match_var, match_bind, var_store, expr_heap)
+					# (src_expr,expr_heap,cs) = add_decons_call_for_overloaded_lists src_expr expr_heap cs
+						with
+							add_decons_call_for_overloaded_lists src_expr expr_heap cs
+								| glob_module==cPredefinedModuleIndex
+									# pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
+									| pd_cons_index==PD_UnboxedConsSymbol			
+										# (stdStrictLists_index,_,decons_u_index,_,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
+										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+										# decons_u_expr = App {app_symb={symb_name=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}			
+										= (decons_u_expr,expr_heap,cs)
+									| pd_cons_index==PD_UnboxedTailStrictConsSymbol
+										# (stdStrictLists_index,_,decons_uts_index,_,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
+										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+										# decons_uts_expr = App {app_symb={symb_name=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+										= (decons_uts_expr,expr_heap,cs)
+									| pd_cons_index==PD_OverloadedConsSymbol
+										# (stdStrictLists_index,_,decons_index,_,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
+										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+										# decons_expr = App {app_symb={symb_name=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+										= (decons_expr,expr_heap,cs)
+										= (src_expr,expr_heap,cs)
+					# (match_var, match_bind, var_store, expr_heap)
 						=  bind_match_expr (MatchExpr cons_symbol src_expr) opt_var_bind position var_store expr_heap
 					-> transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind
 							position var_store expr_heap e_info cs

@@ -2754,7 +2754,7 @@ LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
 	if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==SimpleState && BETWEEN (IntObj,FileObj,cons_symbol_p->symb_unboxed_cons_state_p->state_object))
 		return &unboxed_cons_labels[cons_symbol_p->symb_unboxed_cons_state_p->state_object-IntObj][cons_symbol_p->symb_tail_strictness];
 	else if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==RecordState){
-		unboxed_record_cons_lab.lab_mod=NULL;
+		unboxed_record_cons_lab.lab_mod=ExportLocalLabels ? CurrentModule : NULL;
 		unboxed_record_cons_lab.lab_pref=cons_symbol_p->symb_tail_strictness ? "r_Cons#!" : "r_Cons#";
 		unboxed_record_cons_lab.lab_issymbol=False;
 		unboxed_record_cons_lab.lab_name=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_ident->ident_name;
@@ -3901,9 +3901,13 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				}
 		}
 
-		if (!symbol_arity_eq_one)
+		if (!symbol_arity_eq_one){
+#if STRICT_LISTS
+			if (symbol->symb_kind==cons_symb && symbol->symb_head_strictness>1 || symbol->symb_tail_strictness)
+				strict_constructor=1;
+#endif
 			new_match_sdef=create_match_function (symbol,node->node_arity,strict_constructor);
-		else	
+		} else
 			new_match_sdef=create_select_and_match_function (symbol,strict_constructor);
 	
 		ConvertSymbolToDandNLabel (&name,&codelab,new_match_sdef);
@@ -4009,7 +4013,42 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			*bsp_p += b_size;
 
 			AdjustTuple (a_size,b_size,asp_p,bsp_p,arity,demanded_state_array,constructor_args_state_p,a_size,b_size);
-		} else {
+		} else
+#if STRICT_LISTS
+		if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness)){
+			StateS head_and_tail_states[2];
+			
+			if (symbol->symb_head_strictness>1){
+				if (symbol->symb_head_strictness==4)
+					head_and_tail_states[0]=*symbol->symb_state_p;
+				else
+					head_and_tail_states[0]=StrictState;
+			} else
+				head_and_tail_states[0]=LazyState;
+			
+			if (symbol->symb_tail_strictness)
+				head_and_tail_states[1]=StrictState;
+			else
+				head_and_tail_states[1]=LazyState;
+			
+			if (symbol->symb_head_strictness==4){
+				DetermineSizeOfState (head_and_tail_states[0],&a_size,&b_size);
+				++a_size;
+
+				GenReplRArgs (a_size,b_size);
+				*asp_p -= 1-a_size;
+				*bsp_p += b_size;
+
+				AdjustTuple (a_size,b_size,asp_p,bsp_p,2,demanded_state_array,head_and_tail_states,a_size,b_size);
+			} else {
+				GenReplArgs (2,2);
+				*asp_p -= 1-2;
+				
+				AdjustTuple (2,0,asp_p,bsp_p,2,demanded_state_array,head_and_tail_states,2,0);			
+			}
+		} else
+#endif
+		{
 			*asp_p-=1;
 			UnpackTuple (*asp_p,asp_p,bsp_p,True,demanded_state_arity,demanded_state_array);
 		}
