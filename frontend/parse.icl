@@ -2184,7 +2184,7 @@ where
 	want_updates token update_expr pState
 		# (updates, pState)
 			= parse_updates token update_expr pState
-		=	transform_record_or_array_update update_expr updates pState
+		=	transform_record_or_array_update update_expr updates 0 pState
 	where
 		parse_updates :: Token ParsedExpr ParseState -> ([NestedUpdate], ParseState)
 		parse_updates token update_expr pState
@@ -2206,12 +2206,12 @@ where
 				= ({nu_selectors = selectors, nu_update_expr = expr}, pState)
 				= ({nu_selectors = selectors, nu_update_expr = PE_Empty}, parseError "field assignment" (Yes token) "=" pState)
 
-	transform_record_or_array_update :: ParsedExpr [NestedUpdate] ParseState -> (ParsedExpr, ParseState)
-	transform_record_or_array_update expr updates pState
+	transform_record_or_array_update :: ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
+	transform_record_or_array_update expr updates level pState
 		| is_record_update sortedUpdates
-			=	transform_record_update expr groupedUpdates pState
+			=	transform_record_update expr groupedUpdates level pState
 		// otherwise
-			=	transform_array_update expr updates pState
+			=	transform_array_update expr updates level pState
 		where
 			sortedUpdates
 				// sort updates by first field name, array updates last
@@ -2253,10 +2253,10 @@ where
 			is_record_select _
 				=	False
 
-			transform_record_update :: ParsedExpr ![[NestedUpdate]] ParseState -> (ParsedExpr, ParseState)
-			transform_record_update expr groupedUpdates pState
+			transform_record_update :: ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
+			transform_record_update expr groupedUpdates level pState
 				# (assignments, (optionalIdent, pState))
-					=	mapSt transform_update groupedUpdates (No, pState)
+					=	mapSt (transform_update level) groupedUpdates (No, pState)
 				  updateExpr
 				  	=	build_update optionalIdent expr assignments
 				=	(updateExpr, pState)
@@ -2264,28 +2264,28 @@ where
 					// transform one group of nested updates with the same first field
 					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
 					//  (id is ident to shared expression that's being updated)
-					transform_update :: [NestedUpdate] (Optional Ident, ParseState) -> (FieldAssignment, (Optional Ident, ParseState))
-					transform_update [{nu_selectors=[PS_Record fieldIdent _], nu_update_expr}] state
+					transform_update :: !Int [NestedUpdate] (Optional Ident, ParseState) -> (FieldAssignment, !(!Optional Ident, ParseState))
+					transform_update _ [{nu_selectors=[PS_Record fieldIdent _], nu_update_expr}] state
 						=	({bind_dst = fieldIdent, bind_src = nu_update_expr}, state)
-					transform_update updates=:[{nu_selectors=[PS_Record fieldIdent _ : _]} : _] (optionalIdent, pState)
+					transform_update level updates=:[{nu_selectors=[PS_Record fieldIdent _ : _]} : _] (optionalIdent, pState)
 						# (shareIdent, pState)
-							=	make_ident optionalIdent pState
+							=	make_ident optionalIdent level pState
 						  select
 						  	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent No]
 						  (update_expr, pState)
-						  	=	transform_record_or_array_update select (map sub_update updates) pState
+						  	=	transform_record_or_array_update select (map sub_update updates) (level+1) pState
 						=	({bind_dst = fieldIdent, bind_src = update_expr}, (Yes shareIdent, pState))
 						where
-							make_ident :: (Optional Ident) ParseState -> (Ident, ParseState)
-							make_ident (Yes ident) pState
+							make_ident :: (Optional Ident) !Int ParseState -> (Ident, ParseState)
+							make_ident (Yes ident) _ pState
 								=	(ident, pState)
-							make_ident No pState
-								=	internalIdent "s;" pState
+							make_ident No level pState
+								=	internalIdent ("s" +++ toString level +++ ";") pState
 
 							sub_update :: NestedUpdate -> NestedUpdate
 							sub_update update=:{nu_selectors}
 								=	{update & nu_selectors = tl nu_selectors}
-					transform_update _ (_, pState)
+					transform_update _ _ (_, pState)
 						# pState
 							=	parseError "record or array" No "field assignments mixed with array assignments not" /* expected */ pState
 						=	({bind_dst = errorIdent, bind_src = PE_Empty}, (No, pState))
@@ -2297,14 +2297,14 @@ where
 						=	PE_Let False (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
 									(PE_Record (PE_Ident ident) No assignments)
 
-			transform_array_update :: ParsedExpr [NestedUpdate] ParseState -> (ParsedExpr, ParseState)
-			transform_array_update expr updates pState
+			transform_array_update :: ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
+			transform_array_update expr updates level pState
 				// transform {<e> & [i].<...> = e1, ... } to  {{<e> & [i1].<...> = e1} & ...}
-				=	foldSt transform_update updates (expr, pState)
+				=	foldSt (transform_update level) updates (expr, pState)
 				where
-					transform_update :: NestedUpdate (ParsedExpr, ParseState) -> (ParsedExpr, ParseState)
-					transform_update {nu_selectors, nu_update_expr} (expr1, pState)
-						=	build_update expr1 (split_selectors nu_selectors) nu_update_expr pState
+					transform_update :: !Int NestedUpdate (ParsedExpr, ParseState) -> (ParsedExpr, ParseState)
+					transform_update level {nu_selectors, nu_update_expr} (expr1, pState)
+						=	build_update expr1 (split_selectors nu_selectors) nu_update_expr level pState
 						where
 							// split selectors into final record selectors and initial selectors
 							//  (resulting selectors are reversed)
@@ -2312,21 +2312,21 @@ where
 							split_selectors selectors
 								=	span is_record_select (reverse selectors)
 
-							build_update :: ParsedExpr ([ParsedSelection], [ParsedSelection]) ParsedExpr ParseState -> (ParsedExpr, ParseState)
-							build_update expr ([], initial_selectors) update_expr pState
+							build_update :: ParsedExpr ([ParsedSelection], [ParsedSelection]) ParsedExpr !Int ParseState -> (ParsedExpr, ParseState)
+							build_update expr ([], initial_selectors) update_expr _ pState
 								=	(PE_Update expr (reverse initial_selectors) update_expr, pState)
 							// transform {<e> & <...>.[i].f.g. = e1} to
 							//     let
 							//		index_id = i
 							//		(element_id, array_id) = <e>!<...>.[index_id]
 							//	   in {array_id & [index_id] = {element_id & f.g = e1}}
-							build_update expr (record_selectors, [PS_Array index : initial_selectors]) update_expr pState
+							build_update expr (record_selectors, [PS_Array index : initial_selectors]) update_expr level pState
 								# (index_id, pState)
-									=	internalIdent "i;" pState
+									=	internalIdent ("i" +++ toString level +++ ";") pState
 								# (element_id, pState)
-									=	internalIdent "e;" pState
+									=	internalIdent ("e" +++ toString level +++ ";") pState
 								# (array_id, pState)
-									=	internalIdent "a;" pState
+									=	internalIdent ("a" +++ toString level +++ ";") pState
 								  index_def
 								  	=	buildNodeDef (PE_Ident index_id) index
 								  select_def
@@ -2336,7 +2336,7 @@ where
 								  (updated_element, pState)
 									= transform_record_update
 										(PE_Ident element_id)
-										[[{nu_selectors=(reverse record_selectors), nu_update_expr=update_expr}]] pState
+										[[{nu_selectors=(reverse record_selectors), nu_update_expr=update_expr}]] (level+1) pState
 								=	(PE_Let False
 										(LocalParsedDefs [index_def, select_def])
 										(PE_Update (PE_Ident array_id) (reverse [PS_Array (PE_Ident index_id) : initial_selectors]) updated_element), pState)
