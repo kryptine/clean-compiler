@@ -679,7 +679,7 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_typ
 	  (new_attr, oti, cs) = newAttribute dem_attr "-->" at_attribute oti cs
 	= ({ type & at_type = arg_type --> result_type, at_attribute = new_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
-	# (cons_var, _, (oti, cs)) =  checkTypeVar scope DAK_None tv TA_Multi (oti, cs)
+	# (cons_var, _, (oti, cs)) =  checkTypeVar scope DAK_None tv at_attribute (oti, cs)
 	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
 	  (new_attr, oti, cs) = newAttribute dem_attr ":@:" at_attribute oti cs
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = new_attr }, (ots, oti, cs))
