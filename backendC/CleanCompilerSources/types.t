@@ -2,9 +2,11 @@
 #if !defined (_THE__TYPES_)
 #define _THE__TYPES_
 
-#undef _WINDOWS_
+#if defined (__MWERKS__) && defined (_X86_)
+# define _WINDOWS_
+#endif
 
-#if (defined (__MWERKS__) && !defined (_WINDOWS_)) || defined (__MRC__)
+#if (defined (__MWERKS__) && !defined (_X86_)) || defined (__MRC__)
 # define POWER 1
 #endif
 

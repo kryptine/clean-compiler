@@ -6,13 +6,15 @@
 */
 
 #define _SYSTEM_
-#undef _WINDOWS_
 
-#if defined (applec) || (defined (__MWERKS__) && !defined (_WINDOWS_)) || defined (__MRC__)
+#if defined (__MWERKS__) && defined (_X86_)
+#	define _WINDOWS_
+#endif
+
+#if defined (applec) || (defined (__MWERKS__) && !defined (_X86_)) || defined (__MRC__)
 #	define _MAC_
 #	define _STANDALONE_
-
-#define __ppc__
+#	define __ppc__
 
 #elif defined (THINK_C)
 #	define _MACUSER_
