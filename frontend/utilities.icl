@@ -175,6 +175,14 @@ where
 	fold_st2 xs [] st
 		= abort ("fold_st2: first argument list contains more elements")
 
+unsafeFold2St op l1 l2 st
+	:== ufold_st2 l1 l2 st
+where
+	ufold_st2 [x : xs] [y : ys] st
+		= op x y (ufold_st2 xs ys st)	
+	ufold_st2 _ _ st
+		= st
+
 // foldSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 foldSt op r l :== fold_st r l
 	where
