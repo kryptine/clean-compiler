@@ -87,7 +87,7 @@ where
 		=  (inc length, [x : xs])
 	mapAndLength f []
 		= (0, [])
-
+	
 	skip_indirections subst cc
 		| IsAVariable cc
 			= skip_indirections subst subst.[cc]
@@ -99,12 +99,14 @@ where
 
 ::	*AnalyseInfo =
 	{	ai_var_heap						:: !*VarHeap
-	,	ai_cons_class					:: !*{! ConsClasses}
+	,	ai_cons_class					:: !*{!ConsClasses}
 	,	ai_cur_ref_counts				:: !*RefCounts // for each variable 0,1 or 2
-	,	ai_class_subst					:: !* ConsClassSubst
+	,	ai_class_subst					:: !*ConsClassSubst
 	,	ai_next_var						:: !Int
 	,	ai_next_var_of_fun				:: !Int
 	,	ai_cases_of_vars_for_function	:: ![Case]
+	,	ai_fun_heap						:: !*FunctionHeap
+	,	ai_def_ref_counts				:: !RefCounts
 	}
 
 /*	defined in syntax.dcl:
@@ -267,7 +269,7 @@ where
 		= ai
 			
 instance consumerRequirements App where
-	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_name}, app_args} 
+	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_name}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs})
 			ai=:{ai_cons_class}
 
@@ -277,7 +279,7 @@ instance consumerRequirements App where
 				= reqs_of_args fun_class.cc_args app_args CPassive common_defs ai
 				= consumerRequirements app_args common_defs ai
 
-		| glob_module==stdStrictLists_module_n && (not (isEmpty app_args)) 
+		| glob_module == stdStrictLists_module_n && (not (isEmpty app_args))
 				&& is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 			# [app_arg:app_args]=app_args;
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
@@ -298,17 +300,27 @@ instance consumerRequirements App where
 					= activeArgs (n-1) app_args common_defs ai
 // ...SPECIAL
 			= consumerRequirements app_args common_defs ai
-	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_name}, app_args}
+	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object,symb_name}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
 			ai=:{ai_cons_class}
 		| glob_object < size ai_cons_class
 			#! fun_class = ai_cons_class.[glob_object]
 			= reqs_of_args fun_class.cc_args app_args CPassive common_defs ai
 			= consumerRequirements app_args common_defs ai
+	
+	// new alternative for generated function + reanalysis...
+	consumerRequirements {app_symb={symb_kind = SK_GeneratedFunction fun_info_ptr index,symb_name}, app_args}
+			common_defs
+			ai
+		# (FI_Function {gf_cons_args={cc_args,cc_linear_bits}}, ai_fun_heap)
+			= readPtr fun_info_ptr ai.ai_fun_heap
+		= reqs_of_args cc_args app_args CPassive common_defs {ai & ai_fun_heap = ai_fun_heap}
+	
 	consumerRequirements {app_args} common_defs ai
 		=  not_an_unsafe_pattern (consumerRequirements app_args common_defs ai)
 
-reqs_of_args :: [.Int] !.[Expression] Int ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,!.Bool,!*AnalyseInfo)
+
+reqs_of_args :: ![ConsClass] !.[Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!.Bool,!*AnalyseInfo)
 reqs_of_args _ [] cumm_arg_class _ ai
 	= (cumm_arg_class, False, ai)
 reqs_of_args [] _ cumm_arg_class _ ai
@@ -317,18 +329,48 @@ reqs_of_args [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
 	# (act_cc, _, ai) = consumerRequirements arg common_defs ai
 	  ai = aiUnifyClassifications form_cc act_cc ai
 	= reqs_of_args ccs args (combineClasses act_cc cumm_arg_class) common_defs ai
+reqs_of_args cc xp _ _ _ = abort "classify:reqs_of_args doesn't match" ---> (cc,xp)
+
+showRefCount msg ai
+	:== ai ---> (msg,rc)
+where
+	{ai_cur_ref_counts} = ai
+	
+	rc :: String
+	rc = {show c \\ c <-: ai_cur_ref_counts}
+
+	show 0 = '0'
+	show 1 = '1'
+	show 2 = '2'
+	show _ = '?'
 
 instance consumerRequirements Case where
-	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr} common_defs=:(ConsumerAnalysisRO {common_defs=common_defs_parameter}) ai
-		# (cce, _, ai) = consumerRequirements case_expr common_defs ai
-		  (ccgs, unsafe_bits, ai) = consumer_requirements_of_guards case_guards common_defs ai
-		  has_default = case case_default of
-		  		Yes _ -> True
-		  		_ -> False
-		  (ccd, default_is_unsafe, ai) = consumerRequirements case_default common_defs ai
-		  (every_constructor_appears_in_safe_pattern, may_be_active) = inspect_patterns common_defs_parameter has_default case_guards unsafe_bits
-		  safe = (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
-		  ai = aiUnifyClassifications (if may_be_active CActive CVarOfMultimatchCase) cce ai
+	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr,case_explicit}
+				common_defs=:(ConsumerAnalysisRO {common_defs=common_defs_parameter}) ai
+		# (cce, _, ai)					= consumerRequirements case_expr common_defs ai
+		#! env_counts					= ai.ai_cur_ref_counts
+		   (s,env_counts)				= usize env_counts
+		   zero_array					= createArray s 0
+		   ai							= {ai & ai_cur_ref_counts = zero_array}
+		   (ccd, default_is_unsafe, ai)	= consumerRequirements case_default common_defs ai
+		#! (context_counts,ai)			= case use_context_default of
+											True
+												-> ({},{ai & ai_cur_ref_counts = env_counts})
+		   									False
+		   										-> (ai.ai_def_ref_counts,{ai & ai_def_ref_counts = ai.ai_cur_ref_counts, ai_cur_ref_counts = env_counts})
+		# (ccgs, unsafe_bits, ai)		= consumer_requirements_of_guards case_guards common_defs ai
+		#  ai							= case use_context_default of
+											True
+												-> ai
+											False
+												-> {ai & ai_def_ref_counts = context_counts}
+		# (every_constructor_appears_in_safe_pattern, may_be_active)
+		  								= inspect_patterns common_defs_parameter has_default case_guards unsafe_bits
+		  safe = case_explicit || (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
+		  ai = aiUnifyClassifications (SwitchMultimatchClassification
+		  		(if may_be_active CActive CVarOfMultimatchCase) 
+		  		CActive)
+		  		cce ai
 		  ai = case case_expr of
 				Var {var_info_ptr}
 					| may_be_active
@@ -348,19 +390,28 @@ instance consumerRequirements Case where
 						-> ai
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
+		has_default					= case case_default of
+										  		Yes _ -> True
+										  		_ -> False
+		use_context_default			= not (case_explicit || has_default)
+		
 		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
-			# type_def = common_defs.[glob_module].com_type_defs.[glob_object]
-			  defined_symbols = case type_def.td_rhs of
-									AlgType defined_symbols		-> defined_symbols
-									RecordType {rt_constructor}	-> [rt_constructor]
-			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
-			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
-			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
-			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
-			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, not (multimatch_loop has_default sorted_pattern_constructors))
+			# type_def						= common_defs.[glob_module].com_type_defs.[glob_object]
+			  defined_symbols				= case type_def.td_rhs of
+													AlgType defined_symbols		-> defined_symbols
+													RecordType {rt_constructor}	-> [rt_constructor]
+			  all_constructors				= [ ds_index \\ {ds_index}<-defined_symbols ]
+			  pattern_constructors			= [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
+			  sorted_pattern_constructors	= sort pattern_constructors unsafe_bits
+			  all_sorted_constructors		= if (is_sorted all_constructors)
+			  										all_constructors
+			  										(sortBy (<) all_constructors)
+			= ( appearance_loop all_sorted_constructors sorted_pattern_constructors
+			  , not (multimatch_loop has_default sorted_pattern_constructors)
+			  )
 		inspect_patterns common_defs has_default (BasicPatterns BT_Bool basic_patterns) unsafe_bits
-			# bools_indices = [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
-			  sorted_pattern_constructors = sort bools_indices unsafe_bits
+			# bools_indices					= [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
+			  sorted_pattern_constructors	= sort bools_indices unsafe_bits
 			= (appearance_loop [0,1] sorted_pattern_constructors,
 				not (multimatch_loop has_default sorted_pattern_constructors))
 //		inspect_patterns common_defs has_default (OverloadedListPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
@@ -432,20 +483,29 @@ instance consumerRequirements Case where
 
 consumer_requirements_of_guards :: !CasePatterns ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
 consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
-	# pattern_exprs = [ ap_expr \\ {ap_expr}<-patterns]
-	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
-	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
-	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
+	# pattern_exprs
+			= [ ap_expr \\ {ap_expr}<-patterns]
+	  pattern_vars
+	  		= flatten [ ap_vars \\ {ap_vars}<-patterns]
+	  (ai_next_var, ai_next_var_of_fun, ai_var_heap)
+	  		= bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+	  ai	= { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
 	= independentConsumerRequirements pattern_exprs common_defs ai
 consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
-	# pattern_exprs = [ bp_expr \\ {bp_expr}<-patterns]
+	# pattern_exprs
+			= [ bp_expr \\ {bp_expr}<-patterns]
 	= independentConsumerRequirements pattern_exprs common_defs ai
 consumer_requirements_of_guards (OverloadedListPatterns type _ patterns) common_defs ai
-	# pattern_exprs = [ ap_expr \\ {ap_expr}<-patterns]
-	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
-	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
-	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
+	# pattern_exprs
+			= [ ap_expr \\ {ap_expr}<-patterns]
+	  pattern_vars
+	  		= flatten [ ap_vars \\ {ap_vars}<-patterns]
+	  (ai_next_var, ai_next_var_of_fun, ai_var_heap)
+	  		= bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+	  ai	= { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
 	= independentConsumerRequirements pattern_exprs common_defs ai
+consumer_requirements_of_guards NoPattern common_defs ai
+	= independentConsumerRequirements [] common_defs ai
 
 bindPatternVars :: !.[FreeVar] !Int !Int !*VarHeap -> (!Int,!Int,!*VarHeap)
 bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
@@ -459,26 +519,150 @@ bindPatternVars [] next_var next_var_of_fun var_heap
 	= (next_var, next_var_of_fun, var_heap)
 
 independentConsumerRequirements :: !.[Expression] ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
+independentConsumerRequirements [] common_defs ai=:{ai_cur_ref_counts,ai_def_ref_counts}
+	#! s							= size ai_cur_ref_counts
+	   unified_ref_counts			= unify_with_default` s ai_cur_ref_counts ai_def_ref_counts
+	   ai							= {ai & ai_cur_ref_counts = unified_ref_counts}
+	= (CPassive,[],ai)
+where
+	unify_with_default` 0 accu env
+		= accu
+	unify_with_default` i accu env
+		#! i1			= dec i
+		   rca			= accu.[i1]
+		   rce			= env.[i1]
+		   accu			= { accu & [i1] = unify_counts rca rce }
+		= unify_with_default` i1 accu env
+	where
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==2) 2 (inc x)
+		unify_counts 2 x = 2
+
+independentConsumerRequirements [expr:exprs] common_defs ai=:{ai_cur_ref_counts,ai_def_ref_counts}
+	#! s							= size ai_cur_ref_counts
+	   zero_array					= createArray s 0
+	   ai							= { ai & ai_cur_ref_counts=zero_array }
+
+	   (cce, is_unsafe_case, ai)	= consumerRequirements expr common_defs ai
+	   cc							= combineClasses cce CPassive
+	   r_unsafe_bits				= [is_unsafe_case]
+
+	   pat_counts					= case is_unsafe_case of
+	   									True	-> combine_with_default s ai.ai_cur_ref_counts ai_def_ref_counts
+	   									False	-> ai.ai_cur_ref_counts
+	= case exprs of
+		[]			//| size ai.ai_cur_ref_counts <> s || size ai_def_ref_counts <> s -> abort ("("+++toString s+++","+++ toString (size ai.ai_cur_ref_counts) +++","+++toString (size ai_def_ref_counts) +++")")
+					#! unified_pat_counts				= unify_with_default s ai.ai_cur_ref_counts ai_def_ref_counts
+					   unified_ref_counts				= unify_pattern_accu_with_env s unified_pat_counts ai_cur_ref_counts
+					   ai								= { ai & ai_cur_ref_counts=unified_ref_counts }
+					-> (cc, r_unsafe_bits, ai)
+		_			#! zero_array						= createArray s 0
+					   accu								= ai.ai_cur_ref_counts
+					   ai								= { ai & ai_cur_ref_counts=zero_array }
+					   (accu,cc,r_unsafe_bits,ai)		= foldSt (build_pattern_accu common_defs) exprs (accu,cc,r_unsafe_bits,ai)
+					//| size ai.ai_cur_ref_counts <> s || size ai_def_ref_counts <> s -> abort "222"
+					#! unified_pat_counts				= unify_with_default s accu ai_def_ref_counts
+					   unified_ref_counts				= unify_pattern_accu_with_env s unified_pat_counts ai_cur_ref_counts
+					   ai								= { ai & ai_cur_ref_counts=unified_ref_counts }
+					-> (cc, reverse r_unsafe_bits, ai)
+where
+	build_pattern_accu common_defs expr (ref_counts_accu,cc,unsafe_bits_accu,ai)
+		# (s,ai) = getSize ai
+		#! (cce, is_unsafe_case, ai)	= consumerRequirements expr common_defs ai
+		   cc							= combineClasses cce cc
+		   unsafe_bits_accu				= [is_unsafe_case:unsafe_bits_accu]
+
+		#! ai_cur_ref_counts`			= ai.ai_cur_ref_counts
+		   pat_counts					= case is_unsafe_case of
+		   									True	-> combine_with_default s ai_cur_ref_counts` ai_def_ref_counts
+		   									False	-> ai_cur_ref_counts`
+
+		   (ref_counts_accu,zero_array)	= unify_pattern_accu_with_pat s ref_counts_accu pat_counts
+		   ai							= { ai & ai_cur_ref_counts=zero_array }
+		= (ref_counts_accu,cc,unsafe_bits_accu,ai)
+	where
+		getSize :: !*AnalyseInfo -> (!Int,!*AnalyseInfo)
+		getSize ai=:{ai_cur_ref_counts}
+			# (s,ai_cur_ref_counts) = usize ai_cur_ref_counts
+			= (s,{ ai & ai_cur_ref_counts = ai_cur_ref_counts})
+
+	
+	unify_with_default :: !Int !*RefCounts !RefCounts -> *RefCounts
+	unify_with_default 0 accu env
+		= accu
+	unify_with_default i accu env
+		#! i1			= dec i
+		   rca			= accu.[i1]
+		   rce			= env.[i1]
+		   accu			= { accu & [i1] = unify_counts rce rca }
+		= unify_with_default i1 accu env
+	where
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==0) 1 x
+		unify_counts 2 x = 2
+
+	combine_with_default 0 accu env
+		= accu
+	combine_with_default i accu env
+		#! i1			= dec i
+		   rca			= accu.[i1]
+		   rce			= env.[i1]
+		   accu			= { accu & [i1] = unify_counts rca rce }
+		= combine_with_default i1 accu env
+	where
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==2) 2 (inc x)
+		unify_counts 2 x = 2
+
+	unify_pattern_accu_with_env 0 accu env
+		= env
+	unify_pattern_accu_with_env i accu env
+		#! i1			= dec i
+		   rca			= accu.[i1]
+		   rce			= env.[i1]
+		   env			= { env & [i1] = unify_counts rca rce }
+		= unify_pattern_accu_with_env i1 accu env
+	where
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==2) 2 (inc x)
+		unify_counts 2 x = 2
+
+	unify_pattern_accu_with_pat :: !Int !*RefCounts !*RefCounts -> (!*RefCounts,!*RefCounts)
+	unify_pattern_accu_with_pat 0 accu pat
+		= (accu,pat)
+	unify_pattern_accu_with_pat i accu pat
+		#! i1			= dec i
+		   rca			= accu.[i1]
+		   rcp			= pat.[i1]
+		   accu			= { accu & [i1] = unify_counts rcp rca }
+		   pat			= { pat & [i1] = 0 }
+		= unify_pattern_accu_with_pat i1 accu pat
+	where
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==0) 1 x
+		unify_counts 2 x = 2
+
+/* old WRONG version...
 independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 // reference counting happens independently for each pattern expression
-	#! s = size ai_cur_ref_counts
-	   zero_array = createArray s 0
-	   (_, cc, r_unsafe_bits ,ai) = foldSt (independent_consumer_requirements common_defs) exprs (zero_array, CPassive, [], ai)
+	#! s							= size ai_cur_ref_counts
+	   zero_array					= createArray s 0
+	   (_, cc, r_unsafe_bits ,ai)	= foldSt (independent_consumer_requirements common_defs) exprs (zero_array, CPassive, [], ai)
 	= (cc, reverse r_unsafe_bits, ai)
-  where	
+where	
 	independent_consumer_requirements common_defs expr (zero_array, cc, unsafe_bits_accu, ai=:{ai_cur_ref_counts})
-		#! s = size ai_cur_ref_counts
-		   ai = { ai & ai_cur_ref_counts=zero_array }
-		   (cce, is_unsafe_case, ai) = consumerRequirements expr common_defs ai
-		   (unused, unified_ref_counts) = unify_ref_count_arrays s ai_cur_ref_counts ai.ai_cur_ref_counts
-		   ai = { ai & ai_cur_ref_counts=unified_ref_counts }
+		#! s							= size ai_cur_ref_counts
+		   ai							= { ai & ai_cur_ref_counts=zero_array }
+		   (cce, is_unsafe_case, ai)	= consumerRequirements expr common_defs ai
+		   (unused, unified_ref_counts)	= unify_ref_count_arrays s ai_cur_ref_counts ai.ai_cur_ref_counts
+		   ai							= { ai & ai_cur_ref_counts=unified_ref_counts }
 		= ({ unused & [i]=0 \\ i<-[0..s-1]}, combineClasses cce cc, [is_unsafe_case:unsafe_bits_accu], ai)
 	unify_ref_count_arrays 0 src1 src2_dest
 		= (src1, src2_dest)
 	unify_ref_count_arrays i src1 src2_dest
-		#! i1 = dec i
-		   rc1 = src1.[i1]
-		   rc2 = src2_dest.[i1]
+		#! i1			= dec i
+		   rc1			= src1.[i1]
+		   rc2			= src2_dest.[i1]
 		   src2_dest	= { src2_dest & [i1] = unify_ref_counts rc1 rc2 }
 		= unify_ref_count_arrays i1 src1 src2_dest
 
@@ -486,7 +670,7 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 	unify_ref_counts 0 x = if (x==2) 2 0
 	unify_ref_counts 1 x = if (x==0) 1 2
 	unify_ref_counts 2 _ = 2
-
+*/
 instance consumerRequirements DynamicExpr where
 	consumerRequirements {dyn_expr} common_defs ai
 		= consumerRequirements dyn_expr common_defs ai
@@ -509,7 +693,7 @@ instance consumerRequirements (!a,!b) | consumerRequirements a & consumerRequire
 		
 instance consumerRequirements [a] | consumerRequirements a where
 	consumerRequirements [x : xs] common_defs ai
-		# (ccx, _, ai) = consumerRequirements x common_defs ai
+		# (ccx,  _, ai) = consumerRequirements x  common_defs ai
 		  (ccxs, _, ai) = consumerRequirements xs common_defs ai
 		= (combineClasses ccx ccxs, False, ai)
 	consumerRequirements [] _ ai
@@ -525,8 +709,8 @@ instance consumerRequirements (Bind a b) | consumerRequirements a where
 analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
 analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdStrictLists_module_n groups fun_defs var_heap expr_heap
-	#! nr_of_funs = size fun_defs + ir_from - ir_to /* Sjaak */
-	   nr_of_groups = size groups
+	#! nr_of_funs	= size fun_defs + ir_from - ir_to /* Sjaak */
+	   nr_of_groups	= size groups
 	# consumerAnalysisRO=ConsumerAnalysisRO
 		{ common_defs				= common_defs
 		, imported_funs				= imported_funs
@@ -538,69 +722,101 @@ analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdSt
 				([], class_env, groups, fun_defs, var_heap, expr_heap)
 where	
 	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
-		# ({group_members}, groups) = groups![group_nr]
-		# (nr_of_vars, nr_of_local_vars, var_heap, class_env, fun_defs) = initial_cons_class group_members 0 0 var_heap class_env fun_defs
-		  initial_subst = createArray (nr_of_vars + nr_of_local_vars) CPassive
-		  (ai_cases_of_vars_for_group, ai, fun_defs)
-				 = analyse_functions common_defs group_members []
-						{	ai_var_heap = var_heap,
-						 	ai_cons_class = class_env, 
-							ai_cur_ref_counts = {}, ai_class_subst = initial_subst,
-							ai_next_var = nr_of_vars,
-							ai_next_var_of_fun = 0,
-							ai_cases_of_vars_for_function = [] //,
-//							ai_main_dcl_module_n=main_dcl_module_n
-							} fun_defs
-		  class_env = collect_classifications group_members ai.ai_cons_class ai.ai_class_subst
+		# ({group_members}, groups)
+				= groups![group_nr]
+
+		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
+				= foldSt initial_cons_class group_members (0, 0, var_heap, class_env, fun_defs)
+
+		# ai =
+						{	ai_var_heap						= var_heap
+						, 	ai_cons_class					= class_env
+						,	ai_cur_ref_counts				= {}
+						,	ai_class_subst					= createArray (next_var + nr_of_local_vars) CPassive
+						,	ai_next_var						= next_var
+						,	ai_next_var_of_fun				= 0
+						,	ai_cases_of_vars_for_function	= []
+						,	ai_fun_heap						= newHeap
+						,	ai_def_ref_counts				= {}
+						}
+
+		# (ai_cases_of_vars_for_group, ai, fun_defs)
+				= foldSt (analyse_functions common_defs) group_members ([], ai, fun_defs)
+
+		  class_env
+		  		= ai.ai_cons_class
+		  class_env
+		  		= foldSt (collect_classifications ai.ai_class_subst) group_members class_env
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap)
-				 = foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group) (cleanup_info,class_env, fun_defs, ai.ai_var_heap, expr_heap)
+				= foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group)
+					(cleanup_info, class_env, fun_defs, ai.ai_var_heap, expr_heap)
 		= (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 	  where
 //initial classification...
-		initial_cons_class [fun : funs] next_var_number nr_of_local_vars var_heap class_env fun_defs
-			#  (fun_def, fun_defs) = fun_defs![fun]
-			#  (TransformedBody {tb_args}) = fun_def.fun_body
-			   (fresh_vars, next_var_number, var_heap) = fresh_variables tb_args 0 next_var_number var_heap
-			= initial_cons_class funs next_var_number (length fun_def.fun_info.fi_local_vars + nr_of_local_vars) var_heap
-				{ class_env & [fun] = { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}} fun_defs
-		initial_cons_class [] next_var_number nr_of_local_vars var_heap class_env fun_defs
-			= (next_var_number, nr_of_local_vars, var_heap, class_env, fun_defs)
+		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
+			# (fun_def, fun_defs)					= fun_defs![fun]
+			  (TransformedBody {tb_args})			= fun_def.fun_body
+			  
+			  nr_of_locals							= length fun_def.fun_info.fi_local_vars
+			  nr_of_local_vars						= nr_of_local_vars + nr_of_locals
+			  
+			# (fresh_vars, next_var, var_heap)
+			   										= fresh_variables tb_args 0 next_var var_heap
+			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
+			  class_env								= { class_env & [fun] = fun_class}
+			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
 //determine classification...
-		analyse_functions common_defs [fun : funs] cfvog_accu ai fun_defs
-			#  (fun_def, fun_defs) = fun_defs![fun]
-	 		   (TransformedBody {tb_args, tb_rhs}) = fun_def.fun_body
-			   nr_of_args = length tb_args
-			   ai = { ai & ai_cur_ref_counts = createArray (nr_of_args + length fun_def.fun_info.fi_local_vars) 0,
-							ai_next_var_of_fun = nr_of_args }
-			   (_, _, ai) = consumerRequirements tb_rhs common_defs ai
-			   ai_cur_ref_counts = ai.ai_cur_ref_counts
-			   ai = { ai & ai_cur_ref_counts={} }
-			   ai_cons_class = update_array_element ai.ai_cons_class fun
-			   						(\cc->{ cc & cc_linear_bits=[ ref_count<2 \\ ref_count<-:ai_cur_ref_counts] })
-			   cases_of_vars_for_function = [(a,fun) \\ a<-ai.ai_cases_of_vars_for_function ]
-			   ai = { ai & ai_cons_class=ai_cons_class, ai_cases_of_vars_for_function=[] }
-			= analyse_functions common_defs funs [cases_of_vars_for_function:cfvog_accu] ai fun_defs
-		  where
-			update_array_element array index transition
-				# (before, array) = array![index]
-				= { array & [index]=transition before }
-		analyse_functions common_defs [] cfvog_accu ai fun_defs
+		analyse_functions common_defs fun (cfvog_accu, ai, fun_defs)
+			#  (fun_def, fun_defs)					= fun_defs![fun]
+	 		   (TransformedBody {tb_args, tb_rhs})	= fun_def.fun_body
+
+	 		   nr_of_locals							= length fun_def.fun_info.fi_local_vars
+			   nr_of_args							= length tb_args
+
+			   ai = { ai
+			   		& ai_cur_ref_counts				= createArray (nr_of_args + nr_of_locals) 0
+			   		, ai_def_ref_counts				= createArray (nr_of_args + nr_of_locals) 0
+			   		, ai_next_var_of_fun			= nr_of_args 
+			   		}
+			// classify
+			   (_, _, ai)							= consumerRequirements tb_rhs common_defs ai
+			// set linearity info based on cur_ref_counts
+			#  ai_cur_ref_counts					= ai.ai_cur_ref_counts
+			   ai_cons_class						= ai.ai_cons_class
+			   (fun_cons_class,ai_cons_class)		= ai_cons_class![fun]
+			   linear_bits							= [ ref_count<2 \\ ref_count <-: ai_cur_ref_counts ]
+			   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
+			   cc_args								= add_unused_args fun_cons_class.cc_args ai_cur_ref_counts
+			   fun_cons_class						= { fun_cons_class & cc_args = cc_args }
+			   ai_cons_class						= {ai_cons_class & [fun] = fun_cons_class}
+			   cases_of_vars_for_function			= [(a,fun) \\ a <- ai.ai_cases_of_vars_for_function ]
+			   cfvog_accu							= [cases_of_vars_for_function:cfvog_accu]
+
+			   ai = { ai
+			   		& ai_cons_class					= ai_cons_class
+			   		, ai_cases_of_vars_for_function	= [] 
+			   		, ai_cur_ref_counts				= {}
+			   		}
 			= (cfvog_accu, ai, fun_defs)
 //final classification...
-		collect_classifications [] class_env class_subst
-			= class_env
-		collect_classifications [fun : funs] class_env class_subst
-			# (fun_class, class_env) = class_env![fun]
-			# fun_class = determine_classification fun_class class_subst
-	 		= collect_classifications funs { class_env & [fun] = fun_class /*---> (fun, fun_class)*/} class_subst
+		collect_classifications class_subst fun class_env
+			# (fun_class, class_env)	= class_env![fun]
+			  fun_class					= determine_classification fun_class class_subst
+	 		= { class_env & [fun] = fun_class
 
-		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index) (cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
-			# (VI_AccVar _ arg_position, var_heap) = readPtr var_info_ptr var_heap
-			  ({cc_size, cc_args, cc_linear_bits},class_env) = class_env![fun_index]
-			  (aci_linearity_of_patterns, var_heap) = get_linearity_info cc_linear_bits case_guards var_heap
+		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
+				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
+			# (VI_AccVar _ arg_position, var_heap)				= readPtr var_info_ptr var_heap
+			  ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
+			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
 			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
 				// mark non multimatch cases whose case_expr is an active linear function argument
-				# aci = { aci_params = [], aci_opt_unfolder = No, aci_free_vars=No, aci_linearity_of_patterns = aci_linearity_of_patterns }
+				# aci =
+					{ aci_params				= []
+					, aci_opt_unfolder			= No
+					, aci_free_vars				= No
+					, aci_linearity_of_patterns = aci_linearity_of_patterns
+					}
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 					setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap)
 			= (cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
@@ -615,6 +831,7 @@ where
 		get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
 			# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
 			= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
+
 		get_var_index {fv_info_ptr} var_heap
 			# (vi, var_heap) = readPtr fv_info_ptr var_heap
 			  index = case vi of
@@ -622,9 +839,353 @@ where
 						VI_Count 0 False	-> cNope
 			= (index, var_heap) 
 
-fresh_variables [{fv_name,fv_info_ptr} : vars] arg_position next_var_number var_heap
-	# (fresh_vars, last_var_number, var_heap) = fresh_variables vars (inc arg_position) (inc next_var_number) var_heap
-	  var_heap = writePtr fv_info_ptr (VI_AccVar next_var_number arg_position) var_heap
+reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![FunctionInfoPtr]  ![Group] !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
+				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses})
+reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n new_functions
+	groups fun_defs var_heap expr_heap fun_heap class_env
+	#! nr_of_groups	= size groups
+	# consumerAnalysisRO=ConsumerAnalysisRO
+		{ common_defs				= common_defs
+		, imported_funs				= imported_funs
+		, main_dcl_module_n			= main_dcl_module_n
+		, stdStrictLists_module_n	= stdStrictLists_module_n
+		}
+	= foldSt (analyse_group consumerAnalysisRO) groups
+				([], fun_defs, var_heap, expr_heap, fun_heap, class_env)
+where	
+	analyse_group common_defs group (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env)
+		# {group_members}	= group
+
+		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap)
+				= foldSt initial_cons_class group_members (0, 0, var_heap, class_env, fun_defs, fun_heap)
+
+		# ai =
+						{	ai_var_heap						= var_heap
+						, 	ai_cons_class					= class_env
+						,	ai_cur_ref_counts				= {}
+						,	ai_class_subst					= createArray (next_var + nr_of_local_vars) CPassive
+						,	ai_next_var						= next_var
+						,	ai_next_var_of_fun				= 0
+						,	ai_cases_of_vars_for_function	= []
+						,	ai_fun_heap						= fun_heap
+						,	ai_def_ref_counts				= {}
+						}
+
+		# (ai_cases_of_vars_for_group, ai, fun_defs)
+				= foldSt (analyse_functions common_defs) group_members ([], ai, fun_defs)
+
+		  class_env
+		  		= ai.ai_cons_class
+		  fun_heap
+		  		= ai.ai_fun_heap
+		  (class_env,fun_heap)
+		  		= foldSt (collect_classifications ai.ai_class_subst) group_members (class_env,fun_heap)
+		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap, fun_heap)
+				= foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group)
+					(cleanup_info, class_env, fun_defs, ai.ai_var_heap, expr_heap, fun_heap)
+		= (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env)
+	  where
+//initial classification...
+		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap)
+			# (fun_def, fun_defs, fun_heap)			= get_fun_def fun fun_defs fun_heap
+			# (TransformedBody {tb_args,tb_rhs})	= fun_def.fun_body
+			  
+			  nr_of_locals							= count_locals tb_rhs 0
+			  nr_of_local_vars						= nr_of_local_vars + nr_of_locals
+			  
+			# (fresh_vars, next_var, var_heap)
+			   										= fresh_variables tb_args 0 next_var var_heap
+			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
+			# (fun_heap,class_env)					= set_fun_class fun fun_class fun_heap class_env
+			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap)
+
+
+		set_fun_class fun fun_class fun_heap class_env
+			| fun < size class_env
+				# class_env							= { class_env & [fun] = fun_class}
+				= (fun_heap,class_env)
+
+			# (fun_def_ptr,fun_heap)				= lookup_ptr fun new_functions fun_heap
+				with
+					lookup_ptr fun [] ti_fun_heap = abort "drat"
+					lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
+						# (FI_Function {gf_fun_index}, ti_fun_heap)
+								= readPtr fun_def_ptr ti_fun_heap
+						| gf_fun_index == fun
+							= (fun_def_ptr, ti_fun_heap)
+							= lookup_ptr fun new_functions ti_fun_heap
+			# (FI_Function gf, fun_heap)			= readPtr fun_def_ptr fun_heap
+			# fun_heap								= writePtr fun_def_ptr (FI_Function {gf & gf_cons_args = fun_class}) fun_heap
+			= (fun_heap,class_env)
+
+//determine classification...
+		analyse_functions common_defs fun (cfvog_accu, ai, fun_defs)
+			#  (fun_def, fun_defs, fun_heap)		= get_fun_def fun fun_defs ai.ai_fun_heap
+	 		   ai									= {ai & ai_fun_heap = fun_heap}
+	 		   (TransformedBody {tb_args, tb_rhs})	= fun_def.fun_body
+
+			   nr_of_locals							= count_locals tb_rhs 0
+			   nr_of_args							= length tb_args
+
+			   ai = { ai
+			   		& ai_cur_ref_counts				= createArray (nr_of_args + nr_of_locals) 0
+			   		, ai_def_ref_counts				= createArray (nr_of_args + nr_of_locals) 0
+			   		, ai_next_var_of_fun			= nr_of_args 
+			   		}
+			// classify
+			   (_, _, ai)							= consumerRequirements tb_rhs common_defs ai
+			// set linearity info based on cur_ref_counts
+			#  ai_cur_ref_counts					= ai.ai_cur_ref_counts
+			   ai_cons_class						= ai.ai_cons_class
+
+			#  fun_heap								= ai.ai_fun_heap
+			#  (fun_cons_class,fun_heap,ai_cons_class)	= get_fun_class fun fun_heap ai_cons_class
+
+			   linear_bits							= [ ref_count<2 \\ ref_count <-: ai_cur_ref_counts ]
+			   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
+			   cc_args								= add_unused_args fun_cons_class.cc_args ai_cur_ref_counts
+			   fun_cons_class						= { fun_cons_class & cc_args = cc_args }
+			#  (fun_heap,ai_cons_class)				= set_fun_class fun fun_cons_class fun_heap ai_cons_class
+			   cases_of_vars_for_function			= [(a,fun) \\ a <- ai.ai_cases_of_vars_for_function ]
+			   cfvog_accu							= [cases_of_vars_for_function:cfvog_accu]
+
+			   ai = { ai
+			   		& ai_cons_class					= ai_cons_class
+			   		, ai_cases_of_vars_for_function	= [] 
+			   		, ai_cur_ref_counts				= {}
+			   		, ai_fun_heap					= fun_heap
+			   		}
+			= (cfvog_accu, ai, fun_defs)
+//final classification...
+		collect_classifications class_subst fun (class_env,fun_heap)
+			# (fun_class,fun_heap,class_env)	= get_fun_class fun fun_heap class_env
+			  fun_class					= determine_classification fun_class class_subst
+			# (fun_heap,class_env)		= set_fun_class fun fun_class fun_heap class_env
+	 		= (class_env,fun_heap)
+
+		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
+				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
+			# (VI_AccVar _ arg_position, var_heap)				= readPtr var_info_ptr var_heap
+			  ({cc_size, cc_args, cc_linear_bits},fun_heap,class_env)	= get_fun_class fun_index fun_heap class_env
+			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
+			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
+				// mark non multimatch cases whose case_expr is an active linear function argument
+				# aci =
+					{ aci_params				= []
+					, aci_opt_unfolder			= No
+					, aci_free_vars				= No
+					, aci_linearity_of_patterns = aci_linearity_of_patterns
+					}
+				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
+					setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap, fun_heap)
+			= (cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
+
+		get_fun_class fun fun_heap class_env
+			| fun < size class_env
+				# (fun_cons_class,class_env)		= class_env![fun]
+				= (fun_cons_class,fun_heap,class_env)
+			# (fun_def_ptr,fun_heap)				= lookup_ptr fun new_functions fun_heap
+														with
+															lookup_ptr fun [] ti_fun_heap = abort "drat"
+															lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
+																# (FI_Function {gf_fun_index}, ti_fun_heap)
+																		= readPtr fun_def_ptr ti_fun_heap
+																| gf_fun_index == fun
+																	= (fun_def_ptr, ti_fun_heap)
+																	= lookup_ptr fun new_functions ti_fun_heap
+			# (FI_Function {gf_cons_args}, fun_heap)		= readPtr fun_def_ptr fun_heap
+			= (gf_cons_args, fun_heap, class_env)
+
+		get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
+			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
+		get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
+			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
+		get_linearity_info cc_linear_bits _ var_heap
+			= ([], var_heap)
+
+		get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
+			# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
+			= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
+
+		get_var_index {fv_info_ptr} var_heap
+			# (vi, var_heap) = readPtr fv_info_ptr var_heap
+			  index = case vi of
+						VI_AccVar _ index	-> index
+						VI_Count 0 False	-> cNope
+			= (index, var_heap) 
+
+		get_fun_def fun fun_defs fun_heap
+			| fun < size fun_defs
+				# (fun_def, fun_defs)						= fun_defs![fun]
+				= (fun_def, fun_defs, fun_heap)
+			# (fun_def_ptr, fun_heap)			= lookup_ptr fun new_functions fun_heap
+				with
+					lookup_ptr fun [] ti_fun_heap = abort "drat"
+					lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
+						# (FI_Function {gf_fun_index}, ti_fun_heap)
+								= readPtr fun_def_ptr ti_fun_heap
+						| gf_fun_index == fun
+							= (fun_def_ptr, ti_fun_heap)
+							= lookup_ptr fun new_functions ti_fun_heap
+			# (FI_Function {gf_fun_def}, fun_heap)
+												= readPtr fun_def_ptr fun_heap
+			= (gf_fun_def, fun_defs, fun_heap)
+
+reanalyseFunction
+	:: !Int !FunctionInfoPtr !{# CommonDefs} !{#{#FunType}} !Int !Int !*{#FunDef} !*VarHeap !*FunctionHeap !*{!ConsClasses}
+	-> *(!ConsClasses,!*{#FunDef},!*VarHeap,!*FunctionHeap,!*{!ConsClasses})
+reanalyseFunction fun fun_info_ptr common_defs imported_funs main_dcl_module_n stdStrictLists_module_n fun_defs var_heap fun_heap class_env
+	# consumerAnalysisRO=ConsumerAnalysisRO
+		{ common_defs				= common_defs
+		, imported_funs				= imported_funs
+		, main_dcl_module_n			= main_dcl_module_n
+		, stdStrictLists_module_n	= stdStrictLists_module_n
+		}
+
+	#  (fifun, fun_heap)					= readPtr fun_info_ptr fun_heap
+	   fun_def								= case fifun of
+												FI_Function {gf_fun_def}	-> gf_fun_def
+												FI_Empty					-> abort "unexpected FI_Empty.\n"
+
+	   ({tb_args, tb_rhs})					= case fun_def.fun_body of
+	   											TransformedBody body		-> body
+	   											body						-> abort "unexpected non-Transformed body?\n"
+
+	   nr_of_locals							= count_locals tb_rhs 0
+	   nr_of_args							= length tb_args
+
+	# (fresh_vars, next_var, var_heap)
+	   										= fresh_variables tb_args 0 0 var_heap
+	# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
+
+	# (fun_info, fun_heap)					= readPtr fun_info_ptr fun_heap
+	# fun_info								= case fun_info of
+												FI_Function gf
+													-> FI_Function {gf & gf_cons_args = fun_class}
+	# fun_heap								= writePtr fun_info_ptr fun_info fun_heap
+
+	# ai =
+					{	ai_var_heap						= var_heap
+					, 	ai_cons_class					= class_env
+					,	ai_cur_ref_counts				= createArray (nr_of_args + nr_of_locals) 0
+					,	ai_class_subst					= createArray (nr_of_args + nr_of_locals) CPassive
+					,	ai_next_var						= next_var
+					,	ai_next_var_of_fun				= nr_of_args
+					,	ai_cases_of_vars_for_function	= []
+					,	ai_fun_heap						= fun_heap
+					,	ai_def_ref_counts				= createArray (nr_of_args + nr_of_locals) 0
+					}
+
+	// classify
+	#  (_, _, ai)							= consumerRequirements tb_rhs consumerAnalysisRO ai
+	// set linearity info based on cur_ref_counts?
+	   ai_cur_ref_counts					= ai.ai_cur_ref_counts
+	   ai_cons_class						= ai.ai_cons_class
+	   fun_cons_class						= determine_classification fun_class ai.ai_class_subst
+	   linear_bits							= [ ref_count<2 \\ ref_count <-: ai_cur_ref_counts ]
+	   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
+	   cc_args								= add_unused_args fun_cons_class.cc_args ai_cur_ref_counts
+	   fun_cons_class						= { fun_cons_class & cc_args = cc_args }
+	   cases_of_vars_for_function			= [(a,fun) \\ a <- ai.ai_cases_of_vars_for_function ]
+	// set_case_expr_info cases_of_vars_for_function
+	= (fun_cons_class,fun_defs,ai.ai_var_heap,ai.ai_fun_heap,ai_cons_class)
+
+			
+fresh_variables [{fv_info_ptr} : vars] arg_position next_var_number var_heap
+	# (fresh_vars, last_var_number, var_heap)
+			= fresh_variables vars (inc arg_position) (inc next_var_number) var_heap
+	  var_heap
+	  		= writePtr fv_info_ptr (VI_AccVar next_var_number arg_position) var_heap
 	= ([next_var_number : fresh_vars], last_var_number, var_heap)
 fresh_variables [] _ next_var_number var_heap
 	= ([], next_var_number, var_heap)
+
+// count_locals determines number of local variables...
+
+count_locals (Var _) n
+	= n
+count_locals (App {app_args}) n
+	= foldSt count_locals app_args n
+count_locals (fun_expr @ exprs) n
+	= foldSt count_locals exprs (count_locals fun_expr n)
+count_locals (Let {let_strict_binds,let_lazy_binds,let_expr}) n
+	# let_binds	= let_strict_binds ++ let_lazy_binds
+	= count_let_bind_locals let_binds (count_locals let_expr n)
+count_locals (Case {case_expr,case_guards,case_default}) n
+	= count_case_locals case_guards (count_locals case_expr (count_optional_locals case_default n))
+count_locals (BasicExpr _) n
+	= n
+count_locals (MatchExpr _ expr) n
+	= count_locals expr n
+count_locals (Selection _ expr selectors) n
+	= count_selector_locals selectors (count_locals expr n)
+count_locals (Update expr1 selectors expr2) n
+	# n = count_locals expr1 n
+	# n = count_locals expr2 n
+	# n = count_selector_locals selectors n
+	= n
+count_locals (RecordUpdate _ expr exprs) n
+	= foldSt count_bind_locals exprs (count_locals expr n)
+count_locals (TupleSelect _ _ expr) n
+	= count_locals expr n
+count_locals (AnyCodeExpr _ _ _) n
+	= n
+count_locals (ABCCodeExpr _ _) n
+	= n
+count_locals (DynamicExpr {dyn_expr}) n
+	= count_locals dyn_expr n
+count_locals (TypeCodeExpression _) n
+	= n
+count_locals EE n
+	= n
+count_locals (NoBind _) n
+	= n
+
+count_optional_locals (Yes e) n
+	= count_locals e n
+count_optional_locals No n
+	= n
+
+count_bind_locals {bind_src} n
+	= count_locals bind_src n
+
+count_let_bind_locals binds n
+	= foldSt count_let_bind_locals binds n
+where
+	count_let_bind_locals {lb_src,lb_dst} n
+		| lb_dst.fv_count > 0
+			= count_locals lb_src (inc n)
+			= n
+
+count_case_locals (AlgebraicPatterns _ patterns) n
+	# pattern_exprs		= [ ap_expr \\ {ap_expr} <- patterns ]
+	  pattern_vars		= flatten [ ap_vars \\ {ap_vars} <- patterns ]
+	= foldSt count_locals pattern_exprs (foldSt count_case_guard_locals pattern_vars n)
+count_case_locals (BasicPatterns _ patterns) n
+	# pattern_exprs		= [ bp_expr \\ {bp_expr} <- patterns ]
+	= foldSt count_locals pattern_exprs n
+count_case_locals (OverloadedListPatterns _ _ patterns) n
+	# pattern_exprs		= [ ap_expr \\ {ap_expr} <- patterns ]
+	  pattern_vars		= flatten [ ap_vars \\ {ap_vars} <- patterns ]
+	= foldSt count_locals pattern_exprs (foldSt count_case_guard_locals pattern_vars n)
+count_case_locals NoPattern n
+	= n
+
+count_case_guard_locals {fv_count} n
+	| fv_count > 0
+		= inc n
+		= n
+
+count_selector_locals selectors n
+	= foldSt count_selector_locals selectors n
+where
+	count_selector_locals (ArraySelection _ _ index_expr) n
+		= count_locals index_expr n
+	count_selector_locals (DictionarySelection _ _ _ index_expr) n
+		= count_locals index_expr n
+	// record selection missing?!
+	count_selector_locals _ n
+		= n
+
+add_unused_args args ref_counts
+	= [if (ref_count > 0) arg CUnused \\ arg <- args & ref_count <-: ref_counts]
