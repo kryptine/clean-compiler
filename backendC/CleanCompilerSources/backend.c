@@ -1220,6 +1220,7 @@ BETupleSelectNode (int arity, int index, BENodeP node)
 	select->node_symbol		= symbol;
 	select->node_arity		= index+1;
 	select->node_arguments	= BEArgs (node, NULL);
+	select->node_number		= 0;
 
 	return (select);
 } /* BETupleSelectNode */
@@ -1236,6 +1237,7 @@ BEIfNode (BENodeP cond, BENodeP then, BENodeP elsje)
 	node->node_symbol		= gBasicSymbols [if_symb];
 	node->node_arguments	= BEArgs (cond, BEArgs (then, (BEArgs (elsje, NULL))));
 	node->node_arity		= 3;
+	node->node_number		= 0;
 
 	return (node);
 } /* BEIfNode */
@@ -1261,6 +1263,7 @@ BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts,
 	node->node_kind					= IfNode;
 	node->node_contents.contents_if	= thenElseInfo;
 	node->node_arguments			= BEArgs (cond, BEArgs (then, (BEArgs (elsje, NULL))));
+	node->node_number				= 0;
 
 	return (node);
 } /* BEGuardNode */
@@ -1279,6 +1282,7 @@ BESelectorNode (BESelectorKind selectorKind, BESymbolP fieldSymbol, BEArgP args)
 	node->node_symbol		= fieldSymbol;
 	node->node_arity		= selectorKind;
 	node->node_arguments	= args;
+	node->node_number		= 0;
 
 	return (node);
 } /* BESelectorNode */
@@ -1318,6 +1322,7 @@ BENodeIdNode (BENodeIdP nodeId, BEArgP args)
 	node->node_node_id		= nodeId;
 	node->node_arity		= CountArgs (args);
 	node->node_arguments	= args;
+	node->node_number		= 0;
 
 	return (node);
 } /* BENodeIdNode */
