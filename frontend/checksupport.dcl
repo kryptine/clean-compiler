@@ -148,9 +148,6 @@ instance <<< IdentPos, ExplImpInfo, DeclarationInfo
 	,	ef_is_macro_fun		:: !Bool
 	}
 
-checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
-					-> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
-
 convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)

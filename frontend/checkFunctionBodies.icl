@@ -2,6 +2,7 @@ implementation module checkFunctionBodies
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef //, RWSDebug
 import explicitimports, comparedefimp, mergecases
+from check import checkFunctions
 
 cIsInExpressionList		:== True
 cIsNotInExpressionList	:== False
@@ -461,6 +462,11 @@ where
 		# (let_expr_position, let_expr, expr_heap) = build_sequential_lets seq_lets expr let_expr_position expr_heap
 	  	  (let_expr, expr_heap) = buildLetExpression strict_binds lazy_binds let_expr let_expr_position expr_heap
 		= (if (isEmpty strict_binds && isEmpty lazy_binds) let_expr_position NoPos, let_expr, expr_heap)
+
+checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
+					-> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
+checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) fun_defs e_info heaps cs
+	= checkFunctions mod_index level ir_from ir_to fun_defs e_info heaps cs
 
 checkExpression :: ![FreeVar] !ParsedExpr !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
 	-> *(!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState);

@@ -222,19 +222,11 @@ where
 	,	ef_is_macro_fun		:: !Bool
 	}
 
-checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
-					-> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
-checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) fun_defs e_info heaps cs
-	= checkFunctions mod_index level ir_from ir_to fun_defs e_info heaps cs
-
-
 convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 convertIndex index table_index (Yes tables)
 	= tables.[table_index].[index]
 convertIndex index table_index No
 	= index
-
-
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
 retrieveGlobalDefinition {ste_kind = STE_Imported kind decl_index, ste_def_level, ste_index} requ_kind mod_index
