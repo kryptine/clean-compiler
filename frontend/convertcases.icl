@@ -1562,10 +1562,6 @@ instance <<< (Ptr a)
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  
 
-instance <<< BoundVar
-where
-	(<<<) file {var_name,var_info_ptr} = file <<< var_name <<< '[' <<< var_info_ptr <<< ']'
-
 instance  <<<  FunctionBody
 where
 	(<<<) file (TransformedBody {tb_rhs}) = file <<<  tb_rhs

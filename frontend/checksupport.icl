@@ -75,7 +75,7 @@ where
 	,	dcls_local_for_import ::!{!Declaration}
 	}
 
-::	ExplImpInfos :== {!{!.ExplImpInfo}}
+::	*ExplImpInfos :== *{!*{!*ExplImpInfo}}
 
 ::	ExplImpInfo
 		= ExplImpInfo Ident !.DeclaringModulesSet

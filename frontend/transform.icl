@@ -1253,15 +1253,18 @@ instance expand Expression
 where
 	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_Macro {glob_object,glob_module}}, app_args}) ei
 		# (app_args, (calls, es)) = expand app_args ei
-		# (macro, es) = es!es_fun_defs.[glob_object]
+		  (macro, es) = es!es_fun_defs.[glob_object]
 		| macro.fun_arity == symb_arity
 			= unfoldMacro macro app_args (calls, es)
-			# (calls, es_symbol_table) = examineFunctionCall macro.fun_symb {fc_index = glob_object, fc_level = NotALevel} (calls, es.es_symbol_table)
-			| macro.fun_info.fi_group_index<NoIndex
-				# macro = {macro & fun_info.fi_group_index= -2-macro.fun_info.fi_group_index}
-				# es= {es & es_fun_defs.[glob_object]=macro}
-				= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },(calls, { es & es_symbol_table = es_symbol_table }))
-				= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },(calls, { es & es_symbol_table = es_symbol_table }))
+		# (calls, es_symbol_table)
+				= examineFunctionCall macro.fun_symb {fc_index = glob_object, fc_level = NotALevel}
+						(calls, es.es_symbol_table)
+		  es = { es & es_symbol_table = es_symbol_table }
+		| macro.fun_info.fi_group_index<NoIndex
+			# macro = {macro & fun_info.fi_group_index= -2-macro.fun_info.fi_group_index}
+			  es= {es & es_fun_defs.[glob_object]=macro}
+			= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },(calls, es))
+		= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },(calls, es))
 	expand (App app=:{app_args}) ei
 		# (app_args, ei) = expand app_args ei
 		= (App { app & app_args = app_args }, ei)

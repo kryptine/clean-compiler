@@ -1042,7 +1042,7 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 
 checkDclComponent :: !{![Int]} !{![Int]} ![[(Index, Position, [ImportNrAndIdents])]] ![Int] 
 				!(!Int, !*ExplImpInfos, !*{# DclModule}, !*{# FunDef}, !*Heaps,!*CheckState)
-			-> (!Int, !.ExplImpInfos, !.{# DclModule}, !.{# FunDef}, !.Heaps,!.CheckState)
+			-> (!Int, !*ExplImpInfos, !.{# DclModule}, !.{# FunDef}, !.Heaps,!.CheckState)
 checkDclComponent components_array super_components expl_imp_indices mod_indices
 		(component_nr, expl_imp_infos, dcl_modules, icl_functions, heaps, cs=:{cs_x})
 	| not cs.cs_error.ea_ok || hd mod_indices==size dcl_modules // the icl module!
@@ -1924,6 +1924,9 @@ add_declaration_to_symbol_table opt_dcl_macro_range {dcl_kind=STE_FunctionOrMacr
 add_declaration_to_symbol_table yes_for_icl_module {dcl_kind=dcl_kind=:STE_Imported def_kind def_mod, dcl_ident, dcl_index, dcl_pos} importing_mod cs
 	= addSymbol yes_for_icl_module dcl_ident dcl_pos dcl_kind def_kind dcl_index def_mod importing_mod cs
 
+updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule}
+			{!{!*ExplImpInfo}} *SymbolTable 
+		-> (u:{#DclModule},!{!{!.ExplImpInfo}},.SymbolTable)
 updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
 			dcl_modules expl_imp_infos cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))

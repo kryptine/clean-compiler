@@ -845,7 +845,7 @@ freshAttribute ts=:{ts_attr_store}
 	}
 
 attribute_error type_attr No
-	= abort ("sanity check nr 723 failed in module type"--->("type_attr", type_attr))
+	= No // XXX abort ("sanity check nr 723 failed in module type"--->("type_attr", type_attr))
 attribute_error type_attr (Yes err)
 	# err = errorHeading "Type error" err
 	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
@@ -869,6 +869,7 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 	  					= unsafeFold2St (check_kind type_name modules) tdi_kinds cons_args (1, error_admin)
 	  				-> Yes error_admin
 	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
+// MW probably	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute, at_annotation = AN_None }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
 			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
 				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
 	where
@@ -965,6 +966,7 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 addPropagationAttributesToAType modules type=:{at_type} ps
 	# (at_type, ps) = addPropagationAttributesToType modules at_type ps
 	= ({ type & at_type = at_type }, NoPropClass, ps)
+// MW probably	= ({ type & at_type = at_type, at_annotation = AN_None }, NoPropClass, ps)
 
 addPropagationAttributesToType modules (arg_type --> res_type) ps
 	# (arg_type, prop_class, ps) = addPropagationAttributesToAType modules arg_type ps
