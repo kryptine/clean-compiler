@@ -206,7 +206,7 @@ where
 // MV..
 					<<- ("DynamicTemp",			IC_Type, PD_DynamicTemp)
 //					<<- ("Module",				IC_Type, PD_ModuleType)
-					<<- ("_Module",				IC_Expression, PD_ModuleConsSymbol)
+					<<- ("__Module",			IC_Expression, PD_ModuleConsSymbol)
 // ..MV
 					
 // AA..

@@ -322,7 +322,7 @@ where
 			# (ident,   pState)	= stringToIdent ("_" +++ mod_name +++ "_Module") IC_Type pState
 			# td				= MakeTypeDef ident [] (ConsList []) TA_None [] NoPos
 				
-			# (pc_cons_name, pState) = stringToIdent "_Module" IC_Expression pState
+			# (pc_cons_name, pState) = stringToIdent "__Module" IC_Expression pState
 			# cons
 				= { 
 					pc_cons_name		= pc_cons_name
