@@ -756,38 +756,62 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 					CodeRootSymbolApplication (root,rootid,rootsymb->symb_unboxed_cons_sdef_p,asp,bsp,code_gen_node_ids_p,resultstate);
 					return;
 				} else {
-					LabDef *strict_cons_lab_p;
-					int a_size;
+					if (IsSemiStrictState (root->node_state)){
+						LabDef d_cons_lab,n_cons_lab;
 
-					BuildArgs (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
-										
-					if (rootsymb->symb_head_strictness==4){
-						int b_size;
-
-						strict_cons_lab_p=unboxed_cons_label (rootsymb);
+						if (rootsymb->symb_head_strictness==4){
+							MakeSymbolLabel (&d_cons_lab,rootsymb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,rootsymb->symb_unboxed_cons_sdef_p,0);
+						} else {
+							if (rootsymb->symb_head_strictness>1){
+								if (rootsymb->symb_tail_strictness)
+									d_cons_lab=conssts_lab;
+								else
+									d_cons_lab=conss_lab;
+							} else
+								d_cons_lab=consts_lab;
+							
+							d_cons_lab.lab_pref=d_pref;
+						}
 						
-						DetermineSizeOfArguments (root->node_arguments,&a_size,&b_size);
-						GenFillR (strict_cons_lab_p,a_size,b_size,asp,0,0,ReleaseAndFill,True);
-						bsp-=b_size;
+						n_cons_lab = d_cons_lab;
+						n_cons_lab.lab_pref = n_pref;
+							
+						CreateSemiStrictRootNode (&d_cons_lab,&n_cons_lab,root,rootid,asp,bsp,code_gen_node_ids_p,resultstate);						
+						return;
 					} else {
-						if (rootsymb->symb_head_strictness>1){
-							if (rootsymb->symb_tail_strictness)
-								strict_cons_lab_p=&conssts_lab;
-							else
-								strict_cons_lab_p=&conss_lab;
-						} else
-							strict_cons_lab_p=&consts_lab;
+						LabDef *strict_cons_lab_p;
+						int a_size;
 
-						a_size=root->node_arity;
-						GenFillh (root->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size,asp,ReleaseAndFill);
+						BuildArgs (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
+
+						if (rootsymb->symb_head_strictness==4){
+							int b_size;
+
+							strict_cons_lab_p=unboxed_cons_label (rootsymb);
+							
+							DetermineSizeOfArguments (root->node_arguments,&a_size,&b_size);
+							GenFillR (strict_cons_lab_p,a_size,b_size,asp,0,0,ReleaseAndFill,True);
+							bsp-=b_size;
+						} else {
+							if (rootsymb->symb_head_strictness>1){
+								if (rootsymb->symb_tail_strictness)
+									strict_cons_lab_p=&conssts_lab;
+								else
+									strict_cons_lab_p=&conss_lab;
+							} else
+								strict_cons_lab_p=&consts_lab;
+
+							a_size=root->node_arity;
+							GenFillh (root->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size,asp,ReleaseAndFill);
+						}
+
+						asp-=a_size;
+
+						GenPopA	(asp);
+						GenPopB	(bsp);
+						GenRtn (1,0,OnAState);
+						return;
 					}
-
-					asp-=a_size;
-
-					GenPopA	(asp);
-					GenPopB	(bsp);
-					GenRtn (1,0,OnAState);
-					return;
 				}
 			}
 #endif
