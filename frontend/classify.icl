@@ -353,14 +353,13 @@ reqs_of_args [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
 	= reqs_of_args ccs args (combineClasses act_cc cumm_arg_class) common_defs ai
 reqs_of_args cc xp _ _ _ = abort "classify:reqs_of_args doesn't match" ---> (cc,xp)
 
-showRefCount msg ai
-	:== ai ---> (msg,rc)
-where
-	{ai_cur_ref_counts} = ai
+showRefCount :: !String !*AnalyseInfo -> *AnalyseInfo
+showRefCount msg ai=:{ai_cur_ref_counts}
+	= ai <--- (msg,display ai_cur_ref_counts)
 	
-	rc :: String
-	rc = {show c \\ c <-: ai_cur_ref_counts}
-
+display :: !RefCounts -> String
+display rc = {show c \\ c <-: rc}
+where
 	show 0 = '0'
 	show 1 = '1'
 	show 2 = '2'
@@ -368,26 +367,21 @@ where
 
 instance consumerRequirements Case where
 	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr,case_explicit}
-				common_defs=:(ConsumerAnalysisRO {common_defs=common_defs_parameter}) ai
-		# (cce, _, ai)					= consumerRequirements case_expr common_defs ai
+				ro=:(ConsumerAnalysisRO {common_defs=common_defs_parameter}) ai=:{ai_cur_ref_counts}
+		#  (cce, _, ai)					= consumerRequirements case_expr ro ai
 		#! env_counts					= ai.ai_cur_ref_counts
 		   (s,env_counts)				= usize env_counts
 		   zero_array					= createArray s 0
 		   ai							= {ai & ai_cur_ref_counts = zero_array}
-		   (ccd, default_is_unsafe, ai)	= consumerRequirements case_default common_defs ai
-		#! (context_counts,ai)			= case use_context_default of
-											True
-												-> ({},{ai & ai_cur_ref_counts = env_counts})
-		   									False
-		   										-> (ai.ai_def_ref_counts,{ai & ai_def_ref_counts = ai.ai_cur_ref_counts, ai_cur_ref_counts = env_counts})
-		# (ccgs, unsafe_bits, ai)		= consumer_requirements_of_guards case_guards common_defs ai
-		#  ai							= case use_context_default of
-											True
-												-> ai
-											False
-												-> {ai & ai_def_ref_counts = context_counts}
+		   (ccd, default_is_unsafe, ai)	= consumerRequirements case_default ro ai
+		# (ccgs, unsafe_bits, guard_counts, ai)
+										= consumer_requirements_of_guards case_guards ro ai
+		# default_counts				= ai.ai_cur_ref_counts
 		# (every_constructor_appears_in_safe_pattern, may_be_active)
 		  								= inspect_patterns common_defs_parameter has_default case_guards unsafe_bits
+		  ref_counts = combine_pattern_counts has_default case_guards unsafe_bits guard_counts default_counts
+		  ref_counts = combine_counts s ref_counts env_counts
+		  ai = {ai & ai_cur_ref_counts = ref_counts }
 		  safe = case_explicit || (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
 		  ai = aiUnifyClassifications (SwitchMultimatchClassification
 		  		(if may_be_active CActive CVarOfMultimatchCase) 
@@ -405,24 +399,54 @@ instance consumerRequirements Case where
 						-> { ai & ai_cases_of_vars_for_function=[(safe,kees):ai.ai_cases_of_vars_for_function] }
 						-> ai
 // ...N-WAY
-		# ai = case case_guards of
+/*		# ai = case case_guards of
 					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns
 						// decons_expr will be optimized to a decons_u Selector in transform
-						# (cc, _, ai) = consumerRequirements app_arg common_defs ai
+						# (cc, _, ai)	= consumerRequirements app_arg ro ai
 						# ai = aiUnifyClassifications CActive cc ai
 						-> ai
 					OverloadedListPatterns _ decons_expr _
-						# (_,_,ai) = consumerRequirements decons_expr common_defs ai
+						# (_,_,ai) = consumerRequirements decons_expr ro ai
 						-> ai
 					_
 						-> ai
+*/
+		# ai = handle_overloaded_list_patterns case_guards ai
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
+		handle_overloaded_list_patterns
+					(OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns)
+					ai
+						// decons_expr will be optimized to a decons_u Selector in transform
+						# (cc, _, ai)	= consumerRequirements app_arg ro ai
+						# ai = aiUnifyClassifications CActive cc ai
+						= ai
+		handle_overloaded_list_patterns
+					(OverloadedListPatterns _ decons_expr _) ai
+						# (_,_,ai) = consumerRequirements decons_expr ro ai
+						= ai
+		handle_overloaded_list_patterns
+					_ ai
+						= ai
+		
 		has_default					= case case_default of
 										  		Yes _ -> True
 										  		_ -> False
-		use_context_default			= not (case_explicit || has_default)
-		
+//		use_context_default			= not (case_explicit || has_default)
+
+		combine_counts 0 accu env
+			= accu
+		combine_counts i accu env
+			#! i1			= dec i
+			   rca			= accu.[i1]
+			   rce			= env.[i1]
+			   accu			= { accu & [i1] = unify_counts rca rce }
+			= combine_counts i1 accu env
+		where
+			unify_counts 0 x = x
+			unify_counts 1 x = if (x==2) 2 (inc x)
+			unify_counts 2 x = 2
+
 		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
 			# type_def						= common_defs.[glob_module].com_type_defs.[glob_object]
 			  defined_symbols				= case type_def.td_rhs of
@@ -442,7 +466,6 @@ instance consumerRequirements Case where
 			  sorted_pattern_constructors	= sort bools_indices unsafe_bits
 			= (appearance_loop [0,1] sorted_pattern_constructors,
 				not (multimatch_loop has_default sorted_pattern_constructors))
-//		inspect_patterns common_defs has_default (OverloadedListPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
 		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ algebraic_patterns) unsafe_bits
 			# type_def = case overloaded_list of
 							UnboxedList {glob_object, glob_module} _ _ _
@@ -509,7 +532,120 @@ instance consumerRequirements Case where
 					= True
 				= multimatch_loop has_default (dropWhile (\(ds_index,_,_)->ds_index==cip) constructors_in_pattern)
 
-consumer_requirements_of_guards :: !CasePatterns ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
+combine_pattern_counts has_default patterns unsafe_bits guard_counts default_counts
+	| not ok_pattern_type
+		= createArray (size default_counts) 2
+	# sorted_pattern_constructors`	= sort3 pattern_constructors unsafe_bits guard_counts
+	# initial_count					= case has_default of
+	  										True	-> default_counts
+	  										_		-> zero_array
+	= count_loop default_counts initial_count sorted_pattern_constructors`
+	
+where
+	rc2str (a,b,c,d) = (a,b,c,display d)
+	
+	ok_pattern_type = case patterns of
+		(AlgebraicPatterns _ _)
+			-> True
+		(BasicPatterns BT_Bool _)
+			-> True
+		(BasicPatterns BT_Int _)
+			-> True
+//		(BasicPatterns (BT_String _) basic_patterns)
+//			-> [ string \\ {bp_value=BVS string}<-basic_patterns ] ---> ("BasicPatterns String")
+		(OverloadedListPatterns overloaded_list _ algebraic_patterns)
+			-> True
+		_ -> False //---> ("not ok_pattern_type",patterns)
+	pattern_constructors = case patterns of
+		(AlgebraicPatterns {glob_object, glob_module} algebraic_patterns)
+			-> [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns] //---> ("AlgebraicPatterns")
+		(BasicPatterns BT_Bool basic_patterns)
+			-> [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ] //---> ("BasicPatterns Bool")
+		(BasicPatterns BT_Int basic_patterns)
+			-> [ int \\ {bp_value=BVInt int}<-basic_patterns ] //---> ("BasicPatterns Int")
+//		(BasicPatterns (BT_String _) basic_patterns)
+//			-> [ string \\ {bp_value=BVS string}<-basic_patterns ] ---> ("BasicPatterns String")
+		(OverloadedListPatterns overloaded_list _ algebraic_patterns)
+			-> [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns] //---> ("OverloadedListPatterns")
+		_ -> abort "unsupported?!" ---> ("pattern_constructors",patterns) //[]	// ???
+
+	count_size					= size default_counts
+	zero_array					= createArray count_size 0
+
+	sort3 constr_indices unsafe_bits counts
+		= sortBy smaller (zip4 constr_indices [0..] unsafe_bits counts)
+	  where
+		smaller (i1,si1,_,_) (i2,si2,_,_)
+			| i1<i2		= True
+			| i1>i2		= False
+						= si1<si2
+		zip4 [h1:t1] [h2:t2] [h3:t3] [h4:t4]
+			= [(h1,h2,h3,h4):zip4 t1 t2 t3 t4]
+		zip4 _ _ _ _
+			= []
+
+	count_loop :: RefCounts RefCounts [(Int,Int,Bool,RefCounts)] -> *RefCounts
+	count_loop default_counts unified_counts []
+		= {e \\ e <-: unified_counts}
+	count_loop default_counts unified_counts [(c_index,p_index,unsafe,counts):patterns]
+		# (same,next)	= splitWhile (\(ds_index,_,_,_)->ds_index==c_index) patterns
+		# ccount= case unsafe of
+					True 	-> count_constructor default_counts counts same
+					_		-> counts
+		= count_loop default_counts (unify_counts ccount unified_counts) next
+	where
+		splitWhile :: (a -> .Bool) !u:[a] -> (.[a],v:[a]), [u <= v];
+		splitWhile f []
+			= ([],[])
+		splitWhile f cons=:[a:x]
+			| f a
+				# (t,d)	= splitWhile f x
+				= ([a:t],d)
+				= ([],cons)
+	
+	count_constructor :: RefCounts RefCounts [(Int,Int,Bool,RefCounts)] -> RefCounts
+	count_constructor default_counts combined_counts []
+		= combine_counts combined_counts default_counts
+	count_constructor default_counts combined_counts [(_,_,unsafe,counts):patterns]
+		| unsafe
+			= count_constructor default_counts (combine_counts combined_counts counts) patterns
+			= combine_counts combined_counts counts
+
+	combine_counts :: RefCounts RefCounts -> RefCounts
+	combine_counts c1 c2
+		= {unify_counts e1 e2 \\ e1 <-: c1 & e2 <-: c2}
+	where
+		combine 0 accu env
+			= accu
+		combine i accu env
+			#! i1			= dec i
+			   rca			= accu.[i1]
+			   rce			= env.[i1]
+			   accu			= { accu & [i1] = unify_counts rca rce }
+			= combine i1 accu env
+
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==2) 2 (inc x)
+		unify_counts 2 x = 2
+	
+	unify_counts c1 c2
+		= {unify_counts e1 e2 \\ e1 <-: c1 & e2 <-: c2}
+	where
+		unify :: !Int !*RefCounts !RefCounts -> *RefCounts
+		unify 0 accu env
+			= accu
+		unify i accu env
+			#! i1			= dec i
+			   rca			= accu.[i1]
+			   rce			= env.[i1]
+			   accu			= { accu & [i1] = unify_counts rce rca }
+			= unify i1 accu env
+
+		unify_counts 0 x = x
+		unify_counts 1 x = if (x==0) 1 x
+		unify_counts 2 x = 2
+
+//consumer_requirements_of_guards :: !CasePatterns ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
 consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 	# pattern_exprs
 			= [ ap_expr \\ {ap_expr}<-patterns]
@@ -519,6 +655,7 @@ consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 	  		= bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
 	  ai	= { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
 	= independentConsumerRequirements pattern_exprs common_defs ai
+	
 consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
 	# pattern_exprs
 			= [ bp_expr \\ {bp_expr}<-patterns]
@@ -546,159 +683,23 @@ bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var
 bindPatternVars [] next_var next_var_of_fun var_heap
 	= (next_var, next_var_of_fun, var_heap)
 
-independentConsumerRequirements :: !.[Expression] ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
-independentConsumerRequirements [] common_defs ai=:{ai_cur_ref_counts,ai_def_ref_counts}
-	#! s							= size ai_cur_ref_counts
-	   unified_ref_counts			= unify_with_default` s ai_cur_ref_counts ai_def_ref_counts
-	   ai							= {ai & ai_cur_ref_counts = unified_ref_counts}
-	= (CPassive,[],ai)
+independentConsumerRequirements :: !.[Expression] ConsumerAnalysisRO !*AnalyseInfo -> (!ConsClass,.[Bool],[RefCounts],!*AnalyseInfo)
+independentConsumerRequirements exprs info ai
+	# ref_counts					= ai.ai_cur_ref_counts
+	# (count_size,ref_counts)		= usize ref_counts
+	# zero_array					= createArray count_size 0
+	# (counts_unsafe,(cc,ai))		= mapSt cons_reqs exprs (CPassive,{ ai & ai_cur_ref_counts = zero_array})
+	# (counts,unsafe)				= unzip counts_unsafe
+	= (cc,unsafe,counts,{ ai & ai_cur_ref_counts = ref_counts})
 where
-	unify_with_default` 0 accu env
-		= accu
-	unify_with_default` i accu env
-		#! i1			= dec i
-		   rca			= accu.[i1]
-		   rce			= env.[i1]
-		   accu			= { accu & [i1] = unify_counts rca rce }
-		= unify_with_default` i1 accu env
-	where
-		unify_counts 0 x = x
-		unify_counts 1 x = if (x==2) 2 (inc x)
-		unify_counts 2 x = 2
+	cons_reqs expr (cc,ai)
+		# (cce, unsafe, ai)		= consumerRequirements expr info ai
+		# cc					= combineClasses cce cc
+		# ref_counts			= ai.ai_cur_ref_counts
+		# count_size			= size ref_counts
+		# zero_array			= createArray count_size 0
+		= ((ref_counts,unsafe),(cc, { ai & ai_cur_ref_counts=zero_array }))
 
-independentConsumerRequirements [expr:exprs] common_defs ai=:{ai_cur_ref_counts,ai_def_ref_counts}
-	#! s							= size ai_cur_ref_counts
-	   zero_array					= createArray s 0
-	   ai							= { ai & ai_cur_ref_counts=zero_array }
-
-	   (cce, is_unsafe_case, ai)	= consumerRequirements expr common_defs ai
-	   cc							= combineClasses cce CPassive
-	   r_unsafe_bits				= [is_unsafe_case]
-
-	   pat_counts					= case is_unsafe_case of
-	   									True	-> combine_with_default s ai.ai_cur_ref_counts ai_def_ref_counts
-	   									False	-> ai.ai_cur_ref_counts
-	= case exprs of
-		[]			//| size ai.ai_cur_ref_counts <> s || size ai_def_ref_counts <> s -> abort ("("+++toString s+++","+++ toString (size ai.ai_cur_ref_counts) +++","+++toString (size ai_def_ref_counts) +++")")
-					#! unified_pat_counts				= unify_with_default s ai.ai_cur_ref_counts ai_def_ref_counts
-					   unified_ref_counts				= unify_pattern_accu_with_env s unified_pat_counts ai_cur_ref_counts
-					   ai								= { ai & ai_cur_ref_counts=unified_ref_counts }
-					-> (cc, r_unsafe_bits, ai)
-		_			#! zero_array						= createArray s 0
-					   accu								= ai.ai_cur_ref_counts
-					   ai								= { ai & ai_cur_ref_counts=zero_array }
-					   (accu,cc,r_unsafe_bits,ai)		= foldSt (build_pattern_accu common_defs) exprs (accu,cc,r_unsafe_bits,ai)
-					//| size ai.ai_cur_ref_counts <> s || size ai_def_ref_counts <> s -> abort "222"
-					#! unified_pat_counts				= unify_with_default s accu ai_def_ref_counts
-					   unified_ref_counts				= unify_pattern_accu_with_env s unified_pat_counts ai_cur_ref_counts
-					   ai								= { ai & ai_cur_ref_counts=unified_ref_counts }
-					-> (cc, reverse r_unsafe_bits, ai)
-where
-	build_pattern_accu common_defs expr (ref_counts_accu,cc,unsafe_bits_accu,ai)
-		# (s,ai) = getSize ai
-		#! (cce, is_unsafe_case, ai)	= consumerRequirements expr common_defs ai
-		   cc							= combineClasses cce cc
-		   unsafe_bits_accu				= [is_unsafe_case:unsafe_bits_accu]
-
-		#! ai_cur_ref_counts`			= ai.ai_cur_ref_counts
-		   pat_counts					= case is_unsafe_case of
-		   									True	-> combine_with_default s ai_cur_ref_counts` ai_def_ref_counts
-		   									False	-> ai_cur_ref_counts`
-
-		   (ref_counts_accu,zero_array)	= unify_pattern_accu_with_pat s ref_counts_accu pat_counts
-		   ai							= { ai & ai_cur_ref_counts=zero_array }
-		= (ref_counts_accu,cc,unsafe_bits_accu,ai)
-	where
-		getSize :: !*AnalyseInfo -> (!Int,!*AnalyseInfo)
-		getSize ai=:{ai_cur_ref_counts}
-			# (s,ai_cur_ref_counts) = usize ai_cur_ref_counts
-			= (s,{ ai & ai_cur_ref_counts = ai_cur_ref_counts})
-
-	
-	unify_with_default :: !Int !*RefCounts !RefCounts -> *RefCounts
-	unify_with_default 0 accu env
-		= accu
-	unify_with_default i accu env
-		#! i1			= dec i
-		   rca			= accu.[i1]
-		   rce			= env.[i1]
-		   accu			= { accu & [i1] = unify_counts rce rca }
-		= unify_with_default i1 accu env
-	where
-		unify_counts 0 x = x
-		unify_counts 1 x = if (x==0) 1 x
-		unify_counts 2 x = 2
-
-	combine_with_default 0 accu env
-		= accu
-	combine_with_default i accu env
-		#! i1			= dec i
-		   rca			= accu.[i1]
-		   rce			= env.[i1]
-		   accu			= { accu & [i1] = unify_counts rca rce }
-		= combine_with_default i1 accu env
-	where
-		unify_counts 0 x = x
-		unify_counts 1 x = if (x==2) 2 (inc x)
-		unify_counts 2 x = 2
-
-	unify_pattern_accu_with_env 0 accu env
-		= env
-	unify_pattern_accu_with_env i accu env
-		#! i1			= dec i
-		   rca			= accu.[i1]
-		   rce			= env.[i1]
-		   env			= { env & [i1] = unify_counts rca rce }
-		= unify_pattern_accu_with_env i1 accu env
-	where
-		unify_counts 0 x = x
-		unify_counts 1 x = if (x==2) 2 (inc x)
-		unify_counts 2 x = 2
-
-	unify_pattern_accu_with_pat :: !Int !*RefCounts !*RefCounts -> (!*RefCounts,!*RefCounts)
-	unify_pattern_accu_with_pat 0 accu pat
-		= (accu,pat)
-	unify_pattern_accu_with_pat i accu pat
-		#! i1			= dec i
-		   rca			= accu.[i1]
-		   rcp			= pat.[i1]
-		   accu			= { accu & [i1] = unify_counts rcp rca }
-		   pat			= { pat & [i1] = 0 }
-		= unify_pattern_accu_with_pat i1 accu pat
-	where
-		unify_counts 0 x = x
-		unify_counts 1 x = if (x==0) 1 x
-		unify_counts 2 x = 2
-
-/* old WRONG version...
-independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
-// reference counting happens independently for each pattern expression
-	#! s							= size ai_cur_ref_counts
-	   zero_array					= createArray s 0
-	   (_, cc, r_unsafe_bits ,ai)	= foldSt (independent_consumer_requirements common_defs) exprs (zero_array, CPassive, [], ai)
-	= (cc, reverse r_unsafe_bits, ai)
-where	
-	independent_consumer_requirements common_defs expr (zero_array, cc, unsafe_bits_accu, ai=:{ai_cur_ref_counts})
-		#! s							= size ai_cur_ref_counts
-		   ai							= { ai & ai_cur_ref_counts=zero_array }
-		   (cce, is_unsafe_case, ai)	= consumerRequirements expr common_defs ai
-		   (unused, unified_ref_counts)	= unify_ref_count_arrays s ai_cur_ref_counts ai.ai_cur_ref_counts
-		   ai							= { ai & ai_cur_ref_counts=unified_ref_counts }
-		= ({ unused & [i]=0 \\ i<-[0..s-1]}, combineClasses cce cc, [is_unsafe_case:unsafe_bits_accu], ai)
-	unify_ref_count_arrays 0 src1 src2_dest
-		= (src1, src2_dest)
-	unify_ref_count_arrays i src1 src2_dest
-		#! i1			= dec i
-		   rc1			= src1.[i1]
-		   rc2			= src2_dest.[i1]
-		   src2_dest	= { src2_dest & [i1] = unify_ref_counts rc1 rc2 }
-		= unify_ref_count_arrays i1 src1 src2_dest
-
-	// unify_ref_counts outer_ref_count ref_count_in_pattern
-	unify_ref_counts 0 x = if (x==2) 2 0
-	unify_ref_counts 1 x = if (x==0) 1 2
-	unify_ref_counts 2 _ = 2
-*/
 instance consumerRequirements DynamicExpr where
 	consumerRequirements {dyn_expr} common_defs ai
 		= consumerRequirements dyn_expr common_defs ai
