@@ -30,7 +30,6 @@ supercompile ::
     ,   !.File                  // Written log file
     )
 
-//supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0 = error "supercompile.supercompile: blocked for testing"
 supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0
   #  logfile = stderr
      // First of all, derive a representation for symbols in the program
