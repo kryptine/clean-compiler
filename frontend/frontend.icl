@@ -135,11 +135,11 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
 
 	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin) = 
-		case SupportGenerics of
-		True -> convertGenerics 
+		SwitchGenerics
+			(convertGenerics 
 					components main_dcl_module_n ti_common_defs fun_defs td_infos 
-					heaps hash_table predef_symbols dcl_mods optional_dcl_icl_conversions error_admin
-		False -> (components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin)	
+					heaps hash_table predef_symbols dcl_mods optional_dcl_icl_conversions error_admin)
+			(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin)	
 
 	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
 		with 
