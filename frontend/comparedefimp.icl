@@ -367,8 +367,8 @@ compareDefImp :: !Int !DclModule !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*Erro
 compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=No} n_exported_global_functions icl_module macro_defs heaps error_admin
 	= (icl_module, macro_defs,heaps, error_admin)
 compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=Yes macro_conversion_table} n_exported_global_functions icl_module macro_defs heaps error_admin
-//	| print_function_body_array icl_module.icl_functions
-//		&& print_function_body_array macro_defs.[main_dcl_module_n]
+//	| Trace_array icl_module.icl_functions
+//		&& Trace_array macro_defs.[main_dcl_module_n]
 
 	# {dcl_functions,dcl_macros,dcl_common} = main_dcl_module
 	  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs}}
@@ -1202,15 +1202,13 @@ instance <<< Priority
 		(<<<) file (Prio LeftAssoc i) = file <<< "Prio LeftAssoc " <<< i
 		(<<<) file (Prio RightAssoc i) = file <<< "Prio RightAssoc " <<< i
 		(<<<) file (Prio NoAssoc i) = file <<< "Prio NoAssoc " <<< i
-*/
 
-/*
-print_function_body_array function_bodies
-	= print_function_bodies 0
+Trace_array a
+	= trace_array 0
 	where
-		print_function_bodies i
-			| i<size function_bodies
-				= Trace_tn i && Trace_tn function_bodies.[i] && print_function_bodies (i+1)
+		trace_array i
+			| i<size a
+				= Trace_tn i && Trace_tn a.[i] && trace_array (i+1)
 				= True;
 
 Trace_tn d

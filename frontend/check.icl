@@ -792,7 +792,7 @@ ident_for_errors_from_fun_symb_and_fun_kind fun_symb _
 checkFunction :: !FunDef !Index !FunctionOrMacroIndex !Level !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 													  -> (!FunDef,!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState);
 checkFunction fun_def=:{fun_symb,fun_pos,fun_body,fun_type,fun_kind} mod_index fun_index def_level local_functions_index_offset
-			fun_defs e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps} cs=:{cs_error}
+			fun_defs e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps} cs=:{cs_error}			
 	# function_ident_for_errors = ident_for_errors_from_fun_symb_and_fun_kind fun_symb fun_kind
 	# cs = {cs & cs_error = pushErrorAdmin (newPosition function_ident_for_errors fun_pos) cs_error}
 
@@ -1705,16 +1705,11 @@ compute_used_module_nrs (mod_index, _, _) (mod_nr_accu, dcl_modules)
 checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set
 		super_components imports_ikh mod_index
 		(expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs=:{cs_symbol_table})
-	# ({dcl_name}, dcl_modules)
-			= dcl_modules![mod_index]
-	  (mod_entry, cs_symbol_table)
-	  		= readPtr dcl_name.id_info cs_symbol_table
-	  cs
-	  		= { cs & cs_symbol_table = cs_symbol_table }
-	  ({ ste_kind = STE_Module mod, ste_index })
-			= mod_entry
-	  cs_symbol_table 
-			= writePtr dcl_name.id_info { mod_entry & ste_kind = STE_ClosedModule } cs.cs_symbol_table
+	# ({dcl_name}, dcl_modules) = dcl_modules![mod_index]
+	  (mod_entry, cs_symbol_table) = readPtr dcl_name.id_info cs_symbol_table
+	  cs = { cs & cs_symbol_table = cs_symbol_table }
+	  ({ ste_kind = STE_Module mod, ste_index }) = mod_entry
+	  cs_symbol_table = writePtr dcl_name.id_info { mod_entry & ste_kind = STE_ClosedModule } cs.cs_symbol_table
 	= checkDclModule dcl_imported_module_numbers super_components.[mod_index] imports_ikh component_nr
   	  				is_on_cycle modules_in_component_set
   	  				mod ste_index expl_imp_infos dcl_modules icl_functions macro_defs heaps
@@ -1746,7 +1741,10 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 	#! first_not_exported_global_function_index = size dcl_mod.dcl_functions
 
 	# n_dcl_instances = dcl_instances.ir_to-dcl_instances.ir_from
-	# local_functions_index_offset = n_dcl_instances;
+	#! dcl_specials = dcl_mod.dcl_specials
+	# n_dcl_specials = dcl_specials.ir_to-dcl_specials.ir_from
+
+	# local_functions_index_offset = n_dcl_instances + n_dcl_specials
 		
 	# dcl_mod = case dcl_mod of
 			dcl_mod=:{dcl_macro_conversions=Yes conversion_table}
@@ -1765,13 +1763,10 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 	# first_macro_index = def_macro_indices.ir_from+local_functions_index_offset
 	# end_macro_indexes = def_macro_indices.ir_to+local_functions_index_offset
 	# def_macro_indices={ir_from=first_macro_index,ir_to=end_macro_indexes}
-
-	# icl_instances_ranges = [dcl_instances,{ir_from=icl_instance_range.ir_from+n_dcl_instances,ir_to=icl_instance_range.ir_to}]
+	# icl_instances_ranges = [dcl_instances,{ir_from=icl_instance_range.ir_from+n_dcl_specials+n_dcl_instances,ir_to=icl_instance_range.ir_to+n_dcl_specials}]
 
 	= (icl_global_functions_ranges,icl_instances_ranges,n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules)
-	
 	where
-
 		add_dummy_specialized_functions MK_Main dcl_mod icl_functions
 			= icl_functions
 		add_dummy_specialized_functions _ {dcl_specials={ir_from,ir_to}} icl_functions
@@ -2053,7 +2048,7 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 	  			  ef_cons_defs = icl_common.com_cons_defs, ef_member_defs = icl_common.com_member_defs, ef_generic_defs = icl_common.com_generic_defs,
 	  			  ef_modules = dcl_modules, ef_macro_defs=macro_defs, ef_is_macro_fun = False }
 
-	  (icl_functions, e_info, heaps, cs) = checkAndPartitionateIclMacros main_dcl_module_n def_macro_indices local_functions_index_offset icl_functions e_info heaps cs
+	# (icl_functions, e_info, heaps, cs) = checkAndPartitionateIclMacros main_dcl_module_n def_macro_indices local_functions_index_offset icl_functions e_info heaps cs
 	  (icl_functions, e_info, heaps, cs) = checkGlobalFunctionsInRanges icl_global_functions_ranges main_dcl_module_n local_functions_index_offset icl_functions e_info heaps cs
 
 	  cs = check_start_rule mod_type mod_name icl_global_functions_ranges cs
@@ -2079,10 +2074,9 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 
 		# class_instances = icl_common.com_instance_defs
 
-		  (new_nr_of_functions, dcl_modules, icl_functions, var_heap, th_vars, expr_heap)
+		  (icl_specials,dcl_modules, icl_functions, var_heap, th_vars, expr_heap)
 				= collect_specialized_functions_in_dcl_module mod_type nr_of_functions main_dcl_module_n dcl_modules icl_functions hp_var_heap th_vars hp_expression_heap
 		  
-		  icl_specials	= {ir_from = nr_of_functions,ir_to = new_nr_of_functions}
 		  icl_functions = copy_instance_types instance_types icl_functions
 
 		  (dcl_modules, class_instances, icl_functions, cs_predef_symbols)
@@ -2160,29 +2154,27 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 			= (modules, macro_and_fun_defs, macro_defs, heaps, cs)
 			
 		collect_specialized_functions_in_dcl_module :: ModuleKind !Index !Int !*{# DclModule} !*{# FunDef} !*VarHeap !*TypeVarHeap !*ExpressionHeap
-																  -> (!Index, !*{# DclModule},!*{# FunDef},!*VarHeap,!*TypeVarHeap,!*ExpressionHeap)
+															  -> (!IndexRange,!*{# DclModule},!*{# FunDef},!*VarHeap,!*TypeVarHeap,!*ExpressionHeap)
  		collect_specialized_functions_in_dcl_module MK_Main first_free_index main_dcl_module_n modules icl_functions var_heap type_var_heap expr_heap
-			= (first_free_index, modules, icl_functions, var_heap, type_var_heap, expr_heap)
+			= ({ir_from=first_free_index,ir_to=first_free_index},modules, icl_functions, var_heap, type_var_heap, expr_heap)
  		collect_specialized_functions_in_dcl_module _ first_free_index main_dcl_module_n modules icl_functions var_heap type_var_heap expr_heap
 			# (dcl_mod, modules) = modules![main_dcl_module_n]
-			# {dcl_specials,dcl_functions,dcl_common} = dcl_mod
-			# (icl_functions, last_index, (var_heap, type_var_heap, expr_heap))
-					= collect_specialized_functions dcl_specials.ir_from dcl_specials.ir_to dcl_functions
-							(icl_functions, first_free_index, (var_heap, type_var_heap, expr_heap))
-			= (last_index, modules, icl_functions, var_heap, type_var_heap, expr_heap)
+			# {dcl_specials=dcl_specials=:{ir_from,ir_to},dcl_functions,dcl_common} = dcl_mod
+			# (icl_functions, (var_heap, type_var_heap, expr_heap))
+					= collect_specialized_functions ir_from ir_to dcl_functions (icl_functions, (var_heap, type_var_heap, expr_heap))
+			= (dcl_specials,modules, icl_functions, var_heap, type_var_heap, expr_heap)
 		where
-			collect_specialized_functions spec_index last_index dcl_fun_types (icl_functions, next_fun_index, heaps)
+			collect_specialized_functions spec_index last_index dcl_fun_types (icl_functions, heaps)
 				| spec_index < last_index
 					# {ft_type,ft_specials = SP_FunIndex decl_index} = dcl_fun_types.[spec_index]
 					//  icl_index = conversion_table.[decl_index]
 					  icl_index = decl_index
 					  (icl_fun, icl_functions) = icl_functions![icl_index]
-					  (new_fun_def, heaps) = build_function next_fun_index icl_fun icl_index ft_type heaps
-					  (icl_functions, next_fun_index, heaps)
-					   		= collect_specialized_functions (inc spec_index) last_index dcl_fun_types /*conversion_table*/ (icl_functions, inc next_fun_index, heaps)
+					  (new_fun_def, heaps) = build_function spec_index icl_fun icl_index ft_type heaps
+					  (icl_functions, heaps) = collect_specialized_functions (inc spec_index) last_index dcl_fun_types (icl_functions, heaps)
 					# icl_functions = {icl_functions & [spec_index]=new_fun_def}
-					= (icl_functions, next_fun_index, heaps)
-					= (icl_functions, next_fun_index, heaps)
+					= (icl_functions, heaps)
+					= (icl_functions, heaps)
 		 
 			build_function new_fun_index fun_def=:{fun_symb, fun_arity,  fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
 						(var_heap, type_var_heap, expr_heap)
@@ -2712,6 +2704,7 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 
 	#!nr_of_members = count_members mod_index dcl_common.com_instance_defs dcl_common.com_class_defs modules
 	# nr_of_dcl_functions_and_instances = nr_of_dcl_functions+nr_of_members
+
 
 	  (nr_of_dcl_funs_insts_and_specs, rev_function_list, rev_special_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 	  		= checkDclFunctions mod_index nr_of_dcl_functions_and_instances mod_defs.def_funtypes
