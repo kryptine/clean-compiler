@@ -24,24 +24,21 @@ functions names starting with '->' require a ';' after the type. Solutions:
 	}
 
 ::	* ScanInput
-	=	Input			Input
+	=	Input	Input
 	|	PushedToken		LongToken ScanInput
 
 ::	* Input =
-	{	inp_stream		::	! InputStream
+	{	inp_stream		::	! * InputStream
 	,	inp_filename	::	String
 	,	inp_pos			::	! FilePosition
 	,	inp_tabsize		::	! Int
-	,	inp_charBuffer	::	! Buffer (Char,FilePosition)
-	//,	inp_curToken	::	! [ Char ]
 	}
 
 ::	* InputStream
-	=	InFile			! * File
-	|	InLOC			! [Char]
-	|	OldChar			! Char ! FilePosition ! InputStream
-	|	OldChars		! [Char] ! InputStream
-	|	OldToken		! LongToken	! InputStream
+	=	InFile			* File
+	|	OldLine !Int !{#Char} !InputStream
+//	|	OldChar			! Char ! FilePosition ! InputStream
+//	|	OldChars		! *[Char] ! InputStream
 
 ::	FilePosition =
 	{	fp_line			::	! Int
@@ -220,16 +217,16 @@ class nextToken state :: !Context !*state -> (!Token, !*state)
 
 instance nextToken ScanState
 where
+//	nextToken newContext {ss_input=PushedToken token=:{lt_position,lt_token} rest,ss_tokenBuffer,ss_offsides,ss_useLayout}
 	nextToken newContext scanState=:{ss_input=input=:PushedToken token=:{lt_position,lt_token/*,lt_context*/} rest,ss_tokenBuffer}
 //		| lt_context == newContext || ~ (contextDependent lt_token) || isGeneratedToken lt_token
-//		| True
+
 		=	(	lt_token
-			,	{ scanState
-				& ss_input			= rest
-				, ss_tokenBuffer	= store token ss_tokenBuffer
-				}
+			,	{ scanState & ss_input			= rest , ss_tokenBuffer	= store token ss_tokenBuffer }
+//			,	{ ss_input = rest , ss_tokenBuffer = store token ss_tokenBuffer,ss_useLayout=ss_useLayout, ss_offsides=ss_offsides }
 			)  //-->> ("nextToken: pushed token", lt_token)
-/*		=	nextToken newContext { scanState & ss_input = pushTokensBack input}
+/*
+		=	nextToken newContext { scanState & ss_input = pushTokensBack input}
 	where
 		pushTokensBack input=:(Input _) = input
 		pushTokensBack (PushedToken token input)
@@ -238,12 +235,62 @@ where
 				{ input
 				& inp_stream = OldToken token inp_stream
 				}  //-->> ("pushTokensBack",token)
-*/	nextToken context scanState=:{ss_input=Input inp,ss_tokenBuffer,ss_offsides,ss_useLayout}
+*/
+	nextToken context {ss_input=Input inp,ss_tokenBuffer,ss_offsides,ss_useLayout}
 		# (error, c, inp) 	= SkipWhites inp
-		  (pos, inp)		= inp!inp_pos
-		  scanState			= {scanState & ss_input = Input inp }
 		= case error of
-			Yes string	->	( ErrorToken string
+			Yes string
+				#! (pos, inp)		= inp!inp_pos
+				->	( ErrorToken string
+							,	{	ss_tokenBuffer	= store
+												{	lt_position 	= pos
+												,	lt_token		= ErrorToken string
+											//	,	lt_chars		= []
+											//	,	lt_context		= context
+												}
+												ss_tokenBuffer,
+									ss_input=Input inp,
+									ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout
+								}
+							) -->> ("Error token generated",string)
+			no
+				#	(eof, inp)	= EndOfInput inp
+				#!	(pos, inp)	= inp!inp_pos
+				|	eof && c == NewLineChar
+					#	newToken	= EndOfFileToken
+					->	checkOffside pos newToken
+							{ ss_tokenBuffer	= store
+													{	lt_position 	= pos
+													,	lt_token		= newToken
+												//	,	lt_chars		= []
+												//	,	lt_context		= context
+													}
+													ss_tokenBuffer
+							, ss_input = Input inp,
+							ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout
+							} // -->> ("Token", EndOfFileToken,pos)
+				// otherwise // ~ (eof && c == NewLineChar)
+					#	(token, inp)	= Scan c inp /* {inp & inp_curToken = [c]}*/ context
+				//	#	(chars, inp)	= inp!inp_curToken
+					-> checkOffside pos token
+						{ ss_input 			= Input inp
+						, ss_tokenBuffer	= store
+												{	lt_position 	= pos
+												,	lt_token		= token
+											//	,	lt_chars		= reverse chars
+											//	,	lt_context		= context
+												}
+												ss_tokenBuffer,
+							ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout
+						}	 //-->> (token,pos)
+
+/*
+		#! (pos, inp)		= inp!inp_pos
+		#!  scanState			= {scanState & ss_input = Input inp }
+//		#! scanState = {ss_input=Input inp, ss_offsides=ss_offsides,	ss_useLayout=ss_useLayout, ss_tokenBuffer=ss_tokenBuffer }
+		= case error of
+			Yes string
+				->	( ErrorToken string
 							,	{	scanState
 								&	ss_tokenBuffer	= store
 												{	lt_position 	= pos
@@ -254,38 +301,40 @@ where
 												scanState.ss_tokenBuffer
 								}
 							) -->> ("Error token generated",string)
-			no			->	determineToken c scanState
+			no
+				->	determineToken c pos scanState
 	where
-		determineToken c scanState=:{ss_input=Input inp}
-			#	(eof, inp)	= EndOfInput inp
-				(pos, inp)	= inp!inp_pos
-			|	eof && c == NewLineChar
-				#	newToken	= EndOfFileToken
-				=	checkOffside pos newToken
+			determineToken c pos scanState=:{ss_input=Input inp}
+				#	(eof, inp)	= EndOfInput inp
+	//			#!	(pos, inp)	= inp!inp_pos
+				|	eof && c == NewLineChar
+					#	newToken	= EndOfFileToken
+					=	checkOffside pos newToken
+							{ scanState
+							& ss_tokenBuffer	= store
+													{	lt_position 	= pos
+													,	lt_token		= newToken
+												//	,	lt_chars		= []
+												//	,	lt_context		= context
+													}
+													scanState.ss_tokenBuffer
+							, ss_input = Input inp
+							} // -->> ("Token", EndOfFileToken,pos)
+				// otherwise // ~ (eof && c == NewLineChar)
+					#	(token, inp)	= Scan c inp /* {inp & inp_curToken = [c]}*/ context
+				//	#	(chars, inp)	= inp!inp_curToken
+					= checkOffside pos token
 						{ scanState
-						& ss_tokenBuffer	= store
+						& ss_input 			= Input inp
+						, ss_tokenBuffer	= store
 												{	lt_position 	= pos
-												,	lt_token		= newToken
-											//	,	lt_chars		= []
+												,	lt_token		= token
+											//	,	lt_chars		= reverse chars
 											//	,	lt_context		= context
 												}
-												scanState.ss_tokenBuffer
-						, ss_input = Input inp
-						} // -->> ("Token", EndOfFileToken,pos)
-			// otherwise // ~ (eof && c == NewLineChar)
-				#	(token, inp)	= Scan c inp /* {inp & inp_curToken = [c]}*/ context
-			//	#	(chars, inp)	= inp!inp_curToken
-				= checkOffside pos token
-					{ scanState
-					& ss_input 			= Input inp
-					, ss_tokenBuffer	= store
-											{	lt_position 	= pos
-											,	lt_token		= token
-										//	,	lt_chars		= reverse chars
-										//	,	lt_context		= context
-											}
-											ss_tokenBuffer
-					}	 //-->> (token,pos)
+												ss_tokenBuffer
+						}	 //-->> (token,pos)
+*/
 	nextToken _ _ = abort "Scanner: Error in nextToken"
 
 class tokenBack state :: !*state -> !*state
@@ -298,8 +347,7 @@ where
 		=	{ scanState
 			& ss_tokenBuffer	= buf
 			, ss_input			= PushedToken tok ss_input
-			
-			} // -->> ("tokenBack", tok, buf)
+		} // -->> ("tokenBack", tok, buf)
 
 class currentToken state :: !*state -> (!Token, !*state)
 
@@ -346,36 +394,77 @@ where
 		  }
 
 SkipWhites :: !Input -> (!Optional String, !Char, !Input)
+SkipWhites {inp_stream=OldLine i line stream,inp_pos={fp_line,fp_col},inp_tabsize,inp_filename}
+	| i<size line
+		= skip_whites_in_line i fp_col fp_line line inp_tabsize stream inp_filename
 SkipWhites input
 	# (eof, c, input)		= ReadChar input
 	| eof					= (No, NewLineChar, input) // -->> "EOF in SkipWhites"
 	| IsWhiteSpace c		= SkipWhites input
 							= TryScanComment c input
 
+skip_whites_in_line :: !Int !Int !Int !{#Char} !Int !*InputStream !String -> *(!Optional String,!Char,!*Input);
+skip_whites_in_line i fp_col fp_line line tabsize stream inp_filename
+	| i<size line
+		# c=line.[i]
+		| c==' ' || c == '\f' || c == '\v'
+			= skip_whites_in_line (i+1) (fp_col+1) fp_line line tabsize stream inp_filename
+		| c=='\t'
+			= skip_whites_in_line (i+1) (tabsize * (fp_col / tabsize + 1)) fp_line line tabsize stream inp_filename
+		| c==LFChar || c==CRChar
+			# pos = {fp_line = fp_line + 1, fp_col = 0}
+//			#	(c,stream)	= correctNewline_OldLine c i tabsize line stream
+			=	SkipWhites  {
+						inp_filename=inp_filename,inp_tabsize=tabsize,
+						inp_stream = stream
+					,	inp_pos	= pos
+					}
+			#	pos = {fp_line=fp_line,fp_col = fp_col + 1}
+			=	TryScanComment c {
+						inp_filename=inp_filename,inp_tabsize=tabsize,
+						inp_stream = OldLine (i+1) line stream
+					,	inp_pos	= pos
+					}
+	#	pos = {fp_line=fp_line, fp_col = fp_col}
+	= SkipWhites {
+				inp_filename=inp_filename,inp_tabsize=tabsize,
+				inp_stream = stream
+			,	inp_pos	= pos
+			}
+
 TryScanComment :: !Char !Input -> (!Optional String, !Char, !Input)
 TryScanComment c1=:'/' input
-	#! pos = input.inp_pos // MW++
-	# (eof,c2, input)		= ReadChar input
+//	#! pos = input.inp_pos // MW++
+	# (eof,c2, input)		= ReadNormalChar input
 	| eof					= (No, c1, input)
 	= case c2 of
 		'/' -> SkipWhites (SkipToEndOfLine input)
 		'*' -> case ScanComment input of
 				(No,input)	-> SkipWhites input
 				(er,input)	-> (er, c1, input)
+/*
 // MW..
 		NewLineChar
 			# input = charBack input
 			-> (No, c1, { input & inp_pos = pos })
 // ..MW
+*/
 		_   -> (No, c1, charBack input)
 			
 TryScanComment c input
 	= (No, c, input)
 
 ScanComment	:: !Input -> (!Optional String, !Input)
+ScanComment {inp_stream=OldLine i line stream,inp_pos={fp_line,fp_col},inp_tabsize,inp_filename}
+	| i<size line
+		= scan_comment_in_line i fp_col fp_line line inp_tabsize stream inp_filename
 ScanComment input
 	# (eof1, c1, input)	= ReadChar input
 	| eof1				= (Yes "end of file encountered inside comment", input)
+		= ScanComment2 c1 input;
+
+ScanComment2	:: !Char !Input -> (!Optional String, !Input)
+ScanComment2 c1 input
 	| c1 == '/'
 		# (eof2, c2, input)	= ReadChar input
 		| eof2				= (Yes "end of file encountered inside comment", input)
@@ -386,27 +475,58 @@ ScanComment input
 											error		-> error
 								_	->	ScanComment input
 	| c1 == '*'
-		# (eof2, c2, input)	= ReadChar input
-		| eof2				= (Yes "end of file encountered inside comment", input)
+		# (eol2, c2, input)	= ReadNormalChar input
+		| eol2	
+			# (eof2, c2, input)	= ReadChar input
+			| eof2
+			= (Yes "end of file encountered inside comment", input)
+			= ScanComment input
 		| c2 == '/'			= (No, input)
-		| c2 == '*'			= ScanComment (charBack input)
+		| c2 == '*'
+//					= ScanComment (charBack input)
+					= ScanComment2 c2 input
 							= ScanComment input
 	| otherwise				= ScanComment input
 
+scan_comment_in_line :: !Int !Int !Int !{#Char} !Int !*InputStream !String -> (!Optional String, !Input)
+scan_comment_in_line i fp_col fp_line line tabsize stream inp_filename
+	| i<size line
+		# c=line.[i]
+		| c=='\t'
+			= scan_comment_in_line (i+1) (tabsize * (fp_col / tabsize + 1)) fp_line line tabsize stream inp_filename
+		| c==LFChar || c==CRChar
+			# pos = {fp_line = fp_line + 1, fp_col = 0}
+//			#	(c,stream)	= correctNewline_OldLine c i tabsize line stream
+			=	ScanComment {
+						inp_filename=inp_filename,inp_tabsize=tabsize,
+						inp_stream = stream
+					,	inp_pos	= pos
+					}
+		| c=='/' || c=='*'
+			= ScanComment2 c {
+								inp_filename=inp_filename,inp_tabsize=tabsize,
+								inp_stream = OldLine (i+1) line stream
+							,	inp_pos	= {fp_line=fp_line, fp_col = fp_col+1}
+							}
+			= scan_comment_in_line (i+1) (fp_col+1) fp_line line tabsize stream inp_filename
+	= ScanComment {
+				inp_filename=inp_filename,inp_tabsize=tabsize,
+				inp_stream = stream
+			,	inp_pos	= {fp_line=fp_line, fp_col = fp_col}
+			}
+
 SkipToEndOfLine	:: !Input -> !Input
+SkipToEndOfLine input=:{inp_stream=OldLine i line stream,inp_pos={fp_line,fp_col}}
+	| i<size line
+		= {input & inp_stream=stream,inp_pos={fp_line=fp_line+1,fp_col=0}}
 SkipToEndOfLine input
 	# (eof, c, input)	= ReadChar input
 	| eof				= input
 	| c==NewLineChar	= input
 			= SkipToEndOfLine input
-/*
-SkipToChar :: ! Char ! Input -> Input
-SkipToChar c input
-	# (eof, c1, input)		= ReadChar input
-	| eof || c1 == c		= input
-							= SkipToChar c input
-*/
+
 Scan :: !Char !Input !Context -> (!Token, !Input)
+
 Scan '(' input co			= (OpenToken, input)
 Scan ')' input co			= (CloseToken, input)
 Scan '{' input CodeContext	= ScanCodeBlock input
@@ -415,7 +535,7 @@ Scan '}' input co			= (CurlyCloseToken, input)
 Scan '[' input co			= (SquareOpenToken, input)
 Scan ']' input co			= (SquareCloseToken, input)
 Scan c0=:'|' input co
-	# (eof, c1, input)		= ReadChar input
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (BarToken, input)
 	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
 							= (BarToken, charBack input)
@@ -426,7 +546,7 @@ Scan c0=:'#' input co
 	# (strict, input)		= determineStrictness input
 	| strict
 		= (SeqLetToken strict, input)
-	# (eof,c1, input)		= ReadChar input
+	# (eof,c1, input)		= ReadNormalChar input
 	| eof
 		= (SeqLetToken False, input)
 	| isSpecialChar c1
@@ -435,7 +555,7 @@ Scan c0=:'#' input co
 		= (SeqLetToken strict, charBack input)
 Scan '*' input TypeContext	= (AsteriskToken, input)
 Scan c0=:'&' input co
-	# (eof, c1, input)		= ReadChar input
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (AndToken, input)
 	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
 							= (AndToken, charBack input)
@@ -443,10 +563,10 @@ Scan c0=:'.' input co
 	= case co of
 		TypeContext
 						-> (DotToken, input)
-		_	# (eof, c1, input) = ReadChar input
+		_	# (eof, c1, input) = ReadNormalChar input
 			| eof		-> (DotToken, input)
 			| c1 == '.'
-				# (eof, c2, input) = ReadChar input
+				# (eof, c2, input) = ReadNormalChar input
 				| eof		-> (DotDotToken, input)
 				| isSpecialChar c2
 						-> ScanOperator 2 input [c2, c1, c0] co
@@ -456,78 +576,95 @@ Scan c0=:'.' input co
 						-> (DotToken, charBack input)
 Scan '!' input TypeContext	= (ExclamationToken, input)
 Scan '\\' input co
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (BackSlashToken, input)
 	| c == '\\'				= (DoubleBackSlashToken, input)
 							= (BackSlashToken, charBack input)
 Scan c0=:'_' input co
-	# (eof, c1, input)		= ReadChar input
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (WildCardToken, input)
-	| IsIdentChar c1	co	= ScanIdent 1 input [c1, c0] co
+	| IsIdentChar c1	co
+//		= ScanIdent 1 input [c1, c0] co
+		= ScanIdentFast 2 input co
 //	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
 							= (WildCardToken, charBack input)
 Scan c0=:'<' input TypeContext
-	# (eof, c1, input)		= ReadChar input
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (ErrorToken "< just before end of file in TypeContext", input)
 	| c1 == '='				= (LessThanOrEqualToken, input)
 							=  ScanOperator 0 (charBack input) [c0] TypeContext
 Scan c0=:'<' input co
-	# (eof, c1, input)		= ReadChar input
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof 					= (IdentToken "<", input)
 	| c1 <> '-'				= ScanOperator 0 (charBack input) [c0] co
-	# (eof, c2, input)		= ReadChar input
+	# (eof, c2, input)		= ReadNormalChar input
 	| eof					= (LeftArrowToken, input)
 	| c2 == ':'	
-		# (eof, c3, input)		= ReadChar input
+		# (eof, c3, input)		= ReadNormalChar input
 		| eof					= (LeftArrowColonToken, input)
 		| isSpecialChar c3		= ScanOperator 3 input [c3, c2, c1, c0] co
 								= (LeftArrowColonToken, charBack input)
 	| isSpecialChar c2		= ScanOperator 2 input [c2, c1, c0] co
 							= (LeftArrowToken, charBack input)
 Scan c0=:'-' input co
-	# (eof, c1, input)		= ReadChar input
+	# (previous_char,input) = GetPreviousChar input;
+
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (IdentToken "-", input)
-	# new					= newExp input.inp_charBuffer
-	| IsDigit c1 && new		= ScanNumeral 1 input [c1,c0]
+//	# new					= newExp input.inp_charBuffer
+//	| IsDigit c1 && new		= ScanNumeral 1 input [c1,c0]
+
+	| IsDigit c1 && new_exp_char previous_char
+		= ScanNumeral 1 input [c1,c0]
+
 	| c1 <> '>'				= ScanOperator 0 (charBack input) [c0] co
 	| co == TypeContext		= (ArrowToken, input)	// -> is a reserved symbol in a type context
 							// Can cause an error when token (like ->.) is read in wrong context
-	# (eof, c2, input)		= ReadChar input		
+	# (eof, c2, input)		= ReadNormalChar input		
 	| eof					= (ArrowToken, input)
 	| isSpecialChar c2		= ScanOperator 2 input [c2, c1, c0] co
 							= (ArrowToken, charBack input)
 Scan c0=:'+' input co
-	# (eof, c1, input)		= ReadChar input
+	# (previous_char,input) = GetPreviousChar input;
+
+	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (IdentToken "+", input)
-	# new					= newExp input.inp_charBuffer
-	| IsDigit c1 && new		= ScanNumeral 1 input [c1,c0]
+//	# new					= newExp input.inp_charBuffer
+//	| IsDigit c1 && new		= ScanNumeral 1 input [c1,c0]
+
+	| IsDigit c1 && new_exp_char previous_char
+		= ScanNumeral 1 input [c1,c0]
+
 							= ScanOperator 0 (charBack input) [c0] co
 Scan c0=:'=' input co
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (EqualToken, input)
 	| c == ':'				= (DefinesColonToken, input)
 	| c == '>'				= (DoubleArrowToken, input)
 	| isSpecialChar c		= ScanOperator 1 input [c, c0] co
 							= (EqualToken, charBack input)
 Scan c0=:':' input co
-	# (eof,c1, input)		= ReadChar input
+	# (eof,c1, input)		= ReadNormalChar input
 	| eof					= (ColonToken, input)
 	| c1 == ':'				= (DoubleColonToken, input)
 	| c1 <> '='
 		| isSpecialChar c1	= ScanOperator 1 input [c1, c0] co
 							= (ColonToken, charBack input)
-	# (eof, c2, input)		= ReadChar input
+	# (eof, c2, input)		= ReadNormalChar input
 	| eof					= ScanOperator 1 input [c1, c0] co
 	| c2 == '='				= (ColonDefinesToken, input)
 							= ScanOperator 1 (charBack input) [c1, c0] co
 Scan c0=:'\'' input co		= ScanChar input [c0]
 Scan c0=:'\"' input co		= ScanString 0 input [c0]
+
 Scan c    input co
 	| IsDigit c				= ScanNumeral 0 input [c]
-	| IsIdentChar c	co		= ScanIdent 0 input [c] co
+	| IsIdentChar c	co	
+		= ScanIdentFast 1 input co
+//		= ScanIdent 0 input [c] co
 	| isSpecialChar c		= ScanOperator 0 input [c] co
 							= (ErrorToken ScanErrIllegal, input)
-
+/*
 newExp :: !(Buffer (Char,FilePosition)) -> Bool
 newExp buffer
 	# (c, _)	= case buffer of
@@ -535,23 +672,36 @@ newExp buffer
 					_				-> (' ',{fp_line=0,fp_col=0})
 	= new_exp_char c
 where
-	new_exp_char ',' = True
-	new_exp_char '[' = True
-	new_exp_char '(' = True
-	new_exp_char '/' = True // to handle end of comment symbol: */
-	new_exp_char c	 = isSpace c
+*/
+new_exp_char ',' = True
+new_exp_char '[' = True
+new_exp_char '(' = True
+new_exp_char '/' = True // to handle end of comment symbol: */
+new_exp_char c	 = isSpace c
 
+ScanIdentFast :: !Int !Input !Context -> (!Token, !Input)
+ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
+	# end_i = ScanIdentCharsInString i line co
+		with
+			ScanIdentCharsInString :: !Int !{#Char} !Context -> Int
+			ScanIdentCharsInString i line co
+				| i<size line && IsIdentChar line.[i] co
+					= ScanIdentCharsInString (i+1) line co
+					= i
+	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+	= CheckReserved co (line % (i-n,end_i-1)) input
+/*
 ScanIdent :: !Int !Input ![Char] !Context -> (!Token, !Input)
 ScanIdent n input token co
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= CheckReserved co (revCharListToString n token) input
 	| IsIdentChar c co		= ScanIdent (n + 1) input [c:token] co
 							= CheckReserved co (revCharListToString n token) (charBack input)
-
-
+*/
 ScanOperator :: !Int !Input ![Char] !Context -> (!Token, !Input)
 ScanOperator n input token co
-	#  (eof, c, input)		= ReadChar input
+	#  (eof, c, input)		= ReadNormalChar input
 	| eof					= (IdentToken (revCharListToString n token), input)
 	| isSpecialChar c		= ScanOperator (n + 1) input [c:token] co
 							= CheckReserved co (revCharListToString n token) (charBack input)
@@ -569,7 +719,6 @@ CheckGeneralContext s input
 	"definition"  		-> (DefModuleToken	, input)
 	"implementation"	-> (ImpModuleToken	, input)
 	"system"			-> (SysModuleToken	, input)
-	"import"     		-> (ImportToken		, input)
 	"from" 				-> (FromToken		, input)
 	"in"  	    		-> (InToken			, input)
 	s					-> CheckEveryContext s input
@@ -597,7 +746,8 @@ CheckEveryContext s input
 				->	case error of
 						Yes err -> (ErrorToken err						, input)  //-->> ("Error token generated: "+err)
 						No		-> (PriorityToken (Prio NoAssoc n)		, input)
-	s			->	(IdentToken s		, input)
+	"import" -> (ImportToken,input)
+   	s			->	(IdentToken s		, input)
 
 CheckTypeContext :: !String !Input -> (!Token, !Input)
 CheckTypeContext s input
@@ -623,7 +773,6 @@ CheckFunctContext s input
 	"case"		->	(CaseToken			, input)
 	"of"		->	(OfToken			, input)
 	"system"	->	(SysModuleToken		, input)
-	"import"	->	(ImportToken		, input)
 	"from"		->	(FromToken			, input)
 	"let" 	    #	(strict, input) = determineStrictness input
 				->	(LetToken strict, input)
@@ -650,7 +799,7 @@ where defaultPrio = 0
 
 determineStrictness :: !Input -> (!Bool, !Input)
 determineStrictness input
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (False, input)
 	| c == '!'				= (True, input)
 							= (False, charBack input)
@@ -686,15 +835,14 @@ stripNewline string
 				-> string%(0,size-3)
 				-> string%(0,size-2)
 			-> string
-		
 
 ScanNumeral	:: !Int !Input [Char] -> (!Token, !Input)
 ScanNumeral n input chars=:['0':r]
 	| isEmpty r || r == ['+']
-		# (eof, c, input)		= ReadChar input
+		# (eof, c, input)		= ReadNormalChar input
 		| eof					= (IntToken (revCharListToString n chars), input)
 		| c == 'x'
-			# (eof, c1, input)	= ReadChar input
+			# (eof, c1, input)	= ReadNormalChar input
 			| eof				= (IntToken "0", charBack input)
 			| isHexDigit c1		= ScanHexNumeral (hexDigitToInt c1) input
 								= (IntToken "0", charBack (charBack input))
@@ -702,10 +850,10 @@ ScanNumeral n input chars=:['0':r]
 		| c == '.'				= TestFraction n input chars
 								= (IntToken "0", charBack input)
 	| r == ['-']
-		# (eof, c, input)		= ReadChar input
+		# (eof, c, input)		= ReadNormalChar input
 		| eof					= (IntToken (revCharListToString n chars), input)
 		| c == 'x'
-			# (eof, c1, input)	= ReadChar input
+			# (eof, c1, input)	= ReadNormalChar input
 			| eof				= (IntToken "0", charBack input)
 			| isHexDigit c1		= ScanHexNumeral (~ (hexDigitToInt c1)) input
 								= (IntToken "0", charBack (charBack input))
@@ -713,7 +861,7 @@ ScanNumeral n input chars=:['0':r]
 		| c == '.'				= TestFraction n input chars
 								= (IntToken "0", charBack input)
 ScanNumeral n input chars
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (IntToken (revCharListToString n chars), input)
 	| IsDigit c				= ScanNumeral (n + 1) input [c:chars]
 	| c == 'E'				= ScanExponentSign (n + 1) input [c:chars]
@@ -722,14 +870,14 @@ ScanNumeral n input chars
 
 TestFraction :: !Int !Input ![Char] -> (!Token, !Input)
 TestFraction n input chars
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (ErrorToken ("Incorrect Real at end of file: "+(revCharListToString (n+1) ['.':chars])), input)
 	| IsDigit c				= ScanFraction (n + 2) input [c,'.':chars]
 			 				= (IntToken (revCharListToString n chars), charBack (charBack input))
 
 ScanFraction :: !Int !Input ![Char] -> (!Token, !Input)
 ScanFraction n input chars
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (RealToken (revCharListToString n chars), input)
 	| c == 'E'				= case chars of
 								[c:_] | IsDigit c	-> ScanExponentSign (n + 1) input [c:chars]
@@ -741,7 +889,7 @@ ScanFraction n input chars
 
 ScanExponentSign :: !Int !Input ![Char] -> (!Token, !Input)
 ScanExponentSign n input chars
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (RealToken (revCharListToString n chars), input)
 	| c == '+'				= ScanExponent n input chars
 	| c == '-' || IsDigit c	= ScanExponent (n+1) input [c:chars]
@@ -749,7 +897,7 @@ ScanExponentSign n input chars
 
 ScanExponent :: !Int !Input ![Char] -> (!Token, !Input)
 ScanExponent n input chars
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (RealToken (revCharListToString n chars), input)
 	| IsDigit c				= ScanExponent (n + 1) input [c:chars]
 							= case chars of
@@ -758,21 +906,21 @@ ScanExponent n input chars
 
 ScanHexNumeral	:: !Int !Input -> (!Token, !Input)
 ScanHexNumeral n input
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (IntToken (toString n), input)
 	| isHexDigit c			= ScanHexNumeral (n*16+hexDigitToInt c) input
 							= (IntToken (toString n), charBack input)
 
 ScanOctNumeral	:: !Int !Input -> (!Token, !Input)
 ScanOctNumeral n input
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (IntToken (toString n), input)
 	| isOctDigit c			= ScanOctNumeral (n*8+digitToInt c) input
 							= (IntToken (toString n), charBack input)
 
 ScanChar :: !Input ![Char] -> (!Token, !Input)
 ScanChar input chars
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (ErrorToken "End of file inside Char denotation", input)
 	| '\\' <> c				= ScanEndOfChar 1 [c: chars] input
 	# (chars, n, input)		= ScanBSChar 0 chars input
@@ -780,7 +928,7 @@ ScanChar input chars
 
 ScanBSChar :: !Int ![Char] !Input -> (![Char], !Int, !Input)
 ScanBSChar n chars input
-	# (eof, c, input)		= ReadChar input
+	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (chars, n, input)
 	= case c of
 		'n'		->	(['n','\\':chars], n + 2, input)
@@ -808,7 +956,7 @@ where
 	ScanNumChar base valid 0 acc input
 		= (acc, input)
 	ScanNumChar base valid n acc input
-		# (eof, c, input)		= ReadChar input
+		# (eof, c, input)		= ReadNormalChar input
 		| eof					= (acc, input)
 // RWS ...		| valid c				= ScanNumChar base valid (n-1) (base*acc+digitToInt c) input
 		| valid c				= ScanNumChar base valid (n-1) (base*acc+hexDigitToInt c) input
@@ -960,6 +1108,16 @@ IsIdentChar '`'	_					= True
 IsIdentChar '^'	TypeContext			= True
 IsIdentChar  _	_					= False
 
+string_to_list ::!{#Char} -> .[Char]
+string_to_list s = stolacc s (size s - 1) []
+where
+	stolacc :: !String !Int u:[Char] -> u:[Char]
+	stolacc s i acc 
+		| i >= 0
+			#! si=s.[i];
+			= stolacc s (dec i) [si : acc] 
+			= acc
+
 /*
 	Input functions
 */
@@ -968,135 +1126,249 @@ EndOfInput :: !Input -> (!Bool, !Input)
 EndOfInput input=:{inp_stream = InFile file}
 	# (endoffile, file) = fend file
 	= (endoffile, { input & inp_stream = InFile file })
-EndOfInput f=:{inp_stream = InLOC []}	= (True, f)
 EndOfInput input						= (False, input)
 
-ReadChar :: !Input -> (!Bool, !Char, !Input) // Bool indicates end of file, we read always newlines in an empty file
-ReadChar input=:{inp_stream = InFile file, inp_pos, inp_tabsize, inp_charBuffer /*, inp_curToken*/}
+ReadNormalChar :: !*Input -> (!Bool, !Char, !Input)
+ReadNormalChar {inp_stream = OldLine i line stream,inp_pos,inp_tabsize,inp_filename}
+	| i<size line
+		# c=line.[i]
+		| c==LFChar || c==CRChar || c=='\t'
+			=	(	True,	NewLineChar
+				,	{
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream = OldLine i line stream,
+						inp_pos	= inp_pos
+					}
+				)
+			#	pos = {inp_pos & fp_col = inp_pos.fp_col + 1}
+			=	(	False, c
+				,	{
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream = OldLine (i+1) line stream,
+						inp_pos	= pos
+					}
+				)
+		= ReadNormalChar {inp_filename=inp_filename,inp_tabsize=inp_tabsize,inp_pos=inp_pos,inp_stream = stream}
+ReadNormalChar {inp_stream = InFile file, inp_pos, inp_tabsize, inp_filename}
 	#!	(s, file) = freadline file
-		eof = s == ""
-	| eof
+	| size s==0
+		#	c	= NewLineChar
+//			pos	= NextPos c inp_pos inp_tabsize
+		=	(	True
+			,	c
+			,	{
+//					input &
+					inp_tabsize=inp_tabsize,inp_filename=inp_filename,
+					inp_stream = InFile file
+				,	inp_pos	= inp_pos
+				}
+			) 
+		= ReadNormalChar {
+				inp_tabsize=inp_tabsize,inp_filename=inp_filename,inp_pos=inp_pos,
+				inp_stream = OldLine 0 s (InFile file)
+				}
+
+ReadChar :: !*Input -> (!Bool, !Char, !Input) // Bool indicates end of file, we read always newlines in an empty file
+ReadChar {inp_stream = OldLine i line stream,inp_pos,inp_tabsize,inp_filename}
+	| i<size line
+		# c=line.[i]
+		| c==LFChar || c==CRChar || c=='\t'
+			#	pos = NextPos c inp_pos inp_tabsize
+				(c,stream)	= correctNewline_OldLine c i inp_tabsize line stream
+			=	(	False,	c
+				,	{
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream = stream
+					,	inp_pos	= pos
+					}
+				)
+			#	pos = {inp_pos & fp_col = inp_pos.fp_col + 1}
+			=	(	False, c
+				,	{
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream = OldLine (i+1) line stream
+					,	inp_pos	= pos
+					}
+				)
+		= ReadChar {inp_filename=inp_filename,inp_tabsize=inp_tabsize,inp_pos=inp_pos,
+								inp_stream = stream}
+//ReadChar input=:{inp_stream = InFile file, inp_pos, inp_tabsize}
+ReadChar {inp_stream = InFile file, inp_pos, inp_tabsize, inp_filename}
+	#!	(s, file) = freadline file
+	| size s==0
 		#	c	= NewLineChar
 			pos	= NextPos c inp_pos inp_tabsize
-		=	(	eof
+		=	(	True
 			,	c
-			,	{	input
-				&	inp_stream		= InFile file
-				,	inp_pos			= pos
-				,	inp_charBuffer	= store (c,pos) inp_charBuffer
-			//	,	inp_curToken	= [c:inp_curToken]
+			,	{
+//					input &
+					inp_tabsize=inp_tabsize,inp_filename=inp_filename,
+					inp_stream = InFile file
+				,	inp_pos	= pos
 				}
-			) // -->> ("EOF in " + input.inp_filename + " found in ReadChar")
-	// otherwise // s <> ""
-		# chars = fromString s
-		= ReadChar { input & inp_stream = OldChars chars (InFile file) }
-/*	#! (eof, file) = fend file								// old, too slow
-	| eof
-		#	c	= NewLineChar
-			pos	= NextPos c inp_pos inp_tabsize
-		=	(	eof
-			,	c
-			,	{	input
-				&	inp_stream		= InFile file
-				,	inp_pos			= pos
-				,	inp_charBuffer	= store (c,pos) inp_charBuffer
-			//	,	inp_curToken	= [c:inp_curToken]
+			) 
+		= ReadChar {
+				inp_tabsize=inp_tabsize,inp_filename=inp_filename,inp_pos=inp_pos,
+				inp_stream = OldLine 0 s (InFile file)
 				}
-			) // -->> ("EOF in " + input.inp_filename + " found in ReadChar")
-	#! (ok, c, file) = freadc file
-	| ok
+/*
+		// otherwise // s <> ""
+	//		# chars = fromString s
+			# chars = string_to_list s
+			= ReadChar {
+	//				input &
+					inp_tabsize=inp_tabsize,inp_filename=inp_filename,inp_pos=inp_pos,
+					inp_stream = OldChars chars (InFile file)
+					}
+*/
+
+	/*
+			#! (eof, file) = fend file								// old, too slow
+			| eof
+				#	c	= NewLineChar
+					pos	= NextPos c inp_pos inp_tabsize
+				=	(	eof
+					,	c
+					,	{	input
+						&	inp_stream		= InFile file
+						,	inp_pos			= pos
+						}
+					) // -->> ("EOF in " + input.inp_filename + " found in ReadChar")
+			#! (ok, c, file) = freadc file
+			| ok
+				#	pos			= NextPos c inp_pos inp_tabsize
+					(c,input`)	= correctNewline c pos inp_tabsize (InFile file)
+				=	(	False
+					,	c
+					,	{	input
+						&	inp_stream		= input`
+						,	inp_pos			= pos
+						}
+					)
+				= abort "ReadChar failure"
+	*/
+/*
+	ReadChar input=:{inp_stream = InFile file, inp_pos, inp_tabsize, inp_filename}
+			#! (ok, c, file) = freadc file
+			| ok
+				| c==LFChar || c==CRChar || c=='\t'
+					#	pos			= NextPos c inp_pos inp_tabsize
+						(c,input`)	= correctNewline c pos inp_tabsize (InFile file)
+					=	(	False
+						,	c
+						,	{
+		//						input &
+								inp_filename=inp_filename,inp_tabsize=inp_tabsize,						
+								inp_stream		= input`
+							,	inp_pos			= pos
+							}
+						)
+						#	pos = {inp_pos & fp_col = inp_pos.fp_col + 1}
+						=	(	False
+							,	c
+							,	{
+			//						input &
+									inp_filename=inp_filename,inp_tabsize=inp_tabsize,						
+									inp_stream		= InFile file
+								,	inp_pos			= pos
+								}
+							)
+				#	c	= NewLineChar
+					pos	= NextPos c inp_pos inp_tabsize
+				=	(	True
+					,	c
+					,	{
+	//						input &
+							inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+							inp_stream		= InFile file
+						,	inp_pos			= pos
+						}
+					)
+	//ReadChar input =: {inp_stream = OldChars [c] stream, inp_pos, inp_tabsize, /*, inp_curToken*/}
+	ReadChar {inp_stream = OldChars [c] stream, inp_pos, inp_tabsize, inp_filename}
 		#	pos			= NextPos c inp_pos inp_tabsize
-			(c,input`)	= correctNewline c pos inp_tabsize (InFile file)
+			(c,input`)	= correctNewline_OldChars c pos inp_tabsize[] stream
 		=	(	False
 			,	c
-			,	{	input
-				&	inp_stream		= input`
+			,	{
+	//				input &
+					inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+					inp_stream		= input`
 				,	inp_pos			= pos
-				,	inp_charBuffer	= store (c,pos) inp_charBuffer
-			//	,	inp_curToken	= [c:inp_curToken]
 				}
 			)
-		= abort "ReadChar failure" */
-ReadChar input =: {inp_stream = OldChar c pos oldfile, inp_charBuffer /*, inp_curToken*/}
-	=	(	False
-		,	c
-		,	{	input
-			&	inp_stream		= oldfile
-			,	inp_pos			= pos
-			,	inp_charBuffer	= store (c,pos) inp_charBuffer
-		//	,	inp_curToken	= [c:inp_curToken]
-			}
-		)
-ReadChar input =: {inp_stream = OldChars [c:rest] stream, inp_pos, inp_tabsize, inp_charBuffer /*, inp_curToken*/}
-	#	pos			= NextPos c inp_pos inp_tabsize
-		(c,input`)	= correctNewline c pos inp_tabsize (OldChars rest stream)
-	=	(	False
-		,	c
-		,	{	input
-			&	inp_stream		= input`
-			,	inp_pos			= pos
-			,	inp_charBuffer	= store (c,pos) inp_charBuffer
-		//	,	inp_curToken	= [c:inp_curToken]
-			}
-		)
-ReadChar input =: {inp_stream = OldChars [] stream, inp_pos}
-		= ReadChar {input & inp_stream = stream}
-ReadChar input =: {inp_stream = InLOC [c : r], inp_pos, inp_tabsize /*, inp_curToken*/, inp_charBuffer}
-	# pos	= NextPos c inp_pos inp_tabsize
-	=	(	False
-		,	c
-		,	{	input
-			&	inp_stream		= InLOC r
-			,	inp_pos			= pos
-			,	inp_charBuffer	= store (c,pos) inp_charBuffer
-		//	,	inp_curToken	= [c:inp_curToken]
-			}
-		)
-ReadChar input =: {inp_stream = InLOC [], inp_pos, inp_tabsize /*, inp_curToken*/, inp_charBuffer}
-	#	c	= NewLineChar
-		pos	= NextPos c inp_pos inp_tabsize
-	=	(	True
-		,	c
-		,	{	input
-			&	inp_pos			= pos
-			,	inp_charBuffer	= store (c,pos) inp_charBuffer
-		//	,	inp_curToken	= [c:inp_curToken]
-			}
-		)
-		//-->> ("EOF of InLOC found in ReadChar")
-/*
-ReadChar input =: {inp_stream = OldToken {lt_chars,lt_position} stream, inp_charBuffer}
-	#	pos	= lt_position
-		c	= hd lt_chars
-	=	(	False
-		,	c
-		,	{	input
-			&	inp_stream		= OldChars (tl lt_chars) stream
-			,	inp_pos			= pos
-			,	inp_charBuffer	= store (c,pos) inp_charBuffer
-		//	,	inp_curToken	= [c]
-			}
-		)
+	//ReadChar input =: {inp_stream = OldChars [c:rest] stream,inp_pos,inp_tabsize}
+	ReadChar {inp_stream = OldChars [c:rest] stream,inp_pos,inp_tabsize,inp_filename}
+		| c==LFChar || c==CRChar || c=='\t'
+			#	pos			= NextPos c inp_pos inp_tabsize
+				(c,input`)	= correctNewline_OldChars c pos inp_tabsize rest stream
+			=	(	False
+				,	c
+				,	{
+	//					input &
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream		= input`
+					,	inp_pos			= pos
+					}
+				)
+			#	pos = {inp_pos & fp_col = inp_pos.fp_col + 1}
+			=	(	False
+				,	c
+				,	{
+	//					input &
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream		= OldChars rest stream
+					,	inp_pos			= pos
+					}
+				)
+	
+	//	ReadChar input =: {inp_stream = OldChars [] stream, inp_pos}
+	ReadChar {inp_stream = OldChars [] stream, inp_pos,inp_filename,inp_tabsize}
+	//		= ReadChar {input & inp_stream = stream}
+			= ReadChar {inp_filename=inp_filename,inp_tabsize=inp_tabsize,inp_pos=inp_pos,
+									inp_stream = stream}
 */
+
+/*
+	//ReadChar input =: {inp_stream = OldChar c pos oldfile}
+	ReadChar {inp_stream = OldChar c pos oldfile, inp_tabsize,inp_filename}
+		=	(	False
+				,	c
+				,	{
+	//					input &
+						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
+						inp_stream		= oldfile
+					,	inp_pos			= pos
+					}
+				)
+*/
+
 ReadLine :: !Input -> (!String, !Input)
+/*
 ReadLine input=:{inp_stream = OldChars cs oldfile, inp_pos}
 	# input			= {input & inp_stream = oldfile, inp_pos = NextPos CRChar inp_pos 0}
 	| isEmpty cs	= ReadLine input
 	| otherwise		= (toString cs, input)
+*/
+ReadLine input=:{inp_stream = OldLine i line oldfile, inp_pos}
+	# input			= {input & inp_stream = oldfile, inp_pos = NextPos CRChar inp_pos 0}
+	| i<size line
+		| i==0
+			= (line, input)
+			= (line % (i,size line-1),input)
+		= ReadLine input
 ReadLine input=:{inp_stream = InFile infile,inp_pos}
 	# (eof, file) 	= fend infile
 	| eof			= ("", {input & inp_stream = InFile file})
 	# (l, file )	= freadline file
 	= (l,  {input & inp_stream = InFile file, inp_pos = NextPos CRChar inp_pos 0})
-ReadLine input =: {inp_stream = InLOC [a : c], inp_pos, inp_tabsize}
-	| a==NewLineChar= ("\n", {input & inp_stream = InLOC c, inp_pos = inp_pos})
-	# (line, input)	= ReadLine {input & inp_stream = InLOC c, inp_pos = inp_pos}
-	= (toString a + line, input)
-ReadLine input=:{inp_stream = OldChar c p oldfile}
-	# input			= {input & inp_stream = oldfile}
-	| c==NewLineChar= ("\n", input)
-	# (line, input)	= ReadLine input
-	= (toString c + line, input)
+/*
+	ReadLine input=:{inp_stream = OldChar c p oldfile}
+		# input			= {input & inp_stream = oldfile}
+		| c==NewLineChar= ("\n", input)
+		# (line, input)	= ReadLine input
+		= (toString c + line, input)
+*/
 ReadLine input		= ("", input)
 
 NextPos :: !Char !FilePosition !Int -> FilePosition
@@ -1107,30 +1379,63 @@ NextPos c pos=:{fp_line, fp_col} t
 		'\t'	-> {pos & fp_col = t * (fp_col / t + 1)}
 		_		-> {pos & fp_col = fp_col + 1}
 
-correctNewline :: !Char !FilePosition !Int !InputStream -> (!Char, !InputStream)
-correctNewline c pos tab_size (InFile file) 	// Correct newline convention: Mac: CR, Unix: LF, DOS CR LF
+/*
+	correctNewline :: !Char !FilePosition !Int !InputStream -> (!Char, !InputStream)
+	correctNewline c pos tab_size (InFile file) 	// Correct newline convention: Mac: CR, Unix: LF, DOS CR LF
+		=	case c of
+				LFChar	-> (NewLineChar,InFile file)	//-->> "UNIX newline"
+				CRChar 
+					# (ok,c2,file) =  freadc file
+					| ok
+						| c2 == LFChar -> (NewLineChar,InFile file) // -->> "DOS newline corrected"
+						               -> (NewLineChar,OldChar c2 (NextPos c2 pos tab_size) (InFile file))
+						-> (NewLineChar, InFile file)
+				_		-> (c, InFile file)
+	correctNewline c pos tab_size (OldChars [] input)
+		= correctNewline c pos tab_size input
+	correctNewline c pos tab_size (OldChars chars input)
+		=	case c of
+				LFChar	-> (NewLineChar,OldChars chars input)	//-->> "UNIX newline"
+				CRChar
+					# [c2:rest] = chars
+					| c2 == LFChar -> (NewLineChar,OldChars rest input) // -->> "DOS newline corrected"
+					               -> (NewLineChar,OldChars [c2:rest]/*chars*/ input)
+				_		-> (c,OldChars chars input)
+	correctNewline c _ _ input = (c, input)
+	
+	correctNewline_OldChars :: !Char !FilePosition !Int ! *[Char] ! InputStream -> (!Char, !InputStream)
+	correctNewline_OldChars c pos tab_size [] input
+		= correctNewline c pos tab_size input
+	correctNewline_OldChars c pos tab_size chars input
+		=	case c of
+				LFChar
+					-> (NewLineChar,OldChars chars input)	//-->> "UNIX newline"
+				CRChar
+					# [c2:rest] = chars
+					| c2 == LFChar
+						-> (NewLineChar,OldChars rest input) // -->> "DOS newline corrected"
+					    -> (NewLineChar,OldChars [c2:rest]/*chars*/ input)
+				_		-> (c,OldChars chars input)
+*/
+correctNewline_OldLine :: !Char !Int !Int !{#Char} ! InputStream -> (!Char, !InputStream)
+correctNewline_OldLine c i tab_size line input
 	=	case c of
-			LFChar	-> (NewLineChar,InFile file)	//-->> "UNIX newline"
-			CRChar 
-				# (ok,c2,file) =  freadc file
-				| ok
-					| c2 == LFChar -> (NewLineChar,InFile file) // -->> "DOS newline corrected"
-					               -> (NewLineChar,OldChar c2 (NextPos c2 pos tab_size) (InFile file))
-					-> (NewLineChar, InFile file)
-			_		-> (c, InFile file)
-correctNewline c pos tab_size (OldChars [] input)
-	= correctNewline c pos tab_size input
-correctNewline c pos tab_size (OldChars chars input)
-	=	case c of
-			LFChar	-> (NewLineChar,OldChars chars input)	//-->> "UNIX newline"
+			LFChar
+				-> (NewLineChar,OldLine (i+1) line input)	//-->> "UNIX newline"
 			CRChar
-				# [c2:rest] = chars
-				| c2 == LFChar -> (NewLineChar,OldChars rest input) // -->> "DOS newline corrected"
-				               -> (NewLineChar,OldChars chars input)
-			_		-> (c,OldChars chars input)
-correctNewline c _ _ input = (c, input)
+				| i+1<size line && line.[i+1]==LFChar
+					-> (NewLineChar,OldLine (i+2) line input) // -->> "DOS newline corrected"
+				    -> (NewLineChar,OldLine (i+1) line input)
+			_		-> (c,OldLine (i+1) line input)
 
 charBack :: !Input -> Input
+charBack {inp_stream=OldLine i line stream,inp_pos,inp_tabsize,inp_filename}
+	=	{	
+			inp_stream		= OldLine (i-1) line stream,
+			inp_pos = {inp_pos & fp_col = inp_pos.fp_col - 1},
+			inp_tabsize=inp_tabsize,inp_filename=inp_filename
+		}
+/*
 charBack input=:{inp_stream,inp_charBuffer}
 	|	isEmptyBuffer inp_charBuffer
 		=	abort "charBack with empty character buffer"
@@ -1139,6 +1444,15 @@ charBack input=:{inp_stream,inp_charBuffer}
 		&	inp_stream		= OldChar c p inp_stream
 		,	inp_charBuffer	= rest
 		}
+*/
+
+GetPreviousChar :: !Input -> (!Char,!Input)
+GetPreviousChar input=:{inp_stream=OldLine i line stream}
+	| i<=1
+		= (NewLineChar,input)
+		= (line.[i-2],input)
+GetPreviousChar input
+	= (NewLineChar,input)
 
 qw s :== "\"" + s + "\""
 
@@ -1305,7 +1619,7 @@ openScanner file_name searchPaths files
 									 			, inp_filename		= file_name
 									 			, inp_pos			= {fp_line = 1, fp_col = 0}
 												, inp_tabsize		= 4
-												, inp_charBuffer	= Buffer0
+//												, inp_charBuffer	= Buffer0
 											//	, inp_curToken		= []
 												}
 						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
@@ -1336,10 +1650,9 @@ closeScanner {ss_input=Input {inp_stream}} files
 		No			->	files
 where
 	get_file (InFile file)			= Yes file
-	get_file (OldChar _ _ stream)	= get_file stream
-	get_file (OldChars _ stream)	= get_file stream
-	get_file (OldToken _ stream)	= get_file stream
-	get_file (InLOC _ )				= No
+//	get_file (OldChar _ _ stream)	= get_file stream
+//	get_file (OldChars _ stream)	= get_file stream
+	get_file (OldLine _ _ stream)	= get_file stream
 
 NewLineChar	:== '\n'
 LFChar		:== '\xA'
