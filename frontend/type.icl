@@ -230,6 +230,7 @@ tryToOptimizePositionFromString id_name ip
 	prefix_to_readable_name "_c"	= "case"
 	prefix_to_readable_name "_g"	= "guard"
 	prefix_to_readable_name "_f"	= "filter"
+	prefix_to_readable_name "\\"	= "lambda"
 	prefix_to_readable_name prefix
 		| prefix.[0] == 'c'
 			= "comprehension"
