@@ -903,6 +903,25 @@ cContainsNoFreeVars :== False
 cMacroIsCalled 		:== True
 cNoMacroIsCalled 	:== False
 
+class GetSetPatternRhs a
+where
+	get_pattern_rhs :: !a -> Expression
+	set_pattern_rhs :: !a !Expression -> a
+
+instance GetSetPatternRhs AlgebraicPattern
+	where
+		get_pattern_rhs p = p.ap_expr
+		set_pattern_rhs p expr = {p & ap_expr=expr}
+
+instance GetSetPatternRhs BasicPattern
+	where
+		get_pattern_rhs p = p.bp_expr
+		set_pattern_rhs p expr = {p & bp_expr=expr};
+
+instance GetSetPatternRhs DynamicPattern
+	where
+		get_pattern_rhs p = p.dp_rhs
+		set_pattern_rhs p expr = {p & dp_rhs=expr}
 
 mergeCases :: !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
 			-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
@@ -934,33 +953,30 @@ where
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr alg_pattern.ap_expr var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
-							-> (Yes { split_case & case_guards = push_expression_into_guards (
-										\guard_expr -> Case { this_case & case_guards = 
-												AlgebraicPatterns type [ { alg_pattern & ap_expr = guard_expr }] })
-													split_case.case_guards }, var_heap, symbol_heap)
-									
+							# (cees,symbol_heap) = push_expression_into_guards_and_default
+													( \ guard_expr -> { this_case & case_guards = AlgebraicPatterns type [{ alg_pattern & ap_expr = guard_expr }] } )
+														split_case symbol_heap
+							-> (Yes cees, var_heap, symbol_heap)
 						No
 							-> (No, var_heap, symbol_heap) 
 				BasicPatterns type [basic_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr basic_pattern.bp_expr var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
-							-> (Yes { split_case & case_guards = push_expression_into_guards (
-										\guard_expr -> Case { this_case & case_guards = 
-												BasicPatterns type [ { basic_pattern & bp_expr = guard_expr }] })
-													split_case.case_guards }, var_heap, symbol_heap)
-									
+							# (cees,symbol_heap) = push_expression_into_guards_and_default
+													( \ guard_expr -> { this_case & case_guards = BasicPatterns type [ { basic_pattern & bp_expr = guard_expr }] })
+													split_case symbol_heap
+							-> (Yes cees, var_heap, symbol_heap)
 						No
 							-> (No, var_heap, symbol_heap)
 				DynamicPatterns [dynamic_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr dynamic_pattern.dp_rhs var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
-							-> (Yes { split_case & case_guards = push_expression_into_guards (
-										\guard_expr -> Case { this_case & case_guards = 
-												DynamicPatterns [ { dynamic_pattern & dp_rhs = guard_expr }] })
-													split_case.case_guards }, var_heap, symbol_heap)
-									
+							# (cees,symbol_heap) = push_expression_into_guards_and_default
+										( \ guard_expr -> { this_case & case_guards = DynamicPatterns [ { dynamic_pattern & dp_rhs = guard_expr }] })
+										split_case symbol_heap
+							-> (Yes cees, var_heap, symbol_heap)
 						No
 							-> (No, var_heap, symbol_heap)
 				_
@@ -996,12 +1012,40 @@ where
 	set_alias _ var_heap
 		= var_heap
 
-	push_expression_into_guards expr_fun (AlgebraicPatterns type patterns) 
-		= AlgebraicPatterns type (map (\algpattern -> { algpattern & ap_expr = expr_fun algpattern.ap_expr }) patterns)
-	push_expression_into_guards expr_fun (BasicPatterns type patterns) 
-		= BasicPatterns type (map (\baspattern -> { baspattern & bp_expr = expr_fun baspattern.bp_expr }) patterns)
-	push_expression_into_guards expr_fun (DynamicPatterns patterns) 
-		= DynamicPatterns (map (\dynpattern -> { dynpattern & dp_rhs = expr_fun dynpattern.dp_rhs }) patterns)
+	push_expression_into_guards_and_default expr_fun split_case symbol_heap
+		= push_expression_into_guards_and_default split_case symbol_heap
+	where
+		push_expression_into_guards_and_default split_case=:{case_default=No} symbol_heap
+			= push_expression_into_guards split_case symbol_heap
+		push_expression_into_guards_and_default split_case=:{case_default=Yes default_expr} symbol_heap
+			# (new_default_expr,symbol_heap) = new_case default_expr symbol_heap
+			= push_expression_into_guards {split_case & case_default=Yes new_default_expr} symbol_heap
+	
+		push_expression_into_guards split_case=:{case_guards=AlgebraicPatterns type patterns} symbol_heap
+			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
+			= ({split_case & case_guards=AlgebraicPatterns type new_patterns},symbol_heap)
+		push_expression_into_guards split_case=:{case_guards=BasicPatterns type patterns} symbol_heap
+			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
+			= ({split_case & case_guards=BasicPatterns type new_patterns},symbol_heap)
+		push_expression_into_guards split_case=:{case_guards=DynamicPatterns patterns} symbol_heap
+			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
+			= ({split_case & case_guards=DynamicPatterns new_patterns},symbol_heap)
+		
+		push_expression_into_patterns [] symbol_heap
+			= ([],symbol_heap)
+		push_expression_into_patterns [pattern:patterns] symbol_heap
+			# (patterns,symbol_heap) = mapSt f patterns symbol_heap
+				with
+					f algpattern symbol_heap
+						# (case_expr,symbol_heap) = new_case (get_pattern_rhs algpattern) symbol_heap
+						= (set_pattern_rhs algpattern case_expr,symbol_heap)
+			= ([set_pattern_rhs pattern (Case (expr_fun (get_pattern_rhs pattern))):patterns],symbol_heap)
+
+		new_case expr symbol_heap
+			# cees=expr_fun expr
+			# (case_info,symbol_heap) = readPtr cees.case_info_ptr symbol_heap
+			# (new_case_info_ptr,symbol_heap) = newPtr case_info symbol_heap
+			= (Case {cees & case_info_ptr=new_case_info_ptr},symbol_heap)
 
 	replace_variables_in_expression expr var_heap symbol_heap
 		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info = []}
