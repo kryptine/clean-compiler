@@ -1162,7 +1162,29 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 		
 		BuildArgs (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
 
-		new_update_sdef=CreateUpdateFunction (record_arg,first_field_arg,root);
+		new_update_sdef=CreateUpdateFunction (record_arg,first_field_arg,root
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+							,False
+#endif
+						);
+
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+		{
+			ArgP previous_arg,arg;
+			
+			previous_arg=record_arg;
+			for_l (arg,first_field_arg,arg_next){
+				Node field_node;
+				
+				field_node=arg->arg_node;
+				field_node->node_arguments->arg_next=NULL;
+										
+				previous_arg->arg_next=arg;
+				previous_arg=arg;
+			}
+			previous_arg->arg_next=NULL;
+		}
+#endif
 
 		ConvertSymbolToDandNLabel (&name,&codelab,new_update_sdef);
 
