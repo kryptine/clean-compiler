@@ -16,11 +16,12 @@ write_tcl_file yes no :== no;
 Start world
 	# (std_io, world) = stdio world
 	  (_, ms_out, world) = fopen "out" FWriteText world
+	  (symbol_table,world) = init_identifiers newHeap world
 	  (ms_out,world) = accFiles (
 	  		\files -> 
 				(let
 				    (ms_paths, ms_files, ms_error) = converFileToListOfStrings "mainPrefs" files stderr
-					ms = CommandLoop (init_identifiers newHeap) { ms_io = std_io, ms_out = ms_out, ms_error = ms_error, ms_files = ms_files, ms_paths = ms_paths }
+					ms = CommandLoop symbol_table { ms_io = std_io, ms_out = ms_out, ms_error = ms_error, ms_files = ms_files, ms_paths = ms_paths }
 				in
 					(ms.ms_out, ms.ms_files))) world
 	= fclose ms_out world
@@ -271,6 +272,7 @@ where
 					-> collect_modules modules collected_modules random_numbers proj ms
 				_
 					# ms = {ms & ms_io = ms.ms_io <<< "Compiling " <<< id_name <<< " failed \n"}
+					# proj = {proj & proj_cache=empty_cache proj.proj_cache.hash_table.hte_symbol_heap}
 					-> collect_modules modules collected_modules random_numbers proj ms
 //					-> (NoModules, ms)
 
