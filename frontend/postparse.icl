@@ -1280,8 +1280,10 @@ reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_a
 			= (fun_defs, c_defs, imports, imported_objects, ca)
 		# fun = MakeNewImpOrDefFunction name fun_type.st_arity bodies fun_kind prio (Yes fun_type) pos
 		| icl_module
-			= ([fun : fun_defs], c_defs, imports, imported_objects, ca)		  
-			= ([fun : fun_defs], c_defs, imports, imported_objects, postParseError pos "function body not allowed in definition module" ca)		  
+			| case fun_kind of FK_Macro -> True; _ -> False
+				= ([fun : fun_defs], c_defs, imports, imported_objects, postParseError pos "macro with function type not allowed" ca)		  
+				= ([fun : fun_defs], c_defs, imports, imported_objects, ca)		  
+			= ([fun : fun_defs], c_defs, imports, imported_objects, postParseError pos "function body not allowed in definition module" ca)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs} : defs] cons_count sel_count mem_count type_count ca
 	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
