@@ -1284,7 +1284,7 @@ where
 		  		  (fresh_type, ts_type_heaps) = freshCopy type ts.ts_type_heaps
 				  ts_type_heaps = foldSt clear_var_and_attr vars ts_type_heaps
 		  		-> (fresh_type, Yes var_expr_ptr, (reqs, { ts & ts_type_heaps = ts_type_heaps }))
-		  				---> ("requirements [BoundVar]", fresh_type)
+		  				// ---> ("requirements [BoundVar]", fresh_type)
 		  	_
 				-> abort "requirements BoundVar " // ---> (var_ident <<- var_info))
 		where
