@@ -77,5 +77,12 @@ coretyperule (SuclApply argc)
           = if (argc==0)
                (restype,emptygraph)
                (outfunctype,updategraph outfunctype (SuclFN (argc-1),argtypes++[restype]) emptygraph)
-coretyperule _
- = undef
+coretyperule (SuclInt _) = consttyperule SuclINT
+coretyperule (SuclReal _) = consttyperule SuclREAL
+coretyperule (SuclBool _) = consttyperule SuclBOOL
+coretyperule (SuclUser _) = abort "coreclean: coretyperule: untyped user symbol"
+coretyperule (SuclCase _) = abort "coreclean: coretyperule: untyped case symbol"
+
+consttyperule tsym
+ = mkrule [] root (updategraph root (tsym,[]) emptygraph)
+   where root = SuclANONYMOUS 0
