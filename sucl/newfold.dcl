@@ -9,6 +9,9 @@ from rule import Rgraph,Rule
 from general import Optional
 from StdOverloaded import ==
 
+:: FunBody sym var
+   :== [Rule sym var]
+
 :: Etracer sym var pvar :==
        (Trace sym var pvar)
        (Rgraph sym var)
@@ -20,7 +23,7 @@ fullfold ::
     ((Rgraph sym var)->(sym,[var]))
     sym
     (Trace sym var pvar)
- -> ([Bool],[Rule sym var],[Rgraph sym var])
+ -> ([Bool],FunBody sym var,[Rgraph sym var])
  |  == sym
  &  == var
  &  == pvar

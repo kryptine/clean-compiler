@@ -153,7 +153,7 @@ these tuples.
      , srr_strictness      :: [Bool]            // Strictness annotations
      , srr_typerule        :: Rule tsym tvar    // Type rule
      , srr_trace           :: Trace sym var var // Truncated and folded trace
-     , srr_rules           :: [Rule sym var]    // Resulting rewrite rules
+     , srr_function_body   :: FunBody sym var   // Resulting rewrite rules
      , srr_areas           :: [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
      }
 
@@ -357,7 +357,7 @@ symredarea foldarea cli area
   , srr_strictness      = stricts
   , srr_typerule        = trule
   , srr_trace           = trace
-  , srr_rules           = rules
+  , srr_function_body   = rules
   , srr_areas           = areas
   }
   where agraph = rgraphgraph area; aroot = rgraphroot area
