@@ -1328,7 +1328,7 @@ where
 		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type defs attr_var_env type_heaps
 		| equi
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars
-			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type fun_type case_and_let_exprs type_heaps expr_heap
+			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types case_and_let_exprs type_heaps expr_heap
 			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
 //					---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
 			= (fun_env, attr_var_env, type_heaps, expr_heap, specification_error clean_fun_type error)

@@ -378,7 +378,7 @@ instance bindInstances Type
 		= bindInstances r1 r2 (bindInstances l1 l2 type_var_heap)
 	bindInstances (TB _) (TB _) type_var_heap
 		= type_var_heap
-	bindInstances ((CV l1) :@: r1) ((CV l2) :@: r2) type_var_heap
+	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances (TV l1) (TV l2) type_var_heap)
 
 instance bindInstances [a] | bindInstances a
