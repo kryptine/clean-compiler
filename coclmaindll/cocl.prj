@@ -4,10 +4,10 @@ Global
 	Target:	StdEnv
 	Exec:	{Project}\cocl.exe
 	CodeGen
-		CheckStacks:	True
+		CheckStacks:	False
 		CheckIndexes:	True
 	Application
-		HeapSize:	25165824
+		HeapSize:	20971520
 		StackSize:	2097152
 		ExtraMemory:	0
 		IntialHeapSize:	8388608
@@ -20,8 +20,8 @@ Global
 		Profile
 			Memory:	False
 			MemoryMinimumHeapSize:	0
-			Time:	True
-			Stack:	True
+			Time:	False
+			Stack:	False
 		Output
 			Output:	NoConsole
 			Font:	MS Sans Serif
@@ -48,3 +48,31 @@ Global
 MainModule
 	Name:	cocl
 	Dir:	{Project}\main
+	Compiler
+		NeverMemoryProfile:	False
+		NeverTimeProfile:	False
+		StrictnessAnalysis:	True
+		ListTypes:	StrictExportTypes
+		ListAttributes:	True
+		Warnings:	True
+		Verbose:	True
+		ReadableABC:	False
+		ReuseUniqueNodes:	True
+	Dcl
+		WindowPosition
+			X:	0
+			Y:	0
+			SizeX:	500
+			SizeY:	300
+	DclOpen:	False
+	Icl
+		WindowPosition
+			X:	0
+			Y:	0
+			SizeX:	500
+			SizeY:	300
+	IclOpen:	False
+	LastModified:	No 0 0 0 0 0 0
+Static
+	AppP:	
+	PrjP:	
