@@ -1379,6 +1379,10 @@ makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr} : vars] [type : types]
 			= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type})
 		bind_type info_ptr type optional_position ts_var_heap
 			= ts_var_heap  <:= (info_ptr, VI_Type type optional_position)
+makeBase fun_or_cons_ident arg_nr [] types ts_var_heap
+= abort ("type.makeBase: "+++fun_or_cons_ident.id_name+++": out of actual arguments, but "+++toString (length types)+++" argument type(s) left")
+makeBase fun_or_cons_ident arg_nr vars [] ts_var_heap
+= abort ("type.makeBase: "+++fun_or_cons_ident.id_name+++": out of argument types, but "+++toString (length vars)+++" actual argument(s) left")
 	
 attributedBasicType (BT_String string_type) ts=:{ts_attr_store}
 	= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = string_type}, {ts & ts_attr_store = inc ts_attr_store})
