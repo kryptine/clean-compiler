@@ -105,7 +105,7 @@ Abstype implementation.
 >        stripexports :: [char] -> cli -> cli
 */
 
-:: Cli :== Module SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable
+:: Cli = CliAlias (Module SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable)
 
 /*
 >   cli == module symbol node typesymbol typenode
@@ -121,14 +121,14 @@ Abstype implementation.
 */
 
 exports :: Cli -> [SuclSymbol]
-exports m = m.exportedsymbols
+exports (CliAlias m) = m.exportedsymbols
 
 /*
 >   typerule (tdefs,(es,as,ts,rs)) = maxtyperule ts
 */
 
 typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
-typerule m sym
+typerule (CliAlias m) sym
 = maxtyperule m.typerules sym
 
 /*
@@ -153,7 +153,7 @@ typerule m sym
 */
 
 clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
-clistrategy {arities=as,typeconstructors=tcs,typerules=ts,rules=rs} matchable
+clistrategy (CliAlias {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) matchable
  = ( checkarity (extendfn as (typearity o maxtyperule ts))        // Checks curried occurrences and strict arguments
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
@@ -182,7 +182,7 @@ maxstricts defs sym = extendfn defs corestricts sym
 */
 
 complete :: Cli -> [SuclSymbol] -> Bool
-complete m = mkclicomplete m.typeconstructors (maxtyperule m.typerules)
+complete (CliAlias m) = mkclicomplete m.typeconstructors (maxtyperule m.typerules)
 
 /*
 >   showcli = printcli
@@ -326,10 +326,20 @@ mkcli ::
  -> Cli
 
 mkcli typerules stricts exports constrs bodies
-= { arities          = map (mapsnd fst) bodies
+= CliAlias
+  { arities          = map (mapsnd fst) bodies
   , typeconstructors = constrs
   , exportedsymbols  = exports
   , typerules        = typerules
   , stricts          = stricts
   , rules            = map (mapsnd snd) bodies
   }
+
+instance <<< Cli
+where (<<<) file (CliAlias m)
+      = file <<< "=== Arities ===" <<< nl
+             writeList m.arities
+             <<< "=== Type Rules ===" <<< nl
+             writeList m.typerules
+             <<< "=== Rules ===" <<< nl
+             writeList m.rules
