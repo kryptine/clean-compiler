@@ -57,7 +57,7 @@ accVarHeap f beState
 	where
 		(result, varHeap) =	f beState.bes_varHeap
 
-read_from_var_heap ptr _ beState
+read_from_var_heap ptr beState
 	= (result, {beState & bes_varHeap = varHeap})
 where
 		(result, varHeap) =	readPtr ptr beState.bes_varHeap
@@ -338,11 +338,11 @@ backEndConvertModules p s main_dcl_module_n v be
 	= (newHeap,backEndConvertModulesH p s v be)
 */
 backEndConvertModules p s main_dcl_module_n var_heap be
-	# {bes_varHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n newHeap {bes_varHeap=var_heap,bes_backEnd=be}
+	# {bes_varHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n {bes_varHeap=var_heap,bes_backEnd=be}
 	= (bes_varHeap,bes_backEnd)
 
-backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int VarHeap *BackEndState -> *BackEndState
-backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions} main_dcl_module_n varHeap backEnd
+backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
+backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions} main_dcl_module_n backEnd
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
 //		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"
@@ -398,11 +398,11 @@ backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl
 		=	declareDynamicTemp predefs (backEnd -*-> "declareDynamicTemp")
 
 	#! backEnd
-		=	defineDclModule varHeap main_dcl_module_n fe_dcls.[main_dcl_module_n] (backEnd -*-> "defineDclModule(cIclMoIndex)")
+		=	defineDclModule main_dcl_module_n fe_dcls.[main_dcl_module_n] (backEnd -*-> "defineDclModule(cIclMoIndex)")
 	#! backEnd
 		=	reshuffleTypes (size icl_common.com_type_defs) typeConversions (backEnd -*-> "reshuffleTypes")
 	#! backEnd
-		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers varHeap (backEnd -*-> "defineOtherDclModules")
+		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers (backEnd -*-> "defineOtherDclModules")
 
 	#! backEnd
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
@@ -415,13 +415,13 @@ backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl
 			getConversions (Yes conversions)
 				=	conversions
 	#! backEnd
-		=	declare main_dcl_module_n varHeap icl_common (backEnd -*-> "declare (main_dcl_module_n)")
+		=	declare main_dcl_module_n icl_common (backEnd -*-> "declare (main_dcl_module_n)")
 	#! backEnd
 		=	declareArrayInstances fe_arrayInstances main_dcl_module_n icl_functions (backEnd -*-> "declareArrayInstances")
 	#! backEnd
-		=	adjustArrayFunctions predefs fe_arrayInstances main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers varHeap (backEnd -*-> "adjustArrayFunctions")
+		=	adjustArrayFunctions predefs fe_arrayInstances main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers (backEnd -*-> "adjustArrayFunctions")
 	#! (rules, backEnd)
-		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefs.[PD_DummyForStrictAliasFun].pds_ident varHeap (backEnd -*-> "convertRules")
+		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefs.[PD_DummyForStrictAliasFun].pds_ident (backEnd -*-> "convertRules")
 	#! backEnd
 		=	appBackEnd (BEDefineRules rules) (backEnd -*-> "BEDefineRules")
 	#! backEnd
@@ -453,16 +453,16 @@ where
 		// otherwise
 			=	declareDclModule moduleIndex dclModule
 
-defineOtherDclModules :: {#DclModule} Int NumberSet VarHeap -> BackEnder
-defineOtherDclModules dcls main_dcl_module_n used_module_numbers varHeap
-	=	foldStateWithIndexA (defineOtherDclModule varHeap) dcls
+defineOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
+defineOtherDclModules dcls main_dcl_module_n used_module_numbers
+	=	foldStateWithIndexA defineOtherDclModule dcls
 where
-	defineOtherDclModule :: VarHeap ModuleIndex DclModule -> BackEnder
-	defineOtherDclModule varHeap moduleIndex dclModule
+	defineOtherDclModule :: ModuleIndex DclModule -> BackEnder
+	defineOtherDclModule moduleIndex dclModule
 		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
 			=	identity
 		// otherwise
-			=	defineDclModule varHeap moduleIndex dclModule
+			=	defineDclModule moduleIndex dclModule
 
 isSystem :: ModuleKind -> Bool
 isSystem MK_System
@@ -482,15 +482,15 @@ declareDclModule :: ModuleIndex DclModule -> BackEnder
 declareDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_module_kind}
 	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 /*
-defineCurrentDclModule :: VarHeap IclModule DclModule {#Int} -> BackEnder
-defineCurrentDclModule varHeap {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions
+defineCurrentDclModule :: IclModule DclModule {#Int} -> BackEnder
+defineCurrentDclModule {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions
 	=	declareCurrentDclModuleTypes icl_common.com_type_defs typeConversions varHeap
 	o`	defineCurrentDclModuleTypes dcl_common.com_cons_defs dcl_common.com_selector_defs dcl_common.com_type_defs typeConversions varHeap
 */
-defineDclModule :: VarHeap ModuleIndex DclModule -> BackEnder
-defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_functions,dcl_instances}
-	=	declare moduleIndex varHeap dcl_common
-	o`	declareFunTypes moduleIndex dcl_functions dcl_instances.ir_from  varHeap
+defineDclModule :: ModuleIndex DclModule -> BackEnder
+defineDclModule moduleIndex {dcl_name, dcl_common, dcl_functions,dcl_instances}
+	=	declare moduleIndex dcl_common
+	o`	declareFunTypes moduleIndex dcl_functions dcl_instances.ir_from
 
 removeExpandedTypesFromDclModules :: {#DclModule} NumberSet -> BackEnder
 removeExpandedTypesFromDclModules dcls used_module_numbers
@@ -504,7 +504,7 @@ where
 			where
 				removeExpandedTypesFromFunType :: ModuleIndex Index FunType -> BackEnder
 				removeExpandedTypesFromFunType moduleIndex functionIndex {ft_symb, ft_type_ptr}
-					= \be0 ->	let (ft_type,be) = read_from_var_heap ft_type_ptr 0 be0 in
+					= \be0 ->	let (ft_type,be) = read_from_var_heap ft_type_ptr be0 in
 						(case ft_type of
 							VI_ExpandedType expandedType
 								->	write_to_var_heap ft_type_ptr VI_Empty	
@@ -554,7 +554,7 @@ reshuffleTypes nIclTypes dclIclConversions be
 				#! to` = if (to` >= nDclTypes) frm` to`
 				=	(swap frm` to` p, swap frm to p`, swapTypes frm to be)
 
-:: DeclVarsInput :== (!Ident, !VarHeap)
+:: DeclVarsInput :== Ident
 
 class declareVars a :: a !DeclVarsInput -> BackEnder
 
@@ -564,26 +564,26 @@ instance declareVars [a] | declareVars a where
 		=	foldState (flip declareVars dvInput) list
 
 instance declareVars (Ptr VarInfo) where
-	declareVars varInfoPtr (_, varHeap)
-		=	declareVariable BELhsNodeId varInfoPtr "_var???" varHeap	// +++ name
+	declareVars varInfoPtr _ 
+		=	declareVariable BELhsNodeId varInfoPtr "_var???"	// +++ name
 
 instance declareVars FreeVar where
 	declareVars :: FreeVar !DeclVarsInput -> BackEnder
-	declareVars freeVar (_, varHeap)
-		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+	declareVars freeVar _
+		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
 
 instance declareVars LetBind where
 	declareVars :: LetBind !DeclVarsInput -> BackEnder
-	declareVars {lb_src=App {app_symb, app_args=[Var _:_]}, lb_dst=freeVar} (aliasDummyId, varHeap)
+	declareVars {lb_src=App {app_symb, app_args=[Var _:_]}, lb_dst=freeVar} aliasDummyId
 		| not (isNilPtr app_symb.symb_name.id_info) && app_symb.symb_name==aliasDummyId
 			= identity		// we have an alias. Don't declare the same variable twice
-		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
-	declareVars {lb_dst=freeVar} (_, varHeap)
-		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
+	declareVars {lb_dst=freeVar} _
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
 
-declareVariable :: Int (Ptr VarInfo) {#Char} VarHeap -> BackEnder
-declareVariable lhsOrRhs varInfoPtr name varHeap
-	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber varInfoPtr varHeap be0 in
+declareVariable :: Int (Ptr VarInfo) {#Char} -> BackEnder
+declareVariable lhsOrRhs varInfoPtr name
+	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber varInfoPtr be0 in
 		beDeclareNodeId variable_sequence_number lhsOrRhs name be
 
 instance declareVars (Optional a) | declareVars a where
@@ -617,11 +617,11 @@ instance declareVars Expression where
 		o`	declareVars if_else dvInput
 	declareVars (Case caseExpr) dvInput
 		=	declareVars caseExpr dvInput
-	declareVars (AnyCodeExpr _ outParams _) (_, varHeap)
-		=	foldState (declVar varHeap) outParams 
+	declareVars (AnyCodeExpr _ outParams _) _
+		=	foldState declVar outParams 
 	  where
-		declVar varHeap {bind_dst=freeVar} 
-			= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+		declVar {bind_dst=freeVar} 
+			= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
 	declareVars _ _
 		=	identity
 
@@ -659,20 +659,20 @@ instance declareVars BasicPattern where
 
 :: ModuleIndex :== Index
 
-class declare a :: ModuleIndex !VarHeap a  -> BackEnder
+class declare a :: ModuleIndex a  -> BackEnder
 
-class declareWithIndex a :: Index ModuleIndex !VarHeap a -> BackEnder
+class declareWithIndex a :: Index ModuleIndex a -> BackEnder
 
 //1.3
 instance declare {#a} | declareWithIndex a & ArrayElem a where
-	declare :: ModuleIndex  VarHeap {#a} -> BackEnder | declareWithIndex a & ArrayElem a 
+	declare :: ModuleIndex  {#a} -> BackEnder | declareWithIndex a & ArrayElem a 
 //3.1
 /*2.0
 instance declare {#a} | declareWithIndex a & Array {#} a where
-	declare :: ModuleIndex  VarHeap {#a} -> BackEnder | declareWithIndex a & Array {#} a 
+	declare :: ModuleIndex  {#a} -> BackEnder | declareWithIndex a & Array {#} a 
 0.2*/
-	declare moduleIndex varHeap array
-		=	foldStateWithIndexA (\i -> declareWithIndex i moduleIndex varHeap) array
+	declare moduleIndex array
+		=	foldStateWithIndexA (\i -> declareWithIndex i moduleIndex) array
 
 declareFunctionSymbols :: {#FunDef} {#Int} [(Int, Int)] IndexRange *BackEndState -> *BackEndState
 declareFunctionSymbols functions iclDclConversions functionIndices globalFunctions backEnd
@@ -712,23 +712,23 @@ declareArrayInstances {ir_from, ir_to} main_dcl_module_n functions
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
 instance declare CommonDefs where
-	declare :: ModuleIndex VarHeap CommonDefs -> BackEnder
-	declare moduleIndex varHeap {com_cons_defs, com_type_defs, com_selector_defs, com_class_defs}
-		=	declare moduleIndex varHeap com_type_defs
-		o`	defineTypes moduleIndex com_cons_defs com_selector_defs com_type_defs varHeap
+	declare :: ModuleIndex CommonDefs -> BackEnder
+	declare moduleIndex {com_cons_defs, com_type_defs, com_selector_defs, com_class_defs}
+		=	declare moduleIndex com_type_defs
+		o`	defineTypes moduleIndex com_cons_defs com_selector_defs com_type_defs
 
 instance declareWithIndex (TypeDef a) where
-	declareWithIndex :: Index ModuleIndex VarHeap (TypeDef a) -> BackEnder
-	declareWithIndex typeIndex moduleIndex _ {td_name}
+	declareWithIndex :: Index ModuleIndex (TypeDef a) -> BackEnder
+	declareWithIndex typeIndex moduleIndex {td_name}
 		=	appBackEnd (BEDeclareType typeIndex moduleIndex td_name.id_name)
 
-declareFunTypes :: ModuleIndex {#FunType} Int VarHeap -> BackEnder
-declareFunTypes moduleIndex funTypes nrOfDclFunctions varHeap
-		=	foldStateWithIndexA (declareFunType moduleIndex varHeap nrOfDclFunctions) funTypes
+declareFunTypes :: ModuleIndex {#FunType} Int -> BackEnder
+declareFunTypes moduleIndex funTypes nrOfDclFunctions
+		=	foldStateWithIndexA (declareFunType moduleIndex nrOfDclFunctions) funTypes
 
-declareFunType :: ModuleIndex VarHeap Index Int FunType -> BackEnder
-declareFunType moduleIndex varHeap nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
-	= \be0 -> let (vi,be) = read_from_var_heap ft_type_ptr varHeap be0 in
+declareFunType :: ModuleIndex Index Int FunType -> BackEnder
+declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
+	= \be0 -> let (vi,be) = read_from_var_heap ft_type_ptr be0 in
 					(case vi of
 						VI_ExpandedType expandedType
 							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_symb.id_name functionIndex nrOfDclFunctions)
@@ -793,11 +793,11 @@ currentModuleTypeConversions _ _ No
 	=	{}
 
 /*
-declareCurrentDclModuleTypes :: {#CheckedTypeDef} {#Int} VarHeap -> BackEnder
+declareCurrentDclModuleTypes :: {#CheckedTypeDef} {#Int} -> BackEnder
 */
-defineTypes :: ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} VarHeap -> BackEnder
-defineTypes moduleIndex constructors selectors types varHeap
-	=	foldStateWithIndexA (defineType moduleIndex constructors selectors varHeap) types
+defineTypes :: ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} -> BackEnder
+defineTypes moduleIndex constructors selectors types
+	=	foldStateWithIndexA (defineType moduleIndex constructors selectors) types
 
 convertTypeLhs :: ModuleIndex Index  [ATypeVar] -> BEMonad BEFlatTypeP
 convertTypeLhs moduleIndex typeIndex args
@@ -811,18 +811,18 @@ convertTypeVar :: ATypeVar -> BEMonad BETypeVarP
 convertTypeVar typeVar
 	=	beTypeVar typeVar.atv_variable.tv_name.id_name
 
-defineType :: ModuleIndex {#ConsDef} {#SelectorDef} VarHeap Index CheckedTypeDef *BackEndState -> *BackEndState
-defineType moduleIndex constructors _ varHeap typeIndex {td_name, td_args, td_rhs=AlgType constructorSymbols} be
+defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef *BackEndState -> *BackEndState
+defineType moduleIndex constructors _ typeIndex {td_name, td_args, td_rhs=AlgType constructorSymbols} be
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_args be
 	# (constructors, be)
-		=	convertConstructors typeIndex td_name.id_name moduleIndex constructors constructorSymbols varHeap be
+		=	convertConstructors typeIndex td_name.id_name moduleIndex constructors constructorSymbols be
 	=	appBackEnd (BEAlgebraicType flatType constructors) be
-defineType moduleIndex constructors selectors varHeap typeIndex {td_args, td_rhs=RecordType {rt_constructor, rt_fields}} be
+defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordType {rt_constructor, rt_fields}} be
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_args be
 	# (fields, be)
-		=	convertSelectors moduleIndex selectors rt_fields varHeap be
+		=	convertSelectors moduleIndex selectors rt_fields be
 	# (constructorType,be) = constructorTypeFunction be
 	# (constructorTypeNode, be)
 		=	beNormalTypeNode
@@ -836,23 +836,23 @@ defineType moduleIndex constructors selectors varHeap typeIndex {td_args, td_rhs
 		constructorDef
 			=	constructors.[constructorIndex]
 		constructorTypeFunction be0
-			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr varHeap be0 in
+			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
 					(case cons_type of
 						VI_ExpandedType expandedType
 							->	(expandedType,be)
 						_
 							->	(constructorDef.cons_type,be))
-defineType moduleIndex _ _ _ typeIndex {td_args, td_rhs=AbstractType _} be
+defineType moduleIndex _ _ typeIndex {td_args, td_rhs=AbstractType _} be
  	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_args) be
-defineType _ _ _ _ _ _ be
+defineType _ _ _ _ _ be
 	=	be
 
-convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] VarHeap -> BEMonad BEConstructorListP
-convertConstructors typeIndex typeName moduleIndex constructors symbols varHeap
-	=	sfoldr (beConstructors o convertConstructor typeIndex typeName moduleIndex constructors varHeap) beNoConstructors symbols
+convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] -> BEMonad BEConstructorListP
+convertConstructors typeIndex typeName moduleIndex constructors symbols
+	=	sfoldr (beConstructors o convertConstructor typeIndex typeName moduleIndex constructors) beNoConstructors symbols
 
-convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} VarHeap DefinedSymbol -> BEMonad BEConstructorListP
-convertConstructor typeIndex typeName moduleIndex constructorDefs varHeap {ds_index}
+convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol -> BEMonad BEConstructorListP
+convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index}
 	= \be0 -> let (constructorType,be) = constructorTypeFunction be0 in
 		(appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_symb.id_name) // +++ remove declare
 		o`	beConstructor
@@ -863,19 +863,19 @@ convertConstructor typeIndex typeName moduleIndex constructorDefs varHeap {ds_in
 		constructorDef
 			=	constructorDefs.[ds_index]
 		constructorTypeFunction be0
-			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr varHeap be0 in
+			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
 					(case cons_type of
 						VI_ExpandedType expandedType
 							->	(expandedType,be) // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, expandedType)
 						_
 							->	(constructorDef.cons_type,be)) // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, constructorDef.cons_type)
 
-convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} VarHeap -> BEMonad BEFieldListP
-convertSelectors moduleIndex selectors symbols varHeap
-	=	foldrA (beFields o convertSelector moduleIndex selectors varHeap) beNoFields symbols
+convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} -> BEMonad BEFieldListP
+convertSelectors moduleIndex selectors symbols
+	=	foldrA (beFields o convertSelector moduleIndex selectors) beNoFields symbols
 
-convertSelector :: ModuleIndex {#SelectorDef} VarHeap FieldSymbol -> BEMonad BEFieldListP
-convertSelector moduleIndex selectorDefs varHeap {fs_index}
+convertSelector :: ModuleIndex {#SelectorDef} FieldSymbol -> BEMonad BEFieldListP
+convertSelector moduleIndex selectorDefs {fs_index}
 	= \be0 -> let (selectorType,be) = selectorTypeFunction be0 in
 		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_symb.id_name)
 		o`	beField fs_index moduleIndex (convertAnnotTypeNode (selectorType.st_result))) be
@@ -883,7 +883,7 @@ convertSelector moduleIndex selectorDefs varHeap {fs_index}
 		selectorDef
 			=	selectorDefs.[fs_index]
 		selectorTypeFunction be0
-			= let (sd_type,be) = read_from_var_heap selectorDef.sd_type_ptr varHeap be0 in
+			= let (sd_type,be) = read_from_var_heap selectorDef.sd_type_ptr be0 in
 				(case sd_type of
 					VI_ExpandedType expandedType
 						->	(expandedType,be)
@@ -934,11 +934,10 @@ predefineSymbols {dcl_common} predefs
 	{	asai_moduleIndex	:: !Int
 	,	asai_mapping 		:: !{#BEArrayFunKind}
 	,	asai_funs			:: !{#FunType}
-	,	asai_varHeap	 	:: !VarHeap
 	}
 
-adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet VarHeap -> BackEnder
-adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcls icl_instances used_module_numbers varHeap
+adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet -> BackEnder
+adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcls icl_instances used_module_numbers
 	=	adjustStdArray arrayInfo predefs
 				(if (arrayModuleIndex == main_dcl_module_n) icl_instances stdArray.dcl_common.com_instance_defs)
 	o`	adjustIclArrayInstances arrayInstancesRange arrayMemberMapping functions
@@ -957,7 +956,6 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 			=	{	asai_moduleIndex	= arrayModuleIndex
 				,	asai_mapping 		= arrayMemberMapping
 				,	asai_funs			= stdArray.dcl_functions
-				,	asai_varHeap		= varHeap
 				}
 
 		getArrayMemberMapping :: PredefinedSymbols {#DefinedSymbol} -> {#BEArrayFunKind}
@@ -1009,11 +1007,11 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 							=	foldStateWithIndexA (adjustMember arrayInfo) ins_members
 						where
 							adjustMember :: AdjustStdArrayInfo Int DefinedSymbol -> BackEnder
-							adjustMember {asai_moduleIndex, asai_mapping, asai_funs, asai_varHeap} offset {ds_index}
+							adjustMember {asai_moduleIndex, asai_mapping, asai_funs} offset {ds_index}
 								| asai_moduleIndex == main_dcl_module_n
 									=	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
 								// otherwise
-									= \be0 ->	let (ft_type,be) = read_from_var_heap asai_funs.[ds_index].ft_type_ptr varHeap be0 in
+									= \be0 ->	let (ft_type,be) = read_from_var_heap asai_funs.[ds_index].ft_type_ptr be0 in
 										(case ft_type of
 											VI_ExpandedType _
 												->	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
@@ -1031,35 +1029,27 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 				adjustIclArrayInstance mapping index {fun_index}
 					=	beAdjustArrayFunction mapping.[fun_index] index main_dcl_module_n
 
-/*
-convertRules :: [(Int, FunDef)] VarHeap -> BEMonad BEImpRuleP
-convertRules rules varHeap
-//	=	foldr (beRules o flip convertRule varHeap) beNoRules rules
-	=	foldl (flip beRules) beNoRules (map (flip convertRule varHeap) rules)
-*/
-
-convertRules :: [(Int, FunDef)] Int Ident VarHeap *BackEndState -> (BEImpRuleP, *BackEndState)
-convertRules rules main_dcl_module_n aliasDummyId varHeap be
+convertRules :: [(Int, FunDef)] Int Ident *BackEndState -> (BEImpRuleP, *BackEndState)
+convertRules rules main_dcl_module_n aliasDummyId be
 	# (null, be)
 		=	accBackEnd BENoRules be
-	=	convert rules varHeap null be
-//	=	foldr (beRules o flip convertRule main_dcl_module_n varHeap) beNoRules rules
+	=	convert rules null be
 	where
-		convert :: [(Int, FunDef)] VarHeap BEImpRuleP *BackEndState -> (BEImpRuleP, *BackEndState)
-		convert [] _ rulesP be
+		convert :: [(Int, FunDef)] BEImpRuleP *BackEndState -> (BEImpRuleP, *BackEndState)
+		convert [] rulesP be
 			=	(rulesP, be)
-		convert [h:t] varHeap rulesP be
+		convert [h:t] rulesP be
 			# (ruleP, be)
-				=	convertRule aliasDummyId h main_dcl_module_n varHeap be
+				=	convertRule aliasDummyId h main_dcl_module_n be
 			# (rulesP, be)
 				=	accBackEnd (BERules ruleP rulesP) be
-			=	convert t varHeap rulesP be
+			=	convert t rulesP be
 
-convertRule :: Ident (Int,FunDef) Int VarHeap -> BEMonad BEImpRuleP
-convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) main_dcl_module_n varHeap
+convertRule :: Ident (Int,FunDef) Int -> BEMonad BEImpRuleP
+convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) main_dcl_module_n
 	=	beRule index (cafness fun_kind)
 			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_symb.id_name, index, type)))
-			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n varHeap)
+			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
 	where
 		cafness :: DefOrImpFunKind -> Int
 		cafness (FK_DefFunction _)
@@ -1177,14 +1167,14 @@ convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args
 	=	sfoldr (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
 
-convertTransformedBody :: Int Int Ident TransformedBody Int VarHeap -> BEMonad BERuleAltP
-convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
+convertTransformedBody :: Int Int Ident TransformedBody Int -> BEMonad BERuleAltP
+convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
 	| isCodeBlock body.tb_rhs
-		=	declareVars body (aliasDummyId, varHeap)
-		o`	convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
+		=	declareVars body aliasDummyId
+		o`	convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
 	// otherwise
-		=	declareVars body (aliasDummyId, varHeap)
-		o`	convertBody True functionIndex lineNumber aliasDummyId (map FP_Variable body.tb_args) body.tb_rhs main_dcl_module_n varHeap
+		=	declareVars body aliasDummyId
+		o`	convertBody True functionIndex lineNumber aliasDummyId (map FP_Variable body.tb_args) body.tb_rhs main_dcl_module_n
 
 isCodeBlock :: Expression -> Bool
 isCodeBlock (Case {case_expr=Var _, case_guards=AlgebraicPatterns _ [{ap_expr}]})
@@ -1196,24 +1186,24 @@ isCodeBlock (AnyCodeExpr _ _ _)
 isCodeBlock expr
 	=	False
 
-convertFunctionBody :: Int Int Ident FunctionBody Int VarHeap -> BEMonad BERuleAltP
-convertFunctionBody functionIndex lineNumber aliasDummyId (BackEndBody bodies) main_dcl_module_n varHeap
-	=	convertBackEndBodies functionIndex lineNumber bodies main_dcl_module_n varHeap
+convertFunctionBody :: Int Int Ident FunctionBody Int -> BEMonad BERuleAltP
+convertFunctionBody functionIndex lineNumber aliasDummyId (BackEndBody bodies) main_dcl_module_n
+	=	convertBackEndBodies functionIndex lineNumber bodies main_dcl_module_n
 where
-	convertBackEndBodies :: Int Int [BackEndBody] Int VarHeap -> BEMonad BERuleAltP
-	convertBackEndBodies functionIndex lineNumber bodies main_dcl_module_n varHeap
-		=	sfoldr (beRuleAlts o convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n varHeap) beNoRuleAlts bodies
+	convertBackEndBodies :: Int Int [BackEndBody] Int -> BEMonad BERuleAltP
+	convertBackEndBodies functionIndex lineNumber bodies main_dcl_module_n
+		=	sfoldr (beRuleAlts o convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n) beNoRuleAlts bodies
 	where
-		convertBackEndBody :: Int Int Ident Int VarHeap BackEndBody -> BEMonad BERuleAltP
-		convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n varHeap body
-			=	declareVars body (aliasDummyId, varHeap)
-			o`	convertBody False functionIndex lineNumber aliasDummyId body.bb_args body.bb_rhs main_dcl_module_n varHeap
-convertFunctionBody functionIndex lineNumber aliasDummyId (TransformedBody body) main_dcl_module_n varHeap
-	=	convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
+		convertBackEndBody :: Int Int Ident Int BackEndBody -> BEMonad BERuleAltP
+		convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n body
+			=	declareVars body aliasDummyId
+			o`	convertBody False functionIndex lineNumber aliasDummyId body.bb_args body.bb_rhs main_dcl_module_n
+convertFunctionBody functionIndex lineNumber aliasDummyId (TransformedBody body) main_dcl_module_n
+	=	convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
 
-convertCodeBody :: Int Int Ident TransformedBody Int VarHeap -> BEMonad BERuleAltP
-convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
-	=	convertBody False functionIndex lineNumber aliasDummyId patterns expr main_dcl_module_n varHeap
+convertCodeBody :: Int Int Ident TransformedBody Int -> BEMonad BERuleAltP
+convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
+	=	convertBody False functionIndex lineNumber aliasDummyId patterns expr main_dcl_module_n
 	where
 		patterns
 			=	map (lookUpVar body.tb_rhs) body.tb_args
@@ -1250,42 +1240,42 @@ ruleAlt setRefCounts line lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
 	// otherwise
 		=	beRuleAlt line lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
 
-convertBody :: Bool Int Int Ident [FunctionPattern] Expression Int VarHeap -> BEMonad BERuleAltP
-convertBody _ functionIndex lineNumber aliasDummyId args (ABCCodeExpr instructions inline) main_dcl_module_n varHeap
+convertBody :: Bool Int Int Ident [FunctionPattern] Expression Int -> BEMonad BERuleAltP
+convertBody _ functionIndex lineNumber aliasDummyId args (ABCCodeExpr instructions inline) main_dcl_module_n
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	beCodeAlt
 			lineNumber
-			(convertLhsNodeDefs args noNodeDefs varHeap)
-			(convertBackEndLhs functionIndex args main_dcl_module_n varHeap)
+			(convertLhsNodeDefs args noNodeDefs)
+			(convertBackEndLhs functionIndex args main_dcl_module_n)
 			(beAbcCodeBlock inline (convertStrings instructions))
-convertBody _ functionIndex lineNumber aliasDummyId args (AnyCodeExpr inParams outParams instructions) main_dcl_module_n varHeap
+convertBody _ functionIndex lineNumber aliasDummyId args (AnyCodeExpr inParams outParams instructions) main_dcl_module_n
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	beCodeAlt
 			lineNumber
-			(convertLhsNodeDefs args noNodeDefs varHeap)
-			(convertBackEndLhs functionIndex args main_dcl_module_n varHeap)
-			(beAnyCodeBlock (convertCodeParameters inParams varHeap) (convertCodeParameters outParams varHeap) (convertStrings instructions))
-convertBody setRefCounts functionIndex lineNumber aliasDummyId args rhs main_dcl_module_n varHeap
+			(convertLhsNodeDefs args noNodeDefs)
+			(convertBackEndLhs functionIndex args main_dcl_module_n)
+			(beAnyCodeBlock (convertCodeParameters inParams) (convertCodeParameters outParams) (convertStrings instructions))
+convertBody setRefCounts functionIndex lineNumber aliasDummyId args rhs main_dcl_module_n
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	ruleAlt setRefCounts
 			lineNumber
-			(convertLhsNodeDefs args noNodeDefs varHeap)
-			(convertBackEndLhs functionIndex args main_dcl_module_n varHeap)
-			(convertRhsNodeDefs aliasDummyId rhs main_dcl_module_n varHeap)
-			(convertRhsStrictNodeIds rhs varHeap)
-			(convertRootExpr aliasDummyId rhs main_dcl_module_n varHeap)
+			(convertLhsNodeDefs args noNodeDefs)
+			(convertBackEndLhs functionIndex args main_dcl_module_n)
+			(convertRhsNodeDefs aliasDummyId rhs main_dcl_module_n)
+			(convertRhsStrictNodeIds rhs)
+			(convertRootExpr aliasDummyId rhs main_dcl_module_n)
 
-convertBackEndLhs :: Int [FunctionPattern] Int VarHeap -> BEMonad BENodeP
-convertBackEndLhs functionIndex patterns main_dcl_module_n varHeap
-	=	beNormalNode (beFunctionSymbol functionIndex main_dcl_module_n) (convertPatterns patterns varHeap)
+convertBackEndLhs :: Int [FunctionPattern] Int -> BEMonad BENodeP
+convertBackEndLhs functionIndex patterns main_dcl_module_n
+	=	beNormalNode (beFunctionSymbol functionIndex main_dcl_module_n) (convertPatterns patterns)
 
 convertStrings :: [{#Char}] -> BEMonad BEStringListP
 convertStrings strings
 	=	sfoldr (beStrings o beString) beNoStrings strings
 
-convertCodeParameters :: (CodeBinding a) VarHeap -> BEMonad BECodeParameterP | varInfoPtr a
-convertCodeParameters codeParameters varHeap
-	=	sfoldr (beCodeParameters o flip convertCodeParameter varHeap) beNoCodeParameters codeParameters
+convertCodeParameters :: (CodeBinding a) -> BEMonad BECodeParameterP | varInfoPtr a
+convertCodeParameters codeParameters
+	=	sfoldr (beCodeParameters o convertCodeParameter) beNoCodeParameters codeParameters
 
 class varInfoPtr a :: a -> VarInfoPtr
 
@@ -1297,118 +1287,118 @@ instance varInfoPtr FreeVar where
 	varInfoPtr freeVar
 		=	freeVar.fv_info_ptr
 
-convertCodeParameter :: (Bind String a) VarHeap -> BEMonad BECodeParameterP | varInfoPtr a
-convertCodeParameter {bind_src, bind_dst} varHeap
-		=	beCodeParameter bind_src (convertVar (varInfoPtr bind_dst) varHeap)
+convertCodeParameter :: (Bind String a) -> BEMonad BECodeParameterP | varInfoPtr a
+convertCodeParameter {bind_src, bind_dst}
+		=	beCodeParameter bind_src (convertVar (varInfoPtr bind_dst))
 /*
-convertTransformedLhs :: Int [FreeVar] VarHeap -> BEMonad BENodeP
+convertTransformedLhs :: Int [FreeVar] -> BEMonad BENodeP
 convertTransformedLhs functionIndex freeVars varHeap
 	=	beNormalNode (beFunctionSymbol functionIndex cIclModIndex) (convertLhsArgs freeVars varHeap)
 */
 
-convertPatterns :: [FunctionPattern] VarHeap -> BEMonad BEArgP
-convertPatterns patterns varHeap
-	=	sfoldr (beArgs o flip convertPattern varHeap) beNoArgs patterns
+convertPatterns :: [FunctionPattern] -> BEMonad BEArgP
+convertPatterns patterns
+	=	sfoldr (beArgs o convertPattern) beNoArgs patterns
 
-convertPattern :: FunctionPattern VarHeap -> BEMonad BENodeP
-convertPattern (FP_Variable freeVar) varHeap
-	=	convertFreeVarPattern freeVar varHeap
-convertPattern (FP_Basic _ (Yes freeVar)) varHeap
-	=	convertFreeVarPattern freeVar varHeap
-convertPattern (FP_Basic value No) _
+convertPattern :: FunctionPattern -> BEMonad BENodeP
+convertPattern (FP_Variable freeVar)
+	=	convertFreeVarPattern freeVar
+convertPattern (FP_Basic _ (Yes freeVar))
+	=	convertFreeVarPattern freeVar
+convertPattern (FP_Basic value No)
 	=	beNormalNode (convertLiteralSymbol value) beNoArgs
-convertPattern (FP_Algebraic _ freeVars (Yes freeVar)) varHeap
-	=	convertFreeVarPattern freeVar varHeap
-convertPattern (FP_Algebraic {glob_module, glob_object={ds_index}} subpatterns No) varHeap
-	=	beNormalNode (beConstructorSymbol glob_module ds_index) (convertPatterns subpatterns varHeap)
-convertPattern (FP_Dynamic _ _ _ (Yes freeVar)) varHeap
-	=	convertFreeVarPattern freeVar varHeap
-convertPattern FP_Empty varHeap
+convertPattern (FP_Algebraic _ freeVars (Yes freeVar))
+	=	convertFreeVarPattern freeVar
+convertPattern (FP_Algebraic {glob_module, glob_object={ds_index}} subpatterns No)
+	=	beNormalNode (beConstructorSymbol glob_module ds_index) (convertPatterns subpatterns)
+convertPattern (FP_Dynamic _ _ _ (Yes freeVar))
+	=	convertFreeVarPattern freeVar
+convertPattern FP_Empty
 	=	beNodeIdNode beWildCardNodeId beNoArgs
 
-convertFreeVarPattern :: FreeVar  VarHeap -> BEMonad BENodeP
-convertFreeVarPattern freeVar varHeap
-	=	beNodeIdNode (convertVar freeVar.fv_info_ptr varHeap) beNoArgs
+convertFreeVarPattern :: FreeVar  -> BEMonad BENodeP
+convertFreeVarPattern freeVar
+	=	beNodeIdNode (convertVar freeVar.fv_info_ptr) beNoArgs
 
-convertLhsArgs :: [FreeVar] VarHeap -> BEMonad BEArgP
-convertLhsArgs freeVars varHeap
-	=	sfoldr (beArgs o (flip convertFreeVarPattern) varHeap) beNoArgs freeVars
+convertLhsArgs :: [FreeVar] -> BEMonad BEArgP
+convertLhsArgs freeVars
+	=	sfoldr (beArgs o convertFreeVarPattern) beNoArgs freeVars
 
-convertVarPtr :: VarInfoPtr  VarHeap -> BEMonad BENodeP
-convertVarPtr var varHeap
-	=	beNodeIdNode (convertVar var varHeap) beNoArgs
+convertVarPtr :: VarInfoPtr  -> BEMonad BENodeP
+convertVarPtr var
+	=	beNodeIdNode (convertVar var) beNoArgs
 
-convertVars :: [VarInfoPtr] VarHeap -> BEMonad BEArgP
-convertVars vars varHeap
-	=	sfoldr (beArgs o flip convertVarPtr varHeap) beNoArgs vars
+convertVars :: [VarInfoPtr] -> BEMonad BEArgP
+convertVars vars
+	=	sfoldr (beArgs o convertVarPtr) beNoArgs vars
 
-convertRootExpr :: Ident Expression Int VarHeap -> BEMonad BENodeP
-convertRootExpr aliasDummyId (Let {let_expr}) main_dcl_module_n varHeap
-	=	convertRootExpr aliasDummyId let_expr main_dcl_module_n varHeap
-convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n varHeap
+convertRootExpr :: Ident Expression Int -> BEMonad BENodeP
+convertRootExpr aliasDummyId (Let {let_expr}) main_dcl_module_n
+	=	convertRootExpr aliasDummyId let_expr main_dcl_module_n
+convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n
 	=	beGuardNode
-			(convertRootExpr aliasDummyId cond main_dcl_module_n varHeap)
-			(convertRhsNodeDefs aliasDummyId then main_dcl_module_n varHeap)
-			(convertRhsStrictNodeIds then varHeap)
-			(convertRootExpr aliasDummyId then main_dcl_module_n varHeap)
-			(convertRhsNodeDefs aliasDummyId else main_dcl_module_n  varHeap)
-			(convertRhsStrictNodeIds else varHeap)
-			(convertRootExpr aliasDummyId else main_dcl_module_n varHeap)
-convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=No}) main_dcl_module_n varHeap
+			(convertRootExpr aliasDummyId cond main_dcl_module_n)
+			(convertRhsNodeDefs aliasDummyId then main_dcl_module_n)
+			(convertRhsStrictNodeIds then)
+			(convertRootExpr aliasDummyId then main_dcl_module_n)
+			(convertRhsNodeDefs aliasDummyId else main_dcl_module_n)
+			(convertRhsStrictNodeIds else)
+			(convertRootExpr aliasDummyId else main_dcl_module_n)
+convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=No}) main_dcl_module_n
 		=	beGuardNode
-				(convertRootExpr aliasDummyId cond main_dcl_module_n varHeap)
-				(convertRhsNodeDefs aliasDummyId then main_dcl_module_n varHeap)
-				(convertRhsStrictNodeIds then varHeap)
-				(convertRootExpr aliasDummyId then main_dcl_module_n varHeap)
+				(convertRootExpr aliasDummyId cond main_dcl_module_n)
+				(convertRhsNodeDefs aliasDummyId then main_dcl_module_n)
+				(convertRhsStrictNodeIds then)
+				(convertRootExpr aliasDummyId then main_dcl_module_n)
 				beNoNodeDefs
 				beNoStrictNodeIds
 				(beNormalNode (beBasicSymbol BEFailSymb) beNoArgs)
-convertRootExpr aliasDummyId (Case {case_expr, case_guards, case_default}) main_dcl_module_n varHeap
-	=	beSwitchNode (convertVar var.var_info_ptr varHeap) (convertCases case_guards aliasDummyId var case_default main_dcl_module_n varHeap)
+convertRootExpr aliasDummyId (Case {case_expr, case_guards, case_default}) main_dcl_module_n
+	=	beSwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var case_default main_dcl_module_n)
 	where
 		var
 			=	caseVar case_expr
-convertRootExpr _ expr main_dcl_module_n varHeap
-	=	convertExpr expr main_dcl_module_n varHeap
+convertRootExpr _ expr main_dcl_module_n
+	=	convertExpr expr main_dcl_module_n
 
-convertCondExpr :: Expression Int VarHeap -> BEMonad BENodeP
-convertCondExpr (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n varHeap
+convertCondExpr :: Expression Int -> BEMonad BENodeP
+convertCondExpr (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n
 		=	beGuardNode
-				(convertCondExpr cond main_dcl_module_n varHeap)
+				(convertCondExpr cond main_dcl_module_n)
 				beNoNodeDefs
 				beNoStrictNodeIds
-				(convertCondExpr then main_dcl_module_n varHeap)
+				(convertCondExpr then main_dcl_module_n)
 				beNoNodeDefs
 				beNoStrictNodeIds
-				(convertCondExpr else main_dcl_module_n varHeap)
-convertCondExpr expr main_dcl_module_n varHeap
-	=	convertExpr expr main_dcl_module_n varHeap
+				(convertCondExpr else main_dcl_module_n)
+convertCondExpr expr main_dcl_module_n
+	=	convertExpr expr main_dcl_module_n
 
 // RWS +++ rewrite
-convertLhsNodeDefs :: [FunctionPattern] BENodeDefP VarHeap -> BEMonad BENodeDefP
-convertLhsNodeDefs [FP_Basic value (Yes freeVar) : patterns] nodeDefs varHeap
-	=	convertLhsNodeDefs patterns nodeDefs varHeap ==> \nodeDefs
-	->	defineLhsNodeDef freeVar (FP_Basic value No) nodeDefs varHeap
-convertLhsNodeDefs [FP_Algebraic symbol subpatterns (Yes freeVar) : patterns] nodeDefs varHeap
-	=	convertLhsNodeDefs subpatterns nodeDefs varHeap ==> \nodeDefs
-	->	convertLhsNodeDefs patterns nodeDefs varHeap ==> \nodeDefs
-	->	defineLhsNodeDef freeVar (FP_Algebraic symbol subpatterns No) nodeDefs varHeap
-convertLhsNodeDefs [FP_Algebraic symbol subpatterns No : patterns] nodeDefs varHeap
-	=	convertLhsNodeDefs subpatterns nodeDefs varHeap ==> \nodeDefs
-	->	convertLhsNodeDefs patterns nodeDefs varHeap
-convertLhsNodeDefs [FP_Dynamic varPtrs var typeCode (Yes freeVar) : patterns] nodeDefs varHeap
-	=	convertLhsNodeDefs patterns nodeDefs varHeap ==> \nodeDefs
-	->	defineLhsNodeDef freeVar (FP_Dynamic varPtrs var typeCode No) nodeDefs varHeap
-convertLhsNodeDefs [_ : patterns] nodeDefs varHeap
-	=	convertLhsNodeDefs patterns nodeDefs varHeap
-convertLhsNodeDefs [] nodeDefs varHeap
+convertLhsNodeDefs :: [FunctionPattern] BENodeDefP -> BEMonad BENodeDefP
+convertLhsNodeDefs [FP_Basic value (Yes freeVar) : patterns] nodeDefs
+	=	convertLhsNodeDefs patterns nodeDefs ==> \nodeDefs
+	->	defineLhsNodeDef freeVar (FP_Basic value No) nodeDefs
+convertLhsNodeDefs [FP_Algebraic symbol subpatterns (Yes freeVar) : patterns] nodeDefs
+	=	convertLhsNodeDefs subpatterns nodeDefs ==> \nodeDefs
+	->	convertLhsNodeDefs patterns nodeDefs ==> \nodeDefs
+	->	defineLhsNodeDef freeVar (FP_Algebraic symbol subpatterns No) nodeDefs
+convertLhsNodeDefs [FP_Algebraic symbol subpatterns No : patterns] nodeDefs
+	=	convertLhsNodeDefs subpatterns nodeDefs ==> \nodeDefs
+	->	convertLhsNodeDefs patterns nodeDefs
+convertLhsNodeDefs [FP_Dynamic varPtrs var typeCode (Yes freeVar) : patterns] nodeDefs
+	=	convertLhsNodeDefs patterns nodeDefs ==> \nodeDefs
+	->	defineLhsNodeDef freeVar (FP_Dynamic varPtrs var typeCode No) nodeDefs
+convertLhsNodeDefs [_ : patterns] nodeDefs
+	=	convertLhsNodeDefs patterns nodeDefs
+convertLhsNodeDefs [] nodeDefs
 	=	return nodeDefs
 
-defineLhsNodeDef :: FreeVar FunctionPattern BENodeDefP VarHeap -> BEMonad BENodeDefP
-defineLhsNodeDef freeVar pattern nodeDefs varHeap
-	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr varHeap be0 in
+defineLhsNodeDef :: FreeVar FunctionPattern BENodeDefP -> BEMonad BENodeDefP
+defineLhsNodeDef freeVar pattern nodeDefs
+	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr be0 in
 		beNodeDefs
-			(beNodeDef variable_sequence_number (convertPattern pattern varHeap))
+			(beNodeDef variable_sequence_number (convertPattern pattern))
 			(return nodeDefs) be
 
 collectNodeDefs :: Ident Expression -> [LetBind]
@@ -1432,18 +1422,18 @@ collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
 collectNodeDefs _ _
 	=	[]
 
-convertRhsNodeDefs :: Ident Expression Int VarHeap -> BEMonad BENodeDefP
-convertRhsNodeDefs aliasDummyId expr main_dcl_module_n varHeap
-	=	convertNodeDefs (collectNodeDefs aliasDummyId expr) varHeap
+convertRhsNodeDefs :: Ident Expression Int -> BEMonad BENodeDefP
+convertRhsNodeDefs aliasDummyId expr main_dcl_module_n
+	=	convertNodeDefs (collectNodeDefs aliasDummyId expr)
 where
-	convertNodeDefs :: [LetBind] VarHeap -> BEMonad BENodeDefP
-	convertNodeDefs binds varHeap
-		=	sfoldr (beNodeDefs o flip convertNodeDef varHeap) beNoNodeDefs binds
+	convertNodeDefs :: [LetBind] -> BEMonad BENodeDefP
+	convertNodeDefs binds
+		=	sfoldr (beNodeDefs o convertNodeDef) beNoNodeDefs binds
 		where
-			convertNodeDef :: !LetBind VarHeap -> BEMonad BENodeDefP
-			convertNodeDef {lb_src=expr, lb_dst=freeVar} varHeap
-				= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr varHeap be0 in
-					beNodeDef variable_sequence_number (convertExpr expr main_dcl_module_n varHeap) be
+			convertNodeDef :: !LetBind -> BEMonad BENodeDefP
+			convertNodeDef {lb_src=expr, lb_dst=freeVar}
+				= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr be0 in
+					beNodeDef variable_sequence_number (convertExpr expr main_dcl_module_n) be
 
 collectStrictNodeIds :: Expression -> [FreeVar]
 collectStrictNodeIds (Let {let_strict_binds, let_expr})
@@ -1451,17 +1441,17 @@ collectStrictNodeIds (Let {let_strict_binds, let_expr})
 collectStrictNodeIds _
 	=	[]
 
-convertStrictNodeId :: FreeVar VarHeap -> BEMonad BEStrictNodeIdP
-convertStrictNodeId freeVar varHeap
-	=	beStrictNodeId (convertVar freeVar.fv_info_ptr varHeap)
+convertStrictNodeId :: FreeVar -> BEMonad BEStrictNodeIdP
+convertStrictNodeId freeVar
+	=	beStrictNodeId (convertVar freeVar.fv_info_ptr)
 
-convertStrictNodeIds :: [FreeVar] VarHeap -> BEMonad BEStrictNodeIdP
-convertStrictNodeIds freeVars varHeap
-	=	sfoldr (beStrictNodeIds o flip convertStrictNodeId varHeap) beNoStrictNodeIds freeVars
+convertStrictNodeIds :: [FreeVar] -> BEMonad BEStrictNodeIdP
+convertStrictNodeIds freeVars
+	=	sfoldr (beStrictNodeIds o convertStrictNodeId) beNoStrictNodeIds freeVars
 
-convertRhsStrictNodeIds :: Expression VarHeap -> BEMonad BEStrictNodeIdP
-convertRhsStrictNodeIds expression varHeap
-	=	convertStrictNodeIds (collectStrictNodeIds expression) varHeap
+convertRhsStrictNodeIds :: Expression -> BEMonad BEStrictNodeIdP
+convertRhsStrictNodeIds expression
+	=	convertStrictNodeIds (collectStrictNodeIds expression)
 
 convertLiteralSymbol :: BasicValue -> BEMonad BESymbolP
 convertLiteralSymbol (BVI intString)
@@ -1479,15 +1469,15 @@ convertTypeSymbolIdent :: TypeSymbIdent -> BEMonad BESymbolP
 convertTypeSymbolIdent {type_index={glob_module, glob_object}}
 	=	beTypeSymbol glob_object glob_module // ->> ("convertTypeSymbolIdent", (glob_module, glob_object))
 
-convertExpr :: Expression Int VarHeap -> BEMonad BENodeP
-convertExpr  expr main_dcl_module_n varHeap
-	= convertExpr expr varHeap
+convertExpr :: Expression Int -> BEMonad BENodeP
+convertExpr  expr main_dcl_module_n
+	= convertExpr expr
 where
-	convertExpr :: Expression VarHeap -> BEMonad BENodeP
-	convertExpr  (BasicExpr value _) varHeap
+	convertExpr :: Expression -> BEMonad BENodeP
+	convertExpr  (BasicExpr value _)
 		=	beNormalNode (convertLiteralSymbol value) beNoArgs
-	convertExpr  (App {app_symb, app_args}) varHeap
-		=	beNormalNode (convertSymbol app_symb) (convertArgs app_args varHeap)
+	convertExpr  (App {app_symb, app_args})
+		=	beNormalNode (convertSymbol app_symb) (convertArgs app_args)
 		where
 			convertSymbol :: !SymbIdent -> BEMonad BESymbolP
 			convertSymbol {symb_kind=SK_Function {glob_module, glob_object}}
@@ -1500,14 +1490,14 @@ where
 				=	beConstructorSymbol glob_module glob_object // ->> ("convertSymbol", (glob_module, glob_object))
 			convertSymbol symbol
 				=	undef <<- ("backendconvert, convertSymbol: unknown symbol") // , symbol)
-	convertExpr (Var var) varHeap
-		=	beNodeIdNode (convertVar var.var_info_ptr varHeap) beNoArgs
-	convertExpr (f @ [a]) varHeap
-		=	beNormalNode (beBasicSymbol BEApplySymb) (convertArgs [f, a] varHeap)
-	convertExpr (f @ [a:as]) varHeap
-		=	convertExpr (f @ [a] @ as) varHeap
-	convertExpr (Selection isUnique expression selections) varHeap
-		=	convertSelections (convertExpr expression varHeap) varHeap (addKinds isUnique selections)
+	convertExpr (Var var)
+		=	beNodeIdNode (convertVar var.var_info_ptr) beNoArgs
+	convertExpr (f @ [a])
+		=	beNormalNode (beBasicSymbol BEApplySymb) (convertArgs [f, a])
+	convertExpr (f @ [a:as])
+		=	convertExpr (f @ [a] @ as)
+	convertExpr (Selection isUnique expression selections)
+		=	convertSelections (convertExpr expression) (addKinds isUnique selections)
 		where
 			addKinds No selections
 				=	[(BESelector, selection) \\ selection <- selections]
@@ -1524,49 +1514,49 @@ where
 						=	[(BESelector_N, selection) : addMoreKinds selections]
 			addKinds _ []
 				=	[]
-	convertExpr (RecordUpdate _ expr updates) varHeap
-		=	foldl (convertUpdate varHeap) (convertExpr expr varHeap) updates
+	convertExpr (RecordUpdate _ expr updates)
+		=	foldl (convertUpdate) (convertExpr expr) updates
 		where
-			convertUpdate varHeap  expr {bind_src=NoBind _}
+			convertUpdate  expr {bind_src=NoBind _}
 				=	expr
-			convertUpdate varHeap expr {bind_src, bind_dst=bind_dst=:{glob_module, glob_object={fs_index}}}
+			convertUpdate expr {bind_src, bind_dst=bind_dst=:{glob_module, glob_object={fs_index}}}
 				=	beUpdateNode
 						(beArgs
 							expr
 							(beArgs
 								(beSelectorNode BESelector (beFieldSymbol fs_index glob_module)
-								(beArgs (convertExpr bind_src varHeap)
+								(beArgs (convertExpr bind_src)
 								beNoArgs))
 							beNoArgs))
-	convertExpr (Update expr1 [singleSelection] expr2) varHeap
+	convertExpr (Update expr1 [singleSelection] expr2)
 		=	case singleSelection of
 				RecordSelection _ _
-					->	beUpdateNode (convertArgs [expr1, Selection No expr2 [singleSelection]] varHeap)
+					->	beUpdateNode (convertArgs [expr1, Selection No expr2 [singleSelection]])
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
 	// RWS not used?, eleminate beSpecialArrayFunctionSymbol?
 					->	beNormalNode
 							(beSpecialArrayFunctionSymbol BEArrayUpdateFun ds_index glob_module)
-							(convertArgs [expr1, index, expr2] varHeap)
+							(convertArgs [expr1, index, expr2])
 	//
 				DictionarySelection dictionaryVar dictionarySelections _ index
-					->	convertExpr (Selection No (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2]) varHeap
-	convertExpr (Update expr1 selections expr2) varHeap
+					->	convertExpr (Selection No (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
+	convertExpr (Update expr1 selections expr2)
 		=	case lastSelection of
 				RecordSelection _ _
-					->	beUpdateNode (beArgs selection (convertArgs [Selection No expr2 [lastSelection]] varHeap))
+					->	beUpdateNode (beArgs selection (convertArgs [Selection No expr2 [lastSelection]]))
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
-					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2] varHeap))
+					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2]))
 				DictionarySelection dictionaryVar dictionarySelections _ index
 					->	beNormalNode beDictionaryUpdateFunSymbol
-								(beArgs dictionary (beArgs selection (convertArgs [index, expr2] varHeap)))
+								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
 						with
 							dictionary
-								=	convertExpr (Selection No (Var dictionaryVar) dictionarySelections) varHeap
+								=	convertExpr (Selection No (Var dictionaryVar) dictionarySelections)
 		where
 			lastSelection
 				=	last selections
 			selection
-				=	convertSelections (convertExpr expr1 varHeap) varHeap (addKinds (init selections))
+				=	convertSelections (convertExpr expr1) (addKinds (init selections))
 			addKinds [selection : selections]
 				=	[(BESelector_F, selection) : addMoreKinds selections]
 				where
@@ -1574,36 +1564,36 @@ where
 						=	[(BESelector_U, selection) \\ selection <- selections]
 			addKinds []
 				=	[]
-	convertExpr (TupleSelect {ds_arity} n expr) varHeap
-		=	beTupleSelectNode ds_arity n (convertExpr expr varHeap)
-	convertExpr (MatchExpr optionalTuple {glob_module, glob_object={ds_index}} expr) varHeap
-		=	beMatchNode (arity optionalTuple) (beConstructorSymbol glob_module ds_index) (convertExpr expr varHeap)
+	convertExpr (TupleSelect {ds_arity} n expr)
+		=	beTupleSelectNode ds_arity n (convertExpr expr)
+	convertExpr (MatchExpr optionalTuple {glob_module, glob_object={ds_index}} expr)
+		=	beMatchNode (arity optionalTuple) (beConstructorSymbol glob_module ds_index) (convertExpr expr)
 		where
 			arity :: (Optional (Global DefinedSymbol)) -> Int
 			arity No
 				=	1
 			arity (Yes {glob_object={ds_arity}})
 				=	ds_arity
-	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else}) varHeap
-		=	beIfNode (convertExpr cond varHeap) (convertExpr if_then varHeap) (convertExpr else varHeap)
+	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else})
+		=	beIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
 
-	convertExpr  expr _
+	convertExpr expr
 		=	undef <<- ("backendconvert, convertExpr: unknown expression" , expr)
 
-	convertArgs :: [Expression] VarHeap -> BEMonad BEArgP
-	convertArgs exprs varHeap
-		=	sfoldr (beArgs o flip convertExpr varHeap) beNoArgs exprs
+	convertArgs :: [Expression] -> BEMonad BEArgP
+	convertArgs exprs
+		=	sfoldr (beArgs o convertExpr) beNoArgs exprs
 
-	convertSelections :: (BEMonad BENodeP) VarHeap [(BESelectorKind, Selection)] -> (BEMonad BENodeP)
-	convertSelections expression varHeap selections
-		=	foldl (convertSelection varHeap) expression selections
+	convertSelections :: (BEMonad BENodeP) [(BESelectorKind, Selection)] -> (BEMonad BENodeP)
+	convertSelections expression selections
+		=	foldl (convertSelection) expression selections
 	
-	convertSelection :: VarHeap (BEMonad BENodeP) (BESelectorKind, Selection) -> (BEMonad BENodeP)
-	convertSelection varHeap expression (kind, RecordSelection {glob_object={ds_index}, glob_module} _)
+	convertSelection :: (BEMonad BENodeP) (BESelectorKind, Selection) -> (BEMonad BENodeP)
+	convertSelection expression (kind, RecordSelection {glob_object={ds_index}, glob_module} _)
 		=	beSelectorNode kind (beFieldSymbol ds_index glob_module) (beArgs expression beNoArgs)
-	convertSelection varHeap expression (kind, ArraySelection {glob_object={ds_index}, glob_module} _ index)
-		=	beNormalNode (beSpecialArrayFunctionSymbol (selectionKindToArrayFunKind kind) ds_index glob_module) (beArgs expression (convertArgs [index] varHeap))
-	convertSelection varHeap expression (kind, DictionarySelection dictionaryVar dictionarySelections _ index)
+	convertSelection expression (kind, ArraySelection {glob_object={ds_index}, glob_module} _ index)
+		=	beNormalNode (beSpecialArrayFunctionSymbol (selectionKindToArrayFunKind kind) ds_index glob_module) (beArgs expression (convertArgs [index]))
+	convertSelection expression (kind, DictionarySelection dictionaryVar dictionarySelections _ index)
 		=	case kind of
 				BESelector
 					->	beNormalNode (beBasicSymbol BEApplySymb)
@@ -1611,13 +1601,13 @@ where
 									(beNormalNode (beBasicSymbol BEApplySymb)
 									(beArgs dictionary
 										(beArgs expression beNoArgs)))
-								(convertArgs [index] varHeap))
+								(convertArgs [index]))
 				_
 					->	beNormalNode beDictionarySelectFunSymbol
-								(beArgs dictionary (beArgs expression (convertArgs [index] varHeap)))
+								(beArgs dictionary (beArgs expression (convertArgs [index])))
 			where
 				dictionary
-					=	convertExpr (Selection No (Var dictionaryVar) dictionarySelections) varHeap
+					=	convertExpr (Selection No (Var dictionaryVar) dictionarySelections)
 
 caseVar :: Expression -> BoundVar
 caseVar (Var var)
@@ -1625,26 +1615,26 @@ caseVar (Var var)
 caseVar expr
 	=	undef <<- ("backendconvert, caseVar: unknown expression", expr)
 
-class convertCases a :: a Ident BoundVar (Optional Expression) Int VarHeap -> BEMonad BEArgP
+class convertCases a :: a Ident BoundVar (Optional Expression) Int -> BEMonad BEArgP
 
 instance convertCases CasePatterns where
-	convertCases (AlgebraicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n varHeap
-		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n varHeap
-	convertCases (BasicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n varHeap
-		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n varHeap
+	convertCases (AlgebraicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n
+		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n
+	convertCases (BasicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n
+		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n
 	// +++ other patterns ???
 
 instance convertCases [a] | convertCase a where
-	convertCases patterns aliasDummyId var optionalCase main_dcl_module_n varHeap
+	convertCases patterns aliasDummyId var optionalCase main_dcl_module_n
 		=	sfoldr (beArgs o convertCase main_dcl_module_n (localRefCounts patterns optionalCase)
-						 varHeap aliasDummyId var) (convertDefaultCase optionalCase aliasDummyId main_dcl_module_n varHeap) patterns
+						 aliasDummyId var) (convertDefaultCase optionalCase aliasDummyId main_dcl_module_n) patterns
 	where
 		localRefCounts [x] No
 			=	False
 		localRefCounts _ _
 			=	True
 
-class convertCase a :: Int Bool VarHeap Ident BoundVar a -> BEMonad BENodeP
+class convertCase a :: Int Bool Ident BoundVar a -> BEMonad BENodeP
 
 caseNode localRefCounts arity symbolM defsM strictsM rhsM be
 	| localRefCounts
@@ -1686,13 +1676,13 @@ defaultNode defsM strictsM rhsM be
 	 	=	appBackEnd (BELeaveLocalScope defaul) be
 	=	(defaul, be)
 
-pushNode arity var varHeap symbolM argM nodeIdsM be
+pushNode arity var symbolM argM nodeIdsM be
 	# (symbol, be)
 		=	symbolM be
 	# (nodeIds, be)
 		=	nodeIdsM be
 	# (sequenceNumber, be)
-		=	getVariableSequenceNumber var.var_info_ptr varHeap be
+		=	getVariableSequenceNumber var.var_info_ptr be
 	# be
 		=	appBackEnd (BEAddNodeIdsRefCounts sequenceNumber symbol nodeIds) be
 	# (arg, be)
@@ -1700,51 +1690,51 @@ pushNode arity var varHeap symbolM argM nodeIdsM be
 	=	accBackEnd (BEPushNode arity symbol arg nodeIds) be
 
 instance convertCase AlgebraicPattern where
-	convertCase main_dcl_module_n localRefCounts varHeap aliasDummyId var {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
+	convertCase main_dcl_module_n localRefCounts aliasDummyId var {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
 		| symbolArity == 0
 			=	caseNode localRefCounts 0
 					(beConstructorSymbol glob_module ds_index)
-					(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n varHeap)
-					(convertRhsStrictNodeIds ap_expr varHeap)
-					(convertRootExpr aliasDummyId ap_expr main_dcl_module_n varHeap)
+					(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n)
+					(convertRhsStrictNodeIds ap_expr)
+					(convertRootExpr aliasDummyId ap_expr main_dcl_module_n)
 		// otherwise
 			=	caseNode localRefCounts symbolArity
 					(beConstructorSymbol glob_module ds_index) 
-					(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n varHeap)
-					(convertRhsStrictNodeIds ap_expr varHeap)
-					(pushNode symbolArity var varHeap
+					(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n)
+					(convertRhsStrictNodeIds ap_expr)
+					(pushNode symbolArity var
 						(beConstructorSymbol glob_module ds_index)
-						(beArgs (convertExpr (Var var) main_dcl_module_n varHeap) (beArgs (convertRootExpr aliasDummyId ap_expr main_dcl_module_n varHeap) beNoArgs))
-						(convertPatternVars ap_vars varHeap))
+						(beArgs (convertExpr (Var var) main_dcl_module_n) (beArgs (convertRootExpr aliasDummyId ap_expr main_dcl_module_n) beNoArgs))
+						(convertPatternVars ap_vars))
 		where
 			symbolArity
 				=	length ap_vars		// curried patterns ???
 
 instance convertCase BasicPattern where
-	convertCase main_dcl_module_n localRefCounts varHeap aliasDummyId _ {bp_value, bp_expr}
+	convertCase main_dcl_module_n localRefCounts aliasDummyId _ {bp_value, bp_expr}
 		=	caseNode localRefCounts 0
 				(convertLiteralSymbol bp_value)
-				(convertRhsNodeDefs aliasDummyId bp_expr main_dcl_module_n varHeap)
-				(convertRhsStrictNodeIds bp_expr varHeap)
-				(convertRootExpr aliasDummyId bp_expr main_dcl_module_n varHeap)
+				(convertRhsNodeDefs aliasDummyId bp_expr main_dcl_module_n)
+				(convertRhsStrictNodeIds bp_expr)
+				(convertRootExpr aliasDummyId bp_expr main_dcl_module_n)
 
-convertPatternVars :: [FreeVar] VarHeap -> BEMonad BENodeIdListP
-convertPatternVars vars varHeap
-	=	sfoldr (beNodeIds o flip convertPatternVar varHeap) beNoNodeIds vars
+convertPatternVars :: [FreeVar] -> BEMonad BENodeIdListP
+convertPatternVars vars
+	=	sfoldr (beNodeIds o convertPatternVar) beNoNodeIds vars
 
-convertPatternVar :: FreeVar VarHeap -> BEMonad BENodeIdListP
-convertPatternVar freeVar varHeap
-	=	beNodeIdListElem (convertVar freeVar.fv_info_ptr varHeap)
+convertPatternVar :: FreeVar -> BEMonad BENodeIdListP
+convertPatternVar freeVar
+	=	beNodeIdListElem (convertVar freeVar.fv_info_ptr)
 
-convertDefaultCase :: (Optional Expression) Ident Int VarHeap -> BEMonad BEArgP
-convertDefaultCase No _ _ varHeap
+convertDefaultCase :: (Optional Expression) Ident Int -> BEMonad BEArgP
+convertDefaultCase No _ _
 	=	beNoArgs
-convertDefaultCase (Yes expr) aliasDummyId main_dcl_module_n varHeap
+convertDefaultCase (Yes expr) aliasDummyId main_dcl_module_n
 	=	beArgs
 			(defaultNode
-				(convertRhsNodeDefs aliasDummyId expr main_dcl_module_n varHeap)
-				(convertRhsStrictNodeIds expr varHeap)
-				(convertRootExpr aliasDummyId expr main_dcl_module_n varHeap))
+				(convertRhsNodeDefs aliasDummyId expr main_dcl_module_n)
+				(convertRhsStrictNodeIds expr)
+				(convertRootExpr aliasDummyId expr main_dcl_module_n))
 			beNoArgs
 
 selectionKindToArrayFunKind BESelector
@@ -1758,19 +1748,19 @@ selectionKindToArrayFunKind BESelector_L
 selectionKindToArrayFunKind BESelector_N
 	=	BE_UnqArraySelectLastFun
 
-convertVar :: VarInfoPtr VarHeap -> BEMonad BENodeIdP
-convertVar varInfo varHeap
-	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber varInfo varHeap be0 in
+convertVar :: VarInfoPtr -> BEMonad BENodeIdP
+convertVar varInfo
+	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber varInfo be0 in
 		beNodeId variable_sequence_number be
 
-getVariableSequenceNumber :: VarInfoPtr VarHeap *BackEndState-> (!Int,!*BackEndState)
-getVariableSequenceNumber varInfoPtr varHeap be
-	# (vi,be) = read_from_var_heap varInfoPtr varHeap be
+getVariableSequenceNumber :: VarInfoPtr *BackEndState-> (!Int,!*BackEndState)
+getVariableSequenceNumber varInfoPtr be
+	# (vi,be) = read_from_var_heap varInfoPtr be
 	= case vi of
 		VI_SequenceNumber sequenceNumber
 			-> (sequenceNumber,be)
 		VI_Alias {var_info_ptr}
-			-> getVariableSequenceNumber var_info_ptr varHeap be
+			-> getVariableSequenceNumber var_info_ptr be
 		vi
 			-> abort "getVariableSequenceNumber" <<- vi
 
