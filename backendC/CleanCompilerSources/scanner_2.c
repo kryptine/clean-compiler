@@ -346,6 +346,9 @@ static int get_line_from_inline_file (char *line_buffer,int line_length)
 			
 			c=*buffer_p++;
 			--chars_left_in_buffer;
+
+			if (c=='\r')
+				c='\n';
 			
 			if (line_length>1){
 				--line_length;
