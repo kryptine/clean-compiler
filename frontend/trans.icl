@@ -507,7 +507,7 @@ where
 				 = foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group) (cleanup_info,class_env, fun_defs, ai.ai_var_heap, expr_heap)
 		= (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 	  where
-		set_case_expr_info ({case_expr=(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index) (cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
+		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index) (cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
 			# (VI_AccVar _ arg_position, var_heap) = readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},class_env) = class_env![fun_index]
 			  (aci_linearity_of_patterns, var_heap) = get_linearity_info cc_linear_bits case_guards var_heap
@@ -1264,6 +1264,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 		= undef
 	| False--->("producers:",II_Node prods nilPtr II_Empty II_Empty,("cc_args",cc_args,("cc_linear_bits",cc_linear_bits)))
 		= undef
+
 	# (TransformedBody {tb_args, tb_rhs}) = fd.fun_body
 	| False--->("body:",tb_args, tb_rhs)
 		= undef
@@ -1426,7 +1427,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
  	  		= {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1,ui_conversion_table=No }
 	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
 	  		= unfold tb_rhs ui us
-	  ro 	=	{ ro &	ro_root_case_mode = case tb_rhs of 
+//	| False--->("unfolded:", tb_rhs) = undef
+	# ro 	=	{ ro &	ro_root_case_mode = case tb_rhs of 
 	  						Case _
 	  							-> RootCase
 	  						_	-> NotRootCase,
@@ -1446,8 +1448,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 			= transform tb_rhs ro ti
 	  new_fd
 	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
-//	| (False--->("generated function", new_fd.fun_symb, '\n', new_fd.fun_type, new_cons_args))
-//`		= undef
+//	| (False--->("generated function", new_fd, new_cons_args))
+//		= undef
 	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
 where
 	is_dictionary {at_type=TA {type_index} _} es_td_infos
@@ -2009,12 +2011,11 @@ allocate_fresh_type_var i (accu, th_vars)
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_symb, app_args, extra_args) = complete_application app_symb fun_def.fun_arity app_args extra_args
 	| cc_size > 0
-// Sjaak:	  	# (producers, new_args, ti) = determineProducers fun_def.fun_info.fi_is_macro_fun cc_linear_bits cc_args app_args
 	  	# (producers, new_args, ti) = determineProducers (fun_def.fun_info.fi_properties bitand FI_IsMacroFun <> 0) cc_linear_bits cc_args app_args
 														 0 (createArray cc_size PR_Empty) ro ti
+//		| False--->("determineProducers",(cc_linear_bits,cc_args,app_symb.symb_name, app_args),("\nresults in",II_Node producers nilPtr II_Empty II_Empty))
+//			= undef
 	  	| containsProducer cc_size producers
-//			| False--->("determineProducers",(cc_linear_bits,cc_args,app_symb.symb_name, app_args),("\nresults in",II_Node producers nilPtr II_Empty II_Empty))
-//				= undef
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
 	  			# (fun_index, fun_arity, ti) = generateFunction fun_def cc producers fun_def_ptr ro
@@ -2118,7 +2119,7 @@ determineProducers _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
 determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
 	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun linear_bits cons_args args (inc prod_index) producers ro ti
-	| cons_arg == cActive
+ 	| cons_arg == cActive
 		= determine_producer is_applied_to_macro_fun linear_bit arg new_args prod_index producers ro ti
 	= (producers, [arg : new_args], ti)
 where
@@ -2223,7 +2224,7 @@ renewVariables :: ![Expression] !*VarHeap
 				-> (![Expression], !RenewState)
 renewVariables exprs var_heap
 	# (exprs, (new_vars, free_vars, var_heap))
-			= mapSt (mapExprSt map_expr preprocess_free_var postprocess_free_var)
+			= mapSt (mapExprSt map_expr preprocess_local_var postprocess_local_var)
 					exprs ([], [], var_heap)
 	  var_heap
 	  		= foldSt (\{var_info_ptr} var_heap -> writeVarInfo var_info_ptr VI_Empty var_heap)
@@ -2249,13 +2250,13 @@ renewVariables exprs var_heap
 				   )
 	map_expr x st = (x, st)
 
-	preprocess_free_var :: !FreeVar !RenewState -> (!FreeVar, !RenewState)
-	preprocess_free_var fv=:{fv_name, fv_info_ptr} (new_vars_accu, free_vars_accu, var_heap)
+	preprocess_local_var :: !FreeVar !RenewState -> (!FreeVar, !RenewState)
+	preprocess_local_var fv=:{fv_name, fv_info_ptr} (new_vars_accu, free_vars_accu, var_heap)
 		# (VI_Extended evi _, var_heap)
 				= readPtr fv_info_ptr var_heap
 		  (new_var, var_heap)
 				= allocate_and_bind_new_var fv_name fv_info_ptr evi var_heap
-		= ( { fv & fv_info_ptr = new_var.var_info_ptr}
+		= ( { fv & fv_info_ptr = new_var.var_info_ptr }
 		  , (new_vars_accu, free_vars_accu, var_heap))
 	allocate_and_bind_new_var var_name var_info_ptr evi var_heap
 		# (new_info_ptr, var_heap)
@@ -2265,8 +2266,8 @@ renewVariables exprs var_heap
 		  var_heap
 		  		= writeVarInfo var_info_ptr (VI_Forward new_var) var_heap
 		= (new_var, var_heap)
-	postprocess_free_var :: !FreeVar !RenewState -> RenewState
-	postprocess_free_var {fv_info_ptr} (a, b, var_heap)
+	postprocess_local_var :: !FreeVar !RenewState -> RenewState
+	postprocess_local_var {fv_info_ptr} (a, b, var_heap)
 		= (a, b, writeVarInfo fv_info_ptr VI_Empty var_heap)
 	
 
@@ -2307,7 +2308,6 @@ transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_
 
 	transform_function common_defs imported_funs fun ti=:{ti_fun_defs, ti_var_heap}
 		# (fun_def, ti_fun_defs) = ti_fun_defs![fun]
-//		| False--->("TRANSFORMING", fun_def.fun_symb, '\n') = undef
 		# (Yes {st_args}) = fun_def.fun_type
 		  {fun_body = TransformedBody tb} = fun_def
 		  ti_var_heap = fold2St (\{fv_info_ptr} a_type ti_var_heap
@@ -2696,7 +2696,7 @@ where
 	(<<<) file (PR_GeneratedFunction symbol index)
 		= file <<< "(G)" <<< symbol.symb_name <<< index
 	(<<<) file PR_Empty = file <<< 'E'
-	(<<<) file (PR_Class _ vars type) = file <<< "(Class(" <<< type <<< "))"
+	(<<<) file (PR_Class app vars type) = file <<< "(Class(" <<< App app<<<","<<< type <<< "))"
 	(<<<) file (PR_Curried {symb_name, symb_kind}) = file <<< "(Curried)" <<< symb_name <<< symb_kind
 	(<<<) file _ = file
 
@@ -2759,7 +2759,7 @@ mapExprSt map_expr map_free_var postprocess_free_var expr st :== map_expr_st exp
 		  (strict_rhss, st)
 		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_strict_binds st
 		  (let_expr, st)
-		  		= map_expr let_expr st
+		  		= map_expr_st let_expr st
 		  st = foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_lazy_binds st
 		  st = foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_strict_binds st
 		= map_expr ( Let { lad & let_lazy_binds = combine lazy_free_vars lazy_rhss let_lazy_binds,
@@ -2768,7 +2768,7 @@ mapExprSt map_expr map_free_var postprocess_free_var expr st :== map_expr_st exp
 						 })
 					st
 	map_expr_st (Selection a expr b) st
-		# (expr, st) = map_expr expr st
+		# (expr, st) = map_expr_st expr st
 		= map_expr (Selection a expr b) st
 
 combine :: [FreeVar] [Expression] [LetBind] -> [LetBind]
