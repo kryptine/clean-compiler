@@ -115,7 +115,7 @@ DoCommand ['p':_] argument proj ms=:{ms_io, ms_files}
 	# (file_name, rest_input)		= SplitAtLayoutChar (dropWhile isSpace argument)
 	  (predef_symbols, hash_table) 	= buildPredefinedSymbols newHashTable
 	  (mod_ident, hash_table) 		= putIdentInHashTable (toString file_name) IC_Module hash_table
-	= (False, Yes { proj_main_module = mod_ident, proj_hash_table = hash_table, proj_predef_symbols = predef_symbols, proj_modules = NoModules }, ms)
+	= (False, Yes { proj_main_module = mod_ident.boxed_ident, proj_hash_table = hash_table, proj_predef_symbols = predef_symbols, proj_modules = NoModules }, ms)
 DoCommand ['q':_] argument proj ms
 	= (True, proj, ms)
 DoCommand ['h':_] argument proj  ms=:{ms_io}
@@ -142,14 +142,14 @@ where
 compileModule mod_name ms
 	# (predef_symbols, hash_table) = buildPredefinedSymbols newHashTable
 	  (mod_ident, hash_table) = putIdentInHashTable mod_name IC_Module hash_table
-	  (opt_module, predef_symbols, hash_table, ms) = loadModule mod_ident predef_symbols hash_table ms
+	  (opt_module, predef_symbols, hash_table, ms) = loadModule mod_ident.boxed_ident predef_symbols hash_table ms
 	= (opt_module, ms)
 
 loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
-	# (predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out, optional_syntax_tree)
-		=	frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} No predef_symbols hash_table ms_files ms_error ms_io ms_out
-	  ms
-	  	=	{ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
+	# heaps = { hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = { th_vars = newHeap, th_attrs = newHeap }}
+	# (optional_syntax_tree,_,_,_,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_)
+		=	frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} {} {} No predef_symbols hash_table ms_files ms_error ms_io ms_out heaps
+	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
 		Yes {fe_icl={icl_functions}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
 			->	(Yes (buildInterMod mod_ident fe_dcls icl_functions fe_dclIclConversions fe_iclDclConversions), predef_symbols, hash_table, ms)
