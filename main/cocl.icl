@@ -10,19 +10,26 @@ Start world
 	=	coclMain testArgs world
 	where
 		testArgs
-			=	[
-					// main module			
-					"hello.icl"
-					// list all types
-				,	"-lat"
-					// generate readable abc code
-				,	"-d"
-					// Supercompilation
-				,	"-SC"
-					// paths
-				,	"-P", testDir +++ ";" +++ cleanDir +++ "IOInterface" +++ ";" +++ cleanDir +++ "StdEnv"
-				]
-		testDir
-			=	"C:\\Vincent\\Sucl\\"
-		cleanDir
-			=	"C:\\Clean 1.3.3\\"
+            =   [ "-SC"             // Supercompilation
+                , "-c"
+                , "-pt"
+                , "-desc"
+                , "-d"              // Generate readable abc code
+                , "-lat"            // List all types
+                , "-ou"
+                , iclFile           // Main module
+                , "-P",  paths      // Paths
+                , "-RE", errFile    // Error output
+                , "-RO", outFile    // Standard output
+                ]
+
+        modname = "hello"
+
+        iclFile = testDir+++modname+++".icl"
+        outFile = testDir+++modname+++".out"
+        errFile = testDir+++modname+++".err"
+
+        paths = testDir+++";;"+++cleanDir+++"StdEnv20"
+
+		testDir     =	"C:\\Vincent\\Sucl\\"
+		cleanDir    =	"C:\\Clean 1.3.3\\"
