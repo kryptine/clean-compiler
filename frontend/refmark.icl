@@ -478,7 +478,10 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 			= [ { sel & su_multiply = su_uniquely ++ su_multiply, su_uniquely = [] } : make_primary_selections_on_unique sels ]
 		make_primary_selections_on_unique []
 			= []
-
+/*
+makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} v:{# v:{# TypeDefInfo}} !*VarHeap !*ExpressionHeap !*ErrorAdmin
+	-> (!u:{# FunDef}, !*Coercions, !w:{! Type},  !v:{# v:{# TypeDefInfo}}, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+*/
 makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} !v:TypeDefInfos !*VarHeap !*ExpressionHeap !*ErrorAdmin
 	-> (!u:{# FunDef}, !*Coercions, !w:{! Type},  !v:TypeDefInfos, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 makeSharedReferencesNonUnique [] fun_defs coercion_env subst type_def_infos var_heap expr_heap  error
@@ -548,7 +551,6 @@ where
 						| succ
 //								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr)
 							-> (coercion_env, expr_heap, error)
-// MW3 was:							-> (coercion_env, expr_heap, uniquenessError { cp_expression = FreeVar free_var} " demanded attribute cannot be offered by shared object" error)
 							-> (coercion_env, expr_heap, uniquenessError (CP_Expression (FreeVar free_var)) " demanded attribute cannot be offered by shared object" error)
 					_
 						-> abort ("make_shared_occurrence_non_unique" ---> ((free_var, var_expr_ptr) <<- expr_info))
