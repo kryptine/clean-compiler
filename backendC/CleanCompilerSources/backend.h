@@ -1,7 +1,7 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02030407
+# define	kBEVersionCurrent				0x02100400
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not upward compatible (for example when a function is added)
