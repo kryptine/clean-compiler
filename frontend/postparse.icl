@@ -52,9 +52,13 @@ exprToRhs expr
 
 prefixAndPositionToIdent :: !String !LineAndColumn !*CollectAdmin -> (!Ident, !*CollectAdmin)
 prefixAndPositionToIdent prefix {lc_line, lc_column} ca=:{ca_hash_table}
-//	# (ident, ca_hash_table)	=	putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
-	# ({boxed_ident=ident}, ca_hash_table)	=	putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
-	=	(ident, { ca & ca_hash_table = ca_hash_table } )
+	# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
+	= (ident, { ca & ca_hash_table = ca_hash_table } )
+
+prefixAndPositionToIdentExp :: !String !LineAndColumn !*CollectAdmin -> (!ParsedExpr, !*CollectAdmin)
+prefixAndPositionToIdentExp prefix {lc_line, lc_column} ca=:{ca_hash_table}
+	# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
+	= (PE_Ident ident, { ca & ca_hash_table = ca_hash_table } )
 
 (`) infixl 9
 (`) f a
@@ -159,10 +163,12 @@ where
 	collectFunctions (PE_Compr gen_kind expr qualifiers) icl_module ca
 		# (compr, ca)
 			= transformComprehension gen_kind expr qualifiers ca
+//		| fst (ferror (stderr <<< compr))
+//		=	collectFunctions compr icl_module ca
 		=	collectFunctions compr icl_module ca
 	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) icl_module ca
 		# (compr, ca)
-			= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
+			= transformUpdateComprehension [expr] [updateExpr] [identExpr] identExpr qualifiers ca
 		=	collectFunctions compr icl_module ca
 	collectFunctions (PE_Sequ sequence) icl_module ca=:{ca_predefs}
 		= collectFunctions (transformSequence sequence ca_predefs) icl_module ca
@@ -371,7 +377,8 @@ transformLambda lam_ident args result pos icl_module
 makeNilExpression :: *CollectAdmin -> (ParsedExpr,*CollectAdmin)
 makeNilExpression ca=:{ca_predefs}
 	#! nil_id = ca_predefs.[PD_NilSymbol]
-	= (PE_List [PE_Ident nil_id], ca)
+	= (PE_Ident nil_id, ca)
+//	= (PE_List [PE_Ident nil_id], ca)
 
 makeConsExpression :: ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
 makeConsExpression a1 a2 ca=:{ca_predefs}
@@ -380,77 +387,298 @@ makeConsExpression a1 a2 ca=:{ca_predefs}
 
 // +++ change to accessor functions
 :: TransformedGenerator =
-	{	tg_expr :: ParsedExpr
-	,	tg_lhs_arg :: ParsedExpr
+	{	tg_expr :: ([ParsedDefinition],[ParsedExpr])
+	,	tg_lhs_arg :: [ParsedExpr]
 	,	tg_case_end_expr :: ParsedExpr
 	,	tg_case_end_pattern :: ParsedExpr
 	,	tg_element :: ParsedExpr
+	,	tg_element_is_uselect :: !Bool
 	,	tg_pattern :: ParsedExpr
+	,	tg_rhs_continuation :: [ParsedExpr]
 	,	tg_case1 :: Ident
 	,	tg_case2 :: Ident
-	,	tg_rhs_continuation :: ParsedExpr
 	}
 
-transformGenerator :: Generator *CollectAdmin -> (TransformedGenerator, *CollectAdmin)
-transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
-	| gen_kind == cIsListGenerator
-		# (gen_var, ca) = prefixAndPositionToIdent "g_l" gen_position ca
-		  (gen_var_i, ca) = prefixAndPositionToIdent "g_h" gen_position ca
-		  (gen_var_n, ca) = prefixAndPositionToIdent "g_t" gen_position ca
-		  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
-		  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
-		# list
-			=	PE_Ident gen_var
-		  hd
-			=	PE_Ident gen_var_i
-		  tl
-		  	=	PE_Ident gen_var_n
-		# (cons, ca)
-			=	makeConsExpression hd tl ca
-		  transformed_generator
-		  	=	{	tg_expr = gen_expr
-		  		,	tg_lhs_arg = list
-		  		,	tg_case_end_expr = list
-		  		,	tg_case_end_pattern = cons
-				,	tg_element = hd
-				,	tg_case1 = gen_var_case1
-				,	tg_case2 = gen_var_case2
-				,	tg_pattern = gen_pattern
-				,	tg_rhs_continuation = PE_Ident gen_var_n
-				}
-		=	(transformed_generator, ca)
-	// gen_kind == cIsArrayGenerator
-		# (gen_var, ca) = prefixAndPositionToIdent "g_a" gen_position ca
-		  (gen_var_i, ca) = prefixAndPositionToIdent "g_i" gen_position ca
-		  (gen_var_n, ca) = prefixAndPositionToIdent "g_s" gen_position ca
-		  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
-		  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
-		# (inc, ca)
-			=	get_predef_id PD_IncFun ca
-		  (smaller, ca)
-		  	=	get_predef_id PD_SmallerFun ca
-		  (usize, ca)
-		  	=	get_predef_id PD_UnqArraySizeFun ca
-		  (uselect, ca)
-		  	=	get_predef_id PD_UnqArraySelectFun ca
-		# array
-			=	PE_Ident gen_var
-		  i
-			=	PE_Ident gen_var_i
-		  n
-		  	=	PE_Ident gen_var_n
-		  transformed_generator
-		  	=	{	tg_expr = PE_Tuple [PE_Basic (BVI "0"), PE_List [PE_Ident usize, gen_expr]]
-		  		,	tg_lhs_arg = PE_Tuple [i, PE_Tuple [n, array]]
-		  		,	tg_case_end_expr = PE_List [PE_List [PE_Ident smaller], i, n]
-		  		,	tg_case_end_pattern = PE_Basic (BVB True)
-				,	tg_element = PE_List [PE_Ident uselect, array, i]
-				,	tg_case1 = gen_var_case1
-				,	tg_case2 = gen_var_case2
-				,	tg_pattern = PE_Tuple [gen_pattern, array]
-				,	tg_rhs_continuation = PE_Tuple [PE_List [PE_Ident inc, i], PE_Tuple [n, array]]
-				}
-		=	(transformed_generator, ca)
+:: IndexGenerator :== Optional (ParsedExpr,[([ParsedDefinition],ParsedExpr,ParsedExpr)])
+
+transformGenerator :: Generator String IndexGenerator *CollectAdmin -> (!TransformedGenerator,!IndexGenerator,!Int,!*CollectAdmin)
+transformGenerator {gen_kind=IsListGenerator, gen_expr=PE_Sequ (SQ_FromTo from_exp to_exp), gen_pattern, gen_position} qual_filename index_generator ca
+	# (n, ca) = prefixAndPositionToIdentExp "g_s" gen_position ca
+	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+	= case from_exp of
+		PE_Basic (BVI "0")
+			-> case index_generator of
+				No
+					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# (inc, ca) = get_predef_id PD_IncFun ca
+					  (less_or_equal, ca) = get_predef_id PD_LessOrEqualFun ca
+					# transformed_generator
+					  	=	{	tg_expr = ([],[from_exp,to_exp])
+					  		,	tg_lhs_arg = [i,n]
+					  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
+					  		,	tg_case_end_pattern = PE_Basic (BVB True)
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[([],to_exp,n)]),2,ca)
+				Yes (i,[])
+					# (inc, ca) = get_predef_id PD_IncFun ca
+					  (less_or_equal, ca) = get_predef_id PD_LessOrEqualFun ca
+					# transformed_generator
+					  	=	{	tg_expr = ([],[to_exp])
+					  		,	tg_lhs_arg = [n]
+					  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
+					  		,	tg_case_end_pattern = PE_Basic (BVB True)
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = [n]
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[([],to_exp,n)]),1,ca)
+				Yes (i,size_expressions)
+					# transformed_generator
+					  	=	{	tg_expr = ([],[])
+					  		,	tg_lhs_arg = []
+					  		,	tg_case_end_expr = PE_Empty
+					  		,	tg_case_end_pattern = PE_Empty
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = []
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[([],to_exp,n):size_expressions]),0,ca)
+		_
+			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (inc, ca) = get_predef_id PD_IncFun ca
+			  (less_or_equal, ca) = get_predef_id PD_LessOrEqualFun ca
+			# transformed_generator
+			  	=	{	tg_expr = ([],[from_exp,to_exp])
+			  		,	tg_lhs_arg = [i,n]
+			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
+			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+					,	tg_element = i
+					,	tg_element_is_uselect=False
+					,	tg_pattern = gen_pattern
+					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			-> (transformed_generator,index_generator,0,ca)
+transformGenerator {gen_kind=IsListGenerator, gen_expr=PE_Sequ (SQ_From from_exp), gen_pattern, gen_position} qual_filename index_generator ca
+	# (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+	= case from_exp of
+		PE_Basic (BVI "0")
+			-> case index_generator of
+				No
+					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# (inc, ca) = get_predef_id PD_IncFun ca
+					# transformed_generator
+					  	=	{	tg_expr = ([],[from_exp])
+					  		,	tg_lhs_arg = [i]
+					  		,	tg_case_end_expr = PE_Empty
+					  		,	tg_case_end_pattern = PE_Empty
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[]),0,ca)
+				Yes (i,size_expressions)
+					# transformed_generator
+					  	=	{	tg_expr = ([],[])
+					  		,	tg_lhs_arg = []
+					  		,	tg_case_end_expr = PE_Empty
+					  		,	tg_case_end_pattern = PE_Empty
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = []
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,index_generator,0,ca)
+		_
+			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (inc, ca) = get_predef_id PD_IncFun ca
+			# transformed_generator
+			  	=	{	tg_expr = ([],[from_exp])
+			  		,	tg_lhs_arg = [i]
+			  		,	tg_case_end_expr = PE_Empty
+			  		,	tg_case_end_pattern = PE_Empty
+					,	tg_element = i
+					,	tg_element_is_uselect=False
+					,	tg_pattern = gen_pattern
+					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			-> (transformed_generator,index_generator,0,ca)
+transformGenerator {gen_kind=IsListGenerator, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
+	# (list, ca) = prefixAndPositionToIdentExp "g_l" gen_position ca
+	  (hd, ca) = prefixAndPositionToIdentExp "g_h" gen_position ca
+	  (tl, ca) = prefixAndPositionToIdentExp "g_t" gen_position ca
+	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+	  (cons, ca) = makeConsExpression hd tl ca
+	# transformed_generator
+	  	=	{	tg_expr = ([],[gen_expr])
+	  		,	tg_lhs_arg = [list]
+	  		,	tg_case_end_expr = list
+	  		,	tg_case_end_pattern = cons
+			,	tg_element = hd
+			,	tg_element_is_uselect=False
+			,	tg_pattern = gen_pattern
+			,	tg_rhs_continuation = [tl]
+			,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+			}
+	= (transformed_generator,index_generator,0,ca)
+transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
+	# (array, ca) = prefixAndPositionToIdentExp "g_a" gen_position ca
+	  (n, ca) = prefixAndPositionToIdentExp "g_s" gen_position ca
+	  (n2, ca) = prefixAndPositionToIdentExp "g_s2" gen_position ca
+	  (a2, ca) = prefixAndPositionToIdentExp "g_a2" gen_position ca
+	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+	  (less_or_equal, ca) = get_predef_id PD_LessOrEqualFun ca
+	  (sub, ca) = get_predef_id PD_SubFun ca
+	  (usize, ca) = get_predef_id PD_UnqArraySizeFun ca
+	  (uselect, ca) = get_predef_id PD_UnqArraySelectFun ca
+	  pattern = PE_Tuple [gen_pattern, array]
+	= case index_generator of
+		No
+			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			  (inc, ca) = get_predef_id PD_IncFun ca
+			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVI "1")]
+			# transformed_generator
+			  	=	{	tg_expr =	([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
+				  					[PE_Basic (BVI "0"),dec_n,a2])
+			  		,	tg_lhs_arg = [i, n, array]
+			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal, n]
+			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+					,	tg_element = PE_List [PE_Ident uselect, array, i]
+					,	tg_element_is_uselect=True
+					,	tg_pattern = pattern
+					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n, array]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			-> (transformed_generator,Yes (i,[([],dec_n,n2)]),2,ca)
+		Yes (i,[])
+			# (inc, ca) = get_predef_id PD_IncFun ca
+			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVI "1")]
+			# transformed_generator
+			  	=	{	tg_expr =	([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
+				  					[dec_n,a2])
+			  		,	tg_lhs_arg = [n,array]
+			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal, n]
+			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+					,	tg_element = PE_List [PE_Ident uselect, array, i]
+					,	tg_element_is_uselect=True
+					,	tg_pattern = pattern
+					,	tg_rhs_continuation = [n,array]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			-> (transformed_generator,Yes (i,[([],dec_n,n2)]),1,ca)
+		Yes (i,size_expressions)
+			# transformed_generator
+			  	=	{	tg_expr = ([],[a2])
+					,	tg_lhs_arg = [array]
+			  		,	tg_case_end_expr = PE_Empty
+			  		,	tg_case_end_pattern = PE_Empty
+					,	tg_element = PE_List [PE_Ident uselect, array, i]
+					,	tg_element_is_uselect=True
+					,	tg_pattern = pattern
+					,	tg_rhs_continuation = [array]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			# size_expression
+				=([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
+				  					(PE_List [n,PE_Ident sub,PE_Basic (BVI "1")]),n2)
+			-> (transformed_generator,Yes (i,[size_expression:size_expressions]),0,ca)
+
+transformGenerators :: [Generator] String IndexGenerator *CollectAdmin -> (![TransformedGenerator],!IndexGenerator,!*CollectAdmin)
+transformGenerators [generator:generators] qual_filename index_generator ca
+	# (transformed_generator,index_generator,index_argument_n,ca) = transformGenerator generator qual_filename index_generator ca
+	| index_argument_n>0
+		# (transformed_generators,index_generator,ca) = transformGenerators generators qual_filename index_generator ca		
+		# (node_defs,size_exp,_,ca) = compute_minimum_of_sizes index_generator generator.gen_position ca
+		# transformed_generator = store_minimum_of_sizes_in_generator node_defs size_exp index_argument_n transformed_generator
+		= ([transformed_generator:transformed_generators],index_generator,ca)
+		# (transformed_generators,index_generator,ca) = transformGenerators generators qual_filename index_generator ca
+		= ([transformed_generator:transformed_generators],index_generator,ca)
+transformGenerators [] qual_filename index_generator ca
+	= ([],index_generator,ca)
+
+transformGeneratorsAndReturnSize :: [Generator] String IndexGenerator ParsedExpr *CollectAdmin -> (![TransformedGenerator],!IndexGenerator,!ParsedExpr,!*CollectAdmin)
+transformGeneratorsAndReturnSize [generator:generators] qual_filename index_generator size_exp ca
+	# (transformed_generator,index_generator,index_argument_n,ca) = transformGenerator generator qual_filename index_generator ca
+	| index_argument_n>0
+		# (transformed_generators,index_generator,_,ca) = transformGeneratorsAndReturnSize generators qual_filename index_generator size_exp ca		
+
+		# (node_defs,size_exp,ident,ca) = compute_minimum_of_sizes index_generator generator.gen_position ca
+		# (node_defs,size_exp) = case size_exp of
+									PE_Ident _
+										-> (node_defs,size_exp)
+									_
+										-> (node_defs++[PD_NodeDef NoPos ident (exprToRhs size_exp)],ident)
+		# transformed_generator = store_minimum_of_sizes_in_generator node_defs size_exp index_argument_n transformed_generator
+
+		# (inc,ca) = get_predef_id PD_IncFun ca
+		# size_exp = PE_List [PE_Ident inc,size_exp]
+		
+		= ([transformed_generator:transformed_generators],index_generator,size_exp,ca)
+
+		# (transformed_generators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize generators qual_filename index_generator size_exp ca
+		= ([transformed_generator:transformed_generators],index_generator,size_exp,ca)
+transformGeneratorsAndReturnSize [] qual_filename index_generator size_exp ca
+	= ([],index_generator,size_exp,ca)
+
+compute_minimum_of_sizes :: IndexGenerator LineAndColumn *CollectAdmin -> *(![ParsedDefinition],!ParsedExpr,!ParsedExpr,!*CollectAdmin);
+compute_minimum_of_sizes (Yes (i,sizes)) gen_position ca
+	= compute_minimum (reverse sizes) 1 ca
+where
+	compute_minimum [(node_defs,exp,ident)] n ca
+		= (node_defs,exp,ident,ca)
+	compute_minimum [(node_defs1,exp1,ident1):sizes] n ca
+		# (node_defs2,exp2,ident2,ca) = compute_minimum sizes (n+1) ca
+		# node_defs=node_defs1++node_defs2
+		# (to_exp,ca)=minimum exp1 exp2 ca
+			with
+				minimum ident1=:(PE_Ident _) ident2=:(PE_Ident _) ca
+					= minimum_of_idents ident1 ident2 ca
+				minimum exp1 ident2=:(PE_Ident _) ca
+					# node_def1 = PD_NodeDef NoPos ident1 (exprToRhs exp1)
+					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
+					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def1]) min_exp,ca)
+				minimum ident1=:(PE_Ident _) exp2 ca
+					# node_def2 = PD_NodeDef NoPos ident2 (exprToRhs exp2)
+					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
+					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def2]) min_exp,ca)
+				minimum exp1 exp2 ca
+					# node_def1 = PD_NodeDef NoPos ident1 (exprToRhs exp1)
+					# node_def2 = PD_NodeDef NoPos ident2 (exprToRhs exp2)
+					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
+					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def1,node_def2]) min_exp,ca)
+				
+				minimum_of_idents ident1 ident2 ca
+					# (smaller_fun,ca) = get_predef_id PD_SmallerFun ca
+					# (case_ident,ca) = prefixAndPositionToIdent ("g_s"+++toString n) gen_position ca
+					= (PE_Case case_ident (PE_List [ident1,PE_Ident smaller_fun,ident2])
+						[{calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs ident1},
+						 {calt_pattern = PE_WildCard, calt_rhs = exprToRhs ident2}],ca)
+		= (node_defs,to_exp,ident1,ca)
+
+store_minimum_of_sizes_in_generator :: [ParsedDefinition] ParsedExpr Int TransformedGenerator -> TransformedGenerator;
+store_minimum_of_sizes_in_generator node_defs size_exp index_argument_n generator=:{tg_expr=(exp_node_defs,exps)}
+	# exps=replace_exp_n index_argument_n exps
+		with
+			replace_exp_n 1 [e:l] = [size_exp:l]
+			replace_exp_n n [e:l] = [e: replace_exp_n (n-1) l]
+	= {generator & tg_expr=(node_defs++exp_node_defs,exps)}
 
 ::	TransformedQualifier =
 	{	tq_generators :: [TransformedGenerator]
@@ -464,17 +692,31 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
 	,	tq_fun_pos :: !Position
 	}
 
+rhs_continuation_args_from_generators generators
+	= [arg \\ generator<-generators, arg<-generator.tg_rhs_continuation]
+
+expr_args_from_generators generators
+	= [arg \\ {tg_expr=(_,args)}<-generators, arg<-args]
+
+lhs_args_from_generators generators
+	= [arg \\ generator<-generators, arg<-generator.tg_lhs_arg]
+
+add_node_defs_to_exp [] exp
+	= exp
+add_node_defs_to_exp [{tg_expr=([],_)}:generators] exp
+	= add_node_defs_to_exp generators exp
+add_node_defs_to_exp [{tg_expr=(node_defs,_)}:generators] exp
+	= PE_Let cIsNotStrict (LocalParsedDefs node_defs) (add_node_defs_to_exp generators exp)
+
 transformQualifier :: Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
 transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} ca
-	# (transformedGenerators, ca)
-		=	mapSt transformGenerator qual_generators ca
-	# (qual_fun_id, ca)
-		=	prefixAndPositionToIdent "c" qual_position ca
+	# (transformedGenerators,index_generator,ca) = transformGenerators qual_generators qual_filename No ca
+	# (qual_fun_id, ca) = prefixAndPositionToIdent "c" qual_position ca
 	=	({	tq_generators = transformedGenerators
-		,	tq_call = PE_List [PE_Ident qual_fun_id : [generator.tg_expr \\ generator <- transformedGenerators]]
-		,	tq_lhs_args = [generator.tg_lhs_arg \\ generator <- transformedGenerators]
+		,	tq_call = add_node_defs_to_exp transformedGenerators (PE_List [PE_Ident qual_fun_id : expr_args_from_generators transformedGenerators])
+		,	tq_lhs_args = lhs_args_from_generators transformedGenerators
 		,	tq_filter = qual_filter
-		,	tq_continue = PE_List [PE_Ident qual_fun_id : [generator.tg_rhs_continuation \\ generator <- transformedGenerators]]
+		,	tq_continue = PE_List [PE_Ident qual_fun_id : rhs_continuation_args_from_generators transformedGenerators]
 		,	tq_success = PE_Empty
 		,	tq_end = PE_Empty
 		,	tq_fun_id = qual_fun_id
@@ -482,17 +724,18 @@ transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} 
 		}, ca)
 
 // =array&callArray are misnomers (can also be records)
-transformUpdateQualifier :: ParsedExpr ParsedExpr Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
+transformUpdateQualifier :: [ParsedExpr] [ParsedExpr] Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
 transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position, qual_filename} ca
-	# (transformedGenerators, ca)
-		=	mapSt transformGenerator qual_generators ca
-	# (qual_fun_id, ca)
-		=	prefixAndPositionToIdent "cu" qual_position ca
+	# (transformedGenerators,index_generator,ca) = transformGenerators qual_generators qual_filename No ca
+	= CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_filter qual_position qual_filename ca
+	
+CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_filter qual_position qual_filename ca
+	# (qual_fun_id, ca) = prefixAndPositionToIdent "cu" qual_position ca
 	=	({	tq_generators = transformedGenerators
-		,	tq_call = PE_List [PE_Ident qual_fun_id, callArray : [generator.tg_expr \\ generator <- transformedGenerators]]
-		,	tq_lhs_args = [array : [generator.tg_lhs_arg \\ generator <- transformedGenerators]]
+		,	tq_call = add_node_defs_to_exp transformedGenerators (PE_List [PE_Ident qual_fun_id : callArray ++ expr_args_from_generators transformedGenerators])
+		,	tq_lhs_args = array ++ lhs_args_from_generators transformedGenerators
 		,	tq_filter = qual_filter
-		,	tq_continue = PE_List [PE_Ident qual_fun_id, array : [generator.tg_rhs_continuation \\ generator <- transformedGenerators]]
+		,	tq_continue = PE_List [PE_Ident qual_fun_id : array ++ rhs_continuation_args_from_generators transformedGenerators]
 		,	tq_success = PE_Empty
 		,	tq_end = PE_Empty
 		,	tq_fun_id = qual_fun_id
@@ -500,91 +743,132 @@ transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_pos
 		}, ca)
 
 transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-transformComprehension gen_kind expr qualifiers ca
-	| gen_kind == cIsListGenerator
-		# (transformed_qualifiers, ca)
-		  	=	mapSt transformQualifier qualifiers ca
-		  (success, ca)
-			=	makeConsExpression expr (last transformed_qualifiers).tq_continue ca
-		  (nil, ca)
-			=	makeNilExpression ca
-		  transformed_qualifiers
-		  	=	[	{qual & tq_success = success, tq_end = end}
-		  		\\	qual <- transformed_qualifiers
-		  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
-		  		&	end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
-		  		]
-		=	makeComprehensions transformed_qualifiers success No ca
-	// gen_kin == cIsArrayGenerator
-		# [hd_qualifier : tl_qualifiers] = qualifiers
-		  qual_position = hd_qualifier.qual_position
-		  (c_i, ca) = prefixAndPositionToIdent "c_i" qual_position ca
-		  (c_a, ca) = prefixAndPositionToIdent "c_a" qual_position ca
-		  (frm, ca)
-		  	=	get_predef_id PD_From ca
-		  index_range
-		  	=	PE_List [PE_Ident frm, PE_Basic (BVI "0")]
-		  index_generator = {gen_kind=cIsListGenerator, gen_pattern=PE_Ident c_i, gen_expr=index_range, gen_position=qual_position}
-		  (create_array, ca)
-		  	=	get_predef_id PD__CreateArrayFun ca
-		  (length, ca)
-		  	=	computeLength qualifiers qual_position hd_qualifier.qual_filename ca
-		  new_array
-		  	=	PE_List [PE_Ident create_array, length]
-		  update
-		  	=	PE_Update (PE_Ident c_a) [PS_Array  (PE_Ident c_i)] expr
-		  qualifiers
-		  	=	[{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] } : tl_qualifiers]
-		=	transformUpdateComprehension new_array update (PE_Ident c_a) qualifiers ca
-
-computeLength :: [Qualifier] LineAndColumn FileName *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-computeLength qualifiers qual_position qual_filename ca
-	# (fun_ident, ca)
-		=	prefixAndPositionToIdent "c_l" qual_position ca
-	  (tail_ident, ca)
-		=	prefixAndPositionToIdent "c_l_t" qual_position ca
-	  (i_ident, ca)
-		=	prefixAndPositionToIdent "c_l_i" qual_position ca
-	  (list, ca)
-		=	transformComprehension cIsListGenerator (PE_Basic (BVI "0")) qualifiers ca
-	  (cons, ca)
-	  	=	makeConsExpression PE_WildCard (PE_Ident tail_ident) ca
-	  (inc, ca)
-		=	get_predef_id PD_IncFun ca
-	  new_fun_pos = LinePos qual_filename qual_position.lc_line
-	  parsedFunction1
-		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] 
-						(exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
-						new_fun_pos
-	  parsedFunction2
-		=	MakeNewParsedDef fun_ident [PE_WildCard, PE_Ident i_ident] (exprToRhs (PE_Ident i_ident)) new_fun_pos
-	= (PE_Let cIsStrict (LocalParsedDefs [parsedFunction1, parsedFunction2])
-				(PE_List [PE_Ident fun_ident, list, PE_Basic (BVI "0")]), ca)
-
-transformUpdateComprehension :: ParsedExpr ParsedExpr ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca
-	# (transformed_first_qualifier, ca)
-	  	=	transformUpdateQualifier identExpr expr qualifier ca
-	  (transformed_rest_qualifiers, ca)
-	  	=	mapSt (transformUpdateQualifier identExpr identExpr) qualifiers ca
-	  transformed_qualifiers
-		=	[transformed_first_qualifier : transformed_rest_qualifiers]
-	  success
-	  	// +++ remove hack
-	  	=	this_is_definitely_a_hack (last transformed_qualifiers).tq_continue updateExpr
-			with
-				this_is_definitely_a_hack (PE_List [f, a : args]) updateExpr
-					=	PE_List [f, updateExpr : args]
+transformComprehension IsListGenerator expr qualifiers ca
+	# (transformed_qualifiers, ca) = mapSt transformQualifier qualifiers ca
+	  (success, ca) = makeConsExpression expr (last transformed_qualifiers).tq_continue ca
+	  (nil, ca) = makeNilExpression ca
 	  transformed_qualifiers
 	  	=	[	{qual & tq_success = success, tq_end = end}
 	  		\\	qual <- transformed_qualifiers
 	  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
-	  		&	end <- [identExpr : [qual.tq_continue \\ qual <- transformed_qualifiers]]
+	  		&	end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
 	  		]
- 	=	makeComprehensions transformed_qualifiers success (Yes identExpr) ca
+	= makeComprehensions transformed_qualifiers success [] ca
+transformComprehension IsArrayGenerator expr qualifiers ca
+	# [hd_qualifier:_] = qualifiers
+	  qual_position = hd_qualifier.qual_position
+	  (c_i_ident_exp, ca) = prefixAndPositionToIdentExp "c_i" qual_position ca
+	  (c_a_ident_exp, ca) = prefixAndPositionToIdentExp "c_a" qual_position ca
+	  (create_array, ca) = get_predef_id PD__CreateArrayFun ca
+	| same_index_for_update_and_array_generators qualifiers
+		# index_range = PE_Sequ (SQ_From (PE_Basic (BVI "0")))
+		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From (PE_Basic (BVI "0"))), gen_position=qual_position}
+		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
+		| size_of_generators_can_be_computed_quickly qualifiers
+			# {qual_generators,qual_filter,qual_position,qual_filename} = hd_qualifier
+			# qual_generators = [index_generator : qual_generators]
+			# (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
+			# new_array = PE_List [PE_Ident create_array,size_exp]
+			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_filter qual_position qual_filename ca
+			= makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier] ca
+
+			# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
+			# new_array = PE_List [PE_Ident create_array,length]
+			  qualifiers = [{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] }]
+			= transformUpdateComprehension [new_array] [update] [c_a_ident_exp] c_a_ident_exp qualifiers ca
+
+		# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
+		# new_array = PE_List [PE_Ident create_array,length]
+		# (inc,ca) = get_predef_id PD_IncFun ca
+		  new_array_and_index =	[new_array,PE_Basic (BVI "0")]
+		  update = [PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
+		= transformUpdateComprehension new_array_and_index update [c_a_ident_exp,c_i_ident_exp] c_a_ident_exp qualifiers ca
+
+All p l :== all l
+where
+	all [] = True
+	all [b : tl] = p b && all tl
+
+pattern_will_always_match (PE_Ident _)
+	= True;
+pattern_will_always_match (PE_Tuple tuple_args)
+	= All pattern_will_always_match tuple_args
+pattern_will_always_match _
+	= False
+
+patterns_in_generator_will_always_match {gen_pattern}
+	= pattern_will_always_match gen_pattern
+
+same_index_for_update_and_array_generators [{qual_generators,qual_filter=No}]
+	= All patterns_in_generator_will_always_match qual_generators
+same_index_for_update_and_array_generators _
+	= False
+
+transformUpdateQualifiers :: [ParsedExpr] [ParsedExpr] [Qualifier] *CollectAdmin -> *(![TransformedQualifier],!*CollectAdmin);
+transformUpdateQualifiers identExprs exprs [first_qualifier:rest_qualifiers] ca
+	# (transformed_first_qualifier,ca) = transformUpdateQualifier identExprs exprs first_qualifier ca
+	  (transformed_rest_qualifiers,ca) = mapSt (transformUpdateQualifier identExprs identExprs) rest_qualifiers ca
+	= ([transformed_first_qualifier : transformed_rest_qualifiers],ca)
+
+makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_expr ca
+	# transformed_qualifiers
+	  	=	[	{qual & tq_success = success, tq_end = end}
+	  		\\	qual <- transformed_qualifiers
+	  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
+	  		&	end <- [result_expr : [qual.tq_continue \\ qual <- transformed_qualifiers]]
+	  		]
+ 	= makeComprehensions transformed_qualifiers success identExprs ca
+
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsArrayGenerator}
+	= pattern_will_always_match gen_pattern
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_FromTo (PE_Basic (BVI "0")) to_exp)}
+	= pattern_will_always_match gen_pattern	
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From from_exp)}
+	= pattern_will_always_match gen_pattern	
+size_of_generator_can_be_computed_quickly _
+	= False
+
+size_of_generators_can_be_computed_quickly qualifiers=:[qualifier=:{qual_generators,qual_filter=No}]
+	= All size_of_generator_can_be_computed_quickly qual_generators && not (All is_from_generator qual_generators)
+	where
+		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From from_exp)}
+			= True
+		is_from_generator _
+			= False
+size_of_generators_can_be_computed_quickly _
+	= False
+
+computeSize :: [Qualifier] LineAndColumn FileName *CollectAdmin -> (!ParsedExpr,!*CollectAdmin)
+computeSize qualifiers qual_position qual_filename ca
+	# (counter_ident_exp, ca) = prefixAndPositionToIdentExp "c_l_i" qual_position ca
+	  (transformed_qualifiers,ca) = transformUpdateQualifiers [counter_ident_exp] [PE_Basic (BVI "0")] qualifiers ca
+	  (inc,ca) = get_predef_id PD_IncFun ca
+	  success = insert_inc_in_inner_loop (last transformed_qualifiers).tq_continue
+				with
+					insert_inc_in_inner_loop (PE_List [f, a : args])
+						= PE_List [f, PE_List  [PE_Ident inc,a] : args]
+	= makeUpdateOrSizeComprehension transformed_qualifiers success [counter_ident_exp] counter_ident_exp ca
+
+transformUpdateComprehension :: [ParsedExpr] [ParsedExpr] [ParsedExpr] ParsedExpr [Qualifier] *CollectAdmin -> (!ParsedExpr,!*CollectAdmin)
+transformUpdateComprehension exprs updateExprs identExprs result_expr qualifiers ca
+	# (transformed_qualifiers,ca) = transformUpdateQualifiers identExprs exprs qualifiers ca
+	= makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_expr transformed_qualifiers ca
+
+makeUpdateComprehensionFromTransFormedQualifiers :: [ParsedExpr] [ParsedExpr] ParsedExpr [TransformedQualifier] *CollectAdmin -> *(!ParsedExpr,!*CollectAdmin);
+makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_expr transformed_qualifiers ca
+	# success
+	  	// +++ remove hack
+	  	=	this_is_definitely_a_hack (last transformed_qualifiers).tq_continue updateExprs
+			with
+				this_is_definitely_a_hack (PE_List [f : args]) updateExprs
+					=	PE_List [f : replace_args updateExprs args]
+					with
+						replace_args [] args = args
+						replace_args [e:l] [a:args] = [e:replace_args l args]
+	= makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_expr ca
 
 // +++ rewrite threading
-makeComprehensions :: [TransformedQualifier] ParsedExpr (Optional ParsedExpr) *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+makeComprehensions :: [TransformedQualifier] ParsedExpr [ParsedExpr] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 makeComprehensions [] success _ ca
 	=	(success, ca)
 makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
@@ -597,12 +881,7 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 								 -> (ParsedExpr, *CollectAdmin)
 		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident fun_pos ca
 			# continue
-				=	PE_List (thread (PE_Ident fun_ident) threading [generator.tg_rhs_continuation \\ generator <- generators])
-				with
-					thread ident No args
-						=	[ident : args]
-					thread ident (Yes thread) args
-						=	[ident, thread : args]
+				=	PE_List [PE_Ident fun_ident : threading ++ rhs_continuation_args_from_generators generators]
 			  failure
 				=	continue
 			  rhs
@@ -613,10 +892,11 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 
 		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
 		build_rhs [generator : generators] success optional_filter failure end fun_pos
-			=	case_with_default generator.tg_case1 generator.tg_case_end_expr generator.tg_case_end_pattern
+			=	case_with_default generator.tg_case1 generator.tg_case_end_expr False generator.tg_case_end_pattern
 					(foldr (case_end end)
-						(case_with_default generator.tg_case2 generator.tg_element generator.tg_pattern
-							(foldr (case_pattern failure) rhs generators) failure)
+						(case_with_default generator.tg_case2 generator.tg_element generator.tg_element_is_uselect generator.tg_pattern
+							(foldr (case_pattern failure) rhs generators)
+							failure)
 						generators)
 					end
 			where
@@ -644,20 +924,42 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 
 		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
-			=	case_with_default tg_case1 tg_case_end_expr tg_case_end_pattern rhs end
+			=	case_with_default tg_case1 tg_case_end_expr False tg_case_end_pattern rhs end
 	
 		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
-		case_pattern failure {tg_case2, tg_element, tg_pattern} rhs
-			=	case_with_default tg_case2 tg_element tg_pattern rhs failure
-	
+		case_pattern failure {tg_case2, tg_element,tg_element_is_uselect, tg_pattern} rhs
+			=	case_with_default tg_case2 tg_element tg_element_is_uselect tg_pattern rhs failure
+
 		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
 		single_case case_ident expr pattern rhs
 			=	exprToRhs (PE_Case case_ident expr
 					[	{calt_pattern = pattern, calt_rhs = rhs}
 					])
-	
-		case_with_default :: Ident ParsedExpr ParsedExpr Rhs ParsedExpr -> Rhs
-		case_with_default case_ident expr pattern rhs default_rhs
+
+		case_with_default :: Ident ParsedExpr Bool ParsedExpr Rhs ParsedExpr -> Rhs
+		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
+			# new_node={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
+			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node:ewl_nodes]}}
+/* Clean 2.0 generates incorrect code for:
+		case_with_default case_ident expr expr_is_uselect=:True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
+			# new_node1={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
+			# new_node2={ndwl_strict=True,ndwl_def={bind_src=ident2_exp,bind_dst=ident2_exp},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
+			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node1,new_node2:ewl_nodes]}}
+		we therefore use:
+*/
+		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
+			| expr_is_uselect
+				# new_node1={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
+				# new_node2={ndwl_strict=True,ndwl_def={bind_src=ident2_exp,bind_dst=ident2_exp},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
+				= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node1,new_node2:ewl_nodes]}}
+				= exprToRhs (PE_Case case_ident expr
+					[	{calt_pattern = pattern, calt_rhs = rhs}
+					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs}
+					])
+/**/
+		case_with_default case_ident expr expr_is_uselect PE_Empty rhs default_rhs
+			= rhs
+		case_with_default case_ident expr expr_is_uselect pattern rhs default_rhs
 			=	exprToRhs (PE_Case case_ident expr
 					[	{calt_pattern = pattern, calt_rhs = rhs}
 					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs}

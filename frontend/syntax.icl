@@ -995,8 +995,8 @@ cNonUniqueSelection	:== False
 
 ::	GeneratorKind :== Bool
 
-cIsListGenerator 	:== True
-cIsArrayGenerator	:== False
+IsListGenerator 	:== True
+IsArrayGenerator	:== False
 
 :: LineAndColumn = {lc_line :: !Int, lc_column :: !Int}
 

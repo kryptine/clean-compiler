@@ -2187,7 +2187,7 @@ where
 				| is_pattern
 				->	(PE_Empty, parseError "want list expression" No "No \\\\ expression in a pattern" pState)
 				| length acc == 1
-				->	wantComprehension cIsListGenerator (acc!!0)  pState
+				->	wantComprehension IsListGenerator (acc!!0)  pState
 				// otherwise // length acc <> 1
 				#	(nil_expr, pState)	= makeNilExpression pState
 					pState				= parseError "list comprehension" No "one expressions before \\\\" pState
@@ -2220,9 +2220,9 @@ where
 wantComprehension :: !GeneratorKind !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
 wantComprehension gen_kind exp pState
 	# (qualifiers, pState) = wantQualifiers pState
-	| gen_kind == cIsListGenerator
-		= (PE_Compr cIsListGenerator exp qualifiers, wantToken FunctionContext "list comprehension" SquareCloseToken pState)
-		= (PE_Compr cIsArrayGenerator exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
+	| gen_kind == IsListGenerator
+		= (PE_Compr IsListGenerator exp qualifiers, wantToken FunctionContext "list comprehension" SquareCloseToken pState)
+		= (PE_Compr IsArrayGenerator exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
 
 wantQualifiers :: !ParseState -> (![Qualifier], !ParseState)
 wantQualifiers pState
@@ -2240,11 +2240,9 @@ where
 		  (lhs_expr, pState) = wantExpression cIsAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == LeftArrowToken
-//MW3 was:			= want_generators cIsListGenerator (toLineAndColumn qual_position) lhs_expr pState
-			= want_generators cIsListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+			= want_generators IsListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 		| token == LeftArrowColonToken
-//MW3 was:			= want_generators cIsArrayGenerator (toLineAndColumn qual_position) lhs_expr pState
-			= want_generators cIsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+			= want_generators IsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 			= ({qual_generators = [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)
 
@@ -2388,7 +2386,7 @@ wantRecordOrArrayExp is_pattern pState
 					# (token, pState) = nextToken FunctionContext pState
 					-> want_record_or_array_update token expr pState
 				| token == DoubleBackSlashToken
-					-> wantComprehension cIsArrayGenerator expr pState
+					-> wantComprehension IsArrayGenerator expr pState
 				# (elems, pState) = want_array_elems token pState
 				-> (PE_ArrayDenot [expr : elems], pState)
 where

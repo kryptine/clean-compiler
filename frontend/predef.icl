@@ -67,67 +67,65 @@ PD_UnqArraySizeFun			:== 119
 /* Enum/Comprehension functions */
 
 PD_SmallerFun				:== 120
-PD_IncFun					:== 121
-PD_From						:== 122
-PD_FromThen					:== 123
-PD_FromTo					:== 124
-PD_FromThenTo				:== 125
+PD_LessOrEqualFun:== 121
+PD_SubFun:==122
+PD_IncFun					:== 123
+PD_From						:== 124
+PD_FromThen					:== 125
+PD_FromTo					:== 126
+PD_FromThenTo				:== 127
 
 /* Dynamics */
 
-PD_TypeCodeClass			:== 126
+PD_TypeCodeClass			:== 128
 
-PD_TypeObjectType			:== 127
-PD_TypeConsSymbol			:== 128
-PD_unify					:== 129
+PD_TypeObjectType			:== 129
+PD_TypeConsSymbol			:== 130
+PD_unify					:== 131
 // MV ..
-PD_coerce					:== 130
-PD_variablePlaceholder		:== 131
-PD_StdDynamics				:== 132
-PD_undo_indirections		:== 133
+PD_coerce					:== 132
+PD_variablePlaceholder		:== 133
+PD_StdDynamics				:== 134
+PD_undo_indirections		:== 135
 
 /* Generics */
-PD_StdGeneric				:== 134
-PD_TypeISO					:== 135
-PD_ConsISO					:== 136
-PD_iso_to					:== 137
-PD_iso_from					:== 138
+PD_StdGeneric				:== 136
+PD_TypeISO					:== 137
+PD_ConsISO					:== 138
+PD_iso_to					:== 139
+PD_iso_from					:== 140
 
-PD_TypeUNIT					:== 139
-PD_ConsUNIT					:== 140
-PD_TypeEITHER				:== 141
-PD_ConsLEFT					:== 142
-PD_ConsRIGHT				:== 143
-PD_TypePAIR					:== 144
-PD_ConsPAIR					:== 145
-PD_TypeARROW				:== 146
-PD_ConsARROW				:== 147
+PD_TypeUNIT					:== 141
+PD_ConsUNIT					:== 142
+PD_TypeEITHER				:== 143
+PD_ConsLEFT					:== 144
+PD_ConsRIGHT				:== 145
+PD_TypePAIR					:== 146
+PD_ConsPAIR					:== 147
+PD_TypeARROW				:== 148
+PD_ConsARROW				:== 149
 
-PD_TypeConsDefInfo			:== 148 
-PD_ConsConsDefInfo			:== 149
-PD_TypeTypeDefInfo			:== 150 
-PD_ConsTypeDefInfo			:== 151
-PD_cons_info				:== 152
-PD_TypeCONS					:== 153
-PD_ConsCONS					:== 154
+PD_TypeConsDefInfo			:== 150 
+PD_ConsConsDefInfo			:== 151
+PD_TypeTypeDefInfo			:== 152 
+PD_ConsTypeDefInfo			:== 153
+PD_cons_info				:== 154
+PD_TypeCONS					:== 155
+PD_ConsCONS					:== 156
 
-PD_isomap_ARROW_			:== 155
-PD_isomap_ID				:== 156
+PD_isomap_ARROW_			:== 157
+PD_isomap_ID				:== 158
 
 /* StdMisc */
-PD_StdMisc					:== 157
-PD_abort					:== 158
-PD_undef					:== 159
+PD_StdMisc					:== 159
+PD_abort					:== 160
+PD_undef					:== 161
 
-PD_Start					:== 160
+PD_Start					:== 162
 
-// MW..
-PD_DummyForStrictAliasFun	:== 161
+PD_DummyForStrictAliasFun	:== 163
 
-PD_NrOfPredefSymbols		:== 162
-// ..MW
-
-
+PD_NrOfPredefSymbols		:== 164
 
 (<<=) infixl
 (<<=) state val
@@ -185,8 +183,9 @@ where
 					<<- ("uselect", IC_Expression, PD_UnqArraySelectFun) <<- ("update", IC_Expression, PD_ArrayUpdateFun)
 					<<- ("replace", IC_Expression, PD_ArrayReplaceFun) <<- ("size", IC_Expression, PD_ArraySizeFun)
 					<<- ("usize", IC_Expression, PD_UnqArraySizeFun)
-// RWS ...					<<- ("_smaller", IC_Expression, PD_SmallerFun) <<- ("_inc", IC_Expression, PD_IncFun)
-					<<- ("<", IC_Expression, PD_SmallerFun) <<- ("inc", IC_Expression, PD_IncFun)
+// RWS ...		<<- ("_smaller", IC_Expression, PD_SmallerFun) <<- ("_inc", IC_Expression, PD_IncFun)
+					<<- ("<", IC_Expression, PD_SmallerFun) <<- ("<=", IC_Expression, PD_LessOrEqualFun)
+					<<- ("-", IC_Expression, PD_SubFun) <<- ("inc", IC_Expression, PD_IncFun)
 // ... RWS
 					<<- ("_from", IC_Expression, PD_From) <<- ("_from_then", IC_Expression, PD_FromThen)
 					<<- ("_from_to", IC_Expression, PD_FromTo) <<- ("_from_then_to", IC_Expression, PD_FromThenTo)
