@@ -1,24 +1,5 @@
 implementation module comparedefimp
 
-/*	compare definition and implementation module
-
-	Difficulty: The icl module's type definitions have been tranformed during checking while
-	the dcl module's type definitions have not. When the root of the rhs of a (icl) type definition was
-	originally an application of a synonym type then this type will have been expanded. The comparision
-	algorithm performs expansion of _dcl_ synonym types 'on the fly' by binding lhs argument type variables
-	to the types of the actual type application. e.g.
-		
-		dcl:						icl:
-		
-		:: T1 :== T2 Int			:: T1 :== Int  // previously expanded, was originally :: T1 :== T2 Int
-		:: T2 x :== x				:: T2 y :== y
-	
-	causes x to be bound to Int while processing type T1.
-	
-	While T2 is processed x and y will be bound to a correspondence number to abstract from variable names
-	(see type HeapWithNumber). The same happens with attribute variables and variables in macros/functions.
-*/
-
 import syntax, checksupport, compare_constructor, utilities, StdCompare
 
 :: TypesCorrespondState =
@@ -26,6 +7,8 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare
 				:: !.HeapWithNumber TypeVarInfo
 		,	tc_attr_vars
 				:: !.HeapWithNumber AttrVarInfo
+		,	tc_ignore_strictness
+				:: !Bool
 		}
 
 :: TypesCorrespondMonad
@@ -108,6 +91,7 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_typ
 			  tc_state
 			  		=	{ tc_type_vars = initial_hwn th_vars
 						, tc_attr_vars = initial_hwn th_attrs
+						, tc_ignore_strictness = False
 						}
 			  (_, tc_state, error_admin)
 					= compareWithConversions 
@@ -187,14 +171,28 @@ compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_st
 		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
 		Yes icl_symbol_type
 			# {ft_type=dcl_symbol_type, ft_priority} = dcl_fun_types.[dclIndex]
-			  tc_state = init_attr_vars (dcl_symbol_type.st_attr_vars++icl_symbol_type.st_attr_vars)
-			  							tc_state
-			  tc_state = init_type_vars (dcl_symbol_type.st_vars++icl_symbol_type.st_vars) tc_state
 			  (corresponds, tc_state)
-					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
+					= symbol_types_correspond dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
 			| corresponds && fun_priority==ft_priority
 				-> (icl_functions, tc_state, error_admin)
 			-> generate_error error_message fun_def icl_functions tc_state error_admin
+
+symbolTypesCorrespond :: !SymbolType !SymbolType !*TypeHeaps -> (!Bool, !.TypeHeaps)
+symbolTypesCorrespond symbol_type_1 symbol_type_2 type_heaps=:{th_vars, th_attrs}
+	# tc_state
+			= { tc_type_vars = initial_hwn th_vars
+			  , tc_attr_vars = initial_hwn th_attrs
+			  , tc_ignore_strictness = True
+			  }
+	  (correspond, {tc_type_vars, tc_attr_vars})
+	  		= symbol_types_correspond symbol_type_1 symbol_type_2 tc_state
+	= (correspond, { type_heaps & th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap})
+
+symbol_types_correspond symbol_type_1 symbol_type_2 tc_state
+	# tc_state = init_attr_vars (symbol_type_1.st_attr_vars++symbol_type_2.st_attr_vars)
+								tc_state
+	  tc_state = init_type_vars (symbol_type_1.st_vars++symbol_type_2.st_vars) tc_state
+	= t_corresponds symbol_type_1 symbol_type_2 tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
 
 init_type_vars type_vars tc_state=:{tc_type_vars}
 	# tc_type_vars = init_type_vars` type_vars tc_type_vars
@@ -421,14 +419,20 @@ instance t_corresponds DefinedSymbol where
 instance t_corresponds ATypeVar where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.atv_attribute iclDef.atv_attribute
-		&&&	equal dclDef.atv_annotation iclDef.atv_annotation
+		&&&	t_corresponds dclDef.atv_annotation iclDef.atv_annotation
 		&&&	t_corresponds dclDef.atv_variable iclDef.atv_variable
 
+instance t_corresponds Annotation where
+	t_corresponds dcl_annotation icl_annotation 
+		= t_corresponds` dcl_annotation icl_annotation
+	  where
+		t_corresponds` dcl_annotation icl_annotation tc_state=:{tc_ignore_strictness}
+			= (tc_ignore_strictness || dcl_annotation==icl_annotation, tc_state)
+			
 instance t_corresponds AType where
 	t_corresponds dclDef iclDef
-		| dclDef.at_annotation<>iclDef.at_annotation
-			= return False
 		=	t_corresponds dclDef.at_attribute iclDef.at_attribute
+		&&&	t_corresponds dclDef.at_annotation iclDef.at_annotation
 		&&&	t_corresponds dclDef.at_type iclDef.at_type
 
 instance t_corresponds TypeAttribute where
