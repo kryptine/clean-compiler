@@ -3187,6 +3187,9 @@ where
 				<=< adjust_predef_symbol PD_TypeConsSymbol		mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_variablePlaceholder mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_unify				mod_index STE_DclFunction
+// MV ..
+				<=< adjust_predef_symbol PD_coerce				mod_index STE_DclFunction
+// .. MV
 				<=< adjust_predef_symbol PD_undo_indirections	mod_index STE_DclFunction)
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})
 	where
