@@ -1377,7 +1377,15 @@ where
 		  (pattern_expr, binds, expr_heap) = bind_pattern_variables variables (Var bound_var) expr_heap
 		= (pattern_expr, [{bind_src = this_pattern_expr, bind_dst = free_var} : binds], expr_heap)
 
-
+checkExpression free_vars (PE_Selection is_unique expr [PS_Array index_expr]) e_input e_state e_info cs	
+	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
+	| is_unique
+		# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
+		  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+		= (Selection No expr [selector], free_vars, e_state, e_info, cs)
+		# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
+		  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+		= (Selection No expr [selector], free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Selection is_unique expr selectors) e_input e_state e_info cs	
 	# (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithSelection free_vars selectors e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
@@ -1531,6 +1539,8 @@ checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (check.icl, line 1433)" <<- expr
 
+:: LastSelection	= LS_Update | LS_Selction | LS_UniqueSelection
+ 
 checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_state e_info cs
 	| isEmpty selectors
 		# (selector, free_vars, e_state, e_info, cs) = check_selector end_with_update free_vars selector e_input e_state e_info cs
@@ -1588,16 +1598,17 @@ where
 						= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 				= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 
-	check_selector end_with_update free_vars (PS_Array index_expr) e_input=:{ei_mod_index} e_state e_info cs
-		# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
-		  (glob_select_symb, cs) = get_select_or_update end_with_update cs
-		  (new_info_ptr, es_expression_heap) = newPtr EI_Empty e_state.es_expression_heap
-		= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expression_heap = es_expression_heap }, e_info, cs)
-
-	get_select_or_update end_with_update cs
+	check_selector end_with_update free_vars (PS_Array index_expr) e_input e_state e_info cs
 		| end_with_update
-			= getPredefinedGlobalSymbol PD_ArrayUpdateFun PD_StdArray STE_Member 3 cs
-			= getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
+			# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArrayUpdateFun PD_StdArray STE_Member 3 cs
+			= checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+			# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
+			= checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+
+checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+	# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
+	  (new_info_ptr, es_expression_heap) = newPtr EI_Empty e_state.es_expression_heap
+	= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expression_heap = es_expression_heap }, e_info, cs)
 
 buildLetExpression :: !(Env Expression FreeVar) !Bool !Expression !*ExpressionHeap  -> (!Expression, !*ExpressionHeap)
 buildLetExpression [] is_strict expr expr_heap
