@@ -1522,14 +1522,8 @@ fopenInSearchPaths fileName searchPaths mode modtimefunction f
 		=	(No, f)
 	where
 		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
-		fopenAnywhereInSearchPaths fileName [] mode modtimefunction f
-			// try current directory
-			# (opened, file, f)
-				=	fopen fileName mode f
-			| opened
-				=	getModificationTime file "" modtimefunction f
-			// otherwise
-				=	(No, f)
+		fopenAnywhereInSearchPaths fileName [] _ _ f
+			=	(No, f)
 		fopenAnywhereInSearchPaths fileName [path : paths] mode modtimefunction f
 			# (opened, file, f)
 				=	fopen (path + fileName) mode f
