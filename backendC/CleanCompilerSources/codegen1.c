@@ -2385,7 +2385,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int constructor_arity,
 		rhs_arg_p=&rhs_root->node_arguments;
 
 #if STRICT_LISTS
-		if (constructor_symbol->symb_kind==cons_symb && constructor_symbol->symb_head_strictness>1 || constructor_symbol->symb_tail_strictness){
+		if (constructor_symbol->symb_kind==cons_symb && (constructor_symbol->symb_head_strictness>1 || constructor_symbol->symb_tail_strictness)){
 			constructor_symbol->symb_def->sdef_constructor->cl_state_p;
 			
 			if (constructor_symbol->symb_head_strictness>1){

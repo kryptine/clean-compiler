@@ -3903,7 +3903,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 
 		if (!symbol_arity_eq_one){
 #if STRICT_LISTS
-			if (symbol->symb_kind==cons_symb && symbol->symb_head_strictness>1 || symbol->symb_tail_strictness)
+			if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness))
 				strict_constructor=1;
 #endif
 			new_match_sdef=create_match_function (symbol,node->node_arity,strict_constructor);
