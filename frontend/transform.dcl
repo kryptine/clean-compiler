@@ -22,7 +22,7 @@ partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# Dcl
 	,	cos_error		:: !.ErrorAdmin
 	,	cos_alias_dummy	:: !PredefinedSymbol
 // MV ...
-	,	cos_removed_dynamic_expr	:: !.{#Bool}
+	,	cos_used_dynamics	:: !.{#Bool}
 // ... MV
 	}
 

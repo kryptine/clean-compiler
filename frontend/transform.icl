@@ -1107,7 +1107,7 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current
 // MV ...
 	# (fun_def=:{fun_info},es_fun_defs)
 		= es_fun_defs![es_current_fun_index]
-	# cos_removed_dynamic_expr
+	# cos_used_dynamics
 		= createArray (length fun_info.fi_dynamics) False // means not removed
 // ... MV
 
@@ -1119,13 +1119,13 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
 	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap /* MV ... */, cos_removed_dynamic_expr /* ... MV */})
+	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap /* MV ... */, cos_used_dynamics /* ... MV */})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
-	  					cos_alias_dummy = alias_dummy /* MV ... */, cos_removed_dynamic_expr = cos_removed_dynamic_expr /* ... MV */}
+	  					cos_alias_dummy = alias_dummy /* MV ... */, cos_used_dynamics = cos_used_dynamics /* ... MV */}
 	// MV ...
 	# (changed,fi_dynamics,_,cos_symbol_heap)
-		= foldSt remove_fi_dynamic fun_info.fi_dynamics (False,[],cos_removed_dynamic_expr,cos_symbol_heap)
+		= foldSt remove_fi_dynamic fun_info.fi_dynamics (False,[],cos_used_dynamics,cos_symbol_heap)
 	# fun_info
 		= if changed { fun_info & fi_dynamics = fi_dynamics } fun_info
 	// ... MV
@@ -1135,21 +1135,21 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current
 //		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
 // MV ...
 where
-	remove_fi_dynamic dyn_expr_ptr (changed,accu,cos_removed_dynamic_expr,cos_symbol_heap)
+	remove_fi_dynamic dyn_expr_ptr (changed,accu,cos_used_dynamics,cos_symbol_heap)
 		# (expr_info,cos_symbol_heap)
 			= readPtr dyn_expr_ptr cos_symbol_heap
 		| not (isEI_Dynamic expr_info)
-			= (changed,[dyn_expr_ptr:accu],cos_removed_dynamic_expr,cos_symbol_heap)
+			= (changed,[dyn_expr_ptr:accu],cos_used_dynamics,cos_symbol_heap)
 			
 		# (EI_Dynamic _ id)
 			= expr_info
-		| cos_removed_dynamic_expr.[id]
+		| cos_used_dynamics.[id]
 			// cos_removed_dynamic means cos_used_dynamic
-			= (changed,[dyn_expr_ptr:accu],cos_removed_dynamic_expr,cos_symbol_heap)
+			= (changed,[dyn_expr_ptr:accu],cos_used_dynamics,cos_symbol_heap)
 		
 		
 			// unused
-			= (True,accu,cos_removed_dynamic_expr,cos_symbol_heap)
+			= (True,accu,cos_used_dynamics,cos_symbol_heap)
 	where
 		isEI_Dynamic (EI_Dynamic _ _)	= True
 		isEI_Dynamic _					= False
@@ -1736,7 +1736,7 @@ where
 	,	cos_error		:: !.ErrorAdmin
 	,	cos_alias_dummy	:: !PredefinedSymbol
 // MV ...
-	,	cos_removed_dynamic_expr	:: !.{#Bool}
+	,	cos_used_dynamics	:: !.{#Bool}
 // ... MV
 	}
 
@@ -1935,7 +1935,7 @@ where
 			= { cos & cos_symbol_heap = cos_symbol_heap }
 		# cos
 			= case expr_info of 
-				EI_Dynamic _ id		->  { cos & cos_removed_dynamic_expr = { cos.cos_removed_dynamic_expr & [id] = True } }
+				EI_Dynamic _ id		->  { cos & cos_used_dynamics = { cos.cos_used_dynamics & [id] = True } }
 				_					-> cos
 // ... MV
 		= (DynamicExpr {dynamic_expr & dyn_expr = dyn_expr}, free_vars, cos);
