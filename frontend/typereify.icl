@@ -55,6 +55,8 @@ instance isTypeSynonym (TypeDef a) | isTypeSynonym a where
 	isTypeSynonym {td_rhs}
 		=	isTypeSynonym td_rhs
 
+// Currently type functions are generated for all types, including type
+// synonyms. This should be changed to only type synonyms that are abstract. 
 instance isTypeSynonym TypeRhs where
 	isTypeSynonym (AlgType _)
 		=	False
@@ -63,9 +65,9 @@ instance isTypeSynonym TypeRhs where
 	isTypeSynonym (AbstractType _)
 		=	False
 	isTypeSynonym (SynType _)
-		=	False // True
+		=	False
 	isTypeSynonym (AbstractSynType _ _)
-		=	True
+		=	False
 
 add_dcl_type_fun_types :: TypeSymbIdent Int *{#DclModule} *VarHeap *SymbolTable
 							-> (*{#DclModule}, *VarHeap, *SymbolTable)
