@@ -4,6 +4,7 @@ import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
 import compilerSwitches
 import generics // AA
+from basic import tracevalue
 
 ::	TypeInput =
 	{	ti_common_defs	:: !{# CommonDefs }
@@ -319,17 +320,17 @@ unifyTypes (TArrow1 t1) attr1 (TArrow1 t2) attr2 modules subst heaps
 unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2 modules subst heaps
 	| cons_id1 == cons_id2
 		= unify cons_args1 cons_args2 modules subst heaps
-		# (succ1, t1, heaps) = tryToExpand t1 attr1 modules.ti_common_defs heaps
-		  (succ2, t2, heaps) = tryToExpand t2 attr2 modules.ti_common_defs heaps
+		# (succ1, t1, heaps) = tracevalue "unifyTypes/TA/False" "tryToExpand t1 attr1 modules.ti_common_defs heaps" (tryToExpand t1 attr1 modules.ti_common_defs heaps)
+		  (succ2, t2, heaps) = tracevalue "unfiyTypes/TA/False" "tryToExpand t2 attr2 modules.ti_common_defs heaps" (tryToExpand t2 attr2 modules.ti_common_defs heaps)
 		| succ1 || succ2
 			= unifyTypes t1 attr1 t2 attr2 modules subst heaps
 			= (False, subst, heaps)
 //				---> "unifyTypes1"
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
-	# (_, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
+	# (_, type2, heaps) = tracevalue "unifyTypes/type1=:@:" "tryToExpand type2 attr2 modules.ti_common_defs heaps" (tryToExpand type2 attr2 modules.ti_common_defs heaps)
 	= unifyTypeApplications cons_var attr1 types type2 attr2 modules subst heaps
 unifyTypes type1 attr1 (cons_var :@: types) attr2 modules subst heaps
-	# (_, type1, heaps) = tryToExpand type1 attr1 modules.ti_common_defs heaps
+	# (_, type1, heaps) = tracevalue "unifyTypes/type2=:@:" "tryToExpand type1 attr1 modules.ti_common_defs heaps" (tryToExpand type1 attr1 modules.ti_common_defs heaps)
 	= unifyTypeApplications cons_var attr2 types type1 attr1 modules subst heaps
 unifyTypes t1=:(TempQV qv_number1) attr1 t2=:(TempQV qv_number2) attr2 modules subst heaps
 	= (qv_number1 == qv_number2, subst, heaps)
@@ -338,15 +339,16 @@ unifyTypes (TempQV qv_number) attr1 type attr2 modules subst heaps
 unifyTypes type attr1 (TempQV qv_number1) attr2 modules subst heaps
 	= (False, subst, heaps)
 unifyTypes type1 attr1 type2 attr2 modules subst heaps
-	# (succ1, type1, heaps) = tryToExpand type1 attr1 modules.ti_common_defs heaps
-	  (succ2, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
+	# (succ1, type1, heaps) = tracevalue "unifyTypes/default" "tryToExpand type1 attr1 modules.ti_common_defs heaps" (tryToExpand type1 attr1 modules.ti_common_defs heaps)
+	  (succ2, type2, heaps) = tracevalue "unifyTypes/default" "tryToExpand type2 attr2 modules.ti_common_defs heaps" (tryToExpand type2 attr2 modules.ti_common_defs heaps)
 	| succ1 || succ2
 		= unifyTypes type1 attr1 type2 attr2 modules subst heaps
 		= (False, subst, heaps)
 
 tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
 tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr ti_common_defs type_heaps
-	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
+	#! type_def = tracevalue "tryToExpand" ("ti_common_defs.["+++toString glob_module+++"].com_type_defs.["+++toString glob_object+++"]")
+	              ti_common_defs.[glob_module].com_type_defs.[glob_object]
 	= case type_def.td_rhs of
 		SynType {at_type}
 			# (_, expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
@@ -1998,7 +2000,9 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
-	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
+	# (type_error, fun_defs, predef_symbols, special_instances, ts)
+	  = tracevalue "typeProgram" "type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)"
+	    (type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts))
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_out})
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
@@ -2103,14 +2107,18 @@ where
 	type_instances list_inferred_types ir_from ir_to class_instances ti funs_and_state
 		| ir_from == ir_to
 			= funs_and_state
-			# funs_and_state = type_component list_inferred_types [ir_from] class_instances ti funs_and_state
+			# funs_and_state
+			  = tracevalue "typeProgram.type_instances" "type_component list_inferred_types [ir_from] class_instances ti funs_and_state"
+			    (type_component list_inferred_types [ir_from] class_instances ti funs_and_state)
 			= type_instances list_inferred_types (inc ir_from) ir_to class_instances ti funs_and_state
 
 	type_components list_inferred_types group_index comps class_instances ti funs_and_state
 		| group_index == size comps
 			= funs_and_state
 			#! comp = comps.[group_index]	
-			# funs_and_state = type_component list_inferred_types comp.group_members  class_instances ti funs_and_state
+			# funs_and_state
+			  = tracevalue "typeProgram.type_components" "type_component list_inferred_types comp.group_members  class_instances ti funs_and_state"
+			    (type_component list_inferred_types comp.group_members  class_instances ti funs_and_state)
 			= type_components list_inferred_types (inc group_index) comps class_instances ti funs_and_state
 
 	show_component comp fun_defs
@@ -2128,7 +2136,7 @@ where
 	
 	type_component list_inferred_types comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
-//		# (functions, fun_defs) = show_component comp fun_defs
+		# (functions, fun_defs) = show_component comp fun_defs
 		# (fun_defs, predef_symbols, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (fun_defs, predef_symbols, ts)
 		| not ts.ts_error.ea_ok  // ---> ("typing", functions)
 			= (True, fun_defs, predef_symbols, special_instances, create_erroneous_function_types comp
@@ -2144,7 +2152,9 @@ where
 					ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = []})
 		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_td_infos,ts_cons_variables,ts_exis_variables} = ts
 		  (cons_var_vects, subst) = determine_cons_variables ts_cons_variables (createArray (inc (BITINDEX nr_of_type_variables)) 0, subst)
-		  (subst, nr_of_attr_vars, ts_type_heaps, ts_td_infos) = liftSubstitution subst ti_common_defs cons_var_vects ts_attr_store ts_type_heaps ts_td_infos
+		  (subst, nr_of_attr_vars, ts_type_heaps, ts_td_infos)
+		  = tracevalue "typeProgram.type_component" "liftSubstitution subst ti_common_defs cons_var_vects ts_attr_store ts_type_heaps ts_td_infos"
+		    (liftSubstitution subst ti_common_defs cons_var_vects ts_attr_store ts_type_heaps ts_td_infos)
 		  coer_demanded ={{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrUni] = CT_Unique }
 		  coer_offered = {{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrMulti] = CT_NonUnique }
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }

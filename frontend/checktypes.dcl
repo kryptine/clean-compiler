@@ -44,3 +44,7 @@ createClassDictionaries ::
  ,	[u1<=v1, u2<=v2, u3<=v3, u4<=v4, u5<=v5]
 
 removeVariablesFromSymbolTable :: !Int ![TypeVar] !*SymbolTable -> *SymbolTable
+
+instance toString TypeSymbIdent
+instance toString Type
+instance toString AType

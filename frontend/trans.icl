@@ -3,6 +3,7 @@ implementation module trans
 import StdEnv
 
 import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type
+from basic import tracevalue
 
 SwitchCaseFusion		fuse dont_fuse :== fuse
 SwitchGeneratedFusion	fuse dont_fuse :== fuse
@@ -1502,7 +1503,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 //	| False--->("subst before", [el\\el<-:subst], "cons_vars", [el\\el<-:cons_vars])
 //		= undef
 	# (subst, next_attr_nr, ti_type_heaps=:{th_attrs}, ti_type_def_infos)
-	  		= liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr { ti_type_heaps & th_vars = th_vars } ti_type_def_infos
+	  		= tracevalue "generateFunction" "liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr { ti_type_heaps & th_vars = th_vars } ti_type_def_infos"
+			  (liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr { ti_type_heaps & th_vars = th_vars } ti_type_def_infos)
 //	| False--->("subst after lifting", [el\\el<-:subst])
 //		= undef
 	# coer_demanded

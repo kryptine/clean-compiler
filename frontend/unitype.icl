@@ -4,6 +4,7 @@ import StdEnv
 
 import syntax, analunitypes, type, utilities, checktypes,
 		compilerSwitches //, RWSDebug
+from basic import tracevalue,listToString
 
 // import cheat
 
@@ -206,14 +207,18 @@ where
 liftSubstitution :: !*{! Type} !{# CommonDefs } !{# BOOLVECT }  !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 liftSubstitution subst modules cons_vars attr_store type_heaps td_infos 
 	# ls = { ls_next_attr = attr_store, ls_td_infos = td_infos, ls_type_heaps = type_heaps}
-	= lift_substitution 0 modules cons_vars subst ls
+	= tracevalue "liftSubstitution" "lift_substitution 0 modules cons_vars subst ls"
+	  (lift_substitution 0 modules cons_vars subst ls)
 where
 	lift_substitution var_index modules cons_vars subst ls
 		| var_index < size subst
 			# (type, subst) = subst![var_index]
-			# (_, type, subst, ls) = lift modules cons_vars type subst ls
-			= lift_substitution (inc var_index) modules cons_vars { subst & [var_index] = type } ls
-			= (subst, ls.ls_next_attr, ls.ls_type_heaps, ls.ls_td_infos)
+			# (_, type, subst, ls)
+			  = tracevalue "liftSubstitution.lift_substitution" ("lift modules cons_vars "+++toString type+++" subst ls")
+			    (lift modules cons_vars type subst ls)
+			= tracevalue "liftSubstitution.lift_substitution" "lift_substitution (inc var_index) modules cons_vars { subst & [var_index] = type } ls"
+			  (lift_substitution (inc var_index) modules cons_vars { subst & [var_index] = type } ls)
+		= (subst, ls.ls_next_attr, ls.ls_type_heaps, ls.ls_td_infos)
 
 adjustSignClass :: !SignClassification !Int -> SignClassification
 adjustSignClass {sc_pos_vect,sc_neg_vect} arity
@@ -237,7 +242,7 @@ liftTempTypeVariable modules cons_vars tv_number subst ls
 		TE
 			-> (False, TempV tv_number, subst, ls)
 		_
-			# (_, type, subst, ls) = lift modules cons_vars type subst ls
+			# (_, type, subst, ls) = tracevalue "liftTempTypeVariable" "lift modules cons_vars type subst ls" (lift modules cons_vars type subst ls)
 			-> (True, type, subst, ls)
 
 typeIsNonCoercible _ (TempV _)
@@ -262,17 +267,21 @@ typeIsNonCoercible _ _
 class lift a :: !{# CommonDefs } !{# BOOLVECT } !a !*{! Type} !*LiftState -> (!Bool,!a, !*{! Type}, !*LiftState)
 
 liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_name,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
-	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
-	# (changed,cons_args, sign_classes, prop_classes, subst, ls=:{ls_type_heaps}) = lift_list modules cons_vars cons_args tdi_kinds subst ls
-	| changed
+	# ({tdi_kinds}, ls)
+	  = tracevalue "liftTypeApplication" ("ls!ls_td_infos.["+++toString glob_module+++"].["+++toString glob_object+++"]")
+	    (ls!ls_td_infos.[glob_module].[glob_object])
+	# (changed,cons_args, sign_classes, prop_classes, subst, ls=:{ls_type_heaps})
+	  = tracevalue "liftTypeApplication" "lift_list modules cons_vars cons_args tdi_kinds subst ls"
+	    (lift_list modules cons_vars cons_args tdi_kinds subst ls)
+	| tracevalue "liftTypeApplication" "changed" changed
 		# (type_prop, th_vars, ls_td_infos) = typeProperties glob_object glob_module sign_classes prop_classes modules ls_type_heaps.th_vars ls.ls_td_infos
 		  ls = { ls & ls_td_infos = ls_td_infos, ls_type_heaps = {ls_type_heaps & th_vars = th_vars}}
-		| equal_type_prop type_prop type_prop0
+		| tracevalue "liftTypeApplication" "equal_type_prop type_prop type_prop0" (equal_type_prop type_prop type_prop0)
 			= (True, TA cons_id cons_args, subst, ls)
 			= (True, TA { cons_id & type_prop = type_prop } cons_args, subst, ls)
 		# (type_prop, th_vars, ls_td_infos) = typeProperties glob_object glob_module sign_classes prop_classes modules ls_type_heaps.th_vars ls.ls_td_infos
 		  ls = { ls & ls_td_infos = ls_td_infos, ls_type_heaps = {ls_type_heaps & th_vars = th_vars}}
-		| equal_type_prop type_prop type_prop0
+		| tracevalue "liftTypeApplication" "equal_type_prop type_prop type_prop0" (equal_type_prop type_prop type_prop0)
 			= (False, t0, subst, ls)
 			= (True, TA { cons_id & type_prop = type_prop } cons_args, subst, ls)
 	where
@@ -281,7 +290,7 @@ liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_name,type_index={gl
 		lift_list modules cons_vars [] _ subst ls
 			= (False, [], [], [], subst, ls)
 		lift_list modules cons_vars ts0=:[t0:ts] [tk : tks] subst ls
-			# (changed, t, subst, ls) = lift modules cons_vars t0 subst ls
+			# (changed, t, subst, ls) = tracevalue "liftTypeApplication.lift_list" "lift modules cons_vars t0 subst ls" (lift modules cons_vars t0 subst ls)
 			| changed
 				# (_, ts, sign_classes, prop_classes, subst, ls) = lift_list modules cons_vars ts tks subst ls
 				| IsArrowKind tk
@@ -308,37 +317,37 @@ liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_name,type_index={gl
 		add_sign_and_prop_of_arrow_kind _  sign_classes prop_classes
 			= ([TopSignClass : sign_classes], [PropClass : prop_classes])
 liftTypeApplication modules cons_vars type  subst ls
-	= lift modules cons_vars type  subst ls
+	= tracevalue "liftTypeApplication" "lift modules cons_vars type  subst ls" (lift modules cons_vars type  subst ls)
 
 instance lift Type
 where
 	lift modules cons_vars (TempV temp_var) subst ls
-		= liftTempTypeVariable modules cons_vars temp_var subst ls
+		= tracevalue ("lift(Type)/TempV") "liftTempTypeVariable modules cons_vars temp_var subst ls" (liftTempTypeVariable modules cons_vars temp_var subst ls)
 	lift modules cons_vars type=:(arg_type0 --> res_type0) subst ls
-		# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type0 subst ls
+		# (changed, arg_type, subst, ls) = tracevalue "lift(Type)/-->" "lift modules cons_vars arg_type0 subst ls" (lift modules cons_vars arg_type0 subst ls)
 		| changed
-			# (changed, res_type, subst, ls) = lift modules cons_vars res_type0 subst ls
+			# (changed, res_type, subst, ls) = tracevalue "lift(Type)/-->" "lift modules cons_vars res_type0 subst ls" (lift modules cons_vars res_type0 subst ls)
 			| changed
 				= (True, arg_type --> res_type, subst, ls)
 				= (True, arg_type --> res_type0, subst, ls)
-			# (changed, res_type, subst, ls) = lift modules cons_vars res_type0 subst ls
+			# (changed, res_type, subst, ls) = tracevalue "lift(Type)/-->" "lift modules cons_vars res_type0 subst ls" (lift modules cons_vars res_type0 subst ls)
 			| changed
 				= (True, arg_type0 --> res_type, subst, ls)
 				= (False, type, subst, ls)
 //AA..
 	lift modules cons_vars type=:(TArrow1 arg_type) subst ls
-		# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type subst ls
+		# (changed, arg_type, subst, ls) = tracevalue "lift(Type)/TArrow1" "lift modules cons_vars arg_type subst ls" (lift modules cons_vars arg_type subst ls)
 		| changed 
 			= (True, TArrow1 arg_type, subst, ls)
 			= (False, type, subst, ls)	
 //..AA				
 	lift modules cons_vars type=:(TA cons_id cons_args) subst ls=:{ls_type_heaps}
-		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+		# (_, type, ls_type_heaps) = tracevalue ("lift(Type) modules cons_vars type=:(TA "+++toString cons_id+++" "+++listToString cons_args+++") subst ls") "tryToExpand type TA_Multi modules ls_type_heaps" (tryToExpand type TA_Multi modules ls_type_heaps)
 		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}			
 	lift modules cons_vars type=:(TempCV temp_var :@: types) subst ls
 		# (changed, var_type, subst, ls) = liftTempTypeVariable modules cons_vars temp_var subst ls
 		  (changed_types, types, subst, ls) = lift_list modules cons_vars types subst ls
-		| changed || changed_types
+		| tracevalue "lift(Type)/TempCV" "changed" changed || changed_types
 			= case var_type of
 				TA type_cons cons_args
 					-> (True, TA { type_cons & type_arity = type_cons.type_arity + length types } (cons_args ++ types), subst, ls)
@@ -363,7 +372,7 @@ where
 			lift_list modules cons_vars [] subst ls
 				= (False, [], subst, ls)
 			lift_list modules cons_vars ts0=:[t0:ts] subst ls
-				# (changed,t, subst, ls) = lift modules cons_vars t0 subst ls
+				# (changed,t, subst, ls) = tracevalue "lift_list" "lift modules cons_vars t0 subst ls" (lift modules cons_vars t0 subst ls)
 				| changed
 					# (_, ts, subst, ls) = lift_list modules cons_vars ts subst ls
 					= (True,[t:ts], subst, ls)
@@ -374,12 +383,12 @@ where
 	lift modules cons_vars (TFA vars type) subst ls
 		= abort "lift (TFA) (unitype.icl)"
 	lift modules cons_vars type subst ls
-		= (False, type, subst, ls)
+		= tracevalue "lift(Type)/default" "(False, type, subst, ls)" (False, type, subst, ls)
 
 instance lift AType
 where
 	lift modules cons_vars attr_type=:{at_attribute,at_type} subst ls
-		# (changed, at_type, subst, ls) = lift modules cons_vars at_type subst ls
+		# (changed, at_type, subst, ls) = tracevalue "lift(AType)" "lift modules cons_vars at_type subst ls" (lift modules cons_vars at_type subst ls)
 		| changed
 			| typeIsNonCoercible cons_vars at_type
 				= (True, {attr_type & at_type = at_type },subst, ls)
