@@ -133,8 +133,9 @@ compileModule options commandLineArgs files
 		=	stdio files
 	# (predefSymbols, hashTable) = buildPredefinedSymbols newHashTable
 	  (moduleIdent, hashTable) = putIdentInHashTable options.moduleName IC_Module hashTable
+	  list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
 	# (predefs, _, files, error, io, out, optionalSyntaxTree)
-		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths (isMember "-lt" commandLineArgs)
+		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths list_inferred_types
 								predefSymbols hashTable files error io out
 	# (closed, files)
 		=	fclose io files
