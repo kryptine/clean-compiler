@@ -742,16 +742,13 @@ instance e_corresponds DefinedSymbol where
 instance e_corresponds FunctionBody where
 	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
+//		| False--->("e_corresponds", from_body dclDef, from_body iclDef)
+//			= undef
 		=	e_corresponds (from_body dclDef) (from_body iclDef)
 	  where
 		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
 		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, [ca_rhs \\ {ca_rhs} <- cb_rhs])
 		
-instance e_corresponds TransformedBody where
-	e_corresponds dclDef iclDef
-		=	e_corresponds dclDef.tb_args iclDef.tb_args
-		o`	e_corresponds dclDef.tb_rhs iclDef.tb_rhs
-
 instance e_corresponds FreeVar where
 	e_corresponds dclVar iclVar
 		=	e_corresponds_VarInfoPtr iclVar.fv_name dclVar.fv_info_ptr iclVar.fv_info_ptr
@@ -939,28 +936,28 @@ e_corresponds_VarInfoPtr ident dclPtr iclPtr ec_state=:{ec_var_heap}
 	The problem: also different symbols can correspond with each other, because for macros
 	all local functions (also lambda functions) will be generated twice.
 */
-e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_Function dcl_glob_index} 
+e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Function dcl_glob_index} 
 					icl_app_symb=:{symb_kind=SK_Function icl_glob_index}
 					ec_state
-	= continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
-													ec_state
+	| dcl_glob_index<>icl_glob_index
+		= give_error symb_name ec_state
+	= ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_OverloadedFunction dcl_glob_index} 
+					icl_app_symb=:{symb_kind=SK_OverloadedFunction icl_glob_index}
+					ec_state
+	| dcl_glob_index<>icl_glob_index
+		= give_error symb_name ec_state
+	= ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalMacroFunction dcl_index} 
 					icl_app_symb=:{symb_kind=SK_LocalMacroFunction icl_index}
 					ec_state
-	#! main_dcl_module_n=ec_state.ec_tc_state.tc_main_dcl_module_n
-	= continuation_for_possibly_twice_defined_funs dcl_app_symb 
-			{ glob_module = main_dcl_module_n, glob_object = dcl_index } icl_app_symb
-			{ glob_module = main_dcl_module_n, glob_object = icl_index } ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_OverloadedFunction dcl_glob_index}
-					icl_app_symb=:{symb_kind=SK_OverloadedFunction icl_glob_index}
-					ec_state
-	= continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
-													ec_state
+	= continuation_for_possibly_twice_defined_macros
+			dcl_app_symb dcl_index icl_app_symb icl_index ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_Macro dcl_glob_index}
 					icl_app_symb=:{symb_kind=SK_Macro icl_glob_index}
 					ec_state
-	= continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
-													ec_state
+	= continuation_for_possibly_twice_defined_macros 
+			dcl_app_symb dcl_glob_index.glob_object icl_app_symb icl_glob_index.glob_object ec_state
 e_corresponds_app_symb {symb_name=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index}
 						{symb_name=icl_symb_name, symb_kind=SK_Constructor icl_glob_index}
 						ec_state
@@ -970,23 +967,11 @@ e_corresponds_app_symb {symb_name=dcl_symb_name, symb_kind=SK_Constructor dcl_gl
 e_corresponds_app_symb {symb_name} _ ec_state
 	= give_error symb_name ec_state
 
-continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
+continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_index icl_app_symb icl_index
 											ec_state
-	| dcl_glob_index==icl_glob_index
+	| dcl_index==icl_index
 		= ec_state
-//	| dcl_glob_index.glob_module<>cIclModIndex || icl_glob_index.glob_module<>cIclModIndex
-	#! main_dcl_module_n=ec_state.ec_tc_state.tc_main_dcl_module_n
-	| dcl_glob_index.glob_module<>main_dcl_module_n || icl_glob_index.glob_module<>main_dcl_module_n
-		= give_error icl_app_symb.symb_name ec_state
-	// two different functions from the main module were referenced. Check their correspondence
-	# dcl_index = dcl_glob_index.glob_object
-	  icl_index = icl_glob_index.glob_object
-	#! dcl_is_macro_fun = get_is_macro_fun dcl_index ec_state.ec_icl_functions
-	   icl_is_macro_fun = get_is_macro_fun icl_index ec_state.ec_icl_functions
-	| not dcl_is_macro_fun || not icl_is_macro_fun
-		// at least one function was not locally defined in a macro.
-		= give_error icl_app_symb.symb_name ec_state
-	// two functions that are local to a macro definition were referencend.
+	// two different functions were referenced. In case of macro functions they still could correspond
 	| not (names_are_compatible dcl_index icl_index ec_state.ec_icl_functions)
 		= give_error icl_app_symb.symb_name ec_state
 	| both_funs_have_not_been_checked_before dcl_index icl_index ec_state.ec_correspondences
@@ -999,15 +984,15 @@ continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app
 	names_are_compatible dcl_index icl_index icl_functions
 		# dcl_function = icl_functions.[dcl_index]
 		  icl_function = icl_functions.[icl_index]
-		  dcl_is_lambda = get_is_lambda dcl_function.fun_kind
-		  icl_is_lambda = get_is_lambda icl_function.fun_kind
-		=	(dcl_is_lambda==icl_is_lambda)
-		 && (implies (not dcl_is_lambda) (dcl_function.fun_symb.id_name==icl_function.fun_symb.id_name))
-		// functions that originate from lambda expressions can correspond although their names differ
+		  dcl_name_is_loc_dependent = name_is_location_dependent dcl_function.fun_kind
+		  icl_name_is_loc_dependent = name_is_location_dependent icl_function.fun_kind
+		=	(dcl_name_is_loc_dependent==icl_name_is_loc_dependent)
+		 && (implies (not dcl_name_is_loc_dependent) (dcl_function.fun_symb.id_name==icl_function.fun_symb.id_name))
+		// functions that originate from e.g. lambda expressions can correspond although their names differ
 	  where
-		get_is_lambda (FK_Function is_lambda)
-			= is_lambda
-		get_is_lambda _
+		name_is_location_dependent (FK_Function name_is_loc_dependent)
+			= name_is_loc_dependent
+		name_is_location_dependent _
 		 	= False
 		 	
 	both_funs_have_not_been_checked_before dcl_index icl_index correspondences
@@ -1015,9 +1000,6 @@ continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app
 
 	both_funs_correspond dcl_index icl_index correspondences
 		= correspondences.[dcl_index]==icl_index && correspondences.[icl_index]==dcl_index
-	
-	get_is_macro_fun fun_nr icl_functions
-		= icl_functions.[fun_nr].fun_info.fi_is_macro_fun
 
 init_attr_vars attr_vars tc_state=:{tc_attr_vars}
 	# hwn_heap = foldSt init_attr_var attr_vars tc_attr_vars.hwn_heap
@@ -1039,10 +1021,9 @@ implies a b 		:== not a || b
 
 do f = \state -> (True, f state)
 
-// XXX should be a macro (but this crashes the 1.3.2 compiler)
 (&&&) infixr
 (&&&) m1 m2
-	=	m1 ==> \b
+	:==	m1 ==> \b
 		->	if b
 				m2
 				(return False)
