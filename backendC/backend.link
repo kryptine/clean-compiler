@@ -110,3 +110,10 @@
 /EXPORT: BESetMainDclModuleN
 /EXPORT: BEDeclareDynamicTypeSymbol
 /EXPORT: BEDynamicTempTypeSymbol
+/EXPORT: BEPredefineListTypeSymbol
+/EXPORT: BEPredefineListConstructorSymbol
+/EXPORT: BEAdjustStrictListConsInstance
+/EXPORT: BEAdjustUnboxedListDeconsInstance
+/EXPORT: BEAdjustOverloadedNilFunction
+/EXPORT: BEOverloadedConsSymbol
+/EXPORT: BEOverloadedPushNode
