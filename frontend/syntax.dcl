@@ -988,12 +988,15 @@ instance toString 	KindInfo
 
 ::	CountedFreeVar =
 	{	cfv_var		:: !FreeVar
+	,	cfv_is_let	:: !Bool
 	,	cfv_count	:: !ReferenceCount
 	}
 
 ::	OccurrenceBinding	= OB_Empty 
-						| OB_OpenLet	(Choice Expression [CountedFreeVar])
-						| OB_LockedLet	(Choice Expression [CountedFreeVar])
+						| OB_OpenLet	FreeVar (Optional RefMarkResult)
+						| OB_LockedLet	OccurrenceBinding
+
+::	RefMarkResult :== ([CountedFreeVar], [FreeVar])
 
 ::	OptGuardedAlts	= GuardedAlts ![GuardedExpr] !(Optional ExprWithLocalDefs)
 				 	| UnGuardedExpr !ExprWithLocalDefs
