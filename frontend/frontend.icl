@@ -200,20 +200,11 @@ frontEndInterface opts mod_ident dcl_modules functions_and_macros predef_symbols
 
 // VZ..
 // Select fusion style and do fusion
-	# (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-		= case opts.feo_fusionstyle of
-		  	FS_offline
-				# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-					= analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
-	  			-> transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
-			FS_online
-				# (fun_defs,var_heap,expression_heap,supercompile_range) = supercompile dcl_mods main_dcl_module_n fun_defs var_heap expression_heap
-				# (components, fun_defs) = partitionateFunctions fun_defs [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
-				-> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
-			FS_none
-			    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
+	# (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+		= do_fusion opts.feo_fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
+			array_instances components fun_defs var_heap expression_heap icl_specials list_inferred_types icl_common
+			dcl_mods icl_used_module_numbers predef_symbols error out icl_import global_fun_range icl_instances generic_range
 // ..VZ
-
 	| upToPhase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
 		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
@@ -388,4 +379,31 @@ where
 			# file = show_dcl_function dcl_functions.[fun_index] file
 			= show_dcl_functions (inc fun_index) dcl_functions file 
 	show_dcl_function {ft_symb, ft_type} file
-		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"			
+		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"
+
+do_fusion fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
+			array_instances components fun_defs var_heap expression_heap icl_specials list_inferred_types icl_common
+			dcl_mods icl_used_module_numbers predef_symbols error out icl_import global_fun_range icl_instances generic_range
+=	case fusionstyle of
+  	FS_offline
+		# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
+			= analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
+	    # (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
+ 			= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
+	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+	FS_online
+		# (fun_defs,var_heap,expression_heap,supercompile_range) = supercompile dcl_mods main_dcl_module_n fun_defs var_heap expression_heap
+		# (components, fun_defs) = partitionateFunctions fun_defs [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
+		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
+		# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error, out)
+			= typeProgram (components -*-> "Re-typing after supercompilation") main_dcl_module_n fun_defs icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers type_def_infos heaps predef_symbols error out dcl_mods
+		# components = {c\\c<-:components}
+		| not ok
+			-> abort "frontend: retyping after supercompilation failed"
+		# {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap} = heaps
+		# var_heap = heaps.hp_var_heap
+		  type_heaps = heaps.hp_type_heaps
+		  expression_heap = heaps.hp_expression_heap
+	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+	FS_none
+	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
