@@ -119,6 +119,6 @@ compile_files compile compile_state
 				-> abort "compile_files 3";
 				-> compile_files compile compile_state
 		["quit"]
-			-> trace_n "quiting" compile_state;
+			-> /* trace_n "quiting" */ compile_state;
 		_
 				-> abort "compile_files 4"
