@@ -12,8 +12,7 @@ import CoclSystemDependent
 import compile
 
 coclMain :: ![{#Char}] !*World -> *World
-// currentVersion latestDefVersion latestImpVersion testArgs world
-coclMain  testArgs world
+coclMain testArgs world
 	# world
 		=	set_return_code 0 world
 	# (commandArgs, world)
