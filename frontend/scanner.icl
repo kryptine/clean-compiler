@@ -63,9 +63,11 @@ where
 ::	* RScanState =
 	{	ss_input		::	ScanInput
 	,	ss_offsides		::	! [(Int, Bool) ]	// (column, defines newDefinition)
-	,	ss_useLayout	::	! Bool
+	,	ss_useLayout	::	! Int
 	,	ss_tokenBuffer	::	! Buffer LongToken
 	}
+
+UseLayoutBit :== 1
 
 ::	* ScanInput
 	=	Input			Input
@@ -1437,7 +1439,7 @@ openScanner file_name searchPaths files
 											//	, inp_curToken		= []
 												}
 						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
-						,	ss_useLayout	=	False
+						,	ss_useLayout	=	0
 						,	ss_tokenBuffer	=	Buffer0
 						})
 				, files
@@ -1512,22 +1514,23 @@ isNewLine _      = False
 //------------------------//
 
 UseLayout_ :: !RScanState -> (!Bool, !RScanState)
-UseLayout_ scanState = scanState!ss_useLayout
+UseLayout_ scanState=:{ss_useLayout}
+	= ((ss_useLayout bitand UseLayoutBit) <> 0, scanState)
 
 UseLayout :: !ScanState -> (!Bool, !ScanState)
 UseLayout (ScanState scanState)
-	# (ss_useLayout,scanState) = scanState!ss_useLayout
-	= (ss_useLayout,ScanState scanState)
+	#! (useLayout, scanState) = UseLayout_ scanState
+	= (useLayout,ScanState scanState)
 
 setUseLayout :: !Bool !ScanState -> ScanState
-setUseLayout b (ScanState ss) = ScanState { ss & ss_useLayout = b }
+setUseLayout b (ScanState ss) = ScanState  (setUseLayout_ b ss)
 
 setUseLayout_ :: !Bool !RScanState -> RScanState
-setUseLayout_ b ss = { ss & ss_useLayout = b } // -->> ("uselayout set to ",b)
+setUseLayout_ b ss=:{ss_useLayout} = { ss & ss_useLayout = if b (ss_useLayout bitor UseLayoutBit) (ss_useLayout bitand (bitnot UseLayoutBit)) } // -->> ("uselayout set to ",b)
 
 checkOffside :: !FilePosition !Int !Token !RScanState -> (Token,RScanState)
 checkOffside pos index token scanState=:{ss_offsides,ss_useLayout,ss_input}
-	| ~ ss_useLayout
+	| (ss_useLayout bitand UseLayoutBit) == 0
 		=	(token, scanState)  //-->> (token,pos,"No layout rule applied")
 	| isEmpty ss_offsides
 		=	newOffside token scanState  //-->> "Empty offside stack"
