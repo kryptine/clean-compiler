@@ -1035,7 +1035,9 @@ static void init_apply_symb_function_state_p()
 #endif
 
 #define cTypeDelimiter	';'		/* also in checksupport.h */
+#ifndef CLEAN2
 #define _ANALYSE_IDENT_			/* also in checksupport.c */
+#endif
 
 static int compute_length_before_type_delimiter (char *fname)
 {
