@@ -30,7 +30,7 @@ sucltypeheap :: [SuclTypeVariable]
 sucltypeheap =: map SuclANONYMOUS [0..]
 
 :: SuclSymbol
- = SuclUser Ident
+ = SuclUser SymbKind
  | SuclCase ExprInfoPtr
  | SuclApply Int
  | SuclInt Int
@@ -75,6 +75,18 @@ where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
       (==) (SuclReal  real1)  (SuclReal  real2)  = real1 == real2
       (==) (SuclBool  bool1)  (SuclBool  bool2)  = bool1 == bool2
       (==) _                  _                  = False
+
+instance == SymbKind
+where (==) SK_Unknown                       SK_Unknown                      = True
+      (==) (SK_Function gi1)                (SK_Function gi2)               = gi1==gi2
+      (==) (SK_LocalMacroFunction i1)       (SK_LocalMacroFunction i2)      = i1==i2
+      (==) (SK_OverloadedFunction gi1)      (SK_OverloadedFunction gi2)     = gi1==gi2
+      (==) (SK_Generic gi1 tk1)             (SK_Generic gi2 tk2)            = gi1==gi2 && tk1==tk2
+      (==) (SK_Constructor gi1)             (SK_Constructor gi2)            = gi1==gi2
+      (==) (SK_Macro gi1)                   (SK_Macro gi2)                  = gi1==gi2
+      (==) (SK_GeneratedFunction fip1 i1)   (SK_GeneratedFunction fip2 i2)  = fip1==fip2 && i1==i2
+      (==) SK_TypeCode                      SK_TypeCode                     = True
+      (==) _                                _                               = False
 
 instance == SuclVariable
 where (==) (SuclAnonymous i1) (SuclAnonymous i2) = i1 == i2

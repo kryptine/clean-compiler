@@ -4,7 +4,7 @@ definition module coreclean
 
 from strat import Strategy
 from rule import Rule
-from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr
+from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr,SymbKind
 
 // Transitive necessities
 from strat import Substrategy
@@ -34,7 +34,7 @@ from StdString import String
 sucltypeheap :: [SuclTypeVariable]
 
 :: SuclSymbol
- = SuclUser Ident
+ = SuclUser SymbKind
  | SuclCase ExprInfoPtr
  | SuclApply Int
  | SuclInt Int
