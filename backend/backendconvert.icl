@@ -89,12 +89,7 @@ beLiteralSymbol type value
 	:==	beFunction0 (BELiteralSymbol type value)
 beFunctionSymbol functionIndex moduleIndex
 	:==	beFunction0 (BEFunctionSymbol functionIndex moduleIndex)
-// test ...
 beSpecialArrayFunctionSymbol arrayFunKind functionIndex moduleIndex
-	:==	beSpecialArrayFunctionSymbol2 arrayFunKind functionIndex (moduleIndex) // ->> (moduleIndex, functionIndex, arrayFunKind))
-
-// ... test
-beSpecialArrayFunctionSymbol2 arrayFunKind functionIndex moduleIndex
 	:==	beFunction0 (BESpecialArrayFunctionSymbol arrayFunKind (changeArrayFunctionIndex functionIndex) moduleIndex)
 beDictionarySelectFunSymbol
 	:==	beFunction0 BEDictionarySelectFunSymbol
@@ -318,8 +313,6 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | not imported.io_is_library])
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | imported.io_is_library])
 				(backEnd -*-> "beDefineImportedObjsAndLibs")
-//	#! backEnd
-//		=	adjustArrayFunctions predefs fe_arrayInstances icl_functions fe_dcls varHeap backEnd
 	#! backEnd
 		=	markExports fe_dcls.[cIclModIndex] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs fe_dclIclConversions (backEnd -*-> "markExports")
 			with
@@ -391,14 +384,17 @@ swap i j a
 
 reshuffleTypes :: Int {#Int} *a -> *a | swapTypes a
 reshuffleTypes nIclTypes dclIclConversions be
-	=	thd3 (foldStateWithIndexA swapType dclIclConversions (idP (size dclIclConversions), idP nIclTypes, be))
+	=	thd3 (foldStateWithIndexA (swapType nDclTypes) dclIclConversions (idP nDclTypes, idP nIclTypes, be))
 	where
+		nDclTypes
+			=	size dclIclConversions
+
 		idP :: Int -> .{#Int}
 		idP n
 			=	{i \\ i <- [0 .. n-1]}
 
-		swapType :: Int Int (*{#Int}, *{#Int},  *a) -> (*{#Int}, *{#Int},  *a) | swapTypes a
-		swapType dclIndex iclIndex state=:(p,p`,be)
+		swapType :: Int Int Int (*{#Int}, *{#Int},  *a) -> (*{#Int}, *{#Int},  *a) | swapTypes a
+		swapType nDclTypes dclIndex iclIndex state=:(p,p`,be)
 			#! frm
 				=	p.[dclIndex]
 			#! to
@@ -408,7 +404,7 @@ reshuffleTypes nIclTypes dclIclConversions be
 			// otherwise
 				#! frm` = dclIndex
 				#! to` = p`.[iclIndex]
-				#! to` = if (to` >= size dclIclConversions) frm` to`
+				#! to` = if (to` >= nDclTypes) frm` to`
 				=	(swap frm` to` p, swap frm to p`, swapTypes frm to be)
 
 class declareVars a :: a !VarHeap -> Backender
@@ -525,7 +521,7 @@ instance declare CommonDefs where
 		=	declare moduleIndex varHeap com_type_defs
 		o`	defineTypes moduleIndex com_cons_defs com_selector_defs com_type_defs varHeap
 
-instance declareWithIndex TypeDef a where
+instance declareWithIndex (TypeDef a) where
 	declareWithIndex :: Index ModuleIndex VarHeap (TypeDef a) -> Backender
 	declareWithIndex typeIndex moduleIndex _ {td_name}
 		=	BEDeclareType typeIndex moduleIndex td_name.id_name
@@ -545,10 +541,6 @@ declareFunType moduleIndex varHeap functionIndex {ft_symb, ft_type_ptr}
 
 currentModuleTypeConversions :: {#ClassDef} {#ClassDef} (Optional ConversionTable) -> {#Int}
 currentModuleTypeConversions iclClasses dclClasses (Yes conversionTable)
-	// revert ...
-	// | True
-	//	=	{i \\ i <- [0 .. nDclTypes + nDclClasses - 1]}
-	// ... revert
 	// sanity check ...
 	| sort [dclClass.class_dictionary.ds_index \\ dclClass <-: dclClasses]
 				<> [size typeConversions .. size typeConversions + size dclClasses - 1]
@@ -1203,7 +1195,7 @@ convertExpr (Selection isUnique expression selections) varHeap
 convertExpr (RecordUpdate _ expr updates) varHeap
 	=	foldl (convertUpdate varHeap) (convertExpr expr varHeap) updates
 	where
-		convertUpdate varHeap  expr {bind_src=EE}
+		convertUpdate varHeap  expr {bind_src=NoBind _}
 			=	expr
 		convertUpdate varHeap expr {bind_src, bind_dst=bind_dst=:{glob_module, glob_object={fs_index}}}
 			=	beUpdateNode
@@ -1219,9 +1211,11 @@ convertExpr (Update expr1 [singleSelection] expr2) varHeap
 			RecordSelection _ _
 				->	beUpdateNode (convertArgs [expr1, Selection No expr2 [singleSelection]] varHeap)
 			ArraySelection {glob_object={ds_index}, glob_module} _ index
+// RWS not used?, eleminate beSpecialArrayFunctionSymbol?
 				->	beNormalNode
 						(beSpecialArrayFunctionSymbol BEArrayUpdateFun ds_index glob_module)
 						(convertArgs [expr1, index, expr2] varHeap)
+//
 			DictionarySelection dictionaryVar dictionarySelections _ index
 				->	convertExpr (Selection No (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2]) varHeap
 convertExpr (Update expr1 selections expr2) varHeap
