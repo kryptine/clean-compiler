@@ -1680,7 +1680,7 @@ where
 		# free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
 		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		  bound_var = { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
-		= (Var bound_var, [{bind_src = src_expr, bind_dst = free_var}], var_heap, expr_heap)
+		= (Var bound_var, [{bind_src = src_expr, bind_dst = free_var}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
 	bind_opt_var No src_expr var_heap expr_heap
 		= (src_expr, [], var_heap, expr_heap)
 		
