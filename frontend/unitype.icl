@@ -398,20 +398,18 @@ coerceAttributes TA_Unique dem_attr {neg_sign} coercions
 coerceAttributes off_attr TA_Unique {pos_sign} coercions
 	| not pos_sign
 		= (True, coercions)
-coerceAttributes (TA_TempVar av_number) dem_attr {neg_sign} coercions=:{coer_demanded}
-	| not neg_sign && isUnique coer_demanded.[av_number]
-		= (True, coercions)
-coerceAttributes off_attr (TA_TempVar av_number) {pos_sign} coercions=:{coer_demanded}
-	| not pos_sign && isUnique coer_demanded.[av_number]
-		= (True, coercions)
-/*
 coerceAttributes off_attr TA_Multi {neg_sign} coercions
 	| not neg_sign
 		= (True, coercions)
 coerceAttributes TA_Multi dem_attr {pos_sign} coercions
 	| not pos_sign
 		= (True, coercions)
-*/
+coerceAttributes (TA_TempVar av_number) dem_attr {neg_sign} coercions=:{coer_demanded}
+	| not neg_sign && isUnique coer_demanded.[av_number]
+		= (True, coercions)
+coerceAttributes off_attr (TA_TempVar av_number) {pos_sign} coercions=:{coer_demanded}
+	| not pos_sign && isUnique coer_demanded.[av_number]
+		= (True, coercions)
 coerceAttributes (TA_TempVar av_number1) (TA_TempVar av_number2) {pos_sign,neg_sign} coercions
 	| av_number1 == av_number2
 		= (True, coercions)
@@ -447,17 +445,13 @@ coerceAttributes (TA_TempVar av_number) TA_Unique {pos_sign} coercions=:{coer_of
 		= (False, coercions)
 		= (True, makeUnique av_number coercions)// ---> "*** 2 ***"
 coerceAttributes TA_Multi (TA_TempVar av_number) {pos_sign} coercions=:{coer_demanded}
-	| pos_sign
-		| isUnique coer_demanded.[av_number]
-			= (False, coercions)
-			= (True, makeNonUnique av_number coercions)
-		= (True, coercions)
+	| isUnique coer_demanded.[av_number]
+		= (False, coercions)
+		= (True, makeNonUnique av_number coercions)
 coerceAttributes (TA_TempVar av_number) TA_Multi {neg_sign} coercions=:{coer_demanded}
-	| neg_sign
-		| isUnique coer_demanded.[av_number]
-			= (False, coercions)
-			= (True, makeNonUnique av_number coercions)
-		= (True, coercions)
+	| isUnique coer_demanded.[av_number]
+		= (False, coercions)
+		= (True, makeNonUnique av_number coercions)
 coerceAttributes TA_Unique TA_Multi _ coercions
 	= (False, coercions)
 coerceAttributes off_attr dem_attr {pos_sign,neg_sign} coercions
@@ -591,27 +585,16 @@ where
 		add_propagation_inequalities attr (TA {type_prop={tsp_propagation}} cons_args) coercions
 			= add_inequalities tsp_propagation attr cons_args coercions
 		where
-			add_inequalities prop_class attr _ coercions
-				= (True, coercions)
-
 			add_inequalities prop_class attr [] coercions
 				= (True, coercions)
 			add_inequalities prop_class attr [{at_attribute} : args] coercions
-				| (prop_class bitand 1) == 0 //  || is_existential_attribute at_attribute coercions
+				| (prop_class bitand 1) == 0
 					= add_inequalities (prop_class >> 1) attr args coercions
 				# (succ, coercions) = coerceAttributes attr at_attribute PositiveSign coercions
 				| succ
 					= add_inequalities (prop_class >> 1) attr args coercions
 					= (False, coercions)
-							---> ("add_propagation_inequalities", attr, at_attribute)
-/*
-			is_existential_attribute (TA_TempExVar eav_number) coercions
-				= True
-			is_existential_attribute (TA_TempVar eav_number) {coer_offered}
-				= isExistential coer_offered.[eav_number]
-			is_existential_attribute _ {coer_offered}
-				= False
-*/ 
+//							---> ("add_propagation_inequalities", attr, at_attribute)
 		add_propagation_inequalities attr type coercions
 			= (True, coercions)
 
