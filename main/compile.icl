@@ -93,11 +93,6 @@ parseCommandLine [arg : args] options
 		# (args,modules,options) = parseCommandLine args options
 		= (args,[arg : modules],options);
 
-set_compiler_id :: !Int -> Int;
-set_compiler_id id = code {
-	ccall set_compiler_id "I:I"
- };
-
 stripExtension :: {#Char} {#Char} -> {#Char}
 stripExtension extension string
 	| stringSize >= extensionSize && (string % (stringSize-extensionSize, stringSize-1)) == extension

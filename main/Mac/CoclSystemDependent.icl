@@ -107,6 +107,11 @@ clean2_compile_c_entry r = code {
 	centry clean2_compile e_CoclSystemDependent_sclean2_compile "I:I"
  }
 
+set_compiler_id :: !Int -> Int;
+set_compiler_id id = code {
+	ccall set_compiler_id "I:I"
+ };
+
 ::	* MyFiles = MyFiles;
 
 create_myfiles = MyFiles;
@@ -122,3 +127,4 @@ cast f = code {
 ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
 ensureCleanSystemFilesExists _ files = (True, files)
   // because of dcl file caching the Clean System Files folder should exist always
+ 
