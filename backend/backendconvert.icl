@@ -1696,6 +1696,8 @@ convertRootExpr aliasDummyId (Case kees=:{case_expr, case_guards}) main_dcl_modu
 			 				->	abort "backendconvert:defaultCase, case without id"
 			// otherwise
 			 	=	DefaultCaseNone
+convertRootExpr _ (FailExpr fail_ident) _
+	=	beNormalNode (beLiteralSymbol BEFailSymb fail_ident.id_name) beNoArgs
 convertRootExpr _ expr main_dcl_module_n
 	=	convertExpr expr main_dcl_module_n
 

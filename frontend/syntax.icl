@@ -1226,6 +1226,7 @@ cIsNotStrict	:== False
 				| TypeCodeExpression !TypeCodeExpression
 				| EE 
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
+				| FailExpr !Ident // only allowed on (case) root positions
 
 
 ::	CodeBinding	variable :== Env String variable
@@ -1746,6 +1747,7 @@ where
 	(<<<) file (FreeVar {fv_name})         	= file <<< fv_name
 	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< info_ptr
 
+	(<<<) file (FailExpr _) = file <<< "** FAIL **"
 	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
 	
 instance <<< LetBind
