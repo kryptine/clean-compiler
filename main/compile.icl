@@ -19,6 +19,9 @@ import portToNewSyntax
 // MV ...
 	,	compile_for_dynamics	:: !Bool
 // ... MV
+// DvA ...
+	,	compile_with_fusion		:: !Bool
+// ... DvA
 	}
 
 InitialCoclOptions =
@@ -32,6 +35,9 @@ InitialCoclOptions =
 // MV ...
 	,	compile_for_dynamics	= False
 // ... MV
+// DvA ...
+	,	compile_with_fusion		= False
+// ... DvA
 	}
 
 :: DclCache = {
@@ -85,6 +91,12 @@ parseCommandLine [arg1=:"-dynamics":args] options
 	# (args,modules,options)=	parseCommandLine args {options & compile_for_dynamics = True}
 	= (args,modules,options)
 // ... MV
+// DvA ...
+parseCommandLine [arg1=:"-fusion":args] options
+	// switch on fusion transformations
+	# (args,modules,options)=	parseCommandLine args {options & compile_with_fusion = True}
+	= (args,modules,options)
+// ... DvA
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -183,7 +195,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
+		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False,feo_fusion=options.compile_with_fusion} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
 		= closeTclFile tcl_file files

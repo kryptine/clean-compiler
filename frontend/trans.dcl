@@ -4,9 +4,10 @@ import StdEnv
 
 import syntax, transform
 
-cPassive   		:== -1
-cActive			:== -2
-cAccumulating   :== -3
+cPassive   				:== -1
+cActive					:== -2
+cAccumulating   		:== -3
+cVarOfMultimatchCase	:== -4
 
 ::	CleanupInfo
 
@@ -14,7 +15,7 @@ analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
 
 transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
-					!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap
+					!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool
 				-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 
 partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{! Group}, !*{# FunDef})

@@ -8,8 +8,9 @@ from general import Optional, Yes, No
 import checksupport, transform, overloading
 
 :: FrontEndOptions 
-	=	{	feo_up_to_phase		:: !FrontEndPhase
-		,	feo_generics 		:: !Bool
+	=	{	feo_up_to_phase			:: !FrontEndPhase
+		,	feo_generics 			:: !Bool
+		,	feo_fusion	 			:: !Bool
 		}
 
 :: FrontEndSyntaxTree

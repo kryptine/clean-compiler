@@ -2,8 +2,13 @@ implementation module trans
 
 import StdEnv
 
-import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type,
-       compilerSwitches
+import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type
+
+SwitchCaseFusion		fuse dont_fuse :== fuse
+SwitchGeneratedFusion	fuse dont_fuse :== fuse
+SwitchFunctionFusion	fuse dont_fuse :== fuse
+SwitchConstructorFusion	fuse dont_fuse :== fuse
+SwitchCurriedFusion		fuse dont_fuse :== fuse
 
 ::	PartitioningInfo = 
 	{	pi_marks :: 		!.{# Int}
@@ -12,6 +17,9 @@ import syntax, transform, checksupport, StdCompare, check, utilities, unitype, t
 	,	pi_groups ::		![[Int]]
 	,	pi_deps ::			![Int]
 	}
+
+(-!->) infix :: !.a !b -> .a | <<< b
+(-!->) a b = a // ---> b
 
 NotChecked :== -1	
 implies a b :== not a || b
@@ -451,10 +459,6 @@ instance consumerRequirements Case where
 					= True
 				= multimatch_loop has_default (dropWhile (\(ds_index,_,_)->ds_index==cip) constructors_in_pattern)
 
-instance consumerRequirements DynamicExpr where
-	consumerRequirements {dyn_expr} common_defs ai
-		= consumerRequirements dyn_expr common_defs ai
-
 bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
 	| fv_count > 0
 		= bindPatternVars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
@@ -477,6 +481,37 @@ consumer_requirements_of_guards (OverloadedListPatterns type _ patterns) common_
 	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
 	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
 	= independentConsumerRequirements pattern_exprs common_defs ai
+
+independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
+// reference counting happens independently for each pattern expression
+	#! s = size ai_cur_ref_counts
+	   zero_array = createArray s 0
+	   (_, cc, r_unsafe_bits ,ai) = foldSt (independent_consumer_requirements common_defs) exprs (zero_array, cPassive, [], ai)
+	= (cc, reverse r_unsafe_bits, ai)
+  where	
+	independent_consumer_requirements common_defs expr (zero_array, cc, unsafe_bits_accu, ai=:{ai_cur_ref_counts})
+		#! s = size ai_cur_ref_counts
+		   ai = { ai & ai_cur_ref_counts=zero_array }
+		   (cce, is_unsafe_case, ai) = consumerRequirements expr common_defs ai
+		   (unused, unified_ref_counts) = unify_ref_count_arrays s ai_cur_ref_counts ai.ai_cur_ref_counts
+		   ai = { ai & ai_cur_ref_counts=unified_ref_counts }
+		= ({ unused & [i]=0 \\ i<-[0..s-1]}, combineClasses cce cc, [is_unsafe_case:unsafe_bits_accu], ai)
+	unify_ref_count_arrays 0 src1 src2_dest
+		= (src1, src2_dest)
+	unify_ref_count_arrays i src1 src2_dest
+		#! i1 = dec i
+		   rc1 = src1.[i1]
+		   rc2 = src2_dest.[i1]
+		= unify_ref_count_arrays i1 src1 { src2_dest & [i1]= unify_ref_counts rc1 rc2} 
+
+	// unify_ref_counts outer_ref_count ref_count_in_pattern
+	unify_ref_counts 0 x = if (x==2) 2 0
+	unify_ref_counts 1 x = if (x==0) 1 2
+	unify_ref_counts 2 _ = 2
+
+instance consumerRequirements DynamicExpr where
+	consumerRequirements {dyn_expr} common_defs ai
+		= consumerRequirements dyn_expr common_defs ai
 
 instance consumerRequirements BasicPattern where
 	consumerRequirements {bp_expr} common_defs ai
@@ -505,33 +540,6 @@ instance consumerRequirements [a] | consumerRequirements a where
 instance consumerRequirements (Bind a b) | consumerRequirements a where
 	consumerRequirements {bind_src} common_defs ai
 		= consumerRequirements bind_src common_defs ai
-
-independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
-// reference counting happens independently for each pattern expression
-	#! s = size ai_cur_ref_counts
-	   zero_array = createArray s 0
-	   (_, cc, r_unsafe_bits ,ai) = foldSt (independent_consumer_requirements common_defs) exprs (zero_array, cPassive, [], ai)
-	= (cc, reverse r_unsafe_bits, ai)
-  where	
-	independent_consumer_requirements common_defs expr (zero_array, cc, unsafe_bits_accu, ai=:{ai_cur_ref_counts})
-		#! s = size ai_cur_ref_counts
-		   ai = { ai & ai_cur_ref_counts=zero_array }
-		   (cce, is_unsafe_case, ai) = consumerRequirements expr common_defs ai
-		   (unused, unified_ref_counts) = unify_ref_count_arrays s ai_cur_ref_counts ai.ai_cur_ref_counts
-		   ai = { ai & ai_cur_ref_counts=unified_ref_counts }
-		= ({ unused & [i]=0 \\ i<-[0..s-1]}, combineClasses cce cc, [is_unsafe_case:unsafe_bits_accu], ai)
-	unify_ref_count_arrays 0 src1 src2_dest
-		= (src1, src2_dest)
-	unify_ref_count_arrays i src1 src2_dest
-		#! i1 = dec i
-		   rc1 = src1.[i1]
-		   rc2 = src2_dest.[i1]
-		= unify_ref_count_arrays i1 src1 { src2_dest & [i1]= unify_ref_counts rc1 rc2} 
-
-	// unify_ref_counts outer_ref_count ref_count_in_pattern
-	unify_ref_counts 0 x = if (x==2) 2 0
-	unify_ref_counts 1 x = if (x==0) 1 2
-	unify_ref_counts 2 _ = 2
 
 analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
@@ -668,10 +676,16 @@ mapAndLength f []
 ::	ReadOnlyTI = 
 	{	ro_imported_funs	:: !{# {# FunType} }
 	,	ro_common_defs		:: !{# CommonDefs }
-	,	ro_root_case_mode	:: !RootCaseMode
-	,	ro_fun				:: !SymbIdent
-	,	ro_fun_args			:: ![FreeVar]
-	,	ro_main_dcl_module_n :: !Int
+// the following four are used when possibly generating functions for cases...
+	,	ro_root_case_mode		:: !RootCaseMode
+	,	ro_fun_root				:: !SymbIdent		// original function
+	,	ro_fun_case				:: !SymbIdent		// original function or possibly generated case
+	,	ro_fun_args				:: ![FreeVar]		// args of above
+
+	,	ro_main_dcl_module_n 	:: !Int
+
+	,	ro_transform_fusion		:: !Bool			// fusion switch
+
 	,	ro_stdStrictLists_module_n :: !Int
 	}
 
@@ -794,7 +808,7 @@ unfold_state_to_ti us ti
 	:== { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = us.us_symbol_heap,ti_cleanup_info=us.us_cleanup_info }
 
 transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_info_ptr} ro ti
-	| SwitchFusion False True
+	| SwitchCaseFusion (not ro.ro_transform_fusion) True -!-> ("transformCase",Case this_case)
 		= skip_over this_case ro ti
 	# (case_info, ti_symbol_heap) = readPtr case_info_ptr ti.ti_symbol_heap
 	  ti = { ti & ti_symbol_heap=ti_symbol_heap }
@@ -859,11 +873,11 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 										  (new_next_fun_nr, app_symb)
 											= case ro.ro_root_case_mode of
 													RootCaseOfZombie
-														# (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_fun
+														# (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_fun_case
 														-> (inc ti_next_fun_nr,
 														    { ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ti_next_fun_nr })
 													RootCase
-														-> (ti_next_fun_nr, ro.ro_fun)
+														-> (ti_next_fun_nr, ro.ro_fun_root)
 										  ti = { ti & ti_next_fun_nr = new_next_fun_nr, ti_recursion_introduced = Yes ti_next_fun_nr }
 										  app_args1 = replace_arg [ fv_info_ptr \\ {fv_info_ptr}<-aci_params ] app_args variables
 										  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
@@ -1043,7 +1057,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 				  {fvi_var_heap, fvi_expr_heap, fvi_variables, fvi_expr_ptrs} = freeVariables (Case kees) fvi
 				  ti = { ti & ti_var_heap = fvi_var_heap, ti_symbol_heap = fvi_expr_heap, ti_cleanup_info = fvi_expr_ptrs }
 				-> (fvi_variables, ti)
-	  (outer_fun_def, outer_cons_args, ti_fun_defs, ti_fun_heap) = get_fun_def_and_cons_args ro.ro_fun.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
+	  (outer_fun_def, outer_cons_args, ti_fun_defs, ti_fun_heap) = get_fun_def_and_cons_args ro.ro_fun_root.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
 		// ti.ti_cons_args shared
 	  outer_arguments = case outer_fun_def.fun_body of
 							TransformedBody {tb_args} 	-> tb_args
@@ -1056,9 +1070,9 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 							\\ {var_name, var_info_ptr} <- free_vars | not (isMember var_info_ptr outer_info_ptrs)]
 	  all_args = lifted_arguments++arguments_from_outer_fun
 	  (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
-	  fun_ident = { id_name = ro.ro_fun.symb_name.id_name+++"_case", id_info = nilPtr }
+	  fun_ident = { id_name = ro.ro_fun_root.symb_name.id_name+++"_case", id_info = nilPtr }
 	  fun_symb = { symb_name = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff, symb_arity = length all_args }
-	  new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_fun = fun_symb, ro_fun_args = all_args }
+	  new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_fun_case = fun_symb, ro_fun_args = all_args }
 	  ti = { ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 	  (new_expr, ti) = transformCase kees new_ro ti
 	  (ti_recursion_introduced, ti) = ti!ti_recursion_introduced
@@ -1084,7 +1098,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		= (gf_fun_def, gf_cons_args, fun_defs, fun_heap)
 
 	generate_case_function old_ti_recursion_introduced fun_index case_info_ptr new_expr outer_fun_def outer_cons_args used_mask
-						{ro_fun=ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}, ro_fun_args} ti
+						{ro_fun_case=ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}, ro_fun_args} ti
 //		| False->>"generate_case_function"
 //			= undef
 		# fun_arity = length ro_fun_args
@@ -1548,11 +1562,13 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
 	  		= unfold tb_rhs ui us
 //	| False--->("unfolded:", tb_rhs) = undef
+	# ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr, symb_arity = fun_arity}
 	# ro 	=	{ ro &	ro_root_case_mode = case tb_rhs of 
 	  						Case _
 	  							-> RootCase
 	  						_	-> NotRootCase,
-						ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr, symb_arity = fun_arity},
+						ro_fun_root = ro_fun,
+						ro_fun_case = ro_fun,
 						ro_fun_args = new_fun_args
 				}
 	  ti_trace
@@ -2082,9 +2098,6 @@ instance replaceIntegers AType where
 		  (at_type, used) = replaceIntegers at_type input used
 		= ({atype & at_attribute = at_attribute, at_type = at_type}, used)
 		
-(-!->) infix :: !.a !b -> .a | <<< b
-(-!->) a b = a ---> b
-
 bind_to_fresh_type_variable {tv_name, tv_info_ptr} th_vars
 	# (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 	  tv = { tv_name=tv_name, tv_info_ptr=new_tv_info_ptr }
@@ -2248,7 +2261,7 @@ transformSelection opt_type selectors expr ti
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: Bool [a] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
+determineProducers :: Bool [Bool] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
 determineProducers _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
 determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
@@ -2289,7 +2302,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 			Expanding _
 				-> False
 			(TransformedBody {tb_rhs})
-				-> SwitchFusion (linear_bit && is_sexy_body tb_rhs) False
+				-> SwitchGeneratedFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 	| is_good_producer
 		= ({ producers & [prod_index] = (PR_GeneratedFunction symb fun_index)}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
@@ -2311,7 +2324,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 		# ({fun_body}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
 		  ti = { ti & ti_fun_defs=ti_fun_defs }
 		  (TransformedBody {tb_rhs}) = fun_body
-		  is_good_producer = SwitchFusion (linear_bit && is_sexy_body tb_rhs) False
+		  is_good_producer = SwitchFunctionFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 		| is_good_producer
 			= ({ producers & [prod_index] = (PR_Function symb glob_object)}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args ], ti)
@@ -2408,10 +2421,10 @@ renewVariables exprs var_heap
 ::	ImportedFunctions	:== [Global Index]
 
 transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
-		!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap
+		!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool
 			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fun_defs cons_args common_defs imported_funs imported_types
-		collected_imports type_def_infos var_heap type_heaps symbol_heap
+		collected_imports type_def_infos var_heap type_heaps symbol_heap compile_with_fusion
 	#! nr_of_funs = size fun_defs
 	# (groups, imported_types, collected_imports, ti)
 		= transform_groups 0 groups common_defs imported_funs imported_types collected_imports
@@ -2447,13 +2460,16 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 		  ti_var_heap = fold2St (\{fv_info_ptr} a_type ti_var_heap
 									-> setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap)
 								tb.tb_args st_args ti_var_heap
-		  ro =	{ ro_imported_funs	= imported_funs
-				, ro_common_defs 	= common_defs
-				, ro_root_case_mode	= get_root_case_mode tb
-				, ro_fun			= fun_def_to_symb_ident fun fun_def
-				, ro_fun_args		= tb.tb_args
-				, ro_main_dcl_module_n = main_dcl_module_n
-				, ro_stdStrictLists_module_n = stdStrictLists_module_n
+		  ro_fun = fun_def_to_symb_ident fun fun_def
+		  ro =	{ ro_imported_funs				= imported_funs
+				, ro_common_defs 				= common_defs
+				, ro_root_case_mode				= get_root_case_mode tb
+				, ro_fun_root					= ro_fun
+				, ro_fun_case					= ro_fun
+				, ro_fun_args					= tb.tb_args
+				, ro_main_dcl_module_n			= main_dcl_module_n
+				, ro_transform_fusion			= compile_with_fusion
+				, ro_stdStrictLists_module_n	= stdStrictLists_module_n
 				}
 		  (fun_rhs, ti) = transform tb.tb_rhs ro { ti & ti_fun_defs = ti_fun_defs, ti_var_heap = ti_var_heap }
 		= { ti & ti_fun_defs = {ti.ti_fun_defs & [fun] = { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}}}

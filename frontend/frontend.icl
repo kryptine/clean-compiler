@@ -10,7 +10,8 @@ SwitchGenerics on off :== off
 
 :: FrontEndOptions 
 	=	{	feo_up_to_phase			:: !FrontEndPhase
-		,	feo_generics 		:: !Bool
+		,	feo_generics 			:: !Bool
+		,	feo_fusion	 			:: !Bool
 		}
 
 :: FrontEndSyntaxTree
@@ -234,8 +235,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
 
+//	# (components, fun_defs, error) = showComponents2 components 0 fun_defs acc_args error
+
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
+	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion
 
 	| options.feo_up_to_phase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
@@ -345,18 +348,21 @@ where
 			= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
 			
-showComponents2 :: !{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{# FunDef},!*File)
+showComponents2 :: !*{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{! Group},!*{# FunDef},!*File)
 showComponents2 comps comp_index fun_defs acc_args file
 	| comp_index >= (size comps)
-		= (fun_defs, file)
-	# (fun_defs, file) = show_component comps.[comp_index].group_members fun_defs acc_args file
+		= (comps, fun_defs, file)
+	# (comp, comps) = comps![comp_index]
+	# (fun_defs, file) = show_component comp.group_members fun_defs acc_args file
 	= showComponents2 comps (inc comp_index) fun_defs acc_args file
 where
 	show_component [] fun_defs _ file
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] fun_defs acc_args file
 		# (fd, fun_defs) = fun_defs![fun]
-		# file = show_accumulating_arguments acc_args.[fun].cc_args (file <<< fd.fun_symb <<< '.' <<< fun <<< " (")
+		# file = file <<< fd.fun_symb <<< '.' <<< fun <<< " ("
+		# file = show_accumulating_arguments acc_args.[fun].cc_args file
+		# file = show_linear_arguments acc_args.[fun].cc_linear_bits file
 		= show_component funs fun_defs acc_args (file <<< ") ")
 	
 	show_accumulating_arguments [ cc : ccs] file
@@ -366,8 +372,17 @@ where
 			= show_accumulating_arguments ccs (file <<< 'c')
 		| cc == cAccumulating
 			= show_accumulating_arguments ccs (file <<< 'a')
+		| cc == cVarOfMultimatchCase
+			= show_accumulating_arguments ccs (file <<< 'm')
 			= show_accumulating_arguments ccs (file <<< '?')
 	show_accumulating_arguments [] file
+		= file
+
+	show_linear_arguments [ cc : ccs] file
+		| cc == True
+			= show_linear_arguments ccs (file <<< 'l')
+			= show_linear_arguments ccs (file <<< 'n')
+	show_linear_arguments [] file
 		= file
 
 //show_components comps fun_defs = map (show_component fun_defs) comps
