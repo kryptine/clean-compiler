@@ -1200,6 +1200,7 @@ where
 		= (expr @ exprs, free_vars, cos)
 	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) free_vars cos=:{cos_var_heap}
 		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
+// XXX:	# cos_var_heap = foldSt (\bind cos_var_heap->clearCount bind cIsALocalVar cos_var_heap) let_strict_binds cos_var_heap
 		# cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
 		  (is_cyclic_s, let_strict_binds, cos_var_heap) = detect_cycles_and_remove_alias_binds let_strict_binds cos_var_heap
 		  (is_cyclic_l, let_lazy_binds, cos_var_heap)	= detect_cycles_and_remove_alias_binds let_lazy_binds cos_var_heap
