@@ -1861,6 +1861,7 @@ trySimpleExpressionT token is_pattern pState
 			= (False, PE_Empty, tokenBack pState)
 		= trySimpleNonLhsExpressionT token pState
 
+trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent "\\" pState
 	  (lam_args, pState) 	= wantList "arguments" trySimpleLhsExpression pState
@@ -1876,8 +1877,9 @@ trySimpleNonLhsExpressionT BackSlashToken pState
 				EqualToken	-> pState
 				DotToken	-> pState
 	  			_			-> parseError "lambda expression" (Yes token) "-> or =" (tokenBack pState)
-//trySimpleNonLhsExpressionT (LetToken strict) pState
-trySimpleNonLhsExpressionT (LetToken strict=:False) pState // let! is not supported in Clean 2.0
+trySimpleNonLhsExpressionT (LetToken strict) pState // let! is not supported in Clean 2.0
+	| strict				= (False, PE_Empty, parseError "Expression" No "let! (strict let) not supported in this version of Clean, expression" pState)
+	// otherwise
 	# (let_binds, pState)	= wantLocals pState
 	  pState				= wantToken FunctionContext "let expression" InToken pState
 	  (let_expr, pState)	= wantExpression cIsNotAPattern pState
