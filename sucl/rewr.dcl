@@ -43,7 +43,7 @@ getmapping
  &  == var
  &  == pvar
 
-instantiate
+rewrinstantiate
  :: .(Graph sym pvar)       // Pattern to instantiate with
     pvar                    // Root of the pattern
     var                     // Open node to instantiate

@@ -15,15 +15,13 @@ import StdEnv
 
 // An association between a node-id in the subject graph and a history pattern
 :: HistoryAssociation sym var
-   :== ( var                    // Attachment point in the subject graph where the history pattern is "housed"
-       , HistoryPattern sym var // The pattern in the history
+   :== ( var                        // Attachment point in the subject graph where the history pattern is "housed"
+       , [HistoryPattern sym var]   // The pattern in the history
        )
 
 // A pattern in the history, specifying the most general subject graph (footprint) for a reduction sequence
 :: HistoryPattern sym var
-   = Closed sym [HistoryPattern sym var]    // Indicates a closed node-id in the subject graph (created by a (partial) match)
-   | OpenHist                               // Indicates an open node-id in the subject graph (created by instantiation)
-   | Extensible (Link var)                  // Indicates a link to an untouched node-id in the subject graph, where this pattern can be extended
+   :== Rgraph sym var
 
 // A link in a graph, indicated by its source node-id and the argument number
 // The root of a graph can be indicated by the No constructor
@@ -47,16 +45,17 @@ matchhistory
 matchhistory hist spinenodes sgraph snode
  = foldr (checkassoc spinenodes sgraph snode) [] hist
 
-checkassoc spinenodes sgraph snode (var,pat) rest
- | isMember var spinenodes && checkpat sgraph pat snode
-   = [pat:rest]
- = rest
+checkassoc spinenodes sgraph snode (var,pats) rest
+ = if (isMember var spinenodes) (foldr checkpat rest pats) rest
+   where checkpat pat rest
+         = if (isinstance (hgraph,hroot) (sgraph,snode)) [pat:rest] rest
+           where hgraph = rgraphgraph pat; hroot = rgraphroot pat
 
-checkpat :: (Graph sym var) (HistoryPattern sym var) var -> Bool | == sym & == var
-checkpat sgraph (Closed psym pargs) snode
- # (sdef,(ssym,sargs)) = varcontents sgraph snode
- = sdef && psym==ssym && eqlen pargs sargs && and [checkpat sgraph parg sarg \\ parg<-pargs & sarg<-sargs]
-checkpat sgraph OpenHist snode
- = not (fst (varcontents sgraph snode))
-checkpat _ (Extensible _) _
- = True
+/*
+instantiate ::
+    (HistoryPattern sym pvar)
+    (Graph sym var)
+    var
+    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+*/

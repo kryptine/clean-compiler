@@ -199,10 +199,10 @@ ifopen :: result result !.(Answer sym var pvar) -> result
 
 // Extend the history according to a spine
 extendhistory
- :: (Graph sym var)         // Subject graph
-    (Spine sym var pvar)    // Spine leading to the reduction operation
-    (History sym var)       // Old history
- -> History sym var         // New history
- |  == sym
- &  == var
+ :: (Graph sym var)
+    (var -> var)
+    (Spine sym var pvar)
+    (History sym var)
+ -> History sym var
+ |  == var
  &  == pvar

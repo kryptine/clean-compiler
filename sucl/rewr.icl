@@ -100,7 +100,7 @@ xunfold redexroot rule (heap,root,subject,matching)
         = build (rulegraph rule) (ruleroot rule) (heap,[],subject,matching)
         redirection = adjust redexroot rhs` id
 
-instantiate
+rewrinstantiate
  :: .(Graph sym pvar)       // Pattern to instantiate with
     pvar                    // Root of the pattern
     var                     // Open node to instantiate
@@ -109,7 +109,7 @@ instantiate
  |  == var
  &  == pvar
 
-instantiate pattern proot node (heap,graph)
+rewrinstantiate pattern proot node (heap,graph)
 | not closed
 = (heap,graph)
 = (heap``,graph``)

@@ -229,31 +229,50 @@ Uses in Miranda:
  * extract.lit.m: used to find instances of patterns in the termination history, while folding trace tips.
  * transform.lit.m: Uses a different `instantiate' from rewr.lit.m.
 
->   instantiate :: (graph * ***,graph * **) -> (***,**) -> ([(***,**)],[(***,**)],[(***,**)]) -> ([(***,**)],[(***,**)],[(***,**)])
-
->   instantiate (pgraph,sgraph) (pnode,snode) (seen,mapping,errs)
->   =   (seen,mapping,errs), if member seen psnode
->   =   (psnode:seen,mapping,psnode:errs), if member (map fst seen) pnode
->   =   (psnode:seen,psnode:mapping,errs), if ~pdef
->   =   (psnode:seen,mapping,psnode:errs), if ~sdef
->   =   (psnode:seen,mapping,psnode:errs), if ~(psym=ssym&eqlen pargs sargs)
->   =   (seen',psnode:mapping',errs'), otherwise
->       where (pdef,(psym,pargs)) = nodecontents pgraph pnode
->             (sdef,(ssym,sargs)) = nodecontents sgraph snode
->             (seen',mapping',errs') = instantiateargs (pgraph,sgraph) (zip2 pargs sargs) (psnode:seen,mapping,errs)
->             psnode = (pnode,snode)
-
 `Instantiateargs' is the logical extension of `instantiate' to lists of node pairs.
 
->   instantiateargs :: (graph * ***,graph * **) -> [(***,**)] -> ([(***,**)],[(***,**)],[(***,**)]) -> ([(***,**)],[(***,**)],[(***,**)])
-
->   instantiateargs psgraph [] = id
->   instantiateargs psgraph (psnode:psnodes) (seen,mapping,errs)
->   =   (seen'',mapping'',errs'')
->       where (seen',mapping'',errs'') = instantiate psgraph psnode (seen,mapping',errs')
->             (seen'',mapping',errs') = instantiateargs psgraph psnodes (seen',mapping,errs)
-
 */
+
+instantiate ::
+    (Graph sym pvar,Graph sym var)
+    (pvar,var)
+    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ |  == sym
+ &  == var
+ &  == pvar
+
+instantiate (pgraph,sgraph) (pnode,snode) (seen,mapping,errs)
+| isMember psnode seen
+  = (seen,mapping,errs)
+| isMember pnode (map fst seen)
+  = ([psnode:seen],mapping,[psnode:errs])
+| not pdef
+  = ([psnode:seen],[psnode:mapping],errs)
+| not sdef
+  = ([psnode:seen],mapping,[psnode:errs])
+| not (psym==ssym && eqlen pargs sargs)
+  = ([psnode:seen],mapping,[psnode:errs])
+= (seen`,[psnode:mapping`],errs`)
+  where (pdef,(psym,pargs)) = varcontents pgraph pnode
+        (sdef,(ssym,sargs)) = varcontents sgraph snode
+        (seen`,mapping`,errs`) = instantiateargs (pgraph,sgraph) (zip2 pargs sargs) ([psnode:seen],mapping,errs)
+        psnode = (pnode,snode)
+
+instantiateargs ::
+    (Graph sym pvar,Graph sym var)
+    [(pvar,var)]
+    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ |  == sym
+ &  == var
+ &  == pvar
+
+instantiateargs psgraph [] sme = sme
+instantiateargs psgraph [psnode:psnodes] (seen,mapping,errs)
+= (seen``,mapping``,errs``)
+  where (seen`,mapping``,errs``) = instantiate psgraph psnode (seen,mapping`,errs`)
+        (seen``,mapping`,errs`) = instantiateargs psgraph psnodes (seen`,mapping,errs)
 
 :: Matchstate var pvar
    :== ( [(pvar,var)]  // Pattern-subject var combo's already visited
