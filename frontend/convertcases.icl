@@ -626,31 +626,31 @@ where
 
 instance distributeLets Selection
 where
-	distributeLets depth (ArraySelection selector expr_ptr expr) cp_info
-		# (expr, cp_info) = distributeLets depth expr cp_info
-		= (ArraySelection selector expr_ptr expr, cp_info)
-	distributeLets depth (DictionarySelection var selectors expr_ptr expr) cp_info
-		# (selectors, cp_info) = distributeLets depth selectors cp_info
-		# (expr, cp_info) = distributeLets depth expr cp_info
-		= (DictionarySelection var selectors expr_ptr expr, cp_info)
-	distributeLets depth selection cp_info
-		= (selection, cp_info)
+	distributeLets depth (ArraySelection selector expr_ptr expr) cp_state
+		# (expr, cp_state) = distributeLets depth expr cp_state
+		= (ArraySelection selector expr_ptr expr, cp_state)
+	distributeLets depth (DictionarySelection var selectors expr_ptr expr) cp_state
+		# (selectors, cp_state) = distributeLets depth selectors cp_state
+		# (expr, cp_state) = distributeLets depth expr cp_state
+		= (DictionarySelection var selectors expr_ptr expr, cp_state)
+	distributeLets depth selection cp_state
+		= (selection, cp_state)
 
 instance distributeLets [a] | distributeLets a
 where
-	distributeLets depth l cp_info = mapSt (distributeLets depth) l cp_info 
+	distributeLets depth l cp_state = mapSt (distributeLets depth) l cp_state 
 
 instance distributeLets LetBind
 where
-	distributeLets depth bind=:{lb_src} cp_info
-		# (lb_src, cp_info) = distributeLets depth lb_src cp_info
-		= ({ bind & lb_src = lb_src }, cp_info)
+	distributeLets depth bind=:{lb_src} cp_state
+		# (lb_src, cp_state) = distributeLets depth lb_src cp_state
+		= ({ bind & lb_src = lb_src }, cp_state)
 	
 instance distributeLets (Bind a b) | distributeLets a
 where
-	distributeLets depth bind=:{bind_src} cp_info
-		# (bind_src, cp_info) = distributeLets depth bind_src cp_info
-		= ({ bind & bind_src = bind_src }, cp_info)
+	distributeLets depth bind=:{bind_src} cp_state
+		# (bind_src, cp_state) = distributeLets depth bind_src cp_state
+		= ({ bind & bind_src = bind_src }, cp_state)
 
 newFunction :: !(Optional Ident) !FunctionBody ![FreeVar] ![AType] !AType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
 	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
@@ -1166,152 +1166,152 @@ retrieveVariable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
 	= ( [Var { var_name = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
 		[({ fv_def_level = NotALevel, fv_name = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
 
-::	CopyInfo =
+::	CopyState =
 	{	cp_free_vars	:: ![(VarInfoPtr,AType)]
 	,	cp_local_vars	:: ![FreeVar]
 	,	cp_var_heap		:: !.VarHeap
 	}
 	
-class copy e :: !e !*CopyInfo -> (!e, !*CopyInfo)
+class copy e :: !e !*CopyState -> (!e, !*CopyState)
 
 instance copy BoundVar
 where
-	copy var=:{var_name,var_info_ptr} cp_info=:{cp_var_heap}
+	copy var=:{var_name,var_info_ptr} cp_state=:{cp_var_heap}
 		# (var_info, cp_var_heap) = readPtr var_info_ptr cp_var_heap
-		  cp_info = { cp_info & cp_var_heap = cp_var_heap }
+		  cp_state = { cp_state & cp_var_heap = cp_var_heap }
 		= case var_info of
 			VI_FreeVar name new_info_ptr count type
 				-> ({ var & var_info_ptr = new_info_ptr },
-					{ cp_info & cp_var_heap = cp_info.cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
+					{ cp_state & cp_var_heap = cp_state.cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
 			VI_LocalVar
-				-> (var, cp_info)
+				-> (var, cp_state)
 			VI_BoundVar type
-				# (new_info_ptr, cp_var_heap) = newPtr VI_Empty cp_info.cp_var_heap
+				# (new_info_ptr, cp_var_heap) = newPtr VI_Empty cp_state.cp_var_heap
 				-> ({ var & var_info_ptr = new_info_ptr },
-					{ cp_info & cp_free_vars = [ (var_info_ptr, type) : cp_info.cp_free_vars ],
+					{ cp_state & cp_free_vars = [ (var_info_ptr, type) : cp_state.cp_free_vars ],
 							cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_name new_info_ptr 1 type) })
 			_
 				-> abort "copy [BoundVar] (convertcases)" //  <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
 
 instance copy Expression
 where
-	copy (Var var) cp_info
-		# (var, cp_info) = copy var cp_info
-		= (Var var, cp_info)
-	copy (App app=:{app_args}) cp_info
-		# (app_args, cp_info) = copy app_args cp_info
-		= (App {app & app_args = app_args}, cp_info)
-	copy (fun_expr @ exprs) cp_info
-		# ((fun_expr, exprs), cp_info) = copy (fun_expr, exprs) cp_info
-		= (fun_expr @ exprs, cp_info)
-	copy (Let lad=:{let_strict_binds,let_lazy_binds, let_expr}) cp_info=:{cp_var_heap, cp_local_vars}
+	copy (Var var) cp_state
+		# (var, cp_state) = copy var cp_state
+		= (Var var, cp_state)
+	copy (App app=:{app_args}) cp_state
+		# (app_args, cp_state) = copy app_args cp_state
+		= (App {app & app_args = app_args}, cp_state)
+	copy (fun_expr @ exprs) cp_state
+		# ((fun_expr, exprs), cp_state) = copy (fun_expr, exprs) cp_state
+		= (fun_expr @ exprs, cp_state)
+	copy (Let lad=:{let_strict_binds,let_lazy_binds, let_expr}) cp_state=:{cp_var_heap, cp_local_vars}
 		# (cp_local_vars, cp_var_heap) = foldSt bind_let_var let_strict_binds (cp_local_vars, cp_var_heap)
 		# (cp_local_vars, cp_var_heap) = foldSt bind_let_var let_lazy_binds (cp_local_vars, cp_var_heap)
-		# (let_strict_binds, cp_info) = copy let_strict_binds {cp_info & cp_var_heap = cp_var_heap, cp_local_vars = cp_local_vars }
-		# (let_lazy_binds, cp_info) = copy let_lazy_binds cp_info
-		# (let_expr, cp_info) = copy let_expr cp_info
-		= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cp_info)
+		# (let_strict_binds, cp_state) = copy let_strict_binds {cp_state & cp_var_heap = cp_var_heap, cp_local_vars = cp_local_vars }
+		# (let_lazy_binds, cp_state) = copy let_lazy_binds cp_state
+		# (let_expr, cp_state) = copy let_expr cp_state
+		= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cp_state)
 	where
 		bind_let_var {lb_dst} (local_vars, var_heap)
 			= ([lb_dst : local_vars], var_heap <:= (lb_dst.fv_info_ptr, VI_LocalVar))
-	copy (Case case_expr) cp_info
-		# (case_expr, cp_info) = copy case_expr cp_info
-		= (Case case_expr, cp_info)
-	copy expr=:(BasicExpr _ _) cp_info
-		= (expr, cp_info)
-	copy (MatchExpr opt_tuple constructor expr) cp_info
-		# (expr, cp_info) = copy expr cp_info
-		= (MatchExpr opt_tuple constructor expr, cp_info)
-	copy (Selection is_unique expr selectors) cp_info
-		# (expr, cp_info) = copy expr cp_info
-		  (selectors, cp_info) = copy selectors cp_info
-		= (Selection is_unique expr selectors, cp_info)
-	copy (Update expr1 selectors expr2) cp_info
-		# (expr1, cp_info) = copy expr1 cp_info
-		  (selectors, cp_info) = copy selectors cp_info
-		  (expr2, cp_info) = copy expr2 cp_info
-		= (Update expr1 selectors expr2, cp_info)
-	copy (RecordUpdate cons_symbol expression expressions) cp_info
-		# (expression, cp_info) = copy expression cp_info
-		  (expressions, cp_info) = copy expressions cp_info
-		= (RecordUpdate cons_symbol expression expressions, cp_info)
-	copy (TupleSelect tuple_symbol arg_nr expr) cp_info
-		# (expr, cp_info) = copy expr cp_info
-		= (TupleSelect tuple_symbol arg_nr expr, cp_info)
-	copy EE cp_info
-		= (EE, cp_info)
-	copy (NoBind ptr) cp_info
-		= (NoBind ptr, cp_info)
-	copy expr cp_info
+	copy (Case case_expr) cp_state
+		# (case_expr, cp_state) = copy case_expr cp_state
+		= (Case case_expr, cp_state)
+	copy expr=:(BasicExpr _ _) cp_state
+		= (expr, cp_state)
+	copy (MatchExpr opt_tuple constructor expr) cp_state
+		# (expr, cp_state) = copy expr cp_state
+		= (MatchExpr opt_tuple constructor expr, cp_state)
+	copy (Selection is_unique expr selectors) cp_state
+		# (expr, cp_state) = copy expr cp_state
+		  (selectors, cp_state) = copy selectors cp_state
+		= (Selection is_unique expr selectors, cp_state)
+	copy (Update expr1 selectors expr2) cp_state
+		# (expr1, cp_state) = copy expr1 cp_state
+		  (selectors, cp_state) = copy selectors cp_state
+		  (expr2, cp_state) = copy expr2 cp_state
+		= (Update expr1 selectors expr2, cp_state)
+	copy (RecordUpdate cons_symbol expression expressions) cp_state
+		# (expression, cp_state) = copy expression cp_state
+		  (expressions, cp_state) = copy expressions cp_state
+		= (RecordUpdate cons_symbol expression expressions, cp_state)
+	copy (TupleSelect tuple_symbol arg_nr expr) cp_state
+		# (expr, cp_state) = copy expr cp_state
+		= (TupleSelect tuple_symbol arg_nr expr, cp_state)
+	copy EE cp_state
+		= (EE, cp_state)
+	copy (NoBind ptr) cp_state
+		= (NoBind ptr, cp_state)
+	copy expr cp_state
 		= abort ("copy (Expression) does not match" ---> expr)
 
 instance copy (Optional a) | copy a
 where
-	copy (Yes expr) cp_info
-		# (expr, cp_info) = copy expr cp_info
-		= (Yes expr, cp_info)
-	copy No cp_info
-		= (No, cp_info)
+	copy (Yes expr) cp_state
+		# (expr, cp_state) = copy expr cp_state
+		= (Yes expr, cp_state)
+	copy No cp_state
+		= (No, cp_state)
 
 instance copy Selection  
 where
-	copy (DictionarySelection record selectors expr_ptr index_expr) cp_info
-		# (index_expr, cp_info) = copy index_expr cp_info
-		  (selectors, cp_info) = copy selectors cp_info
-		  (record, cp_info) = copy record cp_info
-		= (DictionarySelection record selectors expr_ptr index_expr, cp_info)
-	copy (ArraySelection selector expr_ptr index_expr) cp_info
-		# (index_expr, cp_info) = copy index_expr cp_info
-		= (ArraySelection selector expr_ptr index_expr, cp_info)
-	copy selector cp_info
-		= (selector, cp_info)
+	copy (DictionarySelection record selectors expr_ptr index_expr) cp_state
+		# (index_expr, cp_state) = copy index_expr cp_state
+		  (selectors, cp_state) = copy selectors cp_state
+		  (record, cp_state) = copy record cp_state
+		= (DictionarySelection record selectors expr_ptr index_expr, cp_state)
+	copy (ArraySelection selector expr_ptr index_expr) cp_state
+		# (index_expr, cp_state) = copy index_expr cp_state
+		= (ArraySelection selector expr_ptr index_expr, cp_state)
+	copy selector cp_state
+		= (selector, cp_state)
 
 instance copy Case
 where
-	copy this_case=:{case_expr, case_guards, case_default} cp_info
-		# ((case_expr,(case_guards,case_default)), cp_info) = copy (case_expr,(case_guards,case_default)) cp_info
-		= ({ this_case & case_expr = case_expr, case_guards = case_guards, case_default = case_default}, cp_info) 
+	copy this_case=:{case_expr, case_guards, case_default} cp_state
+		# ((case_expr,(case_guards,case_default)), cp_state) = copy (case_expr,(case_guards,case_default)) cp_state
+		= ({ this_case & case_expr = case_expr, case_guards = case_guards, case_default = case_default}, cp_state) 
 
 instance copy CasePatterns
 where
-	copy (AlgebraicPatterns type patterns) cp_info
-		# (patterns, cp_info) = copy patterns cp_info
-		= (AlgebraicPatterns type patterns, cp_info) 
-	copy (BasicPatterns type patterns) cp_info
-		# (patterns, cp_info) = copy patterns cp_info
-		= (BasicPatterns type patterns, cp_info) 
+	copy (AlgebraicPatterns type patterns) cp_state
+		# (patterns, cp_state) = copy patterns cp_state
+		= (AlgebraicPatterns type patterns, cp_state) 
+	copy (BasicPatterns type patterns) cp_state
+		# (patterns, cp_state) = copy patterns cp_state
+		= (BasicPatterns type patterns, cp_state) 
 
 instance copy AlgebraicPattern
 where
-	copy pattern=:{ap_vars,ap_expr} cp_info=:{cp_var_heap}
-		# (ap_expr, cp_info) = copy ap_expr { cp_info & cp_var_heap = foldSt (\{fv_info_ptr} -> writePtr fv_info_ptr VI_LocalVar) ap_vars cp_var_heap}
-		= ({ pattern & ap_expr = ap_expr }, cp_info) 
+	copy pattern=:{ap_vars,ap_expr} cp_state=:{cp_var_heap}
+		# (ap_expr, cp_state) = copy ap_expr { cp_state & cp_var_heap = foldSt (\{fv_info_ptr} -> writePtr fv_info_ptr VI_LocalVar) ap_vars cp_var_heap}
+		= ({ pattern & ap_expr = ap_expr }, cp_state) 
 
 instance copy BasicPattern
 where
-	copy pattern=:{bp_expr} cp_info
-		# (bp_expr, cp_info) = copy bp_expr cp_info
-		= ({ pattern & bp_expr = bp_expr }, cp_info) 
+	copy pattern=:{bp_expr} cp_state
+		# (bp_expr, cp_state) = copy bp_expr cp_state
+		= ({ pattern & bp_expr = bp_expr }, cp_state) 
 
 instance copy [a] | copy a
 where
-	copy l cp_info = mapSt copy l cp_info 
+	copy l cp_state = mapSt copy l cp_state 
 		
 instance copy (a,b) | copy a & copy b
 where
-	copy t cp_info = app2St (copy, copy) t cp_info 
+	copy t cp_state = app2St (copy, copy) t cp_state 
 
 instance copy LetBind
 where
-	copy bind=:{lb_src} cp_info
-		# (lb_src, cp_info) = copy lb_src cp_info
-		= ({ bind & lb_src = lb_src }, cp_info) 
+	copy bind=:{lb_src} cp_state
+		# (lb_src, cp_state) = copy lb_src cp_state
+		= ({ bind & lb_src = lb_src }, cp_state) 
 
 instance copy (Bind a b) | copy a
 where
-	copy bind=:{bind_src} cp_info
-		# (bind_src, cp_info) = copy bind_src cp_info
-		= ({ bind & bind_src = bind_src }, cp_info) 
+	copy bind=:{bind_src} cp_state
+		# (bind_src, cp_state) = copy bind_src cp_state
+		= ({ bind & bind_src = bind_src }, cp_state) 
 
 instance <<< ExprInfo
 where
