@@ -75,15 +75,19 @@ UnderscoreSystemModule			:== "_system"		// implements the predefined module
 
 LowLevelInterfaceModule			:== "StdDynamicLowLevelInterface"
 
+FunctionTypeConstructorAsString	:== " -> "
+
 instance toString GlobalTCType
 where
 	toString (GTT_Basic basic_type)							= create_type_string (toString basic_type) PredefinedModuleName
-	toString GTT_Function									= " -> "
+	toString GTT_Function									= FunctionTypeConstructorAsString
 	toString (GTT_Constructor type_symb_indent mod_name _)	= create_type_string type_symb_indent.type_name.id_name mod_name
 //	 +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
 
 create_type_string type_name module_name
-	:== type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) "")
+	:== if (type_name == FunctionTypeConstructorAsString)
+			type_name
+			(type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) ""))
 
 get_type_name_and_module_name_from_type_string :: !String -> (!String,!String)
 get_type_name_and_module_name_from_type_string type_string
@@ -95,6 +99,8 @@ get_type_name_and_module_name_from_type_string type_string
 		#! module_name
 			= type_string % (inc sep_pos,dec (size type_string))
 		= (type_name,module_name)
+	| type_string == FunctionTypeConstructorAsString
+		= (type_string,PredefinedModuleName)
 where 
 	CharIndex  :: !String !Int !Char -> (!Bool,!Int)
 	CharIndex s i char

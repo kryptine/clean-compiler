@@ -98,7 +98,7 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		
 	= (True,tcl_file,type_heaps,predefined_symbols) 
 where
-	collect_type_constructors_in_dynamic_patterns :: !Int !Int [(!TypeSymbIdent,!String)] -> [(!TypeSymbIdent,!String)]
+	collect_type_constructors_in_dynamic_patterns :: !Int !Int [TypeSymbIdent] -> [TypeSymbIdent]
 	collect_type_constructors_in_dynamic_patterns i limit type_constructors_in_dynamic_patterns
 		| i == limit
 			= type_constructors_in_dynamic_patterns
@@ -107,7 +107,7 @@ where
 				# (GTT_Constructor type_name=:{type_name={id_name}} module_name used_in_application_of_type_dependent_function)
 					= global_type_instances.[i]
 				| used_in_application_of_type_dependent_function || ci_type_constructor_used_in_dynamic_patterns.[i]
-					= collect_type_constructors_in_dynamic_patterns (inc i) limit [(type_name,module_name):type_constructors_in_dynamic_patterns]
+					= collect_type_constructors_in_dynamic_patterns (inc i) limit [type_name:type_constructors_in_dynamic_patterns]
 					= collect_type_constructors_in_dynamic_patterns (inc i) limit type_constructors_in_dynamic_patterns
 				= collect_type_constructors_in_dynamic_patterns (inc i) limit type_constructors_in_dynamic_patterns
 	where
