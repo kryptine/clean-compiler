@@ -255,5 +255,10 @@ split sep
           =   ([x:ys],yss)
               where (ys,yss) = spl xs
 
+// `Stub modulename functionname message' aborts with a explanatory message
+stub :: .String .String .String -> a
+stub modulename functionname message
+= abort (modulename+++": "+++functionname+++": "+++message)
+
 superset :: .[a] -> .(.[a] -> Bool) | == a
 superset set = isEmpty o (removeMembers set)
