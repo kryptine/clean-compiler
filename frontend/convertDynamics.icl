@@ -696,7 +696,7 @@ where
 				_
 					-> abort "!!!!"
 */		
-		# sel_type = Selection No (Var coerce_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
+//		# sel_type = Selection No (Var coerce_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
 	
 		# let_expr
 			= Let {
@@ -808,7 +808,7 @@ where
 		  (let_binds, ci) 		= bind_indirection_var ind_var unify_result_var twotuple ci
 		  a_ij_binds			= add_x_i_bind opened_dynamic.opened_dynamic_expr dp_var a_ij_binds
 		  
-		  sel_type	= Selection No (Var unify_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
+//		  sel_type	= Selection No (Var unify_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
 
 		  let_expr = Let {	let_strict_binds = [],
 // MW0		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
