@@ -671,6 +671,22 @@ where
 		= transformSelection opt_type selectors expr ti
 	transform (Update expr1 selectors expr2) ro ti
 		# (expr1,ti) = transform expr1 ro ti
+		# (selectors,ti) = transform_expressions_in_selectors selectors ti
+			with
+				transform_expressions_in_selectors [selection=:RecordSelection _ _ : selections] ti
+					# (selections,ti) = transform_expressions_in_selectors selections ti
+					= ([selection:selections],ti)
+				transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ti
+					# (expr,ti) = transform expr ro ti
+					# (selections,ti) = transform_expressions_in_selectors selections ti
+					= ([ArraySelection ds ep expr:selections],ti)
+				transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ti
+					# (expr,ti) = transform expr ro ti
+					# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ti
+					# (selections,ti) = transform_expressions_in_selectors selections ti
+					= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
+				transform_expressions_in_selectors [] ti
+					= ([],ti)
 		# (expr2,ti) = transform expr2 ro ti
 		= (Update expr1 selectors expr2,ti)
 	transform (RecordUpdate cons_symbol expr exprs) ro ti
@@ -2117,6 +2133,7 @@ transformApplication app [] ro ti
 transformApplication app extra_args ro ti
 	= (App app @ extra_args, ti)
 
+transformSelection :: (Optional .(Global DefinedSymbol)) [Selection] Expression *TransformInfo -> (!Expression,!*TransformInfo)
 transformSelection No s=:[RecordSelection _ field_index : selectors] 
 					app=:(App {app_symb={symb_kind= SK_Constructor _ }, app_args, app_info_ptr})
 					ti=:{ti_symbol_heap}
