@@ -114,7 +114,6 @@
 /EXPORT: BEDefineRules
 /EXPORT: BEGenerateCode
 /EXPORT: BEExportType
-/EXPORT: BESwapTypes
 /EXPORT: BEExportConstructor
 /EXPORT: BEExportField
 /EXPORT: BEExportFunction
