@@ -254,7 +254,7 @@ cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} co
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
 					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, expr_heap, cus_error)
-//			---> (tst, st)
+			---> (tst, st)
 where
 	determine_type_vars to_index all_vars var_env
 		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
