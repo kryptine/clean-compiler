@@ -557,8 +557,13 @@ where
 		| isIclContext parseContext && isLocalContext parseContext && (token == EqualToken || token == DefinesColonToken) &&
 		/* PK isLowerCaseName name.id_name && */ not (isClassOrInstanceDefsContext parseContext)
 			# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact token) (tokenBack pState)
-			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
-
+			| token == EqualToken
+				= (PD_Function pos name False [] rhs FK_NodeDefOrFunction, pState)
+			// otherwise // token == DefinesColonToken
+ 				| isGlobalContext parseContext
+					= (PD_Function pos name False [] rhs FK_Caf, pState)
+				// otherwise
+					= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 	want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
 		# code_allowed  = code_block_allowed token
 		  (token, pState) = nextToken FunctionContext pState
@@ -782,19 +787,20 @@ isDefiningSymbol RhsDefiningSymbolRuleOrMacro observed
 
 definingSymbolToFunKind :: RhsDefiningSymbol -> FunKind
 definingSymbolToFunKind (RhsDefiningSymbolExact defining_token)
-	=	token_to_fun_kind defining_token
-	where
-		token_to_fun_kind ColonDefinesToken
-			=	FK_Macro
-		token_to_fun_kind EqualToken
-			=	FK_Function cNameNotLocationDependent
-		token_to_fun_kind DoubleArrowToken
-			=	FK_Function cNameNotLocationDependent
-		token_to_fun_kind DefinesColonToken
-			=	FK_Caf
-		token_to_fun_kind _
-			=	FK_Unknown
+	=	definingTokenToFunKind defining_token
 definingSymbolToFunKind _
+	=	FK_Unknown
+
+definingTokenToFunKind :: Token -> FunKind
+definingTokenToFunKind ColonDefinesToken
+	=	FK_Macro
+definingTokenToFunKind EqualToken
+	=	FK_Function cNameNotLocationDependent
+definingTokenToFunKind DoubleArrowToken
+	=	FK_Function cNameNotLocationDependent
+definingTokenToFunKind DefinesColonToken
+	=	FK_Caf
+definingTokenToFunKind _
 	=	FK_Unknown
 
 wantRhs :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs

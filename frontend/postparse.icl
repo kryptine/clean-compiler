@@ -25,15 +25,17 @@ optGuardedAltToRhs optGuardedAlt
 		}
 
 exprToRhs expr 
-	:==	{	rhs_alts	= UnGuardedExpr
- 						{	ewl_nodes	= []
-						,	ewl_expr	= expr
-						,	ewl_locals = LocalParsedDefs []
-						,	ewl_position= NoPos
-						}
+	:==	{	rhs_alts	= UnGuardedExpr (exprToExprWithLocalDefs expr)
 		,	rhs_locals	= LocalParsedDefs []
 		}
 
+exprToExprWithLocalDefs expr
+	:== {	ewl_nodes	= []
+		,	ewl_expr	= expr
+		,	ewl_locals = LocalParsedDefs []
+		,	ewl_position= NoPos
+		}
+					
 prefixAndPositionToIdent :: !String !LineAndColumn !*CollectAdmin -> (!Ident, !*CollectAdmin)
 prefixAndPositionToIdent prefix {lc_line, lc_column} ca=:{ca_hash_table}
 	# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
@@ -278,6 +280,11 @@ where
 		reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
 			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			= (fun_defs, [{ nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
+
+		reorganiseLocalDefinitions [PD_Function pos name is_infix [] {rhs_alts, rhs_locals} FK_NodeDefOrFunction : defs] ca
+			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+			= (fun_defs, [{ nd_dst = PE_Ident name, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
+
 		reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
 			# prio = if is_infix (Prio NoAssoc 9) NoPrio
 			  fun_arity = length args

@@ -174,7 +174,7 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_Erroneous
 
-::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
+::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
 
 cNameNotLocationDependent :== False
 cNameLocationDependent :== True

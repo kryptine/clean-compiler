@@ -172,7 +172,7 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_Erroneous
 
-::	FunKind	= FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
+::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
 
 cNameNotLocationDependent :== False
 cNameLocationDependent :== True
@@ -1759,6 +1759,7 @@ instance <<< FunKind
 where
 	(<<<) file (FK_Function False) = file <<< "FK_Function"
 	(<<<) file (FK_Function True) = file <<< "Lambda"
+	(<<<) file FK_NodeDefOrFunction = file <<< "FK_NodeDefOrFunction"
 	(<<<) file FK_Macro = file <<< "FK_Macro"
 	(<<<) file FK_Caf = file <<< "FK_Caf"
 	(<<<) file FK_Unknown = file <<< "FK_Unknown"
