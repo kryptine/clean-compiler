@@ -1,10 +1,10 @@
 
-#if 0
-#define KARBON
+#include "compiledefines.h"
+
+#ifdef KARBON
 #define TARGET_API_MAC_CARBON 1
 #endif
 
-#include "compiledefines.h"
 #include "types.t"
 #include "system.h"
 
