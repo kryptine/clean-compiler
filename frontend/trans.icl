@@ -8,11 +8,12 @@ import StdEnv
 import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type
 import classify
 
-SwitchCaseFusion		fuse dont_fuse :== dont_fuse // fuse
-SwitchGeneratedFusion	fuse dont_fuse :== fuse
-SwitchFunctionFusion	fuse dont_fuse :== fuse
-SwitchConstructorFusion	fuse dont_fuse :== dont_fuse // fuse
-SwitchCurriedFusion		fuse dont_fuse :== fuse
+SwitchCaseFusion			fuse dont_fuse :== dont_fuse // fuse
+SwitchGeneratedFusion		fuse dont_fuse :== fuse
+SwitchFunctionFusion		fuse dont_fuse :== fuse
+SwitchConstructorFusion		fuse dont_fuse :== dont_fuse // fuse
+SwitchCurriedFusion			fuse dont_fuse :== fuse
+SwitchUnusedFusion			fuse dont_fuse :== fuse
 
 (-!->) infix
 (-!->) a b :== a // ---> b
@@ -1926,7 +1927,8 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 //		| False-!->("determineProducers",(app_symb.symb_name, cc_linear_bits,cc_args,app_args))
 //			= undef
 		# is_applied_to_macro_fun = fun_def.fun_info.fi_properties bitand FI_IsMacroFun <> 0
-	  	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
+	  	# (producers, new_args, ti)
+	  		= determineProducers is_applied_to_macro_fun fun_def.fun_type cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
 //	  	| False-!->("results in",II_Node producers nilPtr II_Empty II_Empty)
 //	  		= undef
 	  	| containsProducer cc_size producers
@@ -2090,25 +2092,39 @@ transformSelection NormalSelector [] expr ro ti
 transformSelection selector_kind selectors expr ro ti
 	= (Selection selector_kind expr selectors, ti)
 
-//@	determineProducers
+//@	determineProducers: finds all legal producers in the argument list.
+// This version finds FIRST legal producer in argument list...
 
 // XXX store linear_bits and cc_args together ?
 
-// determineProducers: finds all legal producers in the argument list.
-determineProducers :: Bool [Bool] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
-determineProducers _ _ _ [] _ producers _ ti
+determineProducers :: Bool (Optional SymbolType) [Bool] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
+determineProducers _ _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
-determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
-	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun linear_bits cons_args args (inc prod_index) producers ro ti
+determineProducers is_applied_to_macro_fun fun_type [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
  	| cons_arg == CActive
-		= determine_producer is_applied_to_macro_fun linear_bit arg new_args prod_index producers ro ti
+		# (producers, new_arg, ti) = determine_producer is_applied_to_macro_fun linear_bit arg [] prod_index producers ro ti
+		| isProducer producers.[prod_index]
+			= (producers, new_arg++args, ti)
+		# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+		= (producers, new_arg++new_args, ti)
+	| SwitchUnusedFusion (ro.ro_transform_fusion && cons_arg == CUnused && isLazyArg fun_type prod_index) False
+		# producers = { producers & [prod_index] = PR_Unused }
+		= (producers, args, ti)
+	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 	= (producers, [arg : new_args], ti)
 where
+	isProducer PR_Empty	= False
+	isProducer _		= True
+	
+	isLazyArg No _ = True
+	isLazyArg (Yes {st_args_strictness}) index = not (arg_is_strict (inc index) st_args_strictness)
+	
 	determine_producer is_applied_to_macro_fun linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
 			= determineProducer is_applied_to_macro_fun linear_bit app EI_Empty new_args prod_index producers ro ti
-			# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
-			= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers ro { ti & ti_symbol_heap = ti_symbol_heap }
+		# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
+		# ti = { ti & ti_symbol_heap = ti_symbol_heap }
+		= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers ro ti
 	determine_producer _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
 
