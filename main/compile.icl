@@ -20,6 +20,9 @@ generate_tcl_file :== False;
 	,	outPath:: {#Char}
 	,	outMode::	Int
 	,	searchPaths:: SearchPaths
+// MV ...
+	,	compile_for_dynamics	:: !Bool
+// ... MV
 	}
 
 InitialCoclOptions =
@@ -30,6 +33,9 @@ InitialCoclOptions =
 	,	outPath=	"out"
 	,	outMode=	FWriteText
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
+// MV ...
+	,	compile_for_dynamics	= False
+// ... MV
 	}
 
 :: DclCache = {
@@ -51,6 +57,9 @@ compile args cache files
 	# (args_without_modules,modules,cocl_options) = parseCommandLine args InitialCoclOptions
 	= compile_modules modules 0 cocl_options args_without_modules cache files;
 
+// WARNING:
+// if you add an option which is not supported by the backend, then you should remove it from
+// the first list in the tuple returned by parseCommandLine
 parseCommandLine :: [{#Char}] CoclOptions -> ([{#Char}],[{#Char}],CoclOptions)
 parseCommandLine [] options
 	=	([],[],options)
@@ -81,6 +90,13 @@ parseCommandLine [arg1=:"-RE", errorPath : args] options
 parseCommandLine [arg1=:"-RAE", errorPath : args] options
 	# (args,modules,options)=	parseCommandLine args {options & errorPath = stripQuotes errorPath, errorMode = FAppendText}
 	= ([arg1,errorPath:args],modules,options)
+// MV ...
+parseCommandLine [arg1=:"-dynamics":args] options
+	// generates for each icl an tcl (which contains the type information for that module)
+	# (args,modules,options)=	parseCommandLine args {options & compile_for_dynamics = True}
+	= (args,modules,options)
+// ... MV
+
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -172,7 +188,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (tcl_file, files)
-		= openTclFile options.pathName files
+		= openTclFile options options.pathName files
 	# (io, files)
 		=	stdio files
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
@@ -246,11 +262,10 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		= (success,cache,files)
 
 // MV ...
-openTclFile :: !String !*Files -> (Optional !.File, !*Files)
-openTclFile icl_mod_pathname files
-	| not generate_tcl_file 
-		= (No,files);
-		
+openTclFile :: CoclOptions !String !*Files -> (Optional !.File, !*Files)
+openTclFile options=:{compile_for_dynamics=False} icl_mod_pathname files
+	= (No,files)
+openTclFile options icl_mod_pathname files
 	# csf_path
 		= directoryName icl_mod_pathname +++ "Clean System Files"
 	# tcl_path
