@@ -516,12 +516,12 @@ where
 		# (opt_opr, left, e_state, cs_error) = split_at_operator [expr] exprs e_state cs_error
 		  (left_expr, e_state, cs_error) = combine_expressions left [] 0 e_state cs_error
 		= case opt_opr of
-			Yes (symb, prio, is_fun, right)
+			Yes (symb, arity, prio, is_fun, right)
 				-> case right of
 					[Constant symb _ (Prio _ _) _:_]
 						-> (EE, e_state, checkError symb.symb_ident first_argument_of_infix_operator_missing cs_error)
 					_
-						-> build_operator_expression [] left_expr (symb, prio, is_fun) right e_state cs_error
+						-> build_operator_expression [] left_expr (symb, arity, prio, is_fun) right e_state cs_error
 			No
 				-> (left_expr, e_state, cs_error)
 	where
@@ -533,8 +533,8 @@ where
 		split_at_operator left [Constant symb arity prio is_fun] e_state cs_error
 			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
 			= (No, [appl_exp : left], e_state, cs_error)
-		split_at_operator left [expr=:(Constant symb _ prio is_fun) : exprs] e_state cs_error
-			= (Yes (symb, prio, is_fun, exprs), left, e_state, cs_error)
+		split_at_operator left [expr=:(Constant symb arity prio is_fun) : exprs] e_state cs_error
+			= (Yes (symb, arity, prio, is_fun, exprs), left, e_state, cs_error)
 		split_at_operator left [expr : exprs] e_state cs_error
 			= split_at_operator [expr : left] exprs e_state cs_error
 		split_at_operator exp [] e_state cs_error
@@ -553,36 +553,36 @@ where
 			= combine_expressions rev_args [rev_arg : args] (inc arity) e_state cs_error
 		
 
- 		build_operator_expression left_appls left1 (symb1, prio1, is_fun1) [re : res] e_state cs_error
+ 		build_operator_expression left_appls left1 (symb1, arity1, prio1, is_fun1) [re : res] e_state cs_error
 			# (opt_opr, left2, e_state, cs_error) = split_at_operator [re] res e_state cs_error
 			= case opt_opr of
-				Yes (symb2, prio2, is_fun2, right)
+				Yes (symb2, arity2, prio2, is_fun2, right)
 					# optional_prio = determinePriority prio1 prio2
 					-> case optional_prio of
 						Yes priority
 							| priority
 						  		# (middle_exp, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
-								  (new_left, e_state, cs_error) = buildApplication symb1 2 2 is_fun1 [left1,middle_exp] e_state cs_error
+								  (new_left, e_state, cs_error) = buildApplication symb1 arity1 2 is_fun1 [left1,middle_exp] e_state cs_error
 								  (left_appls, new_left, e_state, cs_error) = build_left_operand left_appls prio2 new_left e_state cs_error
-								-> build_operator_expression left_appls new_left (symb2, prio2, is_fun2) right e_state cs_error
+								-> build_operator_expression left_appls new_left (symb2, arity2, prio2, is_fun2) right e_state cs_error
 						  		# (middle_exp, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
-								-> build_operator_expression [(symb1, prio1, is_fun1, left1) : left_appls]
-										middle_exp (symb2, prio2, is_fun2) right e_state cs_error
+								-> build_operator_expression [(symb1, arity1, prio1, is_fun1, left1) : left_appls]
+										middle_exp (symb2, arity2, prio2, is_fun2) right e_state cs_error
 						No
 							-> (EE, e_state, checkError symb1.symb_ident "conflicting priorities" cs_error)
 				No
 					# (right, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
-					  (result_expr, e_state, cs_error) = buildApplication symb1 2 2 is_fun1 [left1,right] e_state cs_error
+					  (result_expr, e_state, cs_error) = buildApplication symb1 arity1 2 is_fun1 [left1,right] e_state cs_error
 					-> build_final_expression left_appls result_expr e_state cs_error
 
 		build_left_operand [] _ result_expr e_state cs_error
 			= ([], result_expr, e_state, cs_error)		
-		build_left_operand la=:[(symb, priol, is_fun, left) : left_appls] prior result_expr e_state cs_error
+		build_left_operand la=:[(symb, arity, priol, is_fun, left) : left_appls] prior result_expr e_state cs_error
 			# optional_prio = determinePriority priol prior
 			= case optional_prio of
 				Yes priority
 					| priority
-						# (result_expr, e_state, cs_error) = buildApplication symb 2 2 is_fun [left,result_expr] e_state cs_error
+						# (result_expr, e_state, cs_error) = buildApplication symb arity 2 is_fun [left,result_expr] e_state cs_error
 						-> build_left_operand left_appls prior result_expr e_state cs_error
 						-> (la, result_expr, e_state, cs_error)
 				No
@@ -590,8 +590,8 @@ where
 		
 		build_final_expression [] result_expr e_state cs_error
 			= (result_expr, e_state, cs_error)		
-		build_final_expression [(symb, _, is_fun, left) : left_appls] result_expr e_state cs_error
-			# (result_expr, e_state, cs_error) = buildApplication symb 2 2 is_fun [left,result_expr] e_state cs_error
+		build_final_expression [(symb, arity, _, is_fun, left) : left_appls] result_expr e_state cs_error
+			# (result_expr, e_state, cs_error) = buildApplication symb arity 2 is_fun [left,result_expr] e_state cs_error
 			= build_final_expression left_appls result_expr e_state cs_error
 					
 checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
