@@ -3,8 +3,8 @@
 */
 definition module convertDynamics
 
-import syntax, transform
-
+import syntax , checksupport
+from transform import ::Group
 :: TypeCodeVariableInfo
 :: DynamicValueAliasInfo
 
