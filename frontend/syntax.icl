@@ -7,6 +7,9 @@ import scanner, general, Heap, typeproperties, utilities
 PA_BUG on off :== on
 switch_import_syntax one_point_three two_point_zero :== one_point_three
 SwitchFusion fuse dont_fuse :== dont_fuse
+switch_port_to_new_syntax port dont_port :== dont_port
+
+cTabWidth :== switch_port_to_new_syntax 4 (abort "cTabWidth is only used for portToNewSyntax")
 
 ::	Ident =
 	{ 	id_name		:: !String
@@ -53,13 +56,27 @@ where toString {import_module} = toString import_module
 				| STE_Module !(Module (CollectedDefinitions ClassInstance IndexRange))
 				| STE_OpenModule !Int !(Module (CollectedDefinitions ClassInstance IndexRange))
 				| STE_ClosedModule
-				| STE_LockedModule
 				| STE_Empty 
 				| STE_DictType !CheckedTypeDef
 				| STE_DictCons !ConsDef
 				| STE_DictField !SelectorDef
 				| STE_Called ![Index] /* used during macro expansion to indicate that this function is called */
 				| STE_ExplImp !Bool !(Optional ImportDeclaration) !STE_Kind !Bool /* auxiliary used in module explicitimports. */
+				| STE_ExplImpSymbol !Int
+				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
+				| STE_BelongingSymbol !Int
+
+::	Declaration =
+	{	dcl_ident	:: !Ident
+	,	dcl_pos		:: !Position
+	,	dcl_kind	:: !STE_Kind
+	,	dcl_index	:: !Index
+	}
+
+::	ComponentNrAndIndex =
+	{	cai_component_nr	:: !Int
+	,	cai_index			:: !Int
+	}
 
 ::	Global object =
 	{	glob_object	:: !object
@@ -1304,7 +1321,8 @@ where
 	(<<<) file symb=:{symb_kind = SK_LocalMacroFunction symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index } = file <<< symb.symb_name <<<  "[o]@" <<< symb_index
-	(<<<) file symb = file <<< symb.symb_name 
+	(<<<) file symb=:{symb_kind = SK_Constructor symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb = file <<< symb.symb_name
 
 instance <<< TypeSymbIdent
 where
@@ -1820,6 +1838,71 @@ where
 		show_expression file _
 			= file
 		
+instance <<< Declaration
+  where
+	(<<<) file { dcl_ident, dcl_kind } 
+		= file <<< dcl_ident <<< '<' <<< ptrToInt dcl_ident.id_info <<< '>' <<< '(' <<< dcl_kind <<< ')'
+
+instance <<< STE_Kind
+where
+	(<<<) file
+		(STE_FunctionOrMacro _)
+			= file <<< "STE_FunctionOrMacro"
+	(<<<) file
+		STE_Type
+			= file <<< "STE_Type"
+	(<<<) file
+		STE_Constructor
+			= file <<< "STE_Constructor"
+	(<<<) file
+		(STE_Selector _)
+			= file <<< "STE_Selector"
+	(<<<) file
+		STE_Class
+			= file <<< "STE_Class"
+	(<<<) file
+		(STE_Field _)
+			= file <<< "STE_Field"
+	(<<<) file
+		STE_Member
+			= file <<< "STE_Member"
+	(<<<) file
+		(STE_Instance _)
+			= file <<< "STE_Instance"
+	(<<<) file
+		(STE_Variable _) 
+			= file <<< "STE_Variable"
+	(<<<) file
+		(STE_TypeVariable _) 
+			= file <<< "STE_TypeVariable"
+	(<<<) file
+		(STE_TypeAttribute _)
+			= file <<< "STE_TypeAttribute"
+	(<<<) file
+		(STE_BoundTypeVariable _)
+			= file <<< "STE_BoundTypeVariable"
+	(<<<) file
+		(STE_Imported a b)
+			= file <<< "STE_Imported (" <<< a <<< ")" <<< b 
+	(<<<) file
+		STE_DclFunction
+			= file <<< "STE_DclFunction"
+	(<<<) file
+		(STE_Module _)
+			= file <<< "STE_Module"
+	(<<<) file
+		(STE_OpenModule _ _)
+			= file <<< "STE_OpenModule"
+	(<<<) file
+		STE_ClosedModule
+			= file <<< "STE_ClosedModule"
+	(<<<) file
+		STE_Empty 
+			= file <<< "STE_Empty"
+	(<<<) file
+		_ 
+			= file <<< "STE_???"
+
 readable :: !Ident -> String // somewhat hacky
 readable {id_name}
 	| id_name=="_cons" || id_name=="_nil"
@@ -1877,15 +1960,8 @@ PropClass			:== bitnot 0
 newTypeSymbIdentCAF :: TypeSymbIdent;
 newTypeSymbIdentCAF =: MakeTypeSymbIdentMacro { glob_object = NoIndex, glob_module = NoIndex } {id_name="",id_info=nilPtr} 0
 
-//MakeNewTypeSymbIdent name arity
-//	:== MakeTypeSymbIdent { glob_object = NoIndex, glob_module = NoIndex } name arity
-
 MakeNewTypeSymbIdent name arity
 	:== {newTypeSymbIdentCAF & type_name=name, type_arity=arity }
-
-//MakeTypeSymbIdent type_index name arity
-//	:== {	type_name = name, type_arity = arity, type_index = type_index,
-//			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
 
 MakeTypeSymbIdent type_index name arity
 	:== {	newTypeSymbIdentCAF & type_name = name, type_arity = arity, type_index = type_index }

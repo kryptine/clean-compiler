@@ -199,7 +199,7 @@ where
 				# (mark, ({con_var_binds,con_top_var_binds}, as)) = analTypeDef modules module_index type_index as
 				= (mark, ({con_top_var_binds = con_top_var_binds ++ conds.con_top_var_binds, con_var_binds = con_var_binds ++ conds.con_var_binds}, as))
 				= (mark, (conds, as))
-	
+
 	analTypes has_root_attr modules form_tvs (arg_type --> res_type) conds_as
 		# (arg_ldep, arg_kind, arg_type_props, conds_as) = analTypes has_root_attr modules form_tvs arg_type conds_as
 		  (res_ldep, res_kind, res_type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs res_type conds_as
@@ -456,12 +456,12 @@ where
 
 //import RWSDebug
 
-analTypeDefs :: !{#CommonDefs} !ModuleNumberSet !*TypeHeaps !*ErrorAdmin -> (!*TypeDefInfos, !*TypeHeaps, !*ErrorAdmin)
+analTypeDefs :: !{#CommonDefs} !NumberSet !*TypeHeaps !*ErrorAdmin -> (!*TypeDefInfos, !*TypeHeaps, !*ErrorAdmin)
 analTypeDefs modules used_module_numbers heaps error
 //	#! modules = modules ---> "analTypeDefs"
 //	# sizes = [ size mod.com_type_defs - size mod.com_class_defs \\ mod <-: modules ]
 //	# used_module_numbers = used_module_numbers <<- used_module_numbers
-	# sizes = [ if (in_module_number_set module_n used_module_numbers) (size mod.com_type_defs - size mod.com_class_defs) 0 \\ mod <-: modules & module_n<-[0..]]
+	# sizes = [ if (inNumberSet module_n used_module_numbers) (size mod.com_type_defs - size mod.com_class_defs) 0 \\ mod <-: modules & module_n<-[0..]]
 
 	  check_marks	= { createArray nr_of_types AS_NotChecked \\ nr_of_types <- sizes }
 	  type_def_infos	= { createArray nr_of_types EmptyTypeDefInfo \\ nr_of_types <- sizes }

@@ -1,13 +1,13 @@
 implementation module checksupport
 
 import StdEnv, compare_constructor
-import syntax, predef
+import syntax, predef, containers
 import utilities
 from check import checkFunctions
 
-::	VarHeap :== Heap VarInfo
+import RWSDebug
 
-//cIclModIndex 			:== 0
+::	VarHeap :== Heap VarInfo
 
 CS_NotChecked 	:== -1
 NotFound		:== -1
@@ -68,22 +68,26 @@ where
 	,	com_instance_defs	:: !.{# ClassInstance}
 	}
 
-::	Declaration =
-	{	dcl_ident	:: !Ident
-	,	dcl_pos		:: !Position
-	,	dcl_kind	:: !STE_Kind
-	,	dcl_index	:: !Index
-	}
-
 ::	Declarations = {
 		dcls_import		::!{!Declaration}
 	,	dcls_local		::![Declaration]
 	,	dcls_local_for_import ::!{!Declaration}
-	,	dcls_explicit	::!{!ExplicitImport}
 	}
 
-:: ExplicitImport = ExplicitImport !Declaration !Position
-	
+::	ExplImpInfos :== {!{!.ExplImpInfo}}
+
+::	ExplImpInfo
+		= ExplImpInfo Ident !.DeclaringModulesSet
+		| TemporarilyFetchedAway
+
+::	DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
+
+::	DeclarationInfo =
+	{	di_decl			::	!Declaration
+	,	di_instances	::	![Declaration]
+	,	di_belonging	::	!NumberSet
+	}
+
 ::	IclModule  =
 	{	icl_name			:: !Ident
 	,	icl_functions		:: !.{# FunDef }
@@ -93,7 +97,7 @@ where
 //	,	icl_declared		:: !Declarations
 	,	icl_import		:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
-	,	icl_used_module_numbers :: !ModuleNumberSet
+	,	icl_used_module_numbers :: !NumberSet
 	}
 
 ::	DclModule =
@@ -108,18 +112,8 @@ where
 	,	dcl_declared		:: !Declarations
 	,	dcl_conversions		:: !Optional ConversionTable
 	,	dcl_is_system		:: !Bool
-	,	dcl_imported_module_numbers :: !ModuleNumberSet
+	,	dcl_imported_module_numbers :: !NumberSet
 	}
-
-:: ModuleNumberSet = ModuleNumbers !Int !ModuleNumberSet | EndModuleNumbers;
-
-in_module_number_set :: !Int !ModuleNumberSet -> Bool
-in_module_number_set n EndModuleNumbers
-	= False;
-in_module_number_set n (ModuleNumbers module_numbers rest_module_numbers)
-	| n<32
-		= (module_numbers bitand (1<<n))<>0
-		= in_module_number_set (n-32) rest_module_numbers
 
 class Erroradmin state // PK...
 where
@@ -240,106 +234,120 @@ retrieveGlobalDefinition {ste_kind,ste_def_level,ste_index} requ_kind mod_index
 		= (ste_index, mod_index)
 		= (NotFound, mod_index)
 
-retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-retrieveAndRemoveImportsFromSymbolTable [(_, {dcls_import,dcls_local,dcls_local_for_import}) : imports] all_decls symbol_table
-//	# (all_decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable dcls_import dcls_local all_decls symbol_table
-	# (all_decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable2 dcls_import dcls_local_for_import all_decls symbol_table
-	= retrieveAndRemoveImportsFromSymbolTable imports all_decls symbol_table
-retrieveAndRemoveImportsFromSymbolTable []  all_decls symbol_table
-	= (all_decls, symbol_table)
 
-retrieveAndRemoveImportsOfModuleFromSymbolTable2 :: !{!.Declaration} !{!.Declaration} ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-retrieveAndRemoveImportsOfModuleFromSymbolTable2 imports locals_for_import all_decls symbol_table
-	# (all_decls, symbol_table) = retrieve_declared_symbols_in_array ((size imports)-1) imports all_decls symbol_table
-	= retrieve_declared_symbols_in_array ((size locals_for_import)-1) locals_for_import all_decls symbol_table
+updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
+updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
+			dcl_modules expl_imp_infos cs_symbol_table
+	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers
+			(dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Instance class_ident} dcl_modules expl_imp_infos cs_symbol_table
+	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
+	# cs_symbol_table
+			= checkExplImpForInstance decl class_ident cs_symbol_table
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Imported (STE_Instance class_ident) _} dcl_modules expl_imp_infos cs_symbol_table
+	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
+	# cs_symbol_table
+			= checkExplImpForInstance decl class_ident cs_symbol_table
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
-retrieveAndRemoveImportsOfModuleFromSymbolTable :: !{!.Declaration} ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-retrieveAndRemoveImportsOfModuleFromSymbolTable imports locals all_decls symbol_table
-	# (all_decls, symbol_table) = retrieve_declared_symbols_in_array ((size imports)-1) imports all_decls symbol_table
-	= retrieve_declared_symbols locals all_decls symbol_table
-where
-	retrieve_declared_symbols :: ![Declaration] ![Declaration] !*SymbolTable -> (![Declaration], !*SymbolTable)
-	retrieve_declared_symbols [declaration=:{dcl_ident=ident=:{id_info},dcl_kind,dcl_index}:symbols] decls symbol_table
-		#! entry = sreadPtr id_info symbol_table
-		# {ste_kind,ste_def_level} = entry
-		| ste_kind == STE_Empty || ste_def_level > cModuleScope
-			= retrieve_declared_symbols symbols decls symbol_table
-			# symbol_table = symbol_table <:= (id_info, entry.ste_previous)
-			= case ste_kind of
-				STE_Field selector_id
-					| case dcl_kind of
-							STE_Field f -> f==selector_id
-							_ -> False
-						-> retrieve_declared_symbols symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
-						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
-				STE_Imported (STE_Field selector_id) def_mod
-					| case dcl_kind of
-							STE_Imported (STE_Field f) d -> d==def_mod && f==selector_id
-							_ -> False
-						-> retrieve_declared_symbols symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
-						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
-				_
-					| same_STE_Kind ste_kind dcl_kind
-						-> retrieve_declared_symbols symbols [declaration : decls ] symbol_table					
-						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols symbols [declaration : decls ] symbol_table
-	retrieve_declared_symbols [] decls symbol_table
-		= (decls, symbol_table)
+addExplImpInfo :: !Index Declaration ![Declaration] !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
+			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
+addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
+	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
+			= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
+	  (di_belonging, dcl_modules, cs_symbol_table)
+	  		= get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
+	  di
+	  		= { di_decl = decl, di_instances = instances, di_belonging = di_belonging }
+	  new_expl_imp_info
+	  		= ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
+	= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
+  where
+	get_belonging_symbol_nrs :: !Declaration !{#x:DclModule} !u:(Heap SymbolTableEntry) 
+			-> (!.NumberSet,!{#x:DclModule},!u:Heap SymbolTableEntry)
+	get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
+		# (all_belonging_symbols, dcl_modules)
+				= getBelongingSymbols decl dcl_modules
+		  nr_of_belongs
+				= nrOfBelongingSymbols all_belonging_symbols
+		  (_, belonging_bitvect, cs_symbol_table)
+				= foldlBelongingSymbols set_bit all_belonging_symbols (0, bitvectCreate nr_of_belongs, cs_symbol_table)
+		= (bitvectToNumberSet belonging_bitvect, dcl_modules, cs_symbol_table)
 
-retrieve_declared_symbols_in_array :: !Int !{!Declaration} ![Declaration] !*SymbolTable -> (![Declaration], !*SymbolTable)
-retrieve_declared_symbols_in_array symbol_index symbols decls symbol_table
-	| symbol_index>=0
-		#! (declaration,symbols) = symbols![symbol_index]
-		# {dcl_ident=ident=:{id_info},dcl_kind}=declaration
-		#! entry = sreadPtr id_info symbol_table
-		# {ste_kind,ste_def_level} = entry
-		| ste_kind == STE_Empty || ste_def_level > cModuleScope
-			= retrieve_declared_symbols_in_array (symbol_index-1) symbols decls symbol_table
-			# symbol_table = symbol_table <:= (id_info, entry.ste_previous)
-			= case ste_kind of
-				STE_Field selector_id
-					| case dcl_kind of
-							STE_Field f -> f==selector_id
-							_ -> False
-						#! (declaration,symbols) = symbols![symbol_index]
-						#! dcl_index = symbols.[symbol_index].dcl_index
-						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
-						#! (declaration,symbols) = symbols![symbol_index]
-						#! dcl_index = declaration.dcl_index
-						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
-				STE_Imported (STE_Field selector_id) def_mod
-					| case dcl_kind of
-							STE_Imported (STE_Field f) d -> d==def_mod && f==selector_id
-							_ -> False
-						#! (declaration,symbols) = symbols![symbol_index]
-						#! dcl_index = symbols.[symbol_index].dcl_index
-						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
-						#! (declaration,symbols) = symbols![symbol_index]
-						#! dcl_index = declaration.dcl_index
-						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
-				_
-					| same_STE_Kind ste_kind dcl_kind
-						#! (declaration,symbols) = symbols![symbol_index]
-						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] symbol_table					
-						#! (declaration,symbols) = symbols![symbol_index]
-						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] symbol_table
-		= (decls, symbol_table)
+	set_bit {id_info} (bit_nr, bitvect, cs_symbol_table)
+		# ({ste_kind}, cs_symbol_table)
+				= readPtr id_info cs_symbol_table
+		= ( bit_nr+1
+		  , case ste_kind of
+			 	STE_Empty -> bitvect
+				_ -> bitvectSet bit_nr bitvect
+		  , cs_symbol_table
+		  )
 
-same_STE_Kind (STE_Imported s1 i1) (STE_Imported s2 i2) = i1==i2 && same_STE_Kind s1 s2
-same_STE_Kind STE_DclFunction STE_DclFunction = True
-same_STE_Kind (STE_FunctionOrMacro []) (STE_FunctionOrMacro []) = True
-same_STE_Kind STE_Type STE_Type = True
-same_STE_Kind STE_Constructor STE_Constructor = True
-same_STE_Kind (STE_Field f1) (STE_Field f2) = f1==f2
-same_STE_Kind (STE_Instance _) (STE_Instance _) = True
-same_STE_Kind STE_Member STE_Member = True
-same_STE_Kind STE_Class STE_Class = True
-same_STE_Kind _ _ = False
+getBelongingSymbols :: !Declaration !{#x:DclModule} -> (!.BelongingSymbols, !{#x:DclModule})
+getBelongingSymbols {dcl_kind=STE_Imported STE_Type def_mod_index, dcl_index} dcl_modules
+	# ({td_rhs}, dcl_modules)
+			= dcl_modules![def_mod_index].dcl_common.com_type_defs.[dcl_index]
+	= case td_rhs of
+		AlgType constructors
+			-> (BS_Constructors constructors, dcl_modules)
+		RecordType {rt_fields}
+			-> (BS_Fields rt_fields, dcl_modules)
+		_
+			-> (BS_Nothing, dcl_modules)
+getBelongingSymbols {dcl_kind=STE_Imported STE_Class def_mod_index, dcl_index} dcl_modules
+	# ({class_members}, dcl_modules)
+			= dcl_modules![def_mod_index].dcl_common.com_class_defs.[dcl_index]
+	= (BS_Members class_members, dcl_modules)
+getBelongingSymbols _ dcl_modules
+	= (BS_Nothing, dcl_modules)
+
+nrOfBelongingSymbols :: !BelongingSymbols -> Int
+nrOfBelongingSymbols (BS_Constructors constructors)
+	= length constructors
+nrOfBelongingSymbols (BS_Fields fields)
+	= size fields
+nrOfBelongingSymbols (BS_Members members)
+	= size members
+nrOfBelongingSymbols BS_Nothing
+	= 0
+
+:: BelongingSymbols
+	=	BS_Constructors ![DefinedSymbol]
+	|	BS_Fields !{#FieldSymbol}
+	|	BS_Members !{#DefinedSymbol}
+	|	BS_Nothing
+
+foldlBelongingSymbols f bs st
+	:== case bs of
+			BS_Constructors constructors
+				-> foldSt (\{ds_ident} st -> f ds_ident st) constructors st 
+			BS_Fields fields
+				-> foldlArraySt (\{fs_name} st -> f fs_name st) fields st 
+			BS_Members members
+				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
+			BS_Nothing
+				-> st
+
+checkExplImpForInstance decl class_ident cs_symbol_table
+	// this function is only for old syntax
+	| switch_import_syntax False True
+		= cs_symbol_table
+	# (class_ste, cs_symbol_table)
+			= readPtr class_ident.id_info cs_symbol_table
+	= case class_ste.ste_kind of
+		STE_ExplImpComponentNrs component_numbers inst_indices_accu
+			-> writePtr class_ident.id_info 
+					{ class_ste & ste_kind = STE_ExplImpComponentNrs component_numbers [decl:inst_indices_accu]}
+					cs_symbol_table
+		_
+			-> cs_symbol_table
+
+
 
 removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
 removeImportsAndLocalsOfModuleFromSymbolTable {dcls_import,dcls_local} symbol_table
@@ -406,64 +414,37 @@ addDefToSymbolTable level def_index def_ident=:{id_info} def_kind symbol_table e
 		= (symbol_table <:= (id_info,entry), error)
 		= (symbol_table, checkError def_ident " already defined" error)
 
-addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!.Declaration} !{!.Declaration} !*CheckState -> .CheckState;
+addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
 addDeclaredSymbolsToSymbolTable2 is_dcl_mod ste_index locals imported cs
 	# cs=add_imports_in_array_to_symbol_table 0 is_dcl_mod imported cs
 	= addLocalSymbolsForImportToSymbolTable 0 locals ste_index cs
-
-addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] !{!.Declaration} !*CheckState -> .CheckState;
-addDeclaredSymbolsToSymbolTable is_dcl_mod ste_index locals imported cs
-	# cs=add_imports_in_array_to_symbol_table 0 is_dcl_mod imported cs
-	= addLocalSymbolsToSymbolTable locals ste_index cs
-where
-	add_imports_to_symbol_table is_dcl_mod [{dcl_ident,dcl_pos,dcl_kind,dcl_index} : symbols] cs=:{cs_x}
-		= case dcl_kind of
-			STE_Imported def_kind def_mod
-				| is_dcl_mod || def_mod <> cs_x.x_main_dcl_module_n
-	//				-> add_imports_to_symbol_table is_dcl_mod symbols (addImportedSymbol dcl_ident dcl_pos def_kind dcl_index def_mod cs)
-					-> add_imports_to_symbol_table is_dcl_mod symbols (addIndirectlyImportedSymbol dcl_ident dcl_pos dcl_kind def_kind dcl_index def_mod cs)
-					-> add_imports_to_symbol_table is_dcl_mod symbols cs
-			STE_FunctionOrMacro _
-				-> add_imports_to_symbol_table is_dcl_mod symbols (addImportedFunctionOrMacro dcl_ident dcl_index cs)
-	add_imports_to_symbol_table is_dcl_mod [] cs
-		= cs
 
 add_imports_in_array_to_symbol_table symbol_index is_dcl_mod symbols cs=:{cs_x}
 	| symbol_index<size symbols
 		#! ({dcl_ident,dcl_pos,dcl_kind},symbols) = symbols![symbol_index]
 		= case dcl_kind of
 			STE_Imported def_kind def_mod
-//					| is_dcl_mod || def_mod <> cIclModIndex
 				| is_dcl_mod || def_mod <> cs_x.x_main_dcl_module_n
-//					-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols (addImportedSymbol dcl_ident dcl_pos def_kind dcl_index def_mod cs)
 					#! dcl_index= symbols.[symbol_index].dcl_index
-					-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols (addIndirectlyImportedSymbol dcl_ident dcl_pos dcl_kind def_kind dcl_index def_mod cs)
+					-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols (addIndirectlyImportedSymbolOld dcl_ident dcl_pos dcl_kind def_kind dcl_index def_mod cs)
 					-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols cs
 			STE_FunctionOrMacro _
 					#! dcl_index= symbols.[symbol_index].dcl_index
 				-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols (addImportedFunctionOrMacro dcl_ident dcl_index cs)
 		= cs
 
-addLocalSymbolsForImportToSymbolTable :: !Int !{!.Declaration} Int !*CheckState -> .CheckState;
+addLocalSymbolsForImportToSymbolTable :: !Int !{!Declaration} Int !*CheckState -> .CheckState;
 addLocalSymbolsForImportToSymbolTable symbol_index symbols mod_index cs
 	| symbol_index<size symbols
 		# ({dcl_ident,dcl_pos,dcl_kind,dcl_index},symbols) = symbols![symbol_index]
 		= case dcl_kind of
 			STE_FunctionOrMacro _
-				-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index (addImportedFunctionOrMacro dcl_ident dcl_index cs)
+				-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index 
+						(addImportedFunctionOrMacro dcl_ident dcl_index cs)
 			STE_Imported def_kind def_mod
-				-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index (addIndirectlyImportedSymbol dcl_ident dcl_pos dcl_kind def_kind dcl_index mod_index cs)
+				-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index 
+						(addIndirectlyImportedSymbolOld dcl_ident dcl_pos dcl_kind def_kind dcl_index mod_index cs)
 		= cs
-
-addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
-addLocalSymbolsToSymbolTable [{dcl_ident,dcl_pos,dcl_kind,dcl_index} : symbols] mod_index cs
-	= case dcl_kind of
-		STE_FunctionOrMacro _
-			-> addLocalSymbolsToSymbolTable symbols mod_index (addImportedFunctionOrMacro dcl_ident dcl_index cs)
-		_
-			-> addLocalSymbolsToSymbolTable symbols mod_index (addImportedSymbol dcl_ident dcl_pos dcl_kind dcl_index mod_index cs)
-addLocalSymbolsToSymbolTable [] mod_index cs
-	= cs
 
 addImportedFunctionOrMacro :: !Ident .Int !*CheckState -> .CheckState;
 addImportedFunctionOrMacro ident=:{id_info} def_index cs=:{cs_symbol_table}
@@ -487,29 +468,8 @@ addFieldToSelectorDefinition {id_info} glob_field_index cs=:{cs_symbol_table}
 		_
 			-> { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_Selector [glob_field_index]) NoIndex cModuleScope entry }
 
-addImportedSymbol :: !Ident !Position !STE_Kind !.Int !.Int !*CheckState -> .CheckState;
-addImportedSymbol ident pos def_kind def_index def_mod cs=:{cs_symbol_table}
-	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table 
-	= add_imported_symbol entry ident pos def_kind def_index def_mod { cs & cs_symbol_table = cs_symbol_table }
-	where
-		add_imported_symbol /*entry=:*/{ste_kind = STE_Empty} {id_name,id_info} _ def_kind def_index def_mod cs=:{cs_symbol_table}
-			// JVG: read the entry again, because it is boxed
-			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-			# cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info (STE_Imported def_kind def_mod) def_index cModuleScope entry}
-			= case def_kind of
-				STE_Field selector_id
-					-> addFieldToSelectorDefinition selector_id	{ glob_module = def_mod, glob_object = def_index } cs
-				_
-					-> cs
-		add_imported_symbol	/*entry=:*/{ste_kind = STE_Imported kind mod_index, ste_index} ident=:{id_info} _ def_kind def_index def_mod cs
-			| kind == def_kind && mod_index == def_mod && ste_index == def_index
-				= cs
-		add_imported_symbol	entry ident pos def_kind def_index def_mod cs=:{cs_error}
-			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident pos) " multiply imported" cs_error}
-
-// same as addImportedSymbol but does not create a new STE_Imported
-addIndirectlyImportedSymbol :: !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !*CheckState -> .CheckState;
-addIndirectlyImportedSymbol ident pos dcl_kind def_kind def_index def_mod cs=:{cs_symbol_table}
+addIndirectlyImportedSymbolOld :: !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !*CheckState -> .CheckState;
+addIndirectlyImportedSymbolOld ident pos dcl_kind def_kind def_index def_mod cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table
 	= add_indirectly_imported_symbol entry ident pos def_kind def_index def_mod { cs & cs_symbol_table = cs_symbol_table }
 	where
@@ -522,13 +482,40 @@ addIndirectlyImportedSymbol ident pos dcl_kind def_kind def_index def_mod cs=:{c
 					-> addFieldToSelectorDefinition selector_id	{ glob_module = def_mod, glob_object = def_index } cs
 				_
 					-> cs
-		add_indirectly_imported_symbol	/*entry=:*/{ste_kind = STE_Imported kind mod_index, ste_index} ident=:{id_info} _ def_kind def_index def_mod cs
+		add_indirectly_imported_symbol /*entry=:*/{ste_kind = STE_Imported kind mod_index, ste_index} ident=:{id_info} _ def_kind def_index def_mod cs
 			| kind == def_kind && mod_index == def_mod && ste_index == def_index
 				= cs
 		add_indirectly_imported_symbol	entry ident pos def_kind def_index def_mod cs=:{cs_error}
 			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident pos) " multiply imported" cs_error}
 
-addGlobalDefinitionsToSymbolTable :: ![.Declaration] !*CheckState -> .CheckState;
+mw_addIndirectlyImportedSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
+mw_addIndirectlyImportedSymbol yes_for_icl_module ident pos dcl_kind def_kind def_index def_mod importing_mod cs=:{cs_symbol_table}
+	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table
+	= add_indirectly_imported_symbol yes_for_icl_module entry ident pos def_kind def_index def_mod 
+			importing_mod { cs & cs_symbol_table = cs_symbol_table }
+	where
+		add_indirectly_imported_symbol _ {ste_kind = STE_Empty} {id_info} _ def_kind def_index def_mod _ cs=:{cs_symbol_table}
+			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+			  cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info dcl_kind def_index cModuleScope entry}
+			= case def_kind of
+				STE_Field selector_id
+					-> (True, addFieldToSelectorDefinition selector_id	{ glob_module = def_mod, glob_object = def_index } cs)
+				_
+					-> (True, cs)
+		add_indirectly_imported_symbol _ {ste_kind = STE_Imported kind mod_index, ste_index} _ _ def_kind def_index def_mod _ cs
+			| kind == def_kind && mod_index == def_mod && ste_index == def_index
+				= (False, cs)
+		add_indirectly_imported_symbol (Yes _) _ _ _ def_kind def_index def_mod _ cs
+			| def_mod == cs.cs_x.x_main_dcl_module_n
+				// an icl module imports one of it's definitions from the dcl module
+				= (False, cs)
+		add_indirectly_imported_symbol _ _ _ _ def_kind def_index def_mod importing_mod cs
+			| importing_mod==def_mod // a dcl module imports a definition from itself (cycle)
+				= (False, cs)
+		add_indirectly_imported_symbol _ entry ident pos def_kind def_index def_mod _ cs=:{cs_error}
+			= (False, { cs & cs_error = checkError ident "multiply defined" cs_error})
+
+addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable decls cs
 	= foldSt add_global_definition decls cs
 where
@@ -541,18 +528,8 @@ where
 					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = dcl_index } cs
 				_
 					-> cs
-			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident dcl_pos) "(global definition) already defined" cs.cs_error}
+			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident dcl_pos) " multiply defined" cs.cs_error}
 
-retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);
-retrieveImportsFromSymbolTable [{import_module=import_module=:{id_info},import_symbols} : mods ] decls modules symbol_table
-	# ({ste_index}, symbol_table) = readPtr id_info symbol_table
-	  ({dcl_declared={dcls_import,dcls_local,dcls_local_for_import}}, modules) = modules![ste_index]	
-//	  (decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable dcls_import dcls_local decls symbol_table
-	  (decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable2 dcls_import dcls_local_for_import decls symbol_table
-	= retrieveImportsFromSymbolTable mods decls modules symbol_table
-retrieveImportsFromSymbolTable [] decls modules symbol_table
-	= (decls, modules, symbol_table)
- 
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeFieldFromSelectorDefinition {id_info} field_mod field_index symbol_table 
 	# (entry, symbol_table) = readPtr id_info symbol_table
@@ -568,12 +545,13 @@ where
 	remove_field field_mod field_index []
 		= []
 
-removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntry) -> *Heap SymbolTableEntry;
+removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
 removeDeclarationsFromSymbolTable decls scope symbol_table
-	= foldSt (remove_declaration scope) decls symbol_table
+	= unsafeFold2St (remove_declaration scope) decls [1..] symbol_table
 where
-	remove_declaration scope {dcl_ident={id_name,id_info}, dcl_index} symbol_table
-		# ({ste_kind,ste_previous}, symbol_table) = readPtr id_info symbol_table
+	remove_declaration scope decl=:{dcl_ident={id_info}, dcl_index} decl_nr symbol_table
+		# ({ste_kind,ste_previous}, symbol_table)
+				= readPtr id_info symbol_table
 		= case ste_kind of
 			STE_Field field_id
 				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
@@ -638,6 +616,19 @@ local_declaration_for_import decl=:{dcl_kind} module_n
 	= {decl & dcl_kind = STE_Imported dcl_kind module_n}
 
 	
+get_ident :: !ImportDeclaration -> Ident
+get_ident (ID_Function {ii_ident})						= ii_ident
+get_ident (ID_Class {ii_ident} _)						= ii_ident
+get_ident (ID_Type {ii_ident} _)						= ii_ident
+get_ident (ID_Record {ii_ident} _)						= ii_ident
+get_ident (ID_Instance class_ident instance_ident _)	= instance_ident
+
+getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
+getBelongingSymbolsFromID (ID_Class _ x)						= x
+getBelongingSymbolsFromID (ID_Type _ x)						= x
+getBelongingSymbolsFromID (ID_Record _ x)						= x
+getBelongingSymbolsFromID _									= No
+
 class toIdent a :: !a -> Ident
 
 instance toIdent SymbIdent
@@ -713,65 +704,23 @@ where
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_line <<< ',' <<< ip_ident <<< ']'
 	
 
-instance <<< STE_Kind
-where
-	(<<<) file
-		(STE_FunctionOrMacro _)
-			= file <<< "STE_FunctionOrMacro"
-	(<<<) file
-		STE_Type
-			= file <<< "STE_Type"
-	(<<<) file
-		STE_Constructor
-			= file <<< "STE_Constructor"
-	(<<<) file
-		(STE_Selector _)
-			= file <<< "STE_Selector"
-	(<<<) file
-		STE_Class
-			= file <<< "STE_Class"
-	(<<<) file
-		STE_Member
-			= file <<< "STE_Member"
-	(<<<) file
-		(STE_Instance _)
-			= file <<< "STE_Instance"
-	(<<<) file
-		(STE_Variable _) 
-			= file <<< "STE_Variable"
-	(<<<) file
-		(STE_TypeVariable _) 
-			= file <<< "STE_TypeVariable"
-	(<<<) file
-		(STE_TypeAttribute _)
-			= file <<< "STE_TypeAttribute"
-	(<<<) file
-		(STE_BoundTypeVariable _)
-			= file <<< "STE_BoundTypeVariable"
-	(<<<) file
-		(STE_Imported _ _)
-			= file <<< "STE_Imported"
-	(<<<) file
-		STE_DclFunction
-			= file <<< "STE_DclFunction"
-	(<<<) file
-		(STE_Module _)
-			= file <<< "STE_Module"
-	(<<<) file
-		(STE_OpenModule _ _)
-			= file <<< "STE_OpenModule"
-	(<<<) file
-		STE_ClosedModule
-			= file <<< "STE_ClosedModule"
-	(<<<) file
-		STE_LockedModule
-			= file <<< "STE_LockedModule"
-	(<<<) file
-		STE_Empty 
-			= file <<< "STE_Empty"
-
-instance <<< Declaration
+instance <<< ExplImpInfo
   where
-	(<<<) file { dcl_ident } 
-		= file <<< dcl_ident
+	(<<<) file (ExplImpInfo eii_ident eii_declaring_modules)
+		= file <<< eii_ident //<<< " is declared in " <<< eii_declaring_modules
 
+instance <<< DeclarationInfo
+  where
+	(<<<) file {di_decl, di_instances}
+		= file <<< di_decl <<< di_instances
+		
+import_ident :: Ident
+import_ident =: { id_name = "import", id_info = nilPtr }
+
+restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
+restoreHeap {id_info} cs_symbol_table
+	# ({ste_previous}, cs_symbol_table)
+			= readPtr id_info cs_symbol_table
+	= writePtr id_info ste_previous cs_symbol_table
+
+temp_try_a_new_thing_XXX yes no :== no

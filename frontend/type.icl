@@ -1942,7 +1942,7 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	,	fe_location		:: !IdentPos
 	}
 
-typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !ModuleNumberSet !*Heaps !*PredefinedSymbols !*File !*File
+typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*Heaps !*PredefinedSymbols !*File !*File
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File, !*File)
 typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out
 	#! fun_env_size = size fun_defs

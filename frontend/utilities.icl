@@ -179,8 +179,16 @@ unsafeFold2St op l1 l2 st
 	:== ufold_st2 l1 l2 st
 where
 	ufold_st2 [x : xs] [y : ys] st
-		= op x y (ufold_st2 xs ys st)	
+		= ufold_st2 xs ys (op x y st)
 	ufold_st2 _ _ st
+		= st
+
+unsafeFold3St op l1 l2 l3 st
+	:== ufold_st3 l1 l2 l3 st
+where
+	ufold_st3 [x : xs] [y : ys] [z : zs] st
+		= ufold_st3 xs ys zs (op x y z st)
+	ufold_st3 _ _ _ st
 		= st
 
 // foldSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
@@ -232,6 +240,31 @@ iMapFilterYesSt f fr to st
 		   st = st
 		= (f_fr_t2, st)
 				
+foldlArrayStWithIndex f a st :== fold_a_st_i 0 a st
+  where
+	fold_a_st_i i a st
+		| i==size a
+			= st
+		# (ai, a) = a![i]
+		= fold_a_st_i (i+1) a (f i ai st)
+
+foldlArraySt f a st :== fold_a_st 0 a st
+  where
+	fold_a_st i a st
+		| i==size a
+			= st
+		# (ai, a) = a![i]
+		= fold_a_st (i+1) a (f ai st)
+
+foldrArraySt f a st
+	:== foldr_a_st (size a-1) a st
+  where
+	foldr_a_st i a st
+		| i==(-1)
+			= st
+		# (ai, a) = a![i]
+		= foldr_a_st (i-1) a (f ai st)
+
 optCons :: !(Optional .a) !u:[.a] -> (!v:[.a], !Int) ,[u <= v]
 optCons No l
 	= (l, 0)
@@ -294,3 +327,101 @@ bagToList bag
 isEmptyBag :: !(Bag x) -> Bool
 isEmptyBag Empty = True
 isEmptyBag _ = False
+
+:: DAG =
+	{	dag_nr_of_nodes		:: !Int
+	,	dag_get_children	:: !Int -> [Int]
+	}
+
+::	PartitioningState = 
+	{	ps_marks :: 		!.{# Int}
+	,	ps_next_num ::		!Int
+	,	ps_groups ::		![[Int]]
+	,	ps_deps ::			![Int]
+	}
+
+NotChecked :== -1	
+
+partitionateDAG :: !DAG ![Int] -> [[Int]]
+partitionateDAG pi=:{dag_nr_of_nodes} roots
+	# partitioning_info
+			= { ps_marks = createArray dag_nr_of_nodes NotChecked, ps_deps = [],
+				ps_next_num = 0, ps_groups = [] }
+	  {ps_groups}
+			= foldSt (partitionate_node pi) roots partitioning_info
+	= ps_groups
+where
+	partitionate_node :: !DAG !Int !*PartitioningState -> *PartitioningState
+	partitionate_node pi node_index ps=:{ps_marks}
+		| ps_marks.[node_index] == NotChecked
+			= snd (partitionate_unvisited_node node_index pi ps)
+		= ps
+
+	partitionate_unvisited_node :: !Int !DAG !*PartitioningState
+								-> (!Int, !*PartitioningState)
+	partitionate_unvisited_node node_index pi ps=:{ps_next_num}
+		# children
+				= pi.dag_get_children node_index
+		  (min_dep, ps)
+		  		= visit_children children pi.dag_nr_of_nodes pi (push_on_dep_stack node_index ps)
+		= try_to_close_group node_index ps_next_num min_dep pi ps
+
+	push_on_dep_stack :: !Int !*PartitioningState -> *PartitioningState
+	push_on_dep_stack node_index ps=:{ps_deps,ps_marks,ps_next_num}
+		= { ps & ps_deps = [node_index : ps_deps], ps_marks = { ps_marks & [node_index] = ps_next_num},
+			ps_next_num = inc ps_next_num}
+
+	visit_children :: ![Int] !Int !DAG !*PartitioningState -> (!Int, !*PartitioningState)
+	visit_children [child:children] min_dep pi ps=:{ps_marks} 
+		#! mark = ps_marks.[child]
+		| mark == NotChecked
+			# (mark, ps) = partitionate_unvisited_node child pi ps
+			= visit_children children (min min_dep mark) pi ps
+			= visit_children children (min min_dep mark) pi ps
+	visit_children [] min_dep nr_of_nodes ps
+		= (min_dep, ps)
+		
+
+	try_to_close_group :: !Int !Int !Int !DAG !*PartitioningState -> (!Int, !*PartitioningState)
+	try_to_close_group node_index next_num min_dep pi ps=:{ps_marks, ps_deps, ps_groups}
+		| next_num <= min_dep
+			# (ps_deps, ps_marks, group)
+				= close_group node_index ps_deps ps_marks [] pi
+			  ps = { ps & ps_deps = ps_deps, ps_marks = ps_marks, ps_groups = [group : ps_groups] }
+			= (pi.dag_nr_of_nodes, ps)
+			= (min_dep, ps)
+
+	close_group :: !Int ![Int] !*{# Int} ![Int] !DAG -> (![Int], !*{# Int}, ![Int])
+	close_group node_index [d:ds] marks group pi
+		# marks = { marks & [d] = pi.dag_nr_of_nodes }
+		| d == node_index
+			= (ds, marks, [d : group])
+			= close_group node_index ds marks [d : group] pi
+
+replaceTwoDimArrElt :: !Int !Int !.e !{!*{!.e}} -> (!.e, !{!.{!.e}})
+replaceTwoDimArrElt ix1 ix2 el arr
+	# (inner_array, arr)
+			= replace arr ix1 {}
+	  (el2, inner_array)
+	  		= replace inner_array ix2 el
+	= (el2, { arr & [ix1] = inner_array })
+/* crashes!
+replaceTwoDimArrElt ix1 ix2 el arr = code
+	{						| A:arr el								B:ix2 ix1
+		push_b 0			| A:arr el								B:ix2 ix1 ix1
+		update_b 2 1		| A:arr el								B:ix2 ix2 ix1
+		update_b 0 2		| A:arr el								B:ix1 ix2 ix1
+		push_a 1			| A:arr el arr							B:ix1 ix2 ix1
+		select _ 1 0		| A:arr el arr.[ix1]					B:ix1 ix2
+		push_array 0
+		updatepop_a 0 1
+		replace _ 1 0		| A:arr arr.[ix1]* new_el				B:ix1
+		push_a 2	 		| A:arr arr.[ix1]* new_el arr			B:ix1
+		update_a 1 3		| A:new_el arr.[ix1]* new_el arr		B:ix1
+		update_a 2 1		| A:new_el arr.[ix1]* arr.[ix1]* arr	B:ix1
+		update _ 1 0		| A:new_el arr.[ix1]* arr*
+		update_a 2 1		| A:new_el new_el arr*
+		update_a 0 2		| A:arr* new_el arr*
+		pop_a 1				| A:arr* new_el
+	}
+*/

@@ -26,3 +26,6 @@ clearBindingsOfTypeVarsAndAttributes :: !TypeAttribute ![ATypeVar] !*TypeHeaps -
 isATopConsVar cv		:== cv < 0
 encodeTopConsVar cv		:== dec (~cv)
 decodeTopConsVar cv		:== ~(inc cv)
+
+expandSynonymTypes :: !.Index !*{#CheckedTypeDef} !*{#.DclModule} !*TypeHeaps !*ErrorAdmin
+	-> (!.{#CheckedTypeDef},!.{#DclModule},!.TypeHeaps,!.ErrorAdmin)

@@ -2,9 +2,20 @@ definition module explicitimports
 
 import syntax, checksupport
 
-possiblyFilterExplImportedDecls :: ![ImportDeclaration] u:[w:(.Index,y:Declarations)] Position *{#DclModule} !*CheckState
-				-> (!v:[x:(Index,z:Declarations)],!.{#DclModule},!.CheckState), [y <= z, w <= x, u <= v]
+:: ImportNrAndIdents =
+	{	ini_symbol_nr	:: !Index
+	,	ini_belonging	:: !Optional [ImportedIdent]
+	}
 
-checkExplicitImportCompleteness :: !Int ![ExplicitImport] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState 
+:: SolvedImports =
+	{	si_explicit	:: ![([Declaration], Position)]
+	,	si_implicit	:: ![(Index, Position)]	// module indices
+	}
+
+
+solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
+				!*(!{#x:DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
+			-> (!.SolvedImports,!(!{#x:DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
+checkExplicitImportCompleteness :: ![(Declaration, Position)] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
 				-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
 

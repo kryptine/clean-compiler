@@ -422,7 +422,7 @@ where
 		| type_index == nr_of_types
 			| cs.cs_error.ea_ok && not is_main_dcl
 				# marks = createArray nr_of_types CS_NotChecked
-				  {exp_type_defs,exp_modules,exp_type_heaps,exp_error} = expand_syn_types module_index 0 nr_of_types
+				  {exp_type_defs,exp_modules,exp_type_heaps,exp_error} = (temp_try_a_new_thing_XXX id (expand_syn_types module_index 0 nr_of_types))
 				  		{	exp_type_defs = ts.ts_type_defs, exp_modules = ts.ts_modules, exp_marks = marks,
 				  			exp_type_heaps = ti_type_heaps, exp_error = cs.cs_error }
 				= (exp_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, exp_modules, ti_var_heap, exp_type_heaps, { cs & cs_error = exp_error })
@@ -430,14 +430,29 @@ where
 			# (ts, ti, cs) = checkTypeDef type_index module_index ts ti cs
 			= check_type_defs is_main_dcl (inc type_index) nr_of_types module_index ts ti cs
 
-	expand_syn_types module_index type_index nr_of_types expst
-		| type_index == nr_of_types
-			= expst
-		| expst.exp_marks.[type_index] == CS_NotChecked
-			# expst = expandSynType module_index type_index expst
-			= expand_syn_types module_index (inc type_index) nr_of_types expst
-			= expand_syn_types module_index (inc type_index) nr_of_types expst
+expand_syn_types module_index type_index nr_of_types expst
+	| type_index == nr_of_types
+		= expst
+	| expst.exp_marks.[type_index] == CS_NotChecked
+		# expst = expandSynType module_index type_index expst
+		= expand_syn_types module_index (inc type_index) nr_of_types expst
+		= expand_syn_types module_index (inc type_index) nr_of_types expst
 
+expandSynonymTypes :: !.Index !*{#CheckedTypeDef} !*{#.DclModule} !*TypeHeaps !*ErrorAdmin
+	-> (!.{#CheckedTypeDef},!.{#DclModule},!.TypeHeaps,!.ErrorAdmin)
+expandSynonymTypes module_index exp_type_defs exp_modules exp_type_heaps exp_error
+	| temp_try_a_new_thing_XXX False True
+		= abort "expandSynonymTypes"
+	#! nr_of_types
+			= size exp_type_defs
+	# marks 
+			= createArray nr_of_types CS_NotChecked
+	  {exp_type_defs,exp_modules,exp_type_heaps,exp_error}
+			= expand_syn_types module_index 0 nr_of_types
+			  		{	exp_type_defs = exp_type_defs, exp_modules = exp_modules, exp_marks = marks,
+			  			exp_type_heaps = exp_type_heaps, exp_error = exp_error }
+	= (exp_type_defs,exp_modules,exp_type_heaps,exp_error)
+	
 ::	OpenTypeInfo =
 	{	oti_heaps		:: !.TypeHeaps
 	,	oti_all_vars	:: ![TypeVar]

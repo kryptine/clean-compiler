@@ -415,24 +415,24 @@ backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl
 		functionIndices
 			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: fe_components & componentIndex <- [0..]]
 
-declareOtherDclModules :: {#DclModule} Int ModuleNumberSet -> BackEnder
+declareOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
 declareOtherDclModules dcls main_dcl_module_n used_module_numbers
 	=	foldStateWithIndexA declareOtherDclModule dcls
 where
 	declareOtherDclModule :: ModuleIndex DclModule -> BackEnder
 	declareOtherDclModule moduleIndex dclModule
-		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (in_module_number_set moduleIndex used_module_numbers)
+		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
 			=	identity
 		// otherwise
 			=	declareDclModule moduleIndex dclModule
 
-defineOtherDclModules :: {#DclModule} Int ModuleNumberSet VarHeap -> BackEnder
+defineOtherDclModules :: {#DclModule} Int NumberSet VarHeap -> BackEnder
 defineOtherDclModules dcls main_dcl_module_n used_module_numbers varHeap
 	=	foldStateWithIndexA (defineOtherDclModule varHeap) dcls
 where
 	defineOtherDclModule :: VarHeap ModuleIndex DclModule -> BackEnder
 	defineOtherDclModule varHeap moduleIndex dclModule
-		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (in_module_number_set moduleIndex used_module_numbers)
+		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
 			=	identity
 		// otherwise
 			=	defineDclModule varHeap moduleIndex dclModule
@@ -455,13 +455,13 @@ defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_is
 	=	declare moduleIndex varHeap dcl_common
 	o`	declareFunTypes moduleIndex dcl_functions dcl_instances.ir_from  varHeap
 
-removeExpandedTypesFromDclModules :: {#DclModule} ModuleNumberSet -> BackEnder
+removeExpandedTypesFromDclModules :: {#DclModule} NumberSet -> BackEnder
 removeExpandedTypesFromDclModules dcls used_module_numbers
 	=	foldStateWithIndexA removeExpandedTypesFromDclModule dcls
 where
 	removeExpandedTypesFromDclModule :: ModuleIndex DclModule -> BackEnder
 	removeExpandedTypesFromDclModule moduleIndex dclModule=:{dcl_functions}
-		| moduleIndex == cPredefinedModuleIndex || not (in_module_number_set moduleIndex used_module_numbers)
+		| moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
 			= identity
 			= foldStateWithIndexA (removeExpandedTypesFromFunType moduleIndex)  dcl_functions
 			where
@@ -877,7 +877,7 @@ predefineSymbols {dcl_common} predefs
 	,	asai_varHeap	 	:: !VarHeap
 	}
 
-adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} {#ClassInstance} ModuleNumberSet VarHeap -> BackEnder
+adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet VarHeap -> BackEnder
 adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcls icl_instances used_module_numbers varHeap
 	=	adjustStdArray arrayInfo predefs
 				(if (arrayModuleIndex == main_dcl_module_n) icl_instances stdArray.dcl_common.com_instance_defs)
@@ -931,7 +931,7 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 
 		adjustStdArray :: AdjustStdArrayInfo PredefinedSymbols {#ClassInstance} -> BackEnder
 		adjustStdArray arrayInfo predefs instances
-			| arrayModuleIndex == NoIndex || not (in_module_number_set arrayModuleIndex used_module_numbers)
+			| arrayModuleIndex == NoIndex || not (inNumberSet arrayModuleIndex used_module_numbers)
 //				|| arrayModuleIndex <> main_dcl_module_n
 				=	identity
 			// otherwise

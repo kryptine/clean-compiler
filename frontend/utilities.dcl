@@ -1,4 +1,5 @@
 definition module utilities
+// compile with "reuse unique nodes"
 
 from StdEnv import Eq, not, Ord, IncDec
 import StdMisc, general
@@ -93,8 +94,16 @@ unsafeFold2St op l1 l2 st
 	:== ufold_st2 l1 l2 st
 where
 	ufold_st2 [x : xs] [y : ys] st
-		= op x y (ufold_st2 xs ys st)	
+		= ufold_st2 xs ys (op x y st)
 	ufold_st2 _ _ st
+		= st
+
+unsafeFold3St op l1 l2 l3 st
+	:== ufold_st3 l1 l2 l3 st
+where
+	ufold_st3 [x : xs] [y : ys] [z : zs] st
+		= ufold_st3 xs ys zs (op x y z st)
+	ufold_st3 _ _ _ st
 		= st
 
 
@@ -146,6 +155,31 @@ iMapFilterYesSt f fr to st
 		   st = st
 		= (f_fr_t2, st)
 				
+foldlArrayStWithIndex f a st :== fold_a_st_i 0 a st
+  where
+	fold_a_st_i i a st
+		| i==size a
+			= st
+		# (ai, a) = a![i]
+		= fold_a_st_i (i+1) a (f i ai st)
+
+foldlArraySt f a st :== fold_a_st 0 a st
+  where
+	fold_a_st i a st
+		| i==size a
+			= st
+		# (ai, a) = a![i]
+		= fold_a_st (i+1) a (f ai st)
+
+foldrArraySt f a st
+	:== foldr_a_st (size a-1) a st
+  where
+	foldr_a_st i a st
+		| i==(-1)
+			= st
+		# (ai, a) = a![i]
+		= foldr_a_st (i-1) a (f ai st)
+
 optCons :: !(Optional .a) !u:[.a] -> (!v:[.a], !Int) ,[u <= v]
 
 revAppend	:: ![a] ![a] -> [a]	//	Reverse the list using the second argument as accumulator.
@@ -156,3 +190,14 @@ revMap :: !(.a -> .b) ![.a] !u:[.b] -> u:[.b]
 uniqueBagToList :: !*(Bag x) -> [x] // exploits reuse of unique nodes (if compiled with that option)
 bagToList :: !(Bag x) -> [x]
 isEmptyBag :: !(Bag x) -> Bool
+
+
+:: DAG =
+	{	dag_nr_of_nodes		:: !Int
+	,	dag_get_children	:: !Int -> [Int]
+	}
+
+partitionateDAG :: !DAG ![Int] -> [[Int]]
+
+replaceTwoDimArrElt :: !Int !Int !.e !{!*{!.e}} -> (!.e, !{!.{!.e}})
+	// like "replace" for one dimensional arrays

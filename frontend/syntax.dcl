@@ -11,6 +11,10 @@ switch_import_syntax one_point_three two_point_zero :== one_point_three
 
 SwitchFusion fuse dont_fuse :== dont_fuse
 
+switch_port_to_new_syntax port dont_port :== dont_port
+
+cTabWidth :== switch_port_to_new_syntax 4 (abort "cTabWidth is only used for portToNewSyntax")
+
 ::	Ident =
 	{ 	id_name		:: !String
 	,	id_info 	:: !SymbolPtr
@@ -47,13 +51,11 @@ instance toString Ident
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
-//				| STE_BoundType !AType
 				| STE_Imported !STE_Kind !Index
 				| STE_DclFunction
 				| STE_Module !(Module (CollectedDefinitions ClassInstance IndexRange))
 				| STE_OpenModule !Int !(Module (CollectedDefinitions ClassInstance IndexRange))
 				| STE_ClosedModule
-				| STE_LockedModule
 				| STE_Empty
 					/* for creating class dictionaries */
 				| STE_DictType !CheckedTypeDef
@@ -69,7 +71,26 @@ instance toString Ident
 								 case of a selective import like "... import :: R {f1}" this bit is used to remove all
 								 fields different from "f1" from the symbol table again.
 					*/
-				
+				| STE_ExplImpSymbol !Int
+				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
+					/*	stores the numbers of all module components that import the symbol from
+						the "actual" dcl module. Further for each class the all encountered
+						instances are accumulated.
+					*/
+				| STE_BelongingSymbol !Int
+
+::	Declaration =
+	{	dcl_ident	:: !Ident
+	,	dcl_pos		:: !Position
+	,	dcl_kind	:: !STE_Kind
+	,	dcl_index	:: !Index
+	}
+
+::	ComponentNrAndIndex =
+	{	cai_component_nr	:: !Int
+	,	cai_index			:: !Int // points into ExplImpInfos
+	}
+
 ::	Global object =
 	{	glob_object	:: !object
 	,	glob_module	:: !Index
@@ -1183,7 +1204,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind
+			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind
 
 instance == TypeAttribute
 instance == Annotation
@@ -1220,15 +1241,8 @@ PropClass			:== bitnot 0
 
 newTypeSymbIdentCAF :: TypeSymbIdent;
 
-//MakeNewTypeSymbIdent name arity
-//	:== MakeTypeSymbIdent { glob_object = NoIndex, glob_module = NoIndex } name arity
-
 MakeNewTypeSymbIdent name arity
 	:== {newTypeSymbIdentCAF & type_name=name, type_arity=arity }
-
-//MakeTypeSymbIdent type_index name arity
-//	:== {	type_name = name, type_arity = arity, type_index = type_index,
-//			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
 
 MakeTypeSymbIdent type_index name arity
 	:== {	newTypeSymbIdentCAF & type_name = name, type_arity = arity, type_index = type_index }

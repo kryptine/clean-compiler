@@ -1,9 +1,7 @@
 definition module checksupport
 
 import StdEnv
-import syntax, predef
-
-//cIclModIndex 	:== 0
+import syntax, predef, containers, utilities
 
 CS_NotChecked 	:== -1
 NotFound		:== -1
@@ -14,11 +12,9 @@ cGlobalScope	:== 1
 cIsNotADclModule 	:== False
 cIsADclModule 		:== True
 
-// MW..
 cNeedStdArray	:== 1
 cNeedStdEnum	:== 2
 cNeedStdDynamics:== 4
-// ..MW
 
 ::	VarHeap :== Heap VarInfo
 
@@ -61,21 +57,25 @@ cConversionTableSize	:== 8
 //	,	com_instance_types	:: !.{ SymbolType}
 	}
 
-::	Declaration =
-	{	dcl_ident	:: !Ident
-	,	dcl_pos		:: !Position
-	,	dcl_kind	:: !STE_Kind
-	,	dcl_index	:: !Index
-	}
-
 ::	Declarations = {
 		dcls_import	::!{!Declaration}
 	,	dcls_local		::![Declaration]
 	,	dcls_local_for_import ::!{!Declaration}
-	,	dcls_explicit	::!{!ExplicitImport}
 	}
 
-:: ExplicitImport = ExplicitImport !Declaration !Position
+::	ExplImpInfos :== {!{!.ExplImpInfo}}
+
+::	ExplImpInfo
+		= ExplImpInfo Ident !.DeclaringModulesSet
+		| TemporarilyFetchedAway
+
+::	DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
+
+::	DeclarationInfo =
+	{	di_decl			::	!Declaration
+	,	di_instances	::	![Declaration]
+	,	di_belonging	::	!NumberSet
+	}
 
 ::	IclModule  =
 	{	icl_name				:: !Ident
@@ -86,12 +86,8 @@ cConversionTableSize	:== 8
 //	,	icl_declared		:: !Declarations
 	,	icl_import		:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
-	,	icl_used_module_numbers :: !ModuleNumberSet
+	,	icl_used_module_numbers :: !NumberSet
 	}
-
-:: ModuleNumberSet = ModuleNumbers !Int !ModuleNumberSet | EndModuleNumbers;
-
-in_module_number_set :: !Int !ModuleNumberSet -> Bool
 
 ::	DclModule =
 	{	dcl_name			:: !Ident
@@ -105,7 +101,7 @@ in_module_number_set :: !Int !ModuleNumberSet -> Bool
 	,	dcl_declared		:: !Declarations
 	,	dcl_conversions		:: !Optional ConversionTable
 	,	dcl_is_system		:: !Bool
-	,	dcl_imported_module_numbers :: !ModuleNumberSet
+	,	dcl_imported_module_numbers :: !NumberSet
 	}
 
 class Erroradmin state
@@ -116,7 +112,7 @@ where
 
 instance Erroradmin ErrorAdmin, CheckState
 
-newPosition :: !Ident  !Position -> IdentPos 
+newPosition :: !Ident !Position -> IdentPos 
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
@@ -132,7 +128,7 @@ instance toIdent ConsDef, (TypeDef a), ClassDef, MemberDef, FunDef, SelectorDef 
 instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
-instance <<< STE_Kind, IdentPos, Declaration
+instance <<< IdentPos, ExplImpInfo, DeclarationInfo
 
 ::	ExpressionInfo =
 	{	ef_type_defs		:: !.{# CheckedTypeDef}
@@ -150,16 +146,14 @@ checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*H
 convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
-retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
+//retrieveAndRemoveImportsFromSymbolTable :: !Index  ![(.a,.Declarations)] !Int ![Declaration] !*ExplImpInfos !*(Heap SymbolTableEntry)
+//		-> (!Int, ![Declaration], !.ExplImpInfos, !.Heap SymbolTableEntry);
 addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !Bool !*{#FunDef} !*SymbolTable !*ErrorAdmin -> (!*{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
-addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] !{!.Declaration} !*CheckState -> .CheckState;
-addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!.Declaration} !{!.Declaration} !*CheckState -> .CheckState;
-addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
-addGlobalDefinitionsToSymbolTable :: ![.Declaration] !*CheckState -> .CheckState;
-retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);
+addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
+addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
-removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntry) -> *Heap SymbolTableEntry;
+removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
@@ -169,3 +163,24 @@ removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
 
 local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]
+
+get_ident :: !ImportDeclaration -> Ident
+getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
+
+mw_addIndirectlyImportedSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
+updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}},!.SymbolTable)
+
+:: BelongingSymbols
+	=	BS_Constructors ![DefinedSymbol]
+	|	BS_Fields !{#FieldSymbol}
+	|	BS_Members !{#DefinedSymbol}
+	|	BS_Nothing
+
+getBelongingSymbols :: !Declaration !{#x:DclModule} -> (!.BelongingSymbols, !{#x:DclModule})
+nrOfBelongingSymbols :: !BelongingSymbols -> Int
+
+import_ident :: Ident
+restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
+
+temp_try_a_new_thing_XXX yes no :== no
