@@ -280,7 +280,7 @@ predefined_idents
 					[PD_FromThenTo] = i "_from_then_to",
 					
 					[PD_TypeCodeClass] = i "TC",
-					[PD_TypeObjectType] = i "T_ypeObjectType",
+					[PD_TypeObjectType] = i T_ypeObjectTypeRepresentation_String,
 					[PD_TypeConsSymbol] = i "T_ypeConsSymbol",
 					[PD_variablePlaceholder] = i "P_laceholder",
 					[PD_UvariablePlaceholder] = i "UP_laceholder",
@@ -633,6 +633,8 @@ where
 UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"	
 
 DynamicRepresentation_String			:== "DynamicTemp"		
+
+T_ypeObjectTypeRepresentation_String	:== "T_ypeObjectType"
 
 // List-type
 PD_ListType_String				:== "_List"

@@ -203,6 +203,8 @@ UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"
 
 DynamicRepresentation_String			:== "DynamicTemp"		
 
+T_ypeObjectTypeRepresentation_String	:== "T_ypeObjectType"
+
 // List-type
 PD_ListType_String				:== "_List"
 PD_ConsSymbol_String			:== "_Cons"

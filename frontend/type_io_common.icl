@@ -63,7 +63,11 @@ MaybeJustCode					:== (toChar 31)
 // used by {compiler,dynamic rts} to make String representation of types
 PredefinedModuleName			:== "_predefined"
 
+isPredefinedModuleName name		:== name == PredefinedModuleName
+
 UnderscoreSystemModule			:== "_system"		// implements the predefined module
+
+LowLevelInterfaceModule			:== "StdDynamicLowLevelInterface"
 
 instance toString GlobalTCType
 where
