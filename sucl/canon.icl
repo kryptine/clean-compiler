@@ -75,14 +75,14 @@ canonise arity heap rg
 splitrg :: (Rgraph sym Int) -> Rgraph sym Int
 splitrg rgraph
  = foldsingleton single rgraph rgraph
-   where single root sym args = mkrgraph root (updategraph root (sym,fst (claim args (localheap--[root]))) emptygraph)
+   where single root sym args = mkrgraph root (updategraph root (sym,fst ((claim--->"basic.claim begins from canon.splitrg") args (localheap--[root]))) emptygraph)
 
 /*
 >   uncurry :: (*->rule **** *****) -> rgraph * num -> rgraph * num
 >   uncurry typerule rgraph
 >   =   f (nc root)
 >       where f (True,(sym,args))
->             =   mkrgraph root (updategraph root (sym,fst (claim targs (args++localheap--nodelist graph [root]))) graph)
+>             =   mkrgraph root (updategraph root (sym,fst ((claim--->"basic.claim begins from canon.uncurry") targs (args++localheap--nodelist graph [root]))) graph)
 >                 where targs = lhs (typerule sym)
 >             f cont = rgraph
 >             nc = nodecontents graph
