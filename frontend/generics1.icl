@@ -1282,7 +1282,7 @@ buildMemberType gen_def=:{gen_name,gen_pos,gen_type,gen_vars} kind class_var gs=
 	# {th_vars, th_attrs} = th
 	#! gs = {gs & gs_avarh = th_attrs, gs_tvarh = th_vars, gs_error = gs_error }
 	= (member_st, gs)
-		---> ("buildMemberType returns", gen_name, kind, member_st)
+		//---> ("buildMemberType returns", gen_name, kind, member_st)
 where
 	add_bimap_contexts 
 			{gen_type=gen_type=:{st_vars, st_context}, gen_vars, gen_info_ptr} 
@@ -1897,7 +1897,7 @@ buildGenericCaseBody main_module_index gc=:{gc_name, gc_pos, gc_generic, gc_type
 	// get all the data we need
 	#! (gen_def, modules) 	
 		= modules ! [gc_generic.gi_module].com_generic_defs.[gc_generic.gi_index] 		
-			---> ("buildGenericCaseBody for", gc_name, type_name, st)
+			//---> ("buildGenericCaseBody for", gc_name, type_name, st)
 	#! (td_info=:{tdi_gen_rep}, td_infos)
 		= td_infos ! [type_index.glob_module, type_index.glob_object]
 	# (gen_type_rep=:{gtr_iso, gtr_type}) = case tdi_gen_rep of
@@ -1927,7 +1927,7 @@ buildGenericCaseBody main_module_index gc=:{gc_name, gc_pos, gc_generic, gc_type
 		= build_body_expr adaptor_expr specialized_expr original_arg_exprs
 	
 	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, td_infos, modules, heaps, error)	
-		---> ("buildGenericCaseBody", body_expr)
+		//---> ("buildGenericCaseBody", body_expr)
 where
 
 	build_generic_info_arg heaps=:{hp_var_heap}
@@ -2233,7 +2233,7 @@ specializeGeneric gen_index type spec_env gen_name gen_pos main_module_index pre
 
 	#! heaps = clear_tvs spec_env heaps
 	= (expr, (td_infos, heaps, error))
-		---> ("specializeGeneric", expr)
+		//---> ("specializeGeneric", expr)
 where
 	set_tvs spec_env heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}}
 		#! th_vars = foldSt write_tv spec_env th_vars
