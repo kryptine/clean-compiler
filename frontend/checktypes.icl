@@ -1230,7 +1230,7 @@ where
 		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*SymbolTable)
 	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } modules rev_dictionary_list
 			indexes type_var_heap var_heap symbol_table
-		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name}}} = class_def
+		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name}},class_pos} = class_def
 		# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 		  nr_of_members = size class_members
 		  nr_of_fields = nr_of_members + length class_context
@@ -1256,32 +1256,32 @@ where
 		  (cons_type_ptr, var_heap) = newPtr VI_Empty var_heap
 
 		  (td_args, type_var_heap) = mapSt new_attributed_type_variable class_args type_var_heap
-		  
+
 
   		  type_def =
 		 	{	td_name			= rec_type_id
 			,	td_index		= index_type
-			,	td_arity		= 0
+			,	td_arity		= length td_args
 			,	td_args			= td_args
 			,	td_attrs		= []
 			,	td_context		= []
 			,	td_rhs			= RecordType {rt_constructor = cons_symbol, rt_fields = { field \\ field <- reverse rev_fields }}
 			,	td_attribute	= TA_None
-			,	td_pos			= NoPos
+			,	td_pos			= class_pos
 			,	td_used_types	= []
 			}
-		
+
 		  cons_def = 	
 			{	cons_symb		= rec_cons_id
 			,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_result = rec_type,
 								    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
 			,	cons_priority	= NoPrio
-			,	cons_index		= 0
+			,	cons_index		= index_cons
 			,	cons_type_index	= index_type
 			,	cons_exi_vars	= []
 			,	cons_arg_vars	= []
 			,	cons_type_ptr	= cons_type_ptr
-			,	cons_pos		= NoPos
+			,	cons_pos		= class_pos
 			}
 
 		= ({ class_defs & [class_index] = { class_def & class_dictionary = { class_dictionary & ds_index = index_type }}}, modules,
