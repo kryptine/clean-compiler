@@ -285,16 +285,19 @@ static char *PrintTypesOfSymbol (char *type_repr, File file, ModuleInfo module_i
 } /* PrintTypesOfSymbol */
 
 #define _ANALYSE_IDENT_
+#ifndef CLEAN2
+#define _ANALYSE_INSTANCE_TYPES_
+#endif
 #define MAX_SYMBOL_EXTENSION_SIZE 40
 
 void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 {
 	char *next_char,*name;
 	int print_length = MAX_SYMBOL_EXTENSION_SIZE;
-#ifdef _ANALYSE_IDENT_
 
 	name  = sid -> ident_name;
 
+#ifdef _ANALYSE_IDENT_
 	if (*name == cTypeDelimiter)
 	{	for (next_char = name + 1; *next_char == cTypeDelimiter; next_char++)
 			;
@@ -341,7 +344,8 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 			
 			next_char = end_name + 1;
 		}
-		
+
+#ifdef _ANALYSE_INSTANCE_TYPES_		
 		FPutS (" (", file);
 
 		next_char = PrintTypesOfSymbol (next_char, file, sid -> ident_mod_info, & print_length);
@@ -352,6 +356,9 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 		}
 
 		FPutC (')', file);
+#else
+		FPutS (next_char, file);
+#endif /* _ANALYSE_INSTANCE_TYPES_ */
 	}
 
 #else
