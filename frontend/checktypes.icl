@@ -94,9 +94,9 @@ where
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		  (type_index, type_module)	= retrieveGlobalDefinition entry STE_Type cti_module_index
 		| type_index <> NotFound
-			# ({td_arity,td_attribute},type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts_type_defs ts_modules
+			# ({td_arity,td_attribute,td_rhs},type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts_type_defs ts_modules
 			  ts = { ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules }
-			| td_arity >= type_cons.type_arity
+			| checkArityOfType type_cons.type_arity td_arity td_rhs
 				# (types, _, ts_ti_cs) = bindTypes cti types (ts, ti, cs)
 				| type_module == cti_module_index && cti_type_index == type_index
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types, cti_lhs_attribute, ts_ti_cs)
@@ -496,6 +496,11 @@ getTypeDef type_index type_module module_index type_defs modules
 		  type_index = convertIndex type_index (toInt STE_Type) dcl_conversions
 		= (type_def, type_index, type_defs, modules)
 
+checkArityOfType act_arity form_arity (SynType _)
+	= form_arity == act_arity
+checkArityOfType act_arity form_arity _
+	= form_arity >= act_arity
+
 getClassDef :: !Index !Index !Index !u:{# ClassDef} !v:{# DclModule} -> (!ClassDef, !Index , !u:{# ClassDef}, !v:{# DclModule})
 getClassDef class_index type_module module_index class_defs modules
 	| type_module == module_index
@@ -612,9 +617,9 @@ checkOpenAType mod_index scope dem_attr type=:{ at_type=TA type_cons=:{type_name
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	  (type_index, type_module) = retrieveGlobalDefinition entry STE_Type mod_index
 	| type_index <> NotFound
-		# ({td_arity,td_args,td_attribute},type_index,ots_type_defs,ots_modules) = getTypeDef type_index type_module mod_index ots_type_defs ots_modules
+		# ({td_arity,td_args,td_attribute,td_rhs},type_index,ots_type_defs,ots_modules) = getTypeDef type_index type_module mod_index ots_type_defs ots_modules
 		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
-		| type_cons.type_arity <= td_arity
+		| checkArityOfType type_cons.type_arity td_arity td_rhs
 			# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope /* dem_attr */ types td_args (ots, oti, cs)
 			  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr td_attribute) id_name at_attribute oti cs
