@@ -3128,7 +3128,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					{
 						LabDef *strict_cons_lab_p,strict_cons_lab;
 						int a_size,b_size;
-												
+
 						if (symb->symb_head_strictness==4){
 							if (lazy_fill){
 								MakeSymbolLabel (&strict_cons_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
@@ -6298,7 +6298,7 @@ void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_n
 		}
 		case IfNode:
 		{
-			Bool bool;
+			Bool bool_;
 			Label thenlabel,elselabel;
 			LabDef thenlab,elselab;
 			int	new_then_asp,new_then_bsp,new_else_asp,new_else_bsp;
@@ -6310,8 +6310,8 @@ void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_n
 			new_else_bsp = bsp;
 			condpart = condnode->node_arguments;
 			
-			if (IsBooleanValue (condpart->arg_next->arg_node,&bool)){
-				if (bool){
+			if (IsBooleanValue (condpart->arg_next->arg_node,&bool_)){
+				if (bool_){
 					thenlabel = truelab;
 					new_then_asp = then_asp;
 					new_then_bsp = then_bsp;
@@ -6326,8 +6326,8 @@ void BranchOnCondition (Node condnode,int asp,int bsp,CodeGenNodeIdsP code_gen_n
 				thenlab.lab_mod=notused_string;
 			}
 
-			if (IsBooleanValue (condpart->arg_next->arg_next->arg_node,&bool)){
-				if (bool){
+			if (IsBooleanValue (condpart->arg_next->arg_next->arg_node,&bool_)){
+				if (bool_){
 					elselabel = truelab;
 					new_else_asp = then_asp;
 					new_else_bsp = then_bsp;
