@@ -747,6 +747,7 @@ STRUCT (imp_rule,ImpRule){
 #define RULE_HAS_REF_COUNT_MASK			512
 
 #define RULE_CALL_VIA_LAZY_SELECTIONS_ONLY	1024
+#define RULE_TAIL_MODULO_CONS_ENTRY_MASK	2048
 
 #define rule_depend_functions					rule_u.u_depend_functions					/* comparser,checker,macros */
 #define rule_next_changed_function				rule_u.u_next_changed_function				/* optimisations */
