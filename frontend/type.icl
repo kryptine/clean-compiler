@@ -1186,19 +1186,19 @@ where
 	requirements ti app=:{app_symb,app_args,app_info_ptr} (reqs=:{req_attr_coercions}, ts)
 		# (tst=:{tst_attr_env,tst_args,tst_result,tst_context}, specials, ts) = getSymbolType (CP_Expression (App app)) ti app_symb (length app_args) ts
 	  	  reqs = { reqs & req_attr_coercions = tst_attr_env ++ req_attr_coercions }
-	      (reqs, ts) = requirements_of_args ti app_symb.symb_name 1 app_args tst_args (reqs, ts)
+	      (reqs, ts) = requirements_of_args ti app_symb 1 app_args tst_args (reqs, ts)
 		| isEmpty tst_context
 			= (tst_result, No, (reqs, ts))
 			= (tst_result, No, ({ reqs & req_overloaded_calls = [app_info_ptr : reqs.req_overloaded_calls ]}, 
 					{ ts & ts_expr_heap = ts.ts_expr_heap <:= (app_info_ptr,
 							EI_Overloaded { oc_symbol = app_symb, oc_context = tst_context, oc_specials = specials })}))
 	where
-		requirements_of_args :: !TypeInput !Ident !Int ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
+		requirements_of_args :: !TypeInput !SymbIdent !Int ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
 		requirements_of_args ti _ _ [] [] reqs_ts
 			= reqs_ts
 		requirements_of_args ti fun_ident arg_nr [expr:exprs] [lt:lts] reqs_ts
 			# (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
-			  req_type_coercions = [{ tc_demanded = lt, tc_offered = e_type, tc_position = CP_FunArg fun_ident arg_nr, tc_coercible = True } : reqs.req_type_coercions ]
+			  req_type_coercions = [{ tc_demanded = lt, tc_offered = e_type, tc_position = CP_FunArg fun_ident.symb_name arg_nr, tc_coercible = True } : reqs.req_type_coercions ]
 			  ts_expr_heap = storeAttribute opt_expr_ptr lt.at_attribute ts.ts_expr_heap
 			= requirements_of_args ti fun_ident (arg_nr+1) exprs lts ({ reqs & req_type_coercions = req_type_coercions}, { ts & ts_expr_heap = ts_expr_heap })
 
