@@ -120,10 +120,10 @@ where
 							-> (Yes cees, var_heap, symbol_heap)
 
 						No
-*/
+
 							-> (No, var_heap, symbol_heap)
 				_
-					-> (No, var_heap, symbol_heap)
+*/					-> (No, var_heap, symbol_heap)
 		| otherwise
 			= (No, var_heap, symbol_heap)
 	split_case split_var_info_ptr (Let lad=:{let_expr,let_strict_binds,let_lazy_binds}) var_heap symbol_heap

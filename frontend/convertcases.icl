@@ -1729,11 +1729,6 @@ splitGuards (BasicPatterns basicType patterns)
 splitGuards (OverloadedListPatterns type decons_expr patterns)
 	=	[OverloadedListPatterns type decons_expr [pattern] \\ pattern <- patterns]
 
-::	TypedVariable =
-	{	tv_free_var	:: !FreeVar
-	,	tv_type		:: !AType
-	}
-
 copyExpression :: ![TypedVariable] !Expression !*VarHeap -> (![Expression], ![TypedVariable], ![FreeVar], !Expression, !*VarHeap)
 copyExpression bound_vars expr var_heap
     # var_heap = foldSt (\{tv_free_var={fv_info_ptr},tv_type} -> writePtr fv_info_ptr (VI_BoundVar tv_type)) bound_vars var_heap

@@ -150,13 +150,8 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 		= case tcl_file of
 			No
 				-> (No,type_heaps,ci_predef_symb)
-/*2.0
 			_ 
 				# tcl_file = f tcl_file;
-0.2*/
-//1.3
-			(Yes tcl_file)
-//3.1
 				# (ok,tcl_file,type_heaps,ci_predef_symb)
 					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps ci_predef_symb
 				| not ok

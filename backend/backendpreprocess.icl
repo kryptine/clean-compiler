@@ -21,12 +21,7 @@ class preprocess a :: !Ident a -> Preprocessor
 :: PreprocessState
 	:==	VarHeap
 
-//1.3
-instance preprocess {#a} | preprocess a & ArrayElem a where
-//3.1
-/*2.0
 instance preprocess {#a} | preprocess a & Array {#} a where
-0.2*/
 	preprocess aliasDummyId array
 		=	foldStateA (preprocess aliasDummyId) array
 

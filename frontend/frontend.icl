@@ -8,31 +8,10 @@ import scanner, parse, postparse, check, type, trans, convertcases, overloading,
 
 //import print
 
-:: FrontEndOptions 
-	=	{	feo_up_to_phase			:: !FrontEndPhase
-		,	feo_generics 			:: !Bool
-		,	feo_fusion	 			:: !Bool
-		}
-
-:: FrontEndSyntaxTree
-	=	{	fe_icl					:: !IclModule
-		,	fe_dcls					:: !{#DclModule}
-		,	fe_components			:: !{!Group}
-		,	fe_arrayInstances		:: !ArrayAndListInstances
-		}
-
 // trace macro
 (-*->) infixl
 (-*->) value trace
 	:==	value // ---> trace
-
-:: FrontEndPhase
-	=	FrontEndPhaseCheck
-	|	FrontEndPhaseTypeCheck
-	|	FrontEndPhaseConvertDynamics
-	|	FrontEndPhaseTransformGroups
-	|	FrontEndPhaseConvertModules
-	|	FrontEndPhaseAll
 
 instance == FrontEndPhase where
 	(==) a b
@@ -409,12 +388,6 @@ where
 	show_dcl_function {ft_symb, ft_type} file
 		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"			
 		
-
-:: ListTypesKind = ListTypesNone | ListTypesInferred | ListTypesStrictExports | ListTypesAll
-:: ListTypesOption =
-	{	lto_showAttributes :: Bool
-	,	lto_listTypesKind :: ListTypesKind
-	}
 instance == ListTypesKind where
 	(==) ListTypesNone ListTypesNone
 		=	True
