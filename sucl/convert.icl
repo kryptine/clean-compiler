@@ -781,7 +781,7 @@ convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0
         match_failure_reference = Var default_boundvar
 
 convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 freevars0 localvars0 eips0 (BuildGraph srgraph)
-= convert_graph stringtype patnodes (FreeVar o mkfreevar level o varenv) level srgraph varalloc0 exprheap0 freevars0 localvars0 eips0
+= new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 freevars0 localvars0 eips0
 
 convert_matchpatterns ::
     ((Global Index) -> ConsDef)             // Get ConsDef from environment
@@ -977,116 +977,137 @@ Converting a function body:
 
 */
 
-:: ReferenceMaker :== (SuclVariable,*ExpressionHeap) -> (Expression,.ExpressionHeap)
 :: ExpressionMaker :== SuclVariable -> Expression
 
-convert_graph stringtype patnodes mkexpr0 level srgraph varalloc0 exprheap0 freevars0 localvars0 eips0
-= (exprheap3,varalloc1,expression,freevars0,localvars1,eips3)
-  where (exprheap2,eips1,refcount,closeds,_,mkexpr1)
-        = (convert_graph_node--->"convert.convert_graph_node begins from convert.convert_graph") stringtype mkexpr (sgraph--->srgraph) exprheap1 eips0 patnodes (const 0) [] mkexpr0 sroot
-        sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
-        shareds = [(closed,n) \\ closed<-closeds, n<-[refcount closed] | n>1]
-        (mkexpr,letbinds,varalloc1,exprheap3,localvars1,eips2)
-        = foldr (allocate_shared_variable level) (mkexpr1,[],varalloc0,exprheap2,localvars0,eips1) shareds
-        root_expression = mkexpr sroot
-        (expression,exprheap1,eips3) = mkletexpr letbinds root_expression exprheap0 eips2
+new_convert_graph ::
+    .PredefinedSymbol                       // Predefined type of string representations
+    [.SuclVariable]                         // Variables in the patterns of the surrounding cases
+    (SuclVariable -> .(Ident,VarInfoPtr))   // Get information on variables bound in surrounding cases
+    .Level                                  // Nesting level for new variables
+    (Rgraph .SuclSymbol .SuclVariable)      // Rooted graph (replacement of rule) to convert
+    *VarAlloc                               // Variable allocation information (heap)
+    *ExpressionHeap                         // Expression allocation information (heap)
+    .freevars                               // Heap-allocated free variables (accumulator argument) (just passed on)
+    u:[FreeVar]                             // Heap-allocated bound variables (accumulator argument)
+    .[ExprInfoPtr]                          // Heap-allocated expressions (accumulator argument)
+ -> ( .ExpressionHeap                       // Reduced expression heap
+    , .VarAlloc                             // Reduced variable allocation info
+    , Expression                            // Resulting expression
+    , .freevars                             // Heap-allocated free variables
+    , v:[FreeVar]                           // Heap-allocated bound variables
+    , [ExprInfoPtr]                         // Heap-allocated expressions
+    )
+ ,  [u <= v]
 
-mkletexpr letbinds letbody exprheap0 eips0
-| isEmpty letbinds
-  = (letbody,exprheap0,eips0)
-= (letexpr,exprheap1,[letinfoptr:eips0])
-  where letexpr
-        = Let letinfo
-        letinfo
+new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 freevars0 localvars0 eips0
+= ((exprheap4,varalloc1,expression,freevars0,localvars1,eips4) <--- "convert.new_convert_graph ends") ---> ("convert.new_convert_graph begins with patnodes "+++listToString patnodes)
+  where (closeds,opens) = graphvars sgraph [sroot]
+        sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
+        refcounter = refcount sgraph [sroot]
+        shareds = [var \\ var <- closeds | refcounter var>1] -- patnodes
+        mksubexpr = foldr (mkfreevarref varenv) tmpmksubexpr patnodes
+        (varalloc1,(tmpmksubexpr,letbinds,localvars1))
+        = foldlr (bind_a_variable refcounter level lookup_unshared) (varalloc0,(mkunsharedsubexpr,[],localvars0)) shareds
+        mkunsharedsubexpr uvar (uexprheap,(urest,ueips))
+        = (uexprheap,([lookup_unshared uvar:urest],ueips))
+        (exprheap4,(exprs,eips1))
+        = foldlr (new_convert_graph_node stringtype sgraph mksubexpr) (exprheap3,([],eips0)) closeds
+        exprmap = zip2 closeds exprs
+        lookup_unshared = plookup toString exprmap
+        (exprheap3,([rootexpression:_],eips2))
+        = mksubexpr sroot (exprheap2,([],eips1))
+        (exprheap2,(expression,eips4))
+        = (if (isEmpty shareds) id (buildletexpr letbinds)) (exprheap0,(rootexpression,eips2))
+
+mkfreevarref varenv patvar defaultmksubexpr
+= mksubexpr
+  where mksubexpr var (exprheap0,(rest,eips0))
+        = if (var==patvar)
+             (exprheap1,([Var boundvar:rest],eips1))
+             (defaultmksubexpr var (exprheap0,(rest,eips0)))
+          where boundvar
+                = { var_name = ident
+                  , var_info_ptr = varinfoptr
+                  , var_expr_ptr = varexprptr
+                  }
+                (varexprptr,exprheap1) = newPtr EI_Empty exprheap0
+                eips1 = [varexprptr:eips0]
+                (ident,varinfoptr) = varenv patvar
+
+buildletexpr letbinds (exprheap0,(rootexpression,eips0))
+= ((exprheap1,(Let letinfo,eips1)) <--- "convert.buildletexpr ends") ---> "convert.buildletexpr begins"
+  where letinfo
         = { let_strict_binds = []
           , let_lazy_binds = letbinds
-          , let_expr = letbody
+          , let_expr = rootexpression
           , let_info_ptr = letinfoptr
           , let_expr_position = NoPos
           }
         (letinfoptr,exprheap1) = newPtr EI_Empty exprheap0
+        eips1 = [letinfoptr:eips0]
 
-allocate_shared_variable level (pnode,refcount) (mkexpr,letbinds,varalloc0,exprheap0,localvars0,eips0)
-= (adjust pnode (Var boundvar) mkexpr,[letbind:letbinds],varalloc1,exprheap1,[freevar:localvars0],[exprinfoptr:eips0])
-  where boundvar
-        = { var_name = ident
-          , var_info_ptr = varinfoptr
-          , var_expr_ptr = exprinfoptr
-          }
-        letbind
+bind_a_variable refcounter level lookup_unshared var (varalloc0,(defaultmksubexpr,rest,localvars0))
+= ((varalloc1,(mksubexpr,[lb:rest],localvars1)) <--- "convert.bind_a_variable ends") ---> "convert.bind_a_variable begins"
+  where lb
         = { lb_dst = freevar
-          , lb_src = mkexpr pnode
+          , lb_src = lookup_unshared var
           , lb_position = NoPos
           }
         freevar
         = { fv_def_level = level
           , fv_name = ident
           , fv_info_ptr = varinfoptr
-          , fv_count = refcount
+          , fv_count = refcounter var
           }
+        mksubexpr var` (exprheap0,(rest,eips0))
+        = if (var`==var)
+             (exprheap1,([Var boundvar:rest],eips1))
+             (defaultmksubexpr var` (exprheap0,(rest,eips0)))
+          where boundvar
+                = { var_name = ident
+                  , var_info_ptr = varinfoptr
+                  , var_expr_ptr = varexprptr
+                  }
+                (varexprptr,exprheap1) = newPtr EI_Empty exprheap0
+                eips1 = [varexprptr:eips0]
         ((ident,varinfoptr),varalloc1) = newvar "_share" varalloc0
-        (exprinfoptr,exprheap1) = newPtr EI_Empty exprheap0
+        localvars1 = [freevar:localvars0]
 
-convert_graph_nodes ::
-    PredefinedSymbol                // Compiler-predefined String symbol
-    ExpressionMaker                 // Final expression maker
-    (Graph SuclSymbol SuclVariable) // Subject graph to transform
-    *ExpressionHeap                 // Input expression heap for generated expressions
-    [ExprInfoPtr]                   // List of generated expression info's (accumulator input)
-    u:[SuclVariable]                // Input list of seen nodes
-    (SuclVariable->Int)             // Input reference count
-    v:[SuclVariable]                // Input defined nodes
-    ExpressionMaker                 // Input expression maker
-    [SuclVariable]                  // Nodes to examine
- -> ( *ExpressionHeap               // Resulting expression heap
-    , [ExprInfoPtr]                 // List of generated expression info's
-    , SuclVariable->Int             // Output reference count
-    , v:[SuclVariable]              // Output defined nodes
-    , u:[SuclVariable]              // Output list of seen nodes
-    , ExpressionMaker               // Output expression maker
+new_convert_graph_node ::
+    .PredefinedSymbol
+    (Graph .SuclSymbol SuclVariable)
+    (  SuclVariable
+       ( eh1:ExpressionHeap
+       , ( [Expression]
+         , ip2:[ExprInfoPtr]
+         )
+       )
+    -> ( eh0:ExpressionHeap
+       , ( [Expression]
+         , ip0:[ExprInfoPtr]
+         )
+       )
     )
-
-convert_graph_nodes stringtype mkexpr sgraph exprheap0 eips0 seen0 refcount0 closeds0 mkexpr0 []
-= (exprheap0,eips0,refcount0,closeds0,seen0,mkexpr0) <--- "convert.convert_graph_nodes ends ([])"
-convert_graph_nodes stringtype mkexpr sgraph exprheap0 eips0 seen0 refcount0 closeds0 mkexpr0 [snode:snodes]
-= (exprheap2,eips2,refcount3,closeds2,seen2,mkexpr2) <--- "convert.convert_graph_nodes ends ([_:_])"
-  where (exprheap2,eips2,refcount1,closeds1,seen2,mkexpr1)
-        = (convert_graph_nodes--->"convert.convert_graph_nodes begins from convert.convert_graph_nodes") stringtype mkexpr sgraph exprheap1 eips1 seen1 refcount0 closeds0 mkexpr0 snodes
-        (exprheap1,eips1,refcount2,closeds2,seen1,mkexpr2)
-        = (convert_graph_node--->"convert.convert_graph_node begins from convert.convert_graph_nodes") stringtype mkexpr sgraph exprheap0 eips0 seen0 refcount1 closeds1 mkexpr1 snode
-        refcount3 = inccounter snode refcount2
-
-convert_graph_node ::
-    PredefinedSymbol                // Compiler-predefined String symbol
-    ExpressionMaker                 // Final expression builder
-    (Graph SuclSymbol SuclVariable) // Graph to convert
-    *ExpressionHeap                 // Heap from which to allocate new expression info
-    [ExprInfoPtr]                   // List of generated expression info's (accumulator input)
-    u:[SuclVariable]                // Already encountered nodes
-    (SuclVariable->Int)             // Input reference count
-    v:[SuclVariable]                // Input closed variables
-    ExpressionMaker                 // Input expression builder
-    SuclVariable                    // Node in graph to convert
- -> ( *ExpressionHeap               // Modified expression heap
-    , [ExprInfoPtr]                 // List of generated expression info's
-    , SuclVariable -> Int           // Output reference count
-    , v:[SuclVariable]              // Output closed variables
-    , u:[SuclVariable]              // Output seen variables
-    , ExpressionMaker               // Output expression builder
+    SuclVariable
+    ( *ExpressionHeap
+    , ( [Expression]
+      , ip1:[ExprInfoPtr]
+      )
     )
+ -> ( eh2:ExpressionHeap
+    , ( [Expression]
+      , [ExprInfoPtr]
+      )
+    )
+ ,  [eh0<=eh1,eh0<=eh2,ip0 ip1<=ip2]
 
-convert_graph_node stringtype mkexpr sgraph exprheap0 eips0 seen0 refcount0 closeds0 mkexpr0 snode
-| isMember snode seen0
-  = (exprheap0,eips0,refcount0,closeds0,seen0,mkexpr0) <--- "convert.convert_graph_node ends (already seen)"
-= (exprheap2,eips2,refcount1,closeds2,seen2,mkexpr2) <--- "convert.convert_graph_node ends (new node)"
-  where seen1 = [snode:seen0]
-        (_,(ssym,sargs)) = dnc toString sgraph snode  // Must be closed; open nodes already initially in "seen"
-        (expr,exprheap1,eips1)
-        = convert_graph_symbol stringtype ((ssym<---"convert.convert_graph_node.ssym ends")--->"convert.convert_graph_node.ssym begins from convert.convert_graph_node") (map mkexpr ((sargs<---"convert.convert_graph_node.sargs ends")--->"convert.convert_graph_node.sargs begins from convert.convert_graph_node (convert_graph_symbol)")) exprheap0 eips0
-        (exprheap2,eips2,refcount1,closeds1,seen2,mkexpr1)
-        = (convert_graph_nodes--->"convert.convert_graph_nodes begins from convert.convert_graph_node") stringtype mkexpr sgraph exprheap1 eips1 seen1 refcount0 closeds0 mkexpr0 ((sargs<---"convert.convert_graph_node.sargs ends")--->"convert.convert_graph_node.sargs begins from convert.convert_graph_node (convert_graph_nodes)")
-        mkexpr2 = adjust snode expr mkexpr1
-        closeds2 = [snode:closeds1]
+new_convert_graph_node stringtype graph mksubexpr var (exprheap0,(rest,eips0))
+= ((exprheap2,([expr:rest],eips2)) <--- "convert.new_convert_graph_node ends") ---> "convert.new_convert_graph_node begins"
+  where (expr,exprheap1,eips2)
+        = convert_graph_symbol stringtype sym subexprs exprheap0 eips1
+        (exprheap2,(subexprs,eips1))
+        = foldlr mksubexpr (exprheap1,([],eips0)) args
+        (_,(sym,args)) = varcontents graph var
 
 convert_graph_symbol ::
     PredefinedSymbol
