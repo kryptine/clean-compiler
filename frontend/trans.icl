@@ -1542,6 +1542,194 @@ accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, {
 
 createBindingsForUnifiedTypes :: !AType !AType ![TypeVar] !{#CommonDefs} !*TypeHeaps -> (![TypeVar], !.TypeHeaps)
 createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps=:{th_vars}
+	= undef
+
+createBindingsForUnifiedTypes2 :: !AType !AType ![TypeVar] !{#CommonDefs} !*TypeHeaps -> (![TypeVar], !.TypeHeaps)
+createBindingsForUnifiedTypes2 sub_type type all_type_vars common_defs type_heaps=:{th_vars}
+/* unify the two type arguments and generate new bindings. The resulting list of type variables should only
+   contain variables that occur in the second type argument (the "demanded" type).
+*/
+	# th_vars = foldSt (\tv th_vars -> th_vars <:= (tv.tv_info_ptr, TVI_Empty)) all_type_vars th_vars
+	  (type_heaps=:{th_vars}) = bind_and_unify_atypes sub_type type False [] common_defs { type_heaps & th_vars = th_vars }
+//	  th_vars = th_vars -!-> ""
+//	  th_vars = foldSt trace_type_var all_type_vars th_vars
+	  th_vars = foldSt (\ a b -> snd (bind_to_root a b)) all_type_vars th_vars
+//	  th_vars = th_vars -!-> ""
+//	  th_vars = foldSt trace_type_var all_type_vars th_vars
+	  (unbound_type_vars, th_vars) = foldSt get_unbound_var all_type_vars ([], th_vars)
+//	  th_vars = th_vars -!-> ""
+//	  th_vars = foldSt trace_type_var all_type_vars th_vars
+	= (unbound_type_vars, { type_heaps & th_vars = th_vars })
+  where
+	bind_and_unify_types (TV tv_1) (TV tv_2) common_defs type_heaps=:{th_vars}
+		# (root_1, th_vars) = get_root tv_1 th_vars
+		  (root_2, th_vars) = get_root tv_2 th_vars
+		  maybe_root_tv_1 = only_tv root_1
+		  maybe_root_tv_2 = only_tv root_2
+		  type_heaps = { type_heaps & th_vars = th_vars }
+		= case (maybe_root_tv_1, maybe_root_tv_2) of
+						(Yes root_tv_1, No)
+							-> appTypeVarHeap (bind_root_variable_to_type root_tv_1 root_2) type_heaps
+						(No, Yes root_tv_2)
+							-> appTypeVarHeap (bind_root_variable_to_type root_tv_2 root_1) type_heaps
+						(Yes root_tv_1, Yes root_tv_2)
+							| root_tv_1.tv_info_ptr==root_tv_2.tv_info_ptr
+								-> type_heaps
+							-> appTypeVarHeap (bind_roots_together root_tv_1 root_2) type_heaps
+						(No, No)
+							-> bind_and_unify_types root_1 root_2 common_defs type_heaps
+	bind_and_unify_types (TV tv_1) type common_defs type_heaps=:{th_vars}
+		| not (is_non_variable_type type)
+			= abort ("compiler error in trans.icl: assertion failed (1) XXX"--->type)
+		# th_vars = bind_variable_to_type tv_1 type th_vars
+		= { type_heaps & th_vars = th_vars }
+	bind_and_unify_types type (TV tv_1) common_defs type_heaps=:{th_vars}
+		| not (is_non_variable_type type)
+			= abort ("compiler error in trans.icl: assertion failed (2) XXX"--->type)
+		# th_vars = bind_variable_to_type tv_1 type th_vars
+		= { type_heaps & th_vars = th_vars }
+	bind_and_unify_types (TA _ arg_types1) (TA _ arg_types2) common_defs type_heaps
+		= bind_and_unify_atype_lists arg_types1 arg_types2 common_defs type_heaps
+	bind_and_unify_types (l1 --> r1) (l2 --> r2) common_defs type_heaps
+		= bind_and_unify_atypes r1 r2 common_defs (bind_and_unify_atypes l1 l2 common_defs type_heaps)
+	bind_and_unify_types (TB _) (TB _) common_defs type_heaps
+		= type_heaps
+	bind_and_unify_types ((CV l1) :@: r1) ((CV l2) :@: r2) common_defs type_heaps
+		= bind_and_unify_atype_lists r1 r2 common_defs (bind_and_unify_types (TV l1) (TV l2) common_defs type_heaps)
+	bind_and_unify_types (TA type_symb r1) ((CV l2) :@: r2) common_defs type_heaps
+		= bind_and_unify_atype_lists r1 r2 common_defs (bind_and_unify_types (TA type_symb []) (TV l2) common_defs type_heaps)
+	bind_and_unify_types ((CV l1) :@: r1) (TA type_symb r2) common_defs type_heaps
+		= bind_and_unify_atype_lists r1 r2 common_defs (bind_and_unify_types (TV l1) (TA type_symb []) common_defs type_heaps)
+	bind_and_unify_types TE y common_defs type_heaps
+		= type_heaps
+	bind_and_unify_types x TE common_defs type_heaps
+		= type_heaps
+	bind_and_unify_types x y _ _
+		= abort ("bind_and_unify_types"--->(x,y))
+
+	bind_and_unify_atype_lists [] [] common_defs type_heaps
+		= type_heaps
+	bind_and_unify_atype_lists [x:xs] [y:ys] common_defs type_heaps
+		= bind_and_unify_atype_lists xs ys common_defs (bind_and_unify_atypes x y common_defs type_heaps)
+	
+	bind_and_unify_atypes	{at_type=TA type_symb_1 type_args_1, at_attribute = sub_attr}
+							{at_type=TA type_symb_2 type_args_2} at_attribute =     attr}
+							is_plusmin_sign inequalities_accu common_defs type_heaps
+		| type_symb_1==type_symb_2
+			= bind_and_unify_atype_lists type_args_1 type_args_2 is_plusmin_sign 
+										(add_inequality is_plusmin_sign sub_attr attr inequalities_accu)
+										common_defs type_heaps
+		// otherwise further with next alternative ("functional GOTO")
+/* XXX
+	bind_and_unify_atypes atype_1 atype_2 common_defs type_heaps
+		# (mb_expanded_1, type_heaps) = try_to_expand atype_1 common_defs type_heaps
+		  (mb_expanded_2, type_heaps) = try_to_expand atype_2 common_defs type_heaps
+		= bind_and_unify_types mb_expanded_1 mb_expanded_2 common_defs type_heaps
+	  where
+		try_to_expand {at_type=actual_type=:TA {type_index={glob_object,glob_module}} actual_args, at_attribute=actual_type_attr}
+						common_defs type_heaps
+			#! type_def = common_defs.[glob_module].com_type_defs.[glob_object]
+			= case type_def.td_rhs of
+				SynType {at_type=rhs_type}
+					-> expandTypeApplication type_def.td_args type_def.td_attribute rhs_type actual_args actual_type_attr type_heaps
+				_
+					-> (actual_type, type_heaps)
+		try_to_expand {at_type} _ type_heaps
+			= (at_type, type_heaps)
+*/
+::	TypeSymbIdent =
+	{	type_name		:: !Ident
+	,	type_arity		:: !Int
+	,	type_index		:: !Global Index
+	,	type_prop		:: !TypeSymbProperties
+	}
+
+::	TypeSymbProperties =
+	{	tsp_sign		:: !SignClassification
+	,	tsp_propagation	:: !PropClassification
+	,	tsp_coercible	:: !Bool
+	}
+
+
+	bind_to_root :: !TypeVar !*TypeVarHeap -> (!TypeVarInfo,!.TypeVarHeap);
+	bind_to_root this_tv th_vars
+		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Empty
+				-> (tv_info, th_vars)
+			(TVI_Type type)
+				| is_non_variable_type type
+					 -> (tv_info, th_vars)
+				-> case type of
+					(TV next_tv)
+						# (root_tvi, th_vars) = bind_to_root next_tv th_vars
+						  th_vars = th_vars <:= (this_tv.tv_info_ptr, root_tvi)
+						-> (root_tvi, th_vars)
+	
+	get_unbound_var tv=:{tv_info_ptr} (unbound_type_vars_accu, th_vars)
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Empty
+				-> ([tv:unbound_type_vars_accu], th_vars)
+			(TVI_Type type)
+				-> (unbound_type_vars_accu, th_vars)
+
+	only_tv :: Type -> Optional TypeVar
+	only_tv (TV tv) = Yes tv
+	only_tv _ = No
+	
+	is_non_variable_type (TA _ _)	= True
+	is_non_variable_type (_ --> _)	= True
+	is_non_variable_type (_ :@: _)	= True
+	is_non_variable_type (TB _)		= True
+	is_non_variable_type _			= False
+	
+	bind_variable_to_type tv type th_vars
+		# (root, th_vars) = get_root tv th_vars
+		= case (only_tv root) of
+			(Yes tv)	-> bind_root_variable_to_type tv type th_vars
+			No 			-> th_vars
+	
+	bind_root_variable_to_type {tv_info_ptr} type th_vars
+		= th_vars <:= (tv_info_ptr, TVI_Type type)
+	
+	bind_roots_together :: TypeVar Type *(Heap TypeVarInfo) -> .Heap TypeVarInfo;
+	bind_roots_together root_tv_1 root_type_2 th_vars
+		= th_vars <:= (root_tv_1.tv_info_ptr, TVI_Type root_type_2)
+	
+	get_root :: TypeVar *(Heap TypeVarInfo) -> (Type,.Heap TypeVarInfo);
+	get_root this_tv th_vars
+		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Empty
+				-> (TV this_tv, th_vars)
+			(TVI_Type type)
+				| is_non_variable_type type
+					 -> (type, th_vars)
+				-> case type of
+					(TV next_tv) -> get_root next_tv th_vars
+	// XXX for tracing
+	trace_type_var tv th_vars
+		= trace_type_vars tv (th_vars -!-> "TYPE VARIABLE")
+	
+	trace_type_vars this_tv th_vars
+		# th_vars = th_vars -!-> this_tv
+		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Empty
+				-> th_vars
+			(TVI_Type type)
+				| is_non_variable_type type
+					-> (th_vars -!-> ("TVI_Type", type))
+				-> case type of
+					(TV next_tv) -> trace_type_vars next_tv th_vars
+//			(TVI_FreshTypeVar root_type_var)
+//				-> th_vars -!-> ("TVI_FreshTypeVar",root_type_var)
+
+	
+/*
+createBindingsForUnifiedTypes :: !AType !AType ![TypeVar] !{#CommonDefs} !*TypeHeaps -> (![TypeVar], !.TypeHeaps)
+createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps=:{th_vars}
 /* unify the two type arguments and generate new bindings. The resulting list of type variables should only
    contain variables that occur in the second type argument (the "demanded" type).
 */
@@ -1702,7 +1890,7 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps
 					(TV next_tv) -> trace_type_vars next_tv th_vars
 //			(TVI_FreshTypeVar root_type_var)
 //				-> th_vars -!-> ("TVI_FreshTypeVar",root_type_var)
-
+*/
 	
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_symb, app_args, extra_args) = complete_application app_symb fun_def.fun_arity app_args extra_args

@@ -962,9 +962,15 @@ where
 	writeType file opt_beautifulizer (form, type :@: types)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)
-					= writeType (file <<< '(' <<< type <<< ' ') opt_beautifulizer (form, types)
+					= writeType (file <<< '(') opt_beautifulizer (form, type)
+			  (file, opt_beautifulizer)
+					= writeType (file <<< ' ') opt_beautifulizer (form, types)
 			= (file <<< ')', opt_beautifulizer)
-			= writeType (file <<< type <<< ' ') opt_beautifulizer (setProperty form cBrackets, types) 
+			# (file, opt_beautifulizer)
+					= writeType file opt_beautifulizer (form, type)
+			  (file, opt_beautifulizer)
+					= writeType (file <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
+			= (file, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TB tb)
 		= (file <<< tb, opt_beautifulizer)
 	writeType file No (form, TQV varid)
@@ -983,22 +989,18 @@ writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
 			= writeType (file <<< br_open) opt_beautifulizer (form, types)
 	= (file <<< br_close, opt_beautifulizer)
 
-writeBeautifulTypeVar file beautifulizer=:{tvb_visited, tvb_fresh_vars} type_variable
+writeBeautifulTypeVar file beautifulizer=:{tvb_visited_typevars, tvb_fresh_vars} type_variable
 	| sanity_check_failed type_variable
 		= abort "bug nr 12345 in module typesupport"
-	= case lookup type_variable tvb_visited of
+	= case assoc_list_lookup type_variable tvb_visited_typevars of
 		No
-			-> (file <<< hd tvb_fresh_vars, Yes { tvb_visited = [(type_variable, hd tvb_fresh_vars):tvb_visited],
-													tvb_fresh_vars = tl tvb_fresh_vars })
+			-> (file <<< hd tvb_fresh_vars, 
+				Yes { beautifulizer &
+						tvb_visited_typevars = [(type_variable, hd tvb_fresh_vars):tvb_visited_typevars],
+						tvb_fresh_vars = tl tvb_fresh_vars })
 		Yes (_, beautiful_var_name)
 			-> (file <<< beautiful_var_name, Yes beautifulizer)
   where
-	lookup _ [] = No
-	lookup t1 [hd=:(t2, _):tl]
-		| t1==t2
-			= Yes hd
-		= lookup t1 tl
-
 	sanity_check_failed (GTV _)		= False
 	sanity_check_failed (TV _)		= False
 	sanity_check_failed (TempV _)	= False
@@ -1007,6 +1009,27 @@ writeBeautifulTypeVar file beautifulizer=:{tvb_visited, tvb_fresh_vars} type_var
 	sanity_check_failed (TLifted _)	= False
 	sanity_check_failed _			= True
 	
+instance writeType ConsVariable where
+	writeType file No (_, cons_variable)
+		= (file <<< cons_variable, No)
+	writeType file yes_beautifulizer=:(Yes beautifulizer=:{tvb_visited_consvars, tvb_fresh_vars}) 
+			(_, cons_variable)
+		= case assoc_list_lookup cons_variable tvb_visited_consvars of
+			No
+				-> (file <<< hd tvb_fresh_vars, 
+					Yes { beautifulizer &
+							tvb_visited_consvars = [(cons_variable, hd tvb_fresh_vars):tvb_visited_consvars],
+							tvb_fresh_vars = tl tvb_fresh_vars })
+			Yes (_, beautiful_var_name)
+				-> (file <<< beautiful_var_name, yes_beautifulizer)
+
+assoc_list_lookup _ [] = No
+assoc_list_lookup t1 [hd=:(t2, _):tl]
+	| t1==t2
+		= Yes hd
+	= assoc_list_lookup t1 tl
+
+
 cNoPosition :== -1
 	 
 instance writeType [a] | writeType a
@@ -1066,15 +1089,17 @@ where
 
 // MW4..
 :: TypeVarBeautifulizer =
-	{	tvb_visited 	:: ![(Type, String)]
-			// associates type variables with strings, the type should be only GTV, TV, TempV, TQV, TempQV, TLifted.
+	{	tvb_visited_typevars 	:: ![(Type, String)]
+	,	tvb_visited_consvars	:: ![(ConsVariable, String)]
+			// tvb_visited_typevars and tvb_visited_consvars associate type (constructor) variables with
+			// strings, the type in tvb_visited_typevars should be only GTV, TV, TempV, TQV, TempQV, TLifted.
 			// (associations lists are slow but cool)
-	,	tvb_fresh_vars	::	![String]
+	,	tvb_fresh_vars			::	![String]
 	}
 
 initialTypeVarBeautifulizer :: TypeVarBeautifulizer
 initialTypeVarBeautifulizer 
-	= {	tvb_visited = [], tvb_fresh_vars = fresh_vars 'a' (-1) }
+	= {	tvb_visited_typevars = [], tvb_visited_consvars = [], tvb_fresh_vars = fresh_vars 'a' (-1) }
   where
 	fresh_vars 'i' i
 		= fresh_vars 'a' (i+1)

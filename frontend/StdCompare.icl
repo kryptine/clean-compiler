@@ -31,8 +31,8 @@ instance == ConsVariable
 where
 	(==) (CV tv1) (CV tv2)			= tv1 == tv2
 	(==) (TempCV tv1) (TempCV tv2)	= tv1 == tv2
-	(==) cv1 cv2					= False
-
+	(==) (TempQCV tv1) (TempQCV tv2)	= tv1 == tv2 // MW4++
+// MW4 removed:	(==) cv1 cv2					= False
 
 instance == TypeContext
 where
