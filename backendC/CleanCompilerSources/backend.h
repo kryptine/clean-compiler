@@ -1,0 +1,424 @@
+/* version info */
+
+# define	kBEVersionCurrent		0x02000203
+# define	kBEVersionOldestDefinition	0x02000203
+# define	kBEVersionOldestImplementation	0x02000203
+
+# define	kBEDebug	1
+
+/* pointer types */
+
+Clean (:: *UWorld :== Int)
+
+typedef struct BackEnd *BackEnd;
+Clean (:: *BackEnd :== Int)
+
+typedef struct symbol *BESymbolP;
+Clean (:: BESymbolP :== Int)
+
+typedef struct type_node *BETypeNodeP;
+Clean (:: BETypeNodeP :== Int)
+
+typedef struct type_arg *BETypeArgP;
+Clean (:: BETypeArgP :== Int)
+
+typedef struct type_alt *BETypeAltP;
+Clean (:: BETypeAltP :== Int)
+
+typedef struct node *BENodeP;
+Clean (:: BENodeP :== Int)
+
+typedef struct arg *BEArgP;
+Clean (:: BEArgP :== Int)
+
+typedef struct rule_alt *BERuleAltP;
+Clean (:: BERuleAltP :== Int)
+
+typedef struct imp_rule *BEImpRuleP;
+Clean (:: BEImpRuleP :== Int)
+
+typedef struct type *BETypeP;
+Clean (:: BETypeP :== Int)
+
+typedef struct flat_type *BEFlatTypeP;
+Clean (:: BEFlatTypeP :== Int)
+
+typedef struct type_var *BETypeVarP;
+Clean (:: BETypeVarP :== Int)
+
+typedef struct type_var_list *BETypeVarListP;
+Clean (:: BETypeVarListP :== Int)
+
+typedef struct constructor_list *BEConstructorListP;
+Clean (:: BEConstructorListP :== Int)
+
+typedef struct field_list *BEFieldListP;
+Clean (:: BEFieldListP :== Int)
+
+typedef struct node_id *BENodeIdP;
+Clean (:: BENodeIdP :== Int)
+
+typedef struct node_def *BENodeDefP;
+Clean (:: BENodeDefP :== Int)
+
+typedef struct strict_node_id *BEStrictNodeIdP;
+Clean (:: BEStrictNodeIdP :== Int)
+
+typedef struct parameter *BECodeParameterP;
+Clean (:: BECodeParameterP :== Int)
+
+typedef struct code_block *BECodeBlockP;
+Clean (:: BECodeBlockP :== Int)
+
+typedef struct string_list *BEStringListP;
+Clean (:: BEStringListP :== Int)
+
+/* constants */
+# define	kIclModuleIndex			0
+# define	kPredefinedModuleIndex	1
+
+/* enum types */
+typedef int	BEAnnotation;
+Clean (:: BEAnnotation :== Int)
+enum {
+	BENoAnnot, BEStrictAnnot
+};
+
+typedef int	BEAttribution;
+Clean (:: BEAttribution :== Int)
+enum {
+	BENoUniAttr, BENotUniqueAttr, BEUniqueAttr, BEExistsAttr, BEUniqueVariable, BEFirstUniVarNumber
+};
+
+typedef int	BESymbKind;
+Clean (:: BESymbKind :== Int)
+enum {
+	BEIntType, BEBoolType, BECharType, BERealType,
+	BEFileType, BEStringType, BEWorldType, BEProcIdType,
+	BERedIdType,
+	BENrOfBasicTypes,
+
+	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot,
+	BENrOfBasicDenots,
+
+	BEStringDenot,
+	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEListType, BETupleType, BEEmptyType,
+ 	BEDynamicType, 
+ 	BENrOfPredefTypes,
+	
+	BETupleSymb, BEConsSymb, BENilSymb,
+	BEApplySymb, BEIfSymb, BEFailSymb, BEAllSymb,
+	BESelectSymb,
+	BENrOfPredefFunsOrConses,
+
+	BEDefinition, BENewSymbol, BEInstanceSymb, BEEmptySymbol, BEFieldSymbolList,
+	BEErroneousSymb
+};
+
+typedef int BEArrayFunKind;
+Clean (::BEArrayFunKind :== Int)
+enum {
+	BECreateArrayFun, BEArraySelectFun, BEUnqArraySelectFun, BEArrayUpdateFun,
+	BEArrayReplaceFun, BEArraySizeFun, BEUnqArraySizeFun,
+	BE_CreateArrayFun,BE_UnqArraySelectFun,BE_UnqArraySelectNextFun,BE_UnqArraySelectLastFun,
+	BE_ArrayUpdateFun,
+	BENoArrayFun 
+};
+
+typedef int	BESelectorKind;
+Clean (::BESelectorKind :== Int)
+enum {
+	BESelectorDummy, BESelector, BESelector_U, BESelector_F, BESelector_L, BESelector_N
+};
+
+typedef int	BEUpdateKind;
+Clean (::BEUpdateKind :== Int)
+enum {
+	BEUpdateDummy, BEUpdate, BEUpdate_U
+};
+
+
+/* functions */
+
+void BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation);
+Clean (BEGetVersion :: (Int, Int, Int))
+
+BackEnd BEInit (int argc);
+Clean (BEInit :: Int UWorld -> (BackEnd, UWorld))
+
+void BEFree (BackEnd backEnd);
+Clean (BEFree :: BackEnd UWorld -> UWorld)
+
+void BEArg (CleanString arg);
+Clean (BEArg :: String BackEnd -> BackEnd)
+
+void BEDeclareModules (int nModules);
+Clean (BEDeclareModules :: Int BackEnd -> BackEnd)
+
+void BEDeclarePredefinedSymbols (int nConstructors, int nTypes);
+Clean (BEDeclarePredefinedSymbols :: Int Int BackEnd -> BackEnd)
+
+BESymbolP BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex);
+Clean (BESpecialArrayFunctionSymbol :: BEArrayFunKind Int Int BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEDictionarySelectFunSymbol (void);
+Clean (BEDictionarySelectFunSymbol :: BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEDictionaryUpdateFunSymbol (void);
+Clean (BEDictionaryUpdateFunSymbol :: BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEFunctionSymbol (int functionIndex, int moduleIndex);
+Clean (BEFunctionSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEConstructorSymbol (int constructorIndex, int moduleIndex);
+Clean (BEConstructorSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEFieldSymbol (int fieldIndex, int moduleIndex);
+Clean (BEFieldSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BETypeSymbol (int typeIndex, int moduleIndex);
+Clean (BETypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEDontCareDefinitionSymbol (void);
+Clean (BEDontCareDefinitionSymbol :: BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BEBoolSymbol (int value);
+Clean (BEBoolSymbol :: Bool BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BELiteralSymbol (BESymbKind kind, CleanString value);
+Clean (BELiteralSymbol :: BESymbKind String BackEnd -> (BESymbolP, BackEnd))
+
+void BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind);
+Clean (BEPredefineConstructorSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
+
+void BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BESymbKind symbolKind);
+Clean (BEPredefineTypeSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
+
+BESymbolP BEBasicSymbol (BESymbKind kind);
+Clean (BEBasicSymbol :: Int BackEnd -> (BESymbolP, BackEnd))
+
+BETypeNodeP BEVarTypeNode (CleanString name);
+Clean (BEVarTypeNode :: String BackEnd -> (BETypeNodeP, BackEnd))
+
+BETypeVarListP BETypeVars (BETypeVarP typeVar, BETypeVarListP typeVarList);
+Clean (BETypeVars :: BETypeVarP BETypeVarListP BackEnd -> (BETypeVarListP, BackEnd))
+
+BETypeVarListP BENoTypeVars (void);
+Clean (BENoTypeVars :: BackEnd -> (BETypeVarListP, BackEnd))
+
+BETypeNodeP BENormalTypeNode (BESymbolP symbol, BETypeArgP args);
+Clean (BENormalTypeNode :: BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
+
+BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode);
+Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
+
+BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
+Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
+
+BETypeArgP BENoTypeArgs (void);
+Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))
+
+BETypeArgP BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs);
+Clean (BETypeArgs :: BETypeNodeP BETypeArgP BackEnd -> (BETypeArgP, BackEnd))
+
+BETypeAltP BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs);
+Clean (BETypeAlt :: BETypeNodeP BETypeNodeP BackEnd -> (BETypeAltP, BackEnd))
+
+BENodeP BENormalNode (BESymbolP symbol, BEArgP args);
+Clean (BENormalNode :: BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEMatchNode (int arity, BESymbolP symbol, BENodeP node);
+Clean (BEMatchNode :: Int BESymbolP BENodeP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BETupleSelectNode (int arity, int index, BENodeP node);
+Clean (BETupleSelectNode :: Int Int BENodeP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEIfNode (BENodeP cond, BENodeP then, BENodeP elsje);
+Clean (BEIfNode :: BENodeP BENodeP BENodeP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts, BENodeP then, BENodeDefP elseNodeDefs, BEStrictNodeIdP elseStricts, BENodeP elsje);
+Clean (BEGuardNode :: BENodeP BENodeDefP BEStrictNodeIdP BENodeP BENodeDefP  BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BESelectorNode (BESelectorKind selectorKind, BESymbolP fieldSymbol, BEArgP args);
+Clean (BESelectorNode :: BESelectorKind BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEUpdateNode (BEArgP args);
+Clean (BEUpdateNode :: BEArgP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BENodeIdNode (BENodeIdP nodeId, BEArgP args);
+Clean (BENodeIdNode :: BENodeIdP BEArgP BackEnd -> (BENodeP, BackEnd))
+
+BEArgP BENoArgs (void);
+Clean (BENoArgs :: BackEnd -> (BEArgP, BackEnd))
+
+BEArgP BEArgs (BENodeP node, BEArgP nextArgs);
+Clean (BEArgs :: BENodeP BEArgP BackEnd -> (BEArgP, BackEnd))
+
+BERuleAltP BERuleAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BENodeDefP rhsDefs, BEStrictNodeIdP lhsStrictNodeIds, BENodeP rhs);
+Clean (BERuleAlt :: Int BENodeDefP BENodeP BENodeDefP BEStrictNodeIdP BENodeP BackEnd -> (BERuleAltP, BackEnd))
+
+BERuleAltP BERuleAlts (BERuleAltP alt, BERuleAltP alts);
+Clean (BERuleAlts :: BERuleAltP BERuleAltP BackEnd -> (BERuleAltP, BackEnd))
+
+BERuleAltP BENoRuleAlts (void);
+Clean (BENoRuleAlts :: BackEnd -> (BERuleAltP, BackEnd))
+
+# define	BELhsNodeId	0
+# define	BERhsNodeId	1
+void BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name);
+Clean (BEDeclareNodeId :: Int Int String BackEnd -> BackEnd)
+
+BENodeIdP BENodeId (int sequenceNumber);
+Clean (BENodeId :: Int BackEnd -> (BENodeIdP, BackEnd))
+
+BENodeIdP BEWildCardNodeId (void);
+Clean (BEWildCardNodeId :: BackEnd -> (BENodeIdP, BackEnd))
+
+BENodeDefP BENodeDef (int sequenceNumber, BENodeP node);
+Clean (BENodeDef :: Int BENodeP BackEnd -> (BENodeDefP, BackEnd))
+
+BENodeDefP BENoNodeDefs (void);
+Clean (BENoNodeDefs :: BackEnd -> (BENodeDefP, BackEnd))
+
+BENodeDefP BENodeDefs (BENodeDefP nodeDef, BENodeDefP nodeDefs);
+Clean (BENodeDefs :: BENodeDefP BENodeDefP BackEnd -> (BENodeDefP, BackEnd))
+
+BEStrictNodeIdP BEStrictNodeId (BENodeIdP nodeId);
+Clean (BEStrictNodeId :: BENodeIdP BackEnd -> (BEStrictNodeIdP, BackEnd))
+
+BEStrictNodeIdP BENoStrictNodeIds (void);
+Clean (BENoStrictNodeIds :: BackEnd -> (BEStrictNodeIdP, BackEnd))
+
+BEStrictNodeIdP BEStrictNodeIds (BEStrictNodeIdP strictNodeId, BEStrictNodeIdP strictNodeIds);
+Clean (BEStrictNodeIds :: BEStrictNodeIdP BEStrictNodeIdP BackEnd -> (BEStrictNodeIdP, BackEnd))
+
+# define	BEIsNotACaf	0
+# define	BEIsACaf	1
+BEImpRuleP BERule (int functionIndex, int isCaf, BETypeAltP type, BERuleAltP alts);
+Clean (BERule :: Int Int BETypeAltP BERuleAltP BackEnd -> (BEImpRuleP, BackEnd))
+
+void BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name);
+Clean (BEDeclareRuleType :: Int Int String BackEnd -> BackEnd)
+
+void BEDefineRuleType (int functionIndex, int moduleIndex, BETypeAltP typeAlt);
+Clean (BEDefineRuleType :: Int Int BETypeAltP BackEnd -> BackEnd)
+
+void BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex);
+Clean (BEAdjustArrayFunction :: BEArrayFunKind Int Int BackEnd -> BackEnd)
+
+BEImpRuleP BENoRules (void);
+Clean (BENoRules :: BackEnd -> (BEImpRuleP, BackEnd))
+
+BEImpRuleP BERules (BEImpRuleP rule, BEImpRuleP rules);
+Clean (BERules :: BEImpRuleP BEImpRuleP BackEnd -> (BEImpRuleP, BackEnd))
+
+BETypeP BETypes (BETypeP type, BETypeP types);
+Clean (BETypes :: BETypeP BETypeP BackEnd -> (BETypeP, BackEnd))
+
+BETypeP BENoTypes (void);
+Clean (BENoTypes :: BackEnd -> (BETypeP, BackEnd))
+
+BEFlatTypeP BEFlatType (BESymbolP symbol, BETypeVarListP arguments);
+Clean (BEFlatType :: BESymbolP BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
+
+void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
+Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
+
+void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields);
+Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP BEFieldListP BackEnd -> BackEnd)
+
+void BEAbsType (BEFlatTypeP lhs);
+Clean (BEAbsType :: BEFlatTypeP BackEnd -> BackEnd)
+
+BEConstructorListP BEConstructors (BEConstructorListP constructor, BEConstructorListP constructors);
+Clean (BEConstructors:: BEConstructorListP BEConstructorListP BackEnd -> (BEConstructorListP, BackEnd))
+
+BEConstructorListP BENoConstructors (void);
+Clean (BENoConstructors:: BackEnd -> (BEConstructorListP, BackEnd))
+
+BEConstructorListP BEConstructor (BETypeNodeP type);
+Clean (BEConstructor:: BETypeNodeP BackEnd -> (BEConstructorListP, BackEnd))
+
+void BEDeclareField (int fieldIndex, int moduleIndex, CleanString name);
+Clean (BEDeclareField :: Int Int String BackEnd -> BackEnd)
+
+BEFieldListP BEField (int fieldIndex, int moduleIndex, BETypeNodeP type);
+Clean (BEField :: Int Int BETypeNodeP BackEnd -> (BEFieldListP, BackEnd))
+
+BEFieldListP BEFields (BEFieldListP field, BEFieldListP fields);
+Clean (BEFields:: BEFieldListP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
+
+BEFieldListP BENoFields (void);
+Clean (BENoFields:: BackEnd -> (BEFieldListP, BackEnd))
+
+void BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name);
+Clean (BEDeclareConstructor:: Int Int String BackEnd -> BackEnd)
+
+BETypeVarP BETypeVar (CleanString name);
+Clean (BETypeVar:: String BackEnd -> (BETypeVarP, BackEnd))
+
+void BEDeclareType (int typeIndex, int moduleIndex, CleanString name);
+Clean (BEDeclareType:: Int Int String BackEnd -> BackEnd)
+
+void BEDeclareFunction (CleanString name, int arity, int functionIndex, int ancestor);
+Clean (BEDeclareFunction :: String Int Int Int BackEnd -> BackEnd)
+
+BERuleAltP BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock);
+Clean (BECodeAlt:: Int BENodeDefP BENodeP BECodeBlockP BackEnd -> (BERuleAltP, BackEnd))
+
+BEStringListP BEString (CleanString cleanString);
+Clean (BEString:: String BackEnd -> (BEStringListP, BackEnd))
+
+BEStringListP BEStrings (BEStringListP string, BEStringListP strings);
+Clean (BEStrings:: BEStringListP BEStringListP BackEnd -> (BEStringListP, BackEnd))
+
+BEStringListP BENoStrings (void);
+Clean (BENoStrings:: BackEnd -> (BEStringListP, BackEnd))
+
+BECodeParameterP BECodeParameter (CleanString location, BENodeIdP nodeId);
+Clean (BECodeParameter:: String BENodeIdP BackEnd -> (BECodeParameterP, BackEnd))
+
+BECodeParameterP BECodeParameters (BECodeParameterP parameter, BECodeParameterP parameters);
+Clean (BECodeParameters:: BECodeParameterP BECodeParameterP BackEnd -> (BECodeParameterP, BackEnd))
+
+BECodeParameterP BENoCodeParameters (void);
+Clean (BENoCodeParameters:: BackEnd -> (BECodeParameterP, BackEnd))
+
+BECodeBlockP BEAbcCodeBlock (int inline, BEStringListP instructions);
+Clean (BEAbcCodeBlock:: Bool BEStringListP BackEnd -> (BECodeBlockP, BackEnd))
+
+BECodeBlockP BEAnyCodeBlock (BECodeParameterP inParams, BECodeParameterP outParams, BEStringListP instructions);
+Clean (BEAnyCodeBlock:: BECodeParameterP BECodeParameterP BEStringListP BackEnd -> (BECodeBlockP, BackEnd))
+
+void BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstructors, int nFields);
+Clean (BEDeclareIclModule ::  String Int Int Int Int BackEnd -> BackEnd)
+
+void BEDeclareDclModule (int moduleIndex, CleanString name, int systemModule, int nFunctions, int nTypes, int nConstructors, int nFields);
+Clean (BEDeclareDclModule :: Int String Bool Int Int Int Int BackEnd -> BackEnd)
+
+void BEDeclarePredefinedModule (int nTypes, int nConstructors);
+Clean (BEDeclarePredefinedModule :: Int Int BackEnd -> BackEnd)
+
+void BEDefineRules (BEImpRuleP rules);
+Clean (BEDefineRules :: BEImpRuleP BackEnd -> BackEnd)
+
+int BEGenerateCode (CleanString outputFile);
+Clean (BEGenerateCode :: String BackEnd -> (Bool, BackEnd))
+
+void BEExportType (int dclTypeIndex, int iclTypeIndex);
+Clean (BEExportType :: Int Int BackEnd -> BackEnd)
+
+void BESwapTypes (int frm, int to);
+Clean (BESwapTypes :: Int Int BackEnd -> BackEnd)
+
+void BEExportConstructor (int dclConstructorIndex, int iclConstructorIndex);
+Clean (BEExportConstructor :: Int Int BackEnd -> BackEnd)
+
+void BEExportField (int dclTypeIndex, int iclTypeIndex);
+Clean (BEExportField :: Int Int BackEnd -> BackEnd)
+
+void BEExportFunction (int dclFunctionIndex, int iclFunctionIndex);
+Clean (BEExportFunction :: Int Int BackEnd -> BackEnd)
+
+void BEDefineImportedObjsAndLibs (BEStringListP objs, BEStringListP libs);
+Clean (BEDefineImportedObjsAndLibs :: BEStringListP BEStringListP BackEnd -> BackEnd)

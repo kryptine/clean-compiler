@@ -1,0 +1,130 @@
+/*
+		Ronny Wichers Schreur
+		University of Nijmegen
+*/
+
+# pragma segment comparser
+# ifdef THINK_C
+# pragma options (!macsbug_names)
+# endif
+
+# undef	PRINT_RULES_AFTER_PARSING
+# undef	STOP_AFTER_PARSING
+
+# undef H
+
+# include	"types.t"
+# include	"syntaxtr.t"
+
+# include	"comsupport.h"
+# include	"scanner.h"
+# include	"sizes.h"
+# include	"checker.h"
+# include	"statesgen.h"
+# include	"comparser.h"
+# include	"buildtree.h"
+# include	"comprehensions.h"
+# include	"settings.h"
+# include	"checksupport.h"
+
+# ifdef PRINT_RULES_AFTER_PARSING
+# include "dbprint.h"
+# endif
+
+static void	*gSymbIdEnv;
+
+static IdentP	gBasicTypeIdents [Nr_Of_Basic_Types], gIfIdent;
+
+static SymbolP
+NewPredefinedTypeSymbol (SymbKind symbolKind, KeywordKind keyWordKind, IdentP *identPtr)
+{
+	char		*symbolName;
+	SymbolP		symbol;
+	IdentP		ident;
+
+	symbolName	= ReservedWords [keyWordKind];
+	symbol		= NewSymbol (symbolKind);
+
+	ident				= PutStringInHashTable (symbolName, TypeSymbolIdTable);
+	ident->ident_symbol	= symbol;
+	ident->ident_environ= (char*)gSymbIdEnv;
+	*identPtr			= ident;
+
+	return (symbol);
+} /* NewPredefinedSymbol */
+
+static SymbolP
+NewPredefinedSymbol (SymbKind symbolKind, KeywordKind keyWordKind, IdentP *identPtr)
+{
+	char		*symbolName;
+	SymbolP		symbol;
+	IdentP		ident;
+
+	symbolName	= ReservedWords [keyWordKind];
+	symbol		= NewSymbol (symbolKind);
+
+	ident				= PutStringInHashTable (symbolName, SymbolIdTable);
+	ident->ident_symbol	= symbol;
+	ident->ident_environ= (char*)gSymbIdEnv;
+	*identPtr			= ident;
+
+	return (symbol);
+} /* NewPredefinedSymbol */
+
+void
+InitParser (void)
+{
+	int		i;
+
+	ScanInitialise ();
+#ifndef CLEAN2
+	MakeErrorStructures ();
+
+	gCurrentContext			= NULL;
+	gNodeIdEnv				= (char *) 1;
+	/* RWS, hack to avoid name space confusion bug */
+	gAttributeEnv			= (char *) (1 << 16);
+
+	gAttrVarAdmin = NULL;
+#endif
+	for (i = 0; i < MaxNodeArity; i++)
+	{	SelectSymbols	 [i] = NULL;
+		TupleTypeSymbols [i] = NULL;
+	}
+
+	BasicTypeSymbols [int_type]		= NewPredefinedTypeSymbol (int_type, intsym, & gBasicTypeIdents [int_type]);
+	BasicTypeSymbols [bool_type]	= NewPredefinedTypeSymbol (bool_type, boolsym, & gBasicTypeIdents [bool_type]);
+	BasicTypeSymbols [char_type]	= NewPredefinedTypeSymbol (char_type, charsym, & gBasicTypeIdents [char_type]);
+	BasicTypeSymbols [string_type]	= NewPredefinedTypeSymbol (string_type, stringsym, & gBasicTypeIdents [string_type]);
+	BasicTypeSymbols [real_type]	= NewPredefinedTypeSymbol (real_type, realsym, & gBasicTypeIdents [real_type]);
+	BasicTypeSymbols [file_type]	= NewPredefinedTypeSymbol (file_type, filesym, & gBasicTypeIdents [file_type]);
+	BasicTypeSymbols [world_type]	= NewPredefinedTypeSymbol (world_type, worldsym, & gBasicTypeIdents [world_type]);
+
+	ArraySymbols [LazyArrayInstance]	= NewPredefinedTypeSymbol (array_type, arraysym, &gArrayIdents [LazyArrayInstance]);
+	ArraySymbols [StrictArrayInstance]	= NewPredefinedTypeSymbol (strict_array_type, strictarraysym, &gArrayIdents [StrictArrayInstance]);
+	ArraySymbols [UnboxedArrayInstance] = NewPredefinedTypeSymbol (unboxed_array_type, unboxedarraysym, &gArrayIdents [UnboxedArrayInstance]);
+	
+	BasicTypeSymbols [procid_type]	= NewPredefinedTypeSymbol (procid_type, procidsym, & gBasicTypeIdents [procid_type]);
+
+	IfSymbol		= NewPredefinedSymbol (if_symb, ifsym, &gIfIdent);
+	BasicTypeSymbols [redid_type]	= NewPredefinedTypeSymbol (procid_type, procidsym, & gBasicTypeIdents [redid_type]);
+	ApplyTypeSymbol	= NewSymbol (fun_type);
+
+	TrueSymbol		= NewSymbol (bool_denot);
+	TrueSymbol->symb_bool = True;
+	FalseSymbol		= NewSymbol (bool_denot);
+	FalseSymbol->symb_bool = False;
+
+	TupleSymbol		= NewSymbol (tuple_symb);
+	ListSymbol		= NewSymbol (list_type);
+	ConsSymbol		= NewSymbol (cons_symb);
+	NilSymbol		= NewSymbol (nil_symb);
+	ApplySymbol		= NewSymbol (apply_symb);
+	FailSymbol		= NewSymbol (fail_symb);
+	AllSymbol		= NewSymbol (all_symb);
+	EmptyTypeSymbol	= NewSymbol (empty_type);
+
+	InitialiseEnumFunctionIds ();
+
+	clear_p_at_node_tree();
+} /* InitParser */
