@@ -6,9 +6,6 @@ import utilities
 
 ::	VarHeap :== Heap VarInfo
 
-SwitchUniquenessBug with_bug without_bug :== with_bug 
-// temporary switch for compiling the Object I/O library
-
 cIclModIndex 			:== 0
 
 CS_NotChecked 	:== -1
