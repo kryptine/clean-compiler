@@ -1201,6 +1201,10 @@ where
 			  req_type_coercions = [{ tc_demanded = lt, tc_offered = e_type, tc_position = CP_FunArg fun_ident arg_nr, tc_coercible = True } : reqs.req_type_coercions ]
 			  ts_expr_heap = storeAttribute opt_expr_ptr lt.at_attribute ts.ts_expr_heap
 			= requirements_of_args ti fun_ident (arg_nr+1) exprs lts ({ reqs & req_type_coercions = req_type_coercions}, { ts & ts_expr_heap = ts_expr_heap })
+        requirements_of_args _ fun_ident _ [] lts _
+			= abort ("module type: function requirements_of_args: "+++fun_ident.id_name+++": out of argument expressions, but "+++toString (length lts)+++" type arguments left")
+        requirements_of_args _ fun_ident _ exprs [] _
+			= abort ("module type: function requirements_of_args: "+++fun_ident.id_name+++": out of type arguments, but "+++toString (length exprs)+++" argument expressions left")
 
 instance requirements Case
 where
