@@ -1887,7 +1887,7 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 		
 	# dcl_mod = case dcl_mod of
 			dcl_mod=:{dcl_macro_conversions=Yes conversion_table}
-				# new_macro_conversions = {old_icl_macro_index+local_functions_index_offset \\ old_icl_macro_index<-:conversion_table}
+				# new_macro_conversions = {if (old_icl_macro_index==(-1)) old_icl_macro_index (old_icl_macro_index+local_functions_index_offset) \\ old_icl_macro_index<-:conversion_table}
 				-> {dcl_mod & dcl_macro_conversions=Yes new_macro_conversions}
 			dcl_mod
 				-> dcl_mod
