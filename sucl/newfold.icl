@@ -147,48 +147,6 @@ graphs  in  hist)  in the tips of the trace. It returns a list of rules,
 which are the results  of  folding,  and  a  list  of  areas  for  which
 functions  must  be  introduced. If no occurrences were found, Absent is
 returned.
-
->   foldtips ::
->       (rgraph * **->(*,[**])) ->
->       (*,[**]) ->
->       ([(**,graph * **)],[(**,graph * **)]) ->
->       trace * ** *** ->
->       (bool,([bool],[rule * **],[rgraph * **]))
-
->   foldtips foldarea foldcont
->   =   ft
->       where ft hist trace
->             =   ft' transf
->                 where Trace stricts rule answer history transf = trace
->                       ft' Stop
->                       =   foldoptional exres (pair True.addstrict stricts) (actualfold deltanodes rnfnodes foldarea (=) foldcont (snd hist) rule)
->                           where deltanodes = foldoptional [] getdeltanodes answer
->                                 rnfnodes = foldoptional [rhs rule] (const []) answer
->                       ft' (Instantiate yestrace notrace)
->                       =   ft'' (ft hist yestrace) (ft hist notrace)
->                           where ft'' (False,yessra) (False,nosra) = exres
->                                 ft'' (yesfound,(yesstricts,yesrules,yesareas)) (nofound,(nostricts,norules,noareas))
->                                 =   (True,(stricts,yesrules++norules,yesareas++noareas))
->                       ft' (Reduce reductroot trace)
->                       =   ft'' (ft (fst hist,fst hist) trace)
->                           where ft'' (False,sra) = exres
->                                 ft'' (found,sra) = (True,sra)
->                       ft' (Annotate trace)
->                       =   ft'' (ft hist trace)
->                           where ft'' (False,sra) = exres
->                                 ft'' (found,sra) = (True,sra)
->                    || exres = (False,mapfst3 only (extract noetrc foldarea trace ([],[],[])))
->                       exres = (False,newextract noetrc foldarea trace)
-
->   addstrict stricts (rule,areas) = (stricts,[rule],areas)
-
->   noetrc trace area = id
-
->   pair x y = (x,y)
-
->   only :: [*] -> *
->   only [x] = x
->   only xs = error "only: not a singleton list"
 */
 
 foldtips ::
@@ -253,12 +211,6 @@ is  in  practice a subtrace of another trace, introduced recursion might
 exist to the supertrace.  This does not count, since it is not  possible
 to fold the first occurrence of the termination history pattern which is
 in the supertrace.
-
->   etracer * ** ***
->   ==  trace * ** *** ->
->       rgraph * ** ->
->       bool ->
->       bool
 */
 
 :: Etracer sym var pvar :==
@@ -266,72 +218,6 @@ in the supertrace.
        (Rgraph sym var)
        Bool
     -> Bool
-
-/*
->   extract
->   ::  etracer * ** *** ->
->       (rgraph * **->(*,[**])) ->
->       trace * ** *** ->
->       ([[bool]],[rule * **],[rgraph * **]) ->
->       ([[bool]],[rule * **],[rgraph * **])
-
->   extract trc newname (Trace stricts rule answer history transf) (strictss,rules,areas)
->   =   (strictss',recrule:rules,recareas++areas), if trc (Trace stricts rule answer history transf) unsafearea recursive
->   =   mapfst3 (ifopen (const strictss') id answer) (f transf (strictss,rules,areas)), otherwise
->       where f (Reduce reductroot trace) = extract trc newname trace
->             f (Annotate trace) = extract trc newname trace
->             f (Instantiate yestrace notrace) = extract trc newname yestrace.extract trc newname notrace
->             f Stop (strictss,rules,areas) = (stricts:strictss,mkrule rargs rroot stoprgraph:rules,stopareas++areas)
-
->             (recursive,unsafearea)
->             =   foldoptional (False,undef) (findspinepart rule transf) answer, if isreduce transf
->             =   (False,error "extract: not a Reduce transformation"), otherwise
-
->             (recrule,recareas) = splitrule newname rnfnodes deltanodes rule unsafearea
->             (stoprgraph,stopareas) = finishfold newname rnfnodes deltanodes rroot rgraph
-
->             rargs = lhs rule; rroot = rhs rule; rgraph = rulegraph rule
->             rnfnodes = foldoptional (rroot:) (const id) answer (nodelist rgraph rargs)
-
->             deltanodes = foldoptional [] getdeltanodes answer
-
->             strictss' = stricts:strictss
-
-
-This is a version of `extract' that does not use the collector argument.
-
->   newextract
->   ::  etracer * ** *** ->
->       (rgraph * **->(*,[**])) ->
->       trace * ** *** ->
->       ([bool],[rule * **],[rgraph * **])
-
->   newextract trc newname (Trace stricts rule answer history transf)
->   =   (stricts,[recrule],recareas), if recursive
->   =   subex transf, otherwise
->       where subex (Reduce reductroot trace) = newextract trc newname trace
->             subex (Annotate trace) = newextract trc newname trace
->             subex (Instantiate yestrace notrace)
->             = (stricts,yesrules++norules,yesareas++noareas)
->               where (yesstricts,yesrules,yesareas) = newextract trc newname yestrace
->                     (nostricts,norules,noareas) = newextract trc newname notrace
->             subex Stop = (stricts,[mkrule rargs rroot stoprgraph],stopareas)
-
->             (recursive,unsafearea)
->             =   foldoptional (False,undef) (findspinepart rule transf) answer, if isreduce transf
->             =   (False,error "newextract: not a Reduce transformation"), otherwise
-
->             (recrule,recareas) = splitrule newname rnfnodes deltanodes rule unsafearea
->             (stoprgraph,stopareas) = finishfold newname rnfnodes deltanodes rroot rgraph
-
->             rargs = lhs rule; rroot = rhs rule; rgraph = rulegraph rule
->             rnfnodes = foldoptional (rroot:) (const id) answer (nodelist rgraph rargs)
-
->             deltanodes = foldoptional [] getdeltanodes answer
-
->   isreduce (Reduce reductroot trace) = True
->   isreduce transf = False
-*/
 
 newextract ::
     (Etracer sym var pvar)
@@ -381,29 +267,6 @@ using `toprule', occurs in a residu of itself in `trace'.
 
 The use of `findspinepart' is to detect introduced recursion in  `trace'
 to its root.
-
->   findspinepart :: rule * ** -> transformation * ** *** -> spine * ** *** -> (bool,rgraph * **)
-
->   findspinepart rule transf spine
->   =   snd (foldspine pair stop stop id stop (const stop) partial (const stop) redex stop spine)
->       where pair node (pattern,recursion)
->             =   (pattern',recursion')
->                 where pattern'
->                       =   updategraph node cnt pattern, if def
->                       =   pattern, otherwise
->                       (def,cnt) = dnc (const "in findspinepart") graph node
->                       recursion'
->                       =   (True,mkrgraph node pattern'), if findpattern (pattern',node) (spinenodes spine) node transf
->                       =   recursion, otherwise
->             partial rule matching (pattern,recursion) = (extgraph' graph rule matching pattern,recursion)
->             redex rule matching = (extgraph' graph rule matching emptygraph,norecursion)
->             stop = (emptygraph,norecursion)
->             norecursion = (False,error "findspinepart: no part of spine found")
->             graph = rulegraph rule
-
->   extgraph' sgraph rule
->   =   extgraph sgraph rgraph (nodelist rgraph (lhs rule))
->       where rgraph = rulegraph rule
 */
 
 findspinepart :: (Rule sym var) (Transformation sym var pvar) (Spine sym var pvar) -> (Bool,Rgraph sym var) | == sym & == var & == pvar
