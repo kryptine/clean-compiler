@@ -3672,17 +3672,20 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 int contains_fail (NodeP node_p)
 {
 	while (node_p->node_kind==IfNode){
-		NodeP else_node_p;
+		NodeP then_node_p,else_node_p;
 	
+		then_node_p=node_p->node_arguments->arg_next->arg_node;
 		else_node_p=node_p->node_arguments->arg_next->arg_next->arg_node;
-		while (else_node_p->node_kind==IfNode)
-			else_node_p=else_node_p->node_arguments->arg_next->arg_next->arg_node;
-		
+
 		if (else_node_p->node_kind==NormalNode && else_node_p->node_symbol->symb_kind==fail_symb)
 			return 1;
 
-		node_p=node_p->node_arguments->arg_next->arg_node;
+		if (then_node_p->node_kind==IfNode && contains_fail (then_node_p))
+			return 1;
+		
+		node_p=else_node_p;
 	}
+
 	return 0;
 }
 #endif
