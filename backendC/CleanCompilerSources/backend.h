@@ -1,7 +1,14 @@
 /* version info */
 
+// Version number use Apple's numbering in the version resource
+// see <http://developer.apple.com/documentation/mac/Toolbox/Toolbox-487.html>
+// major 8 bits, example 2 = 0x02
+// minor 4+4 bits, example 1.1 = 0x11
+// development stage: 0x20 development, 0x40 alpha, 0x60 beta, 0x80 release
+// revision level
+
 // increment this for every release
-# define	kBEVersionCurrent				0x02100800
+# define	kBEVersionCurrent				0x02116000
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not upward compatible (for example when a function is added)
