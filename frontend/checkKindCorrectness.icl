@@ -82,22 +82,27 @@ checkKindCorrectness icl_used_module_numbers main_dcl_module_n icl_instances com
 					(check_kind_correctness_of_class_context_and_member_contexts common_defs com_member_defs)
 					com_class_defs state
 		= state
-	check_kind_correctness_of_instance common_defs {ins_class, ins_ident, ins_pos, ins_type}
+	check_kind_correctness_of_instance common_defs {ins_is_generic, ins_class, ins_ident, ins_pos, ins_type}
 				(th_vars, td_infos, error_admin)
-		# {class_args}
-				= common_defs.[ins_class.glob_module].com_class_defs.[ins_class.glob_object.ds_index]
-		  (expected_kinds, th_vars)
-		  		= mapSt get_tvi class_args th_vars
-		  error_admin
-		  		= setErrorAdmin (newPosition ins_ident ins_pos) error_admin
-		  th_vars
-		  		= foldSt init_type_var ins_type.it_vars th_vars
-		  state
-		  		= unsafeFold3St possibly_check_kind_correctness_of_type expected_kinds [1..] 
-		  				ins_type.it_types (th_vars, td_infos, error_admin)
-		  state
-		  		= foldSt (check_kind_correctness_of_context common_defs) ins_type.it_context state
-		= state
+		| ins_is_generic
+			// kind correctness of user suppliedg eneric instances
+			// is checked during generic phase
+			= (th_vars, td_infos, error_admin)
+		| otherwise
+			# {class_args}
+					= common_defs.[ins_class.glob_module].com_class_defs.[ins_class.glob_object.ds_index]
+			  (expected_kinds, th_vars)
+			  		= mapSt get_tvi class_args th_vars
+			  error_admin
+			  		= setErrorAdmin (newPosition ins_ident ins_pos) error_admin
+			  th_vars
+			  		= foldSt init_type_var ins_type.it_vars th_vars
+			  state
+			  		= unsafeFold3St possibly_check_kind_correctness_of_type expected_kinds [1..] 
+			  				ins_type.it_types (th_vars, td_infos, error_admin)
+			  state
+			  		= foldSt (check_kind_correctness_of_context common_defs) ins_type.it_context state
+			= state
 	possibly_check_kind_correctness_of_type TVI_Empty _ _ state
 		// This can happen for stooopid classes like StdClass::Ord, where the member type is ignored at all
 		= state

@@ -11,29 +11,31 @@ import analtypes
 
 // whether to generate CONS 
 // (needed for function that use CONS, like toString) 
-supportCons :== True
+supportCons :== False
 
 // whether to bind _cons_info to actual constructor info
 // (needed for functions that create CONS, like fromString)			
 supportConsInfo :== False && supportCons
 
 // whether generate missing alternatives 		
-supportPartialInstances :== True
+supportPartialInstances :== False
 
-:: *GenericState = {
-	gs_modules				:: !*{#CommonDefs},
-	gs_fun_defs				:: !*{# FunDef},
-	gs_groups				:: !{!Group},
-	gs_td_infos 			:: !*TypeDefInfos,
-	gs_gtd_infos			:: !*GenericTypeDefInfos,
-	gs_heaps				:: !*Heaps,
-	gs_main_dcl_module_n	:: !Index,
-	gs_first_fun			:: !Index,
-	gs_last_fun				:: !Index,
-	gs_first_group			:: !Index,
-	gs_last_group			:: !Index,
-	gs_predefs				:: !PredefinedSymbols,
-	gs_error 				:: !*ErrorAdmin	
+:: *GenericState = 
+	{	gs_modules				:: !*{#CommonDefs}
+	,	gs_fun_defs				:: !*{# FunDef}
+	,	gs_groups				:: !{!Group}
+	,	gs_td_infos 			:: !*TypeDefInfos
+	,	gs_gtd_infos			:: !*GenericTypeDefInfos
+	,	gs_heaps				:: !*Heaps
+	,	gs_main_dcl_module_n	:: !Index
+	,	gs_first_fun			:: !Index
+	,	gs_last_fun				:: !Index
+	,	gs_first_group			:: !Index
+	,	gs_last_group			:: !Index
+	,	gs_predefs				:: !PredefinedSymbols
+	,	gs_dcl_modules			:: !*{#DclModule}
+	,	gs_opt_dcl_icl_conversions :: !*(Optional !*{#Index})
+	,	gs_error 				:: !*ErrorAdmin	
 	}
 
 :: GenericTypeDefInfo  
@@ -71,13 +73,15 @@ EmptyGenericType :==
 
 instance toBool GenericTypeDefInfo where
 	toBool GTDI_Empty 		= False
-	toBool (GTDI_Generic _) 	= True
+	toBool (GTDI_Generic _) = True
 
-convertGenerics :: !{!Group} !Int !{#CommonDefs} !*{# FunDef} !*TypeDefInfos !*Heaps !*HashTable !*PredefinedSymbols !u:{# DclModule} !*ErrorAdmin 
-	-> (!{!Group}, !{#CommonDefs}, !*{# FunDef}, !IndexRange, !*TypeDefInfos, !*Heaps, !*HashTable, !*PredefinedSymbols, !u:{# DclModule}, !*ErrorAdmin)
+convertGenerics :: !{!Group} !Int !{#CommonDefs} !*{# FunDef} !*TypeDefInfos !*Heaps !*HashTable !*PredefinedSymbols !u:{# DclModule} !(Optional {#Index}) !*ErrorAdmin 
+	-> (!{!Group}, !{#CommonDefs}, !*{# FunDef}, !IndexRange, !*TypeDefInfos, !*Heaps, !*HashTable, !*PredefinedSymbols, !u:{# DclModule}, !(Optional {#Index}), !*ErrorAdmin)
 convertGenerics 
 		groups main_dcl_module_n modules fun_defs td_infos heaps
-		hash_table predefs dcl_modules error
+		hash_table predefs dcl_modules 
+		opt_dcl_icl_conversions 
+		error
 
 	#! (fun_defs_size, fun_defs) = usize fun_defs 
 	#! groups_size = size groups	
@@ -85,6 +89,7 @@ convertGenerics
 	#! (predef_size, predefs) = usize predefs
 	#! (gs_predefs, predefs) = arrayCopyBegin predefs predef_size
 	
+	// determine sized of type def_infos:
 	// ??? How to map 2-d unique array not so ugly ??? 
 	#! (td_infos_sizes, td_infos) = get_sizes 0 td_infos
 		with 
@@ -97,83 +102,93 @@ convertGenerics
 				= ([row_size : row_sizes], td_infos)
 	#! gtd_infos = { createArray s GTDI_Empty \\ s <- td_infos_sizes } 
 								
-	#! gs = {gs_modules = {m \\m <-: modules}, // unique copy
-			gs_groups = groups, gs_fun_defs = fun_defs, 
-			gs_td_infos = td_infos,
-			gs_gtd_infos = gtd_infos, 
-			gs_heaps = heaps,
-			gs_main_dcl_module_n = main_dcl_module_n,
-			gs_first_fun = fun_defs_size, gs_last_fun = fun_defs_size,
-			gs_first_group = groups_size, gs_last_group = groups_size,
-			gs_predefs = gs_predefs,
-			gs_error = error} 
+	#! gs = 
+		{	gs_modules = {m \\m <-: modules} // unique copy
+		,	gs_groups = groups
+		, 	gs_fun_defs = fun_defs 
+		,	gs_td_infos = td_infos
+		,	gs_gtd_infos = gtd_infos 
+		,	gs_heaps = heaps
+		,	gs_main_dcl_module_n = main_dcl_module_n
+		,	gs_first_fun = fun_defs_size
+		, 	gs_last_fun = fun_defs_size
+		,	gs_first_group = groups_size
+		, 	gs_last_group = groups_size
+		,	gs_predefs = gs_predefs
+		,	gs_dcl_modules = { x \\ x <-: dcl_modules } // unique copy
+		,	gs_opt_dcl_icl_conversions = 
+				case opt_dcl_icl_conversions of
+				No -> No
+				Yes xs -> Yes {x \\ x <-: xs} 	// unique copy
+		,	gs_error = error
+		} 
 	
 	
 	#! gs = collectInstanceKinds gs
 		//---> "*** collect kinds used in generic instances and update generics with them"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 			
 	#! gs = buildClasses gs
 		//---> "*** build generic classes for all used kinds"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! (generic_types, gs) = collectGenericTypes gs
 		//---> "*** collect types of generics (needed for generic representation)"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! (instance_types, gs) = convertInstances gs
 		//---> "*** bind generic instances to classes and collect instance types"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 	
 	#! (cons_funs, cons_groups, gs) = buildConsInstances gs
 	| not ok 
 		//---> "*** bind function for CONS"
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 			
 	#! (td_indexes, gs) = collectGenericTypeDefs generic_types instance_types gs	
 		//---> "*** collect type definitions for which a generic representation must be created"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! (iso_funs, iso_groups, gs) = buildIsoFunctions td_indexes gs	
 		//---> "*** build isomorphisms for type definitions"	
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! (isomap_type_funs, isomap_type_groups, gs) = buildIsomapsForTypeDefs td_indexes gs	
 		//---> "*** build maps for type definitions"	
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! (isomap_gen_funs, isomap_gen_groups, gs) = buildIsomapsForGenerics gs 		
 		//---> "*** build maps for generic function types"	
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! (instance_funs, instance_groups, gs) = buildInstances gs
 		//---> "*** build instances"	
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 
 	#! (star_funs, star_groups, gs) = buildKindConstInstances gs
 		//---> "*** build shortcut instances for kind *"	
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	// the order in the lists below is important! 
 	// Indexes are allocated in that order.
@@ -184,36 +199,37 @@ convertGenerics
 		//---> "*** add geenrated functions"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 
 	#! gs = determineMemberTypes 0 0 gs
 		//---> "*** determine types of member instances"	
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
-		= return gs predefs hash_table dcl_modules
+		= return gs predefs hash_table 
 	
 	//| True
 	//	= abort "-----------------\n"
 				
-	#! {gs_modules, gs_groups, gs_fun_defs, gs_td_infos, 
-		gs_heaps,
-		gs_error} = gs	
+	# {	gs_modules, gs_groups, gs_fun_defs, gs_td_infos, gs_heaps, gs_dcl_modules, 
+		gs_opt_dcl_icl_conversions, 
+		gs_error} 
+			= gs	
 	
 	#! {hte_symbol_heap} = hash_table
-	#! cs = {
-		cs_symbol_table = hte_symbol_heap, 
-		cs_predef_symbols = predefs, 
-		cs_error = gs_error, 
-		cs_x= {
-			x_needed_modules = 0,
-			x_main_dcl_module_n = main_dcl_module_n, 
-			x_is_dcl_module = False,
-			x_type_var_position = 0
+	#! cs = 
+		{	cs_symbol_table = hte_symbol_heap 
+		,	cs_predef_symbols = predefs 
+		,	cs_error = gs_error 
+		,	cs_x = 
+			{	x_needed_modules = 0
+			,	x_main_dcl_module_n = main_dcl_module_n 
+			,	x_is_dcl_module = False
+			,	x_type_var_position = 0
 			}
 		}
 
-	#! (dcl_modules, gs_modules, gs_heaps, cs) = 
-		create_class_dictionaries 0 dcl_modules gs_modules gs_heaps cs
+	#! (gs_dcl_modules, gs_modules, gs_heaps, cs) = 
+		create_class_dictionaries 0 gs_dcl_modules gs_modules gs_heaps cs
 //		create_class_dictionaries1 main_dcl_module_n dcl_modules gs_modules gs_heaps cs
 			//---> "*** create class dictionaries"	
 
@@ -223,11 +239,14 @@ convertGenerics
 	#! index_range = {ir_from = gs.gs_first_fun, ir_to = gs.gs_last_fun}
 		 			
 	= (	gs_groups, gs_modules, gs_fun_defs, index_range, gs_td_infos, gs_heaps, hash_table, 
-		cs_predef_symbols, dcl_modules, cs_error)
+		cs_predef_symbols, gs_dcl_modules, gs_opt_dcl_icl_conversions, cs_error)
 where
-	return {gs_modules, gs_groups, gs_fun_defs, gs_td_infos, gs_gtd_infos, gs_heaps, gs_main_dcl_module_n, gs_error} predefs hash_table dcl_modules  
+	return {	gs_modules, gs_groups, gs_fun_defs, gs_td_infos, gs_gtd_infos, 
+				gs_heaps, gs_main_dcl_module_n, gs_dcl_modules, gs_opt_dcl_icl_conversions, gs_error} 
+				predefs hash_table  
 		= (	gs_groups, gs_modules, gs_fun_defs, {ir_from=0,ir_to=0}, 
-			gs_td_infos, gs_heaps, hash_table, predefs, dcl_modules, gs_error)
+			gs_td_infos, gs_heaps, hash_table, predefs, gs_dcl_modules, 
+			gs_opt_dcl_icl_conversions, gs_error)
 
 	create_class_dictionaries module_index dcl_modules  modules heaps cs 
 		#! size_of_modules = size modules
@@ -321,7 +340,7 @@ where
 		#! instance_def = 
 			{ 	instance_def 
 			& 	ins_class = {glob_module=ins_class.glob_module, glob_object=class_ds} 
-			,	ins_ident = makeIdent (ins_ident.id_name +++ ":" +++ (toString kind))
+			,	ins_ident = makeIdent ins_ident.id_name
 			}
 		#! (is_partial, gs_fun_defs) = check_if_partial instance_def gs_predefs gs_fun_defs
 		 	
@@ -333,7 +352,8 @@ where
 				, 	gs_modules = gs_modules
 				,	gs_fun_defs = gs_fun_defs
 				, 	gs_heaps = gs_heaps
-				, 	gs_error = gs_error }	
+				, 	gs_error = gs_error 
+				}	
 			= ([], instance_defs, gs)
 
 		#! gs_heaps = check_cons_instance generic_def instance_def it_type gs_predefs gs_heaps 
@@ -455,10 +475,10 @@ where
 			= (True, gs_modules, gs_error)
 	
 		# (class_def=:{class_members}, gs_modules) =  
-			getClassDef glob_module glob_object.ds_index gs_modules 
+			getClassDef glob_module glob_object.ds_index gs_modules
 		# (member_def, gs_modules) = 
 			getMemberDef glob_module class_def.class_members.[0].ds_index gs_modules
-		| member_def.me_type.st_arity <> instance_def.ins_members.[0].ds_arity
+		| member_def.me_type.st_arity <> instance_def.ins_members.[0].ds_arity && instance_def.ins_members.[0].ds_arity <> (-1)	
 			# gs_error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) "generic instance function has incorrect arity" gs_error
 			= (False, gs_modules, gs_error)	
 			= (True, gs_modules, gs_error)	
@@ -475,7 +495,7 @@ where
 		# (generic_defs, gs_modules) = gs_modules ! [module_index].com_generic_defs 
 		#! size_generic_defs = size generic_defs
 		| generic_index == size_generic_defs
-			= collect_in_modules (inc module_index) 0 gs_modules
+			= collect_in_modules (inc module_index) 0 gs_modules	
 		# {gen_type={gt_type={st_args, st_result}}} = generic_defs . [generic_index]
 		# (types, gs_modules) = collect_in_modules module_index (inc generic_index) gs_modules
 		= ([at_type \\ {at_type} <- [st_result:st_args]] ++ types, gs_modules)	
@@ -1167,9 +1187,69 @@ where
 			= ([], [], instance_defs, gs)
 		
 		| instance_def.ins_generate
-			#! (fun_def, fun_def_sym, gs) = build_instance_fun instance_def gs 	
+			#! (fun_def, fun_def_sym, gs) = build_instance_fun instance_def gs
 			#! instance_def = { instance_def & ins_members = {fun_def_sym} }		
 			#! instance_defs = {instance_defs & [instance_index] = instance_def} 
+			
+			# (dcl_fun_index, gs) = get_dcl_member_index instance_index gs
+				with
+			 		get_dcl_member_index icl_instance_index gs=:{gs_dcl_modules, gs_main_dcl_module_n}			 		
+			 			# ({dcl_conversions, dcl_common}, gs_dcl_modules) = gs_dcl_modules![gs_main_dcl_module_n] 
+						# gs = {gs & gs_dcl_modules = gs_dcl_modules}
+						# dcl_index = case dcl_conversions of 
+			 				No 	-> NoIndex
+			 				Yes conversion_table 
+					 			# instance_table = conversion_table.[cInstanceDefs]
+					 			# dcl_instance_index = find_dcl_instance_index icl_instance_index 0 instance_table
+					 			| dcl_instance_index == NoIndex
+					 				-> NoIndex
+					 			| otherwise 
+					 				# dcl_instance = dcl_common.com_instance_defs.[dcl_instance_index]
+					 				# dcl_index = dcl_instance.ins_members.[0].ds_index			 			 				 			
+					 				-> dcl_index
+					 	= (dcl_index, gs)						 				
+			 		where
+			 			find_dcl_instance_index icl_instance_index index instance_table
+			 				| index == size instance_table
+			 					= NoIndex
+			 				| instance_table.[index] == icl_instance_index
+			 					= index
+			 				| otherwise
+			 					= find_dcl_instance_index icl_instance_index (inc index) instance_table 	 
+
+			# gs = case dcl_fun_index of
+					NoIndex -> gs
+					_ 
+						# gs = update_dcl_icl_conversions dcl_fun_index fun_def_sym.ds_index gs
+						# gs = update_dcl_fun_conversions module_index dcl_fun_index fun_def_sym.ds_index gs
+						-> gs
+			 	with
+			 		update_dcl_icl_conversions dcl_index icl_index gs=:{gs_opt_dcl_icl_conversions=No}
+			 			= gs
+			 		update_dcl_icl_conversions dcl_index icl_index gs=:{gs_opt_dcl_icl_conversions=Yes cs}
+			 			#! (table_size, cs) = usize cs
+			 			| dcl_index < table_size
+			 				= {gs & gs_opt_dcl_icl_conversions=Yes {cs & [dcl_index] = icl_index}}   
+			 					//---> ("update dcl-to-icl conversion table", dcl_index, icl_index)
+			 				= {gs & gs_opt_dcl_icl_conversions=Yes cs}
+			 					//---> ("update dcl-to-icl conversion table: index does not fit", dcl_index, icl_index)
+			 		
+			 		update_dcl_fun_conversions module_index dcl_index icl_index gs=:{gs_dcl_modules}
+			 			# (dcl_module=:{dcl_conversions}, gs_dcl_modules) = gs_dcl_modules ! [module_index]		 			
+			 			# dcl_conversions = case dcl_conversions of
+			 				No 		-> No
+			 				Yes table
+			 					# fun_table = table.[cFunctionDefs] 			 				 
+			 					# (size_fun_table, fun_table) = usize fun_table
+			 					| dcl_index < size_fun_table
+			 						# fun_table = {x \\ x <-: fun_table}
+			 						# fun_table = {fun_table & [dcl_index] = icl_index}
+			 						-> Yes {{x\\x<-:table} & [cFunctionDefs] = fun_table}
+			 					| otherwise
+			 						-> Yes table
+			 			# dcl_module = { dcl_module & dcl_conversions = dcl_conversions} 			 			
+			 			= {gs & gs_dcl_modules = {gs_dcl_modules & [module_index] = dcl_module }}
+			 					 						
 			= ([fun_def], [{group_members = [fun_def.fun_index]}], instance_defs, gs)
 
 		| supportPartialInstances && instance_def.ins_partial			
@@ -1250,11 +1330,10 @@ where
 		= (instance_def, new_ins_fun_def, {gs & gs_fun_defs = gs_fun_defs, gs_heaps = gs_heaps})
 								
 	build_instance_fun instance_def gs=:{gs_modules}
-				# {ins_class, ins_generic} = instance_def				
+		# {ins_class, ins_generic} = instance_def				
 		# (class_def, gs_modules) = getClassDef ins_class.glob_module ins_class.glob_object.ds_index gs_modules
 		# (member_def, gs_modules) = getMemberDef ins_class.glob_module class_def.class_members.[0].ds_index gs_modules
 		# (generic_def, gs_modules) = getGenericDef ins_generic.glob_module ins_generic.glob_object gs_modules 
-
 		# (fun_index, group_index, gs) = newFunAndGroupIndex {gs & gs_modules=gs_modules}
 		# fun_def_sym = {
 			ds_ident = instance_def.ins_ident, 
@@ -1278,7 +1357,7 @@ buildKindConstInstances gs
 where
 	build_modules :: !Index !*GenericState 
 		-> (![FunDef], ![Group], !*GenericState)
-	build_modules module_index gs=:{gs_modules}
+	build_modules module_index gs=:{gs_modules, gs_main_dcl_module_n}
 
 		#! num_modules = size gs_modules
 		| module_index == num_modules
@@ -1289,9 +1368,15 @@ where
 		# {gs_modules} = gs
 
 		// add instances 
+/*	
 		# (common_defs=:{com_instance_defs}, gs_modules) = gs_modules ! [module_index]		
 		# com_instance_defs = arrayPlusList com_instance_defs instance_defs		
 		# gs_modules = { gs_modules & [module_index] = {common_defs & com_instance_defs = com_instance_defs}} 
+*/
+		# (common_defs=:{com_instance_defs}, gs_modules) = gs_modules ! [gs_main_dcl_module_n]		
+		# com_instance_defs = arrayPlusList com_instance_defs instance_defs		
+		# gs_modules = { gs_modules & [gs_main_dcl_module_n] = {common_defs & com_instance_defs = com_instance_defs}} 
+			
 		= (new_funs ++ funs, new_groups ++ groups, {gs & gs_modules = gs_modules})
 
 	build_instances :: !Index !Index !*GenericState 
@@ -1313,7 +1398,7 @@ where
 		# {	ins_ident, ins_type, ins_pos,
 			ins_generate, ins_is_generic, ins_generic} = instance_def
 		
-		| not (/*ins_generate &&*/ ins_is_generic)
+		| not (ins_is_generic)
 			= ([], [], [], {gs & gs_td_infos = gs_td_infos, gs_modules = gs_modules, gs_heaps = gs_heaps})
 
 		# it_type = hd ins_type.it_types
@@ -1410,7 +1495,7 @@ where
 determineMemberTypes :: !Index !Index !*GenericState	
 	-> !*GenericState
 determineMemberTypes module_index ins_index 
-		gs=:{gs_modules, gs_fun_defs, gs_heaps=gs_heaps=:{hp_var_heap, hp_type_heaps}}
+		gs=:{gs_modules, gs_fun_defs, gs_heaps=gs_heaps=:{hp_var_heap, hp_type_heaps}, gs_dcl_modules, gs_main_dcl_module_n}
 	# (num_modules, gs_modules) = usize gs_modules
 	| module_index == num_modules
 		= {gs & gs_modules = gs_modules}
@@ -1421,34 +1506,95 @@ determineMemberTypes module_index ins_index
 	| not instance_def.ins_is_generic		
 		= determineMemberTypes module_index (inc ins_index) {gs & gs_modules = gs_modules}
 	
-	# {ins_class, ins_type, ins_members} = instance_def
-	# (class_def, gs_modules) = getClassDef ins_class.glob_module ins_class.glob_object.ds_index gs_modules
-	# (member_def, gs_modules) = getMemberDef ins_class.glob_module class_def.class_members.[0].ds_index gs_modules
-	# {me_type, me_class_vars}  = member_def
-		
-		
-		
-	// determine type of the member instance		
-	# (symbol_type, _, hp_type_heaps, _, _) = 
-		determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No No
-	# (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
-	# symbol_type = {symbol_type & st_context = st_context}			
-	
-	// update the instance function
-	# fun_index = ins_members.[0].ds_index
-	# (fun_def, gs_fun_defs) = gs_fun_defs![fun_index]
-	# fun_def = {fun_def & fun_type = (Yes symbol_type)} 
-
-	# gs_fun_defs = {gs_fun_defs & [fun_index] = fun_def}
-	
-	# gs = { gs & 
-		gs_modules = gs_modules, 
-		gs_fun_defs = gs_fun_defs,
-		gs_heaps = {gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap} 
-		}
-
+	# gs = determine_member_type module_index ins_index instance_def {gs & gs_modules = gs_modules}
 	= determineMemberTypes module_index (inc ins_index) gs
+where
+	determine_member_type 
+			module_index 
+			ins_index 
+			{ins_ident, ins_class, ins_type, ins_members} 
+			gs=:{	gs_modules, 
+					gs_fun_defs, 
+					gs_heaps=gs_heaps=:{hp_var_heap, hp_type_heaps}, 
+					gs_dcl_modules, 
+					gs_main_dcl_module_n,
+					gs_opt_dcl_icl_conversions}
+		
+		# (class_def, gs_modules) = getClassDef ins_class.glob_module ins_class.glob_object.ds_index gs_modules
+		# (member_def, gs_modules) = getMemberDef ins_class.glob_module class_def.class_members.[0].ds_index gs_modules
+		# {me_type, me_class_vars}  = member_def
+					
+		// determine type of the instance function		
+		# (symbol_type, _, hp_type_heaps, _, _) = 
+			determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No No
+		# (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
+		# symbol_type = {symbol_type & st_context = st_context}			
 
+		// determine the instance function index (in icl or dcl)
+		# fun_index = ins_members.[0].ds_index
+		| fun_index == NoIndex
+			= abort "no generic instance function\n"				
+		
+		// update the instance function
+		| module_index == gs_main_dcl_module_n	// icl module
+			# (fun_def, gs_fun_defs) = gs_fun_defs![fun_index]
+			# fun_def = { fun_def & fun_type = Yes symbol_type } 		
+			# gs_fun_defs = {gs_fun_defs & [fun_index] = fun_def}
+			
+			// update corresponding DCL function type, which is empty at the moment
+			# ({dcl_conversions}, gs_dcl_modules) = gs_dcl_modules ! [gs_main_dcl_module_n]  
+			# (dcl_fun_index, gs_opt_dcl_icl_conversions) 
+				= find_dcl_fun_index fun_index gs_opt_dcl_icl_conversions// XXX
+				with
+					find_dcl_fun_index icl_fun_index No
+						= (NoIndex /*abort "no dcl_icl conversions table\n"*/, No)
+					find_dcl_fun_index icl_fun_index (Yes table)
+						#! table1 = {x\\x<-:table} 
+						= find_index 0 icl_fun_index table
+					find_index i index table
+						# (size_table, table) = usize table
+						| i == size_table
+							= (NoIndex /*abort ("not found dcl function index " +++ toString index)*/, Yes table)
+						# (x, table) = table ! [i]
+						| x == index 
+							= (i /*abort ("found dcl function index " +++ toString index +++ " " +++ toString i)*/, Yes table) 
+							= find_index (inc i) index table
+					
+									
+			# gs_dcl_modules = case dcl_fun_index of
+				NoIndex -> gs_dcl_modules
+				_		-> update_dcl_fun_type gs_main_dcl_module_n dcl_fun_index symbol_type gs_dcl_modules
+						
+			= 	{ 	gs 
+				& 	gs_modules = gs_modules
+				,	gs_fun_defs = gs_fun_defs
+				,	gs_dcl_modules = gs_dcl_modules
+				,	gs_opt_dcl_icl_conversions = gs_opt_dcl_icl_conversions  
+				,	gs_heaps = {gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap} 
+				}
+
+		| otherwise // dcl module
+				//---> ("update dcl instance function", ins_ident, module_index, ins_index, symbol_type)
+			# gs_dcl_modules = update_dcl_fun_type module_index fun_index symbol_type gs_dcl_modules					
+			= 	{ 	gs 
+				& 	gs_modules = gs_modules
+				,	gs_dcl_modules = gs_dcl_modules
+				,	gs_heaps = {gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap} 
+				}
+				
+	update_dcl_fun_type module_index fun_index symbol_type dcl_modules
+		# (dcl_module=:{dcl_functions}, dcl_modules) = dcl_modules ! [module_index]  
+		# (dcl_fun, dcl_functions) = dcl_functions ! [fun_index]
+		# dcl_fun = 
+			{ dcl_fun 
+			& ft_arity = symbol_type.st_arity
+			, ft_type = symbol_type
+			}
+		# dcl_functions = {{x \\ x <-: dcl_functions} & [fun_index] = dcl_fun}
+		# dcl_module={dcl_module & dcl_functions = dcl_functions}
+		= {dcl_modules & [module_index] = dcl_module}	
+		 
+		
 kindOfTypeDef :: Index Index !*TypeDefInfos -> (!TypeKind, !*TypeDefInfos)
 kindOfTypeDef module_index td_index td_infos 
 	# ({tdi_kinds}, td_infos) = td_infos![module_index, td_index] 
@@ -3154,7 +3300,7 @@ copyExpr expr heaps=:{hp_var_heap, hp_expression_heap}
 	= (expr, {heaps & hp_var_heap = us_var_heap, hp_expression_heap = us_symbol_heap})
 		//---> ("copy Expr")
 
-//mapExprSt :: (Expression .st->(Expression, .st)) Expression .st -> (Expression, .st)
+mapExprSt :: !(Expression -> w:st -> u:(Expression, w:st)) !Expression w:st -> v:(Expression, w:st), [v<=w,u<=v]	
 mapExprSt f (App app=:{app_args}) st
 		# (app_args, st) = mapSt (mapExprSt f) app_args st
 		= f (App { app & app_args = app_args }) st

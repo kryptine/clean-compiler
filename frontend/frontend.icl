@@ -123,7 +123,10 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 
 // AA..
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
-	# ti_common_defs = {{dcl_common \\ {dcl_common} <-: dcl_mods } & [main_dcl_module_n] = icl_common }
+
+	# ti_common_defs = {dcl_common \\ {dcl_common} <-: dcl_mods }
+	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
+
 	# (td_infos, type_heaps, error_admin) = analTypeDefs ti_common_defs icl_used_module_numbers type_heaps error_admin
       (fun_defs, th_vars, td_infos, error_admin) 
       		= checkKindCorrectness icl_used_module_numbers main_dcl_module_n icl_instances 
@@ -131,16 +134,19 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
       type_heaps = { type_heaps & th_vars = th_vars }
 	# heaps = { heaps & hp_type_heaps = type_heaps }
 
-	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
+	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin) = 
 		case SupportGenerics of
 		True -> convertGenerics 
 					components main_dcl_module_n ti_common_defs fun_defs td_infos 
-					heaps hash_table predef_symbols dcl_mods error_admin
-		False -> (components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
+					heaps hash_table predef_symbols dcl_mods optional_dcl_icl_conversions error_admin
+		False -> (components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin)	
 
-
-	# icl_common = ti_common_defs.[main_dcl_module_n]	
-	
+	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
+		with 
+			copied_ti_common_defs :: !.{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
+			copied_ti_common_defs = {x \\ x <-: ti_common_defs}
+	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }
+		
 	# error = error_admin.ea_file
 	#! ok = error_admin.ea_ok
 	| not ok
@@ -155,7 +161,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 			
 
 	# (fun_def_size, fun_defs) = usize fun_defs
-	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials, generic_range]
+	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials, generic_range]
 		
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
@@ -202,6 +208,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs (dcl_types -*-> "Convert types") type_heaps var_heap		
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps}
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
+//	  (dcl_mods, out) = showDclModules dcl_mods out
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
 	#! 	fe ={	fe_icl =
@@ -233,7 +240,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 			| dcl_index < dcl_table_size
 				#  icl_index = dcl_icl_conversions.[dcl_index]
 				= update_conversion_array (inc dcl_index) dcl_table_size dcl_icl_conversions
-						{ icl_conversions & [icl_index] = dcl_index } 
+						{ icl_conversions & [icl_index] = dcl_index }
 				= icl_conversions
 	
 		fill_empty_positions next_index table_size next_new_index icl_conversions
@@ -318,3 +325,29 @@ where
 		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
 		  (Yes ftype) = fun_def.fun_type
 		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype, No) <<< '\n' )
+
+showDclModules :: !u:{#DclModule} !*File -> (!u:{#DclModule}, !*File)
+showDclModules dcl_mods file
+	= show_dcl_mods 0 dcl_mods file
+where
+	show_dcl_mods mod_index dcl_mods file
+		# (size_dcl_mods, dcl_mods) = usize dcl_mods
+		| mod_index == size_dcl_mods
+			= (dcl_mods, file)
+		| otherwise
+			# (dcl_mod, dcl_mods) = dcl_mods ! [mod_index]	
+			# file =  show_dcl_mod dcl_mod file
+			= (dcl_mods, file)
+			
+	show_dcl_mod {dcl_name, dcl_functions} file
+		# file = file <<< dcl_name <<< ":\n"
+		# file = show_dcl_functions 0 dcl_functions file
+		= file <<< "\n"
+	show_dcl_functions fun_index dcl_functions file					 				
+		| fun_index == size dcl_functions
+			= file
+		| otherwise
+			# file = show_dcl_function dcl_functions.[fun_index] file
+			= show_dcl_functions (inc fun_index) dcl_functions file 
+	show_dcl_function {ft_symb, ft_type} file
+		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"			
