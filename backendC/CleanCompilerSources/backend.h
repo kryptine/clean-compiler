@@ -1,7 +1,7 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02000207
+# define	kBEVersionCurrent				0x02000208
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // upward compatible (for example when a function is added)
@@ -9,7 +9,7 @@
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02000206
+# define	kBEVersionOldestImplementation	0x02000208
 
 
 # define	kBEDebug	1
@@ -86,6 +86,9 @@ Clean (:: BEStringListP :== CPtr)
 typedef struct node_id_list_element *BENodeIdListP;
 Clean (:: BENodeIdListP :== CPtr)
 
+typedef struct node_id_ref_count_list *BENodeIdRefCountListP;
+Clean (:: BENodeIdRefCountListP :== CPtr)
+ 
 /* constants */
 /*
 # define	kIclModuleIndex			0
@@ -259,11 +262,23 @@ Clean (BEIfNode :: BENodeP BENodeP BENodeP BackEnd -> (BENodeP, BackEnd))
 BENodeP BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts, BENodeP then, BENodeDefP elseNodeDefs, BEStrictNodeIdP elseStricts, BENodeP elsje);
 Clean (BEGuardNode :: BENodeP BENodeDefP BEStrictNodeIdP BENodeP BENodeDefP  BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
 
+void BESetNodeDefRefCounts (BENodeP lhs);
+Clean (BESetNodeDefRefCounts :: BENodeP BackEnd -> BackEnd)
+
+void BEAddNodeIdsRefCounts (int sequenceNumber, BESymbolP symbol, BENodeIdListP nodeIds);
+Clean (BEAddNodeIdsRefCounts :: Int BESymbolP BENodeIdListP BackEnd -> BackEnd)
+
 BENodeP BESwitchNode (BENodeIdP nodeId, BEArgP caseNode);
 Clean (BESwitchNode :: BENodeIdP BEArgP BackEnd -> (BENodeP, BackEnd))
 
 BENodeP BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node);
 Clean (BECaseNode :: Int BESymbolP BENodeDefP BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
+
+void BEEnterLocalScope (void);
+Clean (BEEnterLocalScope :: BackEnd -> BackEnd)
+
+void BELeaveLocalScope (BENodeP node);
+Clean (BELeaveLocalScope :: BENodeP BackEnd -> BackEnd)
 
 BENodeP BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds);
 Clean (BEPushNode :: Int BESymbolP BEArgP BENodeIdListP BackEnd -> (BENodeP, BackEnd))

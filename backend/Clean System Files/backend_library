@@ -31,8 +31,12 @@ BEMatchNode
 BETupleSelectNode
 BEIfNode
 BEGuardNode
+BESetNodeDefRefCounts
+BEAddNodeIdsRefCounts
 BESwitchNode
 BECaseNode
+BEEnterLocalScope
+BELeaveLocalScope
 BEPushNode
 BEDefaultNode
 BESelectorNode

@@ -30,8 +30,12 @@
 /EXPORT: BETupleSelectNode
 /EXPORT: BEIfNode
 /EXPORT: BEGuardNode
+/EXPORT: BESetNodeDefRefCounts
+/EXPORT: BEAddNodeIdsRefCounts
 /EXPORT: BESwitchNode
 /EXPORT: BECaseNode
+/EXPORT: BEEnterLocalScope
+/EXPORT: BELeaveLocalScope
 /EXPORT: BEPushNode
 /EXPORT: BEDefaultNode
 /EXPORT: BESelectorNode

@@ -27,6 +27,10 @@
 
 # include <limits.h>
 
+# if 1
+# include "dbprint.h"
+# endif
+
 void
 BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation)
 {
@@ -1369,6 +1373,181 @@ BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts,
 	return (node);
 } /* BEGuardNode */
 
+static NodeIdRefCountListP
+NewRefCount (NodeIdRefCountListP next, NodeIdP nodeId, int ref_count)
+{
+	NodeIdRefCountListP	newRefCount;
+
+	newRefCount	= ConvertAllocType (NodeIdRefCountListS);
+
+	newRefCount->nrcl_next		= next;
+	newRefCount->nrcl_node_id	= nodeId;
+	newRefCount->nrcl_ref_count	= ref_count;
+
+	return (newRefCount);
+} /* NewRefCount */
+
+/* +++ dynamic allocation */
+# define kMaxScope 1000
+static int gCurrentScope = 0;
+static	NodeIdRefCountListP	gRefCountLists [kMaxScope];
+static	NodeIdRefCountListP	gRefCountList;
+
+# define	nid_ref_count_sign	nid_scope
+
+
+static void
+AddRefCount (NodeIdP nodeId)
+{
+	gRefCountList	= NewRefCount (gRefCountList, nodeId, 0);
+} /* AddRefCount */
+
+void
+BESetNodeDefRefCounts (BENodeP lhs)
+{
+	ArgP	arg;
+	
+	gRefCountList	= NULL;
+
+	Assert (lhs->node_kind == NormalNode);
+
+	for (arg = lhs->node_arguments; arg != NULL; arg = arg->arg_next)
+	{
+		NodeP	node;
+		NodeIdP	nodeId;
+
+		node	= arg->arg_node;
+
+		Assert (node->node_kind == NodeIdNode);
+		Assert (node->node_arguments == NULL);
+
+		nodeId	= node->node_node_id;
+
+		nodeId->nid_mark |= NID_ALIAS_MARK_MASK;
+		AddRefCount (nodeId);
+	}
+} /* BESetNodeDefRefCounts */
+
+void
+BEAddNodeIdsRefCounts (int sequenceNumber, BESymbolP symbol, BENodeIdListP nodeIds)
+{
+	NodeIdP	nodeId;
+
+	nodeId	= gCurrentNodeIds [sequenceNumber];
+
+	Assert (nodeId != NULL);
+	if (nodeId->nid_mark & NID_ALIAS_MASK)
+	{
+		nodeId	= nodeId->nid_forward_node_id;
+		Assert (nodeId != NULL);
+	}
+
+	Assert (nodeId != NULL);
+
+	if ((nodeId->nid_mark & NID_ALIAS_MARK_MASK)
+			&&
+				(symbol->symb_kind == tuple_symb
+			 	|| (symbol->symb_kind == definition && symbol->symb_def->sdef_kind == RECORDTYPE)))
+	{
+		NodeP				node;
+		ArgP				arg, args;
+		NodeIdListElement	nodeIdList;
+
+		node	= nodeId->nid_node;
+
+		if (node == NULL)
+		{
+			NodeIdP	nid;
+
+			nodeIdList	= nodeIds;
+
+			nid	= nodeIdList->nidl_node_id;
+
+			nid->nid_mark |= NID_ALIAS_MARK_MASK;
+
+			args	= BEArgs (BENodeIdNode (nid, NULL), NULL);;
+
+			for (nodeIdList = nodeIdList->nidl_next, arg = args;
+					nodeIdList != NULL;
+					nodeIdList = nodeIdList->nidl_next, arg	= arg->arg_next)
+			{
+				nid	= nodeIdList->nidl_node_id;
+
+				nid->nid_mark |= NID_ALIAS_MARK_MASK;
+				arg->arg_next	= BEArgs (BENodeIdNode (nid, NULL), NULL);
+			}
+
+			nodeId->nid_node	= BENormalNode (symbol, args);
+		}
+		else
+		{	
+			Assert (node->node_symbol == symbol);
+
+			arg	= node->node_arguments;
+			for (nodeIdList = nodeIds; nodeIdList != NULL && arg != NULL;
+					nodeIdList = nodeIdList->nidl_next, arg = arg->arg_next)
+			{
+				Assert (arg->arg_node->node_kind == NodeIdNode);
+
+				nodeId	= nodeIdList->nidl_node_id;
+
+				nodeId->nid_mark |= NID_ALIAS_MASK;
+				nodeId->nid_forward_node_id	= arg->arg_node->node_node_id;
+				nodeIdList->nidl_node_id	= nodeId->nid_forward_node_id;
+			}
+
+			Assert (nodeIdList == NULL && arg == NULL);
+		}
+	}
+
+	for (; nodeIds; nodeIds=nodeIds->nidl_next)
+	{
+		NodeIdP	nodeId;
+		
+		nodeId	= nodeIds->nidl_node_id;
+
+		Assert (nodeId != NULL);
+		if (nodeId->nid_mark & NID_ALIAS_MASK)
+		{
+			nodeId	= nodeId->nid_forward_node_id;
+			Assert (nodeId != NULL);
+		}
+
+		Assert (nodeId != NULL);
+		AddRefCount (nodeId);
+		Assert (nodeId->nid_ref_count_sign == -1);
+	}
+} /* BEAddNodeIdsRefCounts */
+
+static NodeIdRefCountListP
+CopyRefCountList (NodeIdRefCountListP refCount)
+{
+	NodeIdRefCountListP	first, copy;
+
+	first	= NULL;
+	copy	= NULL;
+	for (; refCount != NULL; refCount = refCount->nrcl_next)
+	{
+		NodeIdP				nodeId;
+		NodeIdRefCountListP	new;
+
+		nodeId	= refCount->nrcl_node_id;
+
+		Assert (nodeId->nid_ref_count_sign == -1);
+
+		new	= NewRefCount (NULL, nodeId, refCount->nrcl_ref_count);
+
+		if (copy == NULL)
+			first	= new;
+		else
+			copy->nrcl_next	=	new;
+
+		copy	=	new;
+	}
+
+	return (first);
+} /* CopyRefCountList */
+
 BENodeP
 BESwitchNode (BENodeIdP nodeId, BEArgP cases)
 {
@@ -1381,9 +1560,60 @@ BESwitchNode (BENodeIdP nodeId, BEArgP cases)
 	switchNode->node_arity		= 1;
 	switchNode->node_arguments	= cases;
 	switchNode->node_annotation	= NoAnnot;
+
+	Assert (nodeId->nid_ref_count_sign == -1);
 	
 	return (switchNode);
 } /* BESwitchNode */
+
+void
+BEEnterLocalScope (void)
+{
+	NodeIdRefCountListP	refCount;
+
+	gRefCountList	= CopyRefCountList (gRefCountList);
+
+	for (refCount = gRefCountList; refCount != NULL; refCount = refCount->nrcl_next)
+	{
+		NodeIdP	nodeId;
+
+		nodeId	= refCount->nrcl_node_id;
+
+		Assert (nodeId->nid_ref_count_sign == -1);
+
+		refCount->nrcl_ref_count	= nodeId->nid_refcount;
+		nodeId->nid_refcount		= -1;
+	}
+
+	Assert (gCurrentScope < kMaxScope);
+	gRefCountLists [gCurrentScope++]	= gRefCountList;
+} /* BEEnterLocalScope */
+
+void
+BELeaveLocalScope (BENodeP node)
+{
+	NodeIdRefCountListP	refCount;
+
+	Assert (gCurrentScope > 0);
+	gRefCountList	= gRefCountLists [--gCurrentScope];
+
+	for (refCount = gRefCountList; refCount != NULL; refCount = refCount->nrcl_next)
+	{
+		NodeIdP	nodeId;
+		int		count;
+
+		nodeId	= refCount->nrcl_node_id;
+
+		Assert (nodeId->nid_ref_count_sign == -1);
+
+		count	= refCount->nrcl_ref_count;
+		refCount->nrcl_ref_count	= nodeId->nid_refcount;
+		nodeId->nid_refcount	+= count + 1;
+	}
+
+	Assert (node->node_kind == CaseNode || node->node_kind == DefaultNode);
+	node->node_node_id_ref_counts	= gRefCountList;
+} /* BELeaveLocalScope */
 
 BENodeP
 BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node)
@@ -1391,7 +1621,7 @@ BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNode
 	NodeP	caseNode;
 	
 	caseNode	= ConvertAllocType (NodeS);
-	
+
 	caseNode->node_kind			= CaseNode;
 	caseNode->node_symbol		= symbol;
 	caseNode->node_arity		= symbolArity;
@@ -1417,9 +1647,8 @@ BEDefaultNode (BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node)
 	defaultNode->node_arity		= 1;
 	defaultNode->node_arguments	= NewArgument (node);
 
-	defaultNode->node_su.su_u.u_case	= ConvertAllocType (CaseNodeContentsS);
+	defaultNode->node_su.su_u.u_case		= ConvertAllocType (CaseNodeContentsS);
 	defaultNode->node_strict_node_ids	= strictNodeIds;
-
 	defaultNode->node_node_id_ref_counts	= NULL;
 	
 	return (defaultNode);
@@ -1429,7 +1658,7 @@ BENodeP
 BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds)
 {
 	NodeP	pushNode;
-	
+
 	pushNode	= ConvertAllocType (NodeS);
 
 	pushNode->node_kind			= PushNode;
@@ -1438,7 +1667,22 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 	pushNode->node_record_symbol= symbol;
 	pushNode->node_node_ids		= nodeIds;
 	pushNode->node_number		= 0;
+/*
+	for (; nodeIds; nodeIds=nodeIds->nidl_next)
+	{
+		NodeIdP	nodeId;
+		
+		nodeId	= nodeIds->nidl_node_id;
 
+		Assert (nodeId->nid_ref_count_sign == -1);
+
+		nodeId->nid_refcount++;
+	}
+*/
+	Assert (arguments->arg_node->node_kind == NodeIdNode);
+	Assert (arguments->arg_node->node_node_id->nid_ref_count_sign == -1);
+	arguments->arg_node->node_node_id->nid_refcount++;
+	
 	return (pushNode);
 } /* BEPushNode */
 
@@ -1521,9 +1765,6 @@ BEArgs (BENodeP node, BEArgP nextArgs)
 	return (arg);
 } /* BEArgs */
 
-
-# define	nid_ref_count_sign	nid_scope
-
 void
 BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name)
 {
@@ -1557,12 +1798,10 @@ BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name)
 	newNodeId->nid_node				= NULL;
 	newNodeId->nid_state.state_kind	= 0;
 	newNodeId->nid_mark				= 0;
-	newNodeId->nid_mark2				= 0;
+	newNodeId->nid_mark2			= 0;
 	newNodeId->nid_ref_count_sign	= lhsOrRhs==BELhsNodeId ? -1 : 1;
 	newNodeId->nid_refcount			= 0;
-/* RWS test ... */
 	newNodeId->nid_ref_count_copy	= 0;
-/* ... test */
 
 	gCurrentNodeIds [sequenceNumber]	= newNodeId;
 } /* BEDeclareNodeId */
@@ -1589,6 +1828,14 @@ BENodeId (int sequenceNumber)
 
 	Assert (nodeId != NULL);
 
+	if (nodeId->nid_mark & NID_ALIAS_MASK)
+	{
+		nodeId	= nodeId->nid_forward_node_id;
+		Assert (nodeId != NULL);
+	}
+
+	Assert (nodeId != NULL);
+
 	nodeId->nid_refcount	+= nodeId->nid_ref_count_sign;
 
 	return (nodeId);
@@ -1609,8 +1856,8 @@ BEWildCardNodeId (void)
 	newNodeId->nid_node				= NULL;
 	newNodeId->nid_state.state_kind	= 0;
 	newNodeId->nid_mark				= 0;
-	newNodeId->nid_mark2				= 0;
-	newNodeId->nid_ref_count_sign	= 0;
+	newNodeId->nid_mark2			= 0;
+	newNodeId->nid_ref_count_sign	= -1;
 	newNodeId->nid_refcount			= -1;
 
 	return (newNodeId);
@@ -1704,6 +1951,65 @@ BENoStrictNodeIds (void)
 	return (NULL);
 } /* BENoStrictNodeIds */
 
+static NodeDefP
+CollectNodeNodeDefs (NodeP node, NodeDefP defs)
+{
+	switch (node->node_kind)
+	{
+		case NormalNode:
+			{
+				ArgP	arg;
+
+				for (arg = node->node_arguments; arg != NULL; arg = arg->arg_next)
+					defs	= CollectNodeNodeDefs (arg->arg_node, defs);
+			}
+			break;
+		case NodeIdNode:
+			{
+				NodeIdP	nodeId;
+			
+				nodeId	= node->node_node_id;
+				if (nodeId->nid_node != NULL && !(nodeId->nid_mark & NID_VERIFY_MASK))
+				{
+					NodeDefP	nodeDef;
+
+					nodeId->nid_mark |= NID_VERIFY_MASK;
+
+					nodeDef	=	ConvertAllocType (NodeDefS);
+
+					nodeDef->def_id		= nodeId;
+					nodeDef->def_node	= nodeId->nid_node;
+					nodeDef->def_next	= defs;
+
+					nodeId->nid_node_def			= nodeDef;
+
+					defs	= CollectNodeNodeDefs (nodeId->nid_node, nodeDef);
+				}
+			}
+			break;
+		default:
+			break;
+	}
+
+	return (defs);
+} /* CollectNodeNodeDefs */
+
+static NodeDefP
+CollectNodeDefs (NodeP node, NodeDefP defs)
+{
+	NodeDefP	def;
+
+	for (def = defs; def != NULL; def = def->def_next)
+		def->def_id->nid_mark |= NID_VERIFY_MASK;
+
+	defs	= CollectNodeNodeDefs (node, defs);
+
+	for (def = defs; def != NULL; def = def->def_next)
+		def->def_id->nid_mark &= ~NID_VERIFY_MASK;
+
+	return (defs);
+} /* CollectNodeDefs */
+
 BERuleAltP
 BERuleAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BENodeDefP rhsDefs, BEStrictNodeIdP rhsStrictNodeIds, BENodeP rhs)
 {
@@ -1712,7 +2018,7 @@ BERuleAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BENodeDefP rhsDefs, BEStri
 	alt	= ConvertAllocType (RuleAltS);
 
 	alt->alt_lhs_root			= lhs;
-	alt->alt_lhs_defs 			= lhsDefs;
+	alt->alt_lhs_defs 			= CollectNodeDefs (lhs, lhsDefs);
 	alt->alt_rhs_root			= rhs;
 	alt->alt_rhs_defs 			= rhsDefs;
 	alt->alt_line				= line;
@@ -1737,7 +2043,7 @@ BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock)
 	alt	= ConvertAllocType (RuleAltS);
 
 	alt->alt_lhs_root			= lhs;
-	alt->alt_lhs_defs 			= lhsDefs;
+	alt->alt_lhs_defs 			= CollectNodeDefs (lhs, lhsDefs);
 	alt->alt_rhs_code			= codeBlock;
 	alt->alt_rhs_defs 			= NULL;
 	alt->alt_line				= line;
