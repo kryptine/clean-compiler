@@ -714,13 +714,13 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index modules es=:{es_
 	# (prev_calls, fun_defs, es_symbol_table) = addFunctionCallsToSymbolTable fi_calls fun_defs es_symbol_table
 	  ([rhs:rhss], fun_defs, modules, (all_calls, es)) = expand cb_rhs fun_defs mod_index modules (prev_calls, { es & es_symbol_table = es_symbol_table })
 	  (fun_defs, es_symbol_table) = removeFunctionCallsFromSymbolTable all_calls fun_defs es.es_symbol_table
-	  (merge_rhs, es_var_heap, es_symbol_heap, es_error) = mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (merge_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap}) = determineVariablesAndRefCounts cb_args merge_rhs
+	  (merged_rhs, es_var_heap, es_symbol_heap, es_error) = mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
+	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap}) = determineVariablesAndRefCounts cb_args merged_rhs
 	  		{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap }
-	= (new_args, merge_rhs, local_vars, all_calls, fun_defs, modules,
+	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
-//		---> (cb_args, cb_rhs, new_args, local_vars, merge_rhs)
+//		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), (new_args, new_rhs, '\n'))
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
@@ -1371,11 +1371,12 @@ where
 
 instance collectVariables BoundVar
 where
-	collectVariables var=:{var_name,var_info_ptr} free_vars cos=:{cos_var_heap}
+	collectVariables var=:{var_name,var_info_ptr,var_expr_ptr} free_vars cos=:{cos_var_heap}
 		#! var_info = sreadPtr var_info_ptr cos_var_heap
 		= case var_info of
 			VI_Alias alias
-				-> collectVariables alias free_vars cos
+				#  (original, free_vars, cos) = collectVariables alias free_vars cos
+				-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, cos)
 			VI_Count count is_global
 				| count > 0 || is_global
 					-> (var, free_vars, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
