@@ -104,7 +104,7 @@ where
 	,	ai_class_subst					:: !*ConsClassSubst
 	,	ai_next_var						:: !Int
 	,	ai_next_var_of_fun				:: !Int
-	,	ai_cases_of_vars_for_function	:: ![Case]
+	,	ai_cases_of_vars_for_function	:: ![(!Bool,!Case)]
 	,	ai_fun_heap						:: !*FunctionHeap
 	,	ai_def_ref_counts				:: !RefCounts
 	}
@@ -251,6 +251,8 @@ instance consumerRequirements Expression where
 		= (CPassive, False, ai)
 	consumerRequirements (NoBind _) _ ai
 		= (CPassive, False, ai)
+	consumerRequirements (FailExpr _) _ ai
+		= (CPassive, False, ai)
 	consumerRequirements expr _ ai
 		= abort ("consumerRequirements [Expression]" ---> expr)
 
@@ -393,10 +395,16 @@ instance consumerRequirements Case where
 		  		cce ai
 		  ai = case case_expr of
 				Var {var_info_ptr}
-					| may_be_active
-						-> { ai & ai_cases_of_vars_for_function=[kees:ai.ai_cases_of_vars_for_function] }
+					| SwitchMultimatchClassification may_be_active True
+						-> { ai & ai_cases_of_vars_for_function=[(safe,kees):ai.ai_cases_of_vars_for_function] }
 						-> ai
-				_	-> ai
+// N-WAY...
+//				_	-> ai
+				_
+					| SwitchMultimatchClassification may_be_active True
+						-> { ai & ai_cases_of_vars_for_function=[(safe,kees):ai.ai_cases_of_vars_for_function] }
+						-> ai
+// ...N-WAY
 		# ai = case case_guards of
 					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns
 						// decons_expr will be optimized to a decons_u Selector in transform
@@ -768,7 +776,7 @@ where
 		  class_env
 		  		= foldSt (collect_classifications ai.ai_class_subst) group_members class_env
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap)
-				= foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group)
+				= foldSt (set_case_expr_info ai.ai_class_subst) (flatten ai_cases_of_vars_for_group)
 					(cleanup_info, class_env, fun_defs, ai.ai_var_heap, expr_heap)
 		= (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 	  where
@@ -824,23 +832,63 @@ where
 			  fun_class					= determine_classification fun_class class_subst
 	 		= { class_env & [fun] = fun_class }
 
-		set_case_expr_info ({case_expr=(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
+		set_case_expr_info class_subst ((safe,{case_expr=(Var {var_info_ptr}), case_guards, case_info_ptr}),fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
-			# (VI_AccVar _ arg_position, var_heap)				= readPtr var_info_ptr var_heap
+			# (VI_AccVar cc arg_position, var_heap)				= readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
 			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
-			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
+//* Try always marking
+//			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
 				// mark non multimatch cases whose case_expr is an active linear function argument
+			| ((arg_position>=cc_size && CActive==skip_indirections class_subst cc) || (arg_position<cc_size && cc_args!!arg_position==CActive)) && cc_linear_bits!!arg_position
+
+//*/
+//			| True
 				# aci =
 					{ aci_params				= []
 					, aci_opt_unfolder			= No
 					, aci_free_vars				= No
 					, aci_linearity_of_patterns = aci_linearity_of_patterns
+					, aci_safe					= safe
 					}
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 					setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap)
 			= (cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
+				  where
+					skip_indirections subst cc
+						| IsAVariable cc
+							= skip_indirections subst subst.[cc]
+							= cc
 
+// N-WAY...
+		set_case_expr_info class_subst ((safe,{case_expr=(App _), case_guards, case_info_ptr}),fun_index)
+				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
+			# ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
+			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
+			# aci =
+				{ aci_params				= []
+				, aci_opt_unfolder			= No
+				, aci_free_vars				= No
+				, aci_linearity_of_patterns = aci_linearity_of_patterns
+				, aci_safe					= safe
+				}
+			= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
+				setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap)
+		set_case_expr_info class_subst ((safe,{case_expr=(_ @ _), case_guards, case_info_ptr}),fun_index)
+				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
+			# ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
+			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
+			# aci =
+				{ aci_params				= []
+				, aci_opt_unfolder			= No
+				, aci_free_vars				= No
+				, aci_linearity_of_patterns = aci_linearity_of_patterns
+				, aci_safe					= safe
+				}
+			= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
+				setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap)
+		set_case_expr_info _ _ s = s
+// ...N-WAY
 		get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
 			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
 		get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
@@ -863,7 +911,7 @@ reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![FunctionInfoPtr]  
 				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses}, !Bool)
 reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n new_functions
 	groups fun_defs var_heap expr_heap fun_heap class_env
-	#! nr_of_groups	= size groups
+//	#! nr_of_groups	= size groups
 	# consumerAnalysisRO=ConsumerAnalysisRO
 		{ common_defs				= common_defs
 		, imported_funs				= imported_funs
@@ -1014,22 +1062,42 @@ where
 		equalCCBits 0 _ _ = True
 		equalCCBits n [l:ls] [r:rs] = l == r && equalCCBits (dec n) ls rs
 		
-		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
+		set_case_expr_info ((safe,{case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr}),fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
 			# (VI_AccVar _ arg_position, var_heap)				= readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},fun_heap,class_env)	= get_fun_class fun_index fun_heap class_env
 			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
+//* Try always marking...
 			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
 				// mark non multimatch cases whose case_expr is an active linear function argument
+//*/
+			| True
 				# aci =
 					{ aci_params				= []
 					, aci_opt_unfolder			= No
 					, aci_free_vars				= No
 					, aci_linearity_of_patterns = aci_linearity_of_patterns
+					, aci_safe					= safe
 					}
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 					setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap, fun_heap)
 			= (cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
+// N-WAY...
+		set_case_expr_info ((safe,{case_expr=(App _), case_guards, case_info_ptr}),fun_index)
+				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
+			# ({cc_size, cc_args, cc_linear_bits},fun_heap,class_env)	= get_fun_class fun_index fun_heap class_env
+			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
+			# aci =
+				{ aci_params				= []
+				, aci_opt_unfolder			= No
+				, aci_free_vars				= No
+				, aci_linearity_of_patterns = aci_linearity_of_patterns
+				, aci_safe					= safe
+				}
+			= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
+				setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap, fun_heap)
+		set_case_expr_info _ s = s
+// ...N-WAY
 
 		get_fun_class fun fun_heap class_env
 			| fun < size class_env
@@ -1189,6 +1257,7 @@ count_locals (TypeCodeExpression _) n
 	= n
 count_locals EE n
 	= n
+count_locals (FailExpr _) n = n
 count_locals (NoBind _) n
 	= n
 

@@ -776,6 +776,7 @@ cNonRecursiveAppl	:== False
 	,	aci_opt_unfolder			:: !(Optional SymbIdent)
 	,	aci_free_vars				:: !Optional [BoundVar]
 	,	aci_linearity_of_patterns	:: ![[Bool]]
+	,	aci_safe					:: !Bool
 	}
 
 ::	RefCountsInCase = 

@@ -2017,6 +2017,8 @@ where
 	collectVariables (DynamicPatterns patterns) free_vars dynamics cos
 		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
 		= (DynamicPatterns patterns, free_vars, dynamics, cos)
+	collectVariables NoPattern free_vars dynamics cos
+		= (NoPattern, free_vars, dynamics, cos)
 
 instance collectVariables AlgebraicPattern
 where
@@ -2069,7 +2071,7 @@ where
 					-> (var, [{fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics,
 								{ cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
 			_
-				-> abort "collectVariables [BoundVar] (transform, 1227)" // <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
+				-> abort "collectVariables [BoundVar] (transform, 1227)"  //---> (var_info ,var_name, ptrToInt var_info_ptr)
 
 instance <<< (Ptr a)
 where
