@@ -1,7 +1,0 @@
-void OptimiseRules (ImpRules rules,SymbDef start_sdef);
-SymbolP copy_imp_rule_and_type (SymbDef old_sdef);
-void copy_imp_rule_nodes (ImpRuleP old_rule_p,ImpRuleP new_rule_p);
-int optimise_tuple_result_function (Node node,StateS demanded_state);
-void generate_states (struct imp_rule *rules,int do_strictness_analysis);
-StateP state_of_node_or_node_id (NodeP node_p);
-void copy_rhs_node_defs_and_root (RuleAltP old_alt_p,NodeP *new_root_node_h,NodeDefP *node_defs_p);
