@@ -19,14 +19,18 @@ script_handler script files
 			# (ok,cache,files) = compile coclArgs cache files;
 			->	(if ok 1 0,store_cache_or_clear_cache cache files)
 		["clear_cache"]
-			| store_state empty_cache>0
+			# cache = load_state 0;
+			| store_state (empty_cache cache.hash_table.hte_symbol_heap)>0
 				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+//				# r=1
 				-> (r,files)
 				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+//				# r=1
 				-> (r,files)
 		_
 			// +++ handle errors from docommand
 			# (r,s) = DoCommandNullTerminated (script +++ "\0") 0
+//			# r=1
 			-> (r,files)
 	where
 		args
@@ -35,14 +39,17 @@ script_handler script files
 			=	splitArgs script
 
 		store_cache_or_clear_cache cache files
-			| isMember "-clear_cache" scriptArgs && store_state empty_cache>0
-				# (r,s)=DoCommandNullTerminated "clear_cache\0" 0
-				| r==0
-					= files
+			| isMember "-clear_cache" scriptArgs
+				| store_state (empty_cache cache.hash_table.hte_symbol_heap)>0
+					# (r,s)=DoCommandNullTerminated "clear_cache\0" 0
+					| r==0
+						= files;
+						= files;
 					= files;
 			| store_state cache>0
 				=	files
 				=	files
+
 		replace s
 			| s == "\xb3" /* \xb3 == >= ligature */
 				=	"-RE"
@@ -72,14 +79,20 @@ script_handler script files
 
 //import StdDebug,StdString;
 
+//get_apple_event_string_dummy :: !Int !String -> Int;
+//get_apple_event_string_dummy _ _ = 0;
+
 clean2_compiler :: !Int !*Files -> (!Int,!*Files);
 clean2_compiler length files
 	# string=createArray length ' ';
 	# r=get_apple_event_string length string;
 //	| trace_t length && trace_t ':' && trace_t r && trace_t '\n'
-//		| trace_t string
-	= script_handler (string%(6,r-1)) files;
-//			= (0,files);
+//	| trace_t string
+
+	| r==r
+//		= (1,files);
+		= script_handler (string%(6,r-1)) files;
+//		= (0,files);
 //		= (0,files);
 
 clean2_compile :: !Int -> Int;
