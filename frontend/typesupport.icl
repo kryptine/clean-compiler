@@ -179,23 +179,23 @@ where
 		# (ok, (t,ts), env) = cleanUpClosed (t,ts) env
 		= (ok, [t:ts], env)
 
-TypeError :: !String !mess !String !*ErrorAdmin -> *ErrorAdmin | <<< mess
-TypeError err_pref err_msg err_post err=:{ea_file,ea_loc}
-	| isEmpty ea_loc
-		# ea_file =  ea_file <<< "Type error: " <<< err_pref <<< ' ' <<< err_msg <<< ' ' <<< err_post <<< '\n'
-		= { err & ea_file = ea_file, ea_ok = False}
-		# ea_file =  ea_file <<< "Type error " <<< hd ea_loc <<< ": " <<< err_pref <<< ' ' <<< err_msg <<< ' ' <<< err_post <<< '\n'
-		= { err & ea_file = ea_file, ea_ok = False}
-		
+errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
+errorHeading  error_kind err=:{ea_file,ea_loc = []}
+	= { err & ea_file = ea_file <<< error_kind <<< ':', ea_ok = False }
+errorHeading  error_kind err=:{ea_file,ea_loc = [ loc : _ ]}
+	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< loc <<< ':', ea_ok = False }
 
 overloadingError class_symb err
-	= TypeError "internal overloading of class" class_symb "is unsolvable" err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< "internal overloading of class " <<< class_symb <<< " is unsolvable\n" }
 
 existentialError err
-	= TypeError "existential" "type variable" "appears in the derived type specification" err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< "existential type variable appears in the derived type specification\n" }
 
 liftedError var err
-	= TypeError "type variable of type of lifted argument" var "appears in the specified type" err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< "type variable of type of lifted argument " <<< var <<< " appears in the specified type\n" }
 
 clean_up_type_contexts [] env error
 	= ([], env, error)
@@ -737,6 +737,134 @@ where
 		| succ
 			= (True, attr_env)
 			= contains_coercion offered next_offered attr_env
+
+:: Format =
+	{	form_properties :: !BITVECT
+	,	form_position	:: ![Int]
+	}
+
+cNoProperties		:== 0
+cCommaSeperator		:== 1
+cBrackets			:== 2
+cAttributed			:== 4
+cAnnotated			:== 8
+
+checkProperty	form property	:== not (form.form_properties bitand property == 0)
+setProperty		form property	:== {form & form_properties = form.form_properties bitor property}
+clearProperty	form property	:== {form & form_properties = form.form_properties bitand (bitnot property)}
+
+class (<::) infixl a :: !*File (!Format, !a) -> *File
+
+instance <:: SymbolType
+where
+	(<::) file (form, {st_args, st_arity, st_result, st_context, st_attr_env})
+		| st_arity > 0
+			= show_environment form (show_context form (file <:: (form, st_args) <<< " -> " <:: (form, st_result)) st_context) st_attr_env
+			= show_environment form ((show_context form (file <:: (form, st_result))) st_context) st_attr_env
+	where
+		show_context form file []
+			= file
+		show_context form file contexts
+			= file <<<  " | " <:: (setProperty form cCommaSeperator, contexts)
+	
+		show_environment form file []
+			= file
+		show_environment form file environ
+			= file <<<  ", " <:: (setProperty form cCommaSeperator, environ)
+
+instance <:: TypeContext
+where
+	(<::) file (form, {tc_class={glob_object={ds_ident}}, tc_types})
+		= file <<< ds_ident <<< ' ' <:: (form, tc_types)
+
+instance <:: AttrInequality
+where
+	(<::) file (form, {ai_demanded, ai_offered})
+		= file <<< ai_offered <<< " <= " <<< ai_demanded
+
+instance <:: AType
+where
+	(<::) file (form, {at_attribute, at_annotation, at_type})
+		| checkProperty form cAnnotated
+			= show_attributed_type (file <<< at_annotation) form at_attribute at_type
+			= show_attributed_type file form at_attribute at_type
+	where
+		show_attributed_type file form TA_Multi type
+			= file <:: (form, type) 
+		show_attributed_type file form attr type
+			| checkProperty form cAttributed
+				= file <<< attr <:: (setProperty form cBrackets, type)
+				= file <:: (form, type)
+
+instance <:: Type
+where
+	(<::) file (form, TV varid)
+		= file <<< varid
+	(<::) file (form, TempV tv_number)
+		= file  <<< 'v' <<< tv_number
+	(<::) file (form, TA {type_name,type_index,type_arity} types)
+		| is_predefined type_index
+			| is_list type_name
+				= file <<< '[' <:: (setProperty form cCommaSeperator, types) <<< ']'
+			| is_lazy_array type_name
+				= file <<< '{' <:: (setProperty form cCommaSeperator, types) <<< '}'
+			| is_strict_array type_name
+				= file <<< "{!" <:: (setProperty form cCommaSeperator, types) <<< '}'
+			| is_unboxed_array type_name
+				= file <<< "{#" <:: (setProperty form cCommaSeperator, types) <<< '}'
+			| is_tuple type_name type_arity
+				= file <<< '(' <:: (setProperty form cCommaSeperator, types) <<< ')'
+			| checkProperty form cBrackets && type_arity > 0
+				= file <<< '(' <<< type_name <<< ' ' <:: (form, types) <<< ')'
+				= file <<< type_name <<< ' ' <:: (setProperty form cBrackets, types)
+		| checkProperty form cBrackets && type_arity > 0
+			= file <<< '(' <<< type_name <<< ' ' <:: (form, types) <<< ')'
+			= file <<< type_name <<< ' ' <:: (setProperty form cBrackets, types)
+	where
+			is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
+
+			is_list {id_name}				= id_name == "_list"
+			is_tuple {id_name} tup_arity	= id_name == "_tuple" +++ toString tup_arity
+			is_lazy_array {id_name} 		= id_name == "_array"
+			is_strict_array {id_name} 		= id_name == "_!array"
+			is_unboxed_array {id_name} 		= id_name == "_#array"
+
+	(<::) file (form, arg_type --> res_type)
+		| checkProperty form cBrackets
+			= file  <<< '(' <:: (form, arg_type) <<< " -> " <:: (form, res_type)  <<< ')'
+			= file  <:: (setProperty form cBrackets, arg_type) <<< " -> " <:: (setProperty form cBrackets, res_type)
+	(<::) file (form, type :@: types)
+		| checkProperty form cBrackets
+			= file <<< '(' <<< type <<< ' ' <:: (form, types)  <<< ')'
+			= file <<< type <<< ' ' <:: (setProperty form cBrackets, types) 
+	(<::) file (form, TB tb)
+		= file <<< tb
+	(<::) file (form, TQV varid)
+		= file <<< "E." <<< varid
+	(<::) file (form, TempQV tv_number)
+		= file  <<< "E." <<< tv_number <<< ' ' 
+	(<::) file (form, TE)
+		= file <<< "__"
+
+
+instance <:: [a] | <:: a
+where
+	(<::) file (form, [type])
+		| checkProperty form cCommaSeperator
+			= file <:: (clearProperty form cCommaSeperator, type)
+			= file <:: (setProperty form cBrackets, type)
+	(<::) file (form, [type : types])
+		| checkProperty form cCommaSeperator
+			= file <:: (clearProperty form cCommaSeperator, type) <<< ',' <:: (form, types)
+			= file <:: (setProperty form cBrackets, type) <<< ' ' <:: (form, types)
+	(<::) file (form, [])
+		= file
+
+from compare_constructor import equal_constructor	
+
+instance == Format
+where
+	(==) form1 form2 = equal_constructor form1 form2
 
 instance <<< TypeContext
 where

@@ -4,7 +4,20 @@ import checksupport, StdCompare
 
 from unitype import Coercions, CoercionTree, AttributePartition
 
-TypeError :: !String !mess !String !*ErrorAdmin -> *ErrorAdmin | <<< mess
+errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
+
+class (<::) infixl a :: !*File (!Format, !a) -> *File
+
+:: Format =
+	{	form_properties :: !BITVECT
+	,	form_position	:: ![Int]
+	}
+
+cNoProperties		:== 0
+cAttributed			:== 4
+cAnnotated			:== 8
+
+instance <:: SymbolType, Type, AType, [a] | <:: a
 
 ::	AttributeEnv	:== {! TypeAttribute }
 ::	VarEnv 			:== {! Type }

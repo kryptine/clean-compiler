@@ -161,9 +161,11 @@ where
 	contains_var var_id _
 		= False
 
-cannotUnify t1 t2 position err=:{ea_file,ea_loc} 
-	# ea_file = ea_file <<< hd ea_loc <<< ": cannot unify " <<< t1 <<< " with " <<< t2 <<< " near " <<< position <<< '\n'
-	= { err & ea_file = ea_file, ea_ok = False}
+cannotUnify t1 t2 position err 
+	# err = errorHeading "Type error" err
+	  format = { form_properties = cNoProperties, form_position = [] }
+	= { err & ea_file = err.ea_file <<< " cannot unify " <:: (format, t1) <<< " with " <:: (format, t2)  <<< " near " <<< position <<< '\n' }
+
 
 /*
 simplifyType ta=:(type :@: type_args)
@@ -572,9 +574,9 @@ freshAttribute ts=:{ts_attr_store}
 	,	prop_error		:: !.ErrorAdmin
 	}
 
-
 attribute_error type_attr err
-	= TypeError "* attribute expected insted of" type_attr "" err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
 
 addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module}} cons_args, at_attribute} ps
 	# (cons_args, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
@@ -1287,7 +1289,9 @@ where
 
 
 specification_error type err
-	= TypeError "specified type conflicts with derived type" type "" err
+	# err = errorHeading "Type error" err
+	  format = { form_properties = cAttributed, form_position = []}
+	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " <:: (format, type) <<< '\n' }
 
 cleanUpAndCheckFunctionTypes [] defs type_contexts coercion_env attr_partition type_var_env attr_var_env fun_defs ts
 	= (fun_defs, ts)

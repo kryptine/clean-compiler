@@ -95,21 +95,25 @@ where
 			= Equal
 		
 		
-instanceError symbol types err=:{ea_file,ea_loc}
-	# ea_file = ea_file <<< "Overloading error " <<< hd ea_loc <<< ": \"" <<< symbol <<< "\" no instance available of type " <<< types <<< '\n'
-	= { err & ea_file = ea_file, ea_ok = False}
+instanceError symbol types err
+	# err = errorHeading "Overloading error" err
+	  format = { form_properties = cNoProperties, form_position = [] }
+	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type " <:: (format, types) <<< '\n' }
 
-contextError err=:{ea_file,ea_loc}
-	# ea_file = ea_file <<< "Overloading Error " <<< hd ea_loc <<< ": specified context is too general\n"
-	= { err & ea_file = ea_file, ea_ok = False}
+contextError err
+	# err = errorHeading "Overloading error" err
+	= { err & ea_file = err.ea_file <<< " specified context is too general\n"}
 
-uniqueError symbol types err=:{ea_file, ea_loc}
-	# ea_file = ea_file <<< "Overloading/Uniqueness Error " <<< hd ea_loc <<< ": \"" <<< symbol <<< "\" uniqueness specification of instance conflicts with current application " <<< types <<< '\n'
-	= { err & ea_file = ea_file, ea_ok = False}
+uniqueError symbol types err
+	# err = errorHeading "Overloading/Uniqueness error" err
+	  format = { form_properties = cAnnotated, form_position = [] }
+	= { err & ea_file = err.ea_file <<< " \"" <<< symbol
+			<<< "\" uniqueness specification of instance conflicts with current application " <:: (format, types) <<< '\n'}
 
-unboxError type err=:{ea_file,ea_loc}
-	# ea_file = ea_file <<< "Overloading error "  <<< hd ea_loc <<< ": instance cannot be unboxed" <<< type <<< '\n'
-	= { err & ea_file = ea_file, ea_ok = False}
+unboxError type err
+	# err = errorHeading "Overloading error of Array class" err
+	  format = { form_properties = cNoProperties, form_position = [] }
+	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type) <<< " instance cannot be unboxed\n"}
 
 get :: !a !(Env a b) -> b | == a 
 get elem_id [] 
