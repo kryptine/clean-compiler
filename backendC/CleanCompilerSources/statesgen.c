@@ -96,6 +96,8 @@ int FirstStateIsStricter (StateS offered_state,StateS demanded_state)
 			return 1;
 		else if (offered_state.state_type==ArrayState && demanded_state.state_type==ArrayState)
 			return 1;
+		else if (offered_state.state_type==RecordState && demanded_state.state_type==RecordState)
+			return 1;
 		else
 			return 0;
 	}
@@ -340,8 +342,6 @@ static void GenRecordState (SymbDef sdef)
 		SetRecordState (&sdef->sdef_record_state, sdef, sdef->sdef_cons_arity);
 		fieldstates=sdef->sdef_record_state.state_record_arguments;
 
-/*		rectype->type_constructors->cl_constructor->type_node_state = sdef->sdef_record_state; */
-		
 		strict_record=0;
 		
 		for_li (fields,i,rectype->type_fields,fl_next){
@@ -395,7 +395,6 @@ static void GenRecordState (SymbDef sdef)
 		return;
 	else
 		StaticMessage (True, "%S", "%s cyclic strict field dependencies are not allowed", CurrentSymbol, sdef->sdef_ident->ident_name);
-
 }
 
 static void GenResultStatesOfLazyFields (SymbDef sdef)
@@ -3318,8 +3317,6 @@ static int create_new_function_with_more_arguments (NodeP node_p,int determine_n
 					struct type_node *rhs_type_node_p;
 					SymbolP new_function_symbol;
 					SymbDef rule_sdef;
-					NodeP function_node_p2;
-					ArgP *arg_h;
 					int n_extra_function_arguments,n;
 
 					rule_sdef=function_symbol_p->symb_def;
@@ -3348,33 +3345,47 @@ static int create_new_function_with_more_arguments (NodeP node_p,int determine_n
 							node_p->node_symbol=new_function_symbol;
 						} else
 							node_p->node_symbol=function_node_p->node_symbol;
-						
-						function_node_p2=node_p->node_arguments->arg_node;
-						node_p->node_arguments=node_p->node_arguments->arg_next;
-						
-						while (function_node_p2!=function_node_p){
-							ArgP second_arg_p;
-							
-							second_arg_p=function_node_p2->node_arguments->arg_next;
-							
-							second_arg_p->arg_next=node_p->node_arguments;
-							node_p->node_arguments=second_arg_p;
-							
-							function_node_p2=function_node_p2->node_arguments->arg_node;							
-						}
-											
-						arg_h=&function_node_p->node_arguments;
-						while (*arg_h!=NULL)
-							arg_h=&(*arg_h)->arg_next;
-						
-						*arg_h=node_p->node_arguments;
-						node_p->node_arguments=function_node_p->node_arguments;
-						
-						node_p->node_arity=function_node_p->node_arity+n_extra_arguments;
-						
-						return 1;
-					}
+					} else
+						return 0;
+				} else
+					return 0;
+			/* 26-6-2000: added DEFRULE and SYSRULE case */
+			} else if (function_symbol_p->symb_def->sdef_kind==DEFRULE || function_symbol_p->symb_def->sdef_kind==SYSRULE){
+				if (function_node_p->node_arity + n_extra_arguments <= function_symbol_p->symb_def->sdef_arity){
+					node_p->node_symbol=function_node_p->node_symbol;
+				} else
+					return 0;
+			} else
+				return 0;
+
+			{
+				NodeP function_node_p2;
+				ArgP *arg_h;
+
+				function_node_p2=node_p->node_arguments->arg_node;
+				node_p->node_arguments=node_p->node_arguments->arg_next;
+				
+				while (function_node_p2!=function_node_p){
+					ArgP second_arg_p;
+					
+					second_arg_p=function_node_p2->node_arguments->arg_next;
+					
+					second_arg_p->arg_next=node_p->node_arguments;
+					node_p->node_arguments=second_arg_p;
+					
+					function_node_p2=function_node_p2->node_arguments->arg_node;							
 				}
+									
+				arg_h=&function_node_p->node_arguments;
+				while (*arg_h!=NULL)
+					arg_h=&(*arg_h)->arg_next;
+				
+				*arg_h=node_p->node_arguments;
+				node_p->node_arguments=function_node_p->node_arguments;
+				
+				node_p->node_arity=function_node_p->node_arity+n_extra_arguments;
+				
+				return 1;
 			}
 		} else if (function_symbol_p->symb_kind==if_symb && function_node_p->node_arity==3){
 			NodeP apply_node_p;
@@ -3672,83 +3683,85 @@ static void CollectSharedAndAnnotatedNodesInRhs (NodeS **root_p,NodeDefS **defs_
 	while (root_node->node_kind==NormalNode && 
 		((root_node->node_symbol->symb_kind==apply_symb && create_new_function_with_more_arguments (root_node,0)) || 
 		 (root_node->node_symbol->symb_kind==definition && root_node->node_symbol->symb_def->sdef_kind==IMPRULE)))
-	{
-		ImpRuleP imp_rule_p;
-		
-		imp_rule_p=root_node->node_symbol->symb_def->sdef_rule;
-		
-		if ((imp_rule_p->rule_mark & RULE_LAMBDA_FUNCTION_MASK) && 
-			root_node->node_symbol->symb_def->sdef_arity==root_node->node_arity &&
-			imp_rule_p->rule_alts->alt_next==NULL
-# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-			&& ! (imp_rule_p->rule_alts->alt_rhs_root->node_kind==SwitchNode ||
-				  imp_rule_p->rule_alts->alt_rhs_root->node_kind==GuardNode ||
-				  imp_rule_p->rule_alts->alt_rhs_root->node_kind==IfNode)
-# endif
-			)
-		{
-			ArgP call_arg_p,lhs_arg_p;
+	{		
+		if (root_node->node_symbol->symb_def->sdef_kind==IMPRULE){
+			ImpRuleP imp_rule_p;
 			
-			for_l (lhs_arg_p,imp_rule_p->rule_alts->alt_lhs_root->node_arguments,arg_next)
-				if (lhs_arg_p->arg_node->node_kind!=NodeIdNode ||
-					lhs_arg_p->arg_node->node_node_id->nid_refcount==-1 ||
-					lhs_arg_p->arg_node->node_node_id->nid_node!=NULL)
-				{
-					break;
-				}
+			imp_rule_p=root_node->node_symbol->symb_def->sdef_rule;
 			
-			if (lhs_arg_p==NULL){
-				NodeP new_root_node;
-/*
-				PrintRuleNode (root_node,False,StdOut);
-				FPrintF (StdOut,"\n");
-				PrintRuleAlt (imp_rule_p->rule_alts,StdOut);
-*/
-				for_ll (call_arg_p,lhs_arg_p,root_node->node_arguments,imp_rule_p->rule_alts->alt_lhs_root->node_arguments,arg_next,arg_next){
-					NodeP call_node_p;
-					NodeIdP lhs_node_id_p,call_node_id_p;
-					
-					lhs_node_id_p=lhs_arg_p->arg_node->node_node_id;
+			if ((imp_rule_p->rule_mark & RULE_LAMBDA_FUNCTION_MASK) && 
+				root_node->node_symbol->symb_def->sdef_arity==root_node->node_arity &&
+				imp_rule_p->rule_alts->alt_next==NULL
+	# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+				&& ! (imp_rule_p->rule_alts->alt_rhs_root->node_kind==SwitchNode ||
+					  imp_rule_p->rule_alts->alt_rhs_root->node_kind==GuardNode ||
+					  imp_rule_p->rule_alts->alt_rhs_root->node_kind==IfNode)
+	# endif
+				)
+			{
+				ArgP call_arg_p,lhs_arg_p;
 				
-					call_node_p=call_arg_p->arg_node;
-					if (call_node_p->node_kind==NodeIdNode)
-						call_node_id_p=call_node_p->node_node_id;
-					else {
-						NodeDefP new_node_def_p;
+				for_l (lhs_arg_p,imp_rule_p->rule_alts->alt_lhs_root->node_arguments,arg_next)
+					if (lhs_arg_p->arg_node->node_kind!=NodeIdNode ||
+						lhs_arg_p->arg_node->node_node_id->nid_refcount==-1 ||
+						lhs_arg_p->arg_node->node_node_id->nid_node!=NULL)
+					{
+						break;
+					}
+				
+				if (lhs_arg_p==NULL){
+					NodeP new_root_node;
+	/*
+					PrintRuleNode (root_node,False,StdOut);
+					FPrintF (StdOut,"\n");
+					PrintRuleAlt (imp_rule_p->rule_alts,StdOut);
+	*/
+					for_ll (call_arg_p,lhs_arg_p,root_node->node_arguments,imp_rule_p->rule_alts->alt_lhs_root->node_arguments,arg_next,arg_next){
+						NodeP call_node_p;
+						NodeIdP lhs_node_id_p,call_node_id_p;
 						
-						call_node_id_p=NewNodeId (NULL);
-						call_node_id_p->nid_refcount=1;
-						call_node_id_p->nid_ref_count_copy_=1;
-						call_node_id_p->nid_exp_=NULL;
-	
-						call_node_id_p->nid_node=call_node_p;
+						lhs_node_id_p=lhs_arg_p->arg_node->node_node_id;
+					
+						call_node_p=call_arg_p->arg_node;
+						if (call_node_p->node_kind==NodeIdNode)
+							call_node_id_p=call_node_p->node_node_id;
+						else {
+							NodeDefP new_node_def_p;
+							
+							call_node_id_p=NewNodeId (NULL);
+							call_node_id_p->nid_refcount=1;
+							call_node_id_p->nid_ref_count_copy_=1;
+							call_node_id_p->nid_exp_=NULL;
+		
+							call_node_id_p->nid_node=call_node_p;
+							
+							new_node_def_p = NewNodeDef (call_node_id_p,call_node_p);
+							new_node_def_p->def_next=*defs_p;
+							*defs_p=new_node_def_p;
+						}
 						
-						new_node_def_p = NewNodeDef (call_node_id_p,call_node_p);
-						new_node_def_p->def_next=*defs_p;
-						*defs_p=new_node_def_p;
+						call_node_id_p->nid_mark &= ~SHARED_NODES_COLLECTED_MASK;
+						if (call_node_id_p->nid_refcount<0)
+							call_node_id_p->nid_refcount -= -2-lhs_node_id_p->nid_refcount;
+						else
+							call_node_id_p->nid_refcount += -2-lhs_node_id_p->nid_refcount;
+					
+						lhs_node_id_p->nid_forward_node_id=call_node_id_p;
 					}
 					
-					call_node_id_p->nid_mark &= ~SHARED_NODES_COLLECTED_MASK;
-					if (call_node_id_p->nid_refcount<0)
-						call_node_id_p->nid_refcount -= -2-lhs_node_id_p->nid_refcount;
-					else
-						call_node_id_p->nid_refcount += -2-lhs_node_id_p->nid_refcount;
-				
-					lhs_node_id_p->nid_forward_node_id=call_node_id_p;
-				}
-				
-				copy_rhs_node_defs_and_root (imp_rule_p->rule_alts,&new_root_node,defs_p);
+					copy_rhs_node_defs_and_root (imp_rule_p->rule_alts,&new_root_node,defs_p);
 /*				
-				PrintRuleNode (new_root_node,False,StdOut);
-				FPrintF (StdOut,"\n");
-				PrintNodeDefs (*defs_p,False,StdOut);
-				FPrintF (StdOut,"\n");
-				FPrintF (StdOut,"\n");
+					PrintRuleNode (new_root_node,False,StdOut);
+					FPrintF (StdOut,"\n");
+					PrintNodeDefs (*defs_p,False,StdOut);
+					FPrintF (StdOut,"\n");
+					FPrintF (StdOut,"\n");
 */
-				root_node=new_root_node;
-				*root_p=new_root_node;
-				
-				continue;
+					root_node=new_root_node;
+					*root_p=new_root_node;
+					
+					continue;
+				}
 			}
 		}
 		break;
