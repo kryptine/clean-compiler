@@ -2483,6 +2483,9 @@ wantEndRootExpression pState=:{ps_skipping}
 				BarToken			->	tokenBack pState
 				InToken		 		->	tokenBack pState
 				CloseToken	 		->	tokenBack pState
+				SquareCloseToken	->	tokenBack pState
+				CommaToken	 		->	tokenBack pState
+				ColonToken	 		->	tokenBack pState
 				(SeqLetToken _)		->	tokenBack pState
 				SemicolonToken		#	(token, pState) = nextToken FunctionContext pState
 									->	case token of
@@ -2587,6 +2590,8 @@ wantEndCase pState
 			CloseToken			->	tokenBack (appScanState dropOffsidePosition pState)
 			SquareCloseToken	->	tokenBack (appScanState dropOffsidePosition pState)
 			SemicolonToken		->	tokenBack (appScanState dropOffsidePosition pState)
+			CommaToken			->	tokenBack (appScanState dropOffsidePosition pState)
+			ColonToken			->	tokenBack (appScanState dropOffsidePosition pState)
 			_					->	parseError "case expression" (Yes token) "end of case with layout" pState
 	// ~ ss_useLayout
 	| token == CurlyCloseToken
