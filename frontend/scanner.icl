@@ -97,7 +97,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	{	lt_position		::	! FilePosition	// Start position of this token
 	,	lt_index		::	! Int			// The index in the current line
 	,	lt_token		::	! Token			// The token itself
-	,	lt_context		::	! Context		// The context of the token
+	,	lt_context		::	! ScanContext	// The context of the token
 	}
 
 ::	Buffer x
@@ -200,13 +200,13 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ForAllToken				//		A.
 
 
-::	Context
+::	ScanContext
 	=	GeneralContext
 	|	TypeContext
 	|	FunctionContext
 	|	CodeContext
 
-instance == Context
+instance == ScanContext
 where
 	(==) co1 co2 = equal_constructor co1 co2
 
@@ -283,7 +283,7 @@ where
 		# (index,stream) = getIndex stream
 		= (index,{input & inp_stream=stream})
 
-class nextToken state :: !Context !*state -> (!Token, !*state)
+class nextToken state :: !ScanContext !*state -> (!Token, !*state)
 
 instance nextToken RScanState
 where
@@ -397,7 +397,7 @@ where currentToken scanState=:{ss_tokenBuffer}
 			= (ErrorToken "dummy", scanState)
 			= ((head ss_tokenBuffer).lt_token, scanState)
 
-class insertToken state :: !Token !Context !*state -> *state
+class insertToken state :: !Token !ScanContext !*state -> *state
 
 instance insertToken RScanState
 where
@@ -572,7 +572,7 @@ SkipToEndOfLine input
 	| c==NewLineChar	= input
 			= SkipToEndOfLine input
 
-Scan :: !Char !Input !Context -> (!Token, !Input)
+Scan :: !Char !Input !ScanContext -> (!Token, !Input)
 Scan '(' input co			= (OpenToken, input)
 Scan ')' input co			= (CloseToken, input)
 Scan '{' input CodeContext	= ScanCodeBlock input
@@ -720,14 +720,20 @@ Scan c0=:'=' input co
 Scan c0=:':' input co
 	# (eof,c1, input)		= ReadNormalChar input
 	| eof					= (ColonToken, input)
-	| c1 == ':'				= (DoubleColonToken, input)
-	| c1 <> '='
-		| isSpecialChar c1	= ScanOperator 1 input [c1, c0] co
-							= (ColonToken, charBack input)
-	# (eof, c2, input)		= ReadNormalChar input
-	| eof					= ScanOperator 1 input [c1, c0] co
-	| c2 == '='				= (ColonDefinesToken, input)
+	| c1 == ':'
+		# (eof, c2, input)	= ReadNormalChar input
+		| eof				= (DoubleColonToken, input)
+		| isSpecialChar c2	&& ~(c2=='!' || c2=='*') // for type rules and the like
+							= ScanOperator 2 input [c2, c1, c0] co
+							= (DoubleColonToken, charBack input)
+	| c1 == '='
+		# (eof, c2, input)	= ReadNormalChar input
+		| eof				= ScanOperator 1 input [c1, c0] co
+		| c2 == '='			= (ColonDefinesToken, input)
 							= ScanOperator 1 (charBack input) [c1, c0] co
+	// c1 <> '='
+	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
+							= (ColonToken, charBack input)
 Scan c0=:'\'' input co		= ScanChar input [c0]
 Scan c0=:'\"' input co		= ScanString 0 [c0] input
 
@@ -748,7 +754,7 @@ Scan c    input co
 	| isSpecialChar c		= ScanOperator 0 input [c] co
 							= (ErrorToken ScanErrIllegal, input)
 
-possibleKeyToken :: !Token ![Char] !Context !Input -> (!Token, !Input)
+possibleKeyToken :: !Token ![Char] !ScanContext !Input -> (!Token, !Input)
 possibleKeyToken token reversedPrefix context input
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (token, input)
@@ -762,11 +768,11 @@ new_exp_char '{' = True
 new_exp_char '/' = True // to handle end of comment symbol: */
 new_exp_char c	 = isSpace c
 
-ScanIdentFast :: !Int !Input !Context -> (!Token, !Input)
+ScanIdentFast :: !Int !Input !ScanContext -> (!Token, !Input)
 ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
 	# end_i = ScanIdentCharsInString i line co
 		with
-			ScanIdentCharsInString :: !Int !{#Char} !Context -> Int
+			ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> Int
 			ScanIdentCharsInString i line co
 				| i<size line && IsIdentChar line.[i] co
 					= ScanIdentCharsInString (i+1) line co
@@ -775,14 +781,14 @@ ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
 	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
 	= CheckReserved co (line % (i-n,end_i-1)) input
 
-ScanOperator :: !Int !Input ![Char] !Context -> (!Token, !Input)
+ScanOperator :: !Int !Input ![Char] !ScanContext -> (!Token, !Input)
 ScanOperator n input token co
 	#  (eof, c, input)		= ReadNormalChar input
 	| eof					= CheckReserved co (revCharListToString n token) input
 	| isSpecialChar c		= ScanOperator (n + 1) input [c:token] co
 							= CheckReserved co (revCharListToString n token) (charBack input)
 
-CheckReserved :: !Context !String !Input -> (!Token, !Input)
+CheckReserved :: !ScanContext !String !Input -> (!Token, !Input)
 CheckReserved GeneralContext    s i = CheckGeneralContext s i
 CheckReserved TypeContext       s i = CheckTypeContext s i
 CheckReserved FunctionContext	s i = CheckFunctContext s i
@@ -1144,7 +1150,7 @@ hexDigitToInt 'f' = 15
 hexDigitToInt 'F' = 15
 hexDigitToInt c   = digitToInt c
 
-IsIdentChar :: !Char !Context -> Bool
+IsIdentChar :: !Char !ScanContext -> Bool
 IsIdentChar  c	_ | isAlphanum c	= True
 IsIdentChar '_'	_ 					= True
 IsIdentChar '`'	_					= True

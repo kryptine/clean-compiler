@@ -113,7 +113,7 @@ instance <<< FilePosition
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
 
-:: Context
+:: ScanContext
 	=	GeneralContext
 	|	TypeContext
 	|	FunctionContext
@@ -129,13 +129,13 @@ instance getFilename ScanState
 class tokenBack state :: !*state -> !*state
 instance tokenBack ScanState
 
-class nextToken state :: !Context !*state -> (!Token, !*state)
+class nextToken state :: !ScanContext !*state -> (!Token, !*state)
 instance nextToken ScanState
 
 class currentToken state :: !*state -> (!Token, !*state)
 instance currentToken ScanState
 
-class insertToken state :: !Token !Context !*state -> *state
+class insertToken state :: !Token !ScanContext !*state -> *state
 instance insertToken ScanState
 
 class replaceToken state :: !Token !*state -> *state
