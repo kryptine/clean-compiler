@@ -3,16 +3,7 @@ definition module trans
 import StdEnv
 
 import syntax, transform
-
-cPassive   				:== -1
-cActive					:== -2
-cAccumulating   		:== -3
-cVarOfMultimatchCase	:== -4
-
-::	CleanupInfo
-
-analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
-				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
+import classify
 
 transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 					!*ImportedTypes !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool
