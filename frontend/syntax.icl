@@ -1050,11 +1050,7 @@ cNonUniqueSelection	:== False
 					| PS_Array  !ParsedExpr
 					| PS_Erroneous
 
-
-::	GeneratorKind :== Bool
-
-IsListGenerator 	:== True
-IsArrayGenerator	:== False
+::	GeneratorKind = IsListGenerator | IsOverloadedListGenerator | IsArrayGenerator
 
 :: LineAndColumn = {lc_line :: !Int, lc_column :: !Int}
 
@@ -1524,7 +1520,11 @@ where
 instance <<< Generator
 where
 	(<<<) file {gen_kind,gen_pattern,gen_expr}
-		= file <<< gen_pattern <<< (if gen_kind "<-" "<-:") <<< gen_expr
+		= file <<< gen_pattern <<< (gen_kind_to_string gen_kind) <<< gen_expr
+	where
+		gen_kind_to_string IsListGenerator = "<-"
+		gen_kind_to_string IsOverloadedListGenerator = "<|-"
+		gen_kind_to_string IsArrayGenerator = "<-:"
 
 instance <<< BasicValue
 where
