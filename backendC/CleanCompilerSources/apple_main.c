@@ -1,13 +1,17 @@
 
 #include "compiledefines.h"
 
+#define CG_PPC_XO
+
 #ifdef KARBON
 # define TARGET_API_MAC_CARBON 1
 #endif
 
 #include <stdio.h>
-#include <unix.h>
-#include <SIOUX.h>
+#if !defined (GNU_C)
+# include <unix.h>
+# include <SIOUX.h>
+#endif
 
 #include <quickdraw.h>
 #include <fonts.h>
@@ -242,8 +246,19 @@ int do_command (char *command)
 		}
 #endif
 #ifdef CODE_GENERATOR
+# ifndef GNU_C
 		else if (!strcmp (argv[0],"cg"))
 			result=generate_code (argc,&argv[0]);
+#  ifdef CG_PPC_XO
+		else if (!strcmp (argv[0],"cg_xo"))
+			result=generate_code_xo (argc,&argv[0],return_error_string,&compiler_id);
+		else if (!strcmp (argv[0],"cg_o"))
+			result=generate_code_o (argc,&argv[0],return_error_string,&compiler_id);
+#  endif
+# else
+		else if (!strcmp (argv[0],"cg_o"))
+			result=generate_code_o (argc,&argv[0],return_error_string,&compiler_id);
+# endif
 # ifndef NO68K
 		else if (!strcmp (argv[0],"cg68"))
 			result=generate_code68 (argc,&argv[0]);
@@ -313,6 +328,10 @@ pascal OSErr do_script_apple_event (const AppleEvent *apple_event,AppleEvent *re
 	return error;
 }
 
+#if defined (KARBON)
+# define NewAEEventHandlerProc(userRoutine) NewAEEventHandlerUPP(userRoutine)
+#endif
+
 static void InitAppleEventsStuff (void)
 {
 	OSErr retCode;
@@ -361,6 +380,8 @@ extern short InstallConsole (short fd);
 # include <Profiler.h>
 #endif
 
+#if !defined (GNU_C)
+
 int /*clean_compiler_*/ main (void)
 {
 	OSErr retCode;
@@ -386,8 +407,9 @@ int /*clean_compiler_*/ main (void)
 # endif
 #endif
 
+#if !defined (GNU_C)
 	_fcreator='3PRM';
-
+#endif
 	gQuitFlag = false;
 	gSleepVal = kSleepMax;
 	
@@ -439,4 +461,5 @@ int /*clean_compiler_*/ main (void)
 	return 1;
 }
 
+#endif
 #endif
