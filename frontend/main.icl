@@ -47,7 +47,7 @@ CommandLoop proj ms=:{ms_io}
 	{	ms_io			:: !*File
 	,	ms_error		:: !*File
 	,	ms_out			:: !*File
-	,	ms_paths		:: !SearchPaths
+	,	ms_paths		:: ![{#Char}]
 	,	ms_files		:: !*Files
 	}	
 
@@ -147,7 +147,7 @@ compileModule mod_name ms
 
 loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
 	# (predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out, optional_syntax_tree)
-		=	frontEndInterface mod_ident ms_paths predef_symbols hash_table ms_files ms_error ms_io ms_out
+		=	frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} predef_symbols hash_table ms_files ms_error ms_io ms_out
 	  ms
 	  	=	{ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
