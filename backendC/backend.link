@@ -88,3 +88,5 @@
 /EXPORT: BEDictionarySelectFunSymbol
 /EXPORT: BEDictionaryUpdateFunSymbol
 /EXPORT: BEGetVersion
+/EXPORT: BEAbsType
+/EXPORT: BESwapTypes
