@@ -2591,9 +2591,11 @@ where
 	rnf_app_args {app_symb=symb=:{symb_kind}, app_args} args index strictness ro
 		= False
 
-determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
+determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit
+				  app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
 				  new_args prod_index producers ro ti
-	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type, fun_info}}, ti_fun_heap)
+					= readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
 	| length app_args<>fun_arity
 		| is_applied_to_macro_fun
@@ -2629,10 +2631,21 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
     	False
 		= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc_hnr",symb.symb_name)
-    | (not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type
-		= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
-				-!-> ("Produce1cc_ho",symb.symb_name)
+// NON-REC...
+	# non_rec_producer
+		= (fun_info.fi_properties bitand FI_IsNonRecursive) <> 0 with FI_IsNonRecursive = 4
+	# ok_non_rec
+		= case fun_body of
+			Expanding _
+				-> False
+			(TransformedBody {tb_rhs})
+				-> ro.ro_transform_fusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//is_good_producer
+	| SwitchNonRecFusion ok_non_rec False
+		= ({ producers & [prod_index] = (PR_GeneratedFunction symb (length app_args) fun_index)}, app_args ++ new_args, ti)
+				-!-> ("Produce1nr",symb.symb_name)
+// ...NON-REC
 	= (producers, [App app : new_args ], ti)
+				-!-> ("Produce1--",symb.symb_name)
 
 determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app=:{app_symb = symb=:{symb_kind}, app_args} _
 				  new_args prod_index producers ro ti
@@ -2655,7 +2668,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 		| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
 			= (producers, [App app : new_args ], ti)
 					-!-> ("Produce2cc_array",symb.symb_name)
-		# ({fun_body,fun_type}, ti) = ti!ti_fun_defs.[glob_object]
+		# ({fun_body,fun_type,fun_info}, ti) = ti!ti_fun_defs.[glob_object]
 		  (TransformedBody {tb_rhs}) = fun_body
 		  is_good_producer = SwitchFunctionFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 		  {cc_producer} = ti.ti_cons_args.[glob_object]
@@ -2672,8 +2685,23 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 		| (not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type
 			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc_ho",symb.symb_name)
+// NON-REC...
+		# non_rec_producer
+			= (fun_info.fi_properties bitand FI_IsNonRecursive) <> 0 with FI_IsNonRecursive = 4
+		# ok_non_rec
+			= case fun_body of
+				Expanding _
+					-> False
+				(TransformedBody {tb_rhs})
+					-> ro.ro_transform_fusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//&& is_good_producer
+		| SwitchNonRecFusion ok_non_rec False
+			= ({ producers & [prod_index] = (PR_Function symb (length app_args) glob_object)}, app_args ++ new_args, ti)
+					-!-> ("Produce2nr",symb.symb_name)
+// ...NON-REC
 		= (producers, [App app : new_args ], ti)
+					-!-> ("Produce2-1",symb.symb_name)
 	= (producers, [App app : new_args ], ti)
+					-!-> ("Produce2-2",symb.symb_name)
 where
 	get_max_index ti=:{ti_cons_args}
 		#! (max_index, ti_cons_args)	= usize ti_cons_args
