@@ -666,6 +666,7 @@ cNotVarNumber :== -1
 				| SK_LocalDclMacroFunction !(Global Index)
 				| SK_OverloadedFunction !(Global Index)
 				| SK_GeneratedFunction !FunctionInfoPtr !Index
+				| SK_GeneratedCaseFunction !FunctionInfoPtr !Index
 				| SK_Constructor !(Global Index)
 				| SK_Generic !(Global Index) !TypeKind
 				| SK_TypeCode

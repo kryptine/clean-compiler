@@ -162,6 +162,7 @@ where
 //			compare_indexes (SK_InternalFunction i1) (SK_InternalFunction i2)		= i1 =< i2
 			compare_indexes (SK_OverloadedFunction i1) (SK_OverloadedFunction i2)	= i1 =< i2
 			compare_indexes (SK_GeneratedFunction _ i1) (SK_GeneratedFunction _ i2)	= i1 =< i2
+			compare_indexes (SK_GeneratedCaseFunction _ i1) (SK_GeneratedCaseFunction _ i2)	= i1 =< i2
 			compare_indexes (SK_LocalDclMacroFunction i1) (SK_LocalDclMacroFunction i2) = i1 =< i2
 
 		| less_constructor symb1 symb2

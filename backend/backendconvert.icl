@@ -1828,6 +1828,8 @@ where
 				=	beFunctionSymbol glob_object main_dcl_module_n
 			convertSymbol {symb_kind=SK_GeneratedFunction _ index}
 				=	beFunctionSymbol index main_dcl_module_n
+			convertSymbol {symb_kind=SK_GeneratedCaseFunction _ index}
+				=	beFunctionSymbol index main_dcl_module_n
 			convertSymbol {symb_kind=SK_Constructor {glob_module, glob_object}}
 				=	beConstructorSymbol glob_module glob_object // ->> ("convertSymbol", (glob_module, glob_object))
 			convertSymbol symbol
