@@ -1,77 +1,90 @@
 /* version info */
 
-# define	kBEVersionCurrent		0x02000206
-# define	kBEVersionOldestDefinition	0x02000204
+// increment this for every release
+# define	kBEVersionCurrent				0x02000207
+
+// change this to the same value as kBEVersionCurrent if the new release is not
+// upward compatible (for example when a function is added)
+# define	kBEVersionOldestDefinition		0x02000204
+
+// change this to the same value as kBEVersionCurrent if the new release is not
+// downward compatible (for example when a function is removed)
 # define	kBEVersionOldestImplementation	0x02000206
+
 
 # define	kBEDebug	1
 
 /* pointer types */
 
+Clean (:: CPtr :== Int)
+
 Clean (:: *UWorld :== Int)
 
 typedef struct BackEnd *BackEnd;
-Clean (:: *BackEnd :== Int)
+Clean (:: *BackEnd :== CPtr)
 
 typedef struct symbol *BESymbolP;
-Clean (:: BESymbolP :== Int)
+Clean (:: BESymbolP :== CPtr)
 
 typedef struct type_node *BETypeNodeP;
-Clean (:: BETypeNodeP :== Int)
+Clean (:: BETypeNodeP :== CPtr)
 
 typedef struct type_arg *BETypeArgP;
-Clean (:: BETypeArgP :== Int)
+Clean (:: BETypeArgP :== CPtr)
 
 typedef struct type_alt *BETypeAltP;
-Clean (:: BETypeAltP :== Int)
+Clean (:: BETypeAltP :== CPtr)
 
 typedef struct node *BENodeP;
-Clean (:: BENodeP :== Int)
+Clean (:: BENodeP :== CPtr)
 
 typedef struct arg *BEArgP;
-Clean (:: BEArgP :== Int)
+Clean (:: BEArgP :== CPtr)
 
 typedef struct rule_alt *BERuleAltP;
-Clean (:: BERuleAltP :== Int)
+Clean (:: BERuleAltP :== CPtr)
 
 typedef struct imp_rule *BEImpRuleP;
-Clean (:: BEImpRuleP :== Int)
+Clean (:: BEImpRuleP :== CPtr)
 
 typedef struct type *BETypeP;
-Clean (:: BETypeP :== Int)
+Clean (:: BETypeP :== CPtr)
 
 typedef struct flat_type *BEFlatTypeP;
-Clean (:: BEFlatTypeP :== Int)
+Clean (:: BEFlatTypeP :== CPtr)
 
 typedef struct type_var *BETypeVarP;
-Clean (:: BETypeVarP :== Int)
+Clean (:: BETypeVarP :== CPtr)
 
 typedef struct type_var_list *BETypeVarListP;
-Clean (:: BETypeVarListP :== Int)
+Clean (:: BETypeVarListP :== CPtr)
 
 typedef struct constructor_list *BEConstructorListP;
-Clean (:: BEConstructorListP :== Int)
+Clean (:: BEConstructorListP :== CPtr)
 
 typedef struct field_list *BEFieldListP;
-Clean (:: BEFieldListP :== Int)
+Clean (:: BEFieldListP :== CPtr)
 
 typedef struct node_id *BENodeIdP;
-Clean (:: BENodeIdP :== Int)
+Clean (:: BENodeIdP :== CPtr)
 
 typedef struct node_def *BENodeDefP;
-Clean (:: BENodeDefP :== Int)
+Clean (:: BENodeDefP :== CPtr)
 
 typedef struct strict_node_id *BEStrictNodeIdP;
-Clean (:: BEStrictNodeIdP :== Int)
+Clean (:: BEStrictNodeIdP :== CPtr)
 
 typedef struct parameter *BECodeParameterP;
-Clean (:: BECodeParameterP :== Int)
+Clean (:: BECodeParameterP :== CPtr)
 
 typedef struct code_block *BECodeBlockP;
-Clean (:: BECodeBlockP :== Int)
+Clean (:: BECodeBlockP :== CPtr)
 
 typedef struct string_list *BEStringListP;
-Clean (:: BEStringListP :== Int)
+Clean (:: BEStringListP :== CPtr)
+
+typedef struct node_id_list_element *BENodeIdListP;
+Clean (:: BENodeIdListP :== CPtr)
 
 /* constants */
 /*
@@ -238,6 +251,18 @@ Clean (BEIfNode :: BENodeP BENodeP BENodeP BackEnd -> (BENodeP, BackEnd))
 BENodeP BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts, BENodeP then, BENodeDefP elseNodeDefs, BEStrictNodeIdP elseStricts, BENodeP elsje);
 Clean (BEGuardNode :: BENodeP BENodeDefP BEStrictNodeIdP BENodeP BENodeDefP  BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
 
+BENodeP BESwitchNode (BENodeIdP nodeId, BEArgP caseNode);
+Clean (BESwitchNode :: BENodeIdP BEArgP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node);
+Clean (BECaseNode :: Int BESymbolP BENodeDefP BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds);
+Clean (BEPushNode :: Int BESymbolP BEArgP BENodeIdListP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEDefaultNode (BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node);
+Clean (BEDefaultNode :: BENodeDefP BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
+
 BENodeP BESelectorNode (BESelectorKind selectorKind, BESymbolP fieldSymbol, BEArgP args);
 Clean (BESelectorNode :: BESelectorKind BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
 
@@ -382,6 +407,15 @@ Clean (BECodeParameters:: BECodeParameterP BECodeParameterP BackEnd -> (BECodePa
 
 BECodeParameterP BENoCodeParameters (void);
 Clean (BENoCodeParameters:: BackEnd -> (BECodeParameterP, BackEnd))
+
+BENodeIdListP BENodeIdListElem (BENodeIdP nodeId);
+Clean (BENodeIdListElem:: BENodeIdP BackEnd -> (BENodeIdListP, BackEnd))
+
+BENodeIdListP BENodeIds (BENodeIdListP nid, BENodeIdListP nids);
+Clean (BENodeIds:: BENodeIdListP BENodeIdListP BackEnd -> (BENodeIdListP, BackEnd))
+
+BENodeIdListP BENoNodeIds (void);
+Clean (BENoNodeIds:: BackEnd -> (BENodeIdListP, BackEnd))
 
 BECodeBlockP BEAbcCodeBlock (int inline, BEStringListP instructions);
 Clean (BEAbcCodeBlock:: Bool BEStringListP BackEnd -> (BECodeBlockP, BackEnd))

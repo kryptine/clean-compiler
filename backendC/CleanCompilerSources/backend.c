@@ -258,6 +258,24 @@ AddUserDefinedArrayFunction (SymbolP functionSymbol)
 	UserDefinedArrayFunctions	= elem;
 } /* AddUserDefinedArrayFunction */
 
+static Node
+NewGuardNode (NodeP ifNode, NodeP node, NodeDefP nodeDefs, StrictNodeIdP stricts)
+{
+	NodeP	guardNode;
+	
+	guardNode	= ConvertAllocType (NodeS);
+	
+	guardNode->node_kind		= GuardNode;
+	guardNode->node_node_defs	= nodeDefs;
+	guardNode->node_arity		= 2;
+	guardNode->node_guard_strict_node_ids	= stricts;
+
+	guardNode->node_arguments	= BEArgs (ifNode, BEArgs (node, NULL));
+	
+	return (guardNode);
+} /* NewGuardNode */
+
+
 static void
 DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 											int nTypes, int nConstructors, int nFields)
@@ -332,7 +350,8 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 
 static int main_dcl_module_n=0;
 
-void BESetMainDclModuleN (int main_dcl_module_n_parameter)
+void
+BESetMainDclModuleN (int main_dcl_module_n_parameter)
 {
 	main_dcl_module_n=main_dcl_module_n_parameter;
 }
@@ -1249,7 +1268,7 @@ BEIfNode (BENodeP cond, BENodeP then, BENodeP elsje)
 	node->node_annotation	= NoAnnot;
 	node->node_kind			= NormalNode;
 	node->node_symbol		= gBasicSymbols [if_symb];
-	node->node_arguments	= BEArgs (cond, BEArgs (then, (BEArgs (elsje, NULL))));
+	node->node_arguments	= BEArgs (cond, BEArgs (then, BEArgs (elsje, NULL)));
 	node->node_arity		= 3;
 	node->node_number		= 0;
 
@@ -1276,11 +1295,108 @@ BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts,
 	node->node_annotation			= NoAnnot;
 	node->node_kind					= IfNode;
 	node->node_contents.contents_if	= thenElseInfo;
-	node->node_arguments			= BEArgs (cond, BEArgs (then, (BEArgs (elsje, NULL))));
+	node->node_arguments			= BEArgs (cond, BEArgs (then, BEArgs (elsje, NULL)));
 	node->node_number				= 0;
+
+	switch (elsje->node_kind)
+	{
+		case SwitchNode:
+			thenElseInfo->if_else_node_defs			= NULL;
+			thenElseInfo->if_else_strict_node_ids	= NULL;
+			node->node_arguments->arg_next->arg_next->arg_node
+								= BENormalNode (BEBasicSymbol (BEFailSymb), BENoArgs ());
+
+			node	= NewGuardNode (node, elsje, elseNodeDefs, elseStricts);
+			break;
+		case GuardNode:
+			/* move the GuardNode to the top */
+			node->node_arguments->arg_next->arg_next->arg_node
+								= elsje->node_arguments->arg_node;
+			elsje->node_arguments->arg_node	=	node;
+			node	= elsje;
+			break;
+		default:
+			break;
+	}
 
 	return (node);
 } /* BEGuardNode */
+
+BENodeP
+BESwitchNode (BENodeIdP nodeId, BEArgP cases)
+{
+	NodeP	switchNode;
+
+	switchNode	= ConvertAllocType (NodeS);
+	
+	switchNode->node_kind		= SwitchNode;
+	switchNode->node_node_id	= nodeId;
+	switchNode->node_arity		= 1;
+	switchNode->node_arguments	= cases;
+	switchNode->node_annotation	= NoAnnot;
+
+//	--nodeId->nid_refcount;
+	
+	return (switchNode);
+} /* BESwitchNode */
+
+BENodeP
+BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node)
+{
+	NodeP	caseNode;
+	
+	caseNode	= ConvertAllocType (NodeS);
+	
+	caseNode->node_kind			= CaseNode;
+	caseNode->node_symbol		= symbol;
+	caseNode->node_arity		= symbolArity;
+	caseNode->node_node_defs	= nodeDefs;
+	caseNode->node_arguments	= NewArgument (node);
+
+	caseNode->node_su.su_u.u_case		= ConvertAllocType (CaseNodeContentsS);
+	caseNode->node_node_id_ref_counts	= NULL;
+	caseNode->node_strict_node_ids	= strictNodeIds;
+
+	return (caseNode);
+} /* BECaseNode */
+
+BENodeP
+BEDefaultNode (BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node)
+{
+	NodeP	defaultNode;
+	
+	defaultNode	= ConvertAllocType (NodeS);
+
+	defaultNode->node_kind		= DefaultNode;
+	defaultNode->node_node_defs	= nodeDefs;
+	defaultNode->node_arity		= 1;
+	defaultNode->node_arguments	= NewArgument (node);
+
+	defaultNode->node_su.su_u.u_case	= ConvertAllocType (CaseNodeContentsS);
+	defaultNode->node_strict_node_ids	= strictNodeIds;
+
+	defaultNode->node_node_id_ref_counts	= NULL;
+	
+	return (defaultNode);
+} /* BEDefaultNode */
+
+BENodeP
+BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds)
+{
+	NodeP	pushNode;
+	
+	pushNode	= ConvertAllocType (NodeS);
+
+	pushNode->node_kind			= PushNode;
+	pushNode->node_arity		= arity;
+	pushNode->node_arguments	= arguments;
+	pushNode->node_record_symbol= symbol;
+	pushNode->node_node_ids		= nodeIds;
+
+	pushNode->node_number		= 0;	/* ??? if !=0 then unique */
+
+	return (pushNode);
+} /* BEPushNode */
 
 BENodeP
 BESelectorNode (BESelectorKind selectorKind, BESymbolP fieldSymbol, BEArgP args)
@@ -1621,6 +1737,7 @@ BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock)
 
 	return (alt);
 } /* BECodeAlt */
+
 
 BERuleAltP
 BERuleAlts (BERuleAltP alt, BERuleAltP alts)
@@ -2281,6 +2398,38 @@ BENoStrings (void)
 	return (NULL);
 } /* BENoStrings */
 
+
+BENodeIdListP
+BENodeIdListElem (BENodeIdP nodeId)
+{
+	struct node_id_list_element	*elem;
+
+	elem	= ConvertAllocType (struct node_id_list_element);
+
+	elem->nidl_node_id	= nodeId;
+	/* ifdef DEBUG */
+	elem->nidl_next	= NULL;
+	/* endif */
+
+	return (elem);
+} /* BENodeIdListElem */
+
+BENodeIdListP
+BENodeIds (BENodeIdListP nid, BENodeIdListP nids)
+{
+	Assert (nid->nidl_next == NULL);
+
+	nid->nidl_next	= nids;
+
+	return (nid);
+} /* BENodeIds*/
+
+BENodeIdListP
+BENoNodeIds (void)
+{
+	return (NULL);
+} /* BENoNodeIds */
+
 BECodeBlockP
 BEAbcCodeBlock (int inlineFlag, BEStringListP instructions)
 {
@@ -2712,7 +2861,6 @@ BEFree (BackEnd backEnd)
 	if (StdOutReopened)
 		fclose (StdOut);
 } /* BEFree */
-
 
 // temporary hack
 
