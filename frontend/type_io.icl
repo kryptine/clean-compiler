@@ -389,14 +389,15 @@ where
 /*2.0
 instance WriteTypeInfo String
 where
-	write_type_info s tcl_file wtis
-		# tcl_file
-			= fwritei (size s) tcl_file
-		= fwrites s tcl_file
-	// warning:
-	// Should be identical to the code in Ident
+        write_type_info s tcl_file wtis
+                # tcl_file
+                        = fwritei (size s) tcl_file
+                = (fwrites s tcl_file,wtis)
+        // warning:
+        // Should be identical to the code in Ident
 
 0.2*/
+
 
 // basic and structural write_type_info's
 instance WriteTypeInfo Int 
