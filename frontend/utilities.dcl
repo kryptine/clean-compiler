@@ -115,3 +115,8 @@ iterateSt op st :== iterate_st op st
 revAppend	:: ![a] ![a] -> [a]	//	Reverse the list using the second argument as accumulator.
 revMap :: !(.a -> .b) ![.a] !u:[.b] -> u:[.b]
 
+:: Bag x = Empty | Single !x | Pair !(Bag x) !(Bag x)
+
+uniqueBagToList :: !*(Bag x) -> [x] // exploits reuse of unique nodes (if compiled with that option)
+bagToList :: !(Bag x) -> [x]
+isEmptyBag :: !(Bag x) -> Bool

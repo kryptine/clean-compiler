@@ -222,3 +222,33 @@ zip2Append [] [] tail
 zip2Append [x : xs] [y : ys] tail
 	= [(x,y) : zip2Append xs ys tail]
 */
+
+:: Bag x = Empty | Single !x | Pair !(Bag x) !(Bag x)
+
+uniqueBagToList :: !*(Bag x) -> [x] // exploits reuse of unique nodes (if compiled with that option)
+uniqueBagToList bag
+	= accumulate_elements bag []
+  where
+	accumulate_elements :: !*(Bag x) [x] -> [x]
+	accumulate_elements Empty accu
+		= accu
+	accumulate_elements (Single element) accu
+		= [element : accu]
+	accumulate_elements (Pair bag1 bag2) accu
+		= accumulate_elements bag1 (accumulate_elements bag2 accu)
+		
+bagToList :: !(Bag x) -> [x]
+bagToList bag
+	= accumulate_elements bag []
+  where
+	accumulate_elements :: !(Bag x) [x] -> [x]
+	accumulate_elements Empty accu
+		= accu
+	accumulate_elements (Single element) accu
+		= [element : accu]
+	accumulate_elements (Pair bag1 bag2) accu
+		= accumulate_elements bag1 (accumulate_elements bag2 accu)
+		
+isEmptyBag :: !(Bag x) -> Bool
+isEmptyBag Empty = True
+isEmptyBag _ = False
