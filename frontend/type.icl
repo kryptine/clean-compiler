@@ -1956,11 +1956,9 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  
 	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
 
-// MW234..
 	| not ts_error.ea_ok
 		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions,
 			{ heaps & hp_type_heaps = hp_type_heaps }, predef_symbols, ts_error.ea_file, out)
-// ..MW234
 	# state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
@@ -1968,12 +1966,9 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
-// MW4 was:	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
-// MW4 was:	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_out})
-// MW4 was:			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
 							{ ts & ts_fun_env = ts_fun_env })
 	  {si_array_instances, si_next_array_member_index, si_next_TC_member_index, si_TC_instances}= special_instances
@@ -1992,7 +1987,6 @@ where
 		= state
 
 	collect_and_check_instances nr_of_instances common_defs state
-//		= iFoldSt (update_instances_of_class common_defs cIclModIndex) 0 nr_of_instances state
 		= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
 
 	update_instances_of_class common_defs mod_index ins_index (dummy, error, class_instances, type_var_heap, td_infos)
@@ -2057,23 +2051,17 @@ where
 			= (error, IT_Node ins it_less it_greater)
 			= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
 
-// MW4 was:	type_instances ir_from ir_to class_instances ti funs_and_state
 	type_instances list_inferred_types ir_from ir_to class_instances ti funs_and_state
 		| ir_from == ir_to
 			= funs_and_state
-// MW4 was:			# funs_and_state = type_component [ir_from] class_instances ti funs_and_state
 			# funs_and_state = type_component list_inferred_types [ir_from] class_instances ti funs_and_state
-// MW4 was:			= type_instances (inc ir_from) ir_to class_instances ti funs_and_state
 			= type_instances list_inferred_types (inc ir_from) ir_to class_instances ti funs_and_state
 
-// MW4 was:	type_components group_index comps class_instances ti funs_and_state
 	type_components list_inferred_types group_index comps class_instances ti funs_and_state
 		| group_index == size comps
 			= funs_and_state
 			#! comp = comps.[group_index]	
-// MW4 was:			# funs_and_state = type_component comp.group_members  class_instances ti funs_and_state
 			# funs_and_state = type_component list_inferred_types comp.group_members  class_instances ti funs_and_state
-// MW4 was:			= type_components (inc group_index) comps class_instances ti funs_and_state
 			= type_components list_inferred_types (inc group_index) comps class_instances ti funs_and_state
 
 	show_component comp fun_defs
@@ -2085,20 +2073,17 @@ where
 	
 	get_index_of_start_rule predef_symbols
 		# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
-//		| pds_def <> NoIndex && pds_module == cIclModIndex
 		| pds_def <> NoIndex && pds_module == main_dcl_module_n
 			= (pds_def, predef_symbols)
 			= (NoIndex, predef_symbols)
 	
-// MW4 was:	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 	type_component list_inferred_types comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
+//		# (functions, fun_defs) = show_component comp fun_defs
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (fun_defs, predef_symbols, [], ts)
-// MW32..
-		| not ts.ts_error.ea_ok
+		| not ts.ts_error.ea_ok  // ---> ("typing", functions)
 			= (True, fun_defs, predef_symbols, special_instances, create_erroneous_function_types comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_error = { ts.ts_error & ea_ok = True } })
-// ..MW32
 		# (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
 		#! nr_of_type_variables = ts.ts_var_store 
 		# (subst, ts_type_heaps, ts_error)
@@ -2130,7 +2115,6 @@ where
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
-// MW4 was:		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 									(fun_defs,  { ts &	ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps,
 		  												ts_td_infos = ts_td_infos, ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap })
@@ -2158,15 +2142,6 @@ where
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 					  ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env})
 
-/* MW4 was
-	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
-	unify_requirements_of_functions [{fe_requirements={req_type_coercions},fe_location} : reqs_list] modules subst heaps ts_error
-		# ts_error = setErrorAdmin fe_location ts_error
-		  (subst, heaps, ts_error) = unify_coercions req_type_coercions modules subst heaps ts_error
-		= unify_requirements_of_functions reqs_list modules subst heaps ts_error
-	unify_requirements_of_functions [] modules subst heaps ts_error
-		= (subst, heaps, ts_error)
-*/
 	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
 	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
 		# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position ip_ident ti) req_type_coercion_groups (subst, heaps, ts_error)
@@ -2174,7 +2149,6 @@ where
 	unify_requirements_of_functions [] ti subst heaps ts_error
 		= (subst, heaps, ts_error)
 
-// MW4 added..
   	unify_requirements_within_one_position :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
  						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
 	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
@@ -2182,7 +2156,6 @@ where
 	unify_requirements_within_one_position fun_symb ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
 		# ts_error = setErrorAdmin (newPosition fun_symb tcg_position) ts_error
 		= unify_coercions tcg_type_coercions ti subst heaps ts_error
-// ..MW4
 
 	build_initial_coercion_env [{fe_requirements={req_attr_coercions},fe_location} : reqs_list] coercion_env
 		= build_initial_coercion_env reqs_list (add_to_initial_coercion_env req_attr_coercions coercion_env)
@@ -2222,12 +2195,10 @@ where
 	build_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		= (subst, coercion_env, type_signs, type_var_heap, error)
 
-// MW4 added..
 	build_coercion_env_for_alternative fun_symb common_defs cons_var_vects {tcg_position, tcg_type_coercions}
 										(subst, coercion_env, type_signs, type_var_heap, error)
 		# error = setErrorAdmin (newPosition fun_symb tcg_position) error
 		= add_to_coercion_env tcg_type_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-// MW4
 
 	add_to_coercion_env [{tc_offered,tc_demanded,tc_coercible,tc_position} : attr_coercions] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (subst, coercion_env, type_signs, type_var_heap, error)
@@ -2317,7 +2288,6 @@ where
 		  ts_var_heap = makeBase fun_symb 1 tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_symb fun_pos
 		  ts_error = setErrorAdmin fe_location ts_error
-// MW4 was:		  reqs = { req_overloaded_calls = [], req_type_coercions = [], req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
 		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],
 		  			 req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
 		  ( rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs,
@@ -2328,7 +2298,6 @@ where
 		  type_coercion_group_from_accu = { tcg_type_coercions = req_type_coercions, tcg_position = fun_pos }
 		  req_type_coercion_groups = [type_coercion_group_from_accu:rhs_reqs.req_type_coercion_groups]
 		= ( { fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
-// MW4 was:			fe_requirements = { rhs_reqs & req_type_coercions = req_type_coercions, req_cons_variables = [] }}, (rhs_reqs.req_cons_variables, fun_defs,
 			  fe_requirements = { rhs_reqs & req_type_coercions = [], req_type_coercion_groups = req_type_coercion_groups, req_cons_variables = [] }
 		    },
 		    (rhs_reqs.req_cons_variables, fun_defs, { ts & ts_expr_heap = ts_expr_heap }))
