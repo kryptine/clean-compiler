@@ -3,6 +3,8 @@
 /EXPORT: BEFree
 /EXPORT: BEArg
 /EXPORT: BEDeclareModules
+/EXPORT: BEBindSpecialModule
+/EXPORT: BEBindSpecialFunction
 /EXPORT: BESpecialArrayFunctionSymbol
 /EXPORT: BEDictionarySelectFunSymbol
 /EXPORT: BEDictionaryUpdateFunSymbol
