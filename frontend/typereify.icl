@@ -190,10 +190,8 @@ predefRecordConstructor record_type_index common_defs predefs
 
 :: BuildTypeFunState =
 	!{	bs_predefs :: !.PredefinedSymbols
-	,	bs_main :: !Int
 	,	bs_type_heaps :: .TypeHeaps
 	,	bs_var_heap :: .VarHeap
-	,	bs_common_defs :: !{#CommonDefs}
 	}
 
 buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs}
@@ -202,15 +200,15 @@ buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs}
 buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 	# bs_state =
 		{	bs_predefs = predefs
-		,	bs_main = main
-		,	bs_common_defs = common_defs
 		,	bs_var_heap = var_heap
 		,	bs_type_heaps = type_heaps
 		}
 	# type_defs
 		=	common_defs.[main].com_type_defs
-	# info
-		=	0
+	# info =
+		{	ri_main = main
+		,	ri_common_defs = common_defs
+		}
 	# (type_funs, bs_state)
 		=	build 0 (size type_defs) type_defs icl_functions info bs_state 
 	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, 
@@ -362,9 +360,9 @@ cons cons_index info bs=:{bs_predefs}
 
 record :: Index  Info *BuildTypeFunState
 			-> *(Expression, *BuildTypeFunState)
-record type_index info bs=:{bs_common_defs, bs_predefs}
+record type_index info=:{ri_common_defs} bs=:{bs_predefs}
 	# (symbol, bs_predefs)
-		=	predefRecordConstructor type_index bs_common_defs bs_predefs
+		=	predefRecordConstructor type_index ri_common_defs bs_predefs
 	=	lift symbol {bs & bs_predefs=bs_predefs}
 
 quote :: {#Char} -> {#Char}
@@ -389,7 +387,11 @@ function fun_index info bs=:{bs_predefs}
 		=	reify a info state
 	=	(apply rf ra, state)
 
-:: Info :== Int
+:: Info =
+	{	ri_main :: !Int
+	,	ri_common_defs :: !{#CommonDefs}
+	}
+
 :: Riefier :== Info -> BMonad Expression
 class reify a ::  a -> Riefier
 
@@ -425,11 +427,11 @@ instance reify TypeRhs where
 	reify (AlgType constructors)
 		=	cons PD_CTAlgType ` get constructors
 		where
-			get constructors info state=:{bs_common_defs, bs_main}
+			get constructors info=:{ri_main, ri_common_defs} state
 				=	reify [(ds_index,common_defs.[ds_index]) \\ {ds_index} <- constructors] info state
 				where
 					common_defs
-						=	bs_common_defs.[bs_main].com_cons_defs
+						=	ri_common_defs.[ri_main].com_cons_defs
 	reify (RecordType record_type)
 		=	reify record_type
 	reify (SynType _)
@@ -442,10 +444,10 @@ instance reify (Int, ConsDef) where
 				` (function PD__CTToCons ` consSymbol cons_ident cons_index)
 				` cons_type.st_args ` length cons_exi_vars)
 		where
-			consSymbol cons_ident cons_index info state=:{bs_main}
+			consSymbol cons_ident cons_index info=:{ri_main} state
 				# cons_symb =
 					{	symb_ident = cons_ident
-					,	symb_kind = SK_Constructor { glob_module = bs_main, glob_object = cons_index}
+					,	symb_kind = SK_Constructor { glob_module = ri_main, glob_object = cons_index}
 					}
 				=	reify cons_symb info state
 
@@ -457,7 +459,7 @@ instance reify FieldSymbol where
 	reify {fs_index}
 		=	selector fs_index
 		where
-			selector fs_index info st=:{bs_main, bs_common_defs}
+			selector fs_index info=:{ri_main,ri_common_defs} st
 				=	(numberTypeVariables def.sd_exi_vars
 				o`	numberTypeVariables def.sd_type.st_vars
 				o`	(record PD_CTFieldDef
@@ -467,7 +469,7 @@ instance reify FieldSymbol where
 					info st
 			where
 				def
-					=	bs_common_defs.[bs_main]
+					=	ri_common_defs.[ri_main]
 									.com_selector_defs.[fs_index]
 
 instance reify AType where
@@ -507,9 +509,9 @@ instance reify Type where
 
 reifyApp :: TypeSymbIdent [AType] Info *BuildTypeFunState
 	-> (Expression, *BuildTypeFunState)
-reifyApp symb args info bs_state=:{bs_common_defs, bs_type_heaps}
+reifyApp symb args info=:{ri_common_defs} bs_state=:{bs_type_heaps}
 	# (expanded, expanded_type, bs_type_heaps)
-		=	expandTypeSynonym bs_common_defs symb args bs_type_heaps
+		=	expandTypeSynonym ri_common_defs symb args bs_type_heaps
 	# bs_state
 		=	{bs_state & bs_type_heaps=bs_type_heaps}
 	| expanded
@@ -575,8 +577,8 @@ instance reify TypeSymbIdent where
 	reify symb
 		=	cons PD_Dyn_TypeCons ` reifyTypeIdent symb
 		where
-			reifyTypeIdent {type_index} info st=:{bs_common_defs}
-				=	reify (toTypeCodeConstructor type_index bs_common_defs) info st
+			reifyTypeIdent {type_index} info=:{ri_common_defs} st
+				=	reify (toTypeCodeConstructor type_index ri_common_defs) info st
 
 instance reify GlobalTCType where
 	reify (GTT_PredefTypeConstructor {glob_object=type_index})
