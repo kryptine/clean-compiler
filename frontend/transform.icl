@@ -83,6 +83,9 @@ where
 	lift (MatchExpr opt_tuple cons_symb expr) ls
 		# (expr, ls) = lift expr ls
 		= (MatchExpr opt_tuple cons_symb expr, ls)
+	lift (DynamicExpr expr) ls
+		# (expr, ls) = lift expr ls
+		= (DynamicExpr expr, ls)
 	lift expr ls
 		= (expr, ls)
 
@@ -187,6 +190,14 @@ where
 	lift pattern=:{dp_rhs} ls
 		# (dp_rhs, ls) = lift dp_rhs ls
 		= ({ pattern & dp_rhs = dp_rhs }, ls)
+
+instance lift DynamicExpr
+where
+	lift dyn=:{dyn_expr} ls
+		# (dyn_expr, ls) = lift dyn_expr ls
+		= ({ dyn & dyn_expr = dyn_expr}, ls)
+
+import RWSDebug
 
 liftFunctions :: [FunctionOrMacroIndex] Int Int *{#FunDef} *{#*{#FunDef}} *(Heap VarInfo) *(Heap ExprInfo) -> .LiftState;
 liftFunctions group group_index main_dcl_module_n fun_defs macro_defs var_heap expr_heap
