@@ -31,6 +31,10 @@ BEMatchNode
 BETupleSelectNode
 BEIfNode
 BEGuardNode
+BESwitchNode
+BECaseNode
+BEPushNode
+BEDefaultNode
 BESelectorNode
 BEUpdateNode
 BENodeIdNode
@@ -78,6 +82,9 @@ BENoStrings
 BECodeParameter
 BECodeParameters
 BENoCodeParameters
+BENodeIdListElem
+BENodeIds
+BENoNodeIds
 BEAbcCodeBlock
 BEAnyCodeBlock
 BEDeclareIclModule
