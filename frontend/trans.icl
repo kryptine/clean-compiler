@@ -1427,11 +1427,6 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  all_attr_vars
 	  		= [ attr_var \\ TA_Var attr_var
 	  							<- [fresh_attr_vars.[i] \\ i<-[0..(size used_attr_vars)-1] | used_attr_vars.[i]]]
-// sanity.. remove! (XXX)
-	| any (\attr_var -> not (isMember attr_var all_attr_vars2)) all_attr_vars ||
-	  any (\attr_var -> not (isMember attr_var all_attr_vars)) all_attr_vars2
-		= abort "sanity chek 046 in m trans failed"
-// ..sanity
  	# (all_fresh_type_vars, th_vars)
  	  		= getTypeVars (fresh_arg_types, fresh_result_type) ti_type_heaps.th_vars
 	  fun_arity
@@ -1553,24 +1548,9 @@ where
 					  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
 					  }
 			# (succ, subst, type_heaps)
-/*
-			  		= case isEmptyType int_class_type || isEmptyType (hd arg_type).at_type of
-			  			True
-			  				-> (True, subst, type_heaps)
-			  			_
-			  				-> unify { empty_atype & at_type = int_class_type } (hd arg_type) type_input subst type_heaps
-			  with
-				isEmptyType TE = True
-				isEmptyType _ = False
-*/
 			  		= unify { empty_atype & at_type = int_class_type } (hd arg_type) type_input subst type_heaps
 			| not succ
 				= abort ("sanity check nr 93 in module trans failed"--->({ empty_atype & at_type = int_class_type }, (hd arg_type)))
-// XXX sanity check: remove later..
-			# (attr_vars, type_heaps) = accAttrVarHeap (getAttrVars (class_type, hd arg_type)) type_heaps
-			| not (isEmpty attr_vars)
-				= abort "sanity check nr 78 in module trans failed"
-// ..sanity check
 			= ( mapAppend (\({var_info_ptr,var_name}, _)
 							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
 						  free_vars_and_types vars
@@ -1646,8 +1626,6 @@ where
 						_ // function or generated function
 							# (TransformedBody tb) = opt_body
 							-> (VI_Body symbol tb (take nr_of_applied_args form_vars), var_heap)
-			| nr_of_applied_args<>length cc_linear_bits || nr_of_applied_args<>length cc_args
-				= abort ("Martin REALLY missed something XXX")
 			= (	form_vars
 			  , { arg_types & [prod_index] = take nr_of_applied_args st_args }
 			  , next_attr_nr
@@ -1663,20 +1641,6 @@ where
 			  ) 
 		  where
 			
-// XXX...
-			traceAttrEnv st_attr_env th_attrs
-				# th_attrs = th_attrs--->("producer attr inequalities")
-				  th_attrs = foldSt traceOne st_attr_env th_attrs
-				= forget th_attrs
-			  where
-				forget :: !x -> Bool
-				forget th_attrs = False
-				traceOne {ai_offered, ai_demanded} th_attrs
-					# (AVI_Attr (TA_TempVar o), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
-					  (AVI_Attr (TA_TempVar d), th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
-					  th_attrs = th_attrs--->("u"+++toString o+++" <= u"+++toString d)
-					= th_attrs 
-// ...XXX
 			calc_cons_args curried {symb_kind, symb_arity} ti_cons_args linear_bit size_fun_defs fun_heap
 				# (opt_cons_classes, fun_heap)
 						= case symb_kind of
@@ -1820,7 +1784,7 @@ where
 //		| False--->("determineAttributeCoercions", ur_offered, ur_demanded)
 //			= undef
 		# (opt_error_info, subst, coercions, ti_type_def_infos, ti_type_heaps)
-				= determineAttributeCoercions ur_offered ur_demanded True /*XXX True?*/
+				= determineAttributeCoercions ur_offered ur_demanded True
 						subst coercions common_defs cons_vars ti_type_def_infos ti_type_heaps
 		= case opt_error_info of
 			Yes _
@@ -2170,7 +2134,6 @@ where
 	determine_producer is_applied_to_macro_fun linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
 			= determineProducer is_applied_to_macro_fun linear_bit app EI_Empty new_args prod_index producers ro ti
-// XXX XXX was			= (producers, [arg : new_args], ti)
 			# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
 			= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers ro { ti & ti_symbol_heap = ti_symbol_heap }
 	determine_producer _ _ arg new_args _ producers _ ti
@@ -2353,7 +2316,7 @@ transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_
 
 	transform_function common_defs imported_funs fun ti=:{ti_fun_defs, ti_var_heap}
 		# (fun_def, ti_fun_defs) = ti_fun_defs![fun]
-		# (Yes {st_args}) = fun_def.fun_type
+		  (Yes {st_args}) = fun_def.fun_type
 		  {fun_body = TransformedBody tb} = fun_def
 		  ti_var_heap = fold2St (\{fv_info_ptr} a_type ti_var_heap
 									-> setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap)
@@ -2621,7 +2584,7 @@ where
 		  (let_info, fvi_expr_heap) = readPtr let_info_ptr fvi_expr_heap
 		= { fvi & fvi_variables = fvi_variables
 		  , fvi_var_heap = fvi_var_heap
-		  , fvi_expr_heap = fvi_expr_heap // XXX<:= (let_info_ptr, EI_FreeVariables unbound_variables let_info)
+		  , fvi_expr_heap = fvi_expr_heap
 		  , fvi_expr_ptrs = [let_info_ptr : fvi_expr_ptrs]
 		  }
 	freeVariables (Case kees) fvi
@@ -2683,7 +2646,7 @@ where
 			_
 				-> ([ v : restored_variables ], writeVarInfo var_info_ptr (VI_UsedVar var_id) var_heap)
 
-// XXX doet deze funktie iets ?
+
 determineGlobalVariables global_variables var_heap
 	= foldSt determine_global_variable global_variables ([], var_heap)
 where		
