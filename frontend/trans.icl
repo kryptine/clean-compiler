@@ -1323,17 +1323,14 @@ where
 				[linear_bit : new_linear_bits], [cons_arg /* was cActive*/ : new_cons_args], type_heaps, symbol_heap, fun_defs, fun_heap,
 				writeVarInfo fv_info_ptr (VI_Variable fv_name new_info_ptr) var_heap)
 
-		determine_arg (PR_Class class_app free_vars class_type) {fv_info_ptr,fv_name} prod_index _
-					  (vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps=:{th_vars}, symbol_heap, fun_defs, fun_heap, var_heap)
-/*
+		determine_arg (PR_Class class_app free_vars class_type) {fv_info_ptr,fv_name} prod_index (_,(_, _, ro))
+					  (vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
 			# (arg_type, arg_types) = arg_types![prod_index]
 			  empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
-			| False--->("determine_arg", class_type, getTypeVars class_type, arg_type, type_vars)
-				= undef
-			# (unbounded_type_vars, th_vars)
+			  (unbounded_type_vars, type_heaps)
 			  		= createBindingsForUnifiedTypes { empty_atype & at_type = class_type } (hd arg_type)
-			  										((getTypeVars class_type)++type_vars) th_vars
-			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = repeatn (length free_vars) empty_atype} { type_heaps & th_vars = th_vars }
+			  										((getTypeVars class_type)++type_vars) ro.ro_common_defs type_heaps
+			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = repeatn (length free_vars) empty_atype} type_heaps
 			  (result_type, type_heaps) = substitute result_type type_heaps
 			= ( mapAppend (\{var_info_ptr,var_name} 
 							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
@@ -1349,27 +1346,6 @@ where
 			  , fun_heap
 			  , writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) var_heap
 			  )
-*/
-			# (arg_type, arg_types) = arg_types![prod_index]
-			  type_heaps = bind_class_types (hd arg_type).at_type class_type type_heaps
-			  empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
-			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = repeatn (length free_vars) empty_atype} type_heaps
-			  (result_type, type_heaps) = substitute result_type type_heaps
-			= ( mapAppend (\{var_info_ptr,var_name} 
-							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
-						  free_vars vars
-			  , arg_types
-			  , result_type
-			  , type_vars
-			  , mapAppend (\_ -> True) free_vars new_linear_bits
-			  , mapAppend (\_ -> cActive) free_vars new_cons_args
-			  , type_heaps
-			  , symbol_heap
-			  , fun_defs
-			  , fun_heap
-			  , writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) var_heap
-			  )
-
 		determine_arg producer {fv_info_ptr,fv_name} prod_index ((linear_bit, _),(ti_cons_args, consumer_body_rhs, ro))
 						(vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps=:{th_vars, th_attrs}, symbol_heap, fun_defs, fun_heap, var_heap)
 			# symbol = get_producer_symbol producer
@@ -1500,35 +1476,6 @@ where
 			= foldr (\atype1 atype2->{at_attribute=TA_None, at_annotation=AN_None, at_type=atype1-->atype2})
 					st_result (drop (nr_of_applied_args-nr_context_args) st_args)
 
-		bind_class_types (TA _ context_types) (TA _ instance_types) type_heaps=:{th_vars}
-			# th_vars = bind_context_types context_types instance_types th_vars
-			= { type_heaps & th_vars = th_vars }
-		where
-			bind_context_types [ctype : atypes] [itype : types] th_vars
-				= bind_context_types atypes types (bind_type ctype.at_type itype.at_type th_vars)
-			bind_context_types [] [] th_vars
-				= th_vars
-		bind_class_types _ _ th_vars
-			= th_vars
-			
-		bind_type (TV {tv_info_ptr}) type type_var_heap
-			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
-		bind_type (TA {type_name} arg_types1) (TA _ arg_types2) type_var_heap
-			| length arg_types1 == length arg_types2
-				= bind_types arg_types1 arg_types2 type_var_heap
-				= abort ("bind_type (trans.icl)" ---> (type_name, arg_types1, arg_types2))
-		bind_type (CV {tv_info_ptr} :@: arg_types1) (TA type_cons arg_types2) type_var_heap
-			# type_arity = type_cons.type_arity - length arg_types1
-			  type_var_heap = type_var_heap <:= (tv_info_ptr, TVI_Type (TA {type_cons & type_arity = type_arity} (take type_arity arg_types2)))
-			= bind_types arg_types1 (drop type_arity arg_types2) type_var_heap
-		bind_type _ _ type_var_heap
-			= type_var_heap
-		
-		bind_types [type1 : types1] [type2 : types2] type_var_heap
-			= bind_types types1 types2 (bind_type type1.at_type type2.at_type type_var_heap)
-		bind_types [] [] type_var_heap
-			= type_var_heap
-
 	new_variables [] var_heap
 		= ([], var_heap)
 	new_variables [form=:{fv_name,fv_info_ptr}:forms] var_heap
@@ -1558,13 +1505,6 @@ where
 			= max fun_info.fi_group_index current_max
 			# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
 			= max generated_function.gf_fun_def.fun_info.fi_group_index current_max
-/*
-	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr _} _ _)
-								current_max fun_defs fun_heap cons_args
-		# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
-		  fun_def = generated_function.gf_fun_def
-		= max fun_def.fun_info.fi_group_index current_max
-*/
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
 
@@ -1623,7 +1563,7 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps
 							-> bind_and_unify_types root_1 root_2 common_defs type_heaps
 	bind_and_unify_types (TV tv_1) type common_defs type_heaps=:{th_vars}
 		| not (is_non_variable_type type)
-			= abort "compiler error in trans.icl: assertion failed (1) XXX"
+			= abort ("compiler error in trans.icl: assertion failed (1) XXX"--->type)
 		# th_vars = bind_variable_to_type tv_1 type th_vars
 		= { type_heaps & th_vars = th_vars }
 	bind_and_unify_types type (TV tv_1) common_defs type_heaps=:{th_vars}
@@ -1776,11 +1716,11 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  					(update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap, ti_trace = False })
 	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index, symb_arity = length new_args}
 				  (app_symb, app_args, extra_args) = complete_application app_symb fun_arity new_args extra_args
-	  			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
+	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 	  			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 				  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index, symb_arity = length new_args}
 				  (app_symb, app_args, extra_args) = complete_application app_symb gf_fun_def.fun_arity new_args extra_args
-	  			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, {ti & ti_fun_heap = ti_fun_heap })
+	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro {ti & ti_fun_heap = ti_fun_heap }
 			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
 		= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
 where
@@ -1792,13 +1732,6 @@ where
 			= { ti & ti_instances = { ti_instances & [fun_index] = instances } }
 		# (FI_Function fun_info, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 		= { ti & ti_fun_heap = ti_fun_heap <:= (fun_def_ptr, FI_Function { fun_info & gf_instance_info = instances })}
-/*
-	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
-		 = { ti & ti_instances = { ti_instances & [glob_object] = instances } }
-	update_instance_info (SK_GeneratedFunction fun_def_ptr _) instances ti=:{ti_fun_heap}
-		# (FI_Function fun_info, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-		= { ti & ti_fun_heap = ti_fun_heap <:= (fun_def_ptr, FI_Function { fun_info & gf_instance_info = instances })}
-*/
 
 	complete_application symb form_arity args []
 		= (symb, args, [])
