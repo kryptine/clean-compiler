@@ -45,6 +45,7 @@ static void PrintUnaryState (StateKind kind, ObjectKind obj, File file)
 		case TupleObj: FPutS ("Tuple ", file); break;
 		case ListObj: FPutS ("List ", file); break;
 		case ProcIdObj: FPutS ("ProcId ", file); break;
+		case RecordObj: FPutS ("Record ", file); break;
 	}
 }
 
@@ -129,8 +130,11 @@ static void DPrintTypeVar (TypeVar tv, Node follow, File file)
 
 static void PrintArgument (Args arg,Bool brackets,int n_leading_spaces,File file)
 {
-	/*
+	/*	
 	PrintState (arg->arg_state, file);
+	
+	if ((arg->arg_state.state_mark & STATE_UNIQUE_MASK)!=0)
+		FPrintF (file,"*");
 	*/
 	
 	if (arg->arg_node->node_kind==NodeIdNode)
@@ -171,7 +175,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 */
 	switch (node -> node_kind){
 	case NormalNode:
-	case PrefixNode:
 	{
 		Symbol node_symb = node->node_symbol;
 	
@@ -247,7 +250,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 
 		FPutC ('\n',file);
 		print_spaces (n_leading_spaces+4,file);
-#if 1
+#if 0
 # ifdef PRINT_NODE_ID_REF_COUNTS
 		FPutS ("[ ", file);
 		{
@@ -289,7 +292,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		FPutC ('\n',file);
 		print_spaces (n_leading_spaces+4,file);
 
-#if 1
+#if 0
 # ifdef PRINT_NODE_ID_REF_COUNTS
 		FPutS ("[ ", file);
 		{
@@ -530,12 +533,15 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 	}
 	case GuardNode:
 		FPutS ("Guard ",file);
-		PrintArguments (node->node_arguments,'\n',True,n_leading_spaces,file);
-		
+		PrintArgument (node->node_arguments,True,n_leading_spaces,file);
+		FPutC ('\n',file);
+		print_spaces (n_leading_spaces,file);
+		PrintArgument (node->node_arguments->arg_next,True,n_leading_spaces,file);
+
 		if (node->node_node_defs!=NULL){
 			FPutC ('\n', file);
 			print_spaces (n_leading_spaces,file);
-			FPutS ("{\n",file);
+			FPutS ("with {\n",file);
 			PrintNodeDefs (node->node_node_defs,n_leading_spaces+4,file);
 			print_spaces (n_leading_spaces,file);
 			FPutS ("}\n", file);
@@ -773,7 +779,10 @@ static void PrintTypeContext (TypeContext type_context, File file)
 	SymbolList symbols;
 	
 	for (symbols = type_context -> tyco_symbols; symbols; symbols = symbols -> sl_next)
-	{	PrintSymbol (symbols -> sl_symbol -> sdef_class -> cd_symbol, file);
+	{
+#ifndef CLEAN2
+		PrintSymbol (symbols -> sl_symbol -> sdef_class -> cd_symbol, file);
+#endif
 		FPutC (' ', file);
 		DPrintTypeVar (type_context -> tyco_variable, NULL, file);
 	}
