@@ -15,7 +15,7 @@ isNilPtr 	:: !(Ptr v) -> Bool
 
 newPtr		:: !v !*(Heap v) -> (!.Ptr v,!.Heap v)
 
-readPtr		:: !(Ptr v) !*(Heap v) -> (!v,!.Heap v)
+readPtr		:: !(Ptr v) !u:(Heap v) -> (!v,!u:Heap v)
 
 writePtr	:: !(Ptr v) !v !*(Heap v) -> .Heap v
 

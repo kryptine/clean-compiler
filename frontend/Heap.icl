@@ -47,7 +47,7 @@ isNilPtr p = code {
 };
 
 
-readPtr :: !(Ptr v) !*(Heap v) -> (!v,!.Heap v);
+readPtr :: !(Ptr v) !u:(Heap v) -> (!v,!u:Heap v);
 readPtr p h = code {
 	push_a_b 1
 	push_r_args_b 0 1 1 1 1
