@@ -249,7 +249,7 @@ wantModule iclmodule file_id=:{id_name} hash_table error searchPaths pre_def_sym
 	= case openScanner file_name searchPaths files of
 		(Yes scanState, files) -> initModule file_name scanState pre_def_symbols files
 		(No       , files) -> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
-							  (False, mod, hash_table, error <<< "Could not open: " <<< file_name, pre_def_symbols, files)
+							  (False, mod, hash_table, error <<< "Could not open: " <<< file_name <<< "\n", pre_def_symbols, files)
 where
 	initModule :: String ScanState !*PredefinedSymbols *Files -> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
 	initModule file_name scanState pre_def_symbols files
@@ -362,32 +362,40 @@ tryDefinition context pState
 where
 	try_definition :: !ParseContext !Token !Position !ParseState -> (!Bool, ParsedDefinition, !ParseState)
 	try_definition context DoubleColonToken pos pState
-		# (def, pState) = wantTypeDef context pos pState
-		= (True, def, pState)
+		| ~(isGlobalContext context)
+			= (False,abort "no def(3)",parseError "definition" No "type definitions are only at the global level" pState)
+			# (def, pState) = wantTypeDef context pos pState
+			= (True, def, pState)
 	try_definition _ ImportToken pos pState
-// RWS ...
+		| ~(isGlobalContext context)
+			= (False,abort "no def(3)",parseError "definition" No "imports are only at the global level" pState)
 		# (token, pState) = nextToken FunctionContext pState
 		| token == CodeToken && isIclContext context
 		# (importedObjects, pState) = wantCodeImports pState
 		= (True, PD_ImportedObjects importedObjects, pState)
 		# pState = tokenBack pState
-// ... RWS
 		# (imports, pState) = wantImports pState
    		= (True, PD_Import imports, pState)
 	try_definition _ FromToken pos pState
-		# (imp, pState) = wantFromImports pState
-   		= (True, PD_Import [imp], pState) -->> imp
+		| ~(isGlobalContext context)
+			= (False,abort "no def(3)",parseError "definition" No "imports are only at the global level" pState)
+			# (imp, pState) = wantFromImports pState
+	   		= (True, PD_Import [imp], pState) -->> imp
 /*	try_definition _ ExportToken pos pState
 		# (exports, pState) = wantExportDef pState
    		= (True, PD_Export exports, pState)
 	try_definition _ ExportAllToken pos pState
    		= (True, PD_Export ExportAll, pState)
 */	try_definition context ClassToken pos pState
-   		# (classdef, pState) = wantClassDefinition context pos pState
-   		= (True, classdef, pState)
+		| ~(isGlobalContext context)
+			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
+	   		# (classdef, pState) = wantClassDefinition context pos pState
+	   		= (True, classdef, pState)
 	try_definition context InstanceToken pos pState
-   		# (instdef, pState) = wantInstanceDeclaration context pos pState
-   		= (True, instdef, pState)
+		| ~(isGlobalContext context)
+			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
+	   		# (instdef, pState) = wantInstanceDeclaration context pos pState
+	   		= (True, instdef, pState)
 	try_definition context token pos pState
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState
@@ -445,8 +453,9 @@ where
 				= (PD_TypeSpec pos name prio (Yes tspec) SP_None, wantEndOfDefinition "type definition (4)" pState)
 			= (PD_TypeSpec pos name prio No SP_None, wantEndOfDefinition "type defenition (5)" (tokenBack pState))
 	want_rhs_of_def context (No, args) token pos pState
-		# pState = want_node_def_token pState token
-  		  (rhs, pState) = wantRhs isEqualToken (tokenBack pState)
+		# pState			= want_node_def_token pState token
+		  localsExpected	= isNotEmpty args || isGlobalContext context
+  		  (rhs, pState)		= wantRhs isEqualToken localsExpected (tokenBack pState)
 		| isGlobalContext context
  			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
  			= (PD_NodeDef pos (combine_args args) rhs, pState)
@@ -459,7 +468,7 @@ where
 		combine_args args	= PE_List args
 	want_rhs_of_def context (Yes (name, False), []) token pos pState
 		| isIclContext context && isLocalContext context && (token == DefinesColonToken || token == EqualToken)
-			# (rhs, pState) = wantRhs (\_ -> True) (tokenBack pState)
+			# (rhs, pState) = wantRhs (\_ -> True) False (tokenBack pState)
 			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 	want_rhs_of_def context (Yes (name, is_infix), args) token pos pState
 		# (fun_kind, code_allowed, pState)  = token_to_fun_kind pState token
@@ -471,11 +480,12 @@ where
   			// otherwise // ~ code_allowed
   				= (PD_Function pos name is_infix args rhs fun_kind, parseError "rhs of def" No "no code" pState)
 		# pState = tokenBack (tokenBack pState)
-		  (rhs, pState) = wantRhs isRhsStartToken pState
+		  localsExpected = isNotEmpty args || isGlobalContext context
+		  (rhs, pState) = wantRhs isRhsStartToken localsExpected pState
 		= case fun_kind of
 			FK_Function  | isDclContext context
 				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
-			FK_Caf | ~(isEmpty args)
+			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
   			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
 	where
@@ -614,10 +624,10 @@ where
 	ExprWithLocals		=	[ LetBefore ] sep RootExpression endOfDefinition [ LocalFunctionDefs ]
 */
 
-wantRhs :: !(!Token -> Bool) !ParseState -> (Rhs, !ParseState) // FunctionAltDefRhs
-wantRhs separator pState
+wantRhs :: !(!Token -> Bool) !Bool !ParseState -> (Rhs, !ParseState) // FunctionAltDefRhs
+wantRhs separator localsExpected pState
 	# (alts, pState)	= want_LetsFunctionBody separator pState
-	  (locals, pState)	= optionalLocals WhereToken pState
+	  (locals, pState)	= optionalLocals WhereToken localsExpected pState
 	= ({ rhs_alts = alts, rhs_locals = locals}, pState)
 where
 	want_LetsFunctionBody :: !(!Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState) 
@@ -684,7 +694,7 @@ where
 		| sep token
 		# (expr, pState)	= wantExpression cIsNotAPattern pState
 		  pState			= wantEndRootExpression pState
-		  (locals,pState)	= optionalLocals WithToken pState
+		  (locals,pState)	= optionalLocals WithToken localsExpected pState
 		= ( Yes	{ ewl_nodes		= nodeDefs
 				, ewl_expr		= expr
 				, ewl_locals	= locals
@@ -729,7 +739,7 @@ where
 			# pState			= wantToken FunctionContext "let definition" EqualToken pState
 			  (rhs_exp, pState) = wantExpression cIsNotAPattern pState
 			  pState			= wantEndRootExpression pState -->> ("#",lhs_exp,"=",rhs_exp)
-	  	  	  (locals , pState) = optionalLocals WithToken pState
+	  	  	  (locals , pState) = optionalLocals WithToken localsExpected pState
 			=	( True
 				, {	ndwl_strict	= strict
 				  ,	ndwl_def	= { bind_dst = lhs_exp
@@ -742,13 +752,13 @@ where
 		// otherwise // ~ succ
 			= (False, abort "no definition", pState)
 
-optionalLocals :: !Token !ParseState -> (!LocalDefs, !ParseState)
-optionalLocals dem_token pState
+optionalLocals :: !Token !Bool !ParseState -> (!LocalDefs, !ParseState)
+optionalLocals dem_token localsExpected pState
     # (off_token, pState) = nextToken FunctionContext pState
 	| dem_token == off_token
 		= wantLocals pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
-	| off_token == CurlyOpenToken && ~ ss_useLayout 
+	| off_token == CurlyOpenToken && ~ ss_useLayout && localsExpected
 		= wantLocals (tokenBack pState)
 	// otherwise
 		= (LocalParsedDefs [], tokenBack pState)
@@ -904,13 +914,15 @@ wantClassDefinition context pos pState
   	| token == DoubleColonToken
 		= want_overloaded_function pos class_or_member_name prio class_arity class_args class_cons_vars contexts pState
 	| might_be_a_class
-		| token == WhereToken
+		# (begin_members, pState) = begin_member_group token pState
+		| begin_members
 			# (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
-		 	  (members, pState) = wantDefinitions context pState
+		 	  (members, pState) = wantDefinitions (SetLocalContext context) pState
   		  	  class_def = { class_name = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }}
-			= (PD_Class class_def members, wantEndGroup "class" pState)
+	    	  pState = wantEndGroup "class" pState
+			= (PD_Class class_def members, pState)
 		| isEmpty contexts
 			= (PD_Erroneous, parseError "Class Definition" (Yes token) "<class definition>: contexts" pState)
 		// otherwise
@@ -923,6 +935,25 @@ wantClassDefinition context pos pState
 			= (PD_Class class_def [], pState)
 		= (PD_Erroneous, parseError "Class Definition" (Yes token) "<class definition>" pState)
 	where
+		begin_member_group token pState // For JvG layout
+			# (token, pState)
+				= case token of
+					SemicolonToken	->	nextToken TypeContext pState
+					_				->	(token, pState)
+			# (ss_useLayout, pState) = accScanState UseLayout pState
+			| token == WhereToken
+				# (token, pState) = nextToken TypeContext pState
+				| token == CurlyOpenToken
+					| ss_useLayout
+						= (True, parseError "class definition" No "No { in layout mode" pState) 
+						= (True, pState)
+					= (True, tokenBack pState)
+			| token == CurlyOpenToken 
+				| ss_useLayout
+					= (True, parseError "class definition" (Yes CurlyOpenToken) "in layout mode the keyword where is" pState) 
+					= (True, pState)
+				= (False, pState) // token is still known: no tokenBack
+		
 		want_class_or_member_name pState 
 			# (token, pState) = nextToken TypeContext pState
 			| token == OpenToken
@@ -966,7 +997,6 @@ wantClassDefinition context pos pState
 				= (arity, [var : class_vars], cons_vars bitor (1 << arg_nr))
 				= (arity, [var : class_vars], cons_vars)
 
-// Sjaak ...
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration context pi_pos pState
 	# (class_name, pState) = want pState
@@ -974,10 +1004,9 @@ wantInstanceDeclaration context pi_pos pState
 	  ((pi_types, pi_context), pState) = want_instance_type pState
 	  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
 	| isIclContext context
-		# pState = wantToken FunctionContext "instance declaration" WhereToken pState
-		  pState = wantBeginGroup "instance" pState
+		# pState = want_begin_group pState
 		  (pi_members, pState) = wantDefinitions context pState
-		  pState = wantEndLocals pState
+		  pState = wantEndGroup "instance" pState
 
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
 						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos }, pState)
@@ -1000,8 +1029,25 @@ wantInstanceDeclaration context pi_pos pState
 			  pState = wantEndOfDefinition "instance declaration" pState
 			= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
 							pi_members = [], pi_specials = specials, pi_pos = pi_pos}, pState)
-// ... Sjaak
 where
+	want_begin_group pState  // For JvG layout
+		# (token, pState) = nextToken TypeContext pState
+		  (token, pState)
+			= case token of
+				SemicolonToken	->	nextToken TypeContext pState
+				_				->	(token, pState)
+		= case token of
+			WhereToken	-> wantBeginGroup "instance declaration" pState
+			CurlyOpenToken
+				# (ss_useLayout, pState) = accScanState UseLayout pState
+				| ss_useLayout
+					-> parseError "instance declaration" (Yes token) "where" pState
+					-> pState
+			_	# (ss_useLayout, pState) = accScanState UseLayout pState
+				| ss_useLayout
+					-> parseError "instance declaration" (Yes token) "where" pState
+					-> parseError "instance declaration" (Yes token) "where or {" pState
+
 	want_instance_type pState
 		# (pi_types, pState)	= wantList "instance types" tryBrackType pState
 //		# (pi_types, pState)	= wantList "instance types" tryType pState	// This accepts 1.3 syntax, but is wrong for multiparameter classes
@@ -1717,8 +1763,8 @@ combineExpressions expr exprs
 where
 	make_app_exp exp []
 		= exp
-	make_app_exp (PE_Bound be=:{ bind_src}) exps
-		= PE_Bound { be & bind_src = make_app_exp bind_src exps }
+//	make_app_exp (PE_Bound be=:{ bind_src}) exps
+//		= PE_Bound { be & bind_src = make_app_exp bind_src exps }
 	make_app_exp exp exprs
 		= PE_List [exp : exprs]
 
@@ -2053,7 +2099,7 @@ where
 	tryCaseAlt pState
 		# (succ, pattern, pState) = try_pattern pState
 		| succ
-			# (rhs, pState) = wantRhs caseSeperator pState
+			# (rhs, pState) = wantRhs caseSeperator True pState
 			= (True, { calt_pattern = pattern, calt_rhs = rhs }, pState) // -->> ("case alt", pattern)
 		// otherwise // ~ succ
 			= (False, abort "no case alt", pState)
@@ -2063,13 +2109,13 @@ where
 		# (token, pState)	= nextToken FunctionContext pState
 		| caseSeperator token
 			#	pState			= tokenBack pState
-				(rhs, pState)	= wantRhs caseSeperator pState
+				(rhs, pState)	= wantRhs caseSeperator True pState
 			= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState) // -->> ("default case alt")
 		| token == OtherwiseToken
 			# (token, pState)	= nextToken FunctionContext pState
 			  pState			= tokenBack pState
 			| caseSeperator token
-				# (rhs, pState) = wantRhs caseSeperator pState
+				# (rhs, pState) = wantRhs caseSeperator True pState
 				= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState) // -->> ("default case alt")
 				= (False, abort "no case alt", pState)
 			= (False, abort "no case alt", tokenBack pState)
@@ -2243,7 +2289,8 @@ where
 						=	equal_selectors a.nu_selectors b.nu_selectors
 			 			where
 							equal_selectors :: [ParsedSelection] [ParsedSelection] -> Bool
-							equal_selectors [PS_Record ident1 _ : [_]] [PS_Record ident2 _ : [_]]
+							equal_selectors [PS_Record ident1 _ ,_ : _] [PS_Record ident2 _ ,_: _]
+							// equal_selectors [PS_Record ident1 _ : [_]] [PS_Record ident2 _ : [_]]
 								=	ident1.id_name == ident2.id_name
 							equal_selectors _ _
 								=	False
@@ -2258,7 +2305,7 @@ where
 			is_record_select _
 				=	False
 
-			transform_record_update :: (Optional Ident) ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
+/*			transform_record_update :: (Optional Ident) ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
 			transform_record_update record_type expr groupedUpdates level pState
 				# (assignments, (optionalIdent, record_type,pState))
 					=	mapSt (transform_update level) groupedUpdates (No, record_type,pState)
@@ -2266,6 +2313,16 @@ where
 				  	=	build_update record_type optionalIdent expr assignments
 				=	(updateExpr, pState)
 				where
+*/
+			transform_record_update :: (Optional Ident) ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
+			transform_record_update record_type expr groupedUpdates level pState
+				=	(updateExpr, pState2)
+				where
+					/* final_record_type on a cycle */
+					(assignments, (optionalIdent, final_record_type,pState2))
+						= mapSt (transform_update level) groupedUpdates (No, record_type,pState)
+					updateExpr
+						= build_update record_type optionalIdent expr assignments
 					// transform one group of nested updates with the same first field
 					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
 					//  (id is ident to shared expression that's being updated)
@@ -2278,7 +2335,8 @@ where
 						# (shareIdent, pState)
 							=	make_ident optionalIdent level pState
 						  select
-						  	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent /*JVG No */ field_record_type]
+						  	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
+						//	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent field_record_type]
 						  (update_expr, pState)
 						  	=	transform_record_or_array_update No select (map sub_update updates) (level+1) pState
 						=	({bind_dst = fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
@@ -2585,7 +2643,7 @@ wantEndLocals :: !ParseState -> ParseState
 wantEndLocals pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == EndOfFileToken
+	| token == EndOfFileToken && ss_useLayout
 		= tokenBack pState
 	| ss_useLayout
 		= case token of
