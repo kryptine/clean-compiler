@@ -7,8 +7,8 @@ import Heap
 import backendsupport
 import RWSDebug
 
-backendPreprocess :: !Ident ![Index] !IclModule !*VarHeap -> *VarHeap
-backendPreprocess aliasDummyId functionIndices iclModule varHeap
+backEndPreprocess :: !Ident ![Index] !IclModule !*VarHeap -> *VarHeap
+backEndPreprocess aliasDummyId functionIndices iclModule varHeap
 	=	preprocess aliasDummyId
 					[iclModule.icl_functions.[i] \\ i <- functionIndices] varHeap
 

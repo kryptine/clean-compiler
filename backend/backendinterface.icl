@@ -12,11 +12,11 @@ checkVersion VersionsAreCompatible errorFile
 	=	(True, errorFile)
 checkVersion VersionObservedIsTooNew errorFile
 	#	errorFile
-			=	fwrites "[Backend] the backend library is too new\n" errorFile
+			=	fwrites "[Backend] the back end library is too new\n" errorFile
 	=	(False, errorFile)
 checkVersion VersionObservedIsTooOld errorFile
 	#	errorFile
-			=	fwrites "[Backend] the backend library is too old\n" errorFile
+			=	fwrites "[Backend] the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
 backEndInterface :: !{#Char} [{#Char}] !PredefinedSymbols !*FrontEndSyntaxTree !*File !*Files -> (!Bool, !*File, !*Files)
@@ -44,7 +44,7 @@ backEndInterface outputFileName commandLineArgs predefs syntaxTree errorFile fil
 	| not compatible
 		=	(False, errorFile, files)
 	# varHeap
-		=	backendPreprocess predefs.[PD_DummyForStrictAliasFun].pds_ident functionIndices
+		=	backEndPreprocess predefs.[PD_DummyForStrictAliasFun].pds_ident functionIndices
 								syntaxTree.fe_icl syntaxTree.fe_varHeap
 		with
 			functionIndices
