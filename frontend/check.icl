@@ -1718,6 +1718,14 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  (dcls_import_list, dcl_modules, cs)
 	  		= addImportedSymbolsToSymbolTable nr_of_modules (Yes dcl_macros) modules_in_component_set
 	  				imports_ikh dcl_modules cs
+				
+// MV ...
+	  (x_main_dcl_module,cs)
+	  	= cs!cs_x.x_main_dcl_module_n
+	  cs = cs
+//		<=< adjust_predef_symbol PD_ModuleType x_main_dcl_module STE_Type
+		<=< adjust_predef_symbol PD_ModuleConsSymbol x_main_dcl_module STE_Constructor
+// .. MV
 
 	  (dcl_modules, icl_functions, hp_expression_heap, cs)
 			= checkExplicitImportCompleteness imports.si_explicit
@@ -2677,6 +2685,20 @@ where
 				= getClassDef ins_class mod_index com_class_defs modules
 	 	= (size class_members + sum, com_class_defs, modules)
 
+// MV...
+adjust_predef_symbol predef_index mod_index symb_kind cs=:{cs_predef_symbols,cs_symbol_table,cs_error}
+	# (pre_symb, cs_predef_symbols) = cs_predef_symbols![predef_index]
+	# pre_id = pre_symb.pds_ident
+	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
+	| pre_index <> NoIndex
+		= { cs & cs_predef_symbols = {cs_predef_symbols & [predef_index] = { pre_symb & pds_def = pre_index, pds_module = mod_index }}}
+		= { cs & cs_predef_symbols = cs_predef_symbols, cs_error = checkError pre_id " function not defined" cs_error }
+where
+	determine_index_of_symbol {ste_kind, ste_index} symb_kind
+		| ste_kind == symb_kind
+			= ste_index
+			= NoIndex
+// ... MV
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })

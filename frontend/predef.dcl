@@ -14,7 +14,6 @@ import syntax, hashtable
 /* identifiers not present the hastable */
 
 
-
 PD_PredefinedModule			:== 0
 
 PD_StringType				:== 1
@@ -69,7 +68,7 @@ PD_UnqArraySizeFun			:== 119
 /* Enum/Comprehension functions */
 
 PD_SmallerFun				:== 120
-PD_LessOrEqualFun:==121
+PD_LessOrEqualFun:== 121
 PD_SubFun:==122
 PD_IncFun					:== 123
 PD_From						:== 124
@@ -90,44 +89,49 @@ PD_variablePlaceholder		:== 133
 PD_StdDynamics				:== 134
 PD_undo_indirections		:== 135
 
+// MV ...
+//PD_ModuleType				:== 136
+PD_ModuleConsSymbol			:== 137
+// ... MV
+
 /* Generics */
-PD_StdGeneric				:== 136
-PD_TypeISO					:== 137
-PD_ConsISO					:== 138
-PD_iso_to					:== 139
-PD_iso_from					:== 140
+PD_StdGeneric				:== 138
+PD_TypeISO					:== 139
+PD_ConsISO					:== 140
+PD_iso_to					:== 141
+PD_iso_from					:== 142
 
-PD_TypeUNIT					:== 141
-PD_ConsUNIT					:== 142
-PD_TypeEITHER				:== 143
-PD_ConsLEFT					:== 144
-PD_ConsRIGHT				:== 145
-PD_TypePAIR					:== 146
-PD_ConsPAIR					:== 147
-PD_TypeARROW				:== 148
-PD_ConsARROW				:== 149
+PD_TypeUNIT					:== 143
+PD_ConsUNIT					:== 144
+PD_TypeEITHER				:== 145
+PD_ConsLEFT					:== 146
+PD_ConsRIGHT				:== 147
+PD_TypePAIR					:== 148
+PD_ConsPAIR					:== 149
+PD_TypeARROW				:== 150
+PD_ConsARROW				:== 151
 
-PD_TypeConsDefInfo			:== 150 
-PD_ConsConsDefInfo			:== 151
-PD_TypeTypeDefInfo			:== 152 
-PD_ConsTypeDefInfo			:== 153
-PD_cons_info				:== 154
-PD_TypeCONS					:== 155
-PD_ConsCONS					:== 156
+PD_TypeConsDefInfo			:== 152 
+PD_ConsConsDefInfo			:== 153
+PD_TypeTypeDefInfo			:== 154 
+PD_ConsTypeDefInfo			:== 155
+PD_cons_info				:== 156
+PD_TypeCONS					:== 157
+PD_ConsCONS					:== 158
 
-PD_isomap_ARROW_			:== 157
-PD_isomap_ID				:== 158
+PD_isomap_ARROW_			:== 159
+PD_isomap_ID				:== 160
 
 /* StdMisc */
-PD_StdMisc					:== 159
-PD_abort					:== 160
-PD_undef					:== 161
+PD_StdMisc					:== 161
+PD_abort					:== 162
+PD_undef					:== 163
 
-PD_Start					:== 162
+PD_Start					:== 164
 
-PD_DummyForStrictAliasFun	:== 163
+PD_DummyForStrictAliasFun	:== 165
 
-PD_NrOfPredefSymbols		:== 164
+PD_NrOfPredefSymbols		:== 166
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

@@ -1103,12 +1103,16 @@ where
 				-> (fun_defs, symbol_table)
 
 expandMacrosInBody :: [.FunCall] CheckedBody PredefinedSymbol /* MV ... */ !Int /* ... MV */ *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],/* MV ... */ !FunInfo, /* ... MV */ .ExpandState);
-expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current_fun_index /* ... MV */ es=:{es_symbol_table,es_fun_defs}
+expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current_fun_index /* ... MV */ es=:{es_symbol_heap,es_fun_defs}
 // MV ...
 	# (fun_def=:{fun_info},es_fun_defs)
 		= es_fun_defs![es_current_fun_index]
+	# (max_index,es_symbol_heap)
+		= determine_amount_of_dynamics 0 fun_info.fi_dynamics es_symbol_heap 
+	# (es=:{es_symbol_table,es_fun_defs})
+		= { es & es_symbol_heap = es_symbol_heap, es_fun_defs = es_fun_defs } 
 	# cos_used_dynamics
-		= createArray (length fun_info.fi_dynamics) False // means not removed
+		= createArray (inc max_index) False // means not removed
 // ... MV
 
 	# (prev_calls, fun_defs, es_symbol_table)
@@ -1144,15 +1148,28 @@ where
 		# (EI_Dynamic _ id)
 			= expr_info
 		| cos_used_dynamics.[id]
-			// cos_removed_dynamic means cos_used_dynamic
 			= (changed,[dyn_expr_ptr:accu],cos_used_dynamics,cos_symbol_heap)
-		
-		
+	
 			// unused
 			= (True,accu,cos_used_dynamics,cos_symbol_heap)
 	where
 		isEI_Dynamic (EI_Dynamic _ _)	= True
 		isEI_Dynamic _					= False
+
+	determine_amount_of_dynamics max_index [] es_symbol_table
+		= (max_index,es_symbol_table)
+	determine_amount_of_dynamics max_index [expr_info_ptr:expr_info_ptrs] es_symbol_table
+		# (expr_info,es_symbol_table)
+			= readPtr expr_info_ptr es_symbol_table
+		# (max_index,es_symbol_table)
+			= case expr_info of
+				EI_Dynamic _ id
+					-> (max max_index id,es_symbol_table)
+				EI_DynamicTypeWithVars _ _ expr_info_ptrs2
+					-> determine_amount_of_dynamics max_index expr_info_ptrs2 es_symbol_table
+				// EI_DynamicType _ expr_info_ptrs2
+				//	-> determine_amount_of_dynamics max_index expr_info_ptrs2 es_symbol_table
+		= determine_amount_of_dynamics max_index expr_info_ptrs es_symbol_table
 // ... MV
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
