@@ -928,3 +928,25 @@ where
 		= ok_coercions
 	check_demanded_attribute_vars av_group_nr _ partition (ok, coercions)
 		= (False, coercions)
+
+copyCoercions :: *Coercions -> (*Coercions, *Coercions)
+copyCoercions coercions=:{coer_demanded, coer_offered}
+	# (coer_demanded_copy, coer_demanded) = copy_coercion_trees coer_demanded
+	# (coer_offered_copy, coer_offered) = copy_coercion_trees coer_offered
+	= ({coercions & coer_demanded = coer_demanded, coer_offered = coer_offered}, {coercions & coer_demanded = coer_demanded_copy, coer_offered = coer_offered_copy})
+where
+	copy_coercion_trees trees
+		= arrayAndElementsCopy CT_Empty copy_coercion_tree trees
+
+	copy_coercion_tree (CT_Node attr left right)
+		# (copy_left, left) = copy_coercion_tree left
+		# (copy_right, right) = copy_coercion_tree right
+		= (CT_Node attr copy_left copy_right, CT_Node attr left right)
+	copy_coercion_tree tree=:CT_Empty
+		= (CT_Empty, tree)
+	copy_coercion_tree tree=:CT_Unique
+		= (CT_Unique, tree)
+	copy_coercion_tree tree=:CT_NonUnique
+		= (CT_NonUnique, tree)
+	copy_coercion_tree tree=:CT_Existential
+		= (CT_Existential, tree)

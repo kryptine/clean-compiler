@@ -4,7 +4,6 @@ implementation module utilities
 import	StdEnv, general
 
 from _aconcat import arrayConcat
-    
 
 /*
 		Utility routines.

@@ -67,3 +67,5 @@ class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*Expan
 instance expandType AType
 
 checkExistentionalAttributeVars :: [TempAttrId] !AttributePartition !*{! CoercionTree} -> (!Bool,!*{! CoercionTree})
+
+copyCoercions :: *Coercions -> (*Coercions, *Coercions)
