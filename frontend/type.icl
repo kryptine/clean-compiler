@@ -2225,7 +2225,7 @@ where
 					# (error=:{ea_file})
 							= errorHeading "Uniqueness error" error
 					  (coercion_env, copy_coercion_env)
-					  		= arrayCopy coercion_env
+					  		= uniqueCopy coercion_env
 					  format
 					  		= { form_properties = cMarkAttribute,
 					  			form_attr_position = Yes (reverse positions, copy_coercion_env) }			
@@ -2488,6 +2488,13 @@ where
 			CheckedType _
 				-> ts
 
+uniqueCopy :: !*a -> (!*a, !*a)
+uniqueCopy x =
+	code
+	{	.inline uniqueCopy
+			push_a 0
+		.end
+	}
 is_rare_name {id_name}
 	= id_name.[0]=='_'
 
