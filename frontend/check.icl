@@ -938,7 +938,7 @@ checkCommonDefinitions opt_icl_info module_index  common modules type_heaps var_
 	  (size_com_cons_defs,com_cons_defs) = usize com_cons_defs
 
 	  (com_class_defs, com_member_defs, modules, com_type_defs, com_selector_defs, com_cons_defs, type_heaps, var_heap, cs_symbol_table)
-	  	= createClassDictionaries2 module_index com_class_defs com_member_defs modules com_type_defs com_selector_defs com_cons_defs
+	  	= createClassDictionaries module_index com_class_defs com_member_defs modules com_type_defs com_selector_defs com_cons_defs
 	  		type_heaps var_heap cs.cs_symbol_table
 
 	= ({common & com_type_defs = com_type_defs, com_cons_defs = com_cons_defs, com_selector_defs = com_selector_defs, com_class_defs = com_class_defs,

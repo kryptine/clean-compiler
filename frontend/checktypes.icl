@@ -1223,7 +1223,7 @@ where
    A later function puts these in their relevant arrays if necessary
 */
 
-createClassDictionaries2 ::
+createClassDictionaries ::
 	Index                   // Module index of dictionary being converted
 	*{#ClassDef}            // Array of classes to convert
 	u1:{#MemberDef}         // Array of class members of classes to convert
@@ -1246,7 +1246,7 @@ createClassDictionaries2 ::
 	)
  ,	[u1<=v1, u2<=v2, u3<=v3, u4<=v4, u5<=v5]
 
-createClassDictionaries2 modindex classdefs0 memberdefs0 dcls0 typedefs0 seldefs0 consdefs0 typeheaps0 vheap0 symboltable0
+createClassDictionaries modindex classdefs0 memberdefs0 dcls0 typedefs0 seldefs0 consdefs0 typeheaps0 vheap0 symboltable0
 = (classdefs1, memberdefs1, dcls1, typedefs1, seldefs1, consdefs1, typeheaps1, vheap1, symboltable1)
   where (classdefs1, memberdefs1, typedefs1, consdefs1, seldefs1, symboltable1, vheap1, typeheaps1, dcls1)
         = convert_classdefs get_classdef modindex (classdefs0, memberdefs0, typedefs0, consdefs0, seldefs0, symboltable0, vheap0, typeheaps0, dcls0)

@@ -20,12 +20,7 @@ checkSuperClasses :: ![TypeVar] ![TypeContext] !Index !u:{# CheckedTypeDef} !v:{
 checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType) !u:{# CheckedTypeDef} !u:{# DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
 	-> (!u:{# CheckedTypeDef}, !u:{# DclModule}, !*TypeHeaps, !*ExpressionHeap, !*CheckState)
 
-/*
-createClassDictionaries :: !Index !*{#ClassDef} !*{#MemberDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*SymbolTable
-	-> (!*{#ClassDef}, !*{#MemberDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*SymbolTable)
-*/
-
-createClassDictionaries2 ::
+createClassDictionaries ::
 	Index                   // Module index of dictionary being converted
 	*{#ClassDef}            // Array of classes to convert
 	u1:{#MemberDef}         // Array of class members of classes to convert
