@@ -44,7 +44,6 @@ import RWSDebug
 	}
 
 // MW4 added..
-// one TypeCoercionGroup collects coercions for one function alternative
 ::	TypeCoercionGroup =
 	{	tcg_type_coercions	:: ![TypeCoercion]
 	,	tcg_position		:: !Position
@@ -414,9 +413,10 @@ cannotUnify t1 t2 position err
 */
 
 cannotUnify t1 t2 position=:(CP_Expression expr) err=:{ea_loc=[ip:_]} 
-	= case tryToOptimizePosition expr ip of
-		Yes ident_pos
-			# err = pushErrorAdmin ident_pos err
+	= case tryToOptimizePosition expr of
+// MW0		Yes ident_pos
+		Yes (id_name, line)
+			# err = pushErrorAdmin { ip & ip_ident.id_name = id_name, ip_line = line } err
 			  err = errorHeading type_error err
 			  err = popErrorAdmin err
 			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
@@ -443,46 +443,14 @@ cannot_unify t1 t2 position err
 	= { err & ea_file = ea_file <<< '\n' }
 
 // MW4..
-tryToOptimizePosition (Case {case_ident=Yes {id_name}}) ip
-	= tryToOptimizePositionFromString id_name ip
-tryToOptimizePosition (App {app_symb={symb_name}}) ip
-	= tryToOptimizePositionFromString symb_name.id_name ip
-tryToOptimizePosition (fun @ _) ip
-	= tryToOptimizePosition fun ip
-tryToOptimizePosition _ _
+tryToOptimizePosition (Case {case_ident=Yes {id_name}})
+	= optBeautifulizeIdent id_name
+tryToOptimizePosition (App {app_symb={symb_name}})
+	= optBeautifulizeIdent symb_name.id_name
+tryToOptimizePosition (fun @ _)
+	= tryToOptimizePosition fun
+tryToOptimizePosition _
 	= No
-
-tryToOptimizePositionFromString id_name ip
-	# fst_semicolon_index = searchlArrElt ((==) ';') id_name 0
-	| fst_semicolon_index < size id_name
-		# snd_semicolon_index = searchlArrElt ((==) ';') id_name (fst_semicolon_index+1)
-		  prefix = id_name % (0, fst_semicolon_index-1)
-		  line = toInt (id_name % (fst_semicolon_index+1, snd_semicolon_index-1))
-		= Yes { ip & ip_ident = { id_name = prefix_to_readable_name prefix, id_info = nilPtr }, ip_line = line }
-	= No
-  where
-	prefix_to_readable_name "_c"	= "case"
-	prefix_to_readable_name "_g"	= "guard"
-	prefix_to_readable_name "_f"	= "filter"
-	prefix_to_readable_name "\\"	= "lambda"
-	prefix_to_readable_name prefix
-		| prefix.[0] == 'c'
-			= "comprehension"
-		| prefix.[0] == 'g'
-			= "generator"
-	prefix_to_readable_name _		= abort "fatal error 21 in type.icl"
-
-// search for an element in an array
-searchlArrElt p s i
-	:== searchl s i
-  where
-	searchl s i
-		| i>=size s
-			= i
-		| p s.[i]
-			= i
-		= searchl s (i+1)
-// ..MW4
 
 class unify a :: !a !a !TypeInput !*{! Type} !*TypeHeaps -> (!Bool, !*{! Type}, !*TypeHeaps)
 
@@ -1344,31 +1312,83 @@ where
 
 instance requirements Let
 where
+/* MW0 was
 	requirements ti {let_lazy_binds, let_strict_binds, let_expr, let_info_ptr} (reqs, ts)
 		# let_binds = let_strict_binds ++ let_lazy_binds
 		  (rev_var_types, ts) = make_base let_binds [] ts
 		  var_types = reverse rev_var_types
 		  (res_type, opt_expr_ptr, reqs_ts) = requirements ti let_expr (reqs, ts)
-		  (reqs, ts) = requirements_of_binds ti let_binds var_types reqs_ts
+ 		  (reqs, ts) = requirements_of_binds ti let_binds var_types reqs_ts
+		  ts_expr_heap = writePtr let_info_ptr (EI_LetType var_types) ts.ts_expr_heap
+		= ( res_type, opt_expr_ptr, ({ reqs & req_case_and_let_exprs = [let_info_ptr : reqs.req_case_and_let_exprs]},{ ts & ts_expr_heap = ts_expr_heap }))
+*/
+	requirements ti {let_lazy_binds, let_strict_binds, let_expr, let_info_ptr, let_expr_position } (reqs, ts)
+		# let_binds = let_strict_binds ++ let_lazy_binds
+		  (rev_var_types, ts) = make_base let_binds [] ts
+		  var_types = reverse rev_var_types
+		  (reqs, ts) = requirements_of_binds NoPos ti let_binds var_types (reqs, ts)
+		  (res_type, opt_expr_ptr, (reqs, ts)) = requirements_of_let_expr let_expr_position ti let_expr (reqs, ts)
 		  ts_expr_heap = writePtr let_info_ptr (EI_LetType var_types) ts.ts_expr_heap
 		= ( res_type, opt_expr_ptr, ({ reqs & req_case_and_let_exprs = [let_info_ptr : reqs.req_case_and_let_exprs]},{ ts & ts_expr_heap = ts_expr_heap }))
 	where
 	
-		make_base [{bind_src, bind_dst={fv_name, fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
+// MW0		make_base [{bind_src, bind_dst={fv_name, fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
+		make_base [{lb_src, lb_dst={fv_name, fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
 			# (v, ts) = freshAttributedVariable ts
-			  optional_position = if (is_rare_name fv_name) (Yes (CP_Expression bind_src)) No
+// MW0			  optional_position = if (is_rare_name fv_name) (Yes (CP_Expression bind_src)) No
+			  optional_position = if (is_rare_name fv_name) (Yes (CP_Expression lb_src)) No
 			= make_base bs [v:var_types] { ts & ts_var_heap = writePtr fv_info_ptr (VI_Type v optional_position) ts.ts_var_heap }
 		make_base [] var_types ts
 			= (var_types, ts)
 	
-		requirements_of_binds _ [] _ reqs_ts
+// MW0		requirements_of_binds _ [] _ reqs_ts
+		requirements_of_binds _ _ [] _ reqs_ts
 			= reqs_ts
+/* MW0
 		requirements_of_binds ti [{bind_src}:bs] [b_type:bts] reqs_ts
 			# (exp_type, opt_expr_ptr, (reqs, ts)) = requirements ti bind_src reqs_ts
 			  ts_expr_heap = storeAttribute opt_expr_ptr b_type.at_attribute ts.ts_expr_heap
 			  req_type_coercions = [ { tc_demanded = b_type, tc_offered = exp_type, tc_position = CP_Expression bind_src, tc_coercible = True }
 			  		: reqs.req_type_coercions ]
 			= requirements_of_binds ti bs bts ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap })
+*/
+		requirements_of_binds last_position ti [{lb_src, lb_position}:bs] [b_type:bts] reqs_ts
+			# position = if (is_a_new_position lb_position last_position) lb_position NoPos
+			  reqs_ts
+					= possibly_accumulate_reqs_in_new_group position (requirements_of_bind b_type ti lb_src) reqs_ts
+			= requirements_of_binds lb_position ti bs bts reqs_ts
+		  where
+			is_a_new_position (LinePos _ line_nr1) (LinePos _ line_nr2)
+				= line_nr1<>line_nr2
+			is_a_new_position (FunPos _ line_nr1 _) (FunPos _ line_nr2 _)
+				= line_nr1<>line_nr2
+			is_a_new_position _ _
+				= True
+
+			requirements_of_bind b_type ti lb_src reqs_ts
+				# (exp_type, opt_expr_ptr, (reqs, ts))
+						= requirements ti lb_src reqs_ts
+				  ts_expr_heap = storeAttribute opt_expr_ptr b_type.at_attribute ts.ts_expr_heap
+				  req_type_coercions = [ { tc_demanded = b_type, tc_offered = exp_type, tc_position = CP_Expression lb_src, tc_coercible = True }
+				  		: reqs.req_type_coercions ]
+				= ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap })
+
+		requirements_of_let_expr NoPos ti let_expr reqs_ts
+			= requirements ti let_expr reqs_ts
+		requirements_of_let_expr let_expr_position ti let_expr (reqs=:{req_type_coercions=old_req_type_coercions}, ts)
+			# reqs_with_empty_accu
+					= { reqs & req_type_coercions = [] }
+			  (res_type, opt_expr_ptr, (reqs_with_new_group_in_accu, ts))
+			  		= requirements ti let_expr (reqs_with_empty_accu, ts)
+			  new_group 
+			  		= { tcg_type_coercions = reqs_with_new_group_in_accu.req_type_coercions,
+			  			tcg_position = let_expr_position }
+			  reqs_with_new_group
+			  		= { reqs_with_new_group_in_accu & 
+			  				req_type_coercion_groups = [new_group:reqs_with_new_group_in_accu.req_type_coercion_groups],
+				  			req_type_coercions = old_req_type_coercions }
+			= (res_type, opt_expr_ptr, (reqs_with_new_group, ts))
+		
 
 instance requirements DynamicExpr
 where
@@ -1579,7 +1599,9 @@ where
 possibly_accumulate_reqs_in_new_group position state_transition reqs_ts
 	:== possibly_accumulate_reqs position reqs_ts
   where
-	possibly_accumulate_reqs position=:(FunPos _ _ _) (reqs=:{req_type_coercions=old_req_type_coercions}, ts)
+	possibly_accumulate_reqs NoPos reqs_ts
+		= state_transition reqs_ts
+	possibly_accumulate_reqs position (reqs=:{req_type_coercions=old_req_type_coercions}, ts)
 		# reqs_with_empty_accu
 				= { reqs & req_type_coercions = [] }
 		  (reqs_with_new_group_in_accu, ts)
@@ -1592,8 +1614,6 @@ possibly_accumulate_reqs_in_new_group position state_transition reqs_ts
 		  				req_type_coercion_groups = [new_group:reqs_with_new_group_in_accu.req_type_coercion_groups],
 			  			req_type_coercions = old_req_type_coercions }
 		= (reqs_with_new_group, ts)
-	possibly_accumulate_reqs _ reqs_ts
-		= state_transition reqs_ts
 
 // ..MW4
 makeBase _ _ [] [] ts_var_heap
@@ -1854,7 +1874,8 @@ where
 			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
 			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
 //					---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
-			= (fun_env, attr_var_env, type_heaps, expr_heap, specification_error clean_fun_type error)
+			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
+			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type error)
 	where
 		add_lifted_arg_types arity_diff args1 args2
 			| arity_diff > 0
@@ -2088,15 +2109,17 @@ where
 */
 	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
 	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
-		# (subst, heaps, ts_error) = foldSt (unify_requirements_of_alternative ip_ident ti) req_type_coercion_groups (subst, heaps, ts_error)
+		# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position ip_ident ti) req_type_coercion_groups (subst, heaps, ts_error)
 		= unify_requirements_of_functions reqs_list ti subst heaps ts_error
 	unify_requirements_of_functions [] ti subst heaps ts_error
 		= (subst, heaps, ts_error)
 
 // MW4 added..
-  	unify_requirements_of_alternative :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
+  	unify_requirements_within_one_position :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
  						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
-	unify_requirements_of_alternative fun_symb ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
+	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
+		= unify_coercions tcg_type_coercions ti subst heaps ts_error
+	unify_requirements_within_one_position fun_symb ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
 		# ts_error = setErrorAdmin (newPosition fun_symb tcg_position) ts_error
 		= unify_coercions tcg_type_coercions ti subst heaps ts_error
 // ..MW4

@@ -1034,10 +1034,17 @@ cIsNotStrict	:== False
 	}
 
 ::	Let =
-	{	let_strict_binds	:: !Env Expression FreeVar
-	,	let_lazy_binds		:: !Env Expression FreeVar
+	{	let_strict_binds	:: ![LetBind]
+	,	let_lazy_binds		:: ![LetBind]
 	,	let_expr			:: !Expression
 	,	let_info_ptr		:: !ExprInfoPtr
+	,	let_expr_position	:: !Position
+	}
+
+::	LetBind =
+	{	lb_dst		:: !FreeVar
+	,	lb_src		:: !Expression
+	,	lb_position	:: !Position
 	}
 
 ::	Conditional =
@@ -1160,7 +1167,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression, CoercionPosition, AttrInequality
+			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind
 
 instance == TypeAttribute
 instance == Annotation

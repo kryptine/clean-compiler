@@ -111,7 +111,12 @@ unboxError type err
 
 overloadingError op_symb err
 	# err = errorHeading "Overloading error" err
-	= { err & ea_file = err.ea_file <<< " internal overloading of \"" <<< op_symb <<< "\" could not be solved\n" }
+	  str = case optBeautifulizeIdent op_symb.id_name of
+	  			No
+	  				-> op_symb.id_name
+	  			Yes (str, line_nr)
+	  				-> str+++" [line "+++toString line_nr+++"]"
+	= { err & ea_file = err.ea_file <<< " internal overloading of \"" <<< str <<< "\" could not be solved\n" }
 
 /*
 	As soon as all overloaded variables in an type context are instantiated, context reduction is carried out.
@@ -736,7 +741,8 @@ where
 				| isEmpty let_binds
 					= (dict_expr, ({ heaps & hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap }, class_ptrs))
 					# (let_info_ptr, hp_expression_heap) = newPtr (EI_LetType let_types) hp_expression_heap
-					= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = dict_expr, let_info_ptr = let_info_ptr },
+// MW0					= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = dict_expr, let_info_ptr = let_info_ptr },
+					= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = dict_expr, let_info_ptr = let_info_ptr, let_expr_position = NoPos },
 						({ heaps & hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap }, [let_info_ptr : class_ptrs]))
 				# dictionary_args = build_class_members (size rc_inst_members) rc_inst_members rc_inst_module expressions context_size dictionary_args
 				  (dict_expr, hp_expression_heap, class_ptrs) = build_dictionary rc_class rc_types dictionary_args defs heaps.hp_expression_heap class_ptrs
@@ -771,13 +777,16 @@ where
 		  	  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		  	  fv = { fv_name = symb_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = nr_of_members }
 		  	  var = { var_name = symb_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
-			= ([{bind_src = dict, bind_dst = fv} : binds ], [ AttributedType class_type : types ], [Var var : rev_dicts], var_heap, expr_heap)
+// MW0			= ([{bind_src = dict, bind_dst = fv} : binds ], [ AttributedType class_type : types ], [Var var : rev_dicts], var_heap, expr_heap)
+			= ([{lb_src = dict, lb_dst = fv, lb_position = NoPos } : binds ], [ AttributedType class_type : types ],
+				[Var var : rev_dicts], var_heap, expr_heap)
 		bind_shared_dictionary nr_of_members dict=:(App {app_symb={symb_name}, app_info_ptr}) (binds, types, rev_dicts, var_heap, expr_heap)
 			# (EI_DictionaryType class_type, expr_heap) = readPtr app_info_ptr expr_heap
 		  	  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		  	  fv = { fv_name = symb_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = nr_of_members }
 		  	  var = { var_name = symb_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
-			= ([{bind_src = dict, bind_dst = fv} : binds ], [ AttributedType class_type : types ], [Var var : rev_dicts], var_heap, expr_heap)
+// MW0			= ([{bind_src = dict, bind_dst = fv} : binds ], [ AttributedType class_type : types ], [Var var : rev_dicts], var_heap, expr_heap)
+			= ([{lb_src = dict, lb_dst = fv, lb_position = NoPos} : binds ], [ AttributedType class_type : types ], [Var var : rev_dicts], var_heap, expr_heap)
 		bind_shared_dictionary nr_of_members dict (binds, types, rev_dicts, var_heap, expr_heap)
 			= (binds, types, [dict : rev_dicts], var_heap, expr_heap)
 
@@ -1209,8 +1218,10 @@ where
 			examine_calls_in_expr _ ui
 				= ui
 
-			examine_calls_bind {bind_src,bind_dst} ui=:{ui_local_vars}
-				= examine_calls_in_expr bind_src { ui & ui_local_vars = [bind_dst : ui_local_vars ]}
+// MW0			examine_calls_bind {bind_src,bind_dst} ui=:{ui_local_vars}
+// MW0				= examine_calls_in_expr bind_src { ui & ui_local_vars = [bind_dst : ui_local_vars ]}
+			examine_calls_bind {lb_src,lb_dst} ui=:{ui_local_vars}
+				= examine_calls_in_expr lb_src { ui & ui_local_vars = [lb_dst : ui_local_vars ]}
 
 		examine_calls [] ui
 			= ui
@@ -1251,6 +1262,12 @@ where
 		= (TupleSelect symbol argn_nr expr, ui)
 	updateExpression group_index expr ui
 		= (expr, ui)
+
+instance updateExpression LetBind
+where
+	updateExpression group_index bind=:{lb_src} ui
+		# (lb_src, ui) = updateExpression group_index lb_src ui
+		= ({bind & lb_src = lb_src }, ui)
 
 instance updateExpression (Bind a b) | updateExpression a
 where
@@ -1352,7 +1369,8 @@ where
 			= ( Let {	let_strict_binds	= []
 					,	let_lazy_binds		= let_binds
 					,	let_expr			= expr
-					,	let_info_ptr		= let_info_ptr}
+					,	let_info_ptr		= let_info_ptr
+					,	let_expr_position	= NoPos} // MW0++
 					, ui)
 			= (expr, ui)
 	where
@@ -1397,10 +1415,13 @@ where
 				# (placeholder_symb, ui) = getSymbol PD_variablePlaceholder SK_Constructor 3 ui
 				  cyclic_var = {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 				  cyclic_fv = varToFreeVar cyclic_var 1	
-				= ({ bind_src = App {	app_symb = placeholder_symb,
+// MW0				= ({ bind_src = App {	app_symb = placeholder_symb,
+				= ({ lb_src = App {	app_symb = placeholder_symb,
 										app_args = [Var cyclic_var, Var cyclic_var],
 										app_info_ptr = nilPtr },
-					 bind_dst = varToFreeVar cyclic_var 1
+// MW0					 bind_dst = varToFreeVar cyclic_var 1
+					 lb_dst = varToFreeVar cyclic_var 1,
+					 lb_position = NoPos
 				   },
 				   { ui & ui_local_vars = [cyclic_fv : ui.ui_local_vars]})	
 	

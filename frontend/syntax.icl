@@ -995,10 +995,17 @@ cIsNotStrict	:== False
 	}
 
 ::	Let =
-	{	let_strict_binds	:: !Env Expression FreeVar
-	,	let_lazy_binds		:: !Env Expression FreeVar
+	{	let_strict_binds	:: ![LetBind]
+	,	let_lazy_binds		:: ![LetBind]
 	,	let_expr			:: !Expression
 	,	let_info_ptr		:: !ExprInfoPtr
+	,	let_expr_position	:: !Position
+	}
+
+::	LetBind =
+	{	lb_dst		:: !FreeVar
+	,	lb_src		:: !Expression
+	,	lb_position	:: !Position
 	}
 
 ::	DynamicExpr =
@@ -1082,7 +1089,6 @@ cIsNotStrict	:== False
 	,	ip_line		:: !Int
 	,	ip_file		:: !FileName
 	}
-
 
 :: FileName			:== String
 
@@ -1417,6 +1423,11 @@ where
 
 	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
 	
+instance <<< LetBind
+where
+	(<<<) file {lb_dst, lb_src}
+		= file <<< lb_dst <<< " = " <<< lb_src <<< "\n"
+
 instance <<< TypeCase
 where
 	(<<<) file {type_case_dynamic,type_case_patterns,type_case_default}

@@ -28,6 +28,12 @@ where
 	convertCases bound_vars group_index common_defs t ci
 		= app2St (convertCases bound_vars group_index common_defs, convertCases bound_vars group_index common_defs) t ci
 
+instance convertCases LetBind
+where
+	convertCases bound_vars group_index common_defs bind=:{lb_src} ci
+		# (lb_src, ci) = convertCases bound_vars group_index common_defs lb_src ci
+		= ({ bind & lb_src = lb_src }, ci)
+
 instance convertCases (Bind a b) | convertCases a
 where
 	convertCases bound_vars group_index common_defs bind=:{bind_src} ci
@@ -55,8 +61,10 @@ where
 			_
 				-> abort "convertCases [Let] (convertcases 53)" // <<- let_info 
 
-addLetVars [{bind_dst} : binds] [bind_type : bind_types] bound_vars
-	= addLetVars binds bind_types [ (bind_dst, bind_type) : bound_vars ]
+// MW0 addLetVars [{bind_dst} : binds] [bind_type : bind_types] bound_vars
+// MW0	= addLetVars binds bind_types [ (bind_dst, bind_type) : bound_vars ]
+addLetVars [{lb_dst} : binds] [bind_type : bind_types] bound_vars
+	= addLetVars binds bind_types [ (lb_dst, bind_type) : bound_vars ]
 addLetVars [] _ bound_vars
 	= bound_vars
 
@@ -805,8 +813,10 @@ where
 		# (let_expr, cp_info) = copy let_expr cp_info
 		= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cp_info)
 	where
-		bind_let_var {bind_dst} (local_vars, var_heap)
-			= ([bind_dst : local_vars], var_heap <:= (bind_dst.fv_info_ptr, VI_LocalVar))
+// MW0		bind_let_var {bind_dst} (local_vars, var_heap)
+// MW0			= ([bind_dst : local_vars], var_heap <:= (bind_dst.fv_info_ptr, VI_LocalVar))
+		bind_let_var {lb_dst} (local_vars, var_heap)
+			= ([lb_dst : local_vars], var_heap <:= (lb_dst.fv_info_ptr, VI_LocalVar))
 	copy (Case case_expr) cp_info
 		# (case_expr, cp_info) = copy case_expr cp_info
 		= (Case case_expr, cp_info)
@@ -947,6 +957,12 @@ instance copy (a,b) | copy a & copy b
 where
 	copy t cp_info = app2St (copy, copy) t cp_info 
 
+instance copy LetBind
+where
+	copy bind=:{lb_src} cp_info
+		# (lb_src, cp_info) = copy lb_src cp_info
+		= ({ bind & lb_src = lb_src }, cp_info) 
+
 instance copy (Bind a b) | copy a
 where
 	copy bind=:{bind_src} cp_info
@@ -1027,7 +1043,8 @@ where
 	where
 		remove_variable ([], var_heap) let_bind
 			= ([], var_heap)
-		remove_variable ([var_ptr : var_ptrs], var_heap) bind=:{bind_dst={fv_name,fv_info_ptr}}
+// MW0		remove_variable ([var_ptr : var_ptrs], var_heap) bind=:{bind_dst={fv_name,fv_info_ptr}}
+		remove_variable ([var_ptr : var_ptrs], var_heap) bind=:{lb_dst={fv_name,fv_info_ptr}}
 			| fv_info_ptr == var_ptr
 				# (VI_LetVar {lvi_count,lvi_depth}, var_heap) = readPtr fv_info_ptr var_heap
 				= (var_ptrs, var_heap) 
@@ -1035,11 +1052,14 @@ where
 				# (var_ptrs, var_heap) = remove_variable (var_ptrs, var_heap) bind
 				= ([var_ptr : var_ptrs], var_heap)
 
-		store_binding {bind_dst={fv_name,fv_info_ptr},bind_src} var_heap
+// MW0		store_binding {bind_dst={fv_name,fv_info_ptr},bind_src} var_heap
+		store_binding {lb_dst={fv_name,fv_info_ptr},lb_src} var_heap
 			= var_heap <:= (fv_info_ptr, VI_LetVar {lvi_count = 0, lvi_depth = depth, lvi_previous = [],
-													lvi_new = True, lvi_expression = bind_src, lvi_var = fv_name})
+// MW0													lvi_new = True, lvi_expression = bind_src, lvi_var = fv_name})
+													lvi_new = True, lvi_expression = lb_src, lvi_var = fv_name})
 
-		get_ref_count {bind_dst={fv_name,fv_info_ptr}} var_heap 
+// MW0		get_ref_count {bind_dst={fv_name,fv_info_ptr}} var_heap 
+		get_ref_count {lb_dst={fv_name,fv_info_ptr}} var_heap 
 			# (VI_LetVar {lvi_count}, var_heap) = readPtr fv_info_ptr var_heap
 		  	= (lvi_count, var_heap)
 //				==> (fv_name,fv_info_ptr,lvi_count)
@@ -1227,6 +1247,11 @@ instance weightedRefCount (a,b) | weightedRefCount a & weightedRefCount b
 where
 	weightedRefCount dcl_functions common_defs depth (x,y) rc_info = weightedRefCount dcl_functions common_defs depth y (weightedRefCount dcl_functions common_defs depth x rc_info) 
 
+instance weightedRefCount LetBind
+where
+	weightedRefCount dcl_functions common_defs depth {lb_src} rc_info
+		= weightedRefCount dcl_functions common_defs depth lb_src rc_info
+
 instance weightedRefCount (Bind a b) | weightedRefCount a
 where
 	weightedRefCount dcl_functions common_defs depth bind=:{bind_src} rc_info
@@ -1324,15 +1349,23 @@ where
 				_	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
 						{dl_info & di_expr_heap = dl_info.di_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
 	where
+/* MW0
 		set_let_expression_info depth [(let_strict, {bind_src,bind_dst}):binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { bind_dst & fv_info_ptr = new_info_ptr },
 			  			lei_expression = bind_src, lei_type = type, lei_status = LES_Untouched }
 			= set_let_expression_info depth binds ref_counts types (var_heap <:= (bind_dst.fv_info_ptr, VI_LetExpression lei))
+*/
+		set_let_expression_info depth [(let_strict, {lb_src,lb_dst}):binds][ref_count:ref_counts][type:types] var_heap
+			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { lb_dst & fv_info_ptr = new_info_ptr },
+			  			lei_expression = lb_src, lei_type = type, lei_status = LES_Untouched }
+			= set_let_expression_info depth binds ref_counts types (var_heap <:= (lb_dst.fv_info_ptr, VI_LetExpression lei))
 		set_let_expression_info depth [] _ _ var_heap
 			= var_heap
 		
-		distribute_lets_in_non_distributed_let depth {bind_dst={fv_name,fv_info_ptr}} dl_info=:{di_var_heap}
+// MW0		distribute_lets_in_non_distributed_let depth {bind_dst={fv_name,fv_info_ptr}} dl_info=:{di_var_heap}
+		distribute_lets_in_non_distributed_let depth {lb_dst={fv_name,fv_info_ptr}} dl_info=:{di_var_heap}
 			# (VI_LetExpression lei=:{lei_depth,lei_count,lei_status}, di_var_heap) = readPtr fv_info_ptr di_var_heap
 			| lei_count > 0
 //			| not lei_moved && lei_count > 0
@@ -1475,10 +1508,14 @@ buildLetExpr let_vars let_expr (var_heap, expr_heap)
 				-> (Let { inner_let & let_lazy_binds = lazy_binds }, (var_heap, expr_heap))
 			_
 				# (let_info_ptr, expr_heap) = newPtr (EI_LetType lazy_binds_types) expr_heap
-				-> (Let { let_strict_binds = [], let_lazy_binds = lazy_binds, let_expr = let_expr, let_info_ptr = let_info_ptr }, (var_heap, expr_heap))
+// MW0				-> (Let { let_strict_binds = [], let_lazy_binds = lazy_binds, let_expr = let_expr, let_info_ptr = let_info_ptr }, (var_heap, expr_heap))
+				-> (Let { let_strict_binds = [], let_lazy_binds = lazy_binds, let_expr = let_expr,
+						let_info_ptr = let_info_ptr, let_expr_position = NoPos }, (var_heap, expr_heap))
 where
-	build_bind :: !VarInfoPtr !(!Env Expression FreeVar, ![AType], !*VarHeap)
-		-> (!Env Expression FreeVar, ![AType], !*VarHeap)
+// MW0	build_bind :: !VarInfoPtr !(!Env Expression FreeVar, ![AType], !*VarHeap)
+// MW0		-> (!Env Expression FreeVar, ![AType], !*VarHeap)
+	build_bind :: !VarInfoPtr !(![LetBind], ![AType], !*VarHeap)
+		-> (![LetBind], ![AType], !*VarHeap)
 	build_bind info_ptr (lazy_binds, lazy_binds_types, var_heap)
 		# (let_info, var_heap) = readPtr info_ptr var_heap
 		# (VI_LetExpression lei=:{lei_var,lei_expression,lei_status,lei_type}) = let_info
@@ -1486,7 +1523,8 @@ where
 		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap 
 		  var_heap = var_heap <:= (info_ptr, VI_LetExpression { lei & lei_status = LES_Untouched, lei_var = { lei_var & fv_info_ptr = new_info_ptr }})
 //			==> (lei_var.fv_name, info_ptr, new_info_ptr)
-		= ([{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
+// MW0		= ([{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
+		= ([{ lb_src = updated_expr, lb_dst = lei_var, lb_position = NoPos } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
 
 instance distributeLets Selection
 where
@@ -1504,6 +1542,12 @@ instance distributeLets [a] | distributeLets a
 where
 	distributeLets depth l cp_info = mapSt (distributeLets depth) l cp_info 
 
+instance distributeLets LetBind
+where
+	distributeLets depth bind=:{lb_src} cp_info
+		# (lb_src, cp_info) = distributeLets depth lb_src cp_info
+		= ({ bind & lb_src = lb_src }, cp_info)
+	
 instance distributeLets (Bind a b) | distributeLets a
 where
 	distributeLets depth bind=:{bind_src} cp_info

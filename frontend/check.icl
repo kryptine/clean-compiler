@@ -1289,7 +1289,7 @@ checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info 
 	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
 	  (pattern_expr, binds, es_expr_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expr_heap
 	  (case_expr, es_expr_heap) = build_case guards defaul pattern_expr case_ident es_expr_heap
-	  (result_expr, es_expr_heap) = buildLetExpression [] binds case_expr es_expr_heap
+	  (result_expr, es_expr_heap) = buildLetExpression [] binds case_expr NoPos es_expr_heap
 	= (result_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 	
 where
@@ -1460,10 +1460,10 @@ where
 		= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident,
 			case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
 
-	bind_default_variable bind_src bind_dst result_expr expr_heap
+	bind_default_variable lb_src lb_dst result_expr expr_heap
 		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Let {let_strict_binds = [], let_lazy_binds = [{ bind_src = bind_src, bind_dst = bind_dst }],
-				let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
+		= (Let {let_strict_binds = [], let_lazy_binds = [{ lb_src = lb_src, lb_dst = lb_dst, lb_position = NoPos }],
+				let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, expr_heap)
 
 	bind_pattern_variables [] pattern_expr expr_heap
 		= (pattern_expr, [], expr_heap)
@@ -1471,7 +1471,7 @@ where
 		# free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
 		  (bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  (pattern_expr, binds, expr_heap) = bind_pattern_variables variables (Var bound_var) expr_heap
-		= (pattern_expr, [{bind_src = this_pattern_expr, bind_dst = free_var} : binds], expr_heap)
+		= (pattern_expr, [{lb_src = this_pattern_expr, lb_dst = free_var, lb_position = NoPos } : binds], expr_heap)
 
 	cons_optional (Yes var) variables
 		= [ var : variables ]
@@ -1715,12 +1715,13 @@ checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info
 	  (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
 	= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
-buildLetExpression :: !(Env Expression FreeVar) !(Env Expression FreeVar) !Expression !*ExpressionHeap  -> (!Expression, !*ExpressionHeap)
-buildLetExpression [] [] expr expr_heap
+buildLetExpression :: ![LetBind] ![LetBind] !Expression !Position !*ExpressionHeap  -> (!Expression, !*ExpressionHeap)
+buildLetExpression [] [] expr _ expr_heap
 	= (expr, expr_heap)
-buildLetExpression let_strict_binds let_lazy_binds expr expr_heap
+buildLetExpression let_strict_binds let_lazy_binds expr let_expr_position expr_heap
 	# (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-	= (Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
+	= (Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = expr,
+			let_info_ptr = let_expr_ptr, let_expr_position = let_expr_position }, expr_heap)
 
 checkLhssOfLocalDefs :: .Int .Int LocalDefs *ExpressionState *ExpressionInfo *CheckState -> (!.[NodeDef AuxiliaryPattern],!(![Ident],![ArrayPattern]),!.ExpressionState,!.ExpressionInfo,!.CheckState);
 checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info cs
@@ -1741,53 +1742,58 @@ checkRhssAndTransformLocalDefs free_vars [] rhs_expr e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 checkRhssAndTransformLocalDefs free_vars loc_defs rhs_expr e_input e_state e_info cs
 	# (binds, free_vars, e_state, e_info, cs) = checkAndTransformPatternIntoBind free_vars loc_defs e_input e_state e_info cs
-	  (rhs_expr, es_expr_heap) = buildLetExpression [] binds rhs_expr e_state.es_expr_heap
+	  (rhs_expr, es_expr_heap) = buildLetExpression [] binds rhs_expr NoPos e_state.es_expr_heap
 	= (rhs_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
 checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals,nd_position} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 	# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} nd_position) cs
 	# (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals e_input e_state e_info cs	
 	  (binds_of_bind, es_var_heap, es_expr_heap, e_info, cs)
-			= transfromPatternIntoBind ei_mod_index ei_expr_level nd_dst bind_src e_state.es_var_heap e_state.es_expr_heap e_info cs
+			= transfromPatternIntoBind ei_mod_index ei_expr_level nd_dst bind_src nd_position
+				e_state.es_var_heap e_state.es_expr_heap e_info cs
 	  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 	  (binds_of_local_defs, free_vars, e_state, e_info, cs) = checkAndTransformPatternIntoBind free_vars local_defs e_input e_state e_info cs
 	= (binds_of_bind ++ binds_of_local_defs, free_vars, e_state, e_info, popErrorAdmin cs)
 checkAndTransformPatternIntoBind free_vars [] e_input e_state e_info cs
 	= ([], free_vars, e_state, e_info, cs)
 
-transfromPatternIntoBind :: !Index !Level !AuxiliaryPattern !Expression !*VarHeap !*ExpressionHeap !*ExpressionInfo !*CheckState
-	-> *(![Bind Expression FreeVar], !*VarHeap, !*ExpressionHeap,  !*ExpressionInfo, !*CheckState)
-transfromPatternIntoBind mod_index def_level (AP_Variable name var_info _) src_expr var_store expr_heap e_info cs
-	# bind = {bind_src = src_expr, bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = def_level, fv_count = 0 }}
+transfromPatternIntoBind :: !Index !Level !AuxiliaryPattern !Expression !Position !*VarHeap !*ExpressionHeap !*ExpressionInfo !*CheckState
+	-> *(![LetBind], !*VarHeap, !*ExpressionHeap,  !*ExpressionInfo, !*CheckState)
+transfromPatternIntoBind mod_index def_level (AP_Variable name var_info _) src_expr position var_store expr_heap e_info cs
+	# bind = {lb_src = src_expr, lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = def_level, fv_count = 0 }, lb_position = position }
 	= ([bind], var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_module,glob_object=ds_cons=:{ds_arity, ds_index, ds_ident}} type_index args opt_var)
-		src_expr var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
-	# (src_expr, opt_var_bind, var_store, expr_heap) = bind_opt_var opt_var src_expr var_store expr_heap
+		src_expr position var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
+	# (src_expr, opt_var_bind, var_store, expr_heap) = bind_opt_var opt_var src_expr position var_store expr_heap
 	| ds_arity == 0
 		= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident " constant not allowed in a node pattern" cs.cs_error})
 	# (is_tuple, cs) = is_tuple_symbol glob_module ds_index cs
 	| is_tuple
-		# (tuple_var, tuple_bind, var_store, expr_heap) = bind_match_expr src_expr opt_var_bind var_store expr_heap
-		= transform_sub_patterns mod_index def_level args ds_cons 0 tuple_var tuple_bind var_store expr_heap e_info cs
+		# (tuple_var, tuple_bind, var_store, expr_heap) = bind_match_expr src_expr opt_var_bind position var_store expr_heap
+		= transform_sub_patterns mod_index def_level args ds_cons 0 tuple_var tuple_bind position var_store expr_heap e_info cs
 		# ({td_rhs}, ef_type_defs, ef_modules) = get_type_def mod_index glob_module type_index ef_type_defs ef_modules
 		  e_info = { e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules }
 		= case td_rhs of
 			RecordType {rt_fields}
 				| size rt_fields == 1
-					-> transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0 src_expr opt_var_bind var_store expr_heap e_info cs
+					-> transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0
+							src_expr opt_var_bind position var_store expr_heap e_info cs
 					# (record_var, record_bind, var_store, expr_heap)
-						= bind_match_expr src_expr opt_var_bind var_store expr_heap
-					-> transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0 record_var record_bind var_store expr_heap e_info cs
+						= bind_match_expr src_expr opt_var_bind position var_store expr_heap
+					-> transform_sub_patterns_of_record mod_index def_level args rt_fields glob_module 0
+							record_var record_bind position var_store expr_heap e_info cs
 			_
 				| ds_arity == 1
 		  			# (binds, var_store, expr_heap, e_info, cs)
-						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr No cons_symbol src_expr) var_store expr_heap e_info cs
+						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr No cons_symbol src_expr)
+								position var_store expr_heap e_info cs
 					-> (opt_var_bind ++ binds, var_store, expr_heap, e_info, cs)
 					# (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex ds_arity) PD_PredefinedModule STE_Type ds_arity cs
 					  (tuple_cons, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex ds_arity) PD_PredefinedModule STE_Constructor ds_arity cs
 					  (match_var, match_bind, var_store, expr_heap)
-						=  bind_match_expr (MatchExpr (Yes tuple_type) cons_symbol src_expr) opt_var_bind var_store expr_heap
-					-> transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind var_store expr_heap e_info cs
+						=  bind_match_expr (MatchExpr (Yes tuple_type) cons_symbol src_expr) opt_var_bind position var_store expr_heap
+					-> transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind
+							position var_store expr_heap e_info cs
 
 
 where
@@ -1803,44 +1809,48 @@ where
 		= (tuple_2_symbol.glob_module == cons_module &&
 		   tuple_2_symbol.glob_object.ds_index <= cons_index && cons_index <= tuple_2_symbol.glob_object.ds_index + 30, cs)
 
-	transform_sub_patterns mod_index def_level [pattern : patterns] tup_id tup_index arg_var all_binds var_store expr_heap e_info cs
-		# (this_arg_var, expr_heap) = adjust_match_expression arg_var expr_heap
-		  match_expr = TupleSelect tup_id tup_index this_arg_var
-		  (binds, var_store, expr_heap, e_info, cs) = transfromPatternIntoBind mod_index def_level pattern match_expr var_store expr_heap e_info cs
-		= transform_sub_patterns mod_index def_level patterns tup_id (inc tup_index) arg_var (binds ++ all_binds) var_store expr_heap e_info cs
-	transform_sub_patterns mod_index _ [] _ _ _ binds var_store expr_heap e_info cs
+	transform_sub_patterns mod_index def_level [pattern : patterns] tup_id tup_index arg_var all_binds position var_store expr_heap e_info cs
+		# (this_arg_var, expr_heap)
+				= adjust_match_expression arg_var expr_heap
+		  match_expr
+		  		= TupleSelect tup_id tup_index this_arg_var
+		  (binds, var_store, expr_heap, e_info, cs)
+		  		= transfromPatternIntoBind mod_index def_level pattern match_expr position var_store expr_heap e_info cs
+		= transform_sub_patterns mod_index def_level patterns tup_id (inc tup_index) arg_var (binds ++ all_binds)
+				position var_store expr_heap e_info cs
+	transform_sub_patterns mod_index _ [] _ _ _ binds _ var_store expr_heap e_info cs
 		= (binds, var_store, expr_heap, e_info, cs)
 
 	transform_sub_patterns_of_record mod_index def_level [pattern : patterns] fields field_module field_index record_expr
-			all_binds var_store expr_heap e_info cs
+			all_binds position var_store expr_heap e_info cs
 		# {fs_name, fs_index} = fields.[field_index]
 		  selector = { glob_module = field_module, glob_object = MakeDefinedSymbol fs_name fs_index 1}
 		  (this_record_expr, expr_heap) = adjust_match_expression record_expr expr_heap
 		  (binds, var_store, expr_heap, e_info, cs)
 				= transfromPatternIntoBind mod_index def_level pattern (Selection No this_record_expr [ RecordSelection selector field_index ])
-						var_store expr_heap e_info cs
+						position var_store expr_heap e_info cs
 		= transform_sub_patterns_of_record mod_index def_level patterns fields field_module (inc field_index) record_expr
-				(binds ++ all_binds) var_store expr_heap e_info cs
-	transform_sub_patterns_of_record mod_index _ [] _ _ _ _ binds var_store expr_heap e_info cs
+				(binds ++ all_binds) position var_store expr_heap e_info cs
+	transform_sub_patterns_of_record mod_index _ [] _ _ _ _ binds _ var_store expr_heap e_info cs
 		= (binds, var_store, expr_heap, e_info, cs)
 
-	bind_opt_var (Yes {bind_src,bind_dst}) src_expr var_heap expr_heap
+	bind_opt_var (Yes {bind_src,bind_dst}) src_expr position var_heap expr_heap
 		# free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
 		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		  bound_var = { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
-		= (Var bound_var, [{bind_src = src_expr, bind_dst = free_var}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
-	bind_opt_var No src_expr var_heap expr_heap
+		= (Var bound_var, [{lb_src = src_expr, lb_dst = free_var, lb_position = position}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
+	bind_opt_var No src_expr _ var_heap expr_heap
 		= (src_expr, [], var_heap, expr_heap)
 		
-	bind_match_expr var_expr=:(Var var) opt_var_bind var_heap expr_heap
+	bind_match_expr var_expr=:(Var var) opt_var_bind _ var_heap expr_heap
 		= (var_expr, opt_var_bind, var_heap, expr_heap)
-	bind_match_expr match_expr opt_var_bind var_heap expr_heap
+	bind_match_expr match_expr opt_var_bind position var_heap expr_heap
 		# new_name = newVarId "_x"
 		  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
 //		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		  bound_var = { var_name = new_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
 		  free_var = { fv_name = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
-		= (Var bound_var, [{bind_src = match_expr, bind_dst = free_var} : opt_var_bind], var_heap, expr_heap)
+		= (Var bound_var, [{lb_src = match_expr, lb_dst = free_var, lb_position = position } : opt_var_bind], var_heap, expr_heap)
 
 	adjust_match_expression (Var var) expr_heap
 		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -1848,9 +1858,9 @@ where
 	adjust_match_expression match_expr expr_heap
 		= (match_expr, expr_heap)
 
-transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr var_store expr_heap e_info cs
+transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, cs)
-transfromPatternIntoBind _ _ pattern src_expr var_store expr_heap e_info cs
+transfromPatternIntoBind _ _ pattern src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" " illegal node pattern" cs.cs_error})
 
 checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) fun_defs e_info heaps cs
@@ -1880,7 +1890,7 @@ where
 		  (default_expr, free_vars, e_state, e_info, cs)
 		  		= check_default_expr free_vars default_expr { e_input & ei_expr_level = last_expr_level } e_state e_info cs
 		  cs = { cs & cs_symbol_table = remove_seq_let_vars e_input.ei_expr_level let_vars_list cs.cs_symbol_table }
-	  	  (result_expr, es_expr_heap) = convert_guards_to_cases rev_guarded_exprs default_expr e_state.es_expr_heap
+	  	  (_, result_expr, es_expr_heap) = convert_guards_to_cases rev_guarded_exprs default_expr e_state.es_expr_heap
 	  	= (result_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 	check_opt_guarded_alts free_vars (UnGuardedExpr unguarded_expr) e_input e_state e_info cs
 		= check_unguarded_expression free_vars unguarded_expr e_input e_state e_info cs
@@ -1897,14 +1907,14 @@ where
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
 		  		case_default = result_expr, case_ident = Yes guard_ident,
 		  		case_info_ptr = case_expr_ptr, case_default_pos = NoPos }
-		= build_sequential_lets let_binds case_expr es_expr_heap
+		= build_sequential_lets let_binds case_expr NoPos es_expr_heap
 	convert_guards_to_cases [(let_binds, guard, expr, guard_ident) : rev_guarded_exprs] result_expr es_expr_heap
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
 		  		case_default = result_expr, case_ident = Yes guard_ident,
 		  		case_info_ptr = case_expr_ptr, case_default_pos = NoPos }
-		  (result_expr, es_expr_heap) = build_sequential_lets let_binds case_expr es_expr_heap
+		  (_, result_expr, es_expr_heap) = build_sequential_lets let_binds case_expr NoPos es_expr_heap
 		= convert_guards_to_cases rev_guarded_exprs (Yes result_expr) es_expr_heap
 	
 	check_guarded_expressions free_vars [gexpr : gexprs] let_vars_list rev_guarded_exprs e_input e_state e_info cs
@@ -1937,7 +1947,7 @@ where
 		  (expr, free_vars, e_state, e_info, cs)
 				= addArraySelections array_patterns expr free_vars e_input e_state e_info cs
 		  cs = { cs & cs_symbol_table = remove_seq_let_vars rhs_expr_level let_vars_list cs.cs_symbol_table }
-		  (seq_let_expr, es_expr_heap) = build_sequential_lets binds expr e_state.es_expr_heap
+		  (_, seq_let_expr, es_expr_heap) = build_sequential_lets binds expr ewl_position e_state.es_expr_heap
 	  	  (expr, free_vars, e_state, e_info, cs)
 				= checkRhssAndTransformLocalDefs free_vars loc_defs seq_let_expr e_input { e_state & es_expr_heap = es_expr_heap} e_info cs
 	  	  (es_fun_defs, e_info, heaps, cs)
@@ -1952,7 +1962,8 @@ where
 	remove_seq_let_vars level [let_vars : let_vars_list] symbol_table
 		= remove_seq_let_vars (dec level) let_vars_list (removeLocalIdentsFromSymbolTable level let_vars symbol_table)
 	
-	check_sequential_lets :: [FreeVar] [NodeDefWithLocals] u:[[Ident]] !ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(![.([Bind Expression FreeVar],![Bind Expression FreeVar])],!u:[[Ident]],!Int,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
+	check_sequential_lets :: [FreeVar] [NodeDefWithLocals] u:[[Ident]] !ExpressionInput *ExpressionState *ExpressionInfo *CheckState 
+						-> *(![.([LetBind],![LetBind])],!u:[[Ident]],!Int,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_sequential_lets free_vars [seq_let:seq_lets] let_vars_list e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# ei_expr_level
 				= inc ei_expr_level
@@ -1963,7 +1974,8 @@ where
 	      (binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	      		= check_sequential_lets free_vars seq_lets [let_vars : let_vars_list] e_input e_state e_info cs
 		  (let_binds, es_var_heap, es_expr_heap, e_info, cs)
-				= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr e_state.es_var_heap e_state.es_expr_heap e_info cs
+				= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr seq_let.ndwl_position
+						e_state.es_var_heap e_state.es_expr_heap e_info cs
 		  e_state
 		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 		  (strict_array_pattern_binds, lazy_array_pattern_binds, free_vars, e_state, e_info, cs)
@@ -1993,13 +2005,13 @@ where
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps, es_fun_defs = ps_fun_defs }
 		= (src_expr, pattern, accus, free_vars, e_state, e_info, popErrorAdmin cs)
 	
-	build_sequential_lets :: ![(![Bind Expression FreeVar],![Bind Expression FreeVar])] !Expression !*ExpressionHeap -> (!Expression, !*ExpressionHeap)
-	build_sequential_lets [] expr expr_heap
-		= (expr, expr_heap)
-	build_sequential_lets [(strict_binds, lazy_binds) : seq_lets] expr expr_heap
-		# (let_expr, expr_heap) = build_sequential_lets seq_lets expr expr_heap
-	  	= buildLetExpression strict_binds lazy_binds let_expr expr_heap
-
+	build_sequential_lets :: ![(![LetBind],![LetBind])] !Expression !Position !*ExpressionHeap -> (!Position, !Expression, !*ExpressionHeap)
+	build_sequential_lets [] expr let_expr_position expr_heap
+		= (let_expr_position, expr, expr_heap)
+	build_sequential_lets [(strict_binds, lazy_binds) : seq_lets] expr let_expr_position expr_heap
+		# (let_expr_position, let_expr, expr_heap) = build_sequential_lets seq_lets expr let_expr_position expr_heap
+	  	  (let_expr, expr_heap) = buildLetExpression strict_binds lazy_binds let_expr let_expr_position expr_heap
+		= (if (isEmpty strict_binds && isEmpty lazy_binds) let_expr_position NoPos, let_expr, expr_heap)
 
 newVarId name = { id_name = name, id_info = nilPtr }
 
@@ -2024,8 +2036,9 @@ convertSubPattern (AP_Variable name var_info (Yes {bind_src,bind_dst})) result_e
 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	  bound_var = { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
 	  free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
-	  (let_expr, expr_heap)	= buildLetExpression [] [{ bind_src = Var bound_var,
-	  			bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}] result_expr expr_heap
+	  (let_expr, expr_heap)	= buildLetExpression [] [{lb_src = Var bound_var,
+	  			lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+	  			lb_position = NoPos }] result_expr NoPos expr_heap
 	= (free_var, let_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Variable name var_info No) result_expr pattern_position var_store expr_heap opt_dynamics cs
 	= ({ fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr, pattern_position, 
@@ -2094,7 +2107,7 @@ addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  (let_expr_ptr, es_expr_heap)
 	  		= newPtr EI_Empty e_state.es_expr_heap
 	= ( Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds,
-				let_expr = rhs_expr, let_info_ptr = let_expr_ptr }
+				let_expr = rhs_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }
 	  , free_vars
 	  , { e_state & es_expr_heap = es_expr_heap}
 	  , e_info
@@ -2112,7 +2125,7 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 					# (bound_array_var, es_expr_heap) = allocate_bound_var ap_array_var e_state.es_expr_heap
 					  free_var = { fv_name = opt_var_ident, fv_info_ptr = opt_var_var_info_ptr, fv_def_level = NotALevel,
 					  				fv_count = 0 }
-	  				-> ([{ bind_dst = free_var, bind_src = Var bound_array_var }: lazy_binds],
+	  				-> ([{ lb_dst = free_var, lb_src = Var bound_array_var, lb_position = NoPos }: lazy_binds],
 	  					{ e_state & es_expr_heap = es_expr_heap })
 	  			no	-> (lazy_binds, e_state)
 	= ([last_array_selection:strict_binds], lazy_binds, free_vars, e_state, e_info, cs)
@@ -2146,9 +2159,9 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  selections
 		  		= [ ArraySelection glob_select_symb new_expr_ptr index_expr \\ new_expr_ptr<-new_expr_ptrs & index_expr<-index_exprs ]
 		= (	new_array_var
-		  ,	[ {bind_dst = var_for_uselect_result, bind_src = Selection opt_tuple_type (Var bound_array_var) selections}
-		    , {bind_dst = new_array_var, bind_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result)}
-		    , {bind_dst = array_element_var, bind_src = TupleSelect tuple_cons.glob_object 0 (Var bound_var_for_uselect_result)}
+		  ,	[ {lb_dst = var_for_uselect_result, lb_src = Selection opt_tuple_type (Var bound_array_var) selections, lb_position = NoPos }
+		    , {lb_dst = new_array_var, lb_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result), lb_position = NoPos }
+		    , {lb_dst = array_element_var, lb_src = TupleSelect tuple_cons.glob_object 0 (Var bound_var_for_uselect_result), lb_position = NoPos }
 		  	: binds
 			]
 		  , free_vars
@@ -2261,19 +2274,22 @@ where
 					# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					-> (Let { let_strict_binds = [], let_lazy_binds= [
-								{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
-									bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}],
-							  let_expr = result_expr, let_info_ptr = let_expr_ptr}, 
+								{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
+									lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+									lb_position = NoPos }],
+							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, 
 						pattern_position, var_store, expr_heap, opt_dynamics, cs)
 					# (var_expr_ptr1, expr_heap) = newPtr EI_Empty expr_heap
 					  (var_expr_ptr2, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					-> (Let { let_strict_binds = [], let_lazy_binds= [
-								{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
-									bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }},
-								{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
-									bind_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }}],
-							  let_expr = result_expr, let_info_ptr = let_expr_ptr}, 
+								{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
+									lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+									lb_position = NoPos },
+								{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
+									lb_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+									lb_position = NoPos }],
+							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, 
 						pattern_position, var_store, expr_heap, opt_dynamics, cs)
 			No
 				| var_info == fv_info_ptr
@@ -2281,9 +2297,10 @@ where
 					# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					-> (Let { let_strict_binds = [], let_lazy_binds=
-									[{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
-										 bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}],
-							  let_expr = result_expr, let_info_ptr = let_expr_ptr},
+									[{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
+										 lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+										 lb_position = NoPos }],
+							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos },
 						pattern_position, var_store, expr_heap, opt_dynamics, cs)
 
 	transform_pattern_into_cases (AP_Algebraic cons_symbol type_index args opt_var) fun_arg result_expr pattern_position
@@ -2331,9 +2348,10 @@ where
 			  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 			= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
 						Let { let_strict_binds = [], let_lazy_binds =
-						 		[{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
-											bind_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }}],
-							  let_expr = result_expr, let_info_ptr = let_expr_ptr}, expr_heap)
+						 		[{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
+									lb_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+									lb_position = NoPos }],
+							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, expr_heap)
 	transform_pattern_variable {fv_info_ptr,fv_name} No result_expr expr_heap
 		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
@@ -3009,8 +3027,8 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 
-//		  (dcl_modules, icl_mod, heaps, cs_error)
-//		  		= compareDefImp icl_sizes_without_added_dcl_defs untransformed_fun_bodies main_dcl_module_n dcl_modules icl_mod heaps cs_error
+		  (dcl_modules, icl_mod, heaps, cs_error)
+		  		= compareDefImp icl_sizes_without_added_dcl_defs untransformed_fun_bodies main_dcl_module_n dcl_modules icl_mod heaps cs_error
 
 		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, cached_functions_and_macros, cs_x.x_main_dcl_module_n, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
 		# icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,

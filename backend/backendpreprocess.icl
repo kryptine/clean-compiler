@@ -113,11 +113,15 @@ instance sequence Selection where
 	sequence (DictionarySelection dictionaryVar dictionarySelections _ index)
 		=	sequence index
 
-instance sequence (Bind Expression FreeVar) where
-	sequence {bind_src=App app , bind_dst}
-		= sequence` app bind_dst
+// MW0 instance sequence (Bind Expression FreeVar) where
+instance sequence LetBind where
+// MW0	sequence {bind_src=App app , bind_dst}
+	sequence {lb_src=App app , lb_dst}
+// MW0		= sequence` app bind_dst
+		= sequence` app lb_dst
 	  where
-	  	sequence` {app_symb, app_args} bind_dst sequenceState=:{ss_aliasDummyId}
+// MW0	  	sequence` {app_symb, app_args} bind_dst sequenceState=:{ss_aliasDummyId}
+	  	sequence` {app_symb, app_args} lb_dst sequenceState=:{ss_aliasDummyId}
 			| app_symb.symb_name==ss_aliasDummyId
 				// the compiled source was a strict alias like "#! x = y"
 				= case hd app_args of
@@ -126,13 +130,17 @@ instance sequence (Bind Expression FreeVar) where
 						  non_alias_bound_var = case vi of
 													VI_SequenceNumber _		-> bound_var
 													VI_Alias alias_bound_var-> alias_bound_var
-						  ss_varHeap = writePtr bind_dst.fv_info_ptr (VI_Alias non_alias_bound_var) ss_varHeap
+// MW0						  ss_varHeap = writePtr bind_dst.fv_info_ptr (VI_Alias non_alias_bound_var) ss_varHeap
+						  ss_varHeap = writePtr lb_dst.fv_info_ptr (VI_Alias non_alias_bound_var) ss_varHeap
 						-> { sequenceState & ss_varHeap = ss_varHeap }
 					_
-						-> sequence bind_dst sequenceState
-		= sequence bind_dst sequenceState
+// MW0						-> sequence bind_dst sequenceState
+						-> sequence lb_dst sequenceState
+// MW0		= sequence bind_dst sequenceState
+		= sequence lb_dst sequenceState
 	sequence bind
-		=	sequence bind.bind_dst
+// MW0		=	sequence bind.bind_dst
+		=	sequence bind.lb_dst
 
 instance sequence FunctionPattern where
 	sequence (FP_Algebraic _ subpatterns optionalVar)

@@ -100,7 +100,8 @@ where
 		= refMark free_vars NotASelector args (refMark free_vars NotASelector fun var_heap)
 	refMark free_vars sel (Let {let_strict_binds,let_lazy_binds,let_expr}) var_heap
 		| isEmpty let_lazy_binds
-			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ] : free_vars]
+// MW0			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ] : free_vars]
+			# new_free_vars = [ [ lb_dst \\ {lb_dst} <- let_strict_binds ] : free_vars]
 			# (observing, var_heap) = binds_are_observing let_strict_binds var_heap
 			| observing
 				# var_heap = saveOccurrences free_vars var_heap
@@ -109,7 +110,8 @@ where
 				  var_heap = refMark new_free_vars sel let_expr var_heap
 				= let_combine free_vars var_heap
 				= refMark new_free_vars sel let_expr (refMark new_free_vars NotASelector let_strict_binds var_heap)
-			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ++ let_lazy_binds ] : free_vars]
+// MW0			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ++ let_lazy_binds ] : free_vars]
+			# new_free_vars = [ [ lb_dst \\ {lb_dst} <- let_strict_binds ++ let_lazy_binds ] : free_vars]
 			  var_heap = foldSt bind_variable let_strict_binds var_heap
 			  var_heap = foldSt bind_variable let_lazy_binds var_heap
 			= refMark new_free_vars sel let_expr var_heap
@@ -118,7 +120,8 @@ where
 		    binds_are_observing binds var_heap
 		    	= foldr bind_is_observing (True, var_heap) binds
 			where
-				bind_is_observing {bind_dst={fv_info_ptr}} (observe, var_heap) 
+// MW0				bind_is_observing {bind_dst={fv_info_ptr}} (observe, var_heap) 
+				bind_is_observing {lb_dst={fv_info_ptr}} (observe, var_heap) 
 					# (VI_Occurrence {occ_observing}, var_heap) = readPtr fv_info_ptr var_heap
 					= (occ_observing && observe, var_heap)
 			
@@ -131,10 +134,12 @@ where
 					  comb_ref_count = parCombineRefCount (seqCombineRefCount occ_ref_count prev_ref_count) pre_pref_recount
 					= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses })
 
-			bind_variable {bind_src,bind_dst={fv_info_ptr}} var_heap
+// MW0			bind_variable {bind_src,bind_dst={fv_info_ptr}} var_heap
+			bind_variable {lb_src,lb_dst={fv_info_ptr}} var_heap
 				# (VI_Occurrence occ, var_heap) = readPtr fv_info_ptr var_heap
 //				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_bind = OB_OpenLet bind_src })
-				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_bind = OB_OpenLet bind_src })
+// MW0				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_bind = OB_OpenLet bind_src })
+				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_bind = OB_OpenLet lb_src })
 
 	refMark free_vars sel (Case {case_expr,case_guards,case_default}) var_heap
 		= refMarkOfCase free_vars sel case_expr case_guards case_default var_heap
@@ -182,10 +187,17 @@ where
 isUsed RC_Unused	= False				
 isUsed _			= True				
 
+instance refMark LetBind
+where
+	refMark free_vars sel {lb_src} var_heap
+		= refMark free_vars NotASelector lb_src var_heap
+
+/* MW0 not necessary anymore
 instance refMark (Bind a b) | refMark a
 where
 	refMark free_vars sel {bind_src} var_heap
 		= refMark free_vars NotASelector bind_src var_heap
+*/
 
 instance refMark Selection
 where

@@ -159,6 +159,12 @@ where
 		# (app_args, ls) = lift app_args ls
 		= ({ app & app_args = app_args }, ls)
 
+instance lift LetBind
+where
+	lift bind=:{lb_src} ls
+		# (lb_src, ls) = lift lb_src ls
+		= ({ bind & lb_src = lb_src }, ls)
+
 instance lift (Bind a b) | lift a
 where
 	lift bind=:{bind_src} ls
@@ -379,6 +385,12 @@ where
 		substitute_EI_DictionaryType x opt_type_heaps
 			= (x, opt_type_heaps)
 
+instance unfold LetBind
+where
+	unfold bind=:{lb_src} us
+		# (lb_src, us) = unfold lb_src us
+		= ({ bind & lb_src = lb_src }, us)
+
 instance unfold (Bind a b) | unfold a
 where
 	unfold bind=:{bind_src} us
@@ -470,10 +482,10 @@ where
 		= ({lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
 			{ us & us_symbol_heap = us_symbol_heap, us_opt_type_heaps = us_opt_type_heaps })
 		where
-			copy_bound_vars [bind=:{bind_dst} : binds] us
-				# (bind_dst, us) = unfold bind_dst us
+			copy_bound_vars [bind=:{lb_dst} : binds] us
+				# (lb_dst, us) = unfold lb_dst us
 				  (binds, us) = copy_bound_vars binds us
-				= ([ {bind & bind_dst = bind_dst} : binds ], us)
+				= ([ {bind & lb_dst = lb_dst} : binds ], us)
 			copy_bound_vars [] us
 				= ([], us)
 
@@ -554,8 +566,9 @@ unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}}
 	| isEmpty let_binds
 		= (result_expr, fun_defs, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
 		#  (new_info_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
-		= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr}, fun_defs, 
-					(calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
+		= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr,
+				let_info_ptr = new_info_ptr, let_expr_position = NoPos }, fun_defs, 
+			(calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
 where
 
 	bind_expressions [var : vars] [expr : exprs] binds var_heap
@@ -574,7 +587,7 @@ where
 			= (binds, writePtr fv_info_ptr (VI_Expression expr) var_heap)
 		# (new_info, var_heap) = newPtr VI_Empty var_heap
 		  new_var = { fv_name = fv_name, fv_def_level = NotALevel, fv_info_ptr = new_info, fv_count = 0 }
-		= ([{ bind_src = expr, bind_dst = new_var} : binds], writePtr fv_info_ptr (VI_Variable fv_name new_info) var_heap)
+		= ([{ lb_src = expr, lb_dst = new_var, lb_position = NoPos} : binds], writePtr fv_info_ptr (VI_Variable fv_name new_info) var_heap)
 
 
 ::	Group =
@@ -907,7 +920,7 @@ where
 			_
 				-> var_info_ptr
 
-	set_alias {bind_src=Var var,bind_dst={fv_info_ptr}} var_heap
+	set_alias {lb_src=Var var,lb_dst={fv_info_ptr}} var_heap
 		= var_heap <:= (fv_info_ptr, VI_Alias var)
 	set_alias _ var_heap
 		= var_heap
@@ -936,13 +949,13 @@ where
 		  (let_lazy_binds, var_heap, expr_heap) = foldSt replace_variables_in_bound_expression rev_let_lazy_binds ([], var_heap, expr_heap)
 		= (Let { lad & let_lazy_binds = let_lazy_binds, let_info_ptr = let_info_ptr, let_expr = expr}, var_heap, expr_heap)
 	where
-		renew_let_var bind=:{bind_dst} (rev_binds, var_heap)
-			# (bind_dst, var_heap) = new_variable bind_dst var_heap
-			= ([{ bind & bind_dst = bind_dst } : rev_binds], var_heap)
+		renew_let_var bind=:{lb_dst} (rev_binds, var_heap)
+			# (lb_dst, var_heap) = new_variable lb_dst var_heap
+			= ([{ bind & lb_dst = lb_dst } : rev_binds], var_heap)
 
-		replace_variables_in_bound_expression bind=:{bind_src} (rev_binds, var_heap, expr_heap)
-			# (bind_src, var_heap, expr_heap) = replace_variables_in_expression bind_src var_heap expr_heap
-			= ([{ bind & bind_src = bind_src } : rev_binds], var_heap, expr_heap)
+		replace_variables_in_bound_expression bind=:{lb_src} (rev_binds, var_heap, expr_heap)
+			# (lb_src, var_heap, expr_heap) = replace_variables_in_expression lb_src var_heap expr_heap
+			= ([{ bind & lb_src = lb_src } : rev_binds], var_heap, expr_heap)
 
 		
 	push_let_expression_into_guards lad (AlgebraicPatterns type patterns) var_heap expr_heap
@@ -1240,6 +1253,12 @@ where
 		= (record_selection, fun_and_macro_defs, modules, es)
 
 
+instance expand LetBind
+where
+	expand bind=:{lb_src} fun_and_macro_defs mod_index modules es
+		# (lb_src, fun_and_macro_defs, modules, es) = expand lb_src fun_and_macro_defs mod_index modules es
+		= ({ bind & lb_src = lb_src }, fun_and_macro_defs, modules, es)
+
 instance expand (Bind a b) | expand a
 where
 	expand bind=:{bind_src} fun_and_macro_defs mod_index modules es
@@ -1318,10 +1337,10 @@ where
 	clearCount [] locality var_heap
 		= var_heap
 
-instance clearCount (Bind a b) | clearCount b
+instance clearCount LetBind
 where
-	clearCount bind=:{bind_dst} locality var_heap
-		= clearCount bind_dst locality var_heap
+	clearCount bind=:{lb_dst} locality var_heap
+		= clearCount lb_dst locality var_heap
 
 instance clearCount FreeVar
 where
@@ -1376,7 +1395,7 @@ where
 		   	the reference count info.
 		*/	   
 		   
-			determine_aliases [{bind_dst={fv_info_ptr}, bind_src = Var var} : binds] var_heap
+			determine_aliases [{lb_dst={fv_info_ptr}, lb_src = Var var} : binds] var_heap
 				= determine_aliases binds (writePtr fv_info_ptr (VI_Alias var) var_heap)
 			determine_aliases [bind : binds] var_heap
 				= determine_aliases binds (clearCount bind cIsALocalVar var_heap)
@@ -1389,7 +1408,8 @@ where
 		
 			detect_cycles_and_handle_alias_binds is_strict [] cos
 				= (cContainsNoCycle, [], cos)
-			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
+//			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
+			detect_cycles_and_handle_alias_binds is_strict [bind=:{lb_dst={fv_info_ptr}} : binds] cos
 				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
 				= case var_info of
 					VI_Alias {var_info_ptr}
@@ -1397,11 +1417,11 @@ where
 							-> (cContainsACycle, binds, cos)
 						| is_strict
 							# cos_var_heap = writePtr fv_info_ptr (VI_Count 0 cIsALocalVar) cos.cos_var_heap
-							  (new_bind_src, cos) = add_dummy_id_for_strict_alias bind.bind_src 
+							  (new_bind_src, cos) = add_dummy_id_for_strict_alias bind.lb_src 
 							  								{ cos & cos_var_heap = cos_var_heap }
 							  (is_cyclic, binds, cos) 
 							  		= detect_cycles_and_handle_alias_binds is_strict binds cos
-							-> (is_cyclic, [{ bind & bind_src = new_bind_src } : binds], cos)
+							-> (is_cyclic, [{ bind & lb_src = new_bind_src } : binds], cos)
 						-> detect_cycles_and_handle_alias_binds is_strict binds cos
 					_
 						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
@@ -1437,13 +1457,13 @@ where
 					= collect_variables_in_binds binds collected_binds free_vars cos
 					= (collected_binds, free_vars, cos)
 		
-			examine_reachable_binds bind_found [bind=:(is_strict, {bind_dst=fv=:{fv_info_ptr},bind_src}) : binds] collected_binds free_vars cos
+			examine_reachable_binds bind_found [bind=:(is_strict, {lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars cos
 				# (bind_found, binds, collected_binds, free_vars, cos) = examine_reachable_binds bind_found binds collected_binds free_vars cos
 				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
 				# (VI_Count count is_global) = var_info
 				| count > 0
-					# (bind_src, free_vars, cos) = collectVariables bind_src free_vars cos
-					= (True, binds, [ (is_strict, { bind_dst = { fv & fv_count = count }, bind_src = bind_src }) : collected_binds ], free_vars, cos)
+					# (lb_src, free_vars, cos) = collectVariables lb_src free_vars cos
+					= (True, binds, [ (is_strict, { snd bind & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, cos)
 					= (bind_found, [bind : binds], collected_binds, free_vars, cos)
 			examine_reachable_binds bind_found [] collected_binds free_vars cos
 				= (bind_found, [], collected_binds, free_vars, cos)
@@ -1575,7 +1595,7 @@ where
 					-> (var, [{fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ],
 								{ cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
 			_
-				-> abort "collectVariables [BoundVar] (transform, 1227)"  <<- (var_info ---> var_name)
+				-> abort "collectVariables [BoundVar] (transform, 1227)"  <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
 
 instance <<< (Ptr a)
 where

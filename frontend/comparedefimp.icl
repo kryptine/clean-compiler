@@ -742,8 +742,6 @@ instance e_corresponds DefinedSymbol where
 instance e_corresponds FunctionBody where
 	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
-//		| False--->("compare", from_body dclDef, from_body iclDef)
-//			= undef
 		=	e_corresponds (from_body dclDef) (from_body iclDef)
 	  where
 		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
@@ -823,6 +821,11 @@ instance e_corresponds Let where
 		=	e_corresponds dclLet.let_strict_binds iclLet.let_strict_binds
 		o`	e_corresponds dclLet.let_lazy_binds iclLet.let_lazy_binds
 		o`	e_corresponds dclLet.let_expr iclLet.let_expr
+
+instance e_corresponds LetBind where
+	e_corresponds dcl icl
+		=	e_corresponds dcl.lb_src icl.lb_src
+		o`	e_corresponds dcl.lb_dst icl.lb_dst
 
 instance e_corresponds (Bind a b) | e_corresponds a & e_corresponds b where
 	e_corresponds dcl icl
@@ -941,6 +944,13 @@ e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_Function dcl_glob_index}
 					ec_state
 	= continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
 													ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalMacroFunction dcl_index} 
+					icl_app_symb=:{symb_kind=SK_LocalMacroFunction icl_index}
+					ec_state
+	#! main_dcl_module_n=ec_state.ec_tc_state.tc_main_dcl_module_n
+	= continuation_for_possibly_twice_defined_funs dcl_app_symb 
+			{ glob_module = main_dcl_module_n, glob_object = dcl_index } icl_app_symb
+			{ glob_module = main_dcl_module_n, glob_object = icl_index } ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_OverloadedFunction dcl_glob_index}
 					icl_app_symb=:{symb_kind=SK_OverloadedFunction icl_glob_index}
 					ec_state

@@ -667,9 +667,9 @@ instance check_completeness BasicPattern where
 	check_completeness {bp_expr} cci ccs
 		= check_completeness bp_expr cci ccs
 
-instance check_completeness (Bind Expression FreeVar) where
-	check_completeness {bind_src} cci ccs
-		= check_completeness bind_src cci ccs
+instance check_completeness LetBind where
+	check_completeness {lb_src} cci ccs
+		= check_completeness lb_src cci ccs
 
 instance check_completeness Case where
 	check_completeness { case_expr, case_guards, case_default } cci ccs

@@ -101,6 +101,13 @@ where
 	convertDynamics _ _ _ No ci
 		= (No, ci)
 
+instance convertDynamics LetBind
+where
+	convertDynamics :: !ConversionInput !BoundVariables !DefaultExpression !LetBind !*ConversionInfo -> (!LetBind, !*ConversionInfo)
+	convertDynamics cinp bound_vars default_expr binding=:{lb_src} ci
+		# (lb_src, ci) = convertDynamics cinp bound_vars default_expr lb_src ci
+		= ({binding &  lb_src = lb_src}, ci)
+
 instance convertDynamics (Bind a b)  |  convertDynamics a
 where
 	convertDynamics :: !ConversionInput !BoundVariables !DefaultExpression !(Bind a b) !*ConversionInfo -> (!Bind a b, !*ConversionInfo)  |  convertDynamics a
@@ -135,7 +142,8 @@ where
 		= (expr @ exprs, ci)
 	convertDynamics cinp bound_vars default_expr (Let letje=:{let_strict_binds, let_lazy_binds, let_expr,let_info_ptr}) ci
 		# (let_types, ci) = determine_let_types let_info_ptr ci
-		  bound_vars = bindVarsToTypes [ bind.bind_dst \\ bind <- let_strict_binds ++ let_lazy_binds ] let_types bound_vars
+// MW0		  bound_vars = bindVarsToTypes [ bind.bind_dst \\ bind <- let_strict_binds ++ let_lazy_binds ] let_types bound_vars
+		  bound_vars = bindVarsToTypes [ bind.lb_dst \\ bind <- let_strict_binds ++ let_lazy_binds ] let_types bound_vars
 		  (let_strict_binds, ci)	= convertDynamics cinp bound_vars default_expr let_strict_binds ci
 		  (let_lazy_binds, ci)		= convertDynamics cinp bound_vars default_expr let_lazy_binds ci
 		  (let_expr,  ci) 			= convertDynamics cinp bound_vars default_expr let_expr  ci
@@ -205,7 +213,9 @@ where
 							let_expr			= App {	app_symb		= twoTuple_symb,
 														app_args 		= [dyn_expr, dyn_type_code],
 														app_info_ptr	= nilPtr },
-							let_info_ptr		= let_info_ptr}, ci)
+// MW0							let_info_ptr		= let_info_ptr,}, ci)
+							let_info_ptr		= let_info_ptr,
+							let_expr_position	= NoPos}, ci)
 	convertDynamics cinp bound_vars default_expr (TypeCodeExpression type_code) ci
 		= abort "convertDynamics cinp bound_vars default_expr (TypeCodeExpression" //convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
@@ -358,13 +368,14 @@ where
 		= [{ tv_free_var = {fv_def_level = NotALevel, fv_name = a_ij_var_name, fv_info_ptr = var_info_ptr, fv_count = 0}, tv_type = empty_attributed_type } : bound_vars]
 
 
-open_dynamic :: Expression !*ConversionInfo -> (OpenedDynamic, Bind Expression FreeVar, !*ConversionInfo)
+open_dynamic :: Expression !*ConversionInfo -> (OpenedDynamic, LetBind, !*ConversionInfo)
 open_dynamic dynamic_expr ci
 	# (twotuple, ci) = getTupleSymbol 2 ci
 	  (dynamicType_var, ci) = newVariable "dt" VI_Empty ci
 	  dynamicType_fv = varToFreeVar dynamicType_var 1
 	= (	{ opened_dynamic_expr = TupleSelect twotuple 0 dynamic_expr, opened_dynamic_type = Var dynamicType_var },
-	  	{ bind_src = TupleSelect twotuple 1 dynamic_expr, bind_dst = dynamicType_fv },
+// MW0	  	{ bind_src = TupleSelect twotuple 1 dynamic_expr, bind_dst = dynamicType_fv },
+	  	{ lb_src = TupleSelect twotuple 1 dynamic_expr, lb_dst = dynamicType_fv, lb_position = NoPos },
 	  	{ ci & ci_new_variables = [ dynamicType_fv : ci.ci_new_variables ]})
 
 /**************************************************************************************************/
@@ -395,7 +406,8 @@ convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards =
 
 	#
 
-      bound_vars = addToBoundVars (freeVarToVar dt_bind.bind_dst) empty_attributed_type (addToBoundVars ind_0 empty_attributed_type
+// MW0      bound_vars = addToBoundVars (freeVarToVar dt_bind.bind_dst) empty_attributed_type (addToBoundVars ind_0 empty_attributed_type
+      bound_vars = addToBoundVars (freeVarToVar dt_bind.lb_dst) empty_attributed_type (addToBoundVars ind_0 empty_attributed_type
       							  (addToBoundVars c_1 result_type (add_dynamic_bound_vars patterns bound_vars)))
 
 																// c_1 ind_0
@@ -407,14 +419,17 @@ convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards =
 	# (tc_binds,ci)
 		= foldSt remove_non_used_arg tc_binds ([],ci) 
 
-	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr, let_info_ptr = let_info_ptr}, ci)
+// MW0	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr, let_info_ptr = let_info_ptr}, ci)
+	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr,
+			let_info_ptr = let_info_ptr, let_expr_position = NoPos }, ci)
 where
-	remove_non_used_arg :: (Bind Expression FreeVar) ([Bind Expression FreeVar],*ConversionInfo) -> ([Bind Expression FreeVar],*ConversionInfo)
-	remove_non_used_arg tc_bind=:{bind_dst={fv_info_ptr}} (l,ci=:{ci_var_heap})
+// MW0	remove_non_used_arg :: (Bind Expression FreeVar) ([Bind Expression FreeVar],*ConversionInfo) -> ([Bind Expression FreeVar],*ConversionInfo)
+	remove_non_used_arg :: LetBind ([LetBind],*ConversionInfo) -> ([LetBind],*ConversionInfo)
+	remove_non_used_arg tc_bind=:{lb_dst={fv_info_ptr}} (l,ci=:{ci_var_heap})
 		# (VI_Indirection ref_count, ci_var_heap) = readPtr fv_info_ptr ci_var_heap
 		| ref_count > 0
 			#! tc_bind
-				= { tc_bind & bind_dst = { tc_bind.bind_dst & fv_count = ref_count} }
+				= { tc_bind & lb_dst = { tc_bind.lb_dst & fv_count = ref_count} }
 			= ([tc_bind:l],{ci & ci_var_heap = ci_var_heap})
 			
 			= (l,{ci & ci_var_heap = ci_var_heap})
@@ -440,15 +455,19 @@ where
 			= addToBoundVars placeholder_var empty_attributed_type bound_vars
 		= (bind,(bound_vars2,ci));
 	where
-		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
+// MW0		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
+		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 		create_variable var_name var_info_ptr ci
 			# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 3 ci
 			  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 			  cyclic_fv = varToFreeVar cyclic_var 1	
-			= ({ bind_src = App {	app_symb = placeholder_symb,
-									app_args = [Var cyclic_var, Var cyclic_var],
-									app_info_ptr = nilPtr },
-				 bind_dst = varToFreeVar cyclic_var 1
+// MW0			= ({ bind_src = App {	app_symb = placeholder_symb,
+			= ({ lb_src = App {	app_symb = placeholder_symb,
+								app_args = [Var cyclic_var, Var cyclic_var],
+								app_info_ptr = nilPtr },
+// MW0				 bind_dst = varToFreeVar cyclic_var 1
+				 lb_dst = varToFreeVar cyclic_var 1,
+				 lb_position = NoPos
 			   },
 			   { ci & ci_new_variables = [ cyclic_fv : ci.ci_new_variables ]} /*ci*/)
 			   
@@ -508,12 +527,17 @@ where
 		# let_expr
 			= Let {
 					let_strict_binds	= []
-				,	let_lazy_binds		= (if (isNo this_default) [] [ {bind_src = opt opt_expr		,	bind_dst = c_inc_i_fv }]) ++ [
-										  { bind_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
-										   bind_dst = coerce_result_fv }
+// MW0				,	let_lazy_binds		= (if (isNo this_default) [] [ {bind_src = opt opt_expr		,	bind_dst = c_inc_i_fv }]) ++ [
+// MW0										  { bind_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
+// MW0										   bind_dst = coerce_result_fv }
+				,	let_lazy_binds		= (if (isNo this_default) [] [ {lb_src = opt opt_expr, lb_dst = c_inc_i_fv, lb_position = NoPos }]) ++ [
+										  { lb_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
+										   lb_dst = coerce_result_fv, lb_position = NoPos }
 										   ,
-										 { bind_src = TupleSelect twotuple 0 (Var coerce_result_var),
-										   bind_dst = coerce_bool_fv } : let_binds
+// MW0										 { bind_src = TupleSelect twotuple 0 (Var coerce_result_var),
+// MW0										   bind_dst = coerce_bool_fv } : let_binds
+										 { lb_src = TupleSelect twotuple 0 (Var coerce_result_var),
+										   lb_dst = coerce_bool_fv, lb_position = NoPos } : let_binds
 										],
 							let_expr =
 							 Case {	case_expr 		= Var coerce_bool_var,
@@ -524,6 +548,7 @@ where
 											case_info_ptr	= case_info_ptr,
 											case_default_pos= NoPos } // MW4++
 				,	let_info_ptr = let_info_ptr	
+				,	let_expr_position = NoPos // MW0++
 				}
 		
 		// dp_rhs
@@ -532,7 +557,8 @@ where
 		opt (Yes x)		= x
 			
 	convert_dynamic_pattern :: !ConversionInput !BoundVariables DefaultExpression Int OpenedDynamic AType (Optional Expression) ![DynamicPattern] *ConversionInfo
-		-> (Env Expression FreeVar, Expression, *ConversionInfo)
+/// MW0		-> (Env Expression FreeVar, Expression, *ConversionInfo)
+		-> ([LetBind], Expression, *ConversionInfo)
 	convert_dynamic_pattern cinp bound_vars this_default pattern_number opened_dynamic result_type last_default
 																			[{ dp_var, dp_type_patterns_vars, dp_type_code, dp_rhs } : patterns] ci
 		# /***  The last case may not have a default  ***/
@@ -609,10 +635,14 @@ where
 		  a_ij_binds			= add_x_i_bind opened_dynamic.opened_dynamic_expr dp_var a_ij_binds
 
 		  let_expr = Let {	let_strict_binds = [],
-		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
-		  								   bind_dst = unify_result_fv },
-		  								 { bind_src = TupleSelect twotuple 0 (Var unify_result_var),
-		  								   bind_dst = unify_bool_fv } : let_binds
+// MW0		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
+// MW0		  								   bind_dst = unify_result_fv },
+// MW0		  								 { bind_src = TupleSelect twotuple 0 (Var unify_result_var),
+// MW0		  								   bind_dst = unify_bool_fv } : let_binds
+		  					let_lazy_binds = [{ lb_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
+		  								   lb_dst = unify_result_fv, lb_position = NoPos },
+		  								 { lb_src = TupleSelect twotuple 0 (Var unify_result_var),
+		  								   lb_dst = unify_bool_fv, lb_position = NoPos } : let_binds
 		  								],
 		  					let_expr = Case {	case_expr 		= Var unify_bool_var,
 // MW was:												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs}],
@@ -621,13 +651,17 @@ where
 												case_ident		= No,
 												case_info_ptr	= case_info_ptr,
 												case_default_pos= NoPos }, // MW4++
-		  					let_info_ptr = let_info_ptr	}
+// MW0		  					let_info_ptr = let_info_ptr	}
+		  					let_info_ptr = let_info_ptr,
+		  					let_expr_position = NoPos }
 		  					
 		= (a_ij_binds ++ binds,  let_expr,  { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
 	where
-		add_x_i_bind bind_src bind_dst=:{fv_count} binds
+// MW0		add_x_i_bind bind_src bind_dst=:{fv_count} binds
+		add_x_i_bind lb_src lb_dst=:{fv_count} binds
 			| fv_count > 0
-				= [ { bind_src = bind_src, bind_dst = bind_dst } : binds ]
+// MW0				= [ { bind_src = bind_src, bind_dst = bind_dst } : binds ]
+				= [ { lb_src = lb_src, lb_dst = lb_dst, lb_position = NoPos } : binds ]
 				= binds
 				
 		isLastDynamicPattern dp_rhs=:(Case keesje=:{case_guards=DynamicPatterns _})
@@ -643,7 +677,8 @@ where
 
 	// other alternatives
 	convert_other_patterns :: ConversionInput BoundVariables DefaultExpression Int OpenedDynamic AType !(Optional Expression) ![DynamicPattern] !*ConversionInfo
-			-> (Env Expression FreeVar, *ConversionInfo)
+// MW0			-> (Env Expression FreeVar, *ConversionInfo)
+			-> ([LetBind], *ConversionInfo)
 	convert_other_patterns _ _ _ _ _ _  No  []  ci
 		// no default and no alternatives left
 		= ([], ci)
@@ -669,7 +704,8 @@ bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_h
 	# (VI_Indirection ref_count, ci_var_heap) = readPtr var_info_ptr ci_var_heap
 	| ref_count > 0
 		# ind_fv = varToFreeVar var ref_count
-  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
+// MW0  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
+  		= ([{ lb_src = TupleSelect twotuple 1 (Var unify_result_var), lb_dst = ind_fv, lb_position = NoPos }],
 				{ ci & ci_var_heap = ci_var_heap, ci_new_variables = [ ind_fv : ci_new_variables ]})
 		= ([], {ci & ci_var_heap = ci_var_heap})
 		
@@ -679,12 +715,14 @@ bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_h
 	it is converted into a function. The references are replaced by an appropriate function application.
 
 */
-generateBinding :: !ConversionInput BoundVariables BoundVar Expression AType !*ConversionInfo -> *(Bind Expression FreeVar, *ConversionInfo)
+// MW0 generateBinding :: !ConversionInput BoundVariables BoundVar Expression AType !*ConversionInfo -> *(Bind Expression FreeVar, *ConversionInfo)
+generateBinding :: !ConversionInput BoundVariables BoundVar Expression AType !*ConversionInfo -> *(LetBind, *ConversionInfo)
 generateBinding cinp bound_vars var bind_expr result_type ci
 	# (ref_count, ci) = get_reference_count var ci
 	| ref_count == 0
 		# free_var = varToFreeVar var 1
-		= ({ bind_src = bind_expr, bind_dst = free_var }, { ci & ci_new_variables = [ free_var : ci.ci_new_variables ]})
+// MW0		= ({ bind_src = bind_expr, bind_dst = free_var }, { ci & ci_new_variables = [ free_var : ci.ci_new_variables ]})
+		= ({ lb_src = bind_expr, lb_dst = free_var, lb_position = NoPos }, { ci & ci_new_variables = [ free_var : ci.ci_new_variables ]})
 		# (saved_defaults, ci_var_heap) = foldSt save_default bound_vars ([], ci.ci_var_heap)
 		  (act_args, free_typed_vars, local_free_vars, tb_rhs, ci_var_heap) = copyExpression bound_vars bind_expr ci_var_heap
 		#
@@ -696,10 +734,13 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 				= newFunction No (TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}) local_free_vars arg_types result_type cinp.cinp_group_index
 						(ci.ci_next_fun_nr, ci.ci_new_functions, ci.ci_fun_heap)
 		  free_var = varToFreeVar var (inc ref_count)
-		= ({	bind_src = App {	app_symb 		= fun_symb,
-									app_args 		= act_args,
-									app_info_ptr	= nilPtr },
-				bind_dst = free_var },
+// MW0		= ({	bind_src = App {	app_symb 		= fun_symb,
+		= ({	lb_src = App {	app_symb 		= fun_symb,
+								app_args 		= act_args,
+								app_info_ptr	= nilPtr },
+// MW0				bind_dst = free_var },
+				lb_dst = free_var,
+				lb_position = NoPos },
 		   { ci & ci_var_heap = ci_var_heap, ci_next_fun_nr = ci_next_fun_nr, ci_new_functions = ci_new_functions, ci_fun_heap = ci_fun_heap,
 					 ci_new_variables = [ free_var : ci_new_variables ] })
 	where
@@ -732,19 +773,24 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 
 /**************************************************************************************************/
 
-createVariables :: [VarInfoPtr] !(Env Expression FreeVar) !*ConversionInfo -> (!Env Expression FreeVar, !*ConversionInfo)
+// MW0 createVariables :: [VarInfoPtr] !(Env Expression FreeVar) !*ConversionInfo -> (!Env Expression FreeVar, !*ConversionInfo)
+createVariables :: [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
 createVariables var_info_ptrs binds ci
 	= mapAppendSt (create_variable a_ij_var_name) var_info_ptrs binds ci
 
-create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
+// MW0create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
+create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 create_variable var_name var_info_ptr ci
 	# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 3 ci
 	  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 	  cyclic_fv = varToFreeVar cyclic_var 1	
-	= ({ bind_src = App {	app_symb = placeholder_symb,
+// MW0	= ({ bind_src = App {	app_symb = placeholder_symb,
+	= ({ lb_src = App {	app_symb = placeholder_symb,
 							app_args = [Var cyclic_var, Var cyclic_var],
 							app_info_ptr = nilPtr },
-		 bind_dst = varToFreeVar cyclic_var 1
+// MW0		 bind_dst = varToFreeVar cyclic_var 1
+		 lb_dst = varToFreeVar cyclic_var 1,
+		 lb_position = NoPos
 	   },
 	   { ci & ci_new_variables = [ cyclic_fv : ci.ci_new_variables ]})
 
