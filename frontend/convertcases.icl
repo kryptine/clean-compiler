@@ -709,8 +709,14 @@ where
 //	convert_boolean_case_into_guard bound_vars  group_index common_defs default_ptr guard [ alt : alts ] case_default case_info_ptr ci
 	convert_boolean_case_into_guard bound_vars  group_index common_defs has_default guard [ alt : alts ] case_default case_info_ptr ci
 		# (guard, ci) = convertRootExpression bound_vars group_index common_defs cHasNoDefault guard ci
-		# (sign_of_then_part, then_part, ci) = convert_boolean_guard bound_vars group_index common_defs alt ci
-		  (opt_else_part, ci) = convert_to_else_part bound_vars group_index common_defs has_default sign_of_then_part alts case_default ci
+		/* JVG: changed 13-6-2000
+ 		# (sign_of_then_part, then_part, ci) = convert_boolean_guard bound_vars group_index common_defs alt ci
+ 		  (opt_else_part, ci) = convert_to_else_part bound_vars group_index common_defs has_default sign_of_then_part alts case_default ci
+		*/
+		# sign_of_then_part = case alt of {{bp_value=BVB bool} -> bool};
+		# (opt_else_part, ci) = convert_to_else_part bound_vars group_index common_defs has_default sign_of_then_part alts case_default ci
+		# (sign_of_then_part, then_part, ci) = convert_boolean_case_then_part bound_vars group_index common_defs default_ptr alt opt_else_part has_default ci
+		/**/
 //		= (Conditional { if_cond = { con_positive = sign_of_then_part, con_expression = guard }, if_then = then_part, if_else = opt_else_part }, ci)
 		= (build_conditional sign_of_then_part guard then_part opt_else_part, ci)
 	where
@@ -737,6 +743,11 @@ where
 		# (bp_expr, ci) = convertRootExpression bound_vars group_index common_defs cHasNoDefault bp_expr ci
 		= (bool, bp_expr, ci)
 
+	convert_boolean_case_then_part bound_vars group_index common_defs default_ptr {bp_value=BVB bool,bp_expr} opt_else_part has_default ci=:{ci_expr_heap}
+		# (EI_CaseTypeAndRefCounts case_type _, ci_expr_heap) = readPtr case_info_ptr ci_expr_heap
+		# (default_ptr, ci_expr_heap) = makePtrToDefault opt_else_part case_type.ct_result_type has_default ci_expr_heap	
+		# (bp_expr, ci) = convertRootExpression bound_vars group_index common_defs default_ptr bp_expr {ci & ci_expr_heap=ci_expr_heap}
+		= (bool, bp_expr, ci)
 
 convertRootExpression bound_vars group_index common_defs _ expr ci
 	= convertCases bound_vars group_index common_defs expr ci
