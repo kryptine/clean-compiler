@@ -287,7 +287,7 @@ BEDeclareDynamicTypeSymbol :: !Int !Int !BackEnd -> BackEnd;
 // void BEDeclareDynamicTypeSymbol (int typeIndex,int moduleIndex);
 BEDynamicTempTypeSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02100401;
+kBEVersionCurrent:==0x02100800;
 kBEVersionOldestDefinition:==0x02100401;
 kBEVersionOldestImplementation:==0x02100401;
 kBEDebug:==1;
