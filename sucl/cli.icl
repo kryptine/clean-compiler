@@ -183,7 +183,7 @@ typearity ti = length (arguments ti)
 //maxtypeinfo defs sym = extendfn defs coretypeinfo sym
 
 maxtyperule :: [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)] SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
-maxtyperule defs sym = extendfn defs (coretyperule--->"cli.coretyperule begins from cli.maxtyperule") sym
+maxtyperule defs sym = extendfn defs (coretyperule--->"coreclean.coretyperule begins from cli.maxtyperule") sym
 
 maxstricts :: [(SuclSymbol,[Bool])] SuclSymbol -> [Bool]
 maxstricts defs sym = extendfn defs corestricts sym
