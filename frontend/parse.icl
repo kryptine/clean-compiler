@@ -1658,13 +1658,11 @@ where
 		= case token of
   			CurlyOpenToken
   				-> want_record_type_rhs name False exi_vars pState
-/*
   			ExclamationToken
 			  	# (token, pState) = nextToken TypeContext pState
   				| token==CurlyOpenToken
   					-> want_record_type_rhs name True exi_vars pState
 	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
-*/
 /*			ColonToken
 				| isEmpty exi_vars
 				->	(PD_Erroneous, parseError "Algebraic type" No "no colon, :," pState)

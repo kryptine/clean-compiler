@@ -21,6 +21,6 @@
 #define SA_RECOGNIZES_ABORT_AND_UNDEF 1
 
 #define STRICT_LISTS 1
-#define BOXED_RECORDS 0
+#define BOXED_RECORDS 1
 
 #undef KARBON
