@@ -1098,7 +1098,6 @@ where
 		# (left, right, is_unique) = split_args (dec n) args
 		= ([ atype : left ], right, is_unique || attr_is_unique at_attribute)
 	
-	
 	attr_is_unique TA_Unique = True
 	attr_is_unique _ = False
 	
@@ -2097,7 +2096,7 @@ where
 			= ptrs
 			= get_dict_ptrs fun_index dict_types
 		
-	clean_up_and_check_function_type {fun_ident,fun_pos,fun_type = opt_fun_type} fun is_start_rule list_inferred_types defs type_contexts type_ptrs
+	clean_up_and_check_function_type {fun_ident,fun_kind,fun_pos,fun_type = opt_fun_type} fun is_start_rule list_inferred_types defs type_contexts type_ptrs
 					coercion_env attr_partition type_var_env attr_var_env out ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_ident fun_pos) ts.ts_error}
@@ -2106,6 +2105,8 @@ where
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env 
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+				  ts_error
+					= check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
 			  			= check_function_type fun_type tmp_fun_type clean_fun_type type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
@@ -2115,6 +2116,8 @@ where
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+				  ts_error
+					= check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				  th_attrs = ts_type_heaps.th_attrs
 				  (out, th_attrs)
 				  		= case list_inferred_types of
@@ -2151,6 +2154,11 @@ where
 			| arity_diff > 0
 				= take arity_diff args2 ++ args1
 				= args1
+
+	check_caf_context position FK_Caf {st_context=[_:_]} error
+		=	checkErrorWithIdentPos position "CAF cannot be overloaded" error
+	check_caf_context _ _ _ error
+		=	error
 
 addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
 	= { st & st_args = take nr_of_lifted_arguments new_args ++ st_args, st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
