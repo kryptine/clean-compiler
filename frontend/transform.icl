@@ -901,7 +901,7 @@ liftFunctions min_level group group_index fun_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs)
 			= foldSt (add_free_vars_of_non_recursive_calls_to_function group_index) group (False, False, fun_defs)
 	| contains_free_vars
-		# fun_defs = iterateSt (foldSt (add_free_vars_of_recursive_calls_to_function group_index) group) fun_defs
+		# fun_defs = iterateSt (add_free_vars_of_recursive_calls_to_functions group_index group) fun_defs
 		= lift_functions group fun_defs var_heap expr_heap
 	| lifted_function_called
 		= lift_functions group fun_defs var_heap expr_heap
@@ -925,6 +925,9 @@ where
 					# (free_vars_added, free_vars) = add_free_variables fun_def_level fi_free_vars (False, free_vars)
 					= (True, free_vars, fun_defs)
 	
+	add_free_vars_of_recursive_calls_to_functions group_index group fun_defs
+		= foldSt (add_free_vars_of_recursive_calls_to_function group_index) group (False, fun_defs)
+
 	add_free_vars_of_recursive_calls_to_function group_index fun (free_vars_added, fun_defs)
 		# (fun_def=:{fun_info}, fun_defs) = fun_defs![fun]
 		  { fi_free_vars,fi_def_level,fi_calls } = fun_info

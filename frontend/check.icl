@@ -718,8 +718,9 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_symb o
 where
 	determine_pattern_symbol mod_index id_index STE_Constructor id_name cons_defs modules error
 		#! cons_def = cons_defs.[id_index]
-		# {cons_type={st_arity},cons_priority, cons_type_index} = cons_def
+		# {cons_symb, cons_type={st_arity},cons_priority, cons_type_index} = cons_def
 		= (id_index, mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
+//			---> ("determine_pattern_symbol", id_name, cons_symb)
 	determine_pattern_symbol mod_index id_index (STE_Imported STE_Constructor import_mod_index) id_name cons_defs modules error
 		#! {dcl_common,dcl_conversions} = modules.[import_mod_index]
 		#! cons_def = dcl_common.com_cons_defs.[id_index]
@@ -2226,11 +2227,11 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 	=	( { modules & [cIclModIndex] = { dcl_mod & dcl_conversions = Yes conversion_table }}
 		, icl_decl_symbols
 		, { icl_definitions
-				& def_types			= rev_append icl_definitions.def_types new_type_defs
-				, def_constructors	= rev_append icl_definitions.def_constructors new_cons_defs
-				, def_selectors		= rev_append icl_definitions.def_selectors new_selector_defs
-				, def_classes		= rev_append icl_definitions.def_classes new_class_defs
-				, def_members		= rev_append icl_definitions.def_members new_member_defs
+				& def_types			= my_append icl_definitions.def_types new_type_defs
+				, def_constructors	= my_append icl_definitions.def_constructors new_cons_defs
+				, def_selectors		= my_append icl_definitions.def_selectors new_selector_defs
+				, def_classes		= my_append icl_definitions.def_classes new_class_defs
+				, def_members		= my_append icl_definitions.def_members new_member_defs
 		  }
 		, icl_sizes
 		, { cs & cs_symbol_table = cs_symbol_table }
@@ -2336,10 +2337,10 @@ where
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 
-	rev_append front []
+	my_append front []
 		= front
-	rev_append front back
-		= front ++ reverse back
+	my_append front back
+		= front ++ back
 
 (<=<) infixl 
 (<=<) state fun :== fun state 

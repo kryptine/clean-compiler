@@ -169,7 +169,7 @@ iFoldSt op fr to st :== i_fold_st fr to st
 iterateSt op st :== iterate_st op st
 	where
 		iterate_st op st
-			# (continue, st) = op (False, st)
+			# (continue, st) = op st
 			| continue
 				= iterate_st op st
 				= st

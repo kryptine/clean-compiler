@@ -3,6 +3,7 @@ definition module utilities
 from StdString import String
 from StdEnv import Eq, not, Ord, IncDec
 import StdMisc, general
+
 /*
 	For Strings
 */
@@ -72,6 +73,7 @@ foldSt op l st :== fold_st l st
 		fold_st [] st		= st
 		fold_st [a:x] st	= fold_st x (op a st)
 
+// iFoldSt :: (Int -> .(.b -> .b)) !Int !Int .b -> .b
 iFoldSt op fr to st :== i_fold_st fr to st
 	where
 		i_fold_st fr to st
@@ -82,7 +84,7 @@ iFoldSt op fr to st :== i_fold_st fr to st
 iterateSt op st :== iterate_st op st
 	where
 		iterate_st op st
-			# (continue, st) = op (False, st)
+			# (continue, st) = op st
 			| continue
 				= iterate_st op st
 				= st
