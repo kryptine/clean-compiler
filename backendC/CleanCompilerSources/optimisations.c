@@ -24,6 +24,8 @@
 #define UNTUPLE_STRICT_TUPLES /* also in statesgen.c */
 #define MOVE_TUPLE_RECORD_AND_ARRAY_RESULT_FUNCTION_ARGUMENT_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
 #define MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
+#define THUNK_LIFT_U_RECORD_SELECTORS
+#define THUNK_LIFT_0_CONSTRUCTORS
 
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 #define for_la(v1,v2,l1,l2,n) for(v1=(l1),v2=(l2);v1!=NULL;v1=v1->n,++v2)
@@ -877,19 +879,8 @@ int optimise_tuple_result_function (Node node,StateS demanded_state)
 	
 	add_strictness_in_state_to_type (&demanded_state,new_rule_p->rule_type->type_alt_rhs);
 
-#if 0
-	/* compute lhs->type_node_state for statesgen, recomputed after strictness analysis */
-
-	if (new_rule_type->type_alt_rhs->type_node_is_var ||
-		new_rule_type->type_alt_rhs->type_node_symbol->symb_kind==apply_symb)
-	{
-		new_rule_type->type_alt_lhs->type_node_state = StrictState;
-		new_rule_type->type_alt_lhs->type_node_state.state_kind = StrictRedirection;
-	} else
-		ConvertTypeToState (new_rule_type->type_alt_rhs,&new_rule_type->type_alt_lhs->type_node_state,StrictOnA);
-#else
 	new_rule_p->rule_state_p=NULL;
-#endif
+
 	node->node_symbol=new_function_symbol;
 	function_changed=1;
 	
@@ -945,12 +936,8 @@ void generate_states (ImpRuleS *rules,int do_strictness_analysis)
 				} else
 					do_strictness_analysis=0;
 
-			for_l (rule,new_strict_result_rules,rule_next){
-#if 0
-				rule->rule_type->type_alt_lhs->type_node_state = LazyState;
-#endif
+			for_l (rule,new_strict_result_rules,rule_next)
 				ExamineTypesAndLhsOfSymbolDefinition (rule->rule_root->node_symbol->symb_def);
-			}
 			
 			rule=new_strict_result_rules;
 			new_strict_result_rules=NULL;
@@ -1087,6 +1074,21 @@ static char *append_n_chars (char *dest,const char *src,int length)
 
 #define allocate_function_state(arity) (((StateP)(CompAlloc (sizeof(StateS)*((arity)+1))))+1)
 
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+static StateP selector_l_or_n_state_p (StateP tuple_state_p,StateP tuple_arg_states,StateP selector_arg_state_p)
+{
+	tuple_arg_states[0]=*selector_arg_state_p;
+	tuple_arg_states[1]=StrictState;
+
+	tuple_state_p->state_arity = 2;
+	tuple_state_p->state_tuple_arguments = tuple_arg_states;
+	tuple_state_p->state_type = TupleState;
+	tuple_state_p->state_mark = 0;
+	
+	return tuple_state_p;
+}
+#endif
+
 #define MAX_N_FUNCTION_ARGUMENTS 32
 
 static int add_n_new_arguments_for_local_function (ArgP arg_p,int n_arguments)
@@ -1201,7 +1203,6 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 									is_rule=True;
 									function_state_p=sdef->sdef_rule_type->rule_type_state_p;
 									break;
-								/* added 5-8-1999 */
 								case RECORDTYPE:
 									if (sdef->sdef_strict_constructor){
 										is_rule=True;
@@ -1209,7 +1210,6 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 									} else
 										is_rule=False;
 									break;
-								/* */
 								default:
 									is_rule=False;
 							}
@@ -1243,6 +1243,24 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 							}
 						}
 					}
+#ifdef THUNK_LIFT_0_CONSTRUCTORS
+					else if (arg_node->node_arity==0 && arg_node->node_symbol->symb_def->sdef_kind==CONSTRUCTOR){
+						NodeP function_node;
+						ArgP new_arg;
+						
+						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
+						function_node->node_state=LazyState;
+						function_node->node_number=0;
+						
+						new_arg=NewArgument (function_node);
+						new_arg->arg_state=LazyState;
+						*rhs_arg_p=new_arg;
+						rhs_arg_p=&new_arg->arg_next;
+						
+						++arg_state_p;
+						continue;
+					}
+#endif
 					break;
 				}
 #ifdef UNTUPLE_STRICT_TUPLES
@@ -1320,6 +1338,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					NodeDefP node_def_p;
 					
 					if (arg_node->node_arguments->arg_node->node_kind==NodeIdNode &&
+						!IsLazyState (*arg_state_p) &&
 						arg_node->node_arguments->arg_node->node_node_id->nid_refcount>0 &&
 						IsLazyState ((tuple_node_p=(node_def_p=arg_node->node_arguments->arg_node->node_node_id->nid_node_def)->def_node)->node_state) &&
 						tuple_node_p->node_kind==NormalNode &&
@@ -1337,7 +1356,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						
 						if (new_n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 							break;
-							
+						
 						n_arguments=new_n_arguments;
 
 						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
@@ -1361,7 +1380,42 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				}
 #endif
 			}
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+		else if (arg_node->node_kind==SelectorNode && arg_node->node_arity>=SELECTOR_U && arg_state_p->state_type==TupleState){
+			int new_n_arguments;
 
+			new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,n_arguments-1);
+			
+			if (new_n_arguments<=MAX_N_FUNCTION_ARGUMENTS){
+				Node selector_node;
+				ArgP new_arg;
+				StateP selector_arg_state_p;
+				StateS tuple_state,tuple_arg_states[2];
+	
+				n_arguments=new_n_arguments;
+
+				selector_node=NewSelectorNode (arg_node->node_symbol,NULL,arg_node->node_arity);
+				selector_node->node_state=LazyState;
+				selector_node->node_number=0;
+
+				new_arg=NewArgument (selector_node);
+				new_arg->arg_state=LazyState;
+				*rhs_arg_p=new_arg;
+				rhs_arg_p=&new_arg->arg_next;
+				
+				selector_arg_state_p=&arg_node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+
+				if (arg_node->node_arity>=SELECTOR_L)
+					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
+
+				function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&selector_node->node_arguments,
+																		 selector_arg_state_p,arity_p,function_name_p,end_function_name,n_arguments);
+				
+				++arg_state_p;	
+				continue;
+			}			
+		}
+#endif
 		if (arg_node->node_kind==NodeIdNode && (arg_node->node_node_id->nid_mark & NID_LIFTED_BY_OPTIMISE) && arg_node->node_node_id->nid_forward_node_id!=NULL){
 			arg_node_id=arg_node->node_node_id->nid_forward_node_id;
 			--arg_node_id->nid_refcount;
@@ -1469,10 +1523,13 @@ static void create_new_local_function (Node node,StateP function_state_p)
 	}
 
 	lhs_root=NewNode (NULL,NULL,0);
-/*	lhs_root->node_state=LazyState; */
 	lhs_root->node_state=StrictState;
-	
+
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+	rhs_root=NewNodeByKind (node->node_kind,node->node_symbol,NULL,node->node_arity);
+#else
 	rhs_root=NewNode (node->node_symbol,NULL,node->node_arity);
+#endif
 	rhs_root->node_state=LazyState;
 	rhs_root->node_number=0;
 	
@@ -1511,6 +1568,9 @@ static void create_new_local_function (Node node,StateP function_state_p)
 	lhs_root->node_arity=function_arity;
 	function_symbol->symb_def->sdef_arity=function_arity;
 	
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+	node->node_kind=NormalNode;
+#endif
 	node->node_symbol=function_symbol;
 	node->node_arity=function_arity;
 
@@ -1532,6 +1592,64 @@ static void create_new_local_function (Node node,StateP function_state_p)
 
 	imp_rule->rule_next=new_rules;
 	new_rules=imp_rule;
+}
+
+static int is_optimisable_argument (NodeP arg_node,StateP function_arg_state_p)
+{
+	if (arg_node->node_kind==NormalNode){
+#ifdef THUNK_LIFT_SELECTORS
+		NodeP tuple_node_p;
+#endif
+		if (arg_node->node_symbol->symb_kind==definition){
+			if ((function_arg_state_p->state_type==SimpleState && function_arg_state_p->state_kind==OnB)
+#ifdef MOVE_TUPLE_RECORD_AND_ARRAY_RESULT_FUNCTION_ARGUMENT_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
+				|| function_arg_state_p->state_type==TupleState || function_arg_state_p->state_type==RecordState || function_arg_state_p->state_type==ArrayState
+#endif
+			){
+				SymbDef sdef;
+				
+				unsigned kind;
+					
+				sdef=arg_node->node_symbol->symb_def;
+				kind=sdef->sdef_kind;
+				
+				if (arg_node->node_arity==(kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity)){
+					if (kind==IMPRULE || kind==DEFRULE || kind==SYSRULE || (kind==RECORDTYPE && sdef->sdef_strict_constructor))
+						return 1;
+				}
+			}
+		}
+#ifdef UNTUPLE_STRICT_TUPLES
+		else if (arg_node->node_symbol->symb_kind==tuple_symb && function_arg_state_p->state_type==TupleState)
+			return 1;
+#endif
+#ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
+		else if (arg_node->node_symbol->symb_kind==apply_symb && function_arg_state_p->state_type==SimpleState &&
+				(function_arg_state_p->state_kind==StrictOnA || function_arg_state_p->state_kind==StrictRedirection))
+			return 1;
+#endif
+#ifdef THUNK_LIFT_SELECTORS
+		else if (arg_node->node_symbol->symb_kind==select_symb && 
+				 !IsLazyState (*function_state_p) &&
+			 	 arg_node->node_arguments->arg_node->node_kind==NodeIdNode &&
+				 arg_node->node_arguments->arg_node->node_node_id->nid_refcount>0 &&
+				 IsLazyState ((tuple_node_p=arg_node->node_arguments->arg_node->node_node_id->nid_node_def->def_node)->node_state) &&
+				 tuple_node_p->node_kind==NormalNode && tuple_node_p->node_symbol->symb_kind==definition &&
+				 (tuple_node_p->node_symbol->symb_def->sdef_kind==IMPRULE ||
+				  tuple_node_p->node_symbol->symb_def->sdef_kind==DEFRULE ||
+				  tuple_node_p->node_symbol->symb_def->sdef_kind==SYSRULE) &&
+				 tuple_node_p->node_arity==tuple_node_p->node_symbol->symb_def->sdef_arity)
+		{
+			return 1;
+		}
+#endif
+	}
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+	else if (arg_node->node_kind==SelectorNode && arg_node->node_arity>=SELECTOR_U && function_arg_state_p->state_type==TupleState)
+		return 1;
+#endif
+	
+	return 0;
 }
 
 static void optimise_normal_node (Node node)
@@ -1587,21 +1705,18 @@ static void optimise_normal_node (Node node)
 				if (sdef->sdef_rule->rule_mark & RULE_CALL_VIA_LAZY_SELECTIONS_ONLY)
 					return;
 # endif
-
 				function_state_p=sdef->sdef_rule->rule_state_p;
 				break;
 			case DEFRULE:
 			case SYSRULE:
 				function_state_p=sdef->sdef_rule_type->rule_type_state_p;
 				break;
-			/* added 5-8-1999 */
 			case CONSTRUCTOR:
 				if (sdef->sdef_strict_constructor){
 					function_state_p=sdef->sdef_constructor->cl_state_p;
 					break;
 				} else
 					return;
-			/* */
 			default:
 				return;
 		}
@@ -1613,61 +1728,9 @@ static void optimise_normal_node (Node node)
 		arg=node->node_arguments;
 
 		for (arg_n=0; arg_n<node->node_arity; ++arg_n){
-			Node arg_node;
-				
-			arg_node=arg->arg_node;
-			if (arg_node->node_kind==NormalNode){
-#ifdef THUNK_LIFT_SELECTORS
-				NodeP tuple_node_p;
-#endif
-				if (arg_node->node_symbol->symb_kind==definition){
-					if ((function_state_p[arg_n].state_type==SimpleState && function_state_p[arg_n].state_kind==OnB)
-#ifdef MOVE_TUPLE_RECORD_AND_ARRAY_RESULT_FUNCTION_ARGUMENT_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
-						|| function_state_p[arg_n].state_type==TupleState || function_state_p[arg_n].state_type==RecordState || function_state_p[arg_n].state_type==ArrayState
-#endif
-					){
-						SymbDef sdef;
-						
-						unsigned kind;
-							
-						sdef=arg_node->node_symbol->symb_def;
-						kind=sdef->sdef_kind;
-						
-						if (arg_node->node_arity==(kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity)){
-							if (kind==IMPRULE || kind==DEFRULE || kind==SYSRULE
-								/* added 5-8-1999 */
-								|| (kind==RECORDTYPE && sdef->sdef_strict_constructor)
-								/* */
-							)
-								break;
-						}
-					}
-				}
-#ifdef UNTUPLE_STRICT_TUPLES
-				else if (arg_node->node_symbol->symb_kind==tuple_symb && function_state_p[arg_n].state_type==TupleState)
-					break;
-#endif
-#ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
-				else if (arg_node->node_symbol->symb_kind==apply_symb && function_state_p[arg_n].state_type==SimpleState &&
-						(function_state_p[arg_n].state_kind==StrictOnA || function_state_p[arg_n].state_kind==StrictRedirection))
-					break;
-#endif
-#ifdef THUNK_LIFT_SELECTORS
-				else if (arg_node->node_symbol->symb_kind==select_symb && 
-					 	 arg_node->node_arguments->arg_node->node_kind==NodeIdNode &&
-						 arg_node->node_arguments->arg_node->node_node_id->nid_refcount>0 &&
-						 IsLazyState ((tuple_node_p=arg_node->node_arguments->arg_node->node_node_id->nid_node_def->def_node)->node_state) &&
-						 tuple_node_p->node_kind==NormalNode && tuple_node_p->node_symbol->symb_kind==definition &&
-						 (tuple_node_p->node_symbol->symb_def->sdef_kind==IMPRULE ||
-						  tuple_node_p->node_symbol->symb_def->sdef_kind==DEFRULE ||
-						  tuple_node_p->node_symbol->symb_def->sdef_kind==SYSRULE) &&
-						 tuple_node_p->node_arity==tuple_node_p->node_symbol->symb_def->sdef_arity)
-				{
-					break;
-				}
-#endif
-			}
-			
+			if (is_optimisable_argument (arg->arg_node,&function_state_p[arg_n]))
+				break;
+
 			arg=arg->arg_next;
 		}
 
@@ -2324,6 +2387,28 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 			return;
 		}
 		case SelectorNode:
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+			if (node->node_arity>=SELECTOR_U && node->node_state.state_type==SimpleState && node->node_state.state_kind==OnA){
+				StateP selector_arg_state_p;
+				StateS tuple_state,tuple_arg_states[2];
+
+				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+
+				if (node->node_arity>=SELECTOR_L)
+					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
+
+				if (is_optimisable_argument (node->node_arguments->arg_node,selector_arg_state_p)){
+					ArgP arg;
+					
+					create_new_local_function (node,selector_arg_state_p);
+
+					for_l (arg,node->node_arguments,arg_next)
+						optimise_node_in_then_or_else (arg->arg_node,f_node_ids_l,local_scope);
+					
+					return;
+				}
+			}
+#endif
 		case MatchNode:
 			optimise_node_in_then_or_else (node->node_arguments->arg_node,f_node_ids_l,local_scope);
 			return;
@@ -2532,6 +2617,28 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 			return;
 		}
 		case SelectorNode:
+#ifdef THUNK_LIFT_U_RECORD_SELECTORS
+			if (node->node_arity>=SELECTOR_U && node->node_state.state_type==SimpleState && node->node_state.state_kind==OnA){
+				StateP selector_arg_state_p;
+				StateS tuple_state,tuple_arg_states[2];
+
+				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				
+				if (node->node_arity>=SELECTOR_L)
+					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
+
+				if (is_optimisable_argument (node->node_arguments->arg_node,selector_arg_state_p)){
+					ArgP arg;
+					
+					create_new_local_function (node,selector_arg_state_p);
+
+					for_l (arg,node->node_arguments,arg_next)
+						optimise_node (arg->arg_node,f_node_ids_l);
+					
+					return;
+				}
+			}
+#endif
 		case MatchNode:
 			optimise_node (node->node_arguments->arg_node,f_node_ids_l);
 			return;
