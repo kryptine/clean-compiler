@@ -659,7 +659,6 @@ copy_local_functions_of_macro local_macro_functions is_def_macro local_functions
 			# function = {function & fun_info.fi_group_index=if (function_group_index<NoIndex) (-2-function_group_index) function_group_index}
 
 			# (function,local_macro_functions,es) = copy_macro_or_local_macro_function is_def_macro function local_macro_functions es
-			# function={function & fun_index=new_function_n}
 			# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions is_def_macro local_functions_to_be_copied es
 			-> ([(old_and_new_function_n,function):new_functions],local_macro_functions,es)
 
@@ -1393,7 +1392,6 @@ where
 
 			# (macro,new_functions,local_macro_functions,es) = copy_macro_and_local_functions macro copied_local_functions es			
 //			# new_function_index=trace ("new_function_index: "+++toString new_function_index+++"\n") new_function_index;
-			# macro={macro & fun_index=new_function_index}
 			# last_function_index = case local_macro_functions of (Yes {next_local_function_n}) -> next_local_function_n-1
 			# es = add_new_fun_defs [({old_function_n=glob_object,new_function_n=new_function_index},macro):new_functions] new_function_index last_function_index es
 				with

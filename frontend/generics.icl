@@ -3303,7 +3303,6 @@ makeFunction {ds_index, ds_arity, ds_ident} group_index arg_vars body_expr opt_s
 			},
 		fun_type = opt_sym_type,
 		fun_pos = fun_pos,
-		fun_index = ds_index,
 		fun_kind  = FK_ImpFunction cNameNotLocationDependent,
 		fun_lifted = 0,
 		fun_info = {	

@@ -474,7 +474,6 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 	,	fun_body		:: !FunctionBody
 	,	fun_type		:: !Optional SymbolType
 	,	fun_pos			:: !Position
-	,	fun_index		:: !Int
 	,	fun_kind		:: !DefOrImpFunKind
 	,	fun_lifted		:: !Int
 //	,	fun_type_ptr	:: !TypeVarInfoPtr
@@ -1709,13 +1708,13 @@ where
 	(<<<) file {fun_symb,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
 			<<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
-		= file <<< fun_symb <<< '@' <<< fun_index <<< '.' <<< "T "  
+	(<<<) file {fun_symb,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
+		= file <<< fun_symb <<< '.' <<< "T "  
 //			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
 			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
-			<<< fun_symb <<< '@' <<< fun_index <<< '.' <<< body <<< '\n'
+	(<<<) file {fun_symb,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
+			<<< fun_symb <<< '.' <<< body <<< '\n'
 	(<<<) file {fun_symb,fun_body=NoBody,fun_type=Yes type} = file // <<< type <<< '\n'
 			<<< fun_symb <<< '.' <<< "Array function\n"
 

@@ -490,7 +490,6 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 	,	fun_body		:: !FunctionBody
 	,	fun_type		:: !Optional SymbolType
 	,	fun_pos			:: !Position
-	,	fun_index		:: !Int
 	,	fun_kind		:: !DefOrImpFunKind
 	,	fun_lifted		:: !Int
 	,	fun_info		:: !FunInfo

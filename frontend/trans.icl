@@ -1114,7 +1114,6 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 					,	fun_body = TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
 					,	fun_type = Yes fun_type
 					,	fun_pos = NoPos
-					,	fun_index = fun_index
 					,	fun_kind = FK_ImpFunction cNameNotLocationDependent
 					,	fun_lifted = undeff
 					,	fun_info = 	{	fi_calls = []
@@ -1522,8 +1521,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 					st_result = fresh_result_type, st_context = [], st_attr_vars = all_attr_vars,
 					st_attr_env = coercionsToAttrEnv fresh_attr_vars final_coercions }
 	  new_fd_expanding 
-	  		= { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, fun_index = ti_next_fun_nr,
-					fun_info.fi_group_index = fi_group_index}
+	  		= { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, 
+	  					fun_info.fi_group_index = fi_group_index}
 	  new_gen_fd
 	  		= { gf_fun_def = new_fd_expanding,	gf_instance_info = II_Empty, gf_fun_index = ti_next_fun_nr,
 				 gf_cons_args = {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits} }
@@ -2146,8 +2145,8 @@ where
 		= App app @ extra_args
 		
 is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
-	:== let { type = imported_funs.[glob_module].[glob_object].ft_type;
-		} in type.st_arity>0 && not (isEmpty type.st_context);
+	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
+		  in type.st_arity>0 && not (isEmpty type.st_context);
 
 is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== not (isEmpty imported_funs.[glob_module].[glob_object].ft_type.st_context);

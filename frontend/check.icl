@@ -796,7 +796,7 @@ checkFunction mod_index fun_index def_level fun_defs
 	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
 	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics,
 	  								  fi_properties = fi_properties }
-	  fun_defs = { es_fun_defs & [fun_index] = { fun_def & fun_body = fun_body, fun_index = fun_index, fun_info = fun_info, fun_type = fun_type}}
+	  fun_defs = { es_fun_defs & [fun_index] = { fun_def & fun_body = fun_body, fun_info = fun_info, fun_type = fun_type}}
 	  (fun_defs, cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls fun_defs cs.cs_symbol_table
 	= (fun_defs,
 			{ e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules },
@@ -1367,23 +1367,15 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 		get_ident (ID_Instance class_ident instance_ident _)	= instance_ident
 
 	get_symbol imp_decl ident=:{id_info} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
-		# (ste, cs_symbol_table)
-				= readPtr id_info cs_symbol_table
+		# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= case ste.ste_kind of
 			STE_ExplImpSymbol expl_imp_symbols_nr
-				# ini
-						= { ini_symbol_nr = expl_imp_symbols_nr, ini_imp_decl = imp_decl }
-				-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, 
-					[ini:expl_imp_indices_accu], cs_symbol_table)
+				# ini = { ini_symbol_nr = expl_imp_symbols_nr, ini_imp_decl = imp_decl }
+				-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [ini:expl_imp_indices_accu], cs_symbol_table)
 			STE_Empty
-				# cs_symbol_table
-						= writePtr id_info { ste & ste_kind = STE_ExplImpSymbol nr_of_expl_imp_symbols, ste_previous = ste }
-								cs_symbol_table
-				  ini
-						= { ini_symbol_nr = nr_of_expl_imp_symbols, ini_imp_decl = imp_decl }
-				-> ([ident:expl_imp_symbols_accu], nr_of_expl_imp_symbols+1,
-					[ini:expl_imp_indices_accu], cs_symbol_table)
-				
+				# cs_symbol_table = writePtr id_info { ste & ste_kind = STE_ExplImpSymbol nr_of_expl_imp_symbols, ste_previous = ste } cs_symbol_table
+				  ini = { ini_symbol_nr = nr_of_expl_imp_symbols, ini_imp_decl = imp_decl }
+				-> ([ident:expl_imp_symbols_accu], nr_of_expl_imp_symbols+1,[ini:expl_imp_indices_accu], cs_symbol_table)				
 
 checkDclComponent :: !{![Int]} !{![Int]} ![[(Index, Position, [ImportNrAndIdents])]] ![Int] 
 				!(!Int, !*ExplImpInfos, !*{# DclModule}, !*{# FunDef}, !*Heaps,!*CheckState)
@@ -2020,13 +2012,13 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 					# {ft_type,ft_specials = SP_FunIndex decl_index} = dcl_fun_types.[spec_index]
 					  icl_index = conversion_table.[decl_index]
 					  (icl_fun, icl_functions) = icl_functions![icl_index]
-					  (new_fun_def, heaps) = build_function next_fun_index icl_fun ft_type heaps
+					  (new_fun_def, heaps) = build_function next_fun_index icl_fun icl_index ft_type heaps
 					  (new_fun_defs, funs_index_heaps)
 					   		= collect_specialized_functions (inc spec_index) last_index dcl_fun_types conversion_table (icl_functions, inc next_fun_index, heaps)
 					= ([new_fun_def : new_fun_defs], funs_index_heaps) 
 					= ([], (icl_functions, next_fun_index, heaps))
 		 
-			build_function new_fun_index fun_def=:{fun_symb, fun_index, fun_arity,  fun_body = CheckedBody {cb_args}, fun_info} fun_type
+			build_function new_fun_index fun_def=:{fun_symb, fun_arity,  fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
 						(var_heap, type_var_heap, expr_heap)
 				# (tb_args, var_heap) = mapSt new_free_var cb_args var_heap
 				  (app_args, expr_heap) = mapSt new_bound_var tb_args expr_heap
@@ -2035,7 +2027,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 												symb_kind = SK_Function { glob_module = main_dcl_module_n, glob_object = fun_index }},
 								 app_args = app_args,
 								 app_info_ptr = app_info_ptr }
-				= ({ fun_def & fun_index=new_fun_index, fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_type = Yes fun_type,
+				= ({ fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_type = Yes fun_type,
 						fun_info = { EmptyFunInfo & fi_calls = [ { fc_index = fun_index, fc_level = cGlobalScope }] }},
 					(var_heap, type_var_heap, expr_heap))
 		
@@ -2234,18 +2226,15 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 		,	dcl_is_cashed	= False
 		}
 
-addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_component_set imports_ikh
-			dcl_modules cs
+addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_component_set imports_ikh dcl_modules cs
 	#! nr_of_dcl_modules
 			= size dcl_modules
-	# {si_explicit, si_implicit}
-			= ikhSearch` importing_mod imports_ikh
+	# {si_explicit, si_implicit} = ikhSearch` importing_mod imports_ikh
 	  (decls_accu, visited_modules, dcl_modules, cs)
 	  		= foldSt (add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod
 	  					modules_in_component_set imports_ikh)
 	  				si_implicit ([], bitvectCreate nr_of_dcl_modules, dcl_modules, cs)
-	= foldSt (add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod) si_explicit
- 				(decls_accu, dcl_modules, cs)
+	= foldSt (add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod) si_explicit (decls_accu, dcl_modules, cs)
   where
 	add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod modules_in_component_set imports_ikh
 			(mod_index, position) (decls_accu, visited_modules, dcl_modules, cs)
@@ -2287,14 +2276,9 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 				si_implicit
 				(decls_accu, visited_modules, dcl_modules, cs)
 
-		
-	add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod (decls, position)
-			(decls_accu, dcl_modules, cs)
-		# cs
-				= pushErrorAdmin (newPosition import_ident position) cs
-		  (decls_accu, dcl_modules, cs)
-				= foldSt (add_expl_imp_declaration opt_macro_range importing_mod) decls
-						(decls_accu, dcl_modules, cs)
+	add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod (decls, position) (decls_accu, dcl_modules, cs)
+		# cs = pushErrorAdmin (newPosition import_ident position) cs
+		  (decls_accu, dcl_modules, cs) = foldSt (add_expl_imp_declaration opt_macro_range importing_mod) decls (decls_accu, dcl_modules, cs)
 		= (decls_accu, dcl_modules, popErrorAdmin cs)		
 		
 	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, cs)
@@ -2616,8 +2600,7 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 	  dcl_macros					= mod_defs.def_macros
 	  cs							= addGlobalDefinitionsToSymbolTable dcl_defined cs
 	  (dcls_import_list, modules, cs)
-	  		= addImportedSymbolsToSymbolTable mod_index No modules_in_component_set
-	  				imports_ikh modules cs
+	  		= addImportedSymbolsToSymbolTable mod_index No modules_in_component_set imports_ikh modules cs
 	  dcls_import
 	  		= { el \\ el<-dcls_import_list }
 	  cs							= { cs & cs_x.x_needed_modules = 0 }

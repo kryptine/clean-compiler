@@ -1327,15 +1327,15 @@ where
 		get_recursive_fun_index :: !Index !SymbKind Int !{# FunDef} -> Index
 		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) main_dcl_module_n fun_defs
 			| glob_module == main_dcl_module_n
-				# {fun_info,fun_index} = fun_defs.[glob_object]
+				# {fun_info} = fun_defs.[glob_object]
 				| fun_info.fi_group_index == group_index
-					= fun_index
+					= glob_object
 					= NoIndex
 				= NoIndex
 		get_recursive_fun_index group_index (SK_LocalMacroFunction glob_object) main_dcl_module_n fun_defs
-			# {fun_info,fun_index} = fun_defs.[glob_object]
+			# {fun_info} = fun_defs.[glob_object]
 			| fun_info.fi_group_index == group_index
-				= fun_index
+				= glob_object
 				= NoIndex
 		get_recursive_fun_index group_index _ main_dcl_module_n fun_defs
 			= NoIndex

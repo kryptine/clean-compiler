@@ -1,6 +1,6 @@
 implementation module convertcases
 
-import syntax, transform, checksupport, StdCompare, check, utilities, trans, general, RWSDebug
+import syntax, transform, checksupport, StdCompare, check, utilities, trans, general //, RWSDebug
 
 // exactZip fails when its arguments are of unequal length
 exactZip` :: ![.a] ![.b] -> [(.a,.b)]
@@ -726,7 +726,6 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 			,	fun_body		= fun_bodies
 			,	fun_type		= Yes fun_type
 			,	fun_pos			= NoPos
-			,	fun_index		= NoIndex
 			,	fun_kind		= FK_ImpFunction cNameNotLocationDependent
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }

@@ -2366,8 +2366,8 @@ where
 		  		add_extra_elements_to_fun_def_array n_new_elements fun_defs
 		  			| n_new_elements==0
 		  				= fun_defs
-			  			# dummy_fun_def = { fun_symb = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_index= -1,fun_kind=FK_DefOrImpUnknown,fun_lifted=0,
-				  							fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
+			  			# dummy_fun_def = { fun_symb = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
+										  				fun_kind=FK_DefOrImpUnknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
 			  			= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
 		  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps) = convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps		  
 		  (list_first_instance_indices,fun_defs, predef_symbols, type_heaps) = convert_list_instances si_list_instances PD_UListClass common_defs fun_defs predef_symbols type_heaps
@@ -2415,8 +2415,6 @@ where
 						,	fun_body		= NoBody
 						,	fun_type		= Yes instance_type
 						,	fun_pos			= me_pos
-//						,	fun_index	= member_index
-						,	fun_index		= fun_index
 						,	fun_kind		= FK_DefOrImpUnknown
 						,	fun_lifted		= 0
 						,	fun_info		= EmptyFunInfo
@@ -2458,8 +2456,6 @@ where
 						,	fun_body		= NoBody
 						,	fun_type		= Yes instance_type
 						,	fun_pos			= me_pos
-//						,	fun_index	= member_index
-						,	fun_index		= fun_index
 						,	fun_kind		= FK_DefOrImpUnknown
 						,	fun_lifted		= 0
 						,	fun_info		= EmptyFunInfo

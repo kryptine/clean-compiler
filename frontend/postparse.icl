@@ -122,7 +122,7 @@ addFunctionsRange fun_defs ca
 
 MakeNewImpOrDefFunction icl_module name arity body kind prio opt_type pos
 	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = fun_kind_to_def_or_imp_fun_kind icl_module kind,
-		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_index = NoIndex, fun_info = EmptyFunInfo }
+		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
 
