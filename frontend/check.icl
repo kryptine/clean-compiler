@@ -457,7 +457,7 @@ instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_en
 	  				False
 	  					-> checkError "instance type incompatible with class type" "" error
 
-	= (inst_vars, inst_attr_vars, inst_types, inst_contexts ++ new_ss_context, inst_attr_env, special_subst_list, { type_heaps & th_vars = th_vars }, error)
+	= (inst_vars, inst_attr_vars, inst_types, new_ss_context ++ inst_contexts, inst_attr_env, special_subst_list, { type_heaps & th_vars = th_vars }, error)
 where
 	clear_vars type_vars type_var_heap = foldSt (\tv -> writePtr tv.tv_info_ptr TVI_Empty) type_vars type_var_heap
 	
