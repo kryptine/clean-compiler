@@ -16,7 +16,7 @@ import RWSDebug
 // trace macro
 (-*->) infixl
 (-*->) value trace
-	:==	value // ---> trace
+	:==	value ---> trace
 
 frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out

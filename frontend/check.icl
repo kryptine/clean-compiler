@@ -16,7 +16,7 @@ convertIndex index table_index (Yes tables)
 	= tables.[table_index].[index]
 convertIndex index table_index No
 	= index
-	
+
 getPredefinedGlobalSymbol :: !Index !Index !STE_Kind !Int !*CheckState -> (!Global DefinedSymbol, !*CheckState)
 getPredefinedGlobalSymbol symb_index module_index req_ste_kind arity cs=:{cs_predef_symbols,cs_symbol_table}
 	# (pre_def_mod, cs_predef_symbols)	= cs_predef_symbols![module_index]
@@ -3335,6 +3335,3 @@ where
 			| level == entry.ste_def_level
 				= remove_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
 				= remove_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
-
-
-
