@@ -40,14 +40,19 @@ simplifyTypeApplication (CV tv :@: type_args1) type_args2
 	,	cus_error		:: !.ErrorAdmin
 	}
 
+::	CleanUpInput =
+	{	cui_coercions	:: !{! CoercionTree}
+	,	cui_attr_part	:: !AttributePartition
+	,	cui_top_level	:: !Bool
+	}
 
-class clean_up a ::  !(!{! CoercionTree}, !AttributePartition) !a !*CleanUpState -> (!a, !*CleanUpState)
+class clean_up a ::  !CleanUpInput !a !*CleanUpState -> (!a, !*CleanUpState)
 
 instance clean_up AType
 where
-	clean_up coercions atype=:{at_attribute,at_type} cus
-		# (at_attribute, cus) = clean_up coercions at_attribute cus 
-		  (at_type, cus) = clean_up coercions at_type cus
+	clean_up cui atype=:{at_attribute,at_type} cus
+		# (at_attribute, cus) = clean_up cui at_attribute cus 
+		  (at_type, cus) = clean_up cui at_type cus
 		= ({atype & at_attribute = at_attribute, at_type = at_type}, cus)
 
 attrIsUndefined TA_None = True
@@ -58,62 +63,68 @@ varIsDefined _ 		= True
 
 instance clean_up TypeAttribute
 where
-	clean_up coercions TA_Unique cus
+	clean_up cui TA_Unique cus
 		= (TA_Unique, cus)
-	clean_up coercions TA_Multi cus
+	clean_up cui TA_Multi cus
 		= (TA_Multi, cus)
-	clean_up (coercions, attr_part) tv=:(TA_TempVar av_number) cus=:{cus_attr_env,cus_heaps,cus_attr_store,cus_error}
-		# av_group_nr = attr_part.[av_number]
-		  coercion_tree = coercions.[av_group_nr]
-		| isNonUnique coercion_tree
+	clean_up cui tv=:(TA_TempVar av_number) cus=:{cus_attr_env,cus_heaps,cus_attr_store,cus_error}
+		| cui.cui_top_level
+			# av_group_nr = cui.cui_attr_part.[av_number]
+			  coercion_tree = cui.cui_coercions.[av_group_nr]
+			| isNonUnique coercion_tree
+				= (TA_Multi, cus)
+			| isUnique coercion_tree
+				= (TA_Unique, cus)
+			#! attr = cus_attr_env.[av_group_nr]
+			| attrIsUndefined attr
+				# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
+				  new_attr_var = TA_Var { av_name = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
+				= (new_attr_var, { cus & cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
+						 cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})
+				= (attr, cus)
 			= (TA_Multi, cus)
-		| isUnique coercion_tree
-			= (TA_Unique, cus)
-		#! attr = cus_attr_env.[av_group_nr]
-		| attrIsUndefined attr
-			# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
-			  new_attr_var = TA_Var { av_name = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
-			= (new_attr_var, { cus & cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
-					 cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})
-			= (attr, cus)
-				
+			
 instance clean_up Type
 where
-	clean_up coercions (TempV tv_number) cus=:{cus_var_env}
+	clean_up cui (TempV tv_number) cus=:{cus_var_env}
 		#! type = cus_var_env.[tv_number]
-		= cleanUpVariable type tv_number cus
-	clean_up coercions (TA tc types) cus
-		# (types, cus) = clean_up coercions types cus
+		= cleanUpVariable cui.cui_top_level type tv_number cus
+	clean_up cui (TA tc types) cus
+		# (types, cus) = clean_up cui types cus
 		= (TA tc types, cus)
-	clean_up coercions (argtype --> restype) cus
-		# (argtype, cus) = clean_up coercions argtype cus
-		  (restype, cus) = clean_up coercions restype cus
+	clean_up cui (argtype --> restype) cus
+		# (argtype, cus) = clean_up cui argtype cus
+		  (restype, cus) = clean_up cui restype cus
 		=  (argtype --> restype, cus)
-	clean_up coercions t=:(TB _) cus
+	clean_up cui t=:(TB _) cus
 		=  (t, cus)
-	clean_up coercions (TempCV tempvar :@: types) cus
+	clean_up cui (TempCV tempvar :@: types) cus
 		#! type = cus.cus_var_env.[tempvar]
-		# (type, cus) = cleanUpVariable type tempvar cus
-		  (types, cus) = clean_up coercions types cus
+		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
+		  (types, cus) = clean_up cui types cus
 		= (simplifyTypeApplication type types, cus)
-	clean_up coercions (TempQV qv_number) cus=:{cus_var_env,cus_error}
+	clean_up cui (TempQV qv_number) cus=:{cus_var_env,cus_error}
 		#! type = cus_var_env.[qv_number]
-		= cleanUpVariable type qv_number {cus & cus_error = existentialError cus_error}
-	clean_up coercions TE cus
+		| cui.cui_top_level
+			= cleanUpVariable True type qv_number {cus & cus_error = existentialError cus_error}
+			= cleanUpVariable False type qv_number cus
+	clean_up cui TE cus
 		= abort "unknown pattern in function clean_up"
 				
 instance clean_up [a] | clean_up a
 where
-	clean_up coercions l cus = mapSt (clean_up coercions) l cus
+	clean_up cui l cus = mapSt (clean_up cui) l cus
 
-cleanUpVariable TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
+cleanUpVariable _ TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cus_heaps.th_vars
 	  new_var = TV { tv_name = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr }
 	= (new_var, { cus & cus_var_env = { cus_var_env & [tv_number] = new_var},
 				cus_heaps = { cus_heaps & th_vars = th_vars }, cus_var_store = inc cus_var_store})
-cleanUpVariable (TLifted var) tv_number cus=:{cus_error}
-	= (TV var, { cus & cus_error = liftedError var cus_error})
-cleanUpVariable type tv_number cus
+cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
+	| top_level
+		= (TV var, { cus & cus_error = liftedError var cus_error})
+		= (TV var, cus)
+cleanUpVariable _ type tv_number cus
 	= (type, cus)
 
 class cleanUpClosed a :: !a !u:VarEnv -> (!Bool, !a, !u:VarEnv)
@@ -226,28 +237,33 @@ cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} co
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_heaps = heaps,
 			  cus_var_store = 0, cus_attr_store = 0, cus_error = error }
-	  (lifted_args, cus=:{cus_var_env}) = clean_up (coercions,attr_part) (take tst_lifted tst_args) cus
-	  (lifted_vars, cus_var_env) = determine_lifted_type_vars nr_of_temp_vars [] cus_var_env
-	  (st_args, cus) = clean_up (coercions,attr_part) (drop tst_lifted tst_args) { cus & cus_var_env = cus_var_env }
-	  (st_result, cus) = clean_up (coercions,attr_part) tst_result cus
+	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_top_level = True }
+	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
+	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
+	  (st_args, cus) = clean_up cui (drop tst_lifted tst_args) { cus & cus_var_env = cus_var_env }
+	  (st_result, cus) = clean_up cui tst_result cus
 	  (st_context, cus_var_env, cus_error) = clean_up_type_contexts (tst_context ++ context) cus.cus_var_env cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
-	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = update_expression_types (coercions,attr_part) case_and_let_exprs
-				expr_heap { cus & cus_var_env = cus_var_env, cus_error = cus_error }
-	  (cus_attr_env, st_attr_vars, st_attr_env) = build_attribute_environment 0 max_attr_nr coercions cus_attr_env [] []
+	  (cus_attr_env, st_attr_vars, st_attr_env) = build_attribute_environment 0 max_attr_nr coercions cus.cus_attr_env [] []
+	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = update_expression_types { cui & cui_top_level = False } case_and_let_exprs
+				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env, cus_error = cus_error }
 	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
 					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, expr_heap, cus_error)
 //			---> (tst, st)
 where
-	determine_lifted_type_var var_index (all_vars, var_env)
-		#! type = var_env.[var_index]
-		= case type of
-			TV var
-				-> ([var : all_vars], { var_env & [var_index] = TLifted var})
-			_
-				-> (all_vars, var_env)
+	determine_type_vars to_index all_vars var_env
+		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
+	where
+		determine_type_var var_index (all_vars, var_env)
+			#! type = var_env.[var_index]
+			= case type of
+				TV var
+					-> ([var : all_vars], { var_env & [var_index] = TLifted var})
+				_
+					-> (all_vars, var_env)
+
 
 	determine_type_var var_index (all_vars, var_env)
 		#! type = var_env.[var_index]
@@ -257,11 +273,6 @@ where
 			_
 				-> (all_vars, var_env)
 
-	determine_lifted_type_vars to_index all_vars var_env
-		= iFoldSt determine_lifted_type_var 0 to_index (all_vars, var_env)
-
-	determine_type_vars to_index all_vars var_env
-		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
 	
 	build_attribute_environment :: !Index !Index !{! CoercionTree} !*AttributeEnv ![AttributeVar] ![AttrInequality]
 		-> (!*AttributeEnv, ![AttributeVar], ![AttrInequality])
@@ -295,26 +306,27 @@ where
 	is_new_inequality dem_var off_var [{ ai_demanded, ai_offered } : inequalities]
 		= (dem_var <> ai_demanded || off_var <> ai_offered) && is_new_inequality dem_var off_var inequalities
 
-	update_expression_types :: !({!CoercionTree},!AttributePartition) ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
-	update_expression_types coercions expr_ptrs expr_heap cus
-		= foldSt (update_expression_type coercions) expr_ptrs (expr_heap, cus)
+	update_expression_types :: !CleanUpInput ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
+	update_expression_types cui expr_ptrs expr_heap cus
+//		= (expr_heap, cus)
+		= foldSt (update_expression_type cui) expr_ptrs (expr_heap, cus)
 
-	update_expression_type coercions expr_ptr (expr_heap, cus)
+	update_expression_type cui expr_ptr (expr_heap, cus)
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
 		= case info of
 			EI_CaseType case_type
-				# (case_type, cus) = clean_up coercions case_type cus
+				# (case_type, cus) = clean_up cui case_type cus
 				-> (expr_heap <:= (expr_ptr, EI_CaseType case_type), cus)
 			EI_LetType let_type
-				# (let_type, cus) = clean_up coercions let_type cus
+				# (let_type, cus) = clean_up cui let_type cus
 				-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cus)
 
 instance clean_up CaseType
 where
-	clean_up coercions ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cus
-		# (ct_pattern_type, cus) = clean_up coercions ct_pattern_type cus 
-		  (ct_result_type, cus) = clean_up coercions ct_result_type cus
-		  (ct_cons_types, cus) = clean_up coercions ct_cons_types cus
+	clean_up cui ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cus
+		# (ct_pattern_type, cus) = clean_up cui ct_pattern_type cus 
+		  (ct_result_type, cus) = clean_up cui ct_result_type cus
+		  (ct_cons_types, cus) = clean_up cui ct_cons_types cus
 		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cus)
 
 	
@@ -440,80 +452,6 @@ where
 	(==) av1 av2 = av1.av_info_ptr == av2.av_info_ptr 
 
 
-/*	
-class equiv a :: !a !a !*VarEnv !*AttributeEnv  -> (!Bool, !*VarEnv, !*AttributeEnv)
-
-instance equiv AType
-where
-	equiv atype1 atype2 var_env attr_env
-		# (ok, attr_env) = equi_attrs atype1.at_attribute atype2.at_attribute attr_env
-		| ok
-			= equiv atype1.at_type atype2.at_type var_env attr_env
-			= (False, var_env, attr_env)
-	where
-		equi_attrs (TA_TempVar av_number) attr=:(TA_Var attr_var) attr_env
-			#! forw_attr = attr_env.[av_number]
-			= case forw_attr of
-				TA_None
-					-> (True, { attr_env & [av_number] = attr})
-			  	TA_Var forw_var
-			  		-> (forw_var == attr_var, attr_env)
-			  	_
-			  		-> abort "Error in equiv (AType)"
-		equi_attrs attr1 attr2 attr_env
-			= (attr1 == attr2, attr_env)
-		
-instance equiv Type
-where
-	equiv (TempV tv_number) type=:(TV var) var_env attr_env
-		#! forw_type = var_env.[tv_number]
-		= case forw_type of
-			TE
-				-> (True, { var_env & [tv_number] = type }, attr_env)
-			TV forw_var
-				-> (forw_var == var, var_env, attr_env)
-			_
-				-> abort "Error in equiv (Type)"
-	equiv (arg_type1 --> restype1) (arg_type2 --> restype2) var_env attr_env
-		= equiv (arg_type1,restype1) (arg_type2,restype2) var_env attr_env
-	equiv (TA tc1 types1) (TA tc2 types2) var_env attr_env
-		| tc1 == tc2
-			= equiv types1 types2 var_env attr_env
-			= (False, var_env, attr_env)
-	equiv (TB basic1) (TB basic2) var_env attr_env
-		= (basic1 == basic2, var_env, attr_env)
-	equiv (type1 :@: types1) (type2 :@: types2) var_env attr_env
-		= equiv (type1,types1) (type2,types2) var_env attr_env
-/*	equiv (TFA vars type1) type2 var_env attr_env
-		= equiv type1 type2 var_env attr_env
-	equiv type1 (TFA vars type2) var_env attr_env
-		= equiv type1 type2 var_env attr_env
-	equiv (TQV _) (TV _) var_env attr_env
-		= (True, var_env attr_env)
-*/
-	equiv type1 type2 var_env attr_env
-		= (False, var_env, attr_env)
-
-instance equiv (a,b) | equiv a & equiv b
-where
-	equiv (x1,y1) (x2,y2) var_env attr_env
-		# (equi_x, var_env, attr_env) =  equiv x1 x2 var_env attr_env
-		| equi_x
-			= equiv y1 y2 var_env attr_env
-			= (False, var_env, attr_env)
-
-instance equiv [a] | equiv a
-where
-	equiv [x:xs] [y:ys] var_env attr_env
-		# (equi, var_env, attr_env) = equiv x y var_env attr_env
-		| equi
-		  	= equiv xs ys var_env attr_env
-			= (False, var_env, attr_env)
-	equiv [] [] var_env attr_env
-		= (True, var_env, attr_env)
-	equiv _ _ var_env attr_env
-		= (False, var_env, attr_env)
-*/
 
 class equiv a :: !a !a !*TypeHeaps -> (!Bool, !*TypeHeaps)
 
