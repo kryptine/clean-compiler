@@ -14,3 +14,5 @@ determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials 
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]
 
 makeElemTypeOfArrayFunctionStrict :: !SymbolType !Index !{# Index} -> SymbolType
+
+initializeContextVariables :: ![TypeContext] !*VarHeap ->  (![TypeContext], !*VarHeap)

@@ -88,7 +88,6 @@ instance <<< FilePosition
 	|	DynamicToken			//		dynamic
 	|	DynamicTypeToken		//		Dynamic
 
-	
 	|	PriorityToken Priority	//		infixX N
 
 	|	CodeToken				//		code
@@ -99,6 +98,11 @@ instance <<< FilePosition
 	|	EndGroupToken			//		generated automatically
 	|	EndOfFileToken			//		end of file
 	|	ErrorToken String		//		if an error occured
+
+	| 	GenericToken			//		generic	
+	|	GenericOpenToken		//		{|
+	|	GenericCloseToken		//		|}
+
 	
 :: Context
 	=	GeneralContext

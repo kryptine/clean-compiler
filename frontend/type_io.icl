@@ -462,6 +462,7 @@ where
 			,	com_class_defs		= {}
 			,	com_member_defs		= {}
 			,	com_instance_defs	= {}
+			,	com_generic_defs	= {}
 			}
 		= (ok1&&ok2,common_defs,tcl_file)
 

@@ -287,7 +287,7 @@ where
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
 			  {ps_scanState,ps_hash_table,ps_error,ps_pre_def_symbols}
 			  						= pState
-			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics")
+			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
 						[PD_Import imports \\ PD_Import imports <- defs]
 						defs
 			  mod					= { mod_name = mod_ident, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
@@ -413,6 +413,13 @@ where
 			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
 	   		# (classdef, pState) = wantClassDefinition context pos pState
 	   		= (True, classdef, pState)
+	// AA..
+	try_definition context GenericToken pos pState
+		| ~(isGlobalContext context)
+			= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
+	   		# (gendef, pState) = wantGenericDefinition context pos pState
+	   		= (True, gendef, pState)	 
+	// ..AA  		
 	try_definition context InstanceToken pos pState
 		| ~(isGlobalContext context)
 			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
@@ -1062,22 +1069,30 @@ wantInstanceDeclaration context pi_pos pState
 	  (pi_class, pState) = stringToIdent class_name IC_Class pState
 	  ((pi_types, pi_context), pState) = want_instance_type pState
 	  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
+// AA..
+	# (token, pState) = nextToken TypeContext pState
+	| token == GenericToken
+		# pState = wantEndOfDefinition "generic instance declaration" pState
+		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
+							pi_members = [], pi_specials = SP_None, pi_pos = pi_pos, pi_generate = True}, pState)
+// ..AA
 	| isIclContext context
-		# pState = want_begin_group pState
+		# pState = tokenBack pState // AA
+		  pState = want_begin_group pState
 		  (pi_members, pState) = wantDefinitions context pState
 		  pState = wantEndGroup "instance" pState
 
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos }, pState)
+						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos, pi_generate = False }, pState)
 	// otherwise // ~ (isIclContext context)
-		# (token, pState) = nextToken TypeContext pState
 		| token == CommaToken
+			// AA: # (token, pState) = nextToken TypeContext pState 		
 			# (pi_types_and_contexts, pState)	= want_instance_types pState
 			  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
 			= (PD_Instances
 //				[	{ pi_class = pi_class, pi_ident = pi_ident, pi_types = type, pi_context = context // voor martin
 				[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
-					, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos}
+					, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos, pi_generate = False}
 				\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
 				&	ident			<- [ pi_ident : idents ]
 				]
@@ -1087,7 +1102,8 @@ wantInstanceDeclaration context pi_pos pState
 			# (specials, pState) = optionalSpecials (tokenBack pState)
 			  pState = wantEndOfDefinition "instance declaration" pState
 			= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-							pi_members = [], pi_specials = specials, pi_pos = pi_pos}, pState)
+							pi_members = [], pi_specials = specials, pi_pos = pi_pos, pi_generate = False}, pState)
+		
 where
 	want_begin_group pState  // For JvG layout
 		# (token, pState) = nextToken TypeContext pState
@@ -1185,6 +1201,48 @@ optionalCoercions pState
 			  , [{ ai_demanded = erroneous_attr_var, ai_offered = erroneous_attr_var }]
 			  , parseError "Function type: optional coercions" (Yes token) "<attribute variable>" pState
 			  )
+
+// AA..
+/*
+	Generic definitions
+*/
+
+wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
+wantGenericDefinition context pos pState
+	# (name, pState) = want_name pState
+	| name == "" = (PD_Erroneous, pState)
+	# (ident, pState) = stringToIdent name IC_Class pState
+	# (member_ident, pState) = stringToIdent name IC_Expression pState
+	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
+		
+	# pState = wantToken TypeContext "generic definition" DoubleColonToken pState
+	# (type, pState) = want_type pState		//	SymbolType
+	# pState = wantEndOfDefinition "generic definition" pState
+	# gen_def = {
+		gen_name = ident,
+		gen_member_name = member_ident, 
+		gen_type = type, 
+		gen_args = arg_vars,
+		gen_arity = length arg_vars,
+		gen_pos = pos, 
+		gen_classes = [],
+		gen_isomap = MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0
+		}
+	= (PD_Generic gen_def, pState)	
+	where
+		want_name pState 
+			# (token, pState) = nextToken TypeContext pState
+			= 	case token of
+				IdentToken name -> (name, pState)
+				_ -> ("", parseError "Generic Definition" (Yes token) "<identifier>" pState)
+		want_type :: !ParseState -> (!SymbolType, !ParseState)
+		want_type pState = want pState // SymbolType 		
+
+		try_variable pState
+			# (token, pState) = nextToken TypeContext pState
+			= tryTypeVarT token pState
+
+// ..AA
 
 /*
 	Type definitions
@@ -1949,6 +2007,10 @@ trySimpleExpression is_pattern pState
 		= trySimpleRhsExpression pState
 
 trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
+
+
+// AA..
+/*
 trySimpleExpressionT (IdentToken name) is_pattern pState
 	| isLowerCaseName name
 	# (id, pState) = stringToIdent name IC_Expression pState
@@ -1967,6 +2029,38 @@ trySimpleExpressionT (IdentToken name) is_pattern pState
 //	| isUpperCaseName name || ~ is_pattern
 	# (id, pState) = stringToIdent name IC_Expression pState
 	= (True, PE_Ident id, pState)
+*/
+
+trySimpleExpressionT (IdentToken name) is_pattern pState
+	| isLowerCaseName name
+	# (id, pState) = stringToIdent name IC_Expression pState
+	| is_pattern
+		# (token, pState) = nextToken FunctionContext pState
+		| token == DefinesColonToken
+			# (succ, expr, pState) = trySimpleExpression is_pattern pState
+			| succ
+				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
+				= (True, PE_Empty, parseError "simple expression" No "expression" pState)
+			// token <> DefinesColonToken
+			= (True, PE_Ident id, tokenBack pState)
+		// not is_pattern
+		# (token, pState) = nextToken FunctionContext pState
+		| token == GenericOpenToken
+			# (kind, pState) = wantKind pState	
+			= (True, PE_Generic id kind, pState)
+			= (True, PE_Ident id, tokenBack pState)			
+			
+trySimpleExpressionT (IdentToken name) is_pattern pState
+//	| isUpperCaseName name || ~ is_pattern
+	# (id, pState) = stringToIdent name IC_Expression pState
+	# (token, pState) = nextToken FunctionContext pState
+	| token == GenericOpenToken
+		# (kind, pState) = wantKind pState	
+		= (True, PE_Generic id kind, pState)
+		= (True, PE_Ident id, tokenBack pState)
+
+// ..AA
+
 trySimpleExpressionT SquareOpenToken is_pattern pState
 	# (list_expr, pState) = wantListExp is_pattern pState
 	= (True, list_expr, pState)
@@ -2843,6 +2937,36 @@ wantBeginGroup msg pState
 			CurlyOpenToken
 				->	pState
 			_	->	parseError msg (Yes token) "begin group without layout, {," pState
+
+// AA..
+wantKind :: !ParseState -> !(!TypeKind, ParseState)
+wantKind pState
+	# (token, pState) = nextToken TypeContext pState
+	# (kind, pState) = want_simple_kind token pState
+	# (token, pState) = nextToken TypeContext pState
+	= want_kind kind token pState
+	where
+		want_simple_kind AsteriskToken pState		= (KindConst, pState)
+		want_simple_kind (IntToken str) pState
+			# n = toInt str
+			| n == 0	= (KindConst, pState)
+			| n > 0 	= (KindArrow (repeatn (n+1) KindConst), pState)
+			| otherwise = (KindConst, parseError "invalid kind" No "positive integer expected" pState)
+		want_simple_kind OpenToken pState 			= wantKind pState
+		want_simple_kind GenericOpenToken pState 	= wantKind pState
+		want_simple_kind token pState 
+			= (KindConst, parseError "invalid kind" (Yes token) "* or (" pState)
+
+		want_kind kind ArrowToken pState
+			# (rhs, pState) = wantKind pState
+			= 	case rhs of
+				(KindArrow ks) 	-> (KindArrow [kind : ks], pState)
+				_				-> (KindArrow [kind, rhs], pState)
+		want_kind kind CloseToken pState 				= (kind, pState)
+		want_kind kind GenericCloseToken pState 		= (kind, pState)
+		want_kind kind token pState	
+			= (kind, parseError "invalid kind" (Yes token) ")" pState)
+// ..AA 
 
 /*
 	Functions on the parse pState

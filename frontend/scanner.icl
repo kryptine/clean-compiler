@@ -185,6 +185,11 @@ where
 	|	EndOfFileToken			//		end of file
 	|	ErrorToken String		//		an error has occured
 
+	| 	GenericToken			//		generic
+	|	GenericOpenToken		//		{|
+	|	GenericCloseToken		//		|}
+
+
 ::	Context
 	=	GeneralContext
 	|	TypeContext
@@ -565,13 +570,21 @@ Scan :: !Char !Input !Context -> (!Token, !Input)
 Scan '(' input co			= (OpenToken, input)
 Scan ')' input co			= (CloseToken, input)
 Scan '{' input CodeContext	= ScanCodeBlock input
-Scan '{' input co			= (CurlyOpenToken, input)
+//Scan '{' input co			= (CurlyOpenToken, input)
+// AA ...
+Scan c0=:'{' input co
+	# (eof, c1, input)		= ReadNormalChar input
+	| eof					= (CurlyOpenToken, input)
+	| c1 == '|'				= (GenericOpenToken, input)
+							= (CurlyOpenToken, charBack input)
+// ... AA
 Scan '}' input co			= (CurlyCloseToken, input)
 Scan '[' input co			= (SquareOpenToken, input)
 Scan ']' input co			= (SquareCloseToken, input)
 Scan c0=:'|' input co
 	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (BarToken, input)
+	| c1 == '}'				= (GenericCloseToken, input) // AA
 	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
 							= (BarToken, charBack input)
 Scan ',' input co			= (CommaToken, input)
@@ -765,6 +778,7 @@ CheckEveryContext s input
 	"with"		->	(WithToken			, input)
 	"class" 	->	(ClassToken			, input)
 	"instance"	->	(InstanceToken		, input)
+	"generic" 	->	(GenericToken		, input)
 	"otherwise"	->	(OtherwiseToken		, input)
 	"!"			->	(ExclamationToken	, input)
 //	"::"		->	(DoubleColonToken	, input)
@@ -1522,6 +1536,8 @@ where
 	toString CurlyCloseToken		= "}"
 	toString SquareOpenToken		= "["
 	toString SquareCloseToken		= "]"
+	toString GenericOpenToken		= "{|"
+	toString GenericCloseToken		= "|}"	
 	toString DotToken				= "."
 	toString SemicolonToken			= ";"
 	toString ColonToken				= ": (ColonToken)"

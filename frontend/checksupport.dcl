@@ -15,6 +15,7 @@ cIsADclModule 		:== True
 cNeedStdArray	:== 1
 cNeedStdEnum	:== 2
 cNeedStdDynamics:== 4
+cNeedStdGeneric	:== 8 // AA
 
 ::	VarHeap :== Heap VarInfo
 
@@ -41,11 +42,12 @@ cConstructorDefs		:== 1
 cSelectorDefs			:== 2
 cClassDefs				:== 3
 cMemberDefs				:== 4
-cInstanceDefs			:== 5
-cFunctionDefs			:== 6
-cMacroDefs				:== 7
+cGenericDefs			:== 5 // AA
+cInstanceDefs			:== 6
+cFunctionDefs			:== 7
+cMacroDefs				:== 8
 
-cConversionTableSize	:== 8
+cConversionTableSize	:== 9 // AA
 
 ::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
@@ -55,6 +57,7 @@ cConversionTableSize	:== 8
 	,	com_member_defs		:: !.{# MemberDef}
 	,	com_instance_defs	:: !.{# ClassInstance}
 //	,	com_instance_types	:: !.{ SymbolType}
+	,	com_generic_defs	:: !.{# GenericDef} // AA
 	}
 
 ::	Declarations = {
@@ -135,6 +138,7 @@ instance <<< IdentPos, ExplImpInfo, DeclarationInfo
 	,	ef_cons_defs		:: !.{# ConsDef}
 	,	ef_member_defs		:: !.{# MemberDef}
 	,	ef_class_defs		:: !.{# ClassDef}
+	,	ef_generic_defs		:: !.{# GenericDef} // AA
 	,	ef_modules			:: !.{# DclModule}
 	,	ef_is_macro_fun		:: !Bool
 	}

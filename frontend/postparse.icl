@@ -725,7 +725,7 @@ where
 
 MakeEmptyModule name :==  { mod_name = name, mod_type = MK_None, mod_imports = [], mod_imported_objects = [],
 	mod_defs = {	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macros = { ir_from = 0, ir_to = 0 },
-					def_members = [], def_funtypes = [], def_instances = [] } }
+					def_members = [], def_funtypes = [], def_instances = [], /* AA */ def_generics = [] } }
 
 parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule], !*Files, !*CollectAdmin)
@@ -1072,6 +1072,10 @@ where
 	    = ([], ca)	
 reorganiseDefinitions icl_module [PD_Instances class_instances : defs] cons_count sel_count mem_count type_count ca
 	= reorganiseDefinitions icl_module ([PD_Instance class_instance \\ class_instance <- class_instances] ++ defs) cons_count sel_count mem_count type_count ca
+reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count mem_count type_count ca
+	# 	(fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
+	= (fun_defs, c_defs, imports, imported_objects, ca)
 reorganiseDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	= (fun_defs, c_defs, new_imports ++ imports, imported_objects, ca)
@@ -1083,7 +1087,7 @@ reorganiseDefinitions icl_module [def:defs] _ _ _ _ ca
 
 reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [], def_classes = [], def_members = [],
-			def_instances = [], def_funtypes = [] }, [], [], ca)
+			def_instances = [], def_funtypes = [], /* AA */ def_generics = [] }, [], [], ca)
 
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix

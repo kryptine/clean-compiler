@@ -400,25 +400,6 @@ expandSynType mod_index type_index expst=:{exp_type_defs}
 		_
 			-> { expst &  exp_marks = { expst.exp_marks & [type_index] = CS_Checked }}
 
-instance toString KindInfo
-where
-	toString (KI_Var ptr) 		= "*" +++ toString (ptrToInt ptr)
-	toString (KI_Const) 		= "*"
-	toString (KI_Arrow kinds)	= kind_list_to_string kinds
-	where
-		kind_list_to_string [k] = "* -> *"
-		kind_list_to_string [k:ks] = "* -> " +++ kind_list_to_string ks
-/*
-instance toString TypeKind
-where
-	toString (KindVar var_num) = "*" +++ toString var_num
-	toString (KindConst) = "*"
-	toString (KindArrow [k:ks]) = toString k +++ kind_list_to_string ks +++ " -> *"
-	where
-		kind_list_to_string [] = ""
-		kind_list_to_string [k:ks] = " -> " +++ toString k +++ kind_list_to_string ks
-*/
-
 checkTypeDefs :: /* TD */ !Bool !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
 checkTypeDefs /* TD */ is_dcl_module is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
@@ -1171,6 +1152,8 @@ where
 			= create_class_dictionaries mod_index (inc class_index) class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
 			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)			
 
+	create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !v:[SymbolPtr] !u:Indexes !*TypeVarHeap !*VarHeap !*CheckState 
+		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*CheckState)
 	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } modules rev_dictionary_list
 			indexes type_var_heap var_heap cs=:{cs_symbol_table,cs_error}
 		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_info}}} = class_def
@@ -1241,6 +1224,7 @@ where
 											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })
 							<:= (cons_id_info, { ste_kind = STE_DictCons cons_def, ste_index = index_cons,
 											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })})
+
 		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		| ste_kind == STE_Empty
 			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap,

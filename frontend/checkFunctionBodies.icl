@@ -860,9 +860,39 @@ where
 
 checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 	= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
-checkExpression free_vars expr e_input e_state e_info cs
-	= abort "checkExpression (check.icl, line 1433)" // <<- expr
+// AA..
+checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_state e_info cs=:{cs_symbol_table, cs_x}
+	//= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
+	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+	= check_generic_expr free_vars entry id kind e_input e_state e_info {cs & cs_symbol_table = cs_symbol_table}
+	where 
+		check_generic_expr :: ![FreeVar] !SymbolTableEntry !Ident !TypeKind !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
+			-> (!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
+		check_generic_expr 
+				free_vars entry=:{ste_kind=STE_Generic,ste_index} id  kind  
+				e_input=:{ei_mod_index}  e_state e_info cs
+			= check_it free_vars ei_mod_index ste_index id kind e_input e_state e_info cs	
+		check_generic_expr 
+				free_vars entry=:{ste_kind=STE_Imported STE_Generic mod_index, ste_index} id kind  
+				e_input e_state e_info cs
+			= check_it free_vars mod_index ste_index id kind e_input e_state e_info cs	
+		check_generic_expr free_vars  entry=:{ste_kind=STE_Empty} id kind  e_input e_state e_info cs=:{cs_error}
+			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined generic" cs_error })
+		check_generic_expr free_vars entry id kind  e_input e_state e_info cs=:{cs_error}
+			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "not a generic" cs_error })						
 
+		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs
+			#! symb_kind = SK_Generic { glob_object = gen_index, glob_module = mod_index} kind
+		  	#! symbol = { symb_name = id, symb_kind = symb_kind, symb_arity = 0 }			
+			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
+			#! app = { app_symb = symbol, app_args = [], app_info_ptr = new_info_ptr }
+			#! e_state = { e_state & es_expr_heap = es_expr_heap }
+			#! cs = { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric }
+			= (App app, free_vars, e_state, e_info, cs)
+		 
+// ..AA
+checkExpression free_vars expr e_input e_state e_info cs
+	= abort "checkExpression (checkFunctionBodies.icl, line 868)" // <<- expr
 
 
 checkIdentExpression :: !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState

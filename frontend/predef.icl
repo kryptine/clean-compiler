@@ -34,62 +34,89 @@ PD_TypeVar_a31				:== 101
 
 /* Dynamics */
 
-PD_TypeCodeMember			:== 123
-PD_DynamicTemp				:== 131
-PD_DynamicValue				:== 132
-PD_DynamicType				:== 133
+PD_TypeCodeMember			:== 102
+// MV ...
+PD_DynamicTemp				:== 103
+PD_DynamicValue				:== 104
+PD_DynamicType				:== 105
+// ... MV
 
 /* identifiers present in the hastable */
 
-PD_StdArray					:== 102
-PD_StdEnum					:== 103
-PD_StdBool					:== 104
+PD_StdArray					:== 106
+PD_StdEnum					:== 107
+PD_StdBool					:== 108
 
-PD_AndOp					:== 105
-PD_OrOp						:== 106
+PD_AndOp					:== 109
+PD_OrOp						:== 110
 
 
 /* Array functions */
 
-PD_ArrayClass				:== 107
+PD_ArrayClass				:== 111
 
-PD_CreateArrayFun			:== 108
-PD__CreateArrayFun			:== 109
-PD_ArraySelectFun			:== 110
-PD_UnqArraySelectFun		:== 111
-PD_ArrayUpdateFun			:== 112
-PD_ArrayReplaceFun			:== 113
-PD_ArraySizeFun				:== 114
-PD_UnqArraySizeFun			:== 115
+PD_CreateArrayFun			:== 112
+PD__CreateArrayFun			:== 113
+PD_ArraySelectFun			:== 114
+PD_UnqArraySelectFun		:== 115
+PD_ArrayUpdateFun			:== 116
+PD_ArrayReplaceFun			:== 117
+PD_ArraySizeFun				:== 118
+PD_UnqArraySizeFun			:== 119
 
 /* Enum/Comprehension functions */
 
-PD_SmallerFun				:== 116
-PD_IncFun					:== 117
-PD_From						:== 118
-PD_FromThen					:== 119
-PD_FromTo					:== 120
-PD_FromThenTo				:== 121
+PD_SmallerFun				:== 120
+PD_IncFun					:== 121
+PD_From						:== 122
+PD_FromThen					:== 123
+PD_FromTo					:== 124
+PD_FromThenTo				:== 125
 
 /* Dynamics */
 
-PD_TypeCodeClass			:== 122
+PD_TypeCodeClass			:== 126
 
-PD_TypeObjectType			:== 124
-PD_TypeConsSymbol			:== 125
-PD_unify					:== 126
+PD_TypeObjectType			:== 127
+PD_TypeConsSymbol			:== 128
+PD_unify					:== 129
 // MV ..
-PD_coerce					:== 127
-PD_variablePlaceholder		:== 128
-PD_StdDynamics				:== 129
-PD_undo_indirections		:== 130
+PD_coerce					:== 130
+PD_variablePlaceholder		:== 131
+PD_StdDynamics				:== 132
+PD_undo_indirections		:== 133
 
-PD_Start					:== 134
+/* Generics */
+PD_StdGeneric				:== 134
+PD_TypeISO					:== 135
+PD_ConsISO					:== 136
+PD_iso_to					:== 137
+PD_iso_from					:== 138
+
+PD_TypeUNIT					:== 139
+PD_ConsUNIT					:== 140
+PD_TypeEITHER				:== 141
+PD_ConsLEFT					:== 142
+PD_ConsRIGHT				:== 143
+PD_TypePAIR					:== 144
+PD_ConsPAIR					:== 145
+PD_TypeARROW				:== 146
+PD_ConsARROW				:== 147
+
+PD_isomap_ARROW_			:== 148
+PD_isomap_ID				:== 149
+
+/* StdMisc */
+PD_StdMisc					:== 150
+PD_abort					:== 151
+PD_undef					:== 152
+
+PD_Start					:== 153
 
 // MW..
-PD_DummyForStrictAliasFun	:== 135
+PD_DummyForStrictAliasFun	:== 154
 
-PD_NrOfPredefSymbols		:== 136
+PD_NrOfPredefSymbols		:== 155
 // ..MW
 
 
@@ -139,7 +166,7 @@ where
 				= build_variables (inc var_number) max_arity (tables <<= (var_name, PD_TypeVar_a0 + var_number))
 
 	fill_table_with_hashing tables
-		# tables	= tables
+		# (predefs, hash_table) = tables	
 					<<- ("StdArray", IC_Module, PD_StdArray) <<- ("StdEnum", IC_Module, PD_StdEnum) <<- ("StdBool", IC_Module, PD_StdBool)
 					<<- ("&&", IC_Expression, PD_AndOp) <<- ("||", IC_Expression, PD_OrOp)
 					<<- ("Array", IC_Class, PD_ArrayClass)
@@ -163,21 +190,46 @@ where
 					<<-	("_coerce",				IC_Expression, PD_coerce) /* MV */
 					<<- ("StdDynamic",			IC_Module, PD_StdDynamics)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
-// MV ...
+// MV..
 					<<- ("DynamicTemp",			IC_Type, PD_DynamicTemp)
-
-		# (predef_symbol_table,hash_table)
-			= tables
-		# ({pds_ident},predef_symbol_table)
-			= predef_symbol_table![PD_DynamicTemp]
-			
-		# tables = (predef_symbol_table,hash_table)
-					<<- ("type",				IC_Field pds_ident, PD_DynamicType)
-					<<- ("value",				IC_Field pds_ident, PD_DynamicValue)
-					<<- ("Start",				IC_Expression, PD_Start)
+// ..MV
 					
-		= tables
-// ... MV
+// AA..
+					<<- ("StdGeneric",			IC_Module, 		PD_StdGeneric)
+					<<- ("ISO",					IC_Type, 		PD_TypeISO)
+					<<- ("_ISO",				IC_Expression, 	PD_ConsISO)					
+					//<<- ("iso_from",			IC_Field {id_name="", id_info=nilPtr}, PD_iso_from)
+					//<<- ("iso_to",			IC_Field {id_name="", id_info=nilPtr}, PD_iso_to)					
+					<<- ("UNIT",				IC_Type, 		PD_TypeUNIT)
+					<<- ("UNIT",				IC_Expression,	PD_ConsUNIT)
+					<<- ("EITHER",				IC_Type, 		PD_TypeEITHER)
+					<<- ("LEFT",				IC_Expression,	PD_ConsLEFT)
+					<<- ("RIGHT",				IC_Expression,	PD_ConsRIGHT)
+					<<- ("PAIR",				IC_Type, 		PD_TypePAIR)					
+					<<- ("PAIR",				IC_Expression,	PD_ConsPAIR)					
+					<<- ("ARROW",				IC_Type, 		PD_TypeARROW)
+					<<- ("ARROW",				IC_Expression, 	PD_ConsARROW)										
+					<<- ("isomap_ARROW_",		IC_Expression, 	PD_isomap_ARROW_)										
+					<<- ("isomap_ID",			IC_Expression, 	PD_isomap_ID)										
+
+					<<- ("StdMisc",				IC_Module, 		PD_StdMisc)
+					<<- ("abort",				IC_Expression, 	PD_abort)
+					<<- ("undef",				IC_Expression, 	PD_undef)					
+// ..AA					
+					
+					<<- ("Start",				IC_Expression, PD_Start)
+
+		# ({pds_ident}, predefs) = predefs![PD_TypeISO]
+		# (predefs, hash_table)= (predefs, hash_table) 
+			<<- ("iso_from", 			IC_Field pds_ident, PD_iso_from)
+			<<- ("iso_to", 				IC_Field pds_ident, PD_iso_to)
+
+		# ({pds_ident}, predefs) = predefs![PD_DynamicTemp]
+		# (predefs, hash_table)= (predefs, hash_table) 
+			<<- ("type",				IC_Field pds_ident, PD_DynamicType)
+			<<- ("value",				IC_Field pds_ident, PD_DynamicValue)
+			<<- ("Start",				IC_Expression, PD_Start)
+		= (predefs, hash_table)
 
 MakeTupleConsSymbIndex arity 	:== arity - 2 + cArity2TupleConsSymbIndex
 MakeTupleTypeSymbIndex arity 	:== arity - 2 + cArity2TupleTypeSymbIndex
@@ -250,7 +302,7 @@ buildPredefinedModule pre_def_symbols
 		 mod_defs = {
 			def_types = [string_def, list_def : type_defs], def_constructors
 						= [ParsedConstructorToConsDef cons_def, ParsedConstructorToConsDef nil_def : cons_defs], def_selectors = [], def_classes = [class_def],
-			def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [] }}, pre_def_symbols)
+			def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [], /* AA */ def_generics = [] }}, pre_def_symbols)
 where
 	add_tuple_defs pre_mod_id tup_arity type_defs cons_defs pre_def_symbols
 		| tup_arity >= 2
@@ -273,7 +325,7 @@ where
 
 	new_defined_symbol symbol_index arity ds_index pre_def_symbols
 		# (ds_ident, pre_def_symbols) = pre_def_symbols![symbol_index]
-		= ({ ds_ident = ds_ident.pds_ident, ds_arity = 2, ds_index = ds_index }, pre_def_symbols)
+		= ({ ds_ident = ds_ident.pds_ident, ds_arity = arity/*AA: was 2*/, ds_index = ds_index }, pre_def_symbols)
 	
 	make_type_def type_cons_index type_vars type_rhs pre_def_symbols
 		# (type_ident, pre_def_symbols) = pre_def_symbols![type_cons_index]

@@ -3,6 +3,7 @@ implementation module overloading
 import StdEnv
 
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics // ,RWSDebug
+import generics // AA
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 
@@ -711,6 +712,13 @@ where
 			= find_instance_of_member me_class me_offset {rcs & rcs_constraints_contexts = rcs_constraints_contexts ++ rcss}
 		find_instance_of_member_in_constraints me_class me_offset []
 			= abort "Error in module overloading: find_instance_of_member_in_constraints\n"
+// AA..			
+convertOverloadedCall defs contexts symbol=:{symb_kind = SK_Generic gen_glob kind} expr_ptr class_appls heaps_and_ptrs
+	# (found, member_glob) = getGenericMember gen_glob kind defs
+	| not found
+		= abort "convertOverloadedCall: no class for kind"	
+ 		=  convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls heaps_and_ptrs  				
+// ..AA
 convertOverloadedCall defs contexts {symb_name,symb_kind = SK_TypeCode} expr_info_ptr class_appls heaps_and_ptrs
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls heaps_and_ptrs
 	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs)
@@ -867,7 +875,6 @@ getClassVariable symb var_info_ptr var_heap error
 			-> (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)), error)
 		(_, var_heap)
 			-> (symb, var_info_ptr, var_heap, overloadingError symb error)
-
 
 updateDynamics :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})

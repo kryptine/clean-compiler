@@ -3,6 +3,7 @@ implementation module type
 import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
 import cheat
+import generics // AA
 
 ::	TypeInput =
 	{	ti_common_defs	:: !{# CommonDefs }
@@ -408,8 +409,10 @@ cannotUnify t1 t2 position=:(CP_Expression expr) err=:{ea_loc=[ip:_]}
 			# err = pushErrorAdmin { ip & ip_ident.id_name = id_name, ip_line = line } err
 			  err = errorHeading type_error err
 			  err = popErrorAdmin err
-			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
-											<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer) <<< '\n' }
+//			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
+//											<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer) <<< '\n' }
+			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, No) 
+											<<< " with " <:: (type_error_format, t2, No) <<< '\n' }
 		_
 			-> cannot_unify t1 t2 position err 
 cannotUnify t1 t2 position err 
@@ -422,8 +425,10 @@ cannot_unify t1 t2 position err
 					-> ea_file <<< "\"" <<< position <<< "\""
 				_
 					-> ea_file
-	  ea_file = ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
-						<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer)
+	  ea_file = ea_file <<< " cannot unify " <:: (type_error_format, t1, No) 
+						<<< " with " <:: (type_error_format, t2, No)
+//	  ea_file = ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
+//						<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer)
 	  ea_file = case position of
 	  			CP_FunArg _ _
 	  				-> ea_file
@@ -741,6 +746,7 @@ where
 cWithFreshContextVars 		:== True		
 cWithoutFreshContextVars 	:== False		
 
+freshSymbolType :: !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,![Int],!*TypeState)
 freshSymbolType fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_env,st_arity} common_defs
 				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_td_infos,ts_var_heap}
 	# (th_vars, ts_var_store)		= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
@@ -753,7 +759,7 @@ freshSymbolType fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_
 	  cons_variables				= foldSt (collect_cons_variables_in_tc common_defs) tst_context []
 	= ({ tst_args = tst_args, tst_result = tst_result, tst_context = tst_context, tst_attr_env = attr_env, tst_arity = st_arity, tst_lifted = 0 }, cons_variables,
 	   { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = copy_heaps, ts_var_heap = ts_var_heap})
-//		---> ("freshSymbolType", tst_args, tst_result, tst_context)
+		//---> ("freshSymbolType", st, tst_args, tst_result, tst_context)
 	where
 		fresh_type_variables :: .[TypeVar] *(*Heap TypeVarInfo,.Int) -> (!.Heap TypeVarInfo,!Int);
 		fresh_type_variables type_variables state
@@ -960,8 +966,8 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 		
 			my_kind_to_int KindConst
 				= 0
-			my_kind_to_int (KindArrow int_kind)
-				= int_kind
+			my_kind_to_int (KindArrow k)
+				= length k
 
 addPropagationAttributesToAType modules type=:{at_type} ps
 	# (at_type, ps) = addPropagationAttributesToType modules at_type ps
@@ -1017,6 +1023,8 @@ where
 
 emptyIdent =: { id_name = "", id_info = nilPtr }
 
+buildCurriedType :: [AType] AType TypeAttribute [AttrCoercion] Int 
+	-> (AType,[AttrCoercion],Int) //AA: exported from the module
 buildCurriedType [] type cum_attr attr_env attr_store
 	= (type, attr_env, attr_store)
 buildCurriedType [at=:{at_attribute}:ats] type cum_attr attr_env attr_store
@@ -1111,7 +1119,7 @@ getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind 
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
 				-> (fun_type_copy, cons_variables, [], ts)
 			_
-				-> abort ("getSymbolType "+++toString symb_name+++toString glob_object)
+				-> abort ("getSymbolType: SK_Function "+++toString symb_name+++" "+++toString glob_object)
 //				-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
 		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
 		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]
@@ -1142,12 +1150,19 @@ getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind 
 			  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
 			-> (fun_type_copy, cons_variables, [], ts)
 		_
-			-> abort ("getSymbolType "+++toString symb_name+++toString glob_object)
+			-> abort ("getSymbolType SK_LocalMacroFunction: "+++toString symb_name+++" " +++toString glob_object)
 //			-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
 getSymbolType ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}, symb_arity} ts
 	# {me_symb, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
 	  (fun_type_copy, cons_variables, ts) = determineSymbolTypeOfFunction me_symb symb_arity me_type me_type_ptr ti_common_defs ts
 	= (fun_type_copy, cons_variables, [], ts)
+// AA..	
+getSymbolType ti=:{ti_common_defs} symbol=:{symb_kind = SK_Generic gen_glob kind} ts
+	# (found, member_glob) = getGenericMember gen_glob kind ti_common_defs
+	| not found
+		= abort "getSymbolType: no class for kind"	
+ 	= getSymbolType ti {symbol & symb_kind = SK_OverloadedFunction member_glob} ts  		
+// ..AA	
 
 class requirements a :: !TypeInput !a !(!u:Requirements, !*TypeState) -> (!AType, !Optional ExprInfoPtr, !(!u:Requirements, !*TypeState))
 
@@ -1160,7 +1175,7 @@ where
 			VI_Type type _
 				-> type
 			_
-				-> abort "requirements BoundVar" // ---> (var_name <<- var_info))
+				-> abort "requirements BoundVar " // ---> (var_name <<- var_info))
 			, Yes var_expr_ptr, (reqs, ts))
 
 instance requirements App
@@ -1581,7 +1596,7 @@ makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr}:vars] [type:types] ts_
 	# optional_position = if (is_rare_name fv_name) (Yes (CP_FunArg fun_or_cons_ident arg_nr)) No
 	  ts_var_heap = ts_var_heap <:= (fv_info_ptr, VI_Type type optional_position)
 	= makeBase fun_or_cons_ident (arg_nr+1) vars types ts_var_heap
-
+	 	
 attributedBasicType (BT_String string_type) ts=:{ts_attr_store}
 	= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = string_type}, {ts & ts_attr_store = inc ts_attr_store})
 attributedBasicType bas_type ts=:{ts_attr_store}
@@ -1850,23 +1865,52 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	,	fe_location		:: !IdentPos
 	}
 
-typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule}
-	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !.TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
-typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out dcl_modules
+typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule} 
+	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
+typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out dcl_modules
+
+//typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule}
+//	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !.TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
+//typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out dcl_modules
+
 	#! fun_env_size = size fun_defs
+
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
 	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [main_dcl_module_n] = icl_defs }
-	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: modules }
+	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: modules }	  
 
 	  type_def_sizes =  [ size com_type_defs \\ {com_type_defs} <-: ti_common_defs ]
-	  class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
-	  class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
-	  
-	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
+      class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
+      class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
 
+/*
+	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
+	  
 	| not ts_error.ea_ok
-		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions, td_infos,
-			{ heaps & hp_type_heaps = hp_type_heaps }, predef_symbols, ts_error.ea_file, out)
+		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions, icl_defs, td_infos,
+			{ heaps & hp_type_heaps = hp_type_heaps }, predef_symbols, hash_table, ts_error.ea_file, out)
+
+*/
+// AA..
+/*
+	# ti_common_defs = {x \\ x <-: ti_common_defs }
+
+	# (ti_common_defs, comps, fun_defs, td_infos, hp_type_heaps, hp_var_heap, hash_table, predef_symbols, modules, ts_error) = 
+		convertGenerics main_dcl_module_n ti_common_defs comps fun_defs td_infos hp_type_heaps hp_var_heap hash_table predef_symbols modules ts_error
+	| not ts_error.ea_ok
+		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions, icl_defs, td_infos,
+			{ heaps & hp_type_heaps = hp_type_heaps,  hp_var_heap = hp_var_heap}, predef_symbols, hash_table, ts_error.ea_file, out)
+	# icl_defs = ti_common_defs.[main_dcl_module_n]	
+
+	#! fun_env_size = size fun_defs
+	# ti_functions = {dcl_functions \\ {dcl_functions} <-: modules }
+
+	# (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
+	# class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
+	# class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
+*/	
+// ..AA
+
 	# state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
@@ -1899,8 +1943,11 @@ where
 		= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
 
 	update_instances_of_class common_defs mod_index ins_index (dummy, error, class_instances, type_var_heap, td_infos)
-		# {ins_class={glob_object={ds_index},glob_module},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
-		  (mod_instances, class_instances) = replace class_instances glob_module dummy
+		#!{ins_class={glob_object={ds_ident={id_name}, ds_index},glob_module},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
+		  id_name = id_name ---> ("update_instances_of_class" +++ id_name +++ " " +++ (toString glob_module) +++ 
+		  	" " +++ toString (size class_instances))	
+		  (mod_instances, class_instances) = replace class_instances glob_module dummy 
+		  id_name = id_name ---> "done"	
 		  (instances, mod_instances) = replace mod_instances ds_index IT_Empty
 		  (error, instances) = insert it_types ins_index mod_index common_defs error instances
 		  (_, mod_instances) = replace mod_instances ds_index instances

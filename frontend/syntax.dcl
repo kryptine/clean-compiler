@@ -42,6 +42,7 @@ instance toString Ident
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
+				| STE_Generic			// AA: For generic declarations
 				| STE_Instance !Ident // argument: the class (used in explicitimports (1.3 syntax only))
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -116,6 +117,7 @@ instance toString Ident
 	,	def_macros			:: !macro_defs
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
+	,	def_generics		:: ![GenericDef] // AA
 	,	def_funtypes		:: ![FunType]
 	,	def_instances		:: ![instance_kind]
 	}
@@ -159,6 +161,7 @@ cIsNotAFunction :== False
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
 	|	PD_Class ClassDef [ParsedDefinition]
+	|	PD_Generic GenericDef // AA
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
@@ -197,6 +200,7 @@ cNameLocationDependent :== True
 	,	pi_pos		:: !Position
 	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
+	,	pi_generate  :: !Bool // AA: instance is to be generated
 	}
 
 /*
@@ -265,6 +269,20 @@ cNameLocationDependent :== True
 	,	me_priority 	:: !Priority
 	}
 
+// AA ... 
+::	GenericDef = 
+	{	gen_name		:: !Ident	// the generics name in the IC_Class
+	,	gen_member_name	:: !Ident	// the generics name in the IC_Member
+	,	gen_args		:: ![TypeVar]
+	, 	gen_arity 		:: !Int		// number of gen_args
+	,	gen_type		:: !SymbolType
+	, 	gen_pos			:: !Position
+	, 	gen_classes		:: ![DefinedSymbol] // generated classes
+	,	gen_isomap		:: !DefinedSymbol	// isomap function
+	}
+	
+// ... AA
+
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
 	,	it_types		:: ![Type]
@@ -279,6 +297,9 @@ cNameLocationDependent :== True
 	,	ins_members		:: !{# DefinedSymbol}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
+	,	ins_is_generic	:: !Bool				//AA 
+	, 	ins_generate	:: !Bool				//AA
+	,	ins_generic		:: !Global Index		//AA 	
 	}
 
 /*
@@ -573,6 +594,7 @@ cNonRecursiveAppl	:== False
 				| SK_Function !(Global Index)
 				| SK_LocalMacroFunction !Index
 				| SK_OverloadedFunction !(Global Index)
+				| SK_Generic !(Global Index) !TypeKind		// AA
 				| SK_Constructor !(Global Index)
 				| SK_Macro !(Global Index)
 //				| SK_RecordSelector !(Global Index)
@@ -795,6 +817,7 @@ cNonRecursiveAppl	:== False
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
+
 			|	TE
 
 ::	ConsVariable = CV 		!TypeVar
@@ -877,7 +900,13 @@ cNonRecursiveAppl	:== False
 ::	BasicValue	= BVI !String | BVC !String | BVB !Bool | BVR !String | BVS !String
 
 
-::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow !Int
+//::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow !Int
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind]
+
+instance toString TypeKind
+instance <<< TypeKind
+instance == TypeKind
+instance toString KindInfo
 
 /* A few obscure type definitions */
 
@@ -967,6 +996,9 @@ cNonUniqueSelection	:== False
 
 				| PE_DynamicPattern !ParsedExpr !DynamicType
 				| PE_Dynamic !ParsedExpr !(Optional DynamicType)
+				
+				| PE_Generic !Ident !TypeKind	/* AA: For generics, kind indexed identifier */
+				
 				| PE_Empty
 
 ::	ParsedSelection	= PS_Record !Ident !(Optional Ident)
@@ -1259,7 +1291,11 @@ ParsedConstructorToConsDef pc :==
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
  		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
- 					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos }
+ 					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, 
+ 		/*AA*/
+ 		ins_is_generic = False, 
+ 		ins_generate = pi.pi_generate, 
+ 		ins_generic = {glob_module = NoIndex, glob_object = NoIndex}}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
 	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,

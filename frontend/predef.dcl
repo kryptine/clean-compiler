@@ -36,64 +36,89 @@ PD_TypeVar_a31				:== 101
 
 /* Dynamics */
 
-PD_TypeCodeMember			:== 123
+PD_TypeCodeMember			:== 102
 // MV ...
-PD_DynamicTemp				:== 131
-PD_DynamicValue				:== 132
-PD_DynamicType				:== 133
+PD_DynamicTemp				:== 103
+PD_DynamicValue				:== 104
+PD_DynamicType				:== 105
 // ... MV
 
 /* identifiers present in the hastable */
 
-PD_StdArray					:== 102
-PD_StdEnum					:== 103
-PD_StdBool					:== 104
+PD_StdArray					:== 106
+PD_StdEnum					:== 107
+PD_StdBool					:== 108
 
-PD_AndOp					:== 105
-PD_OrOp						:== 106
+PD_AndOp					:== 109
+PD_OrOp						:== 110
 
 
 /* Array functions */
 
-PD_ArrayClass				:== 107
+PD_ArrayClass				:== 111
 
-PD_CreateArrayFun			:== 108
-PD__CreateArrayFun			:== 109
-PD_ArraySelectFun			:== 110
-PD_UnqArraySelectFun		:== 111
-PD_ArrayUpdateFun			:== 112
-PD_ArrayReplaceFun			:== 113
-PD_ArraySizeFun				:== 114
-PD_UnqArraySizeFun			:== 115
+PD_CreateArrayFun			:== 112
+PD__CreateArrayFun			:== 113
+PD_ArraySelectFun			:== 114
+PD_UnqArraySelectFun		:== 115
+PD_ArrayUpdateFun			:== 116
+PD_ArrayReplaceFun			:== 117
+PD_ArraySizeFun				:== 118
+PD_UnqArraySizeFun			:== 119
 
 /* Enum/Comprehension functions */
 
-PD_SmallerFun				:== 116
-PD_IncFun					:== 117
-PD_From						:== 118
-PD_FromThen					:== 119
-PD_FromTo					:== 120
-PD_FromThenTo				:== 121
+PD_SmallerFun				:== 120
+PD_IncFun					:== 121
+PD_From						:== 122
+PD_FromThen					:== 123
+PD_FromTo					:== 124
+PD_FromThenTo				:== 125
 
 /* Dynamics */
 
-PD_TypeCodeClass			:== 122
+PD_TypeCodeClass			:== 126
 
-PD_TypeObjectType			:== 124
-PD_TypeConsSymbol			:== 125
-PD_unify					:== 126
+PD_TypeObjectType			:== 127
+PD_TypeConsSymbol			:== 128
+PD_unify					:== 129
 // MV ..
-PD_coerce					:== 127
-PD_variablePlaceholder		:== 128
-PD_StdDynamics				:== 129
-PD_undo_indirections		:== 130
+PD_coerce					:== 130
+PD_variablePlaceholder		:== 131
+PD_StdDynamics				:== 132
+PD_undo_indirections		:== 133
 
-PD_Start					:== 134
+/* Generics */
+PD_StdGeneric				:== 134
+PD_TypeISO					:== 135
+PD_ConsISO					:== 136
+PD_iso_to					:== 137
+PD_iso_from					:== 138
+
+PD_TypeUNIT					:== 139
+PD_ConsUNIT					:== 140
+PD_TypeEITHER				:== 141
+PD_ConsLEFT					:== 142
+PD_ConsRIGHT				:== 143
+PD_TypePAIR					:== 144
+PD_ConsPAIR					:== 145
+PD_TypeARROW				:== 146
+PD_ConsARROW				:== 147
+
+PD_isomap_ARROW_			:== 148
+PD_isomap_ID				:== 149
+
+/* StdMisc */
+PD_StdMisc					:== 150
+PD_abort					:== 151
+PD_undef					:== 152
+
+PD_Start					:== 153
 
 // MW..
-PD_DummyForStrictAliasFun	:== 135
+PD_DummyForStrictAliasFun	:== 154
 
-PD_NrOfPredefSymbols		:== 136
+PD_NrOfPredefSymbols		:== 155
 // ..MW
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2

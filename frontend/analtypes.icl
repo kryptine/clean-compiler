@@ -10,21 +10,6 @@ import syntax, checksupport, checktypes, check, typesupport, utilities, analunit
 	
 AS_NotChecked :== -1
 
-instance <<< TypeKind
-where
-	(<<<) file tk = file <<< toString (toKindInfo tk)
-
-instance toString KindInfo
-where
-	toString (KI_Var ptr) 		= "*" +++ toString (ptrToInt ptr)
-	toString (KI_Const) 		= "*"
-	toString (KI_Arrow kinds)	= kind_list_to_string kinds
-	where
-		kind_list_to_string [] = " ?????? "
-		kind_list_to_string [k] = "* -> *"
-		kind_list_to_string [k:ks] = "* -> " +++ kind_list_to_string ks
-
-
 kindError kind1 kind2 error
 	= checkError "conflicting kinds: " (toString kind1 +++ " and " +++ toString kind2) error
 
@@ -70,8 +55,8 @@ where
 		= KI_Var info_ptr
 	toKindInfo KindConst
 		= KI_Const
-	toKindInfo (KindArrow arity)
-		= KI_Arrow [ KI_Const \\ i <- [1 .. arity]]
+	toKindInfo (KindArrow ks)
+		= KI_Arrow [ toKindInfo k \\ k <- ks]
 //			---> ("toKindInfo", arity)
 
 
@@ -373,7 +358,8 @@ where
 			determine_kind (KI_Indirection kind) 
 				= determine_kind kind
 			determine_kind (KI_Arrow kinds)
-				= KindArrow (length kinds)
+				//AA: = KindArrow (length kinds)
+				= KindArrow [determine_kind k \\ k <- kinds]
 			determine_kind kind
 				= KindConst
 			   

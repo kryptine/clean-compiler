@@ -43,6 +43,7 @@ where toString {import_module} = toString import_module
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
+				| STE_Generic			// AA: For generic declarations
 				| STE_Instance !Ident // the class (for explicit imports (1.3 syntax only))
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -104,6 +105,7 @@ where toString {import_module} = toString import_module
 	,	def_macros			:: !macro_defs
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
+	,	def_generics		:: ![GenericDef] // AA
 	,	def_funtypes		:: ![FunType]
 	,	def_instances		:: ![instance_kind]
 	}
@@ -145,6 +147,7 @@ cIsNotAFunction :== False
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
 	|	PD_Class ClassDef [ParsedDefinition]
+	|	PD_Generic GenericDef // AA
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
@@ -183,6 +186,7 @@ cNameLocationDependent :== True
 	,	pi_pos		:: !Position
 	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
+	,	pi_generate  :: !Bool // AA: instance is to be generated
 	}
 
 
@@ -248,6 +252,19 @@ cNameLocationDependent :== True
 	,	me_priority 	:: !Priority
 	}
 
+// AA.. 
+::	GenericDef = 
+	{	gen_name		:: !Ident	// the generics name in IC_Class 
+	,	gen_member_name	:: !Ident	// the generics name in IC_Member
+	,	gen_args		:: ![TypeVar]
+	,	gen_arity		:: !Int 		// number of gen_args 
+	,	gen_type		:: !SymbolType
+	, 	gen_pos			:: !Position
+	, 	gen_classes		:: ![DefinedSymbol] // generated classes
+	,	gen_isomap		:: !DefinedSymbol	// isomap function
+	}
+
+// ..AA
 
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
@@ -263,6 +280,9 @@ cNameLocationDependent :== True
 	,	ins_members		:: !{# DefinedSymbol}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
+	,	ins_is_generic	:: !Bool			//AA 
+	, 	ins_generate	:: !Bool			//AA
+	,	ins_generic		:: !Global Index	//AA
 	}
 
 ::	Import from_symbol =
@@ -523,6 +543,7 @@ cNotVarNumber :== -1
 				| SK_Function !(Global Index)
 				| SK_LocalMacroFunction !Index
 				| SK_OverloadedFunction !(Global Index)
+				| SK_Generic !(Global Index) !TypeKind		// AA
 				| SK_Constructor !(Global Index)
 				| SK_Macro !(Global Index)
 //				| SK_RecordSelector !(Global Index)
@@ -740,6 +761,7 @@ cNotVarNumber :== -1
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
+
 			|	TE
 
 ::	ConsVariable = CV 		!TypeVar
@@ -824,7 +846,8 @@ cNotVarNumber :== -1
 ::	BasicValue	= BVI !String | BVC !String | BVB !Bool | BVR !String | BVS !String
 
 
-::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow !Int
+//::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow !Int
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind]
 
 ::	Occurrence =
 	{	occ_ref_count	:: !ReferenceCount
@@ -917,6 +940,9 @@ cNonUniqueSelection	:== False
 
 				| PE_DynamicPattern !ParsedExpr !DynamicType
 				| PE_Dynamic !ParsedExpr !(Optional DynamicType)
+				
+				| PE_Generic !Ident !TypeKind	/* AA: For generics, kind indexed identifier */
+				
 				| PE_Empty
 
 ::	ParsedSelection	= PS_Record !Ident !(Optional Ident)
@@ -1621,20 +1647,43 @@ where
 				| sc_neg_vect bitand index_bit == 0
 					= write_signs (file <<< '+') (sc_pos_vect bitand (bitnot index_bit)) sc_neg_vect (inc index)
 					= write_signs (file <<< 'T') (sc_pos_vect bitand (bitnot index_bit)) (sc_neg_vect bitand (bitnot index_bit)) (inc index)
+
+// AA..
+instance toString TypeKind
+where
+	toString (KindVar _) 		= "**"
+	toString KindConst			= "*"
+//	toString (KindArrow args) 	= toString (length args) 
+	toString (KindArrow args) 	= "{" +++ (to_string args) +++ "}" 
+	where
+		to_string []		= "??????" 
+		to_string [k]		= toString k  
+		to_string [k:ks]	= (toString k) +++ "->" +++ (to_string ks)
+
+// ..AA
+
 				
 instance <<< TypeKind
 where
-	(<<<) file (KindVar _) = file <<< "**"
-	(<<<) file KindConst
-		= file <<< '*'
-	(<<<) file (KindArrow arity)
-		= write_kinds file arity
+	(<<<) file kind 		= file <<< (toString kind)
+
+instance == TypeKind 
+where
+	(==) KindConst KindConst = True
+	(==) (KindArrow xs) (KindArrow ys) = xs == ys
+	(==) _ _ = False
+				
+
+instance toString KindInfo
+where
+	toString (KI_Var ptr) 		= "*" +++ toString (ptrToInt ptr)
+	toString (KI_Const) 		= "*"
+	toString (KI_Arrow kinds)	= kind_list_to_string kinds
 	where
-		write_kinds file 1
-			= file <<< "* -> *"
-		write_kinds file n
-			= write_kinds (file <<< "* -> ") (dec n)
-		
+		kind_list_to_string [] = " ?????? "
+		kind_list_to_string [k] = "* -> *"
+		kind_list_to_string [k:ks] = "* -> " +++ kind_list_to_string ks
+
 
 instance <<< TypeDefInfo
 where
@@ -1855,6 +1904,11 @@ where
 	(<<<) file
 		STE_Class
 			= file <<< "STE_Class"
+// AA..			
+	(<<<) file
+		STE_Generic
+			= file <<< "STE_Generic"
+// ..AA
 	(<<<) file
 		(STE_Field _)
 			= file <<< "STE_Field"
@@ -1980,7 +2034,11 @@ ParsedConstructorToConsDef pc :==
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
  		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
- 					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos }
+ 					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, 
+ 		/*AA*/
+  		ins_is_generic = False, 
+ 		ins_generate = pi.pi_generate, 
+ 		ins_generic = {glob_module = NoIndex, glob_object = NoIndex}}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
 	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,

@@ -2,6 +2,8 @@ implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics
 //import RWSDebug
+import analtypes
+import generics
 
 :: FrontEndSyntaxTree
 	=	{	fe_icl :: !IclModule
@@ -121,17 +123,37 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	| upToPhase == FrontEndPhaseCheck
 		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
+// AA..
+	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
+	# ti_common_defs = {{dcl_common \\ {dcl_common} <-: dcl_mods } & [main_dcl_module_n] = icl_common }
+	# (td_infos, type_heaps, error_admin) = analTypeDefs ti_common_defs icl_used_module_numbers type_heaps error_admin
+	# heaps = { heaps & hp_type_heaps = type_heaps }
+
+	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
+		case False of
+		True -> convertGenerics 
+					components main_dcl_module_n ti_common_defs fun_defs td_infos 
+					heaps hash_table predef_symbols dcl_mods error_admin
+		False -> (components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
+
+	# icl_common = ti_common_defs.[main_dcl_module_n]	
+	# error = error_admin.ea_file
+// ..AA
+
 	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram (components -*-> "Typing") main_dcl_module_n icl_functions icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers heaps predef_symbols error out dcl_mods
+		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs/*icl_functions*/ icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
 
 	| not ok
 		= (No,{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+			
 
-	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials]
+	# (fun_def_size, fun_defs) = usize fun_defs
+	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials, generic_range]
+		
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 //	  (fun_defs, error)	= showFunctions array_instances fun_defs error
-
+		
 	| upToPhase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
@@ -242,8 +264,7 @@ where
 			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
 			= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
-
-	
+			
 showComponents2 :: !{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{# FunDef},!*File)
 showComponents2 comps comp_index fun_defs acc_args file
 	| comp_index >= (size comps)

@@ -547,6 +547,7 @@ instance toString STE_Kind where
 	toString STE_Constructor 			= "constructor"
 	toString (STE_Field _) 				= "field"
 	toString STE_Class 					= "class"
+	toString STE_Generic 				= "generic"			//AA
 	toString STE_Member 				= "class member"
 	toString (STE_Instance _)			= "instance"
 
@@ -623,7 +624,7 @@ instance check_completeness CheckedBody where
 instance check_completeness ClassDef where
 	check_completeness {class_context} cci ccs
 		= check_completeness class_context cci ccs
-
+		
 instance check_completeness ClassInstance where
 	check_completeness {ins_class, ins_type} cci ccs
 		= check_completeness ins_type cci
