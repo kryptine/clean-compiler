@@ -8,6 +8,7 @@ switch_import_syntax one_point_three two_point_zero :== two_point_zero
 SwitchPreprocessor preprocessor no_preprocessor :== preprocessor
 
 SwitchGenerics on off :== off
+SwitchGenericInfo on off :== on
 
 // MV...
 // - change T_ypeObjectType in StdDynamic (remove DummyModuleName-argument of T_ypeConsSymbol)

@@ -129,6 +129,8 @@ instance == TypeCons where
 	(==) (TypeConsSymb x) (TypeConsSymb y) = x == y 
 	(==) (TypeConsBasic x) (TypeConsBasic y) = x == y 
 	(==) TypeConsArrow TypeConsArrow = True
+	(==) (TypeConsVar x) (TypeConsVar y) = x == y
+	(==) _ _ = False
 
 ::	CompareValue :== Int
 Smaller :== -1

@@ -286,7 +286,6 @@ cNameLocationDependent :== True
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
 	,	gen_info_ptr	:: !GenericInfoPtr
-	, 	gen_bimap		:: !DefinedSymbol 	// fun def index of the bimap for the generic type 
 	}
 
 :: GenericClassInfo = 
@@ -1038,8 +1037,17 @@ cNotVarNumber :== -1
 	}
 
 // AA..
+// type structure is used to specialize a generic to a type
+:: GenTypeStruct 
+	= GTSAppCons TypeKind [GenTypeStruct]
+	| GTSAppVar TypeVar [GenTypeStruct] 
+	| GTSVar TypeVar
+ 	| GTSCons DefinedSymbol GenTypeStruct
+ 	| GTSField DefinedSymbol GenTypeStruct
+ 	| GTSE
+ 
 :: GenericTypeRep = 
-	{ gtr_type :: AType				// generic structure type
+	{ gtr_type :: GenTypeStruct		//AType				// generic structure type
 	, gtr_iso  :: DefinedSymbol		// the conversion isomorphism
 	}
 // ..AA

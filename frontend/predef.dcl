@@ -168,12 +168,41 @@ PD_ConsRIGHT				:== 186
 PD_TypePAIR					:== 187
 PD_ConsPAIR					:== 188
 
-PD_GenericBimap				:== 189
-PD_bimapId					:== 190
+// for constructor info
+PD_TypeCONS					:== 189
+PD_ConsCONS					:== 190
+PD_TypeFIELD				:== 191
+PD_ConsFIELD				:== 192
+PD_GenericInfo				:== 193
+PD_NoGenericInfo			:== 194
+PD_GenericConsInfo			:== 195
+PD_GenericFieldInfo			:== 196
+PD_TGenericConsDescriptor 	:== 197
+PD_CGenericConsDescriptor 	:== 198
+PD_TGenericFieldDescriptor 	:== 199
+PD_CGenericFieldDescriptor 	:== 200
+PD_TGenericTypeDefDescriptor :== 201
+PD_CGenericTypeDefDescriptor :== 202
+PD_TGenConsPrio				:== 203 
+PD_CGenConsNoPrio			:== 204
+PD_CGenConsPrio				:== 205
+PD_TGenConsAssoc			:== 206
+PD_CGenConsAssocNone		:== 207
+PD_CGenConsAssocLeft		:== 208
+PD_CGenConsAssocRight		:== 209
+PD_TGenType					:== 210
+PD_CGenTypeCons				:== 211
+PD_CGenTypeVar				:== 212
+PD_CGenTypeArrow			:== 213
+PD_CGenTypeApp				:== 214
 
-PD_TypeGenericDict 			:== 191
 
-PD_NrOfPredefSymbols		:== 192
+PD_GenericBimap				:== 215
+PD_bimapId					:== 216
+
+PD_TypeGenericDict 			:== 217
+
+PD_NrOfPredefSymbols		:== 218
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

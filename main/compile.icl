@@ -40,7 +40,7 @@ InitialCoclOptions =
 	,	compile_for_dynamics	= False
 	, 	support_generics 		= True	//???
 	,	compile_with_fusion		= False
-	,	compile_with_generics 	= False
+	,	compile_with_generics 	= True 
 	}
 
 :: DclCache = {

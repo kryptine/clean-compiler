@@ -110,6 +110,7 @@ instance <<< FilePosition
 	| 	DeriveToken				//		derive
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
+	|	GenericOfToken			//		of
 
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
@@ -119,6 +120,7 @@ instance <<< FilePosition
 	|	TypeContext
 	|	FunctionContext
 	|	CodeContext
+	| 	GenericContext
 
 ::	Assoc	= LeftAssoc | RightAssoc | NoAssoc
 

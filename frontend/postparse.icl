@@ -1198,20 +1198,20 @@ collectGenericBodies :: !GenericCaseDef ![ParsedDefinition] !*CollectAdmin
 	-> (![ParsedBody], ![ParsedDefinition], !*CollectAdmin)
 collectGenericBodies first_case all_defs=:[PD_GenericCase gc : defs] ca
 	| first_case.gc_name == gc.gc_name && first_case.gc_type_cons == gc.gc_type_cons		
-		# (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
+		#! (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
 		# (GCB_ParsedBody args rhs) = gc.gc_body
-		# body = 
+		#! body = 
 			{ pb_args = args
 			, pb_rhs = rhs
 			, pb_position = gc.gc_pos 
 			}
 		| first_case.gc_arity == gc.gc_arity
 			= ([body : bodies ], rest_defs, ca)
-			# msg = "This alternative has " + toString gc.gc_arity + " argument" 
+			#! msg = "This generic alternative has " + toString gc.gc_arity + " argument" 
 				+ (if (gc.gc_arity <> 1) "s" "")+" instead of " + toString first_case.gc_arity
-			# ca = postParseError gc.gc_pos msg ca	
+			#! ca = postParseError gc.gc_pos msg ca	
 			= ([body : bodies ], rest_defs, ca)
-		= ([], all_defs, ca)
+		= ([], all_defs, ca)		
 collectGenericBodies first_case defs ca
 	= ([], defs, ca)
 

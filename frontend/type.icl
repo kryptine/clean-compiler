@@ -1090,6 +1090,7 @@ where
 		# (left, right, is_unique) = split_args (dec n) args
 		= ([ atype : left ], right, is_unique || attr_is_unique at_attribute)
 	
+	
 	attr_is_unique TA_Unique = True
 	attr_is_unique _ = False
 	

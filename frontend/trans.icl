@@ -4,11 +4,11 @@ import StdEnv
 
 import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type
 
-SwitchCaseFusion		fuse dont_fuse :== fuse
-SwitchGeneratedFusion	fuse dont_fuse :== fuse
-SwitchFunctionFusion	fuse dont_fuse :== fuse
-SwitchConstructorFusion	fuse dont_fuse :== fuse
-SwitchCurriedFusion		fuse dont_fuse :== fuse
+SwitchCaseFusion		fuse dont_fuse :== dont_fuse
+SwitchGeneratedFusion	fuse dont_fuse :== dont_fuse
+SwitchFunctionFusion	fuse dont_fuse :== dont_fuse
+SwitchConstructorFusion	fuse dont_fuse :== dont_fuse
+SwitchCurriedFusion		fuse dont_fuse :== dont_fuse
 
 (-!->) infix :: !.a !b -> .a | <<< b
 (-!->) a b = a // ---> b
@@ -2076,8 +2076,23 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 	  		  , ti_functions = ro.ro_imported_funs
 			  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
 			  }
+	// AA: Dummy generic dictionary does not unify with corresponding class dictionary.
+	// Make it unify 			  		
 	# (succ, das_subst, das_type_heaps)
-	  		= unify class_atype arg_type type_input das_subst das_type_heaps
+	  		//AA: = unify class_atype arg_type type_input das_subst das_type_heaps
+	  		= unify_dict class_atype arg_type type_input das_subst das_type_heaps
+	  	with
+	  		unify_dict class_atype=:{at_type=TA type_symb1 args1} arg_type=:{at_type=TA type_symb2 args2} 
+	  			| type_symb1 == type_symb2 
+	  				= unify class_atype arg_type
+	  			// FIXME: check indexes, not names. Need predefs for that. 	
+	  			| type_symb1.type_name.id_name == "GenericDict"
+	  				= unify {class_atype & at_type = TA type_symb2 args1} arg_type	
+	  			| type_symb2.type_name.id_name == "GenericDict"
+	  				= unify class_atype {arg_type & at_type = TA type_symb1 args2} 	  				
+	  		unify_dict class_atype arg_type 
+	  			= unify class_atype arg_type	
+	  			
 	| not succ
 		= abort ("sanity check nr 93 in module trans failed\n"--->(class_atype,"\n", arg_type))
 	# (free_vars_and_types,das_type_heaps) = mapSt subFVT free_vars_and_types das_type_heaps

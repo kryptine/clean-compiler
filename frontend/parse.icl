@@ -495,10 +495,18 @@ where
 		= case token of
 			GenericOpenToken // generic function
 				# (type, pState) = wantType pState
+				# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
+				# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
+				# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState
+				# (generic_ident, pState) = stringToIdent name IC_Generic pState					
+
 				# (type_cons, pState) = get_type_cons type pState
 					with
-						get_type_cons (TA type_symb []) pState 
-							= (TypeConsSymb type_symb, pState)
+						get_type_cons (TA type_symb []) pState
+								= (TypeConsSymb type_symb, pState)							
+						get_type_cons (TA type_symb _) pState
+							# pState = parseError "generic type, no constructor arguments allowed" No " |}" pState
+							= (abort "no TypeCons", pState)
 						get_type_cons (TB tb) pState 
 							= (TypeConsBasic tb, pState)
 						get_type_cons TArrow pState
@@ -506,19 +514,48 @@ where
 						get_type_cons (TV tv) pState
 							= (TypeConsVar tv, pState)				 
 						get_type_cons _ pState 
-							# pState = parseError "generic type" No " invalid" pState
+							# pState = parseError "generic type" No " |}" pState
 							= (abort "no TypeCons", pState)
-				# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-				# (ident, pState) = stringToIdent name (IC_GenericCase type) pState					
-				# (generic_ident, pState) = stringToIdent name IC_Generic pState					
 
+				# (token, pState) = nextToken GenericContext pState
+				# (geninfo_arg, pState) = case token of
+					GenericOfToken
+						# (ok, geninfo_arg, pState) = trySimpleLhsExpression pState
+						# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
+						| ok 
+							-> case type_cons of
+								(TypeConsSymb {type_name})
+									| type_name == type_CONS_ident
+										# (cons_CONS_ident, pState) = stringToIdent "GenericConsInfo" IC_Expression pState 
+										-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
+									| type_name == type_FIELD_ident 
+										# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
+										-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)							_ 	
+									| otherwise
+										-> (geninfo_arg, pState)
+						| otherwise
+							# pState = parseError "generic case" No "simple lhs expression" pState
+							-> (PE_Empty, pState)
+						 
+					GenericCloseToken
+						# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
+						-> (PE_Ident geninfo_ident, pState)
+					_ 	
+						# pState = parseError "generic type" (Yes token) "of or |}" pState
+						# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
+						-> (PE_Ident geninfo_ident, pState)
+																						
+				//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 				# (args, pState) = parseList trySimpleLhsExpression pState
+
+				//# (geninfo_ident, pState) = stringToIdent "geninfo" IC_Expression pState
+				# args = SwitchGenericInfo [geninfo_arg :  args] args
 
 				// must be EqualToken or HashToken or ???
 				//# pState = wantToken FunctionContext "generic definition" EqualToken pState
 				//# pState = tokenBack pState
 
-			  	#(ss_useLayout, pState) = accScanState UseLayout pState
+			  	# (ss_useLayout, pState) = accScanState UseLayout pState
 			    # localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
 			    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
 
@@ -1511,11 +1548,6 @@ wantGenericDefinition parseContext pos pState
 		,	gen_vars = arg_vars
 		,	gen_pos = pos
 		,	gen_info_ptr = nilPtr
-		, 	gen_bimap = 
-			{ ds_ident = {id_name = "", id_info = nilPtr} 
-			, ds_index = NoIndex
-			, ds_arity = 0 
-			}
 		}
 	= (PD_Generic gen_def, pState)	
 	where

@@ -53,7 +53,8 @@ where
 		//# (heaps, cs) = check_generic_vars gen_def heaps cs
 
 		# gen_defs = {gen_defs & [index] = gen_def} 
-		# cs = popErrorAdmin cs	
+		# (cs=:{cs_x}) = popErrorAdmin cs
+		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
 		= (gen_defs, type_defs, class_defs, modules, heaps, cs)
 				//---> ("check_generic", gen_name, gen_def.gen_vars, gen_def.gen_type)
 
@@ -219,7 +220,8 @@ where
 	
 		#! (heaps, cs) = check_star_case gc_type_cons generic_def gindex heaps cs 
 			
-		#! cs = popErrorAdmin cs	
+		#! (cs=:{cs_x}) = popErrorAdmin cs	
+		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
 		= (gen_case_defs, generic_defs, type_defs, modules, heaps, cs)
 			//---> ("check_generic_case", gc_name, gc_type_cons)
 
@@ -3408,6 +3410,33 @@ where
 				<=< adjustPredefSymbol PD_TypeEITHER			mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsLEFT				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_ConsRIGHT				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TypeCONS				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsCONS				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TypeFIELD				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsFIELD				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_GenericInfo			mod_index STE_Type
+				<=< adjustPredefSymbol PD_NoGenericInfo			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_GenericConsInfo		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_GenericFieldInfo		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TGenericConsDescriptor mod_index STE_Type
+				<=< adjustPredefSymbol PD_CGenericConsDescriptor mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TGenericFieldDescriptor mod_index STE_Type
+				<=< adjustPredefSymbol PD_CGenericFieldDescriptor mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TGenericTypeDefDescriptor mod_index STE_Type
+				<=< adjustPredefSymbol PD_CGenericTypeDefDescriptor mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TGenConsPrio 			mod_index STE_Type
+				<=< adjustPredefSymbol PD_CGenConsNoPrio 		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_CGenConsPrio 			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TGenConsAssoc 		mod_index STE_Type
+				<=< adjustPredefSymbol PD_CGenConsAssocNone 	mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_CGenConsAssocLeft 	mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_CGenConsAssocRight 	mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TGenType 				mod_index STE_Type
+				<=< adjustPredefSymbol PD_CGenTypeCons 			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_CGenTypeVar 			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_CGenTypeArrow 		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_CGenTypeApp 			mod_index STE_Constructor
+
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index STE_Generic
 				<=< adjustPredefSymbol PD_bimapId				mod_index STE_DclFunction				
 				<=< adjustPredefSymbol PD_TypeGenericDict		mod_index STE_Type				

@@ -168,12 +168,42 @@ PD_ConsRIGHT				:== 186
 PD_TypePAIR					:== 187
 PD_ConsPAIR					:== 188
 
-PD_GenericBimap				:== 189
-PD_bimapId					:== 190
+// for constructor info
+PD_TypeCONS					:== 189
+PD_ConsCONS					:== 190
+PD_TypeFIELD				:== 191
+PD_ConsFIELD				:== 192
+PD_GenericInfo				:== 193
+PD_NoGenericInfo			:== 194
+PD_GenericConsInfo			:== 195
+PD_GenericFieldInfo			:== 196
+PD_TGenericConsDescriptor 	:== 197
+PD_CGenericConsDescriptor 	:== 198
+PD_TGenericFieldDescriptor 	:== 199
+PD_CGenericFieldDescriptor 	:== 200
+PD_TGenericTypeDefDescriptor :== 201
+PD_CGenericTypeDefDescriptor :== 202
+PD_TGenConsPrio				:== 203 
+PD_CGenConsNoPrio			:== 204
+PD_CGenConsPrio				:== 205
+PD_TGenConsAssoc			:== 206
+PD_CGenConsAssocNone		:== 207
+PD_CGenConsAssocLeft		:== 208
+PD_CGenConsAssocRight		:== 209
+PD_TGenType					:== 210
+PD_CGenTypeCons				:== 211
+PD_CGenTypeVar				:== 212
+PD_CGenTypeArrow			:== 213
+PD_CGenTypeApp				:== 214
 
-PD_TypeGenericDict 			:== 191
 
-PD_NrOfPredefSymbols		:== 192
+PD_GenericBimap				:== 215
+PD_bimapId					:== 216
+
+PD_TypeGenericDict 			:== 217
+
+PD_NrOfPredefSymbols		:== 218
+
 
 (<<=) infixl
 (<<=) symbol_table val
@@ -284,7 +314,7 @@ predefined_idents
 					[PD_TypeID] = i "T_ypeID",
 					[PD_ModuleID] = i "ModuleID",
 				
-					[PD_StdGeneric] = i "StdGeneric2",
+					[PD_StdGeneric] = i "StdGeneric",
 					[PD_TypeBimap] = i "Bimap",
 					[PD_ConsBimap] = i "_Bimap",
 					[PD_map_to] = i "map_to",
@@ -295,7 +325,35 @@ predefined_idents
 					[PD_ConsLEFT] = i "LEFT",
 					[PD_ConsRIGHT] = i "RIGHT",
 					[PD_TypePAIR] = i "PAIR",
-					[PD_ConsPAIR] = i "PAIR",
+					[PD_ConsPAIR] = i "PAIR",					
+					[PD_TypeCONS] = i "CONS",
+					[PD_ConsCONS] = i "CONS",
+					[PD_TypeFIELD] = i "FIELD",
+					[PD_ConsFIELD] = i "FIELD",
+					[PD_GenericInfo] = i "GenericInfo",
+					[PD_NoGenericInfo] = i "NoGenericInfo",
+					[PD_GenericConsInfo] = i "GenericConsInfo",
+					[PD_GenericFieldInfo] = i "GenericFieldInfo",
+					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
+					[PD_CGenericConsDescriptor] = i "_GenericConsDescriptor",
+					[PD_TGenericFieldDescriptor] = i "GenericFieldDescriptor",
+					[PD_CGenericFieldDescriptor] = i "_GenericFieldDescriptor",
+					[PD_TGenericTypeDefDescriptor] = i "GenericTypeDefDescriptor",
+					[PD_CGenericTypeDefDescriptor] = i "_GenericTypeDefDescriptor",
+					[PD_TGenConsPrio] = i "GenConsPrio",
+					[PD_CGenConsNoPrio] = i "GenConsNoPrio",
+					[PD_CGenConsPrio] = i "GenConsPrio",
+					[PD_TGenConsAssoc] = i "GenConsAssoc",
+					[PD_CGenConsAssocNone] = i "GenConsAssocNone",
+					[PD_CGenConsAssocLeft] = i "GenConsAssocLeft",
+					[PD_CGenConsAssocRight] = i "GenConsAssocRight",
+					[PD_TGenType] = i "GenType",
+					[PD_CGenTypeCons] = i "GenTypeCons",
+					[PD_CGenTypeVar] = i "GenTypeVar",
+					[PD_CGenTypeArrow] = i "GenTypeArrow",
+					[PD_CGenTypeApp] = i "GenTypeApp",
+														
+					
 					[PD_GenericBimap] = i "bimap",
 					[PD_bimapId] = i "bimapId",
 				
@@ -447,7 +505,34 @@ where
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsLEFT)
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsRIGHT)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypePAIR)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsPAIR)	
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsPAIR)
+					<<- (local_predefined_idents,				IC_Type, 		PD_TypeCONS)					
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsCONS)
+					<<- (local_predefined_idents,				IC_Type, 		PD_TypeFIELD)					
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsFIELD)
+					<<- (local_predefined_idents,				IC_Type, 		PD_GenericInfo)					
+					<<- (local_predefined_idents,				IC_Expression,	PD_NoGenericInfo)
+					<<- (local_predefined_idents,				IC_Expression,	PD_GenericConsInfo)
+					<<- (local_predefined_idents,				IC_Expression,	PD_GenericFieldInfo)
+					<<- (local_predefined_idents,				IC_Type,		PD_TGenericConsDescriptor)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericConsDescriptor)
+					<<- (local_predefined_idents,				IC_Type,		PD_TGenericFieldDescriptor)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericFieldDescriptor)
+					<<- (local_predefined_idents,				IC_Type,		PD_TGenericTypeDefDescriptor)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericTypeDefDescriptor)
+					<<- (local_predefined_idents,				IC_Type,		PD_TGenConsPrio)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsNoPrio)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsPrio)
+					<<- (local_predefined_idents,				IC_Type,		PD_TGenConsAssoc)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsAssocNone)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsAssocLeft)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsAssocRight)
+					<<- (local_predefined_idents,				IC_Type,		PD_TGenType)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeCons)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeVar)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeArrow)
+					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeApp)
+											
 					<<- (local_predefined_idents,				IC_Generic,		PD_GenericBimap)	
 					<<- (local_predefined_idents,				IC_Expression,	PD_bimapId)
 					<<- (local_predefined_idents,				IC_Type,		PD_TypeGenericDict)

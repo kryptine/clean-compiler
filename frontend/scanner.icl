@@ -196,6 +196,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	| 	DeriveToken				//		derive
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
+	|	GenericOfToken			//		of
 
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
@@ -206,6 +207,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	TypeContext
 	|	FunctionContext
 	|	CodeContext
+	| 	GenericContext
 
 instance == ScanContext
 where
@@ -794,6 +796,7 @@ CheckReserved GeneralContext    s i = CheckGeneralContext s i
 CheckReserved TypeContext       s i = CheckTypeContext s i
 CheckReserved FunctionContext	s i = CheckFunctContext s i
 CheckReserved CodeContext		s i = CheckCodeContext s i
+CheckReserved GenericContext	s i = CheckGenericContext s i
 
 CheckGeneralContext	:: !String !Input -> (!Token, !Input)
 CheckGeneralContext s input
@@ -846,6 +849,7 @@ CheckTypeContext s input
 	"Dynamic"	->	(DynamicTypeToken	, input)
 	"special"	->	(SpecialToken		, input)
 	"from" 		->	(FromToken			, input)
+	"of"		->  (GenericOfToken		, input) // AA
 	s			->	CheckEveryContext s input
 
 CheckFunctContext :: !String !Input -> (!Token, !Input)
@@ -871,6 +875,12 @@ CheckCodeContext :: !String !Input -> (!Token, !Input)
 CheckCodeContext s input
  = case s of
 	"inline"	->	(InlineToken		, input)
+	s			->	CheckEveryContext s input	
+
+CheckGenericContext :: !String !Input -> (!Token, !Input)
+CheckGenericContext s input
+ = case s of
+	"of"	->	(GenericOfToken		, input)
 	s			->	CheckEveryContext s input	
 
 GetPrio :: !Input -> (!Optional String, !Int, !Input)
