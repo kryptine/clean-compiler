@@ -309,6 +309,8 @@ beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
 beFlatType
 	:==	beFunction2 BEFlatType
+//beFlatTypeX
+//	:==	beFunction3 BEFlatTypeX
 beNoTypeVars
 	:==	beFunction0 BENoTypeVars
 beTypeVars
@@ -796,8 +798,9 @@ defineTypes :: ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} -> BackEn
 defineTypes moduleIndex constructors selectors types
 	=	foldStateWithIndexA (defineType moduleIndex constructors selectors) types
 
-convertTypeLhs :: ModuleIndex Index  [ATypeVar] -> BEMonad BEFlatTypeP
-convertTypeLhs moduleIndex typeIndex args
+convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
+convertTypeLhs moduleIndex typeIndex attribute args
+//	=	beFlatTypeX (beTypeSymbol typeIndex moduleIndex) (convertAttribution attribute) (convertTypeVars args)
 	=	beFlatType (beTypeSymbol typeIndex moduleIndex) (convertTypeVars args)
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
@@ -809,18 +812,17 @@ convertTypeVar typeVar
 	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_name.id_name) (convertAttribution typeVar.atv_attribute)
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef *BackEndState -> *BackEndState
-defineType moduleIndex constructors _ typeIndex {td_name, td_args, td_rhs=AlgType constructorSymbols} be
+defineType moduleIndex constructors _ typeIndex {td_name, td_attribute, td_args, td_rhs=AlgType constructorSymbols} be
 	# (flatType, be)
-		=	convertTypeLhs moduleIndex typeIndex td_args be
+		=	convertTypeLhs moduleIndex typeIndex td_attribute td_args be
 	# (constructors, be)
 		=	convertConstructors typeIndex td_name.id_name moduleIndex constructors constructorSymbols be
 	=	appBackEnd (BEAlgebraicType flatType constructors) be
-defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordType {rt_constructor, rt_fields}} be
+defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}} be
 //	| trace_tn constructorDef.cons_symb
 	# (flatType, be)
-		=	convertTypeLhs moduleIndex typeIndex td_args be
+		=	convertTypeLhs moduleIndex typeIndex td_attribute td_args be
 	# (fields, be)
-//		=	convertSelectors moduleIndex selectors rt_fields be
 		=	convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness be
 	# (constructorType,be) = constructorTypeFunction be
 	# (constructorTypeNode, be)
@@ -829,6 +831,7 @@ defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordT
 				(convertSymbolTypeArgs constructorType)
 				be
 	=	appBackEnd (BERecordType moduleIndex flatType constructorTypeNode fields) be
+//	=	appBackEnd (BERecordTypeX moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
 	where
 		constructorIndex
 			=	rt_constructor.ds_index
@@ -841,10 +844,10 @@ defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordT
 							->	(expandedType,be)
 						_
 							->	(constructorDef.cons_type,be))
-defineType moduleIndex _ _ typeIndex {td_args, td_rhs=AbstractType _} be
- 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_args) be
-defineType moduleIndex _ _ typeIndex {td_args, td_rhs=AbstractSynType _ _} be
- 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_args) be
+defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} be
+ 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
+defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} be
+ 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
 defineType _ _ _ _ _ be
 	=	be
 
