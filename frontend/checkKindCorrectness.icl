@@ -20,12 +20,12 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 			= iFoldSt (\mod_index state
 						-> if (bitvectSelect mod_index bv_cashed_modules)
 								state
-								(check_kind_correctness_of_classes mod_index state))
+								(check_classes mod_index state))
 					0 size_dcl_mods (dcl_mods, th_vars, td_infos, error_admin)
 	  icl_common_defs
 	  		= common_defs.[main_dcl_module_n]
 	  (_, th_vars, td_infos, error_admin)
-	  		= foldrArraySt (check_kind_correctness_of_class icl_common_defs.com_member_defs)
+	  		= foldrArraySt (check_class icl_common_defs.com_member_defs)
 	  				icl_common_defs.com_class_defs
 					([], th_vars, td_infos, error_admin)
 	  bv_uninitialized_mods
@@ -34,20 +34,20 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 			= iFoldSt (\mod_index state
 						-> if (bitvectSelect mod_index bv_cashed_modules)
 								state
-								(check_kind_correctness_of_instances_and_class_and_member_contexts
+								(check_instances_and_class_and_member_contexts
 										common_defs common_defs.[mod_index] state))
 					0 size_dcl_mods (bv_uninitialized_mods, th_vars, td_infos, error_admin)
-	  // check_kind_correctness_of_icl_function: don't check the types that were generated for instances
+	  // check_icl_function: don't check the types that were generated for instances
 	  state
-			= iFoldSt (check_kind_correctness_of_icl_function common_defs) 0 icl_instances.ir_from
+			= iFoldSt (check_icl_function common_defs) 0 icl_instances.ir_from
 					(fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	  (fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
-			= iFoldSt (check_kind_correctness_of_icl_function common_defs) icl_instances.ir_to n_fun_defs state
+			= iFoldSt (check_icl_function common_defs) icl_instances.ir_to n_fun_defs state
 	  (dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 			= iFoldSt (\mod_index state
 						-> if (bitvectSelect mod_index bv_cashed_modules || mod_index==main_dcl_module_n)
 			    		      state
-						   	  (check_kind_correctness_of_dcl_functions common_defs mod_index state))
+						   	  (check_dcl_functions common_defs mod_index state))
 			  0 size_dcl_mods
 			  (dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	= (fun_defs, dcl_mods, th_vars, td_infos, error_admin)
@@ -57,31 +57,31 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 			= (bitvectSet mod_index bitvect, dcl_mods)
 		= (bitvect, dcl_mods)
 
-	check_kind_correctness_of_classes mod_index (dcl_mods, th_vars, td_infos, error_admin)
+	check_classes mod_index (dcl_mods, th_vars, td_infos, error_admin)
 		# (dcl_mod, dcl_mods)
 				= dcl_mods![mod_index]
 		  {com_class_defs, com_member_defs}
 		  		= dcl_mod.dcl_common
 		  (class_defs_with_cacheable_kind_info, th_vars, td_infos, error_admin)
-		  		= foldrArraySt (check_kind_correctness_of_class com_member_defs) com_class_defs
+		  		= foldrArraySt (check_class com_member_defs) com_class_defs
 						([], th_vars, td_infos, error_admin)
 		  dcl_mods
 		  		= { dcl_mods & [mod_index].dcl_common.com_class_defs 
 		  				= { el \\ el <- class_defs_with_cacheable_kind_info }}
 		= (dcl_mods, th_vars, td_infos, error_admin)
-	check_kind_correctness_of_class com_member_defs class_def=:{class_name, class_args, class_members}
+	check_class com_member_defs class_def=:{class_name, class_args, class_members}
 			(class_defs_accu, th_vars, td_infos, error_admin)
 		# th_vars
 				= foldSt init_type_var class_args th_vars
 		  (th_vars, td_infos, error_admin)
 		  		= foldlArraySt (\{ds_index} state
-									-> check_kind_correctness_of_member_without_context class_args 
+									-> check_member_without_context class_args 
 											com_member_defs.[ds_index] state)
 							class_members (th_vars, td_infos, error_admin)
 		  (derived_kinds, th_vars)
 		  		= mapFilterYesSt get_opt_kind class_args th_vars
 		= ([{ class_def & class_arg_kinds = derived_kinds }:class_defs_accu], th_vars, td_infos, error_admin)
-	check_kind_correctness_of_member_without_context class_args
+	check_member_without_context class_args
 				{me_symb, me_pos, me_class_vars, me_type=me_type=:{st_vars, st_args, st_result}}
 				(th_vars, td_infos, error_admin)
 		# error_admin
@@ -91,7 +91,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  th_vars
 		  		= fold2St copy_TVI class_args me_class_vars th_vars
 		  (th_vars, td_infos, error_admin)
-		  		= unsafeFold2St (check_kind_correctness_of_atype KindConst) 
+		  		= unsafeFold2St (check_atype KindConst) 
 		  				[0..] [st_result:st_args] (th_vars, td_infos, error_admin)
 		  th_vars
 		  		= fold2St copy_TVI me_class_vars class_args th_vars
@@ -101,16 +101,16 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 			# (tvi, th_vars)
 					= readPtr src.tv_info_ptr th_vars
 			= writePtr dst.tv_info_ptr tvi th_vars
-	check_kind_correctness_of_instances_and_class_and_member_contexts common_defs 
+	check_instances_and_class_and_member_contexts common_defs 
 			{com_instance_defs, com_class_defs, com_member_defs} state
 		# state
-				= foldlArraySt (check_kind_correctness_of_instance common_defs) com_instance_defs state
+				= foldlArraySt (check_instance common_defs) com_instance_defs state
 		  state
 				= foldlArraySt 
-					(check_kind_correctness_of_class_context_and_member_contexts common_defs com_member_defs)
+					(check_class_context_and_member_contexts common_defs com_member_defs)
 					com_class_defs state
 		= state
-	check_kind_correctness_of_instance common_defs {ins_is_generic, ins_class, ins_ident, ins_pos, ins_type}
+	check_instance common_defs {ins_is_generic, ins_class, ins_ident, ins_pos, ins_type}
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		| ins_is_generic
 			// kind correctness of user supplied generic instances
@@ -123,17 +123,17 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  th_vars
 		  		= foldSt init_type_var ins_type.it_vars th_vars
 		  (th_vars, td_infos, error_admin)
-		  		= unsafeFold3St possibly_check_kind_correctness_of_type expected_kinds [1..] 
+		  		= unsafeFold3St possibly_check_type expected_kinds [1..] 
 		  				ins_type.it_types (th_vars, td_infos, error_admin)
 		  state
-		  		= foldSt (check_kind_correctness_of_context common_defs) ins_type.it_context
+		  		= foldSt (check_context common_defs) ins_type.it_context
 		  				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		= state
 
 	get_expected_kinds class_index=:{glob_module, glob_object} common_defs bv_uninitialized_mods th_vars
 		| bitvectSelect glob_module bv_uninitialized_mods
 			/* the desired class is defined in a module which is a cached one 
-				=> check_kind_correctness_of_classes has not been called for all the classes
+				=> check_classes has not been called for all the classes
 				   within that module
 				=> the kind information for the class args is not in the heap
 				=> put it in the heap now
@@ -158,30 +158,30 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 	write_ki [] [] th_vars
 		= th_vars
 
-	possibly_check_kind_correctness_of_type TVI_Empty _ _ state
+	possibly_check_type TVI_Empty _ _ state
 		// This can happen for stooopid classes like StdClass::Ord, where the member type is ignored at all
 		= state
-	possibly_check_kind_correctness_of_type (TVI_Kind expected_kind) arg_nr type state
-		= check_kind_correctness_of_type expected_kind arg_nr type state
-	check_kind_correctness_of_class_context_and_member_contexts common_defs com_member_defs
+	possibly_check_type (TVI_Kind expected_kind) arg_nr type state
+		= check_type expected_kind arg_nr type state
+	check_class_context_and_member_contexts common_defs com_member_defs
 				{class_name, class_pos, class_context, class_members, class_args} 
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# error_admin
 				= setErrorAdmin (newPosition class_name class_pos) error_admin
 		  state
-				= foldSt (check_kind_correctness_of_context common_defs) class_context
+				= foldSt (check_context common_defs) class_context
 						(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		  state
-		  		= foldlArraySt (check_kind_correctness_of_member_context common_defs com_member_defs)
+		  		= foldlArraySt (check_member_context common_defs com_member_defs)
 		  				class_members state
 		= state
-	check_kind_correctness_of_member_context common_defs com_member_defs {ds_index}
+	check_member_context common_defs com_member_defs {ds_index}
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# {me_symb, me_pos, me_type}
 				= com_member_defs.[ds_index]
 		  error_admin
 		  		= setErrorAdmin (newPosition me_symb me_pos) error_admin
-		= foldSt (check_kind_correctness_of_context common_defs) me_type.st_context 
+		= foldSt (check_context common_defs) me_type.st_context 
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	get_tvi {tv_info_ptr} th_vars
 		= readPtr tv_info_ptr th_vars
@@ -193,7 +193,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 					TVI_Kind kind -> Yes kind
 					_ -> No
 		= (opt_kind, th_vars)
-	check_kind_correctness_of_icl_function common_defs fun_n 
+	check_icl_function common_defs fun_n 
 				(fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# (fun_def, fun_defs) = fun_defs![fun_n]
 		= case fun_def.fun_type of
@@ -201,10 +201,10 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 				-> (fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 			Yes st
 				# (bv_uninitialized_mods, th_vars, td_infos, error_admin)
-						= check_kind_correctness_of_symbol_type common_defs fun_def.fun_symb fun_def.fun_pos
+						= check_symbol_type common_defs fun_def.fun_symb fun_def.fun_pos
 								st (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 				-> (fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
-	check_kind_correctness_of_dcl_functions common_defs mod_index
+	check_dcl_functions common_defs mod_index
 			(dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# ({dcl_functions, dcl_instances, dcl_macros}, dcl_mods)
 				= dcl_mods![mod_index]
@@ -213,11 +213,11 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 							-> if (in_index_range i dcl_instances || in_index_range i dcl_macros) // yawn
 								  state
 								  (let ({ft_symb, ft_pos, ft_type}) = dcl_functions.[i]
-								    in check_kind_correctness_of_symbol_type common_defs ft_symb ft_pos ft_type 
+								    in check_symbol_type common_defs ft_symb ft_pos ft_type 
 								    		state))
 							0 (size dcl_functions) (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		= (dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
-	check_kind_correctness_of_symbol_type common_defs fun_symb fun_pos
+	check_symbol_type common_defs fun_symb fun_pos
 			st=:{st_vars, st_args, st_result, st_context}
 			(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# error_admin
@@ -225,20 +225,20 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  th_vars
 				= foldSt init_type_var st_vars th_vars
 		  (th_vars, td_infos, error_admin)
-		  		= unsafeFold2St (check_kind_correctness_of_atype KindConst) 
+		  		= unsafeFold2St (check_atype KindConst) 
 		  				[0..] [st_result:st_args] (th_vars, td_infos, error_admin)
 		  (bv_uninitialized_mods, th_vars, td_infos, error_admin)
-		  		= foldSt (check_kind_correctness_of_context common_defs) st_context 
+		  		= foldSt (check_context common_defs) st_context 
 		  				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		= (bv_uninitialized_mods, th_vars, td_infos, error_admin)
-	check_kind_correctness_of_atype expected_kind arg_nr {at_type} state
-		= check_kind_correctness_of_type expected_kind arg_nr at_type state
-	check_kind_correctness_of_type expected_kind arg_nr (TA {type_name,type_index} args)
+	check_atype expected_kind arg_nr {at_type} state
+		= check_type expected_kind arg_nr at_type state
+	check_type expected_kind arg_nr (TA {type_name,type_index} args)
 					(th_vars, td_infos, error_admin)
 		# ({tdi_kinds}, td_infos)
 				= td_infos![type_index.glob_module,type_index.glob_object]
 		  (th_vars, td_infos, error_admin)
-		  		= unsafeFold2St (flip check_kind_correctness_of_atype arg_nr) tdi_kinds args
+		  		= unsafeFold2St (flip check_atype arg_nr) tdi_kinds args
 		  				(th_vars, td_infos, error_admin)
 		  n_args
 		  		= length args
@@ -249,25 +249,25 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  error_admin
 		  		= check_equality_of_kinds arg_nr expected_kind kind_of_application error_admin
 		= (th_vars, td_infos, error_admin)
-	check_kind_correctness_of_type expected_kind _ (TV tv) (th_vars, td_infos, error_admin)
+	check_type expected_kind _ (TV tv) (th_vars, td_infos, error_admin)
 		# (th_vars, error_admin)
 		  		= unify_var_kinds expected_kind tv th_vars error_admin
 		= (th_vars, td_infos, error_admin)
-	check_kind_correctness_of_type expected_kind _ (GTV tv) (th_vars, td_infos, error_admin)
+	check_type expected_kind _ (GTV tv) (th_vars, td_infos, error_admin)
 		# (th_vars, error_admin)
 		  		= unify_var_kinds expected_kind tv th_vars error_admin
 		= (th_vars, td_infos, error_admin)
-	check_kind_correctness_of_type expected_kind arg_nr (l --> r) state
+	check_type expected_kind arg_nr (l --> r) state
 		# state
-				= check_kind_correctness_of_atype KindConst arg_nr l state
+				= check_atype KindConst arg_nr l state
 		  (th_vars, td_infos, error_admin)
-				= check_kind_correctness_of_atype KindConst arg_nr r state
+				= check_atype KindConst arg_nr r state
 		  error_admin
 		  		= check_equality_of_kinds arg_nr expected_kind KindConst error_admin
 		= (th_vars, td_infos, error_admin)
-	check_kind_correctness_of_type expected_kind arg_nr ((CV tv) :@: args) state
+	check_type expected_kind arg_nr ((CV tv) :@: args) state
 		# (th_vars, td_infos, error_admin)
-				= foldSt (check_kind_correctness_of_atype KindConst arg_nr) args state
+				= foldSt (check_atype KindConst arg_nr) args state
 		  expected_kind_of_cons_var
 		  		= KindArrow (repeatn (length args) KindConst)
 		  (th_vars, error_admin)
@@ -275,17 +275,17 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  error_admin
 		  		= check_equality_of_kinds arg_nr expected_kind KindConst error_admin
 		= (th_vars, td_infos, error_admin)
-	check_kind_correctness_of_type expected_kind arg_nr (TB _) (th_vars, td_infos, error_admin)
+	check_type expected_kind arg_nr (TB _) (th_vars, td_infos, error_admin)
 		# error_admin
 		  		= check_equality_of_kinds arg_nr expected_kind KindConst error_admin
 		= (th_vars, td_infos, error_admin)
 	
-	check_kind_correctness_of_context common_defs {tc_class, tc_types} 
+	check_context common_defs {tc_class, tc_types} 
 			(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# (expected_kinds, bv_uninitialized_mods, th_vars)
 		  		= get_expected_kinds tc_class common_defs bv_uninitialized_mods th_vars
 		  (th_vars, td_infos, error_admin)
-		  		= unsafeFold3St possibly_check_kind_correctness_of_type expected_kinds (descending (-1))
+		  		= unsafeFold3St possibly_check_type expected_kinds (descending (-1))
 		  				tc_types (th_vars, td_infos, error_admin)
 		= (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	  where
