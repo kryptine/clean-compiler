@@ -7,6 +7,7 @@ import code from library "backend_library"
 import compilerSwitches
 
 import StdEnv
+// import StdDebug
 
 import frontend
 import backend
@@ -1476,21 +1477,21 @@ convertBody _ functionIndex lineNumber aliasDummyId args (ABCCodeExpr instructio
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	beCodeAlt
 			lineNumber
-			(convertLhsNodeDefs args noNodeDefs)
+			(return noNodeDefs)
 			(convertBackEndLhs functionIndex args main_dcl_module_n)
 			(beAbcCodeBlock inline (convertStrings instructions))
 convertBody _ functionIndex lineNumber aliasDummyId args (AnyCodeExpr inParams outParams instructions) main_dcl_module_n
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	beCodeAlt
 			lineNumber
-			(convertLhsNodeDefs args noNodeDefs)
+			(return noNodeDefs)
 			(convertBackEndLhs functionIndex args main_dcl_module_n)
 			(beAnyCodeBlock (convertCodeParameters inParams) (convertCodeParameters outParams) (convertStrings instructions))
 convertBody setRefCounts functionIndex lineNumber aliasDummyId args rhs main_dcl_module_n
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	ruleAlt setRefCounts
 			lineNumber
-			(convertLhsNodeDefs args noNodeDefs)
+			(return noNodeDefs)
 			(convertBackEndLhs functionIndex args main_dcl_module_n)
 			(convertRhsNodeDefs aliasDummyId rhs main_dcl_module_n)
 			(convertRhsStrictNodeIds rhs)
@@ -1603,23 +1604,6 @@ convertCondExpr (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) mai
 				(convertCondExpr else main_dcl_module_n)
 convertCondExpr expr main_dcl_module_n
 	=	convertExpr expr main_dcl_module_n
-
-// RWS +++ rewrite
-convertLhsNodeDefs :: [FunctionPattern] BENodeDefP -> BEMonad BENodeDefP
-convertLhsNodeDefs [FP_Algebraic symbol subpatterns : patterns] nodeDefs
-	=	convertLhsNodeDefs subpatterns nodeDefs ==> \nodeDefs
-	->	convertLhsNodeDefs patterns nodeDefs
-convertLhsNodeDefs [_ : patterns] nodeDefs
-	=	convertLhsNodeDefs patterns nodeDefs
-convertLhsNodeDefs [] nodeDefs
-	=	return nodeDefs
-
-defineLhsNodeDef :: FreeVar FunctionPattern BENodeDefP -> BEMonad BENodeDefP
-defineLhsNodeDef freeVar pattern nodeDefs
-	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr be0 in
-		beNodeDefs
-			(beNodeDef variable_sequence_number (convertPattern pattern))
-			(return nodeDefs) be
 
 collectNodeDefs :: Ident Expression -> [LetBind]
 collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
