@@ -366,7 +366,7 @@ where
 		| name == id_name
 	  		= pState
 			# ({fp_line}, pState=:{ps_error={pea_file}}) = getPosition pState
- 			  pea_file = pea_file <<< '[' <<< file_name <<< ',' <<< fp_line <<< "]: module name \"" <<< name 
+ 			  pea_file = pea_file <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: module name \"" <<< name 
 	  						<<< "\" does not match file name: \"" <<< file_name <<<"\"\n"
 			= { pState & ps_error = { pea_file = pea_file, pea_ok = False }}
 
