@@ -22,7 +22,6 @@
 #	define USE_PATH_CACHE 0
 #endif
 
-#include "compiledefines.h"
 #ifndef _SYSTEM_
 #	include "types.t"
 #	include "system.h"
