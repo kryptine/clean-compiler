@@ -89,6 +89,9 @@ all the introduced functions from it.
 
 */
 
+/* Disable the new abstraction node
+   Unsafe subtraces are going to be pruned again.
+
 :: FallibleTrace sym var pvar
    = GoodTrace (Trace sym var pvar)
    | NeedAbstraction [Rgraph sym var]
@@ -157,8 +160,6 @@ handleredex _ _ _ _ _ _ = undef
 
 handlestrict :: (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
 handlestrict _ _ _ _ = undef
-
-/*
 
 ------------------------------------------------------------
 

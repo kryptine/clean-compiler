@@ -129,6 +129,9 @@ Implementation
    | Stop
    | Instantiate (Trace sym var pvar)
                  (Trace sym var pvar)
+
+/* Disable the abstraction node for now...
+
    | Abstract [Abstraction sym var pvar]
 
 // Some abstractions (introduced recursion) spawn a fresh subtrace, but others
@@ -137,8 +140,6 @@ Implementation
 :: Abstraction sym var pvar
    = NewAbstraction (Trace sym var pvar)
    | KnownAbstraction (Rule sym var)
-
-/*
 
 >   showtrace showa showb showc (Trace stricts rule answer history transf)
 >   =   "(Trace "++
@@ -236,7 +237,7 @@ foldtrace reduce annotate stop instantiate trace
         ftf stricts rule answer history (Annotate trace) = annotate stricts rule answer history (ftr trace)
         ftf stricts rule answer history Stop = stop stricts rule answer history
         ftf stricts rule answer history (Instantiate yestrace notrace) = instantiate stricts rule answer history (ftr yestrace) (ftr notrace)
-        ftf _ _ _ _ (Abstract _) = abort "foldtrace not implemented for abstraction nodes"
+//      ftf _ _ _ _ (Abstract _) = abort "foldtrace not implemented for abstraction nodes"
 
 foldtransformation
  :: ((Trace sym var pvar) -> .result)
@@ -256,6 +257,6 @@ foldtransformation ftr reduce annotate stop instantiate abstract knownabstractio
         ftf (Annotate trace) = annotate (ftr trace)
         ftf Stop = stop
         ftf (Instantiate yestrace notrace) = instantiate (ftr yestrace) (ftr notrace)
-        ftf (Abstract as) = abstract (map fab as)
-        fab (NewAbstraction t) = newabstraction (ftr t)
-        fab (KnownAbstraction r) = knownabstraction r
+//      ftf (Abstract as) = abstract (map fab as)
+//      fab (NewAbstraction t) = newabstraction (ftr t)
+//      fab (KnownAbstraction r) = knownabstraction r
