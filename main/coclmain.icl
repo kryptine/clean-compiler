@@ -54,7 +54,7 @@ coclMainWithVersionCheck  currentVersion latestDefVersion latestImpVersion testA
 	| not (fst (checkVersion (versionCompare expectedVersion observedVersion) stderr))
 		=	set_return_code (-1) world
 	# (success, world)
-		=	accFiles (compile commandArgs) world
+		=	accFiles (\files0 -> let (r,cache,files)=compile commandArgs empty_cache files0 in (r,files)) world
 	=	set_return_code (if success 0(-1)) world
 	where
 		commandArgs
