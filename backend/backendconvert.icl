@@ -1226,6 +1226,10 @@ convertAttribution (TA_RootVar attrVar)
 	=	convertAttributeVar attrVar
 convertAttribution TA_MultiOfPropagatingConsVar
 	=	return BENoUniAttr
+// FIXME
+// this is a work around for caching / attribute heap bug
+convertAttribution _
+	=	return BENoUniAttr
 convertAttribution attr
 	=	abort "backendconvert, convertAttribution: unknown TypeAttribute" <<- attr
 
