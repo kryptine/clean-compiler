@@ -1247,8 +1247,8 @@ where
 
 instance <<< TypeVar
 where
-//	(<<<) file varid = file <<< varid.tv_name 
-	(<<<) file varid = file <<< varid.tv_name <<< "<" <<< ptrToInt (varid.tv_info_ptr) <<< ">"
+	(<<<) file varid = file <<< varid.tv_name 
+//	(<<<) file varid = file <<< varid.tv_name <<< "<" <<< ptrToInt (varid.tv_info_ptr) <<< ">"
 
 instance <<< AttributeVar
 where
