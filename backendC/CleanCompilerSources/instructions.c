@@ -3136,7 +3136,7 @@ void GenLazyRecordDescriptorAndExport (SymbDef sdef)
 
 void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 {
-	char *name;
+	char *name,*record_name;
 	int arity;
 
 	if (!DescriptorNeeded (sdef))
@@ -3144,24 +3144,22 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 
 	name = sdef->sdef_ident->ident_name;
 	arity = (sdef->sdef_kind == RECORDTYPE) ? sdef->sdef_cons_arity : sdef->sdef_arity;
+
+	record_name=sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
 	
 	put_directive_ (Ddesc);
 	if (sdef->sdef_exported){
-		char *record_name;
-		
-		record_name=sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
-
 		if (has_gc_apply_entry)
-			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s e_%s_%s%s.%s %d 0 \"%s\"",
+			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s e_%s_%s%s.%s %d 0 \"%s.%s\"",
 				CurrentModule,record_name,name,
 				CurrentModule,record_name,name,
 				CurrentModule,l_pref,record_name,name,
-				arity, name);	
+				arity,record_name,name);	
 		else
-			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s _hnf %d 0 \"%s\"",
+			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s _hnf %d 0 \"%s.%s\"",
 				CurrentModule,record_name,name,
 				CurrentModule,record_name,name,
-				arity, name);	
+				arity,record_name,name);
 	} else if ((sdef->sdef_mark & SDEF_USED_LAZILY_MASK) || has_gc_apply_entry){
 		char *record_name;
 		
@@ -3187,14 +3185,14 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 				FPrintF (OutFile, "%s%u ",l_pref,sdef->sdef_number);
 		} else
 			FPrintF (OutFile, "%s ", hnf_lab.lab_name);
-		
-		FPrintF (OutFile, "%d 0 \"%s\"", arity, name);	
+
+		FPrintF (OutFile, "%d 0 \"%s.%s\"", arity,record_name,name);
 	} else if (DoDebug){
-		FPrintF (OutFile, D_PREFIX "%s %s %s %d 0 \"%s\"", name, hnf_lab.lab_name,
-			hnf_lab.lab_name, arity, name);
+		FPrintF (OutFile, D_PREFIX "%s %s %s %d 0 \"%s.%s\"", name, hnf_lab.lab_name,
+			hnf_lab.lab_name,arity,record_name,name);
 	} else
-		FPrintF (OutFile, LOCAL_D_PREFIX "%u %s %s %d 0 \"%s\"", sdef->sdef_number,
-			hnf_lab.lab_name, hnf_lab.lab_name, arity, name);
+		FPrintF (OutFile, LOCAL_D_PREFIX "%u %s %s %d 0 \"%s.%s\"", sdef->sdef_number,
+			hnf_lab.lab_name, hnf_lab.lab_name, arity,record_name,name);
 }
 
 void GenModuleDescriptor (
