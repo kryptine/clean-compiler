@@ -1829,6 +1829,7 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 										# decons_expr = App {app_symb={symb_name=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
 										= (decons_expr,expr_heap,cs)
 										= (src_expr,expr_heap,cs)
+									= (src_expr,expr_heap,cs)
 					# (match_var, match_bind, var_store, expr_heap)
 						=  bind_match_expr (MatchExpr cons_symbol src_expr) opt_var_bind position var_store expr_heap
 					-> transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind
