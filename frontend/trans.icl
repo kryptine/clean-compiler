@@ -194,16 +194,23 @@ where
 		  (let_strict_binds, ti) = transform let_strict_binds ro ti
 		  (let_lazy_binds, ti) = transform let_lazy_binds ro ti
 		  (let_expr, ti) = transform let_expr ro ti
-		= (Let { lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}, ti)
+		  lad = { lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}
+//		  ti = check_type_info lad ti
+		= (Let lad, ti)
 	  where
 		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
 			# let_binds = let_strict_binds ++ let_lazy_binds
 			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
 			  ti_var_heap								= foldSt store_type_info_let_bind
 								   (zip2 var_types let_binds) ti.ti_var_heap
+								   //  ---> ("store_type_info_of_bindings_in_heap",let_strict_binds,let_lazy_binds,var_types)
 			= { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 		store_type_info_let_bind (var_type, {lb_dst={fv_info_ptr}}) var_heap
 			= setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
+		check_type_info {let_strict_binds,let_lazy_binds,let_info_ptr} ti
+			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
+			= { ti & ti_symbol_heap = ti_symbol_heap }
+				//  ---> ("check_type_info_of_bindings_in_heap",let_strict_binds,let_lazy_binds,var_types)
 
 	transform (Case kees) ro ti
 		# ti = store_type_info_of_patterns_in_heap kees ti
@@ -1071,6 +1078,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  (function_producer_types, ti_fun_defs, ti_fun_heap)
 	  		= iFoldSt (accum_function_producer_type prods ro) 0 (size prods) 
 	  				([], ti_fun_defs, ti_fun_heap)
+	  consumer_symbol_type		= strip_universal_quantor consumer_symbol_type
+	  function_producer_types	= mapOpt strip_universal_quantor function_producer_types
 	  (sound_consumer_symbol_type, (ti_type_heaps, ti_type_def_infos))
 	  		= add_propagation_attributes` ro.ro_common_defs consumer_symbol_type (ti_type_heaps, ti_type_def_infos)
 	  (opt_sound_function_producer_types, (ti_type_heaps, ti_type_def_infos))
@@ -1078,6 +1087,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  (opt_sound_function_producer_types, ti_type_heaps)
 	  		= mapSt copy_opt_symbol_type opt_sound_function_producer_types
 	  				ti_type_heaps
+
 	  sound_function_producer_types		// nog even voor determine args....
 	  		= [x \\ Yes x <- opt_sound_function_producer_types]
 
@@ -1093,7 +1103,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  all_involved_types
 	  		= class_types ++ (flatten (map (\{st_args, st_result}-> [st_result:st_args]) 
 					  					[sound_consumer_symbol_type:sound_function_producer_types]))
-	  (propagating_cons_vars, th_vars)
+//	| False ---> ("all_involved_types",app_symb,all_involved_types)	= undef
+	# (propagating_cons_vars, th_vars)
 	  		= collectPropagatingConsVars all_involved_types th_vars
 	  all_type_vars
 	  		=   flatten [st_vars \\ {st_vars} <- [sound_consumer_symbol_type:sound_function_producer_types]]
@@ -1128,6 +1139,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 			, das_fun_heap					= ti_fun_heap
 			, das_var_heap					= ti_var_heap
 			, das_cons_args					= ti_cons_args
+			, das_predef					= ti.ti_predef_symbols
 			}
 	# das		= determine_args cc_linear_bits cc_args 0 prods opt_sound_function_producer_types tb_args ro das
 	  
@@ -1145,12 +1157,21 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  ti_fun_heap				= das.das_fun_heap
 	  ti_var_heap				= das.das_var_heap
 	  ti_cons_args				= das.das_cons_args
+	  ti_predef_symbols			= das.das_predef
 	  
 	  new_fun_arity
 	  		= length new_fun_args
-	| False // RWS SwitchArityChecks (new_fun_arity > 32) False
+	| SwitchArityChecks (new_fun_arity > 32) False
+		# new_gen_fd =
+			{	gf_fun_def			= fd
+			,	gf_instance_info	= II_Empty
+			,	gf_cons_args		= {cc_args = [], cc_size = 0, cc_linear_bits=[], cc_producer = False}
+			,	gf_fun_index		= -1
+			}
+		# ti_fun_heap 	= ti_fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
 		# ti = { ti & ti_type_heaps = ti_type_heaps, ti_symbol_heap = ti_symbol_heap, ti_fun_defs = ti_fun_defs
-				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos }
+				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos
+				, ti_predef_symbols = ti_predef_symbols }
 		  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_fun_root.symb_name.id_name <<< "\n"}
 		= (-1,new_fun_arity,ti)
 	# new_arg_types = flatten [ ats_types \\ {ats_types}<-:new_arg_types_array ]
@@ -1302,7 +1323,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  			ti_next_fun_nr = inc ti_next_fun_nr, ti_type_def_infos = ti_type_def_infos,
 	  			ti_new_functions = [fun_def_ptr : ti_new_functions], ti_fun_defs = ti_fun_defs,
 	  			ti_type_heaps = ti_type_heaps, ti_cleanup_info = us_cleanup_info, 
-	  			ti_cons_args = ti_cons_args }
+	  			ti_cons_args = ti_cons_args,
+	  			ti_predef_symbols = ti_predef_symbols }
 	# ti = arity_warning "generateFunction" fd.fun_symb.id_name ti_next_fun_nr new_fun_arity ti
 	  (new_fun_rhs, ti)
 			= transform tb_rhs ro ti
@@ -1531,6 +1553,7 @@ get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_d
 	, das_fun_heap					:: !*FunctionHeap
 	, das_var_heap					:: !*VarHeap
 	, das_cons_args					:: !*{!ConsClasses}
+	, das_predef					:: !*PredefinedSymbols
 	}
 
 determine_args
@@ -1578,7 +1601,7 @@ determine_arg PR_Unused _ form=:{fv_name,fv_info_ptr} prod_index (_,ro) das=:{da
 		}
 
 determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr,fv_name} prod_index (_,ro)
-			  das=:{das_arg_types, das_subst, das_type_heaps}
+			  das=:{das_arg_types, das_subst, das_type_heaps, das_predef}
 	# (ws_arg_type, das_arg_types)
 			= das_arg_types![prod_index]
 	# {ats_types=[arg_type:_]}
@@ -1594,6 +1617,8 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			  }
 	// AA: Dummy generic dictionary does not unify with corresponding class dictionary.
 	// Make it unify
+	# ({pds_module,pds_def},das_predef) = das_predef![PD_TypeGenericDict]
+	# genericGlobalIndex	= {glob_module = pds_module, glob_object = pds_def}
 	# (succ, das_subst, das_type_heaps)
 		//AA: = unify class_atype arg_type type_input das_subst das_type_heaps
 		= unify_dict class_atype arg_type type_input das_subst das_type_heaps
@@ -1602,9 +1627,11 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 				| type_symb1 == type_symb2 
 					= unify class_atype arg_type
 				// FIXME: check indexes, not names. Need predefs for that. 	
-				| type_symb1.type_name.id_name == "GenericDict"
+//				| type_symb1.type_name.id_name == "GenericDict"
+				| type_symb1.type_index == genericGlobalIndex
 					= unify {class_atype & at_type = TA type_symb2 args1} arg_type	
-				| type_symb2.type_name.id_name == "GenericDict"
+//				| type_symb2.type_name.id_name == "GenericDict"
+				| type_symb2.type_index == genericGlobalIndex
 					= unify class_atype {arg_type & at_type = TA type_symb1 args2} 	  				
 			unify_dict class_atype arg_type 
 				= unify class_atype arg_type
@@ -1629,6 +1656,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 		, das_subst				= das_subst
 		, das_type_heaps		= das_type_heaps
 		, das_var_heap			= writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) das.das_var_heap
+		, das_predef			= das_predef
 		}
 
 determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
@@ -1653,8 +1681,6 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  		= substitute (st_args, st_result) { das_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  nr_of_applied_args
 			= symbol_arity
-//	  application_type
-//	  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args
 	  (application_type, attr_env, das_next_attr_nr)
 	  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args [] das_next_attr_nr
 	  type_input
@@ -1662,10 +1688,10 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  		  , ti_functions			= ro.ro_imported_funs
 			  ,	ti_main_dcl_module_n	= ro.ro_main_dcl_module_n
 			  }
-	  (succ, das_subst, das_type_heaps)
+	# (succ, das_subst, das_type_heaps)
 	  		= unify application_type arg_type type_input das_subst das_type_heaps
 	| not succ
-		= abort ("sanity check nr 94 in module trans failed"--->(application_type, arg_type))
+		= abort "sanity check nr 94 in module trans failed\n"
 	# (attr_inequalities, das_type_heaps)
 			= accAttrVarHeap (mapSt substitute_attr_inequality st_attr_env) das_type_heaps
 	  new_uniqueness_requirement
@@ -2083,15 +2109,17 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  	| containsProducer cc_size producers || arity_changed
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
-	  			# ti = update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
-	  			# (fun_index, fun_arity, ti) = generateFunction app_symb fun_def cc_args cc_linear_bits producers fun_def_ptr ro ti
+	  			# ti							= update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
+	  			# (fun_index, fun_arity, ti)	= generateFunction app_symb fun_def cc_args cc_linear_bits producers fun_def_ptr ro ti
 				| fun_index == (-1)
 					= (build_application { app & app_args = app_args } extra_args, ti)
 	  			# app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index }
 				# (app_args, extra_args) = complete_application fun_arity new_args extra_args
 	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
   			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-			  app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
+			| gf_fun_index == (-1)
+				= (build_application { app & app_args = app_args } extra_args, ti)
+			# app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
 			  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
   			# ti = {ti & ti_fun_heap = ti_fun_heap }
   			= transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti
@@ -4233,3 +4261,19 @@ arity_warning msg symb_name fun_index fun_arity ti
 	| fun_arity <= 32
 		= ti
 	= {ti & ti_error_file = ti.ti_error_file <<< "Warning: Arity > 32 " <<< msg <<< " " <<< fun_arity <<< " " <<< symb_name <<< "@" <<< fun_index <<< "\n"}
+	
+strip_universal_quantor :: SymbolType -> SymbolType
+strip_universal_quantor st=:{st_vars,st_args,st_result}
+	# (st_result,st_vars)	= strip st_result st_vars
+	# (st_args,st_vars)		= mapSt strip st_args st_vars
+	= {st & st_vars = st_vars, st_args = st_args, st_result = st_result}
+where
+	strip :: AType [TypeVar] -> (AType,[TypeVar])
+	strip atype=:{at_type = TFA vars type} tvs
+		= ({atype & at_type = type}, map (\{atv_variable}->atv_variable) vars ++ tvs)
+	strip atype tvs
+		= (atype,tvs)
+
+mapOpt f [Yes a:x]	= [Yes (f a):mapOpt f x]
+mapOpt f [No:x]		= [No:mapOpt f x]
+mapOpt f [] 		= []
