@@ -272,6 +272,9 @@ where
 	check_rhs_of_TypeDef {td_rhs = SynType type} _ cti ts_ti_cs
 		# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
 		= (SynType type, ts_ti_cs)
+	check_rhs_of_TypeDef {td_rhs = AbstractSynType properties type} _ cti ts_ti_cs
+		# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
+		= (AbstractSynType properties type, ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs} _ _ ts_ti_cs
 		= (td_rhs, ts_ti_cs)
 
