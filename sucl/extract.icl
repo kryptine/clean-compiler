@@ -82,18 +82,18 @@ actualfold deltanodes rnfnodes foldarea self foldcont hist rule
         list2 = map (pairwith (findoccs hist rule)) (removeMembers (varlist rgraph [rroot]) (varlist rgraph rargs))
         // list2: list combining every node with list of every instantiable history graph
 
-        list3 = [(rnode,hgraph,mapping) \\ (rnode,[((hroot,hgraph),mapping):_])<-list2]
+        list3 = [(rnode,mapping) \\ (rnode,[mapping:_])<-list2]
         // list3: list combining every instantiable node with first instantiable history graph
 
         rgraph`
         = foldr foldrec rgraph list3
-          where foldrec (rnode,hgraph,mapping) = updategraph rnode (mapsnd (map (lookup mapping)) foldcont)
+          where foldrec (rnode,mapping) = updategraph rnode (mapsnd (map (lookup mapping)) foldcont)
 
         (rgraph``,areas`) = finishfold foldarea fixednodes singlenodes rroot rgraph`
         fixednodes = intersect (removeDup (argnodes++foldednodes++rnfnodes)) (varlist rgraph` [rroot])
         singlenodes = intersect deltanodes (varlist rgraph` [rroot])
         argnodes = varlist rgraph` rargs
-        foldednodes = map fst3 list3
+        foldednodes = map fst list3
 
 /*
 >   findoccs
@@ -125,12 +125,12 @@ findoccs ::
     [(pvar,Graph sym pvar)]
     (Rule sym var)
     var
- -> [((pvar,Graph sym pvar),[(pvar,var)])]
+ -> [[(pvar,var)]]
  |  == var
  &  == pvar
 
 findoccs hist rule rnode
-= [  ((hroot,hgraph),mapping)
+= [  mapping
   \\ ((hroot,hgraph),(seen,mapping,[]))<-list1 // Find instantiable history rgraphs...
   |  unshared rnode (hroot,hgraph) mapping     // ...which don't have shared contents
   ]
