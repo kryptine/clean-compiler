@@ -339,10 +339,10 @@ where
 	
 instance <<< Sequence
 where
-	(<<<) file (SQ_From expr) = file <<< expr
-	(<<<) file (SQ_FromTo from_expr to_expr) = file <<< from_expr <<< ".."  <<< to_expr
-	(<<<) file (SQ_FromThen from_expr then_expr) = file <<< from_expr  <<< ',' <<< then_expr <<< ".."
-	(<<<) file (SQ_FromThenTo from_expr then_expr to_expr) = file <<< from_expr  <<< ',' <<< then_expr <<< ".." <<< to_expr
+	(<<<) file (SQ_From _ expr) = file <<< expr
+	(<<<) file (SQ_FromTo _ from_expr to_expr) = file <<< from_expr <<< ".."  <<< to_expr
+	(<<<) file (SQ_FromThen _ from_expr then_expr) = file <<< from_expr  <<< ',' <<< then_expr <<< ".."
+	(<<<) file (SQ_FromThenTo _ from_expr then_expr to_expr) = file <<< from_expr  <<< ',' <<< then_expr <<< ".." <<< to_expr
 
 instance <<< Expression
 where
@@ -714,7 +714,7 @@ where
 instance <<< RhsDefsOfType
 where
 	(<<<) file (ConsList cons_defs) = file <<< cons_defs
-	(<<<) file (SelectorList _ _ sel_defs) = file <<< sel_defs
+	(<<<) file (SelectorList _ _ _ sel_defs) = file <<< sel_defs
 	(<<<) file (TypeSpec type) = file <<< type
 	(<<<) file _ = file
 

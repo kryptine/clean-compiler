@@ -104,7 +104,7 @@ instance == FunctionOrMacroIndex
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
 ::	RhsDefsOfType	= ConsList ![ParsedConstructor]
-					| SelectorList !Ident ![ATypeVar] ![ParsedSelector]
+					| SelectorList !Ident ![ATypeVar] !Bool /*is_boxed_record*/ ![ParsedSelector]
 					| TypeSpec !AType
 					| EmptyRhs !BITVECT
 					| AbstractTypeSpec !BITVECT !AType
@@ -402,6 +402,7 @@ cIsImportedObject :== False
 ::	RecordType =
 	{	rt_constructor	:: !DefinedSymbol
 	,	rt_fields		:: !{# FieldSymbol}
+	,	rt_is_boxed_record :: !Bool
 	}
 	
 ::	FieldSymbol =
@@ -1163,10 +1164,10 @@ instance toString 	KindInfo
 	,	qual_filename	:: !FileName
 	}
 
-::	Sequence	= SQ_FromThen ParsedExpr ParsedExpr
-				| SQ_FromThenTo ParsedExpr ParsedExpr ParsedExpr
-				| SQ_From ParsedExpr
-				| SQ_FromTo ParsedExpr ParsedExpr
+::	Sequence	= SQ_FromThen !Int ParsedExpr ParsedExpr
+				| SQ_FromThenTo !Int ParsedExpr ParsedExpr ParsedExpr
+				| SQ_From !Int ParsedExpr
+				| SQ_FromTo !Int ParsedExpr ParsedExpr
 
 ::	BoundExpr	:== Bind ParsedExpr Ident
 
