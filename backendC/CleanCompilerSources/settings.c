@@ -30,7 +30,7 @@ Bool DoTimeProfiling=False;
 Bool DoReuseUniqueNodes		= False;
 
 Bool OptimizeLazyTupleRecursion=False;
-Bool OptimizeTailCallModuloCons=False;
+Bool OptimizeTailCallModuloCons=True;
 Bool WriteModificationTimes	= False;
 
 unsigned StrictDepth		= 10; /* 8; */
