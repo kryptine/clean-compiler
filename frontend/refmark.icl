@@ -95,19 +95,20 @@ where
 		= refMark free_vars NotASelector app_args var_heap
 	refMark free_vars sel (fun @ args) var_heap
 		= refMark free_vars NotASelector args (refMark free_vars NotASelector fun var_heap)
-	refMark free_vars sel (Let {let_strict,let_binds,let_expr}) var_heap
-		# let_vars = [ bind_dst \\ {bind_dst} <- let_binds ]
-		  new_free_vars = [ let_vars : free_vars]
-		| let_strict
-			# (observing, var_heap) = binds_are_observing let_binds var_heap
+	refMark free_vars sel (Let {let_strict_binds,let_lazy_binds,let_expr}) var_heap
+		| isEmpty let_lazy_binds
+			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ] : free_vars]
+			# (observing, var_heap) = binds_are_observing let_strict_binds var_heap
 			| observing
 				# var_heap = saveOccurrences free_vars var_heap
-				  var_heap = refMark new_free_vars NotASelector let_binds var_heap
+				  var_heap = refMark new_free_vars NotASelector let_strict_binds var_heap
 				  var_heap = saveOccurrences new_free_vars var_heap
 				  var_heap = refMark new_free_vars sel let_expr var_heap
 				= let_combine free_vars var_heap
-				= refMark new_free_vars sel let_expr (refMark new_free_vars NotASelector let_binds var_heap)
-			# var_heap = foldSt bind_variable let_binds var_heap
+				= refMark new_free_vars sel let_expr (refMark new_free_vars NotASelector let_strict_binds var_heap)
+			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ++ let_lazy_binds ] : free_vars]
+			  var_heap = foldSt bind_variable let_strict_binds var_heap
+			  var_heap = foldSt bind_variable let_lazy_binds var_heap
 			= refMark new_free_vars sel let_expr var_heap
 
 		where

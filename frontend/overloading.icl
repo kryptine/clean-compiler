@@ -1018,9 +1018,11 @@ where
 	updateExpression group_index type_contexts (expr @ exprs) ui
 		# ((expr, exprs), ui) = updateExpression group_index type_contexts (expr, exprs) ui
 		= (expr @ exprs, ui)
-	updateExpression group_index type_contexts (Let lad=:{let_binds, let_expr}) ui
-		# ((let_binds, let_expr), ui) = updateExpression group_index type_contexts (let_binds, let_expr) ui
-		= (Let {lad & let_binds = let_binds, let_expr = let_expr}, ui)
+	updateExpression group_index type_contexts (Let lad=:{let_lazy_binds, let_strict_binds, let_expr}) ui
+		# (let_lazy_binds, ui)		= updateExpression group_index type_contexts let_lazy_binds ui
+		# (let_strict_binds, ui)	= updateExpression group_index type_contexts let_strict_binds ui
+		# (let_expr, ui)			= updateExpression group_index type_contexts let_expr ui
+		= (Let {lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}, ui)
 	updateExpression group_index type_contexts (Case kees=:{case_expr,case_guards,case_default}) ui
 		# ((case_expr,(case_guards,case_default)), ui) = updateExpression group_index type_contexts (case_expr,(case_guards,case_default)) ui
 		= (Case { kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, ui)

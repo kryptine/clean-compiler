@@ -964,12 +964,11 @@ cIsNotStrict	:== False
 	}
 
 ::	Let =
-	{	let_strict		:: !Bool
-	,	let_binds		:: !(Env Expression FreeVar)
-	,	let_expr		:: !Expression
-	,	let_info_ptr	:: !ExprInfoPtr
+	{	let_strict_binds	:: !Env Expression FreeVar
+	,	let_lazy_binds		:: !Env Expression FreeVar
+	,	let_expr			:: !Expression
+	,	let_info_ptr		:: !ExprInfoPtr
 	}
-
 
 ::	DynamicExpr =
 	{	dyn_expr		:: !Expression
@@ -1332,7 +1331,7 @@ where
 //		= file <<< app_symb <<< ' ' <<< app_args
 		= file <<< app_symb <<< " <" <<< ptrToInt app_info_ptr <<< "> " <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
-	(<<<) file (Let {let_info_ptr, let_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') let_binds <<< "in\n" <<< let_expr
+	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') (let_strict_binds ++ let_lazy_binds) <<< "in\n" <<< let_expr
 	where
 		write_binds file []
 			= file

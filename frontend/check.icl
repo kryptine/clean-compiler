@@ -1402,7 +1402,7 @@ where
 		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		   (var_binds, expr_heap) = build_binds vars [] expr_heap
 		   let_binds = [{ bind_src = expr, bind_dst = hd vars }:var_binds]
-		= (Let {let_strict = cIsNotStrict, let_binds = let_binds, let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
+		= (Let {let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
 	  where
 		build_binds [var] accu expr_heap
 			= (accu, expr_heap)
@@ -1673,7 +1673,9 @@ buildLetExpression [] is_strict expr expr_heap
 	= (expr, expr_heap)
 buildLetExpression binds is_strict expr expr_heap
 	#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-	= (Let {let_strict = is_strict, let_binds = binds, let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
+	| is_strict
+		= (Let {let_strict_binds = binds, let_lazy_binds = [], let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
+		= (Let {let_strict_binds = [], let_lazy_binds = binds, let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
 
 checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info cs
 	# (loc_defs, var_env, {ps_fun_defs,ps_var_heap}, e_info, cs)
@@ -2063,14 +2065,14 @@ where
 				| bind_dst == fv_info_ptr
 					# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> (Let { let_strict = cIsStrict, let_binds = [
+					-> (Let { let_lazy_binds = [], let_strict_binds = [
 								{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
 									bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr}, var_store, expr_heap, opt_dynamics, cs)
 					# (var_expr_ptr1, expr_heap) = newPtr EI_Empty expr_heap
 					  (var_expr_ptr2, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> (Let { let_strict = cIsStrict, let_binds = [
+					-> (Let { let_lazy_binds = [], let_strict_binds = [
 								{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
 									bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }},
 								{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
@@ -2081,7 +2083,7 @@ where
 					-> (result_expr, var_store, expr_heap, opt_dynamics, cs)
 					# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> (Let { let_strict = cIsStrict, let_binds =
+					-> (Let { let_lazy_binds = [], let_strict_binds =
 									[{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
 										 bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr}, var_store, expr_heap, opt_dynamics, cs)
@@ -2122,7 +2124,7 @@ where
 			  (var_expr_ptr2, expr_heap) = newPtr EI_Empty expr_heap
 			  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 			= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
-						Let { let_strict = cIsNotStrict, let_binds =
+						Let { let_strict_binds = [], let_lazy_binds =
 						 		[{ bind_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
 											bind_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }}],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr}, expr_heap)

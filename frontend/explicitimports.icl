@@ -788,8 +788,8 @@ instance consequences InstanceType
 	consequences {it_types, it_context}	= consequences it_types++consequences it_context	
 
 instance consequences Let
-  where	consequences { let_binds, let_expr }
-  			= consequences let_expr++(flatten [consequences bind_src \\ {bind_src}<-let_binds] )
+  where	consequences { let_strict_binds, let_lazy_binds, let_expr }
+  			= consequences let_expr++(flatten [consequences bind_src \\ {bind_src}<-let_strict_binds ++ let_lazy_binds] )
 
 instance consequences MemberDef
   where

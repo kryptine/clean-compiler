@@ -220,7 +220,8 @@ instance consumerRequirements Expression where
 		# (cc_fun, _, ai) = consumerRequirements fun_expr common_defs ai
 		  ai_class_subst = unifyClassifications cActive cc_fun ai.ai_class_subst
 		= consumerRequirements exprs common_defs { ai & ai_class_subst = ai_class_subst }
-	consumerRequirements (Let {let_binds,let_expr}) common_defs ai=:{ai_next_var,ai_next_var_of_fun,ai_var_heap}
+	consumerRequirements (Let {let_strict_binds, let_lazy_binds,let_expr}) common_defs ai=:{ai_next_var,ai_next_var_of_fun,ai_var_heap}
+		# let_binds = let_strict_binds ++ let_lazy_binds
 		# (new_next_var, new_ai_next_var_of_fun, ai_var_heap) = init_variables let_binds ai_next_var ai_next_var_of_fun ai_var_heap
 		# ai = acc_requirements_of_let_binds let_binds ai_next_var common_defs
 					{ ai & ai_next_var = new_next_var, ai_next_var_of_fun = new_ai_next_var_of_fun, ai_var_heap = ai_var_heap }
@@ -646,13 +647,15 @@ where
 				-> transformApplication app exprs ro ti
 			_
 				-> (expr @ exprs, ti)
-	transform (Let lad=:{let_binds, let_expr}) ro ti
+	transform (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) ro ti
 		# ti = store_type_info_of_bindings_in_heap lad ti
-		  (let_binds, ti) = transform let_binds ro ti
+		  (let_strict_binds, ti) = transform let_strict_binds ro ti
+		  (let_lazy_binds, ti) = transform let_lazy_binds ro ti
 		  (let_expr, ti) = transform let_expr ro ti
-		= (Let { lad & let_binds = let_binds, let_expr = let_expr}, ti)
+		= (Let { lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}, ti)
 	  where
-		store_type_info_of_bindings_in_heap {let_binds,let_info_ptr} ti
+		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
+			# let_binds = let_strict_binds ++ let_lazy_binds
 			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
 			  ti_var_heap = foldSt (\(var_type, {bind_dst={fv_info_ptr}}) var_heap
 										 ->setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap)
@@ -800,9 +803,10 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			Let lad
 				| not is_active
 					-> skip_over this_case ro ti
-				# (new_let_binds, ti) = transform lad.let_binds { ro & ro_root_case_mode = NotRootCase } ti
+				# (let_strict_binds, ti) = transform lad.let_strict_binds { ro & ro_root_case_mode = NotRootCase } ti
+				  (let_lazy_binds, ti) = transform lad.let_lazy_binds { ro & ro_root_case_mode = NotRootCase } ti
 				  (new_let_expr, ti) = transform (Case { this_case & case_expr = lad.let_expr }) ro ti
-				-> (Let { lad & let_expr = new_let_expr, let_binds = new_let_binds }, ti)
+				-> (Let { lad & let_expr = new_let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, ti)
 		  	_	-> skip_over this_case ro ti
 	where
 		equal (SK_Function glob_index1) (SK_Function glob_index2)
@@ -917,10 +921,10 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 				# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_index]
 				  let_type = filterWith not_unfoldable cons_type.st_args
 				  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
-				= ( Let	{	let_strict		= False
-						,	let_binds		= [ {bind_src=bind_src, bind_dst=bind_dst} \\ (bind_dst,bind_src)<-non_unfoldable_args]
-						,	let_expr		= ap_expr
-						,	let_info_ptr	= new_info_ptr
+				= ( Let	{	let_strict_binds	= []
+						,	let_lazy_binds		= [ {bind_src=bind_src, bind_dst=bind_dst} \\ (bind_dst,bind_src)<-non_unfoldable_args]
+						,	let_expr			= ap_expr
+						,	let_info_ptr		= new_info_ptr
 						}
 				  , ti_symbol_heap
 				  ) 
@@ -2088,8 +2092,9 @@ where
 		= freeVariables app_args fvi
 	freeVariables (fun @ args) fvi
 		= freeVariables args (freeVariables fun fvi)
-	freeVariables (Let {let_binds,let_expr,let_info_ptr}) fvi=:{fvi_variables = global_variables}
-		# (removed_variables, fvi_var_heap) = removeVariables global_variables fvi.fvi_var_heap
+	freeVariables (Let {let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) fvi=:{fvi_variables = global_variables}
+		# let_binds = let_strict_binds ++ let_lazy_binds
+		  (removed_variables, fvi_var_heap) = removeVariables global_variables fvi.fvi_var_heap
 		  fvi = freeVariables let_binds { fvi & fvi_variables = [], fvi_var_heap = fvi_var_heap }
 		  {fvi_expr_heap, fvi_variables, fvi_var_heap, fvi_expr_ptrs} = freeVariables let_expr fvi
 		  (fvi_variables, fvi_var_heap) = removeLocalVariables [bind_dst \\ {bind_dst} <- let_binds] fvi_variables [] fvi_var_heap		

@@ -43,9 +43,11 @@ where
 	lift (expr @ exprs) ls
 		# ((expr,exprs), ls) = lift (expr,exprs) ls
 		= (expr @ exprs, ls)
-	lift (Let lad=:{let_binds, let_expr}) ls
-		# ((let_binds,let_expr), ls) = lift (let_binds,let_expr) ls
-		= (Let {lad & let_binds = let_binds, let_expr = let_expr}, ls)
+	lift (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) ls
+		# (let_strict_binds, ls) = lift let_strict_binds ls
+		  (let_lazy_binds, ls) = lift let_lazy_binds ls
+		  (let_expr, ls) = lift let_expr ls
+		= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr}, ls)
 	lift (Case case_expr) ls
 		# (case_expr, ls) = lift case_expr ls
 		= (Case case_expr, ls)
@@ -406,13 +408,16 @@ where
 
 instance unfold Let
 where
-	unfold lad=:{let_binds, let_expr, let_info_ptr} us
-		# (let_binds, us) = copy_bound_vars let_binds us
-		# ((let_binds,let_expr), us) = unfold (let_binds,let_expr) us
+	unfold lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr} us
+		# (let_strict_binds, us) = copy_bound_vars let_strict_binds us
+		# (let_lazy_binds, us) = copy_bound_vars let_lazy_binds us
+		# (let_strict_binds, us) = unfold let_strict_binds us
+		# (let_lazy_binds, us) = unfold let_lazy_binds us
+		# (let_expr, us) = unfold let_expr us
 		  (old_let_info, us_symbol_heap) = readPtr let_info_ptr us.us_symbol_heap
 		  (new_let_info, us_opt_type_heaps) = substitute_let_or_case_type old_let_info us.us_opt_type_heaps
 		  (new_info_ptr, us_symbol_heap) = newPtr new_let_info us_symbol_heap
-		= ({lad & let_binds = let_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
+		= ({lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
 			{ us & us_symbol_heap = us_symbol_heap, us_opt_type_heaps = us_opt_type_heaps })
 		where
 			copy_bound_vars [bind=:{bind_dst} : binds] us
@@ -498,7 +503,7 @@ unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}}
 	| isEmpty let_binds
 		= (result_expr, fun_defs, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
 		#  (new_info_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
-		= (Let { let_strict = cIsNotStrict, let_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr}, fun_defs, 
+		= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr}, fun_defs, 
 					(calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
 where
 
@@ -1033,9 +1038,11 @@ where
 	expand (expr @ exprs) fun_and_macro_defs mod_index modules es
 		# ((expr,exprs), fun_and_macro_defs, modules, es) = expand (expr,exprs) fun_and_macro_defs mod_index modules es
 		= (expr @ exprs, fun_and_macro_defs, modules, es)
-	expand (Let lad=:{let_binds, let_expr}) fun_and_macro_defs mod_index modules es
-		# ((let_binds,let_expr), fun_and_macro_defs, modules, es) = expand (let_binds,let_expr) fun_and_macro_defs mod_index modules es
-		= (Let {lad & let_expr = let_expr, let_binds = let_binds}, fun_and_macro_defs, modules, es)
+	expand (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) fun_and_macro_defs mod_index modules es
+		# (let_strict_binds, fun_and_macro_defs, modules, es) = expand let_strict_binds fun_and_macro_defs mod_index modules es
+		# (let_lazy_binds, fun_and_macro_defs, modules, es) = expand let_lazy_binds fun_and_macro_defs mod_index modules es
+		# (let_expr, fun_and_macro_defs, modules, es) = expand let_expr fun_and_macro_defs mod_index modules es
+		= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, fun_and_macro_defs, modules, es)
 	expand (Case case_expr) fun_and_macro_defs mod_index modules es
 		# (case_expr, fun_and_macro_defs, modules, es) = expand case_expr fun_and_macro_defs mod_index modules es
 		= (Case case_expr, fun_and_macro_defs, modules, es)
@@ -1177,17 +1184,21 @@ where
 	collectVariables (expr @ exprs) free_vars cos
 		# ((expr, exprs), free_vars, cos) = collectVariables (expr, exprs) free_vars cos
 		= (expr @ exprs, free_vars, cos)
-	collectVariables (Let lad=:{let_binds, let_expr}) free_vars cos=:{cos_var_heap}
-		# cos_var_heap = determine_aliases let_binds cos_var_heap
-		  (is_cyclic, let_binds, cos_var_heap) = detect_cycles_and_remove_alias_binds let_binds cos_var_heap
-		| is_cyclic
-			= (Let {lad & let_binds = let_binds }, free_vars, { cos & cos_var_heap = cos_var_heap, cos_error = checkError "" "cyclic let definition" cos.cos_error})
+	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) free_vars cos=:{cos_var_heap}
+		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
+		# cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+		  (is_cyclic_s, let_strict_binds, cos_var_heap) = detect_cycles_and_remove_alias_binds let_strict_binds cos_var_heap
+		  (is_cyclic_l, let_lazy_binds, cos_var_heap)	= detect_cycles_and_remove_alias_binds let_lazy_binds cos_var_heap
+		| is_cyclic_s || is_cyclic_l
+			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars,
+					{ cos & cos_var_heap = cos_var_heap, cos_error = checkError "" "cyclic let definition" cos.cos_error})
 		| otherwise
-			# (let_expr, free_vars, cos) = collectVariables let_expr free_vars { cos & cos_var_heap = cos_var_heap }
-			  (let_binds, free_vars, cos) = collect_variables_in_binds let_binds [] free_vars cos
-			| isEmpty let_binds
+			# (let_expr, free_vars, cos)			= collectVariables let_expr free_vars { cos & cos_var_heap = cos_var_heap }
+			  (let_strict_binds, free_vars, cos)	= collect_variables_in_binds let_strict_binds [] free_vars cos
+			  (let_lazy_binds, free_vars, cos)		= collect_variables_in_binds let_lazy_binds [] free_vars cos
+			| isEmpty let_strict_binds && isEmpty let_lazy_binds
 				= (let_expr, free_vars, cos)
-				= (Let {lad & let_expr = let_expr, let_binds = let_binds}, free_vars, cos)
+				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, cos)
 		where
 		
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if

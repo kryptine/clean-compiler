@@ -1025,12 +1025,20 @@ cIsNotStrict	:== False
 	,	case_ident		:: !Optional Ident
 	,	case_info_ptr	:: !ExprInfoPtr
 	}
-
+/*
 ::	Let =
 	{	let_strict		:: !Bool
 	,	let_binds		:: !(Env Expression FreeVar)
 	,	let_expr		:: !Expression
 	,	let_info_ptr	:: !ExprInfoPtr
+	}
+*/
+
+::	Let =
+	{	let_strict_binds	:: !Env Expression FreeVar
+	,	let_lazy_binds		:: !Env Expression FreeVar
+	,	let_expr			:: !Expression
+	,	let_info_ptr		:: !ExprInfoPtr
 	}
 
 ::	Conditional =

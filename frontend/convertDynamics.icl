@@ -118,12 +118,13 @@ where
 		# (expr,  ci) = convertDynamics cinp bound_vars default_expr expr  ci
 		  (exprs, ci) = convertDynamics cinp bound_vars default_expr exprs ci
 		= (expr @ exprs, ci)
-	convertDynamics cinp bound_vars default_expr (Let letje=:{let_binds, let_expr,let_info_ptr}) ci
+	convertDynamics cinp bound_vars default_expr (Let letje=:{let_strict_binds, let_lazy_binds, let_expr,let_info_ptr}) ci
 		# (let_types, ci) = determine_let_types let_info_ptr ci
-		  bound_vars = bindVarsToTypes [ bind.bind_dst \\ bind <- let_binds ] let_types bound_vars
-		  (let_binds, ci) = convertDynamics cinp bound_vars default_expr let_binds ci
-		  (let_expr,  ci) = convertDynamics cinp bound_vars default_expr let_expr  ci
-		= (Let { letje &  let_binds = let_binds, let_expr = let_expr}, ci)
+		  bound_vars = bindVarsToTypes [ bind.bind_dst \\ bind <- let_strict_binds ++ let_lazy_binds ] let_types bound_vars
+		  (let_strict_binds, ci)	= convertDynamics cinp bound_vars default_expr let_strict_binds ci
+		  (let_lazy_binds, ci)		= convertDynamics cinp bound_vars default_expr let_lazy_binds ci
+		  (let_expr,  ci) 			= convertDynamics cinp bound_vars default_expr let_expr  ci
+		= (Let { letje &  let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr}, ci)
 	where
 		determine_let_types let_info_ptr ci=:{ci_expr_heap}
 			# (EI_LetType let_types, ci_expr_heap) = readPtr let_info_ptr ci_expr_heap
@@ -183,12 +184,12 @@ where
 							app_args 		= [dyn_expr, dyn_type_code],
 							app_info_ptr	= nilPtr }, ci)
 			_ 	#  (let_info_ptr,  ci) = let_ptr ci
-				-> ( Let {	let_strict		= False,
-							let_binds		= let_binds,
-							let_expr		= App {	app_symb		= twoTuple_symb,
-													app_args 		= [dyn_expr, dyn_type_code],
-													app_info_ptr	= nilPtr },
-							let_info_ptr	= let_info_ptr}, ci)
+				-> ( Let {	let_strict_binds	= [],
+							let_lazy_binds		= let_binds,
+							let_expr			= App {	app_symb		= twoTuple_symb,
+														app_args 		= [dyn_expr, dyn_type_code],
+														app_info_ptr	= nilPtr },
+							let_info_ptr		= let_info_ptr}, ci)
 	convertDynamics cinp bound_vars default_expr (TypeCodeExpression type_code) ci
 		= convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
@@ -283,7 +284,7 @@ convertDynamicPatterns cinp bound_vars {case_expr, case_guards = DynamicPatterns
       							  (addToBoundVars c_1 result_type (add_dynamic_bound_vars patterns bound_vars)))
 	  (binds, expr, ci) = convert_dynamic_pattern cinp bound_vars new_default 1 opened_dynamic result_type case_default patterns ci
 	  (let_info_ptr, ci) = let_ptr ci
-	= (Let {let_strict = False, let_binds = [ dt_bind : binds ], let_expr = expr, let_info_ptr = let_info_ptr}, ci)
+	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ], let_expr = expr, let_info_ptr = let_info_ptr}, ci)
 where
 	convert_dynamic_pattern :: !ConversionInput !BoundVariables DefaultExpression Int OpenedDynamic AType (Optional Expression) ![DynamicPattern] *ConversionInfo
 		-> (Env Expression FreeVar, Expression, *ConversionInfo)
@@ -320,8 +321,8 @@ where
 		  (let_binds, ci) 		= bind_indirection_var ind_var unify_result_var twotuple ci
 		  a_ij_binds			= add_x_i_bind opened_dynamic.opened_dynamic_expr dp_var a_ij_binds
 
-		  let_expr = Let {	let_strict = False,
-		  					let_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
+		  let_expr = Let {	let_strict_binds = [],
+		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
 		  								   bind_dst = unify_result_fv },
 		  								 { bind_src = TupleSelect twotuple 0 (Var unify_result_var),
 		  								   bind_dst = unify_bool_fv } : let_binds

@@ -916,8 +916,9 @@ where
 
 instance requirements Let
 where
-	requirements ti {let_binds, let_expr, let_info_ptr} (reqs, ts)
-		# (rev_var_types, ts) = make_base let_binds [] ts
+	requirements ti {let_lazy_binds, let_strict_binds, let_expr, let_info_ptr} (reqs, ts)
+		# let_binds = let_strict_binds ++ let_lazy_binds
+		  (rev_var_types, ts) = make_base let_binds [] ts
 		  var_types = reverse rev_var_types
 		  (res_type, opt_expr_ptr, reqs_ts) = requirements ti let_expr (reqs, ts)
 		  (reqs, ts) = requirements_of_binds ti let_binds var_types reqs_ts
@@ -1496,7 +1497,7 @@ where
 	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes ti_common_defs comp (fun_defs, predef_symbols, [], ts)
 		  (names, fun_defs) = show_component comp fun_defs
-		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs (ts ---> names)
+		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts //(ts ---> names)
 		#! nr_of_type_variables = ts.ts_var_store
 										
 		# (subst, ts_type_heaps, ts_error)
