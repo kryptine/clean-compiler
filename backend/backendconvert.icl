@@ -29,7 +29,7 @@ sfoldr op r l s
 		foldr [] = r
 		foldr [a:x] = op a (foldr x)
 
-::	FunctionPattern	= FP_Algebraic !(Global DefinedSymbol) ![FunctionPattern] !(Optional FreeVar)
+::	FunctionPattern	= FP_Algebraic !(Global DefinedSymbol) ![FunctionPattern]
 					| FP_Variable !FreeVar
 
 :: BEMonad a :== *BackEndState -> *(!a,!*BackEndState)
@@ -580,9 +580,8 @@ instance declareVars (Optional a) | declareVars a where
 
 instance declareVars FunctionPattern where
 	declareVars :: FunctionPattern !DeclVarsInput -> BackEnder
-	declareVars (FP_Algebraic _ freeVars optionalVar) dvInput
+	declareVars (FP_Algebraic _ freeVars) dvInput
 		=	declareVars freeVars dvInput
-		o`	declareVars optionalVar dvInput
 	declareVars (FP_Variable freeVar) dvInput
 		=	declareVars freeVar dvInput
 
@@ -1444,7 +1443,7 @@ convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
 		lookUpVar :: Expression FreeVar -> FunctionPattern
 		lookUpVar (Case {case_expr=Var boundVar, case_guards=AlgebraicPatterns _ [ap]}) freeVar
 			| freeVar.fv_info_ptr == boundVar.var_info_ptr
-				=	FP_Algebraic ap.ap_symbol subPatterns No
+				=	FP_Algebraic ap.ap_symbol subPatterns
 				with
 					subPatterns
 						=	map (lookUpVar ap.ap_expr) ap.ap_vars
@@ -1529,9 +1528,7 @@ convertPatterns patterns
 convertPattern :: FunctionPattern -> BEMonad BENodeP
 convertPattern (FP_Variable freeVar)
 	=	convertFreeVarPattern freeVar
-convertPattern (FP_Algebraic _ freeVars (Yes freeVar))
-	=	convertFreeVarPattern freeVar
-convertPattern (FP_Algebraic {glob_module, glob_object={ds_index}} subpatterns No)
+convertPattern (FP_Algebraic {glob_module, glob_object={ds_index}} subpatterns)
 	=	beNormalNode (beConstructorSymbol glob_module ds_index) (convertPatterns subpatterns)
 
 convertFreeVarPattern :: FreeVar  -> BEMonad BENodeP
@@ -1608,11 +1605,7 @@ convertCondExpr expr main_dcl_module_n
 
 // RWS +++ rewrite
 convertLhsNodeDefs :: [FunctionPattern] BENodeDefP -> BEMonad BENodeDefP
-convertLhsNodeDefs [FP_Algebraic symbol subpatterns (Yes freeVar) : patterns] nodeDefs
-	=	convertLhsNodeDefs subpatterns nodeDefs ==> \nodeDefs
-	->	convertLhsNodeDefs patterns nodeDefs ==> \nodeDefs
-	->	defineLhsNodeDef freeVar (FP_Algebraic symbol subpatterns No) nodeDefs
-convertLhsNodeDefs [FP_Algebraic symbol subpatterns No : patterns] nodeDefs
+convertLhsNodeDefs [FP_Algebraic symbol subpatterns : patterns] nodeDefs
 	=	convertLhsNodeDefs subpatterns nodeDefs ==> \nodeDefs
 	->	convertLhsNodeDefs patterns nodeDefs
 convertLhsNodeDefs [_ : patterns] nodeDefs
