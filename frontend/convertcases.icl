@@ -1945,7 +1945,7 @@ where
 */
 
 (-*->) infixl
-(-*->) a b :== a ---> b
+(-*->) a b :== a // ---> b
 (->>) infixl
 (->>) a b :== a // ---> b
 (<<-) infixl
