@@ -1485,11 +1485,11 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars type_var_heap
 				-> bind_and_unify_types root_1 root_2 type_var_heap
 	bind_and_unify_types (TV tv_1) type type_var_heap
 		| not (is_non_variable_type type)
-			= abort "compiler error in trans.icl: assertion failed (1)"
+			= abort "compiler error in trans.icl: assertion failed (1) XXX"
 		= bind_variable_to_type tv_1 type type_var_heap 
 	bind_and_unify_types type (TV tv_1) type_var_heap
 		| not (is_non_variable_type type)
-			= abort "compiler error in trans.icl: assertion failed (2)"
+			= abort "compiler error in trans.icl: assertion failed (2) XXX"
 		= bind_variable_to_type tv_1 type type_var_heap
 	bind_and_unify_types (TA _ arg_types1) (TA _ arg_types2) type_var_heap
 		= bind_and_unify_atype_lists arg_types1 arg_types2 type_var_heap
@@ -1499,8 +1499,12 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars type_var_heap
 		= type_var_heap
 	bind_and_unify_types ((CV l1) :@: r1) ((CV l2) :@: r2) type_var_heap
 		= bind_and_unify_atype_lists r1 r2 (bind_and_unify_types (TV l1) (TV l2) type_var_heap)
-//	bind_and_unify_types x y _
-//		= abort ("bind_and_unify_types"--->(x,y))
+	bind_and_unify_types (TA type_symb r1) ((CV l2) :@: r2) type_var_heap
+		= bind_and_unify_atype_lists r1 r2 (bind_and_unify_types (TA type_symb []) (TV l2) type_var_heap)
+	bind_and_unify_types ((CV l1) :@: r1) (TA type_symb r2) type_var_heap
+		= bind_and_unify_atype_lists r1 r2 (bind_and_unify_types (TV l1) (TA type_symb []) type_var_heap)
+	bind_and_unify_types x y _
+		= abort ("bind_and_unify_types"--->(x,y))
 
 	bind_and_unify_atype_lists [] [] type_var_heap
 		= type_var_heap
@@ -1608,8 +1612,6 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  	| containsProducer cc_size producers
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
-//				| app_symb.symb_name.id_name=="_compr0" && (False--->(("TFA:",App app)--->instances))
-//					= undef
 	  			# (fun_index, fun_arity, ti) = generateFunction fun_def cc producers fun_def_ptr ro
 	  					(update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap, ti_trace = False })
 	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index, symb_arity = length new_args}
@@ -1720,7 +1722,7 @@ where
 			= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers { ti & ti_symbol_heap = ti_symbol_heap }
 	determine_producer _ _ arg new_args prod_index producers ti
 		= (producers, [arg : new_args], ti)
-		
+
 determineProducer :: !Bool !Bool !App !ExprInfo ![Expression] !Index !*{! Producer} !*TransformInfo -> (!*{! Producer}, ![Expression], !*TransformInfo)
 // XXX check for linear_bit also in case of a constructor ?
 determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_ClassTypes types) new_args prod_index producers ti
@@ -1732,7 +1734,6 @@ where
 		# (var_info, var_heap) = readVarInfo var_info_ptr var_heap
 		  (VI_Forward var) = var_info
 		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
-// XXX /*
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }}, app_args} _
 				  new_args prod_index producers ti
 	| glob_module <> cIclModIndex
@@ -1758,16 +1759,6 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 			Expanding _	-> (producers, [App app : new_args ], ti)
 			_			-> ({ producers & [prod_index] = PR_GeneratedFunction symb fun_index (length app_args)}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
-/* MW..
-	| linear_bit
-		# (FI_Function {gf_fun_def}, ti_fun_heap) = readPtr fun_ptr ti_fun_heap
-		  ti = { ti & ti_fun_heap=ti_fun_heap }
-		= case gf_fun_def.fun_body of
-			Expanding	-> (producers, [App app : new_args ], ti)
-// ..MW
-			_			-> ({ producers & [prod_index] = PR_GeneratedFunction symb fun_index (length app_args)}, app_args ++ new_args, ti)
-	= (producers, [App app : new_args ], ti)
-*/
 // XXX determineProducer {app_symb = symb=:{symb_kind = SK_Constructor glob_index}, app_args} new_args prod_index producers ti
 //	= ({ producers & [prod_index] = PR_Constructor symb app_args}, new_args, ti)
 // XXX */

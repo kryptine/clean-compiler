@@ -109,6 +109,7 @@ newPosition :: !Ident  !Position -> IdentPos
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
+checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 
 class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 
@@ -128,9 +129,7 @@ addLocalFunctionDefsToSymbolTable :: Level Index .Index u:(a FunDef) *SymbolTabl
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
 addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] ![.Declaration] !*CheckState -> .CheckState;
 addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
-addImportedFunctionOrMacro :: !Ident .Int !*CheckState -> .CheckState;
 addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
-addImportedSymbol :: !Ident STE_Kind .Int .Int !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable :: ![.Declaration] !*CheckState -> .CheckState;
 retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;

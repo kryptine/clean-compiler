@@ -67,7 +67,9 @@ import RWSDebug
 				::	!Int
 		}
 
-class t_corresponds a :: a a -> *TypesCorrespondMonad
+:: OptionalCorrespondenceNumber = CorrespondenceNumber !Int | Bound | Unbound
+
+class t_corresponds a :: !a !a -> *TypesCorrespondMonad
 	// whether two types correspond
 class e_corresponds a :: !a !a -> ExpressionsCorrespondMonad
 	// check for correspondence of expressions
@@ -75,13 +77,13 @@ class e_corresponds a :: !a !a -> ExpressionsCorrespondMonad
 class getIdentPos a :: a -> IdentPos
 
 class CorrespondenceNumber a where
-	toCorrespondenceNumber :: .a -> Optional Int
+	toCorrespondenceNumber :: .a -> OptionalCorrespondenceNumber
 	fromCorrespondenceNumber :: Int -> .a
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
 compareDefImp :: !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
-				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin);
+				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin)
 compareDefImp dcl_modules icl_module heaps error_admin
 	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
 	= case main_dcl_module.dcl_conversions of
@@ -114,18 +116,20 @@ compareDefImp dcl_modules icl_module heaps error_admin
 			  (icl_com_selector_defs, tc_state, error_admin)
 					= compareWithConversions conversion_table.[cSelectorDefs]
 						dcl_common.com_selector_defs icl_com_selector_defs tc_state error_admin
-			  (icl_com_member_defs, tc_state, error_admin)
-					= compareWithConversions conversion_table.[cMemberDefs]
-						dcl_common.com_member_defs icl_com_member_defs tc_state error_admin
 			  (icl_com_class_defs, tc_state, error_admin)
 					= compareWithConversions conversion_table.[cClassDefs]
 						dcl_common.com_class_defs icl_com_class_defs tc_state error_admin
+			  (icl_com_member_defs, tc_state, error_admin)
+					= compareWithConversions conversion_table.[cMemberDefs]
+						dcl_common.com_member_defs icl_com_member_defs tc_state error_admin
 			  (icl_com_instance_defs, tc_state, error_admin)
 					= compareWithConversions conversion_table.[cInstanceDefs]
 						dcl_common.com_instance_defs icl_com_instance_defs tc_state error_admin
+/* XXX macro comparision doesn't work yet
 			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
 					= compareMacrosWithConversion conversion_table.[cMacroDefs] dcl_macros
 								 				 icl_functions hp_var_heap hp_expression_heap tc_state error_admin
+*/
 			  (icl_functions, tc_state, error_admin)
 			  		= compareFunctionTypesWithConversions conversion_table.[cFunctionDefs]
 			  			dcl_functions icl_functions tc_state error_admin
@@ -139,7 +143,7 @@ compareDefImp dcl_modules icl_module heaps error_admin
 			  		= { hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap,
 			  			hp_type_heaps = { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}}
 			-> ( tc_dcl_modules, { icl_module & icl_common = icl_common, icl_functions = icl_functions },
-				heaps, error_admin )
+					heaps, error_admin )
   where
 	copy original
 		#! size = size original
@@ -156,6 +160,9 @@ compareDefImp dcl_modules icl_module heaps error_admin
 compareWithConversions conversions dclDefs iclDefs tc_state error_admin 
 	= iFoldSt (compareWithConversion conversions dclDefs) 0 (size conversions) (iclDefs, tc_state, error_admin)
 
+compareWithConversion :: !w:(a x:Int) !.(b c) !Int !(!u:(d c), !*TypesCorrespondState, !*ErrorAdmin)
+						-> (!v:(d c), !.TypesCorrespondState, !.ErrorAdmin)
+						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c & Array .d & Array .a, [u <= v, w <= x];
 compareWithConversion conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
 	# (iclDef, iclDefs) = iclDefs![conversions.[dclIndex]]
 	  (corresponds, tc_state) = t_corresponds dclDefs.[dclIndex] iclDef tc_state
@@ -167,6 +174,9 @@ compareFunctionTypesWithConversions conversions	dcl_fun_types icl_functions tc_s
 	= iFoldSt (compareTwoFunctionTypes conversions dcl_fun_types) 0 (size conversions)
 				(icl_functions, tc_state, error_admin)
 
+compareTwoFunctionTypes :: !w:(a x:Int) !.(b FunType) !.Int !(!u:(c FunDef),!*TypesCorrespondState,!*ErrorAdmin)
+						-> (!v:(c FunDef),!.TypesCorrespondState,!.ErrorAdmin)
+						| Array .b & Array .c & Array .a, [u <= v, w <= x];
 compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
 	# (fun_def=:{fun_type}, icl_functions) = icl_functions![conversions.[dclIndex]]
 	= case fun_type of
@@ -175,19 +185,22 @@ compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_st
 			# dcl_symbol_type = dcl_fun_types.[dclIndex].ft_type
 			  tc_state = init_attr_vars (dcl_symbol_type.st_attr_vars++icl_symbol_type.st_attr_vars)
 			  							tc_state
-			  tc_type_vars = init_type_vars (dcl_symbol_type.st_vars++icl_symbol_type.st_vars)
-										tc_state.tc_type_vars
+			  tc_state = init_type_vars (dcl_symbol_type.st_vars++icl_symbol_type.st_vars) tc_state
 			  (corresponds, tc_state)
-					= t_corresponds dcl_symbol_type icl_symbol_type { tc_state & tc_type_vars = tc_type_vars }
+					= t_corresponds dcl_symbol_type icl_symbol_type tc_state
 			| corresponds
 				-> (icl_functions, tc_state, error_admin)
 			-> generate_error error_message fun_def icl_functions tc_state error_admin
 
-init_type_vars type_vars tc_type_vars=:{hwn_heap}
-	# hwn_heap = foldSt init_type_var type_vars hwn_heap
-	= { tc_type_vars & hwn_heap = hwn_heap }
-init_type_var {tv_info_ptr} heap
-	= writePtr tv_info_ptr TVI_Empty heap
+init_type_vars type_vars tc_state=:{tc_type_vars}
+	# tc_type_vars = init_type_vars` type_vars tc_type_vars
+	= { tc_state & tc_type_vars = tc_type_vars }
+  where
+	init_type_vars` type_vars tc_type_vars=:{hwn_heap}
+		# hwn_heap = foldSt init_type_var type_vars hwn_heap
+		= { tc_type_vars & hwn_heap = hwn_heap }
+	init_type_var {tv_info_ptr} heap
+		= writePtr tv_info_ptr TVI_Empty heap
 	
 generate_error message iclDef iclDefs tc_state error_admin
 	# ident_pos = getIdentPos iclDef
@@ -209,6 +222,7 @@ compareMacrosWithConversion conversions macro_range icl_functions var_heap expr_
 compareMacroWithConversion conversions ir_from dclIndex ec_state
 	= compareTwoMacroFuns dclIndex conversions.[dclIndex-ir_from] ec_state
 
+compareTwoMacroFuns :: !.Int !.Int !*ExpressionsCorrespondState -> .ExpressionsCorrespondState;
 compareTwoMacroFuns dclIndex iclIndex
 					ec_state=:{ec_correspondences, ec_icl_functions, ec_error_admin}
 	# (dcl_function, ec_icl_functions) = ec_icl_functions![dclIndex]
@@ -223,62 +237,57 @@ compareTwoMacroFuns dclIndex iclIndex
 
 instance getIdentPos (TypeDef a) where
 	getIdentPos {td_name, td_pos}
-		= makeIdentPos td_name td_pos
+		= newPosition td_name td_pos
 
 instance getIdentPos ConsDef where
 	getIdentPos {cons_symb, cons_pos}
-		= makeIdentPos cons_symb cons_pos
+		= newPosition cons_symb cons_pos
 
 instance getIdentPos SelectorDef where
 	getIdentPos {sd_symb, sd_pos}
-		= makeIdentPos sd_symb sd_pos
+		= newPosition sd_symb sd_pos
 
 instance getIdentPos ClassDef where
 	getIdentPos {class_name, class_pos}
-		= makeIdentPos class_name class_pos
+		= newPosition class_name class_pos
 
 instance getIdentPos MemberDef where
 	getIdentPos {me_symb, me_pos}
-		= makeIdentPos me_symb me_pos
+		= newPosition me_symb me_pos
 
 instance getIdentPos ClassInstance where
 	getIdentPos {ins_ident, ins_pos}
-		= makeIdentPos ins_ident ins_pos
+		= newPosition ins_ident ins_pos
 
 instance getIdentPos FunDef where
 	getIdentPos {fun_symb, fun_pos}
-		= makeIdentPos fun_symb fun_pos
+		= newPosition fun_symb fun_pos
 
-makeIdentPos ident (FunPos  fileName lineNr _)
-	= { ip_ident=ident, ip_line=lineNr, ip_file=fileName}
-makeIdentPos ident (LinePos  fileName lineNr)
-	= { ip_ident=ident, ip_line=lineNr, ip_file=fileName}
-makeIdentPos ident NoPos
-	= { ip_ident=ident, ip_line=0, ip_file=""}
-	
 instance CorrespondenceNumber VarInfo where
 	toCorrespondenceNumber (VI_CorrespondenceNumber number)
-		=	Yes number
-	toCorrespondenceNumber _
-		=	No
-
+		=	CorrespondenceNumber number
+	toCorrespondenceNumber VI_Empty
+		=	Unbound
+		
 	fromCorrespondenceNumber number
 		=	VI_CorrespondenceNumber number
 
 instance CorrespondenceNumber TypeVarInfo where
 	toCorrespondenceNumber (TVI_CorrespondenceNumber number)
-		=	Yes number
-	toCorrespondenceNumber _
-		=	No
+		=	CorrespondenceNumber number
+	toCorrespondenceNumber TVI_Empty
+		=	Unbound
+	toCorrespondenceNumber (TVI_AType _)
+		=	Bound
 
 	fromCorrespondenceNumber number
 		=	TVI_CorrespondenceNumber number
 
 instance CorrespondenceNumber AttrVarInfo where
 	toCorrespondenceNumber (AVI_CorrespondenceNumber number)
-		=	Yes number
-	toCorrespondenceNumber _
-		=	No
+		=	CorrespondenceNumber number
+	toCorrespondenceNumber AVI_Empty
+		=	Unbound
 
 	fromCorrespondenceNumber number
 		=	AVI_CorrespondenceNumber number
@@ -295,9 +304,9 @@ tryToUnifyVars ptr1 ptr2 heapWithNumber
 	#! info1 = sreadPtr ptr1 heapWithNumber.hwn_heap
 	   info2 = sreadPtr ptr2 heapWithNumber.hwn_heap
 	=	case (toCorrespondenceNumber info1, toCorrespondenceNumber info2) of
-			(Yes number1, Yes number2)
+			(CorrespondenceNumber number1, CorrespondenceNumber number2)
 				->	(number1==number2, heapWithNumber)
-			(No, No)
+			(Unbound, Unbound)
  				->	(True, assignCorrespondenceNumber ptr1 ptr2 heapWithNumber)
 			_	->	(False, heapWithNumber)
 
@@ -348,12 +357,14 @@ instance t_corresponds (TypeDef TypeRhs) where
 				= undef <<- "t_corresponds (TypeDef): iclDef.td_arity <> length iclDef.td_args"
 		// ... sanity check
 			# tc_state = { tc_state & tc_visited_syn_types.[dclDef.td_index] = True }
-			  tc_state = init_atv_variables dclDef.td_args iclDef.td_args tc_state
+			  tc_state = init_attr_vars dclDef.td_attrs tc_state 
+			  tc_state = init_attr_vars iclDef.td_attrs tc_state 
+			  tc_state = init_atype_vars dclDef.td_args tc_state
+			  tc_state = init_atype_vars iclDef.td_args tc_state
 			  (corresponds, tc_state) = t_corresponds dclDef.td_args iclDef.td_args tc_state
 			| not corresponds
 				= (corresponds, tc_state)
-			# tc_state = init_attr_vars (dclDef.td_attrs++iclDef.td_attrs) tc_state
-			  icl_root_has_anonymous_attr = root_has_anonymous_attr iclDef.td_attribute iclDef.td_rhs
+			# icl_root_has_anonymous_attr = root_has_anonymous_attr iclDef.td_attribute iclDef.td_rhs
 			| icl_root_has_anonymous_attr<>root_has_anonymous_attr dclDef.td_attribute dclDef.td_rhs
 			  && isnt_abstract dclDef.td_rhs
 				= (False, tc_state)
@@ -378,15 +389,6 @@ instance t_corresponds (TypeDef TypeRhs) where
 		isnt_abstract (AbstractType _) = False
 		isnt_abstract _ = True
 		
-init_atv_variables [dcl_type_var:dcl_type_vars] [icl_type_var:icl_type_vars]
-					tc_state=:{tc_type_vars}
-	# tc_type_vars
-			= assignCorrespondenceNumber dcl_type_var.atv_variable.tv_info_ptr
-										icl_type_var.atv_variable.tv_info_ptr tc_type_vars
-	= init_atv_variables dcl_type_vars icl_type_vars { tc_state & tc_type_vars = tc_type_vars }
-init_atv_variables _ _ tc_state
-	= tc_state
-			
 instance t_corresponds TypeContext where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.tc_class iclDef.tc_class
@@ -434,6 +436,12 @@ instance t_corresponds AType where
 				# ({dcl_common}, tc_state) = tc_state!tc_dcl_modules.[glob_module]
 				  type_def = dcl_common.com_type_defs.[glob_object]
 				= case type_def.td_rhs of
+					SynType {at_type=TV type_var, at_attribute}
+						// a "projection" type. attributes are treated in a special way
+						# arg_pos = get_arg_pos type_var type_def.td_args 0
+						  dcl_arg = dclArgs!!arg_pos
+						  coerced_dcl_arg = { dcl_arg & at_attribute = determine_type_attribute type_def.td_attribute }
+						-> t_corresponds coerced_dcl_arg icl_atype tc_state
 					SynType atype
 						# tc_state = { tc_state & tc_type_vars
 						  							= bind_type_vars type_def.td_args dclArgs tc_state.tc_type_vars }
@@ -441,7 +449,7 @@ instance t_corresponds AType where
 						  tc_state = opt_set_visited_bit is_defined_in_main_dcl glob_object True tc_state
 						  atype = { atype & at_attribute = determine_type_attribute type_def.td_attribute }
 						  (corresponds, tc_state) = t_corresponds atype icl_atype tc_state
-						# tc_state = opt_set_visited_bit is_defined_in_main_dcl glob_object False tc_state
+						  tc_state = opt_set_visited_bit is_defined_in_main_dcl glob_object False tc_state
 						-> (corresponds, tc_state) 
 					AbstractType _
 						#! icl_type_def = tc_state.tc_icl_type_defs.[tc_state.tc_type_conversions.[glob_object]]
@@ -450,22 +458,32 @@ instance t_corresponds AType where
 						  tc_state = init_attr_vars icl_type_def.td_attrs tc_state
 						-> case icl_type_def.td_rhs of
 							SynType atype
-								# atype = { atype & at_attribute = determine_type_attribute type_def.td_attribute } // XXX auch bei abstract types
+								# atype = { atype & at_attribute = determine_type_attribute type_def.td_attribute }
 								-> t_corresponds atype icl_atype tc_state
 							_	-> (False, tc_state)
 					_	-> (False, tc_state)
 			  where
+
 				bind_type_vars formal_args actual_args tc_type_vars
-					# (ok, hwn_heap) = bind_type_vars` formal_args actual_args tc_type_vars.hwn_heap
+					# hwn_heap = bind_type_vars` formal_args actual_args tc_type_vars.hwn_heap
 					= { tc_type_vars & hwn_heap = hwn_heap }
 			
 				bind_type_vars` [{atv_variable}:formal_args] [actual_arg:actual_args] type_var_heap
+					# (actual_arg, type_var_heap) = possibly_dereference actual_arg type_var_heap
 					= bind_type_vars` formal_args actual_args
 							(writePtr atv_variable.tv_info_ptr (TVI_AType actual_arg) type_var_heap)
-				bind_type_vars` [] [] type_var_heap
-					= (True, type_var_heap)
+							//	--->("binding", atv_variable.tv_name,"to",actual_arg)
 				bind_type_vars` _ _ type_var_heap
-					= (False, type_var_heap)
+					= type_var_heap
+				
+				possibly_dereference atype=:{at_type=TV {tv_info_ptr}} type_var_heap
+					#! dereferenced = sreadPtr tv_info_ptr type_var_heap
+					= case dereferenced of
+						TVI_AType atype2
+							-> (atype2, type_var_heap)
+						_	-> (atype, type_var_heap)
+				possibly_dereference atype type_var_heap
+					= (atype, type_var_heap)
 			
 				opt_set_visited_bit True glob_object bit tc_state
 					= { tc_state & tc_visited_syn_types.[glob_object] = bit }
@@ -474,6 +492,10 @@ instance t_corresponds AType where
 
 				determine_type_attribute TA_Unique	= TA_Unique
 				determine_type_attribute _			= TA_Multi
+				
+				get_arg_pos x [h:t] count
+					| x==h.atv_variable	= count
+										= get_arg_pos x t (inc count)
 
 instance t_corresponds TypeAttribute where
 	t_corresponds TA_Unique TA_Unique
@@ -482,7 +504,9 @@ instance t_corresponds TypeAttribute where
 		=	return True
 	t_corresponds (TA_Var dclDef) (TA_Var iclDef)
 		=	t_corresponds dclDef iclDef
-	t_corresponds _ TA_Anonymous // XXX comment
+	t_corresponds (TA_RootVar dclDef) (TA_RootVar iclDef)
+		=	t_corresponds dclDef iclDef
+	t_corresponds _ TA_Anonymous
 		=	return True
 	t_corresponds TA_None icl
 		= case icl of
@@ -575,20 +599,24 @@ instance t_corresponds FieldSymbol where
 
 instance t_corresponds ConsDef where
 	t_corresponds dclDef iclDef
-		=	exi_vars_correspond dclDef.cons_exi_vars iclDef.cons_exi_vars
+		=	do (init_atype_vars (dclDef.cons_exi_vars++iclDef.cons_exi_vars))
 		&&&	t_corresponds dclDef.cons_type iclDef.cons_type
 		&&& equal dclDef.cons_symb iclDef.cons_symb
 		&&& equal dclDef.cons_priority iclDef.cons_priority
 
 instance t_corresponds SelectorDef where
 	t_corresponds dclDef iclDef
-		=	exi_vars_correspond dclDef.sd_exi_vars iclDef.sd_exi_vars
+		=	do (init_atype_vars (dclDef.sd_exi_vars++iclDef.sd_exi_vars))
 		&&&	t_corresponds dclDef.sd_type iclDef.sd_type
 		&&& equal dclDef.sd_field_nr iclDef.sd_field_nr
 
-exi_vars_correspond dcl_exi_vars icl_exi_vars tc_state
-	# tc_state = init_atv_variables dcl_exi_vars icl_exi_vars tc_state
-	= t_corresponds dcl_exi_vars icl_exi_vars tc_state
+init_atype_vars atype_vars
+					tc_state=:{tc_type_vars}
+	# type_heap = foldSt init_type_var atype_vars tc_type_vars.hwn_heap
+	  tc_type_vars = { tc_type_vars & hwn_heap = type_heap }
+	= { tc_state & tc_type_vars = tc_type_vars }
+  where
+	init_type_var {atv_variable} type_heap = writePtr atv_variable.tv_info_ptr TVI_Empty type_heap
 
 instance t_corresponds SymbolType where
 	t_corresponds dclDef iclDef
@@ -604,14 +632,17 @@ instance t_corresponds AttrInequality where
 
 instance t_corresponds ClassDef where
 	t_corresponds dclDef iclDef
-		=	equal dclDef.class_name iclDef.class_name
+		=	do (init_type_vars (dclDef.class_args++iclDef.class_args))
+		&&&	equal dclDef.class_name iclDef.class_name
 		&&&	t_corresponds dclDef.class_args iclDef.class_args
 		&&&	t_corresponds dclDef.class_context iclDef.class_context
 		&&&	t_corresponds dclDef.class_members iclDef.class_members
 
 instance t_corresponds MemberDef where
 	t_corresponds dclDef iclDef
-		=	equal dclDef.me_symb iclDef.me_symb
+		=	do (init_type_vars (dclDef.me_type.st_vars++iclDef.me_type.st_vars))
+		&&&	do (init_attr_vars (dclDef.me_type.st_attr_vars++iclDef.me_type.st_attr_vars))
+		&&& equal dclDef.me_symb iclDef.me_symb
 		&&&	equal dclDef.me_offset iclDef.me_offset
 		&&&	equal dclDef.me_priority iclDef.me_priority
 		&&&	t_corresponds dclDef.me_type iclDef.me_type
@@ -623,10 +654,10 @@ instance t_corresponds ClassInstance where
 		t_corresponds` dclDef iclDef tc_state
 			# tc_state
 					= init_attr_vars (dclDef.it_attr_vars++iclDef.it_attr_vars) tc_state
-			  tc_type_vars
-			  		= init_type_vars (dclDef.it_vars++iclDef.it_vars) tc_state.tc_type_vars
+			  tc_state
+			  		= init_type_vars (dclDef.it_vars++iclDef.it_vars) tc_state
 			  (corresponds, tc_state)
-			  		=  t_corresponds dclDef.it_types iclDef.it_types { tc_state & tc_type_vars = tc_type_vars }
+			  		=  t_corresponds dclDef.it_types iclDef.it_types tc_state
 			| not corresponds
 				= (corresponds, tc_state)
 			=  t_corresponds dclDef.it_context iclDef.it_context tc_state
@@ -672,7 +703,7 @@ instance e_corresponds FunDef where
 	  where
 		fromBody (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
 		fromBody (CheckedBody {cb_args, cb_rhs}) = (cb_args, cb_rhs)
-
+		
 instance e_corresponds TransformedBody where
 	e_corresponds dclDef iclDef
 		=	e_corresponds dclDef.tb_args iclDef.tb_args
@@ -939,6 +970,8 @@ implies a b 		:== not a || b
 
 (o`) infixr 0
 (o`) f g :== \state -> g (f state)
+
+do f = \state -> (True, f state)
 
 // XXX should be a macro (but this crashes the 1.3.2 compiler)
 (&&&) infixr
