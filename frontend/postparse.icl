@@ -554,9 +554,9 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
 		build_rhs [generator : generators] success optional_filter failure end
 			=	case_with_default generator.tg_case1 generator.tg_case_end_expr generator.tg_case_end_pattern
-					(foldr (case_end /* end */)
+					(foldr (case_end end)
 						(case_with_default generator.tg_case2 generator.tg_element generator.tg_pattern
-							(foldr (case_pattern /* failure */) rhs generators) failure)
+							(foldr (case_pattern failure) rhs generators) failure)
 						generators)
 					end
 			where
@@ -569,6 +569,7 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 							No
 								->	exprToRhs success
 
+	/* +++ remove code duplication (bug in 2.0 with nested cases)
 		case_end :: TransformedGenerator Rhs -> Rhs
 		case_end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
 			=	single_case tg_case1 tg_case_end_expr tg_case_end_pattern rhs
@@ -576,7 +577,8 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 		case_pattern :: TransformedGenerator Rhs -> Rhs
 		case_pattern {tg_case2, tg_element, tg_pattern} rhs
 			=	single_case tg_case2 tg_element tg_pattern rhs
-	/* +++ this introduces code duplication (bug in 2.0 with nested cases)
+	*/
+
 		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
 			=	case_with_default tg_case1 tg_case_end_expr tg_case_end_pattern rhs end
@@ -584,7 +586,6 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_pattern failure {tg_case2, tg_element, tg_pattern} rhs
 			=	case_with_default tg_case2 tg_element tg_pattern rhs failure
-	*/
 	
 		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
 		single_case case_ident expr pattern rhs
