@@ -82,7 +82,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
 	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_import,icl_name,icl_imported_objects,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
-/**/
+/*
 	  (_,f,files) = fopen "components" FWriteText files
 	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
 	/*	
@@ -93,7 +93,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	  (ok,files) = fclose f files
 	| ok<>ok
 		= abort "";
-/**/
+*/
 
 //	# dcl_mods = {{dcl_mod & dcl_declared={dcls_import={},dcls_local=[],dcls_local_for_import={},dcls_explicit={}}}\\ dcl_mod<-:dcl_mods}
 
