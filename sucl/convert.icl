@@ -70,13 +70,13 @@ cts_function showsuclsymbol main_dcl_module_n fundefs
   where ((typerules,stricts,funbodies,funkinds),fundefs`)
         = foldrarray_u (convert_fundef showsuclsymbol main_dcl_module_n) ([],[],[],[]) fundefs
 
-//foldrarray_u :: (a .b -> .b) .b u:{#a} -> (.b,v:{#a}) | uselect_u,usize_u a, [u<=v]
+//foldrarray_u :: (Int a .b -> .b) .b u:{#a} -> (.b,v:{#a}) | uselect_u,usize_u a, [u<=v]
 foldrarray_u f i xs
 = fold 0 (usize xs)
   where fold j (n,xs)
         | j>=n
           = (i,xs)
-        = (f x i`,xs``)
+        = (f j x i`,xs``)
           where (x,xs`) = xs![j]
                 (i`,xs``) = fold (j+1) (n,xs`)
 
@@ -93,7 +93,8 @@ foldlarrayindex f (a,xs0)
 convert_fundef ::
     (SuclSymbol -> String)
     Int
-    FunDef
+    Index                                                   // Index of function in its array
+    FunDef                                                  // Function definition to convert
     ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]   // Type rule (derives arity)
     , [(SuclSymbol,[Bool])]                                 // Strict arguments (just main args for now)
     , [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]   // Arity and rewrite rules
@@ -105,14 +106,14 @@ convert_fundef ::
     , [(SuclSymbol,SuclSymbolKind)]                         // Kind of symbol
     )
 
-convert_fundef showsuclsymbol main_dcl_module_n fundef (typerulemap,strictsmap,fundefs0,kindmap)
+convert_fundef showsuclsymbol main_dcl_module_n funindex fundef (typerulemap,strictsmap,fundefs0,kindmap)
  = ( [(funsym,typerule):typerulemap]
    , [(funsym,stricts):strictsmap]
    , fundefs1
    , [(funsym,kind):kindmap]
    )
-   where {fun_arity,fun_body,fun_type,fun_index,fun_kind} = fundef
-         funsym = SuclUser (SK_Function {glob_module=main_dcl_module_n,glob_object=fun_index})
+   where {fun_arity,fun_body,fun_type,fun_kind} = fundef
+         funsym = SuclUser (SK_Function {glob_module=main_dcl_module_n,glob_object=funindex})
          (typerule,stricts) = foldoptional (notyperule,repeatn fun_arity False) convert_symboltype fun_type
          //notyperule = abort ("convert: convert_fundef: "+++fundef.fun_symb.id_name+++"/"+++toString fun_arity+++": fun_type is absent")
          notyperule = mkrule (take fun_arity (tl sucltypeheap)) (hd sucltypeheap) emptygraph
@@ -745,15 +746,14 @@ stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex expr
         (exprheap1,varalloc1,suclinfo1,new_fundefs)
         = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype suclinfo1 (getconsdef dcl_mods main_dcl_module_n icl_common) main_dcl_module_n firstnewindex exprheap0 varalloc0 srrs suclinfo0 (copy_oldfuns oldfundefs2 initialarray)
         varalloc0 = {va_heap=varheap0,va_id=0}
-        initialarray = {nofundef i\\i<-[0..new_fundef_limit-1]}
-        nofundef funindex
+        initialarray = createArray new_fundef_limit nofundef
+        nofundef
         = { fun_symb     = noident
           , fun_arity    = 0            // Can't do undef because it's strict
           , fun_priority = NoPrio
           , fun_body     = NoBody
           , fun_type     = No
           , fun_pos      = NoPos
-          , fun_index    = funindex
           , fun_kind     = FK_DefOrImpUnknown
           , fun_lifted   = 0            // FIXME: what's this supposed to be?
           , fun_info     = nofuninfo    // Bah. Give me undef any time.
@@ -848,7 +848,6 @@ create_fundef ident arity funindex funbody funinfo fundefs
           , fun_body     = funbody
           , fun_type     = No
           , fun_pos      = NoPos
-          , fun_index    = funindex
           , fun_kind     = FK_ImpFunction False
           , fun_lifted   = 0   // FIXME: what's this supposed to be?
           , fun_info     = funinfo
@@ -1121,6 +1120,7 @@ convert_matchpattern getconsdef suclinfo build_casebranch patnodes0 varenv0 expr
           , case_default = Yes default_expression
           , case_ident = No
           , case_info_ptr = cip
+          , case_explicit = True    // We don't want the case default propagation rule to apply for things we generate
           , case_default_pos = NoPos
           }
         (exprheap4,([default_expression:_],eips1))

@@ -12,10 +12,10 @@ from predef import PredefinedSymbols
 
 from checksupport import Declarations,ConversionTable
 from containers import NumberSet
-from syntax import AType,ATypeVar,Annotation,AttrInequality,AttrVarHeap,AttrVarInfo,AttrVarInfoPtr,AttributeVar,ClassDef,ClassInstance,ConsDef,Declaration,DeclarationRecord,DefOrImpFunKind,DefinedSymbol,ExprInfo,ExprInfoPtr,Expression,FreeVar,FunCall,FunInfo,FunctionBody,GenericClassInfo,GenericClassInfos,GenericDef,GenericType,Global,Ident,Index,InstanceType,Level,MemberDef,Position,STE_Kind,SelectorDef,Specials,SymbolPtr,SymbolTableEntry,SymbolType,Type,TypeAttribute,TypeContext,TypeDef,TypeDefInfo,TypeKind,TypeRhs,TypeVar,TypeVarHeap,TypeVarInfo,TypeVarInfoPtr,VarInfo,VarInfoPtr
+from syntax import AType,ATypeVar,Annotation,AttrInequality,AttrVarHeap,AttrVarInfo,AttrVarInfoPtr,AttributeVar,ClassDef,ClassInstance,ConsDef,Declaration,DeclarationRecord,DefOrImpFunKind,DefinedSymbol,ExprInfo,ExprInfoPtr,Expression,FreeVar,FunCall,FunInfo,FunctionBody,GenericClassInfo,GenericClassInfos,GenericDef,GenericType,Global,GlobalIndex,Ident,Index,InstanceType,Level,MemberDef,ModuleKind,Position,STE_Kind,SelectorDef,Specials,SymbolPtr,SymbolTableEntry,SymbolType,Type,TypeAttribute,TypeContext,TypeDef,TypeDefInfo,TypeKind,TypeRhs,TypeVar,TypeVarHeap,TypeVarInfo,TypeVarInfoPtr,VarInfo,VarInfoPtr
 from predef import PredefinedSymbol
 from typeproperties import TypeClassification
-from scanner import Context,Priority
+from scanner import Priority,ScanContext
 from general import BITVECT,Optional
 from Heap import Heap,HeapN,Ptr,PtrN
 from cleanversion import String
