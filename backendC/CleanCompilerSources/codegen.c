@@ -673,7 +673,7 @@ static void CodeRule (ImpRuleP rule)
 	GenFunctionDescriptorAndExportNodeAndDescriptor (rule_sdef);
 
 	if (DoTimeProfiling)
-		GenPB (rule_sdef->sdef_ident->ident_name);
+		GenPB_ident (rule_sdef->sdef_ident,rule_sdef->sdef_line);
 
 	if (rule_sdef->sdef_exported && rule_sdef->sdef_calledwithrootnode && ExpectsResultNode (resultstate))
 		MakeSymbolLabel (&ea_lab,CurrentModule,ea_pref,rule_sdef,0);

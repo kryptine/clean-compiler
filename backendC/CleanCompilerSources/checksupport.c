@@ -393,18 +393,18 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 			
 			if (line_nr > 0){
 				FPrintF (file, " [line: %u]", line_nr);
-				if (*end_name == '\0')
-					return;
 			} else {
 				FPutC (cTypeDelimiter, file);
-			
 				PrintName (next_char, end_name, line_nr, file);
-				
-				if (*end_name == '\0')
-					return;
 			}
 			
+			if (*end_name == '\0')
+				return;
+# ifdef CLEAN2
+			next_char = end_name;
+# else
 			next_char = end_name + 1;
+# endif
 		} else
 			FPutC (cTypeDelimiter, file);
 

@@ -87,8 +87,9 @@ void GenPushA (int offset);
 void GenPushB (int offset);
 
 void GenJsrEval (int offset);
+void GenJsrAp (int n_args);
 void GenJmpEval (void);
-
+void GenJmpAp (int n_args);
 void GenPopA (int nr);
 void GenPopB (int nr);
 
@@ -157,6 +158,7 @@ void GenOStackLayout (int asize,int bsize,Args fun_args);
 void GenNodeEntryDirective (int arity,Label label,Label label2);
 void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label label2);
 void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label2);
+void GenApplyEntryDirective (int arity,Label label);
 void GenLazyRecordNodeEntryDirective (int arity,Label label);
 void GenFieldNodeEntryDirective (int arity, Label label, Label label2,char *record_name);
 void GenConstructorDescriptorAndExport (SymbDef sdef);
@@ -213,6 +215,7 @@ void GenFillCaf (Label label,int a_stack_size,int b_stack_size);
 void GenCaf (Label label,int a_stack_size,int b_stack_size);
 
 void GenPB (char *function_name);
+void GenPB_ident (IdentP ident,unsigned int line_n);
 void GenPB_with_line_number (char *function_name,int line_number);
 void GenPD (void);
 void GenPN (void);

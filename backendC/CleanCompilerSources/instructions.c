@@ -607,6 +607,7 @@ enum {
 #define Ipush_b "push_b"
 
 #define Ijsr_eval "jsr_eval"
+#define Ijsr_ap "jsr_ap"
 
 #define Ipop_a "pop_a"
 #define Ipop_b "pop_b"
@@ -638,6 +639,7 @@ enum {
 
 #define Ijmp_eval "jmp_eval"
 #define Ijmp_eval_upd "jmp_eval_upd"
+#define Ijmp_ap "jmp_ap"
 
 #define Ihalt "halt"
 
@@ -668,6 +670,7 @@ static void put_instruction_code (int instruction_code)
 	FPutC (instruction_code,OutFile);
 }
 
+#define Da "a"
 #define Dkeep "keep"
 #define Dd "d"
 #define Do "o"
@@ -2188,9 +2191,21 @@ void GenJsrEval (int offset)
 	put_arguments_n_b (offset);
 }
 
+void GenJsrAp (int n_args)
+{
+	put_instruction_b (jsr_ap);
+	put_arguments_n_b (n_args);
+}
+
 void GenJmpEval (void)
 {
 	put_instruction (Ijmp_eval);
+}
+
+void GenJmpAp (int n_args)
+{
+	put_instruction_b (jmp_ap);
+	put_arguments_n_b (n_args);
 }
 
 void GenPopA (int nr)
@@ -2631,6 +2646,13 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 		}
 #endif
 	}
+}
+
+void GenApplyEntryDirective (int arity,Label label)
+{
+	put_directive_b (a);
+	put_arguments_n__b (arity);
+	GenLabel (label);
 }
 
 void GenLazyRecordNodeEntryDirective (int arity,Label label)
@@ -3665,6 +3687,14 @@ void GenPB (char *function_name)
 {
 	put_directive_ (Dpb);
 	FPrintF (OutFile,"\"%s\"",function_name);
+}
+
+void GenPB_ident (IdentP ident,unsigned int line_n)
+{
+	put_directive_ (Dpb);
+	PutCOutFile ('\"');
+	PrintSymbolOfIdent (ident,line_n,OutFile);
+	PutCOutFile ('\"');
 }
 
 void GenPB_with_line_number (char *function_name,int line_number)
