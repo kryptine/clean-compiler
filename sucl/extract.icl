@@ -95,32 +95,6 @@ actualfold deltanodes rnfnodes foldarea self foldcont hist rule
         argnodes = varlist rgraph` rargs
         foldednodes = map fst list3
 
-/*
->   findoccs
->   ::  [(***,graph * ***)] ->
->       rule * ** ->
->       ** ->
->       [((***,graph * ***),[(***,**)])]
-
->   findoccs hist rule rnode
->   =   [   ((hroot,hgraph),mapping)
->       |   ((hroot,hgraph),(seen,mapping,[]))<-list1 ||  Find instantiable history rgraphs...
->       ;   unshared rnode (hroot,hgraph) mapping     ||  ...which don't have shared contents...
->||     ;   ~self hroot rnode                         ||  ...and aren't the history graph itself
->       ]
->       where rargs = lhs rule; rroot = rhs rule; rgraph = rulegraph rule
->             list1
->             =   [((hroot,hgraph),inst (hroot,hgraph))|(hroot,hgraph)<-hist]
->                 where inst (hroot,hgraph)
->                       =   instantiate (hgraph,rgraph) (hroot,rnode) ([],[],[])
->             ||  list1: all instantiation attempts at rnode with the history rgraphs
-
->             unshared rnode (hroot,hgraph) mapping
->             =   disjoint inner outer
->                 where inner = map (lookup mapping) (fst (nodeset hgraph [hroot]))
->                       outer = nodelist (prunegraph rnode rgraph) (rroot:rargs)--[rnode]
-*/
-
 findoccs ::
     [(pvar,Graph sym pvar)]
     (Rule sym var)
