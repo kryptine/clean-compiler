@@ -1038,7 +1038,7 @@ static Bool IsInlineFromCurrentModule (SymbDef def)
 	are 'GenBStackElems', 'GenStackLayoutOfNode' and 'GenStackLayoutOfState'.
 */
 
-static char BElems[] = BASIC_ELEMS_STRING;			
+static char BElems[] = BASIC_ELEMS_STRING;
 
 static void GenBStackElems (StateS state)
 {
@@ -2804,7 +2804,10 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 
 	tuple_arguments_state[0] = sdef->sdef_record_state;
 	tuple_arguments_state[1] = LazyState;
-	
+# if 0
+	FPutC ('l', OutFile);
+	FPutC ('R', OutFile);
+# endif
 	GenABStackElems (tuple_state);
 
 	DetermineSizeOfState (tuple_state,&asize,&bsize);
@@ -3128,7 +3131,9 @@ void GenLazyRecordDescriptorAndExport (SymbDef sdef)
 	} else {
 		if (ExportLocalLabels){
 			put_directive_ (Dexport);
-			FPrintF (OutFile,"e_%s_" RECORD_N_PREFIX "%s",CurrentModule,name);			
+			FPrintF (OutFile,"e_%s_" RECORD_D_PREFIX "%s",CurrentModule,name);
+			put_directive_ (Dexport);
+			FPrintF (OutFile,"e_%s_" RECORD_N_PREFIX "%s",CurrentModule,name);
 		}
 
 		put_directive_ (Ddescn);
