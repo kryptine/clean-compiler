@@ -466,7 +466,7 @@ NewImpRule (unsigned line_number,TypeAlts typeAlternative,NodeP rule_root)
 	impRule->rule_root = rule_root;
 	impRule->rule_line = line_number;
 	impRule->rule_type = typeAlternative;
-	impRule->rule_depend_functions=NIL;
+	impRule->rule_next_changed_function = NULL;
 
 	impRule->rule_mark = 0;
 	impRule->rule_next = NIL;
@@ -497,11 +497,9 @@ NewRuleAlt (void)
 	alt->alt_kind 				= Contractum;
 	alt->alt_lhs_root			= NIL;
 	alt->alt_lhs_defs			= NIL;
-	alt->alt_lifted_node_ids	= NIL;
 	alt->alt_rhs_defs			= NIL;
 	alt->alt_strict_node_ids	= NIL;
 	alt->alt_next 				= NIL;
-	alt->alt_local_imp_rules	= NIL;
 	alt->alt_line				= 0;
 
 	return (alt);
