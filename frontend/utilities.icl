@@ -139,6 +139,17 @@ second_of_2_tuple t :== e2
 	where
 		(_,e2) = t
 
+map2St f l1 l2 st :== map2_st l1 l2 st
+  where
+	map2_st [h1:t1] [h2:t2] st
+		# (h, st) = f h1 h2 st
+		  (t, st) = map2_st t1 t2 st
+		#! st = st
+		= ([h:t], st)
+	map2_st _ _ st
+		#! st = st
+		= ([], st)
+
 app2St :: !(!.(.a -> .(.st -> (.c,.st))),!.(.e -> .(.st -> (.f,.st)))) !(.a,.e) !.st -> (!(.c,.f),!.st)
 app2St (f,g) (x,y) s
  	# (x, s) = f x s

@@ -2044,16 +2044,27 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 			  			No
 			  				-> (cs_error, type_heaps)
 			  			Yes specified_symbol_type
-							# (symbol_types_correspond, type_heaps)
+							# (err_code, type_heaps)
 							  		= symbolTypesCorrespond specified_symbol_type derived_symbol_type
 							  				type_heaps
-							| symbol_types_correspond
+							| err_code==CEC_Ok
 								-> (cs_error, type_heaps)
 							# cs_error
 									= pushErrorAdmin (newPosition fun_symb fun_pos)
 											cs_error
+							  luxurious_explanation
+							  		= case err_code of
+							  			CEC_ResultNotOK -> "result type"
+										CEC_ArgNrNotOk -> "nr or arguments"
+										CEC_ContextNotOK -> "context"
+										CEC_AttrEnvNotOK -> "attribute environment"
+										1 -> "first argument"
+										2 -> "second argument"
+										3 -> "third argument"
+										_ -> toString err_code+++"th argument"
 							  cs_error
-							  		= checkError "the specified member type is incorrect" "" cs_error
+							  		= checkError "the specified member type is incorrect ("
+											(luxurious_explanation+++" not ok)") cs_error
 							-> ( popErrorAdmin cs_error, type_heaps)
 			= (icl_functions, type_heaps, cs_error)
 

@@ -51,6 +51,14 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare
 
 :: OptionalCorrespondenceNumber = CorrespondenceNumber !Int | Unbound
 	
+:: ComparisionErrorCode :== Int
+// arg n not ok: n
+CEC_ResultNotOK :== 0
+CEC_Ok :== -1
+CEC_ArgNrNotOk :== -2
+CEC_ContextNotOK :== -3
+CEC_AttrEnvNotOK :== -4
+
 class t_corresponds a :: !a !a -> *TypesCorrespondMonad
 	// whether two types correspond
 class e_corresponds a :: !a !a -> ExpressionsCorrespondMonad
@@ -171,28 +179,52 @@ compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_st
 		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
 		Yes icl_symbol_type
 			# {ft_type=dcl_symbol_type, ft_priority} = dcl_fun_types.[dclIndex]
+			  tc_state
+			  		= init_symbol_type_vars dcl_symbol_type icl_symbol_type tc_state
 			  (corresponds, tc_state)
-					= symbol_types_correspond dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
+					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
 			| corresponds && fun_priority==ft_priority
 				-> (icl_functions, tc_state, error_admin)
 			-> generate_error error_message fun_def icl_functions tc_state error_admin
 
-symbolTypesCorrespond :: !SymbolType !SymbolType !*TypeHeaps -> (!Bool, !.TypeHeaps)
+symbolTypesCorrespond :: !SymbolType !SymbolType !*TypeHeaps -> (!ComparisionErrorCode, !.TypeHeaps)
 symbolTypesCorrespond symbol_type_1 symbol_type_2 type_heaps=:{th_vars, th_attrs}
+	| length symbol_type_1.st_args<>length symbol_type_2.st_args
+		= (CEC_ArgNrNotOk, type_heaps)
 	# tc_state
 			= { tc_type_vars = initial_hwn th_vars
 			  , tc_attr_vars = initial_hwn th_attrs
 			  , tc_ignore_strictness = True
 			  }
-	  (correspond, {tc_type_vars, tc_attr_vars})
-	  		= symbol_types_correspond symbol_type_1 symbol_type_2 tc_state
-	= (correspond, { type_heaps & th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap})
+	  tc_state
+	  		= init_symbol_type_vars symbol_type_1 symbol_type_2 tc_state
+	  (correspond_list, tc_state)
+	  		= map2St t_corresponds
+	  				[symbol_type_1.st_result:symbol_type_1.st_args]
+	  				[symbol_type_2.st_result:symbol_type_2.st_args]
+	  		        tc_state
+	  err_code
+	  		= firstIndex not correspond_list
+	| err_code<>CEC_Ok
+		= (err_code, tc_state_to_type_heaps tc_state)
+	# (context_corresponds, tc_state)
+			= t_corresponds symbol_type_1.st_context symbol_type_2.st_context tc_state
+	| not context_corresponds
+		= (CEC_ContextNotOK, tc_state_to_type_heaps tc_state)
+	# (attr_env_corresponds, tc_state)
+			= t_corresponds symbol_type_1.st_attr_env symbol_type_2.st_attr_env tc_state
+	| not attr_env_corresponds
+		= (CEC_AttrEnvNotOK, tc_state_to_type_heaps tc_state)
+	= (CEC_Ok, tc_state_to_type_heaps tc_state)
+  where
+	tc_state_to_type_heaps {tc_type_vars, tc_attr_vars}
+		= { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}
 
-symbol_types_correspond symbol_type_1 symbol_type_2 tc_state
+init_symbol_type_vars symbol_type_1 symbol_type_2 tc_state
 	# tc_state = init_attr_vars (symbol_type_1.st_attr_vars++symbol_type_2.st_attr_vars)
 								tc_state
 	  tc_state = init_type_vars (symbol_type_1.st_vars++symbol_type_2.st_vars) tc_state
-	= t_corresponds symbol_type_1 symbol_type_2 tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
+	= tc_state
 
 init_type_vars type_vars tc_state=:{tc_type_vars}
 	# tc_type_vars = init_type_vars` type_vars tc_type_vars
