@@ -52,11 +52,24 @@ fromSequencerToPreprocessor aliasDummyId sequencer
 	o`	sequencer
 	o`	fromSequenceState
 
+assignSequenceNumber :: VarInfoPtr *SequenceState -> *SequenceState
 assignSequenceNumber varInfoPtr sequenceState
-	:==	{	sequenceState
-		&	ss_varHeap = writePtr varInfoPtr (VI_SequenceNumber sequenceState.ss_sequenceNumber) sequenceState.ss_varHeap
-		,	ss_sequenceNumber = sequenceState.ss_sequenceNumber + 1
-		}
+	# (varInfo, ss_varHeap) = readPtr varInfoPtr sequenceState.ss_varHeap
+	| alreadySequenced varInfo
+		=	sequenceState
+	// otherwise
+		=	{	sequenceState
+			&	ss_varHeap = writePtr varInfoPtr (VI_SequenceNumber sequenceState.ss_sequenceNumber) sequenceState.ss_varHeap
+			,	ss_sequenceNumber = sequenceState.ss_sequenceNumber + 1
+			}
+	where
+		alreadySequenced :: VarInfo -> Bool
+		alreadySequenced (VI_SequenceNumber _)
+			=	True
+		alreadySequenced (VI_AliasSequenceNumber _)
+			=	True
+		alreadySequenced _
+			=	False
 
 instance sequence [a] | sequence a where
 	sequence list
@@ -156,7 +169,8 @@ instance sequence LetBind where
 				// the compiled source was a strict alias like "#! x = y"
 				= case hd app_args of
 					Var bound_var=:{var_info_ptr}
-						# (vi, ss_varHeap) = readPtr var_info_ptr sequenceState.ss_varHeap
+						# sequenceState = assignSequenceNumber var_info_ptr sequenceState
+						  (vi, ss_varHeap) = readPtr var_info_ptr sequenceState.ss_varHeap
 						  non_alias_bound_var = case vi of
 													VI_SequenceNumber _		-> bound_var
 													VI_AliasSequenceNumber alias_bound_var-> alias_bound_var
