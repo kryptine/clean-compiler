@@ -971,6 +971,7 @@ ScanChar :: !Input ![Char] -> (!Token, !Input)
 ScanChar input chars
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (ErrorToken "End of file inside Char denotation", input)
+	| '\'' == c				= (CharListToken "", input)
 	| '\\' <> c				= ScanEndOfChar 1 [c: chars] input
 	= ScanBSChar 0 chars input ScanEndOfChar
 
