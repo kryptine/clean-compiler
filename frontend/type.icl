@@ -707,7 +707,7 @@ where
 		= (var_heap <:= (tv_info_ptr, TVI_Type (TempQV var_store)), inc var_store)
 
 freshAlgebraicType :: !(Global Int) ![AlgebraicPattern] !{#CommonDefs} !*TypeState -> (![[AType]],!AType,![AttrCoercion],!*TypeState)
-freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_td_infos,ts_exis_variables}
+freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
 	# {td_rhs,td_args,td_attrs,td_name,td_attribute} = common_defs.[glob_module].com_type_defs.[glob_object]
 	# (th_vars, ts_var_store)		= fresh_type_variables td_args (ts_type_heaps.th_vars, ts_var_store)
 	  (th_attrs, ts_attr_store)		= fresh_attributes td_attrs (ts_type_heaps.th_attrs, ts_attr_store)
@@ -789,7 +789,7 @@ cWithoutFreshContextVars 	:== False
 
 freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,!*TypeState)
 freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_env,st_arity} common_defs
-				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_td_infos,ts_var_heap,ts_cons_variables,ts_exis_variables}
+				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_var_heap,ts_cons_variables,ts_exis_variables}
 	# (th_vars, ts_var_store)	= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
 	  (th_attrs, ts_attr_store)	= fresh_attributes st_attr_vars (ts_type_heaps.th_attrs, ts_attr_store)
 	  (attr_env, th_attrs)		= freshEnvironment st_attr_env th_attrs 
