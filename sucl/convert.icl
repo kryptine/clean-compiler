@@ -2,6 +2,7 @@ implementation module convert
 
 // $Id$
 
+import newtest
 import newfold
 import coreclean
 import rule
@@ -16,15 +17,29 @@ mstub = stub "convert"
 // Cocl to Sucl for functions
 cts_function
  :: Int                                                 // Index of current module
-    {#FunDef}                                           // Function definitions (from ICL)
+    u:{#FunDef}                                          // Function definitions (from ICL)
  -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]//Type rule (derives arity)
     , [(SuclSymbol,[Bool])]                             // Strict arguments (just main args for now)
     , [(SuclSymbol,[Rule SuclSymbol SuclVariable])]     // Rewrite rules
     , [(SuclSymbol,SuclSymbolKind)]                     // Kind of symbol
+    , v:{#FunDef}                                        // Consulted function definitions
     )
+ ,  [u<=v]
 
 cts_function main_dcl_module_n fundefs
- = foldr (convert_fundef main_dcl_module_n) ([],[],[],[]) [fundef\\fundef<-:fundefs]
+= (typerules,stricts,funbodies,funkinds,fundefs`)
+  where ((typerules,stricts,funbodies,funkinds),fundefs`)
+        = foldrarray (convert_fundef main_dcl_module_n) ([],[],[],[]) fundefs
+
+foldrarray :: (a .b -> .b) .b u:{#a} -> (.b,v:{#a}) | uselect_u,usize_u a, [u<=v]
+foldrarray f i xs
+= fold 0 (usize xs)
+  where fold j (n,xs)
+        | j>=n
+          = (i,xs)
+        = (f x i`,xs``)
+          where (x,xs`) = xs![j]
+                (i`,xs``) = fold (j+1) (n,xs`)
 
 convert_fundef
  :: Int
@@ -150,8 +165,8 @@ convert_btype _ = abort "convert: convert_btype: unhandled BasicType constructor
 
 
 cts_getconstrs ::
-    {#DclModule}					// Info from used DCL modules
- -> [(SuclTypeSymbol,[SuclSymbol])]	// List of constructor symbols for each type symbol
+    {#DclModule}                    // Info from used DCL modules
+ -> [(SuclTypeSymbol,[SuclSymbol])] // List of constructor symbols for each type symbol
 
 cts_getconstrs dcl_mods
 = flatten (zipwith f (a2l dcl_mods) [0..])
@@ -347,8 +362,8 @@ convert_kind _ = abort "convert: convert_kind: unhandled DefOrImpFunKind constru
 **  Conversion of exported function symbols from cocl to sucl  **
 ****************************************************************/
 
-cts_exports :: {#FunDef} {#DclModule} Int -> [SuclSymbol]
-cts_exports fun_defs dcl_mods main_dcl_module_n
+cts_exports :: {#DclModule} Int -> [SuclSymbol]
+cts_exports dcl_mods main_dcl_module_n
 = map (mk_symbol main_dcl_module_n) (getconversion cFunctionDefs dcl_mods.[main_dcl_module_n])
 
 mk_symbol :: Int Index -> SuclSymbol
@@ -374,6 +389,86 @@ getconversion whichtable dcl=:{dcl_conversions=No}
    - Function symbols.
      Reuse function symbols where applicable.
 */
+
+//Sucl to Cocl for function bodies
+stc_funcdefs ::
+    {#.DclModule}       // DCL for looking up constructor types
+    Int                 // Index of current module
+    Int                 // Index of first new generated function
+    *ExpressionHeap     // Fresh expression space
+    *(Heap VarInfo)     // Fresh variable space
+    [Symredresult .SuclSymbol .SuclVariable SuclTypeSymbol SuclTypeVariable]
+                        // Function definitions to convert
+    *{#FunDef}          // Old function definitions
+ -> ( .ExpressionHeap   // Remaining expression space
+    , .(Heap VarInfo)   // Remaining variable space
+    , .{#FunDef}        // Converted function definitions
+    )
+
+stc_funcdefs dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs
+= (exprheap1,varheap1,new_fundefs)
+  where new_fundef_limit = foldr max 0 [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
+        (exprheap1,varheap1,new_fundefs)
+        = store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs (createArray new_fundef_limit nofundef))
+        nofundef
+        = mstub "stc_funcdefs" "introduced function symbol without an actual body"
+
+copy_oldfuns oldfundefs newfundefs
+= foldlArrayStWithIndex copyone newfundefs oldfundefs
+  where copyone i fundef fundefs
+        = {fundefs & [i]=fundef}
+
+store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [] fundefs0
+= (exprheap0,varheap0,fundefs0)
+store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [srr:srrs] fundefs0
+= case srr.srr_assigned_symbol
+  of (SuclUser (SK_Function {glob_module=modi,glob_object=funindex}))
+      | modi == main_dcl_module_n
+        -> store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap1 varheap1 srrs fundefs1
+           where (exprheap1,varheap1,funbody)
+                 = stc_funcdef dcl_mods exprheap0 varheap0 srr.srr_function_def
+                 funinfo
+                 = { fi_calls       = collect_calls main_dcl_module_n funbody
+                   , fi_group_index = 0
+                   , fi_def_level   = NotALevel
+                   , fi_free_vars   = []
+                   , fi_local_vars  = []
+                   , fi_dynamics    = []
+                   , fi_properties  = 0
+                   }
+                 fundefs1 = create_or_update_fundefs funindex funbody funinfo fundefs0
+                 create_or_update_fundefs
+                 = if (funindex>=firstnewindex)
+                      (create_fundef (length (arguments srr.srr_typerule)))
+                      update_fundef
+     _
+      -> store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs fundefs0
+
+create_fundef :: .Int Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
+create_fundef funindex arity funbody funinfo fundefs
+= {fundefs & [funindex] = fundef}
+  where fundef
+        = { fun_symb     = ident
+          , fun_arity    = arity
+          , fun_priority = NoPrio
+          , fun_body     = funbody
+          , fun_type     = No
+          , fun_pos      = NoPos
+          , fun_index    = funindex
+          , fun_kind     = FK_ImpFunction False
+          , fun_lifted   = 0   // FIXME: what's this supposed to be?
+          , fun_info     = funinfo
+          }
+        ident
+        = { id_name = "_anonymous_sucl_generated_function"
+          , id_info = nilPtr
+          }
+
+update_fundef :: .Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
+update_fundef index newbody newinfo oldfundefs
+= {tmpfundefs & [index] = newfundef}
+  where (oldfundef,tmpfundefs) = oldfundefs![index]
+        newfundef = {oldfundef & fun_body = newbody, fun_info = newinfo}
 
 stc_funcdef ::
     {#DclModule}                        // DCL for looking up constructor types
@@ -607,22 +702,22 @@ convert_constructor dcl_mods (SuclUser (SK_Constructor consindex)) freevars expr
 = AlgebraicPatterns typedefindex [ap]
   where typedefindex = {glob_module=consmodule,glob_object=consdef.cons_type_index}
         consmodule = consindex.glob_module
-		consdef = dcl_mods.[consmodule].dcl_common.com_cons_defs.[consindex.glob_object]
-		defsymb
-		= { ds_ident = consdef.cons_symb
-		  , ds_arity = consdef.cons_type.st_arity
-		  , ds_index = consdef.cons_index
-		  }
-		globdefsymb
-		= { glob_module = consmodule
-		  , glob_object = defsymb
-		  }
-		ap
-		= { ap_symbol   = globdefsymb
-		  , ap_vars     = freevars
-		  , ap_expr	    = expr
-		  , ap_position = NoPos
-		  }
+        consdef = dcl_mods.[consmodule].dcl_common.com_cons_defs.[consindex.glob_object]
+        defsymb
+        = { ds_ident = consdef.cons_symb
+          , ds_arity = consdef.cons_type.st_arity
+          , ds_index = consdef.cons_index
+          }
+        globdefsymb
+        = { glob_module = consmodule
+          , glob_object = defsymb
+          }
+        ap
+        = { ap_symbol   = globdefsymb
+          , ap_vars     = freevars
+          , ap_expr     = expr
+          , ap_position = NoPos
+          }
 convert_constructor _ _ _ _
 = mstub "convert_constructor" "unexpected SUCL pattern form"
 
@@ -797,6 +892,55 @@ convert_graph_symbol (SuclUser symbkind) argexprs exprheap0
 convert_graph_symbol _ _ _ = mstub "convert_graph_symbol" "unexpected application form in graph node"
 
 mkbe bv bt = BasicExpr bv bt
+
+//collect_calls :: Int FunctionBody -> [FunCall]
+collect_calls main_dcl_module_n (TransformedBody tb)
+= foldr (addfuncall main_dcl_module_n) [] symbidents
+  where symbidents = collect_expr_calls tb.tb_rhs []
+collect_calls _ _ = mstub "collect_calls" "unexpected FunctionBody form"
+
+addfuncall main_dcl_module_n {symb_kind=SK_Function {glob_module=modindex,glob_object=funindex}} rest
+| modindex == main_dcl_module_n
+  = [{fc_level=NotALevel,fc_index=funindex}:rest]
+= rest
+
+//collect_expr_calls :: Expression [SymbIdent] -> [SymbIdent]
+collect_expr_calls (App app) rest = [app.app_symb:foldr collect_expr_calls rest app.app_args]
+collect_expr_calls (expr@exprs) rest = collect_expr_calls expr (foldr collect_expr_calls rest exprs)
+collect_expr_calls (Let li) rest = collect_expr_calls li.let_expr (foldr collect_letbind_calls (foldr collect_letbind_calls rest li.let_lazy_binds) li.let_strict_binds)
+collect_expr_calls (Case ci) rest = collect_expr_calls ci.case_expr (collect_casepatterns_calls ci.case_guards (foldoptional id collect_expr_calls ci.case_default rest))
+collect_expr_calls (Selection optgd expr sels) rest = collect_expr_calls expr (foldr collect_sel_calls rest sels)
+collect_expr_calls (Update expr1 sels expr2) rest = collect_expr_calls expr1 (foldr collect_sel_calls (collect_expr_calls expr2 rest) sels)
+collect_expr_calls (RecordUpdate gds expr binds) rest = collect_expr_calls expr (foldr collect_bind_calls rest binds)
+collect_expr_calls (TupleSelect ds i expr) rest = collect_expr_calls expr rest
+//collect_expr_calls (Lambda fvs expr) rest = collect_expr_calls expr rest
+collect_expr_calls (Conditional cond) rest = collect_expr_calls cond.if_cond (collect_expr_calls cond.if_then (foldoptional id collect_expr_calls cond.if_else rest))
+collect_expr_calls (MatchExpr ogds gds expr) rest = collect_expr_calls expr rest
+collect_expr_calls (DynamicExpr dyn) rest = collect_expr_calls dyn.dyn_expr (collect_tce_calls dyn.dyn_type_code rest)
+//collect_expr_calls (TypeCase tc) rest = collect_expr_calls tc.type_case_dynamic (foldr collect_dp_calls (foldoptional id collect_expr_calls rest) tc.type_case_patterns)
+collect_expr_calls (TypeCodeExpression tce) rest = collect_tce_calls tce rest
+collect_expr_calls _ rest = rest
+
+collect_letbind_calls lb rest = collect_expr_calls lb.lb_src rest
+
+collect_casepatterns_calls (AlgebraicPatterns gi aps) rest = foldr collect_ap_calls rest aps
+collect_casepatterns_calls (BasicPatterns gi bps) rest = foldr collect_bp_calls rest bps
+collect_casepatterns_calls (DynamicPatterns dps) rest = foldr collect_dp_calls rest dps
+collect_casepatterns_calls NoPattern rest = rest
+
+collect_ap_calls ap rest = collect_expr_calls ap.ap_expr rest
+collect_bp_calls bp rest = collect_expr_calls bp.bp_expr rest
+collect_dp_calls dp rest = collect_tce_calls dp.dp_type_code (collect_expr_calls dp.dp_rhs rest)
+
+collect_sel_calls (RecordSelection gds i) rest = rest
+collect_sel_calls (ArraySelection gds eip expr) rest = collect_expr_calls expr rest
+collect_sel_calls (DictionarySelection bv sels sip expr) rest = foldr collect_sel_calls (collect_expr_calls expr rest) sels
+
+collect_bind_calls b rest = collect_expr_calls b.bind_src rest
+
+collect_tce_calls (TCE_Constructor i tces) rest = foldr collect_tce_calls rest tces
+collect_tce_calls (TCE_Selector sels vip) rest = foldr collect_sel_calls rest sels
+collect_tce_calls _ rest = rest
 
 fold_funcbody ::
     ((Rgraph sym var) .result .result -> .result)
