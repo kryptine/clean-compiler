@@ -77,6 +77,7 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 				
 		No
 			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
+//					---> ("determineAttributeCoercions",position, (off_type, dem_type,exp_off_type,exp_dem_type))
 
 
 NotChecked :== -1	
@@ -323,23 +324,25 @@ where
 	lift modules cons_vars attr_type=:{at_attribute,at_type} subst ls
 		# (changed,at_type, subst, ls) = lift2 modules cons_vars at_type subst ls
 		| changed
-			| type_is_non_coercible at_type
+			| typeIsNonCoercible cons_vars at_type
 				= ({attr_type & at_type = at_type },subst, ls)
 				= ({attr_type & at_attribute = TA_TempVar ls.ls_next_attr, at_type = at_type}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
-			| type_is_non_coercible at_type
+			| typeIsNonCoercible cons_vars at_type
 				= (attr_type,subst, ls)
 				= ({attr_type & at_attribute = TA_TempVar ls.ls_next_attr}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
-	where
-		type_is_non_coercible (TempV _)
-			= True
-		type_is_non_coercible (TempQV _)
-			= True
-		type_is_non_coercible (_ --> _)
-			= True
-		type_is_non_coercible (_ :@: _)
-			= True
-		type_is_non_coercible _
-			= False
+
+typeIsNonCoercible _ (TempV _)
+	= True
+typeIsNonCoercible _ (TempQV _)
+	= True
+typeIsNonCoercible _ (_ --> _)
+	= True
+typeIsNonCoercible cons_vars (TempCV tmp_var_id :@: _)
+	= not (isPositive tmp_var_id cons_vars)
+typeIsNonCoercible cons_vars (_ :@: _)
+	= True
+typeIsNonCoercible _ _
+	= False
 
 class lift2 a :: !{# CommonDefs } !{# BOOLVECT } !a !*{! Type} !*LiftState -> (!Bool,!a, !*{! Type}, !*LiftState)
 
@@ -441,23 +444,12 @@ where
 	lift2 modules cons_vars attr_type=:{at_attribute,at_type} subst ls
 		# (changed,at_type, subst, ls) = lift2 modules cons_vars at_type subst ls
 		| changed
-			| type_is_non_coercible at_type
+			| typeIsNonCoercible cons_vars at_type
 				= (True,{attr_type & at_type = at_type },subst, ls)
 				= (True,{attr_type & at_attribute = TA_TempVar ls.ls_next_attr, at_type = at_type}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
-			| type_is_non_coercible at_type
+			| typeIsNonCoercible cons_vars at_type
 				= (False,attr_type,subst, ls)
 				= (True,{attr_type & at_attribute = TA_TempVar ls.ls_next_attr}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
-	where
-		type_is_non_coercible (TempV _)
-			= True
-		type_is_non_coercible (TempQV _)
-			= True
-		type_is_non_coercible (_ --> _)
-			= True
-		type_is_non_coercible (_ :@: _)
-			= True
-		type_is_non_coercible _
-			= False
 
 ::	ExpansionState = 
 	{	es_type_heaps	:: !.TypeHeaps
@@ -950,7 +942,6 @@ where
 			| tsp_coercible
 				= sign
 				= TopSign
-//					---> ("adjust_sign to top", type_name)
 		adjust_sign sign _ cons_vars
 			= sign
 
@@ -1030,15 +1021,15 @@ coerceTypes sign defs cons_vars tpos {at_type = arg_type1 --> res_type1} {at_typ
 	| Success succ
 		= coerce sign defs cons_vars [1 : tpos] res_type1 res_type2 cs
 		= (succ, cs)
-coerceTypes _ defs cons_vars tpos {at_type = cons_var :@: types1} {at_type = _ :@: types2}  cs
-	# sign = determine_sign_of_arg_types cons_var cons_vars
+coerceTypes sign defs cons_vars tpos {at_type = cons_var :@: types1} {at_type = _ :@: types2}  cs
+	# sign = determine_sign_of_arg_types sign cons_var cons_vars
 	= coercions_of_type_list sign defs cons_vars tpos 0 types1 types2 cs
 where
-	determine_sign_of_arg_types (TempCV tmp_var_id) cons_vars
+	determine_sign_of_arg_types sign (TempCV tmp_var_id) cons_vars
 		| isPositive tmp_var_id cons_vars
-			= PositiveSign
+			= sign
 			= TopSign
-	determine_sign_of_arg_types _ cons_vars
+	determine_sign_of_arg_types _ _ cons_vars
 			= TopSign
 		
 	coercions_of_type_list sign defs cons_vars tpos arg_number [t1 : ts1] [t2 : ts2] cs
