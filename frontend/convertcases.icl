@@ -486,7 +486,7 @@ where
 	convert_function group_index dcl_functions common_defs fun (fun_defs, collected_imports, ci)
 		#! fun_def = fun_defs.[fun]
 		# {fun_body,fun_type} = fun_def
-		  (fun_body, (collected_imports, ci)) = eliminate_code_sharing_in_function dcl_functions common_defs fun_body /* (fun_body ---> ("convert_function", fun_def.fun_symb, fun_body)) */(collected_imports, ci)		  		
+		  (fun_body, (collected_imports, ci)) = eliminate_code_sharing_in_function dcl_functions common_defs fun_body /* (fun_body ---> ("convert_function", fun_def.fun_symb, fun_body)) */ (collected_imports, ci)		  		
 		  (fun_body, ci) = convert_cases_into_function_patterns fun_body fun_type group_index common_defs ci
 		= ({fun_defs & [fun] = { fun_def & fun_body = fun_body }}, collected_imports, ci)
 
@@ -935,10 +935,10 @@ where
 
 /*
 
-	weightedRefCount determines the references counts of variables in an expression. Runtime behaviour of constructs into account: 
+	weightedRefCount determines the reference counts of variables in an expression. Runtime behaviour of constructs is taken into account: 
 	multiple occurrences of variables in different alternatives of the same case clause are counted only once. The outcome
 	is used to distribute shared expressions (via let declarations) over cases. In this way code sharing is eliminated.
-	As a side effect, weightedRefCount returns a list of all imported function that have been used iinside the expression.
+	As a side effect, weightedRefCount returns a list of all imported functions that have been used inside the expression.
 	
 */
 
@@ -988,21 +988,21 @@ where
 	weightedRefCount dcl_functions common_defs depth (fun_expr @ exprs) rc_info
 		= weightedRefCount dcl_functions common_defs depth (fun_expr, exprs) rc_info
 	weightedRefCount dcl_functions common_defs depth (Let {let_strict_binds,let_lazy_binds,let_expr, let_info_ptr}) rc_info=:{rc_var_heap}
-		# let_binds = let_strict_binds ++ let_lazy_binds
-		# rc_info = weightedRefCount dcl_functions common_defs depth let_expr { rc_info & rc_var_heap = foldSt store_binding let_binds rc_var_heap }
+		# rc_info = weightedRefCount dcl_functions common_defs depth let_strict_binds { rc_info & rc_var_heap = foldSt store_binding let_lazy_binds rc_var_heap }
+		  rc_info = weightedRefCount dcl_functions common_defs depth let_expr rc_info
 		  (let_info, rc_expr_heap) = readPtr let_info_ptr rc_info.rc_expr_heap
 		  rc_info = { rc_info & rc_expr_heap = rc_expr_heap }
 		= case let_info of
 			EI_LetType let_type
-		  		# (ref_counts, rc_var_heap) = mapSt get_ref_count let_binds rc_info.rc_var_heap
-				  (rc_free_vars, rc_var_heap) = foldl remove_variable (rc_info.rc_free_vars, rc_var_heap) let_binds
+		  		# (ref_counts, rc_var_heap) = mapSt get_ref_count let_lazy_binds rc_info.rc_var_heap
+				  (rc_free_vars, rc_var_heap) = foldl remove_variable (rc_info.rc_free_vars, rc_var_heap) let_lazy_binds
 				-> { rc_info & rc_free_vars = rc_free_vars, rc_var_heap = rc_var_heap,
 						rc_expr_heap = rc_info.rc_expr_heap <:= (let_info_ptr, EI_LetTypeAndRefCounts let_type ref_counts)}
-//							---> ("weightedRefCount (EI_LetType)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_binds])
+//							---> ("weightedRefCount (EI_LetType)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_lazy_binds])
 			_
-				# (rc_free_vars, rc_var_heap) = foldl remove_variable (rc_info.rc_free_vars, rc_info.rc_var_heap) let_binds
+				# (rc_free_vars, rc_var_heap) = foldl remove_variable (rc_info.rc_free_vars, rc_info.rc_var_heap) let_lazy_binds
 				-> { rc_info & rc_free_vars = rc_free_vars, rc_var_heap = rc_var_heap }
-//							---> ("weightedRefCount (_)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_binds])
+//							---> ("weightedRefCount (_)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_lazy_binds])
 	where
 		remove_variable ([], var_heap) let_bind
 			= ([], var_heap)
@@ -1219,9 +1219,9 @@ checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
 	,	di_expr_heap	:: !.ExpressionHeap
 	}
 /*
-	distributeLets tries to move shared expressions as close as possible to the location at ewhich they are used.
-	Case-expression may require unsharing if the shared expression is used in different alternatives. Of course
-	only if the expreesion is not used in the pattern nor in a surrounding expression.
+	distributeLets tries to move shared expressions as close as possible to the location at which they are used.
+	Case-expressions may require unsharing if the shared expression is used in different alternatives. Of course
+	only if the expression is neither used in the pattern nor in a surrounding expression.
 */
 
 class distributeLets e :: !Int !e !*DistributeInfo -> (!e, !*DistributeInfo)
@@ -1284,12 +1284,22 @@ where
 	distributeLets depth (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) dl_info=:{di_expr_heap,di_var_heap}
 		# (let_info, di_expr_heap) = readPtr let_info_ptr di_expr_heap
 		# (EI_LetTypeAndRefCounts let_type ref_counts) = let_info
-		  let_binds = [(True, bind) \\ bind <- let_strict_binds] ++ [(False, bind) \\ bind <- let_lazy_binds]
-		  di_var_heap = set_let_expression_info depth let_binds ref_counts let_type di_var_heap
+		  nr_of_strict_lets = length let_strict_binds
+		  let_binds = [(False, bind) \\ bind <- let_lazy_binds]
+		  di_var_heap = set_let_expression_info depth let_binds ref_counts (drop nr_of_strict_lets let_type) di_var_heap
 		  (let_expr, dl_info) = distributeLets depth let_expr { dl_info & di_var_heap = di_var_heap, di_expr_heap = di_expr_heap }
-		  dl_info = foldSt (distribute_lets_in_non_distributed_let depth) let_strict_binds dl_info
+		  (let_strict_binds, dl_info) = distributeLets depth let_strict_binds dl_info
 		  dl_info = foldSt (distribute_lets_in_non_distributed_let depth) let_lazy_binds dl_info
-	    = (let_expr, dl_info)
+		| nr_of_strict_lets == 0
+		    = (let_expr, dl_info)
+		    = case let_expr of
+		    	Let inner_let=:{let_info_ptr=inner_let_info_ptr}
+		    		# (EI_LetType strict_inner_types, di_expr_heap) = readPtr inner_let_info_ptr dl_info.di_expr_heap
+		    		  di_expr_heap = writePtr inner_let_info_ptr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) di_expr_heap
+					-> (Let { inner_let & let_strict_binds = let_strict_binds++inner_let.let_strict_binds}, 
+						{dl_info & di_expr_heap = di_expr_heap})
+				 _	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
+						{dl_info & di_expr_heap = dl_info.di_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
 	where
 		set_let_expression_info depth [(let_strict, {bind_src,bind_dst}):binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -1385,7 +1395,7 @@ where
 
 		mark_local_let_var depth {cv_variable, cv_count} (local_vars, var_heap)
 			# (VI_LetExpression lei=:{lei_count,lei_depth}, var_heap) = readPtr cv_variable var_heap
-			| lei_count == cv_count
+			| lei_count == cv_count 
 				= ([(cv_variable, lei_count, lei_depth) : local_vars ], var_heap <:= (cv_variable, VI_LetExpression { lei & lei_depth = depth}))
 						==> ("mark_local_let_var ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
 				= (local_vars, var_heap)
@@ -1430,16 +1440,21 @@ distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_s
 	
 buildLetExpr :: ![VarInfoPtr] !Expression !*(!*VarHeap, !*ExpressionHeap) -> (!Expression, !(!*VarHeap, !*ExpressionHeap))
 buildLetExpr let_vars let_expr (var_heap, expr_heap)
-	# (strict_binds, strict_bind_types, lazy_binds, lazy_binds_types, var_heap) = foldr build_bind ([], [], [], [], var_heap) let_vars
-	| isEmpty strict_binds && isEmpty lazy_binds
+	# (lazy_binds, lazy_binds_types, var_heap) = foldr build_bind ([], [], var_heap) let_vars
+	| isEmpty lazy_binds
 		= (let_expr, (var_heap, expr_heap))
-		# (let_info_ptr, expr_heap) = newPtr (EI_LetType (strict_bind_types ++ lazy_binds_types)) expr_heap
-		= (Let { let_strict_binds = strict_binds, let_lazy_binds = lazy_binds, let_expr = let_expr, let_info_ptr = let_info_ptr }, (var_heap, expr_heap))
-
+		= case let_expr of
+			Let inner_let=:{let_info_ptr }
+				# (EI_LetType strict_bind_types, expr_heap) = readPtr let_info_ptr expr_heap
+				  expr_heap = writePtr let_info_ptr (EI_LetType (strict_bind_types ++ lazy_binds_types)) expr_heap
+				-> (Let { inner_let & let_lazy_binds = lazy_binds }, (var_heap, expr_heap))
+			_
+				# (let_info_ptr, expr_heap) = newPtr (EI_LetType lazy_binds_types) expr_heap
+				-> (Let { let_strict_binds = [], let_lazy_binds = lazy_binds, let_expr = let_expr, let_info_ptr = let_info_ptr }, (var_heap, expr_heap))
 where
-	build_bind :: !VarInfoPtr !(!Env Expression FreeVar, ![AType], !Env Expression FreeVar, ![AType], !*VarHeap)
-		-> (!Env Expression FreeVar, ![AType], !Env Expression FreeVar, ![AType], !*VarHeap)
-	build_bind info_ptr (strict_binds, strict_bind_types, lazy_binds, lazy_binds_types, var_heap)
+	build_bind :: !VarInfoPtr !(!Env Expression FreeVar, ![AType], !*VarHeap)
+		-> (!Env Expression FreeVar, ![AType], !*VarHeap)
+	build_bind info_ptr (lazy_binds, lazy_binds_types, var_heap)
 		# (let_info, var_heap) = readPtr info_ptr var_heap
 		# (VI_LetExpression lei=:{lei_strict,lei_var,lei_expression,lei_status,lei_type}) = let_info
 		  (LES_Updated updated_expr) = lei_status
@@ -1447,8 +1462,8 @@ where
 		  var_heap = var_heap <:= (info_ptr, VI_LetExpression { lei & lei_status = LES_Untouched, lei_var = { lei_var & fv_info_ptr = new_info_ptr }})
 //			==> (lei_var.fv_name, info_ptr, new_info_ptr)
 		| lei_strict
-			= ([{ bind_src = updated_expr, bind_dst = lei_var } : strict_binds], [lei_type : strict_bind_types ], lazy_binds, lazy_binds_types, var_heap)
-			= (strict_binds, strict_bind_types, [{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
+			= abort "assertion 1 failed in module convercases"
+			= ([{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
 
 instance distributeLets Selection
 where

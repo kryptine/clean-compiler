@@ -486,7 +486,7 @@ cIsALocalVar	:== False
 ::	LetExpressionInfo =
 	{	lei_count			:: !Int
 	,	lei_depth			:: !Int 
-	,	lei_strict			:: !Bool 
+	,	lei_strict			:: !Bool // MW this field seems to be superfluos
 	,	lei_var				:: !FreeVar 
 	,   lei_expression		:: !Expression
 //	,	lei_moved			:: !Bool 

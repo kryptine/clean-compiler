@@ -1258,7 +1258,7 @@ checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info 
 	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
 	  (pattern_expr, binds, es_expr_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expr_heap
 	  (case_expr, es_expr_heap) = build_case guards defaul pattern_expr case_ident es_expr_heap
-	  (result_expr, es_expr_heap) = buildLetExpression binds cIsNotStrict case_expr es_expr_heap
+	  (result_expr, es_expr_heap) = buildLetExpression [] binds case_expr es_expr_heap
 	= (result_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 	
 where
@@ -1418,7 +1418,7 @@ where
 
 	bind_default_variable bind_src bind_dst result_expr expr_heap
 		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Let {let_strict_binds = [{ bind_src = bind_src, bind_dst = bind_dst }], let_lazy_binds = [],
+		= (Let {let_strict_binds = [], let_lazy_binds = [{ bind_src = bind_src, bind_dst = bind_dst }],
 				let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
 
 	bind_pattern_variables [] pattern_expr expr_heap
@@ -1667,14 +1667,12 @@ checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info
 	  (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
 	= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
-buildLetExpression :: !(Env Expression FreeVar) !Bool !Expression !*ExpressionHeap  -> (!Expression, !*ExpressionHeap)
-buildLetExpression [] is_strict expr expr_heap
+buildLetExpression :: !(Env Expression FreeVar) !(Env Expression FreeVar) !Expression !*ExpressionHeap  -> (!Expression, !*ExpressionHeap)
+buildLetExpression [] [] expr expr_heap
 	= (expr, expr_heap)
-buildLetExpression binds is_strict expr expr_heap
-	#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-	| is_strict
-		= (Let {let_strict_binds = binds, let_lazy_binds = [], let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
-		= (Let {let_strict_binds = [], let_lazy_binds = binds, let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
+buildLetExpression let_strict_binds let_lazy_binds expr expr_heap
+	# (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	= (Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = expr, let_info_ptr = let_expr_ptr }, expr_heap)
 
 checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info cs
 	# (loc_defs, accus, {ps_fun_defs,ps_var_heap}, e_info, cs)
@@ -1694,7 +1692,7 @@ checkRhssAndTransformLocalDefs free_vars [] rhs_expr e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 checkRhssAndTransformLocalDefs free_vars loc_defs rhs_expr e_input e_state e_info cs
 	# (binds, free_vars, e_state, e_info, cs) = checkAndTransformPatternIntoBind free_vars loc_defs e_input e_state e_info cs
-	  (rhs_expr, es_expr_heap) = buildLetExpression binds cIsNotStrict rhs_expr e_state.es_expr_heap
+	  (rhs_expr, es_expr_heap) = buildLetExpression [] binds rhs_expr e_state.es_expr_heap
 	= (rhs_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
 checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
@@ -1894,9 +1892,9 @@ where
 		  (let_binds, es_var_heap, es_expr_heap, e_info, cs)
 				= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr e_state.es_var_heap e_state.es_expr_heap e_info cs
 		  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
-		  (_, array_pattern_binds, free_vars, e_state, e_info, cs) // XXX arrays currently not strictly evaluated
+		  (strict_array_pattern_binds, lazy_array_pattern_binds, free_vars, e_state, e_info, cs)
 				= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
-		  all_binds = [(seq_let.ndwl_strict, let_binds), (nOT_STRICT, array_pattern_binds) : binds] with nOT_STRICT = False
+		  all_binds = [if seq_let.ndwl_strict (let_binds,[]) ([],let_binds), (strict_array_pattern_binds, lazy_array_pattern_binds) : binds]
 	    = (all_binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	check_sequential_lets free_vars [] let_vars_list e_input=:{ei_expr_level} e_state e_info cs
 		= ([], let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs)
@@ -1917,14 +1915,13 @@ where
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps, es_fun_defs = ps_fun_defs }
 		= (src_expr, pattern, accus, free_vars, e_state, e_info, cs)
 	
-	build_sequential_lets :: ![(Bool,[Bind Expression FreeVar])] !Expression !*ExpressionHeap -> (!Expression, !*ExpressionHeap)
+	build_sequential_lets :: ![(![Bind Expression FreeVar],![Bind Expression FreeVar])] !Expression !*ExpressionHeap -> (!Expression, !*ExpressionHeap)
 	build_sequential_lets [] expr expr_heap
 		= (expr, expr_heap)
-	build_sequential_lets [(nd_strict,[]) : seq_lets] expr expr_heap
-		= build_sequential_lets seq_lets expr expr_heap
-	build_sequential_lets [(nd_strict,binds) : seq_lets] expr expr_heap
+	build_sequential_lets [(strict_binds, lazy_binds) : seq_lets] expr expr_heap
 		# (let_expr, expr_heap) = build_sequential_lets seq_lets expr expr_heap
-	  	= buildLetExpression binds nd_strict let_expr expr_heap
+	  	= buildLetExpression strict_binds lazy_binds let_expr expr_heap
+
 
 newVarId name = { id_name = name, id_info = nilPtr }
 
@@ -1945,8 +1942,8 @@ convertSubPattern (AP_Variable name var_info (Yes {bind_src,bind_dst})) result_e
 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	  bound_var = { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
 	  free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
-	  (let_expr, expr_heap)	= buildLetExpression [{ bind_src = Var bound_var,
-	  			bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}] cIsNotStrict result_expr expr_heap
+	  (let_expr, expr_heap)	= buildLetExpression [] [{ bind_src = Var bound_var,
+	  			bind_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }}] result_expr expr_heap
 	= (free_var, let_expr, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Variable name var_info No) result_expr var_store expr_heap opt_dynamics cs
 	= ({ fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr, var_store, expr_heap, opt_dynamics, cs)
@@ -1995,7 +1992,6 @@ typeOfBasicValue (BVS _) cs
 	= (BT_String (TA (MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity) []), cs)
 
 
-// XXX no strict_binds
 addArraySelections [] rhs_expr free_vars e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
@@ -2013,21 +2009,21 @@ addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 
 buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 					(strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
-	# (ap_array_var, strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
-			= foldSt (build_sc e_input) ap_selections 
-						(ap_array_var, strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
+	# (ap_array_var, [last_array_selection:lazy_binds], free_vars, e_state, e_info, cs)
+			= foldSt (build_sc e_input) (reverse ap_selections) // reverse to make cycle-in-spine behaviour compatible to Clean 1.3
+						(ap_array_var, lazy_binds, free_vars, e_state, e_info, cs)
 	  (lazy_binds, e_state)
 	  		= case ap_opt_var of
 	  			Yes { bind_src = opt_var_ident, bind_dst = opt_var_var_info_ptr }
 					# (bound_array_var, es_expr_heap) = allocate_bound_var ap_array_var e_state.es_expr_heap
 					  free_var = { fv_name = opt_var_ident, fv_info_ptr = opt_var_var_info_ptr, fv_def_level = NotALevel,
 					  				fv_count = 0 }
-	  				-> ([{ bind_dst = free_var, bind_src = Var bound_array_var } : lazy_binds],
+	  				-> ([{ bind_dst = free_var, bind_src = Var bound_array_var }: lazy_binds],
 	  					{ e_state & es_expr_heap = es_expr_heap })
 	  			no	-> (lazy_binds, e_state)
-	= (strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
+	= ([last_array_selection:strict_binds], lazy_binds, free_vars, e_state, e_info, cs)
   where
-	build_sc e_input {bind_dst=parsed_index_exprs, bind_src=array_element_var} (ap_array_var, strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
+	build_sc e_input {bind_dst=parsed_index_exprs, bind_src=array_element_var} (ap_array_var, binds, free_vars, e_state, e_info, cs)
 		# (var_for_uselect_result, es_var_heap)
 				= allocate_free_var { id_name = "_x", id_info = nilPtr } e_state.es_var_heap
 		  (new_array_var, es_var_heap)
@@ -2036,7 +2032,8 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  		= allocate_bound_var ap_array_var e_state.es_expr_heap
 		  (bound_var_for_uselect_result, es_expr_heap)
 		  		= allocate_bound_var var_for_uselect_result es_expr_heap
-		  dimension = length parsed_index_exprs
+		  dimension
+		  		= length parsed_index_exprs
 		  (new_expr_ptrs, es_expr_heap)
 		  		= mapSt newPtr (repeatn dimension EI_Empty) es_expr_heap
 		  (tuple_cons, cs)
@@ -2055,11 +2052,10 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  selections
 		  		= [ ArraySelection glob_select_symb new_expr_ptr index_expr \\ new_expr_ptr<-new_expr_ptrs & index_expr<-index_exprs ]
 		= (	new_array_var
-		  ,	strict_binds
 		  ,	[ {bind_dst = var_for_uselect_result, bind_src = Selection opt_tuple_type (Var bound_array_var) selections}
-			, {bind_dst = new_array_var, bind_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result)}
+		    , {bind_dst = new_array_var, bind_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result)}
 		    , {bind_dst = array_element_var, bind_src = TupleSelect tuple_cons.glob_object 0 (Var bound_var_for_uselect_result)}
-		  	: lazy_binds
+		  	: binds
 			]
 		  , free_vars
 		  , e_state

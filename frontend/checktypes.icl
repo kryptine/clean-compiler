@@ -1021,13 +1021,8 @@ where
 			TA_Var var
 				-> (TA_RootVar var, error)
 			_
-				-> (TA_RootVar undef, error)
-/*		= case root_attr of
-			TA_Var var
-				-> (TA_RootVar var, error)
-			_
-				-> (root_attr, error)
-*/	check_attribute attr root_attr name error
+				-> (SwitchUniquenessBug (TA_RootVar (abort "SwitchUniquenessBug is on")) root_attr, error)
+	check_attribute attr root_attr name error
 		= (TA_Multi, checkError name "specified attribute not allowed" error)
 	
 retrieveKinds :: ![ATypeVar] *TypeVarHeap -> (![TypeKind], !*TypeVarHeap)

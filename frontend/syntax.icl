@@ -1325,12 +1325,13 @@ where
 	(<<<) file (App {app_symb, app_args, app_info_ptr})
 		= file <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
-	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') (let_strict_binds++let_lazy_binds) <<< "in\n" <<< let_expr
+	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
+			= write_binds "" (write_binds "!" (file <<< "let" <<< '\n') let_strict_binds) let_lazy_binds <<< "in\n" <<< let_expr
 	where
-		write_binds file []
+		write_binds x file []
 			= file
-		write_binds file [bind : binds]
-			= write_binds (file <<< bind <<< '\n') binds
+		write_binds x file [bind : binds]
+			= write_binds x (file <<< x <<< " " <<< bind <<< '\n') binds
  	(<<<) file (Case {case_expr,case_guards,case_default=No})
 		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
 	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr})

@@ -1733,32 +1733,46 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 		= (producers, [App app : new_args ], ti)
 	# (fun_def, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
 	  ti = { ti & ti_fun_defs=ti_fun_defs }
-	  is_curried = fun_def.fun_arity<>length app_args
-	  is_good_producer = (implies is_curried is_applied_to_macro_fun) && (implies (not is_curried) (SwitchFusion linear_bit False))
-	| is_good_producer
-		// curried applications may be fused with non linear consumers in functions local to a macro
-		= ({ producers & [prod_index] = PR_Function symb glob_object (length app_args)}, app_args ++ new_args, ti)
-	= (producers, [App app : new_args ], ti)
-
+	  nr_of_app_args = length app_args
+	= determineFunAppProducer fun_def nr_of_app_args (PR_Function symb glob_object nr_of_app_args)
+								is_applied_to_macro_fun linear_bit app new_args prod_index producers ti
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
 				  new_args prod_index producers ti
 	# (FI_Function {gf_fun_def}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
-	# is_curried = gf_fun_def.fun_arity<>length app_args
-	  is_good_producer = (implies is_curried is_applied_to_macro_fun) && (implies (not is_curried) (SwitchFusion linear_bit False))
-	| is_good_producer
-		// curried applications may be fused with non linear consumers in functions local to a macro
-		= case gf_fun_def.fun_body of
-			Expanding _	-> (producers, [App app : new_args ], ti)
-			_			-> ({ producers & [prod_index] = PR_GeneratedFunction symb fun_index (length app_args)}, app_args ++ new_args, ti)
-	= (producers, [App app : new_args ], ti)
+	  nr_of_app_args = length app_args
+	= determineFunAppProducer gf_fun_def nr_of_app_args (PR_GeneratedFunction symb fun_index nr_of_app_args)
+								is_applied_to_macro_fun linear_bit app new_args prod_index producers ti
 // XXX determineProducer {app_symb = symb=:{symb_kind = SK_Constructor glob_index}, app_args} new_args prod_index producers ti
 //	= ({ producers & [prod_index] = PR_Constructor symb app_args}, new_args, ti)
 // XXX */
 determineProducer _ _ app _ new_args _ producers ti
 	= (producers, [App app : new_args ], ti)
 	
-		
+determineFunAppProducer {fun_body, fun_arity} nr_of_app_args new_producer
+					is_applied_to_macro_fun linear_bit app=:{app_args} new_args prod_index producers ti
+	# is_curried = fun_arity<>nr_of_app_args
+	  is_expanding = case fun_body of { Expanding _ -> True; _ -> False }
+	  is_good_producer =	not is_expanding
+	  					 && (implies is_curried is_applied_to_macro_fun)
+	  					 && (implies (not is_curried) (SwitchFusion (linear_bit && is_good_body tb_rhs) False))
+			// curried applications may be fused with non linear consumers in functions local to a macro
+	| is_good_producer
+		= ({ producers & [prod_index] = new_producer}, app_args ++ new_args, ti)
+	= (producers, [App app : new_args ], ti)
+  where
+	(TransformedBody {tb_rhs}) = fun_body
+	
+	is_good_body (AnyCodeExpr _ _ _) = False	
+	is_good_body (ABCCodeExpr _ _) = False	
+	is_good_body (Let {let_strict_binds}) = isEmpty let_strict_binds	
+		// currently a producer's body must not be a let with strict bindings. The code sharing elimination algorithm assumes that
+		// all strict let bindings are on the top level expression (see "convertCasesOfFunctionsIntoPatterns"). This assumption
+		// could otherwise be violated during fusion.
+		// -> Here is place for optimisation: Either the fusion algorithm or the code sharing elimination algorithm could be
+		// extended to generate new functions when a strict let ends up during fusion in a non top level position (MW)
+	is_good_body _ = True	
+
 /*
 	verify_class_members [ App {app_symb, app_args} : mems]
 		= verify_class_members app_args && verify_class_members mems

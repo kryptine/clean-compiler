@@ -1190,14 +1190,15 @@ where
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars,
 					{ cos & cos_var_heap = cos_var_heap, cos_error = checkError "" "cyclic let definition" cos.cos_error})
 		| otherwise
-			# (let_expr, free_vars, cos)			= collectVariables let_expr free_vars { cos & cos_var_heap = cos_var_heap }
-			  (let_strict_binds, free_vars, cos)	= collect_variables_in_binds let_strict_binds [] free_vars cos
-			  (let_lazy_binds, free_vars, cos)		= collect_variables_in_binds let_lazy_binds [] free_vars cos
+			# (let_expr, free_vars, cos) = collectVariables let_expr free_vars { cos & cos_var_heap = cos_var_heap }
+			  all_binds = mapAppend (\sb->(True, sb)) let_strict_binds [(False, lb) \\ lb<-let_lazy_binds]
+			  (collected_binds, free_vars, cos) = collect_variables_in_binds all_binds [] free_vars cos
+			  (let_strict_binds, let_lazy_binds) = split collected_binds
 			| isEmpty let_strict_binds && isEmpty let_lazy_binds
 				= (let_expr, free_vars, cos)
 				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, cos)
 		where
-		
+
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
 			this variable is an alias for 'var') or to 'VI_Count 0 cIsALocalVar' to initialise
 		   	the reference count info.
@@ -1211,7 +1212,7 @@ where
 				= var_heap
 
 			
-		/*	Remove all aliases from the list of 'let'-binds. Be carefull with cycles! */
+		/*	Remove all aliases from the list of 'let'-binds. Be careful with cycles! */
 		
 			detect_cycles_and_remove_alias_binds [] var_heap
 				= (cContainsNoCycle, [], var_heap)
@@ -1247,16 +1248,25 @@ where
 					= collect_variables_in_binds binds collected_binds free_vars cos
 					= (collected_binds, free_vars, cos)
 		
-			examine_reachable_binds bind_found [bind=:{bind_dst=fv=:{fv_info_ptr},bind_src} : binds] collected_binds free_vars cos
+			examine_reachable_binds bind_found [bind=:(is_strict, {bind_dst=fv=:{fv_info_ptr},bind_src}) : binds] collected_binds free_vars cos
 				# (bind_found, binds, collected_binds, free_vars, cos) = examine_reachable_binds bind_found binds collected_binds free_vars cos
 				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
 				# (VI_Count count is_global) = var_info
 				| count > 0
 					# (bind_src, free_vars, cos) = collectVariables bind_src free_vars cos
-					= (True, binds, [ { bind_dst = { fv & fv_count = count }, bind_src = bind_src } : collected_binds ], free_vars, cos)
+					= (True, binds, [ (is_strict, { bind_dst = { fv & fv_count = count }, bind_src = bind_src }) : collected_binds ], free_vars, cos)
 					= (bind_found, [bind : binds], collected_binds, free_vars, cos)
 			examine_reachable_binds bind_found [] collected_binds free_vars cos
 				= (bind_found, [], collected_binds, free_vars, cos)
+
+			split :: ![(Bool, x)] -> (![x], ![x])
+			split []
+				= ([], [])
+			split [(p, x):xs]
+				# (l, r) = split xs
+				| p
+					= ([x:l], r)
+				= (l, [x:r])
 
 	collectVariables (Case case_expr) free_vars cos
 		# (case_expr, free_vars, cos) = collectVariables case_expr free_vars cos
