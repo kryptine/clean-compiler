@@ -53,12 +53,6 @@ where
 		# (bind_src, cs) = convertCases ci bind_src cs
 		= ({ bind & bind_src = bind_src }, cs)
 
-instance convertCases DynamicExpr
-where
-	convertCases ci dynamik=:{dyn_expr} cs
-		# (dyn_expr, cs) = convertCases ci dyn_expr cs
-		= ({ dynamik & dyn_expr = dyn_expr }, cs)
-	
 instance convertCases Let
 where
 	convertCases ci lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr} cs=:{cs_expr_heap}
@@ -111,11 +105,6 @@ where
 		= (TupleSelect tuple_symbol arg_nr expr, cs)
 	convertCases ci (Case case_expr) cs
 		= convertCasesInCaseExpression ci cHasNoDefault case_expr cs
-/*
-	convertCases ci (DynamicExpr dynamik) cs
-		# (dynamik, cs) = convertCases ci dynamik cs
-		= (DynamicExpr dynamik, cs)
-*/
 	convertCases ci expr cs
 		= (expr, cs)
 
@@ -683,11 +672,6 @@ where
 	copy (TupleSelect tuple_symbol arg_nr expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
 		= (TupleSelect tuple_symbol arg_nr expr, cp_info)
-/*
-	copy (DynamicExpr dynamik) cp_info
-		# (dynamik, cp_info) = copy dynamik cp_info
-		= (DynamicExpr dynamik, cp_info)
-*/
 	copy EE cp_info
 		= (EE, cp_info)
 	copy (NoBind ptr) cp_info
@@ -716,40 +700,6 @@ where
 	copy selector cp_info
 		= (selector, cp_info)
 
-/*
-instance copy DynamicExpr
-where
-	copy dynamik=:{dyn_expr,dyn_uni_vars,dyn_type_code} cp_info=:{cp_var_heap}
-		# ((dyn_expr, dyn_type_code), cp_info) = copy (dyn_expr,dyn_type_code)
-				{ cp_info & cp_var_heap = foldSt (\info_ptr -> writePtr info_ptr VI_LocalVar) dyn_uni_vars cp_var_heap }
-		= ({ dynamik & dyn_expr = dyn_expr, dyn_type_code = dyn_type_code }, cp_info)
-
-instance copy TypeCodeExpression
-where
-	copy (TCE_Var var_info_ptr) cp_info=:{cp_free_vars, cp_var_heap}
-		# (new_info_ptr, cp_info) = copyVarInfo var_info_ptr cp_info
-		= (TCE_Var new_info_ptr, cp_info)
-	copy (TCE_Constructor index type_codes) cp_info
-		# (type_codes, cp_info) = copy type_codes cp_info
-		= (TCE_Constructor index type_codes, cp_info)
-	copy (TCE_Selector selections var_info_ptr) cp_info
-		# (new_info_ptr, cp_info) = copyVarInfo var_info_ptr cp_info
-		= (TCE_Selector selections new_info_ptr, cp_info)
-
-copyVarInfo var_info_ptr cp_info=:{cp_free_vars, cp_var_heap}
-	#! var_info = sreadPtr var_info_ptr cp_var_heap
-	= case var_info of
-		VI_FreeVar name new_info_ptr count type
-			-> (new_info_ptr, { cp_free_vars = cp_free_vars, cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
-		VI_LocalVar
-			-> (var_info_ptr, {cp_free_vars = cp_free_vars, cp_var_heap = cp_var_heap})
-		VI_BoundVar type
-			# (new_info_ptr, cp_var_heap) = newPtr VI_Empty cp_var_heap
-			-> (new_info_ptr, { cp_free_vars = [ (var_info_ptr, type) : cp_free_vars ],
-						cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar { id_name = "_t", id_info = nilPtr } new_info_ptr 1 type) })
-
-*/
-
 instance copy Case
 where
 	copy this_case=:{case_expr, case_guards, case_default} cp_info
@@ -764,11 +714,6 @@ where
 	copy (BasicPatterns type patterns) cp_info
 		# (patterns, cp_info) = copy patterns cp_info
 		= (BasicPatterns type patterns, cp_info) 
-/*
-	copy (DynamicPatterns patterns) cp_info
-		# (patterns, cp_info) = copy patterns cp_info
-		= (DynamicPatterns patterns, cp_info) 
-*/
 
 instance copy AlgebraicPattern
 where
@@ -781,16 +726,7 @@ where
 	copy pattern=:{bp_expr} cp_info
 		# (bp_expr, cp_info) = copy bp_expr cp_info
 		= ({ pattern & bp_expr = bp_expr }, cp_info) 
-/*
-instance copy DynamicPattern
-where
-	copy pattern=:{dp_var={fv_info_ptr},dp_rhs,dp_type_patterns_vars, dp_type_code} cp_info=:{cp_var_heap}
-		# (dp_rhs, cp_info) = copy dp_rhs
-				{ cp_info & cp_var_heap = foldSt (\info_ptr -> writePtr info_ptr VI_LocalVar) dp_type_patterns_vars cp_var_heap
-				 			<:= (fv_info_ptr, VI_LocalVar) }
-		  (dp_type_code, cp_info) = copy dp_type_code cp_info
-		= ({ pattern & dp_rhs = dp_rhs, dp_type_code = dp_type_code }, cp_info) 
-*/
+
 instance copy [a] | copy a
 where
 	copy l cp_info = mapSt copy l cp_info 
@@ -916,10 +852,6 @@ where
 		= weightedRefCount dcl_functions common_defs depth (expression, expressions) rc_info
 	weightedRefCount dcl_functions common_defs depth (TupleSelect tuple_symbol arg_nr expr) rc_info
 		= weightedRefCount dcl_functions common_defs depth expr rc_info
-/*
-	weightedRefCount dcl_functions common_defs depth (DynamicExpr {dyn_expr}) rc_info
-		= weightedRefCount dcl_functions common_defs depth dyn_expr rc_info
-*/
 	weightedRefCount dcl_functions common_defs depth (AnyCodeExpr _ _ _) rc_info
 		= rc_info
 	weightedRefCount dcl_functions common_defs depth (ABCCodeExpr _ _) rc_info
@@ -1203,10 +1135,6 @@ where
 		is_moved LES_Moved	= True
 		is_moved _ 			= False
 
-/*	distributeLets depth (DynamicExpr dynamik=:{dyn_expr}) dl_info
-		# (dyn_expr, dl_info) = distributeLets depth dyn_expr dl_info
-		= (DynamicExpr { dynamik & dyn_expr = dyn_expr }, dl_info)
-*/
 	distributeLets depth expr=:(TypeCodeExpression _) dl_info
 		= (expr, dl_info)
 	distributeLets depth (AnyCodeExpr in_params out_params code_expr) dl_info=:{di_var_heap}
