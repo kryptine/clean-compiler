@@ -363,9 +363,9 @@ buildGenericTypeRep type_index funs_and_groups
 //	the structure type
 //========================================================================================
 
-convertATypeToGenTypeStruct :: !Ident !Position !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
+convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbols !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
 	-> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convertATypeToGenTypeStruct ident pos type st
+convertATypeToGenTypeStruct ident pos predefs type st
 	= convert type st	
 where	
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -394,11 +394,17 @@ where
 				# (expanded_type, th) = expandSynonymType type_def attr args heaps.hp_type_heaps 
 				-> convert {at_type = expanded_type, at_attribute = attr} 
 					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
-			_ 	 	
-				#! ({tdi_kinds}, td_infos) = td_infos ! [type_index.glob_module,type_index.glob_object]
-				#! kind = if (isEmpty tdi_kinds) KindConst (KindArrow tdi_kinds)
-				#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
-				->  (GTSAppCons kind args, st)  
+			_ 	
+				#! {pds_module, pds_def} = predefs.[PD_UnboxedArrayType]
+				| 	type_index.glob_module == pds_module
+					&& type_index.glob_object == pds_def
+					&& (case args of [{at_type=TB _}] -> True; _ -> False)
+					-> (GTSAppCons KindConst [], (modules, td_infos, heaps, error))
+				| otherwise	
+					#! ({tdi_kinds}, td_infos) = td_infos ! [type_index.glob_module,type_index.glob_object]
+					#! kind = if (isEmpty tdi_kinds) KindConst (KindArrow tdi_kinds)
+					#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
+					-> (GTSAppCons kind args, st)  
 
 
 
@@ -429,7 +435,7 @@ where
 			[{ci_cons_info, ci_field_infos}] 
 			(modules, td_infos, heaps, error)		
 		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]	
-		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos) st_args (modules, td_infos, heaps, error)
+		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos predefs) st_args (modules, td_infos, heaps, error)
 		
 		# args = SwitchGenericInfo [GTSField fi arg \\ arg <- args & fi <- ci_field_infos] args
 			
@@ -450,7 +456,7 @@ where
 		
 	build_alt td_name td_pos cons_def_sym=:{ds_index} {ci_cons_info} (modules, td_infos, heaps, error)
 		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[ds_index]	
-		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos) st_args (modules, td_infos, heaps, error)	
+		# (args, st) = mapSt (convertATypeToGenTypeStruct td_name td_pos predefs) st_args (modules, td_infos, heaps, error)	
 		# prod_type = build_prod_type args		
 		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type		
 		= (type, st)		
@@ -1991,7 +1997,7 @@ where
 		#! curried_gen_type = curry_symbol_type gen_type
 
 		#! (struct_gen_type, (modules, td_infos, heaps, error)) = convertATypeToGenTypeStruct 
-				bimap_ident gc_pos curried_gen_type (modules, td_infos, heaps, error)  
+				bimap_ident gc_pos predefs curried_gen_type (modules, td_infos, heaps, error)  
 		#! (bimap_expr, (td_infos, heaps, error)) 
 			= specializeGeneric {gi_module=bimap_module,gi_index=bimap_index} struct_gen_type spec_env bimap_ident gc_pos main_module_index predefs (td_infos, heaps, error)
 
