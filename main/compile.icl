@@ -215,7 +215,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	{	feo_upToPhase		= FrontEndPhaseAll
 			,	feo_search_paths	= options.searchPaths
 			,	feo_typelisting		= if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
-			,	feo_fusionstyle		= (if options.supercompilation FS_online FS_offline) ---> ("Read supercompilation option: "+++toString options.supercompilation)
+			,	feo_fusionstyle		= if options.supercompilation FS_online FS_offline
 			}
 	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
 		=	frontEndInterface feopts moduleIdent dcl_modules functions_and_macros predef_symbols hash_table files error io out tcl_file heaps
