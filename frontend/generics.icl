@@ -2330,7 +2330,7 @@ where
 		= (alg_pattern, cons_arg_vars, {gs & gs_heaps = gs_heaps})
 	
 	build_cons_args :: !IsoDirection ![AType] ![FreeVar] ![FreeVar] !CheckedTypeDef !*GenericState 
-		-> ([!Expression], !*GenericState)
+		-> ([Expression], !*GenericState)
 	build_cons_args iso_dir [] [] fun_arg_vars type_def gs = ([], gs) 	
 	build_cons_args	iso_dir [arg_type:arg_types] [cons_arg_var:cons_arg_vars] fun_arg_vars type_def gs
 		# (arg_expr, gs) = build_cons_arg iso_dir arg_type cons_arg_var fun_arg_vars type_def gs
@@ -3225,7 +3225,7 @@ buildVarExpr name heaps=:{hp_var_heap, hp_expression_heap}
 	# heaps = { heaps & hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap } 
 	= (var, fv, heaps)
 
-buildVarExprs :: ![String] !*Heaps -> (![Expression], [!FreeVar], !*Heaps)	 		
+buildVarExprs :: ![String] !*Heaps -> (![Expression], [FreeVar], !*Heaps)	 		
 buildVarExprs [] heaps = ([], [], heaps)
 buildVarExprs [name:names] heaps 
 	# (expr, var, heaps) = buildVarExpr name heaps
@@ -3428,12 +3428,13 @@ where
 		#! heaps = setVarInfos vars infos heaps
 	 	= (fresh_vars, heaps)
 	 	
-	collect_local_vars body_expr fun_arg_vars heaps=:{hp_var_heap, hp_expression_heap} 	
+	collect_local_vars body_expr fun_arg_vars heaps=:{hp_var_heap, hp_expression_heap}
+		# dummy_pds = {pds_ident=makeIdent "dummy", pds_module=NoIndex,pds_def=NoIndex}
 		#! cs =
 	  		{ cos_error = {ea_file = stderr, ea_ok = True, ea_loc=[]}
 	  		, cos_var_heap = hp_var_heap
-	  		, cos_symbol_heap = hp_expression_heap
-	  		, cos_alias_dummy = {pds_ident=makeIdent "dummy", pds_module=NoIndex,pds_def=NoIndex}
+	  		, cos_symbol_heap = hp_expression_heap	  		
+	  		, cos_predef_symbols_for_transform = { predef_alias_dummy=dummy_pds, predef_and=dummy_pds, predef_or=dummy_pds }
 // MV ...
 			, cos_used_dynamics = abort "error, please report to Martijn or Artem"
 // ... MV

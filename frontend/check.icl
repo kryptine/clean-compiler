@@ -801,15 +801,24 @@ checkFunctions mod_index level from_index to_index fun_defs e_info heaps cs
 		# (fun_defs, e_info, heaps, cs) = checkFunction mod_index from_index level fun_defs e_info heaps cs
 		= checkFunctions mod_index level (inc from_index) to_index fun_defs e_info heaps cs
 
+get_predef_symbols_for_transform :: *PredefinedSymbols -> (!PredefSymbolsForTransform,!.PredefinedSymbols)
+// clean 2.0 does not allow this, clean 1.3 does:
+// get_predef_symbols_for_transform cs_predef_symbols=:{[PD_DummyForStrictAliasFun]=predef_alias_dummy,[PD_AndOp]=predef_and,[PD_OrOp]=predef_or}
+get_predef_symbols_for_transform cs_predef_symbols
+	# (predef_alias_dummy,cs_predef_symbols) = cs_predef_symbols![PD_DummyForStrictAliasFun]
+	# (predef_and,cs_predef_symbols) = cs_predef_symbols![PD_AndOp]
+	# (predef_or,cs_predef_symbols) = cs_predef_symbols![PD_OrOp]
+	= ({predef_alias_dummy=predef_alias_dummy,predef_and=predef_and,predef_or=predef_or},cs_predef_symbols)
+
 checkMacros ::  !Index !IndexRange !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 	-> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState);
 checkMacros mod_index range fun_defs e_info=:{ef_is_macro_fun=ef_is_macro_fun_old} heaps cs
 	# (fun_defs, e_info, heaps=:{hp_var_heap, hp_expression_heap}, cs=:{cs_symbol_table, cs_predef_symbols, cs_error})
 			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to fun_defs { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_modules}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
-	  (pds_alias_dummy, cs_predef_symbols) = cs_predef_symbols![PD_DummyForStrictAliasFun]
+	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
 	  (fun_defs, ef_modules, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateMacros range mod_index pds_alias_dummy fun_defs ef_modules hp_var_heap hp_expression_heap cs_symbol_table cs_error
+	  		= partitionateMacros range mod_index predef_symbols_for_transform fun_defs ef_modules hp_var_heap hp_expression_heap cs_symbol_table cs_error
 	= (fun_defs, { e_info & ef_modules = ef_modules }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
 			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
@@ -1853,10 +1862,9 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 
 		  (cached_functions_and_macros,icl_functions) = arrayCopyBegin icl_functions n_functions_and_macros_in_dcl_modules
 
-		  (pds_alias_dummy, cs_predef_symbols) = cs_predef_symbols![PD_DummyForStrictAliasFun]
-
+		# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
 		  (groups, icl_functions, dcl_modules, var_heap, expr_heap, cs_symbol_table, cs_error)
-		  		= partitionateAndLiftFunctions [icl_global_function_range, icl_instances] main_dcl_module_n pds_alias_dummy icl_functions
+		  		= partitionateAndLiftFunctions [icl_global_function_range, icl_instances] main_dcl_module_n predef_symbols_for_transform icl_functions
 		  			dcl_modules var_heap expr_heap cs_symbol_table cs_error
 		  icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
 			  	 			  com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs,

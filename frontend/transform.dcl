@@ -6,10 +6,12 @@ import syntax, checksupport
 	{	group_members	:: ![Int]
 	}
 
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+:: PredefSymbolsForTransform = { predef_alias_dummy :: !PredefinedSymbol, predef_and :: !PredefinedSymbol, predef_or :: !PredefinedSymbol };
+
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
 
-partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+partitionateMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
 
 ::	CopiedLocalFunctions
@@ -20,10 +22,8 @@ partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# Dcl
 	{	cos_var_heap	:: !.VarHeap
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
-	,	cos_alias_dummy	:: !PredefinedSymbol
-// MV ...
+	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
 	,	cos_used_dynamics	:: !.{#Bool}
-// ... MV
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)

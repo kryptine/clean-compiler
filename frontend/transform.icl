@@ -803,9 +803,11 @@ where
 
 NotChecked :== -1	
 
-partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+:: PredefSymbolsForTransform = { predef_alias_dummy :: !PredefinedSymbol, predef_and :: !PredefinedSymbol, predef_or :: !PredefinedSymbol };
+
+partitionateMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
-partitionateMacros {ir_from,ir_to} mod_index alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
+partitionateMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
 							pi_symbol_table = symbol_table,
@@ -855,8 +857,8 @@ where
 					 es_fun_defs=macro_defs, es_main_dcl_module_n = mod_index, es_dcl_modules=modules,
 					 es_expand_in_imp_module=expand_in_imp_module,es_new_fun_def_numbers=[]
 					  }			
-			# (tb_args, tb_rhs, local_vars, fi_calls, /* MV ... */ fun_info, /* ... MV */ {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
-					= expandMacrosInBody [] body alias_dummy /* MV ... */ macro_index /* ... MV */ es
+			# (tb_args, tb_rhs, local_vars, fi_calls, fun_info, {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
+					= expandMacrosInBody [] body predef_symbols_for_transform macro_index es
 			# macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
 			= ({ es_fun_defs & [macro_index] = macro }, es_dcl_modules,
@@ -935,9 +937,9 @@ add_macros_to_current_group new_macro_fun_def_index n_fun_defs_after_expanding_m
 //		# pi_next_group=pi_next_group+1
 		= add_macros_to_current_group (new_macro_fun_def_index+1) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group [new_macro_fun_def_index:macros]
 
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
-partitionateAndLiftFunctions ranges main_dcl_module_n alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
+partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transform fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = {	pi_var_heap = var_heap, pi_symbol_heap = symbol_heap, pi_symbol_table = symbol_table,
 									pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
@@ -982,7 +984,7 @@ where
 				# (min_dep, funs_modules_pi) = foldSt (visit_function mod_index max_fun_nr) fun_def.fun_info.fi_calls
 						(max_fun_nr, ({ fun_defs & [fun_index] = { fun_def & fun_body = PartioningFunction body fun_number }}, modules,
 							{ pi & pi_next_num = inc fun_number, pi_deps = [fun_index : pi.pi_deps] }))
-				-> try_to_close_group mod_index max_fun_nr fun_index fun_number min_dep fun_def.fun_info.fi_def_level funs_modules_pi
+				-> try_to_close_group mod_index max_fun_nr fun_index fun_number min_dep funs_modules_pi
 			PartioningFunction _ fun_number
 				-> (fun_number, (fun_defs, modules, pi))
 			TransformedBody _
@@ -999,13 +1001,13 @@ where
 		# (next_min, funs_modules_pi) = partitionate_function mod_index max_fun_nr fc_index funs_modules_pi
 		= (min next_min min_dep, funs_modules_pi)
 
-	try_to_close_group mod_index max_fun_nr fun_index fun_number min_dep def_level (fun_defs, modules,
+	try_to_close_group mod_index max_fun_nr fun_index fun_number min_dep (fun_defs, modules,
 					pi=:{pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_deps, pi_groups, pi_next_group, pi_error})
 		| fun_number <= min_dep
 			# (pi_deps, functions_in_group, macros_in_group, fun_defs)
 					= close_group fun_index pi_deps [] [] max_fun_nr pi_next_group fun_defs
 			  {ls_x={x_fun_defs=fun_defs}, ls_var_heap=pi_var_heap, ls_expr_heap=pi_symbol_heap}
-			  		= liftFunctions def_level (functions_in_group ++ macros_in_group) pi_next_group main_dcl_module_n fun_defs pi_var_heap pi_symbol_heap		  
+			  		= liftFunctions (functions_in_group ++ macros_in_group) pi_next_group main_dcl_module_n fun_defs pi_var_heap pi_symbol_heap		  
 			# es
 			  		= expand_macros_in_group macros_in_group
 			  			{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
@@ -1049,8 +1051,8 @@ where
 		  	  identPos = newPosition fun_symb fun_pos
 			# expand_in_imp_module=case fun_kind of FK_ImpFunction _->True; FK_ImpMacro->True; FK_ImpCaf->True; _ -> False
 			  es={ es & es_expand_in_imp_module=expand_in_imp_module, es_error = setErrorAdmin identPos es.es_error }
-			# (tb_args, tb_rhs, fi_local_vars, fi_calls, /* MV ... */ fun_info, /* ... MV */ es)
-					= expandMacrosInBody fun_info.fi_calls body alias_dummy /* MV ... */ fun_index /* ... MV */ es
+			# (tb_args, tb_rhs, fi_local_vars, fi_calls, fun_info, es)
+					= expandMacrosInBody fun_info.fi_calls body predef_symbols_for_transform fun_index es
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= {es & es_fun_defs.[fun_index] = fun_def }
@@ -1102,8 +1104,8 @@ where
 			_
 				-> (fun_defs, symbol_table)
 
-expandMacrosInBody :: [.FunCall] CheckedBody PredefinedSymbol /* MV ... */ !Int /* ... MV */ *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],/* MV ... */ !FunInfo, /* ... MV */ .ExpandState);
-expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current_fun_index /* ... MV */ es=:{es_symbol_heap,es_fun_defs}
+expandMacrosInBody :: [.FunCall] CheckedBody PredefSymbolsForTransform !Int *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],/* MV ... */ !FunInfo, /* ... MV */ .ExpandState);
+expandMacrosInBody fi_calls {cb_args,cb_rhs} predef_symbols_for_transform es_current_fun_index es=:{es_symbol_heap,es_fun_defs}
 // MV ...
 	# (fun_def=:{fun_info},es_fun_defs)
 		= es_fun_defs![es_current_fun_index]
@@ -1126,7 +1128,7 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy /* MV ... */ es_current
 	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap /* MV ... */, cos_used_dynamics /* ... MV */})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
-	  					cos_alias_dummy = alias_dummy /* MV ... */, cos_used_dynamics = cos_used_dynamics /* ... MV */}
+	  					cos_predef_symbols_for_transform = predef_symbols_for_transform, cos_used_dynamics = cos_used_dynamics }
 	// MV ...
 	# (changed,fi_dynamics,_,cos_symbol_heap)
 		= foldSt remove_fi_dynamic fun_info.fi_dynamics (False,[],cos_used_dynamics,cos_symbol_heap)
@@ -1184,7 +1186,7 @@ cMacroIsCalled 		:== True
 cNoMacroIsCalled 	:== False
 */
 
-liftFunctions min_level group group_index main_dcl_module_n fun_defs var_heap expr_heap
+liftFunctions group group_index main_dcl_module_n fun_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs)
 			= foldSt (add_free_vars_of_non_recursive_calls_to_function group_index) group (False, False, fun_defs)
 	| contains_free_vars
@@ -1462,10 +1464,8 @@ where
 	{	cos_var_heap	:: !.VarHeap
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
-	,	cos_alias_dummy	:: !PredefinedSymbol
-// MV ...
+	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
 	,	cos_used_dynamics	:: !.{#Bool}
-// ... MV
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
@@ -1522,6 +1522,27 @@ where
 	collectVariables (Var var) free_vars cos
 		# (var, free_vars, cos) = collectVariables var free_vars cos
 		= (Var var, free_vars, cos)
+	/* optimize && and || */
+	collectVariables (App app=:{app_symb={symb_kind=SK_Function {glob_object,glob_module}},app_args}) free_vars cos=:{cos_predef_symbols_for_transform={predef_and,predef_or}}
+		# ([e1,e2:_], free_vars, cos) = collectVariables app_args free_vars cos
+		| glob_object==predef_and.pds_def && glob_module==predef_and.pds_module && two_args app_args
+			# (kase,cos) = if_expression e1 e2 (BasicExpr (BVB False) BT_Bool) cos
+			= (kase, free_vars, cos)
+		| glob_object==predef_or.pds_def && glob_module==predef_or.pds_module && two_args app_args
+			# (kase,cos) = if_expression e1 (BasicExpr (BVB True) BT_Bool) e2 cos
+			= (kase, free_vars, cos)
+		where
+			if_expression :: Expression Expression Expression *CollectState -> (!Expression,!.CollectState);
+			if_expression e1 e2 e3 cos
+				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
+				# kase = Case {	case_expr=e1, case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr=e2,bp_position=NoPos}],
+								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos }
+				= (kase,{cos & cos_symbol_heap=symbol_heap});
+			
+			two_args [_,_]
+				= True;
+			two_args app_args
+				= False;
 	collectVariables (App app=:{app_args}) free_vars cos
 		# (app_args, free_vars, cos) = collectVariables app_args free_vars cos
 		= (App { app & app_args = app_args}, free_vars, cos)
@@ -1596,9 +1617,9 @@ where
 							_
 								-> False
 				
-				add_dummy_id_for_strict_alias bind_src cos=:{cos_symbol_heap, cos_alias_dummy}
+				add_dummy_id_for_strict_alias bind_src cos=:{cos_symbol_heap, cos_predef_symbols_for_transform}
 					# (new_app_info_ptr, cos_symbol_heap) = newPtr EI_Empty cos_symbol_heap
-					  {pds_ident, pds_module, pds_def} = cos_alias_dummy
+					  {pds_ident, pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
 					  app_symb = { symb_name = pds_ident, 
 					  				symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def},
 									symb_arity = 1 }
