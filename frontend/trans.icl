@@ -666,10 +666,30 @@ where
 		store_type_info_of_alg_pattern (var_types,{ap_vars}) var_heap
 			= foldSt (\(var_type, {fv_info_ptr}) var_heap
 						->setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap) (zip2 var_types ap_vars) var_heap
-
 	transform (Selection opt_type expr selectors) ro ti
 		# (expr, ti) = transform expr ro ti
 		= transformSelection opt_type selectors expr ti
+	transform (Update expr1 selectors expr2) ro ti
+		# (expr1,ti) = transform expr1 ro ti
+		# (expr2,ti) = transform expr2 ro ti
+		= (Update expr1 selectors expr2,ti)
+	transform (RecordUpdate cons_symbol expr exprs) ro ti
+		# (expr,ti) = transform expr ro ti
+		# (exprs,ti) = transform_fields exprs ro ti
+		=(RecordUpdate cons_symbol expr exprs,ti)
+	where	
+		transform_fields [] ro ti
+			= ([],ti)
+		transform_fields [bind=:{bind_src} : fields] ro ti
+			# (bind_src,ti) = transform bind_src ro ti
+			# (fields,ti) = transform_fields fields ro ti
+			= ([{bind & bind_src=bind_src} : fields],ti)
+	transform (TupleSelect a1 arg_nr expr) ro ti
+		# (expr,ti) = transform expr ro ti
+		= (TupleSelect a1 arg_nr expr,ti)
+	transform (MatchExpr a1 a2 expr) ro ti
+		# (expr,ti) = transform expr ro ti
+		= (MatchExpr a1 a2 expr,ti)
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
