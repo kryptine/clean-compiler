@@ -2761,7 +2761,7 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 		= case ste_kind of
 			STE_ClosedModule
 				-> cs
-			STE_Empty
+			_ 
 				# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
 				  cs_error = pushErrorAdmin error_location cs.cs_error
 				  cs_error = checkError pds_ident ("not imported"+++explanation) cs_error
