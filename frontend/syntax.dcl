@@ -684,25 +684,22 @@ cNonRecursiveAppl	:== False
 
 					| EI_Overloaded !OverloadedCall 						/* initial, set by the type checker */
 					| EI_Instance 	!(Global DefinedSymbol) ![Expression]	/* intermedediate, used during resolving of overloading */ 
-//					| EI_Selection 	![Selection] !BoundVar ![Expression]	/* intermedediate, used during resolving of overloading */
 					| EI_Selection 	![Selection] !VarInfoPtr ![Expression]	/* intermedediate, used during resolving of overloading */
 					| EI_Context 	![Expression]							/* intermedediate, used during resolving of overloading */
 
 		/* For handling dynamics */
 
-					| EI_Dynamic 				!(Optional DynamicType) !Int
+					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]
+					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]
 					| EI_DynamicType			!DynamicType ![DynamicPtr]
-//					| EI_DynamicType			!DynamicType !(Optional ExprInfoPtr)
 
 		/* Auxiliary, was EI_DynamicType before checking */
 
 					| EI_DynamicTypeWithVars	![TypeVar] !DynamicType ![DynamicPtr]				
-//					| EI_DynamicTypeWithVars	![TypeVar] !DynamicType !(Optional ExprInfoPtr)			
 
 		/* Auxiliary, used during type checking */
 
-					| EI_TempDynamicType 		!(Optional DynamicType) !AType ![TypeContext] !ExprInfoPtr !SymbIdent
-//					| EI_TempDynamicPattern 	![TypeVar] !DynamicType !(Optional ExprInfoPtr) ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
+					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					
 					| EI_TypeOfDynamic 			![VarInfoPtr] !TypeCodeExpression				/* Final */

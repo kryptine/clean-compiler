@@ -4118,7 +4118,6 @@ where
 	  		, cos_var_heap = hp_var_heap
 	  		, cos_symbol_heap = hp_expression_heap	  		
 	  		, cos_predef_symbols_for_transform = { predef_alias_dummy=dummy_pds, predef_and=dummy_pds, predef_or=dummy_pds }
-			, cos_used_dynamics = {} //abort "error, please report to Martijn or Artem"
 	  		}
 		# (body_expr, fun_arg_vars, local_vars, {cos_symbol_heap, cos_var_heap}) = 
 			determineVariablesAndRefCounts fun_arg_vars body_expr cs

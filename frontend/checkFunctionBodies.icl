@@ -10,14 +10,15 @@ cIsNotInExpressionList	:== False
 cEndWithUpdate			:== True
 cEndWithSelection		:== False
 
+::	Dynamics		:== [ExprInfoPtr]
+
 ::	ExpressionState =
 	{	es_expr_heap	:: !.ExpressionHeap
-	,	es_var_heap			:: !.VarHeap
-	,	es_type_heaps		:: !.TypeHeaps
-	,	es_calls			:: ![FunCall]
-	,	es_dynamics			:: ![ExprInfoPtr]
-	,	es_fun_defs			:: !.{# FunDef}
- 	,	es_dynamic_expr_count	:: !Int				// used to give each dynamic expr an unique id
+	,	es_var_heap		:: !.VarHeap
+	,	es_type_heaps	:: !.TypeHeaps
+	,	es_calls		:: ![FunCall]
+	,	es_dynamics		:: !Dynamics
+	,	es_fun_defs		:: !.{# FunDef}
 	}
 
 ::	ExpressionInput =
@@ -120,7 +121,8 @@ make_case_guards cons_symbol type_symbol alg_patterns expr_heap cs
 			= (AlgebraicPatterns type_symbol alg_patterns,expr_heap,cs)						
 		= (AlgebraicPatterns type_symbol alg_patterns,expr_heap,cs)
 
-checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState -> (FunctionBody,[FreeVar],!.ExpressionState,.ExpressionInfo,!.CheckState);
+checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
+	-> (!FunctionBody, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
 	# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
@@ -129,9 +131,7 @@ checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_posit
 
 	  (rhs_expr, free_vars, e_state, e_info, cs)
 	  		= checkRhs [] rhs_alts rhs_locals e_input { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs } e_info cs
-	  (dynamics_in_rhs, e_state)
-	  		= e_state!es_dynamics
-	  (expr_with_array_selections, free_vars, e_state=:{es_var_heap}, e_info, cs)
+	  (expr_with_array_selections, free_vars, e_state=:{es_var_heap,es_dynamics=dynamics_in_rhs}, e_info, cs)
 			= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
 	  (cb_args, es_var_heap) = mapSt determine_function_arg aux_patterns es_var_heap
@@ -614,7 +614,8 @@ checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_leve
 
 checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info cs
 	# (pattern_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
-	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
+	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs)
+	  		= check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
 	  (pattern_expr, binds, es_expr_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expr_heap
 	  (case_expr, es_var_heap, es_expr_heap, cs_error) = build_and_share_case guards defaul pattern_expr case_ident True e_state.es_var_heap es_expr_heap cs.cs_error
 	  cs = {cs & cs_error = cs_error}
@@ -632,25 +633,25 @@ where
 		= check_guarded_expression free_vars g gs pattern_scheme pattern_variables defaul case_name e_input e_state e_info cs 
 
 	check_guarded_expression free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals}} patterns pattern_scheme pattern_variables defaul case_name 
-				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap} e_info cs
+				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap,es_dynamics=outer_dynamics} e_info cs
 		# (pattern, (var_env, array_patterns), {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern calt_pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
 					{ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs} e_info cs
-		  e_state = { e_state & es_var_heap = ps_var_heap,es_fun_defs = ps_fun_defs }
+		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs, es_dynamics = [] }
 		  (rhs_expr, free_vars, e_state, e_info, cs)
 		  		= checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
-		  (expr_with_array_selections, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
+		  (expr_with_array_selections, free_vars, e_state=:{es_dynamics = dynamics_in_rhs, es_expr_heap, es_var_heap}, e_info, cs)
 				= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 		  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
 		  (guarded_expr, pattern_scheme, pattern_variables, defaul, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
 		  		= transform_pattern pattern patterns pattern_scheme pattern_variables defaul expr_with_array_selections case_name
-		  									es_var_heap es_expr_heap es_dynamics { cs & cs_symbol_table = cs_symbol_table }
+		  									es_var_heap es_expr_heap dynamics_in_rhs { cs & cs_symbol_table = cs_symbol_table }
 		= (guarded_expr, pattern_scheme, pattern_variables, defaul, free_vars,
-			{ e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap, es_dynamics = dynamics_in_patterns },
+			{ e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap, es_dynamics = dynamics_in_patterns ++ outer_dynamics },
 				e_info, cs)
 
 	transform_pattern :: !AuxiliaryPattern !CasePatterns !CasePatterns !(Env Ident VarInfoPtr) !(Optional (!Optional FreeVar, !Expression)) !Expression
-			!String !*VarHeap !*ExpressionHeap ![DynamicPtr] !*CheckState
+			!String !*VarHeap !*ExpressionHeap !Dynamics !*CheckState
 				-> (!CasePatterns, !CasePatterns, !Env Ident VarInfoPtr, !Optional (!Optional FreeVar,!Expression), !*VarHeap, !*ExpressionHeap, ![DynamicPtr], !*CheckState)
 	transform_pattern (AP_Algebraic cons_symbol type_index args opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ var_store expr_heap opt_dynamics cs
 		# (var_args, result_expr, _, var_store, expr_heap, opt_dynamics, cs) = convertSubPatterns args result_expr NoPos var_store expr_heap opt_dynamics cs
@@ -1089,14 +1090,12 @@ where
 	get_field_var _
 		= ({ id_name = "** ERRONEOUS **", id_info = nilPtr }, nilPtr)
 
-// MV ...
-checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expr_heap,es_dynamics, es_dynamic_expr_count } e_info cs=:{cs_x}
-	# (dyn_info_ptr, es_expr_heap) = newPtr (EI_Dynamic opt_type es_dynamic_expr_count) es_expr_heap
-	  (dyn_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input
-	  		{e_state & es_dynamics = [dyn_info_ptr : es_dynamics], es_expr_heap = es_expr_heap, es_dynamic_expr_count = inc es_dynamic_expr_count} e_info cs
-	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty /*, dyn_uni_vars = [] */ },
-			free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamic }) 
-// ... MV
+checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_dynamics=outer_dynamics} e_info cs=:{cs_x}
+	# (dyn_expr, free_vars, e_state=:{es_dynamics, es_expr_heap}, e_info, cs) = checkExpression free_vars expr e_input {e_state & es_dynamics = []} e_info cs
+	  (dyn_info_ptr, es_expr_heap) = newPtr (EI_UnmarkedDynamic opt_type es_dynamics) es_expr_heap
+	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty},
+			free_vars, { e_state & es_expr_heap = es_expr_heap, es_dynamics = [dyn_info_ptr : outer_dynamics]},
+			e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamic }) 
 
 checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
 	= (BasicExpr basic_value, free_vars, e_state, e_info, cs)

@@ -1494,10 +1494,6 @@ where
 
 expandMacrosInBody :: [.FunCall] CheckedBody ![ExprInfoPtr] PredefSymbolsForTransform *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],![ExprInfoPtr],.ExpandState);
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_symbol_heap,es_fun_defs,es_macro_defs}
-    # (max_index,es_symbol_heap)
-		   	= determine_amount_of_dynamics 0 fi_dynamics es_symbol_heap
-	# cos_used_dynamics
-			= createArray (inc max_index) False // means not removed
 	# (prev_calls, fun_defs, macro_defs,es_symbol_table)
 			= addFunctionCallsToSymbolTable fi_calls es_fun_defs es_macro_defs es_symbol_table
 	  ([rhs:rhss], (all_calls, es) )
@@ -1509,42 +1505,22 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_tran
 	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap, cos_used_dynamics})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
-	  					cos_predef_symbols_for_transform = predef_symbols_for_transform, cos_used_dynamics = cos_used_dynamics }
-	# (changed,fi_dynamics,_,cos_symbol_heap)
-			= foldSt remove_fi_dynamic fi_dynamics (False,[],cos_used_dynamics,cos_symbol_heap)
-	= (new_args, new_rhs, local_vars, all_calls,fi_dynamics,
+	  					cos_predef_symbols_for_transform = predef_symbols_for_transform }
+	# (fi_dynamics, cos_symbol_heap)
+			= foldSt collect_used_dynmic fi_dynamics ([], cos_symbol_heap)
+	= (new_args, new_rhs, local_vars, all_calls, fi_dynamics,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap, es_fun_defs=fun_defs, es_symbol_table = symbol_table })
 //		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
 where
-	remove_fi_dynamic dyn_expr_ptr (changed,accu,cos_used_dynamics,cos_symbol_heap)
-		# (expr_info,cos_symbol_heap)
-			= readPtr dyn_expr_ptr cos_symbol_heap
-		| not (isEI_Dynamic expr_info)
-			= (changed,[dyn_expr_ptr:accu],cos_used_dynamics,cos_symbol_heap)	
-		# (EI_Dynamic _ id)
-			= expr_info
-		| cos_used_dynamics.[id]
-			= (changed,[dyn_expr_ptr:accu],cos_used_dynamics,cos_symbol_heap)
-			// unused
-			= (True,accu,cos_used_dynamics,cos_symbol_heap)
-	where
-		isEI_Dynamic (EI_Dynamic _ _)	= True
-		isEI_Dynamic _					= False
+	collect_used_dynmic dyn_expr_ptr (used_dynamics, symbol_heap)
+		# (expr_info, symbol_heap) = readPtr dyn_expr_ptr symbol_heap
+		= case expr_info of
+			EI_UnmarkedDynamic _ _
+				-> (used_dynamics, symbol_heap)
+			_
+				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
 
-	determine_amount_of_dynamics max_index [] es_symbol_table
-		= (max_index,es_symbol_table)
-	determine_amount_of_dynamics max_index [expr_info_ptr:expr_info_ptrs] es_symbol_table
-		# (expr_info,es_symbol_table)
-			= readPtr expr_info_ptr es_symbol_table
-		# (max_index,es_symbol_table)
-			= case expr_info of
-				EI_Dynamic _ id
-					-> (max max_index id,es_symbol_table)
-				EI_DynamicTypeWithVars _ _ expr_info_ptrs2
-					-> determine_amount_of_dynamics max_index expr_info_ptrs2 es_symbol_table
-				// EI_DynamicType _ expr_info_ptrs2
-				//	-> determine_amount_of_dynamics max_index expr_info_ptrs2 es_symbol_table
-		= determine_amount_of_dynamics max_index expr_info_ptrs es_symbol_table
+
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
@@ -1779,7 +1755,6 @@ where
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
 	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
-	,	cos_used_dynamics	:: !.{#Bool}
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
@@ -1990,19 +1965,16 @@ where
 	collectVariables (MatchExpr cons_symb expr) free_vars cos
 		# (expr, free_vars, cos) = collectVariables expr free_vars cos
 		= (MatchExpr cons_symb expr, free_vars, cos)
-	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr /* MV ... */ , dyn_info_ptr /* ... MV */}) free_vars cos
-		#! (dyn_expr, free_vars, cos /* MV ... */ =:{cos_symbol_heap} /* ... MV */) = collectVariables dyn_expr free_vars cos
-// MV ...
-		# (expr_info,cos_symbol_heap)
-			= readPtr dyn_info_ptr cos_symbol_heap
-		# cos
-			= { cos & cos_symbol_heap = cos_symbol_heap }
-		# cos
-			= case expr_info of 
-				EI_Dynamic _ id		->  { cos & cos_used_dynamics = { cos.cos_used_dynamics & [id] = True } }
-				_					-> cos
-// ... MV
-		= (DynamicExpr {dynamic_expr & dyn_expr = dyn_expr}, free_vars, cos);
+	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr, dyn_info_ptr}) free_vars cos
+		# (dyn_expr, free_vars, cos=:{cos_symbol_heap}) = collectVariables dyn_expr free_vars cos
+		  cos_symbol_heap = mark_used_dynamic dyn_info_ptr (readPtr dyn_info_ptr cos_symbol_heap)
+		= (DynamicExpr {dynamic_expr & dyn_expr = dyn_expr}, free_vars, { cos & cos_symbol_heap = cos_symbol_heap });
+	where
+		mark_used_dynamic dyn_info_ptr (EI_UnmarkedDynamic opt_type loc_dynamics, symbol_heap) 
+			= symbol_heap <:= (dyn_info_ptr, EI_Dynamic opt_type loc_dynamics)
+		mark_used_dynamic dyn_info_ptr (_, symbol_heap) 
+			= symbol_heap
+			
 	collectVariables expr free_vars cos
 		= (expr, free_vars, cos)
 

@@ -626,7 +626,7 @@ instance check_completeness ConsDef
 instance check_completeness DynamicPattern where
 	check_completeness { dp_rhs, dp_type } cci ccs
 		= check_completeness dp_rhs cci
-		  (check_completeness_of_dyn_expr_ptr dp_type cci ccs)
+		  (check_completeness_of_dyn_expr_ptr cci dp_type ccs)
 	
 instance check_completeness DynamicExpr where
 	check_completeness { dyn_expr, dyn_opt_type } cci ccs
@@ -689,7 +689,7 @@ instance check_completeness FunDef where
 	check_completeness {fun_type, fun_body, fun_info} cci ccs
 		= ( (check_completeness fun_type cci)
 		  o (check_completeness fun_body cci)
-		  o (foldSt (flipM check_completeness_of_dyn_expr_ptr cci) fun_info.fi_dynamics)
+		  o (check_completeness_of_dyn_expr_ptrs cci fun_info.fi_dynamics)
 		  ) ccs
 
 instance check_completeness FunType where
@@ -847,24 +847,31 @@ instance check_completeness [a]	| check_completeness a
 		= check_completeness h cci
 		  (check_completeness t cci ccs)
 
-check_completeness_of_dyn_expr_ptr :: !ExprInfoPtr !CheckCompletenessInputBox !*CheckCompletenessStateBox
+check_completeness_of_dyn_expr_ptr :: !CheckCompletenessInputBox !ExprInfoPtr !*CheckCompletenessStateBox
 								-> *CheckCompletenessStateBox 
-check_completeness_of_dyn_expr_ptr dyn_expr_ptr cci ccs=:{box_ccs=box_ccs=:{ccs_expr_heap}}
+check_completeness_of_dyn_expr_ptr cci dyn_expr_ptr ccs=:{box_ccs=box_ccs=:{ccs_expr_heap}}
 	#! (expr_info, ccs_expr_heap) = readPtr dyn_expr_ptr ccs_expr_heap
 	   ccs = { ccs & box_ccs = { box_ccs & ccs_expr_heap = ccs_expr_heap }}
  	= case expr_info of
-		(EI_Dynamic No _)
-			-> ccs
-		(EI_Dynamic (Yes dynamic_type) _) 
-			-> check_completeness dynamic_type cci ccs
+		(EI_UnmarkedDynamic No further_dynamic_ptrs)
+			-> (check_completeness_of_dyn_expr_ptrs cci further_dynamic_ptrs ccs)
+		(EI_UnmarkedDynamic (Yes dynamic_type) further_dynamic_ptrs) 
+			-> check_completeness dynamic_type cci (check_completeness_of_dyn_expr_ptrs cci further_dynamic_ptrs ccs)
+		(EI_Dynamic No further_dynamic_ptrs)
+			-> (check_completeness_of_dyn_expr_ptrs cci further_dynamic_ptrs ccs)
+		(EI_Dynamic (Yes dynamic_type) further_dynamic_ptrs) 
+			-> check_completeness dynamic_type cci (check_completeness_of_dyn_expr_ptrs cci further_dynamic_ptrs ccs)
 		(EI_DynamicType dynamic_type further_dynamic_ptrs)
-			-> check_completeness dynamic_type cci
-			   (foldSt (flipM check_completeness_of_dyn_expr_ptr cci) further_dynamic_ptrs ccs)
+			-> check_completeness dynamic_type cci (check_completeness_of_dyn_expr_ptrs cci further_dynamic_ptrs ccs)
 		(EI_DynamicTypeWithVars _ dynamic_type further_dynamic_ptrs)
 			-> check_completeness dynamic_type cci
-			   (foldSt (flipM check_completeness_of_dyn_expr_ptr cci) further_dynamic_ptrs ccs)
+			   	(check_completeness_of_dyn_expr_ptrs cci further_dynamic_ptrs ccs)
 
-flipM f a b :== f b a
+check_completeness_of_dyn_expr_ptrs :: !CheckCompletenessInputBox ![ExprInfoPtr] !*CheckCompletenessStateBox
+	-> *CheckCompletenessStateBox 
+check_completeness_of_dyn_expr_ptrs cci dynamic_ptrs ccs
+	= foldSt (check_completeness_of_dyn_expr_ptr cci) dynamic_ptrs ccs
+
 
 // STE_Kinds just for comparision
 ste_field =: STE_Field { id_name="", id_info=nilPtr }

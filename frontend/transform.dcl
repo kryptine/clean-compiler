@@ -24,7 +24,6 @@ partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform 
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
 	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
-	,	cos_used_dynamics	:: !.{#Bool}
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)

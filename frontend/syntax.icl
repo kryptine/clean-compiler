@@ -674,7 +674,8 @@ cNotVarNumber :== -1
 
 		/* For handling dynamics */
 
-					| EI_Dynamic 				!(Optional DynamicType) !Int
+					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]
+					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]
 					| EI_DynamicType			!DynamicType ![DynamicPtr]
 
 		/* Auxiliary, was EI_DynamicType before checking */
@@ -683,7 +684,7 @@ cNotVarNumber :== -1
 
 		/* Auxiliary, used during type checking */
 
-					| EI_TempDynamicType 		!(Optional DynamicType) !AType ![TypeContext] !ExprInfoPtr !SymbIdent
+					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					
 					| EI_TypeOfDynamic 			![VarInfoPtr] !TypeCodeExpression				/* Final */

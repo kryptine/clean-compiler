@@ -1407,7 +1407,7 @@ where
 instance requirements DynamicExpr
 where
 	requirements ti {dyn_expr,dyn_info_ptr} (reqs, ts=:{ts_expr_heap})
-		# (EI_TempDynamicType _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dyn_info_ptr ts_expr_heap
+		# (EI_TempDynamicType _ _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dyn_info_ptr ts_expr_heap
 		  (dyn_expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti dyn_expr (reqs, { ts & ts_expr_heap = ts_expr_heap })
 		  ts_expr_heap = storeAttribute opt_expr_ptr dyn_expr_type.at_attribute ts.ts_expr_heap
 		  type_coercion = { tc_demanded = dyn_type, tc_offered = dyn_expr_type, tc_position = CP_Expression dyn_expr, tc_coercible = True }
@@ -1774,15 +1774,15 @@ where
 	fresh_dynamic dyn_ptr (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
 		# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
 		= case dyn_info of
-			EI_Dynamic opt_dyn_type=:(Yes {dt_uni_vars,dt_type,dt_global_vars}) _
+			EI_Dynamic opt_dyn_type=:(Yes {dt_uni_vars,dt_type,dt_global_vars}) loc_dynamics
 				# (th_vars, var_store)		= fresh_existential_attributed_variables dt_uni_vars (type_heaps.th_vars, var_store)
 				  (th_vars, var_store)		= fresh_type_variables dt_global_vars (th_vars, var_store)
 				  (tdt_type, type_heaps)	= freshCopy dt_type { type_heaps & th_vars = th_vars }
 				  (contexts, expr_ptr, type_code_symbol, (var_heap, expr_heap, type_var_heap, predef_symbols))
 				  		= determine_context_and_expr_ptr dt_global_vars (var_heap, expr_heap, type_heaps.th_vars, predef_symbols)
-				-> (var_store, { type_heaps & th_vars = type_var_heap }, var_heap,
-						expr_heap <:= (dyn_ptr, EI_TempDynamicType opt_dyn_type tdt_type contexts expr_ptr type_code_symbol), predef_symbols)
-			EI_Dynamic No _ 
+				-> fresh_local_dynamics loc_dynamics (var_store, { type_heaps & th_vars = type_var_heap }, var_heap,
+						expr_heap <:= (dyn_ptr, EI_TempDynamicType opt_dyn_type loc_dynamics tdt_type contexts expr_ptr type_code_symbol), predef_symbols)
+			EI_Dynamic No loc_dynamics 
 				# fresh_var = TempV var_store
 				  tdt_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = fresh_var }
 
@@ -1795,18 +1795,20 @@ where
 				  tc_member_symb = { symb_name = pds_ident, symb_kind = SK_OverloadedFunction {glob_module = pds_module, glob_object = pds_def }}
 		 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
 				  context = {tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
-		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap //---> ("^EI_Dynamic No=" +++ toString var_store)
-				-> (inc var_store, type_heaps, var_heap,
-						expr_heap <:= (dyn_ptr, EI_TempDynamicType No tdt_type [context] expr_ptr tc_member_symb), predef_symbols)
+		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+				-> fresh_local_dynamics loc_dynamics (inc var_store, type_heaps, var_heap,
+						expr_heap <:= (dyn_ptr, EI_TempDynamicType No loc_dynamics tdt_type [context] expr_ptr tc_member_symb), predef_symbols)
 			EI_DynamicTypeWithVars loc_type_vars dt=:{dt_uni_vars,dt_type,dt_global_vars} loc_dynamics
 				# (fresh_vars, (th_vars, var_store)) = fresh_existential_variables loc_type_vars (type_heaps.th_vars, var_store)
-//					---> ("fresh_dynamic (EI_DynamicTypeWithVars)", dt_uni_vars)
 				  (th_vars, var_store) = fresh_type_variables dt_global_vars (th_vars, var_store)
 				  (tdt_type, type_heaps) = freshCopy (add_universal_vars_to_type dt_uni_vars dt_type) { type_heaps & th_vars = th_vars }
 				  (contexts, expr_ptr, type_code_symbol, (var_heap, expr_heap, type_var_heap, predef_symbols))
 				  		= determine_context_and_expr_ptr dt_global_vars (var_heap, expr_heap, type_heaps.th_vars, predef_symbols)
 				-> fresh_local_dynamics loc_dynamics (var_store, { type_heaps & th_vars = type_var_heap }, var_heap,
 						expr_heap <:= (dyn_ptr, EI_TempDynamicPattern loc_type_vars dt loc_dynamics fresh_vars tdt_type contexts expr_ptr type_code_symbol), predef_symbols)
+			EI_UnmarkedDynamic _ _
+				-> (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
+//					---> ("fresh_dynamic : EI_UnmarkedDynamic")
 
 	fresh_local_dynamics loc_dynamics state
 		= foldSt fresh_dynamic loc_dynamics state
@@ -1817,12 +1819,15 @@ where
 	clear_dynamic dyn_ptr (var_heap, expr_heap)
 		# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
 		= case dyn_info of
-			EI_Dynamic (Yes {dt_global_vars}) _
-				-> (clear_type_vars dt_global_vars var_heap, expr_heap)
-			EI_Dynamic No _
-				-> (var_heap, expr_heap)
+			EI_Dynamic (Yes {dt_global_vars}) loc_dynamics
+				-> clear_local_dynamics loc_dynamics (clear_type_vars dt_global_vars var_heap, expr_heap)
+			EI_Dynamic No loc_dynamics
+				-> clear_local_dynamics loc_dynamics (var_heap, expr_heap)
 			EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} loc_dynamics
 				-> clear_local_dynamics loc_dynamics (clear_type_vars dt_global_vars var_heap, expr_heap)
+			EI_UnmarkedDynamic _ _
+				-> (var_heap, expr_heap)
+
 
 	clear_local_dynamics loc_dynamics state
 		= foldSt clear_dynamic loc_dynamics state

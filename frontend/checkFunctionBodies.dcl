@@ -2,14 +2,15 @@ definition module checkFunctionBodies
 
 import syntax, checksupport
 
+::	Dynamics		:== [ExprInfoPtr]
+
 ::	ExpressionState =
 	{	es_expr_heap	:: !.ExpressionHeap
-	,	es_var_heap			:: !.VarHeap
-	,	es_type_heaps		:: !.TypeHeaps
-	,	es_calls			:: ![FunCall]
-	,	es_dynamics			:: ![ExprInfoPtr]
-	,	es_fun_defs			:: !.{# FunDef}
- 	,	es_dynamic_expr_count	:: !Int				// used to give each dynamic expr an unique id
+	,	es_var_heap		:: !.VarHeap
+	,	es_type_heaps	:: !.TypeHeaps
+	,	es_calls		:: ![FunCall]
+	,	es_dynamics		:: !Dynamics
+	,	es_fun_defs		:: !.{# FunDef}
 	}
 	
 ::	ExpressionInput =
@@ -21,4 +22,4 @@ import syntax, checksupport
 	}
 
 checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
-					-> (FunctionBody,[FreeVar],!.ExpressionState,.ExpressionInfo,!.CheckState);
+	-> (!FunctionBody, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
