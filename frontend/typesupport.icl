@@ -19,24 +19,6 @@ import syntax, parse, check, unitype, utilities, RWSDebug
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 
-class emptyValue a :: a
-
-instance emptyValue TypeAttribute
-where
-	emptyValue = TA_None
-	
-instance emptyValue Type
-where
-	emptyValue = TE
-
-
-lookUp :: !a !(Env a b) -> (!Bool, !b) | ==, toString a & emptyValue b
-lookUp elem_id [] 
-		= (False, emptyValue)
-lookUp elem_id [b : bs]
-	| elem_id == b.bind_src
-		= (True, b.bind_dst)
-		= lookUp elem_id bs
 
 simplifyTypeApplication :: !Type ![AType] -> Type
 simplifyTypeApplication (TA type_cons=:{type_arity} cons_args) type_args
@@ -235,32 +217,48 @@ newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th
 	= ({ at_annotation = AN_None, at_attribute = TA_Var new_attr_var, at_type = TV new_var},
 		([ new_var : variables ], [ new_attr_var : attributes ], { type_heaps & th_vars = th_vars, th_attrs = th_attrs }))
 
-cleanUpSymbolType :: !TempSymbolType ![TypeContext] !{! CoercionTree} !AttributePartition !*VarEnv !*AttributeEnv !*TypeHeaps !*ErrorAdmin
-	-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*ErrorAdmin)
-cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} context coercions attr_part var_env attr_var_env heaps error
+cleanUpSymbolType :: !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+						!*VarEnv !*AttributeEnv !*TypeHeaps !*ExpressionHeap !*ErrorAdmin
+							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*ExpressionHeap, !*ErrorAdmin)
+cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} context case_and_let_exprs
+		coercions attr_part var_env attr_var_env heaps expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_heaps = heaps,
 			  cus_var_store = 0, cus_attr_store = 0, cus_error = error }
 	  (lifted_args, cus=:{cus_var_env}) = clean_up (coercions,attr_part) (take tst_lifted tst_args) cus
-	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
+	  (lifted_vars, cus_var_env) = determine_lifted_type_vars nr_of_temp_vars [] cus_var_env
 	  (st_args, cus) = clean_up (coercions,attr_part) (drop tst_lifted tst_args) { cus & cus_var_env = cus_var_env }
-	  (st_result, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = clean_up (coercions,attr_part) tst_result cus
-	  (st_context, cus_var_env, error) = clean_up_type_contexts (tst_context ++ context) cus_var_env cus_error
-	  (st_vars, var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
-	  (attr_env, st_attr_vars, st_attr_env) = build_attribute_environment 0 max_attr_nr coercions cus_attr_env [] []
+	  (st_result, cus) = clean_up (coercions,attr_part) tst_result cus
+	  (st_context, cus_var_env, cus_error) = clean_up_type_contexts (tst_context ++ context) cus.cus_var_env cus.cus_error
+	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
+	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = update_expression_types (coercions,attr_part) case_and_let_exprs
+				expr_heap { cus & cus_var_env = cus_var_env, cus_error = cus_error }
+	  (cus_attr_env, st_attr_vars, st_attr_env) = build_attribute_environment 0 max_attr_nr coercions cus_attr_env [] []
 	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
-	= (st,{ var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]}, { attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, error)
+	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
+					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, expr_heap, cus_error)
 //			---> (tst, st)
 where
-	determine_type_var var_index (all_vars, var_env)
+	determine_lifted_type_var var_index (all_vars, var_env)
 		#! type = var_env.[var_index]
 		= case type of
 			TV var
 				-> ([var : all_vars], { var_env & [var_index] = TLifted var})
 			_
 				-> (all_vars, var_env)
+
+	determine_type_var var_index (all_vars, var_env)
+		#! type = var_env.[var_index]
+		= case type of
+			TV var
+				-> ([var : all_vars], var_env)
+			_
+				-> (all_vars, var_env)
+
+	determine_lifted_type_vars to_index all_vars var_env
+		= iFoldSt determine_lifted_type_var 0 to_index (all_vars, var_env)
 
 	determine_type_vars to_index all_vars var_env
 		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
@@ -296,67 +294,28 @@ where
 		= True
 	is_new_inequality dem_var off_var [{ ai_demanded, ai_offered } : inequalities]
 		= (dem_var <> ai_demanded || off_var <> ai_offered) && is_new_inequality dem_var off_var inequalities
-	
 
-		
-/*
-	build_inequalities :: !AttributeVar !(Env Int TypeAttribute) !Int !{# Bool} !Int !Int ![AttrInequality] -> [AttrInequality]
-	build_inequalities off_var attr_var_env next_var_number dem_vars skip size inequalities
-		| next_var_number == size
-			= inequalities
-		| dem_vars.[next_var_number] && next_var_number <> skip
-			# (found, TA_Var dem_var) = lookUp next_var_number attr_var_env
-			| found
-				# inequalities = [ { ai_demanded = dem_var, ai_offered = off_var } : inequalities]
-				= build_inequalities off_var attr_var_env (inc next_var_number) dem_vars skip size inequalities
-				= build_inequalities off_var attr_var_env (inc next_var_number) dem_vars skip size inequalities
-			= build_inequalities off_var attr_var_env (inc next_var_number) dem_vars skip size inequalities
+	update_expression_types :: !({!CoercionTree},!AttributePartition) ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
+	update_expression_types coercions expr_ptrs expr_heap cus
+		= foldSt (update_expression_type coercions) expr_ptrs (expr_heap, cus)
 
-clean_up_symbol_type :: !SymbolType ![TypeContext] !*ErrorAdmin -> (!SymbolType, !*ErrorAdmin)
-clean_up_symbol_type st=:{st_args,st_result,st_context} context error
-	# (st_args, var_env, attr_var_env, var_store, error) = clean_up_argument_types st_args [] [] 0 error
-	  (st_result, var_env, attr_var_env, var_store, error) = clean_up_result_type st_result var_env attr_var_env var_store error
-	  new_env = attr_var_env ++ var_env 
-	  (st_context, error) = clean_up_type_contexts (st_context ++ context) new_env error
-	= ({ st & st_vars = map (\bind=:{bind_dst = TV tv} -> tv) new_env, st_args = st_args, st_result = st_result, st_context = st_context }, error)
+	update_expression_type coercions expr_ptr (expr_heap, cus)
+		# (info, expr_heap) = readPtr expr_ptr expr_heap
+		= case info of
+			EI_CaseType case_type
+				# (case_type, cus) = clean_up coercions case_type cus
+				-> (expr_heap <:= (expr_ptr, EI_CaseType case_type), cus)
+			EI_LetType let_type
+				# (let_type, cus) = clean_up coercions let_type cus
+				-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cus)
 
-
-clean_up_type type var_binds uq_var_binds var_store error
-	# (type, var_binds, new_uq_var_binds, var_store) = clean_up type var_binds [] var_store
- 	  error = check_uq_vars new_uq_var_binds uq_var_binds error
- 	| isEmpty new_uq_var_binds
-		= (type, var_binds, new_uq_var_binds ++ uq_var_binds, var_store, error)
-		= (TFA [ var \\ {bind_dst=TV var} <- new_uq_var_binds ] type, var_binds, new_uq_var_binds ++ uq_var_binds, var_store, error)
-		
-
-quantifiction_error err=:{ea_file}
-	# ea_file = ea_file <<< "Type error: Introduction of universal quantifier failed\n"
-	= { err & ea_file = ea_file}
-
-check_uq_vars [] uq_var_binds error = error
-check_uq_vars [b:bs] uq_var_binds error
-	# (found, var) = lookUp b.bind_src uq_var_binds 
-	| found 
-		= quantifiction_error error
-		= check_uq_vars bs uq_var_binds error
-
-clean_up_argument_types [] var_binds uq_var_binds var_store error
-	= ([], var_binds, uq_var_binds, var_store, error)
-clean_up_argument_types [t:ts] var_binds uq_var_binds var_store error
-	# (t, var_binds, uq_var_binds, var_store, error) = clean_up_type t var_binds uq_var_binds var_store error
- 	  (ts, var_binds, uq_var_binds, var_store, error) = clean_up_argument_types ts var_binds uq_var_binds var_store error
-	= ([t:ts], var_binds, uq_var_binds, var_store, error)
-
-clean_up_result_type (argtype --> restype) var_binds uq_var_binds var_store error
-	# (argtype, var_binds, uq_var_binds, var_store, error) = clean_up_type argtype var_binds uq_var_binds var_store error
-	  (restype, var_binds, uq_var_binds, var_store, error) = clean_up_result_type restype var_binds uq_var_binds var_store error
-	= (argtype --> restype, var_binds, uq_var_binds, var_store, error)
-clean_up_result_type type var_binds uq_var_binds var_store error
-	# (type, var_binds, new_uq_var_binds, var_store) = clean_up type var_binds [] var_store
- 	  error = check_uq_vars new_uq_var_binds uq_var_binds error
-	= (type, var_binds, new_uq_var_binds, var_store, error)
-
-*/
+instance clean_up CaseType
+where
+	clean_up coercions ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cus
+		# (ct_pattern_type, cus) = clean_up coercions ct_pattern_type cus 
+		  (ct_result_type, cus) = clean_up coercions ct_result_type cus
+		  (ct_cons_types, cus) = clean_up coercions ct_cons_types cus
+		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cus)
 
 	
 class substitute a :: !a !u:TypeHeaps -> (!a, !u:TypeHeaps)

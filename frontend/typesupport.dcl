@@ -25,8 +25,9 @@ instance <:: SymbolType, Type, AType, [a] | <:: a
 cleanSymbolType :: !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 extendSymbolType :: !SymbolType !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 
-cleanUpSymbolType :: !TempSymbolType ![TypeContext] !{! CoercionTree} !AttributePartition !*VarEnv !*AttributeEnv !*TypeHeaps !*ErrorAdmin
-	-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*ErrorAdmin)
+cleanUpSymbolType :: !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+						!*VarEnv !*AttributeEnv !*TypeHeaps !*ExpressionHeap !*ErrorAdmin
+							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*ExpressionHeap, !*ErrorAdmin)
 
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 
