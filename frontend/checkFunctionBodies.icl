@@ -923,7 +923,7 @@ checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expr_h
 	# (dyn_info_ptr, es_expr_heap) = newPtr (EI_Dynamic opt_type es_dynamic_expr_count) es_expr_heap
 	  (dyn_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input
 	  		{e_state & es_dynamics = [dyn_info_ptr : es_dynamics], es_expr_heap = es_expr_heap, es_dynamic_expr_count = inc es_dynamic_expr_count} e_info cs
-	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty, dyn_uni_vars = [] },
+	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty /*, dyn_uni_vars = [] */ },
 			free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamics }) 
 // ... MV
 
