@@ -2554,7 +2554,7 @@ where
 		# (types, ets) = expandSynTypes rem_annots common_defs types ets
 		= (cons_var :@: types, ets) 
 	expandSynTypes rem_annots common_defs type=:(TA type_symb types) ets
-		= expand_syn_types_in_TA rem_annots common_defs type_symb types TA_Multi ets
+		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
 // Sjaak 240801 ...
 	expandSynTypes rem_annots common_defs (TFA vars type) ets
 		# (type, ets) = expandSynTypes rem_annots common_defs type ets
@@ -2574,7 +2574,7 @@ where
 	expandSynTypes rem_annots common_defs tuple ets
 		= app2St (expandSynTypes rem_annots common_defs, expandSynTypes rem_annots common_defs) tuple ets
 
-expand_syn_types_in_TA rem_annots common_defs type_symb=:{type_index={glob_object,glob_module},type_name} types attribute ets=:{ets_type_defs}
+expand_syn_types_in_TA rem_annots common_defs (TA type_symb=:{type_index={glob_object,glob_module},type_name} types) attribute ets=:{ets_type_defs}
 	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
 	  ets = { ets & ets_type_defs = ets_type_defs }
 	= case td_rhs of
@@ -2632,8 +2632,8 @@ where
 	expandSynTypes rem_annots common_defs atype ets
 		= expand_syn_types_in_a_type rem_annots common_defs atype ets
 	where
-		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = TA type_symb types, at_attribute} ets
-			# (at_type, ets) = expand_syn_types_in_TA rem_annots common_defs type_symb types at_attribute ets
+		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TA type_symb types,at_attribute} ets
+			# (at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
 			= ({ atype & at_type = at_type }, ets)
 		expand_syn_types_in_a_type rem_annots common_defs atype ets
 			# (at_type, ets) = expandSynTypes rem_annots common_defs atype.at_type ets
