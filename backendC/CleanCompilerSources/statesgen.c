@@ -2262,7 +2262,29 @@ static Bool NodeInASemiStrictContext (Node node,int local_scope)
 					}
 				} else
 					DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
-			} else
+			}
+#if STRICT_LISTS
+			else if (symb->symb_kind==cons_symb && node->node_arity==2){
+				ArgP arg_p;
+				
+				arg_p=node->node_arguments;				
+				if (symb->symb_head_strictness>1){
+					if (ArgInAStrictContext (arg_p,StrictState,True,local_scope))
+						parallel = True;
+				} else
+					if (ShouldDecrRefCount)
+						DecrRefCountCopiesOfArg (arg_p IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+
+				arg_p=arg_p->arg_next;
+				if (symb->symb_tail_strictness){
+					if (ArgInAStrictContext (arg_p,StrictState,True,local_scope))
+						parallel = True;
+				} else
+					if (ShouldDecrRefCount)
+						DecrRefCountCopiesOfArg (arg_p IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+			}
+#endif
+			else
 				DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
 
 			if (parallel)
