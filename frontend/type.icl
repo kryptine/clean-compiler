@@ -487,6 +487,8 @@ where
 	fromInt AttrMulti	= TA_Multi
 	fromInt av_number	= TA_TempVar av_number
 
+
+
 class freshCopy a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 
 instance freshCopy [a] | freshCopy a
@@ -524,10 +526,14 @@ freshConsVariable {tv_info_ptr} type_var_heap
 	# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 	= (to_constructor_variable tv_info, type_var_heap)
 	where
-		to_constructor_variable (TVI_Type (TempV temp_var_id))
-			= TempCV temp_var_id
-		to_constructor_variable (TVI_Type (TempQV temp_var_id))
-			= TempQCV temp_var_id
+		to_constructor_variable (TVI_Type fresh_type)
+			= case fresh_type of
+				TempV temp_var_id
+					-> TempCV temp_var_id
+				TempQV temp_var_id
+					-> TempQCV temp_var_id
+				TV var
+					-> CV var
 
 instance freshCopy AType
 where 	
@@ -562,20 +568,39 @@ where
 		= (TArrow1 arg_type, type_heaps)
 //..AA		
 	freshCopy (TFA vars type) type_heaps
-		# type_heaps = foldSt bind_var_and_attr vars type_heaps
-		  (type, type_heaps) = freshCopy type type_heaps
-		# type_heaps = clearBindings vars type_heaps
-		= (TFA vars type, type_heaps)
-	where
-		bind_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
-			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv)), th_attrs = bind_attr atv_attribute th_attrs }
-		where
-			bind_attr var=:(TA_Var {av_info_ptr}) attr_heap
-				= attr_heap <:= (av_info_ptr, AVI_Attr var)
-			bind_attr attr attr_heap
-				= attr_heap
+		= freshCopyOfTFAType vars type type_heaps
 	freshCopy type type_heaps
 		= (type, type_heaps)
+
+freshCopyOfTFAType vars type type_heaps
+	# (fresh_vars, type_heaps) = foldSt bind_var_and_attr vars ([], type_heaps)
+	  (type, type_heaps) = freshCopy type type_heaps
+	  type_heaps = foldSt clear_binding_of_var_and_attr fresh_vars type_heaps
+	= (TFA fresh_vars type, type_heaps)
+	where
+		bind_var_and_attr atv=:{atv_attribute, atv_variable = tv=:{tv_info_ptr}} (fresh_vars, type_heaps=:{th_vars,th_attrs})
+			# (fresh_vars, th_attrs) = bind_attr atv_attribute atv (fresh_vars, th_attrs)
+			= (fresh_vars, { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv)), th_attrs = th_attrs })
+
+		bind_attr var=:(TA_Var {av_info_ptr}) atv (fresh_vars, attr_heap)
+			# (av_info, attr_heap) = readPtr av_info_ptr attr_heap
+			= case av_info of
+				AVI_Empty
+					-> ([atv : fresh_vars], attr_heap <:= (av_info_ptr, AVI_Attr var))
+				AVI_Attr (TA_TempVar _)
+					-> ([{ atv & atv_attribute = TA_Multi } : fresh_vars], attr_heap)
+		bind_attr attr atv (fresh_vars, attr_heap)
+			= ([atv : fresh_vars], attr_heap)
+
+
+		clear_binding_of_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+				= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attr atv_attribute th_attrs }
+	
+		clear_attr var=:(TA_Var {av_info_ptr}) attr_heap
+			= attr_heap <:= (av_info_ptr, AVI_Empty)
+		clear_attr attr attr_heap
+			= attr_heap
+
 
 freshExistentialVariables type_variables var_store attr_store type_heaps
 	= foldSt fresh_existential_variable type_variables ([], var_store, attr_store, type_heaps) 
@@ -723,21 +748,35 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 	  							= fresh_arg_types is_appl st_args (ts_var_store, ts_attr_store, ts_exis_variables, type_heaps)
 	  (tst_result, type_heaps)	= freshCopy st_result type_heaps
 	  (tst_context, (type_heaps, ts_var_heap)) 	= freshTypeContexts fresh_context_vars st_context (type_heaps, ts_var_heap)
+	  th_attrs					= clear_attributes st_attr_vars th_attrs
 	  cons_variables			= foldSt (collect_cons_variables_in_tc common_defs) tst_context [] 
 	= ({ tst_args = tst_args, tst_result = tst_result, tst_context = tst_context, tst_attr_env = attr_env, tst_arity = st_arity, tst_lifted = 0 },
 	   { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = type_heaps, ts_var_heap = ts_var_heap,
 	   				ts_cons_variables = cons_variables ++ ts_cons_variables, ts_exis_variables = ts_exis_variables })
 		//---> ("freshSymbolType", st, tst_args, tst_result, tst_context)
 	where
-		fresh_type_variables :: .[TypeVar] *(*Heap TypeVarInfo,.Int) -> (!.Heap TypeVarInfo,!Int);
+		fresh_type_variables :: [TypeVar] !(!*TypeVarHeap, !Int) -> (!*TypeVarHeap, !Int)
 		fresh_type_variables type_variables state
-			= foldr (\{tv_info_ptr} (var_heap, var_store) -> (writePtr tv_info_ptr (TVI_Type (TempV var_store)) var_heap, inc var_store))
-							state type_variables
-
-		fresh_attributes :: .[AttributeVar] *(*Heap AttrVarInfo,.Int) -> (!.Heap AttrVarInfo,!Int);
+			= foldSt fresh_type_variable type_variables state
+		where
+			fresh_type_variable {tv_info_ptr} (var_heap, var_store)
+				= (var_heap <:= (tv_info_ptr, TVI_Type (TempV var_store)), inc var_store)
+			
+		fresh_attributes :: [AttributeVar] !(!*AttrVarHeap, !Int) -> (!*AttrVarHeap, !Int)
 		fresh_attributes attributes state
-			= foldr (\{av_info_ptr} (attr_heap, attr_store) -> (writePtr av_info_ptr (AVI_Attr (TA_TempVar attr_store)) attr_heap, inc attr_store))
-							state attributes
+			= foldSt fresh_attribute attributes state
+		where
+			fresh_attribute {av_info_ptr} (attr_heap, attr_store)
+				= (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store)
+
+
+		clear_attributes :: [AttributeVar] !*AttrVarHeap -> !*AttrVarHeap
+		clear_attributes attributes attr_heap
+			= foldSt clear_attribute attributes attr_heap
+		where
+			clear_attribute {av_info_ptr} attr_heap
+				= attr_heap <:= (av_info_ptr, AVI_Empty)
+
 
 		collect_cons_variables_in_tc common_defs tc=:{tc_class={glob_module,glob_object={ds_index}}, tc_types} collected_cons_vars
 			# {class_cons_vars} = common_defs.[glob_module].com_class_defs.[ds_index]
@@ -763,56 +802,60 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 				= [var_id : add_variable new_var_id var_ids]
 				
 		fresh_arg_types No arg_types (var_store, attr_store, exis_variables, type_heaps)
-			# (arg_types, type_heaps) = freshArgumentsOfSymbolType arg_types type_heaps
+			# (arg_types, type_heaps) = mapSt fresh_arg_type arg_types type_heaps
 			= (arg_types, (var_store, attr_store, exis_variables, type_heaps))
+		where
+			fresh_arg_type at=:{at_attribute, at_type = TFA vars type} type_heaps
+				# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
+				  (at_type, type_heaps)			= freshCopyOfTFAType vars type { type_heaps & th_attrs = th_attrs }
+				= ({ at &  at_attribute = fresh_attribute, at_type = at_type }, type_heaps)
+			fresh_arg_type at type_heaps
+				= freshCopy at type_heaps
+
 		fresh_arg_types (Yes pos) arg_types (var_store, attr_store, exis_variables, type_heaps)
 			= mapSt (fresh_arg_type pos) arg_types (var_store, attr_store, exis_variables, type_heaps)
 		where
 			fresh_arg_type pos at=:{at_attribute, at_type = TFA vars type} (var_store, attr_store, exis_variables, type_heaps)
 				# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
-				# (var_store, attr_store, new_exis_variables, type_heaps)
-						= foldSt fresh_var_and_attr vars (var_store, attr_store, [], { type_heaps & th_attrs = th_attrs })
-				  (fresh_type, type_heaps)				= freshCopy type type_heaps
-				  type_heaps							= clearBindings vars type_heaps
+				# (var_store, attr_store, new_exis_variables, bound_attr_vars, type_heaps)
+						= foldSt fresh_var_and_attr vars (var_store, attr_store, [], [], { type_heaps & th_attrs = th_attrs })
+				  (fresh_type, type_heaps) = freshCopy type type_heaps
+				  type_heaps = { type_heaps & th_vars = foldSt clear_binding_of_type_var vars type_heaps.th_vars,
+				  							  th_attrs = foldSt clear_binding_of_attr_var bound_attr_vars type_heaps.th_attrs }
 				= ({ at &  at_attribute = fresh_attribute, at_type = fresh_type },
 						(var_store, attr_store, addToExistentialVariables pos new_exis_variables exis_variables, type_heaps))
 			fresh_arg_type _ at (var_store, attr_store, exis_variables, type_heaps)
 				# (fresh_at, type_heaps) = freshCopy at type_heaps
 				= (fresh_at, (var_store, attr_store, exis_variables, type_heaps))
 
-			fresh_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} (var_store, attr_store, exis_variables, type_heaps)
-				# (attr_store, exis_variables, th_attrs) = fresh_attr atv_attribute (attr_store, exis_variables, type_heaps.th_attrs)
-				= (inc var_store,  attr_store, exis_variables, { type_heaps & th_vars = type_heaps.th_vars <:= (tv_info_ptr, TVI_Type (TempQV var_store)), th_attrs = th_attrs })
+			fresh_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} (var_store, attr_store, exis_variables, bound_attr_vars, type_heaps)
+				# (attr_store, exis_variables, bound_attr_vars, th_attrs)
+						= fresh_attr atv_attribute (attr_store, exis_variables, bound_attr_vars, type_heaps.th_attrs)
+				= (inc var_store,  attr_store, exis_variables, bound_attr_vars,
+						{ type_heaps & th_vars = type_heaps.th_vars <:= (tv_info_ptr, TVI_Type (TempQV var_store)), th_attrs = th_attrs })
 			where
-				fresh_attr var=:(TA_Var {av_info_ptr}) (attr_store, exis_variables, attr_heap)
-					= (inc attr_store, [attr_store : exis_variables], attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)))
+				fresh_attr var=:(TA_Var {av_info_ptr}) (attr_store, exis_variables, bound_attr_vars, attr_heap)
+					# (av_info, attr_heap) = readPtr av_info_ptr attr_heap
+					= case av_info of
+						AVI_Empty
+							-> (inc attr_store, [attr_store : exis_variables], [av_info_ptr : bound_attr_vars], attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)))
+						AVI_Attr (TA_TempVar _)
+							-> (attr_store, exis_variables, bound_attr_vars, attr_heap)
 				fresh_attr attr state
 					= state
+				
+			clear_binding_of_type_var {atv_variable = {tv_info_ptr}} type_var_heap
+					= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+					
+			clear_binding_of_attr_var av_info_ptr attr_var_heap
+				= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+
 			
 addToExistentialVariables pos [] exis_variables
 	= exis_variables
 addToExistentialVariables pos new_exis_variables exis_variables
 	= [(pos, new_exis_variables) : exis_variables]
 
-freshArgumentsOfSymbolType :: ![AType] !*TypeHeaps -> (![AType], !*TypeHeaps)
-freshArgumentsOfSymbolType atypes type_heaps = mapSt fresh_arg_type atypes type_heaps
-where
-	fresh_arg_type at=:{at_attribute, at_type = TFA vars type} type_heaps
-		# (fresh_attribute, th_attrs)			= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
-		# type_heaps							= foldSt bind_var_and_attr vars { type_heaps & th_attrs = th_attrs }
-		  (fresh_type, type_heaps)				= freshCopy type type_heaps
-		  type_heaps							= clearBindings vars type_heaps
-		= ({ at &  at_attribute = fresh_attribute, at_type = TFA vars fresh_type }, type_heaps)
-	where
-		bind_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
-			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv)), th_attrs = bind_attr atv_attribute th_attrs }
-		where
-			bind_attr var=:(TA_Var {av_info_ptr}) attr_heap
-				= attr_heap <:= (av_info_ptr, AVI_Attr var)
-			bind_attr attr attr_heap
-				= attr_heap
-	fresh_arg_type at type_heaps
-		= freshCopy at type_heaps
 	
 freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap

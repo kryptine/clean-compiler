@@ -164,10 +164,12 @@ where
 		# (TV tv, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
 		  (types, cus) = clean_up cui types cus
 		= (CV tv :@: types, cus)
+	clean_up cui (cv :@: types) cus
+		# (types, cus) = clean_up cui types cus
+		= (cv :@: types, cus)
 	clean_up cui (TempQV qv_number) cus=:{cus_error,cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
 		| cui.cui_top_level
-//			= cleanUpVariable True type qv_number {cus & cus_error = existentialError cus_error}
 			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
 			= cleanUpVariable False type qv_number cus
 	where			
@@ -181,30 +183,8 @@ where
 	clean_up cui (TFA vars type) cus=:{cus_heaps}
 		# (type, cus) = clean_up cui type cus
 		= (TFA vars type, cus)
-/*
-	clean_up cui (TV tv=:{tv_info_ptr}) cus=:{cus_heaps}
-		# (TVI_TypeVar new_info_ptr, th_vars) = readPtr tv_info_ptr cus_heaps.th_vars
-		= (TV { tv & tv_info_ptr = new_info_ptr }, { cus & cus_heaps = { cus_heaps & th_vars = th_vars }})
-	clean_up cui (TFA vars type) cus=:{cus_heaps}
-		# (new_vars, cus_heaps) = mapSt refresh_var_and_attr vars cus_heaps
-		  (type, cus) = clean_up cui type { cus & cus_heaps = cus_heaps }
-		  cus_heaps = clearBindings vars cus.cus_heaps
-		= (TFA new_vars type, { cus & cus_heaps = cus_heaps })
-	where	
-		refresh_var_and_attr atv=:{atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
-			# (new_info_ptr, th_vars) = newPtr TVI_Empty th_vars
-			  (atv_attribute, th_attrs) = refresh_attr atv_attribute th_attrs
-			= ( { atv & atv_attribute = atv_attribute, atv_variable = { tv & tv_info_ptr = new_info_ptr }},
-			 	{ type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_TypeVar new_info_ptr), th_attrs = th_attrs })
-		where
-			refresh_attr (TA_Var av=:{av_info_ptr}) attr_heap
-				# (new_info_ptr, attr_heap) = newPtr AVI_Empty attr_heap
-				= (TA_Var {av & av_info_ptr = new_info_ptr}, attr_heap <:= (av_info_ptr, AVI_AttrVar new_info_ptr))
-			refresh_attr attr attr_heap
-				= (attr, attr_heap)
-*/
-	clean_up cui TE cus
-		= abort "unknown pattern in function clean_up"
+	clean_up cui type cus
+		= abort ("clean_up Type (typesupport.icl): unknown type " ---> ("clean_up Type", type))
 				
 instance clean_up [a] | clean_up a
 where
@@ -222,17 +202,6 @@ cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
 cleanUpVariable _ type tv_number cus
 	= (type, cus)
 
-clearBindings :: ![ATypeVar] !*TypeHeaps -> !*TypeHeaps
-clearBindings atvs type_heaps	
-	= foldSt clear_binding_of_var_and_attr atvs type_heaps
-where
-	clear_binding_of_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
-			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attr atv_attribute th_attrs }
-
-	clear_attr var=:(TA_Var {av_info_ptr}) attr_heap
-		= attr_heap <:= (av_info_ptr, AVI_Empty)
-	clear_attr attr attr_heap
-		= attr_heap
 
 ::	CleanUpResult :== BITVECT
 
@@ -549,14 +518,23 @@ where
 					= cus_error						
 	 			= startRuleError "Start rule cannot be overloaded.\n" cus_error
 	 		= cus_error
-	 		
+	 
+	 	
 instance clean_up CaseType
 where
 	clean_up cui ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cus
 		# (ct_pattern_type, cus) = clean_up cui ct_pattern_type cus 
 		  (ct_result_type, cus) = clean_up cui ct_result_type cus
-		  (ct_cons_types, cus) = clean_up cui ct_cons_types cus
+		  (ct_cons_types, cus) = mapSt (mapSt (clean_up_arg_type cui)) ct_cons_types cus
 		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cus)
+	where
+		clean_up_arg_type cui at=:{at_type = TFA avars type, at_attribute} cus
+			# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
+			  (type, cus)			= clean_up cui type cus
+			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, cus)
+		clean_up_arg_type cui at cus
+			= clean_up cui at cus
+
 
 /*
 	In 'bindInstances t1 t2' type variables of t1 are bound to the corresponding subtypes of t2, provided that

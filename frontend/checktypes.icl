@@ -358,8 +358,14 @@ determineAttributeVariable attr_var=:{av_name=attr_name=:{id_info}} oti=:{oti_he
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
 
 newAttribute :: !DemandedAttributeKind {#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute, !*OpenTypeInfo, !*CheckState)
-newAttribute DAK_Ignore var_name _ oti cs
-	= (TA_Multi, oti, cs)
+newAttribute DAK_Ignore var_name attr oti cs
+	= case attr of
+		TA_Multi
+			-> (TA_Multi, oti, cs)
+		TA_None
+			-> (TA_Multi, oti, cs)
+		_
+			-> (TA_Multi, oti, { cs & cs_error = checkError var_name "attribute not allowed" cs.cs_error })
 newAttribute DAK_Unique var_name new_attr  oti cs
 	= case new_attr of
 		TA_Unique
@@ -515,7 +521,7 @@ where
 			# (var, global_vars, var_heap, ste_previous) = retrieve_global_variable var ste_previous global_vars var_heap
 			= (var, global_vars, var_heap, { entry & ste_previous = ste_previous })
 //
-checkOpenAType mod_index scope dem_attr type=:{ at_type=TA type_cons=:{type_name=type_name=:{id_name,id_info}} types, at_attribute}
+checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type_name=type_name=:{id_name,id_info}} types, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
@@ -525,27 +531,27 @@ checkOpenAType mod_index scope dem_attr type=:{ at_type=TA type_cons=:{type_name
 		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
 		| checkArityOfType type_cons.type_arity td_arity td_rhs
 			# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
-			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope /* dem_attr */ types td_args (ots, oti, cs)
-			  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr td_attribute) id_name at_attribute oti cs
+			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr_kind types td_args (ots, oti, cs)
+			  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr_kind td_attribute) id_name at_attribute oti cs
 			= ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs)) 
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
 where
-	check_args_of_type_cons :: !Index !Int ![AType] ![ATypeVar] !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+	check_args_of_type_cons :: !Index !Int !DemandedAttributeKind ![AType] ![ATypeVar] !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 		-> (![AType], !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-	check_args_of_type_cons mod_index scope [] _ cot_state
+	check_args_of_type_cons mod_index scope dem_attr_kind [] _ cot_state
 		= ([], cot_state)
-	check_args_of_type_cons mod_index scope [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
-		# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute DAK_None atv_attribute) arg_type cot_state
-		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope arg_types td_args cot_state
+	check_args_of_type_cons mod_index scope dem_attr_kind [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
+		# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute dem_attr_kind /* DAK_None */ atv_attribute) arg_type cot_state
+		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr_kind arg_types td_args cot_state
 		= ([arg_type : arg_types], cot_state)
 
 	new_demanded_attribute DAK_Ignore _
 		= DAK_Ignore
 	new_demanded_attribute _ TA_Unique
 		= DAK_Unique
-	new_demanded_attribute dem_attr _
-		= dem_attr
+	new_demanded_attribute dem_attr_kind _
+		= dem_attr_kind
 
 checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_type, at_attribute} cot_state
 	# (arg_type, cot_state) = checkOpenAType mod_index scope DAK_None arg_type cot_state
