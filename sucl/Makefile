@@ -27,17 +27,21 @@ $(SYS)/%.abc: %.icl
 
 $(SYS)/supercompile.abc: supercompile.icl supercompile.dcl convert.dcl
 $(SYS)/convert.abc: convert.icl convert.dcl coreclean.dcl rule.dcl graph.dcl basic.dcl
-$(SYS)/cli.abc: cli.icl cli.dcl absmodule.dcl coreclean.dcl law.dcl strat.dcl rule.dcl basic.dcl
-$(SYS)/coreclean.abc: coreclean.icl coreclean.dcl strat.dcl spine.dcl rule.dcl graph.dcl
-$(SYS)/law.abc: law.icl law.dcl coreclean.dcl strat.dcl spine.dcl rule.dcl graph.dcl dnc.dcl basic.dcl
-$(SYS)/loop.abc: loop.icl loop.dcl trace.dcl strat.dcl history.dcl rule.dcl graph.dcl basic.dcl
-$(SYS)/strat.abc: strat.icl strat.dcl history.dcl spine.dcl dnc.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
-$(SYS)/history.abc: history.icl history.dcl spine.dcl rule.dcl graph.dcl basic.dcl
-$(SYS)/spine.abc: spine.icl spine.dcl rule.dcl pfun.dcl basic.dcl
+$(SYS)/newtest.abc: newtest.icl newtest.dcl newfold.dcl cli.dcl canon.dcl coreclean.dcl loop.dcl trace.dcl spine.dcl history.dcl complete.dcl trd.dcl rule.dcl graph.dcl basic.dcl
+$(SYS)/newfold.abc: newfold.icl newfold.dcl trace.dcl spine.dcl history.dcl rule.dcl
+$(SYS)/extract.abc: extract.icl extract.dcl 
+$(SYS)/cli.abc: cli.icl cli.dcl law.dcl coreclean.dcl strat.dcl absmodule.dcl rule.dcl dnc.dcl graph.dcl basic.dcl
+$(SYS)/canon.abc: canon.icl canon.dcl rule.dcl graph.dcl basic.dcl
+$(SYS)/law.abc: law.icl law.dcl coreclean.dcl strat.dcl spine.dcl rule.dcl dnc.dcl graph.dcl basic.dcl
+$(SYS)/coreclean.abc: coreclean.icl coreclean.dcl strat.dcl spine.dcl rule.dcl graph.dcl basic.dcl
+$(SYS)/loop.abc: loop.icl loop.dcl strat.dcl trace.dcl spine.dcl history.dcl rewr.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
+$(SYS)/strat.abc: strat.icl strat.dcl spine.dcl history.dcl rule.dcl dnc.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/absmodule.abc: absmodule.icl absmodule.dcl rule.dcl
-$(SYS)/trace.abc: trace.icl trace.dcl rule.dcl
+$(SYS)/trace.abc: trace.icl trace.dcl spine.dcl history.dcl rule.dcl basic.dcl
+$(SYS)/spine.abc: spine.icl spine.dcl history.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
+$(SYS)/history.abc: history.icl history.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/complete.abc: complete.icl complete.dcl graph.dcl
-$(SYS)/rewr.abc: rewr.icl rewr.dcl graph.dcl pfun.dcl basic.dcl
+$(SYS)/rewr.abc: rewr.icl rewr.dcl rule.dcl graph.dcl pfun.dcl basic.dcl
 $(SYS)/trd.abc: trd.icl trd.dcl rule.dcl graph.dcl basic.dcl
 $(SYS)/rule.abc: rule.icl rule.dcl graph.dcl basic.dcl
 $(SYS)/dnc.abc: dnc.icl dnc.dcl graph.dcl

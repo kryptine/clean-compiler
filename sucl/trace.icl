@@ -2,8 +2,8 @@ implementation module trace
 
 // $Id$
 
-import history
 import spine
+import history
 import rule
 import StdEnv
 

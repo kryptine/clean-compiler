@@ -6,8 +6,8 @@ import coreclean
 import strat
 import spine
 import rule
-import graph
 import dnc
+import graph
 import basic
 import StdEnv
 

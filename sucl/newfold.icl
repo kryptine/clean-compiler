@@ -2,6 +2,10 @@ implementation module newfold
 
 // $Id$
 
+import trace
+import rule
+import StdEnv
+
 /*
 
 newfold.lit - New folding function
@@ -86,8 +90,25 @@ occurs within any subtrace.
 >|| =   mapfst3 only (extract trc foldarea trace ([],[],[])), otherwise
 >   =   newextract trc foldarea trace, otherwise
 >       where (recursive,recurseresult) = recurse foldarea fnsymbol trace
+*/
 
+fullfold ::
+    (Etracer sym var pvar)
+    ((Rgraph sym var)->(sym,[var]))
+    sym
+    (Trace sym var pvar)
+ -> ([Bool],[Rule sym var],[Rgraph sym var])
 
+fullfold trc foldarea fnsymbol trace
+| recursive
+  = recurseresult
+= newextract trc foldarea trace
+  where (recursive,recurseresult) = recurse foldarea fnsymbol trace
+
+recurse = undef
+newextract = undef
+
+/*
 `Recurse foldarea fnsymbol trace' is a pair `(recursive,recurseresult)'.
 `Recurseresult'  is  the derived function definition (strictness, rules,
 and new areas), obtained by folding the trace.  `Recurse' tries to  fold
@@ -193,7 +214,15 @@ in the supertrace.
 >       rgraph * ** ->
 >       bool ->
 >       bool
+*/
 
+:: Etracer sym var pvar :==
+       (Trace sym var pvar)
+       (Rgraph sym var)
+       Bool
+    -> Bool
+
+/*
 >   extract
 >   ::  etracer * ** *** ->
 >       (rgraph * **->(*,[**])) ->

@@ -41,7 +41,7 @@ convert_fundef fundef (typerulemap,strictsmap,fundefs0,kindmap)
    , [(funsym,kind):kindmap]
    )
    where {fun_symb,fun_body,fun_type,fun_kind} = fundef
-         funsym = SuclUser fun_symb.id_info
+         funsym = SuclUser fun_symb
          (typerule,stricts) = foldoptional notyperule convert_symboltype fun_type
          notyperule = abort "convert: convert_fundef: fun_type is absent"
          fundefs1 = convert_functionbody funsym fun_body fundefs0
@@ -188,7 +188,7 @@ convert_expression bounds (App appinfo) ((heap0,seen0),(nodes0,fundefs0,globals0
    where [root:heap1] = heap0
          ((heap2,seen1),(nodes1,fundefs1,globals1,args0))
           = convert_expressions bounds appinfo.app_args ((heap1,seen0),(nodes0,fundefs0,globals0))
-         nodes2 = [(root,(SuclUser appinfo.app_symb.symb_name.id_info,args0)):nodes1]
+         nodes2 = [(root,(SuclUser appinfo.app_symb.symb_name,args0)):nodes1]
 
 convert_expression bounds (expr @ exprs) ((heap0,seen0),(nodes0,fundefs0,globals0,rest))
  = ((heap2,seen1),(nodes2,fundefs1,globals1,[root:rest]))
@@ -270,7 +270,7 @@ convert_algebraic_pattern ap ((heap0,seen0),(nodes0,rest))
          argmap = [(fv.fv_info_ptr,SuclNamed fv.fv_info_ptr) \\ fv <- ap.ap_vars]
          seen1 = argmap++seen0
          args0 = map snd argmap
-         nodes1 = [(root,(SuclUser ap.ap_symbol.glob_object.ds_ident.id_info,args0)):nodes0]
+         nodes1 = [(root,(SuclUser ap.ap_symbol.glob_object.ds_ident,args0)):nodes0]
 
 convert_basic_branch branch ((heap0,seen0),(globals0,fundefs0,alternatives0))
  = ((heap2,seen2),(globals1,fundefs1,alternatives1))
@@ -313,4 +313,4 @@ cts_exports :: {#FunType} -> [SuclSymbol]
 cts_exports funtypes = [convert_funtype funtype\\funtype<-:funtypes]
 
 convert_funtype :: FunType -> SuclSymbol
-convert_funtype funtype = SuclUser funtype.ft_symb.id_info
+convert_funtype funtype = SuclUser funtype.ft_symb

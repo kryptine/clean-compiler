@@ -6,7 +6,10 @@ import strat
 import spine
 import rule
 import graph
+import basic
+import StdCompare
 import syntax
+//import StdEnv
 
 :: SuclTypeSymbol
  = SuclUSER TypeSymbIdent
@@ -27,10 +30,11 @@ sucltypeheap :: [SuclTypeVariable]
 sucltypeheap =: map SuclANONYMOUS [0..]
 
 :: SuclSymbol
- = SuclUser SymbolPtr
+ = SuclUser Ident
  | SuclCase ExprInfoPtr
  | SuclApply Int
  | SuclInt Int
+ | SuclChar Char
  | SuclReal Real
  | SuclBool Bool
 
@@ -46,8 +50,25 @@ sucltypeheap =: map SuclANONYMOUS [0..]
 suclheap :: [SuclVariable]
 suclheap =: map SuclAnonymous [0..]
 
+instance == SuclTypeSymbol
+where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
+      (==) (SuclFN   arity1) (SuclFN   arity2) = arity1==arity2
+      (==)  SuclINT           SuclINT          = True
+      (==)  SuclCHAR          SuclCHAR         = True
+      (==)  SuclREAL          SuclREAL         = True
+      (==)  SuclBOOL          SuclBOOL         = True
+      (==)  SuclDYNAMIC       SuclDYNAMIC      = True
+      (==)  SuclFILE          SuclFILE         = True
+      (==)  SuclWORLD         SuclWORLD        = True
+      (==)  _                 _                = False
+
+instance == SuclTypeVariable
+where (==) (SuclANONYMOUS i1) (SuclANONYMOUS i2) = i1 == i2
+      (==) (SuclNAMED     p1) (SuclNAMED     p2) = p1 == p2
+      (==) _                  _                  = False
+
 instance == SuclSymbol
-where (==) (SuclUser  sptr1)  (SuclUser  sptr2)  = sptr1 == sptr2
+where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
       (==) (SuclCase  eptr1)  (SuclCase  eptr2)  = eptr1 == eptr2
       (==) (SuclApply int1 )  (SuclApply int2 )  = int1  == int2
       (==) (SuclInt   int1 )  (SuclInt   int2 )  = int1  == int2
@@ -78,6 +99,7 @@ coretyperule (SuclApply argc)
                (restype,emptygraph)
                (outfunctype,updategraph outfunctype (SuclFN (argc-1),argtypes++[restype]) emptygraph)
 coretyperule (SuclInt _) = consttyperule SuclINT
+coretyperule (SuclChar _) = consttyperule SuclCHAR
 coretyperule (SuclReal _) = consttyperule SuclREAL
 coretyperule (SuclBool _) = consttyperule SuclBOOL
 coretyperule (SuclUser _) = abort "coreclean: coretyperule: untyped user symbol"
@@ -86,3 +108,15 @@ coretyperule (SuclCase _) = abort "coreclean: coretyperule: untyped case symbol"
 consttyperule tsym
  = mkrule [] root (updategraph root (tsym,[]) emptygraph)
    where root = SuclANONYMOUS 0
+
+corecomplete :: SuclTypeSymbol -> [SuclSymbol] -> Bool
+
+corecomplete (SuclUSER tsid) = const False  // Must be an abstype...
+corecomplete (SuclFN arity) = const False
+corecomplete SuclINT = const False
+corecomplete SuclCHAR = superset (map (SuclChar o toChar) [0..255]) // 256 alternatives... doubtful is this is useful, but hey...
+corecomplete SuclREAL = const False
+corecomplete SuclBOOL = superset (map SuclBool [False,True])
+corecomplete SuclDYNAMIC = const False
+corecomplete SuclFILE = const False
+corecomplete SuclWORLD = const False

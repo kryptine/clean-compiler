@@ -4,6 +4,13 @@ implementation module newtest
 
 import cli
 import coreclean
+import newfold
+import complete
+import trd
+import loop
+import trace
+import rule
+import graph
 import canon
 import basic
 import StdEnv
@@ -138,7 +145,19 @@ these tuples.
 >           [rule * **],      ||  Resulting rewrite rules
 >           [rgraph * **]     ||  New areas for further symbolic reduction (not necessarily canonical)
 >       )
+*/
 
+:: Symredresult sym var tsym tvar
+   :== ( Rgraph sym var    // The initial area in canonical form
+       , sym               // The assigned symbol
+       , [Bool]            // Strictness annotations
+       , Rule tsym tvar    // Type rule
+       , Trace sym var var // Truncated and folded trace
+       , [Rule sym var]    // Resulting rewrite rules
+       , [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
+       )
+
+/*
 >   listopt :: [char] -> [[char]] -> [char]
 
 >   listopt main = listnew main.loadclis
@@ -253,7 +272,7 @@ these tuples.
 fullsymred ::
     [SuclSymbol]    // Fresh function symbols
     Cli             // Module to optimise
- -> [Symredresult symbol node typesymbol typenode]
+ -> [Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable]
 
 fullsymred freshsymbols cli
  = results
@@ -264,11 +283,6 @@ fullsymred freshsymbols cli
          foldarea` = foldarea (labelarea` o canonise`)
          labelarea` = labelarea (map getinit results) freshsymbols
          canonise` = canonise (typerule cli) suclheap
-
-initareas = undef
-getareas = undef
-symredarea = undef
-getinit = undef
 
 /*
 `Initareas cli' is the list  of  initial  rooted  graphs  that  must  be
@@ -290,7 +304,23 @@ its type rule.
 
 >   getareas :: symredresult * ** **** ***** -> [rgraph * **]
 >   getareas (area,symbol,stricts,trule,trace,rules,areas) = areas
+*/
 
+initareas :: Cli -> [Rgraph SuclSymbol SuclVariable]
+initareas cli
+= map (initialise suclheap) (exports cli)
+  where initialise [root:nodes] symbol
+        = mkrgraph root (updategraph root (symbol,args) emptygraph)
+          where args = map2 const nodes targs
+                targs = arguments (typerule cli symbol)
+
+getinit :: (Symredresult sym var tsym tvar) -> Rgraph sym var
+getinit (area,symbol,stricts,trule,trace,rules,areas) = area
+
+getareas :: (Symredresult sym var tsym tvar) -> [Rgraph sym var]
+getareas (area,symbol,stricts,trule,trace,rules,areas) = areas
+
+/*
 `Symredarea' is the function that does symbolic reduction  of  a  single
 area.
 
@@ -311,13 +341,38 @@ area.
 >             complete' = (~).converse matchable' (mkrgraph () emptygraph)
 >             matchable' = matchable (complete cli)
 >             strategy' = clistrategy cli
+*/
 
+:: Unit = Unit
+
+symredarea ::
+    ((Rgraph SuclSymbol SuclVariable)->(SuclSymbol,[SuclVariable]))
+    Cli
+    (Rgraph SuclSymbol SuclVariable)
+ -> Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable
+
+symredarea foldarea cli area
+= (area,symbol,stricts,trule,trace,rules,areas)
+  where agraph = rgraphgraph area; aroot = rgraphroot area
+        (symbol,aargs) = foldarea area
+        arule = mkrule aargs aroot agraph
+        trule = ruletype sucltypeheap (ctyperule SuclFN sucltypeheap (typerule cli)) arule
+        trace = loop strategy` matchable` (removeMembers suclheap (varlist agraph [aroot]),arule)
+        (stricts,rules,areas) = fullfold (trc symbol) foldarea symbol trace
+        matchable` = matchable (complete cli)
+        strategy` = clistrategy cli
+
+/*
 >   trc :: symbol -> trace symbol node node -> rgraph symbol node -> bool -> bool
 
 >   trc symbol trace area recursive
 >   =   error (lay ("Trace is recursive in area":printrgraph showsymbol shownode area:printtrace symbol showsymbol shownode shownode trace)), if esymbol symbol & recursive
 >   =   recursive, otherwise
+*/
 
+trc symbol trace area recursive = recursive
+
+/*
 >   esymbol (User m "E") = True
 >   esymbol symbol = False
 
@@ -403,7 +458,20 @@ area.
 
 >   matchable complete patterns rgraph
 >   =   ~coveredby complete (rgraphgraph rgraph) [(rgraphgraph pattern,[rgraphroot pattern])|pattern<-patterns] [rgraphroot rgraph]
+*/
 
+matchable ::
+    ([sym]->Bool)
+    [Rgraph sym pvar]
+    (Rgraph sym var)
+ -> Bool
+ |  == sym
+ &  == var
+ &  == pvar
+matchable complete patterns rgraph
+= not (coveredby complete (rgraphgraph rgraph) [(rgraphgraph pattern,[rgraphroot pattern]) \\ pattern<-patterns] [rgraphroot rgraph])
+
+/*
 ------------------------------------------------------------------------
 
 `Ctyperule' cli (sym,args)' is the typerule of an occurrence  of  symbol
@@ -424,7 +492,25 @@ sym with the given arguments, curried if there are too few.
 >             (troot',tgraph',theap') = foldr build (troot,tgraph,typeheap--nodelist tgraph (troot:targs)) targs''
 >             build targ (troot,tgraph,tnode:tnodes)
 >             =   (tnode,updategraph tnode (fn,[targ,troot]) tgraph,tnodes)
+*/
 
+ctyperule ::
+    (Int -> tsym)           // The arrow type symbol for functions of given arity
+    [tvar]                  // Fresh type variables
+    (sym->Rule tsym tvar)   // Type rule of a symbol
+    (sym,[var])             // Node to abstract
+ -> Rule tsym tvar
+ |  == tvar
+
+ctyperule fn typeheap typerule (sym,args)
+= mkrule targs` troot` tgraph`
+  where targs = arguments trule; troot = ruleroot trule; tgraph = rulegraph trule
+        trule = typerule sym
+        (targs`,targs``) = claim args targs
+        (troot`,tgraph`,_) = foldr build (troot,tgraph,removeMembers typeheap (varlist tgraph [troot:targs])) targs``
+        build targ (troot,tgraph,[tnode:tnodes])
+        = (tnode,updategraph tnode (fn 1,[targ,troot]) tgraph,tnodes)
+
+/*
 >   newsymbols main = map (User main.("New_"++)) identifiers
-
 */

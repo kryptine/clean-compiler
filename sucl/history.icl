@@ -2,7 +2,6 @@ implementation module history
 
 // $Id$
 
-import spine
 import rule
 import graph
 import pfun

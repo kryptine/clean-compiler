@@ -2,8 +2,8 @@ definition module strat
 
 // $Id$
 
-from history import History
 from spine import Answer
+from history import History
 from rule import Rule
 from graph import Graph,Node
 from StdOverloaded import ==

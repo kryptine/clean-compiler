@@ -34,10 +34,11 @@ from StdString import String
 sucltypeheap :: [SuclTypeVariable]
 
 :: SuclSymbol
- = SuclUser SymbolPtr
+ = SuclUser Ident
  | SuclCase ExprInfoPtr
  | SuclApply Int
  | SuclInt Int
+ | SuclChar Char
  | SuclReal Real
  | SuclBool Bool
 
@@ -52,8 +53,13 @@ sucltypeheap :: [SuclTypeVariable]
 
 suclheap :: [SuclVariable]
 
+instance == SuclTypeSymbol
+instance == SuclTypeVariable
 instance == SuclSymbol
 instance == SuclVariable
 
 // Get the type rule and strictness of a built in core clean symbol
 coretypeinfo :: SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
+
+// Determine if a list of constructors completely covers a given type
+corecomplete :: SuclTypeSymbol -> [SuclSymbol] -> Bool
