@@ -35,8 +35,10 @@ signClassification :: !Index !Index ![SignClassification] !{# CommonDefs } !*Typ
 	-> (!SignClassification, !*TypeVarHeap, !*TypeDefInfos)
 signClassification type_index module_index hio_signs defs type_var_heap td_infos
 	# (td_info, td_infos) = td_infos![module_index].[type_index]
-	= determineSignClassOfTypeDef type_index module_index td_info hio_signs defs type_var_heap td_infos
-//		---> ("signClassification", defs.[module_index].com_type_defs.[type_index].td_name)
+	# (tsp_sign, type_var_heap, td_infos)
+		= determineSignClassOfTypeDef type_index module_index td_info hio_signs defs type_var_heap td_infos
+	= (tsp_sign, type_var_heap, td_infos)
+//		---> ("signClassification", defs.[module_index].com_type_defs.[type_index].td_name, tsp_sign)
 
 
 removeTopClasses [cv : cvs] [tc : tcs] 
@@ -320,7 +322,10 @@ propClassification type_index module_index hio_props defs type_var_heap td_infos
 		# (td_info, td_infos) = td_infos![module_index].[type_index]
 		| td_info.tdi_group_nr== (-1) // is an exported dictionary ?
 			= (0, type_var_heap, td_infos)
-			= determinePropClassOfTypeDef type_index module_index td_info hio_props defs type_var_heap td_infos
+			# (tsp_prop, type_var_heap, td_infos)
+				= determinePropClassOfTypeDef type_index module_index td_info hio_props defs type_var_heap td_infos
+			= (tsp_prop, type_var_heap, td_infos)
+//				---> ("propClassification", defs.[module_index].com_type_defs.[type_index].td_name, tsp_prop)
 
 determinePropClassOfTypeDef :: !Int !Int !TypeDefInfo ![PropClassification] !{# CommonDefs} !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification,!*TypeVarHeap, !*TypeDefInfos)

@@ -452,21 +452,27 @@ checkTypeVar scope dem_attr tv=:{tv_name=var_name=:{id_name,id_info}} tv_attr (o
 	# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
 	| ste_kind == STE_Empty || ste_def_level == cModuleScope
 		# (new_attr, oti=:{oti_heaps,oti_all_vars}, cs) = newAttribute dem_attr id_name tv_attr oti { cs & cs_symbol_table = cs_symbol_table }
-		  (new_var_ptr, th_vars) = newPtr (TVI_Attribute new_attr) oti_heaps.th_vars
+		  (new_var_ptr, th_vars) = newPtr (TVI_AttrAndRefCount new_attr 1) oti_heaps.th_vars
 		  new_var = { tv & tv_info_ptr = new_var_ptr }
 		= (new_var, new_attr, ({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_all_vars = [new_var : oti_all_vars]},
 				{ cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
 								ste_def_level = scope, ste_previous = entry })}))
 		# (STE_TypeVariable tv_info_ptr) = ste_kind
 		  {oti_heaps} = oti
-		  (var_info, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
-		  (var_attr, oti, cs) = check_attribute id_name dem_attr var_info tv_attr { oti & oti_heaps = { oti_heaps & th_vars = th_vars }}
+		  (tv_info, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
+		  th_vars = incr_ref_count tv_info_ptr tv_info th_vars	
+		  (var_attr, oti, cs) = check_attribute id_name dem_attr tv_info tv_attr { oti & oti_heaps = { oti_heaps & th_vars = th_vars }}
 		  								{ cs & cs_symbol_table = cs_symbol_table }
 		= ({ tv & tv_info_ptr = tv_info_ptr }, var_attr, (oti, cs))
 where
-	check_attribute var_name DAK_Ignore (TVI_Attribute prev_attr) this_attr oti cs=:{cs_error}
+	incr_ref_count tv_info_ptr (TVI_AttrAndRefCount prev_attr ref_count) th_vars
+		= th_vars <:=	(tv_info_ptr, TVI_AttrAndRefCount prev_attr (inc ref_count))			
+	incr_ref_count tv_info_ptr _ th_vars
+		= th_vars
+
+	check_attribute var_name DAK_Ignore (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		= (TA_Multi, oti, cs)
-	check_attribute var_name dem_attr (TVI_Attribute prev_attr) this_attr oti cs=:{cs_error}
+	check_attribute var_name dem_attr (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		# (new_attr, cs_error) = determine_attribute var_name dem_attr this_attr cs_error
 		= check_var_attribute prev_attr new_attr oti { cs & cs_error = cs_error }
 	where					
@@ -622,7 +628,7 @@ where
 		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
 		| ste_kind == STE_Empty || ste_def_level < cRankTwoScope
 			# (new_attr, oti=:{oti_heaps}, cs) = newAttribute DAK_None id_name atv_attribute oti { cs & cs_symbol_table = cs_symbol_table }
-			  (new_var_ptr, th_vars) = newPtr (TVI_Attribute new_attr) oti_heaps.th_vars
+			  (new_var_ptr, th_vars) = newPtr (TVI_AttrAndRefCount new_attr 1) oti_heaps.th_vars
 			= ({atv & atv_variable = { tv & tv_info_ptr = new_var_ptr}, atv_attribute = new_attr }, 
 					({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }}, { cs & cs_symbol_table =
 							cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
@@ -657,7 +663,8 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (it_types, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
 	  	= checkOpenTypes mod_index cGlobalScope DAK_None it_types (ots, oti, { cs & cs_error = cs_error })
-	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [] }
+	  (heaps, cs) = check_linearity_of_type_vars it_vars oti.oti_heaps cs
+	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps }
 	  (it_context, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts it_context mod_index class_defs ots oti cs
 	  cs_error = foldSt (compare_context_and_instance_types ins_class it_types) it_context cs.cs_error
 	  (specials, cs) = checkSpecialTypeVars specials { cs & cs_error = cs_error }
@@ -674,6 +681,18 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 	  where
 		is_type_var (TV _) = True
 		is_type_var _ = False
+	
+	check_linearity_of_type_vars vars heaps=:{th_vars} cs=:{cs_error}
+		# (th_vars, cs_error) = foldSt check_linearity vars (th_vars, cs_error)
+		= ({heaps & th_vars = th_vars}, {cs & cs_error = cs_error})
+	where
+		check_linearity {tv_name, tv_info_ptr} (th_vars, error)
+			# (TVI_AttrAndRefCount prev_attr ref_count, th_vars) = readPtr tv_info_ptr th_vars
+			| ref_count > 1
+				= (th_vars, checkError tv_name ": this type variable occurs more than once in an instance type" error)
+				= (th_vars, error)
+			
+		
 	
 	compare_context_and_instance_types ins_class it_types {tc_class=TCGeneric _, tc_types} cs_error
 		= cs_error

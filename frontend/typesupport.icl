@@ -43,6 +43,8 @@ simplifyTypeApplication (TB _) _
 	= (False, TE)
 simplifyTypeApplication (TArrow1 _) _ 
 	= (False, TE)
+simplifyTypeApplication (_ --> _ ) _ 
+	= (False, TE)
 	
 	
 

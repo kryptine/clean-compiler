@@ -964,7 +964,7 @@ cNonRecursiveAppl	:== False
 					| TVI_TypeVar !TypeVarInfoPtr // Sjaak: to collect and check universally quantified type variables
 					| TVI_Forward !TempVarId | TVI_TypeKind !KindInfoPtr
 					| TVI_SignClass !Index !SignClassification !TypeVarInfo | TVI_PropClass !Index !PropClassification !TypeVarInfo
-					| TVI_Attribute TypeAttribute
+					| TVI_AttrAndRefCount !TypeAttribute !Int
 					| TVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 					| TVI_AType !AType /* auxiliary used in module comparedefimp */
 					| TVI_Used /* to administer that this variable is encountered (in checkOpenTypes) */

@@ -7,7 +7,8 @@ partionateAndExpandTypes :: !NumberSet !Index !*CommonDefs !*{#DclModule} !*Type
 
 ::	TypeGroups :== [[GlobalIndex]]
 
-analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin -> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+analyseTypeDefs :: !{#CommonDefs} !TypeGroups !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
+						-> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 
 determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
 	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)

@@ -98,8 +98,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	
 	# (type_groups, ti_common_defs, td_infos, icl_common, dcl_mods, type_heaps, error_admin)
 			= partionateAndExpandTypes icl_used_module_numbers main_dcl_module_n icl_common dcl_mods type_heaps error_admin
-	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
-	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
+//	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
+//	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
+	  ({com_type_defs}, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
+	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups com_type_defs main_dcl_module_n td_infos type_heaps.th_vars error_admin
 	# (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
 	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)

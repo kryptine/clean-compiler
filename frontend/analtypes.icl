@@ -533,8 +533,9 @@ where
 		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 		= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))
 
-analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin -> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
-analyseTypeDefs modules groups type_def_infos type_var_heap error
+analyseTypeDefs :: !{#CommonDefs} !TypeGroups  !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
+						-> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+analyseTypeDefs modules groups dcl_types dcl_mod_index type_def_infos type_var_heap error
 	# as = { as_kind_heap = newHeap, as_type_var_heap = type_var_heap, as_td_infos = type_def_infos, as_error = error }
 	  {as_td_infos,as_type_var_heap,as_error} = foldSt (anal_type_defs_in_group modules) groups as
 	= check_left_root_attribution_of_typedefs modules groups as_td_infos as_type_var_heap as_error
@@ -546,10 +547,12 @@ where
 		| is_abstract_type
 			= as
 			# (type_properties, conds, as) = foldSt (anal_type_def modules) group (cIsHyperStrict, { con_top_var_binds = [], con_var_binds = [] }, as)
+			  as = foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
 			  (kinds_in_group, (as_kind_heap, as_td_infos))	= mapSt determine_kinds group (as.as_kind_heap, as.as_td_infos)
 			  as_kind_heap									= unify_var_binds conds.con_var_binds as_kind_heap
 			  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars conds.con_top_var_binds 0 as_kind_heap
-			  (as_kind_heap, as_td_infos) = update_type_def_infos type_properties normalized_top_vars group kinds_in_group  kind_var_store as_kind_heap as_td_infos
+			  (as_kind_heap, as_td_infos) = update_type_def_infos type_properties normalized_top_vars group
+			  										kinds_in_group  kind_var_store as_kind_heap as_td_infos
 			= { as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos }
 
 	init_type_def_infos modules gi=:{gi_module,gi_index} (is_abstract_type, type_def_infos, as_type_var_heap, kind_heap)
@@ -583,7 +586,7 @@ where
 		anal_rhs_of_type_def modules com_cons_defs (RecordType {rt_constructor}) conds_as
 			= analTypesOfConstructor modules com_cons_defs [rt_constructor] conds_as
 		anal_rhs_of_type_def modules _ (SynType type) conds_as
-			# (type_kind, cv_props, (conds, as=:{as_kind_heap, as_error})) = analTypes cDummyBool modules [] type conds_as
+			# (type_kind, cv_props, (conds, as=:{as_kind_heap, as_error})) = analTypes True /* cDummyBool */ modules [] type.at_type conds_as
 			  {uki_kind_heap, uki_error} = unifyKinds type_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
 			= (cv_props, (conds, { as & as_kind_heap = as_kind_heap, as_error = as_error }))
 
@@ -639,11 +642,11 @@ where
 			= nomalize_var kind_info_ptr kind_info (kind_store, kind_heap)
 			
 	update_type_def_infos type_properties top_vars group updated_kinds_of_group kind_store kind_heap td_infos
-		# (_, as_kind_heap, as_td_infos) = fold2St (update_type_def_info (type_properties bitor cIsAnalysed) top_vars) group updated_kinds_of_group
-				(kind_store, kind_heap, td_infos)
+		# (_, as_kind_heap, as_td_infos) = fold2St (update_type_def_info (type_properties bitor cIsAnalysed) top_vars) group updated_kinds_of_group (kind_store, kind_heap, td_infos)
 		= (as_kind_heap, as_td_infos)
 	where
-		update_type_def_info type_properties top_vars {gi_module,gi_index} updated_kinds (kind_store, kind_heap, td_infos)
+		update_type_def_info type_properties top_vars {gi_module,gi_index} updated_kinds
+				(kind_store, kind_heap, td_infos)
 			# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module].[gi_index]
 			# (group_vars, cons_vars, kind_store, kind_heap) = determine_type_def_info tdi_kinds updated_kinds top_vars kind_store kind_heap
 			= (kind_store, kind_heap, { td_infos & [gi_module,gi_index] =
@@ -662,11 +665,41 @@ where
 					-> ([ var_number : group_vars ], cons_vars, kind_store, kind_heap)
 		determine_type_def_info [] [] top_vars kind_store kind_heap
 			= ([], [], kind_store, kind_heap)
-				
+		
 		is_a_top_var var_number [ top_var_number : top_var_numbers]
 			= var_number == top_var_number || is_a_top_var var_number top_var_numbers
 		is_a_top_var var_number []
 			= False
+
+	check_dcl_properties modules dcl_types dcl_mod_index properties {gi_module, gi_index} as
+		| gi_module == dcl_mod_index && gi_index < size dcl_types
+			# {td_rhs} = dcl_types.[gi_index]
+			= case td_rhs of
+				AbstractType spec_properties
+					| equivalent_properties spec_properties properties
+						| spec_properties bitand cIsNonCoercible == 0
+							# (as_type_var_heap, as_td_infos, as_error) = check_possitive_sign gi_module gi_index modules as.as_type_var_heap as.as_td_infos as.as_error
+							= {as & as_type_var_heap = as_type_var_heap, as_td_infos = as_td_infos, as_error = as_error} 
+						# as_error = checkError "abstract type properties conflict with derived properties in implementation module" "" as.as_error
+						= { as & as_error = as_error }
+				_
+					= as
+			= as
+	where						
+		equivalent_properties icl_props dcl_props
+			| icl_props bitand cIsNonCoercible > 0 && dcl_props bitand cIsNonCoercible == 0
+				= False
+			| dcl_props bitand cIsHyperStrict > 0 && icl_props bitand cIsHyperStrict == 0
+				= False
+				= True
+		
+		check_possitive_sign mod_index type_index modules type_var_heap type_def_infos error
+			# (signs, type_var_heap, type_def_infos) = signClassification mod_index type_index [] modules type_var_heap type_def_infos
+			| signs.sc_neg_vect == 0
+				= (type_var_heap, type_def_infos, error)
+				# error = checkError "abstract type properties conflict with derived properties in implementation module" "" error
+				= (type_var_heap, type_def_infos, error)
+		
 
 	check_left_root_attribution_of_typedefs modules groups type_def_infos type_var_heap error
 		# (type_def_infos, type_var_heap, error) = foldSt (foldSt (checkLeftRootAttributionOfTypeDef modules)) groups (type_def_infos, type_var_heap, error)
@@ -888,8 +921,10 @@ where
 			# as_error = pushErrorAdmin (newPosition ins_ident ins_pos) as_error
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
 			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }
+			  context = {tc_class = TCClass ins_class, tc_types = it_types, tc_var = nilPtr}
 			  (class_infos, as) = determine_kinds_of_type_contexts common_defs
-			  		[{tc_class = TCClass ins_class, tc_types = it_types, tc_var = nilPtr} : it_context] class_infos as
+			  		[ context : it_context] class_infos as
+//			  			---> ("check_kinds_of_class_instance", context.tc_class, context.tc_types)
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
 
 	check_kinds_of_generics common_defs index generic_defs class_infos gen_heap as

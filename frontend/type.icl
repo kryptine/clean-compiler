@@ -1864,7 +1864,10 @@ where
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (prop_type_heaps.th_vars, ts.ts_expr_heap)
 		  (fresh_fun_type, ts) = freshSymbolType No cWithoutFreshContextVars ft_with_prop common_defs { ts & ts_type_heaps = { prop_type_heaps & th_vars = th_vars }, ts_expr_heap = ts_expr_heap,
 		  		 ts_td_infos = prop_td_infos, ts_error = ts_error }
-		  (lifted_args, ts) = fresh_non_unique_type_variables fun_lifted [] ts
+//		  (lifted_args, ts) = fresh_non_unique_type_variables fun_lifted [] ts
+		  (lifted_args, ts) = fresh_attributed_type_variables fun_lifted [] ts
+
+
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
 		  		= fresh_dynamics fi_dynamics (ts.ts_var_store, ts.ts_type_heaps, ts.ts_var_heap, ts.ts_expr_heap, pre_def_symbols)
 		= (pre_def_symbols,

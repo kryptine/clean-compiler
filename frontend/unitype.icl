@@ -5,8 +5,6 @@ import StdEnv
 import syntax, analunitypes, type, utilities, checktypes,
 		compilerSwitches //, RWSDebug
 
-// import cheat
-
 AttrUni			:== 0
 AttrMulti		:== 1
 /*
@@ -53,6 +51,7 @@ determineAttributeCoercions off_type dem_type coercible subst coercions defs con
 	  (_, exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
 	  (result, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce (if coercible PositiveSign TopSign) defs cons_vars [] exp_off_type exp_dem_type 
 	  		 { crc_type_heaps = es_type_heaps, crc_coercions = coercions, crc_td_infos = es_td_infos}
+
 	= case result of
 		No
 	  		-> (No, subst, crc_coercions, crc_td_infos, crc_type_heaps)
@@ -61,19 +60,17 @@ determineAttributeCoercions off_type dem_type coercible subst coercions defs con
 
 
 /*
-
-
 	= case result of
 		No
-	  		# (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
+	  		# (crc_coercions, copy_crc_coercions) = copyCoercions crc_coercions
 			  format = { form_properties = cMarkAttribute, form_attr_position = Yes ([], copy_crc_coercions) }			
-			| file_to_true (stderr <:: (format, exp_off_type,No) <:: (format, exp_dem_type,No) <<< '\n')
-					---> ("determineAttributeCoercions (OK)", off_type, exp_off_type, ('\n',  dem_type, exp_dem_type))
+			| file_to_true (stderr <:: (format, exp_off_type, No) <:: (format, exp_dem_type, No) <<< '\n')
+					---> ("determineAttributeCoercions (OK)", off_type, exp_off_type, ('\n', dem_type, exp_dem_type))
 				-> (No, subst, crc_coercions, crc_td_infos, crc_type_heaps)
 				-> undef
 //	  		-> (No, subst, crc_coercions, crc_td_infos, crc_type_heaps)
 	  	Yes pos
-	  		# (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
+	  		# (crc_coercions, copy_crc_coercions) = copyCoercions crc_coercions
 			  format = { form_properties = cMarkAttribute, form_attr_position = Yes ([], copy_crc_coercions) }			
 			| file_to_true (stderr <:: (format, exp_off_type,No) <:: (format, exp_dem_type,No) <<< '\n')
 					---> ("determineAttributeCoercions (NOK)", off_type, exp_off_type, ('\n',  dem_type, exp_dem_type))
@@ -450,7 +447,8 @@ expandTempTypeVariable tv_number (subst, es)
 IsArrowKind (KindArrow _) = True
 IsArrowKind _ = False
 
-equal_type_prop {tsp_sign=sign0,tsp_propagation=prop0,tsp_coercible=coerc0} {tsp_sign=sign1,tsp_propagation=prop1,tsp_coercible=coerc1}
+equal_type_prop {tsp_sign=sign0,tsp_propagation=prop0,tsp_coercible=coerc0}
+				{tsp_sign=sign1,tsp_propagation=prop1,tsp_coercible=coerc1}
 	= prop0==prop1 && coerc0==coerc1 && sign0.sc_pos_vect==sign1.sc_pos_vect && sign0.sc_neg_vect==sign1.sc_neg_vect
 
 instance expandType Type

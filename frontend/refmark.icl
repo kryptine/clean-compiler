@@ -366,7 +366,7 @@ refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedListPatterns t
 
 refMarkOfCase free_vars sel def {case_expr, case_guards=DynamicPatterns patterns,case_default,case_explicit} rms=:{rms_var_heap}
 	# (def, all_closed_let_vars, rms) = refMarkOfDefault case_explicit free_vars sel def case_expr case_default [] { rms & rms_var_heap = rms_var_heap }
-	  (pattern_depth, used_lets, rms) = foldSt (ref_mark_of_dynamic_pattern free_vars sel def case_expr) patterns (0, all_closed_let_vars, rms)
+	  (pattern_depth, all_closed_let_vars, rms) = foldSt (ref_mark_of_dynamic_pattern free_vars sel def case_expr) patterns (0, all_closed_let_vars, rms)
 	  (let_vars_in_default, rms_var_heap) = addRefMarkOfDefault pattern_depth free_vars def rms.rms_var_heap
 	  rms_var_heap = setUsedLetVars [let_vars_in_default : all_closed_let_vars] rms_var_heap
 	  rms_var_heap = parCombine free_vars rms_var_heap

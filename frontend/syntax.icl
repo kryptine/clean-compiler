@@ -812,6 +812,7 @@ where
 	(<<<) file (LinePos file_name line) = file <<< '[' <<< file_name <<< ',' <<< line <<< ']'
 	(<<<) file _ = file
 
+
 instance <<< TypeVarInfo
 where
 	(<<<) file TVI_Empty				= file <<< "TVI_Empty"
@@ -819,7 +820,7 @@ where
 	(<<<) file (TVI_TypeVar ptr)		= file <<< (ptrToInt ptr) 
 	(<<<) file (TVI_Forward	_) 			= file <<< "TVI_Forward"
 	(<<<) file (TVI_SignClass _ _ _) 	= file <<< "TVI_SignClass"
-	(<<<) file (TVI_Attribute ta) 		= file <<< "TVI_Attribute " <<< ta
+	(<<<) file (TVI_AttrAndRefCount ta rc) 	= file <<< "TVI_AttrAndRefCount " <<< ta <<< " " <<< rc
 	(<<<) file (TVI_CorrespondenceNumber n) = file <<< "TVI_CorrespondenceNumber " <<< n
 	(<<<) file (TVI_AType at) 			= file <<< "TVI_AType " <<< at
 	(<<<) file TVI_Used					= file <<< "TVI_Used"
