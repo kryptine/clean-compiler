@@ -1170,11 +1170,11 @@ checkAndPartitionateDclMacros ::  !Index !IndexRange !*{#FunDef} !*ExpressionInf
 checkAndPartitionateDclMacros mod_index range fun_defs e_info=:{ef_is_macro_fun=ef_is_macro_fun_old} heaps cs
 	# (fun_defs, e_info, heaps=:{hp_var_heap, hp_expression_heap}, cs=:{cs_symbol_table, cs_predef_symbols, cs_error})
 			= checkDclMacros mod_index cGlobalScope range.ir_from range.ir_to fun_defs { e_info & ef_is_macro_fun=True } heaps cs
-	  (e_info=:{ef_modules,ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
+	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (fun_defs, macro_defs, ef_modules, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateDclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs ef_modules hp_var_heap hp_expression_heap cs_symbol_table cs_error
-	= (fun_defs, { e_info & ef_modules = ef_modules,ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+	  (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+	  		= partitionateDclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+	= (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
 			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkAndPartitionateIclMacros ::  !Index !IndexRange !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
@@ -1182,11 +1182,11 @@ checkAndPartitionateIclMacros ::  !Index !IndexRange !Int !*{#FunDef} !*Expressi
 checkAndPartitionateIclMacros mod_index range local_functions_index_offset fun_defs e_info=:{ef_is_macro_fun=ef_is_macro_fun_old} heaps cs
 	# (fun_defs, e_info, heaps=:{hp_var_heap, hp_expression_heap}, cs=:{cs_symbol_table, cs_predef_symbols, cs_error})
 			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to local_functions_index_offset fun_defs { e_info & ef_is_macro_fun=True } heaps cs
-	  (e_info=:{ef_modules,ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
+	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (fun_defs, macro_defs, ef_modules, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs ef_modules hp_var_heap hp_expression_heap cs_symbol_table cs_error
-	= (fun_defs, { e_info & ef_modules = ef_modules,ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+	  (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+	  		= partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+	= (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
 			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkInstanceBodies :: ![IndexRange] !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
@@ -1426,10 +1426,10 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 							renumber_type_def td=:{td_rhs = AlgType conses}
 								# conses = [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
 								= { td & td_rhs = AlgType conses}
-							renumber_type_def td=:{td_rhs = RecordType rt=:{rt_constructor,rt_fields}}
+							renumber_type_def td=:{td_rhs = RecordType rt=:{rt_constructor,rt_fields/*,rt_is_boxed_record*/}}
 								# rt_constructor = {rt_constructor & ds_index=icl_to_dcl_index_table.[cConstructorDefs,rt_constructor.ds_index]}
 								# rt_fields = {{field & fs_index=icl_to_dcl_index_table.[cSelectorDefs,field.fs_index]} \\ field <-: rt_fields}
-								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields}}
+								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields/*,rt_is_boxed_record=rt_is_boxed_record*/}}
 							renumber_type_def td
 								= td
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Constructor, decl_index}) cdefs
@@ -2531,9 +2531,9 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 		  		= compareDefImp main_dcl_module_n main_dcl_module n_exported_global_functions icl_mod e_info.ef_macro_defs heaps cs_error
 
 		# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-		  (groups, icl_functions, macro_defs, dcl_modules, var_heap, expr_heap, cs_symbol_table, cs_error)
+		  (groups, icl_functions, macro_defs, var_heap, expr_heap, cs_symbol_table, cs_error)
 		  		= partitionateAndLiftFunctions (icl_global_functions_ranges++icl_instances_ranges++icl_generic_ranges) main_dcl_module_n predef_symbols_for_transform icl_mod.icl_functions macro_defs
-									  			dcl_modules heaps.hp_var_heap heaps.hp_expression_heap cs_symbol_table cs_error
+									  			heaps.hp_var_heap heaps.hp_expression_heap cs_symbol_table cs_error
 
 		# heaps = {heaps & hp_var_heap=var_heap,hp_expression_heap=expr_heap}
 		# icl_mod = {icl_mod & icl_functions=icl_functions}
