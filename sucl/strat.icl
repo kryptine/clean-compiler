@@ -361,27 +361,51 @@ checkinstance (graph,node) history defaultstrategy
           where hgraph = rgraphgraph hrgraph; hroot = rgraphroot hrgraph
 
 
-// Check a type rule for curried applications and strict arguments
+// Check for curried applications
 
-checktype
- :: !(sym -> (Rule .tsym tvar,[.Bool]))
-    (Strategy sym var .pvar .result)
-    (Substrategy sym var .pvar .result)
-    .(Graph sym var)
-    ((Subspine sym var .pvar) -> .result)
-    .result
-    !.(Node sym var)
+checkarity
+ :: !(sym -> Int)                         // Arity of function symbol
+    (Strategy sym var .pvar .result)      // Default strategy
+    (Substrategy sym var .pvar .result)   // Substrategy
+    .(Graph sym var)                      // Subject graph
+    ((Subspine sym var .pvar) -> .result) // Spine continuation
+    .result                               // RNF continuation
+    !.(Node sym var)                      // Subject node
  -> .result
 
-checktype typeinfo defaultstrategy substrat subject found rnf (ssym,sargs)
-| shorter targs sargs
+checkarity funarity defaultstrategy substrat subject found rnf (ssym,sargs)
+| shortern arity sargs
 = rnf
-| eqlen targs sargs
-= forcenodes substrat found rnf` strictnodes
+| eqlenn arity sargs
+= defaultstrategy substrat subject found rnf (ssym,sargs)
 = abort "checktype: symbol occurrence with arity greater than its type"
+  where arity = funarity ssym
+
+shortern n _      | n<=0 = False
+shortern _ []            = True
+shortern n [x:xs]        = shortern (n-1) xs
+
+eqlenn n _      | n<0 = False
+eqlenn 0 []           = True
+eqlenn n [x:xs]       = eqlenn (n-1) xs
+
+
+// Check for strict arguments
+
+checkstricts
+ :: !(sym -> [.Bool])                     // Strict arguments of function
+    (Strategy sym var .pvar .result)      // Default strategy
+    (Substrategy sym var .pvar .result)   // Substrategy
+    .(Graph sym var)                      // Subject graph
+    ((Subspine sym var .pvar) -> .result) // Spine continuation
+    .result                               // RNF continuation
+    !.(Node sym var)                      // Subject node
+ -> .result
+
+checkstricts funstricts defaultstrategy substrat subject found rnf (ssym,sargs)
+= forcenodes substrat found rnf` strictnodes
   where rnf` = defaultstrategy substrat subject found rnf (ssym,sargs)
-        (trule,tstricts) = typeinfo ssym
-        targs = arguments trule
+        tstricts = funstricts ssym
         strictnodes = [sarg\\(True,sarg)<-zip2 tstricts sargs]
 
 
