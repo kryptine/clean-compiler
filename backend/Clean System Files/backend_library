@@ -90,3 +90,5 @@ BEDeclarePredefinedSymbols
 BEDictionarySelectFunSymbol
 BEDictionaryUpdateFunSymbol
 BEGetVersion
+BEAbsType
+BESwapTypes
