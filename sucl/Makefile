@@ -4,8 +4,8 @@
 
 COCL = cocl
 #COCLFLAGS = -lat
-#SYS = Clean\ System\ Files
-SYS = .
+SYS = Clean\ System\ Files
+#SYS = .
 
 MODULES = cleanversion basic pfun graph dnc rule trd rewr complete history spine trace absmodule strat loop coreclean law canon cli extract newfold newtest expand convert supercompile
 
