@@ -74,6 +74,10 @@ isSpecialChar ':'	= True
 isSpecialChar '.'	= True
 isSpecialChar c	= False
 
+isNotEmpty :: ![a] -> Bool
+isNotEmpty [] = False
+isNotEmpty _  = True
+
 strictMap :: !(.a -> .b) ![.a] -> [.b]
 strictMap f [x : xs]
 		#!	head = f x

@@ -21,6 +21,8 @@ isSpecialChar	:: ! Char	-> Bool
 	For Lists
 */
 
+isNotEmpty :: ![a] -> Bool
+
 mapSt :: !(.a -> (.st -> (.c,.st))) ![.a] !.st -> (![.c],!.st)
 
 app2St :: !(!.(.a -> .(.st -> (.c,.st))),!.(.e -> .(.st -> (.f,.st)))) !(.a,.e) !.st -> (!(.c,.f),!.st)
