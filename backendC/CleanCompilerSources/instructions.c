@@ -3268,10 +3268,7 @@ void GenSystemImports (void)
 void GenParameters (Bool input, Parameters params, int asp, int bsp)
 {
 	int is_first_parameter;
-	
-	if (params==NULL)
-		return;
-	
+		
 	if (input)
 		put_instruction_ (Iin);
 	else
