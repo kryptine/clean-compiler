@@ -306,6 +306,8 @@ instance consumerRequirements App where
 // ACTIVATE DICTIONARIES... [SUBSUMES SPECIAL]
 		# num_dicts = length imported_funs.[glob_module].[glob_object].ft_type.st_context
 		| num_dicts > 0 && num_dicts <= length app_args
+			= reqs_of_args (repeatn num_dicts CActive ++ repeatn (imported_funs.[glob_module].[glob_object].ft_arity) CPassive) app_args CPassive common_defs ai
+/* wrong version...
 			= activeArgs num_dicts app_args common_defs ai
 			with
 				activeArgs 0 app_args common_defs ai
@@ -314,6 +316,7 @@ instance consumerRequirements App where
 					# (cc, _, ai)	= consumerRequirements app_arg common_defs ai
 					# ai			= aiUnifyClassifications CActive cc ai
 					= activeArgs (n-1) app_args common_defs ai
+...*/
 // ...ACTIVATE DICTIONARIES
 		= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object,symb_name}, app_args}
