@@ -46,7 +46,7 @@ Global
 		Path:	{Project}:backend:Mac
 MainModule
 	Name:	CleanCompiler2
-	Dir:	{Project}
+	Dir:	{Project}:main
 	IclOpen:	False
 	Compiler
 		NeverMemoryProfile:	False
