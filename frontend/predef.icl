@@ -73,13 +73,16 @@ PD_TypeCodeClass			:== 122
 PD_TypeObjectType			:== 124
 PD_TypeConsSymbol			:== 125
 PD_unify					:== 126
-PD_variablePlaceholder		:== 127
-PD_StdDynamics				:== 128
-PD_undo_indirections		:== 129
+// MV ..
+PD_coerce					:== 127
+PD_variablePlaceholder		:== 128
+PD_StdDynamics				:== 129
+PD_undo_indirections		:== 130
 
-PD_Start					:== 130
+PD_Start					:== 131
 
-PD_NrOfPredefSymbols		:== 131
+PD_NrOfPredefSymbols		:== 132
+// .. MV
 
 
 (<<=) infixl
@@ -146,6 +149,7 @@ where
 					<<- ("T_ypeConsSymbol",		IC_Expression, PD_TypeConsSymbol)
 					<<- ("P_laceholder",		IC_Expression, PD_variablePlaceholder)
 					<<- ("_unify",				IC_Expression, PD_unify)
+					<<-	("_coerce",				IC_Expression, PD_coerce) /* MV */
 					<<- ("StdDynamics",			IC_Module, PD_StdDynamics)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
 					<<- ("Start",				IC_Expression, PD_Start)

@@ -15,6 +15,7 @@ import syntax, transform, utilities, convertcases
 ::	ConversionInput =
 	{	cinp_glob_type_inst	:: !{! GlobalTCType} 
 	,	cinp_group_index	:: !Int
+	,	cinp_st_args		:: ![FreeVar]
 	}
 
 :: OpenedDynamic =
@@ -52,13 +53,13 @@ where
 		  {fun_body, fun_type, fun_info} = fun_def
 		| isEmpty fun_info.fi_dynamics
 			= (fun_defs, ci)
-			# (fun_body, ci) = convert_dynamics_in_body {cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
+			# (fun_body, ci) = convert_dynamics_in_body {cinp_st_args = [], cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
 			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
 				{ ci & ci_new_variables = [] })
 
 	convert_dynamics_in_body global_type_instances (TransformedBody {tb_args,tb_rhs}) (Yes {st_args}) ci
 		# vars_with_types = bindVarsToTypes tb_args st_args []
-		  (tb_rhs, ci) = convertDynamics global_type_instances vars_with_types No tb_rhs ci
+		  (tb_rhs, ci) = convertDynamics {global_type_instances & cinp_st_args = tb_args} vars_with_types No tb_rhs ci
 		= (TransformedBody {tb_args = tb_args,tb_rhs = tb_rhs}, ci)
 	convert_dynamics_in_body global_type_instances other fun_type ci
 		= abort "unexpected value in 'convert dynamics.convert_dynamics_in_body'"
@@ -175,10 +176,10 @@ where
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
 		= (MatchExpr opt_symb symb expression, ci)
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_uni_vars, dyn_type_code}) ci
-		# (twoTuple_symb, ci) = getSymbol (GetTupleConsIndex 2) SK_Constructor 2 ci
-		  (let_binds,     ci) = createVariables dyn_uni_vars [] ci
-		  (dyn_expr,      ci) = convertDynamics cinp bound_vars default_expr dyn_expr ci
-		  (dyn_type_code, ci) = convertTypecode cinp dyn_type_code ci
+		# (twoTuple_symb, ci) 	= getSymbol (GetTupleConsIndex 2) SK_Constructor 2 ci
+		  (let_binds,     ci) 	= createVariables dyn_uni_vars [] ci
+		  (dyn_expr,      ci) 	= convertDynamics cinp bound_vars default_expr dyn_expr ci
+		  (_,dyn_type_code, ci) = convertTypecode cinp dyn_type_code ci
 		= case let_binds of
 			[]	-> (App {	app_symb		= twoTuple_symb,
 							app_args 		= [dyn_expr, dyn_type_code],
@@ -197,37 +198,47 @@ where
 	convertDynamics cinp bound_vars default_expr expression ci
 		= abort "unexpected value in convertDynamics: 'convertDynamics.Expression'"
 
-convertTypecode ::  !ConversionInput TypeCodeExpression !*ConversionInfo  -> (Expression,!*ConversionInfo)
-convertTypecode cinp TCE_Empty ci
-	= (EE, ci)
-convertTypecode cinp (TCE_Var var_info_ptr) ci
-	= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+// FreeVar; fv_info_ptr
+//convertTypecode ::  !ConversionInput TypeCodeExpression !*ConversionInfo  -> (Expression,!*ConversionInfo)
+convertTypecode cinp TCE_Empty  ci 
+	= (True,EE, ci)
+convertTypecode cinp=:{cinp_st_args} (TCE_Var var_info_ptr) ci
+	#! cinp_st_args
+		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
+	= (isEmpty cinp_st_args,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
 // MV ..
-convertTypecode cinp (TCE_TypeTerm var_info_ptr) ci
-	= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+convertTypecode cinp=:{cinp_st_args} (TCE_TypeTerm var_info_ptr) ci
+	#! cinp_st_args
+		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
+	= (isEmpty cinp_st_args,Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
 // .. MV
 
 convertTypecode cinp (TCE_Constructor index typecode_exprs) ci
-	# (typecons_symb,  ci) 	= getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
-	  constructor			= get_constructor cinp.cinp_glob_type_inst index
-	  (typecode_exprs, ci)	= convertTypecodes cinp typecode_exprs ci
-	= (App {app_symb		= typecons_symb,
+	# (typecons_symb,  ci) 			= getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
+	  constructor					= get_constructor cinp.cinp_glob_type_inst index
+	  (unify,typecode_exprs, ci)	= convertTypecodes cinp typecode_exprs ci
+	= (	unify,
+		App {app_symb		= typecons_symb,
 			app_args 		= [constructor , typecode_exprs],
 			app_info_ptr	= nilPtr}, ci)
-convertTypecode cinp (TCE_Selector selections var_info_ptr) ci
-	= (Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ci)
+convertTypecode cinp=:{cinp_st_args} (TCE_Selector selections var_info_ptr) ci
+	#! cinp_st_args
+		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
+	= (isEmpty cinp_st_args,Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ci)
 
-convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
+//convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
 convertTypecodes _ [] ci
 	# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
-	= (App {	app_symb		= nil_symb,
+	= ( True,
+		App {	app_symb		= nil_symb,
 				app_args 		= [],
 				app_info_ptr	= nilPtr}, ci)
 convertTypecodes cinp [typecode_expr : typecode_exprs] ci
 	# (cons_symb, ci) = getSymbol PD_ConsSymbol SK_Constructor 2 ci
-	  (expr,      ci) = convertTypecode  cinp typecode_expr  ci
-	  (exprs,     ci) = convertTypecodes cinp typecode_exprs ci
-	= (App {	app_symb		= cons_symb,
+	  (unify1,expr,      ci) = convertTypecode  cinp typecode_expr  ci
+	  (unify2,exprs,     ci) = convertTypecodes cinp typecode_exprs ci
+	= (unify1 && unify2,
+		App {	app_symb		= cons_symb,
 				app_args 		= [expr , exprs],
 				app_info_ptr	= nilPtr}, ci)
 
@@ -355,17 +366,17 @@ where
 	
 		  /***  convert the elements of this pattern  ***/
 
-		  (a_ij_binds, ci)	= createVariables dp_type_patterns_vars [] ci
-	 	  (type_code, ci)	= convertTypecode cinp dp_type_code ci
-	 	  (dp_rhs, ci)		= convertDynamics cinp bound_vars this_default dp_rhs ci
-	
+		  (a_ij_binds, ci)		= createVariables dp_type_patterns_vars [] ci
+	 	  (unify,type_code, ci)	= convertTypecode cinp dp_type_code ci
+	 	  (dp_rhs, ci)			= convertDynamics cinp bound_vars this_default dp_rhs ci
+	 	  
 		  /***  recursively convert the other patterns  ***/
 
-		  (binds, ci)		= convert_other_patterns cinp bound_vars this_default pattern_number opened_dynamic result_type last_default patterns ci
+	 	  (binds, ci)		= convert_other_patterns cinp bound_vars this_default pattern_number opened_dynamic result_type last_default patterns ci
 
 		  /***  generate the expression  ***/
 
-	 	  (unify_symb, ci) 		= getSymbol PD_unify SK_Function 2 ci
+	 	  (unify_symb, ci) 		= getSymbol (if unify PD_unify PD_unify /*PD_coerce*/) SK_Function 2 ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
 		  (let_info_ptr, ci) 	= let_ptr ci
 		  (case_info_ptr, ci)	= case_ptr ci
