@@ -1064,6 +1064,8 @@ removeNeverMatchingSubcases keesExpr=:(Case kees)
 	  filtered_default = get_filtered_default case_default
 	= case case_guards of
 		AlgebraicPatterns i alg_patterns
+			| not (any (is_never_matching_case o get_alg_rhs) alg_patterns)
+				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
 				-> Case neverMatchingCase
@@ -1071,6 +1073,8 @@ removeNeverMatchingSubcases keesExpr=:(Case kees)
 				-> fromYes case_default
 			-> Case {kees & case_guards = AlgebraicPatterns i filtered_case_guards, case_default = filtered_default }
 		BasicPatterns bt basic_patterns
+			| not (any (is_never_matching_case o get_basic_rhs) basic_patterns)
+				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_basic_rhs) basic_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
 				-> Case neverMatchingCase

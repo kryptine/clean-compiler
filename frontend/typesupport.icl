@@ -147,7 +147,7 @@ where
 		# (ok, types, env) = cleanUpClosed types env
 		= (ok, TA tc types, env)
 	cleanUpClosed (argtype --> restype) env
-		# (ok, (argtype,res_type), env) = cleanUpClosed (argtype,restype) env
+		# (ok, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
 		= (ok, argtype --> restype, env)
 	cleanUpClosed (TempCV tv_number :@: types) env
 		#! type = env.[tv_number]

@@ -415,7 +415,7 @@ cIsALocalVar	:== False
 		| AP_Basic !BasicValue OptionalVariable
 		| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
 		| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
-		| AP_WildCard OptionalVariable
+		| AP_WildCard !VarInfoPtr !OptionalVariable
 		| AP_Empty !Ident
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro
@@ -1295,7 +1295,7 @@ where
 
 instance <<< CasePatterns
 where
-	(<<<) file (BasicPatterns type patterns) = file <<< patterns
+	(<<<) file (BasicPatterns type patterns) = file <<< " " <<<patterns
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
@@ -1668,7 +1668,7 @@ where
 
 instance <<< OptGuardedAlts
 where
-	(<<<) file (GuardedAlts guarded_exprs def_expr) = file <<<guarded_exprs <<< def_expr
+	(<<<) file (GuardedAlts guarded_exprs def_expr) = file <<< guarded_exprs <<< def_expr
 	(<<<) file (UnGuardedExpr unguarded_expr) = file <<< unguarded_expr
 
 instance <<< ExprWithLocalDefs
