@@ -706,7 +706,7 @@ where
 	fresh_universal_variable {atv_variable={tv_info_ptr}} (var_heap, var_store)
 		= (var_heap <:= (tv_info_ptr, TVI_Type (TempQV var_store)), inc var_store)
 
-freshAlgebraicType :: !(Global Int) ![AlgebraicPattern] !{#CommonDefs} !*TypeState -> (![[AType]],!AType,![AttrCoercion],!*TypeState)
+freshAlgebraicType :: !(Global Int) ![AlgebraicPattern] !{#CommonDefs} !*TypeState -> (![[AType]],!AType,![AttrCoercion],!TypeRhs,!*TypeState)
 freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
 	# {td_rhs,td_args,td_attrs,td_ident,td_attribute} = common_defs.[glob_module].com_type_defs.[glob_object]
 	# (th_vars, ts_var_store)		= fresh_type_variables td_args (ts_type_heaps.th_vars, ts_var_store)
@@ -714,7 +714,7 @@ freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_s
 	  ts_type_heaps					= { ts_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  (cons_types, alg_type, attr_env, ts_var_store, ts_attr_store, ts_type_heaps, ts_exis_variables)
 	  		= fresh_symbol_types patterns common_defs.[glob_module].com_cons_defs ts_var_store ts_attr_store ts_type_heaps ts_exis_variables
-	= (cons_types, alg_type, attr_env,
+	= (cons_types, alg_type, attr_env, td_rhs,
 			{ ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = ts_type_heaps, ts_exis_variables = ts_exis_variables })
 //		---> ("freshAlgebraicType", alg_type, cons_types)
 where
@@ -1365,8 +1365,8 @@ where
 	where
 		requirements_of_guarded_expressions (AlgebraicPatterns alg_type patterns) ti=:{ti_common_defs} match_expr pattern_type opt_pattern_ptr
 						goal_type (reqs, ts)
-			# (cons_types, result_type, new_attr_env, ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
-			  ts_var_heap = update_case_variable match_expr cons_types result_type ts.ts_var_heap
+			# (cons_types, result_type, new_attr_env,td_rhs,ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
+			  ts_var_heap = update_case_variable match_expr td_rhs cons_types alg_type ts.ts_var_heap
 			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, { ts & ts_var_heap = ts_var_heap } )
 			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
 			  (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
@@ -1473,19 +1473,17 @@ where
 			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression expr, tc_coercible = True } : reqs.req_type_coercions] },
 					{ ts & ts_expr_heap = ts_expr_heap })
 		
-		update_case_variable (Var {var_ident,var_info_ptr,var_expr_ptr}) [cons_types] result_type var_heap
+		update_case_variable (Var {var_ident,var_info_ptr,var_expr_ptr}) (RecordType {rt_constructor={ds_index}}) [cons_type] {glob_module} var_heap
 			# (var_info, var_heap) = readPtr var_info_ptr var_heap
-//				---> ("update_case_variable 1", var_ident, cons_types)
 			= case var_info of
 				VI_Type type type_info
-					-> var_heap <:= (var_info_ptr, VI_Type type (VITI_PatternType cons_types result_type type_info))
+					-> var_heap <:= (var_info_ptr, VI_Type type (VITI_PatternType cons_type glob_module ds_index type_info))
 				VI_FAType vars type type_info
-					-> var_heap <:= (var_info_ptr, VI_FAType vars type (VITI_PatternType cons_types result_type type_info))
+					-> var_heap <:= (var_info_ptr, VI_FAType vars type (VITI_PatternType cons_type glob_module ds_index type_info))
 			  	_
 					-> abort "update_case_variable" // ---> (var_ident <<- var_info))
-		update_case_variable expr cons_types result_type var_heap
+		update_case_variable expr td_rhs cons_types alg_type var_heap
 			= var_heap
-//				---> ("update_case_variable 2", expr, cons_types)
 
 instance requirements Let
 where
@@ -1688,24 +1686,21 @@ where
 			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr dem_field_type.at_attribute ts.ts_expr_heap }
 			  coercion = { tc_demanded = dem_field_type, tc_offered = expr_type, tc_position = CP_Expression bind_src, tc_coercible = True }
 			= ({ reqs & req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts)
-			
+		
 		determine_record_type cp cons_index mod_index arity ti (Var var) expression_type opt_expr_ptr (reqs, ts=:{ts_var_heap})
 			# (type_info, ts_var_heap) = getTypeInfoOfVariable var ts_var_heap
 			  ts = { ts & ts_var_heap = ts_var_heap}
 			= case type_info of
-				VITI_PatternType arg_types {at_type=TA {type_index={glob_object,glob_module}} _} _
-					| glob_object==cons_index && mod_index==glob_module
+				VITI_PatternType arg_types module_index constructor_index _
+					| cons_index==constructor_index && mod_index==module_index
 					 	-> (arg_types, (reqs, ts))
-				VITI_PatternType arg_types {at_type=TAS {type_index={glob_object,glob_module}} _ _} _
-					| glob_object==cons_index && mod_index==glob_module
-				 	-> (arg_types, (reqs, ts))
-//						---> ("determine_record_type (Yes)", result_type, arg_types)
+				VITI_PatternType arg_types module_index constructor_index _
+					| cons_index==constructor_index && mod_index==module_index
+					 	-> (arg_types, (reqs, ts))
 				_
 					-> new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr (reqs, ts)
-//						---> ("determine_record_type (No) 1")
 		determine_record_type cp cons_index mod_index arity ti _ expression_type opt_expr_ptr reqs_ts
 			= new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr reqs_ts
-//						---> ("determine_record_type (No) 2")
 
 		new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr (reqs, ts)
 			# (lhs, ts) = standardLhsConstructorType cp cons_index mod_index arity ti ts
@@ -1766,6 +1761,8 @@ where
 	
 	requirements _ expr reqs_ts
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
+
+import StdDebug
 
 :: Box a = { box :: !a}
 
@@ -2842,7 +2839,7 @@ getPositionOfExpr expr=:(Var var) var_heap
 	= case type_info of
 		VITI_Coercion position
 			-> (position, var_heap)
-		VITI_PatternType _ _ (VITI_Coercion position)
+		VITI_PatternType _ _ _ (VITI_Coercion position)
 			-> (position, var_heap)
 		_
 			-> (CP_Expression expr, var_heap)
