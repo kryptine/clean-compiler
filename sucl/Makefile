@@ -17,7 +17,7 @@ clean:
 	rm -Rf errors.err $(SYS)
 
 tags: *.dcl *.icl ../compiler/*.dcl ../compiler/*.icl
-	cleantags $^ >$@
+	sh cleantags $^ >$@
 
 %: $(SYS)/%.abc
 	@:
