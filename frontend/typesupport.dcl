@@ -51,7 +51,13 @@ equivalent :: !SymbolType  !TempSymbolType !{# CommonDefs} !*AttributeEnv !*Type
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 
+class bind_and_unify_types a :: a a !*TypeVarHeap -> *TypeVarHeap
+
+instance bind_and_unify_types AType, Type, [a] | bind_and_unify_types a
+
 class substitute a :: !a !u:TypeHeaps -> (!a, !u:TypeHeaps)
 
-instance substitute AType, Type, TypeContext, AttrInequality, [a] | substitute a
+instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a
 instance <<< TempSymbolType
+
+is_non_variable_type :: !Type -> Bool

@@ -332,6 +332,92 @@ where
 		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cus)
 
 	
+class bind_and_unify_types a :: a a !*TypeVarHeap -> *TypeVarHeap
+
+instance bind_and_unify_types Type
+  where
+	bind_and_unify_types (TV tv_1) (TV tv_2) type_var_heap
+		# (root_1, type_var_heap) = get_root tv_1 type_var_heap
+		  (root_2, type_var_heap) = get_root tv_2 type_var_heap
+		  maybe_root_tv_1 = only_tv root_1
+		  maybe_root_tv_2 = only_tv root_2
+		= case (maybe_root_tv_1, maybe_root_tv_2) of
+			(Yes root_tv_1, No)
+				-> bind_root_variable_to_type root_tv_1 root_2 type_var_heap
+			(No, Yes root_tv_2)
+				-> bind_root_variable_to_type root_tv_2 root_1 type_var_heap
+			(Yes root_tv_1, Yes root_tv_2)
+				| root_tv_1.tv_info_ptr==root_tv_2.tv_info_ptr
+					-> type_var_heap
+				-> bind_roots_together root_tv_1 root_2 type_var_heap
+			(No, No)
+				-> type_var_heap
+	  where
+		bind_roots_together :: TypeVar Type *(Heap TypeVarInfo) -> .Heap TypeVarInfo;
+		bind_roots_together root_tv_1 root_type_2 type_var_heap
+			= type_var_heap <:= (root_tv_1.tv_info_ptr, TVI_Type root_type_2)
+
+	bind_and_unify_types (TV tv_1) type type_var_heap
+		| not (is_non_variable_type type)
+			= abort "compiler error in typesupport.icl: assertion failed (1)"
+		= bind_variable_to_type tv_1 type type_var_heap 
+	bind_and_unify_types type (TV tv_1) type_var_heap
+		| not (is_non_variable_type type)
+			= abort "compiler error in typesupport.icl: assertion failed (2)"
+		= bind_variable_to_type tv_1 type type_var_heap
+	bind_and_unify_types (TA _ arg_types1) (TA _ arg_types2) type_var_heap
+		= bind_and_unify_types arg_types1 arg_types2 type_var_heap
+	bind_and_unify_types (l1 --> r1) (l2 --> r2) type_var_heap
+		= bind_and_unify_types r1 r2 (bind_and_unify_types l1 l2 type_var_heap)
+	bind_and_unify_types (TB _) (TB _) type_var_heap
+		= type_var_heap
+	bind_and_unify_types ((CV l1) :@: r1) ((CV l2) :@: r2) type_var_heap
+		= bind_and_unify_types r1 r2 (bind_and_unify_types (TV l1) (TV l2) type_var_heap)
+
+instance bind_and_unify_types [a] | bind_and_unify_types a
+  where
+	bind_and_unify_types [] [] type_var_heap
+		= type_var_heap
+	bind_and_unify_types [x:xs] [y:ys] type_var_heap
+		= bind_and_unify_types xs ys (bind_and_unify_types x y type_var_heap)
+	
+instance bind_and_unify_types AType
+  where
+	bind_and_unify_types {at_type=t1} {at_type=t2} type_var_heap
+			= bind_and_unify_types t1 t2 type_var_heap
+
+only_tv :: u:Type -> Optional u:TypeVar;
+only_tv (TV tv) = Yes tv
+only_tv _ = No
+	
+is_non_variable_type :: !Type -> Bool
+is_non_variable_type (TA _ _)	= True
+is_non_variable_type (_ --> _)	= True
+is_non_variable_type (_ :@: _)	= True
+is_non_variable_type (TB _)		= True
+is_non_variable_type _			= False
+	
+bind_variable_to_type tv type type_var_heap
+	# (root, type_var_heap) = get_root tv type_var_heap
+	= case (only_tv root) of
+		(Yes tv)	-> bind_root_variable_to_type tv type type_var_heap
+		No 			-> type_var_heap
+	
+bind_root_variable_to_type {tv_info_ptr} type type_var_heap
+	= type_var_heap <:= (tv_info_ptr, TVI_Type type)
+	
+get_root :: TypeVar *(Heap TypeVarInfo) -> (Type,.Heap TypeVarInfo);
+get_root this_tv type_var_heap
+	# (tv_info, type_var_heap) = readPtr this_tv.tv_info_ptr type_var_heap
+	= case tv_info of
+		TVI_Empty
+			-> (TV this_tv, type_var_heap)
+		(TVI_Type type)
+			| is_non_variable_type type
+				 -> (type, type_var_heap)
+			-> case type of
+				(TV next_tv) -> get_root next_tv type_var_heap
+
 class substitute a :: !a !u:TypeHeaps -> (!a, !u:TypeHeaps)
 
 instance substitute AType
@@ -420,6 +506,14 @@ where
 	substitute {ai_demanded,ai_offered} heaps
 		# ((ai_demanded, ai_offered), heaps) = substitute (ai_demanded, ai_offered) heaps
 		= ({ai_demanded = ai_demanded, ai_offered = ai_offered}, heaps)
+
+instance substitute CaseType
+where
+	substitute {ct_pattern_type, ct_result_type, ct_cons_types} heaps 
+		# (ct_pattern_type, heaps) = substitute ct_pattern_type heaps
+		  (ct_result_type, heaps) = substitute ct_result_type heaps
+		  (ct_cons_types, heaps) = substitute ct_cons_types heaps
+		= ({ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, ct_cons_types = ct_cons_types}, heaps)
 
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
