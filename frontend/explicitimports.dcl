@@ -4,7 +4,7 @@ import syntax, checksupport
 
 :: ImportNrAndIdents =
 	{	ini_symbol_nr	:: !Index
-	,	ini_belonging	:: !Optional [ImportedIdent]
+	,	ini_imp_decl	:: !ImportDeclaration
 	}
 
 :: SolvedImports =
@@ -16,7 +16,7 @@ import syntax, checksupport
 markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
 			-> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
 
-updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
 
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 

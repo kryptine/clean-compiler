@@ -17,7 +17,7 @@ implies a b :== not a || b
 
 :: ImportNrAndIdents =
 	{	ini_symbol_nr	:: !Index
-	,	ini_belonging	:: !Optional [ImportedIdent]
+	,	ini_imp_decl	:: !ImportDeclaration
 	}
 
 :: SolvedImports =
@@ -64,7 +64,7 @@ markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
 
 	
 				
-updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
 updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
 			dcl_modules expl_imp_infos cs_symbol_table
@@ -177,9 +177,11 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= ((decl_accu, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	solve_belonging position expl_imp_indices_ikh modules_in_component_set importing_mod
-			(decl, {ini_symbol_nr, ini_belonging=Yes belongs}, imported_mod)
+			(decl, {ini_symbol_nr, ini_imp_decl}, imported_mod)
 			(decls_accu, dcl_modules, visited_modules, expl_imp_info, cs=:{cs_error, cs_symbol_table})
-		# (all_belongs, dcl_modules)
+		# (Yes belongs)
+				= getBelongingSymbolsFromID ini_imp_decl
+		  (all_belongs, dcl_modules)
 				= get_all_belongs decl dcl_modules
 		  (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info)
 				= replace expl_imp_info ini_symbol_nr TemporarilyFetchedAway
@@ -319,7 +321,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				  					{di_decl = di_decl, di_instances = [], di_belonging=EndNumbers} eei_dm)
 				  				path eii_declaring_modules
 				  new_belonging_accu
-				  		= case ini.ini_belonging of
+				  		= case getBelongingSymbolsFromID ini.ini_imp_decl of
 				  			No
 				  				-> belonging_accu
 				  			Yes _
@@ -365,9 +367,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 					belong_nr belong_ident path eii_declaring_modules visited_modules
 		| not (isEmpty imp_imp_symbols)
 			// follow the path trough an explicit import only if the symbol is listed there
-			# (found, ini_belonging)
+			# (found, opt_belongs)
 					= search_imported_symbol imported_symbol imp_imp_symbols
-			| not (found && implies (belong_nr<>cUndef) (belong_ident_found belong_ident ini_belonging))
+			| not (found && implies (belong_nr<>cUndef) (belong_ident_found belong_ident opt_belongs))
 				= try_children imports expl_imp_indices_ikh modules_in_component_set imported_symbol
 						belong_nr belong_ident path eii_declaring_modules visited_modules
 			= continue imp_imp_mod imports expl_imp_indices_ikh modules_in_component_set imported_symbol
@@ -394,9 +396,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	search_imported_symbol :: !Int ![ImportNrAndIdents] -> (!Bool, !Optional [ImportedIdent])
 	search_imported_symbol imported_symbol []
 		= (False, No)
-	search_imported_symbol imported_symbol [{ini_symbol_nr, ini_belonging}:t]
+	search_imported_symbol imported_symbol [{ini_symbol_nr, ini_imp_decl}:t]
 		| imported_symbol==ini_symbol_nr
-			= (True, ini_belonging)
+			= (True, getBelongingSymbolsFromID ini_imp_decl)
 		= search_imported_symbol imported_symbol t
 
 
@@ -437,14 +439,18 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	check_singles position [] [] (expl_imp_info, cs_error)
 		= (expl_imp_info, cs_error)
 		
-	give_error position {ini_symbol_nr} (expl_imp_info, cs_error)
+	give_error position {ini_symbol_nr, ini_imp_decl} (expl_imp_info, cs_error)
 		# (eii_ident, expl_imp_info)
 				= do_a_lot_just_to_read_an_array_2 ini_symbol_nr expl_imp_info
 		  cs_error
 				= pushErrorAdmin (newPosition import_ident position) cs_error
 		  cs_error
-				// XXX it should be also printed to which namespace eii_ident belongs
-		  		= checkError eii_ident "not exported by the specified module" cs_error
+		  		= checkError eii_ident 
+		  			(switch_import_syntax
+		  				"not exported by the specified module"
+		  				("not exported as a "+++impDeclToNameSpaceString ini_imp_decl
+		  				 +++" by the specified module"))
+		  			cs_error
 		= (expl_imp_info, popErrorAdmin cs_error)
 
 	do_a_lot_just_to_read_an_array_2 i expl_imp_info
@@ -453,6 +459,13 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (eii_ident, eii)
 		  		= get_eei_ident eii
 		= (eii_ident, { expl_imp_info & [i] = eii })
+
+	impDeclToNameSpaceString (ID_Function _)	= "function/macro"
+	impDeclToNameSpaceString (ID_Class _ _)		= "class"
+	impDeclToNameSpaceString (ID_Type _ _)		= "type"
+	impDeclToNameSpaceString (ID_Record _ _)	= "type"
+	impDeclToNameSpaceString (ID_Instance _ _ _)= "instance"
+
 
 get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 	
@@ -811,7 +824,7 @@ instance check_completeness TypeContext where
 		  (check_whether_ident_is_imported tc_class.glob_object.ds_ident STE_Class cci ccs)
 
 instance check_completeness (TypeDef TypeRhs) where
-	check_completeness {td_rhs, td_context}	cci ccs
+	check_completeness td=:{td_rhs, td_context}	cci ccs
 		= check_completeness td_rhs cci 
 		  (check_completeness td_context cci ccs)
 

@@ -106,7 +106,6 @@ where
 	,	dcl_functions		:: !{# FunType }
 	,	dcl_instances		:: !IndexRange
 	,	dcl_macros			:: !IndexRange
-	,	dcl_class_specials	:: !IndexRange
 	,	dcl_specials		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
 	,	dcl_sizes			:: !{# Int}
@@ -428,6 +427,18 @@ where
 					-> cs
 			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident dcl_pos) " multiply defined" cs.cs_error}
 
+removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
+removeImportedSymbolsFromSymbolTable {dcl_ident=dcl_ident=:{id_info}, dcl_index} symbol_table
+	# ({ste_kind,ste_def_level,ste_previous}, symbol_table)
+			= readPtr id_info symbol_table
+	  symbol_table
+	  		= symbol_table <:= (id_info, ste_previous)
+	= case ste_kind of
+		STE_Imported (STE_Field selector_id) def_mod
+			-> removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table
+		_
+			-> symbol_table
+
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeFieldFromSelectorDefinition {id_info} field_mod field_index symbol_table 
 	# (entry, symbol_table) = readPtr id_info symbol_table
@@ -620,5 +631,3 @@ restoreHeap {id_info} cs_symbol_table
 	# ({ste_previous}, cs_symbol_table)
 			= readPtr id_info cs_symbol_table
 	= writePtr id_info ste_previous cs_symbol_table
-
-expand_syn_types_late_XXX yes no :== no

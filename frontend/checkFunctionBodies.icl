@@ -1630,7 +1630,6 @@ checkFields mod_index field_ass opt_type e_info=:{ef_selector_defs,ef_type_defs,
 				-> (No, e_info, cs)
 		= (No, e_info, cs)
 where
-
 	check_fields [ bind=:{bind_dst} : field_ass ] cs=:{cs_symbol_table,cs_error}
 		# (entry, cs_symbol_table) = readPtr bind_dst.id_info cs_symbol_table
 		# fields = retrieveSelectorIndexes mod_index entry 
@@ -1667,13 +1666,13 @@ where
 					  (type_def, type_defs) = type_defs![selector_def.sd_type_index]
 					-> (Yes (type_def, glob_module), selector_defs, type_defs, modules, cs)
 					# ({dcl_common={com_selector_defs,com_type_defs}}, modules) = modules![glob_module]
-					# selector_def = com_selector_defs.[glob_object]
-					  type_def = com_type_defs.[selector_def.sd_type_index]
+					  {sd_type_index} = com_selector_defs.[glob_object]
+					  type_def = com_type_defs.[sd_type_index]
 					-> (Yes (type_def,glob_module), selector_defs, type_defs, modules, cs)
 			No
 				-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError "" " could not determine the type of this record" cs.cs_error })
 
-	check_and_rearrange_fields :: Int Int {#FieldSymbol} ![Bind ParsedExpr (Ident,[Global .Int])] *ErrorAdmin -> ([Bind ParsedExpr .(Global FieldSymbol)],!.ErrorAdmin);
+	check_and_rearrange_fields :: !Int !Int !{#FieldSymbol} ![Bind ParsedExpr (Ident,[Global .Int])] !*ErrorAdmin -> (![Bind ParsedExpr .(Global FieldSymbol)],!.ErrorAdmin);
 	check_and_rearrange_fields mod_index field_index fields field_ass cs_error
 		| field_index < size fields
 			# (field_expr, field_ass) = look_up_field mod_index fields.[field_index] field_ass

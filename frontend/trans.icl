@@ -665,9 +665,6 @@ where
 			= foldSt (\(var_type, {fv_info_ptr}) var_heap
 						->setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap) (zip2 var_types ap_vars) var_heap
 
-		store_type_info_of_dyn_pattern ([var_type:_],{dp_var}) var_heap
-			= setExtendedVarInfo dp_var.fv_info_ptr (EVI_VarType var_type) var_heap
-
 	transform (Selection opt_type expr selectors) ro ti
 		# (expr, ti) = transform expr ro ti
 		= transformSelection opt_type selectors expr ti
@@ -1346,24 +1343,6 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	# ([st_result:new_arg_types], (coercions, subst, ti_type_heaps=:{th_vars}, ti_type_def_infos))
 	  		= mapSt (expand_type ro.ro_common_defs cons_vars) [st_result:new_arg_types]
 	  				(coercions, subst, ti_type_heaps, ti_type_def_infos)
-	  with
-		expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
-			| is_dictionary atype ti_type_def_infos
-				# (atype, subst) = arraySubst atype subst
-				= (atype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
-			# es
-		  			= { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
-			  (btype, (subst, es))
-			  		= expandType ro_common_defs cons_vars atype (subst, es)
-	 		  { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
-					= es
-			  cs
-					= { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
-			# (_, cs)
-			  		= coerce PositiveSign ro_common_defs cons_vars [] btype btype cs
-			  { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
-			  		= cs
-			= (btype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
 /*
 	| False--->("unified type", new_arg_types, "->", st_result)
 		= undef
@@ -1841,6 +1820,24 @@ where
 		# (vars, var_heap) = new_variables forms var_heap
 		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		= ([{ form & fv_info_ptr = new_info_ptr } : vars], writeVarInfo fv_info_ptr (VI_Variable fv_name new_info_ptr) var_heap)
+
+	expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
+		| is_dictionary atype ti_type_def_infos
+			# (atype, subst) = arraySubst atype subst
+			= (atype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
+		# es
+	  			= { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
+		  (btype, (subst, es))
+		  		= expandType ro_common_defs cons_vars atype (subst, es)
+ 		  { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
+				= es
+		  cs
+				= { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
+		# (_, cs)
+		  		= coerce PositiveSign ro_common_defs cons_vars [] btype btype cs
+		  { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
+		  		= cs
+		= (btype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
 
 	max_group_index prod_index producers current_max fun_defs fun_heap cons_args
 		| prod_index == size producers

@@ -374,19 +374,19 @@ where
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, specials, type_heaps)
 
-determineTypesOfInstances :: !Index !Index !*CommonDefs !*{#DclModule} !*TypeHeaps !*VarHeap !*CheckState
-	-> (![FunType], !Index, ![ClassInstance], !*CommonDefs, !*{#DclModule}, !*TypeHeaps, !*VarHeap, !*CheckState)
-determineTypesOfInstances first_memb_inst_index mod_index dcl_common=:{com_instance_defs,com_class_defs,com_member_defs}
+determineTypesOfInstances :: !Index !Index !*{#ClassInstance} !*{# ClassDef} !*{# MemberDef}
+							 !*{#DclModule} !*TypeHeaps !*VarHeap !*CheckState
+	-> (![FunType], !Index, ![ClassInstance], !*{#ClassInstance}, !*{# ClassDef}, !*{# MemberDef}, !*{#DclModule}, !*TypeHeaps, !*VarHeap, !*CheckState)
+determineTypesOfInstances first_memb_inst_index mod_index com_instance_defs com_class_defs com_member_defs
 		modules type_heaps var_heap cs=:{cs_error}
 	| cs_error.ea_ok
 		#! nr_of_class_instances = size com_instance_defs
 		# (memb_inst_defs, next_mem_inst_index, all_class_specials, com_class_defs, com_member_defs, modules, com_instance_defs, type_heaps, var_heap, cs_error)
 				= determine_types_of_instances 0 nr_of_class_instances first_memb_inst_index mod_index [] com_class_defs com_member_defs
 						modules com_instance_defs type_heaps var_heap cs_error
-		= (memb_inst_defs, next_mem_inst_index, all_class_specials,
-				{ dcl_common & com_instance_defs = com_instance_defs,com_class_defs = com_class_defs, com_member_defs = com_member_defs },
-					 modules, type_heaps, var_heap, { cs & cs_error = cs_error })
-		= ([], first_memb_inst_index, [], dcl_common, modules, type_heaps, var_heap, cs)
+		= (memb_inst_defs, next_mem_inst_index, all_class_specials, com_instance_defs, com_class_defs,
+		   com_member_defs, modules, type_heaps, var_heap, { cs & cs_error = cs_error })
+		= ([], first_memb_inst_index, [], com_instance_defs, com_class_defs, com_member_defs, modules, type_heaps, var_heap, cs)
 where
 
 	determine_types_of_instances :: !Index !Index !Index !Index ![ClassInstance] !v:{#ClassDef} !w:{#MemberDef}
@@ -910,7 +910,9 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 	  		= { dag_nr_of_nodes = nr_of_dcl_modules+1, dag_get_children = select dependencies }
 	  components
 	  		= partitionateDAG module_dag [cs.cs_x.x_main_dcl_module_n,index_of_icl_module]
-	  (nr_of_components, component_numbers)
+//	| False--->("biggest component:", maxList (map length components))
+//		= undef
+	# (nr_of_components, component_numbers)
 	  		= getComponentNumbers components module_dag.dag_nr_of_nodes
 	  reversed_dag1
 	  		= reverseDAG module_dag
@@ -1015,18 +1017,18 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, 
 			[(ste_index, import_file_position, expl_imp_indices):expl_imp_indices_accu], cs_symbol_table)
 
-	get_expl_imp_symbol (ID_OldSyntax idents) state
-		= foldSt (get_symbol No) idents state
-	get_expl_imp_symbol import_declaration state
-		= get_symbol (getBelongingSymbolsFromID import_declaration) (get_ident import_declaration) state
+	get_expl_imp_symbol imp_decl=:(ID_OldSyntax idents) state
+		= foldSt (get_symbol imp_decl) idents state
+	get_expl_imp_symbol imp_decl state
+		= get_symbol imp_decl (get_ident imp_decl) state
 
-	get_symbol belonging_symbols ident=:{id_info} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
+	get_symbol imp_decl ident=:{id_info} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
 		# (ste, cs_symbol_table)
 				= readPtr id_info cs_symbol_table
 		= case ste.ste_kind of
 			STE_ExplImpSymbol expl_imp_symbols_nr
 				# ini
-						= { ini_symbol_nr = expl_imp_symbols_nr, ini_belonging = belonging_symbols }
+						= { ini_symbol_nr = expl_imp_symbols_nr, ini_imp_decl = imp_decl }
 				-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, 
 					[ini:expl_imp_indices_accu], cs_symbol_table)
 			STE_Empty
@@ -1034,7 +1036,7 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 						= writePtr id_info { ste & ste_kind = STE_ExplImpSymbol nr_of_expl_imp_symbols, ste_previous = ste }
 								cs_symbol_table
 				  ini
-						= { ini_symbol_nr = nr_of_expl_imp_symbols, ini_belonging = belonging_symbols }
+						= { ini_symbol_nr = nr_of_expl_imp_symbols, ini_imp_decl = imp_decl }
 				-> ([ident:expl_imp_symbols_accu], nr_of_expl_imp_symbols+1,
 					[ini:expl_imp_indices_accu], cs_symbol_table)
 
@@ -1062,13 +1064,13 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
  				{ cs & cs_symbol_table = cs_symbol_table })
 		STE_Module _
 			# is_on_cycle
-					= case expl_imp_indices of
+					= case mod_indices of
 						[_]	-> False
 						_	-> True
 			  cs_error
 			  		= fold2St check_whether_module_imports_itself expl_imp_indices mod_indices cs.cs_error
 			  cs_error
-			  		= case expand_syn_types_late_XXX False is_on_cycle of
+			  		= case switch_import_syntax is_on_cycle False of
 			  			True
 			  				# ident_pos
 			  						= { ip_ident = dcl_name_of_first_mod_in_component, ip_line = 1,
@@ -1077,9 +1079,7 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 			  						= pushErrorAdmin ident_pos cs_error
 			  				  cs_error
 			  				  		=  checkError "" 
-				  						(switch_import_syntax
 				  							"cyclic module dependencies not allowed in conjunction with Clean 1.3 import syntax"
-				  							"cyclic module dependencies currently not implemented") // XXX			
 										cs_error
 							-> popErrorAdmin cs_error
 						_
@@ -1109,7 +1109,9 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 			  (imports, (dcl_modules, _, expl_imp_info, cs))
 					= mapSt (solveExplicitImports expl_imp_indices_ikh modules_in_component_set) mod_indices
 							(dcl_modules, bitvectCreate nr_of_modules, expl_imp_info, cs)
-			  imports_ikh
+			| not cs.cs_error.ea_ok
+				-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
+			# imports_ikh
 			  		= fold2St (ikhInsert` False) mod_indices imports ikhEmpty
 			  		// maps the module indices of all modules in the actual component to all explicit
 			  		// imports of that module
@@ -1119,24 +1121,15 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 			  			(possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs)
 			  			(dcl_modules, cs)
 		
-			  (expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
-					= foldSt (checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set
+			  (afterwards_info, (expl_imp_infos, dcl_modules, icl_functions, heaps, cs))
+					= mapSt (checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set
 								super_components imports_ikh) mod_indices
 							(expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
 		
-			#! main_dcl_module_n
-					= cs_x.x_main_dcl_module_n
-			# (dcl_modules, hp_type_heaps, cs_error)
-			  		= foldSt expand_syn_types_of_dcl_mod 
-			  				(expand_syn_types_late_XXX 
-			  					[mod_index \\ mod_index<-mod_indices | mod_index<>main_dcl_module_n] [])
-			  				(dcl_modules, heaps.hp_type_heaps, cs.cs_error)
-			  cs
-			  		= { cs & cs_error = cs_error }
-			  heaps
-			  		= { heaps & hp_type_heaps = hp_type_heaps}
-			  
-			  (dcl_modules, icl_functions, heaps, cs)
+			| not cs.cs_error.ea_ok
+				-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
+
+			# (dcl_modules, icl_functions, heaps, cs)
 					= case is_on_cycle of
 						False
 							-> (dcl_modules, icl_functions, heaps, cs)
@@ -1146,21 +1139,12 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 											mod_indices imports
 											(dcl_modules, icl_functions, heaps.hp_expression_heap, cs)
 							-> (dcl_modules, icl_functions, { heaps & hp_expression_heap = hp_expression_heap }, cs)	
+			  (dcl_modules, heaps, cs)
+			   		= fold2St doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked
+					   		mod_indices afterwards_info
+					   		(dcl_modules, heaps, cs)
 			-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
   where
-	expand_syn_types_of_dcl_mod mod_index (dcl_modules, hp_type_heaps, cs_error)
-		| expand_syn_types_late_XXX False True
-			= abort "expand_syn_types_of_dcl_mod"
-		# (type_defs, dcl_modules)
-				= dcl_modules![mod_index].dcl_common.com_type_defs
-		  unique_type_defs
-		  		= { el \\ el <-:type_defs }
-		  (expanded_type_defs, dcl_modules, hp_type_heaps, cs_error)
-				= expandSynonymTypes mod_index unique_type_defs dcl_modules hp_type_heaps cs_error
-		  dcl_modules
-		  		= { dcl_modules & [mod_index].dcl_common.com_type_defs = expanded_type_defs }
-		= (dcl_modules, hp_type_heaps, cs_error)
-
 	check_whether_module_imports_itself expl_imp_indices_for_module mod_index cs_error
 		= foldSt (check_that mod_index) expl_imp_indices_for_module cs_error
 	  where
@@ -1191,13 +1175,21 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 						(dcl_modules, expl_imp_infos, cs_symbol_table)
 		= (expl_imp_infos, dcl_modules, cs_symbol_table)
 	
+	just_update_expl_imp_info components_array super_components mod_index
+			(expl_imp_infos, dcl_modules, cs_symbol_table)
+		# ({dcls_local_for_import, dcls_import}, dcl_modules)
+				= dcl_modules![mod_index].dcl_declared
+		  (dcl_modules, expl_imp_infos, cs_symbol_table)
+				= updateExplImpInfo super_components.[mod_index] mod_index dcls_import dcls_local_for_import
+							dcl_modules expl_imp_infos cs_symbol_table
+		= (expl_imp_infos, dcl_modules, cs_symbol_table)
+
 	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit}
 					(dcl_modules, icl_functions, hp_expression_heap, cs)
 			# ({dcl_declared}, dcl_modules)
 					= dcl_modules![mod_index]
 			  ({dcls_local_for_import, dcls_import})
 			  		= dcl_declared
-			// XXX possibly adding dcls_local_for_import is not necessary!
 			  cs
 			  		= addDeclarationsOfDclModToSymbolTable mod_index dcls_local_for_import dcls_import cs
 			  (dcl_modules, icl_functions, hp_expression_heap, cs=:{cs_symbol_table})
@@ -1207,14 +1199,6 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
   			  		= removeImportsAndLocalsOfModuleFromSymbolTable dcl_declared cs.cs_symbol_table
 			= (dcl_modules, icl_functions, hp_expression_heap, { cs & cs_symbol_table = cs_symbol_table })
 	
-	just_update_expl_imp_info components_array super_components mod_index
-			(expl_imp_infos, dcl_modules, cs_symbol_table)
-		# ({dcls_local_for_import, dcls_import}, dcl_modules)
-				= dcl_modules![mod_index].dcl_declared
-		  (dcl_modules, expl_imp_infos, cs_symbol_table)
-				= updateExplImpInfo super_components.[mod_index] mod_index dcls_import dcls_local_for_import
-							dcl_modules expl_imp_infos cs_symbol_table
-		= (expl_imp_infos, dcl_modules, cs_symbol_table)
 
 compute_used_module_nrs (mod_index, _, _) (mod_nr_accu, dcl_modules)
 	| inNumberSet mod_index mod_nr_accu
@@ -1238,16 +1222,14 @@ checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cyc
 			= mod_entry
 	  cs_symbol_table 
 			= writePtr dcl_name.id_info { mod_entry & ste_kind = STE_ClosedModule } cs.cs_symbol_table
-	  (expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
-  	  		= checkDclModule dcl_imported_module_numbers super_components.[mod_index] imports_ikh component_nr
+	= checkDclModule dcl_imported_module_numbers super_components.[mod_index] imports_ikh component_nr
   	  				is_on_cycle modules_in_component_set
   	  				mod ste_index expl_imp_infos dcl_modules icl_functions heaps
   	  				{ cs & cs_symbol_table = cs_symbol_table }
-	= (expl_imp_infos, dcl_modules, icl_functions, heaps, cs)
 
 
 checkModule :: !ScannedModule !IndexRange ![FunDef] !Int  !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !{#FunDef} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
-	-> (!Bool, !*IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef}, !Int,!*Heaps, !*PredefinedSymbols, !*SymbolTable, *File)
+	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef}, !Int,!*Heaps, !*PredefinedSymbols, !*SymbolTable, *File)
 checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod scanned_modules dcl_modules functions_and_macros predef_symbols symbol_table err_file heaps
 //	| False--->("checkModule", m.mod_name)
 //		= undef
@@ -1412,7 +1394,7 @@ add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n 
 check_module2 :: Ident [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int 
 				(Optional (Module a)) [Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState 
-			-> (!Bool,!.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},
+			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},
 				!.Heap SymbolTableEntry,!.File);
 check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
@@ -1433,7 +1415,9 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  (nr_of_icl_component, expl_imp_indices, expl_imp_info, dcl_modules, icl_functions, heaps, cs)
 	  		= checkDclModules mod_imports dcl_modules icl_functions heaps cs
 
-	  (imported_module_numbers, dcl_modules)
+	| not cs.cs_error.ea_ok
+		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file)
+	# (imported_module_numbers, dcl_modules)
 	  		= foldSt compute_used_module_nrs
 			  		expl_imp_indices
 	  				(addNr main_dcl_module_n (addNr cPredefinedModuleIndex EndNumbers),
@@ -1488,12 +1472,10 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  		= checkCommonDefinitions cIsNotADclModule main_dcl_module_n icl_common dcl_modules heaps.hp_type_heaps heaps.hp_var_heap cs
 	  
 	  (unexpanded_icl_type_defs, icl_common)
-	  		= expand_syn_types_late_XXX (copy_com_type_defs icl_common) (undef, icl_common) 
+	  		= copy_com_type_defs icl_common
 	  
 	  (com_type_defs, dcl_modules, hp_type_heaps, cs_error)
-			= expand_syn_types_late_XXX
-				(expandSynonymTypes main_dcl_module_n icl_common.com_type_defs dcl_modules hp_type_heaps cs.cs_error)
-				(icl_common.com_type_defs, dcl_modules, hp_type_heaps, cs.cs_error)
+			= expandSynonymTypes main_dcl_module_n icl_common.com_type_defs dcl_modules hp_type_heaps cs.cs_error
 	  icl_common
 	  		= { icl_common & com_type_defs = com_type_defs }
 	  cs
@@ -1520,7 +1502,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  cs_symbol_table = removeDeclarationsFromSymbolTable local_defs cGlobalScope cs_symbol_table
 
 	  cs_symbol_table
-			= foldlArraySt mw_removeImportedSymbolsFromSymbolTable icl_imported cs_symbol_table
+			= foldlArraySt removeImportedSymbolsFromSymbolTable icl_imported cs_symbol_table
 
 	  dcl_modules = e_info.ef_modules
 	  
@@ -1553,9 +1535,11 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 
-		  (dcl_modules, icl_mod, heaps, cs_error)
+		  (main_dcl_module, dcl_modules)
+		  		= dcl_modules![main_dcl_module_n]
+		  (icl_mod, heaps, cs_error)
 		  		= compareDefImp icl_sizes_without_added_dcl_defs untransformed_fun_bodies main_dcl_module_n
-		  				unexpanded_icl_type_defs dcl_modules icl_mod heaps cs_error
+		  				unexpanded_icl_type_defs main_dcl_module icl_mod heaps cs_error
 
 		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, cached_functions_and_macros, cs_x.x_main_dcl_module_n, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
 		# icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
@@ -1591,10 +1575,14 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 			  {ste_kind = STE_Module mod, ste_index} = entry
 			  solved_imports
 			  	= { si_explicit = [], si_implicit = [] }
-			  (_, modules, macro_and_fun_defs, heaps, cs)
+			  (deferred_stuff, (_, modules, macro_and_fun_defs, heaps, cs))
 			  		= checkDclModule EndNumbers [] (ikhInsert` False cPredefinedModuleIndex solved_imports ikhEmpty) cUndef False cDummyArray mod ste_index cDummyArray modules macro_and_fun_defs heaps cs
+			  (modules, heaps, cs)
+					= doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked cPredefinedModuleIndex
+							deferred_stuff (modules, heaps, cs)
 			  ({dcl_declared={dcls_import,dcls_local,dcls_local_for_import}}, modules) = modules![ste_index]
-			= (modules, macro_and_fun_defs, heaps, addDeclarationsOfDclModToSymbolTable ste_index dcls_local_for_import dcls_import cs)
+			= (modules, macro_and_fun_defs, heaps, 
+			   addDeclarationsOfDclModToSymbolTable ste_index dcls_local_for_import dcls_import cs)
 		check_predefined_module No modules macro_and_fun_defs heaps cs
 			= (modules, macro_and_fun_defs, heaps, cs)
 
@@ -1602,7 +1590,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 			-> (![FunDef], !w:{# DclModule}, !v:{# ClassInstance}, !u:{# FunDef}, !Index, !(Optional {# Index}), !*VarHeap,  !*TypeVarHeap, !*ExpressionHeap)
  		collect_specialized_functions_in_dcl_module modules icl_instances icl_functions first_free_index main_dcl_module_n var_heap type_var_heap expr_heap
 			# (dcl_mod, modules) = modules![main_dcl_module_n]
-			# {dcl_specials,dcl_functions,dcl_common,dcl_class_specials,dcl_conversions} = dcl_mod
+			# {dcl_specials,dcl_functions,dcl_common,dcl_conversions} = dcl_mod
 			= case dcl_conversions of
 				Yes conversion_table
 					# (new_conversion_table, icl_instances)
@@ -1718,25 +1706,10 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 			# new = createArray size NoBody
 			= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i.fun_body }, src)) 0 size (new, fun_defs)
 
-		memcpy :: !a:{#Int} -> (!.{#Int}, !a:{#Int})
-		memcpy src
-			#! size = size src
-			# new = createArray size 0
-			= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i }, src)) 0 size (new, src)
-
 		copy_com_type_defs icl_common=:{com_type_defs}
-			#! size 
-					= size com_type_defs
-			| size==0
-				= ({}, { icl_common & com_type_defs = com_type_defs })
-			# (el0, com_type_defs)
-					= com_type_defs![0]
-			  new
-			  		= createArray size el0
-			  (new, com_type_defs)
-  					= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i }, src)) 0 size 
-  							(new, com_type_defs)
-			= (new, { icl_common & com_type_defs = com_type_defs })
+			# (com_type_defs`, com_type_defs)
+				= memcpy com_type_defs
+			= (com_type_defs`, { icl_common & com_type_defs = com_type_defs })
 
 check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules}}
 	# cs = case x_needed_modules bitand cNeedStdDynamics of
@@ -1804,7 +1777,6 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 		,	dcl_functions		= { function \\ function <- mod_defs.def_funtypes }
 		,	dcl_macros			= def_macros
 		,	dcl_instances		= { ir_from = 0, ir_to = 0 }
-		,	dcl_class_specials	= { ir_from = 0, ir_to = 0 }
 		,	dcl_specials		= { ir_from = 0, ir_to = 0 }
 		,	dcl_common			= dcl_common
 		,	dcl_sizes			= sizes
@@ -1952,18 +1924,6 @@ add_declaration_to_symbol_table opt_dcl_macro_range {dcl_kind=STE_FunctionOrMacr
 add_declaration_to_symbol_table yes_for_icl_module {dcl_kind=dcl_kind=:STE_Imported def_kind def_mod, dcl_ident, dcl_index, dcl_pos} importing_mod cs
 	= addSymbol yes_for_icl_module dcl_ident dcl_pos dcl_kind def_kind dcl_index def_mod importing_mod cs
 
-mw_removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
-mw_removeImportedSymbolsFromSymbolTable {dcl_ident=dcl_ident=:{id_info}, dcl_index} symbol_table
-	# ({ste_kind,ste_def_level,ste_previous}, symbol_table)
-			= readPtr id_info symbol_table
-	  symbol_table
-	  		= symbol_table <:= (id_info, ste_previous)
-	= case ste_kind of
-		STE_Imported (STE_Field selector_id) def_mod
-			-> removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table
-		_
-			-> symbol_table
-
 updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
 			dcl_modules expl_imp_infos cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
@@ -2013,10 +1973,87 @@ updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentN
 updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
+
+memcpy :: u:(a b) -> (!.(c b),!v:(a b)) | Array .a & createArray_u , createArrayc_u , size_u , update_u , uselect_u b & Array .c, [u <= v];
+memcpy src
+	#! size
+			= size src
+	| size==0
+		= ({}, src)
+	# (el0, src)
+			= src![0]
+	  new
+			= createArray size el0
+	= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i }, src)) 0 size (new, src)
+
+doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked 
+		:: !.Int !(!.Int,.Int,.[FunType])
+		!(!*{#.DclModule},!*Heaps,!*CheckState)
+	 -> (!.{#DclModule},!.Heaps,!.CheckState);
+doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked mod_index
+			(nr_of_dcl_functions_and_instances, nr_of_dcl_funs_insts_and_specs, rev_special_defs)
+			(dcl_modules, heaps=:{hp_type_heaps, hp_var_heap}, cs=:{cs_error})
+	#! main_dcl_module_n
+			= cs.cs_x.x_main_dcl_module_n
+	# (dcl_modules, hp_type_heaps, cs_error)
+	  		= case mod_index==main_dcl_module_n of
+	  			True
+	  				-> (dcl_modules, hp_type_heaps, cs_error)
+	  			False
+	  				-> expand_syn_types_of_dcl_mod mod_index (dcl_modules, hp_type_heaps, cs_error)
+	  (dcl_mod=:{dcl_functions, dcl_common}, dcl_modules)
+			= dcl_modules![mod_index]
+	  nr_of_dcl_functions
+	  		= size dcl_functions
+	  (memb_inst_defs, nr_of_dcl_functions_and_instances2, rev_spec_class_inst, 
+		com_instance_defs, com_class_defs, com_member_defs, dcl_modules, hp_type_heaps, hp_var_heap, cs)
+	  		= determineTypesOfInstances nr_of_dcl_functions mod_index
+	  				(fst (memcpy dcl_common.com_instance_defs))
+	  				(fst (memcpy dcl_common.com_class_defs))
+	  				(fst (memcpy dcl_common.com_member_defs))
+	  				dcl_modules hp_type_heaps hp_var_heap { cs & cs_error = cs_error }
+	  heaps
+	  		= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }
+	  (nr_of_dcl_funs_insts_and_specs, new_class_instances, rev_special_defs, all_spec_types, heaps, cs_error)
+			= checkSpecialsOfInstances mod_index nr_of_dcl_functions rev_spec_class_inst nr_of_dcl_funs_insts_and_specs []
+					rev_special_defs { mem \\ mem <- memb_inst_defs } { [] \\ mem <- memb_inst_defs } heaps cs.cs_error
+	  dcl_functions
+	  		= array_plus_list dcl_functions
+	  			(   [ { mem_inst & ft_specials = if (isEmpty spec_types) SP_None (SP_ContextTypes spec_types) } 
+				  	  \\ mem_inst <- memb_inst_defs & spec_types <-: all_spec_types 
+				  	]
+	  			 ++ reverse rev_special_defs
+	  			)
+	  dcl_mod
+	  		= { dcl_mod & 
+	  				dcl_functions = dcl_functions,
+	  				dcl_specials = { ir_from = nr_of_dcl_functions_and_instances,
+	  								ir_to = nr_of_dcl_funs_insts_and_specs },
+	  				dcl_common = { dcl_common & com_instance_defs = com_instance_defs,
+	  								com_class_defs = com_class_defs, com_member_defs = com_member_defs }}
+	  dcl_modules
+	  		= { dcl_modules & [mod_index] = dcl_mod }
+	  cs
+	  		= { cs & cs_error = cs_error }
+	= (dcl_modules, heaps, cs)
+  where
+	expand_syn_types_of_dcl_mod mod_index (dcl_modules, hp_type_heaps, cs_error)
+		# (type_defs, dcl_modules)
+				= dcl_modules![mod_index].dcl_common.com_type_defs
+		  unique_type_defs
+		  		= { el \\ el <-:type_defs }
+		  (expanded_type_defs, dcl_modules, hp_type_heaps, cs_error)
+				= expandSynonymTypes mod_index unique_type_defs dcl_modules hp_type_heaps cs_error
+		  dcl_modules
+		  		= { dcl_modules & [mod_index].dcl_common.com_type_defs = expanded_type_defs }
+		= (dcl_modules, hp_type_heaps, cs_error)
+
+	
+
 checkDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect
 					!(Module (CollectedDefinitions ClassInstance IndexRange)) !Index
 					!*ExplImpInfos !*{#DclModule} !*{#FunDef} !*Heaps !*CheckState
-				-> (!*ExplImpInfos, !*{#DclModule}, !*{#FunDef}, !*Heaps, !*CheckState)
+				-> (!(!Int,!Index,![FunType]), !(!*ExplImpInfos, !*{#DclModule}, !*{#FunDef}, !*Heaps, !*CheckState))
 checkDclModule dcl_imported_module_numbers super_components imports_ikh component_nr is_on_cycle modules_in_component_set
 		 {mod_name,mod_imports,mod_defs} mod_index
 		 expl_imp_info modules icl_functions heaps=:{hp_var_heap, hp_type_heaps,hp_expression_heap} cs
@@ -2039,27 +2076,19 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 
 	# (dcl_common, modules, hp_type_heaps, hp_var_heap, cs)
 	  		= checkCommonDefinitions cIsADclModule mod_index dcl_common modules hp_type_heaps hp_var_heap cs
-	  (memb_inst_defs, nr_of_dcl_functions_and_instances, rev_spec_class_inst, dcl_common, modules, hp_type_heaps, hp_var_heap, cs)
-	  		= determineTypesOfInstances nr_of_dcl_functions  mod_index dcl_common modules hp_type_heaps hp_var_heap cs
+	#!nr_of_members
+	  		= count_members mod_index dcl_common.com_instance_defs dcl_common.com_class_defs modules
+	# nr_of_dcl_functions_and_instances
+			= nr_of_dcl_functions+nr_of_members
+	  heaps
+	  		= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap}
 	  (nr_of_dcl_funs_insts_and_specs, rev_function_list, rev_special_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 	  		= checkDclFunctions mod_index nr_of_dcl_functions_and_instances mod_defs.def_funtypes
-	  			dcl_common.com_type_defs dcl_common.com_class_defs modules { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap} cs
+	  			dcl_common.com_type_defs dcl_common.com_class_defs modules heaps cs
 
-	  (nr_of_dcl_funs_insts_and_specs, new_class_instances, rev_special_defs, all_spec_types, heaps, cs_error)
-			= checkSpecialsOfInstances mod_index nr_of_dcl_functions rev_spec_class_inst nr_of_dcl_funs_insts_and_specs []
-					rev_special_defs { mem \\ mem <- memb_inst_defs } { [] \\ mem <- memb_inst_defs } heaps cs.cs_error
+	  dcl_functions = { function \\ function <- reverse rev_function_list }
 
-	  dcl_functions = { function \\ function <- revAppend rev_function_list
-	  		( [ { mem_inst & ft_specials = if (isEmpty spec_types) SP_None (SP_ContextTypes spec_types) } \\
-	  					mem_inst <- memb_inst_defs & spec_types <-: all_spec_types ] ++
-	  						reverse rev_special_defs) }
-	  
-	  com_instance_defs = dcl_common.com_instance_defs
-	  com_instance_defs = { inst_def \\ inst_def <- [ inst_def \\ inst_def <-: com_instance_defs ] ++ new_class_instances }
-
-	  (com_member_defs, com_instance_defs, dcl_functions, cs)
-	  		= adjust_predefined_symbols mod_index dcl_common.com_member_defs com_instance_defs dcl_functions { cs & cs_error = cs_error }
-
+	  com_member_defs = dcl_common.com_member_defs
 	  e_info = { ef_type_defs = com_type_defs, ef_selector_defs = dcl_common.com_selector_defs, ef_class_defs = com_class_defs,
 	  			 ef_cons_defs = dcl_common.com_cons_defs, ef_member_defs = com_member_defs, ef_modules = modules,
 				 ef_is_macro_fun = False }
@@ -2070,7 +2099,6 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 	  cs = check_needed_modules_are_imported mod_name ".dcl" cs
 
 	  com_instance_defs = dcl_common.com_instance_defs
-	  com_instance_defs = array_plus_list com_instance_defs new_class_instances
 
 	  (ef_member_defs, com_instance_defs, dcl_functions, cs)
 	  		= adjust_predefined_symbols mod_index e_info.ef_member_defs com_instance_defs dcl_functions cs
@@ -2082,9 +2110,6 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 				True	-> (modules, icl_functions, hp_expression_heap, cs)
 	  heaps = { heaps & hp_expression_heap = hp_expression_heap }
 
- 	  first_special_class_index = size com_instance_defs
- 	  last_special_class_index = first_special_class_index + length new_class_instances
-	  
 	  dcl_common = { dcl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
 			  	 		com_instance_defs = com_instance_defs, com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs }
 
@@ -2096,14 +2121,14 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 	  		= removeDeclarationsFromSymbolTable dcl_defined cModuleScope cs_symbol_table
 
 	  cs_symbol_table
-			= foldlArraySt mw_removeImportedSymbolsFromSymbolTable dcls_import cs_symbol_table
+			= foldlArraySt removeImportedSymbolsFromSymbolTable dcls_import cs_symbol_table
 	  dcl_mod = { dcl_mod &  dcl_declared = { dcl_mod.dcl_declared & dcls_import = dcls_import },
 	  			 dcl_common = dcl_common, dcl_functions = dcl_functions, 
 	  			 dcl_instances = { ir_from = nr_of_dcl_functions, ir_to = nr_of_dcl_functions_and_instances },
-	  			 dcl_specials = { ir_from = nr_of_dcl_functions_and_instances, ir_to = nr_of_dcl_funs_insts_and_specs },
-	  			 dcl_class_specials = { ir_from = first_special_class_index, ir_to = last_special_class_index },
+	  			 dcl_specials = { ir_from = cUndef, ir_to = cUndef },
 	  			 dcl_imported_module_numbers = dcl_imported_module_numbers}
-	= (expl_imp_info, { modules & [ mod_index ] = dcl_mod }, icl_functions, heaps, { cs & cs_symbol_table = cs_symbol_table })
+	= ((nr_of_dcl_functions_and_instances, nr_of_dcl_funs_insts_and_specs, rev_special_defs),
+		(expl_imp_info, { modules & [ mod_index ] = dcl_mod }, icl_functions, heaps, { cs & cs_symbol_table = cs_symbol_table }))
 where
 	adjust_predefined_symbols mod_index class_members class_instances fun_types cs=:{cs_predef_symbols}
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdArray]
@@ -2183,6 +2208,17 @@ where
 				  (inst_def, instance_defs) = instance_defs![ds_index]
 				  (Yes symbol_type) = inst_def.ft_type
 				= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
+
+	count_members :: !Index !{# ClassInstance} !{# ClassDef} !{# DclModule} -> Int
+	count_members mod_index com_instance_defs com_class_defs modules
+		# (sum, _, _)
+				= foldlArraySt (count_members_of_instance mod_index) com_instance_defs (0, com_class_defs, modules)
+		= sum
+
+	count_members_of_instance mod_index {ins_class} (sum, com_class_defs, modules)
+		# ({class_members}, com_class_defs, modules)
+				= getClassDef ins_class mod_index com_class_defs modules
+	 	= (size class_members + sum, com_class_defs, modules)
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })

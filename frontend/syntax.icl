@@ -5,7 +5,7 @@ import StdEnv, compare_constructor // ,RWSDebug
 import scanner, general, Heap, typeproperties, utilities
 
 PA_BUG on off :== on
-switch_import_syntax one_point_three two_point_zero :== one_point_three
+switch_import_syntax one_point_three two_point_zero :== two_point_zero
 SwitchFusion fuse dont_fuse :== dont_fuse
 switch_port_to_new_syntax port dont_port :== dont_port
 
@@ -1968,8 +1968,8 @@ MakeTypeSymbIdentMacro type_index name arity
 MakeSymbIdent name arity	:== { symb_name = name, symb_kind = SK_Unknown, symb_arity = arity }
 MakeConstant name			:== MakeSymbIdent name 0
 
-ParsedSelectorToSelectorDef ps :==
-	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = NoIndex,
+ParsedSelectorToSelectorDef sd_type_index ps :==
+	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,
 		sd_exi_vars = [], sd_type_ptr = nilPtr, sd_field = ps.ps_field_name,
 		sd_type	= { st_vars = [], st_args = [], st_result = ps.ps_field_type, st_arity = 0, st_context = [],
 				    st_attr_env = [], st_attr_vars = [] }}

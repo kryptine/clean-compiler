@@ -268,7 +268,7 @@ wantModule iclmodule file_id=:{id_name} import_file_position hash_table error se
 			->(ok,mod,hash_table,file,pre_def_symbols,files)
 		(No, files)
 			-> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
-			  (False, mod, hash_table, error <<< import_file_position <<< ":could not open " <<< file_name <<< "\n", pre_def_symbols, files)
+			  (False, mod, hash_table, error <<< import_file_position <<< ": could not open " <<< file_name <<< "\n", pre_def_symbols, files)
 where
 	initModule :: String ScanState !*HashTable !*File !*PredefinedSymbols *Files
 				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
@@ -896,7 +896,8 @@ want_2_0_import_declaration token pState
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, pState)
 			InstanceToken
 				#	(class_name, pState)	= want pState
-					(ii_extended, pState)	= optional_extension pState
+//					(ii_extended, pState)	= optional_extension pState // XXX fix this, Pieter
+					ii_extended				= False
 					(types, pState)			= wantList "instance types" tryBrackType pState
 					(class_id, pState)		= stringToIdent class_name IC_Class pState
 					(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState

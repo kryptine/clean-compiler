@@ -94,7 +94,6 @@ cConversionTableSize	:== 8
 	,	dcl_functions		:: !{# FunType }
 	,	dcl_instances		:: !IndexRange
 	,	dcl_macros			:: !IndexRange
-	,	dcl_class_specials	:: !IndexRange
 	,	dcl_specials		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
 	,	dcl_sizes			:: !{# Int}
@@ -154,6 +153,7 @@ addDeclarationsOfDclModToSymbolTable :: .Int !{!Declaration} !{!Declaration} !*C
 addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
 addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
 addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*CheckState -> (!Bool, !.CheckState)
+removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
@@ -180,5 +180,3 @@ nrOfBelongingSymbols :: !BelongingSymbols -> Int
 
 import_ident :: Ident
 restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
-
-expand_syn_types_late_XXX yes no :== no
