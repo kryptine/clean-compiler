@@ -105,7 +105,7 @@ predefined_idents
 					[PD_Dyn_TypeApp] = i "TypeApp",
 					[PD_Dyn_TypeVar] = i "TypeVar",
 					[PD_Dyn_TypeCons] = i "TypeCons",
-					[PD_Dyn_TypePatternVar] = i "_TypePatternVar",
+//					[PD_Dyn_TypePatternVar] = i "_TypePatternVar",
 					[PD_Dyn_UnificationEnvironment] = i "_UnificationEnvironment",
 					[PD_Dyn_initial_unification_environment] = i "_initial_unification_environment",
 					[PD_Dyn_bind_global_type_pattern_var] = i "_bind_global_type_pattern_var",
@@ -334,7 +334,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeScheme)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeApp)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeVar)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypePatternVar)
+//					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypePatternVar)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCons)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_UnificationEnvironment)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_unify)

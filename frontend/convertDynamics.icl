@@ -744,7 +744,8 @@ convertTypeCode pattern cinp (TCE_Selector selections var_info_ptr) st
 createTypePatternVariable :: !*ConversionState -> (!Expression, !*ConversionState)
 createTypePatternVariable ci
 	# (tpv_symb, ci)
-		=	getSymbol PD_Dyn_TypePatternVar SK_Constructor 1 ci
+//		=	getSymbol PD_Dyn_TypePatternVar SK_Constructor 1 ci
+		=	getSymbol PD_Dyn_TypeVar SK_Constructor 1 ci
 	=	(App {	app_symb = tpv_symb,
 						app_args = [BasicExpr (BVInt ci.ci_type_pattern_var_count)],
 						app_info_ptr = nilPtr },

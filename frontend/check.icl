@@ -3445,7 +3445,7 @@ where
 				<=< adjustPredefSymbol PD_Dyn_TypeCons				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_Dyn_TypeApp				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_Dyn_TypeVar				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_TypePatternVar		mod_index STE_Constructor
+//				<=< adjustPredefSymbol PD_Dyn_TypePatternVar		mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_Dyn_UnificationEnvironment				mod_index STE_Type
 				<=< adjustPredefSymbol PD_Dyn_initial_unification_environment		mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_Dyn_bind_global_type_pattern_var	mod_index STE_DclFunction

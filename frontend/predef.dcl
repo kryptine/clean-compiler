@@ -141,7 +141,7 @@ PD_Dyn_Type					:== 164
 PD_Dyn_TypeScheme			:== 165
 PD_Dyn_TypeApp				:== 166
 PD_Dyn_TypeVar				:== 167
-PD_Dyn_TypePatternVar		:== 168
+// PD_Dyn_TypePatternVar		:== 168
 PD_Dyn_TypeCons				:== 169
 // unification
 PD_Dyn_UnificationEnvironment			:== 170
