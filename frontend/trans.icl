@@ -1259,9 +1259,12 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args_array st_args) st_result st_vars (ti_cons_args, tb_rhs, ro) ti_type_heaps
 							 ti_symbol_heap ti_fun_defs ti_fun_heap ti_var_heap
 	  new_arg_types = flatten [ el \\ el<-:new_arg_types_array ]
+	  (fresh_type_vars, ti_type_heaps) = accTypeVarHeap (mapSt bind_to_fresh_type_variable new_type_vars) ti_type_heaps
+	  (fresh_arg_types, ti_type_heaps) = substitute new_arg_types ti_type_heaps
+	  (fresh_result_type, ti_type_heaps) = substitute new_result_type ti_type_heaps
 	  fun_arity = length new_fun_args
-	  new_fun_type = Yes { st_vars = new_type_vars, st_args = new_arg_types, st_arity = fun_arity,
-							st_result = new_result_type, st_context = [], st_attr_vars = [], st_attr_env = [] }
+	  new_fun_type = Yes { st_vars = fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity,
+							st_result = fresh_result_type, st_context = [], st_attr_vars = [], st_attr_env = [] }
 
 	  new_fd_expanding = { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, fun_index = ti_next_fun_nr,
 								fun_info.fi_group_index = fi_group_index}
@@ -1528,21 +1531,30 @@ where
 (-!->) infix :: !.a !b -> .a | <<< b
 (-!->) a b = a ---> b
 
+bind_to_fresh_type_variable {tv_name, tv_info_ptr} th_vars
+	# (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
+	  tv = { tv_name=tv_name, tv_info_ptr=new_tv_info_ptr }
+	= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
+
 appTypeVarHeap f type_heaps :== let th_vars = f type_heaps.th_vars in { type_heaps & th_vars = th_vars }
+accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, { type_heaps & th_vars = th_vars })
 
 createBindingsForUnifiedTypes :: !AType !AType ![TypeVar] !{#CommonDefs} !*TypeHeaps -> (![TypeVar], !.TypeHeaps)
 createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps=:{th_vars}
+/* unify the two type arguments and generate new bindings. The resulting list of type variables should only
+   contain variables that occur in the second type argument (the "demanded" type).
+*/
 	# th_vars = foldSt (\tv th_vars -> th_vars <:= (tv.tv_info_ptr, TVI_Empty)) all_type_vars th_vars
 	  (type_heaps=:{th_vars}) = bind_and_unify_atypes type_1 type_2 common_defs { type_heaps & th_vars = th_vars }
 //	  th_vars = th_vars -!-> ""
 //	  th_vars = foldSt trace_type_var all_type_vars th_vars
-	  th_vars = foldSt (\ a b -> snd (set_root_tvi_to_non_variable_type_or_fresh_type_var a b)) all_type_vars th_vars
+	  th_vars = foldSt (\ a b -> snd (bind_to_root a b)) all_type_vars th_vars
 //	  th_vars = th_vars -!-> ""
 //	  th_vars = foldSt trace_type_var all_type_vars th_vars
-	  (unsubstituted_type_vars, th_vars) = foldSt bind_to_fresh_type_variable_or_non_variable_type all_type_vars ([], th_vars)
+	  (unbound_type_vars, th_vars) = foldSt get_unbound_var all_type_vars ([], th_vars)
 //	  th_vars = th_vars -!-> ""
 //	  th_vars = foldSt trace_type_var all_type_vars th_vars
-	= (unsubstituted_type_vars, { type_heaps & th_vars = th_vars })
+	= (unbound_type_vars, { type_heaps & th_vars = th_vars })
   where
 	bind_and_unify_types (TV tv_1) (TV tv_2) common_defs type_heaps=:{th_vars}
 		# (root_1, th_vars) = get_root tv_1 th_vars
@@ -1615,40 +1627,29 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps
 		try_to_expand {at_type} _ type_heaps
 			= (at_type, type_heaps)
 
-	set_root_tvi_to_non_variable_type_or_fresh_type_var :: !TypeVar !*TypeVarHeap -> (!TypeVarInfo,!.TypeVarHeap);
-	set_root_tvi_to_non_variable_type_or_fresh_type_var this_tv th_vars
+	bind_to_root :: !TypeVar !*TypeVarHeap -> (!TypeVarInfo,!.TypeVarHeap);
+	bind_to_root this_tv th_vars
 		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
 		= case tv_info of
-			(TVI_FreshTypeVar fresh_type_var)
-				-> (tv_info, th_vars)
 			TVI_Empty
-				# (fresh_type_var, th_vars) = allocate_fresh_type_variable this_tv.tv_name th_vars
-				  th_vars = th_vars <:= (fresh_type_var.tv_info_ptr, TVI_Empty)
-				  th_vars = th_vars <:= (this_tv.tv_info_ptr, TVI_FreshTypeVar fresh_type_var)
-				-> (TVI_FreshTypeVar fresh_type_var, th_vars)
+				-> (tv_info, th_vars)
 			(TVI_Type type)
 				| is_non_variable_type type
 					 -> (tv_info, th_vars)
 				-> case type of
 					(TV next_tv)
-						# (destination, th_vars) = set_root_tvi_to_non_variable_type_or_fresh_type_var next_tv th_vars
-						  th_vars = th_vars <:= (this_tv.tv_info_ptr, destination)
-						-> (destination, th_vars)
+						# (root_tvi, th_vars) = bind_to_root next_tv th_vars
+						  th_vars = th_vars <:= (this_tv.tv_info_ptr, root_tvi)
+						-> (root_tvi, th_vars)
 	
-	bind_to_fresh_type_variable_or_non_variable_type {tv_info_ptr} (unsubstituted_type_vars_accu, th_vars)
+	get_unbound_var tv=:{tv_info_ptr} (unbound_type_vars_accu, th_vars)
 		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
 		= case tv_info of
-			(TVI_FreshTypeVar fresh_variable)
-				-> ([fresh_variable:unsubstituted_type_vars_accu], th_vars <:= (tv_info_ptr,TVI_Type (TV fresh_variable)))
+			TVI_Empty
+				-> ([tv:unbound_type_vars_accu], th_vars)
 			(TVI_Type type)
-				-> (unsubstituted_type_vars_accu, th_vars)
-	
-	allocate_fresh_type_variable new_name th_vars
-		# new_ident = { id_name=new_name, id_info=nilPtr }
-		  (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
-		= ({ tv_name=new_name, tv_info_ptr=new_tv_info_ptr }, th_vars)
-							  
-	
+				-> (unbound_type_vars_accu, th_vars)
+
 	only_tv :: Type -> Optional TypeVar
 	only_tv (TV tv) = Yes tv
 	only_tv _ = No
@@ -1698,8 +1699,8 @@ createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps
 					-> (th_vars -!-> ("TVI_Type", type))
 				-> case type of
 					(TV next_tv) -> trace_type_vars next_tv th_vars
-			(TVI_FreshTypeVar root_type_var)
-				-> th_vars -!-> ("TVI_FreshTypeVar",root_type_var)
+//			(TVI_FreshTypeVar root_type_var)
+//				-> th_vars -!-> ("TVI_FreshTypeVar",root_type_var)
 
 	
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
