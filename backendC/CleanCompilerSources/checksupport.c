@@ -284,7 +284,7 @@ static char *PrintTypesOfSymbol (char *type_repr, File file, ModuleInfo module_i
 
 } /* PrintTypesOfSymbol */
 
-#define _ANALYSE_IDENT_
+#define _ANALYSE_IDENT_ 		/* also in optimisations.c */
 #ifndef CLEAN2
 #define _ANALYSE_INSTANCE_TYPES_
 #endif

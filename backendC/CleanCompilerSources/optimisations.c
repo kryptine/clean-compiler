@@ -1034,7 +1034,8 @@ static void init_apply_symb_function_state_p()
 }
 #endif
 
-#define cTypeDelimiter	';'
+#define cTypeDelimiter	';'		/* also in checksupport.h */
+#define _ANALYSE_IDENT_			/* also in checksupport.c */
 
 static int compute_length_before_type_delimiter (char *fname)
 {
@@ -1043,10 +1044,29 @@ static int compute_length_before_type_delimiter (char *fname)
 
 	p=fname;
 	
+#ifdef _ANALYSE_IDENT_
 	--p;
 	do {
 		c=*++p;
 	} while (c!=cTypeDelimiter && c!='\0');
+
+	if (c == cTypeDelimiter && *(p+1) != '\0')
+	{
+		p++;
+
+		if (isdigit (*p))
+		{	
+			for (p = p+1; *p != cTypeDelimiter && *p != '\0'; p++)
+				 ;
+		}
+	}
+#else /* ifndef _ANALYSE_IDENT_ */
+	--p;
+	do {
+		c=*++p;
+	} while (c!='\0');
+
+#endif /* _ANALYSE_IDENT_ */
 
 	return 	p-fname;
 }

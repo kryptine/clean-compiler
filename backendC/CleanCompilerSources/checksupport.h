@@ -1,5 +1,5 @@
 
-#define cTypeDelimiter	';'
+#define cTypeDelimiter	';'	/* also in optimisations.c */
 #define cTypeFirstArg	'<'
 #define cTypeLastArg	'>'
 

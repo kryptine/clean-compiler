@@ -26,6 +26,7 @@
 # if TAIL_CALL_MODULO_TUPLE_CONS_OPTIMIZATION
 #include "tuple_tail_recursion.h"
 # endif
+#include "dbprint.h"
 
 static char *ECodeBlock	= "incorrect number of output parameters";
 
