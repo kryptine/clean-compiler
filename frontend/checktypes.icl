@@ -120,6 +120,11 @@ where
 		# (arg_type, _, ts_ti_cs) = bindTypes cti arg_type ts_ti_cs
 		  (res_type, _, ts_ti_cs) = bindTypes cti res_type ts_ti_cs
 		= (arg_type --> res_type, TA_Multi, ts_ti_cs)
+//AA..
+	bindTypes cti (TArrow1 type) ts_ti_cs
+		# (type, _, ts_ti_cs) = bindTypes cti type ts_ti_cs
+		= (TArrow1 type, TA_Multi, ts_ti_cs)	
+//..AA		
 	bindTypes cti (CV tv :@: types) ts_ti_cs
 		# (tv, type_attr, ts_ti_cs) = bindTypes cti tv ts_ti_cs
 		  (types, _, ts_ti_cs) = bindTypes cti types ts_ti_cs
@@ -320,6 +325,11 @@ where
 		# (arg_type, expst) = expand module_index arg_type expst
 		  (res_type, expst) = expand module_index res_type expst
 		= (arg_type --> res_type, expst)
+// AA..
+	expand module_index (TArrow1 type) expst
+		# (type, expst) = expand module_index type expst
+		= (TArrow1 type, expst)
+// ..AA				
 	expand module_index (CV tv :@: types) expst
 		# (type, expst) = expandTypeVariable tv expst
 		  (types, expst) = expand module_index types expst
@@ -367,6 +377,10 @@ where
 		= look_for_cycles module_index types expst
 	look_for_cycles module_index (arg_type --> res_type) expst
 		= look_for_cycles module_index res_type (look_for_cycles module_index arg_type expst)
+//AA..
+	look_for_cycles module_index (TArrow1 arg_type) expst
+		= look_for_cycles module_index arg_type expst
+//..AA
 	look_for_cycles module_index (type :@: types) expst
 		= look_for_cycles module_index types expst
 	look_for_cycles module_index type expst
@@ -545,6 +559,16 @@ getClassDef class_index type_module module_index class_defs modules
 		  class_index = convertIndex class_index (toInt STE_Class) dcl_conversions
 		= (class_def, class_index, class_defs, modules)
 
+getGenericDef :: !Index !Index !Index !u:{# GenericDef} !v:{# DclModule} -> (!GenericDef, !Index , !u:{# GenericDef}, !v:{# DclModule})
+getGenericDef generic_index type_module module_index generic_defs modules
+	| type_module == module_index
+		#! si = size generic_defs
+		# (generic_def, generic_defs) = generic_defs![generic_index]
+		= (generic_def, generic_index, generic_defs, modules)
+		# ({dcl_common={com_generic_defs},dcl_conversions}, modules) = modules![type_module]
+		  generic_def = com_generic_defs.[generic_index]
+		  generic_index = convertIndex generic_index (toInt STE_Generic) dcl_conversions
+		= (generic_def, generic_index, generic_defs, modules)
 
 checkTypeVar :: !Level !DemandedAttributeKind !TypeVar !TypeAttribute !(!*OpenTypeInfo, !*CheckState)
 					-> (! TypeVar, !TypeAttribute, !(!*OpenTypeInfo, !*CheckState))
@@ -681,6 +705,12 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_typ
 	  (result_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None result_type cot_state
 	  (new_attr, oti, cs) = newAttribute dem_attr "-->" at_attribute oti cs
 	= ({ type & at_type = arg_type --> result_type, at_attribute = new_attr }, (ots, oti, cs))
+//AA..
+checkOpenAType mod_index scope dem_attr type=:{at_type = TArrow1 arg_type, at_attribute} cot_state
+	# (arg_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None arg_type cot_state
+	  (new_attr, oti, cs) = newAttribute dem_attr "TArrow1" at_attribute oti cs
+	= ({ type & at_type = TArrow1 arg_type, at_attribute = new_attr }, (ots, oti, cs))
+//..AA
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, _, (oti, cs)) = checkTypeVar scope DAK_None tv TA_Multi (oti, cs)
 	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
@@ -740,6 +770,12 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 			= ti1==ti2 && are_equal_accu
 		compare_context_and_instance_type (_ --> _) (_ --> _) are_equal_accu
 			= are_equal_accu
+//AA..
+		compare_context_and_instance_type TArrow TArrow are_equal_accu
+			= are_equal_accu	
+		compare_context_and_instance_type (TArrow1 _) (TArrow1 _) are_equal_accu
+			= are_equal_accu	
+//..AA			
 		compare_context_and_instance_type (CV tv1 :@: _) (CV tv2 :@: _) are_equal_accu
 			= tv1==tv2 && are_equal_accu
 		compare_context_and_instance_type (TB bt1) (TB bt2) are_equal_accu
@@ -863,7 +899,61 @@ checkTypeContext mod_index tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_
 			= (tc, (class_defs, ots, oti, cs))
 			= (tc, (class_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
 		= ({tc & tc_types = []}, (class_defs, ots, oti, { cs & cs_error = checkError id_name "undefined" cs.cs_error }))
-where	
+where
+	
+	check_context_types tc_class [] cs=:{cs_error}
+		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
+	check_context_types tc_class [((CV {tv_name}) :@: _):_] cs=:{cs_error}
+		= cs
+//		= { cs & cs_error = checkError tv_name "not allowed as higher order type variable in context" cs_error}
+	check_context_types tc_class [TV _ : types] cs
+		= cs
+	check_context_types tc_class [type : types] cs
+		= check_context_types tc_class types cs
+
+checkTypeContext1 ::  !Index !TypeContext !(!v:{# ClassDef}, !x:{# GenericDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+	-> (!TypeContext,!(!v:{# ClassDef}, !x:{# GenericDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
+checkTypeContext1 mod_index tc (class_defs, generic_defs, ots, oti, cs)
+	# (entry, cs) = get_entry tc cs
+	= check_context mod_index entry tc (class_defs, generic_defs, ots, oti, cs)
+where
+	get_entry tc cs=:{cs_symbol_table}
+		# (entry, cs_symbol_table) = readPtr tc.tc_class.glob_object.ds_ident.id_info cs_symbol_table
+		= (entry, {cs & cs_symbol_table = cs_symbol_table}) 
+
+	check_context 
+			mod_index 
+			entry 
+			tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
+	  		(class_defs, generic_defs, ots, oti, cs)
+		# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
+		| class_index <> NotFound
+			# (class_def, class_index, class_defs, ots_modules) = getClassDef class_index class_module mod_index class_defs ots.ots_modules
+			  ots = { ots & ots_modules = ots_modules }
+			  (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
+			  cs = check_context_types 	class_def.class_name tc_types cs
+			  tc = { tc & tc_class = { tc_class & glob_object = { class_name & ds_index = class_index }, glob_module = class_module }, tc_types = tc_types}
+			| class_def.class_arity == ds_arity
+				= (tc, (class_defs, generic_defs, ots, oti, cs))
+				= (tc, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
+			= ({tc & tc_types = []}, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "class undefined" cs.cs_error }))
+	check_context 
+			mod_index
+			entry
+			tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
+			(class_defs, generic_defs, ots, oti, cs)	
+		# 	(generic_index, generic_module) = retrieveGlobalDefinition entry STE_Generic mod_index
+		| generic_index <> NotFound
+			# (generic_def, generic_index, generic_defs, ots_modules) = getGenericDef generic_index generic_module mod_index generic_defs ots.ots_modules
+			  ots = { ots & ots_modules = ots_modules }
+			  (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
+			  //cs = check_context_types 	generic_def.gen_name tc_types cs
+			  tc = { tc & tc_class = { tc_class & glob_object = { class_name & ds_index = generic_index }, glob_module = generic_module }, tc_types = tc_types}
+			| ds_arity == 1
+				= (tc, (class_defs, generic_defs, ots, oti, cs))
+				= (tc, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
+			= ({tc & tc_types = []}, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "generic undefined" cs.cs_error }))
+			
 	check_context_types tc_class [] cs=:{cs_error}
 		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
 	check_context_types tc_class [((CV {tv_name}) :@: _):_] cs=:{cs_error}

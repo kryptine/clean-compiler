@@ -265,6 +265,18 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  error_admin
 		  		= check_equality_of_kinds arg_nr expected_kind KindConst error_admin
 		= (th_vars, td_infos, error_admin)
+//AA..
+	check_type expected_kind arg_nr TArrow (th_vars, td_infos, error_admin)
+		# error_admin
+		  		= check_equality_of_kinds arg_nr expected_kind (KindArrow [KindConst,KindConst]) error_admin
+		= (th_vars, td_infos, error_admin)
+
+	check_type expected_kind arg_nr (TArrow1 arg) state
+		# (th_vars, td_infos, error_admin) = check_atype KindConst arg_nr arg state
+		# error_admin
+		  		= check_equality_of_kinds arg_nr expected_kind (KindArrow [KindConst]) error_admin
+		= (th_vars, td_infos, error_admin)
+//..AA
 	check_type expected_kind arg_nr ((CV tv) :@: args) state
 		# (th_vars, td_infos, error_admin)
 				= foldSt (check_atype KindConst arg_nr) args state
@@ -300,7 +312,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		= case tvi of
 			TVI_Empty
 				-> (writePtr tv_info_ptr (TVI_Kind expected_kind) th_vars, error_admin)
-			TVI_Kind kind
+			TVI_Kind kind			
 				| expected_kind==kind
 					-> (th_vars, error_admin)
 				-> (th_vars, checkError "cannot consistently assign a kind to type variable"

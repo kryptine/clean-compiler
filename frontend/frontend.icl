@@ -145,8 +145,15 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 					heaps hash_table predef_symbols dcl_mods optional_dcl_icl_conversions error_admin)
 			(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin)	
 
-	# (icl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n saved_main_dcl_common		
+
+	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
+		with 
+			copied_ti_common_defs :: !.{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
+			copied_ti_common_defs = {x \\ x <-: ti_common_defs}
+
 	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }
+
+	# icl_mod = {icl_mod & icl_common = icl_common} 
 		
 	# error = error_admin.ea_file
 	#! ok = error_admin.ea_ok
@@ -165,7 +172,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials, generic_range]
 		
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
-//	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
+//	  (components, fun_defs, out)	= showComponents components 0 True fun_defs out
 //	  (fun_defs, error)	= showFunctions array_instances fun_defs error
 		
 	| upToPhase == FrontEndPhaseTypeCheck
@@ -363,3 +370,5 @@ where
 			= show_dcl_functions (inc fun_index) dcl_functions file 
 	show_dcl_function {ft_symb, ft_type} file
 		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"			
+		
+		  			

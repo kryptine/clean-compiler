@@ -789,6 +789,8 @@ cNotVarNumber :== -1
 
 ::	Type	=	TA !TypeSymbIdent ![AType]
 			|	(-->) infixr 9 !AType !AType
+			| 	TArrow							/* (->) */
+			| 	TArrow1	!AType					/* ((->) a) */
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
@@ -1226,6 +1228,8 @@ where
 		= True
 	needs_brackets (_ :@: _)
 		= True
+	needs_brackets (TArrow1 _)
+		= True		
 /*	needs_brackets (TFA _ _)
 		= True
 */	needs_brackets _
@@ -1344,6 +1348,12 @@ where
 		= file  <<< consid <<< " " <<< types
 	(<<<) file (arg_type --> res_type)
 		= file <<< arg_type <<< " -> " <<< res_type
+//AA..		
+	(<<<) file TArrow
+		= file <<< "(->)"	
+	(<<<) file (TArrow1 t)
+		= file <<< "(->) " <<< t	
+//..AA		
 	(<<<) file (type :@: types)
 		= file <<< type <<< " @" <<< types
 	(<<<) file (TB tb)
@@ -1435,11 +1445,13 @@ where
 
 instance <<< AlgebraicPattern
 where
-	(<<<) file g = file <<< g.ap_symbol <<< g.ap_vars <<< " -> " <<< g.ap_expr
+	//(<<<) file g = file <<< g.ap_symbol <<< g.ap_vars <<< " -> " <<< g.ap_expr
+	(<<<) file g = file <<< '\n' <<< g.ap_symbol <<< g.ap_vars <<< "\n\t-> " <<< g.ap_expr
 
 instance <<< BasicPattern
 where
-	(<<<) file g = file <<< g.bp_value <<< " -> " <<< g.bp_expr
+	//(<<<) file g = file <<< g.bp_value <<< " -> " <<< g.bp_expr
+	(<<<) file g = file <<< '\n' <<< g.bp_value <<< "\n\t-> " <<< g.bp_expr
 
 instance <<< CasePatterns
 where
@@ -1491,9 +1503,11 @@ where
 		write_binds x file [bind : binds]
 			= write_binds x (file <<< x <<< " " <<< bind <<< '\n') binds
  	(<<<) file (Case {case_expr,case_guards,case_default=No})
-		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
+		//= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
+		= file <<< "case " <<< case_expr <<< " of" <<< case_guards
 	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr})
-		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t->" <<< def_expr
+		//= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t->" <<< def_expr
+		= file <<< "case " <<< case_expr <<< " of" <<< case_guards <<< "\n\t->" <<< def_expr
 	(<<<) file (BasicExpr basic_value basic_type) = file <<< basic_value
 	(<<<) file (Conditional {if_cond,if_then,if_else}) =
 			else_part (file <<< "IF " <<< if_cond <<< "\nTHEN\n" <<< if_then) if_else
@@ -1680,11 +1694,11 @@ instance <<< FunDef
 where
 	(<<<) file {fun_symb,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< ' ' <<< bodies 
 	(<<<) file {fun_symb,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
-			<<< "C " <<< cb_args <<< " = " <<< cb_rhs 
+			<<< "C " <<< cb_args <<< "\n= " <<< cb_rhs 
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
 	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}}
 		= file <<< fun_symb <<< '@' <<< fun_index <<< '.'
-			<<< "T "  <<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs 
+			<<< "T "  <<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n= " <<< tb_rhs 
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
 	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '@' <<< fun_index <<< '.'
 			<<< body <<< '\n'
@@ -1694,8 +1708,8 @@ where
 instance <<< FunctionBody
 where
 	(<<<) file (ParsedBody bodies) = file <<< bodies 
-	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< " = " <<< cb_rhs 
-	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< " = " <<< tb_rhs 
+	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< "\n= " <<< cb_rhs 
+	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< "\n= " <<< tb_rhs 
 	(<<<) file (BackendBody body) = file <<< body <<< '\n'
 	(<<<) file NoBody = file <<< "Array function\n"
 

@@ -818,6 +818,8 @@ cNonRecursiveAppl	:== False
 
 ::	Type	=	TA !TypeSymbIdent ![AType]
 			|	(-->) infixr 9 !AType !AType
+			| 	TArrow							/* (->) */
+			| 	TArrow1	!AType					/* ((->) a) */
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 

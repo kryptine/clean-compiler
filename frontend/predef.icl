@@ -363,7 +363,7 @@ where
 		  me_type = { st_vars = [], st_args = [], st_arity = 0,
 					  st_result = { at_attribute = TA_None, at_annotation = AN_None, at_type = TV class_var },
 					  st_context = [ {tc_class = {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name.pds_ident, ds_arity = 1, ds_index = NoIndex }},
-					   				tc_types = [ TV class_var ], tc_var = nilPtr }],
+					   				tc_types = [ TV class_var ], tc_var = nilPtr}],
 					  st_attr_vars = [], st_attr_env = [] }
 
 		  member_def = { me_symb = tc_member_name.pds_ident, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,

@@ -96,11 +96,20 @@ where
 				| ok
 					-> (True, simplified_type, subst)
 					-> (False, tcv, subst)
+//AA..					
+	arraySubst type=:(TArrow1 arg_type) subst
+		# (changed, arg_type, subst) = arraySubst arg_type subst
+		| changed
+			= (changed, TArrow1 arg_type, subst)
+			= (False, type, subst)
+//..AA					
+
 	arraySubst tfa_type=:(TFA vars type) subst
 		# (changed, type, subst) = arraySubst type subst
 		| changed
 			= (changed, TFA vars type, subst)
 			= (False, tfa_type, subst)
+
 	arraySubst type subst
 		= (False, type, subst)
 
@@ -167,6 +176,10 @@ where
 			= tv_number == var_id
 	containsTypeVariable var_id (arg_type --> res_type) subst
 		= containsTypeVariable var_id arg_type subst || containsTypeVariable var_id res_type subst
+//AA..
+	containsTypeVariable var_id (TArrow1 arg_type) subst
+		= containsTypeVariable var_id arg_type subst
+//..AA
 	containsTypeVariable var_id (TA cons_id cons_args) subst
 		= containsTypeVariable var_id cons_args subst
 	containsTypeVariable var_id (type :@: types) subst
@@ -282,6 +295,12 @@ unifyTypes t1=:(TB tb1) attr1 t2=:(TB tb2) attr2 modules subst heaps
 		= (False, subst, heaps)
 unifyTypes (arg_type1 --> res_type1) attr1 (arg_type2 --> res_type2) attr2 modules subst heaps
 	= unify (arg_type1,res_type1) (arg_type2,res_type2) modules subst heaps
+//AA..	
+unifyTypes TArrow attr1 TArrow attr2 modules subst heaps
+	= (True, subst, heaps)	
+unifyTypes (TArrow1 t1) attr1 (TArrow1 t2) attr2 modules subst heaps
+	= unify t1 t2 modules subst heaps	
+//..AA
 unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2 modules subst heaps
 	| cons_id1 == cons_id2
 		= unify cons_args1 cons_args2 modules subst heaps
@@ -340,6 +359,12 @@ simplifyTypeApplication (TempV tv_number) type_args
 	= (True, TempCV tv_number :@: type_args)
 simplifyTypeApplication (TempQV tv_number) type_args
 	= (True, TempQCV tv_number :@: type_args)
+//AA..
+simplifyTypeApplication TArrow [type1, type2] 
+	= (True, type1 --> type2)
+simplifyTypeApplication (TArrow1 type1) [type2] 
+	= (True, type1 --> type2)
+//..AA
 simplifyTypeApplication type type_args
 	= (False, type)
 
@@ -375,6 +400,19 @@ unifyCVwithType is_exist tv_number type_args type=:(TA type_cons cons_args) modu
 			= unifyTypes (toTV is_exist tv_number) TA_Multi (TA { type_cons & type_arity = diff } (take diff cons_args)) TA_Multi modules subst heaps
 		    = (False, subst, heaps)
 		= (False, subst, heaps)
+
+// AA..		
+unifyCVwithType is_exist tv_number [type_arg1, type_arg2] type=:(atype1 --> atype2) modules subst heaps
+	# (succ, subst, heaps) = unify (type_arg1, type_arg2) (atype1, atype2) modules subst heaps
+	| succ
+		= unifyTypes (toTV is_exist tv_number) TA_Multi TArrow TA_Multi modules subst heaps
+		= (False, subst, heaps)		
+unifyCVwithType is_exist tv_number [type_arg] type=:(atype1 --> atype2) modules subst heaps
+	# (succ, subst, heaps) = unify type_arg atype2 modules subst heaps
+	| succ
+		= unifyTypes (toTV is_exist tv_number) TA_Multi (TArrow1 atype1) TA_Multi modules subst heaps
+		= (False, subst, heaps)
+// ..AA 		
 unifyCVwithType is_exist tv_number type_args type modules subst heaps
 	= (False, subst, heaps)
 
@@ -487,6 +525,11 @@ where
 		# (arg_type, type_heaps) = freshCopy arg_type type_heaps
 		  (res_type, type_heaps) = freshCopy res_type type_heaps
 		= (arg_type --> res_type, type_heaps)
+//AA..
+	freshCopy (TArrow1 arg_type) type_heaps
+		# (arg_type, type_heaps) = freshCopy arg_type type_heaps
+		= (TArrow1 arg_type, type_heaps)
+//..AA		
 	freshCopy (TFA vars type) type_heaps
 		# type_heaps = foldSt bind_var_and_attr vars type_heaps
 		  (type, type_heaps) = freshCopy type type_heaps
@@ -763,6 +806,11 @@ addPropagationAttributesToType modules (arg_type --> res_type) ps
 addPropagationAttributesToType modules (type_var :@: types) ps
 	# (types, ps) = addPropagationAttributesToATypes modules types ps
 	= (type_var :@: types, ps)
+//AA..
+addPropagationAttributesToType modules (TArrow1 arg_type) ps
+	# (arg_type, prop_class, ps) = addPropagationAttributesToAType modules arg_type ps
+	= (TArrow1 arg_type, ps)
+//..AA
 addPropagationAttributesToType modules type ps
 	= (type, ps)
 
@@ -1792,12 +1840,12 @@ where
 			= state
 
 		check_type_of_constructor_variable ins_pos common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
-			# {td_arity} = common_defs.[glob_module].com_type_defs.[glob_object]
+			# {td_arity,td_name} = common_defs.[glob_module].com_type_defs.[glob_object]
 			  ({tdi_properties,tdi_cons_vars}, td_infos) = td_infos![glob_module].[glob_object]
 			| tdi_properties bitand cIsNonCoercible == 0
 				# ({sc_neg_vect}, type_var_heap, td_infos)
 					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
-				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)			
+				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)							
 				= (checkErrorWithIdentPos (newPosition empty_id ins_pos)
 					 " instance type should be coercible" error, type_var_heap, td_infos)
 		where
@@ -1810,6 +1858,17 @@ where
 		check_type_of_constructor_variable ins_pos common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
 			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
 				type_var_heap, td_infos)
+//AA..
+/*
+		// ??? not sure if it is correct
+		check_type_of_constructor_variable ins_pos common_defs TArrow (error, type_var_heap, td_infos)
+			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
+				type_var_heap, td_infos)		
+		check_type_of_constructor_variable ins_pos common_defs type=:(TArrow1 arg_type) (error, type_var_heap, td_infos)
+			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
+				type_var_heap, td_infos)		
+*/
+//..AA				
 		check_type_of_constructor_variable ins_pos common_defs type=:(cv :@: types) (error, type_var_heap, td_infos)
 			= (checkError (newPosition empty_id ins_pos) " instance type should be coercible" error,
 				type_var_heap, td_infos)
@@ -2226,7 +2285,7 @@ where
 
 instance <<< TypeContext
 where
-	(<<<) file co = file <<< "TypeContext:  (tc_class)=" <<< co.tc_class <<< " (tc_var)=" <<< ptrToInt co.tc_var <<< " (tc_types)=" <<< " " <<< co.tc_types
+	(<<<) file co = file <<< "TypeContext:  (tc_class)=" <<< co.tc_class <<< " (tc_var)=" <<< ptrToInt co.tc_var <<< " (tc_types)=" <<< " " <<< co.tc_types 
 	
 instance <<< DefinedSymbol
 where

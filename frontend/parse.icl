@@ -1290,8 +1290,11 @@ optionalCoercions pState
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition context pos pState
+	| SwitchGenerics False True
+		= (PD_Erroneous, parseError "generic definition" No "support for generics is disabled in the compiler. " pState)
 	# (name, pState) = want_name pState
-	| name == "" = (PD_Erroneous, pState)
+	| name == "" 
+		= (PD_Erroneous, pState)
 	# (ident, pState) = stringToIdent name IC_Class pState
 	# (member_ident, pState) = stringToIdent name IC_Expression pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
@@ -1740,6 +1743,14 @@ where
 		= (TA { sym & type_arity = length types } types, pState)
 	convert_list_of_types (TV tv) types pState
 		= (CV tv :@: types, pState)
+//AA..
+	convert_list_of_types TArrow [type1, type2]	pState
+		= (type1 --> type2, pState)
+	convert_list_of_types TArrow [type1] pState
+		= (TArrow1 type1, pState)
+	convert_list_of_types (TArrow1 type1) [type2] pState
+		= (type1 --> type2, pState)
+//..AA
 	convert_list_of_types _ types pState
 		= (TE, parseError "Type" No "ordinary type variable" pState)
 tryApplicationType _ annot attr pState
@@ -1787,7 +1798,13 @@ trySimpleTypeT OpenToken annot attr pState
 	| token == CommaToken
 		# (tup_arity, pState)		= determine_arity_of_tuple 2 pState
 		  (tuple_symbol, pState)	= makeTupleTypeSymbol tup_arity 0 pState
-		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA tuple_symbol []}, pState)
+		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA tuple_symbol []}, pState)	
+	| token == ArrowToken
+		# (token, pState) = nextToken TypeContext pState
+		| token == CloseToken
+			= (True, {at_annotation = annot, at_attribute = attr, at_type = TArrow}, pState)
+			= (False,{at_annotation = annot, at_attribute = attr, at_type = TE},
+				parseError "arrow type" (Yes token) ")" pState)
 	// otherwise // token <> CommaToken
 	# (atype, pState)	= wantAType (tokenBack pState)
 	  (token, pState)	= nextToken TypeContext pState
@@ -3088,6 +3105,8 @@ wantBeginGroup msg pState
 // AA..
 wantKind :: !ParseState -> !(!TypeKind, ParseState)
 wantKind pState
+	| SwitchGenerics False True
+		= (KindConst, parseError "kind" No "support for generics is disabled in the compiler. " pState)
 	# (token, pState) = nextToken TypeContext pState
 	# (kind, pState) = want_simple_kind token pState
 	# (token, pState) = nextToken TypeContext pState

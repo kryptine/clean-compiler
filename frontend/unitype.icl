@@ -246,6 +246,12 @@ typeIsNonCoercible _ (TempQV _)
 	= True
 typeIsNonCoercible _ (_ --> _)
 	= True
+//AA..	
+typeIsNonCoercible _ TArrow
+	= True
+typeIsNonCoercible _ (TArrow1 t)
+	= True	
+//AA..
 typeIsNonCoercible cons_vars (TempCV tmp_var_id :@: _)
 	= not (isPositive tmp_var_id cons_vars)
 typeIsNonCoercible cons_vars (_ :@: _)
@@ -319,9 +325,16 @@ where
 			| changed
 				= (True, arg_type0 --> res_type, subst, ls)
 				= (False, type, subst, ls)
+//AA..
+	lift modules cons_vars type=:(TArrow1 arg_type) subst ls
+		# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type subst ls
+		| changed 
+			= (True, TArrow1 arg_type, subst, ls)
+			= (False, type, subst, ls)	
+//..AA				
 	lift modules cons_vars type=:(TA cons_id cons_args) subst ls=:{ls_type_heaps}
 		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
-		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}
+		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}			
 	lift modules cons_vars type=:(TempCV temp_var :@: types) subst ls
 		# (changed, var_type, subst, ls) = liftTempTypeVariable modules cons_vars temp_var subst ls
 		  (changed_types, types, subst, ls) = lift_list modules cons_vars types subst ls
@@ -333,6 +346,15 @@ where
 					-> (True, TempCV tv_number :@: types, subst, ls)
 				cons_var :@: cv_types
 					-> (True, cons_var :@: (cv_types ++ types), subst, ls)
+// AA..
+				TArrow -> case types of
+					[t1, t2] 	-> (True, t1 --> t2, subst, ls)
+					[t1]		-> (True, TArrow1 t1, subst, ls)
+					_			-> (False, type, subst, ls)	
+				(TArrow1 t1) -> case types of
+					[t2]		-> (True, t1 --> t2, subst, ls)
+					_			-> (False, type, subst, ls)				
+// ..AA						
 			= (False, type, subst, ls)
 		where
 			lift_list :: !{#CommonDefs} !{# BOOLVECT } ![a] !*{!Type} !*LiftState -> (!Bool,![a], !*{!Type}, !*LiftState) | lift a
@@ -426,6 +448,13 @@ where
 			| changed
 				= (True,arg_type0 --> res_type, es)
 				= (False,t0, es)
+//AA..
+	expandType modules cons_vars type=:(TArrow1 arg_type) es
+		# (changed,arg_type, es) = expandType modules cons_vars arg_type es
+		| changed
+			= (True, TArrow1 arg_type, es)
+			= (False, type, es)	
+//..AA					
 	expandType modules cons_vars t0=:(TA cons_id=:{type_name, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args) (subst, es)
 		# ({tdi_kinds}, es) = es!es_td_infos.[glob_module].[glob_object]
 		  (changed,cons_args, hio_signs, hio_props, (subst,es=:{es_td_infos,es_type_heaps})) = expand_type_list modules cons_vars cons_args tdi_kinds (subst, es)
@@ -487,6 +516,15 @@ where
 					-> (True, TempCV tv_number :@: types, es)
 				cons_var :@: cv_types
 					-> (True, cons_var :@: (cv_types ++ types), es)
+// AA..
+				TArrow -> case types of
+					[t1, t2] 	-> (True, t1 --> t2, es)
+					[t1]		-> (True, TArrow1 t1, es)
+					_			-> (False, type, es)	
+				(TArrow1 t1) -> case types of
+					[t2]		-> (True, t1 --> t2, es)
+					_			-> (False, type, es)				
+//..AA
 			= (False, type, es)
 	expandType modules cons_vars type es
 		= (False, type, es)
@@ -723,6 +761,12 @@ where
 			= TopSign
 		adjust_sign sign (_ --> _) cons_vars
 			= TopSign
+//AA..
+		adjust_sign sign TArrow cons_vars
+			= TopSign
+		adjust_sign sign (TArrow1 _) cons_vars
+			= TopSign					
+//..AA			
 		adjust_sign sign (TempCV tmp_var_id :@: _) cons_vars
 			| isPositive tmp_var_id cons_vars
 				= sign
@@ -812,6 +856,13 @@ coerceTypes sign defs cons_vars tpos {at_type = arg_type1 --> res_type1} {at_typ
 	| Success succ
 		= coerce sign defs cons_vars [1 : tpos] res_type1 res_type2 cs
 		= (succ, cs)
+//AA..
+coerceTypes sign defs cons_vars tpos {at_type = TArrow} {at_type = TArrow} cs
+	= (No, cs) // ???
+coerceTypes sign defs cons_vars tpos {at_type = TArrow1 arg_type1} {at_type = TArrow1 arg_type2} cs
+	# arg_sign = NegativeSign * sign
+	= coerce arg_sign defs cons_vars [0 : tpos] arg_type1 arg_type2  cs
+//..AA		
 coerceTypes sign defs cons_vars tpos {at_type = cons_var :@: types1} {at_type = _ :@: types2}  cs
 	# sign = determine_sign_of_arg_types sign cons_var cons_vars
 	= coercions_of_type_list sign defs cons_vars tpos 0 types1 types2 cs

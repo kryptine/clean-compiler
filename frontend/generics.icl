@@ -11,7 +11,7 @@ import analtypes
 
 // whether to generate CONS 
 // (needed for function that use CONS, like toString) 
-supportCons :== False
+supportCons :== True
 
 // whether to bind _cons_info to actual constructor info
 // (needed for functions that create CONS, like fromString)			
@@ -125,7 +125,7 @@ convertGenerics
 	
 	
 	#! gs = collectInstanceKinds gs
-		//---> "*** collect kinds used in generic instances and update generics with them"
+		//---> "*** collect kinds used in generic instances and store them in the generics"
 	#! (ok,gs) = gs!gs_error.ea_ok
 	| not ok 
 		= return gs predefs hash_table 
@@ -148,6 +148,12 @@ convertGenerics
 	| not ok 
 		= return gs predefs hash_table 
 	
+	#! gs = checkConsInstances gs
+		//---> "*** check that cons instances are provided for all generics"
+	#! (ok,gs) = gs!gs_error.ea_ok
+	| not ok 
+		= return gs predefs hash_table 
+
 	#! (cons_funs, cons_groups, gs) = buildConsInstances gs
 	| not ok 
 		//---> "*** bind function for CONS"
@@ -317,7 +323,7 @@ where
 	convert_instance 
 			module_index instance_index instance_defs 
 			gs=:{gs_td_infos, gs_modules, gs_error, gs_fun_defs, gs_predefs, gs_heaps}
-		#! (instance_def=:{ins_class,ins_ident,ins_pos}, instance_defs) = instance_defs ! [instance_index]
+		#! (instance_def=:{ins_class,ins_ident}, instance_defs) = instance_defs ! [instance_index]
 		| not instance_def.ins_is_generic
 			# gs = { gs 
 				& 	gs_td_infos = gs_td_infos
@@ -396,7 +402,7 @@ where
 		determine_td_index (SynType _) gs_modules gs_error
 			# gs_error = checkErrorWithIdentPos 
 				(newPosition ins_ident ins_pos) 
-				"generic instance type cannot be a sysnonym type" 
+				"generic instance type cannot be a synonym type" 
 				gs_error 				 
 			= ([], instance_def, gs_modules, gs_error)			
 		determine_td_index (AbstractType _) gs_modules gs_error
@@ -406,9 +412,31 @@ where
 					"cannot generate an instance for an abstract data type" 
 					gs_error 				 
 				= ([], instance_def, gs_modules, gs_error)									
-				= ([], instance_def, gs_modules, gs_error)
-	determine_type_def_index (TB _) instance_def _ gs_modules gs_error
-		= ([], instance_def, gs_modules, gs_error)			
+				= ([], instance_def, gs_modules, gs_error)				
+	determine_type_def_index TArrow instance_def=:{ins_generate,ins_ident,ins_pos} _ gs_modules gs_error
+		| ins_generate
+			# gs_error = checkErrorWithIdentPos 
+					(newPosition ins_ident ins_pos) 
+					"cannot generate an instance for arrow type" 
+					gs_error 	
+			= ([], instance_def, gs_modules, gs_error)
+			= ([], instance_def, gs_modules, gs_error)
+	determine_type_def_index (TArrow1 _) instance_def=:{ins_generate,ins_ident,ins_pos} _ gs_modules gs_error
+		| ins_generate
+			# gs_error = checkErrorWithIdentPos 
+					(newPosition ins_ident ins_pos) 
+					"cannot generate an instance for arrow type" 
+					gs_error 	
+			= ([], instance_def, gs_modules, gs_error)			
+			= ([], instance_def, gs_modules, gs_error)		
+	determine_type_def_index (TB _) instance_def=:{ins_generate,ins_ident,ins_pos} _ gs_modules gs_error
+		| ins_generate
+			# gs_error = checkErrorWithIdentPos 
+					(newPosition ins_ident ins_pos) 
+					"cannot generate an instance for a basic type" 
+					gs_error 	
+			= ([], instance_def, gs_modules, gs_error)			
+			= ([], instance_def, gs_modules, gs_error)			
 	determine_type_def_index _ instance_def=:{ins_ident,ins_pos} _ gs_modules gs_error
 		#! gs_error = checkErrorWithIdentPos 
 			(newPosition ins_ident ins_pos) 
@@ -482,6 +510,41 @@ where
 			# gs_error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) "generic instance function has incorrect arity" gs_error
 			= (False, gs_modules, gs_error)	
 			= (True, gs_modules, gs_error)	
+
+// check that CONS instances are provided for all generics
+checkConsInstances :: !*GenericState -> !*GenericState
+checkConsInstances gs
+	| supportConsInfo
+		= check_cons_instances 0 0 gs
+		= gs
+
+where
+	check_cons_instances module_index generic_index gs=:{gs_modules, gs_heaps, gs_error}
+		#! size_gs_modules = size gs_modules
+		| module_index == size_gs_modules 
+			= {gs & gs_modules = gs_modules} 
+		# (generic_defs, gs_modules) = gs_modules ! [module_index].com_generic_defs 
+		#! size_generic_defs = size generic_defs
+		| generic_index == size_generic_defs
+			= check_cons_instances (inc module_index) 0 {gs & gs_modules = gs_modules}
+		
+		# (gs_heaps, gs_error) = check_generic generic_defs.[generic_index] gs_heaps gs_error
+		= check_cons_instances 
+			module_index (inc generic_index)
+			{gs & gs_modules = gs_modules, gs_heaps = gs_heaps, gs_error = gs_error}
+				
+	check_generic 
+			{gen_cons_ptr, gen_name, gen_pos} 
+			gs_heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}}
+			gs_error			
+		# (info, th_vars) = readPtr gen_cons_ptr th_vars	
+		# gs_error = case info of
+			TVI_ConsInstance _ 	
+				->  gs_error
+			_					
+				-> reportError gen_name gen_pos "instance on CONS must be provided" gs_error
+		= ({gs_heaps & hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}, gs_error)
+
 
 collectGenericTypes :: !*GenericState -> (![Type], !*GenericState)
 collectGenericTypes gs=:{gs_modules} 
@@ -681,7 +744,7 @@ where
 		= ([], [], generic_def, class_index, member_index, gs)
 	build_classes [kind:kinds] generic_def module_index class_index member_index gs 	
 		#! (class_def, member_def, generic_def, gs) = 
-			buildClassDef1 module_index class_index member_index generic_def kind gs
+			buildClassDef module_index class_index member_index generic_def kind gs
 		#! (class_defs, member_defs, generic_def, class_index, member_index, gs) = 
 			build_classes kinds generic_def module_index (inc class_index) (inc member_index) gs
 		= ([class_def:class_defs], [member_def:member_defs], generic_def, class_index, member_index, gs) 			 
@@ -726,34 +789,57 @@ where
 		
 	collect_in_type :: !Type !*GenericState 
 		-> (![(Global Index, Int)], !*GenericState)		
-	collect_in_type (TA {type_arity=0, type_name} _) gs=:{gs_gtd_infos, gs_td_infos, gs_modules}
-		// types with no arguments do not need mapping to be built:
-		// their mapping is identity
-		= ([], gs)
-			//---> ("ignore type", type_name)  
-	collect_in_type (TA {type_index, type_name} args) gs=:{gs_gtd_infos, gs_td_infos, gs_modules}
-		# {glob_module, glob_object} = type_index	
-		#! (gtd_info, gs_gtd_infos) = gs_gtd_infos ! [glob_module, glob_object]
-		| toBool gtd_info // already marked
-			= ([], {gs & gs_gtd_infos = gs_gtd_infos})
-				//---> ("already marked type", type_name, type_index)
-		#! gs_gtd_infos = {gs_gtd_infos & [glob_module, glob_object] = GTDI_Generic EmptyGenericType}
-			//---> ("collect in type", type_name.id_name, type_index)						
-		#! (type_def, gs_modules) = getTypeDef glob_module glob_object gs_modules
-		#! (td_info, gs_td_infos) = gs_td_infos ! [glob_module, glob_object]
-		# gs = {gs & gs_td_infos = gs_td_infos, gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules}
-		# (td_indexes, gs) = collect_in_type_def_rhs glob_module type_def gs
-		= (merge_td_indexes [(type_index, td_info.tdi_group_nr)] td_indexes, gs)				
-	collect_in_type (arg --> res) gs
-		#! (td_indexes1, gs) = collect_in_type arg.at_type gs
-		#! (td_indexes2, gs) = collect_in_type res.at_type gs
-		= (td_indexes1 ++ td_indexes2, gs)
+	collect_in_type (TA type_symb arg_types) gs
+		# (td_indexes1, gs) = collect_in_atypes arg_types gs
+		# (td_indexes2, gs) = collect_in_type_app type_symb gs 
+		= (merge_td_indexes td_indexes1 td_indexes2, gs)
+	where	
+		collect_in_type_app {type_arity=0} gs 
+			// types with no arguments do not need mapping to be built:
+			// their mapping is identity
+			= ([], gs)
+		collect_in_type_app 
+				{type_index=type_index=:{glob_module, glob_object}, type_name}    
+				gs=:{gs_gtd_infos, gs_td_infos, gs_modules}
+			# (gtd_info, gs_gtd_infos) = gs_gtd_infos ! [glob_module, glob_object]
+			| toBool gtd_info // already marked
+				= ([], {gs & gs_gtd_infos = gs_gtd_infos})
+					//---> ("already marked type", type_name, type_index)
+			| otherwise // not yet marked		
+				# gs_gtd_infos = {gs_gtd_infos & [glob_module, glob_object] = GTDI_Generic EmptyGenericType}
+				# (td_info, gs_td_infos) = gs_td_infos ! [glob_module, glob_object]
+				# (type_def, gs_modules) = getTypeDef glob_module glob_object gs_modules				
+				# gs = {gs & gs_td_infos = gs_td_infos, gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules}
+				# (td_indexes1, gs) = collect_in_type_def_rhs glob_module type_def gs
+				# td_indexes2 = [(type_index, td_info.tdi_group_nr)]		
+				= (merge_td_indexes td_indexes1 td_indexes2, gs)
+					//---> ("already marked type", type_name, type_index)
+
+	collect_in_type (arg_type --> res_type) gs
+		#! (td_indexes1, gs) = collect_in_atype arg_type gs
+		#! (td_indexes2, gs) = collect_in_atype res_type gs
+		= (merge_td_indexes td_indexes1 td_indexes2, gs)
+	collect_in_type (TArrow1 arg_type) gs
+		= collect_in_atype arg_type gs	
 	collect_in_type (cons_var :@: args) gs
-		# types = [ at_type \\ {at_type} <- args] 
+		#! types = [ at_type \\ {at_type} <- args] 
 		= collect_in_types types gs				
 	collect_in_type _ gs
 		= ([], gs)
 	
+	collect_in_atype :: !AType !*GenericState 
+		-> (![(Global Index, Int)], !*GenericState)		
+	collect_in_atype {at_type} gs = collect_in_type at_type gs	
+
+	collect_in_atypes :: ![AType] !*GenericState 
+		-> (![(Global Index, Int)], !*GenericState)		
+	collect_in_atypes [] gs = ([], gs)
+	collect_in_atypes [atype:atypes] gs
+		# (td_indexes1, gs) = collect_in_atype atype gs
+		# (td_indexes2, gs) = collect_in_atypes atypes gs
+		# merged_td_indexes = merge_td_indexes td_indexes1 td_indexes2
+		= (merged_td_indexes, gs)
+
 	collect_in_type_def_rhs :: !Index !CheckedTypeDef !*GenericState 
 		-> (![(Global Index, Int)], !*GenericState)		 
 	collect_in_type_def_rhs mod {td_rhs=(AlgType cons_def_symbols)} gs
@@ -763,13 +849,13 @@ where
 	collect_in_type_def_rhs mod {td_rhs=(SynType {at_type})}	gs			
 		= collect_in_type at_type gs 
 	collect_in_type_def_rhs mod {td_rhs=(AbstractType _), td_name, td_pos} gs=:{gs_error}				
-		# gs_error = checkErrorWithIdentPos
+		#! gs_error = checkErrorWithIdentPos
 				(newPosition td_name td_pos) 
 				"cannot build generic type representation for an abstract type" 
 				gs_error
 		= ([], {gs & gs_error = gs_error})
 		//= ([], {gs & gs_error = checkWarning td_name "abstract data type" gs_error})
-	
+					
 	collect_in_conses :: !Index ![DefinedSymbol] !*GenericState 
 		-> (![(Global Index, Int)], !*GenericState)
 	collect_in_conses mod [] gs 
@@ -783,8 +869,8 @@ where
 		= (merge_td_indexes td_indexes1 td_indexes2, gs)
 
 	collect_in_symbol_type {st_args, st_result} gs
-		# (td_indexes1, gs) = collect_in_types (map (\x->x.at_type) st_args)  gs
-		# (td_indexes2, gs) = collect_in_type st_result.at_type gs
+		#! (td_indexes1, gs) = collect_in_types (map (\x->x.at_type) st_args)  gs
+		#! (td_indexes2, gs) = collect_in_type st_result.at_type gs
 		= (merge_td_indexes td_indexes1 td_indexes2, gs)
 		 
 	merge_td_indexes x y 
@@ -795,8 +881,8 @@ buildIsoFunctions :: ![Global Index] !*GenericState
 	-> (![FunDef], ![Group], !*GenericState)
 buildIsoFunctions [] gs = ([], [], gs)
 buildIsoFunctions [type_index:type_indexes] gs
-	# (iso_funs1, iso_groups1, gs) = build_function type_index gs
-	# (iso_funs2, iso_groups2, gs) = buildIsoFunctions type_indexes gs	 
+	#! (iso_funs1, iso_groups1, gs) = build_function type_index gs
+	#! (iso_funs2, iso_groups2, gs) = buildIsoFunctions type_indexes gs	 
 	= (iso_funs1 ++ iso_funs2, iso_groups1 ++ iso_groups2, gs) 
 where
 	build_function {glob_module, glob_object} gs
@@ -1454,23 +1540,31 @@ where
 		= (fun_def, {gs & gs_heaps = gs_heaps})
 		
 	build_instance_type ins_type=:{it_vars, it_types, it_context} (KindArrow kinds) class_glob_def_sym heaps		
-		# type_var_names = ["a" +++ toString i \\ i <- [1 .. (length kinds) - 1]]
-		# (type_vars, heaps) = mapSt buildTypeVar type_var_names heaps
-		# type_var_types = map TV type_vars 	
-		# new_type_args = map (\t->makeAType t TA_Multi) type_var_types
+		#! type_var_names = ["a" +++ toString i \\ i <- [1 .. (length kinds) - 1]]
+		#! (type_vars, heaps) = mapSt buildTypeVar type_var_names heaps
+		#! type_var_types = [TV tv \\ tv <- type_vars] 	
+		#! new_type_args = [makeAType t TA_Multi \\ t <- type_var_types]
 
-		# (TA type_symb_ident=:{type_arity} type_args) = hd it_types		
-		# new_type = TA	{type_symb_ident & type_arity = type_arity + length new_type_args} (type_args ++ new_type_args)
+		#! new_type = fill_type_args (hd it_types) new_type_args
+			with 
+				fill_type_args (TA type_symb_ident=:{type_arity} type_args) new_type_args
+					#! type_arity = type_arity + length new_type_args 
+					#! type_args = type_args ++ new_type_args
+					= TA {type_symb_ident & type_arity = type_arity} type_args 
+				fill_type_args TArrow [arg_type, res_type]
+					= arg_type --> res_type
+				fill_type_args (TArrow1 arg_type) [res_type]
+					= arg_type --> res_type	 
 		
-		# (new_contexts, heaps) = mapSt (build_type_context class_glob_def_sym) type_var_types heaps
+		#! (new_contexts, heaps) = mapSt (build_type_context class_glob_def_sym) type_var_types heaps
 		
-		# new_ins_type = { ins_type & 
+		#! new_ins_type = { ins_type & 
 			it_vars = it_vars ++ type_vars,
 			it_types = [new_type],
 			it_context = it_context ++ new_contexts
 			}
 		= (new_ins_type, heaps)
-			//---> new_ins_type
+			//---> new_ins_type			
 		
 	build_type_var name heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}}
 		# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
@@ -1482,11 +1576,10 @@ where
 			
 	build_type_context class_glob_def_sym type heaps=:{hp_var_heap}
 		# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
-		# type_context = {
-		
-			tc_class = class_glob_def_sym,
-			tc_types = [type],
-			tc_var	 = var_info_ptr
+		# type_context =		
+			{	tc_class = class_glob_def_sym
+			,	tc_types = [type]
+			,	tc_var	 = var_info_ptr
 			}
 		= (type_context, {heaps & hp_var_heap = hp_var_heap})	
 									
@@ -1496,17 +1589,17 @@ determineMemberTypes :: !Index !Index !*GenericState
 	-> !*GenericState
 determineMemberTypes module_index ins_index 
 		gs=:{gs_modules, gs_fun_defs, gs_heaps=gs_heaps=:{hp_var_heap, hp_type_heaps}, gs_dcl_modules, gs_main_dcl_module_n}
-	# (num_modules, gs_modules) = usize gs_modules
+	#! (num_modules, gs_modules) = usize gs_modules
 	| module_index == num_modules
 		= {gs & gs_modules = gs_modules}
-	# (common_defs=:{com_instance_defs}, gs_modules) = gs_modules![module_index]		
+	#! (common_defs=:{com_instance_defs}, gs_modules) = gs_modules![module_index]		
 	| ins_index == size com_instance_defs
 		= determineMemberTypes (inc module_index) 0 {gs & gs_modules = gs_modules} 		
-	# (instance_def, com_instance_defs) = com_instance_defs![ins_index]
+	#! (instance_def, com_instance_defs) = com_instance_defs![ins_index]
 	| not instance_def.ins_is_generic		
 		= determineMemberTypes module_index (inc ins_index) {gs & gs_modules = gs_modules}
 	
-	# gs = determine_member_type module_index ins_index instance_def {gs & gs_modules = gs_modules}
+	#! gs = determine_member_type module_index ins_index instance_def {gs & gs_modules = gs_modules}
 	= determineMemberTypes module_index (inc ins_index) gs
 where
 	determine_member_type 
@@ -1520,30 +1613,30 @@ where
 					gs_main_dcl_module_n,
 					gs_opt_dcl_icl_conversions}
 		
-		# (class_def, gs_modules) = getClassDef ins_class.glob_module ins_class.glob_object.ds_index gs_modules
-		# (member_def, gs_modules) = getMemberDef ins_class.glob_module class_def.class_members.[0].ds_index gs_modules
-		# {me_type, me_class_vars}  = member_def
+		#! (class_def, gs_modules) = getClassDef ins_class.glob_module ins_class.glob_object.ds_index gs_modules
+		#! (member_def, gs_modules) = getMemberDef ins_class.glob_module class_def.class_members.[0].ds_index gs_modules
+		#! {me_type, me_class_vars}  = member_def
 					
 		// determine type of the instance function		
-		# (symbol_type, _, hp_type_heaps, _, _) = 
+		#! (symbol_type, _, hp_type_heaps, _, _) = 
 			determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No No
-		# (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
-		# symbol_type = {symbol_type & st_context = st_context}			
+		#! (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
+		#! symbol_type = {symbol_type & st_context = st_context}			
 
 		// determine the instance function index (in icl or dcl)
-		# fun_index = ins_members.[0].ds_index
+		#! fun_index = ins_members.[0].ds_index
 		| fun_index == NoIndex
 			= abort "no generic instance function\n"				
 		
 		// update the instance function
 		| module_index == gs_main_dcl_module_n	// icl module
-			# (fun_def, gs_fun_defs) = gs_fun_defs![fun_index]
-			# fun_def = { fun_def & fun_type = Yes symbol_type } 		
-			# gs_fun_defs = {gs_fun_defs & [fun_index] = fun_def}
+			#! (fun_def, gs_fun_defs) = gs_fun_defs![fun_index]
+			#! fun_def = { fun_def & fun_type = Yes symbol_type } 		
+			#! gs_fun_defs = {gs_fun_defs & [fun_index] = fun_def}
 			
 			// update corresponding DCL function type, which is empty at the moment
-			# ({dcl_conversions}, gs_dcl_modules) = gs_dcl_modules ! [gs_main_dcl_module_n]  
-			# (dcl_fun_index, gs_opt_dcl_icl_conversions) 
+			#! ({dcl_conversions}, gs_dcl_modules) = gs_dcl_modules ! [gs_main_dcl_module_n]  
+			#! (dcl_fun_index, gs_opt_dcl_icl_conversions) 
 				= find_dcl_fun_index fun_index gs_opt_dcl_icl_conversions// XXX
 				with
 					find_dcl_fun_index icl_fun_index No
@@ -1552,16 +1645,16 @@ where
 						#! table1 = {x\\x<-:table} 
 						= find_index 0 icl_fun_index table
 					find_index i index table
-						# (size_table, table) = usize table
+						#! (size_table, table) = usize table
 						| i == size_table
 							= (NoIndex /*abort ("not found dcl function index " +++ toString index)*/, Yes table)
-						# (x, table) = table ! [i]
+						#! (x, table) = table ! [i]
 						| x == index 
 							= (i /*abort ("found dcl function index " +++ toString index +++ " " +++ toString i)*/, Yes table) 
 							= find_index (inc i) index table
 					
 									
-			# gs_dcl_modules = case dcl_fun_index of
+			#! gs_dcl_modules = case dcl_fun_index of
 				NoIndex -> gs_dcl_modules
 				_		-> update_dcl_fun_type gs_main_dcl_module_n dcl_fun_index symbol_type gs_dcl_modules
 						
@@ -1575,7 +1668,7 @@ where
 
 		| otherwise // dcl module
 				//---> ("update dcl instance function", ins_ident, module_index, ins_index, symbol_type)
-			# gs_dcl_modules = update_dcl_fun_type module_index fun_index symbol_type gs_dcl_modules					
+			#! gs_dcl_modules = update_dcl_fun_type module_index fun_index symbol_type gs_dcl_modules					
 			= 	{ 	gs 
 				& 	gs_modules = gs_modules
 				,	gs_dcl_modules = gs_dcl_modules
@@ -1597,126 +1690,35 @@ where
 		
 kindOfTypeDef :: Index Index !*TypeDefInfos -> (!TypeKind, !*TypeDefInfos)
 kindOfTypeDef module_index td_index td_infos 
-	# ({tdi_kinds}, td_infos) = td_infos![module_index, td_index] 
+	#! ({tdi_kinds}, td_infos) = td_infos![module_index, td_index] 
 	| isEmpty tdi_kinds
 		= (KindConst, td_infos)
 		= (KindArrow (tdi_kinds ++ [KindConst]), td_infos)
 
 kindOfType :: !Type !*TypeDefInfos -> (!TypeKind, !*TypeDefInfos)
 kindOfType (TA type_cons args) td_infos
-	# {glob_object,glob_module} = type_cons.type_index
-	# ({tdi_kinds}, td_infos) = td_infos![glob_module,glob_object] 
-	# kinds = drop (length args) tdi_kinds	
+	#! {glob_object,glob_module} = type_cons.type_index
+	#! ({tdi_kinds}, td_infos) = td_infos![glob_module,glob_object] 
+	#! kinds = drop (length args) tdi_kinds	
 	| isEmpty kinds 
 		= (KindConst, td_infos) 
 		= (KindArrow (kinds ++ [KindConst]), td_infos)
-kindOfType (TV _) td_infos = (KindConst, td_infos)
-kindOfType (GTV _) td_infos = (KindConst, td_infos)
-kindOfType (TQV _) td_infos = (KindConst, td_infos)
-kindOfType _ td_infos = (KindConst, td_infos)
+kindOfType TArrow td_infos
+	= (KindArrow [KindConst, KindConst, KindConst], td_infos)
+kindOfType (TArrow1 _) td_infos 
+	= (KindArrow [KindConst, KindConst], td_infos)
+kindOfType (TV _) td_infos 
+	= (KindConst, td_infos)
+kindOfType (GTV _) td_infos 
+	= (KindConst, td_infos)
+kindOfType (TQV _) td_infos 
+	= (KindConst, td_infos)
+kindOfType _ td_infos 
+	= (KindConst, td_infos)
 			
-buildClassDef :: /*generic*/!(Global DefinedSymbol) !TypeKind !*GenericState
-	-> (/*class*/!(Global DefinedSymbol), !*GenericState)	
-buildClassDef 
-		generic_glob=:{glob_module, glob_object={ds_ident, ds_index}} 
-		kind 
-		gs=:{gs_modules, gs_heaps=gs_heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}, hp_var_heap}}
-	#! (common_defs=:{com_generic_defs, com_class_defs, com_member_defs}, gs_modules) = gs_modules![glob_module]
-	#! (generic_def=:{gen_name=gen_name=:{id_name}, gen_type, gen_pos, gen_classes}, com_generic_defs) = com_generic_defs![ds_index]
-	
-	// check if the class is already created
-	# (found, class_symbol) = getGenericClassForKind generic_def kind
-	| found 
-		= (	{glob_module = glob_module, glob_object = class_symbol}, 
-			{gs & gs_modules = gs_modules}) 
-
-	#! id_name = id_name +++ ":" +++ (toString kind) 
-	#! ident = {id_name = id_name, id_info = nilPtr}
-
-	// allocate new class and member
-	#! class_index = size com_class_defs
-	#! class_ds = {ds_ident = ident, ds_index = class_index, ds_arity = 1}
-	#! glob_class = {glob_module = glob_module, glob_object = class_ds}	       
-	#! member_index = size com_member_defs
-
-	// class argument
-	#! (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars 
-	#! class_arg = {tv_name = {id_name = "class_var", id_info = nilPtr}, tv_info_ptr = tv_info_ptr}	
-
-	// member
-	#! (type_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap 
-	#! (tc_var_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap  
-	#! type_context = { 
-		tc_class = glob_class,
-		tc_types = [ TV class_arg ], 
-		tc_var = tc_var_ptr 				// ???
-		}
-	#! hp_type_heaps = {hp_type_heaps & th_vars = th_vars}	
-	#! (member_type, hp_type_heaps) = buildMemberType1 generic_def kind class_arg hp_type_heaps
-	#! member_type = { member_type & st_context = [type_context : gen_type.gt_type.st_context] }
-	#! member_def = {
-		me_symb = ident,
-		me_class = {glob_module = glob_module, glob_object = class_index},
-		me_offset = 0,
-		me_type = member_type,
-		me_type_ptr = type_ptr,				// empty
-		me_class_vars = [class_arg], 		// the same variable as in the class
-		me_pos = gen_pos,
-		me_priority = NoPrio
-		}
-	
-	// class
-	#! class_member = {ds_ident=ident, ds_index = member_index, ds_arity = member_def.me_type.st_arity}
-	#! class_dictionary = { 
-		ds_ident = {id_name = id_name, id_info = nilPtr}, 
-		ds_arity = 0, 
-		ds_index = NoIndex/*index in the type def table, filled in later*/ 
-		}
-	#! class_def = { 
-		class_name = ident, 
-		class_arity = 1,  
-		class_args = [class_arg],
-	    class_context = [], 
-	    class_pos = gen_pos, 
-	    class_members = createArray 1 class_member, 
-	    class_cons_vars = case kind of KindConst -> 0; _ -> 1,
-	    class_dictionary = class_dictionary,
-	    class_arg_kinds = [kind]
-	    }	 
-	    
-	#! com_class_defs = append_array com_class_defs class_def
-	#! com_member_defs = append_array com_member_defs member_def	
-	#! generic_def = {generic_def & gen_classes = [{gci_kind = kind, gci_class = class_ds} : gen_classes] }
-	#! com_generic_defs = {(copy_array com_generic_defs) & [ds_index] = generic_def}
-	#! common_defs = {common_defs & 
-		com_class_defs = com_class_defs, 
-		com_generic_defs = com_generic_defs, 
-		com_member_defs = com_member_defs}	
-	#! gs_modules = {gs_modules & [glob_module] = common_defs} 
-	#! gs = { gs &
-		gs_modules = gs_modules,
-		gs_heaps = { gs_heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap}
-		}		
-	= (glob_class, gs) 
-		//---> ("generated class " +++ id_name)
-where
-	append_array array el 
-//1.3
-		= arrayConcat array {el}
-//3.1
-/*2.0
-		= r2
-	where
-		r2={r1 & [s]=el}
-		r1={r0 & [i]=array.[i] \\ i<-[0..s-1]} 	
-		r0 = _createArray (s+1)
-		s = size array		
-0.2*/
-	copy_array array = {x \\ x <-: array}	
-
-buildClassDef1 :: !Index !Index !Index !GenericDef !TypeKind !*GenericState
+buildClassDef :: !Index !Index !Index !GenericDef !TypeKind !*GenericState
 	-> (!ClassDef, !MemberDef!, !GenericDef, *GenericState)	
-buildClassDef1 	module_index class_index member_index generic_def=:{gen_name, gen_classes} kind gs=:{gs_heaps}
+buildClassDef 	module_index class_index member_index generic_def=:{gen_name, gen_classes} kind gs=:{gs_heaps}
 	#! ident = makeIdent (gen_name.id_name +++ ":" +++ (toString kind))
 	#! class_ds={ds_ident=ident, ds_index=class_index, ds_arity=0}
 	#! (class_var, gs_heaps) = build_class_var gs_heaps
@@ -1737,12 +1739,12 @@ where
 			heaps=:{hp_var_heap, hp_type_heaps}
 		#! (type_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap 
 		#! (tc_var_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap  
-		#! type_context = { 
-			tc_class = {glob_module = module_index, glob_object=class_ds},
-			tc_types = [ TV class_var ], 
-			tc_var = tc_var_ptr 				// ???
+		#! type_context = 
+			{	tc_class = {glob_module = module_index, glob_object=class_ds}
+			,	tc_types = [ TV class_var ] 
+			,	tc_var = tc_var_ptr 
 			}
-		#! (member_type, hp_type_heaps) = buildMemberType1 generic_def kind class_var hp_type_heaps
+		#! (member_type, hp_type_heaps) = buildMemberType generic_def kind class_var hp_type_heaps
 		#! member_type = { member_type & st_context = [type_context : gen_type.gt_type.st_context] }
 		#! member_def = {
 			me_symb = ds_ident, // same name as class
@@ -1772,7 +1774,7 @@ where
 		    class_context = [], 
 		    class_pos = gen_pos, 
 		    class_members = createArray 1 class_member, 
-		    class_cons_vars = case kind of KindConst -> 0; _ -> 1,
+		    class_cons_vars = 0, // dotted class variables
 		    class_dictionary = class_dictionary,
 		    class_arg_kinds = [kind]
 		    }	 
@@ -1859,8 +1861,8 @@ where
 		= (cum_attr, [], [], index, th_attrs)
 
 
-buildMemberType1 :: !GenericDef !TypeKind !TypeVar !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
-buildMemberType1 generic_def=:{gen_name,gen_type} kind class_var th 
+buildMemberType :: !GenericDef !TypeKind !TypeVar !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
+buildMemberType generic_def=:{gen_name,gen_type} kind class_var th 
 
 	#! (gen_type, th) = freshGenericType gen_type th
 
@@ -2111,11 +2113,11 @@ where
 		-> ([AlgebraicPattern], [FreeVar], !*GenericState)
 	build_alts i n type_def_mod [] [] gs = ([], [], gs) 
 	build_alts i n type_def_mod [cons_def_sym:cons_def_syms] cons_infos gs	
-		# (cons_info, cons_infos) = case supportCons of
+		#! (cons_info, cons_infos) = case supportCons of
 			True -> (hd cons_infos, tl cons_infos)
 			False -> (EmptyDefinedSymbol, [])	
-		# (alt, fvs, gs) = build_alt i n type_def_mod cons_def_sym cons_info gs
-		# (alts, free_vars, gs) =  build_alts (i+1) n type_def_mod cons_def_syms cons_infos gs 		
+		#! (alt, fvs, gs) = build_alt i n type_def_mod cons_def_sym cons_info gs
+		#! (alts, free_vars, gs) =  build_alts (i+1) n type_def_mod cons_def_syms cons_infos gs 		
 		= ([alt:alts], fvs ++ free_vars, gs)
 
 	build_alt :: !Int !Int !Int !DefinedSymbol !DefinedSymbol !*GenericState 
@@ -2123,19 +2125,19 @@ where
 	build_alt 
 			i n type_def_mod def_symbol=:{ds_ident, ds_arity} cons_info 
 			gs=:{gs_heaps, gs_predefs, gs_main_dcl_module_n}		
-		# names = ["x" +++ toString (i+1) +++ toString k \\ k <- [1..ds_arity]]
-		# (var_exprs, vars, gs_heaps) = buildVarExprs names gs_heaps 
-		# (expr, gs_heaps) = build_prod var_exprs gs_predefs gs_heaps		
-		# (expr, gs_heaps) = case supportCons of
+		#! names = ["x" +++ toString (i+1) +++ toString k \\ k <- [1..ds_arity]]
+		#! (var_exprs, vars, gs_heaps) = buildVarExprs names gs_heaps 
+		#! (expr, gs_heaps) = build_prod var_exprs gs_predefs gs_heaps		
+		#! (expr, gs_heaps) = case supportCons of
 			True 
 				//# (cons_info_expr, gs_heaps) = buildUndefFunApp [] gs_predefs gs_heaps
 				# (cons_info_expr, gs_heaps) = buildFunApp gs_main_dcl_module_n cons_info [] gs_heaps 	
 				-> buildCONS cons_info_expr expr gs_predefs gs_heaps
 			False 
 				-> (expr, gs_heaps)				
-		# (expr, gs_heaps) = build_sum i n expr gs_predefs gs_heaps
+		#! (expr, gs_heaps) = build_sum i n expr gs_predefs gs_heaps
 				
-		# alg_pattern = {
+		#! alg_pattern = {
 			ap_symbol = {glob_module = type_def_mod, glob_object = def_symbol},
 			ap_vars = vars,
 			ap_expr = expr,
@@ -2197,55 +2199,55 @@ where
 	build_sum type_def_mod [] predefs heaps error
 		= abort "algebraic type with no constructors!\n"
 	build_sum type_def_mod [def_symbol] predefs heaps error
-		# (cons_app_expr, cons_args, heaps) = build_cons_app type_def_mod def_symbol heaps
-		# (alt_expr, free_vars, heaps) = build_prod cons_app_expr cons_args predefs heaps 		
+		#! (cons_app_expr, cons_args, heaps) = build_cons_app type_def_mod def_symbol heaps
+		#! (alt_expr, free_vars, heaps) = build_prod cons_app_expr cons_args predefs heaps 		
 		=	case supportCons of
 			True
-				# (var_expr, var, heaps) = buildVarExpr "c" heaps
-				# (info_var, heaps) = buildFreeVar0 "i" heaps
-				# (alt_expr, heaps) = buildCaseCONSExpr var_expr info_var (hd free_vars) alt_expr predefs heaps   
+				#! (var_expr, var, heaps) = buildVarExpr "c" heaps
+				#! (info_var, heaps) = buildFreeVar0 "i" heaps
+				#! (alt_expr, heaps) = buildCaseCONSExpr var_expr info_var (hd free_vars) alt_expr predefs heaps   
 				-> (alt_expr, [var, info_var : free_vars], heaps, error)										
 			False
 				-> (alt_expr, free_vars, heaps, error)
 				
 	build_sum type_def_mod def_symbols predefs heaps error
-		# (var_expr, var, heaps) = buildVarExpr "e" heaps
-		# (left_def_syms, right_def_syms) = splitAt ((length def_symbols) /2) def_symbols
+		#! (var_expr, var, heaps) = buildVarExpr "e" heaps
+		#! (left_def_syms, right_def_syms) = splitAt ((length def_symbols) /2) def_symbols
 	
-		# (left_expr, left_vars, heaps, error) = build_sum type_def_mod left_def_syms predefs heaps error
-		# (right_expr, right_vars, heaps, error) = build_sum type_def_mod right_def_syms predefs heaps error
+		#! (left_expr, left_vars, heaps, error) = build_sum type_def_mod left_def_syms predefs heaps error
+		#! (right_expr, right_vars, heaps, error) = build_sum type_def_mod right_def_syms predefs heaps error
 	
-		# (case_expr, heaps) = 
+		#! (case_expr, heaps) = 
 			buildCaseEITHERExpr var_expr (hd left_vars, left_expr) (hd right_vars, right_expr) predefs heaps
-		# vars = [var : left_vars ++ right_vars]
+		#! vars = [var : left_vars ++ right_vars]
 		= (case_expr, vars, heaps, error)
 		
 	build_prod :: !Expression ![FreeVar] !PredefinedSymbols !*Heaps
 		-> (!Expression, ![FreeVar], !*Heaps)
 	build_prod expr [] predefs heaps
-		# (var_expr, var, heaps) = buildVarExpr "x" heaps 
-		# (case_expr, heaps) = buildCaseUNITExpr var_expr expr predefs heaps	
+		#! (var_expr, var, heaps) = buildVarExpr "x" heaps 
+		#! (case_expr, heaps) = buildCaseUNITExpr var_expr expr predefs heaps	
 		= (case_expr, [var], heaps)
 	build_prod expr [cons_arg_var] predefs heaps
 		= (expr, [cons_arg_var], heaps)	
 	build_prod expr cons_arg_vars predefs heaps
-		# (var_expr, var, heaps) = buildVarExpr "p" heaps
-		# (left_vars, right_vars) = splitAt ((length cons_arg_vars) /2) cons_arg_vars
+		#! (var_expr, var, heaps) = buildVarExpr "p" heaps
+		#! (left_vars, right_vars) = splitAt ((length cons_arg_vars) /2) cons_arg_vars
 		 
-		# (expr, left_vars, heaps) = build_prod expr left_vars predefs heaps
-		# (expr, right_vars, heaps) = build_prod expr right_vars predefs heaps
+		#! (expr, left_vars, heaps) = build_prod expr left_vars predefs heaps
+		#! (expr, right_vars, heaps) = build_prod expr right_vars predefs heaps
 		
-		# (case_expr, heaps) = buildCasePAIRExpr var_expr (hd left_vars) (hd right_vars) expr predefs heaps
+		#! (case_expr, heaps) = buildCasePAIRExpr var_expr (hd left_vars) (hd right_vars) expr predefs heaps
 		
-		# vars = [var : left_vars ++ right_vars]	
+		#! vars = [var : left_vars ++ right_vars]	
 		= (case_expr, vars, heaps) 
 	
 	build_cons_app :: !Index !DefinedSymbol !*Heaps 
 		-> (!Expression, [FreeVar], !*Heaps)
 	build_cons_app cons_mod def_symbol=:{ds_arity} heaps
-		# names = ["x"  +++ toString k \\ k <- [1..ds_arity]]
-		# (var_exprs, vars, heaps) = buildVarExprs names heaps 
-		# (expr, heaps) = buildConsApp cons_mod def_symbol var_exprs heaps
+		#! names = ["x"  +++ toString k \\ k <- [1..ds_arity]]
+		#! (var_exprs, vars, heaps) = buildVarExprs names heaps 
+		#! (expr, heaps) = buildConsApp cons_mod def_symbol var_exprs heaps
 		= (expr, vars, heaps) 
 
 buildIsomapFromTo :: !IsoDirection !DefinedSymbol !Int !Int !Int !*GenericState
@@ -2253,17 +2255,17 @@ buildIsomapFromTo :: !IsoDirection !DefinedSymbol !Int !Int !Int !*GenericState
 buildIsomapFromTo 
 		iso_dir def_sym group_index type_def_mod type_def_index 
 		gs=:{gs_heaps, gs_modules}
-	# (type_def=:{td_name, td_index, td_arity, td_pos}, gs_modules) 
+	#! (type_def=:{td_name, td_index, td_arity, td_pos}, gs_modules) 
 		= getTypeDef type_def_mod type_def_index gs_modules
-	# arg_names = [ "isomap" +++ toString n \\ n <- [1 .. td_arity]]
-	# (isomap_arg_vars, gs_heaps) = buildFreeVars arg_names gs_heaps 
-	# (arg_expr, arg_var, gs_heaps) = buildVarExpr "x" gs_heaps
-	# gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
-	# (body_expr, free_vars, gs) = 
+	#! arg_names = [ "isomap" +++ toString n \\ n <- [1 .. td_arity]]
+	#! (isomap_arg_vars, gs_heaps) = buildFreeVars arg_names gs_heaps 
+	#! (arg_expr, arg_var, gs_heaps) = buildVarExpr "x" gs_heaps
+	#! gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
+	#! (body_expr, free_vars, gs) = 
 		build_body iso_dir type_def_mod td_index type_def arg_expr isomap_arg_vars gs	
 
-	# (fun_type, gs) = build_type iso_dir type_def_mod type_def_index gs
-	# fun_def = makeFunction def_sym group_index (isomap_arg_vars ++ [arg_var]) body_expr (Yes fun_type) free_vars [] td_pos	
+	#! (fun_type, gs) = build_type iso_dir type_def_mod type_def_index gs
+	#! fun_def = makeFunction def_sym group_index (isomap_arg_vars ++ [arg_var]) body_expr (Yes fun_type) free_vars [] td_pos	
 	= (fun_def, gs)
 where
 	build_body :: !IsoDirection !Int !Int !CheckedTypeDef !Expression ![FreeVar] !*GenericState
@@ -2277,7 +2279,7 @@ where
 	build_body 
 			iso_dir type_def_mod type_def_index 
 			type_def=:{td_rhs=(AbstractType _),td_name, td_pos} arg_expr isomap_arg_vars gs=:{gs_error}
-		# gs_error = checkErrorWithIdentPos
+		#! gs_error = checkErrorWithIdentPos
 				(newPosition td_name td_pos) 
 				"cannot build map function for an abstract type" 
 				gs_error
@@ -2286,17 +2288,17 @@ where
 	build_body 
 			iso_dir type_def_mod type_def_index 
 			type_def=:{td_rhs=(SynType _), td_name, td_pos} arg_expr isomap_arg_vars gs=:{gs_error}
-		# gs_error = checkErrorWithIdentPos
+		#! gs_error = checkErrorWithIdentPos
 				(newPosition td_name td_pos) 
 				"cannot build map function for a synonym type" 
 				gs_error
 		= (EE, [], {gs & gs_error = gs_error})
 
 	build_body1 iso_dir type_def_mod type_def_index type_def def_symbols arg_expr isomap_arg_vars gs
-		# (case_alts, free_vars, gs=:{gs_heaps}) = 
+		#! (case_alts, free_vars, gs=:{gs_heaps}) = 
 			build_alts iso_dir 0 (length def_symbols) type_def_mod def_symbols isomap_arg_vars type_def gs
-		# case_patterns = AlgebraicPatterns {glob_module = type_def_mod, glob_object = type_def_index} case_alts
-		# (case_expr, gs_heaps) = buildCaseExpr arg_expr case_patterns gs_heaps
+		#! case_patterns = AlgebraicPatterns {glob_module = type_def_mod, glob_object = type_def_index} case_alts
+		#! (case_expr, gs_heaps) = buildCaseExpr arg_expr case_patterns gs_heaps
 		= (case_expr, free_vars, {gs & gs_heaps = gs_heaps})
 
 	build_alts :: !IsoDirection !Int !Int !Int ![DefinedSymbol] ![FreeVar] !CheckedTypeDef !*GenericState 
@@ -2304,8 +2306,8 @@ where
 	build_alts iso_dir i n type_def_mod [] arg_vars type_def gs 
 		= ([], [], gs) 
 	build_alts iso_dir i n type_def_mod [def_symbol:def_symbols] arg_vars type_def gs
-		# (alt, fvs, gs) = build_alt iso_dir i n type_def_mod def_symbol arg_vars type_def gs
-		# (alts, free_vars, gs) = build_alts iso_dir (i+1) n type_def_mod def_symbols arg_vars type_def gs 		
+		#! (alt, fvs, gs) = build_alt iso_dir i n type_def_mod def_symbol arg_vars type_def gs
+		#! (alts, free_vars, gs) = build_alts iso_dir (i+1) n type_def_mod def_symbols arg_vars type_def gs 		
 		= ([alt:alts], fvs ++ free_vars, gs)
 
 	build_alt :: !IsoDirection !Int !Int !Int !DefinedSymbol ![FreeVar] !CheckedTypeDef !*GenericState 
@@ -2313,15 +2315,15 @@ where
 	build_alt 
 			iso_dir i n type_def_mod def_symbol=:{ds_ident, ds_arity, ds_index} 
 			fun_arg_vars type_def gs=:{gs_heaps, gs_modules}		
-		# names = ["x" +++ toString (i+1) +++ toString k \\ k <- [1..ds_arity]]
-		# (cons_arg_vars, gs_heaps) = buildFreeVars names gs_heaps
-		# (cons_def=:{cons_type}, gs_modules) = getConsDef type_def_mod ds_index gs_modules 				
-		# gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
+		#! names = ["x" +++ toString (i+1) +++ toString k \\ k <- [1..ds_arity]]
+		#! (cons_arg_vars, gs_heaps) = buildFreeVars names gs_heaps
+		#! (cons_def=:{cons_type}, gs_modules) = getConsDef type_def_mod ds_index gs_modules 				
+		#! gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
 		
-		# (cons_arg_exprs, gs=:{gs_heaps}) = 
+		#! (cons_arg_exprs, gs=:{gs_heaps}) = 
 			build_cons_args iso_dir cons_type.st_args cons_arg_vars fun_arg_vars type_def gs 
-		# (expr, gs_heaps) = buildConsApp type_def_mod def_symbol cons_arg_exprs gs_heaps				
-		# alg_pattern = {
+		#! (expr, gs_heaps) = buildConsApp type_def_mod def_symbol cons_arg_exprs gs_heaps				
+		#! alg_pattern = {
 			ap_symbol = {glob_module = type_def_mod, glob_object = def_symbol},
 			ap_vars = cons_arg_vars,
 			ap_expr = expr,
@@ -2333,20 +2335,20 @@ where
 		-> ([Expression], !*GenericState)
 	build_cons_args iso_dir [] [] fun_arg_vars type_def gs = ([], gs) 	
 	build_cons_args	iso_dir [arg_type:arg_types] [cons_arg_var:cons_arg_vars] fun_arg_vars type_def gs
-		# (arg_expr, gs) = build_cons_arg iso_dir arg_type cons_arg_var fun_arg_vars type_def gs
-		# (arg_exprs, gs) = build_cons_args iso_dir arg_types cons_arg_vars fun_arg_vars type_def gs 
+		#! (arg_expr, gs) = build_cons_arg iso_dir arg_type cons_arg_var fun_arg_vars type_def gs
+		#! (arg_exprs, gs) = build_cons_args iso_dir arg_types cons_arg_vars fun_arg_vars type_def gs 
 		= ([arg_expr : arg_exprs], gs)
 	
 	build_cons_arg :: !IsoDirection !AType !FreeVar ![FreeVar] !CheckedTypeDef !*GenericState 
 		-> (!Expression, !*GenericState)	
 	build_cons_arg iso_dir type cons_arg_var fun_vars type_def gs
-		# type_def_args = [atv_variable \\ {atv_variable} <- type_def.td_args]	
-		# (iso_expr, gs) = buildIsomapExpr type type_def_args fun_vars gs
-		# {gs_heaps, gs_predefs} = gs
-		# sel_expr = case iso_dir of 
+		#! type_def_args = [atv_variable \\ {atv_variable} <- type_def.td_args]	
+		#! (iso_expr, gs) = buildIsomapExpr type type_def_args fun_vars gs
+		#! {gs_heaps, gs_predefs} = gs
+		#! sel_expr = case iso_dir of 
 			IsoTo 	-> buildIsoToSelectionExpr iso_expr gs_predefs  
 			IsoFrom -> buildIsoFromSelectionExpr iso_expr gs_predefs  
- 		# (cons_var_expr, _, gs_heaps) = buildBoundVarExpr cons_arg_var gs_heaps
+ 		#! (cons_var_expr, _, gs_heaps) = buildBoundVarExpr cons_arg_var gs_heaps
 		= (sel_expr @ [cons_var_expr], {gs & gs_heaps = gs_heaps})
 
 	build_type :: !IsoDirection !Int !Int !*GenericState
@@ -2357,11 +2359,11 @@ where
 	
 		#! ({td_arity, td_name}, gs_modules) = getTypeDef module_index type_def_index gs_modules 		
 	
-		# (tvs1, gs_heaps) = mapSt (\n->build_type_var ("a"+++toString n)) [1..td_arity] gs_heaps 
-		# (tvs2, gs_heaps) = mapSt (\n->build_type_var ("b"+++toString n)) [1..td_arity] gs_heaps 
-		# (iso_args) = [buildATypeISO t1 t2 gs_predefs \\ t1 <- tvs1 & t2 <- tvs2] 
+		#! (tvs1, gs_heaps) = mapSt (\n->build_type_var ("a"+++toString n)) [1..td_arity] gs_heaps 
+		#! (tvs2, gs_heaps) = mapSt (\n->build_type_var ("b"+++toString n)) [1..td_arity] gs_heaps 
+		#! (iso_args) = [buildATypeISO t1 t2 gs_predefs \\ t1 <- tvs1 & t2 <- tvs2] 
 	
-		# type_symb_ident = {
+		#! type_symb_ident = {
 			type_name = td_name,
 			type_index = { glob_module = module_index, glob_object = type_def_index },
 			type_arity = td_arity,
@@ -2372,15 +2374,15 @@ where
 				}
 			}
 			
-		# (av1, gs_heaps) = buildAttrVar "u1" gs_heaps
-		# (av2, gs_heaps) = buildAttrVar "u2" gs_heaps							
-		# type1 = makeAType (TA type_symb_ident tvs1) (TA_Var av1) 
-		# type2 = makeAType (TA type_symb_ident tvs2) (TA_Var av2)
-		# (arg_type, res_type) = case iso_dir of
+		#! (av1, gs_heaps) = buildAttrVar "u1" gs_heaps
+		#! (av2, gs_heaps) = buildAttrVar "u2" gs_heaps							
+		#! type1 = makeAType (TA type_symb_ident tvs1) (TA_Var av1) 
+		#! type2 = makeAType (TA type_symb_ident tvs2) (TA_Var av2)
+		#! (arg_type, res_type) = case iso_dir of
 			IsoTo 	-> (type1, type2)
 			IsoFrom -> (type2, type1)
 			 
-		# symbol_type = {
+		#! symbol_type = {
 			st_vars = 	
 				[tv \\ {at_type=(TV tv)} <- tvs1] ++ 
 				[tv \\ {at_type=(TV tv)} <- tvs2],
@@ -2399,8 +2401,8 @@ where
 			//---> ("isomap to/from type", symbol_type)
 	
 	build_type_var name heaps
-		# (av, heaps) = buildAttrVar name heaps 
-		# (tv, heaps) = buildTypeVar name heaps
+		#! (av, heaps) = buildAttrVar name heaps 
+		#! (tv, heaps) = buildTypeVar name heaps
 		= (makeAType (TV tv) (TA_Var av), heaps)	
 
 buildIsomapForTypeDef :: !DefinedSymbol !Int !Int !CheckedTypeDef !DefinedSymbol !DefinedSymbol !*GenericState
@@ -2410,13 +2412,13 @@ buildIsomapForTypeDef
 		type_def=:{td_name, td_index, td_arity, td_pos}
 		from_fun to_fun 
 		gs=:{gs_main_dcl_module_n, gs_heaps, gs_predefs}	 
-	# arg_names = [ "iso" +++ toString n \\ n <- [1 .. td_arity]]  
-	# (arg_exprs, arg_vars, gs_heaps) = buildVarExprs arg_names gs_heaps
+	#! arg_names = [ "iso" +++ toString n \\ n <- [1 .. td_arity]]  
+	#! (arg_exprs, arg_vars, gs_heaps) = buildVarExprs arg_names gs_heaps
 		
-	# (from_expr, gs_heaps) = buildFunApp gs_main_dcl_module_n from_fun arg_exprs gs_heaps
-	# (to_expr, gs_heaps) 	= buildFunApp gs_main_dcl_module_n to_fun arg_exprs gs_heaps	
-	# (iso_expr, gs_heaps) 	= buildISO to_expr from_expr gs_predefs gs_heaps
-	# fun_def = makeFunction fun_def_sym group_index arg_vars iso_expr No [] [from_fun.ds_index, to_fun.ds_index] td_pos					
+	#! (from_expr, gs_heaps) = buildFunApp gs_main_dcl_module_n from_fun arg_exprs gs_heaps
+	#! (to_expr, gs_heaps) 	= buildFunApp gs_main_dcl_module_n to_fun arg_exprs gs_heaps	
+	#! (iso_expr, gs_heaps) 	= buildISO to_expr from_expr gs_predefs gs_heaps
+	#! fun_def = makeFunction fun_def_sym group_index arg_vars iso_expr No [] [from_fun.ds_index, to_fun.ds_index] td_pos					
 	= (fun_def, {gs & gs_heaps = gs_heaps})
 
 buildIsomapForGeneric :: !DefinedSymbol !Int !GenericDef !*GenericState
@@ -2455,13 +2457,13 @@ where
 		# (gtd_info, gs_gtd_infos) = gs_gtd_infos ! [type_index.glob_module, type_index.glob_object]		
 		# gt = case gtd_info of
 			(GTDI_Generic gt) -> gt
-			_ -> abort ("type " +++ type_name.id_name +++ " does not have generic representation\n")
+			_ -> abort ("(generic.icl) type " +++ type_name.id_name +++ " does not have generic representation\n")
 		# (expr, gs_heaps) = buildFunApp gs_main_dcl_module_n gt.gtr_isomap arg_exprs gs_heaps			
 		= (expr, {gs & gs_heaps = gs_heaps, gs_gtd_infos = gs_gtd_infos})
 	
-	build_expr (arg --> res) arg_type_vars arg_vars gs
-		# (arg_expr, gs) = buildIsomapExpr arg arg_type_vars arg_vars gs
-		# (res_expr, gs) = buildIsomapExpr res arg_type_vars arg_vars gs				
+	build_expr (arg_type --> res_type) arg_type_vars arg_vars gs
+		# (arg_expr, gs) = buildIsomapExpr arg_type arg_type_vars arg_vars gs
+		# (res_expr, gs) = buildIsomapExpr res_type arg_type_vars arg_vars gs				
 		# {gs_heaps, gs_main_dcl_module_n, gs_predefs} = gs		
 		# (expr, gs_heaps) = buildIsomapArrowApp arg_expr res_expr gs_predefs gs_heaps
 		= (expr, {gs & gs_heaps = gs_heaps})
@@ -2484,7 +2486,7 @@ where
 	build_expr (TLifted type_var) arg_type_vars arg_vars gs
 		= build_expr_for_type_var type_var arg_type_vars arg_vars gs 
 	build_expr _ arg_type_vars arg_vars gs
-		= abort "type does not match\n"
+		= abort "(generics.icl) type does not match\n"
 	
 	build_exprs [] arg_type_vars arg_vars gs 
 		= ([], gs)
@@ -2546,12 +2548,11 @@ where
 		# instance_type = hd ins_type.it_types
 		# {type_index} = case instance_type of 
 			TA type_symb_ident _ 	-> type_symb_ident
-			_ 						-> abort ("instance type is not a type application") 
-				---> instance_type
+			_ 						-> abort ("instance type is not a type application")
+				---> instance_type 
 		# (gtd_info, gs_gtd_infos) = gs_gtd_infos ! [type_index.glob_module, type_index.glob_object]
-		//# (type_def, gs_modules) = getTypeDef type_index.glob_module type_index.glob_object gs_modules
-		# (GTDI_Generic gt) = gtd_info 
-		= (gt, {gs & gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules})
+		# (GTDI_Generic gt) = gtd_info
+		= (gt, {gs & gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules, gs_error=gs_error})
 	
 	build_adaptor_expr {gtr_iso, gtr_type} gen_isomap gs=:{gs_heaps, gs_main_dcl_module_n, gs_predefs}
 		// create n iso applications 
@@ -2594,9 +2595,10 @@ where
 			# (kind, gs) = get_kind_of_type_def type_index gs
 			= build_generic_app gen_sym kind arg_exprs cons_infos gs		
 			
-	build_instance_expr1 (arg_type --> res_type) cons_infos  type_vars vars gen_sym gs=:{gs_error}	
-		# gs_error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) "arrow types are not yet supported" gs_error
-		= (EE, cons_infos, {gs & gs_error = gs_error})
+	build_instance_expr1 (arg_type --> res_type) cons_infos  type_vars vars gen_sym gs	
+		#! (arg_expr, cons_infos, gs) = build_instance_expr arg_type cons_infos type_vars vars gen_sym gs
+		#! (res_expr, cons_infos, gs) = build_instance_expr res_type cons_infos type_vars vars gen_sym gs
+		= build_generic_app gen_sym (KindArrow [KindConst,KindConst,KindConst]) [arg_expr, res_expr] cons_infos gs
 	build_instance_expr1 (type_cons_var :@: type_args) cons_infos  type_vars vars gen_sym gs=:{gs_error}	
 		# gs_error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) "application of type constructor variable is not supported" gs_error
 		= (EE, cons_infos, {gs & gs_error = gs_error})				
@@ -2608,8 +2610,9 @@ where
 		= build_expr_for_type_var type_var type_vars vars cons_infos gs 
 	build_instance_expr1 (TQV type_var) cons_infos  type_vars vars gen_sym gs 
 		= build_expr_for_type_var type_var type_vars vars cons_infos gs 
-	build_instance_expr1 _ _ _ _ _ gs
-		= abort "build_instance_expr1: type does not match\n" 
+	build_instance_expr1 _ cons_infos _ _ _ gs=:{gs_error}
+		# gs_error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) "can not build instance for the type" gs_error
+		= (EE, cons_infos, {gs & gs_error = gs_error})
 			
 	build_expr_for_type_var type_var type_vars vars cons_infos gs=:{gs_predefs, gs_heaps}
 		# (var_expr, gs_heaps) = buildExprForTypeVar type_var type_vars vars gs_predefs gs_heaps 
@@ -3404,15 +3407,15 @@ copyFunDef :: !FunDef !Index !Index !*Heaps -> (!FunDef, !*Heaps)
 copyFunDef fun_def=:{fun_symb,fun_arity,fun_body,fun_info} fun_index group_index gs_heaps
 	# (TransformedBody {tb_args, tb_rhs}) = fun_body
 
-	#! (fresh_arg_vars, gs_heaps) = copy_vars tb_args gs_heaps			
-	#! (copied_rhs, gs_heaps) = copyExpr tb_rhs gs_heaps
+	# (fresh_arg_vars, gs_heaps) = copy_vars tb_args gs_heaps			
+	# (copied_rhs, gs_heaps) = copyExpr tb_rhs gs_heaps
 	
-	#! (copied_rhs, fresh_arg_vars, fresh_local_vars, gs_heaps) = 
+	# (copied_rhs, fresh_arg_vars, fresh_local_vars, gs_heaps) = 
 		collect_local_vars copied_rhs fresh_arg_vars gs_heaps
 		
-	#! gs_heaps = clearVarInfos tb_args gs_heaps
+	# gs_heaps = clearVarInfos tb_args gs_heaps
 				
-	#! fun_def = 
+	# fun_def = 
 		{ 	fun_def
 		& 	fun_index = fun_index
 		//,	fun_symb = makeIdent "zzzzzzzzzzzz"
@@ -3426,9 +3429,9 @@ copyFunDef fun_def=:{fun_symb,fun_arity,fun_body,fun_info} fun_index group_index
 	= (fun_def, gs_heaps)
 where
 	copy_vars vars heaps
-		#! (fresh_vars, heaps) = copyVars vars heaps
-		#! infos = [VI_Variable fv_name fv_info_ptr\\ {fv_name,fv_info_ptr} <- fresh_vars]	 
-		#! heaps = setVarInfos vars infos heaps
+		# (fresh_vars, heaps) = copyVars vars heaps
+		# infos = [VI_Variable fv_name fv_info_ptr\\ {fv_name,fv_info_ptr} <- fresh_vars]	 
+		# heaps = setVarInfos vars infos heaps
 	 	= (fresh_vars, heaps)
 	 	
 	collect_local_vars body_expr fun_arg_vars heaps=:{hp_var_heap, hp_expression_heap}
@@ -3438,13 +3441,11 @@ where
 	  		, cos_var_heap = hp_var_heap
 	  		, cos_symbol_heap = hp_expression_heap	  		
 	  		, cos_predef_symbols_for_transform = { predef_alias_dummy=dummy_pds, predef_and=dummy_pds, predef_or=dummy_pds }
-// MV ...
-			, cos_used_dynamics = abort "error, please report to Martijn or Artem"
-// ... MV
+			, cos_used_dynamics = {} //abort "error, please report to Martijn or Artem"
 	  		}
-		#! (body_expr, fun_arg_vars, local_vars, {cos_symbol_heap, cos_var_heap}) = 
+		# (body_expr, fun_arg_vars, local_vars, {cos_symbol_heap, cos_var_heap}) = 
 			determineVariablesAndRefCounts fun_arg_vars body_expr cs
-		#! heaps = { heaps & hp_var_heap = cos_var_heap, hp_expression_heap = cos_symbol_heap }
+		# heaps = { heaps & hp_var_heap = cos_var_heap, hp_expression_heap = cos_symbol_heap }
 		= (body_expr, fun_arg_vars, local_vars, heaps)
 	
 makeIdent :: String -> Ident

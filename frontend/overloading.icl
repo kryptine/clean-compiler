@@ -531,6 +531,12 @@ where
 		| diff >= 0
 			= match defs (TV tv, types) (TA { type_cons & type_arity = diff } (take diff cons_args), drop diff cons_args) type_heaps
 			= (False, type_heaps)
+//AA..
+	match defs TArrow TArrow type_heaps
+		= (True, type_heaps)
+	match defs (TArrow1 t1) (TArrow1 t2) type_heaps
+		= match defs t1 t2 type_heaps
+//..AA		
 	match defs (TB tb1) (TB tb2) type_heaps
 		= (tb1 == tb2, type_heaps)
 /*	match defs type (TB (BT_String array_type)) type_heaps

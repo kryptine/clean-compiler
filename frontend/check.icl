@@ -26,7 +26,6 @@ checkGenerics
 		# (generic_def=:{gen_name, gen_type, gen_pos}, generic_defs) = generic_defs![gen_index]
 		# position = newPosition gen_name gen_pos
 		# cs_error = setErrorAdmin position cs_error
-			//---> ("checkGenerics generic type 1", gen_type.gt_type)
 
 		// add * for kind-star instances and *->* for arrays
 		# kinds = 
@@ -44,6 +43,11 @@ checkGenerics
 
 		#! {cs_error} = cs
 		#! (gt_vars, st_vars, cs_error) = split_vars gen_type.gt_vars  gt_type.st_vars cs_error
+
+		#! cs_error = case gt_type.st_context of
+			[] -> cs_error 
+			_  -> checkError "" "class contexts are not supported in generic types" cs_error   
+
 		#! cs = {cs & cs_error = cs_error}
 		#! gt_type = {gt_type & st_vars = st_vars}
 
@@ -55,7 +59,6 @@ checkGenerics
 			}
 
 		# generic_defs = {generic_defs & [gen_index] = generic_def}				
-			//---> ("checkGenerics generic type 2", gt_type)
 		= checkGenerics (inc gen_index) module_index generic_defs class_defs type_defs modules type_heaps cs
 where	
 	split_vars [] st_vars error

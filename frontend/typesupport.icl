@@ -32,6 +32,18 @@ simplifyTypeApplication (CV tv :@: type_args1) type_args2
 	= (True, CV tv :@: (type_args1 ++ type_args2))
 simplifyTypeApplication (TB _) _
 	= (False, TE)
+//AA..
+simplifyTypeApplication TArrow [type1, type2] 
+	= (True, type1 --> type2)
+simplifyTypeApplication TArrow [type] 
+	= (True, TArrow1 type)
+simplifyTypeApplication (TArrow1 type1) [type2] 
+	= (True, type1 --> type2)
+//AA..
+simplifyTypeApplication (TArrow1 _) _ 
+	= (False, TE)
+	
+	
 
 ::	AttributeEnv	:== {! TypeAttribute }
 ::	VarEnv 			:== {! Type }
@@ -124,6 +136,11 @@ where
 		# (argtype, cus) = clean_up cui argtype cus
 		  (restype, cus) = clean_up cui restype cus
 		=  (argtype --> restype, cus)
+//AA..
+	clean_up cui (TArrow1 argtype) cus
+		# (argtype, cus) = clean_up cui argtype cus
+		=  (TArrow1 argtype, cus)
+//..AA		
 	clean_up cui t=:(TB _) cus
 		=  (t, cus)
 	clean_up cui (TempCV tempvar :@: types) cus
@@ -229,6 +246,11 @@ where
 	cleanUpClosed (argtype --> restype) env
 		# (cur, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
 		= (cur, argtype --> restype, env)
+//AA..
+	cleanUpClosed (TArrow1 argtype) env
+		# (cur, argtype, env) = cleanUpClosed argtype env
+		= (cur, TArrow1 argtype, env)
+//..AA		
 	cleanUpClosed (TempCV tv_number :@: types) env
 		# (type, env) = env![tv_number]
 		# (cur1, type, env) = cleanUpClosedVariable type env
@@ -536,6 +558,10 @@ instance bindInstances Type
 		= bindInstances arg_types1 arg_types2 type_var_heap
 	bindInstances (l1 --> r1) (l2 --> r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances l1 l2 type_var_heap)
+//AA..
+	bindInstances (TArrow1 x1) (TArrow1 x2) type_var_heap
+		= bindInstances x1 x2 type_var_heap
+//..AA
 	bindInstances (TB _) (TB _) type_var_heap
 		= type_var_heap
 	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
@@ -616,6 +642,12 @@ where
 	substitute (arg_type --> res_type) heaps
 		# (ok, (arg_type, res_type), heaps) = substitute (arg_type, res_type) heaps
 		= (ok, arg_type --> res_type, heaps)
+//AA..
+	substitute (TArrow1 arg_type) heaps
+		# (ok, arg_type, heaps) = substitute arg_type heaps
+		= (ok, TArrow1 arg_type, heaps)
+
+//..AA		
 	substitute (TA cons_id cons_args) heaps
 		# (ok, cons_args, heaps) = substitute cons_args heaps
 		= (ok, TA cons_id cons_args,  heaps)
@@ -687,6 +719,13 @@ where
 		| rem 
 			= (True, arg_type --> res_type)
 			= (False, t)
+//AA..
+	removeAnnotations t=:(TArrow1 arg_type)
+		# (rem, arg_type) = removeAnnotations arg_type
+		| rem 
+			= (True, TArrow1 arg_type)
+			= (False, t)
+//..AA			
 	removeAnnotations t=:(TA cons_id cons_args)
 		# (rem, cons_args) = removeAnnotations cons_args
 		| rem 
@@ -782,6 +821,10 @@ where
 		= equivTypeVars tv var_number heaps
 	equiv (arg_type1 --> restype1) (arg_type2 --> restype2) heaps
 		= equiv (arg_type1,restype1) (arg_type2,restype2) heaps
+//AA..
+	equiv (TArrow1 arg_type1) (TArrow1 arg_type2) heaps
+		= equiv arg_type1 arg_type2 heaps
+//..AA
 	equiv (TA tc1 types1) (TA tc2 types2) heaps
 		| tc1 == tc2
 			= equiv types1 types2 heaps
@@ -1145,6 +1188,15 @@ where
 			= (file, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TB tb)
 		= (file <<< tb, opt_beautifulizer)
+//AA..
+	writeType file opt_beautifulizer (form, TArrow)
+		= (file <<< "(->)", opt_beautifulizer)	
+	writeType file opt_beautifulizer (form, TArrow1 t)
+		# file = file <<< "((->)" 
+		# (file, opt_opt_beautifulizer) = writeType file opt_beautifulizer (form, t)
+		# file = file <<< ")" 
+		= (file, opt_beautifulizer)	
+//..AA		
 	writeType file opt_beautifulizer (form, TQV varid)
 		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
@@ -1334,6 +1386,10 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 		= get_ineqs_of_atype_list args
 	get_ineqs_of_type (l --> r)
 		= Pair (get_ineqs_of_atype l) (get_ineqs_of_atype r)
+//AA..
+	get_ineqs_of_type (TArrow1 type)
+		= get_ineqs_of_atype type
+//..AA
 	get_ineqs_of_type (cv :@: args)
 		= get_ineqs_of_atype_list args
 	get_ineqs_of_type _
@@ -1523,6 +1579,11 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 		# (l, th_attrs) = anonymize_atype l th_attrs
 		  (r, th_attrs) = anonymize_atype r th_attrs
 		= (l --> r, th_attrs)
+//AA..
+	anonymize_type (TArrow1 type) th_attrs
+		# (type, th_attrs) = anonymize_atype type th_attrs
+		= (TArrow1 type, th_attrs)
+//..AA		
 	anonymize_type (cv :@: args) th_attrs
 		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
 		= (cv :@: args, th_attrs)
@@ -1548,6 +1609,10 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 			= foldSt count_attr_vars_of_atype args th_attrs
 		count_attr_vars_of_type (l --> r) th_attrs
 			= count_attr_vars_of_atype l (count_attr_vars_of_atype r th_attrs)
+//AA..
+		count_attr_vars_of_type (TArrow1 t) th_attrs
+			= count_attr_vars_of_atype t th_attrs
+//..AA
 		count_attr_vars_of_type (_ :@: args) th_attrs
 			= foldSt count_attr_vars_of_atype args th_attrs
 		count_attr_vars_of_type _ th_attrs
@@ -1708,6 +1773,10 @@ instance performOnTypeVars Type
 		= performOnTypeVars f args st
 	performOnTypeVars f (at1 --> at2) st
 		= performOnTypeVars f at2 (performOnTypeVars f at1 st)
+//AA..
+	performOnTypeVars f (TArrow1 at) st
+		= performOnTypeVars f at st
+//..AA
 	performOnTypeVars f (cv :@: at) st
 		= performOnTypeVars f cv (performOnTypeVars f at st)
 	performOnTypeVars f _ st
@@ -1750,6 +1819,10 @@ instance performOnAttrVars Type
 		= performOnAttrVars f args st
 	performOnAttrVars f (at1 --> at2) st
 		= performOnAttrVars f at2 (performOnAttrVars f at1 st)
+//AA..
+	performOnAttrVars f (TArrow1 at) st
+		= performOnAttrVars f at st
+//..AA
 	performOnAttrVars f (_ :@: at) st
 		= performOnAttrVars f at st
 	performOnAttrVars f _ st
@@ -1799,6 +1872,11 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= fold_atype_st r (fold_atype_st l st)
 		= on_type type st
+//AA..
+	fold_type_st type=:(TArrow1 t) st
+		#! st = fold_atype_st t st
+		= on_type type st	
+//..AA		
 	fold_type_st type=:(_ :@: args) st
 		#! st
 				= foldSt fold_atype_st args st

@@ -148,6 +148,11 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= fold_atype_st r (fold_atype_st l st)
 		= on_type type st
+//AA..
+	fold_type_st type=:(TArrow1 t) st
+		#! st = fold_atype_st t st
+		= on_type type st	
+//..AA
 	fold_type_st type=:(_ :@: args) st
 		#! st
 				= foldSt fold_atype_st args st
