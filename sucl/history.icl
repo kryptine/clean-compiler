@@ -31,26 +31,16 @@ import StdEnv
 :: Link var
    :== Optional (var,Int)
 
+
+/*********************************************
+* Extending the history according to a spine *
+*********************************************/
+
 // A function that associates specific patterns with extensible nodes
 // To be used for extending history patterns
 :: LinkExtender sym var
    :== (Link var)               // The extensible link to look for
     -> HistoryPattern sym var   // The associated pattern
-
-/*
-
->   history * ** == [(**,[rgraph * **])]
-
->   showhistory :: (*->[char]) -> (**->[char]) -> history * ** -> [char]
->   showhistory showa showb = showlist (showpair showb (showlist (showrgraph showa showb)))
-
->   printhistory :: (*->[char]) -> (**->[char]) -> history * ** -> [[char]]
->   printhistory showa showb
->   =   concat.map print
->       where print (node,rgraphs)
->             =   showb node:map2 (++) ("<=  ":repeat "    ") (map (printrgraph showa showb) rgraphs)
-
-*/
 
 extendhistory
  :: (Graph sym var)         // Subject graph
@@ -158,14 +148,6 @@ extendopen _ _ link extender0
    where histpat = OpenHist
          newpattern = (link,histpat)
          extender1 = adjust link histpat extender0
-
-/*
-
->   extendpartial :: graph * ** -> rule * *** -> pfun *** ** -> (graph * **,history * **) -> (graph * **,history * **)
->   extendpartial sgraph rule matching (hgraph,history)
->   =   (extgraph' sgraph rule matching hgraph,history)
-
-*/
 
 extendpartial
  :: (Graph sym var)             // Subject graph
@@ -321,6 +303,42 @@ extendnode sgraph rgraph matching issub extendsub (link,rnode) (newpattern0,rest
          unmapped
           = (newpattern0,[Extensible link:rest],extender0)
          (rdef,(rsym,rargs)) = varcontents rgraph rnode
+
+
+/************************************************
+* Verifying a subject graph against the history *
+************************************************/
+
+checkhistory
+ :: (History sym var)
+    [Link var]
+    (Graph sym var)
+    var
+ -> [HistoryPattern sym var]
+ |  == sym
+ &  == var
+
+checkhistory hist spinelinks sgraph snode
+ = foldr (checkassoc spinelinks sgraph snode) [] hist
+
+checkassoc spinelinks sgraph snode (link,pat) rest
+ | isMember link spinelinks && checkpat sgraph pat snode
+   = [pat:rest]
+ = rest
+
+checkpat :: (Graph sym var) (HistoryPattern sym var) var -> Bool | == sym & == var
+checkpat sgraph (Closed psym pargs) snode
+ # (sdef,(ssym,sargs)) = varcontents sgraph snode
+ = sdef && psym==ssym && eqlen pargs sargs && and [checkpat sgraph parg sarg \\ parg<-pargs & sarg<-sargs]
+checkpat sgraph OpenHist snode
+ = not (fst (varcontents sgraph snode))
+checkpat _ (Extensible _) _
+ = True
+
+
+/****************
+* Miscellaneous *
+****************/
 
 instance == (Optional a) | == a
  where (==) No No = True
