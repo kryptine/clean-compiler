@@ -226,8 +226,31 @@ where
 		| isEmpty fun_info.fi_dynamics
 			= (fun_defs, ci)
 			# ci 
-				= { ci & ci_used_tcs = [], ci_generated_global_tc_placeholders = False }
-			# (fun_body, ci) = convert_dynamics_in_body {cinp_st_args = [], cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
+				= { ci & ci_used_tcs = [], ci_generated_global_tc_placeholders = False, ci_module_id = No }
+			# (TransformedBody fun_body=:{tb_rhs}, ci) = convert_dynamics_in_body {cinp_st_args = [], cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
+			
+/*
+::	TransformedBody =
+	{	tb_args			:: ![FreeVar]
+	,	tb_rhs			:: !Expression
+	}
+	# (let_info_ptr,  ci)	= let_ptr 1 ci
+	# letje
+		= Let {	let_strict_binds	= [],
+				let_lazy_binds		= [let_bind],
+				let_expr			= dyn_type_code,
+				let_info_ptr		= let_info_ptr,
+				let_expr_position	= NoPos
+		}
+
+*/
+			# (tb_rhs,ci)
+				= build_type_identification tb_rhs ci
+			# fun_body
+				= TransformedBody {fun_body & tb_rhs = tb_rhs}
+			
+			
+			// TransformedBody
 			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
 				{ ci & ci_new_variables = [] })
 // MV ..
@@ -418,9 +441,7 @@ where
 /* Sjaak ... */
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_type_code}) ci=:{ci_symb_ident}
 		#  (dyn_expr,      ci) 			= convertDynamics cinp bound_vars default_expr dyn_expr ci
-		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False [] [] {ci & ci_module_id = No}
-		# (dyn_type_code,ci)
-			= build_type_identification dyn_type_code ci
+		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False [] [] ci
 		= (App {	app_symb		= ci_symb_ident,
 					app_args 		= [dyn_expr, dyn_type_code],
 					app_info_ptr	= nilPtr }, ci)
@@ -861,9 +882,7 @@ where
 		  /***  convert the elements of this pattern  ***/
 
 		  (a_ij_binds, ci)		= createVariables dp_type_patterns_vars [] ci
-	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ [] [] {ci & ci_module_id = No} // ci
-		# (type_code,ci)
-			= build_type_identification type_code ci
+	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ [] [] ci //{ci & ci_module_id = No} // ci
 	
 		// collect ...
 	 	# (is_last_dynamic_pattern,dp_rhs) 
@@ -928,27 +947,6 @@ where
 		  
 //		  sel_type	= Selection No (Var unify_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
 
-
-/*
-// TIJDELIJK...
-
-		# (ci=:{ci_predef_symb})
-			= ci;
-		# ({pds_module, pds_def}, ci_predef_symb)	= ci_predef_symb![PD_ModuleConsSymbol]
-		# pds_ident = predefined_idents.[PD_ModuleConsSymbol]
-		# module_symb1	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
-		# ci
-			= { ci & ci_predef_symb = ci_predef_symb };
-
-		# module_symb = 
-			{	app_symb 		= module_symb1
-			,	app_args 		= []
-			,	app_info_ptr	= nilPtr
-			}
-		# module_symb =
-			App module_symb
-		// ...TIJDELIJK
-*/
 /* Sjaak ... */
 		  (let_info_ptr, ci) 	= let_ptr (2 + length let_binds) ci
 		  (case_info_ptr, ci)	= bool_case_ptr ci
