@@ -684,10 +684,17 @@ where
 			# {td_ident, td_rhs, td_args, td_pos} = dcl_types.[gi_index]
 			= case td_rhs of
 				AbstractType spec_properties
+					= check_abstract_type spec_properties td_ident td_args td_pos as
+				AbstractSynType spec_properties _
+					= check_abstract_type spec_properties td_ident td_args td_pos as
+				_
+					= as
+			with
+				check_abstract_type spec_properties td_ident td_args td_pos as
 					# as_error = pushErrorAdmin (newPosition td_ident td_pos) as.as_error
 					| check_coercibility  spec_properties properties
 //						---> ("check_coercibility", td_ident, spec_properties, properties)
-						|check_hyperstrictness spec_properties properties
+						| check_hyperstrictness spec_properties properties
 							| spec_properties bitand cIsNonCoercible == 0
 								# (as_type_var_heap, as_td_infos, as_error) = check_positive_sign gi_module gi_index modules td_args as.as_type_var_heap as.as_td_infos as_error
 								= {as & as_type_var_heap = as_type_var_heap, as_td_infos = as_td_infos, as_error = popErrorAdmin as_error} 
@@ -696,10 +703,8 @@ where
 							= { as & as_error = popErrorAdmin as_error }
 						#	as_error = checkError "abstract type as defined in the implementation module is not coercible" "" as_error
 						= { as & as_error = popErrorAdmin as_error }
-				_
-					= as
 			= as
-	where						
+	where
 		check_coercibility dcl_props icl_props
 			= dcl_props bitand cIsNonCoercible > 0 || icl_props bitand cIsNonCoercible == 0
 
