@@ -454,7 +454,9 @@ coerceAttributes (TA_TempVar av_number) TA_Multi {neg_sign} coercions=:{coer_dem
 		= (True, makeNonUnique av_number coercions)
 coerceAttributes TA_Unique TA_Multi _ coercions
 	= (False, coercions)
-coerceAttributes off_attr dem_attr {pos_sign,neg_sign} coercions
+coerceAttributes TA_Multi TA_Unique _ coercions
+	= (False, coercions)
+coerceAttributes off_attr dem_attr _ coercions
 	= (True, coercions)
 
 newInequality :: !Int !Int !*Coercions -> *Coercions 

@@ -617,8 +617,7 @@ where
 		= (False, heaps)
 
 equivalent :: !SymbolType  !TempSymbolType !{# CommonDefs}  !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
-equivalent {st_args,st_result,st_context,st_attr_env} {tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} defs attr_env heaps
-	#! nr_of_temp_attrs = size attr_env
+equivalent st=:{st_args,st_result,st_context,st_attr_env} tst=:{tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} defs attr_env heaps
 	# (ok, heaps) = equiv (drop tst_lifted st_args,st_result) (drop tst_lifted tst_args,tst_result) heaps
 	| ok
 		# (ok, heaps) = equivalent_list_of_contexts st_context tst_context defs heaps
@@ -775,7 +774,9 @@ where
 			= show_attributed_type file form at_attribute at_type
 	where
 		show_attributed_type file form TA_Multi type
-			= file <:: (form, type) 
+			| checkProperty form cMarkAttribute
+				= show_marked_attribute TA_Multi form file <:: (form, type) 
+				= file <:: (form, type) 
 		show_attributed_type file form attr type
 			| checkProperty form cAttributed
 				= file <<< attr <:: (setProperty form cBrackets, type)
@@ -786,7 +787,8 @@ where
 		show_marked_attribute attr {form_attr_position = Yes (positions, coercions)} file
 			| isEmpty positions
 				= show_attribute attr coercions (file <<< "^ ") 
-				= show_attribute attr coercions file 
+				= show_attribute attr coercions file
+					 
 
 		show_attribute TA_Unique coercions file 
 			= file <<< '*' 
