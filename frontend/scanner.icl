@@ -1340,91 +1340,100 @@ where
 
 instance toString Token
 where
-	toString (IdentToken id)		= id // qw id
-	toString (UnderscoreIdentToken id)		= id // qw id
-	toString (IntToken id)			= id
-	toString (RealToken id)			= id
-	toString (StringToken id)		= id
-	toString (CharToken id)			= id
-	toString (CharListToken id)		= "['"+id+"']"
-	toString (BoolToken id)			= toString id
-	toString OpenToken				= "("
-	toString CloseToken				= ")"
-	toString CurlyOpenToken			= "{"
-	toString CurlyCloseToken		= "}"
-	toString SquareOpenToken		= "["
-	toString SquareCloseToken		= "]"
-	toString ExistsToken			= "E."
-	toString ForAllToken			= "A."
-	toString GenericOpenToken		= "{|"
-	toString GenericCloseToken		= "|}"	
-	toString DotToken				= "."
-	toString SemicolonToken			= ";"
-	toString ColonToken				= ": (ColonToken)"
-	toString DoubleColonToken		= "::"
-	toString CommaToken				= ","
-	toString ExclamationToken		= "!"
-	toString BarToken				= "|"
-	toString ArrowToken				= "->"
-	toString DoubleArrowToken		= "=>"
-	toString EqualToken				= "="
-	toString DefinesColonToken		= "=:"
-	toString ColonDefinesToken		= ":=="
-	toString WildCardToken			= "_"
-	toString BackSlashToken			= "\\"
-	toString DoubleBackSlashToken	= "\\\\"
-	toString LeftArrowToken			= "<-"
-	toString LeftArrowColonToken	= "<-:"
-	toString LeftArrowWithBarToken	= "<|-"
-	toString DotDotToken			= ".."
-	toString AndToken				= "&"
-	toString HashToken				= "#"
-	toString AsteriskToken			= "*"
-	toString LessThanOrEqualToken	= "<="
-	toString ModuleToken			= "module"
-	toString ImpModuleToken			= "implementation"
-	toString DefModuleToken			= "definition"
-	toString SysModuleToken			= "system"	
-	toString ImportToken			= "import"
-	toString FromToken				= "from"
-	toString SpecialToken			= "special"
-	toString IntTypeToken			= "Int"
-	toString CharTypeToken			= "Char"
-	toString RealTypeToken			= "Real"
-	toString BoolTypeToken			= "Bool"
-	toString StringTypeToken		= "String"
-	toString FileTypeToken			= "File"
-	toString WorldTypeToken			= "World"
-	toString VoidTypeToken			= "Void"
-	toString LeftAssocToken			= "left"
-	toString RightAssocToken		= "right"
-	toString ClassToken				= "class"
-	toString InstanceToken			= "instance"
-	toString OtherwiseToken			= "otherwise"
-	toString IfToken				= "if"
-	toString WhereToken				= "where"
-	toString WithToken				= "with"
-	toString CaseToken				= "case"
-	toString OfToken				= "of"
-	toString (LetToken strict)
-		| strict	= "let!"
-					= "let"
-	toString (SeqLetToken strict)
-		| strict	= "#!"
-					= "#"
+	toString (IdentToken id)			= id // qw id
+	toString (UnderscoreIdentToken id)	= id // qw id
+	toString (IntToken id)				= id
+	toString (RealToken id)				= id
+	toString (StringToken id)			= id
+	toString (CharToken id)				= id
+	toString (CharListToken id)			= "['"+id+"']"
+	toString (BoolToken id)				= toString id
+	toString OpenToken					= "("
+	toString CloseToken					= ")"
+	toString CurlyOpenToken				= "{"
+	toString CurlyCloseToken			= "}"
+	toString SquareOpenToken			= "["
+	toString SquareCloseToken			= "]"
+
+	toString DotToken					= "."
+	toString SemicolonToken				= ";"
+	toString ColonToken					= ": (ColonToken)"
+	toString DoubleColonToken			= "::"
+	toString CommaToken					= ","
+	toString ExclamationToken			= "!"
+	toString BarToken					= "|"
+	toString ArrowToken					= "->"
+	toString DoubleArrowToken			= "=>"
+	toString EqualToken					= "="
+	toString DefinesColonToken			= "=:"
+	toString ColonDefinesToken			= ":=="
+	toString WildCardToken				= "_"
+	toString BackSlashToken				= "\\"
+	toString DoubleBackSlashToken		= "\\\\"
+	toString LeftArrowToken				= "<-"
+	toString LeftArrowColonToken		= "<-:"
+	toString LeftArrowWithBarToken		= "<|-"
+	toString DotDotToken				= ".."
+	toString AndToken					= "&"
+	toString HashToken					= "#"
+	toString AsteriskToken				= "*"
+	toString LessThanOrEqualToken		= "<="
+
+	toString ModuleToken				= "module"
+	toString ImpModuleToken				= "implementation"
+	toString DefModuleToken				= "definition"
+	toString SysModuleToken				= "system"	
+
+	toString ImportToken				= "import"
+	toString FromToken					= "from"
+	toString SpecialToken				= "special"
+
+	toString IntTypeToken				= "Int"
+	toString CharTypeToken				= "Char"
+	toString RealTypeToken				= "Real"
+	toString BoolTypeToken				= "Bool"
+	toString StringTypeToken			= "String"
+	toString FileTypeToken				= "File"
+	toString WorldTypeToken				= "World"
+	toString VoidTypeToken				= "Void"
+	toString LeftAssocToken				= "left"
+	toString RightAssocToken			= "right"
+	toString ClassToken					= "class"
+	toString InstanceToken				= "instance"
+	toString OtherwiseToken				= "otherwise"
+
+	toString IfToken					= "if"
+	toString WhereToken					= "where"
+	toString WithToken					= "with"
+	toString CaseToken					= "case"
+	toString OfToken					= "of"
+	toString (LetToken strict)			= if strict "let!" "let"
+	toString (SeqLetToken strict)		= if strict "#!" "#"
 	toString InToken					= "in"
 
 	toString DynamicToken				= "dynamic"
 	toString DynamicTypeToken			= "Dynamic"
 
 	toString (PriorityToken priority)	= toString priority
+
+	toString CodeToken					= "code"
+	toString InlineToken				= "inline"
+	toString (CodeBlockToken the_code)	= "<code block>"
+
 	toString NewDefinitionToken			= "offside token (new def)"
 	toString EndGroupToken				= "offside token (end group)"
 	toString EndOfFileToken				= "end of file"
 	toString (ErrorToken id)			= "Scanner error: " + id
-	toString CodeToken					= "code"
-	toString InlineToken				= "inline"
-	toString (CodeBlockToken the_code)	= "<code block>"
+
+	toString GenericToken				= "generic"	
+	toString DeriveToken				= "derive"	
+	toString GenericOpenToken			= "{|"
+	toString GenericCloseToken			= "|}"	
+	toString GenericOfToken				= "of"	
+
+	toString ExistsToken				= "E."
+	toString ForAllToken				= "A."
+
 	toString token						= "toString (Token) does not know this token"
 
 instance == Token
