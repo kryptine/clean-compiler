@@ -564,8 +564,8 @@ buildTypeDefInfo1 td_module {td_name, td_pos, td_arity} alts fields main_module_
 	
 	# (field_dsc_funs, (modules, heaps)) = zipWithSt (build_field_dsc group_index (hd cons_dsc_dss)) field_dsc_dss fields (modules, heaps)
 	 
-	// NOTE: reverse order 
-	# new_funs = field_dsc_funs ++ cons_dsc_funs ++ [type_def_dsc_fun] ++ funs 
+	// NOTE: reverse order (new functions are added at the head) 
+	# new_funs = (reverse field_dsc_funs) ++ (reverse cons_dsc_funs) ++ [type_def_dsc_fun] ++ funs 
 	
 	# funs_and_groups = (new_fun_index, new_group_index, new_funs, new_groups)
 	
@@ -576,7 +576,7 @@ buildTypeDefInfo1 td_module {td_name, td_pos, td_arity} alts fields main_module_
 		= mapSt build_field_info field_dsc_dss (funs_and_groups, heaps)
 
 	# cons_infos = case (cons_info_dss, field_info_dss) of
-		([cons_info_ds], field_infos) -> [{ci_cons_info = cons_info_ds, ci_field_infos = reverse field_infos}] 	 
+		([cons_info_ds], field_infos) -> [{ci_cons_info = cons_info_ds, ci_field_infos = field_infos}] 	 
 		(cons_info_dss, []) -> [{ci_cons_info=x,ci_field_infos=[]}\\x<-cons_info_dss]
 		_ -> abort "generics.icl sanity check: fields in non-record type\n"
 
@@ -586,18 +586,24 @@ where
 	build_type_def_dsc group_index cons_info_dss {ds_index, ds_ident}  heaps	
 		# td_name_expr = makeStringExpr td_name.id_name
 		# td_arity_expr = makeIntExpr td_arity
+		# num_conses_expr = makeIntExpr (length alts)
 		# (cons_info_exprs, heaps) = mapSt (\x st->buildFunApp main_module_index x [] st) cons_info_dss heaps
 		# (td_conses_expr, heaps) = makeListExpr cons_info_exprs predefs heaps
 		
 		# (body_expr, heaps) = buildPredefConsApp PD_CGenericTypeDefDescriptor 
-			[td_name_expr, td_arity_expr, td_conses_expr] 
+			[ td_name_expr
+			, td_arity_expr
+			, num_conses_expr 
+			, td_conses_expr
+			] 
 			predefs heaps	
 						
 		# fun = makeFunction ds_ident ds_index group_index [] body_expr No main_module_index td_pos		
 		= (fun, heaps)
 
 	build_cons_dsc group_index type_def_info_ds field_dsc_dss cons_info_ds cons_ds (modules, heaps)
-		# ({cons_symb, cons_type, cons_priority}, modules)	= modules! [td_module].com_cons_defs.[cons_ds.ds_index]  		
+		# ({cons_symb, cons_type, cons_priority,cons_index}, modules)	
+			= modules! [td_module].com_cons_defs.[cons_ds.ds_index]  		
 		# name_expr 			 = makeStringExpr cons_symb.id_name
 		# arity_expr 			 = makeIntExpr cons_type.st_arity
 		# (prio_expr, heaps)	 = make_prio_expr cons_priority heaps
@@ -605,6 +611,7 @@ where
 		# (type_expr, heaps) 	 = make_type_expr cons_type heaps 			
 		# (field_exprs, heaps)   = mapSt (\x st->buildFunApp main_module_index x [] st) field_dsc_dss heaps
 		# (fields_expr, heaps)   =  makeListExpr field_exprs predefs heaps 
+		# cons_index_expr		 = makeIntExpr cons_index
 		# (body_expr, heaps) 
 			= buildPredefConsApp PD_CGenericConsDescriptor 
 				[ name_expr 
@@ -613,6 +620,7 @@ where
 				, type_def_expr
 				, type_expr
 				, fields_expr 
+				, cons_index_expr
 				]  
 				predefs heaps
 
@@ -1066,6 +1074,12 @@ where
 		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
 		= build_case_expr case_patterns heaps 
 	
+	// REC case
+	build_case_field var body_expr heaps
+		# pat = buildPredefConsPattern PD_ConsREC [var] body_expr predefs	
+		# {pds_module, pds_def} = predefs.[PD_TypeREC]
+		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
 		
 	// case with a variable as the selector expression
 	build_case_expr case_patterns heaps
@@ -3162,8 +3176,8 @@ makeFunction ident fun_index group_index arg_vars body_expr opt_sym_type main_dc
 			, fi_dynamics = []
 			, fi_properties = 0
 			}	
-		}
-		//---> ("makeFunction", ident, fun_index)
+		}	
+		//---> ("makeFunction", ident, fun_index, collectCalls main_dcl_module_n body_expr)
 
 // build function and
 buildFunAndGroup :: 

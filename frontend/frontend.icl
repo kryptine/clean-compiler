@@ -139,7 +139,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# error = error_admin.ea_file
 
 /*
-	# (_,genout,files) = fopen "c:\\Generics\\genout.icl" FWriteText files
+	# (_,genout,files) = fopen "c:\\Clean\\Generics\\genout.icl" FWriteText files
 	# (fun_defs, genout) = printFunDefs fun_defs genout
 	# (ok,files) = fclose genout files
 	| not ok = abort "could not write genout.icl" 
@@ -149,6 +149,15 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	| not ok
 		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
+/*
+	# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "partitionateFunctions") (icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges)
+	# (_,f,files) = fopen "components" FWriteText files
+	  (components, fun_defs, f) = showComponents {x\\x<-:components} 0 True fun_defs f
+	  (ok,files) = fclose f files
+	| ok<>ok
+		= abort "";
+*/
+	
 	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
 		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs/*icl_functions*/ icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
 

@@ -465,6 +465,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	| GTSVar TypeVar
  	| GTSCons DefinedSymbol GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
+ 	| GTSRec GenTypeStruct
  	| GTSE
  
 :: GenericTypeRep = 

@@ -2,6 +2,7 @@ implementation module predef
 
 import syntax, hashtable, type_io_common
 
+
 (<<=) infixl
 (<<=) symbol_table val
 	:==	let (predefined_idents, index) = val
@@ -135,6 +136,8 @@ predefined_idents
 					[PD_ConsCONS] = i "CONS",
 					[PD_TypeFIELD] = i "FIELD",
 					[PD_ConsFIELD] = i "FIELD",
+					[PD_TypeREC] = i "REC",
+					[PD_ConsREC] = i "REC",
 					[PD_GenericInfo] = i "GenericInfo",
 					[PD_NoGenericInfo] = i "NoGenericInfo",
 					[PD_GenericConsInfo] = i "GenericConsInfo",
@@ -317,7 +320,9 @@ where
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeCONS)					
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsCONS)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeFIELD)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsFIELD)
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsREC)
+					<<- (local_predefined_idents,				IC_Type, 		PD_TypeREC)					
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsFIELD)					
 					<<- (local_predefined_idents,				IC_Type, 		PD_GenericInfo)					
 					<<- (local_predefined_idents,				IC_Expression,	PD_NoGenericInfo)
 					<<- (local_predefined_idents,				IC_Expression,	PD_GenericConsInfo)

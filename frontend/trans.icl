@@ -2594,6 +2594,18 @@ where
 		# (expr, st) = map_expr_st expr st
 		= f (Selection a expr b) st
 
+	// AA:
+	map_expr_st expr=:(BasicExpr _) st 
+		= f expr st
+	map_expr_st (expr @ exprs) st 
+		= abort "trans.icl: map_expr_st (expr @ exprs) not implemented\n"
+	map_expr_st (TupleSelect ds n expr) st 
+		= abort "trans.icl: map_expr_st (TupleSelect ds n expr) not implemented\n"
+	map_expr_st (DynamicExpr dyn_expr) st 
+		= abort "trans.icl: map_expr_st (DynamicExpr dyn_expr) not implemented\n"
+	map_expr_st _ st = abort "trans.icl: map_expr_st does not match !!!!!!!!!!!!\n"
+
+
 foldrExprSt f expr st :== foldr_expr_st expr st
   where
 	foldr_expr_st expr=:(Var _) st
@@ -2610,6 +2622,10 @@ foldrExprSt f expr st :== foldr_expr_st expr st
 		= f lad st
 	foldr_expr_st sel=:(Selection a expr b) st
 		= f sel (foldr_expr_st expr st)
+		
+	// AA:	
+	foldr_expr_st expr=:(BasicExpr _) st 
+		= f expr st
 
 add_let_binds :: [FreeVar] [Expression] [LetBind] -> [LetBind]
 add_let_binds free_vars rhss original_binds

@@ -3472,6 +3472,8 @@ where
 				<=< adjustPredefSymbol PD_ConsCONS				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_TypeFIELD				mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsFIELD				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TypeREC				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsREC				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericInfo			mod_index STE_Type
 				<=< adjustPredefSymbol PD_NoGenericInfo			mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericConsInfo		mod_index STE_Constructor
