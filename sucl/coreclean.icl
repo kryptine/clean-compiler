@@ -38,6 +38,9 @@ sucltypeheap =: map SuclANONYMOUS [0..]
 :: SuclSymbol
  = SuclUser SymbKind
  | SuclCase ExprInfoPtr
+ | SuclFieldSelect (Global DefinedSymbol) Int
+ | SuclArraySelect (Global DefinedSymbol)
+ | SuclDictSelect BoundVar // [Selection] // FIXME: from DictionarySelection; what to do with these?
  | SuclApply Int
  | SuclInt Int
  | SuclChar Char

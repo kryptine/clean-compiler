@@ -36,7 +36,7 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
      // First of all, derive a representation for symbols in the program
   #  (showsuclsymbol,fun_defs1) = suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fun_defs0
      // Determine defined functions
-  #  (sucl_typerules,sucl_stricts,sucl_bodies,sucl_kinds,fun_defs2) = cts_function main_dcl_module_n fun_defs1
+  #  (sucl_typerules,sucl_stricts,sucl_bodies,sucl_kinds,fun_defs2) = cts_function showsuclsymbol main_dcl_module_n fun_defs1
      // Determine exported functions
   #  (predefs1,sucl_exports) = cts_exports dcl_mods predefs0 main_dcl_module_n
      // Get constructor lists of algebraic types

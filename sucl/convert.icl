@@ -39,17 +39,21 @@ funinfo_to_string (id,arity)
 
 suclsymbol_to_funinfo symbkind_to_string sym
 = case sym
-  of SuclUser sk    -> symbkind_to_string sk
-     SuclCase eip   -> "_lifted_expression_"+++toString (ptrToInt eip)+++"/?"
-     SuclApply ar   -> "_apply/"+++toString ar
-     SuclInt i      -> toString i+++"/0"
-     SuclChar c     -> "'"+++toString c+++"'/0"
-     SuclReal r     -> toString r+++"/0"
-     SuclBool b     -> toString b+++"/0"
-     SuclString s   -> "\""+++toString s+++"\""+++"/0"
+  of SuclUser sk            -> symbkind_to_string sk
+     SuclCase eip           -> "_lifted_expression_"+++toString (ptrToInt eip)+++"/?"
+     SuclFieldSelect gds i  -> "_fieldselect_"+++toString gds.glob_object.ds_ident.id_name+++"_"+++toString i+++"/1"
+     SuclArraySelect gds    -> "_arrayselect_"+++toString gds.glob_object.ds_ident.id_name+++"/2"
+     SuclDictSelect bv      -> "_distselect_"+++toString bv.var_name.id_name+++"/2"
+     SuclApply ar           -> "_apply_"+++toString ar+++"/"+++toString (ar+1)
+     SuclInt i              -> toString i+++"/0"
+     SuclChar c             -> "'"+++toString c+++"'/0"
+     SuclReal r             -> toString r+++"/0"
+     SuclBool b             -> toString b+++"/0"
+     SuclString s           -> "\""+++toString s+++"\""+++"/0"
 
 // Cocl to Sucl for functions
 cts_function ::
+    (SuclSymbol -> String)                                  // Get representation of symbol
     Int                                                     // Index of current module
     u:{#FunDef}                                             // Function definitions (from ICL)
  -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]   // Type rule (derives arity)
@@ -61,10 +65,10 @@ cts_function ::
  ,  [u<=v]
 
 //cts_function main_dcl_module_n fundefs = block "cts_function"
-cts_function main_dcl_module_n fundefs
+cts_function showsuclsymbol main_dcl_module_n fundefs
 = (typerules,stricts,funbodies,funkinds,fundefs`)
   where ((typerules,stricts,funbodies,funkinds),fundefs`)
-        = foldrarray_u (convert_fundef main_dcl_module_n) ([],[],[],[]) fundefs
+        = foldrarray_u (convert_fundef showsuclsymbol main_dcl_module_n) ([],[],[],[]) fundefs
 
 //foldrarray_u :: (a .b -> .b) .b u:{#a} -> (.b,v:{#a}) | uselect_u,usize_u a, [u<=v]
 foldrarray_u f i xs
@@ -86,8 +90,9 @@ foldlarrayindex f (a,xs0)
           where a1 = f a0 j xj
                 (xj,xs3) = xs2![j]
 
-convert_fundef
- :: Int
+convert_fundef ::
+    (SuclSymbol -> String)
+    Int
     FunDef
     ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]   // Type rule (derives arity)
     , [(SuclSymbol,[Bool])]                                 // Strict arguments (just main args for now)
@@ -100,17 +105,18 @@ convert_fundef
     , [(SuclSymbol,SuclSymbolKind)]                         // Kind of symbol
     )
 
-convert_fundef main_dcl_module_n fundef (typerulemap,strictsmap,fundefs0,kindmap)
+convert_fundef showsuclsymbol main_dcl_module_n fundef (typerulemap,strictsmap,fundefs0,kindmap)
  = ( [(funsym,typerule):typerulemap]
    , [(funsym,stricts):strictsmap]
    , fundefs1
    , [(funsym,kind):kindmap]
    )
-   where {fun_body,fun_type,fun_index,fun_kind} = fundef
+   where {fun_arity,fun_body,fun_type,fun_index,fun_kind} = fundef
          funsym = SuclUser (SK_Function {glob_module=main_dcl_module_n,glob_object=fun_index})
-         (typerule,stricts) = foldoptional notyperule convert_symboltype fun_type
-         notyperule = abort "convert: convert_fundef: fun_type is absent"
-         fundefs1 = convert_functionbody main_dcl_module_n funsym fun_body fundefs0
+         (typerule,stricts) = foldoptional (notyperule,repeatn fun_arity False) convert_symboltype fun_type
+         //notyperule = abort ("convert: convert_fundef: "+++fundef.fun_symb.id_name+++"/"+++toString fun_arity+++": fun_type is absent")
+         notyperule = mkrule (take fun_arity (tl sucltypeheap)) (hd sucltypeheap) emptygraph
+         fundefs1 = convert_functionbody showsuclsymbol main_dcl_module_n funsym fun_body fundefs0
          kind = convert_kind fun_kind
 
 /******************************************************************************
@@ -253,7 +259,7 @@ maparrayindex f xs
         | j>=sizexs
           = []
         = [f j xs.[j]:map (j+1)]
-		sizexs = size xs
+        sizexs = size xs
 
 
 /******************************************************************************
@@ -296,11 +302,23 @@ mkglobal gmod gob = {glob_module = gmod, glob_object = gob}
 *  EXPRESSION CONVERSION                                                      *
 ******************************************************************************/
 
-convert_functionbody :: Int SuclSymbol FunctionBody [FunBinding SuclSymbol SuclVariable] -> [FunBinding SuclSymbol SuclVariable]
-convert_functionbody main_dcl_module_n funsym (TransformedBody t) fundefs0 = convert_transformedbody main_dcl_module_n funsym t fundefs0
-convert_functionbody main_dcl_module_n funsym _ fundefs0
+convert_functionbody :: (SuclSymbol->String) Int SuclSymbol FunctionBody [FunBinding SuclSymbol SuclVariable] -> [FunBinding SuclSymbol SuclVariable]
+convert_functionbody showsuclsymbol main_dcl_module_n funsym (TransformedBody t) fundefs0 = convert_transformedbody main_dcl_module_n funsym t fundefs0
+convert_functionbody showsuclsymbol main_dcl_module_n funsym (CheckedBody c) fundefs0 = fundefs0 ---> "convert.convertbody ignores CheckedBody"
+convert_functionbody showsuclsymbol main_dcl_module_n funsym fb fundefs0
  = [(funsym,norule):fundefs0]
-   where norule = error "convert: convert_functionbody: unexpected FunctionBody constructor"
+   where norule = mstub "convert_functionbody" ("unexpected FunctionBody constructor "+++fbcn fb+++" for "+++toString funsym+++" ("+++showsuclsymbol funsym+++")")
+
+fbcn :: FunctionBody -> String
+fbcn (ParsedBody pb)           = "ParsedBody"
+fbcn (CheckedBody cb)          = "CheckedBody"
+fbcn (PartioningMacro)         = "PartitioningMacro"
+fbcn (PartioningFunction cb i) = "PartitioningFunction"
+fbcn (RhsMacroBody cb)         = "RhsMacroBody"
+fbcn (TransformedBody tb)      = "TransformedBody"
+fbcn (Expanding fv)            = "Expanding"
+fbcn (BackendBody bebs)        = "BackendBody"
+fbcn (NoBody)                  = "NoBody"
 
 convert_transformedbody :: Int SuclSymbol TransformedBody [FunBinding SuclSymbol SuclVariable] -> [FunBinding SuclSymbol SuclVariable]
 convert_transformedbody main_dcl_module_n funsym {tb_args=args,tb_rhs=expression} fundefs0
@@ -347,7 +365,7 @@ convert_expression ::
  -> Econv_state                                 // Resulting expression conversion state
 
 convert_expression main_dcl_module_n topinfo bindings (Var varinfo) lrinfo
-= (heap0,(nodes0,fundefs0,globals1,rest`,False))
+= (heap0,(nodes0,fundefs0,globals1,rest`,False)) <--- "convert.convert_expression ends (for Var expression)"
   where (globals1,rest`) = foldmap bound free bindings vip
         bound node = ([node:globals0],[node:rest])
         free
@@ -377,7 +395,7 @@ convert_expression main_dcl_module_n topinfo bindings0 (Let letinfo) lrinfo
   = mstub "convert_expression/Let" "cannot handle strict lets"
 = (heap2,(nodes2,fundefs2,globals3,rest`,False)) <--- "convert.convert_expression ends (for Let expression)"
   where globals3 = filter (not o flip isMember (map snd bindings1)) globals2
-        (heap2,(nodes2,fundefs2,globals2,rest`,_)) = convert_expression main_dcl_module_n No bindings1 letinfo.let_expr (heap1,(nodes1,fundefs1,globals1,rest,False))
+        (heap2,(nodes2,fundefs2,globals2,rest`,_)) = (convert_expression--->"convert.convert_expression begins from convert)_expression/Let") main_dcl_module_n No bindings1 letinfo.let_expr (heap1,(nodes1,fundefs1,globals1,rest,False))
         (heap1,(nodes1,fundefs1,globals1,suclbounds,_)) = convert_expressions main_dcl_module_n bindings1 [lb.lb_src \\ lb<-letinfo.let_lazy_binds] (heap0,(nodes0,fundefs0,globals0))
         bindings1 = zip2 boundvars suclbounds++bindings0
         boundvars = [lb.lb_dst.fv_info_ptr \\ lb<-letinfo.let_lazy_binds]
@@ -391,7 +409,7 @@ convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) 
         //       (2) build rules/fundef from branches
         //       (4) build closure node
         // (4) Build closure node
-        closureargs = (map fv2sucl funargs <--- ("convert.convert_expression.Case.closureargs ends with "+++toString (length innerglobals1)+++" inner global(s), "+++toString (length defaultroots)+++" default root(s), and "+++toString (length selectorroots)+++" selector root")) ---> "convert.convert_expression.Case.closureargs begins"
+        closureargs = (map fv2sucl funargs <--- ("convert.convert_expression.Case.closureargs ends with "+++toString (length innerglobals1)+++" inner global(s), "+++toString (length defaultroots)+++" default root(s), and "+++toString (length selectorroots)+++" selector root; nodes [in,selector,default,out]"+++showlist toString (map length [nodes7,nodes8,nodes9]))) ---> "convert.convert_expression.Case.closureargs begins"
         fv2sucl fv = lookup bindings fv.fv_info_ptr
         nodes9 = [(root,(introduced_function_symbol,closureargs)):nodes8]
         // (2) build rules/fundef from branches
@@ -402,6 +420,7 @@ convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) 
                  mkdefaultalt defaultroot
                   = mkrule closureargs defaultroot (compilegraph defaultnodes)
         // (1.5) convert default if necessary
+        // Note: there is no surrounding expression; we cannot put the default expression there, so we really have to make the default rule here
         (heap4,(defaultnodes,fundefs6,globals7,defaultroots,_))
          = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,([],fundefs5,globals6,[],False))
         // (1) convert branches
@@ -431,19 +450,20 @@ convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
         //       (2) build rules/fundef from branches
         //       (4) build closure node
         // (4) Build closure node
-        closureargs = ((selectorroots++innerglobals1++defaultroots) <--- ("convert.convert_expression.Case.closureargs ends with "+++toString (length innerglobals1)+++" inner global(s), "+++toString (length defaultroots)+++" default root(s), and "+++toString (length selectorroots)+++" selector root")) ---> "convert.convert_expression.Case.closureargs begins"
-        nodes9 = [(root,(introduced_function_symbol,closureargs)):nodes8]
+        closureargs = ((selectorroots++innerglobals1++defaultroots) <--- ("convert.convert_expression.Case.closureargs ends with "+++toString (length innerglobals1)+++" inner global(s), "+++toString (length defaultroots)+++" default root(s), and "+++toString (length selectorroots)+++" selector root; nodes [in,selector,default,out]"+++showlist toString (map length [nodes7,nodes8,nodes85,nodes9]))) ---> "convert.convert_expression.Case.closureargs begins"
+        nodes9 = [(root,(introduced_function_symbol,closureargs)):nodes85]
         // (2) build rules/fundef from branches
         fundefs9
         = [(introduced_function_symbol,(length closureargs,map mkalt alternatives++map mkdefaultalt defaultroots)):fundefs8]
            where mkalt (patroot,reproot,nodes)
                   = mkrule ([patroot:innerglobals1++defaultroots]) reproot (compilegraph nodes)
                  mkdefaultalt defaultroot
-                  = mkrule (selectorroots++innerglobals1++defaultroots) defaultroot (compilegraph defaultnodes)
+                  = mkrule (selectorroots++innerglobals1++defaultroots) defaultroot emptygraph // (compilegraph defaultnodes)
         introduced_function_symbol = SuclCase caseinfo.case_info_ptr
         // (1.5) convert default if necessary
-        (heap4,(defaultnodes,fundefs6,globals7,defaultroots,_))
-         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,([],fundefs5,globals6,[],False))
+        // Note: the default expression is added to the surrounding expression, and passed as argument to the lifted function for this case
+        (heap4,(nodes85,fundefs6,globals7,defaultroots,_))
+         = foldoptional id ((convert_expression--->"convert.convert_expression begins from convert.convert_expression (Case default)") main_dcl_module_n No bindings) caseinfo.case_default (heap3,(nodes8,fundefs5,globals6,[],False))
         // (1) convert branches
         globals8 = innerglobals1++globals7
         innerglobals1 = removeDup innerglobals0
@@ -469,21 +489,32 @@ convert_expression main_dcl_module_n topinfo bindings (BasicExpr bv bt) lrinfo
         nodes1 = [(root,(convert_bvalue bv,[])):nodes0]
         (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
-convert_expression _ _ _ (Selection _ _ _)      _ = mstub "convert_expression" "Selection constructor not handled"
-convert_expression _ _ _ (Update _ _ _)         _ = mstub "convert_expression" "Update not handled"
-convert_expression _ _ _ (RecordUpdate _ _ _)   _ = mstub "convert_expression" "RecordUpdate constructor not handled"
-convert_expression _ _ _ (TupleSelect _ _ _)    _ = mstub "convert_expression" "TupleSelect constructor not handled"
-convert_expression _ _ _ (WildCard)             _ = mstub "convert_expression" "WildCard constructor not handled"
-convert_expression _ _ _ (AnyCodeExpr _ _ _)    _ = mstub "convert_expression" "AnyCodeExpr constructor not handled"
-convert_expression _ _ _ (ABCCodeExpr _ _)      _ = mstub "convert_expression" "ABCCodeExpr constructor not handled"
-convert_expression _ _ _ (MatchExpr _ _ _)      _ = mstub "convert_expression" "MatchExpr constructor not handled"
-convert_expression _ _ _ (FreeVar _)            _ = mstub "convert_expression" "FreeVar constructor not handled"
-convert_expression _ _ _ (Constant _ _ _ _)     _ = mstub "convert_expression" "Constant constructor not handled"
-convert_expression _ _ _ (ClassVariable _)      _ = mstub "convert_expression" "ClassVariable constructor not handled"
-convert_expression _ _ _ (DynamicExpr _)        _ = mstub "convert_expression" "DynamicExpr constructor not handled"
-convert_expression _ _ _ (TypeCodeExpression _) _ = mstub "convert_expression" "TypeCodeExpression constructor not handled"
-convert_expression _ _ _ (EE)                   _ = mstub "convert_expression" "EE constructor not handled"
-convert_expression _ _ _ (NoBind _)             _ = mstub "convert_expression" "NoBind constructor not handled"
+convert_expression main_dcl_module_n topinfo bindings (Selection _ fromexpr selections) lrinfo
+= (heap2,(nodes2,fundefs2,globals2,[selroot:rest],False))
+  where ((nodes2,fundefs2,globals2,selroot),heap1) = foldlr (convert_selection main_dcl_module_n topinfo bindings) ((nodes1,fundefs1,globals1,hd fromroots),heap0) selections
+        (heap2,(nodes1,fundefs1,globals1,fromroots,_)) = convert_expression main_dcl_module_n topinfo bindings fromexpr (heap1,(nodes0,fundefs0,globals0,rest,False))
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
+
+convert_expression main_dcl_module_n topinfo bindings (Update _ _ _)         lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "Update" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (RecordUpdate _ _ _)   lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "RecordUpdate" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (TupleSelect _ _ _)    lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "TupleSelect" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (WildCard)             lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "WildCard" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (AnyCodeExpr _ _ _)    lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "AnyCodeExpr" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (ABCCodeExpr _ _)      lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "ABCCodeExpr" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (MatchExpr _ _ _)      lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "MatchExpr" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (FreeVar _)            lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "FreeVar" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (Constant _ _ _ _)     lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "Constant" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (ClassVariable _)      lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "ClassVariable" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (DynamicExpr _)        lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "DynamicExpr" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (TypeCodeExpression _) lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "TypeCodeExpression" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (EE)                   lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "EE" lrinfo <--- "convert.convert_expression ends (for other expression)"
+convert_expression main_dcl_module_n topinfo bindings (NoBind _)             lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "NoBind" lrinfo <--- "convert.convert_expression ends (for other expression)"
+
+convert_expression_stub main_dcl_module_n topinfo bindings constrname lrinfo
+= (heap1,(nodes1,fundefs0,globals0,[root:rest],False))
+  where [root:heap1] = heap0
+        nodes1 = [(root,(mstub "convert_expression_stub" (constrname+++" not handled"),[])):nodes0]
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
 convert_algebraic_branch ::
     Int                             // Index of main module
@@ -504,7 +535,7 @@ convert_algebraic_branch ::
     )
 
 convert_algebraic_branch main_dcl_module_n root bindings0 branch lrinfo
-= (heap2,(globals2,fundefs1,alternatives1)) ---> ("convert.convert_algebraic_branch: binding variables: "+++listToString (map fst argmap))
+= ((heap2,(globals2,fundefs1,alternatives1)) <--- ("convert.convert_algebraic_branch globals "+++showlist toString (map length [globals0,globals1,globals2])+++" nodes "+++showlist toString (map length [nodes0,nodes1]))) ---> ("convert.convert_algebraic_branch: binding variables: "+++listToString (map fst argmap))
   where // Unpack conversion state
         (heap0,(globals0,fundefs0,alternatives0)) = lrinfo
         // DON'T Claim root node of pattern
@@ -564,6 +595,49 @@ convert_bvalue (BVB bool) = SuclBool bool
 convert_bvalue (BVR realrepr) = SuclReal (toReal realrepr)
 convert_bvalue (BVS stringrepr) = SuclString (fromString stringrepr)
 convert_bvalue _ = mstub "convert_bvalue" "unhandled BasicValue constructor"
+
+convert_selection ::
+    Int                                         // Index of current DCL module
+    (Optional (SuclSymbol,[FreeVar]))           // Arguments and function symbol to use (to prevent lifted top-level cases)
+    [(VarInfoPtr,SuclVariable)]                 // Variables bound in the environment
+    Selection
+    ( ( [NodeBinding SuclSymbol SuclVariable]   // Nodes of Sucl expression being built
+      , [FunBinding SuclSymbol SuclVariable]    // Lifted functions for case/lambda expressions
+      , [SuclVariable]                          // Free Sucl variables in expression being built
+      , SuclVariable                            // Root of resulting expression selection
+      )
+    , [SuclVariable]                            // Heap of fresh node-ids
+    )
+ -> ( ( [NodeBinding SuclSymbol SuclVariable]   // Nodes of Sucl expression being built
+      , [FunBinding SuclSymbol SuclVariable]    // Lifted functions for case/lambda expressions
+      , [SuclVariable]                          // Free Sucl variables in expression being built
+      , SuclVariable                            // Root of resulting expression selection
+      )
+    , [SuclVariable]                            // Heap of fresh node-ids
+    )
+
+convert_selection main_dcl_module_n topinfo bindings (RecordSelection fieldname fieldindex) lrinfo
+= ((nodes1,fundefs0,globals0,root),heap1)
+  where nodes1 = [(root,(symbol,[arg])):nodes0]
+        [root:heap1] = heap0
+        symbol = SuclFieldSelect fieldname fieldindex
+        ((nodes0,fundefs0,globals0,arg),heap0) = lrinfo
+
+convert_selection main_dcl_module_n topinfo bindings (ArraySelection gds _ indexexpr) lrinfo
+= ((nodes2,fundefs1,globals1,root),heap2)
+  where nodes2 = [(root,(symbol,args)):nodes1]
+        [root:heap1] = heap0
+        symbol = SuclArraySelect gds
+        (heap2,(nodes1,fundefs1,globals1,args,_)) = convert_expression main_dcl_module_n topinfo bindings indexexpr (heap1,(nodes0,fundefs0,globals0,[arrayarg],False))
+        ((nodes0,fundefs0,globals0,arrayarg),heap0) = lrinfo
+
+convert_selection main_dcl_module_n topinfo bindings (DictionarySelection bv sels _ dictexpr) lrinfo
+= ((nodes2,fundefs1,globals1,root),heap2)
+  where nodes2 = [(root,(symbol,args)):nodes1]
+        [root:heap1] = heap0
+        symbol = SuclDictSelect bv // FIXME: What to do with sels::[Selection] ?
+        (heap2,(nodes1,fundefs1,globals1,args,_)) = convert_expression main_dcl_module_n topinfo bindings dictexpr (heap1,(nodes0,fundefs0,globals0,[dictarg],False))
+        ((nodes0,fundefs0,globals0,dictarg),heap0) = lrinfo
 
 convert_kind :: DefOrImpFunKind -> SuclSymbolKind
 convert_kind (FK_DefFunction b) = SuclPrimitive // Function from a definition module
@@ -1397,13 +1471,31 @@ where toString {fv_def_level,fv_name,fv_info_ptr,fv_count}
      }
 
 get_formal_name_and_arity :: Environment SymbKind -> (Ident,Int)
-get_formal_name_and_arity env (SK_Constructor {glob_module,glob_object})
-# consdef = (env.env_getcommon glob_module).com_cons_defs.[glob_object]
-= (consdef.cons_symb,consdef.cons_type.st_arity)
 get_formal_name_and_arity env (SK_Function {glob_module,glob_object})
 = if (glob_module==env.env_main)
      (get_formal_name_and_arity_from_fundef env glob_object)
      (get_formal_name_and_arity_from_funtype env glob_module glob_object)
+get_formal_name_and_arity env (SK_OverloadedFunction {glob_module,glob_object})
+# memberdef = (env.env_getcommon glob_module).com_member_defs.[glob_object]
+# classdef = (env.env_getcommon memberdef.me_class.glob_module).com_class_defs.[memberdef.me_class.glob_object]
+= (memberdef.me_symb,classdef.class_arity)
+get_formal_name_and_arity env (SK_Constructor {glob_module,glob_object})
+# consdef = (env.env_getcommon glob_module).com_cons_defs.[glob_object]
+= (consdef.cons_symb,consdef.cons_type.st_arity)
+get_formal_name_and_arity env sk
+= (noident,noarity)
+  where noident = {id_name = "<unhandled symbol kind: "+++sk_descr sk+++">", id_info = nilPtr}
+        noarity = -1
+
+sk_descr (SK_Unknown) = "Unknown"
+sk_descr (SK_Function _) = "Function"
+sk_descr (SK_LocalMacroFunction _) = "LocalMacroFunction"
+sk_descr (SK_OverloadedFunction _) = "OverloadedFunction"
+sk_descr (SK_Generic _ _) = "Generic"
+sk_descr (SK_Constructor _) = "Constructor"
+sk_descr (SK_Macro _) = "Macro"
+sk_descr (SK_GeneratedFunction _ _) = "GeneratedFunction"
+sk_descr (SK_TypeCode) = "TypeCode"
 
 get_formal_name_and_arity_from_fundef env funindex
 = env.env_infos.[funindex]

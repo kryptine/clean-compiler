@@ -4,7 +4,7 @@ definition module coreclean
 
 from strat import Strategy
 from rule import Rule
-from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr,SymbKind
+from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr,SymbKind,BoundVar,DefinedSymbol
 from StdOverloaded import ==,toString
 from StdFile import <<<
 
@@ -39,6 +39,9 @@ sucltypeheap :: [SuclTypeVariable]
 :: SuclSymbol
  = SuclUser SymbKind
  | SuclCase ExprInfoPtr
+ | SuclFieldSelect (Global DefinedSymbol) Int
+ | SuclArraySelect (Global DefinedSymbol)
+ | SuclDictSelect BoundVar // [Selection] // FIXME: from DictionarySelection; what to do with these?
  | SuclApply Int
  | SuclInt Int
  | SuclChar Char

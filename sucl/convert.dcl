@@ -39,6 +39,7 @@ suclsymbol_to_string ::
 
 // Cocl to Sucl for functions
 cts_function ::
+    (SuclSymbol -> String)                                  // Get representation of symbol
     Int                                                     // Index of current module
     u:{#FunDef}                                             // Function definitions (from ICL)
  -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]   // Type rule (derives arity)
