@@ -432,9 +432,9 @@ checkArityOfType act_arity form_arity (SynType _)
 checkArityOfType act_arity form_arity _
 	= form_arity >= act_arity
 
-checkAbstractType (AbstractType _)			= True
-checkAbstractType (AbstractSynType _ _)		= True
-checkAbstractType _							= False
+checkAbstractType type_index(AbstractType _)			= type_index <> cPredefinedModuleIndex 
+checkAbstractType type_index (AbstractSynType _ _)		= type_index <> cPredefinedModuleIndex 
+checkAbstractType _ _									= False
 
 getClassDef :: !Index !Index !Index !u:{# ClassDef} !v:{# DclModule} -> (!ClassDef, !Index , !u:{# ClassDef}, !v:{# DclModule})
 getClassDef class_index type_module module_index class_defs modules
@@ -584,7 +584,7 @@ checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type
 	| type_index <> NotFound
 		# ({td_arity,td_args,td_attribute,td_rhs},type_index,ots_type_defs,ots_modules) = getTypeDef type_index type_module mod_index ots_type_defs ots_modules
 		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
-		| x_check_dynamic_types && checkAbstractType td_rhs
+		| x_check_dynamic_types && checkAbstractType type_module td_rhs
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "(abstract type) not permitted in a dynamic type" cs.cs_error}))
 
 			| checkArityOfType type_cons.type_arity td_arity td_rhs

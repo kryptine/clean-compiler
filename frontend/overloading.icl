@@ -540,6 +540,9 @@ where
 			ai_record = record }
 				
 	disallow_abstract_types_in_dynamics type_index=:{glob_module,glob_object} error
+		| cPredefinedModuleIndex == glob_module
+			= error
+			
 		#! ({td_name,td_rhs})
 			= defs.[glob_module].com_type_defs.[glob_object]
 		= case td_rhs of
