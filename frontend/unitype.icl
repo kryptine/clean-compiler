@@ -5,6 +5,8 @@ import StdEnv
 
 import syntax, analunitypes, type, utilities
 
+import cheat
+
 ::	CoercionPosition =
 	{	cp_expression	:: !Expression
 	}
@@ -26,10 +28,12 @@ FirstAttrVar	:== 2
 	,	pi_deps ::			![Int]
 	}
 
+
 uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
 uniquenessError position mess err=:{ea_file,ea_loc}
 	# ea_file = ea_file <<< "Uniqueness error " <<< hd ea_loc <<< ": \"" <<<  position <<< '\"' <<< mess <<< '\n'
 	= { err & ea_file = ea_file, ea_ok = False}
+
 
 ::	BOOLVECT :== Int
 
@@ -46,13 +50,20 @@ determineAttributeCoercions :: !AType !AType !Bool !CoercionPosition !u:{! Type}
 determineAttributeCoercions off_type dem_type coercible position subst coercions defs cons_vars td_infos type_heaps error
 	# (exp_off_type, es) = expandType defs cons_vars off_type (subst, { es_type_heaps = type_heaps, es_td_infos = td_infos})
 	  (exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
-	  (ok, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce defs cons_vars exp_off_type exp_dem_type (if coercible PositiveSign TopSign)
+	  (result, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce (if coercible PositiveSign TopSign) defs cons_vars [] exp_off_type exp_dem_type 
 	  		 { crc_type_heaps = es_type_heaps, crc_coercions = coercions, crc_td_infos = es_td_infos}
-	| ok
-		= (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
-//					---> ("OK", off_type, exp_off_type, dem_type, exp_dem_type)
-		= (subst, crc_coercions, crc_td_infos, crc_type_heaps, uniquenessError position " invalid coercion" error)
-					---> (off_type, exp_off_type, dem_type, exp_dem_type)
+	= case result of
+		Yes positions
+			# error = errorHeading "Uniqueness error" error
+			  (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
+
+			  format = { form_properties = cMarkAttribute, form_attr_position = Yes (reverse positions, copy_crc_coercions) }			
+			  ea_file = error.ea_file <<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) <<< '\n'
+
+			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, { error & ea_file = ea_file })
+				
+		No
+			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
 
 NotChecked :== -1	
 DummyAttrNumber :== -1
@@ -373,8 +384,7 @@ where
 	,	crc_td_infos	:: !.TypeDefInfos
 	}
 
-
-class coerce a :: !{# CommonDefs} !{# BOOLVECT} !a !a !Sign !*CoercionState -> (!Bool, !*CoercionState)
+::	TypePosition :== [Int]
 
 /*
 
@@ -419,13 +429,7 @@ coerceAttributes (TA_TempVar av_number1) (TA_TempVar av_number2) {pos_sign,neg_s
 where
 	new_inequality :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
 	new_inequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
-/*		| isExistential coer_offered.[off_attr]
-			#! off_attr_tree = coer_offered.[off_attr]
-			= coerce_to_existential_attribute off_attr_tree dem_attr coercions
-		| isExistential coer_demanded.[dem_attr]
-			#! dem_attr_tree = coer_demanded.[off_attr]
-			= coerce_to_existential_attribute dem_attr_tree off_attr coercions
-*/		| isNonUnique coer_offered.[off_attr]
+		| isNonUnique coer_offered.[off_attr]
 			| isUnique coer_demanded.[dem_attr]
 				= (False, coercions)
 				= (True, makeNonUnique dem_attr coercions)
@@ -434,10 +438,6 @@ where
 		| isNonUnique coer_offered.[dem_attr] || isUnique coer_demanded.[off_attr]
 			= (True, coercions)
 			= (True, newInequality off_attr dem_attr coercions)
-/*	
-	coerce_to_existential_attribute (CT_Existential exi_number) attr_number coercions
-		= coerceToExistentialAttribute exi_number attr_number coercions
-*/
 					
 coerceAttributes TA_Unique (TA_TempVar av_number) {neg_sign} coercions=:{coer_offered}
 	| isNonUnique coer_offered.[av_number]
@@ -462,65 +462,8 @@ coerceAttributes (TA_TempVar av_number) TA_Multi {neg_sign} coercions=:{coer_dem
 coerceAttributes TA_Unique TA_Multi _ coercions
 	= (False, coercions)
 coerceAttributes off_attr dem_attr {pos_sign,neg_sign} coercions
-/*
-	| pos_sign || neg_sign // ---> ("coerceAttributes", off_attr, dem_attr)
-		= case off_attr of
-			TA_TempExVar eav_number
-				-> case dem_attr of
-					TA_TempVar av_number
-						-> coerceToExistentialAttribute eav_number av_number coercions
-					TA_TempExVar eav_number2
-						-> (eav_number == eav_number2, coercions)
-					_
-						-> (False, coercions)
-				
-			TA_TempVar av_number
-				-> case dem_attr of
-					TA_TempExVar eav_number
-						-> coerceToExistentialAttribute eav_number av_number coercions
-					_
-						-> (True, coercions)
-			_
-				-> case dem_attr of
-					TA_TempExVar eav_number
-						-> (False, coercions)
-					_
-						-> (True, coercions)
-*/
-		= (True, coercions)
+	= (True, coercions)
 
-/*
-coerceToExistentialAttribute exi_attr_number attr_number coercions=:{coer_demanded, coer_offered}
-	#! dem_attr_tree = coer_demanded.[attr_number]
-	   off_attr_tree = coer_offered.[attr_number]
-	= case dem_attr_tree ---> ("coerceToExistentialAttribute", exi_attr_number, attr_number, dem_attr_tree, off_attr_tree) of
-		CT_Unique
-			-> (False, coercions)
-		CT_Existential exi_attr_number2
-			-> (exi_attr_number == exi_attr_number2, coercions)
-		_
-			-> case off_attr_tree of
-				CT_NonUnique
-					-> (False, coercions)
-				_
-					-> (True, make_attr_existential attr_number exi_attr_number coercions)
-	
-where
-	make_attr_existential :: !Int  !Int !*Coercions -> *Coercions
-	make_attr_existential attr exi_attr {coer_demanded, coer_offered}
-		# (dem_heaps_and_coercions, coer_demanded) = replace coer_demanded attr (CT_Existential exi_attr)
-		  (off_heaps_and_coercions, coer_offered) = replace coer_offered attr (CT_Existential exi_attr)
-		= make_existential off_heaps_and_coercions exi_attr (
-			make_existential dem_heaps_and_coercions exi_attr {coer_offered = coer_offered, coer_demanded = coer_demanded})
-
-	make_existential (CT_Node this_attr ct_less ct_greater) exi_attr coercions
-		# coercions = make_attr_existential this_attr exi_attr coercions
-		  coercions = make_existential ct_less exi_attr coercions
-		  coercions = make_existential ct_greater exi_attr coercions
-		= coercions
-	make_existential tree exi_attr coercions
-		= coercions
-*/
 newInequality :: !Int !Int !*Coercions -> *Coercions 
 newInequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
 	# (dem_coercions, coer_demanded) = replace coer_demanded off_attr CT_Empty
@@ -554,11 +497,13 @@ isUnique  :: !CoercionTree -> Bool
 isUnique CT_Unique			= True
 isUnique _					= False
 
-/*
-isExistential  :: !CoercionTree -> Bool
-isExistential (CT_Existential exi_number)	= True
-isExistential attr_tree						= False
-*/
+isUniqueAttribute :: !Int !Coercions -> Bool
+isUniqueAttribute attr_number {coer_demanded}
+	= isUnique coer_demanded.[attr_number]
+
+isNonUniqueAttribute :: !Int !Coercions -> Bool
+isNonUniqueAttribute attr_number {coer_offered}
+	= isNonUnique coer_offered.[attr_number]
 		
 makeUnique :: !Int !*Coercions -> *Coercions
 makeUnique attr {coer_demanded, coer_offered}
@@ -601,19 +546,24 @@ tryToMakeNonUnique attr coercions=:{coer_demanded}
 		= (True, makeNonUnique attr coercions)
 //				---> ("tryToMakeNonUnique", attr)
 
+class coerce a ::  !Sign !{# CommonDefs} !{# BOOLVECT} !TypePosition !a !a !*CoercionState -> (!Optional TypePosition, !*CoercionState)
+
+Success No		=  True
+Success (Yes _)	=  False
+
 instance coerce AType
 where
-	coerce defs cons_vars at1=:{at_attribute=attr1,at_type=type1} at2=:{at_attribute=attr2,at_type=type2} sign cs=:{crc_coercions}
+	coerce sign defs cons_vars tpos at1=:{at_attribute=attr1,at_type=type1} at2=:{at_attribute=attr2,at_type=type2}  cs=:{crc_coercions}
 		# sign = adjust_sign sign type1 cons_vars
 		  (succ, crc_coercions) = coerceAttributes attr1 attr2 sign crc_coercions
 		| succ
-			# (succ, cs) = coerce defs cons_vars type1 type2 sign { cs & crc_coercions = crc_coercions }
-			| succ
+			# (succ, cs) = coerce sign defs cons_vars tpos type1 type2 { cs & crc_coercions = crc_coercions }
+			| Success succ
 				# (succ1, crc_coercions) = add_propagation_inequalities attr1 type1 cs.crc_coercions
 				  (succ2, crc_coercions) = add_propagation_inequalities attr2 type2 crc_coercions
-				= (succ1 && succ2, { cs & crc_coercions = crc_coercions })
-				= (False, cs)
-			= (False, { cs & crc_coercions = crc_coercions })
+				= (if (succ1 && succ2) No (Yes tpos), { cs & crc_coercions = crc_coercions })
+				= (succ, cs)
+			= (Yes tpos, { cs & crc_coercions = crc_coercions })
 				// ---> ("coerceAttributes", attr1, attr2, sign)
 
 	where		
@@ -665,15 +615,6 @@ where
 */ 
 		add_propagation_inequalities attr type coercions
 			= (True, coercions)
-	
-coercionsOfTypeList defs cons_vars [t1 : ts1] [t2 : ts2] sign_class type_index sign cs
-	# arg_sign = sign * signClassToSign sign_class type_index
-	  (ok, cs) = coerce defs cons_vars t1 t2 arg_sign cs
-	| ok
-		= coercionsOfTypeList defs cons_vars ts1 ts2 sign_class (inc type_index) sign cs
-		= (False, cs)
-coercionsOfTypeList defs cons_vars [] [] _ _ _ cs
-	= (True, cs)
 
 isSynonymType (SynType _)
 	= True
@@ -688,6 +629,7 @@ tryToExpandTypeSyn defs cons_vars cons_id=:{type_index={glob_object,glob_module}
 		  (expanded_type, (_, {es_type_heaps, es_td_infos}))
 		  		= expandType defs cons_vars at_type ({}, { es_type_heaps = type_heaps, es_td_infos = td_infos })
 		= (True, expanded_type, es_type_heaps, es_td_infos)
+//				 ---> expanded_type
 		= (False, TA cons_id type_args, type_heaps, td_infos)
 where
 	bind_type_and_attr {atv_attribute = TA_Var {av_info_ptr}, atv_variable={tv_info_ptr}} {at_attribute,at_type} {th_vars,th_attrs}
@@ -698,29 +640,40 @@ where
 	
 instance coerce Type
 where
-	coerce defs cons_vars (TA dem_cons dem_args) (TA off_cons off_args) sign cs=:{crc_type_heaps, crc_td_infos}
+	coerce sign defs cons_vars tpos (TA dem_cons dem_args) (TA off_cons off_args)  cs=:{crc_type_heaps, crc_td_infos}
 		| dem_cons == off_cons
-			= coercionsOfTypeList defs cons_vars dem_args off_args dem_cons.type_prop.tsp_sign 0 sign cs
+			= coercions_of_arg_types sign defs cons_vars tpos dem_args off_args dem_cons.type_prop.tsp_sign 0 cs
 			# (_, dem_type, crc_type_heaps, crc_td_infos) = tryToExpandTypeSyn defs cons_vars dem_cons dem_args crc_type_heaps crc_td_infos
 			  (_, off_type, crc_type_heaps, crc_td_infos) = tryToExpandTypeSyn defs cons_vars off_cons off_args crc_type_heaps crc_td_infos
-			= coerce defs cons_vars dem_type off_type sign { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
-	coerce defs cons_vars (TA dem_cons dem_args) off_type sign cs=:{crc_type_heaps, crc_td_infos}
+			= coerce sign defs cons_vars tpos dem_type off_type { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
+		where
+			coercions_of_arg_types sign defs cons_vars tpos [t1 : ts1] [t2 : ts2] sign_class arg_number cs
+				# arg_sign = sign * signClassToSign sign_class arg_number
+				  (succ, cs) = coerce arg_sign defs cons_vars [arg_number : tpos] t1 t2 cs
+				| Success succ 
+					= coercions_of_arg_types sign defs cons_vars tpos ts1 ts2 sign_class (inc arg_number) cs
+					= (succ, cs)
+			coercions_of_arg_types sign defs cons_vars tpos [] [] _ _ cs
+				= (No, cs)
+
+	coerce sign defs cons_vars tpos (TA dem_cons dem_args) off_type cs=:{crc_type_heaps, crc_td_infos}
 		# (succ, dem_type, crc_type_heaps, crc_td_infos) = tryToExpandTypeSyn defs cons_vars dem_cons dem_args crc_type_heaps crc_td_infos
 		| succ
-			= coerce defs cons_vars dem_type off_type sign { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
-			= (True, { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos })
-	coerce defs cons_vars dem_type (TA off_cons off_args) sign cs=:{crc_type_heaps, crc_td_infos}
+			= coerce sign defs cons_vars tpos dem_type off_type { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
+			= (No, { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos })
+	coerce sign defs cons_vars tpos dem_type (TA off_cons off_args) cs=:{crc_type_heaps, crc_td_infos}
 		# (succ, off_type, crc_type_heaps, crc_td_infos) = tryToExpandTypeSyn defs cons_vars off_cons off_args crc_type_heaps crc_td_infos
 		| succ
-			= coerce defs cons_vars dem_type off_type sign { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
-			= (True, { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos })
-	coerce defs cons_vars (arg_type1 --> res_type1) (arg_type2 --> res_type2) sign cs
-		# (ok, cs) = coerce defs cons_vars arg_type1 arg_type2 (NegativeSign * sign) cs
-		| ok
-			= coerce defs cons_vars res_type1 res_type2 sign cs
-			= (False, cs)
-	coerce defs cons_vars (cons_var :@: types1) (_ :@: types2) sign cs
-		= coercions_of_type_list defs cons_vars (determine_sign_of_arg_types cons_var cons_vars) types1 types2 cs
+			= coerce sign defs cons_vars tpos dem_type off_type { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
+			= (No, { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos })
+	coerce sign defs cons_vars tpos (arg_type1 --> res_type1) (arg_type2 --> res_type2) cs
+		# (succ, cs) = coerce (NegativeSign * sign) defs cons_vars [0 : tpos] arg_type1 arg_type2  cs
+		| Success succ
+			= coerce sign defs cons_vars [1 : tpos] res_type1 res_type2 cs
+			= (succ, cs)
+	coerce _ defs cons_vars tpos (cons_var :@: types1) (_ :@: types2)  cs
+		# sign = determine_sign_of_arg_types cons_var cons_vars
+		= coercions_of_type_list sign defs cons_vars tpos 0 types1 types2 cs
 	where
 		determine_sign_of_arg_types (TempCV tmp_var_id) cons_vars
 			| isPositive tmp_var_id cons_vars
@@ -729,16 +682,17 @@ where
 		determine_sign_of_arg_types _ cons_vars
 				= TopSign
 			
-		coercions_of_type_list :: !{# CommonDefs} !{# BOOLVECT} !Sign ![a] ![a] !*CoercionState -> (!Bool,!*CoercionState) | coerce a
-		coercions_of_type_list defs cons_vars sign [t1 : ts1] [t2 : ts2] cs
-			# (ok, cs) = coerce defs cons_vars t1 t2 sign cs
-			| ok
-				= coercions_of_type_list defs cons_vars sign ts1 ts2 cs
-				= (False, cs)
-		coercions_of_type_list defs cons_vars sign [] [] cs
-			= (True, cs)
-	coerce defs cons_vars _ _ sign cs
-		= (True, cs)
+//		coercions_of_type_list :: !Sign !{# CommonDefs} !{# BOOLVECT} ![a] ![a] !*CoercionState -> (!Bool,!*CoercionState) | coerce a
+		coercions_of_type_list sign defs cons_vars tpos arg_number [t1 : ts1] [t2 : ts2] cs
+			# (succ, cs) = coerce sign defs cons_vars [arg_number : tpos] t1 t2 cs
+			| Success succ
+				= coercions_of_type_list sign defs cons_vars tpos (inc arg_number) ts1 ts2 cs
+				= (succ, cs)
+		coercions_of_type_list sign defs cons_vars tpos arg_number [] [] cs
+			= (No, cs)
+
+	coerce sign defs cons_vars tpos _ _  cs
+		= (No, cs)
 
 AttrRestricted :== 0
 
