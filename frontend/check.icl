@@ -1095,6 +1095,9 @@ where
 
 ::	RecordKind = RK_Constructor | RK_Update | RK_UpdateToConstructor ![AuxiliaryPattern]
 
+cEndWithUpdate :== True
+cEndWithSelection :== False
+
 checkExpression :: ![FreeVar] !ParsedExpr !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
 	-> *(!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState);
 checkExpression free_vars (PE_List exprs) e_input e_state e_info cs	
@@ -1356,7 +1359,7 @@ where
 
 
 checkExpression free_vars (PE_Selection is_unique expr selectors) e_input e_state e_info cs	
-	# (selectors, free_vars, e_state, e_info, cs) = checkSelectors free_vars selectors e_input e_state e_info cs
+	# (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithSelection free_vars selectors e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	| is_unique
 		# (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
@@ -1364,7 +1367,7 @@ checkExpression free_vars (PE_Selection is_unique expr selectors) e_input e_stat
 		= (Selection No expr selectors, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_info cs	
 	# (expr1, free_vars, e_state, e_info, cs) = checkExpression free_vars expr1 e_input e_state e_info cs
-	  (selectors, free_vars, e_state, e_info, cs) = checkSelectors free_vars selectors e_input e_state e_info cs
+	  (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithUpdate free_vars selectors e_input e_state e_info cs
 	  (expr2, free_vars, e_state, e_info, cs) = checkExpression free_vars expr2 e_input e_state e_info cs
 	= (Update expr1 selectors expr2, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Tuple exprs) e_input e_state e_info cs
@@ -1508,14 +1511,15 @@ checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (check.icl, line 1433)" <<- expr
 
-checkSelectors free_vars [] e_input e_state e_info cs
-	= ([], free_vars, e_state, e_info, cs)
-checkSelectors free_vars [ selector : selectors ] e_input e_state e_info cs
-	# (selector, free_vars, e_state, e_info, cs) = check_selector free_vars selector e_input e_state e_info cs
-	  (selectors, free_vars, e_state, e_info, cs) = checkSelectors free_vars selectors e_input e_state e_info cs
-	= ([ selector : selectors ], free_vars, e_state, e_info, cs)
+checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_state e_info cs
+	| isEmpty selectors
+		# (selector, free_vars, e_state, e_info, cs) = check_selector end_with_update free_vars selector e_input e_state e_info cs
+		= ([ selector ], free_vars, e_state, e_info, cs)
+		# (selector, free_vars, e_state, e_info, cs) = check_selector cEndWithSelection free_vars selector e_input e_state e_info cs
+		  (selectors, free_vars, e_state, e_info, cs) = checkSelectors end_with_update free_vars selectors e_input e_state e_info cs
+		= ([ selector : selectors ], free_vars, e_state, e_info, cs)
 where		
-	check_selector free_vars (PS_Record selector=:{id_info,id_name} opt_type) e_input=:{ei_mod_index} e_state
+	check_selector _ free_vars (PS_Record selector=:{id_info,id_name} opt_type) e_input=:{ei_mod_index} e_state
 			e_info=:{ef_selector_defs, ef_modules} cs=:{cs_symbol_table}
 		#! entry = sreadPtr id_info cs_symbol_table
 		# selectors = retrieveSelectorIndexes ei_mod_index entry 
@@ -1564,12 +1568,16 @@ where
 						= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 				= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 
-	check_selector free_vars (PS_Array index_expr) e_input=:{ei_mod_index} e_state e_info cs
+	check_selector end_with_update free_vars (PS_Array index_expr) e_input=:{ei_mod_index} e_state e_info cs
 		# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
-		  (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
+		  (glob_select_symb, cs) = get_select_or_update end_with_update cs
 		  (new_info_ptr, es_expression_heap) = newPtr EI_Empty e_state.es_expression_heap
 		= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expression_heap = es_expression_heap }, e_info, cs)
 
+	get_select_or_update end_with_update cs
+		| end_with_update
+			= getPredefinedGlobalSymbol PD_ArrayUpdateFun PD_StdArray STE_Member 3 cs
+			= getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
 
 buildLetExpression :: !(Env Expression FreeVar) !Bool !Expression !*ExpressionHeap  -> (!Expression, !*ExpressionHeap)
 buildLetExpression [] is_strict expr expr_heap
