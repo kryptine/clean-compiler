@@ -19,40 +19,28 @@ implies a b :== not a || b
 	,	si_implicit	:: ![(Index, Position)]	// module indices
 	}
 
-markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
-		-> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
+markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable) -> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
 markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
-	#! nr_of_expl_imp_symbols
-			= size expl_imp_info.[component_nr]
-	   (new_symbols, expl_imp_info, cs_symbol_table)
-			= iFoldSt (mark_symbol component_nr) 0 nr_of_expl_imp_symbols ([], expl_imp_info, cs_symbol_table)
+	#! nr_of_expl_imp_symbols = size expl_imp_info.[component_nr]
+	   (new_symbols, expl_imp_info, cs_symbol_table) = iFoldSt (mark_symbol component_nr) 0 nr_of_expl_imp_symbols ([], expl_imp_info, cs_symbol_table)
 	= (new_symbols, (expl_imp_info, cs_symbol_table))
   where
-	mark_symbol component_nr i
-				(changed_symbols_accu, expl_imp_info, cs_symbol_table)
-		# (eii_ident, expl_imp_info)
-				= do_a_lot_just_to_read_an_array component_nr i expl_imp_info
-		  (ste, cs_symbol_table)
-				= readPtr eii_ident.id_info cs_symbol_table
-		  cai
-		  		= { cai_component_nr = component_nr, cai_index = i }
+	mark_symbol component_nr i (changed_symbols_accu, expl_imp_info, cs_symbol_table)
+		# (eii_ident, expl_imp_info) = do_a_lot_just_to_read_an_array component_nr i expl_imp_info
+		  (ste, cs_symbol_table) = readPtr eii_ident.id_info cs_symbol_table
+		  cai = { cai_component_nr = component_nr, cai_index = i }
 		= case ste.ste_kind of
 			STE_ExplImpComponentNrs component_nrs _
-				# new_ste_kind
-						= STE_ExplImpComponentNrs [cai:component_nrs] []
-				  cs_symbol_table
-				  		= writePtr eii_ident.id_info { ste & ste_kind = new_ste_kind } cs_symbol_table
+				# new_ste_kind = STE_ExplImpComponentNrs [cai:component_nrs] []
+				  cs_symbol_table = writePtr eii_ident.id_info { ste & ste_kind = new_ste_kind } cs_symbol_table
 				-> (changed_symbols_accu, expl_imp_info, cs_symbol_table)
 			_
-				# new_ste
-						= { ste & ste_kind = STE_ExplImpComponentNrs [cai] [], ste_previous = ste }
+				# new_ste = { ste & ste_kind = STE_ExplImpComponentNrs [cai] [], ste_previous = ste }
 				-> ([eii_ident:changed_symbols_accu], expl_imp_info, writePtr eii_ident.id_info new_ste cs_symbol_table)
 
 	do_a_lot_just_to_read_an_array component_nr i expl_imp_info
-		# (eii, expl_imp_info)
-				= replaceTwoDimArrElt component_nr i TemporarilyFetchedAway expl_imp_info
-		  (eii_ident, eii)
-		  		= get_eei_ident eii
+		# (eii, expl_imp_info) = replaceTwoDimArrElt component_nr i TemporarilyFetchedAway expl_imp_info
+		  (eii_ident, eii) = get_eei_ident eii
 		= (eii_ident, { expl_imp_info & [component_nr, i] = eii })
 				
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
@@ -89,11 +77,11 @@ addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_mod
 		= (bitvectToNumberSet belonging_bitvect, dcl_modules, cs_symbol_table)
 
 	set_bit {id_info} (bit_nr, bitvect, cs_symbol_table)
-		# ({ste_kind}, cs_symbol_table)
-				= readPtr id_info cs_symbol_table
+		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= ( bit_nr+1
 		  , case ste_kind of
 			 	STE_Empty -> bitvect
+			 	STE_BelongingSymbolForExportedSymbol -> bitvect
 				_ -> bitvectSet bit_nr bitvect
 		  , cs_symbol_table
 		  )

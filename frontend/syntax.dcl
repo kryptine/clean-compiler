@@ -66,6 +66,8 @@ instance == FunctionOrMacroIndex
 				
 				| STE_UsedType !Index !STE_Kind
 					/* used during binding of types to mark types that have been applied. The first  */
+				| STE_BelongingSymbolExported
+				| STE_BelongingSymbolForExportedSymbol
 
 ::	Declaration = Declaration !DeclarationRecord
 

@@ -67,6 +67,8 @@ instance == FunctionOrMacroIndex
 				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
 				| STE_BelongingSymbol !Int
 				| STE_UsedType !Index !STE_Kind
+				| STE_BelongingSymbolExported
+				| STE_BelongingSymbolForExportedSymbol
 
 ::	Declaration = Declaration !DeclarationRecord
 

@@ -1563,8 +1563,7 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 		STE_ClosedModule
 			// this component has been already checked during the previous icl module's compilation
 			# (expl_imp_infos, dcl_modules, cs_symbol_table)
-					= foldSt (just_update_expl_imp_info components_array super_components) mod_indices
-							(expl_imp_infos, dcl_modules, cs.cs_symbol_table)
+					= foldSt (just_update_expl_imp_info components_array super_components) mod_indices (expl_imp_infos, dcl_modules, cs.cs_symbol_table)
  			-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps,
  				{ cs & cs_symbol_table = cs_symbol_table })
 		STE_Module _
@@ -1676,14 +1675,9 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 						(dcl_modules, expl_imp_infos, cs_symbol_table)
 		= (expl_imp_infos, dcl_modules, cs_symbol_table)
 	
-	just_update_expl_imp_info components_array super_components mod_index
-			(expl_imp_infos, dcl_modules, cs_symbol_table)
-		# ({dcls_local_for_import, dcls_import}, dcl_modules)
-				= dcl_modules![mod_index].dcl_declared
-		# (dcl_modules, expl_imp_infos, cs_symbol_table)
-				= updateExplImpInfo super_components.[mod_index] mod_index dcls_import dcls_local_for_import
-							dcl_modules expl_imp_infos cs_symbol_table
-		= (expl_imp_infos, dcl_modules, cs_symbol_table)
+	just_update_expl_imp_info components_array super_components mod_index (expl_imp_infos, dcl_modules, cs_symbol_table)
+		# ({dcls_local_for_import, dcls_import}, dcl_modules) = dcl_modules![mod_index].dcl_declared
+		= updateExplImpInfoForCachedModule super_components.[mod_index] mod_index dcls_import dcls_local_for_import expl_imp_infos dcl_modules cs_symbol_table
 
 	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit} (dcl_modules, icl_functions,macro_defs,hp_expression_heap, cs)
 		# ({dcl_declared}, dcl_modules) = dcl_modules![mod_index]
@@ -2502,16 +2496,122 @@ updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
 	  			cs_symbol_table
 
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
-	  		= foldlArraySt (update_expl_imp_for_marked_symbol mod_index) dcls_local_for_import
-	  				(dcl_modules, expl_imp_infos, cs_symbol_table)
+	  		= update_expl_imp_for_marked_symbols mod_index dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
-	  		= foldlArraySt (update_expl_imp_for_marked_symbol mod_index) dcls_import
-	  				(dcl_modules, expl_imp_infos, cs_symbol_table)
+	  		= update_expl_imp_for_marked_symbols mod_index dcls_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  cs_symbol_table
 	  		= foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table)
 	  				changed_symbols cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-	
+
+updateExplImpInfoForCachedModule :: [Int] Index {!Declaration} {!Declaration} {!{!*ExplImpInfo}} u:{#DclModule} *SymbolTable 
+																		 -> (!{!{!.ExplImpInfo}},u:{#DclModule},.SymbolTable)
+updateExplImpInfoForCachedModule super_components mod_index dcls_import dcls_local_for_import expl_imp_infos dcl_modules cs_symbol_table
+	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
+	  		= mapSt markExplImpSymbols super_components (expl_imp_infos, cs_symbol_table)
+
+	  dcl_modules13 = dcl_modules
+	  cs_symbol_table13 = cs_symbol_table
+
+	  dcl_modules__cs_symbol_table = mark_belongings_of_expl_imp_symbols dcls_local_for_import (dcl_modules, cs_symbol_table)
+	  (dcl_modules, cs_symbol_table) = mark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table
+
+	  cs_symbol_table = mark_belongings_of_expl_imp_symbols_as_exported dcls_local_for_import cs_symbol_table
+	  cs_symbol_table = mark_belongings_of_expl_imp_symbols_as_exported dcls_import cs_symbol_table
+
+	  cs_symbol_table = switch_import_syntax cs_symbol_table13 cs_symbol_table
+	  dcl_modules = switch_import_syntax dcl_modules13 dcl_modules
+
+	  cs_symbol_table
+	  		= switch_import_syntax
+	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_local_for_import cs_symbol_table)
+	  			cs_symbol_table
+	  cs_symbol_table
+	  		= switch_import_syntax
+	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_import cs_symbol_table)
+	  			cs_symbol_table
+
+	  (dcl_modules, expl_imp_infos, cs_symbol_table)
+	  		= update_expl_imp_for_marked_symbols mod_index dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
+	  (dcl_modules, expl_imp_infos, cs_symbol_table)
+	  		= update_expl_imp_for_marked_symbols mod_index dcls_import (dcl_modules, expl_imp_infos, cs_symbol_table)
+
+	  dcl_modules__cs_symbol_table
+	  		= switch_import_syntax
+	  			(dcl_modules, cs_symbol_table)
+	  			(unmark_belongings_of_expl_imp_symbols dcls_local_for_import (dcl_modules, cs_symbol_table))
+	  (dcl_modules, cs_symbol_table)
+	  		= switch_import_syntax
+	  			dcl_modules__cs_symbol_table
+	  			(unmark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table)
+
+	  cs_symbol_table = foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
+	= (expl_imp_infos, dcl_modules, cs_symbol_table)
+where
+	mark_belongings_of_expl_imp_symbols decls (dcl_modules, cs_symbol_table)
+		= foldlArraySt mark_belongings_of_expl_imp_symbol decls (dcl_modules, cs_symbol_table)
+		where
+			mark_belongings_of_expl_imp_symbol decl=:(Declaration {decl_ident={id_info}}) (dcl_modules, cs_symbol_table)
+				# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+				= case ste of
+					({ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices})
+						# (all_belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
+						-> (dcl_modules, foldlBelongingSymbols mark_belonging_symbol all_belonging_symbols cs_symbol_table)
+						where
+							mark_belonging_symbol {id_info} cs_symbol_table
+								# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+								= case ste.ste_kind of
+								 	STE_Empty
+								 		-> writePtr id_info {ste & ste_kind=STE_BelongingSymbolForExportedSymbol} cs_symbol_table
+								 	_
+										-> cs_symbol_table
+					_
+						-> (dcl_modules, cs_symbol_table)
+
+	mark_belongings_of_expl_imp_symbols_as_exported decls cs_symbol_table
+		= foldlArraySt mark_belonging_of_expl_imp_marked_symbol_as_exported decls cs_symbol_table
+		where
+			mark_belonging_of_expl_imp_marked_symbol_as_exported decl=:(Declaration {decl_ident={id_info}}) cs_symbol_table
+				# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+				= case ste.ste_kind of
+				 	STE_BelongingSymbolForExportedSymbol
+				 		-> writePtr id_info {ste & ste_kind=STE_BelongingSymbolExported} cs_symbol_table
+				 	_
+						-> cs_symbol_table
+
+	unmark_belongings_of_expl_imp_symbols decls (dcl_modules, cs_symbol_table)
+		= foldlArraySt unmark_belongings_of_expl_imp_symbol decls (dcl_modules, cs_symbol_table)
+		where
+			unmark_belongings_of_expl_imp_symbol decl=:(Declaration {decl_ident={id_info}}) (dcl_modules, cs_symbol_table)
+				# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+				= case ste of
+					({ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices})
+						# (all_belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
+						-> (dcl_modules, foldlBelongingSymbols unmark_belonging_symbol all_belonging_symbols cs_symbol_table)
+						where
+							unmark_belonging_symbol {id_info} cs_symbol_table
+								# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+								= case ste.ste_kind of
+								 	STE_BelongingSymbolExported
+								 		-> writePtr id_info {ste & ste_kind=STE_Empty} cs_symbol_table
+								 	STE_BelongingSymbolForExportedSymbol
+								 		-> writePtr id_info {ste & ste_kind=STE_Empty} cs_symbol_table
+								 	_
+										-> cs_symbol_table
+					_
+						-> (dcl_modules, cs_symbol_table)
+
+foldlBelongingSymbols f bs st
+	:== case bs of
+			BS_Constructors constructors
+				-> foldSt (\{ds_ident} st -> f ds_ident st) constructors st 
+			BS_Fields fields
+				-> foldlArraySt (\{fs_name} st -> f fs_name st) fields st 
+			BS_Members members
+				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
+			BS_Nothing
+				-> st
+
 /*
 ste_kind_to_string :: STE_Kind -> String
 ste_kind_to_string ste_kind = case ste_kind of
@@ -2573,14 +2673,15 @@ opt_store_instance_with_class_symbol decl=:(Declaration  {decl_kind=STE_Imported
 opt_store_instance_with_class_symbol _ cs_symbol_table
 	= cs_symbol_table
 
+update_expl_imp_for_marked_symbols mod_index decls (dcl_modules, expl_imp_infos, cs_symbol_table)
+	= foldlArraySt (update_expl_imp_for_marked_symbol mod_index) decls (dcl_modules, expl_imp_infos, cs_symbol_table)
+
 update_expl_imp_for_marked_symbol mod_index decl=:(Declaration {decl_ident}) (dcl_modules, expl_imp_infos, cs_symbol_table)
-	# (ste, cs_symbol_table)
-			= readPtr decl_ident.id_info cs_symbol_table
+	# (ste, cs_symbol_table) = readPtr decl_ident.id_info cs_symbol_table
 	= updateExplImpForMarkedSymbol mod_index decl ste dcl_modules expl_imp_infos cs_symbol_table
 
 update_expl_imp_for_marked_local_symbol mod_index decl=:(Declaration {decl_ident}) (dcl_modules, expl_imp_infos, cs_symbol_table)
-	# (ste, cs_symbol_table)
-			= readPtr decl_ident.id_info cs_symbol_table
+	# (ste, cs_symbol_table) = readPtr decl_ident.id_info cs_symbol_table
 	= updateExplImpForMarkedLocalSymbol mod_index decl ste dcl_modules expl_imp_infos cs_symbol_table
 
 updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
