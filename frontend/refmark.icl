@@ -493,18 +493,21 @@ where
 			= foldSt initial_occurrence vars (subst, type_def_infos, var_heap, expr_heap)
 		where
 			initial_occurrence {fv_name,fv_info_ptr} (subst, type_def_infos, var_heap, expr_heap) 
-// MW3 was:				# (VI_Type {at_type,at_attribute}, var_heap) = readPtr fv_info_ptr var_heap
-				# (VI_Type {at_type,at_attribute} _, var_heap) = readPtr fv_info_ptr var_heap
-				= case at_type of
-					TempV tv_number
-						#! is_oberving = has_observing_type type_def_infos subst.[tv_number]
-						-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
-								VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
-									occ_observing = is_oberving, occ_bind = OB_Empty }), expr_heap)
+				# (var_info, var_heap) = readPtr fv_info_ptr var_heap
+				= case var_info of
+					VI_Type {at_type,at_attribute} _						
+						-> case at_type of
+							TempV tv_number
+								#! is_oberving = has_observing_type type_def_infos subst.[tv_number]
+								-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
+										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
+											occ_observing = is_oberving, occ_bind = OB_Empty }), expr_heap)
+							_
+								-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
+										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
+											occ_observing = False,  occ_bind = OB_Empty }), expr_heap)
 					_
-						-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
-								VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
-									occ_observing = False,  occ_bind = OB_Empty }), expr_heap)
+						-> abort ("initial_occurrence (remark.icl)" ---> ((fv_name,fv_info_ptr) <<- var_info))
 					
 
 		make_shared_vars_non_unique vars coercion_env var_heap expr_heap error

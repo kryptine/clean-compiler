@@ -746,7 +746,7 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modu
 	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
-//		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), (new_args, local_vars, new_rhs, '\n'))
+//		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
@@ -773,7 +773,7 @@ mergeCases case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_de
 
 where
 	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default}) var_heap symbol_heap
-		| split_var_info_ptr == var_info_ptr
+		| split_var_info_ptr == skip_alias var_info_ptr var_heap
 			= (Yes this_case, var_heap, symbol_heap)
 		| has_no_default case_default
 			= case case_guards of
@@ -814,8 +814,9 @@ where
 					-> (No, var_heap, symbol_heap)
 		| otherwise
 			= (No, var_heap, symbol_heap)
-	split_case split_var_info_ptr (Let lad=:{let_expr,let_strict_binds}) var_heap symbol_heap
+	split_case split_var_info_ptr (Let lad=:{let_expr,let_strict_binds,let_lazy_binds}) var_heap symbol_heap
 		| isEmpty let_strict_binds
+			# var_heap = foldSt set_alias let_lazy_binds var_heap
 			# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr let_expr var_heap symbol_heap
 			= case split_result of
 				Yes split_case
@@ -829,6 +830,18 @@ where
 	
 	has_no_default No 		= True
 	has_no_default (Yes _) 	= False
+	
+	skip_alias var_info_ptr var_heap
+		= case sreadPtr var_info_ptr var_heap of
+			VI_Alias bv
+				-> bv.var_info_ptr
+			_
+				-> var_info_ptr
+
+	set_alias {bind_src=Var var,bind_dst={fv_info_ptr}} var_heap
+		= var_heap <:= (fv_info_ptr, VI_Alias var)
+	set_alias _ var_heap
+		= var_heap
 
 	push_expression_into_guards expr_fun (AlgebraicPatterns type patterns) 
 		= AlgebraicPatterns type (map (\algpattern -> { algpattern & ap_expr = expr_fun algpattern.ap_expr }) patterns)

@@ -161,20 +161,9 @@ where
 cannotUnify t1 t2 position err 
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
-// MW3 was:	= { err & ea_file = err.ea_file <<< " cannot unify " <:: (format, t1) <<< " with " <:: (format, t2)  <<< " near " <<< position <<< '\n' }
 	= { err & ea_file = err.ea_file <<< optionalFrontPosition position <<< " cannot unify " <:: (format, t1) 
 							<<< " with " <:: (format, t2) <<< position <<< '\n' }
 
-/*
-simplifyType ta=:(type :@: type_args)
-	# type = simplify_type type
-	= case type of
-		TA type_cons cons_args
-			-> TA { type_cons & type_arity = type_cons.type_arity + length type_args } (cons_args ++ type_args)
-	 	_ 	-> ta
-simplifyType type
-	= type
-*/
 
 class unify a :: !a !a !TypeInput !*{! Type} !*TypeHeaps -> (!Bool, !*{! Type}, !*TypeHeaps)
 
@@ -812,21 +801,13 @@ where
 	requirements ti {var_name,var_info_ptr,var_expr_ptr} (reqs, ts)
 		# (var_info, ts_var_heap) = readPtr var_info_ptr ts.ts_var_heap
 		  ts = { ts & ts_var_heap = ts_var_heap }
-/* JVG: changed to reduce allocation because the case is polymorphic and lazy in req and ts: */
 		= (case var_info of
-// MW3 was:			VI_Type type
 			VI_Type type _
 				-> type
 			_
 				-> abort ("requirements BoundVar" ---> (var_name <<- var_info))
 			, Yes var_expr_ptr, (reqs, ts))
-/*
-		= case var_info of
-			VI_Type type
-				-> (type, Yes var_expr_ptr, (reqs, ts))
-			_
-				-> abort ("requirements BoundVar" ---> (var_name <<- var_info))
-*/
+
 instance requirements App
 where
 	requirements ti {app_symb,app_args,app_info_ptr} (reqs=:{req_cons_variables, req_attr_coercions}, ts)
@@ -839,18 +820,13 @@ where
 					{ ts & ts_expr_heap = ts.ts_expr_heap <:= (app_info_ptr,
 							EI_Overloaded { oc_symbol = app_symb, oc_context = tst_context, oc_specials = specials })}))
 	where
-// MW3 was:		requirements_of_args :: !TypeInput ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
 		requirements_of_args :: !TypeInput !Ident !Int ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
-// MW3 was:		requirements_of_args ti [] [] reqs_ts
 		requirements_of_args ti _ _ [] [] reqs_ts
 			= reqs_ts
-// MW3 was:		requirements_of_args ti [expr:exprs] [lt:lts] reqs_ts
 		requirements_of_args ti fun_ident arg_nr [expr:exprs] [lt:lts] reqs_ts
 			# (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
-// MW3 was:			  req_type_coercions = [{ tc_demanded = lt, tc_offered = e_type, tc_position = { cp_expression = expr }, tc_coercible = True } : reqs.req_type_coercions ]
 			  req_type_coercions = [{ tc_demanded = lt, tc_offered = e_type, tc_position = CP_FunArg fun_ident arg_nr, tc_coercible = True } : reqs.req_type_coercions ]
 			  ts_expr_heap = storeAttribute opt_expr_ptr lt.at_attribute ts.ts_expr_heap
-// MW3 was:			= requirements_of_args ti exprs lts ({ reqs & req_type_coercions = req_type_coercions}, { ts & ts_expr_heap = ts_expr_heap })
 			= requirements_of_args ti fun_ident (arg_nr+1) exprs lts ({ reqs & req_type_coercions = req_type_coercions}, { ts & ts_expr_heap = ts_expr_heap })
 
 instance requirements Case
@@ -869,38 +845,31 @@ where
 			# (cons_types, result_type, new_attr_env, ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
 			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, ts)
 			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
-			  (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap // MW3++
-// MW3 was:			= (reverse used_cons_types,  ({ reqs & req_type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = { cp_expression = match_expr },
+			  (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
 			= (reverse used_cons_types,  ({ reqs & req_type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = position,
 					tc_coercible = True} : reqs.req_type_coercions],
-// MW3 was:						req_attr_coercions = new_attr_env ++ reqs.req_attr_coercions }, { ts & ts_expr_heap = ts_expr_heap }))
 						req_attr_coercions = new_attr_env ++ reqs.req_attr_coercions }, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap }))
 	
 		requirements_of_guarded_expressions ti (BasicPatterns bas_type patterns) match_expr pattern_type opt_pattern_ptr goal_type (reqs, ts)
 			# (attr_bas_type, ts) = attributedBasicType bas_type ts
 			  (reqs, ts) = requirements_of_basic_patterns ti patterns goal_type (reqs, ts)
 			  ts_expr_heap = storeAttribute opt_pattern_ptr attr_bas_type.at_attribute ts.ts_expr_heap
-// MW3 was:			= ([], ({ reqs & req_type_coercions = [{tc_demanded = attr_bas_type,tc_offered = pattern_type, tc_position = { cp_expression = match_expr }, tc_coercible = True} :
 			= ([], ({ reqs & req_type_coercions = [{tc_demanded = attr_bas_type,tc_offered = pattern_type, tc_position = CP_Expression match_expr, tc_coercible = True} :
 						reqs.req_type_coercions]}, { ts & ts_expr_heap = ts_expr_heap }))
 		requirements_of_guarded_expressions ti (DynamicPatterns dynamic_patterns) match_expr pattern_type opt_pattern_ptr goal_type reqs_ts
 			# dyn_type = { at_type = TB BT_Dynamic, at_attribute = TA_Multi, at_annotation = AN_None }
 			  (used_dyn_types, (reqs, ts)) = requirements_of_dynamic_patterns ti goal_type dynamic_patterns [] reqs_ts
 			  ts_expr_heap = storeAttribute opt_pattern_ptr TA_Multi ts.ts_expr_heap
-// MW3 was:			= (reverse used_dyn_types, ({ reqs & req_type_coercions = [{tc_demanded = dyn_type, tc_offered = pattern_type, tc_position = { cp_expression = match_expr }, tc_coercible = True} :
 			= (reverse used_dyn_types, ({ reqs & req_type_coercions = [{tc_demanded = dyn_type, tc_offered = pattern_type, tc_position = CP_Expression match_expr, tc_coercible = True} :
 						reqs.req_type_coercions] }, { ts & ts_expr_heap = ts_expr_heap }))
 	
 		requirements_of_algebraic_patterns ti [] cons_types goal_type used_cons_types reqs_ts
 			= (used_cons_types, reqs_ts)
-// MW3 was:		requirements_of_algebraic_patterns ti=:{ti_common_defs}[{ap_vars, ap_expr }:gs] [ cons_arg_types : cons_types] goal_type used_cons_types (reqs, ts)
-// MW3 was:			# (res_type, opt_expr_ptr, (reqs, ts)) = requirements ti ap_expr (reqs, { ts & ts_var_heap = makeBase ap_vars cons_arg_types ts.ts_var_heap})
 		requirements_of_algebraic_patterns ti=:{ti_common_defs} [{ap_symbol, ap_vars, ap_expr }:gs] [ cons_arg_types : cons_types] goal_type used_cons_types (reqs, ts)
 			# (res_type, opt_expr_ptr, (reqs, ts)) 
 					= requirements ti ap_expr (reqs, { ts & ts_var_heap = makeBase ap_symbol.glob_object.ds_ident 1 ap_vars cons_arg_types ts.ts_var_heap})
 			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
 			= requirements_of_algebraic_patterns ti gs cons_types goal_type [ cons_arg_types : used_cons_types ]
-// MW3 was:				({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = { cp_expression = ap_expr }, tc_coercible = True } : reqs.req_type_coercions] },
 				({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression ap_expr, tc_coercible = True } : reqs.req_type_coercions] },
 					  { ts & ts_expr_heap = ts_expr_heap })
 	
@@ -910,17 +879,14 @@ where
 		  	# (res_type, opt_expr_ptr, (reqs, ts)) = requirements ti bp_expr reqs_ts
 			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
 			= requirements_of_basic_patterns ti gs goal_type
-// MW3 was:				({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = { cp_expression = bp_expr }, tc_coercible = True } : reqs.req_type_coercions] },
 				({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression bp_expr, tc_coercible = True } : reqs.req_type_coercions] },
 						 { ts & ts_expr_heap = ts_expr_heap })
 	
 		requirements_of_dynamic_patterns ti goal_type [{dp_var={fv_info_ptr},dp_type,dp_rhs} : dps] used_dyn_types (reqs, ts=:{ts_expr_heap, ts_var_heap})
 			# (EI_TempDynamicPattern _ _ _ _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dp_type ts_expr_heap
-// MW3 was:			  ts_var_heap = ts_var_heap <:= (fv_info_ptr, VI_Type dyn_type)
 			  ts_var_heap = ts_var_heap <:= (fv_info_ptr, VI_Type dyn_type No)
 			  (dp_rhs_type, opt_expr_ptr, (reqs, ts)) = requirements ti dp_rhs (reqs, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
 			  ts_expr_heap = storeAttribute opt_expr_ptr dp_rhs_type.at_attribute ts.ts_expr_heap
-// MW3 was:			  type_coercion = { tc_demanded = goal_type, tc_offered = dp_rhs_type, tc_position = { cp_expression = dp_rhs }, tc_coercible = True }
 			  type_coercion = { tc_demanded = goal_type, tc_offered = dp_rhs_type, tc_position = CP_Expression dp_rhs, tc_coercible = True }
 			| isEmpty dyn_context
 				# reqs = {reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions]}
@@ -935,7 +901,6 @@ where
 		requirements_of_default ti (Yes expr) goal_type reqs_ts
 			# (res_type, opt_expr_ptr, (reqs,  ts)) = requirements ti expr reqs_ts
 			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
-// MW3 was:			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = { cp_expression = expr }, tc_coercible = True } : reqs.req_type_coercions] },
 			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression expr, tc_coercible = True } : reqs.req_type_coercions] },
 					{ ts & ts_expr_heap = ts_expr_heap })
 		requirements_of_default ti No goal_type reqs_ts
@@ -953,11 +918,6 @@ where
 		= ( res_type, opt_expr_ptr, ({ reqs & req_case_and_let_exprs = [let_info_ptr : reqs.req_case_and_let_exprs]},{ ts & ts_expr_heap = ts_expr_heap }))
 	where
 	
-/* MW3 was
-		make_base [{bind_dst={fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
-			# (v, ts) = freshAttributedVariable ts
-			= make_base bs [v:var_types] { ts & ts_var_heap = writePtr fv_info_ptr (VI_Type v) ts.ts_var_heap }
-*/
 		make_base [{bind_src, bind_dst={fv_name, fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
 			# (v, ts) = freshAttributedVariable ts
 			  optional_position = if (is_rare_name fv_name) (Yes (CP_Expression bind_src)) No
@@ -970,7 +930,6 @@ where
 		requirements_of_binds ti [{bind_src}:bs] [b_type:bts] reqs_ts
 			# (exp_type, opt_expr_ptr, (reqs, ts)) = requirements ti bind_src reqs_ts
 			  ts_expr_heap = storeAttribute opt_expr_ptr b_type.at_attribute ts.ts_expr_heap
-// MW3 was:			  req_type_coercions = [ { tc_demanded = b_type, tc_offered = exp_type, tc_position = { cp_expression = bind_src }, tc_coercible = True }
 			  req_type_coercions = [ { tc_demanded = b_type, tc_offered = exp_type, tc_position = CP_Expression bind_src, tc_coercible = True }
 			  		: reqs.req_type_coercions ]
 			= requirements_of_binds ti bs bts ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap })
@@ -981,7 +940,6 @@ where
 		# (EI_TempDynamicType _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dyn_info_ptr ts_expr_heap
 		  (dyn_expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti dyn_expr (reqs, { ts & ts_expr_heap = ts_expr_heap })
 		  ts_expr_heap = storeAttribute opt_expr_ptr dyn_expr_type.at_attribute ts.ts_expr_heap
-// MW3 was:		  type_coercion = { tc_demanded = dyn_type, tc_offered = dyn_expr_type, tc_position = { cp_expression = dyn_expr }, tc_coercible = True }
 		  type_coercion = { tc_demanded = dyn_type, tc_offered = dyn_expr_type, tc_position = CP_Expression dyn_expr, tc_coercible = True }
 		| isEmpty dyn_context
 			= ({ at_type = TB BT_Dynamic, at_attribute = TA_Multi, at_annotation = AN_None }, No, 
@@ -1005,7 +963,6 @@ where
 		  (alpha, ts) = freshAttributedVariable ts
 		  (fun_type, req_type_coercions, ts) = apply_type rev_off_arg_types alpha reqs.req_type_coercions function ts
 		  ts_expr_heap = storeAttribute opt_fun_expr_ptr fun_type.at_attribute ts.ts_expr_heap
-// MW3 was:		= (alpha, No, ({ reqs & req_type_coercions = [{ tc_demanded = fun_type, tc_offered = off_fun_type, tc_position = { cp_expression = function }, tc_coercible = True } : req_type_coercions ]}, { ts & ts_expr_heap = ts_expr_heap }))
 		= (alpha, No, ({ reqs & req_type_coercions = [{ tc_demanded = fun_type, tc_offered = off_fun_type, tc_position = CP_Expression function, tc_coercible = True } : req_type_coercions ]}, { ts & ts_expr_heap = ts_expr_heap }))
 	where
 		requirements_of_list _ [] rev_list_types reqs_ts
@@ -1026,7 +983,6 @@ where
 		determine_demanded_type type (Yes expr_ptr) type_coercions expr ts
 			# (dem_type, ts) = freshAttributedVariable ts
 			  ts_expr_heap = writePtr expr_ptr (EI_Attribute (toInt dem_type.at_attribute)) ts.ts_expr_heap
-// MW3 was:			= (dem_type, [ { tc_demanded = dem_type, tc_offered = type, tc_position = { cp_expression = expr }, tc_coercible = True } : type_coercions ],
 			= (dem_type, [ { tc_demanded = dem_type, tc_offered = type, tc_position = CP_Expression expr, tc_coercible = True } : type_coercions ],
 				{ ts & ts_expr_heap = ts_expr_heap })
 		determine_demanded_type type No type_coercions expr ts
@@ -1050,8 +1006,6 @@ where
 				  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
 				  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
 				  req_type_coercions
-// MW3 was:						= [ { tc_demanded = non_unique_type_var, tc_offered = result_type, tc_position = { cp_expression = expr }, tc_coercible = False },
-// MW3 was:							{ tc_demanded = var, tc_offered = expr_type, tc_position = { cp_expression = expr }, tc_coercible = True } :
 						= [ { tc_demanded = non_unique_type_var, tc_offered = result_type, tc_position = CP_Expression expr, tc_coercible = False },
 							{ tc_demanded = var, tc_offered = expr_type, tc_position = CP_Expression expr, tc_coercible = True } :
 	 								reqs.req_type_coercions]
@@ -1072,7 +1026,6 @@ where
 		  (expression_type, opt_expr_ptr, reqs_ts) = requirements ti expression (reqs, ts)
 		  (reqs, ts) = requirements_of_fields ti expression expressions rhs.tst_args lhs.tst_args reqs_ts
 		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr lhs.tst_result.at_attribute ts.ts_expr_heap }
-// MW3 was:		  coercion = { tc_demanded = lhs.tst_result, tc_offered = expression_type, tc_position = { cp_expression = expression }, tc_coercible = True }
 		  coercion = { tc_demanded = lhs.tst_result, tc_offered = expression_type, tc_position = CP_Expression expression, tc_coercible = True }
 		= (rhs.tst_result, No, ({ reqs & req_attr_coercions = rhs.tst_attr_env ++ lhs.tst_attr_env ++ reqs.req_attr_coercions,
 										 req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts))
@@ -1085,24 +1038,20 @@ where
 	
 		requirements_of_field ti expression {bind_src=NoBind expr_ptr} dem_field_type off_field_type (reqs=:{req_type_coercions}, ts)
 			# ts = { ts & ts_expr_heap = ts.ts_expr_heap <:= (expr_ptr, EI_Attribute (toInt dem_field_type.at_attribute)) }
-// MW3 was:			  coercion = { tc_demanded = dem_field_type, tc_offered = off_field_type, tc_position = { cp_expression = expression }, tc_coercible = True }
 			  coercion = { tc_demanded = dem_field_type, tc_offered = off_field_type, tc_position = CP_Expression expression, tc_coercible = True }
 			= ({ reqs & req_type_coercions = [ coercion : req_type_coercions ]}, ts)
 		requirements_of_field ti _ {bind_src} dem_field_type _ reqs_ts
 			# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti bind_src reqs_ts
 			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr dem_field_type.at_attribute ts.ts_expr_heap }
-// MW3 was:			  coercion = { tc_demanded = dem_field_type, tc_offered = expr_type, tc_position = { cp_expression = bind_src }, tc_coercible = True }
 			  coercion = { tc_demanded = dem_field_type, tc_offered = expr_type, tc_position = CP_Expression bind_src, tc_coercible = True }
 			= ({ reqs & req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts)
 
 	requirements ti (TupleSelect tuple_symbol arg_nr expr) (reqs=:{req_attr_coercions}, ts)
 		# ({tst_args = [argtype:_], tst_result, tst_attr_env}, ts) = standardTupleSelectorType tuple_symbol arg_nr ti ts
 		  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr ({ reqs & req_attr_coercions = tst_attr_env ++ req_attr_coercions }, ts)
-// MW3 was:		  req_type_coercions = [{ tc_demanded = argtype, tc_offered = e_type, tc_position = { cp_expression = expr }, tc_coercible = True } : reqs.req_type_coercions ]
 		  (position, ts_var_heap) = getPositionOfExpr expr ts.ts_var_heap // MW3++
 		  req_type_coercions = [{ tc_demanded = argtype, tc_offered = e_type, tc_position = position, tc_coercible = True } : reqs.req_type_coercions ]
 		  ts_expr_heap = storeAttribute opt_expr_ptr argtype.at_attribute ts.ts_expr_heap
-// MW3 was:		= (tst_result, No, ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap }))
 		= (tst_result, No, ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap }))
 	
 	
@@ -1115,7 +1064,6 @@ where
 		# ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType ds_index glob_module ds_arity ti ts	
 		  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
 		  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
-// MW3 was:		  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = { cp_expression = expr }, tc_coercible = True } : reqs.req_type_coercions ] }
 		  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = CP_Expression expr, tc_coercible = True } : reqs.req_type_coercions ] }
 		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap }
 		= case opt_tuple_type of
@@ -1159,7 +1107,6 @@ where
 */		  
 requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible sel_expr_type sel_expr (reqs, ts )
 	# ({tst_args, tst_result, tst_attr_env}, ts) = standardFieldSelectorType field ti ts
-// MW3 was:	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : 
 	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
 	= (tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
@@ -1170,8 +1117,6 @@ requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident
 	  reqs ={ reqs & req_attr_coercions = tst_attr_env ++ reqs.req_attr_coercions, req_cons_variables = [ cons_variables : reqs.req_cons_variables ]}
 	  (index_type, opt_expr_ptr, (reqs, ts)) = requirements ti index_expr (reqs, ts)
 	  ts_expr_heap = storeAttribute opt_expr_ptr dem_index_type.at_attribute ts.ts_expr_heap
-// MW3 was:      reqs = { reqs & req_type_coercions = [{ tc_demanded = dem_index_type, tc_offered = index_type, tc_position = { cp_expression = expr }, tc_coercible = True },
-// MW3 was:      			{ tc_demanded = dem_array_type, tc_offered = sel_expr_type, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : reqs.req_type_coercions ]}
       reqs = { reqs & req_type_coercions = [{ tc_demanded = dem_index_type, tc_offered = index_type, tc_position = CP_Expression expr, tc_coercible = True },
       			{ tc_demanded = dem_array_type, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : reqs.req_type_coercions ]}
 	  (reqs, ts) = requirements_of_update ti opt_expr rest_type (reqs, { ts & ts_expr_heap = ts_expr_heap })
@@ -1191,14 +1136,9 @@ where
 		# (elem_expr_type, opt_elem_expr_ptr, (reqs, ts)) = requirements ti elem_expr reqs_ts
 		  ts = { ts & ts_expr_heap = storeAttribute opt_elem_expr_ptr elem_type.at_attribute ts.ts_expr_heap }
 	      reqs = { reqs & req_type_coercions = [{ tc_demanded = elem_type, tc_offered = elem_expr_type,
-// MW3 was:						tc_position = { cp_expression = elem_expr }, tc_coercible = True } : reqs.req_type_coercions ]}
 						tc_position = CP_Expression elem_expr, tc_coercible = True } : reqs.req_type_coercions ]}
 		= (reqs, ts)
 
-/* MW3 was
-makeBase vars types ts_var_heap
-	= fold2St (\ {fv_info_ptr} type var_heap -> var_heap <:= (fv_info_ptr, VI_Type type)) vars types ts_var_heap
-*/
 makeBase _ _ [] [] ts_var_heap
 	= ts_var_heap
 makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr}:vars] [type:types] ts_var_heap
@@ -1771,14 +1711,12 @@ where
 		  (type, ts_fun_env) = ts_fun_env![fun_index]
 		  {fun_symb,fun_arity,fun_body=TransformedBody {tb_args,tb_rhs},fun_pos, fun_info, fun_type} = fd
 		  temp_fun_type = type_of type
-// MW3 was:		  ts_var_heap = makeBase tb_args temp_fun_type.tst_args ts_var_heap
 		  ts_var_heap = makeBase fun_symb 1 tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_symb fun_pos
 		  ts_error = setErrorAdmin fe_location ts_error
 		  reqs = { req_overloaded_calls = [], req_type_coercions = [], req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
 		  ( rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs,
 		  		{ ts & ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error, ts_fun_env = ts_fun_env })
-// MW3 was:		  req_type_coercions = [{tc_demanded = temp_fun_type.tst_result,tc_offered = rhs_type, tc_position = {cp_expression = tb_rhs }, tc_coercible = True} :
 		  req_type_coercions = [{tc_demanded = temp_fun_type.tst_result,tc_offered = rhs_type, tc_position = CP_Expression tb_rhs, tc_coercible = True} :
 		  		rhs_reqs.req_type_coercions ]
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap
