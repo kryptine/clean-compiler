@@ -536,7 +536,7 @@ where
 			  	        	 0 class_size ins_members class_members class_name ins_pos ins_type instance_types member_defs type_defs modules var_heap type_heaps cs
 				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 			// otherwise
-				# cs = { cs & cs_error = checkError class_name "different number of members specified" cs.cs_error }
+				# cs = { cs & cs_error = checkErrorWithIdentPos (newPosition class_name ins_pos) "different number of members specified" cs.cs_error }
 				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 
 /*
@@ -1427,10 +1427,10 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 							renumber_type_def td=:{td_rhs = AlgType conses}
 								# conses = [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
 								= { td & td_rhs = AlgType conses}
-							renumber_type_def td=:{td_rhs = RecordType rt=:{rt_constructor,rt_fields/*,rt_is_boxed_record*/}}
+							renumber_type_def td=:{td_rhs = RecordType rt=:{rt_constructor,rt_fields,rt_is_boxed_record}}
 								# rt_constructor = {rt_constructor & ds_index=icl_to_dcl_index_table.[cConstructorDefs,rt_constructor.ds_index]}
 								# rt_fields = {{field & fs_index=icl_to_dcl_index_table.[cSelectorDefs,field.fs_index]} \\ field <-: rt_fields}
-								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields/*,rt_is_boxed_record=rt_is_boxed_record*/}}
+								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields,rt_is_boxed_record=rt_is_boxed_record}}
 							renumber_type_def td
 								= td
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Constructor, decl_index}) cdefs
@@ -1506,8 +1506,8 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local ([],[],{ createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
 	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes, cop_gd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], ([], [],[]), conversion_table, icl_sizes, icl_decl_symbols, cs)
-	  (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,symbol_table)
-	  		= foldSt (add_all_dcl_cons_and_members_to_conversion_table dcl_common) dcl_cons_and_member_defs (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs.cs_symbol_table)
+	  (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,symbol_table,errors)
+	  		= foldSt (add_all_dcl_cons_and_members_to_conversion_table dcl_common) dcl_cons_and_member_defs (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs.cs_symbol_table,cs.cs_error)
 
 	  new_cons_defs = reverse new_cons_defs
 	  new_member_defs = reverse new_member_defs
@@ -1536,7 +1536,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 				, def_generics		= my_append icl_definitions.def_generics new_generic_defs
 		  }
 		,  icl_sizes
-		, { cs & cs_symbol_table = symbol_table }
+		, { cs & cs_symbol_table = symbol_table, cs_error=errors }
 		)
 where
 
@@ -1682,22 +1682,26 @@ where
 			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
 			= (-1,{ ds & ds_index = ste_index }, (conversion_table,icl_sizes,icl_defs,{ cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }))
 
-	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident={id_info},decl_kind=STE_Constructor,decl_index}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind=STE_Constructor,decl_index,decl_pos}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 		| conversion_table.[cConstructorDefs].[decl_index]>=0
-			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 		# (entry=:{ste_kind,ste_index}, symbol_table) = readPtr id_info symbol_table
 		| ste_kind == STE_Empty
 			# (conversion_table,icl_sizes,icl_defs,symbol_table)
 				= add_dcl_declaration id_info entry decl cConstructorDefs decl_index (conversion_table,icl_sizes,icl_defs,symbol_table)
-			= ([dcl_common.com_cons_defs.[decl_index] : new_cons_defs],new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
-	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident={id_info},decl_kind=STE_Member,decl_index}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+			= ([dcl_common.com_cons_defs.[decl_index] : new_cons_defs],new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
+			# errors = checkErrorWithIdentPos (newPosition decl_ident decl_pos) " constructor already defined" errors
+			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
+	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind=STE_Member,decl_index,decl_pos}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 		| conversion_table.[cMemberDefs].[decl_index]>=0
-			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table)
+			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 		# (entry=:{ste_kind,ste_index}, symbol_table) = readPtr id_info symbol_table
 		| ste_kind == STE_Empty
 			# (conversion_table,icl_sizes,icl_defs,symbol_table)
 				= add_dcl_declaration id_info entry decl cMemberDefs decl_index (conversion_table,icl_sizes,icl_defs,symbol_table)
-			= (new_cons_defs,[dcl_common.com_member_defs.[decl_index] :  new_member_defs],conversion_table,icl_sizes,icl_defs,symbol_table)
+			= (new_cons_defs,[dcl_common.com_member_defs.[decl_index] :  new_member_defs],conversion_table,icl_sizes,icl_defs,symbol_table,errors)
+			# errors = checkErrorWithIdentPos (newPosition decl_ident decl_pos) " member already defined" errors
+			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 
 	my_append front []
 		= front
