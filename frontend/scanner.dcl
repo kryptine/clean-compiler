@@ -77,7 +77,6 @@ instance <<< FilePosition
 	|	StringTypeToken			//		String
 	|	FileTypeToken			//		File
 	|	WorldTypeToken			//		World
-	|	VoidTypeToken			//		Void
 	|	ClassToken				//		class
 	|	InstanceToken			//		instance
 	|	OtherwiseToken			//		otherwise

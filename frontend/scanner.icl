@@ -163,7 +163,6 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	StringTypeToken			//		String
 	|	FileTypeToken			//		File
 	|	WorldTypeToken			//		World
-	|	VoidTypeToken			//		Void
 	|	ClassToken				//		class
 	|	InstanceToken			//		instance
 	|	OtherwiseToken			//		otherwise
@@ -1396,7 +1395,6 @@ where
 	toString StringTypeToken			= "String"
 	toString FileTypeToken				= "File"
 	toString WorldTypeToken				= "World"
-	toString VoidTypeToken				= "Void"
 	toString ClassToken					= "class"
 	toString InstanceToken				= "instance"
 	toString OtherwiseToken				= "otherwise"
