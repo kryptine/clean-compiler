@@ -232,7 +232,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			
 			for_l (node_id_ref_count_elem,node->node_then_node_id_ref_counts,nrcl_next){
 				DPrintNodeId (node_id_ref_count_elem->nrcl_node_id,file);
-				printf (" %d ",node_id_ref_count_elem->nrcl_ref_count);
+				fprintf (file," %d ",node_id_ref_count_elem->nrcl_ref_count);
 			}		
 		}
 		FPutS ("]\n", file);
@@ -274,7 +274,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			
 			for_l (node_id_ref_count_elem,node->node_else_node_id_ref_counts,nrcl_next){
 				DPrintNodeId (node_id_ref_count_elem->nrcl_node_id,file);
-				printf (" %d ",node_id_ref_count_elem->nrcl_ref_count);
+				fprintf (file," %d ",node_id_ref_count_elem->nrcl_ref_count);
 			}		
 		}
 		FPutS ("]\n",file);
@@ -399,7 +399,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			
 			for_l (node_id_ref_count_elem,node->node_node_id_ref_counts,nrcl_next){
 				DPrintNodeId (node_id_ref_count_elem->nrcl_node_id,file);
-				printf (" %d ",node_id_ref_count_elem->nrcl_ref_count);
+				fprintf (file," %d ",node_id_ref_count_elem->nrcl_ref_count);
 			}
 		}
 		FPutS ("]\n",file);
@@ -445,7 +445,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			
 			for_l (node_id_ref_count_elem,node->node_node_id_ref_counts,nrcl_next){
 				DPrintNodeId (node_id_ref_count_elem->nrcl_node_id,file);
-				printf (" %d ",node_id_ref_count_elem->nrcl_ref_count);
+				fprintf (file," %d ",node_id_ref_count_elem->nrcl_ref_count);
 			}		
 		}
 		FPutS ("]\n",file);
