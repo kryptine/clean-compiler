@@ -1,6 +1,6 @@
 implementation module predef
 
-import syntax, hashtable
+import syntax, hashtable, type_io_common
 
 cPredefinedModuleIndex :== 1
 
@@ -206,14 +206,14 @@ GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
 
 cons_and_nil_idents :: {!Ident}
 cons_and_nil_idents =: {
-	{ id_name = "_Cons", id_info = allocPtr },
+	{ id_name = PD_ConsSymbol_String, id_info = allocPtr },
 	{ id_name = "_!Cons", id_info = allocPtr },
 	{ id_name = "_#Cons", id_info = allocPtr },
 	{ id_name = "_Cons!", id_info = allocPtr },
 	{ id_name = "_!Cons!", id_info = allocPtr },
 	{ id_name = "_#Cons!", id_info = allocPtr },
 	{ id_name = "_|Cons", id_info = allocPtr },
-	{ id_name = "_Nil", id_info = allocPtr },
+	{ id_name = PD_NilSymbol_String, id_info = allocPtr },
 	{ id_name = "_!Nil", id_info = allocPtr },
 	{ id_name = "_#Nil", id_info = allocPtr },
 	{ id_name = "_Nil!", id_info = allocPtr },
@@ -246,14 +246,14 @@ where
 		= build_variables 0 32 (build_tuples 2 32 tables)
 			<<= ("_predefined", PD_PredefinedModule)
 			<<= ("_String", PD_StringType)
-			<<= ("_List", PD_ListType) <<+ (local_cons_and_nil_idents, PD_ConsSymbol)<<+ (local_cons_and_nil_idents, PD_NilSymbol)
+			<<= (PD_ListType_String, PD_ListType) <<+ (local_cons_and_nil_idents, PD_ConsSymbol)<<+ (local_cons_and_nil_idents, PD_NilSymbol)
 			<<= ("_!List", PD_StrictListType) <<+ (local_cons_and_nil_idents, PD_StrictConsSymbol) <<+ (local_cons_and_nil_idents, PD_StrictNilSymbol)
 			<<= ("_#List", PD_UnboxedListType) <<+ (local_cons_and_nil_idents, PD_UnboxedConsSymbol) <<+ (local_cons_and_nil_idents, PD_UnboxedNilSymbol)
 			<<= ("_List!", PD_TailStrictListType) <<+ (local_cons_and_nil_idents, PD_TailStrictConsSymbol) <<+ (local_cons_and_nil_idents, PD_TailStrictNilSymbol)
 			<<= ("_!List!", PD_StrictTailStrictListType) <<+ (local_cons_and_nil_idents, PD_StrictTailStrictConsSymbol) <<+ (local_cons_and_nil_idents, PD_StrictTailStrictNilSymbol)
 			<<= ("_#List!", PD_UnboxedTailStrictListType) <<+ (local_cons_and_nil_idents, PD_UnboxedTailStrictConsSymbol) <<+ (local_cons_and_nil_idents, PD_UnboxedTailStrictNilSymbol)
 			<<= ("_|List", PD_OverloadedListType) <<+ (local_cons_and_nil_idents, PD_OverloadedConsSymbol) <<+ (local_cons_and_nil_idents, PD_OverloadedNilSymbol)
-			<<= ("_Array", PD_LazyArrayType) <<= ("_!Array", PD_StrictArrayType) <<= ("_#Array", PD_UnboxedArrayType)
+			<<= ("_Array", PD_LazyArrayType) <<= ("_!Array", PD_StrictArrayType) <<= (PD_UnboxedArray_String, PD_UnboxedArrayType)
 			<<= ("_type_code", PD_TypeCodeMember)
 			<<= ("_dummyForStrictAlias", PD_DummyForStrictAliasFun) // MW++
 	where
@@ -317,10 +317,10 @@ where
 					<<- ("P_laceholder",		IC_Expression, PD_variablePlaceholder)
 					<<- ("_unify",				IC_Expression, PD_unify)
 					<<-	("_coerce",				IC_Expression, PD_coerce) /* MV */
-					<<- ("_SystemDynamic",		IC_Module, PD_StdDynamic)
+					<<- (UnderscoreSystemDynamicModule_String,		IC_Module, PD_StdDynamic)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
 // MV..
-					<<- ("DynamicTemp",			IC_Type, PD_DynamicTemp)
+					<<- (DynamicRepresentation_String,			IC_Type, PD_DynamicTemp)
 					<<- ("__Module",			IC_Expression, PD_ModuleConsSymbol)
 					<<- ("T_ypeID",				IC_Type, PD_TypeID)
 					<<- ("ModuleID",			IC_Expression, PD_ModuleID)
@@ -499,3 +499,19 @@ where
 		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
 			ft_specials = SP_None, ft_type_ptr = nilPtr }
 // ..MW
+
+// MV ...
+// changes requires recompile of {static,dynamic}-linker plus all dynamics ever made
+UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"	
+
+DynamicRepresentation_String			:== "DynamicTemp"		
+
+// List-type
+PD_ListType_String				:== "_List"
+PD_ConsSymbol_String			:== "_Cons"
+PD_NilSymbol_String				:== "_Nil"
+
+// Array-type
+PD_UnboxedArray_String			:== "_#Array"
+// ... MV
+

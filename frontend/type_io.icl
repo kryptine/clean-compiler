@@ -27,8 +27,10 @@ F a b :== b;
 
 :: WriteTypeInfoState
 	= { 
-		wtis_type_heaps			:: !.TypeHeaps
-	,	wtis_n_type_vars		:: !Int
+		wtis_type_heaps				:: !.TypeHeaps
+	,	wtis_n_type_vars			:: !Int
+	,	wtis_predefined_module_def	:: !Index
+
 	};
 	
 class WriteTypeInfo a 
@@ -382,13 +384,17 @@ where
 
 instance WriteTypeInfo TypeSymbIdent
 where
-	write_type_info {type_name,type_arity} tcl_file wtis
+	write_type_info {type_name,type_arity,type_index={glob_module}} tcl_file wtis=:{wtis_predefined_module_def}
+		# is_type_without_definition
+			= glob_module == wtis_predefined_module_def
+		# tcl_file
+			= fwritec (if is_type_without_definition TypeSymbIdentWithoutDefinition TypeSymbIdentWithDefinition) tcl_file
+
 		# (tcl_file,wtis)
 			= write_type_info type_name tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info type_arity tcl_file wtis
 		= (tcl_file,wtis)
-		
 
 // basic and structural write_type_info's
 instance WriteTypeInfo Int 
@@ -439,3 +445,62 @@ where
 		# tcl_file
 			= fwritec c tcl_file;
 		= (tcl_file,wtis);
+
+// MV ...
+from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
+
+openTclFile :: !Bool !String !*Files -> (Optional !.File, !*Files)
+openTclFile False icl_mod_pathname files
+	= (No,files)
+openTclFile compile_for_dynamics icl_mod_pathname files
+	# csf_path
+		= directoryName icl_mod_pathname +++ "Clean System Files"
+	# tcl_path
+		= csf_path +++ {DirectorySeparator} +++ baseName icl_mod_pathname +++ ".tcl"
+	# (opened, tcl_file, files)
+		= fopen tcl_path FWriteData files
+	| opened
+		= (Yes tcl_file, files)
+	// try again after creating Clean System Files folder
+	# (ok, files)
+		= ensureCleanSystemFilesExists csf_path files
+	| not ok
+		= abort ("can't create folder \"" +++ csf_path +++"\"\n")
+	# (opened, tcl_file, files)
+		= fopen tcl_path FWriteData files
+	| opened
+		=(Yes tcl_file, files)
+	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
+	
+closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
+closeTclFile (Yes tcl_file) files
+	= fclose tcl_file files
+closeTclFile _ files
+	= (True,files);
+
+// copy from compile.icl ...	
+baseName :: {#Char} -> {#Char}
+baseName path
+	=	last (splitBy DirectorySeparator path)
+
+directoryName :: {#Char} -> {#Char}
+directoryName path
+	=	foldr (\p ps -> p +++ {DirectorySeparator} +++ ps) "" (init (splitBy DirectorySeparator path))
+	
+splitBy :: Char {#Char} -> [{#Char}]
+splitBy char string
+	=	splitBy` 0 0
+	where
+		splitBy` frm to
+			| to >= stringSize
+				=	[string % (frm, to-1)]
+			| string.[to] == char
+				=	[string % (frm, to-1) : splitBy` (to+1) (to+1)]
+			// otherwise
+				=	splitBy` frm (to+1)
+		stringSize
+			=	size string
+
+// ... copy from compile.icl
+
+// ... MV

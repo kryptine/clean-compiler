@@ -7,6 +7,12 @@ import StdEnv
 import frontend
 // ... RWS
 
+// MV ...
+from type_io import openTclFile, closeTclFile
+// ... MV
+
+write_tcl_file yes no :== no;
+
 Start world
 	# (std_io, world) = stdio world
 	  (_, ms_out, world) = fopen "out" FWriteText world
@@ -171,8 +177,12 @@ dummyModTime _ f
 
 loadModule :: Ident *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
 loadModule mod_ident {dcl_modules,cached_macros,predef_symbols,hash_table,heaps} ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
+// MV ...
+	# (tcl_file,ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths})
+		= write_tcl_file (WrapopenTclFile ms) (No,ms);
+// ... MV
 	# (optional_syntax_tree,cached_cached_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
-		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules cached_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out No heaps
+		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules cached_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out tcl_file heaps
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
 		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls}
@@ -183,6 +193,11 @@ loadModule mod_ident {dcl_modules,cached_macros,predef_symbols,hash_table,heaps}
 					{dcl_modules=dcl_modules,cached_macros=cached_cached_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}, ms)
 		No
 			->	(No, {dcl_modules=dcl_modules,cached_macros=cached_cached_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps},ms)
+where
+	WrapopenTclFile ms=:{ms_files}
+		# (tcl_file,ms_files)
+			= openTclFile True "test" ms_files
+		= (tcl_file,{ms & ms_files = ms_files});
 
 remove_expanded_types_from_dcl_modules :: Int {#DclModule} NumberSet *VarHeap -> *VarHeap
 remove_expanded_types_from_dcl_modules module_n dcls used_module_numbers var_heap

@@ -4,7 +4,11 @@
 implementation module type_io_common
 
 // common between compiler and static linker
-from StdChar import toChar
+import StdEnv
+import syntax
+import StdOverloaded
+
+APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== yes
 
 /*
 // Priority
@@ -48,5 +52,32 @@ ConsVariableCVCode		:== (toChar 25)
 ConsVariableTempCVCode	:== (toChar 26)
 ConsVariableTempQCVCode	:== (toChar 27)
 
-// used by {compiler,dynamic rts}
-PredefinedModuleName	:== "_predefined"
+// TypeSymbIdent
+TypeSymbIdentWithoutDefinition	:== (toChar 28)		// valid only for predefined in PD_PredefinedModule e.g. _String, _List
+TypeSymbIdentWithDefinition		:== (toChar 29)		// for all types which have definitions in some .icl-module
+
+// Maybe
+MaybeNothingCode				:== (toChar 30)
+MaybeJustCode					:== (toChar 31)
+
+// used by {compiler,dynamic rts} to make String representation of types
+PredefinedModuleName			:== "_predefined"
+
+UnderscoreSystemModule			:== "_system"		// implements the predefined module
+
+instance toString GlobalTCType
+where
+	toString (GTT_Basic basic_type)							= toString basic_type +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ PredefinedModuleName ) "")
+	toString GTT_Function									= " -> "
+	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
+
+instance toString BasicType
+where
+	toString BT_Int 		= "Int"
+	toString BT_Char		= "Char"
+	toString BT_Real		= "Real"
+	toString BT_Bool		= "Bool"
+	toString BT_Dynamic		= "Dynamic"
+	toString BT_File		= "File"
+	toString BT_World		= "World"
+	toString (BT_String _)	= "String"

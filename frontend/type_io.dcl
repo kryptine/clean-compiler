@@ -3,6 +3,15 @@
 */
 definition module type_io
 
+openTclFile :: !Bool !String !*Files -> (Optional !.File, !*Files)
+closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
+
+baseName :: {#Char} -> {#Char}
+
+directoryName :: {#Char} -> {#Char}
+
+splitBy :: Char {#Char} -> [{#Char}]
+
 // WARNING: It is essential to report changes in this module to martijnv@cs.kun.nl
 //			because the binary format for type-files is used by the dynamic run-time
 //			system.
@@ -15,6 +24,7 @@ import StdEnv
 	= { 
 		wtis_type_heaps			:: !.TypeHeaps
 	,	wtis_n_type_vars		:: !Int
+	,	wtis_predefined_module_def	:: !Index
 	};
 
 class WriteTypeInfo a 
@@ -30,4 +40,3 @@ instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b
 //1.3
 instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 
 //3.1
-

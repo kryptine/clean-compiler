@@ -3,7 +3,7 @@ implementation module overloading
 import StdEnv
 
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
-import generics, compilerSwitches
+import generics, compilerSwitches, type_io_common
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 

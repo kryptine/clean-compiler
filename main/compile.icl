@@ -10,6 +10,7 @@ import filesystem, CoclSystemDependent
 import portToNewSyntax
 import compilerSwitches
 //import RWSDebug
+from type_io import openTclFile, closeTclFile, baseName, directoryName, splitBy
 
 
 ::	CoclOptions =
@@ -138,28 +139,6 @@ splitPaths :: {#Char} -> [{#Char}]
 splitPaths paths
 	=	[path +++ {DirectorySeparator} \\ path <- splitBy PathSeparator paths]
 
-splitBy :: Char {#Char} -> [{#Char}]
-splitBy char string
-	=	splitBy` 0 0
-	where
-		splitBy` frm to
-			| to >= stringSize
-				=	[string % (frm, to-1)]
-			| string.[to] == char
-				=	[string % (frm, to-1) : splitBy` (to+1) (to+1)]
-			// otherwise
-				=	splitBy` frm (to+1)
-		stringSize
-			=	size string
-
-baseName :: {#Char} -> {#Char}
-baseName path
-	=	last (splitBy DirectorySeparator path)
-
-directoryName :: {#Char} -> {#Char}
-directoryName path
-	=	foldr (\p ps -> p +++ {DirectorySeparator} +++ ps) "" (init (splitBy DirectorySeparator path))
-
 compile_modules [module_:modules] n_compiles cocl_options args_without_modules cache files
 	# cocl_options = prependModulePath {cocl_options & pathName=stripExtension ".icl" (stripQuotes module_)}
 		with
@@ -190,7 +169,7 @@ compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbo
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (tcl_file, files)
-		= openTclFile options options.pathName files
+		= openTclFile options.compile_for_dynamics options.pathName files
  	# (io, files)
 		=	stdio files
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
@@ -259,32 +238,3 @@ compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbo
 		= (success,cache,files)
 		# cache={dcl_modules=cached_dcl_mods,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
-
-// MV ...
-openTclFile :: CoclOptions !String !*Files -> (Optional !.File, !*Files)
-openTclFile options=:{compile_for_dynamics=False} icl_mod_pathname files
-	= (No,files)
-openTclFile options icl_mod_pathname files
-	# csf_path
-		= directoryName icl_mod_pathname +++ "Clean System Files"
-	# tcl_path
-		= csf_path +++ {DirectorySeparator} +++ baseName icl_mod_pathname +++ ".tcl"
-	# (opened, tcl_file, files)
-		= fopen tcl_path FWriteData files
-	| opened
-		= (Yes tcl_file, files)
-	// try again after creating Clean System Files folder
-	# (ok, files)
-		= ensureCleanSystemFilesExists csf_path files
-	| not ok
-		= abort ("can't create folder \"" +++ csf_path +++"\"\n")
-	# (opened, tcl_file, files)
-		= fopen tcl_path FWriteData files
-	| opened
-		=(Yes tcl_file, files)
-	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
-
-closeTclFile (Yes tcl_file) files
-	= fclose tcl_file files
-closeTclFile _ files
-	= (True,files);

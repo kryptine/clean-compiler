@@ -11,9 +11,12 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 
 //import pp;
 
-APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== yes
 import type_io; 
 //import RWSDebug;
+
+/*2.0
+from type_io_common import toString;
+0.2*/
 
 ::	*ConversionInfo =
 	{	ci_predef_symb		:: !*PredefinedSymbols
@@ -62,12 +65,14 @@ F a b = b
 
 
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
-write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] !*TypeHeaps -> (.Bool,.File,!*TypeHeaps)
-write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules type_heaps
+write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
+write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules type_heaps predefined_symbols
+	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
 		= { WriteTypeInfoState |
-			wtis_type_heaps		= type_heaps
-		,	wtis_n_type_vars		= 0
+			wtis_type_heaps				= type_heaps
+		,	wtis_n_type_vars			= 0
+		,	wtis_predefined_module_def	= pre_mod.pds_def
 		};
 	# (j,tcl_file)
 		= fposition tcl_file
@@ -87,28 +92,38 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_cons_defs) tcl_file
-	= (True,tcl_file,type_heaps) 
+	= (True,tcl_file,type_heaps,predefined_symbols) 
 	
 where
 	f write_type_info_state=:{wtis_type_heaps}
 		= (wtis_type_heaps,{write_type_info_state & wtis_type_heaps = abort "convertDynamics.icl"});
 //---> ("dcl",size main_dcl_module.dcl_common.com_type_defs, "icl", size common_defs.com_type_defs);
 
+/*2.0
+f (Yes tcl_file)
+	= tcl_file;
+0.2*/
 			
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */ (Optional !*File) {# DclModule} !IclModule /* TD */ [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, /* TD */ (Optional !*File))
 convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap /* TD */ tcl_file dcl_mods icl_mod  /* TD */ directly_imported_dcl_modules
 	// TD ...
-	# (tcl_file,type_heaps)
+	# (tcl_file,type_heaps,predefined_symbols)
 		= case tcl_file of
 			No
-				-> (No,type_heaps)
+				-> (No,type_heaps,predefined_symbols)
+/*2.0
+			_ 
+				# tcl_file = f tcl_file;
+0.2*/
+//1.3
 			(Yes tcl_file)
-				# (ok,tcl_file,type_heaps)
-					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file /* TD */ directly_imported_dcl_modules type_heaps
+//3.1
+				# (ok,tcl_file,type_heaps,predefined_symbols)
+					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file /* TD */ directly_imported_dcl_modules type_heaps predefined_symbols
 				| not ok
 					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
-					-> (Yes tcl_file,type_heaps)
+					-> (Yes tcl_file,type_heaps,predefined_symbols)
 
 				
 	// ... TD
@@ -1161,29 +1176,9 @@ addToBoundVars :: BoundVar AType BoundVariables -> BoundVariables
 addToBoundVars var type bound_vars
 	= [ { tv_free_var = varToFreeVar var 0, tv_type = type } : bound_vars ]
 
-
 get_constructor :: !{!GlobalTCType} Index -> Expression
 get_constructor glob_type_inst index
 	= BasicExpr (BVS ("\"" +++ toString  glob_type_inst.[index] +++ "\"")) (BT_String TE)
-
-
-instance toString GlobalTCType
-where
-	toString (GTT_Basic basic_type)							= toString basic_type +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ PredefinedModuleName ) "")
-	toString GTT_Function									= " -> "
-	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
-
-instance toString BasicType
-where
-	toString BT_Int 		= "Int"
-	toString BT_Char		= "Char"
-	toString BT_Real		= "Real"
-	toString BT_Bool		= "Bool"
-	toString BT_Dynamic		= "Dynamic"
-	toString BT_File		= "File"
-	toString BT_World		= "World"
-	toString (BT_String _)	= "String"
-
 
 getResultType :: ExprInfoPtr !*ConversionInfo -> (!AType, !*ConversionInfo)
 getResultType case_info_ptr ci=:{ci_expr_heap}

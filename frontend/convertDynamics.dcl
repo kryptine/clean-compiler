@@ -15,7 +15,4 @@ convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !*{! Gr
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 */
 
-instance toString GlobalTCType
-instance toString BasicType
-
 get_module_id_app :: !*PredefinedSymbols -> (App,Expression,!*PredefinedSymbols)
