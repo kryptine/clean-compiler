@@ -437,9 +437,11 @@ where
 
 instance unfold DynamicExpr
 where
-	unfold expr=:{dyn_expr} ui us
-		# (dyn_expr, us) = unfold dyn_expr ui us
-		= ({ expr & dyn_expr = dyn_expr }, us)
+	unfold expr=:{dyn_expr, dyn_info_ptr} ui us=:{us_symbol_heap}
+		# (dyn_info, us_symbol_heap) = readPtr dyn_info_ptr us_symbol_heap
+		# (new_dyn_info_ptr, us_symbol_heap) = newPtr dyn_info us_symbol_heap
+		# (dyn_expr, us) = unfold dyn_expr ui {us & us_symbol_heap=us_symbol_heap}
+		= ({ expr & dyn_expr = dyn_expr, dyn_info_ptr = new_dyn_info_ptr }, us)
 
 instance unfold Selection
 where
