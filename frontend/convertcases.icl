@@ -1159,18 +1159,6 @@ splitGuards (BasicPatterns basicType patterns)
 splitGuards (OverloadedListPatterns type decons_expr patterns)
 	=	[OverloadedListPatterns type decons_expr [pattern] \\ pattern <- patterns]
 
-makeCase :: Expression CasePatterns -> Expression
-makeCase expr guard
-	=	Case
-	{	case_expr		= expr
-	,	case_guards		= guard
-	,	case_default	= No
-	,	case_ident		= No
-	,	case_info_ptr	= nilPtr
-	,	case_explicit=False
-	,	case_default_pos= NoPos
-	}
-
 ::	TypedVariable =
 	{	tv_free_var	:: !FreeVar
 	,	tv_type		:: !AType
