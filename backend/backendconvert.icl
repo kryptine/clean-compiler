@@ -1174,7 +1174,7 @@ convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_modul
 		o`	convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
 	// otherwise
 		=	declareVars body (aliasDummyId, varHeap)
-		o`	convertBody functionIndex lineNumber aliasDummyId (map FP_Variable body.tb_args) body.tb_rhs main_dcl_module_n varHeap
+		o`	convertBody True functionIndex lineNumber aliasDummyId (map FP_Variable body.tb_args) body.tb_rhs main_dcl_module_n varHeap
 
 isCodeBlock :: Expression -> Bool
 isCodeBlock (Case {case_expr=Var _, case_guards=AlgebraicPatterns _ [{ap_expr}]})
@@ -1197,13 +1197,13 @@ where
 		convertBackEndBody :: Int Int Ident Int VarHeap BackEndBody -> BEMonad BERuleAltP
 		convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n varHeap body
 			=	declareVars body (aliasDummyId, varHeap)
-			o`	convertBody functionIndex lineNumber aliasDummyId body.bb_args body.bb_rhs main_dcl_module_n varHeap
+			o`	convertBody False functionIndex lineNumber aliasDummyId body.bb_args body.bb_rhs main_dcl_module_n varHeap
 convertFunctionBody functionIndex lineNumber aliasDummyId (TransformedBody body) main_dcl_module_n varHeap
 	=	convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
 
 convertCodeBody :: Int Int Ident TransformedBody Int VarHeap -> BEMonad BERuleAltP
 convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n varHeap
-	=	convertBody functionIndex lineNumber aliasDummyId patterns expr main_dcl_module_n varHeap
+	=	convertBody False functionIndex lineNumber aliasDummyId patterns expr main_dcl_module_n varHeap
 	where
 		patterns
 			=	map (lookUpVar body.tb_rhs) body.tb_args
@@ -1228,25 +1228,36 @@ convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n var
 		codeBlock expr
 			=	expr
 
+ruleAlt setRefCounts line lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
+	| setRefCounts
+		# (lhs, be)
+			=	lhsM be
+		# be
+			=	appBackEnd (BESetNodeDefRefCounts lhs) be	
+		# (lhsDefs, be)
+			=	lhsDefsM be
+		=	beFunction3 (BERuleAlt line lhsDefs lhs) rhsDefsM rhsStrictsM rhsM be
+	// otherwise
+		=	beRuleAlt line lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
 
-convertBody :: Int Int Ident [FunctionPattern] Expression Int VarHeap -> BEMonad BERuleAltP
-convertBody functionIndex lineNumber aliasDummyId args (ABCCodeExpr instructions inline) main_dcl_module_n varHeap
+convertBody :: Bool Int Int Ident [FunctionPattern] Expression Int VarHeap -> BEMonad BERuleAltP
+convertBody _ functionIndex lineNumber aliasDummyId args (ABCCodeExpr instructions inline) main_dcl_module_n varHeap
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	beCodeAlt
 			lineNumber
 			(convertLhsNodeDefs args noNodeDefs varHeap)
 			(convertBackEndLhs functionIndex args main_dcl_module_n varHeap)
 			(beAbcCodeBlock inline (convertStrings instructions))
-convertBody functionIndex lineNumber aliasDummyId args (AnyCodeExpr inParams outParams instructions) main_dcl_module_n varHeap
+convertBody _ functionIndex lineNumber aliasDummyId args (AnyCodeExpr inParams outParams instructions) main_dcl_module_n varHeap
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	beCodeAlt
 			lineNumber
 			(convertLhsNodeDefs args noNodeDefs varHeap)
 			(convertBackEndLhs functionIndex args main_dcl_module_n varHeap)
 			(beAnyCodeBlock (convertCodeParameters inParams varHeap) (convertCodeParameters outParams varHeap) (convertStrings instructions))
-convertBody functionIndex lineNumber aliasDummyId args rhs main_dcl_module_n varHeap
+convertBody setRefCounts functionIndex lineNumber aliasDummyId args rhs main_dcl_module_n varHeap
 	=	beNoNodeDefs ==> \noNodeDefs
-	->	beRuleAlt
+	->	ruleAlt setRefCounts
 			lineNumber
 			(convertLhsNodeDefs args noNodeDefs varHeap)
 			(convertBackEndLhs functionIndex args main_dcl_module_n varHeap)
@@ -1568,7 +1579,6 @@ where
 				=	1
 			arity (Yes {glob_object={ds_arity}})
 				=	ds_arity
-	// this alternative should be deleted (can't occur)
 	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else}) varHeap
 		=	beIfNode (convertExpr cond varHeap) (convertExpr if_then varHeap) (convertExpr else varHeap)
 
@@ -1621,24 +1631,83 @@ instance convertCases CasePatterns where
 
 instance convertCases [a] | convertCase a where
 	convertCases patterns aliasDummyId var optionalCase main_dcl_module_n varHeap
-		=	sfoldr (beArgs o convertCase main_dcl_module_n varHeap aliasDummyId var) (convertDefaultCase optionalCase aliasDummyId main_dcl_module_n varHeap) patterns
+		=	sfoldr (beArgs o convertCase main_dcl_module_n (localRefCounts patterns optionalCase)
+						 varHeap aliasDummyId var) (convertDefaultCase optionalCase aliasDummyId main_dcl_module_n varHeap) patterns
+	where
+		localRefCounts [x] No
+			=	False
+		localRefCounts _ _
+			=	True
 
-class convertCase a :: Int VarHeap Ident BoundVar a -> BEMonad BENodeP
+class convertCase a :: Int Bool VarHeap Ident BoundVar a -> BEMonad BENodeP
+
+caseNode localRefCounts arity symbolM defsM strictsM rhsM be
+	| localRefCounts
+		# be
+		 	=	appBackEnd BEEnterLocalScope be
+		# (symbol, be)
+			=	symbolM be
+		# (rhs, be)
+			=	rhsM be
+		# (defs, be)
+			=	defsM be
+		# (stricts, be)
+			=	strictsM be
+		# (kees, be)
+			=	accBackEnd (BECaseNode arity symbol defs stricts rhs) be
+		# be
+		 	=	appBackEnd (BELeaveLocalScope kees) be
+		=	(kees, be)
+	// otherwise
+		# (symbol, be)
+			=	symbolM be
+		# (rhs, be)
+			=	rhsM be
+		# (defs, be)
+			=	defsM be
+		# (stricts, be)
+			=	strictsM be
+		# (kees, be)
+			=	accBackEnd (BECaseNode arity symbol defs stricts rhs) be
+		=	(kees, be)
+//		=	beCaseNode arity symbolM defsM strictsM rhsM be
+
+defaultNode defsM strictsM rhsM be
+	# be
+		=	appBackEnd BEEnterLocalScope be
+	# (defaul, be)
+		=	beDefaultNode defsM strictsM rhsM be
+	# be
+	 	=	appBackEnd (BELeaveLocalScope defaul) be
+	=	(defaul, be)
+
+pushNode arity var varHeap symbolM argM nodeIdsM be
+	# (symbol, be)
+		=	symbolM be
+	# (nodeIds, be)
+		=	nodeIdsM be
+	# (sequenceNumber, be)
+		=	getVariableSequenceNumber var.var_info_ptr varHeap be
+	# be
+		=	appBackEnd (BEAddNodeIdsRefCounts sequenceNumber symbol nodeIds) be
+	# (arg, be)
+		=	argM be
+	=	accBackEnd (BEPushNode arity symbol arg nodeIds) be
 
 instance convertCase AlgebraicPattern where
-	convertCase main_dcl_module_n varHeap aliasDummyId var {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
+	convertCase main_dcl_module_n localRefCounts varHeap aliasDummyId var {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
 		| symbolArity == 0
-			=	beCaseNode 0
+			=	caseNode localRefCounts 0
 					(beConstructorSymbol glob_module ds_index)
 					(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n varHeap)
 					(convertRhsStrictNodeIds ap_expr varHeap)
 					(convertRootExpr aliasDummyId ap_expr main_dcl_module_n varHeap)
 		// otherwise
-			=	beCaseNode symbolArity
+			=	caseNode localRefCounts symbolArity
 					(beConstructorSymbol glob_module ds_index) 
 					(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n varHeap)
 					(convertRhsStrictNodeIds ap_expr varHeap)
-					(bePushNode symbolArity
+					(pushNode symbolArity var varHeap
 						(beConstructorSymbol glob_module ds_index)
 						(beArgs (convertExpr (Var var) main_dcl_module_n varHeap) (beArgs (convertRootExpr aliasDummyId ap_expr main_dcl_module_n varHeap) beNoArgs))
 						(convertPatternVars ap_vars varHeap))
@@ -1647,8 +1716,8 @@ instance convertCase AlgebraicPattern where
 				=	length ap_vars		// curried patterns ???
 
 instance convertCase BasicPattern where
-	convertCase main_dcl_module_n varHeap aliasDummyId _ {bp_value, bp_expr}
-		=	beCaseNode 0
+	convertCase main_dcl_module_n localRefCounts varHeap aliasDummyId _ {bp_value, bp_expr}
+		=	caseNode localRefCounts 0
 				(convertLiteralSymbol bp_value)
 				(convertRhsNodeDefs aliasDummyId bp_expr main_dcl_module_n varHeap)
 				(convertRhsStrictNodeIds bp_expr varHeap)
@@ -1667,7 +1736,7 @@ convertDefaultCase No _ _ varHeap
 	=	beNoArgs
 convertDefaultCase (Yes expr) aliasDummyId main_dcl_module_n varHeap
 	=	beArgs
-			(beDefaultNode
+			(defaultNode
 				(convertRhsNodeDefs aliasDummyId expr main_dcl_module_n varHeap)
 				(convertRhsStrictNodeIds expr varHeap)
 				(convertRootExpr aliasDummyId expr main_dcl_module_n varHeap))
