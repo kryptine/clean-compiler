@@ -219,6 +219,16 @@ Differences in the standard environment (StdEnv)
     uselect_u, uselectf_u, uselectn_u, uselectl_u, updatei_u, size_u, usize_u
     update_u, createArray_u, createArrayc_u, replace_u
 
+  Example: Assume a function "f" that does something with arrays that had
+  the following type in Clean 1.3:
+
+    f :: (a b) -> b | select_u b & Array .a
+
+  "(a b)" stands for "an array (can be strict, lazy or unboxed) with element b".
+  In Clean 2.x this simply becomes:
+
+    f :: (a b) -> b | Array a b
+
 
 Miscellaneous Differences
 -------------------------
@@ -295,11 +305,11 @@ For the 1.3 this would be the same as
 
 Note that the "//1.3", "//3.1", "/*2.0" and "0.2*/" brackets have to be
 the first characters of the line (no preceeding whitespace characters are
-allowed). Otherwise they will be ignored. Furtheron such sections shouldn't
-be nested nor overlapping.
+allowed). Otherwise they will be ignored. Furtheron such sections should
+neither be nested nor overlapping.
 
 Finally we have written an application "rmPreprop" that can be used to remove
 all these preprocessor directives when you don't want them anymore.
 
-We will remove the preprocessor feature in the future. Regard it as
+We will remove the preprocessor in the future. Regard it as
 a temporary feature.

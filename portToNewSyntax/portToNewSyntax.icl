@@ -109,14 +109,12 @@ write_expl_import all_expl_imp_decls (declarations, _) (dcl_modules, file)
 	= (dcl_modules, fwriteNewSyntax declaration_strings file)
 
 // only for portToNewSyntax
-decl_to_opt_string all_expl_imp_decls decl=:{dcl_ident, dcl_index, dcl_kind=STE_Imported ste_kind def_mod_index}
+decl_to_opt_string all_expl_imp_decls (Declaration {decl_ident, decl_index, decl_kind=STE_Imported ste_kind def_mod_index})
 			dcl_modules
-	= imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index ste_kind def_mod_index
+	= imported_decl_to_opt_string all_expl_imp_decls decl_ident decl_index ste_kind def_mod_index
 			dcl_modules
-decl_to_opt_string _ {dcl_ident, dcl_kind=STE_FunctionOrMacro _} dcl_modules
-	= (Yes dcl_ident.id_name, dcl_modules)
-decl_to_opt_string all_expl_imp_decls decl dcl_modules
-	= abort ("decl_to_opt_string failed"--->decl)
+decl_to_opt_string _ (Declaration{decl_ident, decl_kind=STE_FunctionOrMacro _}) dcl_modules
+	= (Yes decl_ident.id_name, dcl_modules)
 	
 // only for portToNewSyntax
 imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Constructor def_mod_index
@@ -201,8 +199,8 @@ constructor_bracket def_mod_index all_expl_imp_decls constructors
 // only for portToNewSyntax
 is_expl_imported_constructor def_mod_index ds_ident []
 	= False
-is_expl_imported_constructor def_mod_index ds_ident [{dcl_ident, dcl_kind=STE_Imported STE_Constructor def_mod_index2}:_]
-	| dcl_ident==ds_ident && def_mod_index==def_mod_index2
+is_expl_imported_constructor def_mod_index ds_ident [Declaration {decl_ident, decl_kind=STE_Imported STE_Constructor def_mod_index2}:_]
+	| decl_ident==ds_ident && def_mod_index==def_mod_index2
 		= True
 	// GOTO next alternative
 is_expl_imported_constructor def_mod_index ds_ident [h:t]
