@@ -572,7 +572,7 @@ CheckEveryContext s input
 	"class" 	->	(ClassToken			, input)
 	"instance"	->	(InstanceToken		, input)
 	"otherwise"	->	(OtherwiseToken		, input)
-//	"!"			->	(ExclamationToken	, input)
+	"!"			->	(ExclamationToken	, input)
 //	"::"		->	(DoubleColonToken	, input)
 	"*/"		->	(ErrorToken "Unexpected end of comment, */", input)
 	"infixr"	#	(error, n, input) = GetPrio  input
