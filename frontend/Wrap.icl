@@ -1,3 +1,10 @@
+/*
+	Wrap Clean nodes (for debugging purposes).
+
+	Version 1.0.1
+	Ronny Wichers Schreur
+	ronny@cs.kun.nl
+*/
 implementation module Wrap
 
 import	StdOverloaded
@@ -39,8 +46,8 @@ instance toString WrappedDescriptorId where
 			.o 1 0
 			}
 
-Wrap :: !.a -> WrappedNode
-Wrap node
+wrapNode :: !.a -> WrappedNode
+wrapNode node
 	=	code
 	{
 					| A: <node> <result>
@@ -133,7 +140,7 @@ Wrap node
 					| B: <i> <n>
 		| wrap arg
 		push_a	1
-		build	e_Wrap_sWrap 1 e_Wrap_nWrap
+		build	e_Wrap_swrapNode 1 e_Wrap_nwrapNode
 		update_a	0 2
 		pop_a	1
 
@@ -208,6 +215,7 @@ Wrap node
 		rtn
 
 	.o 2 0
+	| constructors with strict arguments are also represented by records
 	:wrap_record
 		pushI	0
 		pushD_a	0
@@ -221,37 +229,59 @@ Wrap node
 					| (l: points to record layout,
 					|	desc: record descriptor
 					|	return: return selector)
+
+		| determine if it's a record or a constructor with strict arguments
 		push_b	0
+		push_r_arg_t
+		eqC_b	'd' 0
+		jmp_false	is_record
+
+		pop_b	1
+		| increment <l> if it's not a record
+		incI
+		pushB	FALSE
+		jmp	count_fields
+
+	:is_record
+		pop_b	1
+		pushB	TRUE
+
+	:count_fields
+		push_b	1
 
 	:count_fields_loop
 					| A: <afield_1 .. afield_m> <result>
-					| B: <p> <l> <bfield_1 .. bfield_n> <desc> <return> 
+					| B: <p> <is_record> <l> <bfield_1 .. bfield_n> <desc> <return> 
 					| (p=l+offset)
 		push_b	0
 		push_r_arg_t
 		eqI_b	0 0
 		jmp_true	end_count_record_fields
 		pop_b	1
-		incI
+
+		| increment <p>
+		incI		
+
 		jmp	count_fields_loop
 
 	:end_count_record_fields
 		pop_b	1
 		push_b	0
-		update_b	2 1
+		update_b	3 1
 		subI
 					| A: <afield_1 .. afield_m> <result>
-					| B: <n+m> <l> <bfield_1 .. bfield_n> <desc> <return>
+					| B: <n+m> <is_record> <l> <bfield_1 .. bfield_n> <desc> <return>
 		create_array_	_ 1 0
 		pushI	0
-		push_b	1
+		push_b	2
+		update_b	2 3
 		update_b	1 2
 		update_b	0 1
 		pop_b	1
 
 	:wrap_fields_loop
 					| A: <_{fields}> <afield_ .. afield_m> <result>
-					| B: <p> <i> <bfield_ .. bfield_n> <desc> <return>
+					| B: <p> <i> <is_record> <bfield_ .. bfield_n> <desc> <return>
 		push_b	0
 		push_r_arg_t
 		eqI_b	0 0
@@ -268,7 +298,7 @@ Wrap node
 		jmp_true	wrap_file_field
 		eqC_b	'a' 0
 		jmp_true	wrap_graph_field
-		print_sc	"Wrap: unimplemented record field type\n"
+		print_sc	"Wrap.wrapNode: unimplemented record field type\n"
 		halt
 
 	:wrap_int_field
@@ -276,12 +306,13 @@ Wrap node
 
 		| create and fill int node
 		create
-		fillI_b	2 0
+		fillI_b	3 0
 		push_a	1
 		update_a	1 2
 		update_a	0 1
 		pop_a	1
 
+		update_b	2 3
 		update_b	1 2
 		update_b	0 1
 		pop_b	1
@@ -293,12 +324,13 @@ Wrap node
 
 		| create and fill char node
 		create
-		fillC_b	2 0
+		fillC_b	3 0
 		push_a	1
 		update_a	1 2
 		update_a	0 1
 		pop_a	1
 
+		update_b	2 3
 		update_b	1 2
 		update_b	0 1
 		pop_b	1
@@ -310,12 +342,13 @@ Wrap node
 
 		| create and fill bool node
 		create
-		fillB_b	2 0
+		fillB_b	3 0
 		push_a	1
 		update_a	1 2
 		update_a	0 1
 		pop_a	1
 
+		update_b	2 3
 		update_b	1 2
 		update_b	0 1
 		pop_b	1
@@ -328,12 +361,13 @@ Wrap node
 
 		| create and fill real node
 		create
-		fillR_b	2 0
+		fillR_b	3 0
 		push_a	1
 		update_a	1 2
 		update_a	0 1
 		pop_a	1
 
+		update_b	2 4
 		update_b	1 3
 		update_b	0 2
 		pop_b	2
@@ -345,12 +379,13 @@ Wrap node
 
 		| create and fill file node
 		create
-		fillF_b	2 0
+		fillF_b	3 0
 		push_a	1
 		update_a	1 2
 		update_a	0 1
 		pop_a	1
 
+		update_b	2 4
 		update_b	1 3
 		update_b	0 2
 		pop_b	2
@@ -365,7 +400,7 @@ Wrap node
 					| A: <_{fields}> <field> <afield_ .. afield_m>
 		| wrap field
 		push_a	1
-		build	e_Wrap_sWrap 1 e_Wrap_nWrap
+		build	e_Wrap_swrapNode 1 e_Wrap_nwrapNode
 		update_a	0 2
 		pop_a	1
 
@@ -373,25 +408,31 @@ Wrap node
 		push_b	1
 		update _ 1 0
 					| A: <_{fields}> <afield_ .. afield_m> <result>
-					| B: <p> <i> <bfield_ .. bfield_n> <desc> <return>
+					| B: <p> <i> <is_record> <bfield_ .. bfield_n> <desc> <return>
 
 		| increment index
 		push_b	1
 		incI
 		update_b	0 2
+		pop_b	1
 
 		| increment pointer in layout string
-		pop_b	1
 		incI
 
 		jmp	wrap_fields_loop
 
 	:end_wrap_record_fields
 					| A: <_{fields}> <result>
-					| B: <i=0> <p> <i> <desc> <return>
+					| B: <i=0> <p> <i> <is_record> <desc> <return>
 		pop_b	3
 					| A: <_{fields}> <result>
-					| B: <desc> <return>
+					| B: <is_record> <desc> <return>
+
+		push_b	1
+		update_b	1 2
+		update_b	0 1
+		pop_b	1
+					| B: <desc> <is_record> <return>
 
 		| create WrappedDescriptorOther node
 		build_r	e_Wrap_rWrappedDescriptorId 0 1 0 0
@@ -400,11 +441,23 @@ Wrap node
 		update_a	0 1
 		pop_a 1
 					| A: <descriptor> <{fields}> <result>
+					| B: <is_record> <return>
 
-		| fill result node
+		| pop is_record +++ use this
+		jmp_false fill_constructor_result
+
+		| fill result node for record
 		fill_r	e_Wrap_kWrappedRecord 2 0 2 0 0
 		pop_a	2
+		jmp	wrapped_record_return_to_caller
 
+	:fill_constructor_result
+		| fill result node for constructor
+
+		fill_r	e_Wrap_kWrappedOther 2 0 2 0 0
+		pop_a	2
+
+	:wrapped_record_return_to_caller
 					| A: <result>
 					| B: <return>
 		| return to caller (determined by the return selector)
@@ -412,7 +465,7 @@ Wrap node
 		jmp_true	wrap_record_return_node
 		eqI_b	1 0
 		jmp_true	wrap_record_array_return
-		print_sc	"Wrap: (record fields) unknown return selector\n"
+		print_sc	"Wrap.wrapNode: (record fields) unknown return selector\n"
 		halt
 
 	:wrap_record_return_node
@@ -494,7 +547,7 @@ Wrap node
 		push_b	1
 		push_a	1
 		select	_ 1 0
-		build	e_Wrap_sWrap 1 e_Wrap_nWrap
+		build	e_Wrap_swrapNode 1 e_Wrap_nwrapNode
 					| A: <element> <_wrapped_array> <_array> <result>
 					| B: <n> <i>
 		| update i-th element of _wrapped_array with wrapped element

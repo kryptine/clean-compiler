@@ -1,8 +1,11 @@
-definition module Wrap
-
 /*
-	Wrap arbitrary Clean nodes (for debugging purposes).
+	Wrap Clean nodes (for debugging purposes).
+
+	Version 1.0.1
+	Ronny Wichers Schreur
+	ronny@cs.kun.nl
 */
+definition module Wrap
 
 from StdOverloaded import toString 
 
@@ -40,4 +43,4 @@ instance toString WrappedDescriptorId
 	// other nodes
     |   WrappedOther !WrappedDescriptor !{WrappedNode}
 
-Wrap :: !.a -> WrappedNode
+wrapNode :: !.a -> WrappedNode
