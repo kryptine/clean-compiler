@@ -2,7 +2,7 @@ implementation module unitype
 
 import StdEnv
 
-import syntax, analunitypes, type, utilities
+import syntax, analunitypes, type, utilities // , RWSDebug
 
 import cheat
 
@@ -64,6 +64,16 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 		No
 			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
 
+/*
+		No
+
+			# (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
+			  format = { form_properties = cMarkAttribute, form_attr_position = Yes ([], copy_crc_coercions) }			
+			| file_to_true (stderr <:: (format, exp_off_type) <:: (format, exp_dem_type) <<< '\n')
+					---> ("determineAttributeCoercions", exp_off_type, exp_dem_type)
+				-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
+				-> undef
+*/
 NotChecked :== -1	
 DummyAttrNumber :== -1
 ::	AttributeGroups	:== {! [Int]}
@@ -525,6 +535,7 @@ makeNonUnique attr {coer_demanded, coer_offered}
 	# (dem_coercions, coer_demanded) = replace coer_demanded attr CT_Empty
 	  coer_offered = { coer_offered & [attr] = CT_NonUnique }
 	= make_non_unique dem_coercions {coer_offered = coer_offered, coer_demanded = coer_demanded}
+//		---> ("makeNonUnique", attr)
 where
 	make_non_unique (CT_Node this_attr ct_less ct_greater) coercions
 		# coercions = makeNonUnique this_attr coercions
@@ -549,8 +560,8 @@ Success (Yes _)	=  False
 instance coerce AType
 where
 	coerce sign defs cons_vars tpos at1=:{at_attribute=attr1,at_type=type1} at2=:{at_attribute=attr2,at_type=type2}  cs=:{crc_coercions}
-		# sign = adjust_sign sign type1 cons_vars
-		  (succ, crc_coercions) = coerceAttributes attr1 attr2 sign crc_coercions
+		# attr_sign = adjust_sign sign type1 cons_vars
+		  (succ, crc_coercions) = coerceAttributes attr1 attr2 attr_sign crc_coercions
 		| succ
 			# (succ, cs) = coerce sign defs cons_vars tpos type1 type2 { cs & crc_coercions = crc_coercions }
 			| Success succ
@@ -651,7 +662,8 @@ where
 			= coerce sign defs cons_vars tpos dem_type off_type { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos }
 			= (No, { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos })
 	coerce sign defs cons_vars tpos (arg_type1 --> res_type1) (arg_type2 --> res_type2) cs
-		# (succ, cs) = coerce (NegativeSign * sign) defs cons_vars [0 : tpos] arg_type1 arg_type2  cs
+		# arg_sign = NegativeSign * sign
+		# (succ, cs) = coerce arg_sign defs cons_vars [0 : tpos] arg_type1 arg_type2  cs
 		| Success succ
 			= coerce sign defs cons_vars [1 : tpos] res_type1 res_type2 cs
 			= (succ, cs)
@@ -731,4 +743,12 @@ where
 				| del_char == ident.[del_pos]
 					= del_pos
 					= find_delimiter del_char (inc del_pos) ident
+
+file_to_true :: !File -> Bool
+file_to_true file = code {
+  .inline file_to_true
+          pop_b 2
+          pushB TRUE
+  .end
+  }
 			

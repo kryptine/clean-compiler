@@ -1,7 +1,7 @@
 implementation module typesupport
 
 import StdEnv, StdCompare
-import syntax, parse, check, unitype, utilities, RWSDebug
+import syntax, parse, check, unitype, utilities // , RWSDebug
 
 // MW: this switch is used to en(dis)able the fusion algorithm
 SwitchFusion fuse dont_fuse :== dont_fuse
@@ -799,7 +799,7 @@ where
 				= file <<< '*' 
 			| isNonUniqueAttribute av_number coercions
 				= file 
-				= file <<< '.' 
+				= file <<< '.' <<< "[[" <<< av_number <<< "]]"
 
 instance <:: Type
 where

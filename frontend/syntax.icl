@@ -427,6 +427,7 @@ cIsALocalVar	:== False
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
+				VI_ClassVar !Ident !VarInfoPtr !Int /* used to hold dictionary variables during overloading */ |
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo | VI_CaseVar !VarInfoPtr |
 				VI_CorrespondenceNumber !Int | VI_SequenceNumber !Int |
 				VI_Used | /* for indicating that an imported function has been used */
@@ -547,7 +548,7 @@ cNotVarNumber :== -1
 
 					| EI_Overloaded !OverloadedCall 						/* initial, set by the type checker */
 					| EI_Instance 	!(Global DefinedSymbol) ![Expression]	/* intermedediate, used during resolving of overloading */ 
-					| EI_Selection 	![Selection] !BoundVar ![Expression]	/* intermedediate, used during resolving of overloading */
+					| EI_Selection 	![Selection] !VarInfoPtr ![Expression]	/* intermedediate, used during resolving of overloading */
 					| EI_Context 	![Expression]							/* intermedediate, used during resolving of overloading */
 
 		/* For handling dynamics */
@@ -936,7 +937,8 @@ cIsNotStrict	:== False
 
 				| MatchExpr !(Optional (Global DefinedSymbol)) !(Global DefinedSymbol) !Expression
 				| FreeVar FreeVar 
-				| Constant !SymbIdent !Int !Priority !Bool /* auxiliary clause used during checking */
+				| Constant !SymbIdent !Int !Priority !Bool	/* auxiliary clause used during checking */
+				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
 
 				| DynamicExpr !DynamicExpr
 //				| TypeCase !TypeCase
@@ -1375,7 +1377,9 @@ where
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
 
 	(<<<) file (FreeVar {fv_name})         	= file <<< "FREEVAR " <<< fv_name
-	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" <<- expr)
+	(<<<) file (ClassVariable _)         	= file <<< "ClassVariable "
+
+	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
 	
 instance <<< TypeCase
 where

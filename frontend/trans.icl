@@ -207,7 +207,7 @@ where
 			   ai_cur_ref_counts = { ai_cur_ref_counts & [arg_position]=min (ref_count+1) 2 }
 			= (temp_var, False, { ai & ai_cur_ref_counts=ai_cur_ref_counts })
 		continuation var_info ai=:{ai_cur_ref_counts}
-			=  abort ("consumerRequirements" ---> (var_name <<- var_info))
+			=  abort ("consumerRequirements" ---> (var_name))//  <<- var_info))
 //		continuation vi ai
 //			= (cPassive, ai)
 
@@ -280,7 +280,7 @@ instance consumerRequirements Expression where
 	consumerRequirements EE _ ai
 		= (cPassive, False, ai)
 	consumerRequirements expr _ ai
-		= abort ("consumerRequirements " <<- expr)
+		= abort ("consumerRequirements ") // <<- expr)
 
 requirementsOfSelectors selectors common_defs ai
 	= foldSt (reqs_of_selector common_defs) selectors ai

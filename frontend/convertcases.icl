@@ -50,7 +50,7 @@ where
 				# ((let_binds,let_expr), ci) = convertCases (addLetVars let_binds let_type bound_vars) group_index common_defs (let_binds,let_expr) ci
 				-> ({ lad & let_binds = let_binds, let_expr = let_expr }, ci)
 			_
-				-> abort "convertCases [Let] (convertcases 53)" <<- let_info 
+				-> abort "convertCases [Let] (convertcases 53)" // <<- let_info 
 
 addLetVars [{bind_dst} : binds] [bind_type : bind_types] bound_vars
 	= addLetVars binds bind_types [ (bind_dst, bind_type) : bound_vars ]
@@ -760,7 +760,7 @@ where
 					{ cp_info & cp_free_vars = [ (var_info_ptr, type) : cp_info.cp_free_vars ],
 							cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_name new_info_ptr 1 type) })
 			_
-				-> abort "copy [BoundVar] (convertcases, 612)" <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
+				-> abort "copy [BoundVar] (convertcases, 612)" // <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
 
 instance copy Expression
 where
@@ -1274,9 +1274,8 @@ where
 		# (let_info, di_expr_heap) = readPtr let_info_ptr di_expr_heap
 		  ok = case let_info of 
 		  		EI_LetTypeAndRefCounts let_type ref_counts -> True
-				x											-> abort ("abort [distributeLets (EI_LetTypeAndRefCounts)]" ->> x)
+				x											-> abort ("abort [distributeLets (EI_LetTypeAndRefCounts)]") // ->> x)
 		| ok
-			// ---> ("distributeLets", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_binds])
 			# (EI_LetTypeAndRefCounts let_type ref_counts) = let_info
 			  di_var_heap = set_let_expression_info depth let_strict let_binds ref_counts let_type di_var_heap
 			  (let_expr, dl_info) = distributeLets depth let_expr { dl_info & di_var_heap = di_var_heap, di_expr_heap = di_expr_heap }

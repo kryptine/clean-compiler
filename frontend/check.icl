@@ -1537,7 +1537,7 @@ where
 checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 	= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
 checkExpression free_vars expr e_input e_state e_info cs
-	= abort "checkExpression (check.icl, line 1433)" <<- expr
+	= abort "checkExpression (check.icl, line 1433)" // <<- expr
 
 :: LastSelection	= LS_Update | LS_Selction | LS_UniqueSelection
  
@@ -2128,7 +2128,7 @@ where
 		= (fun_defs, symbol_table)
 
 	get_calls (STE_FunctionOrMacro [x:xs]) = (x,xs)
-	get_calls ste_kind = abort "get_calls (check.icl)" <<- ste_kind
+	get_calls ste_kind = abort "get_calls (check.icl)" // <<- ste_kind
 
 			
 checkFunctions :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState)
@@ -2375,7 +2375,7 @@ where
 		# ({ste_kind,ste_index}, cs_symbol_table) = readPtr ds_ident.id_info cs.cs_symbol_table
 		| ste_kind == req_kind
 			= ({ ds & ds_index = ste_index }, { cs & cs_symbol_table = cs_symbol_table })
-			# cs_error = checkError "definition module" ("conflicting definition in implementation module"->>("ste_kind",ste_kind,ptrToInt ds_ident.id_info))
+			# cs_error = checkError "definition module" "conflicting definition in implementation module"
 							(setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
 			= ({ ds & ds_index = ste_index }, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 

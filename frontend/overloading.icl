@@ -2,7 +2,7 @@ implementation module overloading
 
 import StdEnv
 
-import syntax, check, type, typesupport, utilities, unitype, predef, RWSDebug
+import syntax, check, type, typesupport, utilities, unitype, predef // , RWSDebug
 
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
@@ -582,6 +582,7 @@ getDictionaryConstructor {glob_module, glob_object = {ds_ident,ds_index}} defs
 	  (RecordType {rt_constructor}) = defs.[glob_module].com_type_defs.[class_dictionary.ds_index].td_rhs
 	= rt_constructor
 
+
 simplifyOverloadedCall {symb_kind = SK_OverloadedFunction {glob_module,glob_object}, symb_arity} expr_info_ptr [class_appl:class_appls]
 		defs has_context contexts type_heaps var_heap symbol_heap error
 	# mem_def = defs.[glob_module].com_member_defs.[glob_object]
@@ -603,7 +604,7 @@ where
 				= determineContextAddress tc has_context contexts defs type_heaps var_heap error
 		  {class_dictionary={ds_index}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
-		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) (createBoundVar class_context) class_exprs,
+		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
 				contexts, (type_heaps, var_heap, symbol_heap), error)
 
 	adjust_member_application _ _ (CA_GlobalTypeCode {tci_index,tci_contexts}) _ defs has_context contexts heaps error
@@ -655,8 +656,8 @@ where
 		# (class_context, context_address, contexts, type_heaps, var_heap, error)
 				= determineContextAddress tc has_context contexts defs type_heaps var_heap error
 		| isEmpty context_address
-			= (Var (createBoundVar class_context), (contexts, (type_heaps, var_heap, expr_heap), error))
-			= (Selection No (Var (createBoundVar class_context)) (generateClassSelection context_address []), (contexts, (type_heaps, var_heap, expr_heap), error))
+			= (ClassVariable class_context.tc_var, (contexts, (type_heaps, var_heap, expr_heap), error))
+			= (Selection No (ClassVariable class_context.tc_var) (generateClassSelection context_address []), (contexts, (type_heaps, var_heap, expr_heap), error))
 	convert_class_appl_to_expression defs has_context (CA_LocalTypeCode new_var_ptr) contexts_heaps_error
 		= (TypeCodeExpression (TCE_Var new_var_ptr), contexts_heaps_error)
 	convert_class_appl_to_expression defs has_context (CA_GlobalTypeCode {tci_index,tci_contexts}) contexts_heaps_error
@@ -689,19 +690,18 @@ where
 		  (app_info_ptr, expr_heap) = newPtr (EI_ClassTypes instance_types) expr_heap
 		  rc_record = App { app_symb = record_symbol, app_args = rc_exprs ++ rcs_exprs, app_info_ptr = app_info_ptr }
 		= (rc_record, (contexts, (type_heaps, var_heap, expr_heap), error))
-	
+
+/*	
 createBoundVar :: !TypeContext -> BoundVar
 createBoundVar {tc_class={glob_object={ds_ident}}, tc_var}
-/*	| isNilPtr tc_var
-		= abort ("createBoundVar : NIL ptr" ---> ds_ident)
-*/	= { var_name = { id_name = "_v" +++ ds_ident.id_name, id_info = nilPtr }, var_info_ptr = tc_var, var_expr_ptr = nilPtr }
+	= { var_name = { id_name = "_v" +++ ds_ident.id_name, id_info = nilPtr }, var_info_ptr = tc_var, var_expr_ptr = nilPtr }
 
 createFreeVar :: !TypeContext -> FreeVar
 createFreeVar {tc_class={glob_object={ds_ident}}, tc_var}
 	| isNilPtr tc_var
 		= abort ("createFreeVar : NIL ptr" ---> ds_ident)
 		= { fv_name = { id_name = "_v" +++ ds_ident.id_name, id_info = nilPtr }, fv_info_ptr = tc_var, fv_def_level = NotALevel, fv_count = -1 }
-
+*/
 
 determineContextAddress :: !TypeContext !Bool ![TypeContext] !{#CommonDefs} !*TypeHeaps !*VarHeap !*ErrorAdmin
 	-> (!TypeContext, ![(Int, Global DefinedSymbol)], ![TypeContext], !*TypeHeaps, !*VarHeap, !*ErrorAdmin)
@@ -750,6 +750,10 @@ where
 			No
 				-> find_super_instance context tcs (inc tc_index) address  dict_mod dict_index defs type_heaps
 
+getClassVariable var_info_ptr var_heap
+	# (VI_ClassVar var_name new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
+	= (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)))
+
 updateDynamics :: ![Int] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin
 	-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
 updateDynamics funs type_contexts type_pattern_vars fun_defs symbol_heap type_code_info var_heap error
@@ -766,46 +770,63 @@ where
 			= update_dynamics funs type_contexts fun_defs symbol_heap type_code_info ltp error
 		  	# (type_code_info, symbol_heap, ltp) = convertDynamicTypes fi_dynamics (type_code_info, symbol_heap, ltp)
 		  	  (TransformedBody tb) = fun_body
-		  	  (tb_rhs, {ui_instance_calls, ui_symbol_heap, ui_fun_defs})
-		  	  		= updateExpression fi_group_index [] tb.tb_rhs {  ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_fun_defs = fun_defs }
+		  	  (tb_rhs, {ui_instance_calls, ui_symbol_heap, ui_var_heap, ui_fun_defs}) = updateExpression fi_group_index [] tb.tb_rhs
+					{ ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_fun_defs = fun_defs, ui_var_heap = ltp.ltp_var_heap }
 		 	  fun_def = { fun_def & fun_body = TransformedBody {tb & tb_rhs = tb_rhs}}
-			= update_dynamics funs type_contexts { ui_fun_defs & [fun] = fun_def } ui_symbol_heap type_code_info ltp error
+			= update_dynamics funs type_contexts { ui_fun_defs & [fun] = fun_def } ui_symbol_heap type_code_info { ltp & ltp_var_heap = ui_var_heap } error
 
 removeOverloadedFunctions :: ![Int] ![(Optional [TypeContext], IdentPos)] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin
 		-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
 removeOverloadedFunctions funs opt_spec_contexts type_contexts type_pattern_vars fun_defs symbol_heap type_code_info var_heap error
 	| error.ea_ok
-		= remove_overloaded_functions funs opt_spec_contexts type_contexts fun_defs symbol_heap type_code_info
-				{ ltp_var_heap = var_heap, ltp_variables = type_pattern_vars} error
-		= (fun_defs, symbol_heap, type_code_info, var_heap, error)	
-where	
-	remove_overloaded_functions :: ![Int] ![(Optional [TypeContext], IdentPos)] ![TypeContext] !*{#FunDef} !*ExpressionHeap !*TypeCodeInfo
-		!*LocalTypePatternVariables !*ErrorAdmin
-			-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
-	remove_overloaded_functions [] opt_contexts type_contexts fun_defs symbol_heap type_code_info ltp error
-		= (fun_defs, symbol_heap, type_code_info, ltp.ltp_var_heap,  error)
-	remove_overloaded_functions [fun:funs] [(opt_context, location):opt_contexts] type_contexts fun_defs symbol_heap type_code_info ltp error
-		#! fun_def = fun_defs.[fun]
-		# {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb} = fun_def
+		# (_, fun_defs, symbol_heap, type_code_info, ltp, error)
+			= fold2St (remove_overloaded_function type_contexts) funs opt_spec_contexts
+					(False, fun_defs, symbol_heap, type_code_info, { ltp_var_heap = var_heap, ltp_variables = type_pattern_vars}, error)
+		= (fun_defs, symbol_heap, type_code_info, ltp.ltp_var_heap, error)
+where
+	remove_overloaded_function derived_context fun_index (opt_context, location)
+			(refresh_variables, fun_defs, symbol_heap, type_code_info, ltp, error)
+		# (fun_def, fun_defs) = fun_defs![fun_index]
+		  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb} = fun_def
+		  (refresh_variables, rev_variables, ltp_var_heap) = determine_class_arguments refresh_variables opt_context derived_context ltp.ltp_var_heap
 		  error = setErrorAdmin location error
-		  (type_code_info, symbol_heap, ltp) = convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, ltp)
-		  tb_args = determine_class_arguments opt_context type_contexts tb_args
-		  (tb_rhs, {ui_instance_calls, ui_symbol_heap, ui_fun_defs}) = updateExpression fun_info.fi_group_index type_contexts tb_rhs
-		  							{  ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_fun_defs = fun_defs }
+		  (type_code_info, symbol_heap, ltp) = convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, { ltp & ltp_var_heap = ltp_var_heap })
+		  (tb_rhs, {ui_instance_calls, ui_symbol_heap, ui_var_heap, ui_fun_defs}) = updateExpression fun_info.fi_group_index rev_variables tb_rhs
+		  							{  ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_var_heap = ltp.ltp_var_heap, ui_fun_defs = fun_defs }
+		  (tb_args, ltp_var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap)
 		  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs},
 		  								  fun_arity = length tb_args, fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls } }
-		= remove_overloaded_functions funs opt_contexts type_contexts { ui_fun_defs & [fun] = fun_def } ui_symbol_heap type_code_info ltp error
+		= (refresh_variables, { ui_fun_defs & [fun_index] = fun_def }, ui_symbol_heap, type_code_info, { ltp & ltp_var_heap = ltp_var_heap }, error)
 
-	determine_class_arguments (Yes spec_context) _ tb_args
-		= mapAppend (\tc -> createFreeVar tc) spec_context tb_args
-	determine_class_arguments No type_contexts tb_args
-		= mapAppend (\tc -> createFreeVar tc) type_contexts tb_args
+	determine_class_arguments fresh_variables (Yes spec_context) _ var_heap
+		# (rev_variables, var_heap) = foldSt set_variable spec_context ([], var_heap)
+		= (fresh_variables, rev_variables, var_heap)
+	determine_class_arguments fresh_variables No derived_context var_heap
+		| fresh_variables
+			# (rev_variables, var_heap) = foldSt set_fresh_variable derived_context ([], var_heap)
+			= (True, rev_variables, var_heap)
+			# (rev_variables, var_heap) = foldSt set_variable derived_context ([], var_heap)
+			= (True, rev_variables, var_heap)
+							
+	set_fresh_variable {tc_class={glob_object={ds_ident={id_name}}}, tc_var} (variables, var_heap)
+		# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+		= ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
+
+	set_variable {tc_class={glob_object={ds_ident={id_name}}}, tc_var} (variables, var_heap)
+		= ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name id_name) tc_var 0))
+
+	build_var_name id_name
+		= { id_name = "_v" +++ id_name, id_info = nilPtr }
+
+	retrieve_class_argument var_info_ptr (args, var_heap)
+		# (VI_ClassVar var_name new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
+		= ([{fv_name = var_name, fv_info_ptr = new_info_ptr, fv_def_level = NotALevel, fv_count = count } : args], var_heap)
 
 convertDynamicTypes dyn_ptrs update_info
 	= foldSt update_dynamic dyn_ptrs update_info
 where		
-	update_dynamic dyn_ptr (type_code_info, expr_heap, local_type_pattern_vars)
+	update_dynamic dyn_ptr (type_code_info, expr_heap, ltp)
 		# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
 		= case dyn_info of
 			EI_TempDynamicType (Yes {dt_global_vars, dt_uni_vars, dt_type}) _ _ expr_ptr _
@@ -814,47 +835,43 @@ where
 					EI_TypeCodes type_codes
 						# type_var_heap = fold2St (\{tv_info_ptr} type_code -> writePtr tv_info_ptr (TVI_TypeCode type_code))
 														dt_global_vars type_codes type_code_info.tci_type_var_heap
-						  (uni_vars, (type_var_heap, ltp_var_heap)) = new_type_variables dt_uni_vars (type_var_heap, local_type_pattern_vars.ltp_var_heap)
+						  (uni_vars, (type_var_heap, ltp_var_heap)) = new_type_variables dt_uni_vars (type_var_heap, ltp.ltp_var_heap)
 						  (type_code_expr, type_code_info) = toTypeCodeExpression dt_type { type_code_info & tci_type_var_heap = type_var_heap }
-						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr), {local_type_pattern_vars & ltp_var_heap = ltp_var_heap})
+						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr), { ltp & ltp_var_heap = ltp_var_heap})
 					EI_Empty
-						# (uni_vars, (type_var_heap, ltp_var_heap)) = new_type_variables dt_uni_vars (type_code_info.tci_type_var_heap, local_type_pattern_vars.ltp_var_heap)
+						# (uni_vars, (type_var_heap, ltp_var_heap)) = new_type_variables dt_uni_vars (type_code_info.tci_type_var_heap, ltp.ltp_var_heap)
 						  (type_code_expr, type_code_info) = toTypeCodeExpression dt_type { type_code_info & tci_type_var_heap = type_var_heap }
-						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr), {local_type_pattern_vars & ltp_var_heap = ltp_var_heap})
+						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr), {ltp & ltp_var_heap = ltp_var_heap})
 			EI_TempDynamicType No _ _ expr_ptr _
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCode type_expr
-						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic [] type_expr), local_type_pattern_vars)
+						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic [] type_expr), ltp)
 					EI_Selection selectors record_var _
-						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic [] (convert_selectors selectors record_var)), local_type_pattern_vars)
+						# (_, var_info_ptr, ltp_var_heap) = getClassVariable record_var ltp.ltp_var_heap
+						-> (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamic [] (convert_selectors selectors var_info_ptr)), { ltp & ltp_var_heap = ltp_var_heap })
 			EI_TempDynamicPattern type_vars {dt_global_vars, dt_type} loc_dynamics temp_local_vars _ _ expr_ptr _
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCodes type_codes
 						# type_var_heap = fold2St (\{tv_info_ptr} type_code -> writePtr tv_info_ptr (TVI_TypeCode type_code)) dt_global_vars type_codes type_code_info.tci_type_var_heap
-						  (var_ptrs, local_type_pattern_vars) = mapSt addLocalTCInstance temp_local_vars local_type_pattern_vars
+						  (var_ptrs, ltp) = mapSt addLocalTCInstance temp_local_vars ltp
 						  type_var_heap = fold2St (\{tv_info_ptr} var_ptr -> writePtr tv_info_ptr (TVI_TypeCode (TCE_Var var_ptr))) type_vars var_ptrs type_var_heap
 						  (type_code_expr, type_code_info) = toTypeCodeExpression dt_type { type_code_info & tci_type_var_heap = type_var_heap }
-						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr), local_type_pattern_vars)
+						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr), ltp)
 					EI_Empty
-						# (var_ptrs, local_type_pattern_vars) = mapSt addLocalTCInstance temp_local_vars local_type_pattern_vars
+						# (var_ptrs, ltp) = mapSt addLocalTCInstance temp_local_vars ltp
 						  type_var_heap = fold2St (\{tv_info_ptr} var_ptr -> writePtr tv_info_ptr (TVI_TypeCode (TCE_Var var_ptr))) type_vars var_ptrs type_code_info.tci_type_var_heap
 						  (type_code_expr, type_code_info) = toTypeCodeExpression dt_type { type_code_info & tci_type_var_heap = type_var_heap }
-						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr), local_type_pattern_vars)
+						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr), ltp)
 					
 	where
 		convert_local_dynamics loc_dynamics state
 			= foldSt update_dynamic loc_dynamics state
-/*
-		convert_local_dynamics (Yes loc_dynamics) state
-			= update_dynamic loc_dynamics state
-		convert_local_dynamics No state
-			= state
-*/
-		convert_selectors [type_code_selector] {var_info_ptr}
+
+		convert_selectors [type_code_selector] var_info_ptr
 			= TCE_Var var_info_ptr
-		convert_selectors selectors {var_info_ptr}
+		convert_selectors selectors var_info_ptr
 			= TCE_Selector (init selectors) var_info_ptr
 		
 		new_type_variables uni_vars heaps
@@ -900,10 +917,12 @@ where
 ::	UpdateInfo =
 	{	ui_instance_calls	:: ![FunCall]
 	,	ui_symbol_heap		:: !.ExpressionHeap
+	,	ui_var_heap			:: !.VarHeap
 	,	ui_fun_defs			:: !.{# FunDef}
 	}
 
-class updateExpression e :: !Index ![TypeContext] !e !*UpdateInfo -> (!e, !*UpdateInfo)
+class updateExpression e :: !Index ![VarInfoPtr] !e !*UpdateInfo -> (!e, !*UpdateInfo)
+
 
 instance updateExpression Expression
 where
@@ -915,24 +934,32 @@ where
 			= case symb_info of
 				EI_Empty
 					| is_recursive_call group_index symb_kind ui.ui_fun_defs
-						# app_args = strictMapAppend (\tc -> Var (createBoundVar tc)) type_contexts app_args
-						-> (App { app & app_symb = { symb & symb_arity = length type_contexts + symb_arity }, app_args = app_args }, ui)
+						# (symb_arity, app_args, ui_var_heap) = foldSt build_context_arg type_contexts (symb_arity, app_args, ui.ui_var_heap)
+						-> (App { app & app_symb = { symb & symb_arity = symb_arity }, app_args = app_args }, { ui & ui_var_heap = ui_var_heap })
 						-> (App { app & app_args = app_args }, ui)
 				EI_Instance inst_symbol context_args
+					# (context_args, ui_var_heap) = adjustClassExpressions context_args [] ui.ui_var_heap
 					-> (build_application inst_symbol context_args app_args symb_arity app_info_ptr,
-							examine_calls context_args (new_call inst_symbol.glob_module inst_symbol.glob_object.ds_index ui))
+							examine_calls context_args (new_call inst_symbol.glob_module inst_symbol.glob_object.ds_index
+								{ ui & ui_var_heap = ui_var_heap }))
 				EI_Selection selectors record_var context_args
-					# all_args = context_args ++ app_args
-					  select_expr = Selection No (Var record_var) selectors
+					# (all_args, ui_var_heap) = adjustClassExpressions context_args app_args ui.ui_var_heap
+					  (var_name, var_info_ptr, ui_var_heap) = getClassVariable record_var ui_var_heap
+					  select_expr = Selection No (Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selectors
 					| isEmpty all_args
-						-> (select_expr, ui)
-						-> (select_expr @ all_args, examine_calls context_args ui)
+						-> (select_expr, { ui & ui_var_heap = ui_var_heap })
+						-> (select_expr @ all_args, examine_calls context_args { ui & ui_var_heap = ui_var_heap })
 				EI_Context context_args
-					# app = { app & app_symb = { symb & symb_arity = length context_args + symb_arity }, app_args = context_args ++  app_args}
-					-> (App app, examine_calls context_args ui)
+					# (app_args, ui_var_heap) = adjustClassExpressions context_args app_args ui.ui_var_heap
+					# app = { app & app_symb = { symb & symb_arity = length context_args + symb_arity }, app_args = app_args}
+					-> (App app, examine_calls context_args { ui & ui_var_heap = ui_var_heap })
 
 
 	where
+		build_context_arg var_info_ptr (arity, args, var_heap)
+			# (var_name, var_info_ptr, var_heap) = getClassVariable var_info_ptr var_heap
+			= (inc arity, [ Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr } : args ], var_heap)
+
 		is_recursive_call group_index (SK_Function {glob_module,glob_object}) fun_defs
 			| glob_module == cIclModIndex
 				#! fun_def = fun_defs.[glob_object]
@@ -991,25 +1018,6 @@ where
 		# (expr, ui) = updateExpression group_index type_contexts expr ui
 		  (selectors, ui) = updateExpression group_index type_contexts selectors ui
 		= (Selection is_unique expr selectors, ui)
-/*
-		where
-			update_selections group_index type_contexts is_unique selectors ui
-				= foldl (update_selection group_index type_contexts is_unique) state selectors
-		  
-		  	update_selection group_index type_contexts is_unique (expr, ui) (ArraySelection selector expr_ptr index_expr)
-				# (index_expr, ui) = updateExpression group_index type_contexts index_expr ui
-				#! symb_info = sreadPtr expr_ptr ui.ui_symbol_heap
-				= case symb_info of
-					EI_Instance array_select []
-						-> (App {app_symb = { symb_name = glob_object.ds_ident,
-									symb_kind = SK_Function { glob_module = glob_module, glob_object = glob_object.ds_index },
-										symb_arity = glob_object.ds_arity + 2 },
-								 app_args = context_args ++ [expr,index_expr], app_info_ptr = expr_ptr }, ui)
-					EI_Selection selectors record context_args
-						-> (Selection is_unique record selectors @ [expr,index_expr], ui)
-		  	update_selection group_index type_contexts is_unique (expr, ui) (RecordSelection selector field_nr)
-		  		= (Selection is_unique expr [RecordSelection selector field_nr], ui)
-*/
 	updateExpression group_index type_contexts (Update expr1 selectors expr2) ui
 		# (expr1, ui) = updateExpression group_index type_contexts expr1 ui
 		  (selectors, ui) = updateExpression group_index type_contexts selectors ui
@@ -1078,8 +1086,10 @@ where
 		= case symb_info of
 			EI_Instance array_select []
 				-> (ArraySelection array_select expr_ptr index_expr, ui)
-			EI_Selection selectors record context_args
-				-> (DictionarySelection record selectors expr_ptr index_expr, ui)
+			EI_Selection selectors record_var context_args
+				# (var_name, var_info_ptr, ui_var_heap) = getClassVariable record_var ui.ui_var_heap
+				-> (DictionarySelection { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr } selectors expr_ptr index_expr,
+							{ ui & ui_var_heap = ui_var_heap })
   	updateExpression group_index type_contexts selection ui
 		= (selection, ui)
 
@@ -1106,7 +1116,21 @@ instance updateExpression [e] | updateExpression e
 where
 	updateExpression group_index type_contexts l ui
 		= mapSt (updateExpression group_index type_contexts) l ui
-		
+
+adjustClassExpressions exprs tail_exprs var_heap 
+	= mapAppendSt adjustClassExpression exprs tail_exprs var_heap
+
+adjustClassExpression (App app=:{app_args}) var_heap
+	# (app_args, var_heap) = adjustClassExpressions app_args [] var_heap
+	= (App { app & app_args = app_args }, var_heap)
+adjustClassExpression (ClassVariable var_info_ptr) var_heap
+	# (var_name, var_info_ptr, var_heap) = getClassVariable var_info_ptr var_heap
+	= (Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }, var_heap)
+adjustClassExpression (Selection opt_type expr selectors) var_heap
+	# (expr, var_heap) = adjustClassExpression expr var_heap
+	= (Selection opt_type expr selectors, var_heap)
+adjustClassExpression expr var_heap
+	= (expr, var_heap)
 
 class equalTypes a :: !a !a !*TypeVarHeap -> (!Bool, !*TypeVarHeap)
 
