@@ -996,7 +996,8 @@ getClassVariable symb var_info_ptr var_heap error
 		(VI_ClassVar var_name new_info_ptr count, var_heap)
 			-> (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)), error)
 		(_, var_heap)
-			-> (symb, var_info_ptr, var_heap, overloadingError symb error)
+			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			-> (symb, var_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), overloadingError symb error)
 
 updateDynamics :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
@@ -1038,35 +1039,38 @@ removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int!*{#FunDef
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
 removeOverloadedFunctions group type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-	| error.ea_ok
-		# (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-			= foldSt (remove_overloaded_function type_pattern_vars) group (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-		= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+	#! ok = error.ea_ok
+	# (_, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		= foldSt (remove_overloaded_function type_pattern_vars) group (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+	= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 where
-	remove_overloaded_function type_pattern_vars fun_index (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-// MV ...			
+	remove_overloaded_function type_pattern_vars fun_index (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		| ok
+	// MV ...			
 			# (_,module_id_app,predef_symbols)
 				= get_module_id_app predef_symbols
-// ... MV			
-		# (fun_def, fun_defs) = fun_defs![fun_index]  
-		  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
-		  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb,fun_pos} = fun_def
-		  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
-		  error = setErrorAdmin (newPosition fun_symb fun_pos) error
-		  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
-		  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
-		 
-		  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}})
-		  		= updateExpression fun_info.fi_group_index tb_rhs {  ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
-		  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
-// MV ...
-					    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n,x_internal_type_id = module_id_app,x_module_id = No}}
-// ... MV
-// WAS:			    	ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
-		  (tb_args, var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap) 
-		  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
-		  						fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars } }
-		= ({ ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
+	// ... MV			
+			# (fun_def, fun_defs) = fun_defs![fun_index]  
+			  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
+			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb,fun_pos} = fun_def
+			  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
+			  error = setErrorAdmin (newPosition fun_symb fun_pos) error
+			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
+			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
+			 
+			  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}})
+			  		= updateExpression fun_info.fi_group_index tb_rhs {  ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
+			  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
+	// MV ...
+						    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n,x_internal_type_id = module_id_app,x_module_id = No}}
+	// ... MV
+	// WAS:			    	ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
+			  (tb_args, var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap) 
+			  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
+			  						fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars } }
+			#! ok = ui_error.ea_ok
+			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
+			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 
 	determine_class_argument {tc_class={glob_object={ds_ident={id_name}}}, tc_var} (variables, var_heap)
 		# (var_info, var_heap) = readPtr tc_var var_heap
