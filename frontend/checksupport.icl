@@ -2,11 +2,11 @@ implementation module checksupport
 
 import StdEnv, compare_constructor
 import syntax, predef
-import utilities // MW++
+import utilities
 
 ::	VarHeap :== Heap VarInfo
 
-cIclModIndex 			:== 0 // MW++
+cIclModIndex 			:== 0
 
 CS_NotChecked 	:== -1
 NotFound		:== -1
@@ -14,8 +14,8 @@ NotFound		:== -1
 cModuleScope	:== 0
 cGlobalScope	:== 1
 
-cIsNotADclModule 	:== False // MW++
-cIsADclModule 		:== True  // MW++
+cIsNotADclModule 	:== False
+cIsADclModule 		:== True
 
 ::	Heaps =
 	{	hp_var_heap			::!.VarHeap
@@ -59,7 +59,6 @@ where
 	,	com_class_defs		:: !.{# ClassDef}
 	,	com_member_defs		:: !.{# MemberDef}
 	,	com_instance_defs	:: !.{# ClassInstance}
-//	,	com_instance_types	:: !.{ SymbolType}
 	}
 
 ::	Declaration =
@@ -72,7 +71,7 @@ where
 ::	Declarations =
 	{	dcls_import		::![Declaration]
 	,	dcls_local		::![Declaration]
-	,	dcls_explicit	::![(!Declaration, !LineNr)]	// MW++
+	,	dcls_explicit	::![(!Declaration, !LineNr)]
 	}
 	
 ::	IclModule  =
@@ -82,9 +81,7 @@ where
 	,	icl_specials		:: !IndexRange
 	,	icl_common			:: !.CommonDefs
 	,	icl_declared		:: !Declarations
-// RWS ...
 	,	icl_imported_objects	:: ![ImportedObject]
-// ... RWS
 	}
 
 ::	DclModule =
@@ -182,7 +179,6 @@ where
 		= (False, abort "illegal value")
 
 
-// MW..
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsFromSymbolTable [(_, {dcls_import,dcls_local}) : imports] all_decls symbol_table
 	# (all_decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable dcls_import dcls_local all_decls symbol_table
@@ -286,7 +282,7 @@ addImportedSymbol ident def_kind def_index def_mod cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table 
 	= add_imported_symbol entry ident def_kind def_index def_mod { cs & cs_symbol_table = cs_symbol_table }
 where	
-	add_imported_symbol entry=:{ste_kind = STE_Empty} {id_info} def_kind def_index def_mod cs=:{cs_symbol_table}
+	add_imported_symbol entry=:{ste_kind = STE_Empty} {id_name,id_info} def_kind def_index def_mod cs=:{cs_symbol_table}
 		# cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info (STE_Imported def_kind def_mod) def_index cModuleScope entry}
 		= case def_kind of
 			STE_Field selector_id
@@ -309,7 +305,8 @@ where
 			# cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info dcl_kind dcl_index cGlobalScope entry }
 			= case dcl_kind of
 				STE_Field selector_id
-					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = dcl_index } cs
+					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = dcl_index } (cs
+								 ---> ("add_global_definition", ident, selector_id, (ptrToInt id_info, ptrToInt selector_id.id_info)))
 				_
 					-> cs
 			= { cs & cs_error = checkError ident "(global definition) already defined" cs.cs_error}
@@ -344,12 +341,13 @@ removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntr
 removeDeclarationsFromSymbolTable decls scope symbol_table
 	= foldSt (remove_declaration scope) decls symbol_table
 where
-	remove_declaration scope {dcl_ident={id_info}, dcl_index} symbol_table
+	remove_declaration scope {dcl_ident={id_name,id_info}, dcl_index} symbol_table
 		#! entry = sreadPtr id_info symbol_table
 		# {ste_kind,ste_previous} = entry
 		= case ste_kind of
 			STE_Field field_id
-				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
+				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index (symbol_table
+								 ---> ("removeDeclarationsFromSymbolTable", id_name, field_id, (ptrToInt id_info, ptrToInt field_id.id_info)))
 				| ste_previous.ste_def_level == scope
 					-> symbol_table <:= (id_info, ste_previous.ste_previous)
 					-> symbol_table <:= (id_info, ste_previous)
@@ -385,7 +383,6 @@ removeIdentFromSymbolTable level {id_name,id_info} symbol_table
 	| level <= ste_def_level 
 		= symbol_table <:= (id_info,ste_previous) // ---> ("removeIdentFromSymbolTable", id_name)
 		= symbol_table // ---> ("NO removeIdentFromSymbolTable", id_name)
-// ..MW
 
 class toIdent a :: !a -> Ident
 
