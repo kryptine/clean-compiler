@@ -24,14 +24,14 @@ from Heap import Heap
 
 
 // Cocl to Sucl for functions
-cts_function
- :: Int                                                 // Index of current module
-    u:{#FunDef}                                          // Function definitions (from ICL)
- -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]//Type rule (derives arity)
-    , [(SuclSymbol,[Bool])]                             // Strict arguments (just main args for now)
-    , [(SuclSymbol,[Rule SuclSymbol SuclVariable])]     // Rewrite rules
-    , [(SuclSymbol,SuclSymbolKind)]                     // Kind of symbol
-    , v:{#FunDef}                                        // Consulted function definitions
+cts_function ::
+    Int                                                     // Index of current module
+    u:{#FunDef}                                             // Function definitions (from ICL)
+ -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]   // Type rule (derives arity)
+    , [(SuclSymbol,[Bool])]                                 // Strict arguments (just main args for now)
+    , [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]   // Arity and rewrite rules
+    , [(SuclSymbol,SuclSymbolKind)]                         // Kind of symbol
+    , v:{#FunDef}                                           // Consulted function definitions
     )
  ,  [u<=v]
 

@@ -27,5 +27,5 @@ mkcli ::
     [(SuclSymbol,[Bool])]
     [SuclSymbol]
     [(SuclTypeSymbol,[SuclSymbol])]
-    [(SuclSymbol,[Rule SuclSymbol SuclVariable])]
+    [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
  -> Cli

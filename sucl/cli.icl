@@ -153,8 +153,8 @@ typerule m sym
 */
 
 clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
-clistrategy {typeconstructors=tcs,typerules=ts,rules=rs} matchable
- = ( checkarity (typearity o maxtyperule ts)        // Checks curried occurrences and strict arguments
+clistrategy {arities=as,typeconstructors=tcs,typerules=ts,rules=rs} matchable
+ = ( checkarity (extendfn as (typearity o maxtyperule ts))        // Checks curried occurrences and strict arguments
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
    o checkimport islocal                            // Checks for delta symbols
@@ -322,13 +322,14 @@ mkcli ::
     [(SuclSymbol,[Bool])]
     [SuclSymbol]
     [(SuclTypeSymbol,[SuclSymbol])]
-    [(SuclSymbol,[Rule SuclSymbol SuclVariable])]
+    [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
  -> Cli
 
 mkcli typerules stricts exports constrs bodies
-= { typeconstructors = constrs
+= { arities          = map (mapsnd fst) bodies
+  , typeconstructors = constrs
   , exportedsymbols  = exports
   , typerules        = typerules
   , stricts          = stricts
-  , rules            = bodies
+  , rules            = map (mapsnd snd) bodies
   }
