@@ -1110,7 +1110,7 @@ beautifyAttributes st
 convertTypeAlt :: Int ModuleIndex SymbolType -> BEMonad BETypeAltP
 convertTypeAlt functionIndex moduleIndex symbolType
 	=	beautifyAttributes (symbolType) ==> \symbolType=:{st_result, st_attr_env, st_attr_vars} 
-	->	resetAttrNumbers
+	->	resetAttrNumbers st_attr_vars
 	o`	(beTypeAlt
 			(beNormalTypeNode (beFunctionSymbol functionIndex moduleIndex) (convertSymbolTypeArgs symbolType))
 			(convertAnnotTypeNode st_result)
@@ -1138,10 +1138,17 @@ convertTypeAlt functionIndex moduleIndex symbolType
 	,	ig_demanded:: !AttributeVar
 	}
 
-resetAttrNumbers :: *BackEndState -> *BackEndState
-resetAttrNumbers state
-	=	{state & bes_attr_number = 0}
-
+resetAttrNumbers :: [AttributeVar] *BackEndState -> *BackEndState
+resetAttrNumbers attrVars state=:{bes_attrHeap}
+	=	{	state
+		&	bes_attr_number = 0
+		,	bes_attrHeap = foldSt resetAttrVar attrVars bes_attrHeap
+		}
+	where
+		resetAttrVar :: AttributeVar *AttrVarHeap -> *AttrVarHeap
+		resetAttrVar {av_info_ptr} attrHeap
+			=	writePtr av_info_ptr AVI_Empty attrHeap
+		
 convertAttributeInequalities :: [InequalityGroup] -> BEMonad BEUniVarEquations
 convertAttributeInequalities inequalities
 	=	sfoldr (beUniVarEquationsList o convertAttributeInequality) beNoUniVarEquations inequalities
