@@ -105,7 +105,7 @@ convert_atype atype (heap,(graph,rest,srest))
                -> (heap``,updategraph typevar (typesym,typeargs) graph`,typevar)
                   where (heap``,(graph`,typeargs,_)) = convert_atypes (heap`,graph) atypes // _ => forget annotations of subtypes
                         [typevar:heap`] = heap
-                        typesym = SuclUSER typename
+                        typesym = SuclUSER typename.type_index
 
               // A function type (a->b)
               functype --> argtype
@@ -142,6 +142,36 @@ convert_btype BT_Dynamic = SuclDYNAMIC
 convert_btype BT_File = SuclFILE
 convert_btype BT_World = SuclWORLD
 convert_btype _ = abort "convert: convert_btype: unhandled BasicType constructor"
+
+
+/******************************************************************************
+*  ALGEBRAIC TYPE CONVERSION                                                  *
+******************************************************************************/
+
+
+cts_getconstrs ::
+    {#DclModule}					// Info from used DCL modules
+ -> [(SuclTypeSymbol,[SuclSymbol])]	// List of constructor symbols for each type symbol
+
+cts_getconstrs dcl_mods
+= flatten (zipwith f (a2l dcl_mods) [0..])
+  where f dcl_mod dcli
+        = [convert_typedef dcli typedef \\ typedef <-: dcl_mod.dcl_common.com_type_defs]
+
+a2l a = [e \\ e<-:a]
+
+convert_typedef :: Index (TypeDef TypeRhs) -> (SuclTypeSymbol,[SuclSymbol])
+convert_typedef dcli typedef
+= (SuclUSER (mkglobal dcli typedef.td_index),getconstrs dcli typedef.td_rhs)
+
+getconstrs dcli (AlgType constrs)
+= map mkalgconstr constrs
+  where mkalgconstr defsymb = SuclUser (SK_Constructor (mkglobal dcli defsymb.ds_index))
+getconstrs _ _
+= mstub "getconstrs" "unhandled TypeRhs form"
+
+mkglobal gmod gob = {glob_module = gmod, glob_object = gob}
+
 
 /******************************************************************************
 *  EXPRESSION CONVERSION                                                      *

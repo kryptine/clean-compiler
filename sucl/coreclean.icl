@@ -12,7 +12,7 @@ import syntax
 //import StdEnv
 
 :: SuclTypeSymbol
- = SuclUSER TypeSymbIdent
+ = SuclUSER (Global Index)
  | SuclFN Int
  | SuclINT
  | SuclCHAR

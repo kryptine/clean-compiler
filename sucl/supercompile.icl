@@ -8,8 +8,8 @@ import syntax
 import transform
 import trans
 
-supercompile
- :: !{# CommonDefs}             // common_defs
+supercompile ::
+    !{# CommonDefs}             // common_defs
     !IndexRange                 // array_instances
     !{#DclModule}               // dcl_mods
     !Int                        // main_dcl_module_n
@@ -39,5 +39,7 @@ supercompile common_defs array_instances dcl_mods main_dcl_module_n components f
         _ = cts_function fun_defs
 		// Determine exported functions
         _ = cts_exports fun_defs dcl_mods main_dcl_module_n
+		// Get constructor lists of algebraic types
+		_ = cts_getconstrs dcl_mods main_dcl_module_n
         // Convert sucl-generated function body back to core clean
         (expression_heap`,var_heap`,func_body) = stc_funcdef dcl_mods expression_heap var_heap undef

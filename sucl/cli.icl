@@ -153,7 +153,7 @@ typerule m sym
 */
 
 clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
-clistrategy cli=:{exportedtypesymbols=tes,typealias=tas,typeconstructors=tcs,exportedsymbols=es,aliases=as,typerules=ts,rules=rs} matchable
+clistrategy {typeconstructors=tcs,typerules=ts,rules=rs} matchable
  = ( checkarity (typearity o maxtypeinfo ts)        // Checks curried occurrences and strict arguments
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules

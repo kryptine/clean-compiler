@@ -17,7 +17,7 @@ from StdOverloaded import ==
 from StdString import String
 
 :: SuclTypeSymbol
- = SuclUSER TypeSymbIdent   // A user-defined type symbol
+ = SuclUSER (Global Index)  // A user-defined type symbol (index into com_type_def array)
  | SuclFN Int               // THE function type for a function with specified arity
  | SuclINT                  // Built-in integer
  | SuclCHAR                 // Etc.

@@ -18,8 +18,8 @@ from general import BITVECT,Optional
 from Heap import Heap,HeapN,Ptr,PtrN
 from StdString import String
 
-supercompile
- :: !{# CommonDefs}             // common_defs
+supercompile ::
+    !{# CommonDefs}             // common_defs
     !IndexRange                 // array_instances
     !{#DclModule}               // dcl_mods
     !Int                        // main_dcl_module_n

@@ -34,6 +34,11 @@ cts_exports ::
     Int             // Index of current module
  -> [SuclSymbol]
 
+//Cocl to Sucl for (algebraic) type specifications
+cts_getconstrs ::
+    {#DclModule}					// Info from used DCL modules
+ -> [(SuclTypeSymbol,[SuclSymbol])]	// List of constructor symbols for each type symbol
+
 //Sucl to Cocl for function bodies
 stc_funcdef ::
     {#DclModule}                        // DCL for looking up constructor types
