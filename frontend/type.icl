@@ -1923,35 +1923,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
       class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
       class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
 
-/*
-	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
-	  
-	| not ts_error.ea_ok
-		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions, icl_defs, td_infos,
-			{ heaps & hp_type_heaps = hp_type_heaps }, predef_symbols, hash_table, ts_error.ea_file, out)
-
-*/
-// AA..
-/*
-	# ti_common_defs = {x \\ x <-: ti_common_defs }
-
-	# (ti_common_defs, comps, fun_defs, td_infos, hp_type_heaps, hp_var_heap, hash_table, predef_symbols, modules, ts_error) = 
-		convertGenerics main_dcl_module_n ti_common_defs comps fun_defs td_infos hp_type_heaps hp_var_heap hash_table predef_symbols modules ts_error
-	| not ts_error.ea_ok
-		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions, icl_defs, td_infos,
-			{ heaps & hp_type_heaps = hp_type_heaps,  hp_var_heap = hp_var_heap}, predef_symbols, hash_table, ts_error.ea_file, out)
-	# icl_defs = ti_common_defs.[main_dcl_module_n]	
-
-	#! fun_env_size = size fun_defs
-	# ti_functions = {dcl_functions \\ {dcl_functions} <-: modules }
-
-	# (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
-	# class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
-	# class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
-*/	
-// ..AA
-
-	# state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
+	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar,
@@ -2105,10 +2077,13 @@ where
 					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap })
 		# (fun_defs, coercion_env, subst, ts_td_infos, os_var_heap, os_symbol_heap, os_error)
 		  		= makeSharedReferencesNonUnique comp fun_defs coercion_env subst ts_td_infos os_var_heap os_symbol_heap os_error
-		  (subst, {coer_offered,coer_demanded}, ts_td_infos, ts_type_heaps, ts_error)
+		  (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
 		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
-		  (attr_partition, coer_demanded) = partitionateAttributes coer_offered coer_demanded
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
+		  (ts_fun_env, {coer_offered,coer_demanded})
+		  		= foldSt (add_unicity_of_essentially_unique_types_for_function ti_common_defs)
+		  				comp (ts_fun_env, coercions)
+		  (attr_partition, coer_demanded) = partitionateAttributes coer_offered coer_demanded
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
 		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
@@ -2137,6 +2112,29 @@ where
 				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 					  ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env})
+
+	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (ts_fun_env, coercions)
+		# (env_type, ts_fun_env) = ts_fun_env![fun]
+		= case env_type of
+			ExpandedType _ _ _
+				-> (ts_fun_env, coercions)
+		  	UncheckedType {tst_args, tst_result}
+				-> ( ts_fun_env
+				   , foldSt (foldATypeSt (add_unicity_of_essentially_unique_type ti_common_defs) (\x st -> st)) 
+							[tst_result:tst_args] coercions
+				   )
+	  where
+		add_unicity_of_essentially_unique_type common_defs 
+								{at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} coercions
+			# {td_attribute} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
+			= case td_attribute of
+				TA_Unique
+					// the type is essentially unique
+					-> snd (tryToMakeUnique av_number coercions)
+				_
+					-> coercions
+		add_unicity_of_essentially_unique_type _ _ coercions
+			= coercions
 
 	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
 	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
