@@ -310,11 +310,13 @@ convert_expression main_dcl_module_n topinfo bounds (expr @ exprs) lrinfo
         (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
 convert_expression main_dcl_module_n topinfo bindings0 (Let letinfo) lrinfo
+| not (isEmpty (letinfo.let_strict_binds))
+  = mstub "convert_expression/Let" "cannot handle strict lets"
 = (heap2,(nodes2,fundefs2,globals3,rest`,False)) <--- "convert.convert_expression ends (for Let expression)"
   where globals3 = filter (not o flip isMember (map snd bindings1)) globals2
         (heap2,(nodes2,fundefs2,globals2,rest`,_)) = convert_expression main_dcl_module_n No bindings1 letinfo.let_expr (heap1,(nodes1,fundefs1,globals1,rest,False))
-        (heap1,(nodes1,fundefs1,globals1,_,_)) = convert_expressions main_dcl_module_n bindings1 [lb.lb_src \\ lb<-letinfo.let_lazy_binds] (heap0,(nodes0,fundefs0,globals0))
-        bindings1 = map (pairwith SuclNamed) boundvars++bindings0
+        (heap1,(nodes1,fundefs1,globals1,suclbounds,_)) = convert_expressions main_dcl_module_n bindings1 [lb.lb_src \\ lb<-letinfo.let_lazy_binds] (heap0,(nodes0,fundefs0,globals0))
+        bindings1 = zip2 boundvars suclbounds++bindings0
         boundvars = [lb.lb_dst.fv_info_ptr \\ lb<-letinfo.let_lazy_binds]
         (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
