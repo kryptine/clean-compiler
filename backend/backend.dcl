@@ -277,6 +277,8 @@ BEExportFunction :: !Int !BackEnd -> BackEnd;
 // void BEExportFunction (int functionIndex);
 BEDefineImportedObjsAndLibs :: !BEStringListP !BEStringListP !BackEnd -> BackEnd;
 // void BEDefineImportedObjsAndLibs (BEStringListP objs,BEStringListP libs);
+BEInsertForeignExport :: !BESymbolP !BackEnd -> BackEnd;
+// void BEInsertForeignExport (BESymbolP symbol_p);
 BESetMainDclModuleN :: !Int !BackEnd -> BackEnd;
 // void BESetMainDclModuleN (int main_dcl_module_n_parameter);
 BEStrictPositions :: !Int !BackEnd -> (!Int,!Int,!BackEnd);
