@@ -85,7 +85,7 @@ where
 		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_type_var_heap = initialyseATypeVars icl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
-		  (ok, comp_st) = compare dcl_cons_type.st_args icl_cons_type.st_args comp_st
+		  (ok, comp_st) = compare (dcl_cons_type.st_args,dcl_cons_type.st_args_strictness) (icl_cons_type.st_args,icl_cons_type.st_args_strictness) comp_st
 		| dcl_cons_def.cons_priority == icl_cons_def.cons_priority
 			| ok && do_compare_result_types
 				# (ok, comp_st) = compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
