@@ -2804,10 +2804,10 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 
 	tuple_arguments_state[0] = sdef->sdef_record_state;
 	tuple_arguments_state[1] = LazyState;
-# if 0
+
 	FPutC ('l', OutFile);
 	FPutC ('R', OutFile);
-# endif
+
 	GenABStackElems (tuple_state);
 
 	DetermineSizeOfState (tuple_state,&asize,&bsize);
