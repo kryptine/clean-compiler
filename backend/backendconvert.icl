@@ -921,7 +921,7 @@ convertSelector moduleIndex selectorDefs {fs_index}
 
 declareDynamicTemp :: PredefinedSymbols -> BackEnder
 declareDynamicTemp predefs
-	=	appBackEnd (BEDeclareDynamicTypeSymbol predefs.[PD_StdDynamics].pds_def predefs.[PD_DynamicTemp].pds_def)
+	=	appBackEnd (BEDeclareDynamicTypeSymbol predefs.[PD_StdDynamic].pds_def predefs.[PD_DynamicTemp].pds_def)
 
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
