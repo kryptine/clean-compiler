@@ -1609,12 +1609,16 @@ transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module,
 // This function is imported
 		| isEmpty extra_args
 			= (App app, ti)
-			# ar_diff = ro.ro_imported_funs.[glob_module].[glob_object].ft_arity - symb_arity
+/* Sjaak ... */
+			# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+			  form_arity = ft_arity + length ft_type.st_context
+			  ar_diff = form_arity - symb_arity
 			  nr_of_extra_args = length extra_args
 			| nr_of_extra_args <= ar_diff
 				= (App {app  &  app_args = app_args ++ extra_args, app_symb = { symb & symb_arity = symb_arity + nr_of_extra_args }}, ti)
 				= (App {app  &  app_args = app_args ++ take ar_diff extra_args, app_symb = { symb & symb_arity = symb_arity + ar_diff }} @
 						drop ar_diff extra_args, ti)
+/* ... Sjaak */
 				
 // XXX linear_bits field has to be added for generated functions
 transformApplication app=:{app_symb={symb_kind = SK_GeneratedFunction fun_def_ptr _}} extra_args ro ti=:{ti_fun_heap}
