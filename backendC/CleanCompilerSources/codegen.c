@@ -1211,8 +1211,12 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
 			if (OptimizeTailCallModuloCons)
 				for_l (rule,imod->im_rules,rule_next)
-					if (rule->rule_alts->alt_kind==Contractum && does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs))
-						rule->rule_mark |= RULE_TAIL_MODULO_CONS_ENTRY_MASK;
+					if (rule->rule_alts->alt_kind==Contractum){
+						CurrentSymbol=rule->rule_root->node_symbol;
+						
+						if (does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs))
+							rule->rule_mark |= RULE_TAIL_MODULO_CONS_ENTRY_MASK;
+					}
 #endif
 
 			update_function_p=&first_update_function;

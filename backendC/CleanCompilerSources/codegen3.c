@@ -1432,21 +1432,28 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 #endif
 			NodeIdListElementP node_id_list;
 			char bits[MaxNodeArity+2];
-			unsigned int a_bits,b_bits,a_size,b_size,n,arg_n;
-			int n_a_fill_bits,n_b_fill_bits,node_arity;
+			unsigned int a_bits,b_bits,a_size,b_size,a_size2,b_size2,n,arg_n;
+			int total_a_size2,total_b_size2;
+			int node_arity;
 			ArgP arg_p;
-							
+			
+			total_a_size2=0;
+			total_b_size2=0;
+			
+			for_l (node_id_list,push_node->node_node_ids,nidl_next){
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+				AddSizeOfState (*node_id_list->nidl_node_id->nid_lhs_state_p,&total_a_size2,&total_b_size2);
+# else
+				AddSizeOfState (node_id_list->nidl_node_id->nid_state,&total_a_size2,&total_b_size2);	
+# endif	
+			}	
+
 			a_bits=0;
 			b_bits=0;
 			a_size=0;
 			b_size=0;
-			n_a_fill_bits=0;
-			n_b_fill_bits=0;
-
-			if (a_size>0)
-				a_bits|=1;
-			else
-				b_bits|=1;
+			a_size2=0;
+			b_size2=0;
 
 			arg_p=root_node->node_arguments;
 			node_arity=root_node->node_arity;
@@ -1454,22 +1461,41 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 
 			for (arg_n=0; arg_n<node_arity; ++arg_n){
 				int arg_a_size,arg_b_size;
+				int e_a_size2,e_b_size2;
 																
 				DetermineSizeOfState (arg_p->arg_state,&arg_a_size,&arg_b_size); 
-				
-				if (!(arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_id_list->nidl_node_id)){
-					a_bits |= (~((~0)<<arg_a_size))<<a_size;
-					b_bits |= (~((~0)<<arg_b_size))<<b_size;
 
-					n_a_fill_bits+=arg_a_size;
-					n_b_fill_bits+=arg_b_size;
+				if (node_id_list!=NULL){
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+					DetermineSizeOfState (*node_id_list->nidl_node_id->nid_lhs_state_p,&e_a_size2,&e_b_size2);
+# else
+					DetermineSizeOfState (node_id_list->nidl_node_id->nid_state,&e_a_size2,&e_b_size2);
+# endif
+					if (arg_p->arg_node->node_kind!=NodeIdNode || arg_p->arg_node->node_node_id!=node_id_list->nidl_node_id ||
+						arg_a_size!=e_a_size2 || arg_b_size!=e_b_size2 ||
+						(arg_a_size!=0 && (a_size!=a_size2)) || (arg_b_size!=0 && (b_size+asize!=b_size2+total_a_size2))
+					){
+						a_bits |= (~((~0)<<arg_a_size))<<a_size;;
+						b_bits |= (~((~0)<<arg_b_size))<<b_size;
+					}
+					
+					a_size2+=e_a_size2;
+					b_size2+=e_b_size2;
+					node_id_list=node_id_list->nidl_next;
+				} else {
+					a_bits |= (~((~0)<<arg_a_size))<<a_size;;
+					b_bits |= (~((~0)<<arg_b_size))<<b_size;
 				}
-				
+
 				arg_p=arg_p->arg_next;
 				a_size+=arg_a_size;
 				b_size+=arg_b_size;
-				node_id_list=node_id_list->nidl_next;
-			}				
+			}
+
+			if (a_size>0)
+				a_bits|=1;
+			else
+				b_bits|=1;
 
 			for (n=0; n<a_size; ++n)
 				bits[n]='0' + ((a_bits>>n) & 1);
@@ -1543,7 +1569,8 @@ static int is_tail_call_module_cons_node (NodeP node_p)
 		
 		sdef=node_p->node_symbol->symb_def;
 		
-		if (sdef->sdef_kind==IMPRULE && sdef->sdef_arity==node_p->node_arity && !IsLazyState (node_p->node_state) &&
+		if (sdef->sdef_kind==IMPRULE && sdef->sdef_ancestor==CurrentSymbol->symb_def->sdef_ancestor &&
+			sdef->sdef_arity==node_p->node_arity && !IsLazyState (node_p->node_state) &&
 			ExpectsResultNode (node_p->node_state) && node_p->node_state.state_kind!=Parallel)
 		{
 			return 1;
@@ -2041,41 +2068,57 @@ int CodeRhsNodeDefs
 				
 				arg_p2=NULL;
 				
-				for_l (arg_p,root_node->node_arguments,arg_next)
-					if (arg_p->arg_node->node_kind!=NodeIdNode)
-						if (arg_p2==NULL)
-							arg_p2=arg_p;
-						else
-							break;
-								
-				if (arg_p==NULL){
-					if (arg_p2==NULL){
-						if (defs!=NULL){
-							NodeDefP *last_node_def_h,last_node_def_p;
-							NodeP node_p;
-							
-							last_node_def_h=&defs;
-							while ((last_node_def_p=*last_node_def_h)->def_next!=NULL)
-								last_node_def_h=&last_node_def_p->def_next;
-							
-							node_p=last_node_def_p->def_node;
-							
-							if (node_p!=NULL){
-								NodeIdP node_def_id;
-								NodeP push_node;
+				for_l (arg_p,root_node->node_arguments,arg_next){
+					NodeP arg_node_p;
+					
+					arg_node_p=arg_p->arg_node;
+					
+					if (arg_node_p->node_kind==FillUniqueNode)
+						arg_node_p=arg_node_p->node_arguments->arg_node;
 
-								push_node=NULL;
+					if (is_tail_call_module_cons_node (arg_node_p) && (arg_node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
+						arg_p2=arg_p;
+						break;
+					}
+				}
 
-								node_def_id=last_node_def_p->def_id;
+				if (arg_p2==NULL){
+					if (defs!=NULL){
+						NodeDefP *last_node_def_h,last_node_def_p;
+						NodeP node_p;
+						
+						last_node_def_h=&defs;
+						while ((last_node_def_p=*last_node_def_h)->def_next!=NULL)
+							last_node_def_h=&last_node_def_p->def_next;
+						
+						node_p=last_node_def_p->def_node;
+						
+						if (node_p!=NULL){
+							NodeIdP node_def_id;
+							NodeP push_node;
+							int n_node_id_refs;
+
+							node_def_id=last_node_def_p->def_id;
+							push_node=NULL;
 							
-								if (node_p->node_kind==FillUniqueNode){
-									push_node=node_p->node_node;
-									node_p=node_p->node_arguments->arg_node;
-								}
+							if (node_p->node_kind==FillUniqueNode){
+								push_node=node_p->node_node;
+								node_p=node_p->node_arguments->arg_node;
+							}
+							
+							if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_p)
+								&& (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK))
+							{
+								n_node_id_refs=node_def_id->nid_refcount;
+
+								for_l (arg_p,root_node->node_arguments,arg_next)
+									if (arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_def_id){
+										--n_node_id_refs;
+										if (n_node_id_refs==0)
+											break;
+									}
 								
-								if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_p)
-									&& (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK))
-								{
+								if (n_node_id_refs==0){
 									*last_node_def_h=NULL;
 									CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
 									*last_node_def_h=last_node_def_p;
@@ -2086,37 +2129,31 @@ int CodeRhsNodeDefs
 								}
 							}
 						}
-					} else {
-						NodeP node_p;
-						NodeIdP node_id_p;
-						NodeP push_node_p;
-						
-						push_node_p=NULL;
-						node_p=arg_p2->arg_node;
-
-						if (node_p->node_kind==FillUniqueNode){
-							push_node_p=node_p->node_node;
-							node_p=node_p->node_arguments->arg_node;
-						}
-
-						if (is_tail_call_module_cons_node (node_p) && (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
-							NodeP old_arg_node_p;
-							
-							node_id_p=NewNodeId (NULL);
-							
-							node_id_p->nid_refcount=1;
-							
-							old_arg_node_p=arg_p2->arg_node;
-							arg_p2->arg_node=NewNodeIdNode (node_id_p);
-
-							CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
-							generate_code_for_tail_call_modulo_cons (node_p,node_id_p,root_node,push_node_p,asp,bsp,&moved_node_ids,&code_gen_node_ids);
-							
-							arg_p2->arg_node=old_arg_node_p;
-
-							return 0;
-						}
 					}
+				} else {
+					NodeP node_p,push_node_p,old_arg_node_p;
+					NodeIdP node_id_p;
+					
+					node_p=arg_p2->arg_node;
+					push_node_p=NULL;
+
+					if (node_p->node_kind==FillUniqueNode){
+						push_node_p=node_p->node_node;
+						node_p=node_p->node_arguments->arg_node;
+					}
+
+					node_id_p=NewNodeId (NULL);
+					node_id_p->nid_refcount=1;
+					
+					old_arg_node_p=arg_p2->arg_node;
+					arg_p2->arg_node=NewNodeIdNode (node_id_p);
+
+					CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
+					generate_code_for_tail_call_modulo_cons (node_p,node_id_p,root_node,push_node_p,asp,bsp,&moved_node_ids,&code_gen_node_ids);
+					
+					arg_p2->arg_node=old_arg_node_p;
+
+					return 0;
 				}
 			}
 		}
@@ -2414,49 +2451,53 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 			 (node_symbol_p->symb_kind==definition && node_symbol_p->symb_def->sdef_kind==CONSTRUCTOR &&
 			  node_p->node_arity==node_symbol_p->symb_def->sdef_arity))
 		{
-			ArgP arg_p,arg_p2;
+			ArgP arg_p;
 			
-			arg_p2=NULL;
-			for_l (arg_p,node_p->node_arguments,arg_next)
-				if (arg_p->arg_node->node_kind!=NodeIdNode)
-					if (arg_p2==NULL)
-						arg_p2=arg_p;
-					else
-						break;
-			
-			if (arg_p==NULL){
-				if (arg_p2==NULL){
-					if (node_defs!=NULL){
-						NodeDefP last_node_def_p;
-						NodeP node_def_node_p;
-						
-						last_node_def_p=node_defs;
-						while (last_node_def_p->def_next!=NULL)
-							last_node_def_p=last_node_def_p->def_next;
-						
-						node_def_node_p=last_node_def_p->def_node;
-						
-						if (node_def_node_p!=NULL){
-							NodeIdP node_def_id;
-							
-							node_def_id=last_node_def_p->def_id;
-							
-							if (node_def_node_p->node_kind==FillUniqueNode)
-								node_def_node_p=node_def_node_p->node_arguments->arg_node;
-							
-							if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_def_node_p))
-								return 1;
-						}
-					}
-				} else {
-					NodeP node_p;
-					
-					node_p=arg_p2->arg_node;
-					if (node_p->node_kind==FillUniqueNode)
-						node_p=node_p->node_arguments->arg_node;
+			for_l (arg_p,node_p->node_arguments,arg_next){
+				NodeP arg_node_p;
+				
+				arg_node_p=arg_p->arg_node;
+				
+				if (arg_node_p->node_kind==FillUniqueNode)
+					arg_node_p=arg_node_p->node_arguments->arg_node;
 
-					if (is_tail_call_module_cons_node (node_p))
-						return 1;
+				if (is_tail_call_module_cons_node (arg_node_p))
+					return 1;
+			}
+
+			if (node_defs!=NULL){
+				NodeDefP last_node_def_p;
+				NodeP node_def_node_p;
+				
+				last_node_def_p=node_defs;
+				while (last_node_def_p->def_next!=NULL)
+					last_node_def_p=last_node_def_p->def_next;
+				
+				node_def_node_p=last_node_def_p->def_node;
+				
+				if (node_def_node_p!=NULL){
+					NodeIdP node_def_id;
+					
+					node_def_id=last_node_def_p->def_id;
+
+					if (node_def_node_p->node_kind==FillUniqueNode)
+						node_def_node_p=node_def_node_p->node_arguments->arg_node;
+					
+					if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_def_node_p)){
+						int n_node_id_refs;
+						
+						n_node_id_refs=node_def_id->nid_refcount;
+						
+						for_l (arg_p,node_p->node_arguments,arg_next)
+							if (arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_def_id){
+								--n_node_id_refs;
+								if (n_node_id_refs==0)
+									break;
+							}
+						
+						if (n_node_id_refs!=0)
+							return 1;
+					}
 				}
 			}
 		}
