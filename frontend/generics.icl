@@ -2915,6 +2915,7 @@ where
 				[tv \\ {at_type=(TV tv)} <- tvs1] ++ 
 				[tv \\ {at_type=(TV tv)} <- tvs2],
 			st_args = iso_args ++ [arg_type],
+			st_args_strictness = NotStrict,
 			st_arity = td_arity + 1,
 			st_result = res_type,
 			st_context = [],
