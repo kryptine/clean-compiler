@@ -119,6 +119,9 @@ where toString {symb_name, symb_kind, symb_arity}
         ", symb_arity = "+++toString symb_arity+++
         "}"
 
+instance <<< SymbKind
+where (<<<) file sk = file <<< toString sk
+
 instance toString SymbKind
 where toString SK_Unknown = "Unknown"
       toString (SK_Function gi) = "Function "+++toString gi

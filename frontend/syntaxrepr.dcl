@@ -6,6 +6,7 @@ from Heap import Ptr,HeapN,PtrN
 from general import BITVECT
 from scanner import Priority,ScanContext
 from typeproperties import PropClassification,SignClassification
+from StdFile import <<<
 
 /* This module defines additional functions for
  * converting (the contents of) data structures to string representation.
@@ -87,6 +88,7 @@ from syntax import SymbIdent
 instance toString  SymbIdent
 
 from syntax import SymbKind
+instance <<<       SymbKind
 instance toString  SymbKind
 
 from syntax import SymbolPtr
