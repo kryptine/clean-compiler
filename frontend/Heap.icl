@@ -46,6 +46,27 @@ allocPtr = code {
 	pop_a 2
 };
 
+initPtr :: !(Ptr v) !v !*(Heap v) !*World -> (!.Heap v,!*World);
+initPtr p v h w
+ = code {
+	push_args 0 2 2
+	pop_a 1
+	eq_desc _Cons 0 0
+	pop_a 1
+	jmp_false init_pointer_error
+	push_a 2
+	push_a 2
+	fill1_r e_Heap_kPtr 2 0 2 011
+.keep 0 2
+	pop_a 2
+.d 2 0
+	rtn
+:init_pointer_error
+	pop_a 3
+	print "initPtr: Pointer already initialized"
+	halt
+};
+/*
 initPtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
 initPtr p v h
  = code {
@@ -66,6 +87,7 @@ initPtr p v h
 	print "initPtr: Pointer already initialized"
 	halt
 };
+*/
 
 readPtr :: !(Ptr v) !u:(Heap v) -> (!v,!u:Heap v);
 readPtr p h = code {

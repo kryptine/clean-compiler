@@ -23,7 +23,7 @@ sreadPtr	:: !(Ptr v) !(Heap v) -> v
 
 allocPtr :: Ptr v;
 
-initPtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+initPtr :: !(Ptr v) !v !*(Heap v) !*World -> (!.Heap v,!*World);
 
 ptrToInt 	:: !(Ptr w) -> Int
 
