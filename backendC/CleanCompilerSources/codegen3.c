@@ -860,7 +860,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			CodeRootSelection (root, rootid, asp, bsp,code_gen_node_ids_p,resultstate);
 			return;
 		case fail_symb:
-#if CLEAN2
+#ifdef CLEAN2
 		{
 			IdentS case_ident_s;
 			SymbDefS case_def_s;
@@ -1343,21 +1343,10 @@ static Bool ExamineRootNodeOnACycle (NodeId rhsid,Node rhsroot,int *asp_p,StateS
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
 extern int tail_call_modulo_cons;
 
-static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_def_id,NodeP root_node,
-#if STRICT_LISTS
-													NodeP fill_unique_node,
-#else
-													NodeP push_node,
-#endif
-													int asp,int bsp,struct code_gen_node_ids *code_gen_node_ids_p)
+static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_def_id,NodeP root_node,NodeP push_node,int asp,int bsp,struct code_gen_node_ids *code_gen_node_ids_p)
 {
 	LabDef name;
 	int a_size,b_size;
-#if STRICT_LISTS
-	NodeP push_node;
-	
-	push_node=fill_unique_node->node_node;
-#endif
 
 	ConvertSymbolToLabel (&name,node_p->node_symbol->symb_def);
 
@@ -1383,79 +1372,93 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 
 	BuildArgs (root_node->node_arguments,&asp,&bsp,code_gen_node_ids_p);
 
-	if (root_node->node_symbol->symb_kind==cons_symb){
-		GenFillh (&cons_lab,root_node->node_arity,asp,ReleaseAndFill);
-		asp-=root_node->node_arity;
-	} else {
-		LabDef constructor_name;
-
-		if (!root_node->node_symbol->symb_def->sdef_strict_constructor){
-			ConvertSymbolToConstructorDLabel (&constructor_name,root_node->node_symbol->symb_def);
-			GenFillh (&constructor_name,root_node->node_arity,asp,ReleaseAndFill);
-			asp-=root_node->node_arity;
-		} else {
-			int asize,bsize;
-	
-			ConvertSymbolToKLabel (&constructor_name,root_node->node_symbol->symb_def);
-
-			DetermineSizeOfArguments (root_node->node_arguments,&asize,&bsize);
-			
 #if STRICT_LISTS
-			if (asize+bsize>2 && push_node!=NULL && push_node->node_push_size>=asize+bsize){
+	if (root_node->node_symbol->symb_kind==cons_symb ? root_node->node_symbol->symb_head_strictness!=4 : !root_node->node_symbol->symb_def->sdef_strict_constructor){
 #else
-			if (asize+bsize>2 && push_node!=NULL && push_node->node_line>=asize+bsize){
+	if (root_node->node_symbol->symb_kind==cons_symb || !root_node->node_symbol->symb_def->sdef_strict_constructor){
 #endif
-				NodeIdListElementP node_id_list;
-				char bits[MaxNodeArity+2];
-				unsigned int a_bits,b_bits,a_size,b_size,n,arg_n;
-				int n_a_fill_bits,n_b_fill_bits,node_arity;
-				ArgP arg_p;
-								
-				a_bits=0;
-				b_bits=0;
-				a_size=0;
-				b_size=0;
-				n_a_fill_bits=0;
-				n_b_fill_bits=0;
+		LabDef constructor_name,*constructor_name_p;
 
-				arg_p=root_node->node_arguments;
-				node_arity=root_node->node_arity;
-				node_id_list=push_node->node_node_ids;
-
-				for (arg_n=0; arg_n<node_arity; ++arg_n){
-					int arg_a_size,arg_b_size;
-																	
-					DetermineSizeOfState (arg_p->arg_state,&arg_a_size,&arg_b_size); 
-					
-					if (arg_n==0 || !(arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_id_list->nidl_node_id)){
-						a_bits |= (~((~0)<<arg_a_size))<<a_size;
-						b_bits |= (~((~0)<<arg_b_size))<<b_size;
-
-						n_a_fill_bits+=arg_a_size;
-						n_b_fill_bits+=arg_b_size;
-					}
-					
-					arg_p=arg_p->arg_next;
-					a_size+=arg_a_size;
-					b_size+=arg_b_size;
-					node_id_list=node_id_list->nidl_next;
-				}
-
-				for (n=0; n<a_size; ++n)
-					bits[n]='0' + ((a_bits>>n) & 1);
-				
-				for (n=0; n<b_size; ++n)
-					bits[n+a_size]='0' + ((b_bits>>n) & 1);
-
-				bits[a_size+b_size]='\0';
-														
-				GenPushA (asp-node_def_id->nid_a_index);
-				GenFill3R (&constructor_name,asize,bsize,asp+1,bits);
-			} else
-				GenFillR (&constructor_name,asize,bsize,asp,0,0,ReleaseAndFill,True);
-			asp-=asize;
-			bsp-=bsize;
+		if (root_node->node_symbol->symb_kind==cons_symb)
+			constructor_name_p=&cons_lab;
+		else {
+			ConvertSymbolToConstructorDLabel (&constructor_name,root_node->node_symbol->symb_def);
+			constructor_name_p=&constructor_name;
 		}
+		GenFillh (constructor_name_p,root_node->node_arity,asp,ReleaseAndFill);
+		asp-=root_node->node_arity;
+	} else {			
+		LabDef constructor_name,*constructor_name_p;
+		int asize,bsize;
+
+#if STRICT_LISTS
+		if (root_node->node_symbol->symb_kind==cons_symb)
+			constructor_name_p=unboxed_cons_label (root_node->node_symbol);
+		else
+#endif
+		{
+			ConvertSymbolToKLabel (&constructor_name,root_node->node_symbol->symb_def);
+			constructor_name_p=&constructor_name;
+		}
+
+		DetermineSizeOfArguments (root_node->node_arguments,&asize,&bsize);
+	
+#if STRICT_LISTS
+		if (asize+bsize>2 && push_node!=NULL && push_node->node_push_size>=asize+bsize){
+#else
+		if (asize+bsize>2 && push_node!=NULL && push_node->node_line>=asize+bsize){
+#endif
+			NodeIdListElementP node_id_list;
+			char bits[MaxNodeArity+2];
+			unsigned int a_bits,b_bits,a_size,b_size,n,arg_n;
+			int n_a_fill_bits,n_b_fill_bits,node_arity;
+			ArgP arg_p;
+							
+			a_bits=0;
+			b_bits=0;
+			a_size=0;
+			b_size=0;
+			n_a_fill_bits=0;
+			n_b_fill_bits=0;
+
+			arg_p=root_node->node_arguments;
+			node_arity=root_node->node_arity;
+			node_id_list=push_node->node_node_ids;
+
+			for (arg_n=0; arg_n<node_arity; ++arg_n){
+				int arg_a_size,arg_b_size;
+																
+				DetermineSizeOfState (arg_p->arg_state,&arg_a_size,&arg_b_size); 
+				
+				if (arg_n==0 || !(arg_p->arg_node->node_kind==NodeIdNode && arg_p->arg_node->node_node_id==node_id_list->nidl_node_id)){
+					a_bits |= (~((~0)<<arg_a_size))<<a_size;
+					b_bits |= (~((~0)<<arg_b_size))<<b_size;
+
+					n_a_fill_bits+=arg_a_size;
+					n_b_fill_bits+=arg_b_size;
+				}
+				
+				arg_p=arg_p->arg_next;
+				a_size+=arg_a_size;
+				b_size+=arg_b_size;
+				node_id_list=node_id_list->nidl_next;
+			}
+
+			for (n=0; n<a_size; ++n)
+				bits[n]='0' + ((a_bits>>n) & 1);
+			
+			for (n=0; n<b_size; ++n)
+				bits[n+a_size]='0' + ((b_bits>>n) & 1);
+
+			bits[a_size+b_size]='\0';
+													
+			GenPushA (asp-node_def_id->nid_a_index);
+			GenFill3R (constructor_name_p,asize,bsize,asp+1,bits);
+		} else
+			GenFillR (constructor_name_p,asize,bsize,asp,0,0,ReleaseAndFill,True);
+
+		asp-=asize;
+		bsp-=bsize;
 	}
 								
 	if (tail_call_modulo_cons)
@@ -2023,23 +2026,14 @@ int CodeRhsNodeDefs
 							
 							if (node_p!=NULL){
 								NodeIdP node_def_id;
-#if STRICT_LISTS
-								NodeP fill_unique_node;
-
-								fill_unique_node=NULL;
-#else
 								NodeP push_node;
 
 								push_node=NULL;
-#endif								
+
 								node_def_id=last_node_def_p->def_id;
 							
 								if (node_p->node_kind==FillUniqueNode){
-#if STRICT_LISTS
-									fill_unique_node=node_p;
-#else
 									push_node=node_p->node_node;
-#endif
 									node_p=node_p->node_arguments->arg_node;
 								}
 								
@@ -2047,11 +2041,9 @@ int CodeRhsNodeDefs
 									*last_node_def_h=NULL;
 									CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
 									*last_node_def_h=last_node_def_p;
-#if STRICT_LISTS
-									generate_code_for_tail_call_modulo_cons (node_p,node_def_id,root_node,fill_unique_node,asp,bsp,&code_gen_node_ids);
-#else
+
 									generate_code_for_tail_call_modulo_cons (node_p,node_def_id,root_node,push_node,asp,bsp,&code_gen_node_ids);
-#endif
+
 									while (moved_node_ids!=NULL){
 										moved_node_ids->mnid_node_id->nid_a_index_=moved_node_ids->mnid_a_stack_offset;
 										moved_node_ids=moved_node_ids->mnid_next;
@@ -2064,23 +2056,13 @@ int CodeRhsNodeDefs
 					} else {
 						NodeP node_p;
 						NodeIdP node_id_p;
-#if STRICT_LISTS
-						NodeP fill_unique_node_p;
-						
-						fill_unique_node_p=NULL;
-#else
 						NodeP push_node_p;
 						
 						push_node_p=NULL;
-#endif
 						node_p=arg_p2->arg_node;
 
 						if (node_p->node_kind==FillUniqueNode){
-#if STRICT_LISTS
-							fill_unique_node_p=node_p->node_node;
-#else
 							push_node_p=node_p->node_node;
-#endif
 							node_p=node_p->node_arguments->arg_node;
 						}
 
@@ -2095,11 +2077,8 @@ int CodeRhsNodeDefs
 							arg_p2->arg_node=NewNodeIdNode (node_id_p);
 
 							CodeSharedNodeDefs (defs,NULL,&asp,&bsp,&code_gen_node_ids);
-#if STRICT_LISTS
-							generate_code_for_tail_call_modulo_cons (node_p,node_id_p,root_node,fill_unique_node_p,asp,bsp,&code_gen_node_ids);
-#else
 							generate_code_for_tail_call_modulo_cons (node_p,node_id_p,root_node,push_node_p,asp,bsp,&code_gen_node_ids);
-#endif
+
 							while (moved_node_ids!=NULL){
 								moved_node_ids->mnid_node_id->nid_a_index_=moved_node_ids->mnid_a_stack_offset;
 								moved_node_ids=moved_node_ids->mnid_next;
