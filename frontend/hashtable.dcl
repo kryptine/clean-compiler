@@ -2,7 +2,7 @@ definition module hashtable
 
 import syntax
 
-::	HashTableEntry 
+::	.HashTableEntry 
 
 ::	HashTable =
 	{	hte_symbol_heap	:: !.SymbolTable

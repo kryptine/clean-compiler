@@ -90,13 +90,13 @@ where
 			= mark_selected_variable sel pvs var_heap
 		
 	mark_variable {pv_var={fv_name,fv_info_ptr}} var_heap
-		# (VI_Occurrence old_occ=:{occ_ref_count}, var_heap) = readPtr fv_info_ptr var_heap
+		# (VI_Occurrence old_occ=:{occ_ref_count,occ_observing = (_, expr_ptr)}, var_heap) = readPtr fv_info_ptr var_heap
 		= case occ_ref_count ===> ("mark_variable", fv_name) of
 			RC_Unused
-				# occ_ref_count = RC_Used {rcu_multiply = [], rcu_selectively = [], rcu_uniquely = [nilPtr]}
+				# occ_ref_count = RC_Used {rcu_multiply = [], rcu_selectively = [], rcu_uniquely = [expr_ptr]}
 				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
 			RC_Used {rcu_multiply,rcu_uniquely,rcu_selectively}
-				# occ_ref_count = RC_Used { rcu_multiply = collectAllSelections rcu_selectively (rcu_uniquely ++ rcu_multiply),
+				# occ_ref_count = RC_Used { rcu_multiply = collectAllSelections rcu_selectively (rcu_uniquely ++ [expr_ptr : rcu_multiply]),
 							 rcu_selectively = [], rcu_uniquely = [] }
 				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
 
@@ -105,7 +105,7 @@ refMarkOfVariable free_vars sel (VI_Occurrence var_occ) var=:{var_name, var_info
 	# occ_ref_count = adjust_ref_count sel var_occ.occ_ref_count var_expr_ptr
 	  rms_var_heap = markPatternVariables sel var_occ.occ_pattern_vars rms_var_heap
 	= ref_count_of_bindings free_vars var_name var_info_ptr occ_ref_count var_occ { rms & rms_var_heap = rms_var_heap }
-		===> ("refMarkOfVariable", var_name, var_occ.occ_ref_count, occ_ref_count)
+		===> ("refMarkOfVariable", var_name, var_occ.occ_ref_count, occ_ref_count, var_occ.occ_pattern_vars)
 where
 	adjust_ref_count sel RC_Unused var_expr_ptr
 		| sel == NotASelector
@@ -134,7 +134,7 @@ where
 	ref_count_of_bindings free_vars var_name var_info_ptr occ_ref_count var_occ=:{occ_bind = OB_OpenLet fv let_info} rms=:{rms_var_heap,rms_let_vars}
 		# rms_var_heap = rms_var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count, occ_bind = OB_LockedLet var_occ.occ_bind })
 		= { rms & rms_var_heap = rms_var_heap, rms_let_vars = [ fv : rms_let_vars ]}
-//				===> ("ref_count_of_bindings (OB_OpenLet)", var_name)
+				===> ("ref_count_of_bindings (OB_OpenLet)", var_name)
 	ref_count_of_bindings free_vars var_name var_info_ptr occ_ref_count var_occ=:{occ_bind = OB_LockedLet _} rms=:{rms_var_heap} 
 		= { rms & rms_var_heap = rms_var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count })}
 //				===> ("ref_count_of_bindings (OB_LockedLet)", var_name)
@@ -152,14 +152,14 @@ where
 				# rms_var_heap = rms.rms_var_heap <:= (fv_info_ptr, VI_Occurrence {var_occ & occ_bind = OB_LockedLet var_occ.occ_bind})
 				  rms_var_heap = addParRefCounts call ref_counts rms_var_heap
 				-> addParRefMarksOfLets call let_vars ([fv : closed_let_vars], {rms & rms_var_heap = rms_var_heap})
-//						 ===> ("addParRefMarksOfLets (OB_OpenLet Yes)", fv_name) 
+						 ===> ("addParRefMarksOfLets (OB_OpenLet Yes)", fv_name) 
 			OB_OpenLet _ No
 				# rms_var_heap = rms.rms_var_heap <:= (fv_info_ptr, VI_Occurrence {var_occ & occ_bind = OB_LockedLet var_occ.occ_bind})
 				-> (closed_let_vars, { rms  & rms_var_heap = rms_var_heap, rms_let_vars = [fv : rms.rms_let_vars]})
-//						 ===> ("addParRefMarksOfLets (OB_OpenLet No)", fv_name) 
+						 ===> ("addParRefMarksOfLets (OB_OpenLet No)", fv_name) 
 			OB_LockedLet _
 				-> (closed_let_vars, rms)
-//						 ===> ("addParRefMarksOfLets (OB_LockedLet)", fv_name) 
+						 ===> ("addParRefMarksOfLets (OB_LockedLet)", fv_name) 
 		
 addParRefCounts call ref_counts var_heap
 	= foldSt (set_occurrence call) ref_counts var_heap
@@ -219,9 +219,9 @@ where
 		    binds_are_observing binds var_heap
 		    	= foldSt bind_is_observing binds (True, var_heap)
 			where
-				bind_is_observing {lb_dst={fv_info_ptr}} (observe, var_heap) 
-					# (VI_Occurrence {occ_observing}, var_heap) = readPtr fv_info_ptr var_heap
-					= (occ_observing && observe, var_heap)
+				bind_is_observing {lb_dst={fv_info_ptr}} (observing, var_heap) 
+					# (VI_Occurrence {occ_observing=(observe,attr)}, var_heap) = readPtr fv_info_ptr var_heap
+					= (observing && observe, var_heap)
 			
 			let_combine free_vars var_heap
 				= foldSt (foldSt let_combine_ref_count) free_vars var_heap
@@ -253,8 +253,13 @@ where
 
 	refMark free_vars sel def (Case ca) rms
 		= refMarkOfCase free_vars sel def ca rms 
-	refMark free_vars sel _ (Selection _ expr selectors) rms 
-		= refMark free_vars (field_number selectors) No expr rms 
+	refMark free_vars sel _ (Selection selkind expr selectors) rms
+		= case selkind of
+			UniqueSelector
+				-> refMark free_vars NotASelector No expr rms
+			_ 
+				-> refMark free_vars (field_number selectors) No expr rms 
+//		= refMark free_vars (field_number selectors) No expr rms 
 	where
 		field_number [ RecordSelection _ field_nr : _ ]
 			= field_nr	
@@ -650,17 +655,18 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 			= []
 
 
-emptyOccurrence observing =
+emptyOccurrence type_info =
 		{	occ_ref_count		= RC_Unused
 		,	occ_previous		= []
-		,	occ_observing		= observing
+		,	occ_observing		= type_info
 		,	occ_bind			= OB_Empty
 		, 	occ_pattern_vars	= []
 		}
 
+/*
 emptyObservingOccurrence	=: VI_Occurrence (emptyOccurrence True)
 emptyNonObservingOccurrence =: VI_Occurrence (emptyOccurrence False)
-																	
+*/																	
 makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} !v:TypeDefInfos !*VarHeap !*ExpressionHeap !*ErrorAdmin
 	-> (!u:{# FunDef}, !*Coercions, !w:{! Type},  !v:TypeDefInfos, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 makeSharedReferencesNonUnique [] fun_defs coercion_env subst type_def_infos var_heap expr_heap  error
@@ -679,6 +685,7 @@ where
 	  position = newPosition fun_symb fun_pos
 	  (coercion_env, var_heap, expr_heap, error) = make_shared_vars_non_unique variables coercion_env rms_var_heap expr_heap
 	  		(setErrorAdmin position error)
+	  var_heap = empty_occurrences variables var_heap
 	= (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
 	
 	where
@@ -687,9 +694,20 @@ where
 		where
 			initial_occurrence {fv_name,fv_info_ptr} (subst, type_def_infos, var_heap, expr_heap) 
 				# (var_info, var_heap) = readPtr fv_info_ptr var_heap
-				| has_observing_base_type var_info type_def_infos subst
-					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, emptyObservingOccurrence), expr_heap)
-					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, emptyNonObservingOccurrence), expr_heap)
+				  {at_type, at_attribute} 	= get_type var_info
+				  (expr_ptr, expr_heap)		= newPtr (EI_Attribute (toInt at_attribute)) expr_heap
+//				| has_observing_base_type var_info type_def_infos subst
+//					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, emptyObservingOccurrence), expr_heap)
+//					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, emptyNonObservingOccurrence), expr_heap)
+				| has_observing_type at_type type_def_infos subst
+					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, VI_Occurrence (emptyOccurrence (True, expr_ptr))), expr_heap)
+					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, VI_Occurrence (emptyOccurrence (False, expr_ptr))), expr_heap)
+
+		empty_occurrences vars var_heap
+			= foldSt empty_occurrence vars var_heap
+		where
+			empty_occurrence {fv_info_ptr} var_heap 
+				= var_heap <:= (fv_info_ptr, VI_Empty)
 				
 		has_observing_base_type (VI_Type {at_type} _) type_def_infos subst
 			= has_observing_type at_type type_def_infos subst
@@ -697,6 +715,11 @@ where
 			= has_observing_type at_type type_def_infos subst
 		has_observing_base_type _ type_def_infos subst
 			= abort "has_observing_base_type (refmark.icl)"
+
+		get_type (VI_Type atype _)		= atype
+		get_type (VI_FAType _ atype _)	= atype
+		get_type _						= abort "has_observing_base_type (refmark.icl)"
+		
 
 		make_shared_vars_non_unique vars coercion_env var_heap expr_heap error
 			= foldl make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error) vars
@@ -774,4 +797,7 @@ instance <<< CountedFreeVar
 where
 	(<<<) file {cfv_var,cfv_count} = file <<< cfv_var <<< ':' <<< cfv_count
 
+instance <<< PatternVar
+where
+	(<<<) file {pv_var} = file <<< pv_var
 

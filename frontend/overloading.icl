@@ -161,7 +161,9 @@ where
 	try_to_reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 		| context_is_reducible tc predef_symbols
 			= reduce_any_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+//				---> ("try_to_reduce_context (Yes)", tc)
 		| containsContext tc new_contexts
+//				---> ("try_to_reduce_context (No)", tc)
 			= (CA_Context tc, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 			# (var_heap, type_heaps) = heaps
 			  (tc_var, var_heap) = newPtr VI_Empty var_heap
@@ -355,16 +357,15 @@ where
 					-> (False, coercion_env)
 	
 	context_is_reducible {tc_class=TCClass class_symb,tc_types = [type : types]} predef_symbols
-//		= type_is_reducible type && is_reducible types
-		= type_is_reducible type && types_are_reducible types type class_symb predef_symbols
+		= type_is_reducible type class_symb predef_symbols && types_are_reducible types type class_symb predef_symbols
 	context_is_reducible tc=:{tc_class=TCGeneric {gtc_class}, tc_types = [type : types]} predef_symbols
-		= type_is_reducible type && types_are_reducible types type gtc_class predef_symbols
+		= type_is_reducible type gtc_class predef_symbols && types_are_reducible types type gtc_class predef_symbols
 
-	type_is_reducible (TempV _)
+	type_is_reducible (TempV _) tc_class predef_symbols
+		= False // is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_TypeCodeClass predef_symbols
+	type_is_reducible (_ :@: _) tc_class predef_symbols
 		= False
-	type_is_reducible (_ :@: _)
-		= False
-	type_is_reducible _
+	type_is_reducible _ tc_class predef_symbols
 		= True
 
 	types_are_reducible [] _ _ _
@@ -376,8 +377,7 @@ where
 			_ :@: _
 				->	is_lazy_or_strict_array_or_list_context
 			_
-				-> is_reducible types
-
+				-> is_reducible types tc_class predef_symbols
 	where
 		is_lazy_or_strict_array_or_list_context
 			=>	(is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_ArrayClass predef_symbols &&
@@ -402,10 +402,11 @@ where
 		is_lazy_or_strict_list_type _ _
 			= False
 
-	is_reducible []
-		= True
-	is_reducible [ type : types]
-		= type_is_reducible type && is_reducible types
+		is_reducible [] tc_class predef_symbols
+			= True
+		is_reducible [ type : types] tc_class predef_symbols
+			= type_is_reducible type tc_class predef_symbols && is_reducible types tc_class predef_symbols
+
 
 	fresh_contexts contexts heaps
 		= mapSt fresh_context contexts heaps
@@ -1425,17 +1426,17 @@ where
 						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_name) st_context app_args (ui.ui_var_heap, ui.ui_error)
 						-> (App { app & app_args = app_args }, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_Context context_args
-					# (app_args, ui=:{ui_var_heap, ui_error}) = adjustClassExpressions symb_name context_args app_args ui
+					# (app_args, ui) = adjustClassExpressions symb_name context_args app_args ui
 					#! main_dcl_module_n = ui.ui_x.UpdateInfoX.x_main_dcl_module_n
 					#! fun_index = get_recursive_fun_index group_index symb_kind main_dcl_module_n ui.ui_fun_defs
 					| fun_index == NoIndex
 						# app = { app & app_args = app_args}
-						-> (App app, examine_calls context_args { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
+						-> (App app, examine_calls context_args ui)
 						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
 						  nr_of_context_args = length context_args
 						  nr_of_lifted_contexts = length st_context - nr_of_context_args
-						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_name) (take nr_of_lifted_contexts st_context) app_args (ui_var_heap, ui_error)
-						-> (App { app & app_args = app_args }, examine_calls context_args { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
+						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_name) (take nr_of_lifted_contexts st_context) app_args (ui.ui_var_heap,ui.ui_error)
+						-> (App { app & app_args = app_args }, examine_calls context_args {ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_Instance inst_symbol context_args
 					# (context_args, ui=:{ui_var_heap, ui_error}) = adjustClassExpressions symb_name context_args [] ui
 					-> (build_application inst_symbol context_args app_args app_info_ptr,

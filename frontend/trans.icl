@@ -1785,7 +1785,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 
 determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
 				{fv_info_ptr,fv_name} prod_index ((linear_bit, _),ro)
-				das=:{das_subst,das_type_heaps,das_fun_defs,das_fun_heap,das_var_heap,das_cons_args}
+				das=:{das_subst,das_type_heaps,das_fun_defs,das_fun_heap,das_var_heap,das_cons_args,das_arg_types,das_next_attr_nr}
 
 	# {th_vars, th_attrs}		= das_type_heaps
 	# (symbol,symbol_arity)		= get_producer_symbol producer
@@ -1794,12 +1794,11 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 
 	# ({cc_args, cc_linear_bits}, das_fun_heap, das_cons_args)
 			= calc_cons_args curried symbol symbol_arity das_cons_args linear_bit size_fun_defs das_fun_heap
-
-	  ({ats_types=[arg_type:_],ats_strictness}, das)
-	  		= das!das_arg_types.[prod_index]
+	  ({ats_types=[arg_type:_],ats_strictness}, das_arg_types)
+	  		= das_arg_types![prod_index]
 
 	  (das_next_attr_nr, th_attrs)
-	  		= foldSt bind_to_temp_attr_var st_attr_vars (das.das_next_attr_nr, th_attrs)
+	  		= foldSt bind_to_temp_attr_var st_attr_vars (das_next_attr_nr, th_attrs)
 	  		// prepare for substitute calls
 	  (_, (st_args, st_result), das_type_heaps)
 	  		= substitute (st_args, st_result) { das_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
@@ -1876,9 +1875,10 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 					-> (VI_Empty, das_var_heap, let_bindings)
 				_	-> (expr_to_unfold,das_var_heap,let_bindings)
 ...DvA */
+	# das_arg_types = { das_arg_types & [prod_index] = {ats_types=take nr_of_applied_args st_args,ats_strictness=st_args_strictness} }
 	=	{ das 
 		& das_vars						= form_vars
-		, das_arg_types.[prod_index]	= {ats_types=take nr_of_applied_args st_args,ats_strictness=st_args_strictness} 
+		, das_arg_types					= das_arg_types 
 		, das_next_attr_nr				= das_next_attr_nr
 		, das_new_linear_bits			= cc_linear_bits ++ das.das_new_linear_bits
 		, das_new_cons_args				= cc_args ++ das.das_new_cons_args
@@ -1984,6 +1984,7 @@ where
 		has_unique_attribute {at_attribute=TA_Unique} = True
 		has_unique_attribute _ = False
 */
+
 // DvA: from type.icl...
 currySymbolType tst_args tst_arity tst_result tst_attr_env req_arity ts_attr_store
 	| tst_arity == req_arity
@@ -2597,10 +2598,10 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 		# { glob_module, glob_object } = gi
 		| glob_module == ro.ro_main_dcl_module_n
 			| glob_object < size ti_cons_args
-				#! cons_class = ti_cons_args.[glob_object]
+				#  (cons_class,ti_cons_args) = ti_cons_args![glob_object]
 				   (instances, ti_instances) = ti_instances![glob_object]
 				   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
-				   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
+				   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs, ti_cons_args = ti_cons_args }
 				= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
 			// It seems as if we have an array function 
 				| isEmpty extra_args
@@ -2698,10 +2699,10 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
 	| fun_index < size ti_cons_args
-		#! cons_class = ti_cons_args.[fun_index]
+		#  (cons_class, ti_cons_args) = ti_cons_args![fun_index]
 		   (instances, ti_instances) = ti_instances![fun_index]
 		   (fun_def, ti_fun_defs) = ti_fun_defs![fun_index]
-		   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
+		   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs, ti_cons_args = ti_cons_args }
 		= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
 	# (FI_Function {gf_fun_def,gf_instance_info,gf_cons_args}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 	  ti = { ti & ti_fun_heap = ti_fun_heap }

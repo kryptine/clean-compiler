@@ -374,16 +374,17 @@ where
 analTypes_for_TA :: Ident Int Int Int [AType] !Bool !{#CommonDefs} ![KindInfoPtr] !Conditions !*AnalyseState
 	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
 analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
-	# form_type_arity = modules.[glob_module].com_type_defs.[glob_object].td_arity
+	# {td_arity, td_name} = modules.[glob_module].com_type_defs.[glob_object]
 	  ({tdi_kinds, tdi_properties}, as) = as!as_td_infos.[glob_module].[glob_object]
-	| type_arity <= form_type_arity
+	| type_arity <= td_arity
 		# kind = kindArrowToKindInfo (drop type_arity tdi_kinds)
 		| tdi_properties bitand cIsAnalysed == 0
 			# (type_properties, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tdi_kinds (conds, as)
 			= (kind, type_properties, conds_as)
 			# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
-//			= (kind, type_properties, conds_as)
-			= (kind, addHyperstrictness type_properties tdi_properties, conds_as)
+			  new_properties = condCombineTypeProperties has_root_attr type_properties tdi_properties
+			= (kind, new_properties, conds_as)
+//				---> ("analTypes_for_TA", td_name, type_properties, tdi_properties, new_properties, has_root_attr)
 		= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_name type_appl_error as.as_error }))
 where
 	anal_types_of_rec_type_cons modules form_tvs [] _ conds_as
@@ -517,6 +518,7 @@ where
 							(combineTypeProperties cv_props other_type_props)
 							(combineCoercionProperties cv_props other_type_props)
 		= (cons_props, (conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
+//			---> ("anal_types_of_cons", type)
 
 analTypesOfConstructor _ _ [] conds_as
 	= (cIsHyperStrict, conds_as)
@@ -535,6 +537,7 @@ where
 		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 		= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))
 
+
 analyseTypeDefs :: !{#CommonDefs} !TypeGroups  !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
 						-> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 analyseTypeDefs modules groups dcl_types dcl_mod_index type_def_infos type_var_heap error
@@ -552,7 +555,7 @@ where
 			  (kinds_in_group, (as_kind_heap, as_td_infos))	= mapSt determine_kinds group (as.as_kind_heap, as.as_td_infos)
 			  as_kind_heap									= unify_var_binds conds.con_var_binds as_kind_heap
 			  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars conds.con_top_var_binds 0 as_kind_heap
-			  (as_kind_heap, as_td_infos) = update_type_def_infos type_properties normalized_top_vars group
+			  (as_kind_heap, as_td_infos) = update_type_def_infos modules type_properties normalized_top_vars group
 			  										kinds_in_group  kind_var_store as_kind_heap as_td_infos
 			  as = { as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos }
 			  as = foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
@@ -644,19 +647,21 @@ where
 			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			= nomalize_var kind_info_ptr kind_info (kind_store, kind_heap)
 			
-	update_type_def_infos type_properties top_vars group updated_kinds_of_group kind_store kind_heap td_infos
-		# (_, as_kind_heap, as_td_infos) = fold2St (update_type_def_info (type_properties bitor cIsAnalysed) top_vars) group updated_kinds_of_group (kind_store, kind_heap, td_infos)
+	update_type_def_infos modules type_properties top_vars group updated_kinds_of_group kind_store kind_heap td_infos
+		# (_, as_kind_heap, as_td_infos) = fold2St (update_type_def_info modules (type_properties bitor cIsAnalysed) top_vars) group updated_kinds_of_group (kind_store, kind_heap, td_infos)
 		= (as_kind_heap, as_td_infos)
 	where
-		update_type_def_info type_properties top_vars {gi_module,gi_index} updated_kinds
+		update_type_def_info modules type_properties top_vars {gi_module,gi_index} updated_kinds
 				(kind_store, kind_heap, td_infos)
-			# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module].[gi_index]
+//			# {com_type_defs} = modules.[gi_module]
+//			  {td_name} = com_type_defs.[gi_index]
+			# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module].[gi_index] // ---> ("update_type_def_info", td_name, type_properties)
 			# (group_vars, cons_vars, kind_store, kind_heap) = determine_type_def_info tdi_kinds updated_kinds top_vars kind_store kind_heap
 			= (kind_store, kind_heap, { td_infos & [gi_module,gi_index] =
 					{td_info & tdi_properties = type_properties, tdi_kinds = updated_kinds, tdi_group_vars = group_vars, tdi_cons_vars = cons_vars }})
 
 		determine_type_def_info [ KindVar kind_info_ptr : kind_vars ] [ kind : kinds ] top_vars kind_store kind_heap
-			#! kind_info = sreadPtr kind_info_ptr kind_heap
+			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			# (var_number, (kind_store, kind_heap)) = nomalize_var kind_info_ptr kind_info (kind_store, kind_heap)
 			  (group_vars, cons_vars, kind_store, kind_heap) = determine_type_def_info kind_vars kinds top_vars kind_store kind_heap
 			= case kind of
@@ -684,7 +689,7 @@ where
 //						---> ("check_coercibility", td_name, spec_properties, properties)
 						|check_hyperstrictness spec_properties properties
 							| spec_properties bitand cIsNonCoercible == 0
-								# (as_type_var_heap, as_td_infos, as_error) = check_possitive_sign gi_module gi_index modules td_args as.as_type_var_heap as.as_td_infos as_error
+								# (as_type_var_heap, as_td_infos, as_error) = check_positive_sign gi_module gi_index modules td_args as.as_type_var_heap as.as_td_infos as_error
 								= {as & as_type_var_heap = as_type_var_heap, as_td_infos = as_td_infos, as_error = popErrorAdmin as_error} 
 								= {as & as_error = popErrorAdmin as_error} 
 							#	as_error = checkError "abstract type as defined in the implementation module is not hyperstrict" "" as_error
@@ -701,7 +706,7 @@ where
 		check_hyperstrictness dcl_props icl_props
 			= dcl_props bitand cIsHyperStrict == 0 || icl_props bitand cIsHyperStrict > 0
 		
-		check_possitive_sign mod_index type_index modules td_args type_var_heap type_def_infos error
+		check_positive_sign mod_index type_index modules td_args type_var_heap type_def_infos error
 			# top_signs = [ TopSignClass \\ _ <- td_args ]
 			# (signs, type_var_heap, type_def_infos) = signClassification type_index mod_index top_signs modules type_var_heap type_def_infos
 			| signs.sc_neg_vect == 0

@@ -1018,7 +1018,7 @@ instance toString 	KindInfo
 	{	occ_ref_count		:: !ReferenceCount
 	,	occ_bind			:: !OccurrenceBinding
 	,	occ_pattern_vars	:: ![[PatternVar]]
-	,	occ_observing		:: !Bool
+	,	occ_observing		:: (Bool, Ptr ExprInfo)
 	,	occ_previous 		:: ![ReferenceCount]
 	}
 

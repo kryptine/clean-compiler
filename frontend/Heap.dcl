@@ -3,7 +3,7 @@ definition module Heap
 import StdClass
 
 :: Heap v = {heap::!.HeapN v}
-:: HeapN v
+:: .HeapN v
 :: Ptr v = {pointer::!.(PtrN v)};
 :: PtrN v = Ptr !v !(HeapN v);
 

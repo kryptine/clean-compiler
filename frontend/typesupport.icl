@@ -906,20 +906,21 @@ where
 		equi_attrs attr1 attr2 attr_var_heap
 			= (attr1 == attr2, attr_var_heap)
 
-equivTypeVars :: !TypeVar !TempVarId !*TypeHeaps -> (!Bool, !*TypeHeaps)
-equivTypeVars {tv_info_ptr} var_number heaps=:{th_vars}
-	#! tv_info = sreadPtr tv_info_ptr th_vars
+equivTypeVars :: !TypeVar !TempVarId !*TypeVarHeap -> (!Bool, !*TypeVarHeap)
+equivTypeVars {tv_info_ptr} var_number type_var_heap
+	# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 	= case tv_info of
 		TVI_Forward forw_var_number
-			-> (forw_var_number == var_number, heaps)
+			-> (forw_var_number == var_number, type_var_heap)
 		_
-			-> (True, { heaps & th_vars = writePtr tv_info_ptr (TVI_Forward var_number) heaps.th_vars })
+			-> (True, type_var_heap <:= (tv_info_ptr, TVI_Forward var_number))
 	
 
 instance equiv Type
 where
-	equiv (TV tv) (TempV var_number) heaps
-		= equivTypeVars tv var_number heaps
+	equiv (TV tv) (TempV var_number) heaps=:{th_vars}
+		# (equiv, th_vars) = equivTypeVars tv var_number th_vars
+		= (equiv, { heaps & th_vars = th_vars })
 	equiv (TV tv1) (TV tv2) heaps
 		= (True, heaps)
 	equiv (arg_type1 --> restype1) (arg_type2 --> restype2) heaps
@@ -946,11 +947,11 @@ where
 			= (False, heaps)
 	equiv (TB basic1) (TB basic2) heaps
 		= (basic1 == basic2, heaps)
-	equiv (CV tv :@: types1) (TempCV var_number :@: types2) heaps
-		# (equi_vars, heaps) =  equivTypeVars tv var_number heaps
+	equiv (CV tv :@: types1) (TempCV var_number :@: types2) heaps=:{th_vars}
+		# (equi_vars, th_vars) =  equivTypeVars tv var_number th_vars
 		| equi_vars
-			= equiv types1 types2 heaps
-			= (False, heaps)
+			= equiv types1 types2 { heaps & th_vars = th_vars }
+			= (False, { heaps & th_vars = th_vars })
 	equiv (TFA vars1 type1) (TFA vars2 type2) heaps
 		= equiv type1 type2 heaps
 	equiv type1 type2 heaps

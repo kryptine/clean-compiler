@@ -988,7 +988,7 @@ determine_attribute_of_cons modules cons_attr cons_args prop_class attr_var_heap
 where
 	determine_cummulative_attribute [] cumm_attr attr_vars prop_class
 		= (cumm_attr, attr_vars, prop_class)
-	determine_cummulative_attribute [{at_attribute} : types ] cumm_attr attr_vars prop_class
+	determine_cummulative_attribute [t=:{at_attribute} : types ] cumm_attr attr_vars prop_class
 		| prop_class bitand 1 == 0
 			= determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
 			= case at_attribute of
@@ -998,9 +998,12 @@ where
 					-> determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
 				TA_Var attr_var
 					-> determine_cummulative_attribute types at_attribute [attr_var : attr_vars] (prop_class >> 1)
+				TA_RootVar attr_var
+					-> determine_cummulative_attribute types at_attribute [attr_var : attr_vars] (prop_class >> 1)
 				TA_MultiOfPropagatingConsVar
 					-> determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
-
+				_
+					-> abort ("determine_cummulative_attribute" ---> at_attribute) 
 	combine_attributes (TA_Var attr_var) cumm_attr prop_vars attr_var_heap attr_vars attr_env ps_error
 		= case cumm_attr of
 			TA_Unique
@@ -1010,6 +1013,8 @@ where
 				-> (TA_Var attr_var, attr_var_heap, attr_vars, attr_env, ps_error)
 			TA_Var _
 				-> (TA_Var attr_var, attr_var_heap, attr_vars, foldSt (new_inequality attr_var) prop_vars attr_env, ps_error)
+			_
+				-> abort ("combine_attributes" ---> cumm_attr) 
 	where
 		new_inequality off_attr_var dem_attr_var [] 
 			= [{ ai_demanded = dem_attr_var, ai_offered = off_attr_var }]
@@ -2624,18 +2629,19 @@ where
 	type_functions group ti ts
 		= mapSt (type_function ti) group ts
 
-	type_function ti fun_index ts=:{ts_fun_env, ts_var_heap, ts_expr_heap, ts_error}
-		# (fd, ts) = ts!ts_fun_defs.[fun_index]
-		  (type, ts_fun_env) = ts_fun_env![fun_index]
+	type_function ti fun_index ts=:{ts_fun_env, ts_var_heap, ts_error, ts_fun_defs}
+		# (fd, ts_fun_defs)		= ts_fun_defs![fun_index]
+		  (type, ts_fun_env)	= ts_fun_env![fun_index]
 		  {fun_symb,fun_arity,fun_body=TransformedBody {tb_args,tb_rhs},fun_pos, fun_info, fun_type} = fd
 		  temp_fun_type = type_of type
 		  ts_var_heap = makeBase fun_symb 1 tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_symb fun_pos
 		  ts_error = setErrorAdmin fe_location ts_error
+//		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error}
+		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error, ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env}
 		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],
 		  			 req_attr_coercions = [], req_case_and_let_exprs = [] }
-		  ( rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs,
-		  		{ ts & ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error, ts_fun_env = ts_fun_env })
+		  (rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs, ts)
 		  req_type_coercions = [{tc_demanded = temp_fun_type.tst_result,tc_offered = rhs_type, tc_position = CP_Expression tb_rhs, tc_coercible = True} :
 		  		rhs_reqs.req_type_coercions ]
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap

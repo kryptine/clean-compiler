@@ -38,7 +38,8 @@ where
 		check_type_attribute :: !TypeAttribute !TypeAttribute !TypeAttribute !*ErrorAdmin -> (!TypeAttribute,!*ErrorAdmin)
 		check_type_attribute TA_Anonymous type_attr root_attr error
 			| try_to_combine_attributes type_attr root_attr
-				= (root_attr, error)
+				= (to_root_attr root_attr, error)
+//				= (root_attr, error)
 				= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
 		check_type_attribute TA_Unique type_attr root_attr error
 			| try_to_combine_attributes TA_Unique type_attr || try_to_combine_attributes TA_Unique root_attr
@@ -69,7 +70,12 @@ where
 			= checkError var "uniqueness attribute not allowed" error
 		check_attr_of_type_var attr _ error
 			= error
-		
+	
+		to_root_attr (TA_Var var)
+			= TA_RootVar var
+		to_root_attr attr
+			= attr
+					
 instance bindTypes TypeVar
 where
 	bindTypes cti tv=:{tv_name=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table})

@@ -127,7 +127,7 @@ where
 	toString (TA_Var avar)
 		= toString avar + ":"
 	toString (TA_RootVar avar)
-		= toString avar + ":"
+		= toString avar + ":)"
 	toString (TA_Anonymous)
 		= "."
 	toString TA_None

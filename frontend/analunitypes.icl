@@ -243,7 +243,7 @@ signClassOfType_for_TA glob_module glob_object types sign use_top_sign group_nr 
 	# (td_info=:{tdi_group_nr,tdi_index_in_group,tdi_kinds}, scs) = scs!scs_type_def_infos.[glob_module].[glob_object]
 	| tdi_group_nr == group_nr
 		= sign_class_of_type_list_of_rec_type types sign use_top_sign tdi_index_in_group ci [] scs 
-		# {td_arity} = ci.[glob_module].com_type_defs.[glob_object]
+		# {td_arity,td_name} = ci.[glob_module].com_type_defs.[glob_object]
 		  (sign_classes, hio_signs, scs) = collect_sign_classes_of_type_list types tdi_kinds group_nr ci scs 
 		  (type_class, scs_type_var_heap, scs_type_def_infos)
 		  		= determineSignClassOfTypeDef glob_object glob_module td_info hio_signs ci scs.scs_type_var_heap scs.scs_type_def_infos
@@ -266,6 +266,8 @@ where
 			= collect_sign_classes_of_type_list ts tks group_nr ci scs
 	collect_sign_classes_of_type_list [] _ _ ci scs
 		= ([], [], scs)
+	collect_sign_classes_of_type_list _ _ _ ci scs
+		= abort "collect_sign_classes_of_type_list (analunitypes)"
 
 	determine_cummulative_sign [t : ts] [tk : tks] sign use_top_sign sign_class sign_classes type_index ci cumm_class scs
 		| IsArrowKind tk

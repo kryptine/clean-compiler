@@ -277,8 +277,8 @@ instance consumerRequirements App where
 
 		| glob_module == main_dcl_module_n
 			| glob_object < size ai_cons_class
-				#! fun_class = ai_cons_class.[glob_object]
-				= reqs_of_args fun_class.cc_args app_args CPassive common_defs ai
+				# (fun_class, ai_cons_class) = ai_cons_class![glob_object]
+				= reqs_of_args fun_class.cc_args app_args CPassive common_defs { ai & ai_cons_class = ai_cons_class }
 				= consumerRequirements app_args common_defs ai
 
 		| glob_module == stdStrictLists_module_n && (not (isEmpty app_args))
@@ -323,8 +323,8 @@ instance consumerRequirements App where
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
 			ai=:{ai_cons_class}
 		| glob_object < size ai_cons_class
-			#! fun_class = ai_cons_class.[glob_object]
-			= reqs_of_args fun_class.cc_args app_args CPassive common_defs ai
+			# (fun_class, ai_cons_class) = ai_cons_class![glob_object]
+			= reqs_of_args fun_class.cc_args app_args CPassive common_defs { ai & ai_cons_class = ai_cons_class }
 			= consumerRequirements app_args common_defs ai
 	
 	// new alternative for generated function + reanalysis...
@@ -356,10 +356,11 @@ reqs_of_args [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
 	= reqs_of_args ccs args (combineClasses act_cc cumm_arg_class) common_defs ai
 reqs_of_args cc xp _ _ _ = abort "classify:reqs_of_args doesn't match" ---> (cc,xp)
 
+/*
 showRefCount :: !String !*AnalyseInfo -> *AnalyseInfo
 showRefCount msg ai=:{ai_cur_ref_counts}
 	= ai <--- (msg,display ai_cur_ref_counts)
-	
+*/	
 display :: !RefCounts -> String
 display rc = {show c \\ c <-: rc}
 where

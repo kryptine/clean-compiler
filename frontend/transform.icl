@@ -2111,7 +2111,8 @@ where
 instance collectVariables BoundVar
 where
 	collectVariables var=:{var_name,var_info_ptr,var_expr_ptr} free_vars dynamics cos=:{cos_var_heap}
-		#! var_info = sreadPtr var_info_ptr cos_var_heap
+		# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
+		  cos = { cos & cos_var_heap = cos_var_heap }
 		= case var_info of
 			VI_Alias alias
 				#  (original, free_vars, dynamics, cos) = collectVariables alias free_vars dynamics cos
