@@ -98,8 +98,9 @@ instance sequence Expression where
 		=	sequence let_strict_binds
 		o`	sequence let_lazy_binds
 		o`	sequence let_expr
-	sequence (Conditional {if_then, if_else})
-		=	sequence if_then
+	sequence (Conditional {if_cond, if_then, if_else})
+		=	sequence if_cond
+		o`	sequence if_then
 		o`	sequence if_else
 	sequence (App {app_args})
 		=	sequence app_args
@@ -152,9 +153,10 @@ instance sequence LetBind where
 // MW0		= sequence` app bind_dst
 		= sequence` app lb_dst
 	  where
-// MW0	  	sequence` {app_symb, app_args} bind_dst sequenceState=:{ss_aliasDummyId}
+// MW0	sequence` {app_symb, app_args} bind_dst sequenceState=:{ss_aliasDummyId}
 	  	sequence` {app_symb, app_args} lb_dst sequenceState=:{ss_aliasDummyId}
-			| app_symb.symb_name==ss_aliasDummyId
+			| not (isNilPtr app_symb.symb_name.id_info) // nilPtr's are generated for Case's with case_ident=No in convertcases
+				&& app_symb.symb_name==ss_aliasDummyId
 				// the compiled source was a strict alias like "#! x = y"
 				= case hd app_args of
 					Var bound_var=:{var_info_ptr}
