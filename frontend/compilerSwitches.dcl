@@ -12,7 +12,5 @@ SwitchGenericInfo on off :== on
 // - change T_ypeObjectType in StdDynamic (remove DummyModuleName-argument of T_ypeConsSymbol)
 // - the (ModuleID _)-constructor is *not* yet shared
 
-USE_DummyModuleName yes no :== yes
-
 switch_dynamics on off :== on;		// to turn dynamics on or off
 // ...MV
