@@ -15,11 +15,11 @@ checkVersion VersionsAreCompatible errorFile
 	=	(True, errorFile)
 checkVersion VersionObservedIsTooNew errorFile
 	#	errorFile
-			=	fwrites "[Backend] the back end library is too new\n" errorFile
+			=	fwrites "Error: the back end library is too new\n" errorFile
 	=	(False, errorFile)
 checkVersion VersionObservedIsTooOld errorFile
 	#	errorFile
-			=	fwrites "[Backend] the back end library is too old\n" errorFile
+			=	fwrites "Error: the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
 backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*Files -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*Files)
