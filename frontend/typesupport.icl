@@ -1036,7 +1036,9 @@ where
 	clear_environment [{ac_demanded,ac_offered} : coercions ] attr_env
 		= clear_environment coercions { attr_env & [ac_demanded] = TA_None }
 	
-//	equivalent_environments :: ![AttrInequality] !u:{!TypeAttribute} !v:AttrVarHeap -> (!Bool, !u:{!TypeAttribute}, !v:AttrVarHeap)
+	equivalent_environments inequalities attr_env attr_heap
+		= foldSt equivalent_inequality inequalities (True, attr_env, attr_heap)
+/*
 	equivalent_environments [] attr_env attr_heap
 		= (True, attr_env, attr_heap)
 	equivalent_environments [{ai_demanded,ai_offered} : coercions ] attr_env attr_heap
@@ -1049,6 +1051,22 @@ where
 		| succ
 			= equivalent_environments coercions attr_env attr_heap
 			= (False, attr_env, attr_heap)
+*/
+	equivalent_inequality {ai_demanded,ai_offered} (equiv, attr_env, attr_heap)
+		| equiv
+			# (dem_forward, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
+			= case dem_forward of
+				AVI_Forward demanded_var_number
+					# (AVI_Forward offered_var_number, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
+					  (offered_of_demanded, attr_env) = attr_env![demanded_var_number]
+					  attr_env = { attr_env & [demanded_var_number] = TA_Locked offered_of_demanded }
+					  (succ, locked_attributes, attr_env) = contains_coercion offered_var_number offered_of_demanded [demanded_var_number] attr_env
+					  attr_env = foldSt unlock_attribute locked_attributes attr_env
+					-> (succ, attr_env, attr_heap)
+				_
+					-> (True, attr_env, attr_heap)
+			= (False, attr_env, attr_heap)			
+		
 
 //	contains_coercion :: !Int !TypeAttribute ![Int] !u:{! TypeAttribute} -> (!Bool, ![Int], !u:{!TypeAttribute})
 	contains_coercion offered TA_None locked_attributes attr_env
@@ -1274,7 +1292,6 @@ where
 			= writeWithinBrackets "(" ")" file opt_beautifulizer
 									(clearProperty (setProperty form cArrowSeparator) cBrackets, [arg_type, res_type])
 			= writeType file opt_beautifulizer (setProperty form (cBrackets bitor cArrowSeparator), [arg_type, res_type])
-
 	writeType file opt_beautifulizer (form, type :@: types)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)
@@ -1502,6 +1519,8 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 //..AA
 	get_ineqs_of_type (cv :@: args)
 		= get_ineqs_of_atype_list args
+	get_ineqs_of_type (TFA vars type)
+		= get_ineqs_of_type type
 	get_ineqs_of_type _
 		= Empty
 
@@ -1691,6 +1710,9 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	anonymize_type (cv :@: args) th_attrs
 		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
 		= (cv :@: args, th_attrs)
+	anonymize_type (TFA vars type) th_attrs
+		# (type, th_attrs) = anonymize_type type th_attrs
+		= (TFA vars type, th_attrs)
 	anonymize_type x th_attrs
 		= (x, th_attrs)
 
