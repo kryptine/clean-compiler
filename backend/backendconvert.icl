@@ -1411,7 +1411,6 @@ defineLhsNodeDef freeVar pattern nodeDefs varHeap
 			(beNodeDef variable_sequence_number (convertPattern pattern varHeap))
 			(return nodeDefs) be
 
-// MW0 collectNodeDefs :: Ident Expression -> [Bind Expression FreeVar]
 collectNodeDefs :: Ident Expression -> [LetBind]
 collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
 	= filterStrictAlias let_strict_binds let_lazy_binds
@@ -1437,21 +1436,17 @@ convertRhsNodeDefs :: Ident Expression Int VarHeap -> BEMonad BENodeDefP
 convertRhsNodeDefs aliasDummyId expr main_dcl_module_n varHeap
 	=	convertNodeDefs (collectNodeDefs aliasDummyId expr) varHeap
 where
-// MW0	convertNodeDefs :: [Bind Expression FreeVar] VarHeap -> BEMonad BENodeDefP
 	convertNodeDefs :: [LetBind] VarHeap -> BEMonad BENodeDefP
 	convertNodeDefs binds varHeap
 		=	sfoldr (beNodeDefs o flip convertNodeDef varHeap) beNoNodeDefs binds
 		where
-// MW0			convertNodeDef :: !(Bind Expression FreeVar) VarHeap -> BEMonad BENodeDefP
 			convertNodeDef :: !LetBind VarHeap -> BEMonad BENodeDefP
-// MW0			convertNodeDef {bind_src=expr, bind_dst=freeVar} varHeap
 			convertNodeDef {lb_src=expr, lb_dst=freeVar} varHeap
 				= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr varHeap be0 in
 					beNodeDef variable_sequence_number (convertExpr expr main_dcl_module_n varHeap) be
 
 collectStrictNodeIds :: Expression -> [FreeVar]
 collectStrictNodeIds (Let {let_strict_binds, let_expr})
-// MW0	=	[bind_dst \\ {bind_dst} <- let_strict_binds]
 	=	[lb_dst \\ {lb_dst} <- let_strict_binds]
 collectStrictNodeIds _
 	=	[]
