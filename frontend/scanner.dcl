@@ -167,3 +167,6 @@ determinePriority :: !Priority !Priority -> Optional Bool
 /* ... Sjaak */
 
 
+setNoNewOffsideForSeqLetBit :: !ScanState -> ScanState
+
+clearNoNewOffsideForSeqLetBit :: !ScanState -> ScanState

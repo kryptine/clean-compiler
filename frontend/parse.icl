@@ -2450,7 +2450,9 @@ HeadUnboxedAndTailStrict:==4;
 
 wantListExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantListExp is_pattern pState
+	# pState=appScanState setNoNewOffsideForSeqLetBit pState
 	# (token, pState) = nextToken FunctionContext pState
+	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
 	# (head_strictness,token,pState) = wantHeadStrictness token pState
 		with
 			wantHeadStrictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)

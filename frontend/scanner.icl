@@ -67,6 +67,8 @@ where
 ScanOptionUseLayoutBit :== 1
 ScanOptionUnderscoreIdentsBit :== 2
 
+ScanOptionNoNewOffsideForSeqLetBit:==4;
+
 ::	* ScanInput
 	=	Input			Input
 	|	PushedToken		LongToken ScanInput
@@ -1557,6 +1559,12 @@ setUseUnderscoreIdents b (ScanState ss) = ScanState  (setUseUnderscoreIdents_ b 
 setUseUnderscoreIdents_ :: !Bool !RScanState -> RScanState
 setUseUnderscoreIdents_ b ss=:{ss_scanOptions} = { ss & ss_scanOptions = if b (ss_scanOptions bitor ScanOptionUnderscoreIdentsBit) (ss_scanOptions bitand (bitnot ScanOptionUnderscoreIdentsBit)) } // -->> ("uselayout set to ",b)
 
+setNoNewOffsideForSeqLetBit :: !ScanState -> ScanState
+setNoNewOffsideForSeqLetBit (ScanState ss=:{ss_scanOptions}) = ScanState { ss & ss_scanOptions = ss_scanOptions bitor ScanOptionNoNewOffsideForSeqLetBit};
+
+clearNoNewOffsideForSeqLetBit :: !ScanState -> ScanState
+clearNoNewOffsideForSeqLetBit (ScanState ss=:{ss_scanOptions}) = ScanState { ss & ss_scanOptions = ss_scanOptions bitand (bitnot ScanOptionNoNewOffsideForSeqLetBit)};
+
 checkOffside :: !FilePosition !Int !Token !RScanState -> (Token,RScanState)
 checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 	| (ss_scanOptions bitand ScanOptionUseLayoutBit) == 0
@@ -1629,8 +1637,13 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 		= (token, { scanState & ss_offsides = tl ss_offsides })
 		= newOffside token scanState
 where
-	newOffside token scanState=:{ss_offsides}
+	newOffside token scanState=:{ss_offsides,ss_scanOptions}
 	| definesOffside token
+		&& ((ss_scanOptions bitand ScanOptionNoNewOffsideForSeqLetBit)==0
+			|| (case token of
+				SeqLetToken _ -> False
+				_ -> True
+			))
 		#	( _, scanState )		= nextToken FunctionContext scanState
 			( os_pos, scanState )	= getPosition scanState // next token defines offside position
 			scanState				= tokenBack scanState
