@@ -6,7 +6,7 @@ COCL = cocl
 #COCLFLAGS = -lat
 SYS = Clean\ System\ Files
 
-MODULES = basic pretty pfun graph dnc rule trd rewr complete history spine trace absmodule spine strat loop law
+MODULES = basic pretty pfun graph dnc rule trd rewr complete history spine trace absmodule spine strat loop law supercompile
 
 ABC = $(patsubst %,$(SYS)/%.abc,$(MODULES))
 
@@ -22,6 +22,7 @@ clean:
 $(SYS)/%.abc: %.icl
 	$(COCL) $(COCLFLAGS) $*
 
+$(SYS)/supercompile.abc: supercompile.icl supercompile.dcl
 $(SYS)/law.abc: law.icl law.dcl
 $(SYS)/loop.abc: loop.icl loop.dcl trace.dcl strat.dcl history.dcl rule.dcl graph.dcl basic.dcl
 $(SYS)/strat.abc: strat.icl strat.dcl history.dcl spine.dcl dnc.dcl rule.dcl graph.dcl pfun.dcl basic.dcl

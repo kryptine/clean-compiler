@@ -1,7 +1,11 @@
 implementation module frontend
 
+// $Id$
+
+// vi:set tabstop=4 noet:
+
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
-		convertimportedtypes, checkKindCorrectness, compilerSwitches, analtypes, generics
+		convertimportedtypes, checkKindCorrectness, compilerSwitches, analtypes, generics, supercompile
 
 :: FrontEndSyntaxTree
 	=	{	fe_icl :: !IclModule
@@ -45,6 +49,13 @@ where
 				= fill_empty_positions (inc next_index) table_size next_new_index icl_conversions
 			= icl_conversions
 
+:: FrontEndOptions
+	=	{	feo_upToPhase    :: !FrontEndPhase  // How much of the frontend to execute
+		,	feo_search_paths :: !SearchPaths    // Folders in which to search for files
+		,	feo_typelisting  :: !Optional !Bool // Whether to list derived types, and if so whether to list attributes
+		,	feo_fusionstyle  :: !FusionStyle    // What type of fusion to perform
+		}
+
 :: FrontEndPhase
 	=	FrontEndPhaseCheck
 	|	FrontEndPhaseTypeCheck
@@ -52,6 +63,11 @@ where
 	|	FrontEndPhaseTransformGroups
 	|	FrontEndPhaseConvertModules
 	|	FrontEndPhaseAll
+
+:: FusionStyle
+	=	FS_online  // Do online fusion (supercompilation)
+	|	FS_offline // Do offline fusion (deforestation)
+	|	FS_none    // Do no fusion
 
 instance == FrontEndPhase where
 	(==) a b
@@ -70,11 +86,11 @@ frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_module
 			},cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
-//frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !*File !*Heaps -> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File !*File, !*File, !*File, !*Heaps) 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File (!Optional !*File) !*Heaps
+frontEndInterface :: !FrontEndOptions !Ident !{#DclModule} !{#FunDef} !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File (!Optional !*File) !*Heaps
 	-> ( !Optional *FrontEndSyntaxTree,!.{# FunDef },!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
 
-frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
+frontEndInterface opts mod_ident dcl_modules functions_and_macros predef_symbols hash_table files error io out tcl_file heaps 
+	# {feo_upToPhase=upToPhase, feo_search_paths=search_paths,feo_typelisting=list_inferred_types} = opts
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident NoPos (hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths predef_symbols files
 	| not ok
@@ -181,11 +197,20 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
 //	  (components, fun_defs, error) = showComponents components 0 True fun_defs error
-	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
 
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  	= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
+// VZ..
+// Select fusion style and do fusion
+	# (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+		= case opts.feo_fusionstyle of
+		  	FS_offline
+				# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
+					= analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
+	  			-> transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
+			FS_online
+				-> supercompile common_defs array_instances main_dcl_module_n (components -*-> "Supercompile") fun_defs var_heap expression_heap imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
+			FS_none
+			    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
+// ..VZ
 
 	| upToPhase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}

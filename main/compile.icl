@@ -1,5 +1,9 @@
 implementation module compile
 
+// $Id$
+
+// vi:set tabstop=4 noet:
+
 import StdEnv
 import frontend
 import backendinterface
@@ -193,9 +197,16 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	stdio files
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
-	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
+// VZ..
+	# feopts
+		=	{	feo_upToPhase		= FrontEndPhaseAll
+			,	feo_search_paths	= options.searchPaths
+			,	feo_typelisting		= if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
+			,	feo_fusionstyle		= if (isMember "-sc" commandLineArgs) FS_online FS_offline
+			}
 	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
+		=	frontEndInterface feopts moduleIdent dcl_modules functions_and_macros predef_symbols hash_table files error io out tcl_file heaps
+// ..VZ
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 
 // MV ...
