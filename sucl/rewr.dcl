@@ -1,5 +1,7 @@
 definition module rewr
 
+// $Id$
+
 from rule import Rule
 from graph import Graph
 from pfun import Pfun
@@ -41,7 +43,7 @@ getmapping
  &  == var
  &  == pvar
 
-instantiate
+rewrinstantiate
  :: .(Graph sym pvar)       // Pattern to instantiate with
     pvar                    // Root of the pattern
     var                     // Open node to instantiate

@@ -1,6 +1,11 @@
 definition module graph
 
+// $Id$
+
+from pfun import Pfun
 from StdOverloaded import ==
+from cleanversion import String
+from StdString import toString
 
 // A rule associating a replacement with a pattern
 //:: Rule sym var
@@ -94,34 +99,34 @@ Implementation
 */
 
 // The empty graph.
-emptygraph :: Graph .sym .var
+emptygraph :: .Graph sym var
 
 // Assign a node to a variable in a graph.
-updategraph :: .var (Node .sym .var) (Graph .sym .var) -> Graph .sym .var
+updategraph :: var .(Node sym var) !.(Graph sym var) -> .Graph sym var
 
 // Unassign a variable in a graph, making it free.
-prunegraph :: .var (Graph .sym .var) -> Graph .sym .var
+prunegraph :: var !.(Graph sym var) -> .Graph sym var
 
 // Restrict a graph to a given domain, i.e.
 // make all variables free except those in the domain.
-restrictgraph :: !.[var] .(Graph sym var) -> Graph sym var | == var
+restrictgraph :: .[var] .(Graph sym var) -> .Graph sym var | == var
 
 // Redirect references (node arguments) in a graph
 // according to a redirection function
-redirectgraph :: (.var->.var) !(Graph .sym .var) -> Graph .sym .var | == var
+redirectgraph :: (var->var) !.(Graph sym var) -> .Graph sym var
 
 // Overwrite the variables in the second graph by their contents in the first.
 // Keeps the contents of the second graph if free in the first.
-overwritegraph :: !(Graph .sym .var) (Graph .sym .var) -> Graph .sym .var
+overwritegraph :: !.(Graph sym var) !.(Graph sym var) -> .Graph sym var
 
 // Movegraph moves a graph to a different variable domain
 // Requires a list of bound variables in the graph
-movegraph :: (var1->.var2) !.[var1] .(Graph sym var1) -> Graph sym .var2 | == var1
+movegraph :: (var1->var2) !.[var1] .(Graph sym var1) -> .Graph sym var2 | == var1
 
 // Varcontents obtains the contents of a variable in a graph
 // Returns a boolean determining if it's bound, and
 // its contents if the boolean is True.
-varcontents :: !(Graph .sym var) var -> (.Bool,Node .sym var) | == var
+varcontents :: !.(Graph sym var) var -> (.Bool,Node sym var) | == var
 
 // Graphvars determines the top-level-bound and free variables in a graph,
 // reachable from a given list of variables.
@@ -135,6 +140,10 @@ varlist :: .(Graph sym var) !.[var] -> .[var] | == var
 
 // Cannot remember what this one does???
 prefix :: .(Graph sym var) .[var] !.[var] -> .([var],[var]) | == var
+
+// Determine a multiline representation of a graph with multiple roots
+printgraph :: .(Graph sym var) .[var] -> .[String] | toString sym & toString var & == var
+printgraphBy :: (sym->String) (var->String) .(Graph sym var) .[var] -> .[String] | == var
 
 // Do reference counting in a graph for the outer bindings.
 // References from case branches are counted once only.
@@ -156,6 +165,11 @@ isinstance
 /*
 >   compilegraph :: [(**,(*,[**]))] -> graph * **
 >   compilegraph = foldr (uncurry updategraph) emptygraph
+*/
+
+compilegraph :: ![(var,Node sym var)] -> Graph sym var
+
+/*
 
 ------------------------------------------------------------------------
 
@@ -206,3 +220,16 @@ isinstance
 >                 where (sdef,scont) = nodecontents sgraph snode
 
 */
+
+extgraph :: (Graph sym var) (Graph sym pvar) [pvar] (Pfun pvar var) (Graph sym var) -> Graph sym var | == var & == pvar
+
+instance == (Graph sym var) | == sym & == var
+
+instantiate ::
+    (Graph sym pvar,Graph sym var)
+    (pvar,var)
+    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
+ |  == sym
+ &  == var
+ &  == pvar

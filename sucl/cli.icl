@@ -1,3 +1,20 @@
+implementation module cli
+
+// $Id$
+
+import law
+import coreclean
+import strat
+import absmodule
+import rule
+import dnc
+import basic
+from syntax import SK_Function
+import general
+import StdEnv
+
+/*
+
 cli.lit - Clean implementation modules
 ======================================
 
@@ -88,7 +105,11 @@ Abstype implementation.
 >        aliases :: cli -> [(typesymbol,rule typesymbol typenode)]
 >        macros :: cli -> [(symbol,rule symbol node)]
 >        stripexports :: [char] -> cli -> cli
+*/
 
+:: Cli = CliAlias (SuclSymbol->String) (Module SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable)
+
+/*
 >   cli == module symbol node typesymbol typenode
 
 >   readcli = compilecli.readcleanparts
@@ -99,9 +120,25 @@ Abstype implementation.
 >   stripexports main (tdefs,(es,as,ts,rs)) = (tdefs,([User m i|User m i<-es;m=main],as,ts,rs))
 
 >   exports (tdefs,(es,as,ts,rs)) = es
+*/
 
->   typerule (tdefs,(es,as,ts,rs)) = fst.maxtypeinfo ts
+exports :: Cli -> [SuclSymbol]
+exports (CliAlias ss m) = m.exportedsymbols
 
+// Determine the arity of a core clean symbol
+arity :: Cli SuclSymbol -> Int
+arity (CliAlias ss m) sym
+= extendfn m.arities (length o arguments o (extendfn m.typerules (coretyperule--->"coreclean.coretyperule begins from cli.arity"))) sym
+
+/*
+>   typerule (tdefs,(es,as,ts,rs)) = maxtyperule ts
+*/
+
+typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+typerule (CliAlias ss m) sym
+= maxtyperule m.typerules sym
+
+/*
 >   rules (tdefs,(es,as,ts,rs)) = foldmap Present Absent rs
 
 >   imports (tdefs,(es,as,ts,rs)) = [sym|(sym,tdef)<-ts;~member (map fst rs) sym]
@@ -120,17 +157,47 @@ Abstype implementation.
 >       ) (corestrategy matchable)         ||  Checks rules for symbols in the language core (IF, _AP, ...)
 >       where islocal (User m i) = member (map fst rs) (User m i)
 >             islocal rsym = True ||  Symbols in the language core are always completely known
+*/
 
->   maxtypeinfo :: [(symbol,(rule typesymbol typenode,[bool]))] -> symbol -> (rule typesymbol typenode,[bool])
->   maxtypeinfo ts = extendfn ts coretypeinfo
+clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
+clistrategy (CliAlias showsymbol {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) matchable
+ = ( checkarity getarity        // Checks curried occurrences and strict arguments
+   o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
+   o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
+   o checkimport islocal                            // Checks for delta symbols
+   o ( checkconstr toString (flip isMember (flatten (map snd tcs))) // Checks for constructors
+        ---> ("cli.clistrategy.checkconstr",tcs)
+     )
+   ) (corestrategy matchable)                       // Checks rules for symbols in the language core (IF, _AP, ...)
+   where islocal rsym=:(SuclUser (SK_Function _)) = isMember rsym (map fst rs)  // User-defined function symbols can be imported, so they're known if we have a list of rules for them
+         islocal _                                = True                        // Symbols in the language core (the rest) are always completely known
+                                                                                // This includes lifted case symbols; we lifted them ourselves, after all
+         getarity sym
+         = (arity <--- ("cli.clistrategy.getarity ends with "+++toString arity)) ---> ("cli.clistrategy.getarity begins for "+++showsymbol sym)
+           where arity = extendfn as (typearity o (maxtyperule--->"cli.clistrategy.getarity uses maxtyperule") ts) sym 
 
->   extendfn :: [(*,**)] -> (*->**) -> * -> **
->   extendfn mapping f x = foldmap id (f x) mapping x
+typearity :: (Rule SuclTypeSymbol SuclTypeVariable) -> Int
+typearity ti = length (arguments ti)
 
+//maxtypeinfo :: [(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))] SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
+//maxtypeinfo defs sym = extendfn defs coretypeinfo sym
+
+maxtyperule :: [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)] SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+maxtyperule defs sym = extendfn defs (coretyperule--->"cli.coretyperule begins from cli.maxtyperule") sym
+
+maxstricts :: [(SuclSymbol,[Bool])] SuclSymbol -> [Bool]
+maxstricts defs sym = extendfn defs corestricts sym
+
+/*
 >   constrs ((tes,tas,tcs),defs) = tcs
 
 >   complete ((tes,tas,tcs),(es,as,ts,rs)) = mkclicomplete tcs (fst.maxtypeinfo ts)
+*/
 
+complete :: Cli -> [SuclSymbol] -> Bool
+complete (CliAlias ss m) = mkclicomplete m.typeconstructors (maxtyperule m.typerules)
+
+/*
 >   showcli = printcli
 
 >   mkclicomplete
@@ -145,7 +212,24 @@ Abstype implementation.
 >   =   foldmap superset (corecomplete tsym) tcs tsym syms, otherwise
 >       where trule = typerule (hd syms)
 >             (tdef,(tsym,targs)) = dnc (const "in mkclicomplete") (rulegraph trule) (rhs trule)
+*/
 
+mkclicomplete ::
+    [(SuclTypeSymbol,[SuclSymbol])]
+    (SuclSymbol->Rule SuclTypeSymbol tvar)
+    [SuclSymbol]
+ -> Bool
+ |  == tvar
+
+mkclicomplete tcs typerule [] = False
+mkclicomplete tcs typerule syms
+| not tdef
+  = False
+= foldmap superset (corecomplete tsym) tcs tsym syms
+  where trule = typerule (hd syms)
+        (tdef,(tsym,_)) = dnc (const "in mkclicomplete") (rulegraph trule) (ruleroot trule)
+
+/*
 ------------------------------------------------------------------------
 
 >   printcli :: module symbol node typesymbol typenode -> [char]
@@ -243,3 +327,37 @@ Compiling clean parts into module information...
 >             ctargs = init targs
 >             ctroot = hd (theap--nodelist tgraph (troot:targs))
 >             ctgraph = updategraph ctroot (fn,[last targs,troot]) tgraph
+
+*/
+
+mkcli ::
+    (SuclSymbol->String)
+    [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]
+    [(SuclSymbol,[Bool])]
+    [SuclSymbol]
+    [(SuclSymbol,Int)]
+    [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])]
+    [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
+ -> Cli
+
+mkcli showsymbol typerules stricts exports imports constrs bodies
+= CliAlias
+  showsymbol
+  { arities          = map (mapsnd fst) bodies++imports
+  , typeconstructors = map (mapsnd (map fst)) constrs
+  , exportedsymbols  = exports
+  , typerules        = typerules++flatten ((map (map (mapsnd fst) o snd)) constrs)
+  , stricts          = stricts++flatten ((map (map (mapsnd snd) o snd)) constrs)
+  , rules            = map (mapsnd snd) bodies
+  }
+
+instance <<< Cli
+where (<<<) file (CliAlias showsymbol m)
+      # file = file <<< "=== Arities ===" <<< nl
+      # file = printlist (showpair showsymbol toString) "" m.arities file
+      # file = file <<< "=== Type Rules ===" <<< nl
+      # file = printlist (showpair showsymbol toString) "" m.typerules file
+      # file = file <<< "=== Rules ===" <<< nl
+      # file = printlist (showpair showsymbol (showlist showrule`)) "" m.rules file
+      = file
+      where showrule` rule = showruleanch showsymbol toString (map (const False) (arguments rule)) rule []

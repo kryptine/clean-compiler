@@ -1,5 +1,7 @@
 definition module trd
 
+// $Id$
+
 from rule import Rule
 from graph import Node
 from StdOverloaded import ==
@@ -14,8 +16,8 @@ If typing does not succeed, the function aborts.
 
 ruletype
  :: .[tvar]
-    ((Node sym var) -> .Rule tsym trvar)
-    .(Rule sym var)
+    ((Node sym var) -> Rule tsym trvar)
+    (Rule sym var)
  -> .Rule tsym tvar
  |  == var
  &  == tsym
