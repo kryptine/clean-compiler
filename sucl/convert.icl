@@ -840,7 +840,7 @@ allocate_freevars level freevarenv0 varheap0 [pnode:pnodes]
         = { fv_def_level = level
           , fv_name      = ident
           , fv_info_ptr  = varinfoptr
-          , fv_count     = mstub "allocate_freevars" "reference counting for case pattern argument not yet implemented"
+          , fv_count     = 1 // FIXME: reference counting for case pattern argument not yet implemented
           }
         ident
         = { id_name = "_anonymous_case_pattern_argument_variable"
