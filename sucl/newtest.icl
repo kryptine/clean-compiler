@@ -2,6 +2,12 @@ implementation module newtest
 
 // $Id$
 
+import cli
+import coreclean
+import canon
+import basic
+import StdEnv
+
 /*
 
 newtest.lit - Testing the new trace implementation
@@ -242,7 +248,29 @@ these tuples.
 >             foldarea' = foldarea (labelarea'.canonise')
 >             labelarea' = labelarea (map getinit results) (newsymbols main)
 >             canonise' = canonise (typerule cli) heap
+*/
 
+fullsymred ::
+    [SuclSymbol]    // Fresh function symbols
+    Cli             // Module to optimise
+ -> [Symredresult symbol node typesymbol typenode]
+
+fullsymred freshsymbols cli
+ = results
+   where results = depthfirst generate process (initareas cli)
+         generate result = map canonise` (getareas result)
+         process area = symredarea foldarea` cli area
+
+         foldarea` = foldarea (labelarea` o canonise`)
+         labelarea` = labelarea (map getinit results) freshsymbols
+         canonise` = canonise (typerule cli) suclheap
+
+initareas = undef
+getareas = undef
+symredarea = undef
+getinit = undef
+
+/*
 `Initareas cli' is the list  of  initial  rooted  graphs  that  must  be
 symbolically  reduced.  An initial rooted graph is formed by applying an
 exported symbol to its full complement of open  arguments  according  to
