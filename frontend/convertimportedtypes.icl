@@ -70,14 +70,13 @@ convertImportedTypeSpecifications main_dcl_module_n dcl_mods dcl_functions commo
 			| isEmpty abstract_type_indexes
 				-> convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
 				#!(icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
-				  type_defs = foldSt (insert_abstract_type /*conversion_table.[cTypeDefs]*/) abstract_type_indexes { icl_type_def \\ icl_type_def <-: icl_type_defs }
+				  type_defs = foldSt insert_abstract_type abstract_type_indexes { icl_type_def \\ icl_type_def <-: icl_type_defs }
 				  (imported_types, type_heaps, var_heap)
 				  		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions
 							{ imported_types & [main_dcl_module_n] = type_defs } type_heaps var_heap
 				-> ({ imported_types & [main_dcl_module_n] = icl_type_defs }, type_heaps, var_heap)
 		No
 			-> convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
-			  
 
 where
 	determine_abstract_type dcl_type_defs type_index abstract_type_indexes
@@ -88,8 +87,7 @@ where
 			_
 				-> abstract_type_indexes
 					
-	insert_abstract_type /*conversion_table*/ type_index type_defs
-//		# icl_index = conversion_table.[type_index]
+	insert_abstract_type type_index type_defs
 		# icl_index=type_index
 		# (type_def, type_defs) = type_defs![icl_index]
 		= { type_defs & [icl_index] = { type_def & td_rhs = AbstractType cAllBitsClear }}
