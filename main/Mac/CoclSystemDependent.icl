@@ -76,9 +76,12 @@ script_handler script files
 					=	split quoted frm (to+2) n s
 				| s.[to] == ' ' && not quoted 
 					=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
-				| s.[to] == '\'' && quoted
-					=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
 				| s.[to] == '\''
+					| quoted
+						| to<n-1 && s.[to+1]=='\''
+							# s=(s % (0,to-1))+++(s % (to+1,n-1))
+							= split quoted frm (to+1) (n-1) s
+					=	[s % (frm, to-1) : split False (to+1) (to+1) n s]
 					=	[s % (frm, to-1) : split True (to+1) (to+1) n s]
 				// otherwise
 					=	split quoted frm (to+1) n s
