@@ -149,6 +149,8 @@ where
 	clean_up cui (TArrow1 argtype) cus
 		# (argtype, cus) = clean_up cui argtype cus
 		=  (TArrow1 argtype, cus)
+	clean_up cui t=:TArrow cus
+		=  (t, cus)
 //..AA		
 	clean_up cui t=:(TB _) cus
 		=  (t, cus)
