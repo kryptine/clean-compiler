@@ -67,9 +67,10 @@ UnderscoreSystemModule			:== "_system"		// implements the predefined module
 
 instance toString GlobalTCType
 where
-	toString (GTT_Basic basic_type)							= toString basic_type +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ PredefinedModuleName ) "")
+	toString (GTT_Basic basic_type)							= create_type_string (toString basic_type) PredefinedModuleName
 	toString GTT_Function									= " -> "
-	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
+	toString (GTT_Constructor type_symb_indent mod_name)	= create_type_string type_symb_indent.type_name.id_name mod_name
+//	 +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
 
 instance toString BasicType
 where
@@ -81,3 +82,29 @@ where
 	toString BT_File		= "File"
 	toString BT_World		= "World"
 	toString (BT_String _)	= "String"
+
+create_type_string type_name module_name
+	:== type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) "")
+
+get_type_name_and_module_name_from_type_string :: !String -> (!String,!String)
+get_type_name_and_module_name_from_type_string type_string
+	#! (found_sep,sep_pos)
+		= CharIndex type_string 0 '\'' 
+	| found_sep
+		#! type_name
+			= type_string % (0,dec sep_pos)
+		#! module_name
+			= type_string % (inc sep_pos,dec (size type_string))
+		= (type_name,module_name)
+where 
+	CharIndex  :: !String !Int !Char -> (!Bool,!Int)
+	CharIndex s i char
+		| i == (size s)
+			= (False,size s)
+			
+			| i < (size s)
+				| s.[i] == char
+					= (True,i)
+					= CharIndex s (inc i) char;
+				= abort "CharIndex: index out of range"
+	

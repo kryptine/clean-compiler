@@ -8,6 +8,8 @@ import StdEnv
 import syntax
 import StdOverloaded
 
+APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== yes
+
 /*
 // Priority
 PrioCode						:== toChar 0
@@ -66,3 +68,8 @@ UnderscoreSystemModule			:== "_system"		// implements the predefined module
 instance toString GlobalTCType
 
 instance toString BasicType
+
+create_type_string type_name module_name
+	:== type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) "")
+
+get_type_name_and_module_name_from_type_string :: !String -> (!String,!String)
