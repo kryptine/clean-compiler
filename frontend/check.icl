@@ -2115,7 +2115,7 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 //..AA
 	# cs = case x_needed_modules bitand cNeedStdDynamics of
 			0 -> cs
-			_ -> check_it PD_StdDynamic mod_name "" extension cs
+			_ -> switch_dynamics (check_it PD_StdDynamic mod_name "" extension cs) (switched_off_Clean_feature PD_StdDynamic mod_name " (dynamics are disabled)" extension cs)
 	# cs = case x_needed_modules bitand cNeedStdArray of
 			0 -> cs
 			_ -> check_it PD_StdArray mod_name " (needed for array denotations)" extension cs
@@ -2137,6 +2137,17 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 				  cs_error = checkError pds_ident ("not imported"+++explanation) cs_error
 				  cs_error = popErrorAdmin cs_error
 				-> { cs & cs_error = cs_error }
+				
+// MV ...
+	switched_off_Clean_feature pd mod_name explanation extension cs=:{cs_predef_symbols, cs_symbol_table}
+  		#! {pds_ident} = cs_predef_symbols.[pd]	
+		# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
+		  cs_error = pushErrorAdmin error_location cs.cs_error
+		  cs_error = checkError pds_ident ("not supported"+++explanation) cs_error
+		  cs_error = popErrorAdmin cs_error
+		= { cs & cs_error = cs_error }
+
+// ... MV
 
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]
 arrayFunOffsetToPD_IndexTable member_defs predef_symbols

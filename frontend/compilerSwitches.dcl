@@ -16,4 +16,6 @@ SwitchPreprocessor preprocessor no_preprocessor :== preprocessor
 // - the (ModuleID _)-constructor is *not* yet shared
 
 USE_DummyModuleName yes no :== yes
+
+switch_dynamics on off :== off;		// to turn dynamics on or off
 // ...MV
