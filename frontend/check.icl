@@ -1677,8 +1677,9 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
 	  (dcl_modules, local_defs, cdefs, icl_sizes, cs)
 	  		= combineDclAndIclModule mod_type init_dcl_modules local_defs cdefs sizes cs
-
-	  icl_common = createCommonDefinitions cdefs
+	| not cs.cs_error.ea_ok
+		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
+	# icl_common = createCommonDefinitions cdefs
 
 	  (local_defs,dcl_modules,icl_common,cs)
 		= renumber_icl_definitions_as_dcl_definitions mod_type local_defs dcl_modules icl_common {icl_sizes.[i] \\ i<-[0..cMacroDefs-1]} cs
@@ -1693,7 +1694,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  		= checkDclModules mod_imports dcl_modules icl_functions heaps cs
 
 	| not cs.cs_error.ea_ok
-		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
+		= (False, abort "evaluated error 2 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 	# (imported_module_numbers_of_main_dcl_mod, dcl_modules)
 			= dcl_modules![main_dcl_module_n].dcl_imported_module_numbers
 	  (imported_module_numbers, dcl_modules)
