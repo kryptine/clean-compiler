@@ -3023,7 +3023,13 @@ copyExpr expr heaps=:{hp_var_heap, hp_expression_heap}
 	= (expr, {heaps & hp_var_heap = us_var_heap, hp_expression_heap = us_symbol_heap})
 		//---> ("copy Expr")
 
+/* RWS ... Clean 2.0 compiler bug workaround
 mapExprSt :: (Expression .st->(Expression, .st)) Expression .st -> (Expression, .st)
+*/
+mapExprSt :: (Expression .st->v:(Expression, .st)) Expression .st 
+          -> w:(Expression, .st)
+          ,  [v<=w]
+// ... RWS
 mapExprSt f (App app=:{app_args}) st
 		# (app_args, st) = mapSt (mapExprSt f) app_args st
 		= f (App { app & app_args = app_args }) st
