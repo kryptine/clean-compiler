@@ -213,6 +213,11 @@ zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 // Tracing evaluation of a value, otherwise acts like identity
 tracevalue :: !String !String .a -> .a
 
+// Tracing first evaluation in a module
+// Use as: tm =: tracemodule "$Id$"
+// Then put in front of the return of every exported function
+tracemodule :: String -> .a -> .a
+
 // Sequential evaluation of left and right arguments
 ($) infixr :: !.a .b -> .b
 

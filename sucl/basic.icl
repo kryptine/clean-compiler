@@ -313,6 +313,10 @@ tracevalue :: !String !String .a -> .a
 tracevalue contextdesc valuedesc value
 = (value <--- (contextdesc+++" <<== "+++valuedesc)) ---> (contextdesc+++" ==>> "+++valuedesc)
 
+// Tracing first evaluation in a module
+tracemodule :: String -> .a -> .a
+tracemodule modulename = fwritec '\n' (fwrites modulename stderr) $ id
+
 ($) infixr :: !.a .b -> .b
 ($) x y = y
 
