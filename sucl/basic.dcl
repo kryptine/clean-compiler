@@ -212,3 +212,6 @@ zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 
 // Sequential evaluation of left and right arguments
 ($) infixr :: !.a .b -> .b
+
+// Write a list of things, each one terminated by a newline
+(writeList) infixl :: !*File [a] -> .File | <<< a
