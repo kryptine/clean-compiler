@@ -2,7 +2,7 @@ implementation module check
 
 import StdEnv
 
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef//, RWSDebug
+import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, RWSDebug
 import explicitimports, comparedefimp
 
 cPredefinedModuleIndex 	:== 1
@@ -1071,7 +1071,24 @@ checkIdentExpression is_expr_list free_vars id=:{id_info} e_input e_state e_info
 where
 	check_id_expression :: !SymbolTableEntry !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 		-> (!Expression, ![FreeVar], !*ExpressionState, !u:ExpressionInfo, !*CheckState)
-	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
+
+	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error,cs_predef_symbols}
+		# ({pds_ident=from_ident}) = cs_predef_symbols.[PD_From]
+		  ({pds_ident=from_then_ident}) = cs_predef_symbols.[PD_FromThen]
+		  ({pds_ident=from_to_ident}) = cs_predef_symbols.[PD_FromTo]
+		  ({pds_ident=from_then_to_ident}) = cs_predef_symbols.[PD_FromThenTo]
+		| id==from_ident || id==from_then_ident || id==from_to_ident || id==from_then_to_ident
+			= (EE, free_vars, e_state, e_info, { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdEnum})
+				// instead of giving an error message remember that StdEnum should have been imported.
+				// Error will be given in function check_needed_modules_are_imported
+		# ({pds_ident=createArray_ident}) = cs_predef_symbols.[PD__CreateArrayFun]
+		  ({pds_ident=uselect_ident}) = cs_predef_symbols.[PD_UnqArraySelectFun]
+		  ({pds_ident=update_ident}) = cs_predef_symbols.[PD_ArrayUpdateFun]
+		  ({pds_ident=usize_ident}) = cs_predef_symbols.[PD_UnqArraySizeFun]
+		| id==createArray_ident || id==uselect_ident || id==update_ident || id==usize_ident
+			= (EE, free_vars, e_state, e_info, { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdArray})
+				// instead of giving an error message remember that StdArray should have been be imported.
+				//  Error will be given in function check_needed_modules_are_imported
 		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })
 	check_id_expression {ste_kind = STE_Variable info_ptr,ste_def_level} is_expr_list free_vars id e_input=:{ei_fun_level} e_state=:{es_expr_heap} e_info cs
 		| ste_def_level < ei_fun_level
@@ -1896,7 +1913,7 @@ where
 		# (let_binds, let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars alt_nodes let_vars_list
 		  		{ e_input & ei_expr_level = inc ei_expr_level } e_state e_info cs
 		  e_input = { e_input & ei_expr_level = ei_expr_level }
-		  cs = pushErrorAdmin (newPosition { id_name = "guard", id_info = nilPtr } alt_position) cs
+		  cs = pushErrorAdmin2 "guard" alt_position cs
 	  	  (guard, free_vars, e_state, e_info, cs) = checkExpression free_vars alt_guard e_input e_state e_info cs
 		  cs = popErrorAdmin cs
 		  (expr, free_vars, e_state, e_info, cs) = check_opt_guarded_alts free_vars alt_expr e_input e_state e_info cs
@@ -1909,7 +1926,7 @@ where
 		  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
 		 		= checkLhssOfLocalDefs this_expr_level ei_mod_index ewl_locals e_state e_info cs
 		  (binds, let_vars_list, rhs_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars ewl_nodes [] { e_input & ei_expr_level = this_expr_level } e_state e_info cs
-		  cs = pushErrorAdmin (newPosition { id_name = "", id_info = nilPtr } ewl_position) cs
+		  cs = pushErrorAdmin2 "" ewl_position cs
 	  	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars ewl_expr { e_input & ei_expr_level = rhs_expr_level } e_state e_info cs
 		  cs = popErrorAdmin cs
 		  (expr, free_vars, e_state, e_info, cs)
@@ -2962,16 +2979,16 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 check_needed_modules_are_imported mod_name extension cs=:{cs_needed_modules}
 	# cs = case cs_needed_modules bitand cNeedStdDynamics of
 			0 -> cs
-			_ -> check_it PD_StdDynamics mod_name extension cs
+			_ -> check_it PD_StdDynamics mod_name "" extension cs
 	# cs = case cs_needed_modules bitand cNeedStdArray of
 			0 -> cs
-			_ -> check_it PD_StdArray mod_name extension cs
+			_ -> check_it PD_StdArray mod_name " (needed for array denotations)" extension cs
 	# cs = case cs_needed_modules bitand cNeedStdEnum of
 			0 -> cs
-			_ -> check_it PD_StdEnum mod_name extension cs
+			_ -> check_it PD_StdEnum mod_name " (needed for [..] expressions)" extension cs
 	= cs
   where
-	check_it pd mod_name extension cs=:{cs_predef_symbols, cs_symbol_table}
+	check_it pd mod_name explanation extension cs=:{cs_predef_symbols, cs_symbol_table}
   		#! {pds_ident} = cs_predef_symbols.[pd]	
 		# ({ste_kind}, cs_symbol_table) = readPtr pds_ident.id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
@@ -2981,7 +2998,7 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_needed_modules}
 			STE_Empty
 				# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
 				  cs_error = pushErrorAdmin error_location cs.cs_error
-				  cs_error = checkError pds_ident "not imported" cs_error
+				  cs_error = checkError pds_ident ("not imported"+++explanation) cs_error
 				  cs_error = popErrorAdmin cs_error
 				-> { cs & cs_error = cs_error }
 
@@ -3309,6 +3326,11 @@ addImportsToSymbolTable [{import_module={id_info},import_symbols, import_file_po
 addImportsToSymbolTable [] explicit_akku modules cs
 	= (explicit_akku, modules, cs)
 
+pushErrorAdmin2 _ NoPos cs=:{cs_error={ea_loc=[top_of_stack:_]}}
+	// there is no position info, push current position to balance pop calls
+	= pushErrorAdmin top_of_stack cs
+pushErrorAdmin2 string pos=:(LinePos _ _) cs
+	= pushErrorAdmin (newPosition {id_name=string, id_info=nilPtr} pos) cs
 
 file_and_status {ea_file,ea_ok}
 	= (ea_file, ea_ok)
