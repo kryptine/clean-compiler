@@ -520,7 +520,7 @@ new_demanded_attribute DAK_Ignore _
 new_demanded_attribute _ TA_Unique
 	= DAK_Unique
 new_demanded_attribute dem_attr_kind _
-	= dem_attr_kind
+	= DAK_None /* dem_attr_kind */
 
 checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
