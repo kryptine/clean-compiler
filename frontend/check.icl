@@ -798,7 +798,7 @@ checkFunction fun_def=:{fun_symb,fun_pos,fun_body,fun_type,fun_kind} mod_index f
 	# cs = {cs & cs_error = pushErrorAdmin (newPosition function_ident_for_errors fun_pos) cs_error}
 
 	  (fun_type, ef_type_defs, ef_class_defs, ef_modules, hp_var_heap, hp_type_heaps, cs)
-			= check_function_type fun_type mod_index ef_type_defs ef_class_defs ef_modules hp_var_heap hp_type_heaps cs
+			= check_function_type fun_type mod_index (fun_kind == FK_Caf) ef_type_defs ef_class_defs ef_modules hp_var_heap hp_type_heaps cs
 	  e_info  = { e_info & ef_type_defs = ef_type_defs, ef_class_defs = ef_class_defs, ef_modules = ef_modules }
 	  e_state = {   es_var_heap = hp_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,
 	  				es_dynamics = [], es_calls = [], es_fun_defs = fun_defs, es_dynamic_expr_count = 0}
@@ -812,6 +812,7 @@ checkFunction fun_def=:{fun_symb,fun_pos,fun_body,fun_type,fun_kind} mod_index f
 	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
 	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics,
 	  								  fi_properties = fi_properties }
+  
 	  fun_def = { fun_def & fun_body = fun_body, fun_info = fun_info, fun_type = fun_type}
 	  (fun_defs,macro_defs,cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls e_state.es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	= (fun_def,fun_defs,
@@ -823,12 +824,19 @@ where
 	has_type (Yes _) 	= FI_HasTypeSpec
 	has_type no 		= 0
 	
-	check_function_type (Yes ft) module_index type_defs class_defs modules var_heap type_heaps cs
+	check_function_type (Yes ft) module_index is_caf type_defs class_defs modules var_heap type_heaps cs
 		# (ft, _, type_defs, class_defs, modules, type_heaps, cs) = checkFunctionType module_index ft SP_None type_defs class_defs modules type_heaps cs
+		  cs = (if is_caf (check_caf_uniqueness ft.st_result.at_attribute) id) cs
 		  (st_context, var_heap) = initializeContextVariables ft.st_context var_heap
 		= (Yes { ft & st_context = st_context } , type_defs,  class_defs, modules, var_heap, type_heaps, cs)
-
-	check_function_type No module_index type_defs class_defs modules var_heap type_heaps cs
+		where
+			check_caf_uniqueness TA_None cs
+				=	cs
+			check_caf_uniqueness TA_Multi cs
+				=	cs
+			check_caf_uniqueness _ cs
+				= {cs & cs_error = checkError "result type of CAF must be non-unique " "" cs.cs_error}
+	check_function_type No module_index _ type_defs class_defs modules var_heap type_heaps cs
 		= (No, type_defs,  class_defs, modules, var_heap, type_heaps, cs)
 
 	remove_calls_from_symbol_table fun_index fun_level [FunCall fc_index fc_level : fun_calls] fun_defs macro_defs symbol_table

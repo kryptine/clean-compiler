@@ -1727,8 +1727,8 @@ where
 				{ ts & ts_fun_env = { ts.ts_fun_env & [fun] = SpecifiedType ft_with_prop lifted_args
 					{ fresh_fun_type & tst_arity = st_arity + fun_lifted, tst_args = lifted_args ++ fresh_fun_type.tst_args, tst_lifted = fun_lifted }},
 						ts_var_heap = ts_var_heap, ts_var_store = ts_var_store, ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps })
-	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}} (pre_def_symbols, ts)
-		# (st_gen, ts) = create_general_symboltype is_start_rule fun_arity fun_lifted ts
+	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}, fun_kind} (pre_def_symbols, ts)
+		# (st_gen, ts) = create_general_symboltype is_start_rule (fun_kind == FK_Caf) fun_arity fun_lifted ts
 		  ts_type_heaps = ts.ts_type_heaps 
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (ts_type_heaps.th_vars, ts.ts_expr_heap)
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
@@ -1738,15 +1738,15 @@ where
 					ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap})
 
 
-	create_general_symboltype :: !Bool !Int !Int !*TypeState -> (!TempSymbolType, !*TypeState)
-	create_general_symboltype is_start_rule nr_of_args nr_of_lifted_args ts
+	create_general_symboltype :: !Bool !Bool !Int !Int !*TypeState -> (!TempSymbolType, !*TypeState)
+	create_general_symboltype is_start_rule is_caf nr_of_args nr_of_lifted_args ts
 		| is_start_rule && nr_of_args > 0
 			# (tst_args, ts) = fresh_attributed_type_variables (nr_of_args - 1) [{at_attribute = TA_Unique, at_annotation = AN_Strict, at_type = TB BT_World }] ts
-			  (tst_result, ts) = freshAttributedVariable ts
+			  (tst_result, ts) = (if is_caf freshNonUniqueVariable freshAttributedVariable) ts
 			= ({ tst_args = tst_args, tst_arity = 1, tst_result = tst_result, tst_context = [], tst_attr_env = [], tst_lifted = 0 }, ts)
 			# (tst_args, ts) = fresh_attributed_type_variables nr_of_args [] ts
 			  (tst_args, ts) = fresh_attributed_type_variables nr_of_lifted_args tst_args ts
-			  (tst_result, ts) = freshAttributedVariable ts
+			  (tst_result, ts) = (if is_caf freshNonUniqueVariable freshAttributedVariable) ts
 			= ({ tst_args = tst_args, tst_arity = nr_of_args + nr_of_lifted_args, tst_result = tst_result, tst_context = [], tst_attr_env = [], tst_lifted = 0 }, ts)
 
 	fresh_attributed_type_variables :: !Int ![AType] !*TypeState -> (![AType], !*TypeState)
