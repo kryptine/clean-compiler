@@ -2,6 +2,14 @@ implementation module convertcases
 
 import syntax, checksupport, trans
 
+// exactZip fails when its arguments are of unequal length
+// move to utilities?
+exactZip :: ![.a] ![.b] -> [(.a,.b)]
+exactZip [] []
+	=	[]
+exactZip [x:xs][y:ys]
+	=	[(x,y) : exactZip xs ys]
+
 ::	*ConversionInfo =
 	{	ci_new_functions 	:: ![FunctionInfoPtr]
 	,	ci_fun_heap			:: !*FunctionHeap
@@ -332,11 +340,11 @@ hasOption No		= False
 convertPatterns :: CasePatterns [[AType]] (Optional (FreeVar,AType)) [.(FreeVar,AType)] [(FreeVar,AType)] (Ptr ExprInfo) Index {#CommonDefs} *ConversionInfo -> *(!.[BackendBody],!*ConversionInfo);
 convertPatterns (AlgebraicPatterns algtype patterns) cons_types opt_var left_vars right_vars default_ptr group_index common_defs ci
 	# (guarded_exprs_list, ci) = mapSt (convert_algebraic_guard_into_function_pattern opt_var left_vars right_vars
-			group_index common_defs default_ptr) (zip2 patterns cons_types) ci
+			group_index common_defs default_ptr) (exactZip patterns cons_types) ci
 	= (flatten guarded_exprs_list, ci)
 where
 	convert_algebraic_guard_into_function_pattern opt_var left_vars right_vars group_index common_defs default_ptr ({ap_symbol, ap_vars, ap_expr}, cons_arg_types) ci
-		# pattern_vars = zip2 ap_vars cons_arg_types
+		# pattern_vars = exactZip ap_vars cons_arg_types
 		  (guarded_exprs, ci)
 				= convertPatternExpression (consOptional opt_var left_vars) [pattern_vars, right_vars] group_index common_defs default_ptr ap_expr ci
 		= (map (complete_pattern left_vars ap_symbol (getOptionalFreeVar opt_var)) guarded_exprs, ci)
@@ -374,7 +382,7 @@ convertPatternExpression left_vars right_vars group_index common_defs default_pt
 		  		  split_result = split_list_of_vars var_info_ptr [] right_vars
 				  (default_patterns, ci) = convert_default left_vars split_result group_index common_defs case_default { ci & ci_expr_heap = ci_expr_heap }
 				  (guarded_exprs, ci) = mapSt (convert_algebraic_guard_into_function_pattern left_vars split_result group_index common_defs case_info_ptr)
-											(zip2 algebraic_patterns ct_cons_types) ci
+											(exactZip algebraic_patterns ct_cons_types) ci
 				-> (flatten guarded_exprs ++ default_patterns, ci)
 			_
 				-> convertToRhsExpression left_vars right_vars group_index common_defs default_ptr case_expr ci
@@ -411,7 +419,7 @@ where
 	convert_algebraic_guard_into_function_pattern left_vars ((fv,fv_type), list_of_left, list_of_right) group_index common_defs case_info_ptr
 				({ap_symbol, ap_vars, ap_expr}, arg_types) ci=:{ci_expr_heap}
 		# (guarded_exprs, ci)
-				= convertPatternExpression (left_vars ++ [ (fv,fv_type) : flatten list_of_left ]) [ zip2 ap_vars arg_types : list_of_right ]
+				= convertPatternExpression (left_vars ++ [ (fv,fv_type) : flatten list_of_left ]) [ exactZip ap_vars arg_types : list_of_right ]
 						 group_index common_defs default_ptr ap_expr { ci & ci_expr_heap = ci_expr_heap }
 		= (map (complete_pattern list_of_left ap_symbol (Yes fv)) guarded_exprs, ci) 
 	where
@@ -520,7 +528,7 @@ where
 			(Yes {st_result,st_args}) group_index common_defs ci=:{ci_expr_heap}
 		# (EI_CaseTypeAndRefCounts case_type _, ci_expr_heap) = readPtr case_info_ptr ci_expr_heap
 		  (default_ptr, ci_expr_heap) = makePtrToDefault case_default st_result cHasNoDefault ci_expr_heap
-		  vars_with_types = zip2 tb_args st_args
+		  vars_with_types = exactZip tb_args st_args
 		  (form_var_with_type, left_vars, right_vars) = split_vars var_info_ptr vars_with_types
 		  (fun_bodies, ci) = convertPatterns case_guards case_type.ct_cons_types (Yes form_var_with_type) left_vars right_vars default_ptr group_index common_defs
 					{ ci & ci_expr_heap = ci_expr_heap }
@@ -533,7 +541,7 @@ where
 				# (form_var, left, right) = split_vars var_info_ptr free_vars
 				= (form_var, [form_var_with_type : left], right)			
 	convert_cases_into_function_patterns (TransformedBody {tb_args,tb_rhs}) (Yes {st_result,st_args}) group_index common_defs ci
-		# (tb_rhs, ci) = convertRootExpression (zip2 tb_args st_args) group_index common_defs cHasNoDefault tb_rhs ci
+		# (tb_rhs, ci) = convertRootExpression (exactZip tb_args st_args) group_index common_defs cHasNoDefault tb_rhs ci
 		= (BackendBody [ { bb_args = map FP_Variable tb_args, bb_rhs = tb_rhs }], ci)
 
 	eliminate_code_sharing_in_function dcl_functions common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, ci=:{ci_expr_heap,ci_var_heap})
@@ -1307,14 +1315,14 @@ where
 				  (ap_expr, heaps) = distribute_lets_in_pattern_expr depth ref_counts pattern.ap_expr (di_var_heap, di_expr_heap)
 				= ({ pattern & ap_vars = ap_vars, ap_expr = ap_expr }, heaps) 
 		distribute_lets_in_patterns depth ref_counts (BasicPatterns type patterns) heaps
-			# (patterns, heaps) = mapSt (distribute_lets_in_basic_pattern depth) (zip2 ref_counts patterns) heaps
+			# (patterns, heaps) = mapSt (distribute_lets_in_basic_pattern depth) (exactZip ref_counts patterns) heaps
 			= (BasicPatterns type patterns, heaps)
 		where
 			distribute_lets_in_basic_pattern depth (ref_counts,pattern) heaps
 				# (bp_expr, heaps) = distribute_lets_in_pattern_expr depth ref_counts pattern.bp_expr heaps
 				= ({ pattern & bp_expr = bp_expr }, heaps) 
 		distribute_lets_in_patterns depth ref_counts (DynamicPatterns patterns) heaps
-			# (patterns, heaps) = mapSt (distribute_lets_in_dynamic_pattern depth) (zip2 ref_counts patterns) heaps
+			# (patterns, heaps) = mapSt (distribute_lets_in_dynamic_pattern depth) (exactZip ref_counts patterns) heaps
 			= (DynamicPatterns patterns, heaps)
 		where
 			distribute_lets_in_dynamic_pattern depth (ref_counts,pattern) (di_var_heap, di_expr_heap)
