@@ -311,8 +311,8 @@ where
 
 	update_expression_types :: !CleanUpInput ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
 	update_expression_types cui expr_ptrs expr_heap cus
-//		= (expr_heap, cus)
-		= foldSt (update_expression_type cui) expr_ptrs (expr_heap, cus)
+		= (expr_heap, cus)
+//		= foldSt (update_expression_type cui) expr_ptrs (expr_heap, cus)
 
 	update_expression_type cui expr_ptr (expr_heap, cus)
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
@@ -648,15 +648,18 @@ where
 			= contains_coercion offered next_offered attr_env
 
 :: Format =
-	{	form_properties :: !BITVECT
-	,	form_position	:: ![Int]
+	{	form_properties 	:: !BITVECT
+	,	form_attr_position	:: Optional ([Int], Coercions)
 	}
 
 cNoProperties		:== 0
-cCommaSeperator		:== 1
-cBrackets			:== 2
-cAttributed			:== 4
-cAnnotated			:== 8
+cAttributed			:== 1
+cAnnotated			:== 2
+cMarkAttribute		:== 4
+
+cBrackets			:== 8
+cCommaSeparator		:== 16
+cArrowSeparator		:== 32
 
 checkProperty	form property	:== not (form.form_properties bitand property == 0)
 setProperty		form property	:== {form & form_properties = form.form_properties bitor property}
@@ -674,12 +677,12 @@ where
 		show_context form file []
 			= file
 		show_context form file contexts
-			= file <<<  " | " <:: (setProperty form cCommaSeperator, contexts)
+			= file <<<  " | " <:: (setProperty form cCommaSeparator, contexts)
 	
 		show_environment form file []
 			= file
 		show_environment form file environ
-			= file <<<  ", " <:: (setProperty form cCommaSeperator, environ)
+			= file <<<  ", " <:: (setProperty form cCommaSeparator, environ)
 
 instance <:: TypeContext
 where
@@ -703,7 +706,25 @@ where
 		show_attributed_type file form attr type
 			| checkProperty form cAttributed
 				= file <<< attr <:: (setProperty form cBrackets, type)
+			| checkProperty form cMarkAttribute
+				= show_marked_attribute attr form file <:: (setProperty form cBrackets, type)
 				= file <:: (form, type)
+
+		show_marked_attribute attr {form_attr_position = Yes (positions, coercions)} file
+			| isEmpty positions
+				= show_attribute attr coercions (file <<< "^ ") 
+				= show_attribute attr coercions file 
+
+		show_attribute TA_Unique coercions file 
+			= file <<< '*' 
+		show_attribute TA_Multi coercions file 
+			= file 
+		show_attribute (TA_TempVar av_number) coercions file 
+			| isUniqueAttribute av_number coercions
+				= file <<< '*' 
+			| isNonUniqueAttribute av_number coercions
+				= file 
+				= file <<< '.' 
 
 instance <:: Type
 where
@@ -714,19 +735,23 @@ where
 	(<::) file (form, TA {type_name,type_index,type_arity} types)
 		| is_predefined type_index
 			| is_list type_name
-				= file <<< '[' <:: (setProperty form cCommaSeperator, types) <<< ']'
+				= file <<< '[' <:: (setProperty form cCommaSeparator, types) <<< ']'
 			| is_lazy_array type_name
-				= file <<< '{' <:: (setProperty form cCommaSeperator, types) <<< '}'
+				= file <<< '{' <:: (setProperty form cCommaSeparator, types) <<< '}'
 			| is_strict_array type_name
-				= file <<< "{!" <:: (setProperty form cCommaSeperator, types) <<< '}'
+				= file <<< "{!" <:: (setProperty form cCommaSeparator, types) <<< '}'
 			| is_unboxed_array type_name
-				= file <<< "{#" <:: (setProperty form cCommaSeperator, types) <<< '}'
+				= file <<< "{#" <:: (setProperty form cCommaSeparator, types) <<< '}'
 			| is_tuple type_name type_arity
-				= file <<< '(' <:: (setProperty form cCommaSeperator, types) <<< ')'
-			| checkProperty form cBrackets && type_arity > 0
+				= file <<< '(' <:: (setProperty form cCommaSeparator, types) <<< ')'
+			| type_arity == 0
+				= file <<< type_name
+			| checkProperty form cBrackets
 				= file <<< '(' <<< type_name <<< ' ' <:: (form, types) <<< ')'
 				= file <<< type_name <<< ' ' <:: (setProperty form cBrackets, types)
-		| checkProperty form cBrackets && type_arity > 0
+		| type_arity == 0
+			= file <<< type_name
+		| checkProperty form cBrackets
 			= file <<< '(' <<< type_name <<< ' ' <:: (form, types) <<< ')'
 			= file <<< type_name <<< ' ' <:: (setProperty form cBrackets, types)
 	where
@@ -740,8 +765,8 @@ where
 
 	(<::) file (form, arg_type --> res_type)
 		| checkProperty form cBrackets
-			= file  <<< '(' <:: (form, arg_type) <<< " -> " <:: (form, res_type)  <<< ')'
-			= file  <:: (setProperty form cBrackets, arg_type) <<< " -> " <:: (setProperty form cBrackets, res_type)
+			= file  <<< '(' <:: (clearProperty (setProperty form cArrowSeparator) cBrackets, [arg_type, res_type])  <<< ')'
+			= file  <:: (setProperty form (cBrackets bitor cArrowSeparator), [arg_type, res_type])
 	(<::) file (form, type :@: types)
 		| checkProperty form cBrackets
 			= file <<< '(' <<< type <<< ' ' <:: (form, types)  <<< ')'
@@ -755,19 +780,54 @@ where
 	(<::) file (form, TE)
 		= file <<< "__"
 
-
+/*
 instance <:: [a] | <:: a
 where
 	(<::) file (form, [type])
-		| checkProperty form cCommaSeperator
-			= file <:: (clearProperty form cCommaSeperator, type)
+		| checkProperty form cCommaSeparator
+			= file <:: (clearProperty form cCommaSeparator, type)
 			= file <:: (setProperty form cBrackets, type)
 	(<::) file (form, [type : types])
-		| checkProperty form cCommaSeperator
-			= file <:: (clearProperty form cCommaSeperator, type) <<< ',' <:: (form, types)
+		| checkProperty form cCommaSeparator
+			= file <:: (clearProperty form cCommaSeparator, type) <<< ',' <:: (form, types)
 			= file <:: (setProperty form cBrackets, type) <<< ' ' <:: (form, types)
 	(<::) file (form, [])
 		= file
+*/
+
+cNoPosition :== -1
+	 
+instance <:: [a] | <:: a
+where
+	(<::) file (form, types)
+		= show_list 0 form types file
+	where
+		show_list elem_number form [type] file
+			| checkProperty form cCommaSeparator
+				= show_elem elem_number (clearProperty form cCommaSeparator) type file
+			| checkProperty form cArrowSeparator
+				= show_elem elem_number (clearProperty form cArrowSeparator) type file
+				= show_elem elem_number (setProperty form cBrackets) type file
+		show_list elem_number form [type : types] file
+			| checkProperty form cCommaSeparator
+				= show_list (inc elem_number) form types (show_elem elem_number (clearProperty form cCommaSeparator) type file <<< ',')
+			| checkProperty form cArrowSeparator
+				= show_list (inc elem_number) form types (show_elem elem_number (clearProperty form cArrowSeparator) type file <<< " -> ")
+				= show_list (inc elem_number) form types (show_elem elem_number (setProperty form cBrackets) type file <<< ' ')
+		show_list elem_number form [] file
+			= file
+
+		show_elem elem_nr form=:{form_attr_position = No} type file
+			= file <:: (form, type)
+		show_elem elem_nr form=:{form_attr_position = Yes ([pos : positions], coercions)} type file
+			| elem_nr == pos
+				= file <:: ({form & form_attr_position = Yes (positions, coercions)}, type)
+			| pos == cNoPosition
+				= file <:: (form, type)
+				= file <:: ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
+		show_elem elem_nr form=:{form_attr_position = Yes ([], coercions)} type file
+			= file <:: ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
+
 
 from compare_constructor import equal_constructor	
 
