@@ -6,7 +6,7 @@ COCL = cocl
 #COCLFLAGS = -lat
 SYS = Clean\ System\ Files
 
-MODULES = basic pretty pfun graph dnc rule trd rewr complete history spine trace absmodule spine strat loop law coreclean convert supercompile
+MODULES = basic pretty pfun graph dnc rule trd rewr complete spine history trace absmodule spine strat loop law coreclean convert supercompile
 
 ABC = $(patsubst %,$(SYS)/%.abc,$(MODULES))
 
