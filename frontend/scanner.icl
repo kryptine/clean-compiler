@@ -1,6 +1,7 @@
 implementation module scanner
 
 import	StdEnv, compare_constructor, StdCompare, general, compilerSwitches
+import RWSDebug
 
 from utilities import revCharListToString, isSpecialChar
 
@@ -278,19 +279,14 @@ class nextToken state :: !Context !*state -> (!Token, !*state)
 
 instance nextToken RScanState
 where
-/* RWS ... rolled back from Pieter's version
-
-    this fixes the bug funny_id_after_type, but failes on
-        g = let x = 1 in x
-
 	nextToken newContext (scanState=:{ss_input=inp=:PushedToken token=:{lt_position,lt_token,lt_context,lt_index} rest_inp,ss_tokenBuffer,ss_offsides,ss_useLayout})
 		| lt_context == newContext || notContextDependent lt_token
 		=	(	lt_token
 			,	{ scanState & ss_input = rest_inp , ss_tokenBuffer	= store token ss_tokenBuffer }
-			)  //-->> ("nextToken: pushed token", lt_token)
+			)  -->> ("nextToken: pushed token", lt_token)
 		= token_back rest_inp
 		where
-			token_back input=:(Input {inp_pos,inp_stream=OldLine _ string stream,inp_filename,inp_tabsize}) // one old token in wrong context.
+			token_back input=:(Input {inp_pos,inp_stream=OldLine currentIndex string stream,inp_filename,inp_tabsize}) // one old token in wrong context.
 				|	inp_pos.fp_line == lt_position.fp_line
 				#	old_input
 					=	{ inp_stream	= OldLine lt_index string stream
@@ -306,26 +302,6 @@ where
 				=	(	lt_token
 					,	{ss_input = input , ss_tokenBuffer	= store token ss_tokenBuffer, ss_offsides=ss_offsides, ss_useLayout=ss_useLayout}
 					) -->> ("unable to push token_back in input; generated token", lt_token)
-*/
-	nextToken newContext scanState=:{ss_input=input=:PushedToken token=:{lt_position,lt_token/*,lt_context*/} rest,ss_tokenBuffer}
-//		| lt_context == newContext || ~ (contextDependent lt_token) || isGeneratedToken lt_token
-
-		=	(	lt_token
-			,	{ scanState & ss_input			= rest , ss_tokenBuffer	= store token ss_tokenBuffer }
-//			,	{ ss_input = rest , ss_tokenBuffer = store token ss_tokenBuffer,ss_useLayout=ss_useLayout, ss_offsides=ss_offsides }
-			)  //-->> ("nextToken: pushed token", lt_token)
-/*
-		=	nextToken newContext { scanState & ss_input = pushTokensBack input}
-	where
-		pushTokensBack input=:(Input _) = input
-		pushTokensBack (PushedToken token input)
-			# (Input input=:{inp_stream}) = pushTokensBack input
-			= Input
-				{ input
-				& inp_stream = OldToken token inp_stream
-				}  //-->> ("pushTokensBack",token)
-*/
-// ... RWS
 
 	nextToken context {ss_input=Input inp,ss_tokenBuffer,ss_offsides,ss_useLayout}
 		# (error, c, inp) 	= SkipWhites inp
@@ -419,6 +395,9 @@ notContextDependent :: !Token -> Bool
 notContextDependent NewDefinitionToken	= True
 notContextDependent EndGroupToken		= True
 notContextDependent EndOfFileToken		= True
+// RWS ..
+notContextDependent InToken		= True
+// ... RWS
 notContextDependent (ErrorToken _)		= True
 notContextDependent (CodeBlockToken _)	= True
 notContextDependent _					= False
