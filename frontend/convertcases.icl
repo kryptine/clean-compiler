@@ -1288,7 +1288,7 @@ instance convertRootCases Expression where
 			_
 				-> case case_expr of
 					(Var var)
-						| not case_explicit && (case ci.ci_case_level of
+						| not case_explicit || (case ci.ci_case_level of
 													CaseLevelAfterGuardRoot -> False 
 													_ -> True)
 							# (varInfo, cs_var_heap) = readPtr var.var_info_ptr cs.cs_var_heap
