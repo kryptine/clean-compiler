@@ -331,7 +331,7 @@ where
 	lift_patterns_2 default_exists [guard_expr : guard_exprs] outer_case ro ti
 		# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No
 				,us_cleanup_info=ti.ti_cleanup_info, us_local_macro_functions = No }
-		  ui = {ui_handle_aci_free_vars = LeaveThem, ui_convert_module_n= -1,ui_conversion_table=No }
+		  ui = {ui_handle_aci_free_vars = LeaveThem }
 		  (outer_guards, us=:{us_cleanup_info})	= unfold outer_case.case_guards ui us
 		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr us.us_symbol_heap
 		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
@@ -437,7 +437,7 @@ where
 			  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module ds_index ro ti.ti_symbol_heap
 			  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
 			  				   us_local_macro_functions = No }
-			  ui= {ui_handle_aci_free_vars = LeaveThem, ui_convert_module_n= -1,ui_conversion_table=No }
+			  ui= {ui_handle_aci_free_vars = LeaveThem }
 			  (unfolded_expr, unfold_state) = unfold new_expr ui unfold_state
 			  (final_expr, ti) = transform unfolded_expr
 			  						{ ro & ro_root_case_mode = NotRootCase }
@@ -600,8 +600,6 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  			}
 	  ui =
 	  			{ ui_handle_aci_free_vars	= SubstituteThem
-	  			, ui_convert_module_n		= -1
-	  			, ui_conversion_table		= No 
 	  			}
 	  (copied_expr, us)
 			= unfold new_expr ui us
@@ -1179,8 +1177,6 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  			, us_local_macro_functions	= No 
 	  			}
  	  ui	=	{ ui_handle_aci_free_vars	= RemoveThem
- 	  			, ui_convert_module_n		= -1
- 	  			, ui_conversion_table		= No 
  	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
 	# (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
@@ -1943,8 +1939,6 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 			  			, us_local_macro_functions	= No 
 			  			}
 		 	  ui	=	{ ui_handle_aci_free_vars	= RemoveThem
-		 	  			, ui_convert_module_n		= -1
-		 	  			, ui_conversion_table		= No 
 		 	  			}
 			  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
 			  		= unfold tb_rhs ui us

@@ -195,7 +195,7 @@ where
 
 	replace_variables_in_expression expr var_heap symbol_heap
 		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info = [], us_local_macro_functions = No }
-		  ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = -1, ui_conversion_table = No}
+		  ui = {ui_handle_aci_free_vars = RemoveThem}
 		  (expr, us) = unfold expr ui us
 		= (expr, us.us_var_heap, us.us_symbol_heap)
 
@@ -362,7 +362,7 @@ where
 	replace_variables vars expr ap_vars var_heap symbol_heap
 		# var_heap = build_aliases vars ap_vars var_heap
 		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info=[], us_local_macro_functions = No }
-		  ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1, ui_conversion_table=No }
+		  ui = {ui_handle_aci_free_vars = RemoveThem }
 		  (expr, us) = unfold expr ui us
 		= (expr, us.us_var_heap, us.us_symbol_heap)
 	where
