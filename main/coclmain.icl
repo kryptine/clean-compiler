@@ -68,11 +68,12 @@ import code from "thread_message.obj";
 
 compiler :: ![{#Char}] *Files -> *(!Bool,!*Files);
 compiler commandArgs files
+	# dcl_cache = empty_cache (init_identifiers newHeap)
 	| length commandArgs==2 && commandArgs!!0=="-ide"
 		# wm_number=get_message_number;
 		# thread_id=hex_to_int (commandArgs!!1);
-		= (True,compile_files (empty_cache newHeap) thread_id wm_number files)
-		# (r,cache,files)=compile commandArgs (empty_cache newHeap) files
+		= (True,compile_files dcl_cache thread_id wm_number files)
+		# (r,cache,files)=compile commandArgs dcl_cache files
 		= (r,files)
 
 hex_to_int :: {#Char} -> Int
