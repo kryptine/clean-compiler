@@ -1766,7 +1766,8 @@ convertSubPattern (AP_Empty _) result_expr pattern_position var_store expr_heap 
 
 checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals,nd_position} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 	# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} nd_position) cs
-	# (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals e_input e_state e_info cs	
+	# (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals
+			{e_input & ei_expr_level = ei_expr_level + 1} e_state e_info cs	
 	  (binds_of_bind, es_var_heap, es_expr_heap, e_info, cs)
 			= transfromPatternIntoBind ei_mod_index ei_expr_level nd_dst bind_src nd_position
 				e_state.es_var_heap e_state.es_expr_heap e_info cs
