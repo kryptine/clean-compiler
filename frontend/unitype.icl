@@ -15,7 +15,7 @@ FirstAttrVar	:== 2
 AttrExi			:== 2
 FirstAttrVar	:== 3
 
-::	CoercionTree	= CT_Node !Int !CoercionTree !CoercionTree | CT_Empty | CT_Unique | CT_NonUnique
+::	CoercionTree	= CT_Node !Int !CoercionTree !CoercionTree | CT_Empty | CT_Unique | CT_NonUnique | CT_Existential
 
 ::	Coercions		= { coer_demanded :: !.{! .CoercionTree}, coer_offered :: !.{! .CoercionTree }}
 
@@ -93,7 +93,7 @@ NotChecked :== -1
 DummyAttrNumber :== -1
 ::	AttributeGroups	:== {! [Int]}
 
-partitionateAttributes :: !{! CoercionTree} !{! *CoercionTree} -> (!AttributePartition, !{! CoercionTree})
+partitionateAttributes :: !{! CoercionTree} !{! *CoercionTree} -> (!AttributePartition, !*{! CoercionTree})
 partitionateAttributes coer_offered coer_demanded
 	#! max_attr_nr = size coer_offered
 	# partitioning_info = { pi_marks = createArray max_attr_nr NotChecked, pi_deps = [], pi_next_num = 0, pi_groups = [] }
@@ -344,6 +344,8 @@ where
 					-> (True, TA { type_cons & type_arity = type_cons.type_arity + length types } (cons_args ++ types), subst, ls)
 				TempV tv_number
 					-> (True, TempCV tv_number :@: types, subst, ls)
+				TempQV tv_number
+					-> (True, TempQCV tv_number :@: types, subst, ls)
 				cons_var :@: cv_types
 					-> (True, cons_var :@: (cv_types ++ types), subst, ls)
 // AA..
@@ -514,6 +516,8 @@ where
 					-> (True, TA { type_cons & type_arity = type_arity + nr_of_new_args } (cons_args ++ types), es)
 				TempV tv_number
 					-> (True, TempCV tv_number :@: types, es)
+				TempQV tv_number
+					-> (True, TempQCV tv_number :@: types, es)
 				cons_var :@: cv_types
 					-> (True, cons_var :@: (cv_types ++ types), es)
 // AA..
@@ -551,7 +555,7 @@ where
 	 toInt (TA_TempVar av_number)	= av_number
 	 toInt TA_Multi 				= AttrMulti
 	 toInt TA_None 					= AttrMulti
-	 toInt TA_TempExVar 			= PA_BUG AttrExi (abort "toInt TA_TempExVar")
+	 toInt TA_PA_BUG 				= PA_BUG AttrExi (abort "toInt TA_PA_BUG")
 
 
 ::	CoercionState =
@@ -573,10 +577,11 @@ coerceAttributes :: !.TypeAttribute !.TypeAttribute !.Sign *Coercions -> (!Bool,
 
 /* Just Temporary */
 
-coerceAttributes TA_TempExVar dem_attr _ coercions
-	= PA_BUG (True, coercions) (abort "coerceAttributes TA_TempExVar")
-coerceAttributes _ TA_TempExVar _ coercions
-	= PA_BUG (True, coercions) (abort "coerceAttributes TA_TempExVar")
+coerceAttributes TA_PA_BUG dem_attr _ coercions
+	= PA_BUG (True, coercions) (abort "coerceAttributes TA_PA_BUG")
+coerceAttributes _ TA_PA_BUG _ coercions
+	= PA_BUG (True, coercions) (abort "coerceAttributes TA_PA_BUG")
+
 /* ... remove this !!!! */
 
 coerceAttributes TA_Unique dem_attr {neg_sign} coercions
@@ -678,6 +683,10 @@ isNonUnique _ 				= False
 isUnique  :: !CoercionTree -> Bool
 isUnique CT_Unique			= True
 isUnique _					= False
+
+isExistential :: !CoercionTree -> Bool
+isExistential CT_Existential	= True
+isExistential _					= False
 
 isUniqueAttribute :: !Int !Coercions -> Bool
 isUniqueAttribute attr_number {coer_demanded}
@@ -898,3 +907,23 @@ set_bit var_number bitvects
 	# bit_index = BITINDEX var_number
 	  (prev_vect, bitvects) = bitvects![bit_index]
 	= { bitvects & [bit_index] = prev_vect bitor (1 << BITNUMBER var_number) }
+
+checkExistentionalAttributeVars :: [TempAttrId] !AttributePartition !*{! CoercionTree} -> (!Bool,!*{! CoercionTree})
+checkExistentionalAttributeVars tmp_attr_vars partition coercions
+	= foldSt (check_existentional_attribute_var partition) tmp_attr_vars (True, coercions)
+where
+	check_existentional_attribute_var partition tmp_attr (ok, coercions)
+		# av_group_nr = partition.[tmp_attr]
+		  (coercion_tree,coercions) = coercions![av_group_nr]
+		= check_demanded_attribute_vars av_group_nr coercion_tree partition (ok, coercions)
+	
+	check_demanded_attribute_vars av_group_nr (CT_Node dem_attr left right) partition (ok, coercions)
+		# (ok, coercions) = check_existentional_attribute_var partition dem_attr (ok, { coercions & [av_group_nr] = CT_Existential })
+		| ok
+			# ok_coercions = check_demanded_attribute_vars av_group_nr left partition (True, coercions)
+			= check_demanded_attribute_vars av_group_nr right partition ok_coercions
+			= (False, coercions)
+	check_demanded_attribute_vars av_group_nr CT_Empty partition ok_coercions
+		= ok_coercions
+	check_demanded_attribute_vars av_group_nr _ partition (ok, coercions)
+		= (False, coercions)

@@ -2428,6 +2428,11 @@ where
 		= (cons_var :@: types, ets) 
 	expandSynTypes rem_annots common_defs type=:(TA type_symb types) ets
 		= expand_syn_types_in_TA rem_annots common_defs type_symb types TA_Multi ets
+// Sjaak 240801 ...
+	expandSynTypes rem_annots common_defs (TFA vars type) ets
+		# (type, ets) = expandSynTypes rem_annots common_defs type ets
+		= (TFA vars type, ets)
+// ... Sjaak
 	expandSynTypes rem_annots common_defs type ets
 		= (type, ets)
 

@@ -71,13 +71,13 @@ where
 		
 instance bindTypes TypeVar
 where
-	bindTypes cti tv=:{tv_name=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table /* TD ... */, cs_x={x_type_var_position,x_is_dcl_module} /* ... TD */ })
+	bindTypes cti tv=:{tv_name=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table})
 		# (var_def, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case var_def.ste_kind of
-			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count /* TD */, stv_position}
+			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count}
 				# cs = { cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, { var_def & ste_kind = STE_BoundTypeVariable { bv & stv_count = inc stv_count }})}
-				-> ({ tv & tv_info_ptr = stv_info_ptr /* TD ... */, tv_name = if x_is_dcl_module tv.tv_name { tv.tv_name & id_name = toString stv_position } /* ... TD */ }, stv_attribute, (ts, ti, cs))
+				-> ({ tv & tv_info_ptr = stv_info_ptr}, stv_attribute, (ts, ti, cs))
 			_
 				-> (tv, TA_Multi, (ts, ti, { cs & cs_error = checkError var_id "undefined" cs.cs_error }))
 
@@ -129,6 +129,13 @@ where
 		# (tv, type_attr, ts_ti_cs) = bindTypes cti tv ts_ti_cs
 		  (types, _, ts_ti_cs) = bindTypes cti types ts_ti_cs
 		= (CV tv :@: types, type_attr, ts_ti_cs)
+// Sjaak 16-08-01
+	bindTypes cti (TFA vars type) (ts, ti=:{ti_type_heaps}, cs)
+		# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
+		  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
+		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
+		= (TFA type_vars type, TA_Multi, (ts, ti, { cs & cs_symbol_table = cs_symbol_table }))
+// ... Sjaak
 	bindTypes cti type ts_ti_cs
 		= (type, TA_Multi, ts_ti_cs)
 	
@@ -158,7 +165,7 @@ bindTypesOfConstructors cti=:{cti_lhs_attribute} cons_index free_vars free_attrs
 	  (st_args, cons_arg_vars, st_attr_env, (ts, ti, cs))
 	  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars []
 	  				({ ts & ts_cons_defs = ts_cons_defs }, { ti  & ti_type_heaps = ti_type_heaps }, cs)
-	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cOuterMostLevel exi_vars cs.cs_symbol_table
+	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
 	  (ts, ti, cs) = bindTypesOfConstructors cti (inc cons_index) free_vars free_attrs type_lhs conses
 							(ts, ti, { cs & cs_symbol_table = cs_symbol_table }) 
 	  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = free_attrs, st_attr_env = st_attr_env }
@@ -175,17 +182,17 @@ where
 		# (types, local_vars_list, attr_env, ts_ti_cs)
 				= bind_types_of_cons types cti free_vars attr_env ts_ti_cs
 		  (type, type_attr, (ts, ti, cs)) = bindTypes cti type ts_ti_cs
-		  (local_vars, cs_symbol_table /* TD ... */, _ /* ... TD */ ) = foldSt retrieve_local_vars free_vars ([], cs.cs_symbol_table /* TD ...*/, cs.cs_x /* ... TD */ )
+		  (local_vars, cs_symbol_table) = foldSt retrieve_local_vars free_vars ([], cs.cs_symbol_table)
 		  (attr_env, cs_error) = addToAttributeEnviron type_attr cti.cti_lhs_attribute attr_env cs.cs_error
 		= ([type : types], [local_vars : local_vars_list], attr_env, (ts, ti , { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
 	where 
-		retrieve_local_vars tv=:{tv_name={id_info}} (local_vars, symbol_table /* TD ... */, cs_x=:{x_is_dcl_module} /* ... TD */ )
-			# (ste=:{ste_kind = STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count /* TD ... */,stv_position  /* ... TD */ }}, symbol_table) = readPtr id_info symbol_table
+		retrieve_local_vars tv=:{tv_name={id_info}} (local_vars, symbol_table)
+			# (ste=:{ste_kind = STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count }}, symbol_table) = readPtr id_info symbol_table
 			| stv_count == 0
-				= (local_vars, symbol_table /* TD ... */, cs_x /* ... TD */)
+				= (local_vars, symbol_table)
 				
-				= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr /* TD ... */, tv_name = if x_is_dcl_module tv.tv_name { tv.tv_name & id_name = toString stv_position } /* ... TD */ }, atv_attribute = stv_attribute, atv_annotation = AN_None } : local_vars],
-						symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}})/* TD ... */, cs_x /* ... TD */)
+				= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr}, atv_attribute = stv_attribute, atv_annotation = AN_None } : local_vars],
+						symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
 						
 //
 checkRhsOfTypeDef :: !CheckedTypeDef ![AttributeVar] !CurrentTypeInfo !(!*TypeSymbols, !*TypeInfo, !*CheckState)
@@ -220,7 +227,8 @@ where
 		| field_nr < size fields
 			# {fs_index} = fields.[field_nr]
 			# (sel_def, selector_defs) = selector_defs![fs_index]
-			# [sel_type:sel_types] = sel_types
+			  [sel_type : sel_types] = sel_types
+			# (sel_type, (st_vars, st_attr_vars)) = lift_quantifier sel_type (st_vars, st_attr_vars)
 			# (st_attr_env, error) = addToAttributeEnviron sel_type.at_attribute rec_type.at_attribute [] error
 			# (new_type_ptr, var_heap) = newPtr VI_Empty var_heap
 			  sd_type = { sel_def.sd_type &  st_arity = 1, st_args = [rec_type], st_result = sel_type, st_vars = st_vars,
@@ -229,6 +237,20 @@ where
 			  									sd_type_ptr = new_type_ptr, sd_exi_vars = exi_vars  } }
 			= check_selectors (inc field_nr) fields rec_type_index sel_types  rec_type st_vars st_attr_vars exi_vars selector_defs var_heap error
 			= (selector_defs, var_heap, error)
+	where
+		lift_quantifier at=:{at_type = TFA vars type} (type_vars, attr_vars)
+			= ({ at & at_type = type}, foldSt add_var_and_attr vars (type_vars, attr_vars))
+		lift_quantifier at (type_vars, attr_vars)
+			= (at, (type_vars, attr_vars))
+			
+		add_var_and_attr {atv_variable, atv_attribute} (type_vars, attr_vars)
+			= ([atv_variable : type_vars], add_attr_var atv_attribute attr_vars)
+
+		add_attr_var (TA_Var av) attr_vars
+			= [av : attr_vars]
+		add_attr_var attr attr_vars
+			= attr_vars
+			
 checkRhsOfTypeDef {td_rhs = SynType type} _ cti ts_ti_cs
 	# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
 	= (SynType type, ts_ti_cs)
@@ -241,35 +263,22 @@ isATopConsVar cv		:== cv < 0
 encodeTopConsVar cv		:== dec (~cv)
 decodeTopConsVar cv		:== ~(inc cv)
 
-checkTypeDef :: /* TD */ !Bool !Index !Index !*TypeSymbols !*TypeInfo !*CheckState -> (!*TypeSymbols, !*TypeInfo, !*CheckState);
-checkTypeDef /* TD */ is_dcl_module type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
+checkTypeDef :: !Index !Index !*TypeSymbols !*TypeInfo !*CheckState -> (!*TypeSymbols, !*TypeInfo, !*CheckState);
+checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
 	# (type_def, ts_type_defs) = ts_type_defs![type_index]
 	# {td_name,td_pos,td_args,td_attribute} = type_def
-	
-	// TD ...
-	// in case of an icl-module, the arguments i.e. the type variables of type constructors are normalized which makes
-	// comparison by the static linker easier.
-	# (cs=:{cs_error})
-		= { cs & cs_x = { cs.cs_x & x_is_dcl_module = /*is_dcl_module*/ True, x_type_var_position = 0 } }
-// 	| FB (not is_dcl_module)  ("checkTypeDef: " +++ td_name.id_name) True
-	#
- 	// ... TD
- 	
 	  position = newPosition td_name td_pos
 	  cs_error = pushErrorAdmin position cs_error
 	  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_name.id_name ti_type_heaps.th_attrs
 	  (type_vars, (attr_vars, ti_type_heaps, cs))
-	  		= addTypeVariablesToSymbolTable td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
+	  		= addTypeVariablesToSymbolTable cGlobalScope td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
 	  type_def = {	type_def & td_args = type_vars, td_index = type_index, td_attrs = attr_vars, td_attribute = td_attribute }
 	  (td_rhs, (ts, ti, cs)) = checkRhsOfTypeDef type_def attr_vars
 			{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute }
 				({ ts & ts_type_defs = ts_type_defs },{ ti & ti_type_heaps = ti_type_heaps}, cs)
 	= ({ ts & ts_type_defs = { ts.ts_type_defs & [type_index] = { type_def & td_rhs = td_rhs }}}, ti,
 				{ cs &	cs_error = popErrorAdmin cs.cs_error,
-						cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cOuterMostLevel type_vars cs.cs_symbol_table
-	// TD ...
-						, cs_x = { cs.cs_x & x_is_dcl_module = False}      })
-	// ... TD 
+						cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ type_vars cs.cs_symbol_table})
 where
 	determine_root_attribute TA_None name attr_var_heap
 		# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
@@ -330,18 +339,25 @@ where
 		# (type, expst) = expand module_index type expst
 		= (TArrow1 type, expst)
 // ..AA				
-	expand module_index (CV tv :@: types) expst
+	expand module_index (CV tv=:{tv_name} :@: types) expst
 		# (type, expst) = expandTypeVariable tv expst
 		  (types, expst) = expand module_index types expst
-		= (simplify_type_appl type types, expst) 
+		  (combined_type, exp_error) = simplify_type_appl tv_name type types expst.exp_error
+		= (combined_type, { expst & exp_error = exp_error }) 
 		where
-			simplify_type_appl :: !Type ![AType] -> Type
-			simplify_type_appl (TA type_cons=:{type_arity} cons_args) type_args
-				= TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args)
-			simplify_type_appl (TV tv) type_args
-				= CV tv :@: type_args
-			simplify_type_appl TE t2
-				= TE
+			simplify_type_appl :: !Ident !Type ![AType] !*ErrorAdmin -> (!Type, *ErrorAdmin)
+			simplify_type_appl cv (TA type_cons=:{type_arity} cons_args) type_args error
+				= (TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args), error)
+			simplify_type_appl cv (TV tv) type_args error
+				= (CV tv :@: type_args, error)
+			simplify_type_appl cv TE t2 error
+				= (TE, error)
+			simplify_type_appl cv t1 t2 error
+				= (TE, checkError cv "kind conflict in argument of type synonym" error)
+				
+	expand module_index (TFA vars type) expst
+		# (type, expst) = expand module_index type expst
+		= (TFA vars type, expst)
 	expand module_index type expst
 		= (type, expst)
 
@@ -360,6 +376,24 @@ where
 		# (at_attribute, expst) = expandTypeAttribute at_attribute expst
 		  (at_type, expst) = expand module_index at_type expst
 		= ({ atype & at_type = at_type, at_attribute = at_attribute }, expst)
+/*
+expandTypeApplication (CV tv={tv_name}) types expst
+	# (type, expst) = expandTypeVariable tv expst
+	  (types, expst) = expand module_index types expst
+	  (combined_type, exp_error) = simplify_type_appl tv_name type types expst.exp_error
+	= (simplify_type_appl type types, { expst & exp_error = exp_error }) 
+	where
+		simplify_type_appl :: !Ident !Type ![AType] !*ErrorAdmin -> (!Type, *ErrorAdmin)
+		simplify_type_appl cv (TA type_cons=:{type_arity} cons_args) type_args error
+			= (TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args), error)
+		simplify_type_appl cv (TV tv) type_args error
+			= (CV tv :@: type_args, error)
+		simplify_type_appl cv TE t2 error
+			= (TE, error)
+		simplify_type_appl cv t1 t2 error
+			= (TE, checkError cv "kind conflict in argument of type synonym" error)
+*/
+
 
 class look_for_cycles a :: !Index !a !*ExpandState -> *ExpandState
 
@@ -418,6 +452,7 @@ expandSynType mod_index type_index expst=:{exp_type_defs}
 						 		exp_marks = { expst.exp_marks & [type_index] = CS_Checked },
 						 		exp_type_heaps = clearBindingsOfTypeVarsAndAttributes td_attribute td_args expst.exp_type_heaps,
 								exp_error = popErrorAdmin expst.exp_error }
+//										---> ("SynType", rhs_type, exp_type)
 
 				_
 					# exp_marks = { expst.exp_marks & [type_index] = CS_Checking }
@@ -427,9 +462,9 @@ expandSynType mod_index type_index expst=:{exp_type_defs}
 		_
 			-> { expst &  exp_marks = { expst.exp_marks & [type_index] = CS_Checked }}
 
-checkTypeDefs :: /* TD */ !Bool !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
+checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
-checkTypeDefs /* TD */ is_dcl_module is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
+checkTypeDefs is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
 	   ti = { ti_type_heaps = type_heaps, ti_var_heap = var_heap  }
@@ -438,16 +473,9 @@ where
 	check_type_defs is_main_dcl type_index nr_of_types module_index ts ti=:{ti_type_heaps,ti_var_heap} cs
 		| type_index == nr_of_types
 			= (ts.ts_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, ts.ts_modules, ti_var_heap, ti_type_heaps, cs)
-			# (ts, ti, cs) = checkTypeDef /* TD */ is_dcl_module type_index module_index ts ti cs
+			# (ts, ti, cs) = checkTypeDef  type_index module_index ts ti cs
 			= check_type_defs is_main_dcl (inc type_index) nr_of_types module_index ts ti cs
 
-expand_syn_types module_index type_index nr_of_types expst
-	| type_index == nr_of_types
-		= expst
-	| expst.exp_marks.[type_index] == CS_NotChecked
-		# expst = expandSynType module_index type_index expst
-		= expand_syn_types module_index (inc type_index) nr_of_types expst
-		= expand_syn_types module_index (inc type_index) nr_of_types expst
 /*
 Tracea_tn a
 	# s=size a
@@ -481,7 +509,15 @@ expandSynonymTypes module_index exp_type_defs exp_modules exp_type_heaps exp_err
 			  		{	exp_type_defs = exp_type_defs, exp_modules = exp_modules, exp_marks = marks,
 			  			exp_type_heaps = exp_type_heaps, exp_error = exp_error }
 	= (exp_type_defs,exp_modules,exp_type_heaps,exp_error)
-	
+where
+	expand_syn_types module_index type_index nr_of_types expst
+		| type_index == nr_of_types
+			= expst
+		| expst.exp_marks.[type_index] == CS_NotChecked
+			# expst = expandSynType module_index type_index expst
+			= expand_syn_types module_index (inc type_index) nr_of_types expst
+			= expand_syn_types module_index (inc type_index) nr_of_types expst
+
 ::	OpenTypeInfo =
 	{	oti_heaps		:: !.TypeHeaps
 	,	oti_all_vars	:: ![TypeVar]
@@ -519,7 +555,7 @@ newAttribute DAK_Unique var_name new_attr  oti cs
 		TA_None
 			-> (TA_Unique, oti, cs)
 		_
-			-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })
+			-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed (2)" cs.cs_error })
 newAttribute DAK_None var_name (TA_Var attr_var) oti cs=:{cs_symbol_table}
 	# (attr_var, oti, cs_symbol_table) = determineAttributeVariable attr_var oti cs_symbol_table
 	= (TA_Var attr_var, oti, { cs & cs_symbol_table = cs_symbol_table })
@@ -599,7 +635,7 @@ where
 			| old_var.av_info_ptr == new_var.av_info_ptr
 				= (TA_Var old_var, oti, { cs &  cs_symbol_table = cs_symbol_table })
 				= (TA_Var old_var, oti, { cs &  cs_symbol_table = cs_symbol_table,
-						cs_error = checkError new_var.av_name "inconsistently attributed" cs_error })
+						cs_error = checkError new_var.av_name "inconsistently attributed (3)" cs_error })
 		check_var_attribute var_attr=:(TA_Var old_var) TA_Anonymous oti cs
 			= (var_attr, oti, cs)
 		check_var_attribute TA_Unique new_attr oti cs
@@ -607,7 +643,7 @@ where
 				TA_Unique
 					-> (TA_Unique, oti, cs)
 				_
-					-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })
+					-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed (4)" cs.cs_error })
 		check_var_attribute TA_Multi new_attr oti cs
 			= case new_attr of
 				TA_Multi
@@ -615,9 +651,9 @@ where
 				TA_None
 					-> (TA_Multi, oti, cs)
 				_
-					-> (TA_Multi, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })
+					-> (TA_Multi, oti, { cs & cs_error = checkError var_name "inconsistently attributed (5)" cs.cs_error })
 		check_var_attribute var_attr new_attr oti cs
-			= (var_attr, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })// ---> (var_attr, new_attr)
+			= (var_attr, oti, { cs & cs_error = checkError var_name "inconsistently attributed (6)" cs.cs_error })// ---> (var_attr, new_attr)
 		
 		
 		determine_attribute var_name DAK_Unique new_attr error
@@ -629,7 +665,7 @@ where
 				 TA_Unique
 				 	-> (TA_Unique, error)
 				 _
-				 	-> (TA_Unique, checkError var_name "inconsistently attributed" error)
+				 	-> (TA_Unique, checkError var_name "inconsistently attributed (1)" error)
 		determine_attribute var_name dem_attr TA_None error
 			= (TA_Multi, error)
 		determine_attribute var_name dem_attr new_attr error
@@ -641,7 +677,7 @@ where
 checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
-	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
+	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs) 
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_type = GTV var_id=:{tv_name={id_info}}} (ots, oti=:{oti_heaps,oti_global_vars}, cs=:{cs_symbol_table})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
@@ -716,6 +752,28 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_att
 	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
 	  (new_attr, oti, cs) = newAttribute dem_attr ":@:" at_attribute oti cs
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = new_attr }, (ots, oti, cs))
+checkOpenAType mod_index scope dem_attr atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
+	# (vars, (oti, cs)) = mapSt add_universal_var vars  (oti, cs) 
+	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr { atype & at_type = type } (ots, oti, cs)
+	  cs = { cs & cs_symbol_table = foldSt remove_universal_var vars cs.cs_symbol_table }
+	= ( { checked_type & at_type = TFA vars checked_type.at_type }, (ots, oti, cs))
+where
+	add_universal_var atv=:{atv_variable = tv=:{tv_name={id_name,id_info}}, atv_attribute} (oti, cs=:{cs_symbol_table,cs_error})
+		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
+		| ste_kind == STE_Empty || ste_def_level < cRankTwoScope
+			# (new_attr, oti=:{oti_heaps}, cs) = newAttribute DAK_None id_name atv_attribute oti { cs & cs_symbol_table = cs_symbol_table }
+			  (new_var_ptr, th_vars) = newPtr (TVI_Attribute new_attr) oti_heaps.th_vars
+			= ({atv & atv_variable = { tv & tv_info_ptr = new_var_ptr}, atv_attribute = new_attr }, 
+					({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }}, { cs & cs_symbol_table =
+							cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
+									ste_def_level = cRankTwoScope, ste_previous = entry })}))
+			= (atv, (oti, { cs & cs_error = checkError id_name "type variable already undefined" cs_error, cs_symbol_table = cs_symbol_table }))
+
+	remove_universal_var {atv_variable = {tv_name}, atv_attribute = TA_Var {av_name}} cs_symbol_table
+		= removeDefinitionFromSymbolTable cGlobalScope av_name (removeDefinitionFromSymbolTable cRankTwoScope tv_name cs_symbol_table)
+	remove_universal_var {atv_variable = {tv_name}} cs_symbol_table
+		= removeDefinitionFromSymbolTable cRankTwoScope tv_name cs_symbol_table
+
 checkOpenAType mod_index scope dem_attr type=:{at_attribute} (ots, oti, cs)
 	# (new_attr, oti, cs) = newAttribute dem_attr "." at_attribute oti cs
 	= ({ type & at_attribute = new_attr}, (ots, oti, cs))
@@ -803,6 +861,7 @@ checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (st_args, cot_state) = checkOpenATypes mod_index cGlobalScope st_args (ots, oti, cs)
+//	   ---> ("checkSymbolType", st_args))
 	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars}, cs))
 	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [] }
@@ -1159,74 +1218,57 @@ where
 checkSpecialTypes mod_index SP_None type_defs modules heaps cs
 	= (SP_None, type_defs, modules, heaps, cs)
 
+/* cOuterMostLevel :== 0 */
 
-cOuterMostLevel :== 0
-
-addTypeVariablesToSymbolTable :: ![ATypeVar] ![AttributeVar] !*TypeHeaps !*CheckState
+addTypeVariablesToSymbolTable :: !Level ![ATypeVar] ![AttributeVar] !*TypeHeaps !*CheckState
 	-> (![ATypeVar], !(![AttributeVar], !*TypeHeaps, !*CheckState))
-addTypeVariablesToSymbolTable type_vars attr_vars heaps cs /* TD */ =:{cs_x={x_type_var_position,x_is_dcl_module}}
-// TD ...
-	| x_type_var_position <> 0	= abort "addTypeVariablesToSymbolTable: x_type_var_position must be zero-initialized"
-
-	# ((a_type_vars,t=:(attribute_vars, type_heaps, check_state)))
-		= mapSt (add_type_variable_to_symbol_table) type_vars (attr_vars, heaps, cs)
-	| x_is_dcl_module
-		= (a_type_vars,t)
-		
-		// in case of an icl-module, the type variables of the type definition need to be normalized by storing its
-		// argument number for later use. To avoid incomprehensible error messages the constructor's type variables
-		// are changed below.
-		# (a_type_vars,check_state)
-			= mapSt change_type_variables_into_their_type_constructor_position a_type_vars check_state
-		= (a_type_vars,(attribute_vars, type_heaps, check_state))		
-// ... TD	
+addTypeVariablesToSymbolTable scope type_vars attr_vars heaps cs
+	= mapSt (add_type_variable_to_symbol_table scope) type_vars (attr_vars, heaps, cs)
 where
-// TD ...
-	change_type_variables_into_their_type_constructor_position :: !ATypeVar !*CheckState -> (!ATypeVar, !*CheckState)
-	change_type_variables_into_their_type_constructor_position	atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute} cs=:{cs_symbol_table}
-		# tv_info = tv_name.id_info
-		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table	  
-		# stv_position
-			= case entry.ste_kind of
-				STE_BoundTypeVariable {stv_position}
-					-> stv_position
-		# atv
-			= { atv & atv_variable.tv_name.id_name = toString stv_position }
-		= (atv,{cs & cs_symbol_table = cs_symbol_table})		
-// ... TD
-
-	add_type_variable_to_symbol_table :: !ATypeVar !(![AttributeVar], !*TypeHeaps, !*CheckState)
+	add_type_variable_to_symbol_table :: !Level !ATypeVar !(![AttributeVar], !*TypeHeaps, !*CheckState)
 		-> (!ATypeVar, !(![AttributeVar], !*TypeHeaps, !*CheckState))
-	add_type_variable_to_symbol_table atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
-		(attr_vars, heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error /* TD ... */, cs_x={x_type_var_position} /* ... TD */})
+	add_type_variable_to_symbol_table scope atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
+		(attr_vars, heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error })
 		# tv_info = tv_name.id_info
 		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table	  
-		| entry.ste_def_level < cOuterMostLevel
+		| entry.ste_def_level < scope // cOuterMostLevel
 			# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
-		      (atv_attribute, attr_vars, th_attrs, cs_error) = check_attribute atv_attribute tv_name.id_name attr_vars th_attrs cs_error
+		      (atv_attribute, attr_vars, th_attrs, cs_error) = check_attribute (scope == cRankTwoScope) atv_attribute tv_name.id_name attr_vars th_attrs cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr, stv_count = 0 /* TD */, stv_position = x_type_var_position}, ste_def_level = cOuterMostLevel, ste_previous = entry })
+			  						stv_info_ptr = tv_info_ptr, stv_count = 0}, ste_def_level = scope /* cOuterMostLevel */, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
-					(attr_vars, heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
+					(attr_vars, heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
 			= (atv, (attr_vars, { heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
+					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error }))
 
-	check_attribute :: !TypeAttribute !String ![AttributeVar] !*AttrVarHeap !*ErrorAdmin
+	check_attribute :: !Bool !TypeAttribute !String ![AttributeVar] !*AttrVarHeap !*ErrorAdmin
 		-> (!TypeAttribute, ![AttributeVar], !*AttrVarHeap, !*ErrorAdmin)
-	check_attribute TA_Multi name attr_vars attr_var_heap cs
-			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-			  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
-			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
-	check_attribute TA_None name attr_vars attr_var_heap cs
-			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-			  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
-			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
-	check_attribute TA_Unique name attr_vars attr_var_heap cs
+	check_attribute _ TA_Unique name attr_vars attr_var_heap cs
 		= (TA_Unique, attr_vars, attr_var_heap, cs)
-	check_attribute _ name attr_vars attr_var_heap cs
-		= (TA_Multi, attr_vars, attr_var_heap, checkError name "specified attribute variable not allowed" cs)
+	check_attribute is_rank_two attr name attr_vars attr_var_heap cs
+		| is_rank_two
+			= check_rank_two_attribute attr name attr_vars attr_var_heap cs
+			= check_global_attribute attr name attr_vars attr_var_heap cs
+	where
+		check_global_attribute TA_Multi name attr_vars attr_var_heap cs
+				# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+				  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
+				= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
+		check_global_attribute TA_None name attr_vars attr_var_heap cs
+				# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+				  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
+				= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
+		check_global_attribute _ name attr_vars attr_var_heap cs
+			= (TA_Multi, attr_vars, attr_var_heap, checkError name "specified attribute variable not allowed" cs)
+
+		check_rank_two_attribute TA_Anonymous name attr_vars attr_var_heap cs
+			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+			  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
+			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
+		check_rank_two_attribute attr name attr_vars attr_var_heap cs
+			= (attr, attr_vars, attr_var_heap, cs)
 
 
 addExistentionalTypeVariablesToSymbolTable :: !TypeAttribute ![ATypeVar] !*TypeHeaps !*CheckState
@@ -1237,20 +1279,20 @@ where
 	add_exi_variable_to_symbol_table :: !TypeAttribute !ATypeVar !(!*TypeHeaps, !*CheckState)
 		-> (!ATypeVar, !(!*TypeHeaps, !*CheckState))
 	add_exi_variable_to_symbol_table root_attr atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
-		(heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error /* TD ... */, cs_x={x_type_var_position} /* ... TD */})
+		(heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error})
 		# tv_info = tv_name.id_info
 		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table
-		| entry.ste_def_level < cOuterMostLevel
+		| entry.ste_def_level < cGlobalScope // cOuterMostLevel
 			# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
 		      (atv_attribute, cs_error) = check_attribute atv_attribute root_attr tv_name.id_name cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr, stv_count = 0 /* TD */, stv_position = x_type_var_position }, ste_def_level = cOuterMostLevel, ste_previous = entry })
+			  						stv_info_ptr = tv_info_ptr, stv_count = 0  }, ste_def_level = cGlobalScope /* cOuterMostLevel */, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
-					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */ }))
+					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error}))
 			= (atv, ({ heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
+					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error}))
 
 	check_attribute :: !TypeAttribute !TypeAttribute !String !*ErrorAdmin
 		-> (!TypeAttribute, !*ErrorAdmin)

@@ -442,10 +442,7 @@ where
 			# (inst_var, (type_pattern_vars, var_heap)) = addLocalTCInstance var_number (type_pattern_vars, var_heap)
 			= (CA_LocalTypeCode inst_var, (new_contexts, special_instances, type_pattern_vars, var_heap))
 		reduce_tc_context type_code_class (TempV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap)
-// MV ...
-// was:		# (tc_var, var_heap) = newPtr VI_Empty var_heap
-			# (tc_var, var_heap) = newPtr VI_FreeTypeVarAtRuntime var_heap
-// ... MV
+			# (tc_var, var_heap) = newPtr VI_Empty var_heap
 			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
 			| containsContext tc new_contexts
 				= (CA_Context tc, (new_contexts, special_instances, type_pattern_vars, var_heap))
@@ -920,7 +917,7 @@ where
 		 	  fun_def = { fun_def & fun_body = TransformedBody {tb & tb_rhs = tb_rhs}, fun_info = { fun_info &  fi_local_vars = ui_local_vars}}		 	  
 			= update_dynamics funs type_pattern_vars ({ ui_fun_defs & [fun] = fun_def })
 				 ui_fun_env ui_symbol_heap x_type_code_info ui_var_heap ui_error predef_symbols
-	
+
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int!*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
@@ -966,7 +963,7 @@ where
 						-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
 //							---> ("determine_class_argument (VI_ForwardClassVar)", ptrToInt tc_var, ptrToInt var_info_ptr)
 					_
-						-> abort "determine_class_argument (overloading.icl)"
+						-> abort ("determine_class_argument 1 (overloading.icl)")//  <<- var_info)
 
 			VI_Empty
 				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -974,7 +971,7 @@ where
 				-> ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
 //							---> ("determine_class_argument (VI_Empty)", ptrToInt tc_var)
 			_
-				-> abort "determine_class_argument (overloading.icl)"
+				-> abort ("determine_class_argument 2 (overloading.icl)") // <<- var_info)
 
 	build_var_name id_name
 		= { id_name = "_v" +++ id_name, id_info = nilPtr }

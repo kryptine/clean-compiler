@@ -49,19 +49,20 @@ simplifyTypeApplication (TArrow1 _) _
 ::	VarEnv 			:== {! Type }
 
 ::	CleanUpState =
-	{	cus_var_env		:: !.VarEnv
-	,	cus_attr_env	:: !.AttributeEnv
+	{	cus_var_env					:: !.VarEnv
+	,	cus_attr_env				:: !.AttributeEnv
 	,	cus_appears_in_lifted_part	:: !.LargeBitvect
-	,	cus_heaps		:: !.TypeHeaps
-	,	cus_var_store	:: !Int
-	,	cus_attr_store	:: !Int
-	,	cus_error		:: !.ErrorAdmin
+	,	cus_heaps					:: !.TypeHeaps
+	,	cus_var_store				:: !Int
+	,	cus_attr_store				:: !Int
+	,	cus_exis_vars				:: ![(Int,TypeAttribute)]
+	,	cus_error					:: !.ErrorAdmin
 	}
 
 ::	CleanUpInput =
-	{	cui_coercions	:: !{! CoercionTree}
-	,	cui_attr_part	:: !AttributePartition
-	,	cui_top_level	:: !Bool
+	{	cui_coercions		:: !{! CoercionTree}
+	,	cui_attr_part		:: !AttributePartition
+	,	cui_top_level		:: !Bool
 	,	cui_is_lifted_part	:: !Bool
 	}
 
@@ -69,8 +70,20 @@ class clean_up a ::  !CleanUpInput !a !*CleanUpState -> (!a, !*CleanUpState)
 
 instance clean_up AType
 where
+	clean_up cui atype=:{at_attribute, at_type = TempQV qv_number} cus
+		| cui.cui_top_level
+			# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
+			# (type, cus)			= cus!cus_var_env.[qv_number]
+			  (var, cus)			= cleanUpVariable True type qv_number cus
+			= ({atype & at_attribute = at_attribute, at_type = var, at_annotation = AN_None},
+					{cus & cus_exis_vars = add_new_variable type qv_number at_attribute cus.cus_exis_vars})
+	where			
+		add_new_variable TE ev_number ev_attr cus_exis_vars
+			= [(ev_number, ev_attr) : cus_exis_vars]
+		add_new_variable type ev_number ev_attr cus_exis_vars
+			= cus_exis_vars
 	clean_up cui atype=:{at_attribute,at_type} cus
-		# (at_attribute, cus) = clean_up cui at_attribute cus 
+		# (at_attribute, cus) = cleanUpTypeAttribute False cui at_attribute cus 
 		  (at_type, cus) = clean_up cui at_type cus
 		= ({atype & at_attribute = at_attribute, at_type = at_type, at_annotation = AN_None}, cus)
 
@@ -78,51 +91,49 @@ where
 attrIsUndefined TA_None = True
 attrIsUndefined _ 		= False
 
-instance clean_up TypeAttribute
-where
-	clean_up cui TA_Unique cus
-		= (TA_Unique, cus)
-	clean_up cui TA_Multi cus
-		= (TA_Multi, cus)
-	clean_up cui tv=:(TA_TempVar av_number) cus=:{cus_attr_env,cus_appears_in_lifted_part,cus_heaps,cus_attr_store,cus_error}
-		| cui.cui_top_level
-			# av_group_nr = cui.cui_attr_part.[av_number]
-			  coercion_tree = cui.cui_coercions.[av_group_nr]
-			| isNonUnique coercion_tree
-				= (TA_Multi, cus)
-			| isUnique coercion_tree
-				= (TA_Unique, cus)
-			#! attr = cus_attr_env.[av_group_nr]
-			# (cus_appears_in_lifted_part, cus_error)
-					= case cui.cui_is_lifted_part of
-						True
-							-> (cus_appears_in_lifted_part, cus_error)
-						_
-							| bitvectSelect av_group_nr cus_appears_in_lifted_part
-								-> ( bitvectResetAll cus_appears_in_lifted_part // to prevent repetition of error message
-								   , checkError "attribute variable of lifted argument appears in the specified type" "" cus_error)
-							-> (cus_appears_in_lifted_part, cus_error)
-			| attrIsUndefined attr
-				# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
-				  new_attr_var = TA_Var { av_name = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
-				  cus_appears_in_lifted_part
-				  		= case cui.cui_is_lifted_part of
-				  			False
-				  				-> cus_appears_in_lifted_part
-				  			_
-				  				-> bitvectSet av_group_nr cus_appears_in_lifted_part
-				= (new_attr_var, { cus & cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
-						cus_appears_in_lifted_part = cus_appears_in_lifted_part,
-						 cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store,
-						 cus_error = cus_error})
-				= (attr, { cus & cus_appears_in_lifted_part = cus_appears_in_lifted_part,
-								cus_error = cus_error })
+cleanUpTypeAttribute :: !Bool !CleanUpInput TypeAttribute !*CleanUpState -> (!TypeAttribute, !*CleanUpState)
+cleanUpTypeAttribute _ cui TA_Unique cus
+	= (TA_Unique, cus)
+cleanUpTypeAttribute _ cui TA_Multi cus
+	= (TA_Multi, cus)
+cleanUpTypeAttribute may_be_existential cui tv=:(TA_TempVar av_number) cus
+	| cui.cui_top_level
+		# av_group_nr = cui.cui_attr_part.[av_number]
+		  coercion_tree = cui.cui_coercions.[av_group_nr]
+		| isNonUnique coercion_tree
 			= (TA_Multi, cus)
-	clean_up cui (TA_Var av=:{av_info_ptr}) cus=:{cus_heaps}
-		# (AVI_AttrVar new_info_ptr, th_attrs) = readPtr av_info_ptr cus_heaps.th_attrs
-		= (TA_Var { av & av_info_ptr = new_info_ptr }, { cus & cus_heaps = { cus_heaps & th_attrs = th_attrs }})
-	clean_up cui TA_TempExVar cus
-		= PA_BUG (TA_Multi, cus) (abort "clean_up cui (TA_TempExVar)")
+		| isUnique coercion_tree
+			= (TA_Unique, cus)
+		# cus 			= check_appearance cui.cui_is_lifted_part av_group_nr cus
+		# (attr, cus)	= clean_up_attribute_variable av_group_nr (cus!cus_attr_env.[av_group_nr])
+		| isExistential coercion_tree
+			| may_be_existential
+				= (attr, { cus & cus_error = checkError "attribute variable could not be universally quantified" "" cus.cus_error})
+				= (attr, cus)
+			= (attr, cus)
+		= (TA_Multi, cus)
+where
+	check_appearance is_lifted_part group_nr cus=:{cus_appears_in_lifted_part, cus_error}
+		| is_lifted_part
+			= { cus & cus_appears_in_lifted_part = bitvectSet group_nr cus_appears_in_lifted_part}
+		| bitvectSelect group_nr cus_appears_in_lifted_part
+			= { cus &	cus_appears_in_lifted_part = bitvectReset group_nr cus_appears_in_lifted_part,
+						cus_error = checkError "attribute variable of lifted argument appears in the specified type" "" cus_error}
+			= cus
+
+	clean_up_attribute_variable av_group_nr (TA_None, cus=:{cus_heaps,cus_attr_store,cus_attr_env})
+		# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
+		  new_attr_var = TA_Var { av_name = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
+		= (new_attr_var, { cus &	cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
+				 					cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})	
+	clean_up_attribute_variable av_group_nr attr_and_cus
+		= attr_and_cus
+		
+cleanUpTypeAttribute _ cui av=:(TA_Var _) cus
+	= (av, cus)
+cleanUpTypeAttribute _ cui TA_PA_BUG cus
+	= PA_BUG (TA_Multi, cus) (abort "clean_up cui (TA_PA_BUG)")
+			
 			
 instance clean_up Type
 where
@@ -153,11 +164,24 @@ where
 		# (TV tv, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
 		  (types, cus) = clean_up cui types cus
 		= (CV tv :@: types, cus)
-	clean_up cui (TempQV qv_number) cus=:{cus_error}
+	clean_up cui (TempQV qv_number) cus=:{cus_error,cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
 		| cui.cui_top_level
-			= cleanUpVariable True type qv_number {cus & cus_error = existentialError cus_error}
+//			= cleanUpVariable True type qv_number {cus & cus_error = existentialError cus_error}
+			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
 			= cleanUpVariable False type qv_number cus
+	where			
+		add_new_variable TE qv_number cus_exis_vars
+			= [(qv_number, TA_None) : cus_exis_vars]
+		add_new_variable type qv_number cus_exis_vars
+			= cus_exis_vars
+			
+	clean_up cui tv=:(TV _) cus
+		= (tv, cus)
+	clean_up cui (TFA vars type) cus=:{cus_heaps}
+		# (type, cus) = clean_up cui type cus
+		= (TFA vars type, cus)
+/*
 	clean_up cui (TV tv=:{tv_info_ptr}) cus=:{cus_heaps}
 		# (TVI_TypeVar new_info_ptr, th_vars) = readPtr tv_info_ptr cus_heaps.th_vars
 		= (TV { tv & tv_info_ptr = new_info_ptr }, { cus & cus_heaps = { cus_heaps & th_vars = th_vars }})
@@ -165,7 +189,7 @@ where
 		# (new_vars, cus_heaps) = mapSt refresh_var_and_attr vars cus_heaps
 		  (type, cus) = clean_up cui type { cus & cus_heaps = cus_heaps }
 		  cus_heaps = clearBindings vars cus.cus_heaps
-		= (TFA vars type, { cus & cus_heaps = cus_heaps })
+		= (TFA new_vars type, { cus & cus_heaps = cus_heaps })
 	where	
 		refresh_var_and_attr atv=:{atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
 			# (new_info_ptr, th_vars) = newPtr TVI_Empty th_vars
@@ -178,6 +202,7 @@ where
 				= (TA_Var {av & av_info_ptr = new_info_ptr}, attr_heap <:= (av_info_ptr, AVI_AttrVar new_info_ptr))
 			refresh_attr attr attr_heap
 				= (attr, attr_heap)
+*/
 	clean_up cui TE cus
 		= abort "unknown pattern in function clean_up"
 				
@@ -344,13 +369,13 @@ cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,ts
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
-				cus_heaps = heaps, cus_var_store = 0, cus_attr_store = 0, cus_error = error }
+				cus_heaps = heaps, cus_var_store = 0, cus_attr_store = 0, cus_error = error, cus_exis_vars = [] }
 	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_top_level = True, cui_is_lifted_part = True }
 	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
 	  cui = { cui & cui_is_lifted_part = False }
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
-	  (st_args, cus) = clean_up cui (drop tst_lifted tst_args) { cus & cus_var_env = cus_var_env }
-	  (st_result, cus) = clean_up cui tst_result cus
+	  (st_args, (_, cus))	= mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], { cus & cus_var_env = cus_var_env })
+	  (st_result, cus) = clean_up_result_type cui tst_result cus
 	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
@@ -377,13 +402,38 @@ where
 				_
 					-> (all_vars, var_env)
 
-	determine_type_var var_index (all_vars, var_env)
-		#! type = var_env.[var_index]
-		= case type of
-			TV var
-				-> ([var : all_vars], var_env)
-			_
-				-> (all_vars, var_env)
+	clean_up_arg_type cui at=:{at_type = TFA avars type, at_attribute} (all_exi_vars, cus)
+		# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
+		  (type, cus)			= clean_up cui type cus
+		| isEmpty cus.cus_exis_vars
+			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, (all_exi_vars, cus))
+			= ({ at & at_type = TFA avars type, at_attribute = at_attribute},
+					(all_exi_vars, { cus & cus_error = existentialError cus.cus_error, cus_exis_vars = [] }))
+	clean_up_arg_type cui at (all_exi_vars, cus)
+		# (at, cus) = clean_up cui at cus
+		  (cus_exis_vars, cus) = cus!cus_exis_vars
+		| isEmpty cus_exis_vars
+			= (at, (all_exi_vars, cus))
+			# (new_exi_vars, all_exi_vars, cus) = foldSt check_existential_var cus_exis_vars ([], all_exi_vars, cus)
+			= ({ at & at_type = TFA new_exi_vars at.at_type }, (all_exi_vars, { cus & cus_exis_vars = [] }))
+	where
+		check_existential_var (var_number,var_attr) (exi_vars, all_vars, cus)
+			| isMember var_number all_vars
+				# (type, cus) = cus!cus_var_env.[var_number]
+				= case type of
+					TE
+						-> (exi_vars, all_vars, cus)
+					_
+						-> (exi_vars, all_vars, { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
+				# (TV var, cus) = cus!cus_var_env.[var_number]
+				= ([{atv_attribute = var_attr, atv_variable = var, atv_annotation = AN_None } : exi_vars ],
+						[var_number : all_vars], { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }})
+
+	clean_up_result_type cui at cus
+		# (at, cus=:{cus_exis_vars}) = clean_up cui at cus
+		| isEmpty cus_exis_vars
+			= (at, cus)
+			= (at, { cus & cus_error = existentialError cus.cus_error })
 
 	clean_up_type_contexts spec_type spec_context derived_context env var_heap error
 		|  spec_type
@@ -525,10 +575,25 @@ updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*Ex
 updateExpressionTypes {st_args,st_vars,st_result,st_attr_vars} st_copy type_ptrs heaps=:{th_vars,th_attrs} expr_heap
 	# th_vars = foldSt (\{tv_info_ptr} var_heap -> var_heap <:= (tv_info_ptr, TVI_Empty)) st_vars th_vars
 	  th_attrs = foldSt (\{av_info_ptr} attr_heap -> attr_heap <:= (av_info_ptr, AVI_Empty)) st_attr_vars th_attrs
-	  th_vars = bindInstances st_args st_copy.st_args th_vars
-	  th_vars = bindInstances st_result st_copy.st_result th_vars
-	= foldSt update_expression_type type_ptrs ({heaps & th_vars = th_vars, th_attrs = th_attrs}, expr_heap)
+	  heaps = fold2St bind_instances_in_arg_type st_args st_copy.st_args {heaps & th_vars = th_vars, th_attrs = th_attrs}
+	  th_vars = bindInstances st_result st_copy.st_result heaps.th_vars
+	= foldSt update_expression_type type_ptrs ({heaps & th_vars = th_vars}, expr_heap)
 where
+	bind_instances_in_arg_type { at_type = TFA vars type1 } { at_type = TFA _ type2 } heaps
+		# heaps = foldSt clear_atype_var vars heaps
+		= { heaps & th_vars = bindInstances type1 type2 heaps.th_vars }
+	where
+		clear_atype_var {atv_variable={tv_info_ptr},atv_attribute} heaps=:{th_vars,th_attrs}
+			= { heaps & th_vars = th_vars  <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attribute atv_attribute th_attrs }
+		where
+			clear_attribute (TA_Var {av_info_ptr}) attr_heap
+				= attr_heap <:= (av_info_ptr, AVI_Empty)
+			clear_attribute _ attr_heap
+				= attr_heap
+	bind_instances_in_arg_type { at_type } atype2 heaps=:{th_vars}
+		= { heaps & th_vars = bindInstances at_type atype2.at_type th_vars }
+
+
 	update_expression_type expr_ptr (type_heaps, expr_heap)
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
 		= case info of
@@ -564,6 +629,8 @@ instance bindInstances Type
 //..AA
 	bindInstances (TB _) (TB _) type_var_heap
 		= type_var_heap
+	bindInstances (TFA _ type1) (TFA _ type2) type_var_heap
+		= bindInstances type1 type2 type_var_heap
 	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances (TV l1) (TV l2) type_var_heap)
 
@@ -802,8 +869,10 @@ where
 					-> (forw_var_number == av_number, attr_var_heap)
 				_
 					-> (True, writePtr av_info_ptr (AVI_Forward av_number) attr_var_heap)
-		equi_attrs attr1 attr2 attr_env
-			= (attr1 == attr2, attr_env)
+		equi_attrs (TA_Var _) (TA_Var _) attr_var_heap
+			= (True, attr_var_heap)
+		equi_attrs attr1 attr2 attr_var_heap
+			= (attr1 == attr2, attr_var_heap)
 
 equivTypeVars :: !TypeVar !TempVarId !*TypeHeaps -> (!Bool, !*TypeHeaps)
 equivTypeVars {tv_info_ptr} var_number heaps=:{th_vars}
@@ -819,12 +888,12 @@ instance equiv Type
 where
 	equiv (TV tv) (TempV var_number) heaps
 		= equivTypeVars tv var_number heaps
+	equiv (TV tv1) (TV tv2) heaps
+		= (True, heaps)
 	equiv (arg_type1 --> restype1) (arg_type2 --> restype2) heaps
 		= equiv (arg_type1,restype1) (arg_type2,restype2) heaps
-//AA..
 	equiv (TArrow1 arg_type1) (TArrow1 arg_type2) heaps
 		= equiv arg_type1 arg_type2 heaps
-//..AA
 	equiv (TA tc1 types1) (TA tc2 types2) heaps
 		| tc1 == tc2
 			= equiv types1 types2 heaps
@@ -836,13 +905,8 @@ where
 		| equi_vars
 			= equiv types1 types2 heaps
 			= (False, heaps)
-/*	equiv (TFA vars type1) type2 heaps
+	equiv (TFA vars1 type1) (TFA vars2 type2) heaps
 		= equiv type1 type2 heaps
-	equiv type1 (TFA vars type2) heaps
-		= equiv type1 type2 heaps
-	equiv (TQV _) (TV _) heaps
-		= (True, heaps)
-*/
 	equiv type1 type2 heaps
 		= (False, heaps)
 
@@ -1114,8 +1178,8 @@ instance writeType TypeAttribute
 		= writeBeautifulAttrVarAndColon file beautifulizer ta
 	writeType file yes_beautifulizer=:(Yes _) (form, TA_Multi)
 		= (file, yes_beautifulizer)
-	writeType file opt_beautifulizer (form, TA_TempExVar)
-		= PA_BUG (file <<< "(E)", opt_beautifulizer) (abort "writeType (TypeAttribute) TA_TempExVar")
+	writeType file opt_beautifulizer (form, TA_PA_BUG)
+		= PA_BUG (file <<< "(E)", opt_beautifulizer) (abort "writeType (TypeAttribute) TA_PA_BUG")
 	writeType file opt_beautifulizer (_, ta)
 		= (file <<< ta, opt_beautifulizer)
 
@@ -1168,7 +1232,6 @@ where
 			is_unboxed_array {id_name} 		= id_name == "_#array"
 			is_string_type {id_name}		= id_name == "_string"
 
-// MW4 was:	writeType file (form, arg_type --> res_type)
 	writeType file opt_beautifulizer (form, arg_type --> res_type)
 		| checkProperty form cBrackets
 			= writeWithinBrackets "(" ")" file opt_beautifulizer
@@ -1197,6 +1260,10 @@ where
 		# file = file <<< ")" 
 		= (file, opt_beautifulizer)	
 //..AA		
+	writeType file opt_beautifulizer (form, TFA vars type)
+		 # (file, opt_beautifulizer) = writeType (file <<< "(A.") opt_beautifulizer (form, vars)
+		 # (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
+		 = (file <<< ")", opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TQV varid)
 		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
@@ -1211,6 +1278,11 @@ where
 		= writeBeautifulTypeVar file beautifulizer type_var
 	writeType file _ (form, type)
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
+
+instance writeType ATypeVar
+where
+	writeType file beautifulizer (form, {atv_attribute,atv_annotation,atv_variable})
+		= writeType file beautifulizer (form, { at_attribute = atv_attribute, at_annotation = atv_annotation, at_type = TV atv_variable })
 
 writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
 	# (file, opt_beautifulizer) 

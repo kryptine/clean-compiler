@@ -22,12 +22,13 @@ FirstAttrVar	:== 3
 
 instance toInt TypeAttribute
 
-::	CoercionTree	= CT_Node !Int !CoercionTree !CoercionTree | CT_Empty | CT_Unique | CT_NonUnique  /* | CT_Existential !Int */
+::	CoercionTree	= CT_Node !Int !CoercionTree !CoercionTree | CT_Empty | CT_Unique | CT_NonUnique  | CT_Existential
 
 ::	Coercions		= { coer_demanded :: !.{! .CoercionTree}, coer_offered :: !.{! .CoercionTree }}
 
 isNonUnique				:: !CoercionTree -> Bool
 isUnique  				:: !CoercionTree -> Bool
+isExistential  			:: !CoercionTree -> Bool
 
 isNonUniqueAttribute	:: !Int !Coercions -> Bool
 isUniqueAttribute		:: !Int !Coercions -> Bool
@@ -44,7 +45,7 @@ determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{# C
 
 ::	AttributePartition	:== {# Int}
 
-partitionateAttributes :: !{! CoercionTree} !{! *CoercionTree} -> (!AttributePartition, !{! CoercionTree})
+partitionateAttributes :: !{! CoercionTree} !{! *CoercionTree} -> (!AttributePartition, !*{! CoercionTree})
 
 newInequality :: !Int !Int !*Coercions -> *Coercions
 
@@ -62,7 +63,7 @@ liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeHeaps !
 	}
 
 class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!Bool, !a, !*(!u:{! Type}, !*ExpansionState))
-//class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!a, !*(!u:{! Type}, !*ExpansionState))
-
 
 instance expandType AType
+
+checkExistentionalAttributeVars :: [TempAttrId] !AttributePartition !*{! CoercionTree} -> (!Bool,!*{! CoercionTree})

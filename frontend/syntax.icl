@@ -30,7 +30,7 @@ where toString {import_module} = toString import_module
 	,	ste_previous	:: SymbolTableEntry
 	}
 
-::	STE_BoundTypeVariable	= { stv_count :: !Int, stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr /* TD */, stv_position :: Int }
+::	STE_BoundTypeVariable	= { stv_count :: !Int, stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr }
 
 ::	STE_Kind	= STE_FunctionOrMacro ![Index]
 				| STE_Type
@@ -525,7 +525,6 @@ cIsALocalVar	:== False
 // ... MdM
 				| VI_Labelled_Empty {#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
-				| VI_FreeTypeVarAtRuntime // MV (dynamics), mark type variables which continue to exist at run-time.
 
 
 ::	ExtendedVarInfo = EVI_VarType !AType
@@ -881,10 +880,11 @@ cNotVarNumber :== -1
 	,	atv_variable		:: !TypeVar
 	}
 
-::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int | TA_TempExVar
+::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int // | TA_TempExVar !Int
 					| TA_Anonymous | TA_None
 					| TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 					| TA_MultiOfPropagatingConsVar
+					| TA_PA_BUG
 
 ::	AttributeVar =
 	{	av_name			:: !Ident
@@ -1312,8 +1312,8 @@ where
 		= "@@ "
 	toString (TA_List _ _)
 		= "??? "
-	toString TA_TempExVar
-		= PA_BUG "(E)" (abort "toString TA_TempExVar")
+	toString TA_PA_BUG
+		= PA_BUG "(E)" (abort "toString TA_PA_BUG")
 
 instance <<< Annotation
 where

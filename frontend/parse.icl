@@ -1539,24 +1539,28 @@ optionalAnnotAndAttr pState
    	# (token, pState) = nextToken TypeContext pState
    	| token == ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
-		  (_   , attr, pState)  = optional_attribute token pState
+// Sjaak		  (_   , attr, pState)  = optional_attribute token pState
+		  (_   , attr, pState)  = tryAttribute token pState
 		= (True, AN_Strict, attr, pState)
 	| otherwise // token <> ExclamationToken
-		# (succ, attr, pState)  = optional_attribute token pState
+		# (succ, attr, pState)  = tryAttribute token pState
 		= (succ, AN_None, attr, pState)
-where		  
-	optional_attribute :: !Token !ParseState -> (!Bool, !TypeAttribute, !ParseState)
-	optional_attribute DotToken           pState = (True, TA_Anonymous,    pState)
-	optional_attribute AsteriskToken      pState = (True, TA_Unique, pState)
-	optional_attribute (IdentToken id) pState
-		| isLowerCaseName id
-	  	# (token, pState) = nextToken TypeContext pState
-		| ColonToken == token
-			# (ident, pState) = stringToIdent id IC_TypeAttr pState
-			= (True, TA_Var (makeAttributeVar ident), pState)
-			= (False, TA_None, tokenBack (tokenBack pState))
-	optional_attribute _	              pState = (False, TA_None, tokenBack pState)
+
+// Sjaak 210801 ...
+		  
+tryAttribute :: !Token !ParseState -> (!Bool, !TypeAttribute, !ParseState)
+tryAttribute DotToken           pState = (True, TA_Anonymous,    pState)
+tryAttribute AsteriskToken      pState = (True, TA_Unique, pState)
+tryAttribute (IdentToken id) pState
+	| isLowerCaseName id
+  	# (token, pState) = nextToken TypeContext pState
+	| ColonToken == token
+		# (ident, pState) = stringToIdent id IC_TypeAttr pState
+		= (True, TA_Var (makeAttributeVar ident), pState)
+		= (False, TA_None, tokenBack (tokenBack pState))
+tryAttribute _	              pState = (False, TA_None, tokenBack pState)
    
+// ... Sjaak
 
 cIsInfix	:== True
 cIsNotInfix	:== False
@@ -1649,15 +1653,24 @@ where
 			_
 				-> (MakeTypeVar erroneousIdent, parseError "Type variable" (Yes token) "<type variable>" pState)
 
-adjustAttribute :: !TypeAttribute Type *ParseState -> (TypeAttribute,*ParseState)
-adjustAttribute TA_Anonymous (TV {tv_name={id_name}}) pState
-	# (ident, pState) = stringToIdent id_name IC_TypeAttr pState
-	= (TA_Var (makeAttributeVar ident), pState)
-adjustAttribute TA_Anonymous (GTV {tv_name={id_name}}) pState
-	# (ident, pState) = stringToIdent id_name IC_TypeAttr pState
-	= (TA_Var (makeAttributeVar ident), pState)
+// Sjaak 210801 ...
+
+adjustAttribute :: !TypeAttribute Type *ParseState -> (!TypeAttribute, !*ParseState)
+adjustAttribute attr (TV {tv_name}) pState
+	= adjustAttributeOfTypeVariable attr tv_name pState
+adjustAttribute attr (GTV {tv_name}) pState
+	= adjustAttributeOfTypeVariable attr tv_name pState
 adjustAttribute attr type pState
 	= (attr, pState)
+
+adjustAttributeOfTypeVariable :: !TypeAttribute !Ident !*ParseState -> (!TypeAttribute, !*ParseState)
+adjustAttributeOfTypeVariable TA_Anonymous {id_name} pState
+	# (ident, pState) = stringToIdent id_name IC_TypeAttr pState
+	= (TA_Var (makeAttributeVar ident), pState)
+adjustAttributeOfTypeVariable attr _ pState
+	= (attr, pState)
+
+// ... Sjaak 210801
 
 stringToType :: !String !ParseState -> (!Type, !ParseState)
 stringToType name pState
@@ -1937,6 +1950,7 @@ wantDynamicType pState
 	# (type_vars, pState) = optionalUniversalQuantifiedVariables pState
 	  (type, pState) = want pState
 	= ({ dt_uni_vars = type_vars, dt_type = type, dt_global_vars = [] }, pState)
+
 /* PK
 ::	QuantifierKind = UniversalQuantifier | ExistentialQuantifier
 
@@ -1970,38 +1984,56 @@ optionalExistentialQuantifiedVariables pState
 	# (token, pState) = nextToken TypeContext pState
 	= case token of
 		ExistsToken
-			# (vars, pState) = wantList "existential quantified variable(s)" tryAttributedFreeTypeVar pState
+			# (vars, pState) = wantList "existential quantified variable(s)" try_existential_type_var pState
 			-> (vars, wantToken TypeContext "Existential Quantified Variables" ColonToken pState)
 		_	-> ([], tokenBack pState)
+where
+	try_existential_type_var :: !ParseState -> (Bool,ATypeVar,ParseState)
+	try_existential_type_var pState
+		# (token, pState)	= nextToken TypeContext pState
+		= case token of
+			DotToken
+	// Sjaak 210801 ...
+				# (typevar, pState)	= wantTypeVar pState
+				-> (True, {atv_attribute = TA_Anonymous, atv_annotation = AN_None, atv_variable = typevar}, pState)
+	// ... Sjaak
+			_
+				# (succ, typevar, pState)	= tryTypeVarT token pState
+				| succ
+					#	atypevar = {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}
+					->	(True,atypevar,pState)
+					->	(False,abort "no ATypeVar",pState)
+
+// Sjaak 210801 ....
 
 optionalUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalUniversalQuantifiedVariables pState
 	# (token, pState) = nextToken TypeContext pState
 	= case token of
 		ForAllToken
-			# (vars, pState) = wantList "universal quantified variable(s)" tryAttributedFreeTypeVar pState
+			# (vars, pState) = wantList "universal quantified variable(s)" try_universal_type_var pState
 			-> (vars, wantToken TypeContext "Universal Quantified Variables" ColonToken pState)
 		_	-> ([], tokenBack pState)
+where
+	try_universal_type_var :: !ParseState -> (Bool, ATypeVar, ParseState)
+	try_universal_type_var pState
+		# (token, pState)			= nextToken TypeContext pState
+	 	  (succ, attr, pState)		= try_universal_attribute token pState
+	 	| succ
+			# (typevar, pState)	= wantTypeVar pState
+			  (attr, pState)	= adjustAttributeOfTypeVariable attr typevar.tv_name pState
+			= (True, {atv_attribute = attr, atv_annotation = AN_None, atv_variable = typevar}, pState)
+		# (succ, typevar, pState) = tryTypeVarT token pState
+		| succ
+			= (True, {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}, pState)
+			= (False, abort "no ATypeVar", pState)
+			
+	try_universal_attribute DotToken        pState = (True,	TA_Anonymous,	pState)
+	try_universal_attribute AsteriskToken   pState = (True,	TA_Unique,		pState)
+	try_universal_attribute token      		pState = (False,	TA_None,	pState)
 
-tryAttributedFreeTypeVar :: !ParseState -> (Bool,ATypeVar,ParseState)
-tryAttributedFreeTypeVar pState
-	# (token, pState)	= nextToken TypeContext pState
-	= case token of
-		DotToken
-// RWS ...
-			# (token, pState)	= nextToken TypeContext pState
-// ... RWS
-			# (succ,typevar, pState)	= tryTypeVarT token pState
-			| succ
-				#	atypevar = {atv_attribute = TA_Anonymous, atv_annotation = AN_None, atv_variable = typevar}
-				->	(True,atypevar,pState)
-				->	(False,abort "no ATypeVar",pState)
-		_
-			# (succ,typevar, pState)	= tryTypeVarT token pState
-			| succ
-				#	atypevar = {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}
-				->	(True,atypevar,pState)
-				->	(False,abort "no ATypeVar",pState)
+// ... Sjaak
+
 
 /* PK
 optionalQuantifiedVariables :: !QuantifierKind !*ParseState -> *(![ATypeVar],!*ParseState)
