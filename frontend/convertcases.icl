@@ -494,7 +494,7 @@ where
 	eliminate_code_sharing_in_function dcl_functions common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, ci=:{ci_expr_heap,ci_var_heap})
 		# {rc_var_heap, rc_expr_heap, rc_imports} = weightedRefCount dcl_functions common_defs 1 tb_rhs
 				{ rc_var_heap = ci_var_heap, rc_expr_heap = ci_expr_heap, rc_free_vars = [], rc_imports = collected_imports} 
-		  	==> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
+//		  	---> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
 		  (tb_rhs, {di_lets,di_var_heap,di_expr_heap}) = distributeLets 1 tb_rhs { di_lets = [], di_var_heap = rc_var_heap, di_expr_heap = rc_expr_heap}
 		  (tb_rhs, (var_heap, expr_heap)) = buildLetExpr di_lets tb_rhs (di_var_heap,di_expr_heap)
 		= (TransformedBody { body & tb_rhs = tb_rhs }, (rc_imports, { ci & ci_var_heap = var_heap, ci_expr_heap = expr_heap }))
@@ -959,11 +959,11 @@ where
 				  (rc_free_vars, rc_var_heap) = foldl remove_variable (rc_info.rc_free_vars, rc_var_heap) let_binds
 				-> { rc_info & rc_free_vars = rc_free_vars, rc_var_heap = rc_var_heap,
 						rc_expr_heap = rc_info.rc_expr_heap <:= (let_info_ptr, EI_LetTypeAndRefCounts let_type ref_counts)}
-							 ==> ("weightedRefCount (EI_LetType)", ref_counts, rc_info.rc_free_vars, rc_free_vars, depth)
+//							---> ("weightedRefCount (EI_LetType)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_binds])
 			_
 				# (rc_free_vars, rc_var_heap) = foldl remove_variable (rc_info.rc_free_vars, rc_info.rc_var_heap) let_binds
 				-> { rc_info & rc_free_vars = rc_free_vars, rc_var_heap = rc_var_heap }
-//						==> ("weightedRefCount (Let)" <<- let_info)
+//							---> ("weightedRefCount (_)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_binds])
 	where
 		remove_variable ([], var_heap) let_bind
 			= ([], var_heap)
@@ -1026,11 +1026,10 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 	  (default_vars, (all_vars, rc_imports, var_heap, expr_heap)) = weighted_ref_count_in_default dcl_functions common_defs (inc depth) case_default vars_and_heaps
 	  rc_info = weightedRefCount dcl_functions common_defs depth case_expr { rc_info & rc_var_heap = var_heap, rc_expr_heap = expr_heap, rc_imports = rc_imports }
 	  (rc_free_vars, rc_var_heap) = foldSt (addPatternVariable depth) all_vars (rc_info.rc_free_vars, rc_info.rc_var_heap)
-//	  (EI_CaseType case_type, rc_expr_heap) = readPtr case_info_ptr rc_info.rc_expr_heap
 	  rc_expr_heap = rc_info.rc_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type 
 	  		{ rcc_all_variables = all_vars, rcc_default_variables = default_vars, rcc_pattern_variables = local_vars })
 	= { rc_info & rc_var_heap = rc_var_heap, rc_expr_heap = rc_expr_heap, rc_free_vars = rc_free_vars   }
-//			==> (rc_free_vars, all_vars, default_vars, local_vars)
+//			---> ("weightedRefCountOfCase", ptrToInt case_info_ptr, case_expr)
 	where
 		weighted_ref_count_in_default dcl_functions common_defs depth (Yes expr) info
 			= weightedRefCountInPatternExpr dcl_functions common_defs depth expr info
@@ -1060,6 +1059,7 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 	# rc_info = weightedRefCount dcl_functions common_defs depth case_expr rc_info
 	  (rc_free_vars, rc_var_heap) = foldSt (addPatternVariable depth) rcc_all_variables (rc_info.rc_free_vars, rc_info.rc_var_heap)
 	= { rc_info & rc_var_heap = rc_var_heap, rc_free_vars = rc_free_vars }	
+//			---> ("weightedRefCountOfCase 2", ptrToInt case_info_ptr, case_expr)
 
 checkRecordSelector common_defs {glob_module, glob_object={ds_index}} rc_info=:{rc_imports,rc_var_heap}
 	| glob_module <> cIclModIndex
@@ -1241,10 +1241,17 @@ where
 		# (expr, dl_info) = distributeLets depth expr dl_info
 		= (TupleSelect tuple_symbol arg_nr expr, dl_info)
 	distributeLets depth (Let lad=:{let_binds,let_expr,let_strict,let_info_ptr}) dl_info=:{di_expr_heap,di_var_heap}
-		# (EI_LetTypeAndRefCounts let_type ref_counts, di_expr_heap) = readPtr let_info_ptr di_expr_heap
-		  di_var_heap = set_let_expression_info depth let_strict let_binds ref_counts let_type di_var_heap
-		  (let_expr, dl_info) = distributeLets depth let_expr { dl_info & di_var_heap = di_var_heap, di_expr_heap = di_expr_heap }
-        = (let_expr, foldSt (distribute_lets_in_non_distributed_let depth) let_binds dl_info)
+		# (let_info, di_expr_heap) = readPtr let_info_ptr di_expr_heap
+		  ok = case let_info of 
+		  		EI_LetTypeAndRefCounts let_type ref_counts -> True
+				x											-> abort ("abort [distributeLets (EI_LetTypeAndRefCounts)]" ->> x)
+		| ok
+			// ---> ("distributeLets", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_binds])
+			# (EI_LetTypeAndRefCounts let_type ref_counts) = let_info
+			  di_var_heap = set_let_expression_info depth let_strict let_binds ref_counts let_type di_var_heap
+			  (let_expr, dl_info) = distributeLets depth let_expr { dl_info & di_var_heap = di_var_heap, di_expr_heap = di_expr_heap }
+		    = (let_expr, foldSt (distribute_lets_in_non_distributed_let depth) let_binds dl_info)
+		    = undef
 	where
 		set_let_expression_info depth let_strict [{bind_src,bind_dst}:binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -1287,6 +1294,9 @@ where
 	distributeLets depth EE dl_info
 		= (EE, dl_info)
 
+my_zip [] [] = []
+my_zip [x:xs][y:ys] = [(x,y) : my_zip xs ys]
+
 instance distributeLets Case
 where 
 	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr} dl_info=:{di_var_heap, di_expr_heap}
@@ -1301,7 +1311,7 @@ where
 		= ({ kees & case_guards = case_guards, case_expr = case_expr, case_default = case_default }, dl_info)
 	where
 		distribute_lets_in_patterns depth ref_counts (AlgebraicPatterns conses patterns) heaps
-			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (zip2 ref_counts patterns) heaps
+			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (my_zip ref_counts patterns) heaps
 			= (AlgebraicPatterns conses patterns, heaps)
 		where
 			distribute_lets_in_alg_pattern depth (ref_counts,pattern) (di_var_heap, di_expr_heap)
