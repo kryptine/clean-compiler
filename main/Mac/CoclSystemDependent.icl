@@ -24,10 +24,12 @@ script_handler script files
 		["clear_cache"]
 			# cache = load_state 0;
 			| store_state (empty_cache cache.hash_table.hte_symbol_heap)>0
-				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+//				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+				# r=clear_cache 1
 //				# r=1
 				-> (r,files)
-				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+//				# (r,s) = DoCommandNullTerminated ("clear_cache" +++ "\0") 0
+				# r=clear_cache 1
 //				# r=1
 				-> (r,files)
 		_
@@ -44,7 +46,8 @@ script_handler script files
 		store_cache_or_clear_cache cache files
 			| isMember "-clear_cache" scriptArgs
 				| store_state (empty_cache cache.hash_table.hte_symbol_heap)>0
-					# (r,s)=DoCommandNullTerminated "clear_cache\0" 0
+					# r=clear_cache 1
+//					# (r,s)=DoCommandNullTerminated "clear_cache\0" 0
 					| r==0
 						= files;
 						= files;
@@ -114,6 +117,11 @@ set_compiler_id :: !Int -> Int;
 set_compiler_id id = code {
 	ccall set_compiler_id "I:I"
  };
+
+clear_cache :: !Int -> Int;
+clear_cache i = code {
+ 	ccall clear_cache ":V:I"
+ }
 
 ::	* MyFiles = MyFiles;
 

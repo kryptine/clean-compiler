@@ -177,6 +177,15 @@ struct file_block **get_file_blocks_p_of_dcl_file (char *file_name)
 	return NULL;
 }
 
+extern void clear_inline_cache (void);
+
+void clear_cache (void)
+{
+	clear_path_cache();
+	clear_inline_cache();
+	FreePathList();
+}
+
 void clear_path_cache (void)
 {
 	int n;
