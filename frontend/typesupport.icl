@@ -927,7 +927,7 @@ where
 			| isEmpty positions
 				= show_attribute attr coercions (file <<< "^ ") opt_beautifulizer
 				= show_attribute attr coercions file opt_beautifulizer
-					 
+//				= (file, opt_beautifulizer)
 
 		show_attribute TA_Unique coercions file opt_beautifulizer
 			= (file <<< '*' , opt_beautifulizer)
@@ -1061,10 +1061,12 @@ instance writeType ConsVariable where
 				-> (file <<< beautiful_var_name, yes_beautifulizer)
 
 toTypeVarPtrCV (CV {tv_info_ptr}) = tv_info_ptr
+toTypeVarPtrCV _ = nilPtr
 
 toTypeVarPtr (TV {tv_info_ptr}) = tv_info_ptr
 toTypeVarPtr (GTV {tv_info_ptr}) = tv_info_ptr
 toTypeVarPtr (TQV {tv_info_ptr}) = tv_info_ptr
+toTypeVarPtr _ = nilPtr
 
 assoc_list_lookup _ [] = No
 assoc_list_lookup t1 [hd=:(t2, _):tl]
@@ -1141,7 +1143,7 @@ where
 
 initialTypeVarBeautifulizer :: TypeVarBeautifulizer
 initialTypeVarBeautifulizer 
-	= {	tvb_visited_typevars = [], tvb_fresh_vars = fresh_vars 'a' (-1) }
+	= {	tvb_visited_typevars = [(nilPtr,"??")], tvb_fresh_vars = fresh_vars 'a' (-1) }
   where
 	fresh_vars 'i' i
 		= fresh_vars 'a' (i+1)
