@@ -681,19 +681,20 @@ cyclicClassInfoMark =: [KindCycle]
 determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
 	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 determineKindsOfClasses used_module_numbers modules type_def_infos type_var_heap error
+	#! prev_error_ok = error.ea_ok	
 	# nr_of_modules = size modules
 	  class_infos = {{} \\ module_nr <- [0..nr_of_modules] }
 	  class_infos = iFoldSt (initialyse_info_for_module used_module_numbers modules) 0 nr_of_modules class_infos
-	
 	  as =
 	  	{	as_td_infos			= type_def_infos
 		,	as_type_var_heap	= type_var_heap
 		,	as_kind_heap		= newHeap
-		,	as_error			= error
+		,	as_error			= { error & ea_ok = True }
 		}
 
 	  (class_infos, {as_td_infos,as_type_var_heap,as_error}) = iFoldSt (determine_kinds_of_class_in_module modules) 0 nr_of_modules (class_infos, as)
-	= (class_infos, as_td_infos, as_type_var_heap, as_error)
+	#! ok = as_error.ea_ok
+	= (class_infos, as_td_infos, as_type_var_heap, { as_error & ea_ok = prev_error_ok && ok })
 where
 	initialyse_info_for_module used_module_numbers modules module_index class_infos
 		| inNumberSet module_index used_module_numbers
