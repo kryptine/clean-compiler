@@ -249,7 +249,7 @@ checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:
 		  		= addTypeVariablesToSymbolTable cGlobalScope td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
 		  type_def = {	type_def & td_args = type_vars, td_index = type_index, td_attrs = attr_vars, td_attribute = td_attribute }
 		  (td_rhs, (ts, ti, cs)) = check_rhs_of_TypeDef type_def attr_vars
-				{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute, cti_scope = cGlobalScope, cti_arrow_context = ForallAllowedOnLhsOfArrow}
+				{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute, cti_scope = cGlobalScope, cti_arrow_context = ForallAllowed}
 					({ ts & ts_type_defs = ts_type_defs },{ ti & ti_type_heaps = ti_type_heaps}, cs)
 		  (td_used_types, cs_symbol_table) = retrieve_used_types ti.ti_used_types cs.cs_symbol_table
 		= ({ ts & ts_type_defs = { ts.ts_type_defs & [type_index] = { type_def & td_rhs = td_rhs, td_used_types = td_used_types }}}, { ti & ti_used_types = [] },
@@ -337,8 +337,9 @@ where
 		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars []
 		  				({ ts & ts_cons_defs = ts_cons_defs }, { ti  & ti_type_heaps = ti_type_heaps }, cs)
 		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
-		  (ts, ti, cs) = bind_types_of_constructors cti (inc cons_index) free_vars free_attrs type_lhs conses
-								(ts, ti, { cs & cs_symbol_table = cs_symbol_table }) 
+		  (ts, ti, cs) = bind_types_of_constructors 
+		  					cti (inc cons_index) free_vars free_attrs type_lhs conses
+							(ts, ti, { cs & cs_symbol_table = cs_symbol_table }) 
 		  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = free_attrs, st_attr_env = st_attr_env }
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
 		= ({ ts & ts_cons_defs = { ts.ts_cons_defs & [ds_index] =
