@@ -558,6 +558,7 @@ int function_called_only_curried_or_lazy_with_one_return=0;
 
 #if 0
 # include "dbprint.h"
+extern File rules_file;
 #endif
 
 static void CodeRule (ImpRuleP rule)
@@ -1047,13 +1048,16 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if 0
 		PrintRules (imod->im_rules);
 #endif
-
 		DetermineSharedAndAnnotatedNodes (imod->im_rules,&imod->im_symbols);
 		ExitOnInterrupt();
 
+#if 0
+		PrintRules (imod->im_rules,rules_file);
+#endif
+
 		GenerateStatesForRecords (imod->im_symbols);
 
-#ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+#if defined (TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS) && !CLEAN2
 		{
 			ImpRuleP rule_p;
 
