@@ -24,6 +24,4 @@ partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{! Group}, !*{# FunDef
 convertSymbolType :: !{# CommonDefs} !SymbolType !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap
 	-> (!SymbolType, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 
-// MV ..
-addTypesOfDictionaries :: w:(a x:CommonDefs) .[TypeContext] u:[AType] -> v:[AType] | Array .a, [u <= v, w <= x];
-// .. MV
+addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]

@@ -692,7 +692,7 @@ where
 
 	transform (Selection opt_type expr selectors) ro ti
 		# (expr, ti) = transform expr ro ti
-		= transformSelection opt_type selectors expr ti
+		= transformSelection opt_type selectors expr ro ti
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
@@ -1416,10 +1416,7 @@ where
 					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
 					= (symbol_type, fun_defs, fun_heap)
 				# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-// MV ..
 				  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
-// was:				  st_args = mapAppend (add_types_of_dictionary ro.ro_common_defs) ft_type.st_context ft_type.st_args
-// .. MV
 				= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
 					fun_defs, fun_heap)
 			get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
@@ -1789,8 +1786,15 @@ transformApplication app [] ro ti
 transformApplication app extra_args ro ti
 	= (App app @ extra_args, ti)
 
-transformSelection opt_type [RecordSelection _ field_index : selectors] (App {app_symb={symb_kind= SK_Constructor _ }, app_args}) ti
-	= transform_selections selectors (app_args !! field_index) ti
+transformSelection No s=:[RecordSelection _ field_index : selectors] 
+					app=:(App {app_symb={symb_kind= SK_Constructor {glob_object, glob_module} }, app_args})
+					ro ti=:{ti_var_heap, ti_type_heaps}
+	# cons_def
+			= ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object]
+    | isEmpty [i \\ {at_annotation=AN_Strict} <- cons_def.cons_type.st_args & i<-[0..] 
+				| i<>field_index]
+    	= transform_selections selectors (app_args !! field_index) ti
+	= (Selection No app s, ti)
 where
 	transform_selections [] expr ti
 		= (expr, ti)
@@ -1798,7 +1802,7 @@ where
 		= transform_selections selectors (app_args !! field_index) ti
 	transform_selections selectors expr ti
 		= (Selection No expr selectors, ti)
-transformSelection opt_type selectors expr ti
+transformSelection opt_type selectors expr _ ti
 	= (Selection opt_type expr selectors, ti)
 
 // XXX store linear_bits and cc_args together ?
@@ -2029,8 +2033,7 @@ convertSymbolType  common_defs st imported_types collected_imports type_heaps va
 	,	ets_var_heap			:: !.VarHeap
 	}
 
-// MV ..
-addTypesOfDictionaries :: w:(a x:CommonDefs) .[TypeContext] u:[AType] -> v:[AType] | Array .a, [u <= v, w <= x];
+addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
 where
@@ -2039,7 +2042,6 @@ where
 		  dict_type_symb = 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
 		= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
 				map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
-// .. MV
 	
 class expandSynTypes a :: !{# CommonDefs} !a !*ExpandTypeState -> (!a, !*ExpandTypeState)
 
@@ -2051,11 +2053,8 @@ instance expandSynTypes SymbolType
 where
 	expandSynTypes common_defs st=:{st_args,st_result,st_context} ets
 		# ((st_args,st_result), ets) = expandSynTypes common_defs (st_args,st_result) ets
-// MV ..
 		# st_args = addTypesOfDictionaries common_defs st_context st_args
-// was:	# st_args = mapAppend (add_types_of_dictionary common_defs) st_context st_args
 		= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
-// .. MV
 
 add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
 	# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
