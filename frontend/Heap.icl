@@ -16,19 +16,6 @@ newPtr v h = code {
 	update_a 0 1
 	pop_a 1
 };
-/*
-nilPtr :: !v -> .Ptr v;
-nilPtr v = code {
-	build _Nil 0 _hnf
-	push_a 1
-	update_a 1 2
-	update_a 0 1
-	pop_a 1
-	build_r e_Heap_kPtr 2 0 0 0
-	update_a 0 2
-	pop_a 2
-};
-*/
 
 nilPtr :: Ptr v;
 nilPtr =: make_nilPtr;
@@ -50,6 +37,35 @@ isNilPtr p = code {
 	pop_a 1
 };
 
+allocPtr :: Ptr v;
+allocPtr = code {
+	build _Cons 0 _hnf
+	push_a 0
+	build_r e_Heap_kPtr 2 0 0 0
+	update_a 0 2
+	pop_a 2
+};
+
+initPtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+initPtr p v h
+ = code {
+	push_args 0 2 2
+	pop_a 1
+	eq_desc _Cons 0 0
+	pop_a 1
+	jmp_false init_pointer_error
+	push_a 2
+	push_a 2
+	fill1_r e_Heap_kPtr 2 0 2 011
+.keep 0 2
+	pop_a 2
+.d 1 0
+	rtn
+:init_pointer_error
+	pop_a 2
+	print "initPtr: Pointer already initialized"
+	halt
+};
 
 readPtr :: !(Ptr v) !u:(Heap v) -> (!v,!u:Heap v);
 readPtr p h = code {
@@ -61,6 +77,7 @@ readPtr p h = code {
 .d 2 0
 	rtn
 :read_heap_error
+	pop_a 1
 	print "readPtr: Not a pointer of this heap"
 	halt
 };
@@ -77,18 +94,22 @@ sreadPtr p h = code {
 .d 1 0
 	rtn
 :sread_heap_error
+	pop_a 1
 	print "sreadPtr: Not a pointer of this heap"
 	halt
 };
 
 writePtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
 writePtr p v h
+/*
 	| isNilPtr p
 		= abort "writePtr: Nil pointer encountered\n";
 		= writePtr2 p v h;
 
 writePtr2 :: !(Ptr v) !v !*(Heap v) -> .Heap v;
-writePtr2 p v h = code {
+writePtr2 p v h
+*/
+ = code {
 	push_a_b 2
 	push_r_args_b 0 1 1 1 1
 	eqI
@@ -100,6 +121,7 @@ writePtr2 p v h = code {
 .d 1 0
 	rtn
 :write_heap_error
+	pop_a 2
 	print "writePtr: Not a pointer of this heap"
 	halt
 };
@@ -149,7 +171,8 @@ where
 .d 0 1 b
 	rtn	
 :equal_pointer_error
-	print "equal_pointer: Pointers to different heaps"
+	pop_a 1
+	print "equal_pointer: Pointers to different heaps or a nilPtr"
 	halt	
 	}
 };

@@ -21,6 +21,10 @@ writePtr	:: !(Ptr v) !v !*(Heap v) -> .Heap v
 
 sreadPtr	:: !(Ptr v) !(Heap v) -> v
 
+allocPtr :: Ptr v;
+
+initPtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+
 ptrToInt 	:: !(Ptr w) -> Int
 
 (<:=) infixl 
@@ -29,3 +33,4 @@ where
 	(ptr, val) = ptr_and_val
 
 instance == (Ptr a)
+
