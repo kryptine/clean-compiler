@@ -585,13 +585,13 @@ store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varh
                  fundefs1 = create_or_update_fundefs funindex funbody funinfo fundefs0
                  create_or_update_fundefs
                  = if (funindex>=firstnewindex)
-                      (create_fundef (length (arguments srr.srr_typerule)))
+                      (create_fundef srr.srr_arity)
                       update_fundef
      _
       -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs fundefs0 <--- "convert.store_newfuns ends (srr in other module)"
 
 create_fundef :: .Int Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
-create_fundef funindex arity funbody funinfo fundefs
+create_fundef arity funindex funbody funinfo fundefs
 = ({fundefs & [funindex] = fundef} <--- ("convert.create_fundef "+++toString funindex+++" ends")) ---> ("convert.create_fundef "+++toString funindex+++" begins")
   where fundef
         = { fun_symb     = ident

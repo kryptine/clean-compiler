@@ -44,10 +44,10 @@ adjust a r f x
 // Claim a list of nodes from a heap
 claim :: ![.param] u:[.cell] -> ([.cell],v:[.cell]), [u<=v]
 
-claim [] heap = ([],heap)
+claim [] heap = ([],heap) <--- "basic.claim ends (with empty result)"
 claim [pnode:pnodes] [snode:heap]
-=   ([snode:snodes],heap`)
-    where (snodes,heap`) = claim pnodes heap
+=   ([snode:snodes],heap`) <--- "basic.claim ends (with nonempty result)"
+    where (snodes,heap`) = (claim--->"basic.claim begins from basic.claim") pnodes heap
 claim pnodes emptyheap = abort "claim: out of heap" // Just in case. Should be used with an infinite heap.
 
 /* Depthfirst collects results of a function (called process), applied to a

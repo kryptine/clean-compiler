@@ -19,6 +19,7 @@ from StdClass import Eq
    = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
      , srr_assigned_symbol :: sym               // The assigned symbol
      , srr_strictness      :: [Bool]            // Strictness annotations
+     , srr_arity           :: Int               // Arity
      , srr_typerule        :: Rule tsym tvar    // Type rule
      , srr_trace           :: Trace sym var var // Truncated and folded trace
      , srr_function_def    :: FuncDef sym var   // Resulting rewrite rules

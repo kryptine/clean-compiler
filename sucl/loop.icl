@@ -267,7 +267,7 @@ initrule
 
 initrule [root:heap] template sym
 = (heap`,mkrule args root (updategraph root (sym,args) emptygraph))
-  where (args,heap`) = claim (template sym) heap
+  where (args,heap`) = (claim--->"basic.claim begins from loop.initrule") (template sym) heap
 initrule _ _ _
 = abort "initrule: out of heap space"
 

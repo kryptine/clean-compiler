@@ -5,6 +5,7 @@ implementation module trd
 import rule
 import graph
 import basic
+from general import --->
 import StdEnv
 
 /*
@@ -133,7 +134,7 @@ buildtype typerule graph node bcont theap tgraph assignment
         trule = typerule cont
         trargs = arguments trule; trroot = ruleroot trule; trgraph = rulegraph trule
         trnodes = varlist trgraph [trroot:trargs]
-        (tnodes,theap`) = claim trnodes theap
+        (tnodes,theap`) = (claim--->"basic.claim begins from trd.buildtype") trnodes theap
         matching = zip2 trnodes tnodes
         tgraph` = foldr addnode tgraph matching
         addnode (trnode,tnode)

@@ -152,6 +152,7 @@ these tuples.
    = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
      , srr_assigned_symbol :: sym               // The assigned symbol
      , srr_strictness      :: [Bool]            // Strictness annotations
+     , srr_arity           :: Int               // Arity
      , srr_typerule        :: Rule tsym tvar    // Type rule
      , srr_trace           :: Trace sym var var // Truncated and folded trace
      , srr_function_def    :: FuncDef sym var   // Resulting rewrite rules
@@ -163,6 +164,7 @@ where toString srr
       = "Task: "+++toString srr.srr_task_expression+++
         "\nSymbol: "+++toString srr.srr_assigned_symbol+++
         "\nStrictness: "+++listToString srr.srr_strictness+++
+        "\nArity: "+++toString srr.srr_arity+++
         "\nTyperule: "+++"<typerule>"+++
         "\nTrace: "+++"<trace>"+++
         "\nFunction definition: "+++"<funcdef>"+++
@@ -388,6 +390,7 @@ symredarea foldarea cli area
 = { srr_task_expression = (area <--- "newtest.symredarea.srr_task_expression ends") ---> "newtest.symredarea.srr_task_expression begins"
   , srr_assigned_symbol = (symbol <--- "newtest.symredarea.srr_assigned_symbol ends") ---> "newtest.symredarea.srr_assigned_symbol begins"
   , srr_strictness      = (stricts <--- "newtest.symredarea.srr_strictness ends") ---> "newtest.symredarea.srr_strictness begins"
+  , srr_arity           = length aargs
   , srr_typerule        = trule
   , srr_trace           = (trace <--- "newtest.symredarea.srr_trace ends") ---> "newtest.symredarea.srr_trace begins"
   , srr_function_def    = (rules <--- "newtest.symredarea.srr_function_def ends") ---> "newtest.symredarea.srr_function_def begins"
@@ -546,7 +549,7 @@ ctyperule fn typeheap typerule (sym,args)
 = mkrule targs` troot` tgraph`
   where targs = arguments trule; troot = ruleroot trule; tgraph = rulegraph trule
         trule = typerule sym
-        (targs`,targs``) = claim args targs
+        (targs`,targs``) = (claim--->"basic.claim begins from newtest.ctyperule") args targs
         (troot`,tgraph`,_) = foldr build (troot,tgraph,typeheap--varlist tgraph [troot:targs]) targs``
         build targ (troot,tgraph,[tnode:tnodes])
         = (tnode,updategraph tnode (fn 1,[targ,troot]) tgraph,tnodes)
