@@ -46,6 +46,11 @@ static void error_in_function (char *m)
 	ErrorInCompiler ("statesgen.c",m,"");
 }
 
+static void error_in_function_s (char *m,char *s)
+{
+	ErrorInCompiler ("statesgen.c",m,s);
+}
+
 static char *Elhsannots	  = "annotations are not allowed at this position";
 static char *ECodeBlock	  = "missing type specification";
 static char *Wtypeannot	  = "only strict annotations in a type rule will be regarded";
@@ -2406,7 +2411,7 @@ static void DetermineStatesOfNodeDefs (NodeDefs firstdef, int local_scope)
 			if (! (next->def_id->nid_ref_count_copy<0 ||
 					(next->def_id->nid_ref_count_copy==0 && (next->def_id->nid_mark & ON_A_CYCLE_MASK))))
 			{
-				error_in_function ("DetermineStatesOfNodeDefs");
+				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbol->symb_def->sdef_ident->ident_name/*next->def_id->nid_ident->ident_name*/);
 			}
 }
 
@@ -2683,7 +2688,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 	} else if (root_node->node_kind==GuardNode){
 		int old_scope;
 		
-		old_scope=scope;
+ 		old_scope=scope;
 		DetermineStatesOfNodeAndDefs (root_node->node_arguments->arg_node,node_defs,demstate,local_scope);
 		scope=old_scope;
 		DetermineStatesOfNodeAndDefs (root_node->node_arguments->arg_next->arg_node,root_node->node_node_defs,demstate,local_scope);
@@ -3043,20 +3048,19 @@ static NodeP add_argument_to_switch_node (NodeP rhs_root_p,NodeIdP new_node_id_p
 	ArgP arg_p;
 
 	for_l (arg_p,rhs_root_p->node_arguments,arg_next){
-		NodeP node_p;
+		NodeP node_p,*node_h;
 
 		node_p=arg_p->arg_node;
 		if (node_p->node_kind==CaseNode){
-			
-			node_p=node_p->node_arguments->arg_node;
-			if (node_p->node_kind==PushNode)
-				node_p=node_p->node_arguments->arg_next->arg_node;
+			node_h=&node_p->node_arguments->arg_node;
+			if ((*node_h)->node_kind==PushNode)
+				node_h=&(*node_h)->node_arguments->arg_next->arg_node;
 		} else if (node_p->node_kind==DefaultNode){
-			node_p	= node_p->node_arguments->arg_node;
+			node_h=&node_p->node_arguments->arg_node;
 		} else
 			error_in_function ("add_argument_to_switch_node");
 
-		add_argument_to_node (node_p, new_node_id_p);
+		*node_h=add_argument_to_node (*node_h, new_node_id_p);
 
 		--new_node_id_p->nid_refcount;
 	}
@@ -3815,6 +3819,12 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 				} else
 					error_in_function ("AnnotateStrictNodeIds");
 			}
+			break;
+		}
+		case GuardNode:
+		{
+			AnnotateStrictNodeIds (node->node_arguments->arg_node,strict_node_ids,node_def_h);
+			AnnotateStrictNodeIds (node->node_arguments->arg_next->arg_node,node->node_guard_strict_node_ids,&node->node_node_defs);
 			break;
 		}
 		default:
