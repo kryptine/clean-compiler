@@ -8,6 +8,7 @@ from type_io_common import PredefinedModuleName
 // Optional
 USE_TUPLES tuple b :== b;					// change also StdDynamic.icl and recompile all applications
 extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
+import syntaxrepr
 
 //import pp;
 
@@ -1172,17 +1173,6 @@ where
 	toString (GTT_Basic basic_type)							= toString basic_type +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ PredefinedModuleName ) "")
 	toString GTT_Function									= " -> "
 	toString (GTT_Constructor type_symb_indent mod_name)	= type_symb_indent.type_name.id_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
-
-instance toString BasicType
-where
-	toString BT_Int 		= "Int"
-	toString BT_Char		= "Char"
-	toString BT_Real		= "Real"
-	toString BT_Bool		= "Bool"
-	toString BT_Dynamic		= "Dynamic"
-	toString BT_File		= "File"
-	toString BT_World		= "World"
-	toString (BT_String _)	= "String"
 
 
 getResultType :: ExprInfoPtr !*ConversionInfo -> (!AType, !*ConversionInfo)

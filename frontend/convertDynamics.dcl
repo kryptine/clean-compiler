@@ -16,6 +16,5 @@ convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !*{! Gr
 */
 
 instance toString GlobalTCType
-instance toString BasicType
 
 get_module_id_app :: !*PredefinedSymbols -> (App,Expression,!*PredefinedSymbols)
