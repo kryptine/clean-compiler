@@ -339,7 +339,7 @@ determine_defaults No default_expr=:(Yes (var=:{var_info_ptr}, indirection_var_l
 	#! var_info = sreadPtr var_info_ptr ci_var_heap
 	# (expression, ci) = toExpression default_expr {ci & ci_var_heap = ci_var_heap}
 	# expression
-		= expression ---> expression
+		= expression// ---> expression
 	= case var_info of
 		VI_Default ref_count
 			-> (expression, default_expr, {ci & ci_var_heap = ci.ci_var_heap <:= (var_info_ptr, VI_Default (inc ref_count))} )
@@ -426,7 +426,7 @@ where
 			= VI_Indirection 0
 							
   		#! (placeholder_var, ci) 
-			= newVariable v_tc_placeholder v ci ---> st_arg
+			= newVariable v_tc_placeholder v ci //---> st_arg
 		#! (bind,ci)
 			= create_variable v_tc_placeholder_ident_global placeholder_var.var_info_ptr ci
 		
