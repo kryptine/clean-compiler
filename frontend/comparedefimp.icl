@@ -141,13 +141,13 @@ compareWithConversions size_uncopied_icl_defs conversions dclDefs iclDefs tc_sta
 	= iFoldSt (compareWithConversion size_uncopied_icl_defs conversions dclDefs) 0 (size conversions)
 			(iclDefs, tc_state, error_admin)
 
-compareWithConversion :: !Int !{#Int} !(b c) !Int !(!u:(b c), !*TypesCorrespondState, !*ErrorAdmin)
-						-> (!v:(b c), !.TypesCorrespondState, !.ErrorAdmin)
+compareWithConversion :: !Int !{#Int} !(d c) !Int !(!u:(b c), !*TypesCorrespondState, !*ErrorAdmin)
+						-> (!u:(b c), !.TypesCorrespondState, !.ErrorAdmin)
 //1.3
-						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c, [u <= v]
+						| Array b & Array d & getIdentPos , select_u , t_corresponds , uselect_u c
 //3.1
 /*2.0
-						| Array b c & t_corresponds, getIdentPos c, [u <= v]
+						| Array b c & Array d c & t_corresponds, getIdentPos c
 0.2*/
 compareWithConversion size_uncopied_icl_defs conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
 	# icl_index = conversions.[dclIndex]
