@@ -70,16 +70,6 @@ updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs co
 			dcl_modules expl_imp_infos cs_symbol_table
 	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers
 			(dcl_modules, expl_imp_infos, cs_symbol_table)
-updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Instance class_ident} dcl_modules expl_imp_infos cs_symbol_table
-	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
-	# cs_symbol_table
-			= optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
-	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Imported (STE_Instance class_ident) _} dcl_modules expl_imp_infos cs_symbol_table
-	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
-	# cs_symbol_table
-			= optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
-	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
@@ -119,6 +109,7 @@ addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_mod
 		  )
 
 
+optStoreInstanceWithClassSymbol :: Declaration !Ident !*SymbolTable -> .SymbolTable
 optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
 	// this function is only for old syntax
 	| switch_import_syntax False True

@@ -19,6 +19,9 @@ markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
 
+optStoreInstanceWithClassSymbol :: Declaration !Ident !*SymbolTable
+			-> .SymbolTable
+
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
 				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
 			-> (!.SolvedImports,!(!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))

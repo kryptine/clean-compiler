@@ -1928,6 +1928,14 @@ updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
 			dcl_modules expl_imp_infos cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 	  		= mapSt markExplImpSymbols super_components (expl_imp_infos, cs_symbol_table)
+	  cs_symbol_table
+	  		= switch_import_syntax
+	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_local_for_import cs_symbol_table)
+	  			cs_symbol_table
+	  cs_symbol_table
+	  		= switch_import_syntax
+	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_import cs_symbol_table)
+	  			cs_symbol_table
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  		= foldlArraySt (update_expl_imp_for_marked_symbol mod_index) dcls_local_for_import
 	  				(dcl_modules, expl_imp_infos, cs_symbol_table)
@@ -1939,6 +1947,16 @@ updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
 	  				changed_symbols cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 	
+	
+opt_store_instance_with_class_symbol decl=:{dcl_kind=STE_Imported (STE_Instance class_ident) _} cs_symbol_table
+	/* This function is only for old import syntax.
+	   All declared instances for a class have to be collected
+	*/
+	= optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
+opt_store_instance_with_class_symbol _ cs_symbol_table
+	= cs_symbol_table
+
+
 update_expl_imp_for_marked_symbol mod_index decl=:{dcl_ident} (dcl_modules, expl_imp_infos, cs_symbol_table)
 	# (ste, cs_symbol_table)
 			= readPtr dcl_ident.id_info cs_symbol_table
