@@ -1247,7 +1247,7 @@ where
 		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*CheckState)
 	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } modules rev_dictionary_list
 			indexes type_var_heap var_heap cs=:{cs_symbol_table,cs_error}
-		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_info}}} = class_def
+		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}}} = class_def
 		| isNilPtr id_info
 			# (type_id_info, cs_symbol_table) = newPtr EmptySymbolTableEntry cs_symbol_table
 			  nr_of_members = size class_members
@@ -1315,7 +1315,7 @@ where
 											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })
 							<:= (cons_id_info, { ste_kind = STE_DictCons cons_def, ste_index = index_cons,
 											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })})
-
+					
 		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		| ste_kind == STE_Empty
 			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap,

@@ -871,22 +871,28 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			-> (!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
 		check_generic_expr 
 				free_vars entry=:{ste_kind=STE_Generic,ste_index} id  kind  
-				e_input=:{ei_mod_index}  e_state 
+				e_input=:{ei_mod_index} e_state 
 				e_info=:{ef_generic_defs} cs
-			//#! e_info = {e_info & ef_generic_defs = add_kind ef_generic_defs ste_index kind}	
+
+			#! (ef_generic_defs, e_state) = add_kind ste_index kind ef_generic_defs e_state
+			#! e_info = { e_info & ef_generic_defs = ef_generic_defs }  
 			= check_it free_vars ei_mod_index ste_index id kind e_input e_state e_info cs	
 		check_generic_expr 
 				free_vars entry=:{ste_kind=STE_Imported STE_Generic mod_index, ste_index} id kind  
 				e_input e_state 
 				e_info=:{ef_modules} cs
 			
-			//#! (dcl_module, ef_modules) = ef_modules ! [mod_index]
-			//#! (dcl_common, dcl_module) = dcl_module ! dcl_common 
-			//#! (com_generic_defs, dcl_common) = dcl_common ! com_generic_defs
-			//#! dcl_common = {dcl_common & com_generic_defs = add_kind com_generic_defs ste_index kind}
-			//#! dcl_module = {dcl_module & dcl_common = dcl_common}
-			//#! ef_modules = {ef_modules & [mod_index] = dcl_module} 
-			//#! e_info = { e_info & ef_modules = ef_modules }
+			#! (dcl_module, ef_modules) = ef_modules ! [mod_index]
+			#! (dcl_common, dcl_module) = dcl_module ! dcl_common 
+			#! (com_generic_defs, dcl_common) = dcl_common ! com_generic_defs
+			
+			#! (com_generic_defs, e_state) = add_kind ste_index kind com_generic_defs e_state
+						
+			#! dcl_common = {dcl_common & com_generic_defs = com_generic_defs}
+			#! dcl_module = {dcl_module & dcl_common = dcl_common}
+			#! ef_modules = {ef_modules & [mod_index] = dcl_module} 
+			
+			#! e_info = { e_info & ef_modules = ef_modules }
 
 			= check_it free_vars mod_index ste_index id kind e_input e_state e_info cs	
 		check_generic_expr free_vars  entry=:{ste_kind=STE_Empty} id kind  e_input e_state e_info cs=:{cs_error}
@@ -903,11 +909,15 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			#! cs = { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric }
 			= (App app, free_vars, e_state, e_info, cs)
 
-		add_kind :: !*{#GenericDef} !Index !TypeKind -> !*{#GenericDef}			
-		add_kind generic_defs generic_index kind
-			# (generic_def, generic_defs) = generic_defs ! [generic_index]		
-			= {generic_defs & [generic_index] = addGenericKind generic_def kind}
-			 									 
+		add_kind :: !Index !TypeKind !u:{#GenericDef} !*ExpressionState 
+			-> (!u:{#GenericDef}, !*ExpressionState)			
+		add_kind generic_index kind generic_defs e_state=:{es_type_heaps=es_type_heaps=:{th_vars}}
+			#! (generic_def=:{gen_kinds_ptr}, generic_defs) = generic_defs ! [generic_index]
+			#! (TVI_Kinds kinds, th_vars) = readPtr gen_kinds_ptr th_vars			
+			#! kinds = eqMerge [kind] kinds  
+			#! th_vars = writePtr gen_kinds_ptr (TVI_Kinds kinds) th_vars
+			#! e_state = { e_state & es_type_heaps = {es_type_heaps & th_vars = th_vars}}
+			= (generic_defs, e_state) 									 
 // ..AA
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl, line 868)" // <<- expr
@@ -947,6 +957,15 @@ where
 			#! (var_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 			= (Var {var_name = id, var_info_ptr = info_ptr, var_expr_ptr = var_expr_ptr}, free_vars,
 					{e_state & es_expr_heap = es_expr_heap}, e_info, cs)
+// AA..
+	check_id_expression {ste_kind = STE_Generic} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
+		= (EE, free_vars, e_state, e_info, 
+			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})
+	check_id_expression {ste_kind = STE_Imported STE_Generic _} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
+		= (EE, free_vars, e_state, e_info, 
+			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})			
+// ..AA					
+					
 	check_id_expression entry is_expr_list free_vars id=:{id_info} e_input e_state e_info cs
 		# (symb_kind, arity, priority, is_a_function, e_state, e_info, cs) = determine_info_of_symbol entry id_info e_input e_state e_info cs
 		  symbol = { symb_name = id, symb_kind = symb_kind, symb_arity = 0 }

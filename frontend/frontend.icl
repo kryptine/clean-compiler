@@ -130,14 +130,19 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# heaps = { heaps & hp_type_heaps = type_heaps }
 
 	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
-		case False of
+		case True of
 		True -> convertGenerics 
 					components main_dcl_module_n ti_common_defs fun_defs td_infos 
 					heaps hash_table predef_symbols dcl_mods error_admin
 		False -> (components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
 
+
 	# icl_common = ti_common_defs.[main_dcl_module_n]	
+	
 	# error = error_admin.ea_file
+	#! ok = error_admin.ea_ok
+	| not ok
+		= (No,{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 // ..AA
 
 	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)

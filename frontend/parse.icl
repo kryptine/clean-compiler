@@ -1228,6 +1228,7 @@ wantGenericDefinition context pos pState
 				,	gt_arity = length arg_vars
 				}
 		,	gen_pos = pos
+		,	gen_kinds_ptr = nilPtr
 		,	gen_classes = []
 		,	gen_isomap = MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0
 		}

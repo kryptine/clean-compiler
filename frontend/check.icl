@@ -23,15 +23,21 @@ checkGenerics
 	| gen_index == size generic_defs
 		= (generic_defs, class_defs, type_defs, modules, type_heaps, cs)
 	// otherwise
-		# (gen_def=:{gen_name, gen_type, gen_pos}, generic_defs) = generic_defs![gen_index]
+		# (generic_def=:{gen_name, gen_type, gen_pos}, generic_defs) = generic_defs![gen_index]
 		# position = newPosition gen_name gen_pos
 		# cs_error = setErrorAdmin position cs_error
 			//---> ("checkGenerics generic type 1", gen_type.gt_type)
 
+		// add * for kind-star instances and *->* for arrays
+		# kinds = 
+			[	KindConst
+			, 	KindArrow [KindConst, KindConst]
+			]
+		# (kinds_ptr, th_vars) = newPtr (TVI_Kinds kinds) th_vars
+
 		# cs = {cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }
 		# type_heaps = {type_heaps & th_vars = th_vars}
-		//# (gt_type, _, type_defs, class_defs, modules, type_heaps, cs) =
-		//	checkSymbolType module_index gen_type.gt_type SP_None type_defs class_defs modules type_heaps cs
+
 		# (gt_type, type_defs, class_defs, modules, type_heaps, cs) =
 			checkMemberType module_index gen_type.gt_type type_defs class_defs modules type_heaps cs
 
@@ -40,7 +46,13 @@ checkGenerics
 		#! cs = {cs & cs_error = cs_error}
 		#! gt_type = {gt_type & st_vars = st_vars}
 
-		# generic_defs = {generic_defs & [gen_index] . gen_type = { gen_type & gt_vars = gt_vars, gt_type = gt_type }}				
+		# generic_def =
+			{	generic_def &
+				gen_type = { gen_type & gt_vars = gt_vars, gt_type = gt_type }
+			,	gen_kinds_ptr = kinds_ptr
+			}
+
+		# generic_defs = {generic_defs & [gen_index] = generic_def}				
 			//---> ("checkGenerics generic type 2", gt_type)
 		= checkGenerics (inc gen_index) module_index generic_defs class_defs type_defs modules type_heaps cs
 where	
@@ -2537,6 +2549,7 @@ where
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_PredefinedModule]
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+				<=< adjust_predef_symbol PD_StringType mod_index STE_Type
 				<=< adjust_predef_symbols PD_ListType PD_UnboxedArrayType mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsSymbol PD_Arity32TupleSymbol mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_TypeCodeClass mod_index STE_Class
@@ -2581,7 +2594,12 @@ where
 				<=< adjust_predef_symbol PD_TypeARROW			mod_index STE_Type
 				<=< adjust_predef_symbol PD_ConsARROW			mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_isomap_ARROW_		mod_index STE_DclFunction				
-				<=< adjust_predef_symbol PD_isomap_ID			mod_index STE_DclFunction)				
+				<=< adjust_predef_symbol PD_isomap_ID			mod_index STE_DclFunction				
+				<=< adjust_predef_symbol PD_TypeCONSInfo		mod_index STE_Type
+				<=< adjust_predef_symbol PD_ConsCONSInfo		mod_index STE_Constructor
+				<=< adjust_predef_symbol PD_TypeCONS			mod_index STE_Type
+				<=< adjust_predef_symbol PD_ConsCONS			mod_index STE_Constructor
+				<=< adjust_predef_symbol PD_cons_info			mod_index STE_DclFunction)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
