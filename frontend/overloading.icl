@@ -997,7 +997,7 @@ getClassVariable symb var_info_ptr var_heap error
 			-> (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)), error)
 		(_, var_heap)
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			-> (symb, var_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), overloadingError symb error)
+			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), overloadingError symb error)
 
 updateDynamics :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
@@ -1035,7 +1035,7 @@ where
 			= update_dynamics funs type_pattern_vars ({ ui_fun_defs & [fun] = fun_def })
 				 ui_fun_env ui_symbol_heap x_type_code_info ui_var_heap ui_error predef_symbols
 
-removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int!*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
 removeOverloadedFunctions group type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
@@ -1053,7 +1053,7 @@ where
 			# (fun_def, fun_defs) = fun_defs![fun_index]  
 			  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb,fun_pos} = fun_def
-			  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
+			  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap) // ---> ("remove_overloaded_function", fun_symb, st_context))
 			  error = setErrorAdmin (newPosition fun_symb fun_pos) error
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
@@ -1064,7 +1064,6 @@ where
 	// MV ...
 						    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n,x_internal_type_id = module_id_app,x_module_id = No}}
 	// ... MV
-	// WAS:			    	ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
 			  (tb_args, var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap) 
 			  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
 			  						fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars } }
@@ -1268,6 +1267,8 @@ where
 // ... MV
 	}
 
+import RWSDebug
+
 class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
 
 instance updateExpression Expression
@@ -1326,7 +1327,9 @@ where
 					-> (Var { var_name = var_name, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
 								(var_heap <:= (tc_var, VI_ClassVar var_name new_info_ptr (inc count)), error))
 				_
-					-> abort "build_context_arg (overloading.icl)" // ---> (tc <<- var_info))
+					# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+					-> (Var { var_name = symb, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
+								(var_heap <:= (tc_var, VI_ClassVar symb new_info_ptr 1), overloadingError symb error))
 
 		get_recursive_fun_index :: !Index !SymbKind Int !{# FunDef} -> Index
 		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) main_dcl_module_n fun_defs
