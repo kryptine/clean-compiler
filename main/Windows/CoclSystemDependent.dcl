@@ -23,6 +23,6 @@ SystemDependentInitialIO :: [a]
 
 ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
 
-set_compiler_id :: Int -> Int
+set_compiler_id :: !Int -> Int
 
 compiler_loop :: ([{#Char}] *st -> *(Bool, *st)) *st -> (!Bool, !*st)

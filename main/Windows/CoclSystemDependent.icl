@@ -26,12 +26,19 @@ ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
 ensureCleanSystemFilesExists path env
 	= ensureDirectoryExists path env
 
-set_compiler_id :: Int -> Int
-set_compiler_id compiler_id = compiler_id
-
 import thread_message;
 
 import code from "thread_message.obj";
+
+set_compiler_id :: !Int -> Int
+set_compiler_id compiler_id = code {
+	ccall	set_compiler_id "I:I"
+ };
+
+get_compiler_id :: Int
+get_compiler_id = code {
+	ccall	get_compiler_id ":I"
+ };
 
 compiler_loop :: ([{#Char}] *st -> *(Bool, *st)) *st -> (!Bool, !*st)
 compiler_loop compile compile_state
@@ -119,7 +126,7 @@ compile_files compile thread_id wm_number compile_state
 		["cocl":cocl_args]
 			# (ok,compile_state)=compile cocl_args compile_state
 			# result=if ok 0(-1);
-			# r=send_integers_to_thread thread_id wm_number 0 result;
+			# r=send_integers_to_thread thread_id wm_number get_compiler_id result;
 			| r==0
 				-> abort "compile_files 3";
 				-> compile_files compile thread_id wm_number compile_state
