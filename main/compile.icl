@@ -131,11 +131,11 @@ compileModule options commandLineArgs files
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (io, files)
 		=	stdio files
-
 	# (predefSymbols, hashTable) = buildPredefinedSymbols newHashTable
 	  (moduleIdent, hashTable) = putIdentInHashTable options.moduleName IC_Module hashTable
 	# (predefs, _, files, error, io, out, optionalSyntaxTree)
-		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths predefSymbols hashTable files error io out
+		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths (isMember "-lt" commandLineArgs)
+								predefSymbols hashTable files error io out
 	# (closed, files)
 		=	fclose io files
 	| not closed
