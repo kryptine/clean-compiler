@@ -1,11 +1,19 @@
 implementation module explicitimports
+// compile with reuse unique nodes option
 
 import StdEnv
 
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, RWSDebug
+:: FilterState =
+	{	fs_wanted_symbols	:: ![Ident]
+	,	fs_modules			:: !.{#DclModule}
+	,	fs_symbol_table		:: !.SymbolTable
+	,	fs_error			:: !.ErrorAdmin
+	}
 
-possiblyFilterExplImportedDecls :: ![ImportDeclaration] u:[w:(.Index,y:Declarations)] Position u0:{#DclModule} !*CheckState
-				-> (!v:[x:(Index,z:Declarations)],!u0:{#DclModule},!.CheckState), [y <= z, w <= x, u <= v]
+import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, RWSDebug, cheat
+
+possiblyFilterExplImportedDecls :: ![ImportDeclaration] u:[w:(.Index,y:Declarations)] Position *{#DclModule} !*CheckState
+				-> (!v:[x:(Index,z:Declarations)],!.{#DclModule},!.CheckState), [y <= z, w <= x, u <= v]
 possiblyFilterExplImportedDecls [] decls_of_imported_module _ modules cs // implicit import
 	= (decls_of_imported_module, modules, cs)
 possiblyFilterExplImportedDecls import_declarations decls_of_imported_module import_statement_pos modules cs=:{cs_error, cs_symbol_table}
@@ -13,13 +21,14 @@ possiblyFilterExplImportedDecls import_declarations decls_of_imported_module imp
 	# cs_error = pushErrorAdmin (newPosition { id_name="", id_info=nilPtr } import_statement_pos) cs_error
 	  (wanted_symbols, cs_symbol_table, cs_error)
 	  		= foldSt add_wanted_symbol_to_symbol_table import_declarations ([], cs_symbol_table, cs_error)
-	  (imported_decls, wanted_symbols, modules, cs=:{cs_error, cs_symbol_table})
-	  		= foldSt (filter_decls_per_module import_statement_pos) decls_of_imported_module
-	  					([], wanted_symbols, modules, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
-	  cs = { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }
-	  cs = foldSt (switch_import_syntax restore_symbol_table_old_syntax restore_symbol_table) wanted_symbols cs
+	  fs = { fs_wanted_symbols = wanted_symbols, fs_modules = modules,
+	  		fs_symbol_table = cs_symbol_table, fs_error = cs_error }
+	  (imported_decls, { fs_wanted_symbols, fs_modules, fs_symbol_table, fs_error })
+	  		= foldSt (filter_decls_per_module import_statement_pos) decls_of_imported_module ([], fs)
+	  cs = foldSt (switch_import_syntax restore_symbol_table_old_syntax restore_symbol_table) fs_wanted_symbols
+	  			{ cs & cs_symbol_table = fs_symbol_table, cs_error = fs_error }
 	  cs = { cs & cs_error = popErrorAdmin cs.cs_error }
-	= (imported_decls, modules, cs)
+	= (imported_decls, fs_modules, cs)
   where
 	add_wanted_symbol_to_symbol_table import_declaration=:(ID_OldSyntax idents) (wanted_symbols_accu, cs_symbol_table, cs_error)
 		// this alternative is only for old syntax
@@ -105,12 +114,12 @@ possiblyFilterExplImportedDecls import_declarations decls_of_imported_module imp
 					-> writePtr id_info { ste & ste_kind = STE_ExplImp True a b c } cs_symbol_table
 				_	-> cs_symbol_table
 			
-	filter_decls_per_module import_statement_pos (mod_index, {dcls_import, dcls_local}) (imported_decls_per_module, wanted_symbols, modules, cs)
-		# (dcls_import, (wanted_symbols, modules, cs))
+	filter_decls_per_module import_statement_pos (mod_index, {dcls_import, dcls_local}) (imported_decls_per_module, fs)
+		# (dcls_import, fs)
 				= iMapFilterYesSt (i_filter_possibly_imported_decl mod_index dcls_import)
-						0 (size dcls_import) (wanted_symbols, modules, cs)
-		  (dcls_local, (wanted_symbols, modules, cs))
-		  		= mapFilterYesSt (filter_possibly_imported_decl mod_index) dcls_local (wanted_symbols, modules, cs)
+						0 (size dcls_import) fs
+		  (dcls_local, fs)
+		  		= mapFilterYesSt (filter_possibly_imported_decl mod_index) dcls_local fs
 		  dcls_import_array
 		  		= { el \\ el <- dcls_import}
 		  size_dia
@@ -127,218 +136,207 @@ possiblyFilterExplImportedDecls import_declarations decls_of_imported_module imp
 							dcls_explicit = dcls_explicit })
 			:imported_decls_per_module
 			],
-			wanted_symbols, modules, cs)
+			fs)
 
+	i_filter_possibly_imported_decl :: !Int !{!Declaration} !Int !*FilterState
+									-> (!Optional Declaration, !.FilterState)
 	i_filter_possibly_imported_decl mod_index dcls_import i state
 		= filter_possibly_imported_decl mod_index dcls_import.[i] state
 		
+	filter_possibly_imported_decl :: !Int !Declaration !*FilterState -> (!Optional Declaration, !.FilterState)
 	filter_possibly_imported_decl _ decl=:{dcl_kind=STE_Imported ste_kind mod_index} state
 		= filter_decl mod_index decl ste_kind state
 	filter_possibly_imported_decl mod_index decl=:{dcl_kind} state
 		= filter_decl mod_index decl dcl_kind state
 
-//	filter_decl :: !Int !Declaration !STE_Kind !(!v:[Ident],!u:{#DclModule},!*CheckState)
-//			-> (!Optional Declaration,!(!w:[Ident],!u:{#DclModule},!.CheckState)), [v<=w]
-	filter_decl mod_index decl (STE_Instance class_ident) state
+	filter_decl :: !Int !Declaration !STE_Kind !*FilterState -> (!Optional Declaration, !.FilterState)
+	filter_decl mod_index decl (STE_Instance class_ident) fs
 		// this alternative is only for old syntax
 		| switch_import_syntax True False
-			= filter_instance_decl mod_index decl class_ident state
-	filter_decl mod_index decl=:{dcl_ident={id_info}} dcl_kind (wanted_symbols_accu, modules, cs=:{cs_symbol_table})
-		# (ste=:{ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
+			= filter_instance_decl mod_index decl class_ident fs
+	filter_decl mod_index decl=:{dcl_ident={id_info}} dcl_kind fs=:{fs_symbol_table}
+		# (ste=:{ste_kind}, fs_symbol_table) = readPtr id_info fs_symbol_table
+		  fs = { fs & fs_symbol_table = fs_symbol_table }
 		= case ste_kind of
 			STE_ExplImp _ opt_import_declaration ste_kind_2 _
 				// the symbol is wanted (see above).
-				# cs_symbol_table 
+				# fs_symbol_table 
 						= writePtr id_info { ste & ste_kind = STE_ExplImp True opt_import_declaration ste_kind_2 False}
-									cs.cs_symbol_table //--->("setting True", decl.dcl_ident)
+									fs.fs_symbol_table //--->("setting True", decl.dcl_ident)
 						// mark this symbol as being succesfully imported
-				  cs = { cs & cs_symbol_table = cs_symbol_table}
+				  fs = { fs & fs_symbol_table = fs_symbol_table}
 		  		-> case opt_import_declaration of
-					No	-> (Yes decl, (wanted_symbols_accu, modules, cs))
+					No	-> (Yes decl, fs)
 					Yes import_declaration
-						# cs = switch_import_syntax (mark_partners import_declaration cs) cs
-						-> (Yes decl, add_bracketed_symbols_to_symbol_table import_declaration decl dcl_kind mod_index
-												 (wanted_symbols_accu, modules, cs))
-			_	-> (No, (wanted_symbols_accu, modules, cs))
+						# fs = switch_import_syntax (mark_partners import_declaration fs) fs
+						-> (Yes decl, add_bracketed_symbols_to_symbol_table import_declaration decl dcl_kind mod_index fs)
+			_	-> (No, fs)
 
 	// only for old syntax
-	filter_instance_decl mod_index decl=:{dcl_index} class_ident
-							(wanted_symbols_accu, modules, cs=:{cs_symbol_table})
-		# (ste=:{ste_kind}, cs_symbol_table) = readPtr class_ident.id_info cs_symbol_table
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
+	filter_instance_decl mod_index decl=:{dcl_index} class_ident fs=:{fs_symbol_table}
+		# (ste=:{ste_kind}, fs_symbol_table) = readPtr class_ident.id_info fs_symbol_table
+		  fs = { fs & fs_symbol_table = fs_symbol_table }
 		= case ste_kind of
 			STE_ExplImp _ _ _ _
-				-> (Yes decl, (wanted_symbols_accu, modules, cs))
-			_	-> (No, (wanted_symbols_accu, modules, cs))
+				-> (Yes decl, fs)
+			_	-> (No, fs)
 
 	// only for old syntax
-	mark_partners (ID_OldSyntax partners) cs=:{cs_symbol_table}
-		# cs_symbol_table = foldSt mark_partner partners cs_symbol_table
-		= { cs & cs_symbol_table = cs_symbol_table }
+	mark_partners (ID_OldSyntax partners) fs=:{fs_symbol_table}
+		# fs_symbol_table = foldSt mark_partner partners fs_symbol_table
+		= { fs & fs_symbol_table = fs_symbol_table }
 	  where
-		mark_partner {id_info} cs_symbol_table
-			# (ste=:{ste_kind=STE_ExplImp _ a b c}, cs_symbol_table) = readPtr id_info cs_symbol_table
-			= writePtr id_info { ste & ste_kind = STE_ExplImp True a b c } cs_symbol_table
+		mark_partner {id_info} fs_symbol_table
+			# (ste=:{ste_kind=STE_ExplImp _ a b c}, fs_symbol_table) = readPtr id_info fs_symbol_table
+			= writePtr id_info { ste & ste_kind = STE_ExplImp True a b c } fs_symbol_table
 		
-	add_bracketed_symbols_to_symbol_table import_declaration decl dcl_kind mod_index
-										(wanted_symbols_accu, modules, cs)
-		# (opt_bracket_info, modules, cs=:{cs_symbol_table})
+	add_bracketed_symbols_to_symbol_table import_declaration decl dcl_kind mod_index fs
+		# (opt_bracket_info, fs=:{fs_symbol_table})
 				= (switch_import_syntax get_opt_bracket_info_old_syntax get_opt_bracket_info)
-					import_declaration decl dcl_kind mod_index modules cs
+					import_declaration decl dcl_kind mod_index fs
 		| isNo opt_bracket_info
-			= (wanted_symbols_accu, modules, { cs & cs_symbol_table = cs_symbol_table })
+			= { fs & fs_symbol_table = fs_symbol_table }
 		# (Yes (all_bracket_ids, wanted_bracket_ids, structure_name, ste_kind)) 
 				= opt_bracket_info
 		  all_bracket_ids_are_wanted
 		  		= isEmpty wanted_bracket_ids
-		  cs_symbol_table
+		  fs_symbol_table
 				= foldSt (add_bracket_symbol_to_symbol_table ste_kind all_bracket_ids_are_wanted) all_bracket_ids
-																  cs_symbol_table
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
+																  fs_symbol_table
+		  fs = { fs & fs_symbol_table = fs_symbol_table }
 		| all_bracket_ids_are_wanted
 			// "import class C (..)" or "import :: T (..)" or "import :: T {..}" 
-			= (all_bracket_ids++wanted_symbols_accu, modules, cs)
+			= { fs & fs_wanted_symbols = all_bracket_ids++fs.fs_wanted_symbols }
 		// "import class C (m1, m2)" or "import :: T (C1, C2)" or "import :: T {f1, f2}" 
 		// currently all bracket symbols have (STE_ExplImp _ _ _ True). Mark those that are really wanted False
 		// and overwrite the remaining again with STE_Empty
-		# cs = foldSt (check_wanted_idents structure_name) wanted_bracket_ids cs
-		  cs_symbol_table = foldSt overwrite_wanted_idents wanted_bracket_ids cs.cs_symbol_table
-		  (wanted_symbols_accu, cs_symbol_table)
-		  		= foldSt remove_and_collect all_bracket_ids (wanted_symbols_accu, cs_symbol_table)
-		= (wanted_symbols_accu, modules, { cs & cs_symbol_table = cs_symbol_table })
+		# fs = foldSt (check_wanted_idents structure_name) wanted_bracket_ids fs
+		  fs_symbol_table = foldSt overwrite_wanted_idents wanted_bracket_ids fs.fs_symbol_table
+		  (fs_wanted_symbols, fs_symbol_table)
+		  		= foldSt remove_and_collect all_bracket_ids (fs.fs_wanted_symbols, fs_symbol_table)
+		= { fs & fs_wanted_symbols = fs_wanted_symbols, fs_symbol_table = fs_symbol_table }
 	  where
 	  	isNo No = True
 	  	isNo _  = False
 
-	add_bracketed_symbols_to_symbol_table _ _ _ mod_index states
-		= states
-	
-	get_opt_bracket_info (ID_Class _ (Yes wanted_members)) {dcl_kind, dcl_index} mod_index modules cs=:{cs_symbol_table}
-		# (dcl_module, module_entry, modules, cs_symbol_table)
-				= get_module_and_entry dcl_kind mod_index modules cs_symbol_table
+	get_opt_bracket_info (ID_Class _ (Yes wanted_members)) {dcl_kind, dcl_index} mod_index fs
+		# (dcl_module, module_entry, fs)
+				= get_module_and_entry dcl_kind mod_index fs
 		  class_def = case module_entry.ste_kind of
 						STE_OpenModule _ modul
 							-> modul.mod_defs.def_classes!!dcl_index
 						STE_ClosedModule
 							-> dcl_module.dcl_common.com_class_defs.[dcl_index]
 		  all_member_idents = [ ds_ident \\ {ds_ident} <-: class_def.class_members ]
-		= (Yes (all_member_idents, wanted_members, class_def.class_name, STE_Member),
-			modules, { cs & cs_symbol_table = cs_symbol_table })
-	get_opt_bracket_info (ID_Type ii (Yes wanted_constructors)) {dcl_kind, dcl_index} mod_index modules cs=:{cs_symbol_table}
-		# (dcl_module, module_entry, modules, cs_symbol_table)
-				= get_module_and_entry dcl_kind mod_index modules cs_symbol_table
+		= (Yes (all_member_idents, wanted_members, class_def.class_name, STE_Member), fs)
+	get_opt_bracket_info (ID_Type ii (Yes wanted_constructors)) {dcl_kind, dcl_index} mod_index fs
+		# (dcl_module, module_entry, fs)
+				= get_module_and_entry dcl_kind mod_index fs
 		  type_def = case module_entry.ste_kind of
 						STE_OpenModule _ modul
 							-> modul.mod_defs.def_types!!dcl_index
 						STE_ClosedModule
 							-> dcl_module.dcl_common.com_type_defs.[dcl_index]
 		| not (isAlgType type_def.td_rhs)
-			# cs = { cs & cs_error = checkError ii.ii_ident "is not an algebraic type" cs.cs_error,
-							cs_symbol_table = cs_symbol_table }
-			= (No, modules, cs)
+			# fs = { fs & fs_error = checkError ii.ii_ident "is not an algebraic type" fs.fs_error }
+			= (No, fs)
 		# (AlgType constructors) = type_def.td_rhs
 		  all_constructor_idents = [ ds_ident \\ {ds_ident} <- constructors ]
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
-		= (Yes (all_constructor_idents, wanted_constructors, type_def.td_name, STE_Constructor), modules, cs)
+		= (Yes (all_constructor_idents, wanted_constructors, type_def.td_name, STE_Constructor), fs)
 	  where
 		isAlgType (AlgType _) = True
 		isAlgType _ = False
-	get_opt_bracket_info (ID_Record ii (Yes wanted_fields)) {dcl_kind, dcl_index} mod_index modules cs=:{cs_symbol_table}
-		# (dcl_module, module_entry, modules, cs_symbol_table)
-				= get_module_and_entry dcl_kind mod_index modules cs_symbol_table
+	get_opt_bracket_info (ID_Record ii (Yes wanted_fields)) {dcl_kind, dcl_index} mod_index fs
+		# (dcl_module, module_entry, fs)
+				= get_module_and_entry dcl_kind mod_index fs
 		  type_def = case module_entry.ste_kind of
 						STE_OpenModule _ modul
 							-> modul.mod_defs.def_types!!dcl_index
 						STE_ClosedModule
 							-> dcl_module.dcl_common.com_type_defs.[dcl_index]
 		| not (isRecordType type_def.td_rhs)
-			# cs = { cs & cs_error = checkError ii.ii_ident "is not a record type" cs.cs_error,
-							cs_symbol_table = cs_symbol_table }
-			= (No, modules, cs)
+			# fs = { fs & fs_error = checkError ii.ii_ident "is not a record type" fs.fs_error }
+			= (No, fs)
 		# (RecordType {rt_fields}) = type_def.td_rhs
 		  all_field_idents = [ fs_name \\ {fs_name} <-: rt_fields ]
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
-		= (Yes (all_field_idents, wanted_fields, type_def.td_name, STE_Field (hd all_field_idents)), modules, cs)
+		= (Yes (all_field_idents, wanted_fields, type_def.td_name, STE_Field (hd all_field_idents)), fs)
 	  where
 		isRecordType (RecordType _) = True
 		isRecordType _ = False
-	get_opt_bracket_info _ _ _ modules cs
-		= (No, modules, cs)
+	get_opt_bracket_info _ _ _ fs
+		= (No, fs)
 
 	// this function is only for old syntax
-	get_opt_bracket_info_old_syntax _ {dcl_index} STE_Class mod_index modules cs=:{cs_symbol_table}
-		# (dcl_module, module_entry, modules, cs_symbol_table)
-				= get_module_and_entry STE_Class mod_index modules cs_symbol_table
+	get_opt_bracket_info_old_syntax _ {dcl_index} STE_Class mod_index fs
+		# (dcl_module, module_entry, fs)
+				= get_module_and_entry STE_Class mod_index fs
 		  class_def = case module_entry.ste_kind of
 						STE_OpenModule _ modul
 							-> modul.mod_defs.def_classes!!dcl_index
 						STE_ClosedModule
 							-> dcl_module.dcl_common.com_class_defs.[dcl_index]
 		  all_member_idents = [ ds_ident \\ {ds_ident} <-: class_def.class_members ]
-		  (all_member_idents_2, cs_symbol_table)
-		  		= foldSt filter_member all_member_idents ([], cs_symbol_table)
-		= (Yes (all_member_idents_2, [], class_def.class_name, STE_Member),
-			modules, { cs & cs_symbol_table = cs_symbol_table })
-	get_opt_bracket_info_old_syntax _ {dcl_index} STE_Type mod_index modules cs=:{cs_symbol_table}
-		# (dcl_module, module_entry, modules, cs_symbol_table)
-				= get_module_and_entry STE_Type mod_index modules cs_symbol_table
+		  (all_member_idents_2, fs_symbol_table)
+		  		= foldSt filter_member all_member_idents ([], fs.fs_symbol_table)
+		= (Yes (all_member_idents_2, [], class_def.class_name, STE_Member), { fs & fs_symbol_table = fs_symbol_table })
+	get_opt_bracket_info_old_syntax _ {dcl_index} STE_Type mod_index fs
+		# (dcl_module, module_entry, fs)
+				= get_module_and_entry STE_Type mod_index fs
 		  type_def = case module_entry.ste_kind of
 						STE_OpenModule _ modul
 							-> modul.mod_defs.def_types!!dcl_index
 						STE_ClosedModule
 							-> dcl_module.dcl_common.com_type_defs.[dcl_index]
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case type_def.td_rhs of
 			RecordType {rt_fields}
 				# all_field_idents = [ fs_name \\ {fs_name} <-: rt_fields ]
-				-> (Yes (all_field_idents, [], type_def.td_name, STE_Field (hd all_field_idents)), modules, cs)
-			_	-> (No, modules, cs)
-	get_opt_bracket_info_old_syntax _ _ _ _ modules cs
-		= (No, modules, cs)
+				-> (Yes (all_field_idents, [], type_def.td_name, STE_Field (hd all_field_idents)), fs)
+			_	-> (No, fs)
+	get_opt_bracket_info_old_syntax _ _ _ _ fs
+		= (No, fs)
 	
 	// only for old syntax
-	filter_member member_id=:{id_info} (accu, cs_symbol_table)
+	filter_member member_id=:{id_info} (accu, fs_symbol_table)
 		// it is possible that a member that had to be added the the list of wanted
 		// symbols is already in there because an identifier with the same name was
 		// explicitly imported. Special case: class and member have the same name
-		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
+		# ({ste_kind}, fs_symbol_table) = readPtr id_info fs_symbol_table
 		= case ste_kind of
 			STE_ExplImp _ _ _ _
-				-> (accu, cs_symbol_table)
-			_	-> ([member_id:accu], cs_symbol_table)
+				-> (accu, fs_symbol_table)
+			_	-> ([member_id:accu], fs_symbol_table)
 			
-	get_module_and_entry dcl_kind mod_index modules cs_symbol_table
+	get_module_and_entry dcl_kind mod_index fs=:{fs_modules, fs_symbol_table}
 		# index_mod_with_def = case dcl_kind of
 								STE_Imported _ index_mod_with_def
 									-> abort "assertion 2 failed in module explicitimports"
 								_	-> mod_index
 							// get the index of the module where the symbol is defined
-		  (dcl_module=:{dcl_name=dcl_name=:{id_info}}, modules) = modules![index_mod_with_def]
-		  (module_entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-		= (dcl_module, module_entry, modules, cs_symbol_table)
+		  (dcl_module=:{dcl_name=dcl_name=:{id_info}}, fs_modules) = fs_modules![index_mod_with_def]
+		  (module_entry, fs_symbol_table) = readPtr id_info fs_symbol_table
+		= (dcl_module, module_entry, { fs & fs_modules = fs_modules, fs_symbol_table = fs_symbol_table })
 
-	check_wanted_idents structure_name {ii_ident=ii_ident=:{id_info}} cs=:{cs_symbol_table}
-		# (ste=:{ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
+	check_wanted_idents structure_name {ii_ident=ii_ident=:{id_info}} fs=:{fs_symbol_table}
+		# (ste=:{ste_kind}, fs_symbol_table) = readPtr id_info fs_symbol_table
+		  fs = { fs & fs_symbol_table = fs_symbol_table }
 		= case ste_kind of
 			STE_ExplImp a b _ True
-				-> cs 
-			_	-> { cs & cs_error = checkError ii_ident ("does not belong to "+++toString structure_name) cs.cs_error}
+				-> fs 
+			_	-> { fs & fs_error = checkError ii_ident ("does not belong to "+++toString structure_name) fs.fs_error}
 
-	overwrite_wanted_idents {ii_ident={id_info}} cs_symbol_table
-		# (ste=:{ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
+	overwrite_wanted_idents {ii_ident={id_info}} fs_symbol_table
+		# (ste=:{ste_kind}, fs_symbol_table) = readPtr id_info fs_symbol_table
 		= case ste_kind of
 			STE_ExplImp a b c _
-				-> writePtr id_info { ste & ste_kind = STE_ExplImp a b c False } cs_symbol_table
+				-> writePtr id_info { ste & ste_kind = STE_ExplImp a b c False } fs_symbol_table
 			STE_Empty
-				-> cs_symbol_table
+				-> fs_symbol_table
 		
-	remove_and_collect ident=:{id_info} (wanted_symbols_accu, cs_symbol_table)
-		# (ste=:{ste_kind=STE_ExplImp _ _ _ is_unwanted}, cs_symbol_table) = readPtr id_info cs_symbol_table
+	remove_and_collect ident=:{id_info} (wanted_symbols_accu, fs_symbol_table)
+		# (ste=:{ste_kind=STE_ExplImp _ _ _ is_unwanted}, fs_symbol_table) = readPtr id_info fs_symbol_table
 		| is_unwanted
-			= (wanted_symbols_accu, writePtr id_info { ste & ste_kind = STE_Empty } cs_symbol_table)
-		= ([ident:wanted_symbols_accu], cs_symbol_table)
+			= (wanted_symbols_accu, writePtr id_info { ste & ste_kind = STE_Empty } fs_symbol_table)
+		= ([ident:wanted_symbols_accu], fs_symbol_table)
 
 
 :: CheckCompletenessState =
@@ -377,7 +375,7 @@ checkExplicitImportCompleteness main_dcl_module_n dcls_explicit dcl_modules icl_
 	   cs = { cs & cs_symbol_table = ccs_symbol_table, cs_error = ccs_error }
 	= (ccs_dcl_modules, ccs_icl_functions, ccs_expr_heap, cs)
   where
-	checkCompleteness :: !ExplicitImport *CheckCompletenessStateBox -> *CheckCompletenessStateBox
+	checkCompleteness :: !ExplicitImport !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
 	checkCompleteness (ExplicitImport {dcl_ident, dcl_index, dcl_kind=STE_FunctionOrMacro _} import_position) ccs 
 		= checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
 	checkCompleteness (ExplicitImport {dcl_ident, dcl_index, dcl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index} import_position) ccs 
@@ -385,16 +383,26 @@ checkExplicitImportCompleteness main_dcl_module_n dcls_explicit dcl_modules icl_
 	checkCompleteness (ExplicitImport {dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index} import_position) ccs 
 		#! ({dcl_common,dcl_functions}, ccs) = ccs!box_ccs.ccs_dcl_modules.[mod_index]
 		   cci = { box_cci = { cci_import_position = import_position, cci_main_dcl_module_n=main_dcl_module_n }}
-		= case expl_imp_kind of
-			STE_Type			-> check_completeness dcl_common.com_type_defs.[dcl_index] cci ccs
-			STE_Constructor		-> check_completeness dcl_common.com_cons_defs.[dcl_index] cci ccs
-			(STE_Field _)		-> check_completeness dcl_common.com_selector_defs.[dcl_index] cci ccs
-			STE_Class			-> check_completeness dcl_common.com_class_defs.[dcl_index] cci ccs
-			STE_Member			-> check_completeness dcl_common.com_member_defs.[dcl_index] cci ccs
-			(STE_Instance _)	-> check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
-			STE_DclFunction		-> check_completeness dcl_functions.[dcl_index] cci ccs
+		= continuation expl_imp_kind dcl_common dcl_functions cci ccs
+	  where
+		continuation :: !STE_Kind CommonDefs !{# FunType} !CheckCompletenessInputBox !*CheckCompletenessStateBox
+					-> *CheckCompletenessStateBox
+		continuation STE_Type dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_type_defs.[dcl_index] cci ccs
+		continuation STE_Constructor dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_cons_defs.[dcl_index] cci ccs
+		continuation (STE_Field _) dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_selector_defs.[dcl_index] cci ccs
+		continuation STE_Class dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_class_defs.[dcl_index] cci ccs
+		continuation STE_Member dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_member_defs.[dcl_index] cci ccs
+		continuation (STE_Instance _) dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
+		continuation STE_DclFunction dcl_common dcl_functions cci ccs
+			= check_completeness dcl_functions.[dcl_index] cci ccs
 
-	checkCompletenessOfMacro :: !Ident !Index !Int !Position *CheckCompletenessStateBox -> *CheckCompletenessStateBox
+	checkCompletenessOfMacro :: !Ident !Index !Int !Position !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
 	checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
 		#! ({fun_body}, ccs) = ccs!box_ccs.ccs_icl_functions.[dcl_index]
 		   ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[dcl_index] = True }
@@ -719,3 +727,4 @@ flipM f a b :== f b a
 // STE_Kinds just for comparision
 ste_field =: STE_Field { id_name="", id_info=nilPtr }
 ste_fun_or_macro =: STE_FunctionOrMacro []
+
