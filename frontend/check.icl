@@ -2159,10 +2159,10 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 				
 // MV ...
 	switched_off_Clean_feature pd mod_name explanation extension cs=:{cs_predef_symbols, cs_symbol_table}
-  		#! {pds_ident} = cs_predef_symbols.[pd]	
+  		# (ident,cs_predef_symbols) = cs_predef_symbols![pd].pds_ident
 		# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
 		  cs_error = pushErrorAdmin error_location cs.cs_error
-		  cs_error = checkError pds_ident ("not supported"+++explanation) cs_error
+		  cs_error = checkError ident ("not supported"+++explanation) cs_error
 		  cs_error = popErrorAdmin cs_error
 		= { cs & cs_error = cs_error }
 
@@ -2943,4 +2943,3 @@ possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs
 			-> (dcl_modules, cs)
 		Yes {si_explicit}
 			-> writeExplImportsToFile "dcl.txt" si_explicit dcl_modules cs
-
