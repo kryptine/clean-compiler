@@ -157,9 +157,6 @@ Clean (BEArg :: String BackEnd -> BackEnd)
 void BEDeclareModules (int nModules);
 Clean (BEDeclareModules :: Int BackEnd -> BackEnd)
 
-void BEDeclarePredefinedSymbols (int nConstructors, int nTypes);
-Clean (BEDeclarePredefinedSymbols :: Int Int BackEnd -> BackEnd)
-
 BESymbolP BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex);
 Clean (BESpecialArrayFunctionSymbol :: BEArrayFunKind Int Int BackEnd -> (BESymbolP, BackEnd))
 

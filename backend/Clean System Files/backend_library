@@ -4,7 +4,6 @@ BEInit
 BEFree
 BEArg
 BEDeclareModules
-BEDeclarePredefinedSymbols
 BESpecialArrayFunctionSymbol
 BEDictionarySelectFunSymbol
 BEDictionaryUpdateFunSymbol
