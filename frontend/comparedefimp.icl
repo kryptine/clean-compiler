@@ -219,6 +219,10 @@ where
 		= compare (dclIdent.type_index, (dclArgs,dclStrictness)) (iclIdent.type_index, (iclArgs,iclStrictness)) comp_st
 	compare (dclFun --> dclArg) (iclFun --> iclArg) comp_st
 		= compare (dclFun, dclArg) (iclFun, iclArg) comp_st
+	compare (TArrow1 dclArg) (TArrow1 iclArg) comp_st
+		= compare dclArg iclArg comp_st
+	compare TArrow TArrow comp_st
+		= (True, comp_st)
 	compare (CV dclVar :@: dclArgs) (CV iclVar :@: iclArgs) comp_st
 		= compare (dclVar, dclArgs) (iclVar, iclArgs) comp_st
 	compare (TB dclDef) (TB iclDef) comp_st
