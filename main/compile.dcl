@@ -21,4 +21,4 @@ compile :: ![{#Char}] !*DclCache !*Files -> (!Bool,!*DclCache,!*Files)
 	heaps::!.Heaps
  };
 
-empty_cache :: *SymbolTable -> *DclCache
+empty_cache :: !*SymbolTable -> *DclCache

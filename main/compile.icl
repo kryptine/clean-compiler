@@ -115,7 +115,7 @@ InitialCoclOptions =
 	heaps::!.Heaps
  };
 
-empty_cache :: *SymbolTable -> *DclCache
+empty_cache :: !*SymbolTable -> *DclCache
 empty_cache symbol_heap
 	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}, hp_generic_heap = newHeap}
 	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
