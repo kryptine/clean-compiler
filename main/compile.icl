@@ -26,6 +26,8 @@ from type_io import openTclFile, closeTclFile, baseName, directoryName, splitBy
 	,	compile_for_dynamics	:: !Bool
 	,	support_generics 		:: !Bool
 	,	compile_with_fusion		:: !Bool
+	,	dump_core				:: !Bool
+	,	strip_unused			:: !Bool
 	,	compile_with_generics   :: !Bool
 	}
 
@@ -45,6 +47,8 @@ InitialCoclOptions =
 	,	compile_for_dynamics	= False
 	, 	support_generics 		= True	//???
 	,	compile_with_fusion		= False
+	,	dump_core				= False
+	,	strip_unused			= False
 	,	compile_with_generics 	= True 
 	}
 
@@ -104,6 +108,10 @@ parseCommandLine [arg1=:"-dynamics":args] options
 parseCommandLine [arg1=:"-fusion":args] options
 	// switch on fusion transformations
 	= parseCommandLine args {options & compile_with_fusion = True}
+parseCommandLine [arg1=:"-dump":args] options
+	= parseCommandLine args {options & dump_core = True}
+parseCommandLine [arg1=:"-strip":args] options
+	= parseCommandLine args {options & strip_unused = True}
 parseCommandLine ["-generics":args] options
 	// enable generics
 	= parseCommandLine args (SwitchGenerics {options & compile_with_generics = True} options)
@@ -199,7 +207,13 @@ compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbo
 				(Yes options.listTypes.lto_showAttributes)
 				No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		=	frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=options.compile_with_generics,feo_fusion=options.compile_with_fusion} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
+		= frontEndInterface
+			{feo_up_to_phase=FrontEndPhaseAll
+			,feo_generics=options.compile_with_generics
+			,feo_fusion=options.compile_with_fusion
+			,feo_dump_core=options.dump_core
+			,feo_strip_unused=options.strip_unused
+			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
 		= closeTclFile tcl_file files
