@@ -1241,12 +1241,6 @@ coercionsToAttrEnv attr_vars {coer_demanded, coer_offered}
 	,	ur_attr_ineqs	:: ![AttrCoercion]
 	}
 
-// XXX unused!
-instance == AttributeVar
-where
-	(==) av1 av2 = av1.av_info_ptr==av2.av_info_ptr
-
-
 readableCoercions {coer_demanded}
 	= [ (i, readable coer_demanded.[i]) \\ i<-[0..size coer_demanded - 1] ]
   where

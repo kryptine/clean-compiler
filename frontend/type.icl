@@ -1022,8 +1022,6 @@ where
 
 emptyIdent =: { id_name = "", id_info = nilPtr }
 
-buildCurriedType :: [AType] AType TypeAttribute [AttrCoercion] Int 
-	-> (AType,[AttrCoercion],Int) //AA: exported from the module
 buildCurriedType [] type cum_attr attr_env attr_store
 	= (type, attr_env, attr_store)
 buildCurriedType [at=:{at_attribute}:ats] type cum_attr attr_env attr_store
@@ -1773,11 +1771,14 @@ where
 		= ({tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}, (var_heap, type_var_heap))
 
 
-specification_error type err
+specification_error type type1 err
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cAttributed, form_attr_position = No}
-	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " 
-									<:: (format, type, Yes initialTypeVarBeautifulizer) <<< '\n' }
+	= { err & ea_file = err.ea_file <<< " specified type " 	 
+									<:: (format, type1, Yes initialTypeVarBeautifulizer) 
+									<<< "conflicts with derived type "
+									<:: (format, type, Yes initialTypeVarBeautifulizer) 
+									<<< '\n' }
 
 
 cleanUpAndCheckFunctionTypes [] _ _ start_index _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
@@ -1844,7 +1845,9 @@ where
 			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
 //					---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
 			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
-			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type error)
+			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
+			
+			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
 	where
 		add_lifted_arg_types arity_diff args1 args2
 			| arity_diff > 0

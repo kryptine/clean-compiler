@@ -675,14 +675,6 @@ NewAttrVarId attr_var_store
  		= newIdent AttrVarIdTable.[attr_var_store]
 		= newIdent ("u" +++ toString attr_var_store)
 
-
-
-instance == AttributeVar
-where
-	(==) av1 av2 = av1.av_info_ptr == av2.av_info_ptr 
-
-
-
 class equiv a :: !a !a !*TypeHeaps -> (!Bool, !*TypeHeaps)
 
 instance equiv AType

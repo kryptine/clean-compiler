@@ -10,9 +10,6 @@ typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !Common
 
 addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);
 
-buildCurriedType :: [AType] AType TypeAttribute [AttrCoercion] Int 
-	-> (AType,[AttrCoercion],Int) // AA: exported from the module
-
 ::	PropState =
 	{	prop_type_heaps	:: !.TypeHeaps
 	,	prop_td_infos	:: !.TypeDefInfos
