@@ -33,6 +33,7 @@ where
 	
 instance WriteTypeInfo CommonDefs, Char, [a] | WriteTypeInfo a
 
+instance WriteTypeInfo StrictnessList
 /*2.0
 instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b 
 0.2*/

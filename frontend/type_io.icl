@@ -213,10 +213,14 @@ where
  		// unimplemented
  		= (tcl_file,wtis) 
 		
-	write_type_info (RecordType {rt_fields}) tcl_file wtis
+	write_type_info (RecordType {rt_constructor,rt_fields}) tcl_file wtis
  		#! tcl_file
  			= fwritec RecordTypeCode tcl_file;
-		= write_type_info rt_fields tcl_file wtis
+		#! (tcl_file,wtis)
+			= write_type_info rt_constructor tcl_file wtis
+		#! (tcl_file,wtis)
+			= write_type_info rt_fields tcl_file wtis
+		= (tcl_file,wtis)
 
 	write_type_info (AbstractType _) tcl_file wtis
  		#! tcl_file
@@ -261,26 +265,34 @@ where
 		# (tcl_file,wtis)
 			= write_type_info st_vars tcl_file wtis
 		# (tcl_file,wtis)
-			= write_annotated_type_info st_args st_args_strictness tcl_file wtis
+			= write_type_info st_args tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info st_args_strictness tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info st_arity tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info st_result tcl_file wtis
 		= (tcl_file,wtis)
-
-write_annotated_type_info l strictness tcl_file wtis
-	# tcl_file
-		= fwritei (length l) tcl_file
-	= write_annotated_type_info_loop l 0 tcl_file wtis
-	where
-		write_annotated_type_info_loop [] arg_index tcl_file wtis
-			= (tcl_file,wtis)
-		write_annotated_type_info_loop [x:xs] arg_index tcl_file wtis
-			# tcl_file = fwritec (if (arg_is_strict arg_index strictness) '!' ' ') tcl_file
-			# (tcl_file,wtis)
-				= write_type_info x tcl_file wtis
-			= write_annotated_type_info_loop xs (arg_index+1) tcl_file wtis
-		
+	
+instance WriteTypeInfo StrictnessList
+where
+	write_type_info NotStrict tcl_file wtis
+		# tcl_file
+			= fwritec NotStrictCode tcl_file
+		= (tcl_file,wtis)
+	write_type_info (Strict i) tcl_file wtis
+		# tcl_file
+			= fwritec StrictCode tcl_file
+		# tcl_file
+			= fwritei i tcl_file
+		= (tcl_file,wtis)
+	write_type_info (StrictList i tail) tcl_file wtis
+		# tcl_file
+			= fwritec StrictListCode tcl_file
+		# tcl_file
+			= fwritei i tcl_file
+		= write_type_info tail tcl_file wtis
+				
 instance WriteTypeInfo AType
 where
 	write_type_info {at_type} tcl_file wtis
@@ -292,20 +304,28 @@ instance WriteTypeInfo Type
 where
 	write_type_info (TA type_symb_ident atypes) tcl_file wtis
 		# tcl_file
-			= fwritec TypeTACode tcl_file
+			= fwritec TypeTASCode tcl_file
 		# (tcl_file,wtis)
 			= write_type_info type_symb_ident tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info atypes tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info NotStrict tcl_file wtis			
+//		# (tcl_file,wtis)
+//			= write_annotated_type_info atypes strictness tcl_file wtis
 		= (tcl_file,wtis)
 
 	write_type_info (TAS type_symb_ident atypes strictness) tcl_file wtis
 		# tcl_file
-			= fwritec TypeTACode tcl_file
+			= fwritec TypeTASCode tcl_file
 		# (tcl_file,wtis)
 			= write_type_info type_symb_ident tcl_file wtis
 		# (tcl_file,wtis)
-			= write_annotated_type_info atypes strictness tcl_file wtis
+			= write_type_info atypes tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info strictness tcl_file wtis			
+//		# (tcl_file,wtis)
+//			= write_annotated_type_info atypes strictness tcl_file wtis
 		= (tcl_file,wtis)
 
 	write_type_info (atype1 --> atype2) tcl_file wtis

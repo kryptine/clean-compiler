@@ -792,7 +792,7 @@ where
 // MW0		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
 		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 		create_variable var_name var_info_ptr ci
-			# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 3 ci
+			# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 2 ci
 			  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 			  cyclic_fv = varToFreeVar cyclic_var 1	
 // MW0			= ({ bind_src = App {	app_symb = placeholder_symb,
@@ -1128,8 +1128,8 @@ where
 	create_variable var_name var_info_ptr ci
 		# (placeholder_symb, ci) 
 			= case generate_universal_type_variables of
-				False	-> getSymbol PD_variablePlaceholder SK_Constructor 3 ci
-				True 	-> getSymbol PD_UvariablePlaceholder SK_Constructor 3 ci
+				False	-> getSymbol PD_variablePlaceholder SK_Constructor 2 ci
+				True 	-> getSymbol PD_UvariablePlaceholder SK_Constructor 2 ci
 		  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 		  cyclic_fv = varToFreeVar cyclic_var 1	
 	// MW0	= ({ bind_src = App {	app_symb = placeholder_symb,
