@@ -3,14 +3,8 @@ implementation module explicitimports
 
 import StdEnv
 
-:: FilterState =
-	{	fs_wanted_symbols	:: ![Ident]
-	,	fs_modules			:: !.{#DclModule}
-	,	fs_symbol_table		:: !.SymbolTable
-	,	fs_error			:: !.ErrorAdmin
-	}
-
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, cheat//, RWSDebug
+import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, cheat,
+		compilerSwitches//, RWSDebug
 
 cUndef :== (-1)
 implies a b :== not a || b

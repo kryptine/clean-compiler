@@ -1,6 +1,6 @@
 implementation module comparedefimp
 
-import syntax, checksupport, compare_constructor, utilities, StdCompare
+import syntax, checksupport, compare_constructor, utilities, StdCompare, compilerSwitches
 
 :: TypesCorrespondState =
 		{	tc_type_vars

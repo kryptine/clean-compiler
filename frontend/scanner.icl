@@ -1,6 +1,6 @@
 implementation module scanner
 
-import	StdEnv, compare_constructor, StdCompare, general
+import	StdEnv, compare_constructor, StdCompare, general, compilerSwitches
 
 from utilities import revCharListToString, isSpecialChar
 
@@ -1989,8 +1989,6 @@ where
  //--- Preprocessor ---//
 //--------------------//
 
-
-SwitchPreprocessor preprocessor no_preprocessor :== preprocessor
 
 freadPreprocessedLine :: !*File -> (!.{#Char},!*File)
 freadPreprocessedLine file

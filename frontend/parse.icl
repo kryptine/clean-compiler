@@ -1,7 +1,7 @@
 implementation module parse
 
 import StdEnv
-import scanner, syntax, hashtable, utilities, predef
+import scanner, syntax, hashtable, utilities, predef, compilerSwitches
 
 ParseOnly :== False
 

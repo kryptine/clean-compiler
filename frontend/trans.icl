@@ -2,7 +2,8 @@ implementation module trans
 
 import StdEnv
 
-import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type
+import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type,
+       compilerSwitches
 
 ::	PartitioningInfo = 
 	{	pi_marks :: 		!.{# Int}

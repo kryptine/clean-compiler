@@ -2,7 +2,8 @@ implementation module unitype
 
 import StdEnv
 
-import syntax, analunitypes, type, utilities, checktypes //, RWSDebug
+import syntax, analunitypes, type, utilities, checktypes,
+		compilerSwitches //, RWSDebug
 
 import cheat
 
