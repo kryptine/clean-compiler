@@ -1534,8 +1534,6 @@ where
 	updateExpression group_index l ui
 		= mapSt (updateExpression group_index) l ui
 
-import RWSDebug
-
 adjustClassExpressions symb_name exprs tail_exprs ui
 	= mapAppendSt (adjustClassExpression symb_name) exprs tail_exprs ui
 where
