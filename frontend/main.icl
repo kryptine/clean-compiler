@@ -168,7 +168,7 @@ compileModule mod_name dcl_cache ms
 loadModule :: Ident *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
 loadModule mod_ident {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
 	# (optional_syntax_tree,cached_functions_and_macros,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
-		= frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules functions_and_macros No predef_symbols hash_table ms_files ms_error ms_io ms_out No heaps
+		= frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules functions_and_macros No predef_symbols hash_table ms_files ms_error ms_io ms_out No heaps
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
 		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
