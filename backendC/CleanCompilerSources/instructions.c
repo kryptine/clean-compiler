@@ -2770,17 +2770,14 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	
 	unboxed_record_cons_prefix=tail_strict ? "r_Cons#!" : "r_Cons#";
 	
-	if (sdef->sdef_exported || ExportLocalLabels){
+	if (ExportLocalLabels){
 		put_directive_ (Dexport);
 		FPrintF (OutFile, "e_%s_%s%s",CurrentModule,unboxed_record_cons_prefix,name);
 		put_directive_ (Drecord);
 		FPrintF (OutFile, "e_%s_%s%s ",CurrentModule,unboxed_record_cons_prefix,name);
-	} else if (DoDebug){
-		put_directive_ (Drecord);
-		FPrintF (OutFile, "%s%s ",unboxed_record_cons_prefix,name);
 	} else {
 		put_directive_ (Drecord);
-		FPrintF (OutFile, "%s%u ",unboxed_record_cons_prefix,sdef->sdef_number);
+		FPrintF (OutFile, "%s%s ",unboxed_record_cons_prefix,name);
 	}
 
 	tuple_state.state_type=TupleState;
