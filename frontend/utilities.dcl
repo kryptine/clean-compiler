@@ -71,6 +71,7 @@ where
 	fold_st2 xs [] st
 		= abort ("fold_st2: first argument list contains more elements")
 
+
 // foldSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 foldSt op l st :== fold_st l st
 	where

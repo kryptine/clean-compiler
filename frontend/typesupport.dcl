@@ -5,7 +5,7 @@ import checksupport, StdCompare
 from unitype import Coercions, CoercionTree, AttributePartition
 
 // MW: this switch is used to en(dis)able the fusion algorithm
-SwitchFusion fuse dont_fuse :== fuse
+SwitchFusion fuse dont_fuse :== dont_fuse
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
@@ -29,13 +29,16 @@ instance <:: SymbolType, Type, AType, [a] | <:: a
 cleanSymbolType :: !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 extendSymbolType :: !SymbolType !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 
-cleanUpSymbolType :: !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
-						!*VarEnv !*AttributeEnv !*TypeHeaps !*ExpressionHeap !*ErrorAdmin
-							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*ExpressionHeap, !*ErrorAdmin)
+cSpecifiedType	:== True
+cDerivedType	:== False
+
+cleanUpSymbolType :: !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+						!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
+							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 
-equivalent :: !SymbolType  !TempSymbolType !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
+equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
 
 ::	AttrCoercion =
 	{	ac_demanded	:: !Int
@@ -50,6 +53,10 @@ equivalent :: !SymbolType  !TempSymbolType !{# CommonDefs} !*AttributeEnv !*Type
 	,	tst_context		:: ![TypeContext]
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
+
+::	FunctionType = CheckedType !SymbolType | SpecifiedType !SymbolType ![AType] !TempSymbolType
+				 | UncheckedType !TempSymbolType | ExpandedType !SymbolType !TempSymbolType !TempSymbolType  | EmptyFunctionType
+
 
 updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*ExpressionHeap -> (!*TypeHeaps, !*ExpressionHeap)
 
