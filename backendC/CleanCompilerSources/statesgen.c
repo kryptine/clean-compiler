@@ -3112,6 +3112,8 @@ static NodeP add_argument_to_node (NodeP rhs_root_p,NodeIdP new_node_id_p)
 		root_symbol_p=rhs_root_p->node_symbol;
 		if (root_symbol_p->symb_kind==if_symb && rhs_root_p->node_arity==3)
 			return add_argument_to_if_node (rhs_root_p,new_node_id_p);
+		else if (root_symbol_p->symb_kind == fail_symb)
+			return rhs_root_p;
 		else if (get_symbol_arity_or_zero (root_symbol_p) > rhs_root_p->node_arity){
 			ArgP *last_rhs_arg_h;
 			
