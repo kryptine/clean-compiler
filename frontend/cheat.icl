@@ -8,3 +8,10 @@ i x =
 		.end
 	}
 
+uniqueCopy :: !*a -> (!*a, !*a)
+uniqueCopy x =
+	code
+	{	.inline uniqueCopy
+			push_a 0
+		.end
+	}

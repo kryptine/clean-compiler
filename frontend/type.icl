@@ -163,7 +163,7 @@ where
 
 cannotUnify t1 t2 position err 
 	# err = errorHeading "Type error" err
-	  format = { form_properties = cNoProperties, form_position = [] }
+	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " cannot unify " <:: (format, t1) <<< " with " <:: (format, t2)  <<< " near " <<< position <<< '\n' }
 
 
@@ -222,16 +222,16 @@ unifyTypes (arg_type1 --> res_type1) attr1 (arg_type2 --> res_type2) attr2 modul
 unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2 modules subst heaps
 	| cons_id1 == cons_id2
 		= unify cons_args1 cons_args2 modules subst heaps
-		# (succ1, t1, heaps) = trytoExpand t1 attr1 modules heaps
-		  (succ2, t2, heaps) = trytoExpand t2 attr2 modules heaps
+		# (succ1, t1, heaps) = tryToExpand t1 attr1 modules heaps
+		  (succ2, t2, heaps) = tryToExpand t2 attr2 modules heaps
 		| succ1 || succ2
 			= unifyTypes t1 attr1 t2 attr2 modules subst heaps
 			= (False, subst, heaps)
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
-	# (_, type2, heaps) = trytoExpand type2 attr2 modules heaps
+	# (_, type2, heaps) = tryToExpand type2 attr2 modules heaps
 	= unifyTypeApplications cons_var types type2 modules subst heaps
 unifyTypes type1 attr1 (cons_var :@: types) attr2 modules subst heaps
-	# (_, type1, heaps) = trytoExpand type1 attr1 modules heaps
+	# (_, type1, heaps) = tryToExpand type1 attr1 modules heaps
 	= unifyTypeApplications cons_var types type1 modules subst heaps
 unifyTypes t1=:(TempQV qv_number1) attr1 t2=:(TempQV qv_number2) attr2 modules subst heaps
 	= (qv_number1 == qv_number2, subst, heaps)
@@ -240,13 +240,13 @@ unifyTypes (TempQV qv_number) attr1 type attr2 modules subst heaps
 unifyTypes type attr1 (TempQV qv_number1) attr2 modules subst heaps
 	= (False, subst, heaps)
 unifyTypes type1 attr1 type2 attr2 modules subst heaps
-	# (succ1, type1, heaps) = trytoExpand type1 attr1 modules heaps
-	  (succ2, type2, heaps) = trytoExpand type2 attr2 modules heaps
+	# (succ1, type1, heaps) = tryToExpand type1 attr1 modules heaps
+	  (succ2, type2, heaps) = tryToExpand type2 attr2 modules heaps
 	| succ1 || succ2
 		= unifyTypes type1 attr1 type2 attr2 modules subst heaps
 		= (False, subst, heaps)
 
-trytoExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr {ti_common_defs} type_heaps
+tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr {ti_common_defs} type_heaps
 	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
 	= case type_def.td_rhs of
 		SynType {at_type}
@@ -254,7 +254,7 @@ trytoExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_att
 			-> (True, res_type, type_heaps)
 		_
 			-> (False, type, type_heaps)
-trytoExpand type type_attr modules type_heaps
+tryToExpand type type_attr modules type_heaps
 	= (False, type, type_heaps)
 
 unifyConsVariables (TempCV tv_number1) (TempCV tv_number2) subst heaps
@@ -1290,7 +1290,7 @@ where
 
 specification_error type err
 	# err = errorHeading "Type error" err
-	  format = { form_properties = cAttributed, form_position = []}
+	  format = { form_properties = cAttributed, form_attr_position = No}
 	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " <:: (format, type) <<< '\n' }
 
 cleanUpAndCheckFunctionTypes [] _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)

@@ -17,9 +17,11 @@ instance toInt TypeAttribute
 
 ::	Coercions		= { coer_demanded :: !.{! .CoercionTree}, coer_offered :: !.{! .CoercionTree }}
 
-isNonUnique 	:: !CoercionTree -> Bool
-isUnique		:: !CoercionTree -> Bool
-// isExistential	:: !CoercionTree -> Bool
+isNonUnique				:: !CoercionTree -> Bool
+isUnique  				:: !CoercionTree -> Bool
+
+isNonUniqueAttribute	:: !Int !Coercions -> Bool
+isUniqueAttribute		:: !Int !Coercions -> Bool
 
 ::	BOOLVECT :== Int
 
