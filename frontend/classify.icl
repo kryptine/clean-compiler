@@ -437,6 +437,7 @@ instance consumerRequirements Case where
 										  		_ -> False
 //		use_context_default			= not (case_explicit || has_default)
 
+		combine_counts :: !Int !*{#Int} !{#Int} -> *{#Int}
 		combine_counts 0 accu env
 			= accu
 		combine_counts i accu env
@@ -446,10 +447,12 @@ instance consumerRequirements Case where
 			   accu			= { accu & [i1] = unify_counts rca rce }
 			= combine_counts i1 accu env
 		where
+			unify_counts :: !Int !Int -> Int
 			unify_counts 0 x = x
 			unify_counts 1 x = if (x==2) 2 (inc x)
 			unify_counts 2 x = 2
 
+		inspect_patterns :: !{#.CommonDefs} !.Bool !.CasePatterns ![.Bool] -> (!.Bool,!Bool)
 		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
 			# type_def						= common_defs.[glob_module].com_type_defs.[glob_object]
 			  defined_symbols				= case type_def.td_rhs of
@@ -535,6 +538,7 @@ instance consumerRequirements Case where
 					= True
 				= multimatch_loop has_default (dropWhile (\(ds_index,_,_)->ds_index==cip) constructors_in_pattern)
 
+combine_pattern_counts :: !.Bool !.CasePatterns ![.Bool] ![{#.Int}] !{#Int} -> *{#Int}
 combine_pattern_counts has_default patterns unsafe_bits guard_counts default_counts
 	| not ok_pattern_type
 		= createArray (size default_counts) 2
@@ -575,6 +579,7 @@ where
 	count_size					= size default_counts
 	zero_array					= createArray count_size 0
 
+	sort3 :: !.[Int] !.[a] !.[b] -> .[(!Int,!Int,!a,!b)]
 	sort3 constr_indices unsafe_bits counts
 		= sortBy smaller (zip4 constr_indices [0..] unsafe_bits counts)
 	  where
@@ -587,7 +592,7 @@ where
 		zip4 _ _ _ _
 			= []
 
-	count_loop :: RefCounts RefCounts [(Int,Int,Bool,RefCounts)] -> *RefCounts
+	count_loop :: !RefCounts !RefCounts ![(!Int,!Int,!Bool,!RefCounts)] -> *RefCounts
 	count_loop default_counts unified_counts []
 		= {e \\ e <-: unified_counts}
 	count_loop default_counts unified_counts [(c_index,p_index,unsafe,counts):patterns]
@@ -597,7 +602,7 @@ where
 					_		-> counts
 		= count_loop default_counts (unify_counts ccount unified_counts) next
 	where
-		splitWhile :: (a -> .Bool) !u:[a] -> (.[a],v:[a]), [u <= v];
+		splitWhile :: !(a -> .Bool) !u:[a] -> (!.[a],!v:[a]), [u <= v];
 		splitWhile f []
 			= ([],[])
 		splitWhile f cons=:[a:x]
@@ -606,7 +611,7 @@ where
 				= ([a:t],d)
 				= ([],cons)
 	
-	count_constructor :: RefCounts RefCounts [(Int,Int,Bool,RefCounts)] -> RefCounts
+	count_constructor :: !RefCounts !RefCounts ![(!Int,!Int,!Bool,!RefCounts)] -> RefCounts
 	count_constructor default_counts combined_counts []
 		= combine_counts combined_counts default_counts
 	count_constructor default_counts combined_counts [(_,_,unsafe,counts):patterns]
@@ -614,7 +619,7 @@ where
 			= count_constructor default_counts (combine_counts combined_counts counts) patterns
 			= combine_counts combined_counts counts
 
-	combine_counts :: RefCounts RefCounts -> RefCounts
+	combine_counts :: !RefCounts !RefCounts -> RefCounts
 	combine_counts c1 c2
 		= {unify_counts e1 e2 \\ e1 <-: c1 & e2 <-: c2}
 	where
@@ -627,10 +632,12 @@ where
 			   accu			= { accu & [i1] = unify_counts rca rce }
 			= combine i1 accu env
 
+		unify_counts :: !Int !Int -> Int
 		unify_counts 0 x = x
 		unify_counts 1 x = if (x==2) 2 (inc x)
 		unify_counts 2 x = 2
 	
+	unify_counts :: !RefCounts !RefCounts -> *RefCounts
 	unify_counts c1 c2
 		= {unify_counts e1 e2 \\ e1 <-: c1 & e2 <-: c2}
 	where
@@ -644,11 +651,13 @@ where
 			   accu			= { accu & [i1] = unify_counts rce rca }
 			= unify i1 accu env
 
+		unify_counts :: !Int !Int -> Int
 		unify_counts 0 x = x
 		unify_counts 1 x = if (x==0) 1 x
 		unify_counts 2 x = 2
 
 //consumer_requirements_of_guards :: !CasePatterns ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
+consumer_requirements_of_guards :: !.CasePatterns !.ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,!.[Bool],![{#Int}],!*AnalyseInfo)
 consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 	# pattern_exprs
 			= [ ap_expr \\ {ap_expr}<-patterns]
@@ -686,7 +695,7 @@ bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var
 bindPatternVars [] next_var next_var_of_fun var_heap
 	= (next_var, next_var_of_fun, var_heap)
 
-independentConsumerRequirements :: !.[Expression] ConsumerAnalysisRO !*AnalyseInfo -> (!ConsClass,.[Bool],[RefCounts],!*AnalyseInfo)
+independentConsumerRequirements :: !.[Expression] !ConsumerAnalysisRO !*AnalyseInfo -> (!ConsClass,!.[Bool],![RefCounts],!*AnalyseInfo)
 independentConsumerRequirements exprs info ai
 	# ref_counts					= ai.ai_cur_ref_counts
 	# (count_size,ref_counts)		= usize ref_counts
@@ -695,6 +704,7 @@ independentConsumerRequirements exprs info ai
 	# (counts,unsafe)				= unzip counts_unsafe
 	= (cc,unsafe,counts,{ ai & ai_cur_ref_counts = ref_counts})
 where
+	cons_reqs :: !Expression !*(!.Int,!*AnalyseInfo) -> *(!.(!{#Int},!Bool),!*(!Int,!*AnalyseInfo))
 	cons_reqs expr (cc,ai)
 		# (cce, unsafe, ai)		= consumerRequirements expr info ai
 		# cc					= combineClasses cce cc
@@ -1214,17 +1224,19 @@ reanalyseFunction fun fun_info_ptr common_defs imported_funs main_dcl_module_n s
 	= (fun_cons_class,fun_defs,ai.ai_var_heap,ai.ai_fun_heap,ai_cons_class)
 
 			
+fresh_variables :: ![.FreeVar] !Int !Int !*(Heap VarInfo) -> *(!.[Int],!Int,!*(Heap VarInfo))
 fresh_variables [{fv_info_ptr} : vars] arg_position next_var_number var_heap
+	# var_heap
+	  		= writePtr fv_info_ptr (VI_AccVar next_var_number arg_position) var_heap
 	# (fresh_vars, last_var_number, var_heap)
 			= fresh_variables vars (inc arg_position) (inc next_var_number) var_heap
-	  var_heap
-	  		= writePtr fv_info_ptr (VI_AccVar next_var_number arg_position) var_heap
 	= ([next_var_number : fresh_vars], last_var_number, var_heap)
 fresh_variables [] _ next_var_number var_heap
 	= ([], next_var_number, var_heap)
 
 // count_locals determines number of local variables...
 
+count_locals :: !Expression !Int -> Int
 count_locals (Var _) n
 	= n
 count_locals (App {app_args}) n

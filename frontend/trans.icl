@@ -1489,16 +1489,19 @@ where
 		# strict1=Strict 1
 		= { {ats_types=[el],ats_strictness=if (arg_is_strict i args_strictness) strict1 NotStrict} \\ i<-[0..] & el <- st_args }
 		
+	is_dictionary :: !.AType !{#{#.TypeDefInfo}} -> Bool
 	is_dictionary {at_type=TA {type_index} _} es_td_infos
 		#! td_infos_of_module=es_td_infos.[type_index.glob_module]
 		= type_index.glob_object>=size td_infos_of_module || td_infos_of_module.[type_index.glob_object].tdi_group_nr==(-1)
 	is_dictionary _ es_td_infos
 		= False
 
+	set_cons_var_bit :: !.TypeVar !*(!*{#.Int},!u:(Heap TypeVarInfo)) -> (!.{#Int},!v:(Heap TypeVarInfo)), [u <= v]
 	set_cons_var_bit {tv_info_ptr} (cons_vars, th_vars)
 		# (TVI_Type (TempV i), th_vars) = readPtr tv_info_ptr th_vars 
 		= (set_bit i cons_vars, th_vars)
 
+	copy_opt_symbol_type :: !(Optional .SymbolType) !*TypeHeaps -> (!(Optional .SymbolType),!.TypeHeaps)
 	copy_opt_symbol_type No ti_type_heaps
 		= (No, ti_type_heaps)
 	copy_opt_symbol_type (Yes symbol_type=:{st_vars, st_attr_vars, st_args, st_result, st_attr_env})
@@ -1514,12 +1517,14 @@ where
 		= (Yes { symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
 				st_result = fresh_st_result, st_attr_env = fresh_st_attr_env}, ti_type_heaps)
 
+	add_propagation_attributes :: !{#.CommonDefs} !(Optional .SymbolType) !*(!*TypeHeaps,!*{#*{#.TypeDefInfo}}) -> (!(Optional .SymbolType),!(!.TypeHeaps,!{#.{#TypeDefInfo}}))
 	add_propagation_attributes common_defs No state
 		= (No, state)
 	add_propagation_attributes common_defs (Yes st) state
 		# (st, state)	= add_propagation_attributes` common_defs st state
 		= (Yes st, state)
 
+	add_propagation_attributes` :: !{#.CommonDefs} !.SymbolType !*(!*TypeHeaps,!*{#*{#.TypeDefInfo}}) -> (!.SymbolType,!(!.TypeHeaps,!{#.{#TypeDefInfo}}))
 	add_propagation_attributes` common_defs st=:{st_args, st_result, st_attr_env, st_attr_vars}
 				(type_heaps, type_def_infos)
 		# ps	=
@@ -1541,6 +1546,7 @@ where
 		  state = (ps.prop_type_heaps, ps.prop_td_infos)
 		= (sound_symbol_type, state)
 
+	add_propagation_attributes_to_atype :: !{#.CommonDefs} !.AType !*PropState -> (!AType,!.PropState)
 	add_propagation_attributes_to_atype modules type ps
 		| is_dictionary type ps.prop_td_infos
 			= (type, ps)
@@ -1551,6 +1557,7 @@ where
 //	add_propagation_attributes_to_atypes modules types ps
 //		= mapSt (add_propagation_attributes_to_atype modules) types ps
 
+	accum_class_type :: !{!.Producer} !.ReadOnlyTI !.Int !(!u:[v:AType],!.b,!.c) -> (!w:[x:AType],!.b,!.c), [u <= w,v <= x]
 	accum_class_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
 		= case prods.[i] of
 			PR_Class _ _ class_type
@@ -1558,6 +1565,7 @@ where
 			_
 				-> (type_accu, ti_fun_defs, ti_fun_heap)
 
+	accum_function_producer_type :: !{!.Producer} !.ReadOnlyTI !.Int !*(!u:[v:(Optional .SymbolType)],!*{#.FunDef},!*(Heap FunctionInfo)) -> (!w:[x:(Optional SymbolType)],!.{#FunDef},!.(Heap FunctionInfo)), [u <= w,v <= x]
 	accum_function_producer_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
 		= case prods.[size prods-i-1] of
 			PR_Empty
@@ -1572,11 +1580,13 @@ where
 						= get_producer_type symbol ro ti_fun_defs ti_fun_heap
 				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
 
+	collectPropagatingConsVars :: ![AType] !*(Heap TypeVarInfo) -> (!.[TypeVar],!.(Heap TypeVarInfo))
 	collectPropagatingConsVars type th_vars
 		# th_vars
 				= performOnTypeVars initializeToTVI_Empty type th_vars
 		= performOnTypeVars collect_unencountered_cons_var type ([], th_vars)
 	  where
+		collect_unencountered_cons_var :: !.TypeAttribute !u:TypeVar !*(!v:[w:TypeVar],!*(Heap TypeVarInfo)) -> (!x:[y:TypeVar],!.(Heap TypeVarInfo)), [v <= x,w u <= y]
 		collect_unencountered_cons_var TA_MultiOfPropagatingConsVar tv=:{tv_info_ptr} (cons_var_accu, th_vars)
 			# (tvi, th_vars) = readPtr tv_info_ptr th_vars
 			= case tvi of
@@ -1587,6 +1597,7 @@ where
 		collect_unencountered_cons_var _ _ state
 			= state
 
+	replace_integers_in_substitution :: (!{!.TypeVar},!{!.TypeAttribute},!{#.Int}) !.Int !*(!*{!Type},!*{#.Bool}) -> (!.{!Type},!.{#Bool})
 	replace_integers_in_substitution replace_input i (subst, used)
 		# (subst_i, subst)
 				= subst![i]
@@ -1604,6 +1615,7 @@ where
 			No
 				-> (subst, coercions, ti_type_def_infos, ti_type_heaps)
 
+	expand_type :: !{#.CommonDefs} !{#.Int} !.AType !*(!*Coercions,!u:{!.Type},!*TypeHeaps,!*{#*{#.TypeDefInfo}}) -> (!AType,!(!.Coercions,!v:{!Type},!.TypeHeaps,!{#.{#TypeDefInfo}})), [u <= v]
 	expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
 		| is_dictionary atype ti_type_def_infos
 			# (_, atype, subst) = arraySubst atype subst
@@ -2188,7 +2200,7 @@ bind_to_temp_type_var {tv_info_ptr} (next_type_var_nr, th_vars)
 bind_to_temp_attr_var {av_info_ptr} (next_attr_var_nr, th_attrs)
 	= (next_attr_var_nr+1, writePtr av_info_ptr (AVI_Attr (TA_TempVar next_attr_var_nr)) th_attrs)
 
-transformFunctionApplication :: FunDef InstanceInfo !ConsClasses !App [Expression] ReadOnlyTI !*TransformInfo -> *(Expression,!*TransformInfo)
+transformFunctionApplication :: !FunDef !InstanceInfo !ConsClasses !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_args, extra_args) = complete_application fun_def.fun_arity app_args extra_args
 //	| False -!-> ("transformFunctionApplication",app_symb,app_args,extra_args,fun_def.fun_arity,cc_size) = undef
@@ -2214,9 +2226,9 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 							non_var (Var _)					= False
 							non_var _						= True
 	  	# ok_non_rec_consumer	= non_rec_consumer && safe_args
-	  	# (producers, new_args, ti)
+	  	#! (producers, new_args, ti)
 	  		= determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_def.fun_type cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
-		# (arity_changed,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+		#! (arity_changed,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
 			= determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
 	  	| containsProducer cc_size producers || arity_changed
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
@@ -2247,6 +2259,7 @@ where
 	is_not_caf FK_Caf	= False
 	is_not_caf _		= True
 
+	transform_trivial_function :: !.App ![.Expression] ![.Expression] !.ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 	transform_trivial_function app=:{app_symb} app_args extra_args ro ti
 		# (fun_def,ti_fun_defs,ti_fun_heap)		= get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
 		# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
@@ -2261,6 +2274,7 @@ where
 					-> (tb_rhs, ti)
 					-> (tb_rhs @ extra_args, ti)
 
+	update_instance_info :: !.SymbKind !.InstanceInfo !*TransformInfo -> *TransformInfo
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
 		 = { ti & ti_instances = { ti_instances & [glob_object] = instances } }
 	update_instance_info (SK_LocalMacroFunction glob_object) instances ti=:{ti_instances}
@@ -2271,11 +2285,13 @@ where
 		# (FI_Function fun_info, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 		= { ti & ti_fun_heap = ti_fun_heap <:= (fun_def_ptr, FI_Function { fun_info & gf_instance_info = instances })}
 
+	complete_application :: !.Int !.[Expression] !.[Expression] -> (!.[Expression],![Expression])
 	complete_application form_arity args extra_args
 		= (take form_arity all_args,drop form_arity all_args)
 	where
 		all_args = args ++ extra_args
 
+	build_application :: !.App ![.Expression] -> Expression
 	build_application app []
 		= App app
 	build_application app extra_args
@@ -2285,6 +2301,7 @@ is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
 		  in type.st_arity>0 && not (isEmpty type.st_context);
 
+determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !Bool !{!.Producer} ![Int] ![Bool] !FunDef !ReadOnlyTI !*TransformInfo -> *(!Bool,![Expression],![Expression],!{!Producer},![Int],![Bool],!FunDef,!*TransformInfo)
 determineCurriedProducersInExtraArgs new_args [] is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
 	= (False,new_args,[],producers,cc_args,cc_linear_bits,fun_def,ti)
 determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
@@ -2620,6 +2637,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			| not (isEmpty specials)
 				# (ei,ti_symbol_heap)			= mapSt readAppInfo app_args ti.ti_symbol_heap
 					with
+						readAppInfo :: !Expression !*ExpressionHeap -> (!ExprInfo,!*ExpressionHeap)
 						readAppInfo (App {app_info_ptr}) heap
 							| isNilPtr app_info_ptr
 								= (EI_Empty,heap)
@@ -2635,6 +2653,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			= build_application app app_args extra_args gi ti
 		= build_application app app_args extra_args gi ti
 	where
+		build_application :: !.App ![.Expression] ![.Expression] !(Global .Int) !*TransformInfo -> (!Expression,!*TransformInfo)
 		build_application app app_args extra_args {glob_module,glob_object} ti
 			| isEmpty extra_args
 				= (App {app & app_args = app_args}, ti)
@@ -2645,7 +2664,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			| nr_of_extra_args <= ar_diff
 				= (App {app  &  app_args = app_args ++ extra_args }, ti)
 				= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
-		
+/*		
 		build_special_application app app_args extra_args {glob_module,glob_object} ro ti
 			| isEmpty extra_args
 				= (App {app & app_args = app_args}, ti)
@@ -2656,13 +2675,15 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			| nr_of_extra_args <= ar_diff
 				= (App {app  &  app_args = app_args ++ extra_args }, ti)
 				= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
-
+*/
+		find_member_n :: !Int !String !{#.DefinedSymbol} -> Int
 		find_member_n i member_string a
 			| i<size a
 				| a.[i].ds_ident.id_name % (0,size member_string-1)==member_string
 					= i
 					= find_member_n (i+1) member_string a
 
+		select_member :: !.Expression !(Global .DefinedSymbol) !.Int !*TransformInfo -> *(!Expression,!*TransformInfo)
 		select_member exp=:(App {app_symb={symb_kind=SK_Constructor _},app_args,app_info_ptr}) select_symb me_offset ti=:{ti_symbol_heap}
 			| not (isNilPtr app_info_ptr) 
 				# (ei,ti_symbol_heap)	= readPtr app_info_ptr ti_symbol_heap
@@ -2693,12 +2714,14 @@ transformApplication app=:{app_symb={symb_name,symb_kind = SK_Constructor cons_i
 	# (app_args,extra_args)	= complete_application cons_type.st_arity app_args extra_args
 	= (build_application { app & app_args = app_args } extra_args, ti)
 where
+	complete_application :: !.Int ![Expression] ![Expression] -> (![Expression],![Expression])
 	complete_application form_arity args []
 		= (args, [])
 	complete_application form_arity args extra_args
 		# arity_diff = min (form_arity - length args) (length extra_args)
 		= (args ++ take arity_diff extra_args, drop arity_diff extra_args)
 
+	build_application :: !.App ![.Expression] -> Expression
 	build_application app []
 		= App app
 	build_application app extra_args
@@ -2771,7 +2794,7 @@ transformSelection selector_kind selectors expr ro ti
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: Bool Bool Bool (Optional SymbolType) [Bool] [Int] [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
+determineProducers :: !Bool !Bool !Bool !(Optional SymbolType) ![Bool] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
 determineProducers _ _ _ _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
 determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
@@ -2779,12 +2802,12 @@ determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consum
 		# (producers, new_arg, ti) = determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
 			= (producers, new_arg++args, ti)
-		# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+		#! (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, new_arg++new_args, ti)
 	| SwitchUnusedFusion (ro.ro_transform_fusion && cons_arg == CUnused && isLazyArg fun_type prod_index) False
 		# producers = { producers & [prod_index] = PR_Unused }
 		= (producers, args, ti)
-	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+	#! (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 	= (producers, [arg : new_args], ti)
 where
 	isProducer PR_Empty	= False
@@ -3165,6 +3188,7 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min d
 	  cons_args	= { consarg \\ consarg <- [ consarg \\ consarg <-: ti.ti_cons_args ] ++ new_cons_classes }
 	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, cons_args, ti.ti_error_file, ti.ti_predef_symbols)
 where
+	transform_groups :: !Int ![.Group] !u:[Group] !{#CommonDefs} !{#{#FunType}} !*{#{#(TypeDef .TypeRhs)}} ![(Global Int)] !v:[Int] !*TransformInfo -> *(!w:[Group],!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!x:[Int],!*TransformInfo), [u <= w,v <= x]
 	transform_groups group_nr [] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 		= (acc_groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 	transform_groups group_nr [group:groups] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
@@ -3176,12 +3200,14 @@ where
 			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr group_members acc_groups ti
 			= transform_groups group_nr groups acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 
+	transform_groups` :: !{#CommonDefs} !{#{#FunType}} !Int ![Group] !u:[Group] !*TransformInfo -> *(!Int,!u:[Group],!*TransformInfo)
 	transform_groups` common_defs imported_funs group_nr [] acc_groups ti
 			= (group_nr, acc_groups, ti)
 	transform_groups` common_defs imported_funs group_nr [{group_members}:groups] acc_groups ti
 			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr group_members acc_groups ti
 			= transform_groups` common_defs imported_funs group_nr groups acc_groups ti
 	
+	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int ![Int] !u:[Group] !*TransformInfo -> *(!Int,!u:[Group],!*TransformInfo)
 	transform_group common_defs imported_funs group_nr group_members acc_groups ti
 			// assign group_nr to group_members
 			# ti = ti <-!- ("transform_group",group_nr)
@@ -3222,12 +3248,14 @@ where
 	changed_group_classification [fun:funs] ti
 		= (False,ti)
 	
+	assign_group :: !.Int !.Int !*TransformInfo -> *TransformInfo
 	assign_group group_number fun ti
 		# (fd,ti)		= get_fun_def fun ti
 		# fd			= { fd & fun_info.fi_group_index = group_number }
 		# ti			= set_fun_def fun fd ti
 		= ti
 	
+	get_fun_def :: !.Int !*TransformInfo -> *(!FunDef,!*TransformInfo)
 	get_fun_def fun ti=:{ti_fun_defs}
 		| fun < size ti_fun_defs
 			# (fun_def, ti)						= ti!ti_fun_defs.[fun]
@@ -3246,6 +3274,7 @@ where
 		  ti								= { ti & ti_fun_heap = ti_fun_heap }
 		= (gf_fun_def,ti)
 
+	set_fun_def :: !.Int !.FunDef !*TransformInfo -> *TransformInfo
 	set_fun_def fun fun_def ti=:{ti_fun_defs}
 		| fun < size ti_fun_defs
 			= {ti & ti_fun_defs.[fun] = fun_def}
@@ -3264,6 +3293,7 @@ where
 		  ti								= { ti & ti_fun_heap = ti_fun_heap }
 		= ti
 	
+	partition_group :: !.Int ![.Int] !*TransformInfo -> *(![Group],!*TransformInfo)
 	partition_group group_nr group_members ti
 		# fun_defs = ti.ti_fun_defs
 		# fun_heap = ti.ti_fun_heap
@@ -3288,6 +3318,7 @@ where
 			}
 		= (groups,ti)
 		
+	transform_function :: !{#.CommonDefs} !{#{#.FunType}} !.Int !*TransformInfo -> *TransformInfo
 	transform_function common_defs imported_funs fun ti
 		# (fun_def, ro_fun, ti)	= get_fun_def_and_symb_ident fun ti
 		# ti = ti <-!- ("transform_function",fun,ro_fun,fun_def)
@@ -3409,7 +3440,7 @@ where
 		  	, ets_main_dcl_module_n					= main_dcl_module_n
 		  	, ets_contains_unexpanded_abs_syn_type	= False
 		  	}
-		  (_,(st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
+		#! (_,(st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
 		  		= expandSynTypes (if (fi_properties bitand FI_HasTypeSpec == 0) (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs (st_result,st_args) ets
 		# ft = { ft &  st_result = st_result, st_args = st_args }
 		| fi_group_index >= size groups
@@ -3436,6 +3467,7 @@ where
 			= (fun_defs, imported_types, collected_imports, [fun_index : fun_indices_with_abs_syn_types], type_heaps, var_heap)
 			= (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 
+	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#u:FunDef},!*{#{#.(TypeDef .TypeRhs)}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!{#v:FunDef},!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo)), [u <= v]
 	expand_abstract_syn_types_in_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
 					= fun_defs![fun_index]
@@ -3471,8 +3503,8 @@ convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types c
 				}	
 	# {st_args,st_result,st_context,st_args_strictness}
 										= st
-	# (_,(st_args,st_result), ets)		= expandSynTypes rem_annots common_defs (st_args,st_result) ets
-	  new_st_args						= addTypesOfDictionaries common_defs st_context st_args
+	#! (_,(st_args,st_result), ets)		= expandSynTypes rem_annots common_defs (st_args,st_result) ets
+	# new_st_args						= addTypesOfDictionaries common_defs st_context st_args
 	  new_st_arity						= length new_st_args
 	  st	=
 	  			{ st
@@ -3569,8 +3601,8 @@ where
 	expandSynTypes rem_annots common_defs [] ets
 		= (False,[],ets)
 	expandSynTypes rem_annots common_defs t=:[type:types] ets
-		# (changed_type,type,ets) = expandSynTypes rem_annots common_defs type ets
-		# (changed_types,types,ets) = expandSynTypes rem_annots common_defs types ets
+		#! (changed_type,type,ets)		= expandSynTypes rem_annots common_defs type ets
+		   (changed_types,types,ets)	= expandSynTypes rem_annots common_defs types ets
 		| changed_type || changed_types
 			= (True,[type:types],ets)
 			= (False,t,ets)
@@ -3578,8 +3610,8 @@ where
 instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b
 where
 	expandSynTypes rem_annots common_defs (type1,type2) ets
-		# (changed_type1,type1,ets) = expandSynTypes rem_annots common_defs type1 ets
-		# (changed_type2,type2,ets) = expandSynTypes rem_annots common_defs type2 ets
+		#! (changed_type1,type1,ets) = expandSynTypes rem_annots common_defs type1 ets
+		   (changed_type2,type2,ets) = expandSynTypes rem_annots common_defs type2 ets
 		= (changed_type1 || changed_type2,(type1,type2),ets)
 
 instance expandSynTypes AType
@@ -3587,6 +3619,7 @@ where
 	expandSynTypes rem_annots common_defs atype ets
 		= expand_syn_types_in_a_type rem_annots common_defs atype ets
 	where
+		expand_syn_types_in_a_type :: !.Int !{#.CommonDefs} !.AType !*ExpandTypeState -> (!.Bool,!AType,!.ExpandTypeState)
 		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TA type_symb types,at_attribute} ets
 			# (changed,at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
 			| changed
@@ -3603,6 +3636,7 @@ where
 				= (True,{ atype & at_type = at_type }, ets)
 				= (False,atype,ets)
 
+expand_syn_types_in_TA :: !.Int !{#.CommonDefs} !.Type !.TypeAttribute !*ExpandTypeState -> (!Bool,!Type,!.ExpandTypeState)
 expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_defs}
 	# (glob_object,glob_module,types)	= case ta_type of
 		(TA type_symb=:{type_index={glob_object,glob_module},type_name} types)				-> (glob_object,glob_module,types)
@@ -3621,7 +3655,7 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 				-> (True,type,ets)
 
 				# ets = {ets & ets_contains_unexpanded_abs_syn_type=True }
-				# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+				#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 				# ta_type = if changed
 								( case ta_type of
 									TA  type_symb _				-> TA  type_symb types
@@ -3631,7 +3665,7 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 					-> (changed,ta_type, ets)
 					-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
 		_
-			# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+			#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 			# ta_type = if changed
 							( case ta_type of
 								TA  type_symb _				-> TA  type_symb types
@@ -3663,6 +3697,7 @@ where
 				  	= substitute rhs_type type_heaps
 				  	= substitute rhs_type type_heaps
 
+	collect_imported_constructors :: !{#.CommonDefs} !.Int !.TypeRhs !*ExpandTypeState -> .ExpandTypeState
 	collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}
 		# (ets_collected_conses, ets_var_heap)
 				= collect_imported_constructor mod_index common_defs.[mod_index].com_cons_defs rt_constructor (ets_collected_conses, ets_var_heap)
@@ -3674,6 +3709,7 @@ where
 	collect_imported_constructors common_defs mod_index _ ets
 		= ets
 	
+	collect_imported_constructor :: !.Int !{#.ConsDef} !.DefinedSymbol !*(!u:[v:(Global .Int)],!*(Heap VarInfo)) -> (!w:[x:(Global Int)],!.(Heap VarInfo)), [u <= w,v <= x]
 	collect_imported_constructor mod_index cons_defs {ds_index} (collected_conses, var_heap)
 		# {cons_type_ptr} = cons_defs.[ds_index]
 		  (type_info, var_heap) = readVarInfo cons_type_ptr var_heap
@@ -4357,7 +4393,7 @@ instance <<< TypeContext
 where
 	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
 
-resolveContext :: [TypeContext] [ExprInfo] -> [[Type]]
+resolveContext :: ![TypeContext] ![ExprInfo] -> [[Type]]
 resolveContext [tc:tcs] [EI_DictionaryType t:eis]
 	= minimiseContext tc t ++ resolveContext tcs eis
 resolveContext _ _ = []
@@ -4369,6 +4405,7 @@ minimiseContext {tc_class = TCClass gds} (TA ti ts)
 		= []
 minimiseContext _ _ = []
 
+findInstInSpecials :: ![[.Type]] ![.Special] -> .(!Int,!(Global Int))
 findInstInSpecials insts []
 	= (0,{glob_object= -1,glob_module = -1})
 findInstInSpecials insts [{spec_types,spec_index}:specials]

@@ -923,8 +923,11 @@ unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {
 				with
 					new_fun_defs :: *{!FunDef}
 					new_fun_defs => {fun_def \\ (_,fun_def)<-new_functions}
-			-> ({if (i<size_fun_defs) es_fun_defs.[i] new_fun_defs.[i-size_fun_defs] \\ i<-[0..last_function_index]} // inefficient
-				,[size_fun_defs:es_new_fun_def_numbers])
+//			-> ({if (i<size_fun_defs) es_fun_defs.[i] new_fun_defs.[i-size_fun_defs] \\ i<-[0..last_function_index]} // inefficient
+//				,[size_fun_defs:es_new_fun_def_numbers])
+//			#! new_fun_defs = arrayConcat es_fun_defs new_fun_defs	// leads to backend crash!
+			# new_fun_defs = arrayConcat es_fun_defs new_fun_defs
+			-> (new_fun_defs, [size_fun_defs:es_new_fun_def_numbers])
 	# (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls es_fun_defs es_symbol_table
 	| isEmpty let_binds
 		= (result_expr, (calls, { es & es_symbol_table = es_symbol_table, es_fun_defs=fun_defs,es_new_fun_def_numbers=es_new_fun_def_numbers }))
@@ -1787,7 +1790,7 @@ where
 	Dynamic administration is rebuilt.
 */	
 
-class collectVariables a :: !a ![FreeVar] ![DynamicPtr] !*CollectState -> (!a, ![FreeVar],[DynamicPtr],!*CollectState)
+class collectVariables a :: !a ![FreeVar] ![DynamicPtr] !*CollectState -> (!a, ![FreeVar],![DynamicPtr],!*CollectState)
 
 cContainsACycle		:== True
 cContainsNoCycle	:== False
@@ -1807,7 +1810,7 @@ where
 			# (kase,cos) = if_expression e1 (BasicExpr (BVB True)) e2 cos
 			= (kase, free_vars, dynamics, cos)
 		where
-			if_expression :: Expression Expression Expression *CollectState -> (!Expression,!.CollectState);
+			if_expression :: !Expression !Expression !Expression !*CollectState -> (!Expression,!.CollectState);
 			if_expression e1 e2 e3 cos
 //				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
 				# case_type =
@@ -1903,6 +1906,7 @@ where
 		/*	Remove all aliases from the list of lazy 'let'-binds. Add a _dummyForStrictAlias
 			function call for the strict aliases. Be careful with cycles! */
 		
+			detect_cycles_and_handle_alias_binds :: !.Bool !u:[v:(.a,w:LetBind)] !*CollectState -> (!.Bool,!x:[y:(.a,z:LetBind)],!.CollectState), [u <= x,v <= y,w <= z]
 			detect_cycles_and_handle_alias_binds is_strict [] cos
 				= (cContainsNoCycle, [], cos)
 //			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
@@ -1925,6 +1929,7 @@ where
 						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
 						-> (is_cyclic, [(type,bind) : binds], cos)
 			where
+				is_cyclic :: !.(Ptr VarInfo) !(Ptr VarInfo) !(Heap VarInfo) -> .Bool
 				is_cyclic orig_info_ptr info_ptr var_heap
 					| orig_info_ptr == info_ptr
 						= True
@@ -1935,6 +1940,7 @@ where
 							_
 								-> False
 				
+				add_dummy_id_for_strict_alias :: !.Expression !*CollectState -> (!.Expression,!.CollectState)
 				add_dummy_id_for_strict_alias bind_src cos=:{cos_symbol_heap, cos_predef_symbols_for_transform}
 					# (new_app_info_ptr, cos_symbol_heap) = newPtr EI_Empty cos_symbol_heap
 					  {pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
@@ -1948,12 +1954,14 @@ where
 		    by examining the reference count.
 		*/
 
+			collect_variables_in_binds :: ![(.a,.b,.LetBind)] !u:[v:(.a,.b,w:LetBind)] ![FreeVar] ![(Ptr ExprInfo)] !*CollectState -> (!x:[y:(.a,.b,z:LetBind)],![FreeVar],![(Ptr ExprInfo)],!.CollectState), [u <= x,v <= y,w <= z]
 			collect_variables_in_binds binds collected_binds free_vars dynamics cos
 				# (continue, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds False binds collected_binds free_vars dynamics cos
 				| continue
 					= collect_variables_in_binds binds collected_binds free_vars dynamics cos
 					= (collected_binds, free_vars, dynamics, cos)
 		
+			examine_reachable_binds :: !u:Bool ![v:(.a,.b,w:LetBind)] !x:[y:(.a,.b,z:LetBind)] ![.FreeVar] ![.(Ptr ExprInfo)] !*CollectState -> *(!u0:Bool,![v0:(.a,.b,w0:LetBind)],!x0:[y0:(.a,.b,z0:LetBind)],![FreeVar],![(Ptr ExprInfo)],!*CollectState), [u <= u0,v <= v0,w <= w0,x <= x0,y <= y0,z <= z0]
 			examine_reachable_binds bind_found [bind=:(is_strict, type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
 				# (bind_found, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds bind_found binds collected_binds free_vars dynamics cos
 				# (VI_Count count is_global, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
