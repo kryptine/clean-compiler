@@ -1492,6 +1492,8 @@ where
 			_
 				-> (fun_defs, symbol_table)
 
+import RWSDebug 
+
 expandMacrosInBody :: [.FunCall] CheckedBody ![ExprInfoPtr] PredefSymbolsForTransform *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],![ExprInfoPtr],.ExpandState);
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_symbol_heap,es_fun_defs,es_macro_defs}
 	# (prev_calls, fun_defs, macro_defs,es_symbol_table)
@@ -1517,10 +1519,18 @@ where
 		= case expr_info of
 			EI_UnmarkedDynamic _ _
 				-> (used_dynamics, symbol_heap)
-			_
+			EI_Dynamic opt_dyn_type ptrs
+				# (new_ptrs,cos_symbol_heap)
+					= foldSt collect_used_dynmic ptrs ([], cos_symbol_heap)
+				# cos_symbol_heap
+					= writePtr dyn_expr_ptr (EI_Dynamic opt_dyn_type new_ptrs)
 				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
-
-
+			EI_DynamicTypeWithVars type_vars dyn_type ptrs
+				# (new_ptrs,cos_symbol_heap)
+					= foldSt collect_used_dynmic ptrs ([], cos_symbol_heap)
+				# cos_symbol_heap
+					= writePtr dyn_expr_ptr (EI_DynamicTypeWithVars type_vars dyn_type new_ptrs)
+				-> (used_dynamics, symbol_heap)
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
