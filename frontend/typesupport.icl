@@ -4,7 +4,7 @@ import StdEnv, StdCompare
 import syntax, parse, check, unitype, utilities // , RWSDebug
 
 // MW: this switch is used to en(dis)able the fusion algorithm
-SwitchFusion fuse dont_fuse :== fuse
+SwitchFusion fuse dont_fuse :== dont_fuse
 
 ::	Store	:== Int
 
@@ -21,6 +21,9 @@ SwitchFusion fuse dont_fuse :== fuse
 	,	tst_context		:: ![TypeContext]
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
+
+::	FunctionType = CheckedType !SymbolType | SpecifiedType !SymbolType ![AType] !TempSymbolType
+				 | UncheckedType !TempSymbolType | ExpandedType !SymbolType !TempSymbolType !TempSymbolType  | EmptyFunctionType
 
 
 simplifyTypeApplication :: !Type ![AType] -> Type
@@ -60,9 +63,6 @@ where
 
 attrIsUndefined TA_None = True
 attrIsUndefined _ 		= False
-
-varIsDefined TE		= False
-varIsDefined _ 		= True
 
 instance clean_up TypeAttribute
 where
@@ -132,50 +132,70 @@ cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
 cleanUpVariable _ type tv_number cus
 	= (type, cus)
 
-class cleanUpClosed a :: !a !u:VarEnv -> (!Bool, !a, !u:VarEnv)
+
+::	CleanUpResult :== BITVECT
+
+cClosed				:== 0
+cDefinedVar			:== 1
+cUndefinedVar		:== 2
+cLiftedVar			:== 4
+
+cleanUpClosedVariable TE env
+	= (cUndefinedVar, TE, env)
+cleanUpClosedVariable (TLifted tvar) env
+	= (cLiftedVar, TV tvar, env)
+cleanUpClosedVariable tvar env
+	= (cDefinedVar, tvar, env)
+
+combineCleanUpResults cur1 cur2 :== cur1 bitor cur2
+
+checkCleanUpResult cur prop :== not (cur bitand prop == 0)
+
+class cleanUpClosed a :: !a !u:VarEnv -> (!CleanUpResult, !a, !u:VarEnv)
 
 instance cleanUpClosed AType
 where
 	cleanUpClosed atype=:{at_type} env
-		# (ok, at_type, env) = cleanUpClosed at_type env
-		= (ok, { atype & at_attribute = TA_Multi, at_type = at_type}, env)
+		# (cur, at_type, env) = cleanUpClosed at_type env
+		= (cur, { atype & at_attribute = TA_Multi, at_type = at_type}, env)
 
 instance cleanUpClosed Type
 where
 	cleanUpClosed (TempV tv_number) env
 		#! type = env.[tv_number]
-		= (varIsDefined type, type, env)
+		= cleanUpClosedVariable type env
 	cleanUpClosed (TA tc types) env
-		# (ok, types, env) = cleanUpClosed types env
-		= (ok, TA tc types, env)
+		# (cur, types, env) = cleanUpClosed types env
+		= (cur, TA tc types, env)
 	cleanUpClosed (argtype --> restype) env
-		# (ok, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
-		= (ok, argtype --> restype, env)
+		# (cur, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
+		= (cur, argtype --> restype, env)
 	cleanUpClosed (TempCV tv_number :@: types) env
 		#! type = env.[tv_number]
-		| varIsDefined type
-			# (ok, types, env) = cleanUpClosed types env
-            = (ok, simplifyTypeApplication type types, env)
-			= (False, TempCV tv_number :@: types, env)
+		# (cur1, type, env) = cleanUpClosedVariable type env
+		| checkCleanUpResult cur1 cUndefinedVar
+			= (cur1, TempCV tv_number :@: types, env)
+			# (cur2, types, env) = cleanUpClosed types env
+            = (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
 	cleanUpClosed t env
-		= (True, t, env)
+		= (cClosed, t, env)
 
 instance cleanUpClosed (a,b) | cleanUpClosed a & cleanUpClosed b
 where
 	cleanUpClosed (x,y) env
-		# (ok_x, x, env) = cleanUpClosed x env
-		| ok_x
-			# (ok_y, y, env) = cleanUpClosed y env
-			= (ok_y, (x,y), env)
-		= (False, (x,y), env)
+		# (cur1, x, env) = cleanUpClosed x env
+		| checkCleanUpResult cur1 cUndefinedVar
+			= (cur1, (x,y), env)
+			# (cur2, y, env) = cleanUpClosed y env
+			= (combineCleanUpResults cur1 cur2, (x,y), env)
 
 instance cleanUpClosed [a] | cleanUpClosed a
 where
 	cleanUpClosed [] env
-		= (True, [], env)
+		= (cClosed, [], env)
 	cleanUpClosed [t:ts] env
-		# (ok, (t,ts), env) = cleanUpClosed (t,ts) env
-		= (ok, [t:ts], env)
+		# (cur, (t,ts), env) = cleanUpClosed (t,ts) env
+		= (cur, [t:ts], env)
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 errorHeading  error_kind err=:{ea_file,ea_loc = []}
@@ -184,8 +204,16 @@ errorHeading  error_kind err=:{ea_file,ea_loc = [ loc : _ ]}
 	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< loc <<< ':', ea_ok = False }
 
 overloadingError class_symb err
-	# err = errorHeading "Type error" err
-	= { err & ea_file = err.ea_file <<< "internal overloading of class " <<< class_symb <<< " is unsolvable\n" }
+	# err = errorHeading "Overloading error" err
+	= { err & ea_file = err.ea_file <<< " internal overloading of class \"" <<< class_symb <<< "\" is unsolvable\n" }
+
+contextError class_symb err
+	# err = errorHeading "Overloading error" err
+	= { err & ea_file = err.ea_file <<< " unresolved class \"" <<< class_symb <<< "\" not occurring in specified type\n"}
+
+liftedContextError class_symb err
+	# err = errorHeading "Overloading error" err
+	= { err & ea_file = err.ea_file <<< " type variable of type of lifted argument appears in class \"" <<< class_symb <<< "\"\n"}
 
 existentialError err
 	# err = errorHeading "Type error" err
@@ -194,15 +222,6 @@ existentialError err
 liftedError var err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< "type variable of type of lifted argument " <<< var <<< " appears in the specified type\n" }
-
-clean_up_type_contexts [] env error
-	= ([], env, error)
-clean_up_type_contexts [tc:tcs] env error
-	# (tcs, env, error) = clean_up_type_contexts tcs env error
-	  (ok_tc_types, tc_types, env) = cleanUpClosed tc.tc_types env
-	| ok_tc_types
-		= ([{ tc & tc_types = tc_types } : tcs], env, error)
-		= (tcs, env, overloadingError tc.tc_class.glob_object.ds_ident error)
 
 extendSymbolType :: !SymbolType !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 extendSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars} nr_of_extra_args type_heaps
@@ -233,11 +252,14 @@ newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th
 	= ({ at_annotation = AN_None, at_attribute = TA_Var new_attr_var, at_type = TV new_var},
 		([ new_var : variables ], [ new_attr_var : attributes ], { type_heaps & th_vars = th_vars, th_attrs = th_attrs }))
 
-cleanUpSymbolType :: !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
-						!*VarEnv !*AttributeEnv !*TypeHeaps !*ExpressionHeap !*ErrorAdmin
-							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*ExpressionHeap, !*ErrorAdmin)
-cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} context case_and_let_exprs
-		coercions attr_part var_env attr_var_env heaps expr_heap error
+cSpecifiedType	:== True
+cDerivedType	:== False
+
+cleanUpSymbolType :: !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+						!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
+							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+cleanUpSymbolType spec_type tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
+		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_heaps = heaps,
@@ -247,7 +269,7 @@ cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} co
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
 	  (st_args, cus) = clean_up cui (drop tst_lifted tst_args) { cus & cus_var_env = cus_var_env }
 	  (st_result, cus) = clean_up cui tst_result cus
-	  (st_context, cus_var_env, cus_error) = clean_up_type_contexts (tst_context ++ context) cus.cus_var_env cus.cus_error
+	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env) = build_attribute_environment 0 max_attr_nr coercions cus.cus_attr_env [] []
 	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = update_expression_types { cui & cui_top_level = False } case_and_let_exprs
@@ -255,7 +277,8 @@ cleanUpSymbolType tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} co
 	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
-					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, expr_heap, cus_error)
+					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, var_heap, expr_heap, cus_error)
+//					---> ("cleanUpSymbolType", st)
 where
 	determine_type_vars to_index all_vars var_env
 		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
@@ -268,7 +291,6 @@ where
 				_
 					-> (all_vars, var_env)
 
-
 	determine_type_var var_index (all_vars, var_env)
 		#! type = var_env.[var_index]
 		= case type of
@@ -277,7 +299,42 @@ where
 			_
 				-> (all_vars, var_env)
 
-	
+	clean_up_type_contexts spec_type spec_context derived_context env var_heap error
+		|  spec_type
+			# var_heap = foldSt (mark_specified_context derived_context) spec_context var_heap
+			  (rev_contexts, env, error) = foldSt clean_up_lifted_type_context derived_context ([], env, error)
+			  (rev_contexts, env, error) = foldSt clean_up_type_context spec_context (rev_contexts, env, error)
+			= (reverse rev_contexts, env, var_heap, error)
+			# (rev_contexts, env, error) = foldSt clean_up_type_context derived_context ([], env, error)
+			= (reverse rev_contexts, env, var_heap, error)
+
+	mark_specified_context [] spec_tc var_heap
+		= var_heap
+	mark_specified_context [tc=:{tc_var} : tcs] spec_tc var_heap
+		| spec_tc == tc
+			| spec_tc.tc_var == tc_var
+				= var_heap
+				= var_heap <:= (spec_tc.tc_var, VI_ForwardClassVar tc_var)
+			= mark_specified_context tcs spec_tc var_heap
+				
+	clean_up_type_context tc=:{tc_types} (collected_contexts, env, error)
+		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
+		| checkCleanUpResult cur cUndefinedVar
+//			= ([{ tc & tc_types = tc_types } : collected_contexts], env, overloadingError tc.tc_class.glob_object.ds_ident error)
+			= (collected_contexts, env, error)
+		| checkCleanUpResult cur cLiftedVar
+			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, liftedContextError tc.tc_class.glob_object.ds_ident error)
+			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, error)
+
+	clean_up_lifted_type_context tc=:{tc_types,tc_var} (collected_contexts, env, error)
+		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
+		| checkCleanUpResult cur cLiftedVar
+			| checkCleanUpResult cur cDefinedVar
+				= (collected_contexts, env, liftedContextError tc.tc_class.glob_object.ds_ident error)
+				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
+		| otherwise
+			= (collected_contexts, env, error)
+				
 	build_attribute_environment :: !Index !Index !{! CoercionTree} !*AttributeEnv ![AttributeVar] ![AttrInequality]
 		-> (!*AttributeEnv, ![AttributeVar], ![AttrInequality])
 	build_attribute_environment attr_group_index max_attr_nr coercions attr_env attr_vars inequalities
@@ -416,9 +473,11 @@ where
 			AVI_Attr attr
 				-> (attr, heaps)
 			_
-				-> SwitchFusion
+				-> (TA_Multi, heaps)
+/* Sjaak ...				-> SwitchFusion
 						(TA_Multi, heaps)
 						(abort "compiler bug nr 7689 in module typesupport")
+... Sjaak */
 	substitute TA_None heaps
 		= (TA_Multi, heaps)
 	substitute attr heaps
@@ -618,11 +677,12 @@ where
 	equiv _ _ heaps
 		= (False, heaps)
 
-equivalent :: !SymbolType  !TempSymbolType !{# CommonDefs}  !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
-equivalent st=:{st_args,st_result,st_context,st_attr_env} tst=:{tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} defs attr_env heaps
+equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs}  !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
+equivalent st=:{st_args,st_result,st_context,st_attr_env} tst=:{tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} nr_of_contexts defs attr_env heaps
+	# nr_of_lifted_contexts = length st_context - nr_of_contexts
 	# (ok, heaps) = equiv (drop tst_lifted st_args,st_result) (drop tst_lifted tst_args,tst_result) heaps
 	| ok
-		# (ok, heaps) = equivalent_list_of_contexts st_context tst_context defs heaps
+		# (ok, heaps) = equivalent_list_of_contexts (drop nr_of_lifted_contexts st_context) (drop nr_of_lifted_contexts tst_context) defs heaps
 		| ok
 			# (ok, attr_env, attr_var_heap) = equivalent_environments st_attr_env (fill_environment tst_attr_env attr_env) heaps.th_attrs
 			= (ok, clear_environment tst_attr_env attr_env, { heaps & th_attrs = attr_var_heap })
@@ -695,32 +755,43 @@ where
 	clear_environment [{ac_demanded,ac_offered} : coercions ] attr_env
 		= clear_environment coercions { attr_env & [ac_demanded] = TA_None }
 	
-	equivalent_environments :: ![AttrInequality] !u:{!TypeAttribute} !v:AttrVarHeap -> (!Bool, !u:{!TypeAttribute}, !v:AttrVarHeap)
+//	equivalent_environments :: ![AttrInequality] !u:{!TypeAttribute} !v:AttrVarHeap -> (!Bool, !u:{!TypeAttribute}, !v:AttrVarHeap)
 	equivalent_environments [] attr_env attr_heap
 		= (True, attr_env, attr_heap)
 	equivalent_environments [{ai_demanded,ai_offered} : coercions ] attr_env attr_heap
-		#! av_info = sreadPtr ai_demanded.av_info_ptr attr_heap
-		# (AVI_Forward demanded_var_number) = av_info
-		#! av_info = sreadPtr ai_offered.av_info_ptr attr_heap
-		# (AVI_Forward offered_var_number) = av_info
-		#! offered_of_demanded = attr_env.[demanded_var_number]
-		# (succ, attr_env) = contains_coercion offered_var_number offered_of_demanded attr_env
+		# (AVI_Forward demanded_var_number, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
+		  (AVI_Forward offered_var_number, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
+		# (offered_of_demanded, attr_env) = attr_env![demanded_var_number]
+		  attr_env = { attr_env & [demanded_var_number] = TA_Locked offered_of_demanded }
+		# (succ, locked_attributes, attr_env) = contains_coercion offered_var_number offered_of_demanded [demanded_var_number] attr_env
 		| succ
-			= equivalent_environments coercions attr_env attr_heap
+			= equivalent_environments coercions (foldSt unlock_attribute locked_attributes attr_env) attr_heap
 			= (False, attr_env, attr_heap)
 
-	contains_coercion :: !Int !TypeAttribute !u:{! TypeAttribute} -> (!Bool,!u:{!TypeAttribute});
-	contains_coercion offered TA_None attr_env
-		= (False, attr_env)
-	contains_coercion offered (TA_List this_offered next_offered) attr_env
+//	contains_coercion :: !Int !TypeAttribute ![Int] !u:{! TypeAttribute} -> (!Bool, ![Int], !u:{!TypeAttribute})
+	contains_coercion offered TA_None locked_attributes attr_env
+		= (False, locked_attributes, attr_env)
+	contains_coercion offered (TA_List this_offered next_offered) locked_attributes attr_env
 		| offered == this_offered
-			= (True, attr_env)
-		#! offered_of_offered = attr_env.[this_offered]
-		# (succ, attr_env) = contains_coercion offered offered_of_offered attr_env
+			= (True, locked_attributes, attr_env)
+		# (succ, locked_attributes, attr_env) = contains_coercion offered next_offered locked_attributes attr_env
 		| succ
-			= (True, attr_env)
-			= contains_coercion offered next_offered attr_env
+			= (True, locked_attributes, attr_env)
+		# (offered_of_offered, attr_env) = attr_env![this_offered]
+		| is_locked offered_of_offered
+			= (False, locked_attributes, attr_env)
+			= contains_coercion offered offered_of_offered [this_offered : locked_attributes] { attr_env & [this_offered] = TA_Locked offered_of_offered }
+	contains_coercion offered (TA_Locked _) locked_attributes attr_env
+		= (False, locked_attributes, attr_env)
 
+	
+	unlock_attribute attr_number attr_env
+		# (TA_Locked attr, attr_env) = attr_env![attr_number]
+		= { attr_env & [attr_number] = attr }
+	
+	is_locked (TA_Locked _) = True
+	is_locked _ 			= False
+	
 :: Format =
 	{	form_properties 	:: !BITVECT
 	,	form_attr_position	:: Optional ([Int], Coercions)
@@ -858,6 +929,8 @@ where
 		= file  <<< "E." <<< tv_number <<< ' ' 
 	(<::) file (form, TE)
 		= file <<< "__"
+	(<::) file (form, type)
+		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
 
 cNoPosition :== -1
@@ -902,7 +975,8 @@ where
 
 instance <<< TypeContext
 where
-	(<<<) file tc = file <<< tc.tc_class.glob_object.ds_ident <<< ' ' <<< tc.tc_types
+	(<<<) file co = file <<< co.tc_class.glob_object.ds_ident <<< " <" <<< ptrToInt co.tc_var <<< '>' <<< " " <<< co.tc_types
+	
 
 instance <<< AttrCoercion
 where
