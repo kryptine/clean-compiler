@@ -542,6 +542,13 @@ BEFlatType a0 a1 a2 = code {
 	ccall BEFlatType "II:I:I"
 }
 // BEFlatTypeP BEFlatType (BESymbolP symbol,BETypeVarListP arguments);
+/*
+BEFlatTypeX :: !BESymbolP !BEAttribution !BETypeVarListP !BackEnd -> (!BEFlatTypeP,!BackEnd);
+BEFlatTypeX a0 a1 a2 a3 = code {
+	ccall BEFlatTypeX "III:I:I"
+}
+*/
+// BEFlatTypeP BEFlatTypeX (BESymbolP symbol,BETypeVarListP arguments,BEAttribution attribute);
 
 BEAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
 BEAlgebraicType a0 a1 a2 = code {
@@ -554,6 +561,13 @@ BERecordType a0 a1 a2 a3 a4 = code {
 	ccall BERecordType "IIII:V:I"
 }
 // void BERecordType (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,BEFieldListP fields);
+/*
+BERecordTypeX :: !Int !BEFlatTypeP !BETypeNodeP !Int !BEFieldListP !BackEnd -> BackEnd;
+BERecordTypeX a0 a1 a2 a3 a4 a5 = code {
+	ccall BERecordTypeX "IIIII:V:I"
+}
+*/
+// void BERecordTypeX (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,int is_boxed_record,BEFieldListP fields);
 
 BEAbsType :: !BEFlatTypeP !BackEnd -> BackEnd;
 BEAbsType a0 a1 = code {
