@@ -3,6 +3,9 @@ implementation module checktypes
 import StdEnv
 import syntax, checksupport, check, typesupport, utilities,
 		compilerSwitches //, RWSDebug
+from basic import listToString
+from coreclean import toString
+import convertDynamics
 
 
 ::	TypeSymbols =
@@ -1454,7 +1457,7 @@ build_constructor classdef dictindex dicttype dicttypevars constr_index typeinfo
 		(ok1, constr_type_copy, typeheaps1) = copy_symboltype dicttypevars constr_type typeheaps0
 		(ok2, constr_atvs_copy, typeheaps2) = substitute argvarss typeheaps1
 		constr_type
-		= { st_vars      = removeDup (flatten typevarss)
+		= { st_vars      = removeDup (dicttypevars++flatten typevarss)
 		  , st_args      = fieldtypes
 		  , st_arity     = constr_arity
 		  , st_result    = dicttype
@@ -1787,6 +1790,39 @@ where
 				-> (True, new_tv, heaps)
 			_
 				-> (True, tv, heaps)
+
+instance toString SymbolType
+where toString st
+      = listToString st.st_args+++" -> "+++toString st.st_result
+
+instance toString ATypeVar
+where toString atv
+      = toString atv.atv_attribute+++toString atv.atv_annotation+++toString atv.atv_variable
+
+instance toString AType
+where toString at
+      = toString at.at_annotation+++toString at.at_attribute+++toString at.at_type
+
+instance toString Type
+where toString (TA tsident argtypes)
+      = "("+++toString tsident+++foldr prependtype ")" argtypes
+      toString (argtype --> restype) = "("+++toString argtype+++" -> "+++toString restype+++")"
+      toString (TArrow) = "(->)"
+      toString (TArrow1	argtype) = "("+++toString argtype+++" ->)"
+      toString (tconsvar :@: argtypes) = "("+++toString tconsvar+++foldr prependtype ")" argtypes
+      toString (TB bt) = "<BT "+++toString bt+++">"
+      toString (TFA newtypevars type) = "A."+++listToString newtypevars+++"."+++toString type
+      toString (GTV typevar) = "<GTV "+++toString typevar+++">"
+      toString (TV typevar) = toString typevar
+      toString (TempV tvid) = "<TempV "+++toString tvid+++">"
+      toString (TQV	typevar) = "<TQV "+++toString typevar+++">"
+      toString (TempQV tvid) = "<TempQV "+++toString tvid+++">"
+      toString (TLifted typevar) = "<TLifted "+++toString typevar+++">"
+      toString (TE) = "<TE>"
+prependtype argtype rest = " "+++toString argtype+++rest
+
+instance toString TypeSymbIdent
+where toString tsi = toString tsi.type_name+++"/"+++toString tsi.type_arity+++"@"+++toString tsi.type_index
 
 //foldrarray :: (Int a .b -> .b) .b .{#a} -> .b | uselect,usize a
 foldrarray f i xs

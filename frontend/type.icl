@@ -517,8 +517,30 @@ cIsExistential 		:== True
 cIsNotExistential	:== False
 
 freshCopyOfTypeVariable {tv_name,tv_info_ptr} type_heaps=:{th_vars}
-	# (TVI_Type fresh_var, th_vars)	= readPtr tv_info_ptr th_vars
-	= (fresh_var, { type_heaps & th_vars = th_vars })
+	# (tvi, th_vars) = readPtr tv_info_ptr th_vars
+	= ( case tvi
+        of TVI_Type fresh_var -> fresh_var
+           _                  -> abort ("freshCopyOfTypeVariable (type.icl): unexpected TypeVarInfo entry in heap: "+++tvi_name tvi) ---> tvi
+	  , { type_heaps & th_vars = th_vars }
+	  )
+
+tvi_name (TVI_Empty                  ) = "TVI_Empty"
+tvi_name (TVI_Type _                 ) = "TVI_Type"
+tvi_name (TVI_TypeVar _              ) = "TVI_TypeVar"
+tvi_name (TVI_Forward _              ) = "TVI_Forward"
+tvi_name (TVI_TypeKind _             ) = "TVI_TypeKind"
+tvi_name (TVI_SignClass _ _ _        ) = "TVI_SignClass"
+tvi_name (TVI_PropClass _ _ _        ) = "TVI_PropClass"
+tvi_name (TVI_Attribute _            ) = "TVI_Attribute"
+tvi_name (TVI_CorrespondenceNumber _ ) = "TVI_CorrespondenceNumber"
+tvi_name (TVI_AType _                ) = "TVI_AType"
+tvi_name (TVI_Used                   ) = "TVI_Used"
+tvi_name (TVI_TypeCode _             ) = "TVI_TypeCode"
+tvi_name (TVI_CPSLocalTypeVar _      ) = "TVI_CPSLocalTypeVar"
+tvi_name (TVI_Kinds _                ) = "TVI_Kinds"
+tvi_name (TVI_Kind _                 ) = "TVI_Kind"
+tvi_name (TVI_ConsInstance _         ) = "TVI_ConsInstance"
+tvi_name (TVI_Normalized _           ) = "TVI_Normalized"
 
 freshConsVariable {tv_info_ptr} type_var_heap
 	# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
@@ -1046,7 +1068,7 @@ standardFieldSelectorType pos {glob_object={ds_ident,ds_index},glob_module} {ti_
 	  ts_exis_variables = addToExistentialVariables pos new_exis_variables ts_exis_variables
 	  ts = { ts & ts_type_heaps = ts_type_heaps, ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_exis_variables = ts_exis_variables }
 	= freshSymbolType (Yes pos) cWithFreshContextVars sd_type ti_common_defs ts
-//		 ---> ("standardFieldSelectorType", ds_ident, inst)
+//		 ---> ("standardFieldSelectorType", ds_ident)
 
 standardTupleSelectorType pos {ds_index} arg_nr {ti_common_defs} ts
 	#! {cons_type} = ti_common_defs.[cPredefinedModuleIndex].com_cons_defs.[ds_index]
@@ -1076,7 +1098,7 @@ standardLhsConstructorType pos index mod arity {ti_common_defs} ts=:{ts_var_stor
 	  ts_exis_variables = addToExistentialVariables pos new_exis_variables ts_exis_variables
 	  ts = { ts & ts_type_heaps = ts_type_heaps, ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_exis_variables = ts_exis_variables }
 	= freshSymbolType No cWithFreshContextVars cons_type ti_common_defs ts
-//		 ---> ("standardLhsConstructorType", cons_symb, fresh_type)
+//		 ---> ("standardLhsConstructorType", cons_symb)
 
 :: ReferenceMarking :== Bool
 
