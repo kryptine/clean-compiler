@@ -48,11 +48,13 @@ where
 			= convert_groups (inc group_nr) groups global_type_instances (foldSt (convert_function group_nr global_type_instances) group.group_members fun_defs_and_ci)
 
 	convert_function group_nr global_type_instances fun (fun_defs, ci)
-		#! fun_def = fun_defs.[fun]
-		# {fun_body, fun_type, fun_info} = fun_def
-		  (fun_body, ci) = convert_dynamics_in_body {cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
-		= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
-			{ ci & ci_new_variables = [] }) ---> ("convert_function", ci.ci_new_variables ++ fun_info.fi_local_vars)
+		# (fun_def, fun_defs) = fun_defs![fun]
+		  {fun_body, fun_type, fun_info} = fun_def
+		| isEmpty fun_info.fi_dynamics
+			= (fun_defs, ci)
+			# (fun_body, ci) = convert_dynamics_in_body {cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
+			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
+				{ ci & ci_new_variables = [] })
 
 	convert_dynamics_in_body global_type_instances (TransformedBody {tb_args,tb_rhs}) (Yes {st_args}) ci
 		# vars_with_types = bindVarsToTypes tb_args st_args []
@@ -295,17 +297,16 @@ where
 	
 		  /***  convert the elements of this pattern  ***/
 
-		  x_i_bind = { bind_src = opened_dynamic.opened_dynamic_expr,  bind_dst = dp_var }
-		  (a_ij_binds, ci) = createVariables dp_type_patterns_vars [] ci
-	 	  (type_code, ci) = convertTypecode cinp dp_type_code ci
-	 	  (dp_rhs,    ci) = convertDynamics cinp bound_vars this_default dp_rhs ci
+		  (a_ij_binds, ci)	= createVariables dp_type_patterns_vars [] ci
+	 	  (type_code, ci)	= convertTypecode cinp dp_type_code ci
+	 	  (dp_rhs, ci)		= convertDynamics cinp bound_vars this_default dp_rhs ci
 	
 		  /***  recursively convert the other patterns  ***/
 
-		  (binds, ci) = convert_other_patterns cinp bound_vars this_default pattern_number opened_dynamic result_type last_default patterns ci
+		  (binds, ci)		= convert_other_patterns cinp bound_vars this_default pattern_number opened_dynamic result_type last_default patterns ci
 
-	
 		  /***  generate the expression  ***/
+
 	 	  (unify_symb, ci) 		= getSymbol PD_unify SK_Function 2 ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
 		  (let_info_ptr, ci) 	= let_ptr ci
@@ -313,10 +314,11 @@ where
 		  (default_expr, ci) 	= toExpression this_default ci
 		  (unify_result_var, ci)	= newVariable "result" VI_Empty ci
 		  unify_result_fv 			= varToFreeVar unify_result_var 1
-		  (unify_bool_var,   ci)	= newVariable "unify_bool" VI_Empty ci
+		  (unify_bool_var, ci)		= newVariable "unify_bool" VI_Empty ci
 		  unify_bool_fv 			= varToFreeVar unify_bool_var 1
 
-		  (let_binds, ci) = bind_indirection_var ind_var unify_result_var twotuple ci
+		  (let_binds, ci) 		= bind_indirection_var ind_var unify_result_var twotuple ci
+		  a_ij_binds			= add_x_i_bind opened_dynamic.opened_dynamic_expr dp_var a_ij_binds
 
 		  let_expr = Let {	let_strict = False,
 		  					let_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
@@ -330,7 +332,7 @@ where
 												case_ident		= No,
 												case_info_ptr	= case_info_ptr	},
 		  					let_info_ptr = let_info_ptr	}
-		= ([x_i_bind : a_ij_binds ++ binds],  let_expr,  { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
+		= (a_ij_binds ++ binds,  let_expr,  { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
 	where
 		bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_heap,ci_new_variables}
 			# (VI_Indirection ref_count, ci_var_heap) = readPtr var_info_ptr ci_var_heap
@@ -339,6 +341,11 @@ where
 		  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
 						{ ci & ci_var_heap = ci_var_heap, ci_new_variables = [ ind_fv : ci_new_variables ]})
 				= ([], {ci & ci_var_heap = ci_var_heap})
+
+		add_x_i_bind bind_src bind_dst=:{fv_count} binds
+			| fv_count > 0
+				= [ { bind_src = bind_src, bind_dst = bind_dst } : binds ]
+				= binds
 
 	convert_other_patterns :: ConversionInput BoundVariables DefaultExpression Int OpenedDynamic AType !(Optional Expression) ![DynamicPattern] !*ConversionInfo
 			-> (Env Expression FreeVar, *ConversionInfo)

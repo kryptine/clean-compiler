@@ -5,7 +5,7 @@ import checksupport, StdCompare
 from unitype import Coercions, CoercionTree, AttributePartition
 
 // MW: this switch is used to en(dis)able the fusion algorithm
-SwitchFusion fuse dont_fuse :== fuse
+SwitchFusion fuse dont_fuse :== dont_fuse
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 

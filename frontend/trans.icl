@@ -196,7 +196,7 @@ not_an_unsafe_pattern (cc, _, ai) = (cc, False, ai)
 
 instance consumerRequirements BoundVar
 where
-	consumerRequirements {var_info_ptr} _ ai=:{ai_var_heap}
+	consumerRequirements {var_name,var_info_ptr} _ ai=:{ai_var_heap}
 		# (var_info, ai_var_heap) = readPtr var_info_ptr ai_var_heap
 		= continuation var_info { ai & ai_var_heap=ai_var_heap }
 	  where
@@ -206,6 +206,8 @@ where
 			#! ref_count = ai_cur_ref_counts.[arg_position] 
 			   ai_cur_ref_counts = { ai_cur_ref_counts & [arg_position]=min (ref_count+1) 2 }
 			= (temp_var, False, { ai & ai_cur_ref_counts=ai_cur_ref_counts })
+		continuation var_info ai=:{ai_cur_ref_counts}
+			=  abort ("consumerRequirements" ---> (var_name <<- var_info))
 //		continuation vi ai
 //			= (cPassive, ai)
 
@@ -224,7 +226,7 @@ instance consumerRequirements Expression where
 					{ ai & ai_next_var = new_next_var, ai_next_var_of_fun = new_ai_next_var_of_fun, ai_var_heap = ai_var_heap }
 		= consumerRequirements let_expr common_defs ai // XXX why not not_an_unsafe_pattern
 		where
-			init_variables [{bind_dst={fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
+			init_variables [{bind_dst={fv_name, fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
 /* Sjaak ... */
 				| fv_count > 0
 					= init_variables binds (inc ai_next_var) (inc ai_next_var_of_fun)
@@ -1561,7 +1563,7 @@ where
 		
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module, glob_object},symb_arity}, app_args} extra_args
-	ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
+			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
 	| glob_module == cIclModIndex
 		| glob_object < size ti_cons_args
 			#! cons_class = ti_cons_args.[glob_object]
@@ -1587,9 +1589,17 @@ transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module,
 /* ... Sjaak */
 				
 // XXX linear_bits field has to be added for generated functions
-transformApplication app=:{app_symb={symb_kind = SK_GeneratedFunction fun_def_ptr _}} extra_args ro ti=:{ti_fun_heap}
-	# (FI_Function {gf_fun_def,gf_instance_info,gf_cons_args}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-	= transformFunctionApplication gf_fun_def gf_instance_info gf_cons_args app extra_args ro { ti & ti_fun_heap = ti_fun_heap }
+/* Sjaak ... */
+transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
+			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
+	| fun_index < size ti_cons_args
+		#! cons_class = ti_cons_args.[fun_index]
+		   instances = ti_instances.[fun_index]
+		   fun_def = ti_fun_defs.[fun_index]
+		= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
+		# (FI_Function {gf_fun_def,gf_instance_info,gf_cons_args}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
+		= transformFunctionApplication gf_fun_def gf_instance_info gf_cons_args app extra_args ro { ti & ti_fun_heap = ti_fun_heap }
+/* ... Sjaak  */
 transformApplication app [] ro ti
 	= (App app, ti)
 transformApplication app extra_args ro ti
@@ -1790,14 +1800,15 @@ where
 					(foldSt (transform_function common_defs imported_funs) group_members
 						{ ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap })
 			= (groups, imported_types, collected_imports, ti)
+
 	transform_function common_defs imported_funs fun ti=:{ti_fun_defs}
 		#! fun_def = ti_fun_defs.[fun]
 		# {fun_body = TransformedBody tb} = fun_def
-		  ro =	{	ro_imported_funs = imported_funs
-				,	ro_common_defs = common_defs
-				,	ro_root_case_mode = case tb of {{tb_rhs=Case _} -> RootCase; _ -> NotRootCase}
-				,	ro_fun = fun_def_to_symb_ident fun fun_def
-				,	ro_fun_args = tb.tb_args
+		  ro =	{	ro_imported_funs	= imported_funs
+				,	ro_common_defs 		= common_defs
+				,	ro_root_case_mode	= case tb of {{tb_rhs=Case _} -> RootCase; _ -> NotRootCase}
+				,	ro_fun				= fun_def_to_symb_ident fun fun_def
+				,	ro_fun_args			= tb.tb_args
 				}
 		  (fun_rhs, ti) = transform tb.tb_rhs ro ti
 		= { ti & ti_fun_defs = {ti.ti_fun_defs & [fun] = { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}}}

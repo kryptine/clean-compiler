@@ -1247,13 +1247,14 @@ where
 					= collect_variables_in_binds binds collected_binds free_vars cos
 					= (collected_binds, free_vars, cos)
 		
-			examine_reachable_binds bind_found [bind=:{bind_dst={fv_info_ptr},bind_src} : binds] collected_binds free_vars cos
+			examine_reachable_binds bind_found [bind=:{bind_dst=fv=:{fv_info_ptr},bind_src} : binds] collected_binds free_vars cos
 				# (bind_found, binds, collected_binds, free_vars, cos) = examine_reachable_binds bind_found binds collected_binds free_vars cos
 				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
 				# (VI_Count count is_global) = var_info
 				| count > 0
 					# (bind_src, free_vars, cos) = collectVariables bind_src free_vars cos
-					= (True, binds, [ { bind & bind_src = bind_src } : collected_binds ], free_vars, cos)
+/* Sjaak */
+					= (True, binds, [ { bind_dst = { fv & fv_count = count }, bind_src = bind_src } : collected_binds ], free_vars, cos)
 					= (bind_found, [bind : binds], collected_binds, free_vars, cos)
 			examine_reachable_binds bind_found [] collected_binds free_vars cos
 				= (bind_found, [], collected_binds, free_vars, cos)
