@@ -1253,7 +1253,6 @@ where
 				# (VI_Count count is_global) = var_info
 				| count > 0
 					# (bind_src, free_vars, cos) = collectVariables bind_src free_vars cos
-/* Sjaak */
 					= (True, binds, [ { bind_dst = { fv & fv_count = count }, bind_src = bind_src } : collected_binds ], free_vars, cos)
 					= (bind_found, [bind : binds], collected_binds, free_vars, cos)
 			examine_reachable_binds bind_found [] collected_binds free_vars cos

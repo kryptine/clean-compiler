@@ -227,23 +227,19 @@ instance consumerRequirements Expression where
 		= consumerRequirements let_expr common_defs ai // XXX why not not_an_unsafe_pattern
 		where
 			init_variables [{bind_dst={fv_name, fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
-/* Sjaak ... */
 				| fv_count > 0
 					= init_variables binds (inc ai_next_var) (inc ai_next_var_of_fun)
 						(writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap)
 					= init_variables binds ai_next_var ai_next_var_of_fun ai_var_heap
-/* ... Sjaak  */
 			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
 				= (ai_next_var, ai_next_var_of_fun, ai_var_heap)
 				
 			acc_requirements_of_let_binds [ {bind_src, bind_dst} : binds ] ai_next_var common_defs ai
-/* Sjaak ... */
 				| bind_dst.fv_count > 0
 					# (bind_var, _, ai) = consumerRequirements bind_src common_defs ai
 			  		  ai_class_subst = unifyClassifications ai_next_var bind_var ai.ai_class_subst
 					= acc_requirements_of_let_binds binds (inc ai_next_var) common_defs { ai & ai_class_subst = ai_class_subst }
 					= acc_requirements_of_let_binds binds ai_next_var common_defs ai
-/* ... Sjaak  */
 			acc_requirements_of_let_binds [] ai_next_var _ ai
 				= ai
 				
@@ -678,8 +674,6 @@ where
 					# (EI_CaseType {ct_cons_types},ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 					  ti_var_heap = foldSt store_type_info_of_dyn_pattern (zip2 ct_cons_types dynamic_patterns) ti.ti_var_heap
 					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
-
-//					-> abort "case for DynamicPatterns not yet implemented in module trans (XXX)"
 				NoPattern
 					-> ti
 		store_type_info_of_alg_pattern (var_types,{ap_vars}) var_heap
@@ -804,6 +798,12 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 						Yes default_expr-> transform default_expr { ro & ro_root_case_mode = NotRootCase } ti
 						No				-> (Case neverMatchingCase, ti)
 				-> transform (hd may_be_match_pattern).bp_expr { ro & ro_root_case_mode = NotRootCase } ti
+			Let lad
+				| not is_active
+					-> skip_over this_case ro ti
+				# (new_let_binds, ti) = transform lad.let_binds { ro & ro_root_case_mode = NotRootCase } ti
+				  (new_let_expr, ti) = transform (Case { this_case & case_expr = lad.let_expr }) ro ti
+				-> (Let { lad & let_expr = new_let_expr, let_binds = new_let_binds }, ti)
 		  	_	-> skip_over this_case ro ti
 	where
 		equal (SK_Function glob_index1) (SK_Function glob_index2)
@@ -812,13 +812,6 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			= index1==index2
 		equal _ _
 			= False
-	
-		get_instance_info (SK_Function {glob_object}) instances fun_heap
-			# (instance_info, instances) = instances![glob_object]
-			= (instance_info, instances, fun_heap)
-		get_instance_info (SK_GeneratedFunction fun_info_ptr _) instances fun_heap
-			# (FI_Function {gf_instance_info, gf_fun_def}, fun_heap) = readPtr fun_info_ptr fun_heap
-			= (gf_instance_info, instances, fun_heap)
 	
 		replace_arg producer_vars=:[fv_info_ptr:_] act_pars form_pars=:[h_form_pars=:(Var {var_info_ptr}):t_form_pars]
 			| fv_info_ptr<>var_info_ptr
@@ -895,7 +888,6 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 								[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] case_default ro ti
 			| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
 				# zipped = zip2 ap_vars app_args
-				  linearity = map (const True) linearity // XXX
 				  linear_args = filterWith linearity zipped
 				  not_linearity = map not linearity
 				  non_linear_args = filterWith not_linearity zipped
@@ -974,13 +966,24 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 										outer_fun_def outer_cons_args used_mask new_ro ti
 		No	-> (new_expr, { ti & ti_recursion_introduced = old_ti_recursion_introduced })
   where
+
+	get_fun_def_and_cons_args (SK_Function {glob_object}) cons_args fun_defs fun_heap
+		# (fun_def, fun_defs) = fun_defs![glob_object]
+		= (fun_def, cons_args.[glob_object], fun_defs, fun_heap)
+	get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr fun_index) cons_args fun_defs fun_heap
+		| fun_index < size fun_defs
+			# (fun_def, fun_defs) = fun_defs![fun_index]
+			= (fun_def, cons_args.[fun_index], fun_defs, fun_heap)
+		# (FI_Function {gf_fun_def, gf_cons_args}, fun_heap) = readPtr fun_info_ptr fun_heap
+		= (gf_fun_def, gf_cons_args, fun_defs, fun_heap)
+/*
 	get_fun_def_and_cons_args (SK_Function {glob_object}) cons_args fun_defs fun_heap
 		# (fun_def, fun_defs) = fun_defs![glob_object]
 		= (fun_def, cons_args.[glob_object], fun_defs, fun_heap)
 	get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr _) cons_args fun_defs fun_heap
 		# (FI_Function {gf_fun_def, gf_cons_args}, fun_heap) = readPtr fun_info_ptr fun_heap
 		= (gf_fun_def, gf_cons_args, fun_defs, fun_heap)
-
+*/
 	generate_case_function old_ti_recursion_introduced fun_index case_info_ptr new_expr outer_fun_def outer_cons_args used_mask
 						{ro_fun=ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}, ro_fun_args} ti
 //		| False->>"generate_case_function"
@@ -1268,7 +1271,7 @@ where
 		determine_arg producer {fv_info_ptr,fv_name} type (_,(outer_type_vars, ti_cons_args, consumer_body_rhs))
 						(vars, types, new_linear_bits, new_cons_args, type_var_heap, symbol_heap, fun_defs, fun_heap, var_heap)
 			# ((symbol, nr_of_applied_args, fun_def, {cc_args, cc_linear_bits}), fun_defs, fun_heap)
-					= from_function_or_generated_function producer fun_defs fun_heap
+					= from_function_or_generated_function producer ti_cons_args fun_defs fun_heap
 			  (TransformedBody tb) = fun_def.fun_body
 			  (form_vars, act_vars, var_heap) = build_var_args (reverse (take nr_of_applied_args tb.tb_args)) vars [] var_heap
 			  (Yes symbol_type) = fun_def.fun_type
@@ -1289,6 +1292,17 @@ where
 			  ,	writeVarInfo fv_info_ptr expr_to_unfold var_heap
 			  ) 
 		  where
+			from_function_or_generated_function (PR_Function symbol index nr_of_applied_args) ti_cons_args fun_defs fun_heap
+				# (fun_def, fun_defs) = fun_defs![index]
+				= ((symbol, nr_of_applied_args, fun_def, ti_cons_args.[index]), fun_defs, fun_heap)
+			from_function_or_generated_function (PR_GeneratedFunction symbol=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index} _ nr_of_applied_args)
+												ti_cons_args fun_defs fun_heap
+				| fun_index < size fun_defs
+					# (fun_def, fun_defs) = fun_defs![fun_index]
+					= ((symbol, nr_of_applied_args, fun_def, ti_cons_args.[fun_index]), fun_defs, fun_heap)
+				# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
+				= ((symbol, nr_of_applied_args, generated_function.gf_fun_def, generated_function.gf_cons_args), fun_defs, fun_heap)
+/*
 			from_function_or_generated_function (PR_Function symbol index nr_of_applied_args) fun_defs fun_heap
 				# (fun_def, fun_defs) = fun_defs![index]
 				= ((symbol, nr_of_applied_args, fun_def, ti_cons_args.[index]), fun_defs, fun_heap)
@@ -1296,7 +1310,7 @@ where
 												fun_defs fun_heap
 				# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
 				= ((symbol, nr_of_applied_args, generated_function.gf_fun_def, generated_function.gf_cons_args), fun_defs, fun_heap)
-
+*/
 		build_application_type :: !SymbolType !Int -> AType
 		build_application_type symbol_type=:{st_arity, st_result, st_args} nr_of_applied_args
 			| st_arity==nr_of_applied_args
@@ -1347,11 +1361,20 @@ where
 	max_group_index_of_producer (PR_Function _ fun_index _) current_max fun_defs fun_heap cons_args
 		# (fun_def, fun_defs) = fun_defs![fun_index]
 		= max fun_def.fun_info.fi_group_index current_max
+	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _ _)
+								current_max fun_defs fun_heap cons_args
+		# fun_def = case fun_index < size fun_defs of
+						True	-> fun_defs.[fun_index] 
+						_		# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
+								-> generated_function.gf_fun_def
+		= max fun_def.fun_info.fi_group_index current_max
+/*
 	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr _} _ _)
 								current_max fun_defs fun_heap cons_args
 		# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
 		  fun_def = generated_function.gf_fun_def
 		= max fun_def.fun_info.fi_group_index current_max
+*/
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
 
@@ -1544,11 +1567,21 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
 		= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
 where
+
+	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
+		 = { ti & ti_instances = { ti_instances & [glob_object] = instances } }
+	update_instance_info (SK_GeneratedFunction fun_def_ptr fun_index) instances ti=:{ti_fun_heap, ti_instances}
+		| fun_index < size ti_instances
+			= { ti & ti_instances = { ti_instances & [fun_index] = instances } }
+		# (FI_Function fun_info, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
+		= { ti & ti_fun_heap = ti_fun_heap <:= (fun_def_ptr, FI_Function { fun_info & gf_instance_info = instances })}
+/*
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
 		 = { ti & ti_instances = { ti_instances & [glob_object] = instances } }
 	update_instance_info (SK_GeneratedFunction fun_def_ptr _) instances ti=:{ti_fun_heap}
 		# (FI_Function fun_info, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 		= { ti & ti_fun_heap = ti_fun_heap <:= (fun_def_ptr, FI_Function { fun_info & gf_instance_info = instances })}
+*/
 
 	complete_application symb form_arity args []
 		= (symb, args, [])
@@ -1577,7 +1610,6 @@ transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module,
 // This function is imported
 		| isEmpty extra_args
 			= (App app, ti)
-/* Sjaak ... */
 			# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
 			  form_arity = ft_arity + length ft_type.st_context
 			  ar_diff = form_arity - symb_arity
@@ -1586,10 +1618,8 @@ transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module,
 				= (App {app  &  app_args = app_args ++ extra_args, app_symb = { symb & symb_arity = symb_arity + nr_of_extra_args }}, ti)
 				= (App {app  &  app_args = app_args ++ take ar_diff extra_args, app_symb = { symb & symb_arity = symb_arity + ar_diff }} @
 						drop ar_diff extra_args, ti)
-/* ... Sjaak */
 				
 // XXX linear_bits field has to be added for generated functions
-/* Sjaak ... */
 transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
 	| fun_index < size ti_cons_args
@@ -1599,7 +1629,6 @@ transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction 
 		= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
 		# (FI_Function {gf_fun_def,gf_instance_info,gf_cons_args}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 		= transformFunctionApplication gf_fun_def gf_instance_info gf_cons_args app extra_args ro { ti & ti_fun_heap = ti_fun_heap }
-/* ... Sjaak  */
 transformApplication app [] ro ti
 	= (App app, ti)
 transformApplication app extra_args ro ti
@@ -1661,6 +1690,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 		// curried applications may be fused with non linear consumers in functions local to a macro
 		= ({ producers & [prod_index] = PR_Function symb glob_object (length app_args)}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
+
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
 				  new_args prod_index producers ti
 	# (FI_Function {gf_fun_def}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
@@ -1761,19 +1791,12 @@ where
 
 ::	ImportedConstructors	:== [Global Index]
 
-/* Sjaak ... */
-// transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap
-//	-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-
 transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-/* ... Sjaak */
 
-// transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs var_heap type_heaps symbol_heap
 transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs imported_types collected_imports var_heap type_heaps symbol_heap
 	#! (nr_of_funs, fun_defs) = usize fun_defs
-//	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, imported_types, collected_imports, ti)
 		= transform_groups 0 groups common_defs imported_funs imported_types collected_imports
 			{ti_fun_defs = fun_defs, ti_instances = createArray nr_of_funs II_Empty,
