@@ -14,3 +14,5 @@ compile :: ![{#Char}] !*DclCache !*Files -> (!Bool,!*DclCache,!*Files)
  };
 
 empty_cache :: *DclCache
+
+openTclFile :: !String !*Files -> (!.File, !*Files)
