@@ -7,7 +7,6 @@
 
 #include "compiledefines.h"
 #include "comsupport.h"
-#include "system.h"
 
 #include <ctype.h>
 

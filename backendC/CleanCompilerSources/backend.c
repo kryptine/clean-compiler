@@ -3193,15 +3193,39 @@ RemoveSpecialArrayFunctionsFromSymbolList (SymbolP *symbolH)
 	}
 } /* RemoveSpecialArrayFunctionsFromSymbolList */
 
-#if 0
-File rules_file;
-#endif
+/* copied from compiler.c ... */
+
+static Bool
+RemoveExtension (char *name)
+{
+	int len;
+
+	len = strlen (name);
+
+	if (len>=4 && name[len-4]=='.'){
+		name [len-4] = '\0';
+		return True;
+	} else
+		return False;
+}
+
+static void
+AddExtension (char *name)
+{
+	name [strlen (name)] = '.';
+}
+
+/* ... copied from compiler.c */
+
+
+ 
 
 int
 BEGenerateCode (CleanString outputFile)
 {
 	char	*outputFileName;
 	ImpRule	rule;
+	Bool	hadExtension;
 
 	if (CompilerError)
 		return False;
@@ -3218,29 +3242,30 @@ BEGenerateCode (CleanString outputFile)
 	gBEState.be_icl.beicl_module->im_rules	=	rule;
 
 	outputFileName	= ConvertCleanString (outputFile);
+	hadExtension = RemoveExtension (outputFileName);
 
 #if 0
 	{
-		rules_file=fopen ("Rules","w");
-		if (rules_file){
+		File f;
+		
+		f=fopen ("Rules","w");
+		if (f){
 			ImpRuleS *rule;
 
 			for (rule=gBEState.be_icl.beicl_module->im_rules; rule!=NULL; rule=rule->rule_next){
-				PrintImpRule (rule,4,rules_file);
+				PrintImpRule (rule,4,f);
 				
 				if (rule->rule_next!=NULL)
-					FPutC ('\n',rules_file);
+					FPutC ('\n',f);
 			}
+			fclose (f);
 		}
 	}
 #endif
 
 	CodeGeneration (gBEState.be_icl.beicl_module, outputFileName);
-
-#if 0
-	if (rules_file)
-		fclose (rules_file);
-#endif
+	if (hadExtension)
+		AddExtension (outputFileName);
 
 	return (!CompilerError);
 } /* BEGenerateCode */
@@ -3279,6 +3304,7 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 	dclDef->sdef_dcl_icl	= iclDef;
 
 	iclDef->sdef_exported = True;
+	dclDef->sdef_exported = True;
 } /* BEExportType */
 
 void
@@ -3329,6 +3355,8 @@ BEExportConstructor (int dclConstructorIndex, int iclConstructorIndex)
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
+
+	iclDef->sdef_exported = True;
 } /* BEExportConstructor */
 
 void
@@ -3364,6 +3392,8 @@ BEExportField (int dclFieldIndex, int iclFieldIndex)
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
+
+	iclDef->sdef_exported = True;
 } /* BEExportField */
 
 void
@@ -3393,6 +3423,8 @@ BEExportFunction (int dclFunctionIndex, int iclFunctionIndex)
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
+
+	iclDef->sdef_exported = True;
 } /* BEExportFunction */
 
 void

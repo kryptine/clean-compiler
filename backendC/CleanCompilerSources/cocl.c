@@ -2,7 +2,6 @@
 #include "compiledefines.h"
 #include "comsupport.h"
 #include "settings.h"
-#include "system.h"
 #include <ctype.h>
 #include "compiler.h"
 #include "version.h"
@@ -62,7 +61,7 @@ static Bool SetStrictOption (char *opt)
 
 char *path_parameter;
 #ifdef _SUN_
-extern int use_clean_system_files;
+int use_clean_system_files;
 #endif
 
 #ifdef CLEAN2
