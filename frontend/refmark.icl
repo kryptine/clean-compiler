@@ -289,7 +289,7 @@ where
 	ref_mark_of_patterns with_composite_pattern free_vars sel opt_pattern_var patterns case_default var_heap
 		# (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
 		  (with_pattern_bindings, pattern_depth, used_lets, var_heap)
-			= foldSt (ref_mark_of_algebraic_pattern free_vars sel No local_lets) patterns (False, 0, [], var_heap)		
+			= foldSt (ref_mark_of_algebraic_pattern free_vars sel opt_pattern_var local_lets) patterns (False, 0, [], var_heap)		
 		= refMarkOfDefault (with_composite_pattern && with_pattern_bindings) pattern_depth free_vars sel case_default used_lets var_heap
 
 	ref_mark_of_algebraic_pattern free_vars sel opt_pattern_var local_lets {ap_vars,ap_expr}
@@ -299,7 +299,7 @@ where
 		  used_pattern_vars = collectPatternsVariables ap_vars
 		  var_heap = bind_optional_pattern_variable opt_pattern_var used_pattern_vars var_heap
 		  var_heap = refMark [ [ fv \\ (fv,_) <- used_pattern_vars ] : free_vars ] sel ap_expr var_heap
-		  var_heap = restore_bindinding_of_pattern_variable opt_pattern_var used_pattern_vars var_heap
+		  var_heap = restore_binding_of_pattern_variable opt_pattern_var used_pattern_vars var_heap
 		  (used_lets, var_heap) = collectUsedLetVars local_lets (used_lets, var_heap)
 		= (with_pattern_bindings || not (isEmpty used_pattern_vars), pattern_depth, used_lets, var_heap)
 	
@@ -311,12 +311,13 @@ where
 	bind_optional_pattern_variable _ used_pattern_vars var_heap
 		= var_heap
 
-	restore_bindinding_of_pattern_variable _ [] var_heap
+	restore_binding_of_pattern_variable _ [] var_heap
 		= var_heap
-	restore_bindinding_of_pattern_variable (Yes var_info_ptr) used_pattern_vars var_heap
-		# (VI_Occurrence var_occ=:{occ_bind=OB_Pattern used_pattern_vars occ_bind}, var_heap) = readPtr var_info_ptr var_heap
+	restore_binding_of_pattern_variable (Yes var_info_ptr) used_pattern_vars var_heap
+		# (VI_Occurrence var_occ=:{occ_ref_count, occ_bind=OB_Pattern _ occ_bind}, var_heap) = readPtr var_info_ptr var_heap
 		= var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_bind = occ_bind})
-	restore_bindinding_of_pattern_variable _ used_pattern_vars var_heap
+//			---> ("restore_binding_of_pattern_variable", occ_ref_count)
+	restore_binding_of_pattern_variable _ used_pattern_vars var_heap
 		= var_heap
 	
 refMarkOfCase free_vars sel expr (BasicPatterns type patterns) defaul var_heap
