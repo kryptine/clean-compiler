@@ -1,5 +1,7 @@
 implementation module supercompile
 
+// $Id$
+
 import checksupport
 import syntax
 import transform
@@ -28,4 +30,6 @@ supercompile
     ,   !*ExpressionHeap        // expression_heap
     )
 
-supercompile _ _ _ _ _ _ _ _ _ _ _ _ = abort "supercompile: not implemented"
+supercompile common_defs array_instances main_dcl_module_n components fun_defs var_heap expression_heap imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
+= (components,fun_defs,dcl_types,used_conses,var_heap,type_heaps,expression_heap)
+  where (used_conses) = abort "supercompile: not implemented"
