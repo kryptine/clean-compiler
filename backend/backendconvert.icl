@@ -9,6 +9,12 @@ import backend
 import backendsupport, backendpreprocess
 import RWSDebug
 
+// trace macro
+(-*->) infixl
+(-*->) value trace
+	:==	value // ---> trace
+
+
 :: BEMonad a :== St !*BackEnd !a
 
 
@@ -83,7 +89,12 @@ beLiteralSymbol type value
 	:==	beFunction0 (BELiteralSymbol type value)
 beFunctionSymbol functionIndex moduleIndex
 	:==	beFunction0 (BEFunctionSymbol functionIndex moduleIndex)
+// test ...
 beSpecialArrayFunctionSymbol arrayFunKind functionIndex moduleIndex
+	:==	beSpecialArrayFunctionSymbol2 arrayFunKind functionIndex (moduleIndex) // ->> (moduleIndex, functionIndex, arrayFunKind))
+
+// ... test
+beSpecialArrayFunctionSymbol2 arrayFunKind functionIndex moduleIndex
 	:==	beFunction0 (BESpecialArrayFunctionSymbol arrayFunKind (changeArrayFunctionIndex functionIndex) moduleIndex)
 beDictionarySelectFunSymbol
 	:==	beFunction0 BEDictionarySelectFunSymbol
@@ -203,12 +214,12 @@ beTypeVars
 	:==	beFunction2 BETypeVars
 beTypeVar name
 	:==	beFunction0 (BETypeVar name)
-beExportType typeIndex
-	:==	beFunction0 (BEExportType typeIndex)
-beExportConstructor constructorIndex
-	:==	beFunction0 (BEExportConstructor constructorIndex)
-beExportField fieldIndex
-	:==	beFunction0 (BEExportField fieldIndex)
+beExportType dclTypeIndex iclTypeIndex
+	:==	beFunction0 (BEExportType dclTypeIndex iclTypeIndex)
+beExportConstructor dclConstructorIndex iclConstructorIndex
+	:==	beFunction0 (BEExportConstructor dclConstructorIndex iclConstructorIndex)
+beExportField dclFieldIndex iclFieldIndex
+	:==	beFunction0 (BEExportField dclFieldIndex iclFieldIndex)
 beExportFunction dclIndexFunctionIndex iclFunctionIndex
 	:==	beFunction0 (BEExportFunction dclIndexFunctionIndex iclFunctionIndex)
 beTupleSelectNode arity index
@@ -217,6 +228,8 @@ beMatchNode arity
 	:==	beFunction2 (BEMatchNode arity)
 beDefineImportedObjsAndLibs
 	:== beFunction2 BEDefineImportedObjsAndLibs
+beAbsType
+	:== beFunction1 BEAbsType
 
 notYetImplementedExpr :: Expression
 notYetImplementedExpr
@@ -241,22 +254,49 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 		=	BEDeclareModules (size fe_dcls) backEnd
 	#! backEnd
 		=	predefineSymbols fe_dcls.[cPredefinedModuleIndex] predefs backEnd
+
+	#  currentDcl
+	   	=	fe_dcls.[cIclModIndex]
+	   typeConversions
+		=	currentModuleTypeConversions icl_common.com_class_defs currentDcl.dcl_common.com_class_defs currentDcl.dcl_conversions
+/*
+	# 	rstypes = reshuffleTypes (size icl_common.com_type_defs) typeConversions {type.td_name.id_name \\ type <-: currentDcl.dcl_common.com_type_defs}
+		types = {type.td_name.id_name \\ type <-: icl_common.com_type_defs}
+	#  backEnd
+		=	backEnd ->>
+				(	"dcl conversions"
+				,	currentDcl.dcl_conversions
+				,	"dcl constructors"
+				,	[constructor.cons_symb.id_name \\ constructor <-: currentDcl.dcl_common.com_cons_defs]
+				,	"dcl selectors"
+				,	[selector.sd_symb.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
+				,	"dcl types"
+				,	[type.td_name.id_name \\ type <-: currentDcl.dcl_common.com_type_defs]
+				,	"icl selectors"
+				,	[constructor.cons_symb.id_name \\ constructor <-: icl_common.com_cons_defs]
+				,	"icl fields"
+				,	[selector.sd_symb.id_name \\ selector <-: icl_common.com_selector_defs]
+				,	"icl types"
+				,	[type.td_name.id_name \\ type <-: icl_common.com_type_defs]
+				,	"compare names"
+				,	(rstypes, types)
+				)
+*/
 	#! backEnd
-		=	declareCurrentDclModule fe_icl fe_dcls.[cIclModIndex] backEnd
+		=	declareCurrentDclModule fe_icl fe_dcls.[cIclModIndex] (backEnd -*-> "declareCurrentDclModule")
 	#! backEnd
-		=	declareOtherDclModules fe_dcls backEnd
+		=	declareOtherDclModules fe_dcls (backEnd -*-> "declareOtherDclModules")
 	#! backEnd
-		=	defineCurrentDclModule varHeap fe_icl fe_dcls.[cIclModIndex] backEnd
+		=	defineDclModule varHeap cIclModIndex fe_dcls.[cIclModIndex] (backEnd -*-> "defineDclModule(cIclMoIndex)")
 	#! backEnd
-		=	defineOtherDclModules fe_dcls varHeap backEnd
+		=	reshuffleTypes (size icl_common.com_type_defs) typeConversions (backEnd -*-> "reshuffleTypes")
 	#! backEnd
-		=	declareDclModule cIclModIndex fe_dcls.[cIclModIndex] backEnd
+		=	defineOtherDclModules fe_dcls varHeap (backEnd -*-> "defineOtherDclModules")
+
 	#! backEnd
-		=	defineDclModule varHeap cIclModIndex fe_dcls.[cIclModIndex] backEnd
+		=	BEDeclareIclModule icl_name.id_name (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs) (backEnd -*-> "BEDeclareIclModule")
 	#! backEnd
-		=	BEDeclareIclModule icl_name.id_name (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs) backEnd
-	#! backEnd
-		=	declareFunctionSymbols icl_functions (getConversions fe_iclDclConversions) functionIndices backEnd
+		=	declareFunctionSymbols icl_functions (getConversions fe_iclDclConversions) functionIndices (backEnd -*-> "declareFunctionSymbols")
 		with
 			getConversions :: (Optional {#Int}) -> {#Int}
 			getConversions No
@@ -264,23 +304,28 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 			getConversions (Yes conversions)
 				=	conversions
 	#! backEnd
-		=	declare cIclModIndex varHeap icl_common backEnd
+		=	declare cIclModIndex varHeap icl_common (backEnd -*-> "declare (cIclModIndex)")
 	#! backEnd
-		=	declareArrayInstances fe_arrayInstances icl_functions backEnd
+		=	declareArrayInstances fe_arrayInstances icl_functions (backEnd -*-> "declareArrayInstances")
+	#! backEnd
+		=	adjustArrayFunctions predefs fe_arrayInstances icl_functions fe_dcls varHeap (backEnd -*-> "adjustArrayFunctions")
 	#! (rules, backEnd)
-		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] varHeap backEnd
+		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] varHeap (backEnd -*-> "convertRules")
 	#! backEnd
-		=	BEDefineRules rules backEnd
+		=	BEDefineRules rules (backEnd -*-> "BEDefineRules")
 	#! backEnd
 		=	beDefineImportedObjsAndLibs
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | not imported.io_is_library])
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | imported.io_is_library])
-				backEnd
+				(backEnd -*-> "beDefineImportedObjsAndLibs")
+//	#! backEnd
+//		=	adjustArrayFunctions predefs fe_arrayInstances icl_functions fe_dcls varHeap backEnd
 	#! backEnd
-		=	adjustArrayFunctions predefs fe_arrayInstances icl_functions fe_dcls varHeap backEnd
-	#! backEnd
-		=	markExports fe_dcls.[cIclModIndex] icl_common.com_class_defs icl_common.com_type_defs fe_dclIclConversions backEnd
-	=	backEnd
+		=	markExports fe_dcls.[cIclModIndex] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs fe_dclIclConversions (backEnd -*-> "markExports")
+			with
+				dcl_common
+					=	currentDcl.dcl_common
+	=	(backEnd -*-> "backend done")
 	where
 		componentCount
 			=	length functionIndices
@@ -310,13 +355,10 @@ declareDclModule :: ModuleIndex DclModule -> Backender
 declareDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_is_system}
 	=	BEDeclareDclModule moduleIndex dcl_name.id_name dcl_is_system (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs)
 
-defineCurrentDclModule :: VarHeap IclModule DclModule -> Backender
-defineCurrentDclModule varHeap {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions}
-	=	declareCurrentDclModuleTypes dcl_common.com_type_defs typeConversions varHeap
+defineCurrentDclModule :: VarHeap IclModule DclModule {#Int} -> Backender
+defineCurrentDclModule varHeap {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions
+	=	declareCurrentDclModuleTypes icl_common.com_type_defs typeConversions varHeap
 	o`	defineCurrentDclModuleTypes dcl_common.com_cons_defs dcl_common.com_selector_defs dcl_common.com_type_defs typeConversions varHeap
-	where
-		typeConversions
-			=	currentModuleTypeConversions icl_common.com_class_defs dcl_common.com_class_defs dcl_conversions
 
 defineOtherDclModule :: VarHeap ModuleIndex DclModule -> Backender
 defineOtherDclModule varHeap moduleIndex dclModule
@@ -329,6 +371,45 @@ defineDclModule :: VarHeap ModuleIndex DclModule -> Backender
 defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_is_system}
 	=	declare moduleIndex varHeap dcl_common
 	o`	declareFunTypes moduleIndex dcl_functions varHeap
+
+// move types from their dcl to icl positions
+
+class swapTypes a :: Int Int *a -> *a
+
+instance swapTypes BackEnd where
+	swapTypes i j be
+		=	BESwapTypes i j be
+
+instance swapTypes {{#Char}} where
+	swapTypes i j a
+		=	swap i j a
+
+swap i j a
+	#! iValue = a.[i]
+	#! jValue = a.[j]
+	=	{a & [i] = jValue, [j] = iValue}
+
+reshuffleTypes :: Int {#Int} *a -> *a | swapTypes a
+reshuffleTypes nIclTypes dclIclConversions be
+	=	thd3 (foldStateWithIndexA swapType dclIclConversions (idP (size dclIclConversions), idP nIclTypes, be))
+	where
+		idP :: Int -> .{#Int}
+		idP n
+			=	{i \\ i <- [0 .. n-1]}
+
+		swapType :: Int Int (*{#Int}, *{#Int},  *a) -> (*{#Int}, *{#Int},  *a) | swapTypes a
+		swapType dclIndex iclIndex state=:(p,p`,be)
+			#! frm
+				=	p.[dclIndex]
+			#! to
+				=	iclIndex
+			| frm == to
+				=	state
+			// otherwise
+				#! frm` = dclIndex
+				#! to` = p`.[iclIndex]
+				#! to` = if (to` >= size dclIclConversions) frm` to`
+				=	(swap frm` to` p, swap frm to p`, swapTypes frm to be)
 
 class declareVars a :: a !VarHeap -> Backender
 
@@ -542,14 +623,12 @@ convertTypeVar typeVar
 	=	beTypeVar typeVar.atv_variable.tv_name.id_name
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} VarHeap Index CheckedTypeDef *BackEnd -> *BackEnd
-defineType moduleIndex constructors _ varHeap typeIndex {td_args, td_rhs=AlgType constructorSymbols} be
+defineType moduleIndex constructors _ varHeap typeIndex {td_name, td_args, td_rhs=AlgType constructorSymbols} be
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_args be
 	# (constructors, be)
-		=	convertConstructors moduleIndex constructors constructorSymbols varHeap be
-	# (_, be)
-		=	BEAlgebraicType flatType constructors be
-	=	be 
+		=	convertConstructors typeIndex td_name.id_name moduleIndex constructors constructorSymbols varHeap be
+	=	BEAlgebraicType flatType constructors be
 defineType moduleIndex constructors selectors varHeap typeIndex {td_args, td_rhs=RecordType {rt_constructor, rt_fields}} be
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_args be
@@ -560,9 +639,7 @@ defineType moduleIndex constructors selectors varHeap typeIndex {td_args, td_rhs
 				(beConstructorSymbol moduleIndex constructorIndex)
 				(convertSymbolTypeArgs constructorType)
 				be
-	# (_, be)
-		=	BERecordType moduleIndex flatType constructorTypeNode fields be
-	=	be
+	=	BERecordType moduleIndex flatType constructorTypeNode fields be
 	where
 		constructorIndex
 			=	rt_constructor.ds_index
@@ -574,16 +651,17 @@ defineType moduleIndex constructors selectors varHeap typeIndex {td_args, td_rhs
 						->	expandedType
 					_
 						->	constructorDef.cons_type
-
+defineType moduleIndex _ _ _ typeIndex {td_args, td_rhs=AbstractType _} be
+ 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_args) be
 defineType _ _ _ _ _ _ be
 	=	be
 
-convertConstructors :: ModuleIndex {#ConsDef} [DefinedSymbol] VarHeap -> BEMonad BEConstructorListP
-convertConstructors moduleIndex constructors symbols varHeap
-	=	foldr (beConstructors o convertConstructor moduleIndex constructors varHeap) beNoConstructors symbols
+convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] VarHeap -> BEMonad BEConstructorListP
+convertConstructors typeIndex typeName moduleIndex constructors symbols varHeap
+	=	foldr (beConstructors o convertConstructor typeIndex typeName moduleIndex constructors varHeap) beNoConstructors symbols
 
-convertConstructor :: ModuleIndex {#ConsDef} VarHeap DefinedSymbol -> BEMonad BEConstructorListP
-convertConstructor moduleIndex constructorDefs varHeap {ds_index}
+convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} VarHeap DefinedSymbol -> BEMonad BEConstructorListP
+convertConstructor typeIndex typeName moduleIndex constructorDefs varHeap {ds_index}
 	=	BEDeclareConstructor ds_index moduleIndex constructorDef.cons_symb.id_name // +++ remove declare
 	o`	beConstructor
 			(beNormalTypeNode
@@ -595,9 +673,9 @@ convertConstructor moduleIndex constructorDefs varHeap {ds_index}
 		constructorType
 			=	case (sreadPtr constructorDef.cons_type_ptr varHeap) of
 					VI_ExpandedType expandedType
-						->	expandedType
+						->	expandedType // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, expandedType)
 					_
-						->	constructorDef.cons_type
+						->	constructorDef.cons_type // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, constructorDef.cons_type)
 
 convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} VarHeap -> BEMonad BEFieldListP
 convertSelectors moduleIndex selectors symbols varHeap
@@ -747,13 +825,33 @@ adjustArrayFunctions predefs arrayInstancesRange functions dcls varHeap
 				adjustIclArrayInstance mapping index {fun_index}
 					=	beAdjustArrayFunction mapping.[fun_index] index cIclModIndex
 
+/*
 convertRules :: [(Int, FunDef)] VarHeap -> BEMonad BEImpRuleP
 convertRules rules varHeap
-	=	foldr (beRules o flip convertRule varHeap) beNoRules rules
+//	=	foldr (beRules o flip convertRule varHeap) beNoRules rules
+	=	foldl (flip beRules) beNoRules (map (flip convertRule varHeap) rules)
+*/
+
+convertRules :: [(Int, FunDef)] VarHeap *BackEnd -> (BEImpRuleP, *BackEnd)
+convertRules rules varHeap be
+	# (null, be)
+		=	BENoRules be
+	=	convert rules varHeap null be
+//	=	foldr (beRules o flip convertRule varHeap) beNoRules rules
+	where
+		convert :: [(Int, FunDef)] VarHeap BEImpRuleP *BackEnd -> (BEImpRuleP, *BackEnd)
+		convert [] _ rulesP be
+			=	(rulesP, be)
+		convert [h:t] varHeap rulesP be
+			# (ruleP, be)
+				=	convertRule h varHeap be
+			# (rulesP, be)
+				=	BERules ruleP rulesP be
+			=	convert t varHeap rulesP be
 
 convertRule :: (Int,FunDef) VarHeap -> BEMonad BEImpRuleP
-convertRule (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind}) varHeap
-	=	beRule index (cafness fun_kind) (convertTypeAlt index cIclModIndex type) (convertFunctionBody index (positionToLineNumber fun_pos) body varHeap)
+convertRule (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) varHeap
+	=	beRule index (cafness fun_kind) (convertTypeAlt index cIclModIndex (type /* ->> ("convertRule", fun_symb.id_name, index, type) */)) (convertFunctionBody index (positionToLineNumber fun_pos) body varHeap)
 	where
 		cafness :: FunKind -> Int
 		cafness (FK_Function _)
@@ -1065,13 +1163,13 @@ convertSymbol {symb_kind=SK_Function {glob_module, glob_object}}
 convertSymbol {symb_kind=SK_GeneratedFunction _ index}
 	=	beFunctionSymbol index cIclModIndex
 convertSymbol {symb_kind=SK_Constructor {glob_module, glob_object}}
-	=	beConstructorSymbol glob_module glob_object
+	=	beConstructorSymbol glob_module glob_object // ->> ("convertSymbol", (glob_module, glob_object))
 convertSymbol symbol
 	=	undef <<- ("backendconvert, convertSymbol: unknown symbol", symbol)
 
 convertTypeSymbolIdent :: TypeSymbIdent -> BEMonad BESymbolP
 convertTypeSymbolIdent {type_index={glob_module, glob_object}}
-	=	beTypeSymbol glob_object glob_module
+	=	beTypeSymbol glob_object glob_module // ->> ("convertTypeSymbolIdent", (glob_module, glob_object))
 
 convertExpr :: Expression VarHeap -> BEMonad BENodeP
 convertExpr  (BasicExpr value _) varHeap
@@ -1212,26 +1310,28 @@ getVariableSequenceNumber varInfoPtr varHeap
 		=	sreadPtr varInfoPtr varHeap
 	=	sequenceNumber
 
-markExports :: DclModule {#ClassDef} {#CheckedTypeDef} (Optional {#Int}) -> Backender
-markExports {dcl_conversions = Yes conversionTable} iclClasses iclTypes (Yes functionConversions)
-	=	foldStateA beExportType conversionTable.[cTypeDefs]
-	o	foldStateA beExportConstructor conversionTable.[cConstructorDefs]
-	o	foldStateA beExportField conversionTable.[cSelectorDefs]
-	o	foldStateA (exportDictionary iclClasses iclTypes) conversionTable.[cClassDefs]
+markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} (Optional {#Int}) -> Backender
+markExports {dcl_conversions = Yes conversionTable} dclClasses dclTypes iclClasses iclTypes (Yes functionConversions)
+	=	foldStateA (\icl -> beExportType icl icl) conversionTable.[cTypeDefs]
+	o	foldStateWithIndexA beExportConstructor conversionTable.[cConstructorDefs]
+	o	foldStateWithIndexA beExportField conversionTable.[cSelectorDefs]
+	o	foldStateWithIndexA (exportDictionary iclClasses iclTypes) conversionTable.[cClassDefs]
 	o	foldStateWithIndexA beExportFunction functionConversions
 	where
-		exportDictionary :: {#ClassDef} {#CheckedTypeDef} Index -> Backender
-		exportDictionary iclClasses iclTypes classIndex
-			=	beExportType typeIndex
+		exportDictionary :: {#ClassDef} {#CheckedTypeDef} Index Index -> Backender
+		exportDictionary iclClasses iclTypes dclClassIndex iclClassIndex
+			=	beExportType (-1) iclTypeIndex	// remove -1 hack
 			o	foldStateA exportDictionaryField rt_fields
 			where
-				typeIndex
-					=	iclClasses.[classIndex].class_dictionary.ds_index
+				dclTypeIndex
+					=	dclClasses.[dclClassIndex].class_dictionary.ds_index
+				iclTypeIndex
+					=	iclClasses.[iclClassIndex].class_dictionary.ds_index
 				{td_rhs = RecordType {rt_fields}}
-					=	iclTypes.[typeIndex]
+					=	iclTypes.[iclTypeIndex]
 
 				exportDictionaryField :: FieldSymbol -> Backender
 				exportDictionaryField {fs_index}
-					=	beExportField fs_index
-markExports _ _ _ _
+					=	beExportField (-1) fs_index	// remove -1 hack
+markExports _ _ _ _ _ _
 	=	identity
