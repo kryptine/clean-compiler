@@ -1,4 +1,4 @@
-definition module backendC/CleanCompilerSources/backend;
+definition module backend;
 
 //1.3
 from StdString import String;
