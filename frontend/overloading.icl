@@ -1636,7 +1636,8 @@ where
 
 		getSymbol :: !Int !(!(Global !Int) -> !SymbKind) !Int !*UpdateInfo -> (SymbIdent,*UpdateInfo)
 		getSymbol index symb_kind arity ui=:{ui_x}
-			# ({pds_module, pds_def, pds_ident}, ui_x) = ui_x!x_predef_symbols.[index]
+			# ({pds_module, pds_def}, ui_x) = ui_x!x_predef_symbols.[index]
+			# pds_ident = predefined_idents.[index]
 			  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
 			= (symbol, { ui & ui_x = ui_x})
 

@@ -47,9 +47,9 @@ Conventions:
 	,	ps_error			:: !*ParseErrorAdmin
 	,	ps_skipping			:: !Bool
 	,	ps_hash_table		:: !*HashTable
-	,	ps_pre_def_symbols	:: !*PredefinedSymbols
 	,	ps_support_generics :: !Bool // AA: compiler option "-generics"
 	}
+
 /*
 appScanState :: (ScanState -> ScanState) !ParseState -> ParseState
 appScanState f pState=:{ps_scanState}
@@ -78,45 +78,45 @@ instance getFilename ParseState
 where
 	getFilename pState = accScanState getFilename pState
 
-makeStringTypeSymbol pState=:{ps_pre_def_symbols}
-	#! string_id = ps_pre_def_symbols.[PD_StringType]
-	= (MakeNewTypeSymbIdent string_id.pds_ident 0, pState)
+makeStringType
+	#! string_ident = predefined_idents.[PD_StringType]
+	=: TA (MakeNewTypeSymbIdent string_ident 0) []
 
-makeListTypeSymbol :: Int Int !*ParseState -> *(!TypeSymbIdent,!*ParseState)
-makeListTypeSymbol head_strictness arity pState=:{ps_pre_def_symbols}
+makeListTypeSymbol :: Int Int -> TypeSymbIdent
+makeListTypeSymbol head_strictness arity
 	# pre_def_list_index=if (head_strictness==HeadLazy)
 							PD_ListType
 						(if (head_strictness==HeadStrict)
 							PD_StrictListType
 							PD_UnboxedListType)
-	#! list_id = ps_pre_def_symbols.[pre_def_list_index]
-	= (MakeNewTypeSymbIdent list_id.pds_ident arity, pState)
+	#! list_ident = predefined_idents.[pre_def_list_index]
+	= MakeNewTypeSymbIdent list_ident arity
 
-makeTailStrictListTypeSymbol :: Int Int !*ParseState -> *(!TypeSymbIdent,!*ParseState)
-makeTailStrictListTypeSymbol head_strictness arity pState=:{ps_pre_def_symbols}
+makeTailStrictListTypeSymbol :: Int Int -> TypeSymbIdent
+makeTailStrictListTypeSymbol head_strictness arity
 	# pre_def_list_index=if (head_strictness==HeadLazy)
 							PD_TailStrictListType
 						(if (head_strictness==HeadStrict)
 							PD_StrictTailStrictListType
 							PD_UnboxedTailStrictListType)
-	#! list_id = ps_pre_def_symbols.[pre_def_list_index]
-	= (MakeNewTypeSymbIdent list_id.pds_ident arity, pState)
+	#! list_ident = predefined_idents.[pre_def_list_index]
+	= MakeNewTypeSymbIdent list_ident arity
 
-makeLazyArraySymbol arity pState=:{ps_pre_def_symbols}
-	#! lazy_array_id = ps_pre_def_symbols.[PD_LazyArrayType]
-	= (MakeNewTypeSymbIdent lazy_array_id.pds_ident arity, pState)
+makeLazyArraySymbol arity
+	#! lazy_array_ident = predefined_idents.[PD_LazyArrayType]
+	= MakeNewTypeSymbIdent lazy_array_ident arity
 
-makeStrictArraySymbol arity	pState=:{ps_pre_def_symbols}
-	#! strict_array_id = ps_pre_def_symbols.[PD_StrictArrayType]
-	= (MakeNewTypeSymbIdent strict_array_id.pds_ident arity, pState)
+makeStrictArraySymbol arity
+	#! strict_array_ident = predefined_idents.[PD_StrictArrayType]
+	= MakeNewTypeSymbIdent strict_array_ident arity
 
-makeUnboxedArraySymbol arity pState=:{ps_pre_def_symbols}
-	#! unboxed_array_id = ps_pre_def_symbols.[PD_UnboxedArrayType]
-	= (MakeNewTypeSymbIdent unboxed_array_id.pds_ident arity, pState)
+makeUnboxedArraySymbol arity
+	#! unboxed_array_ident = predefined_idents.[PD_UnboxedArrayType]
+	= MakeNewTypeSymbIdent unboxed_array_ident arity
 
-makeTupleTypeSymbol form_arity act_arity  pState=:{ps_pre_def_symbols}
-	#! tuple_id = ps_pre_def_symbols.[GetTupleTypeIndex form_arity]
-	= (MakeNewTypeSymbIdent tuple_id.pds_ident act_arity, pState)
+makeTupleTypeSymbol form_arity act_arity
+	#! tuple_ident = predefined_idents.[GetTupleTypeIndex form_arity]
+	= MakeNewTypeSymbIdent tuple_ident act_arity
 	
 class try a	 :: !Token !*ParseState -> (!Optional a, !*ParseState)
 class want a :: !*ParseState -> (!a, !*ParseState)
@@ -279,30 +279,30 @@ isGlobalOrClassOrInstanceDefsContext parseContext	:== parseContext bitand (cGlob
 cWantIclFile :== True
 cWantDclFile :== False
 
-wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols (ModTimeFunction *Files) !*Files
-	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths pre_def_symbols modtimefunction files
+wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
+	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
+wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths modtimefunction files
 	= case openScanner file_name searchPaths modtimefunction files of
 		(Yes (scanState, modification_time), files)
 			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
-			# (ok,mod,hash_table,file,pre_def_symbols,files) = initModule file_name modification_time scanState hash_table error pre_def_symbols files
+			# (ok,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
 			# hash_table=set_hte_mark 0 hash_table
-			->(ok,mod,hash_table,file,pre_def_symbols,files)
+			->(ok,mod,hash_table,file,files)
 		(No, files)
 			-> let mod = { mod_name = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
-			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", pre_def_symbols, files)
+			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
 where
 	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
-	initModule :: String String ScanState !*HashTable !*File !*PredefinedSymbols *Files
-				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-	initModule file_name modification_time scanState hash_table error pre_def_symbols files
+
+	initModule :: String String ScanState !*HashTable !*File *Files
+				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
+	initModule file_name modification_time scanState hash_table error files
 		# (succ, mod_type, mod_name, scanState) = try_module_header iclmodule scanState
 		| succ
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
 										, ps_skipping = False
 										, ps_hash_table = hash_table
-										, ps_pre_def_symbols = pre_def_symbols
 										, ps_support_generics = support_generics
 										}
 			  pState				= verify_name mod_name id_name file_name pState
@@ -312,7 +312,7 @@ where
 // MV ...
 			# (defs, pState)		= add_module_id mod_name defs pState;
 // ... MV			  				
-			  {ps_scanState,ps_hash_table,ps_error,ps_pre_def_symbols}
+			  {ps_scanState,ps_hash_table,ps_error}
 			  						= pState
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
 						[PD_Import imports \\ PD_Import imports <- defs]
@@ -321,14 +321,13 @@ where
 			= ( ps_error.pea_ok
 			  , mod, ps_hash_table
 			  , ps_error.pea_file
-			  , ps_pre_def_symbols
 			  , closeScanner ps_scanState files
 			  )
 		// otherwise // ~ succ
 		# ({fp_line}, scanState) = getPosition scanState
 		  mod = { mod_name = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
 		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
-			pre_def_symbols, closeScanner scanState files)
+			closeScanner scanState files)
 	where
 // MV...
 		add_module_id mod_name defs pState
@@ -1863,30 +1862,30 @@ trySimpleTypeT SquareOpenToken annot attr pState
 		| head_strictness==HeadStrict
 			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
 			| tail_strict
-				# (list_symbol, pState) = makeTailStrictListTypeSymbol HeadLazy 0 pState
+				# list_symbol = makeTailStrictListTypeSymbol HeadLazy 0
 		  		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)					
-				# (list_symbol, pState) = makeListTypeSymbol head_strictness 0 pState
+				# list_symbol = makeListTypeSymbol head_strictness 0
 		  		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)
-		# (list_symbol, pState) = makeListTypeSymbol head_strictness 0 pState
+		# list_symbol = makeListTypeSymbol head_strictness 0
   		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)
 
 	| token==ExclamationToken
 		# (token,pState) = nextToken TypeContext pState
 		| token==SquareCloseToken
-			# (list_symbol, pState) = makeTailStrictListTypeSymbol head_strictness 0 pState
+			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
   			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)
 			= (False, {at_annotation = annot, at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 
 	# (type, pState)	= wantAType (tokenBack pState)
 	  (token, pState)	= nextToken TypeContext pState
 	| token == SquareCloseToken
-		# (list_symbol, pState) = makeListTypeSymbol head_strictness 1 pState
+		# list_symbol = makeListTypeSymbol head_strictness 1
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol [type]}, pState)
 
 	| token==ExclamationToken
 		# (token,pState) = nextToken TypeContext pState
 		| token==SquareCloseToken
-			# (list_symbol, pState) = makeTailStrictListTypeSymbol head_strictness 1 pState
+			# list_symbol = makeTailStrictListTypeSymbol head_strictness 1
 			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol [type]}, pState)
 			= (False, {at_annotation = annot, at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 
@@ -1896,7 +1895,7 @@ trySimpleTypeT OpenToken annot attr pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == CommaToken
 		# (tup_arity, pState)		= determine_arity_of_tuple 2 pState
-		  (tuple_symbol, pState)	= makeTupleTypeSymbol tup_arity 0 pState
+		  tuple_symbol = makeTupleTypeSymbol tup_arity 0
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA tuple_symbol []}, pState)	
 	| token == ArrowToken
 		# (token, pState) = nextToken TypeContext pState
@@ -1917,7 +1916,7 @@ trySimpleTypeT OpenToken annot attr pState
 		  pState			= wantToken TypeContext "tuple type" CloseToken pState
 		  atypes			= [atype:atypes]
 		  arity				= length atypes
-	 	  (tuple_symbol, pState)	= makeTupleTypeSymbol arity arity pState
+	 	  tuple_symbol = makeTupleTypeSymbol arity arity
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA tuple_symbol atypes}, pState)
 	// otherwise // token <> CloseToken && token <> CommaToken
 		= (False, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
@@ -1933,36 +1932,36 @@ where
 trySimpleTypeT CurlyOpenToken annot attr pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == CurlyCloseToken
-		# (array_symbol, pState) = makeLazyArraySymbol 0 pState
+		# array_symbol = makeLazyArraySymbol 0
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA array_symbol []}, pState)
 	| token == HashToken
 		# (token, pState) = nextToken TypeContext pState
 		| token == CurlyCloseToken
-			# (array_symbol, pState) = makeUnboxedArraySymbol 0 pState
+			# array_symbol = makeUnboxedArraySymbol 0
 			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
 	  		# (atype, pState)			= wantAType (tokenBack pState)
   			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
-  			  (array_symbol, pState)	= makeUnboxedArraySymbol 1 pState
+  			  array_symbol = makeUnboxedArraySymbol 1
   			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 	| token == ExclamationToken
 		# (token, pState) = nextToken TypeContext pState
 		| token == CurlyCloseToken
-			# (array_symbol, pState) = makeStrictArraySymbol 0 pState
+			# array_symbol = makeStrictArraySymbol 0
 			= (True,  {at_annotation = annot, at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
 	  		# (atype,pState)			= wantAType (tokenBack pState)
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
-  			  (array_symbol, pState)	= makeStrictArraySymbol 1 pState
+  			  array_symbol = makeStrictArraySymbol 1
   			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
   	// otherwise
   		# (atype,pState)			= wantAType (tokenBack pState)
   		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
-		  (array_symbol, pState)	= makeLazyArraySymbol 1 pState
+		  array_symbol = makeLazyArraySymbol 1
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 trySimpleTypeT StringTypeToken annot attr pState
-	# (type, pState) = makeStringTypeSymbol pState
-	= (True, {at_annotation = annot, at_attribute = attr, at_type = TA type []}, pState)
+	# type = makeStringType
+	= (True, {at_annotation = annot, at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT token annot attr pState
 	# (bt, pState) = try token pState
 	= case bt of
@@ -2380,23 +2379,23 @@ wantListExp is_pattern pState
 	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
 		# (token, pState) = nextToken FunctionContext pState
 		| token==SquareCloseToken
-			= makeTailStrictNilExpression head_strictness is_pattern pState
+			= (makeTailStrictNilExpression head_strictness is_pattern,pState)
 			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
 	| token==SquareCloseToken
 		| head_strictness==HeadUnboxedAndTailStrict
-			= makeTailStrictNilExpression HeadUnboxed is_pattern pState
+			= (makeTailStrictNilExpression HeadUnboxed is_pattern,pState)
 		| head_strictness==HeadStrict
 			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
 			| tail_strict
-				= makeTailStrictNilExpression HeadLazy is_pattern pState
-				= makeNilExpression head_strictness is_pattern pState
-			= makeNilExpression head_strictness is_pattern pState
+				= (makeTailStrictNilExpression HeadLazy is_pattern,pState)
+				= (makeNilExpression head_strictness is_pattern,pState)
+			= (makeNilExpression head_strictness is_pattern,pState)
 	| head_strictness==HeadUnboxedAndTailStrict
 		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
 	| head_strictness==HeadLazy && (case token of (IdentToken "!!") -> True; _ -> False)
 		# (next_token,pState) = nextToken FunctionContext pState
 		| next_token==SquareCloseToken
-			= makeTailStrictNilExpression HeadStrict is_pattern pState
+			= (makeTailStrictNilExpression HeadStrict is_pattern,pState)
 			= want_LGraphExpr token [] head_strictness (tokenBack pState)
 		= want_LGraphExpr token [] head_strictness pState
 	where
@@ -2415,14 +2414,14 @@ wantListExp is_pattern pState
 				# (token, pState) = nextToken FunctionContext pState
 				= case token of
 					SquareCloseToken
-						#	(nil_expr, pState) = makeNilExpression head_strictness is_pattern pState
-						->	gen_cons_nodes acc nil_expr pState
+						#	nil_expr = makeNilExpression head_strictness is_pattern
+						->	(gen_cons_nodes acc nil_expr,pState)
 					ExclamationToken
 						| head_strictness<>HeadOverloaded
 							# (token, pState) = nextToken FunctionContext pState
 							| token==SquareCloseToken
-								# (nil_expr,pState) = makeTailStrictNilExpression head_strictness is_pattern pState
-								->	gen_tail_strict_cons_nodes acc nil_expr pState
+								# nil_expr = makeTailStrictNilExpression head_strictness is_pattern
+								->	(gen_tail_strict_cons_nodes acc nil_expr,pState)
 								-> (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
 					CommaToken
 						#	(token, pState)	= nextToken FunctionContext pState
@@ -2431,21 +2430,21 @@ wantListExp is_pattern pState
 						# (exp, pState)		= wantExpression is_pattern pState
 						# (token,pState)	= nextToken FunctionContext pState
 						| token==SquareCloseToken
-							-> gen_cons_nodes acc exp pState
+							-> (gen_cons_nodes acc exp,pState)
 						| token==ExclamationToken && head_strictness<>HeadOverloaded
 							# pState = wantToken FunctionContext "list" SquareCloseToken pState
-							-> gen_tail_strict_cons_nodes acc exp pState
+							-> (gen_tail_strict_cons_nodes acc exp,pState)
 						| token==ColonToken // to allow [1:2:[]] etc.
 							-> want_list [exp:acc] (tokenBack pState)
 							# pState = parseError "list" (Yes token) "] or :" pState
-							-> gen_cons_nodes acc exp pState
+							-> (gen_cons_nodes acc exp,pState)
 					DotDotToken
 						| is_pattern
 						->	(PE_Empty, parseError "want list expression" No "No dot dot expression in a pattern" pState)
 						| length acc > 2 || isEmpty acc
-						#	(nil_expr, pState)	= makeNilExpression head_strictness is_pattern pState
+						#	nil_expr = makeNilExpression head_strictness is_pattern
 							pState				= parseError "list expression" No "one or two expressions before .." pState
-						->	gen_cons_nodes acc nil_expr pState
+						->	(gen_cons_nodes acc nil_expr,pState)
 						#	(token, pState)		= nextToken FunctionContext pState
 						->	case token of
 							 SquareCloseToken
@@ -2467,27 +2466,39 @@ wantListExp is_pattern pState
 						| length acc == 1
 						->	wantListComprehension head_strictness (acc!!0)  pState
 						// otherwise // length acc <> 1
-						#	(nil_expr, pState)	= makeNilExpression head_strictness is_pattern pState
+						#	nil_expr = makeNilExpression head_strictness is_pattern
 							pState				= parseError "list comprehension" No "one expressions before \\\\" pState
-						->	gen_cons_nodes acc nil_expr pState
-					_	#	(nil_expr, pState)	= makeNilExpression head_strictness is_pattern pState
+						->	(gen_cons_nodes acc nil_expr,pState)
+					_	#	nil_expr = makeNilExpression head_strictness is_pattern
 							pState	= parseError "list" (Yes token) "list element separator" pState
-						->	gen_cons_nodes acc nil_expr pState
+						->	(gen_cons_nodes acc nil_expr,pState)
 			
-			gen_cons_nodes [] exp pState
-				= (exp, pState)
-			gen_cons_nodes [e:r] exp pState
-				# (exp, pState) = makeConsExpression head_strictness is_pattern e exp pState
-				= gen_cons_nodes r exp pState
+			gen_cons_nodes [] exp
+				= exp
+			gen_cons_nodes l exp
+				= gen_cons_nodes l exp
+			where
+				cons_ident_exp = makeConsIdentExpression head_strictness is_pattern
+				
+				gen_cons_nodes [e:r] exp
+					= gen_cons_nodes r (PE_List [cons_ident_exp,e,exp])
+				gen_cons_nodes [] exp
+					= exp
 	
-			gen_tail_strict_cons_nodes [] exp pState
-				= (exp, pState)
-			gen_tail_strict_cons_nodes [e:r] exp pState
-				# (exp, pState) = makeTailStrictConsExpression head_strictness is_pattern e exp pState
-				= gen_tail_strict_cons_nodes r exp pState
+			gen_tail_strict_cons_nodes [] exp
+				= exp
+			gen_tail_strict_cons_nodes r exp
+				= gen_tail_strict_cons_nodes r exp
+			where
+				tail_strict_cons_ident_exp = makeTailStrictConsIdentExpression head_strictness is_pattern
+				
+				gen_tail_strict_cons_nodes [e:r] exp
+					= gen_tail_strict_cons_nodes r (PE_List [tail_strict_cons_ident_exp,e,exp])
+				gen_tail_strict_cons_nodes [] exp
+					= exp
 
-makeNilExpression :: Int Bool *ParseState -> *(!ParsedExpr,!*ParseState)
-makeNilExpression head_strictness is_pattern pState=:{ps_pre_def_symbols}
+makeNilExpression :: Int Bool -> ParsedExpr
+makeNilExpression head_strictness is_pattern
 	# pre_def_nil_index= if (head_strictness==HeadLazy)
 							PD_NilSymbol
 						(if (head_strictness==HeadStrict)
@@ -2495,21 +2506,21 @@ makeNilExpression head_strictness is_pattern pState=:{ps_pre_def_symbols}
 						(if (head_strictness==HeadOverloaded)
 							(if is_pattern PD_OverloadedNilSymbol PD_nil)
 							(if is_pattern PD_UnboxedNilSymbol PD_nil_u)))
-	#! nil_id = ps_pre_def_symbols.[pre_def_nil_index]
-	= (PE_Ident nil_id.pds_ident, pState)
+	#! nil_ident = predefined_idents.[pre_def_nil_index]
+	= PE_Ident nil_ident
 
-makeTailStrictNilExpression :: Int Bool *ParseState -> *(!ParsedExpr,!*ParseState)
-makeTailStrictNilExpression head_strictness is_pattern pState=:{ps_pre_def_symbols}
+makeTailStrictNilExpression :: Int Bool -> ParsedExpr
+makeTailStrictNilExpression head_strictness is_pattern
 	# pre_def_nil_index= if (head_strictness==HeadLazy)
 							PD_TailStrictNilSymbol
 						(if (head_strictness==HeadStrict)
 							PD_StrictTailStrictNilSymbol
 							(if is_pattern PD_UnboxedTailStrictNilSymbol PD_nil_uts))
-	#! nil_id = ps_pre_def_symbols.[pre_def_nil_index]
-	= (PE_Ident nil_id.pds_ident, pState)
+	#! nil_ident = predefined_idents.[pre_def_nil_index]
+	= PE_Ident nil_ident
 
-makeConsExpression :: Int Bool ParsedExpr ParsedExpr *ParseState -> *(!ParsedExpr,!*ParseState)
-makeConsExpression head_strictness is_pattern a1 a2 pState=:{ps_pre_def_symbols}
+makeConsIdentExpression :: Int Bool -> ParsedExpr
+makeConsIdentExpression head_strictness is_pattern
 	# pre_def_cons_index=if (head_strictness==HeadLazy)
 							PD_ConsSymbol
 						(if (head_strictness==HeadStrict)
@@ -2517,23 +2528,23 @@ makeConsExpression head_strictness is_pattern a1 a2 pState=:{ps_pre_def_symbols}
 						(if (head_strictness==HeadOverloaded)
 							(if is_pattern PD_OverloadedConsSymbol PD_cons)
 							(if is_pattern PD_UnboxedConsSymbol PD_cons_u)))
-	#! cons_id = ps_pre_def_symbols.[pre_def_cons_index]
-	= (PE_List [PE_Ident cons_id.pds_ident, a1, a2], pState)
+	#! cons_ident = predefined_idents.[pre_def_cons_index]
+	= PE_Ident cons_ident
 
 cons_and_nil_symbol_index HeadLazy = (PD_ConsSymbol,PD_NilSymbol)
 cons_and_nil_symbol_index HeadStrict = (PD_StrictConsSymbol,PD_StrictNilSymbol)
 cons_and_nil_symbol_index HeadUnboxed = (PD_cons_u,PD_nil_u)
 cons_and_nil_symbol_index HeadOverloaded = (PD_cons,PD_nil)
 
-makeTailStrictConsExpression :: Int Bool ParsedExpr ParsedExpr *ParseState -> *(!ParsedExpr,!*ParseState)
-makeTailStrictConsExpression head_strictness is_pattern a1 a2 pState=:{ps_pre_def_symbols}
+makeTailStrictConsIdentExpression :: Int Bool -> ParsedExpr
+makeTailStrictConsIdentExpression head_strictness is_pattern
 	# pre_def_cons_index=if (head_strictness==HeadLazy)
 							PD_TailStrictConsSymbol
 						(if (head_strictness==HeadStrict)
 							PD_StrictTailStrictConsSymbol
 							(if is_pattern PD_UnboxedTailStrictConsSymbol PD_cons_uts))
-	#! cons_id = ps_pre_def_symbols.[pre_def_cons_index]
-	= (PE_List [PE_Ident cons_id.pds_ident, a1, a2], pState)
+	#! cons_ident = predefined_idents.[pre_def_cons_index]
+	= PE_Ident cons_ident
 
 tail_strict_cons_and_nil_symbol_index HeadLazy = (PD_TailStrictConsSymbol,PD_TailStrictNilSymbol)
 tail_strict_cons_and_nil_symbol_index HeadStrict = (PD_StrictTailStrictConsSymbol,PD_StrictTailStrictNilSymbol)

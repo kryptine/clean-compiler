@@ -1891,8 +1891,9 @@ where
 				
 				add_dummy_id_for_strict_alias bind_src cos=:{cos_symbol_heap, cos_predef_symbols_for_transform}
 					# (new_app_info_ptr, cos_symbol_heap) = newPtr EI_Empty cos_symbol_heap
-					  {pds_ident, pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
-					  app_symb = { symb_name = pds_ident, 
+					  {pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
+					  pds_ident = predefined_idents.[PD_DummyForStrictAliasFun]
+			  		  app_symb = { symb_name = pds_ident, 
 					  				symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def},
 									symb_arity = 1 }
 					= (App { app_symb = app_symb, app_args = [bind_src], app_info_ptr = new_app_info_ptr },

@@ -47,7 +47,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	| not compatible
 		=	(False, var_heap, attrHeap, errorFile, files)
 	# varHeap
-		=	backEndPreprocess predef_symbols.[PD_DummyForStrictAliasFun].pds_ident functionIndices fe_icl var_heap
+		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
 			functionIndices
 				=	flatten [[member \\ member <- group.group_members] \\ group <-: fe_components]

@@ -80,29 +80,6 @@ where
 		  char = name.[index]
 		= hash_value name index (val << 2 + toInt char)
 
-/*
-putIdentInHashTable :: !String !IdentClass !*HashTable -> (!Ident, !*HashTable)
-putIdentInHashTable name ident_class {hte_symbol_heap,hte_entries}
-	# hash_val = hashValue name
-	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty
-	  (ident, hte_symbol_heap, entries) = insert name ident_class hte_symbol_heap entries
-	  hte_entries = update hte_entries hash_val entries
-	= (ident, { hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries })
-where
-	insert ::  !String !IdentClass !*SymbolTable *HashTableEntry -> (!Ident, !*SymbolTable, !*HashTableEntry)
-	insert name ident_class hte_symbol_heap HTE_Empty
-		# (hte_symbol_ptr, hte_symbol_heap) = newPtr EmptySymbolTableEntry hte_symbol_heap
-		= ({ id_name = name, id_info = hte_symbol_ptr}, hte_symbol_heap, HTE_Ident name hte_symbol_ptr ident_class HTE_Empty HTE_Empty)
-	insert name ident_class hte_symbol_heap (HTE_Ident hte_name hte_symbol_ptr hte_class hte_left hte_right)
-		# cmp = (name,ident_class) =< (hte_name,hte_class)
-		| cmp == Equal
-			= ({ id_name = hte_name, id_info = hte_symbol_ptr}, hte_symbol_heap, HTE_Ident hte_name hte_symbol_ptr hte_class hte_left hte_right)
-		| cmp == Smaller
-			#! (ident, hte_symbol_heap, hte_left) = insert name ident_class hte_symbol_heap hte_left
-			= (ident, hte_symbol_heap, HTE_Ident hte_name hte_symbol_ptr hte_class hte_left hte_right)
-			#! (ident, hte_symbol_heap, hte_right) = insert name ident_class hte_symbol_heap hte_right
-			= (ident, hte_symbol_heap, HTE_Ident hte_name hte_symbol_ptr hte_class hte_left hte_right)
-*/
 putIdentInHashTable :: !String !IdentClass !*HashTable -> (!BoxedIdent, !*HashTable)
 putIdentInHashTable name ident_class {hte_symbol_heap,hte_entries,hte_mark}
 	# hash_val = hashValue name
@@ -115,20 +92,40 @@ where
 	insert name ident_class hte_mark0 hte_symbol_heap HTE_Empty
 		# (hte_symbol_ptr, hte_symbol_heap) = newPtr EmptySymbolTableEntry hte_symbol_heap
 		# ident = { id_name = name, id_info = hte_symbol_ptr}
-//		= ({boxed_ident=ident}, hte_symbol_heap, HTE_Ident ident ident_class hte_mark0 HTE_Empty HTE_Empty)
 		# boxed_ident={boxed_ident=ident}
 		= (boxed_ident, hte_symbol_heap, HTE_Ident boxed_ident ident_class hte_mark0 HTE_Empty HTE_Empty)
-//	insert name ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{id_name,id_info} hte_class hte_mark hte_left hte_right)
 	insert name ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{boxed_ident={id_name,id_info}} hte_class hte_mark hte_left hte_right)
 		# cmp = (name,ident_class) =< (id_name,hte_class)
 		| cmp == Equal
-//			= ({boxed_ident=hte_ident}, hte_symbol_heap, HTE_Ident hte_ident hte_class (hte_mark bitand hte_mark0) hte_left hte_right)
 			= (hte_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class (hte_mark bitand hte_mark0) hte_left hte_right)
 		| cmp == Smaller
 			#! (boxed_ident, hte_symbol_heap, hte_left) = insert name ident_class hte_mark0 hte_symbol_heap hte_left
 			= (boxed_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
 			#! (boxed_ident, hte_symbol_heap, hte_right) = insert name ident_class hte_mark0 hte_symbol_heap hte_right
 			= (boxed_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
+
+putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> !*HashTable
+putPredefinedIdentInHashTable predefined_ident=:{id_name} ident_class {hte_symbol_heap,hte_entries,hte_mark}
+	# hash_val = hashValue id_name
+	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty
+	  (hte_symbol_heap, entries) = insert id_name ident_class hte_mark hte_symbol_heap entries
+	  hte_entries = update hte_entries hash_val entries
+	= { hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark }
+where
+	insert ::  !String !IdentClass !Int !*SymbolTable *HashTableEntry -> (!*SymbolTable, !*HashTableEntry)
+	insert name ident_class hte_mark0 hte_symbol_heap HTE_Empty
+		# hte_symbol_heap = writePtr predefined_ident.id_info EmptySymbolTableEntry hte_symbol_heap
+		# boxed_ident={boxed_ident=predefined_ident}
+		= (hte_symbol_heap, HTE_Ident boxed_ident ident_class hte_mark0 HTE_Empty HTE_Empty)
+	insert name ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{boxed_ident={id_name,id_info}} hte_class hte_mark hte_left hte_right)
+		# cmp = (name,ident_class) =< (id_name,hte_class)
+		| cmp == Equal
+			= (hte_symbol_heap, HTE_Ident hte_ident hte_class (hte_mark bitand hte_mark0) hte_left hte_right)
+		| cmp == Smaller
+			#! (hte_symbol_heap, hte_left) = insert name ident_class hte_mark0 hte_symbol_heap hte_left
+			= (hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
+			#! (hte_symbol_heap, hte_right) = insert name ident_class hte_mark0 hte_symbol_heap hte_right
+			= (hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
 
 remove_icl_symbols_from_hash_table :: !*HashTable -> *HashTable
 remove_icl_symbols_from_hash_table hash_table=:{hte_entries}

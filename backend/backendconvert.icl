@@ -462,7 +462,7 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		=	adjustStrictListFunctions fe_arrayInstances.ali_list_first_instance_indices fe_arrayInstances.ali_tail_strict_list_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd;
 	#! (rules, backEnd)
-		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefs.[PD_DummyForStrictAliasFun].pds_ident (backEnd -*-> "convertRules")
+		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefined_idents.[PD_DummyForStrictAliasFun] (backEnd -*-> "convertRules")
 	#! backEnd
 		=	appBackEnd (BEDefineRules rules) (backEnd -*-> "BEDefineRules")
 	#! backEnd

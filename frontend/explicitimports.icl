@@ -42,13 +42,11 @@ markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
 		# (eii, expl_imp_info) = replaceTwoDimArrElt component_nr i TemporarilyFetchedAway expl_imp_info
 		  (eii_ident, eii) = get_eei_ident eii
 		= (eii_ident, { expl_imp_info & [component_nr, i] = eii })
-				
+
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
-updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
-			dcl_modules expl_imp_infos cs_symbol_table
-	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers
-			(dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices} dcl_modules expl_imp_infos cs_symbol_table
+	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
 updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
@@ -59,19 +57,15 @@ addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_mod
 			= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
 	  (di_belonging, dcl_modules, cs_symbol_table)
 	  		= get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
-	  di
-	  		= { di_decl = decl, di_instances = instances, di_belonging = di_belonging }
-	  new_expl_imp_info
-	  		= ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
+	  di = { di_decl = decl, di_instances = instances, di_belonging = di_belonging }
+	  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
 	= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
   where
 	get_belonging_symbol_nrs :: !Declaration !v:{#DclModule} !u:(Heap SymbolTableEntry) 
-			-> (!.NumberSet,!v:{#DclModule},!u:Heap SymbolTableEntry)
+							 -> (!.NumberSet,!v:{#DclModule},!u: Heap SymbolTableEntry)
 	get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
-		# (all_belonging_symbols, dcl_modules)
-				= getBelongingSymbols decl dcl_modules
-		  nr_of_belongs
-				= nrOfBelongingSymbols all_belonging_symbols
+		# (all_belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
+		  nr_of_belongs = nrOfBelongingSymbols all_belonging_symbols
 		  (_, belonging_bitvect, cs_symbol_table)
 				= foldlBelongingSymbols set_bit all_belonging_symbols (0, bitvectCreate nr_of_belongs, cs_symbol_table)
 		= (bitvectToNumberSet belonging_bitvect, dcl_modules, cs_symbol_table)
@@ -131,15 +125,12 @@ getBelongingSymbolsFromID (ID_Record _ x)						= x
 getBelongingSymbolsFromID _									= No
 
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
-				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
-			-> (!.SolvedImports,!(!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
+								!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
+			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod (dcl_modules, visited_modules, expl_imp_info, cs)
-	# import_indices
-			= ikhSearch` importing_mod expl_imp_indices_ikh
-	  expl_imp_indices
-	  		= [ imports \\ imports=:(_, _, [_:_]) <- import_indices ]
-	  impl_imports
-	  		= [ (mod_index, position) \\ imports=:(mod_index, position, []) <- import_indices ]
+	# import_indices = ikhSearch` importing_mod expl_imp_indices_ikh
+	  expl_imp_indices = [ imports \\ imports=:(_, _, [_:_]) <- import_indices ]
+	  impl_imports = [ (mod_index, position) \\ imports=:(mod_index, position, []) <- import_indices ]
 	  (expl_imports, state)
 	  		= mapSt (solve_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set importing_mod)
 					expl_imp_indices (dcl_modules, visited_modules, expl_imp_info, cs)
@@ -203,20 +194,15 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						eii_declaring_modules (bitvectResetAll visited_modules)
 		= case found of
 			Yes _
-				# eii_declaring_modules
-				  		= foldSt (store_belonging belong_nr ini_symbol_nr) path eii_declaring_modules
-				  (belong_decl, dcl_modules)
-					= get_nth_belonging_decl position belong_nr decl dcl_modules
+				# eii_declaring_modules = foldSt (store_belonging belong_nr ini_symbol_nr) path eii_declaring_modules
+				  (belong_decl, dcl_modules) = get_nth_belonging_decl position belong_nr decl dcl_modules
 				-> ([belong_decl:decls_accu], dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 			_
 				# cs_error
 					= case need_all of
 						True
-							# cs_error
-									= pushErrorAdmin (newPosition import_ident position) cs_error
-							  cs_error
-							  		= checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by the specified module")
-							  				cs_error
+							# cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
+							  cs_error = checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by the specified module") cs_error
 							-> popErrorAdmin cs_error
 						_
 							-> cs_error
@@ -271,23 +257,18 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				-> ([], dcl_modules)
 
 	numerate_belongs {id_info} (i, cs_symbol_table)
-		# (ste, cs_symbol_table)
-				= readPtr id_info cs_symbol_table
-		  new_ste
-		  		= { ste & ste_kind = STE_BelongingSymbol i, ste_previous = ste }
+		# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+		  new_ste = { ste & ste_kind = STE_BelongingSymbol i, ste_previous = ste }
 		= (i+1, writePtr id_info new_ste cs_symbol_table)
 	
 	get_opt_nr_and_ident position eii_ident {ii_ident=ii_ident=:{id_info}} (cs_error, cs_symbol_table)
-		# ({ste_kind}, cs_symbol_table)
-				= readPtr id_info cs_symbol_table
+		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= case ste_kind of
 			STE_BelongingSymbol i
 				-> (Yes (i, ii_ident), (cs_error, cs_symbol_table))
 			_
-				# cs_error
-						= pushErrorAdmin (newPosition import_ident position) cs_error
-				  cs_error
-						= checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error 
+				# cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
+				  cs_error = checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error 
 				-> (No, (popErrorAdmin cs_error, cs_symbol_table))
 		
 	search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod
@@ -322,14 +303,12 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 					  				-> belonging_accu
 					  			Yes _
 					  				-> [(di_decl, ini, imported_mod):belonging_accu]
-					  new_eii
-					  			= ExplImpInfo eii_ident new_eii_declaring_modules
+					  new_eii = ExplImpInfo eii_ident new_eii_declaring_modules
 					-> (True, ([di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
 								{ expl_imp_info & [ini_symbol_nr] = new_eii }))
 				// otherwise GOTO next alternative
 			_
-				# eii
-				  		= ExplImpInfo eii_ident eii_declaring_modules
+				# eii = ExplImpInfo eii_ident eii_declaring_modules
 				-> (False, (decls_accu, belonging_accu, visited_modules, { expl_imp_info & [ini_symbol_nr] = eii }))
 
 	depth_first_search expl_imp_indices_ikh modules_in_component_set
@@ -450,10 +429,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= (expl_imp_info, popErrorAdmin cs_error)
 
 	do_a_lot_just_to_read_an_array_2 i expl_imp_info
-		# (eii, expl_imp_info)
-				= replace expl_imp_info i TemporarilyFetchedAway
-		  (eii_ident, eii)
-		  		= get_eei_ident eii
+		# (eii, expl_imp_info) = replace expl_imp_info i TemporarilyFetchedAway
+		  (eii_ident, eii) = get_eei_ident eii
 		= (eii_ident, { expl_imp_info & [i] = eii })
 
 	impDeclToNameSpaceString (ID_Function _)	= "function/macro"

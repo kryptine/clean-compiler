@@ -30,6 +30,5 @@ instance unify AType
 	}
 
 class arraySubst type :: !type !u:{!Type} -> (!Bool,!type, !u:{! Type})
-//class arraySubst type :: !type !u:{!Type} -> (!type, !u:{! Type})
 
 instance arraySubst AType

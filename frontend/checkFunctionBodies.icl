@@ -62,7 +62,7 @@ get_unboxed_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
 	# decons_u_index=decons_u_symbol.pds_def
 	# (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
 	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
-	= (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,decons_u_symbol.pds_ident,cs)
+	= (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,predefined_idents.[PD_decons_u],cs)
 
 make_unboxed_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
@@ -79,7 +79,7 @@ get_unboxed_tail_strict_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,c
 	# decons_uts_index=decons_uts_symbol.pds_def
 	# (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
 	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
-	= (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_symbol.pds_ident,cs)
+	= (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,predefined_idents.[PD_decons_uts],cs)
 
 make_unboxed_tail_strict_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_u_ident cs
@@ -96,7 +96,7 @@ get_overloaded_list_indices_and_decons_ident cs=:{cs_predef_symbols,cs_x}
 	# decons_index=decons_symbol.pds_def
 	# (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
 	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
-	= (stdStrictLists_index,cons_index,decons_index,nil_index,decons_symbol.pds_ident,cs)
+	= (stdStrictLists_index,cons_index,decons_index,nil_index,predefined_idents.[PD_decons],cs)
 
 make_overloaded_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_index,decons_index,nil_index,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
@@ -795,11 +795,13 @@ where
 				| glob_module==cPredefinedModuleIndex
 					# index=glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
 					| index==PD_OverloadedConsSymbol
-						# ({pds_ident,pds_def},cs) = cs!cs_predef_symbols.[pd_cons_symbol]
+						# ({pds_def},cs) = cs!cs_predef_symbols.[pd_cons_symbol]
+						# pds_ident = predefined_idents.[pd_cons_symbol]
 						# glob_object = {glob_object & ds_index=pds_def,ds_ident=pds_ident}
 						= ({pattern & ap_symbol.glob_object=glob_object},cs)
 					| index==PD_OverloadedNilSymbol
-						# ({pds_ident,pds_def},cs) = cs!cs_predef_symbols.[pd_nil_symbol]
+						# ({pds_def},cs) = cs!cs_predef_symbols.[pd_nil_symbol]
+						# pds_ident = predefined_idents.[pd_nil_symbol]
 						# glob_object = {glob_object & ds_index=pds_def,ds_ident=pds_ident}
 						= ({pattern & ap_symbol.glob_object=glob_object},cs)
 						= abort "replace_overloaded_symbol_in_pattern"
@@ -1239,26 +1241,28 @@ where
 		-> (!Expression, ![FreeVar], !*ExpressionState, !u:ExpressionInfo, !*CheckState)
 
 	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error,cs_predef_symbols,cs_x}
-		# ({pds_ident=from_ident}) = cs_predef_symbols.[PD_From]
-		  ({pds_ident=from_then_ident}) = cs_predef_symbols.[PD_FromThen]
-		  ({pds_ident=from_to_ident}) = cs_predef_symbols.[PD_FromTo]
-		  ({pds_ident=from_then_to_ident}) = cs_predef_symbols.[PD_FromThenTo]
+		# local_predefined_idents = predefined_idents
+		# from_ident = local_predefined_idents.[PD_From]
+		  from_then_ident = local_predefined_idents.[PD_FromThen]
+		  from_to_ident = local_predefined_idents.[PD_FromTo]
+		  from_then_to_ident = local_predefined_idents.[PD_FromThenTo]
+
 		| id==from_ident || id==from_then_ident || id==from_to_ident || id==from_then_to_ident
 			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdEnum})
 				// instead of giving an error message remember that StdEnum should have been imported.
 				// Error will be given in function check_needed_modules_are_imported
-		# ({pds_ident=createArray_ident}) = cs_predef_symbols.[PD__CreateArrayFun]
-		  ({pds_ident=uselect_ident}) = cs_predef_symbols.[PD_UnqArraySelectFun]
-		  ({pds_ident=update_ident}) = cs_predef_symbols.[PD_ArrayUpdateFun]
-		  ({pds_ident=usize_ident}) = cs_predef_symbols.[PD_UnqArraySizeFun]
+		# createArray_ident = local_predefined_idents.[PD__CreateArrayFun]
+		  uselect_ident = local_predefined_idents.[PD_UnqArraySelectFun]
+		  update_ident = local_predefined_idents.[PD_ArrayUpdateFun]
+		  usize_ident = local_predefined_idents.[PD_UnqArraySizeFun]
 		| id==createArray_ident || id==uselect_ident || id==update_ident || id==usize_ident
 			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdArray})
 				// instead of giving an error message remember that StdArray should have been be imported.
 				//  Error will be given in function check_needed_modules_are_imported
-		| id==cs_predef_symbols.[PD_cons].pds_ident || id==cs_predef_symbols.[PD_decons].pds_ident
-		  || id==cs_predef_symbols.[PD_cons_u].pds_ident || id==cs_predef_symbols.[PD_decons_u].pds_ident
-		  || id==cs_predef_symbols.[PD_cons_uts].pds_ident || id==cs_predef_symbols.[PD_decons_uts].pds_ident
-		  || id==cs_predef_symbols.[PD_nil].pds_ident || id==cs_predef_symbols.[PD_nil_u].pds_ident || id==cs_predef_symbols.[PD_nil_uts].pds_ident
+		| id==local_predefined_idents.[PD_cons] || id==local_predefined_idents.[PD_decons]
+		  || id==local_predefined_idents.[PD_cons_u] || id==local_predefined_idents.[PD_decons_u]
+		  || id==local_predefined_idents.[PD_cons_uts] || id==local_predefined_idents.[PD_decons_uts]
+		  || id==local_predefined_idents.[PD_nil] || id==local_predefined_idents.[PD_nil_u] || id==local_predefined_idents.[PD_nil_uts]
 			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdStrictLists})
 				// instead report that StdStrictLists should be imported in function check_needed_modules_are_imported
 		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })
@@ -2249,8 +2253,7 @@ buildPattern mod_index (APK_Macro is_dcl_macro) {glob_module,glob_object} args o
 
 getPredefinedGlobalSymbol :: !Index !Index !STE_Kind !Int !*CheckState -> (!Global DefinedSymbol, !*CheckState)
 getPredefinedGlobalSymbol symb_index module_index req_ste_kind arity cs=:{cs_predef_symbols,cs_symbol_table}
-	# (pre_def_mod, cs_predef_symbols)	= cs_predef_symbols![module_index]
-	# mod_id							= pre_def_mod.pds_ident
+	# mod_id = predefined_idents.[module_index]
 	# (mod_entry, cs_symbol_table)		= readPtr mod_id.id_info cs_symbol_table
 	| mod_entry.ste_kind == STE_ClosedModule
 		# (glob_object, cs) = get_predefined_symbol symb_index req_ste_kind arity mod_entry.ste_index
@@ -2261,8 +2264,7 @@ getPredefinedGlobalSymbol symb_index module_index req_ste_kind arity cs=:{cs_pre
 where
 	get_predefined_symbol :: !Index !STE_Kind !Int !Index !*CheckState -> (!DefinedSymbol,!*CheckState)
 	get_predefined_symbol symb_index req_ste_kind arity mod_index cs=:{cs_predef_symbols,cs_symbol_table,cs_error}
-		# (pre_def_symb, cs_predef_symbols)	= cs_predef_symbols![symb_index]
-		  symb_id							= pre_def_symb.pds_ident
+		# symb_id = predefined_idents.[symb_index]
 		  (symb_entry, cs_symbol_table) 	= readPtr symb_id.id_info cs_symbol_table
 		  cs = { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table }
 		| symb_entry.ste_kind == req_ste_kind

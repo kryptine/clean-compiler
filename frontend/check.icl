@@ -1487,23 +1487,17 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 				= foldSt restoreHeap expl_imp_symbols cs_symbol_table
 		= ((reverse expl_imp_symbols, reverse expl_imp_indices), (dcl_modules, cs_symbol_table))
 		
-	get_expl_imp_symbols_of_module imports_of_icl_mod mod_index
-					(expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, dcl_modules, cs_symbol_table)
-		#! siz
-				= size dcl_modules
+	get_expl_imp_symbols_of_module imports_of_icl_mod mod_index (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, dcl_modules, cs_symbol_table)
+		#! siz = size dcl_modules
 		# (mod_imports, dcl_modules, cs_symbol_table)
 				= get_mod_imports (mod_index==siz) imports_of_icl_mod dcl_modules cs_symbol_table
 		  (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
-				= foldSt get_expl_imp_symbols mod_imports
-						(expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
-		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [expl_imp_indices:expl_imp_indices_accu],
-			dcl_modules, cs_symbol_table)
+				= foldSt get_expl_imp_symbols mod_imports (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [expl_imp_indices:expl_imp_indices_accu],dcl_modules, cs_symbol_table)
 	  where
 		get_mod_imports is_icl_mod=:False _ dcl_modules cs_symbol_table
-			# ({dcl_name}, dcl_modules)
-					=  dcl_modules![mod_index]
-			  ({ste_kind}, cs_symbol_table)
-					= readPtr dcl_name.id_info cs_symbol_table
+			# ({dcl_name}, dcl_modules) =  dcl_modules![mod_index]
+			  ({ste_kind}, cs_symbol_table) = readPtr dcl_name.id_info cs_symbol_table
 			= case ste_kind of
 				STE_Module {mod_imports}
 					-> (mod_imports, dcl_modules, cs_symbol_table)
@@ -1511,16 +1505,12 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 					-> ([], dcl_modules, cs_symbol_table)
 		get_mod_imports _ imports_of_icl_mod dcl_modules cs_symbol_table
 		 	= (imports_of_icl_mod, dcl_modules, cs_symbol_table)
-			
-	get_expl_imp_symbols {import_module, import_symbols, import_file_position}
-			(expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
+
+	get_expl_imp_symbols {import_module, import_symbols, import_file_position} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
 		# (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
-				= foldSt get_expl_imp_symbol import_symbols
-						(expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
-		  ({ste_index}, cs_symbol_table)
-		  		= readPtr import_module.id_info cs_symbol_table
-		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, 
-			[(ste_index, import_file_position, expl_imp_indices):expl_imp_indices_accu], cs_symbol_table)
+				= foldSt get_expl_imp_symbol import_symbols (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+		  ({ste_index}, cs_symbol_table) = readPtr import_module.id_info cs_symbol_table
+		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [(ste_index, import_file_position, expl_imp_indices):expl_imp_indices_accu], cs_symbol_table)
 
 	get_expl_imp_symbol imp_decl=:(ID_OldSyntax idents) state
 		= foldSt (get_symbol imp_decl) idents state
@@ -1658,8 +1648,7 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 		# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 				= markExplImpSymbols component_nr (expl_imp_infos, cs.cs_symbol_table)
 		  (expl_imp_infos, dcl_modules, cs_symbol_table)
-		  		= foldSt collect_expl_imp_info_per_module mod_indices
-		  				(expl_imp_infos, dcl_modules, cs_symbol_table)
+		  		= foldSt collect_expl_imp_info_per_module mod_indices (expl_imp_infos, dcl_modules, cs_symbol_table)
 		  cs_symbol_table
 		  		= foldSt restoreHeap changed_symbols cs_symbol_table
 		= (expl_imp_infos, dcl_modules, { cs & cs_symbol_table = cs_symbol_table })
@@ -1671,8 +1660,7 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 				= foldlArraySt ((switch_import_syntax
 									update_expl_imp_for_marked_symbol
 									update_expl_imp_for_marked_local_symbol) mod_index)
-						dcls_local_for_import
-						(dcl_modules, expl_imp_infos, cs_symbol_table)
+						dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 		= (expl_imp_infos, dcl_modules, cs_symbol_table)
 	
 	just_update_expl_imp_info components_array super_components mod_index (expl_imp_infos, dcl_modules, cs_symbol_table)
@@ -1888,7 +1876,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 			adjust_predefined_module_symbol :: !Index !(!*PredefinedSymbols, !*SymbolTable) -> (!*PredefinedSymbols, !*SymbolTable)
 			adjust_predefined_module_symbol predef_index (pre_def_symbols, symbol_table)
 				# (mod_symb, pre_def_symbols) = pre_def_symbols![predef_index]
-				# (mod_entry, symbol_table) = readPtr mod_symb.pds_ident.id_info symbol_table
+				# (mod_entry, symbol_table) = readPtr predefined_idents.[predef_index].id_info symbol_table
 				= case mod_entry.ste_kind of
 					STE_Module _
 						-> ({ pre_def_symbols & [predef_index] = { mod_symb & pds_module = cs_x.x_main_dcl_module_n, pds_def =  mod_entry.ste_index }}, symbol_table)
@@ -1900,7 +1888,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 			  (mods, macro_defs, cs) = add_modules_to_symbol_table mods (inc mod_index) cs
 			= ([mod_sizes_and_defs:mods],[dcl_macro_defs:macro_defs], cs)
 
-		add_module_to_symbol_table mod=:{mod_defs} mod_index cs=:{cs_predef_symbols,cs_symbol_table, cs_error}
+		add_module_to_symbol_table mod=:{mod_defs} mod_index cs=:{cs_symbol_table, cs_error}
 			# def_instances	= convert_class_instances mod_defs.def_instances
 			  mod_defs = { mod_defs & def_instances = def_instances }
 			  sizes_and_defs = collectFunctionTypes mod_defs.def_funtypes (collectCommonfinitions mod_defs)
@@ -2109,25 +2097,24 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 	    		  			icl_import = icl_imported ,icl_modification_time = mod_modification_time}
 		= (False, icl_mod, dcl_modules, {}, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
 	where
-		check_start_rule mod_kind mod_name icl_global_functions_ranges cs=:{cs_predef_symbols,cs_symbol_table,cs_x}
-			# (pre_symb, cs_predef_symbols) = cs_predef_symbols![PD_Start]
-			  ({ste_kind, ste_index}, cs_symbol_table) = readPtr pre_symb.pds_ident.id_info cs_symbol_table
-			  cs = { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table }
+		check_start_rule mod_kind mod_name icl_global_functions_ranges cs=:{cs_symbol_table,cs_x}
+			# ({ste_kind, ste_index}, cs_symbol_table) = readPtr predefined_idents.[PD_Start].id_info cs_symbol_table
+			  cs = { cs & cs_symbol_table = cs_symbol_table }
 			= case ste_kind of
 				STE_FunctionOrMacro _
 					| index_in_ranges ste_index icl_global_functions_ranges
-						-> { cs & cs_predef_symbols = { cs.cs_predef_symbols & [PD_Start] = { pre_symb & pds_def = ste_index, pds_module = cs_x.x_main_dcl_module_n }}}
+						-> { cs & cs_predef_symbols.[PD_Start] = { pds_def = ste_index, pds_module = cs_x.x_main_dcl_module_n }}
 					where
 						index_in_ranges index [{ir_from, ir_to}:ranges]
 							= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
 						index_in_ranges index []
 							= False
 				STE_Imported STE_DclFunction mod_index
-					-> { cs & cs_predef_symbols = { cs.cs_predef_symbols & [PD_Start] = { pre_symb & pds_def = ste_index, pds_module = mod_index }}}
+					-> { cs & cs_predef_symbols.[PD_Start] = { pds_def = ste_index, pds_module = mod_index }}
 				_
 					-> case mod_kind of
 							MK_Main
-								# pos = newPosition pre_symb.pds_ident (LinePos (mod_name.id_name+++".icl") 1)
+								# pos = newPosition predefined_idents.[PD_Start] (LinePos (mod_name.id_name+++".icl") 1)
 								-> { cs & cs_error = checkErrorWithIdentPos pos " has not been declared" cs.cs_error }
 							_
 								-> cs
@@ -2275,10 +2262,10 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 			_ -> check_it PD_StdStrictLists mod_name " (needed for strict lists)" extension cs
 	= cs
   where
-	check_it pd mod_name explanation extension cs=:{cs_predef_symbols, cs_symbol_table}
-  		# (pds_ident, cs_predef_symbols) = cs_predef_symbols![pd].pds_ident	
+	check_it pd mod_name explanation extension cs=:{cs_symbol_table}
+ 		# pds_ident = predefined_idents.[pd]	
 		# ({ste_kind}, cs_symbol_table) = readPtr pds_ident.id_info cs_symbol_table
-		  cs = { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols }
+		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case ste_kind of
 			STE_ClosedModule
 				-> cs
@@ -2290,13 +2277,13 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 				-> { cs & cs_error = cs_error }
 				
 // MV ...
-	switched_off_Clean_feature pd mod_name explanation extension cs=:{cs_predef_symbols, cs_symbol_table}
-  		# (ident,cs_predef_symbols) = cs_predef_symbols![pd].pds_ident	
-		# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
+	switched_off_Clean_feature pd mod_name explanation extension cs=:{cs_symbol_table}
+ 		# ident = predefined_idents.[pd]	
+ 		# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
 		  cs_error = pushErrorAdmin error_location cs.cs_error
 		  cs_error = checkError ident ("not supported"+++explanation) cs_error
 		  cs_error = popErrorAdmin cs_error
-		= { cs & cs_error = cs_error, cs_predef_symbols = cs_predef_symbols }
+		= { cs & cs_error = cs_error}
 // ... MV
 
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]
@@ -2461,6 +2448,7 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 			| is_new
 				= ([declaration:declarations_accu], dcl_modules, cs)
 			= (declarations_accu, dcl_modules, cs)
+
 		add_member importing_mod mod_index {ds_ident, ds_index} (declarations_accu, dcl_modules, cs)
 			# (sd=:{me_symb, me_pos}, dcl_modules)
 					= dcl_modules![mod_index].dcl_common.com_member_defs.[ds_index]
@@ -2478,11 +2466,9 @@ add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_
 add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod cs
 	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod cs
 
-updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule}
-			{!{!*ExplImpInfo}} *SymbolTable 
+updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} {!{!*ExplImpInfo}} *SymbolTable 
 		-> (u:{#DclModule},!{!{!.ExplImpInfo}},.SymbolTable)
-updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
-			dcl_modules expl_imp_infos cs_symbol_table
+updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import dcl_modules expl_imp_infos cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 	  		= mapSt markExplImpSymbols super_components (expl_imp_infos, cs_symbol_table)
 
@@ -2500,8 +2486,7 @@ updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  		= update_expl_imp_for_marked_symbols mod_index dcls_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  cs_symbol_table
-	  		= foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table)
-	  				changed_symbols cs_symbol_table
+	  		= foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
 updateExplImpInfoForCachedModule :: [Int] Index {!Declaration} {!Declaration} {!{!*ExplImpInfo}} u:{#DclModule} *SymbolTable 
@@ -2683,30 +2668,25 @@ update_expl_imp_for_marked_symbol mod_index decl=:(Declaration {decl_ident}) (dc
 update_expl_imp_for_marked_local_symbol mod_index decl=:(Declaration {decl_ident}) (dcl_modules, expl_imp_infos, cs_symbol_table)
 	# (ste, cs_symbol_table) = readPtr decl_ident.id_info cs_symbol_table
 	= updateExplImpForMarkedLocalSymbol mod_index decl ste dcl_modules expl_imp_infos cs_symbol_table
-
-updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
-		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
-updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
-			dcl_modules expl_imp_infos cs_symbol_table
-	= foldSt (addExplImpInfo mod_index decl) component_numbers
-			(dcl_modules, expl_imp_infos, cs_symbol_table)
-  where
-	addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
-				-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
-	addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
-		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
-				= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
-		  (all_belongs, dcl_modules)
-		  		= getBelongingSymbols decl dcl_modules
-		  di_belonging
-		  		= nsFromTo (nrOfBelongingSymbols all_belongs)
-		  di
-		  		= { di_decl = decl, di_instances = [], di_belonging = di_belonging }
-		  new_expl_imp_info
-		  		= ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
-		= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
-updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
-	= (dcl_modules, expl_imp_infos, cs_symbol_table)
+where
+	updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
+	updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
+				dcl_modules expl_imp_infos cs_symbol_table
+		= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
+	  where
+		addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
+					-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
+		addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
+			# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
+					= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
+			  (all_belongs, dcl_modules) = getBelongingSymbols decl dcl_modules
+			  di_belonging = nsFromTo (nrOfBelongingSymbols all_belongs)
+			  di = { di_decl = decl, di_instances = [], di_belonging = di_belonging }
+			  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
+			= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
+	updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
+		= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
 checkInstancesOfDclModule :: !.Int !(!.Int,.Int,.[FunType]) !(!*{#DclModule},!*Heaps,!*CheckState)
 														  -> (!.{#DclModule},!.Heaps,!.CheckState);
@@ -2902,13 +2882,13 @@ where
 				<=< adjustPredefSymbol PD_ModuleID			mod_index STE_Constructor)
 // AA..			
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
-		# (pd_type_iso, cs_predef_symbols) = cs_predef_symbols![PD_TypeISO]	
+		# type_iso_ident = predefined_idents.[PD_TypeISO]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_TypeISO				mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsISO				mod_index STE_Constructor				
-				<=< adjustPredefSymbol PD_iso_from				mod_index (STE_Field pd_type_iso.pds_ident)
-				<=< adjustPredefSymbol PD_iso_to				mod_index (STE_Field pd_type_iso.pds_ident)				
+				<=< adjustPredefSymbol PD_iso_from				mod_index (STE_Field type_iso_ident)
+				<=< adjustPredefSymbol PD_iso_to				mod_index (STE_Field type_iso_ident)				
 				<=< adjustPredefSymbol PD_TypeUNIT				mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsUNIT				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_TypePAIR				mod_index STE_Type
@@ -2941,7 +2921,7 @@ where
 		unused
 			= { id_name = "unused", id_info = nilPtr }
 					
-		adjust_predef_symbols next_symb last_symb mod_index symb_kind cs=:{cs_predef_symbols, cs_symbol_table, cs_error} 
+		adjust_predef_symbols next_symb last_symb mod_index symb_kind cs
 			| next_symb > last_symb
 				= cs
 				= cs
@@ -2961,13 +2941,12 @@ where
 				= getClassDef ins_class mod_index com_class_defs modules
 	 		= (size class_members + sum, com_class_defs, modules)
 
-adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_predef_symbols,cs_symbol_table,cs_error}
-	# (pre_symb, cs_predef_symbols) = cs_predef_symbols![predef_index]
-	# pre_id = pre_symb.pds_ident
+adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_error}
+	# pre_id = predefined_idents.[predef_index]
 	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
 	| pre_index <> NoIndex
-		= { cs & cs_predef_symbols = {cs_predef_symbols & [predef_index] = { pre_symb & pds_def = pre_index, pds_module = mod_index }}}
-		= { cs & cs_predef_symbols = cs_predef_symbols, cs_error = checkError pre_id " function not defined" cs_error }
+		= { cs & cs_predef_symbols.[predef_index] = { pds_def = pre_index, pds_module = mod_index }}
+		= { cs & cs_error = checkError pre_id " function not defined" cs_error }
 where
 	determine_index_of_symbol {ste_kind, ste_index} symb_kind
 		| ste_kind == symb_kind
@@ -2976,9 +2955,6 @@ where
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
-	
-file_and_status {ea_file,ea_ok}
-	= (ea_file, ea_ok)
 
 instance <<< AuxiliaryPattern
 where
@@ -3096,11 +3072,6 @@ groupify { dag_nr_of_nodes, dag_get_children } component_numbers nr_of_component
 				= node_to_components![node_nr]
 		= ({ visited_array & [child_component_number] = True }, [child_component_number : visited_list],
 			{ node_to_components & [node_nr] = [child_component_number:current_components] })
-
-array_to_list a = [el\\el<-:a]
-
-dummy_decl
-	=: { decl_ident = { id_name = "", id_info = nilPtr }, decl_pos = NoPos, decl_kind = STE_Empty, decl_index = cUndef }
 
 arg_string 0 = "result"
 arg_string arg_nr = toString arg_nr+++". arg"

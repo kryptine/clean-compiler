@@ -3573,7 +3573,8 @@ buildTypeApp  td_module {td_name, td_arity, td_index} args
 		
 buildPredefTypeApp :: !Int [AType] !PredefinedSymbols -> !AType
 buildPredefTypeApp predef_index args predefs
-	# {pds_ident, pds_module, pds_def} = predefs.[predef_index]
+	# {pds_module, pds_def} = predefs.[predef_index]
+	# pds_ident = predefined_idents.[predef_index]
 	# global_index = {glob_module = pds_module, glob_object = pds_def}
 	# type_symb = MakeTypeSymbIdent global_index pds_ident (length args) 		  
 	= makeAType (TA type_symb args) TA_Multi	
@@ -3715,7 +3716,8 @@ where
 buildPredefConsPattern :: !Int ![FreeVar] !Expression !PredefinedSymbols
 	-> AlgebraicPattern
 buildPredefConsPattern predef_index vars expr predefs
-	# {pds_ident, pds_module, pds_def} = predefs.[predef_index]
+	# {pds_module, pds_def} = predefs.[predef_index]
+	# pds_ident = predefined_idents.[predef_index]
 	# cons_def_symbol = {
 		ds_ident = pds_ident,
 		ds_arity = length vars,
@@ -3840,7 +3842,8 @@ buildCaseCONSExpr arg_expr cons_info_var arg_var body_expr predefs heaps
 buildPredefConsApp :: !Int [Expression] !PredefinedSymbols !*Heaps
 	-> (!Expression, !*Heaps)
 buildPredefConsApp predef_index args predefs heaps=:{hp_expression_heap}
-	# {pds_ident, pds_module, pds_def} = predefs.[predef_index]
+	# {pds_module, pds_def} = predefs.[predef_index]
+	# pds_ident = predefined_idents.[predef_index]
 	# global_index = {glob_module = pds_module, glob_object = pds_def}
 	# symb_ident = {
 		symb_name = pds_ident, 
@@ -3862,7 +3865,8 @@ buildCONS cons_info arg predefs heaps :== buildPredefConsApp PD_ConsCONS [cons_i
 buildPredefFunApp :: !Int [Expression] !PredefinedSymbols !*Heaps
 	-> (!Expression, !*Heaps)
 buildPredefFunApp predef_index args predefs heaps=:{hp_expression_heap}
-	# {pds_ident, pds_module, pds_def} = predefs.[predef_index]
+	# {pds_module, pds_def} = predefs.[predef_index]
+	# pds_ident = predefined_idents.[predef_index]
 	# global_index = {glob_module = pds_module, glob_object = pds_def}
 	# symb_ident = {
 		symb_name = pds_ident, 
@@ -3879,7 +3883,8 @@ buildIsomapIdApp predefs heaps :== buildPredefFunApp PD_isomap_ID [] predefs hea
  	
 buildIsoToSelectionExpr :: !Expression !PredefinedSymbols -> Expression
 buildIsoToSelectionExpr record_expr predefs
-	# {pds_module, pds_def, pds_ident} = predefs . [PD_iso_to]
+	# {pds_module, pds_def} = predefs . [PD_iso_to]
+	# pds_ident = predefined_idents . [PD_iso_to]
 	# selector = { 
 		glob_module = pds_module, 
 		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
@@ -3887,7 +3892,8 @@ buildIsoToSelectionExpr record_expr predefs
 
 buildIsoFromSelectionExpr :: !Expression !PredefinedSymbols -> Expression
 buildIsoFromSelectionExpr record_expr predefs 
-	# {pds_module, pds_def, pds_ident} = predefs . [PD_iso_from]
+	# {pds_module, pds_def} = predefs . [PD_iso_from]
+	# pds_ident = predefined_idents . [PD_iso_from]
 	# selector = { 
 		glob_module = pds_module, 
 		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
@@ -4108,7 +4114,7 @@ where
 	 	= (fresh_vars, heaps)
 	 	
 	collect_local_vars body_expr fun_arg_vars heaps=:{hp_var_heap, hp_expression_heap}
-		# dummy_pds = {pds_ident=makeIdent "dummy", pds_module=NoIndex,pds_def=NoIndex}
+		# dummy_pds = {pds_module=NoIndex,pds_def=NoIndex}		
 		#! cs =
 	  		{ cos_error = {ea_file = stderr, ea_ok = True, ea_loc=[]}
 	  		, cos_var_heap = hp_var_heap
@@ -4177,7 +4183,8 @@ makeIntExpr value = BasicExpr (BVI (toString value)) BT_Int
 
 makeStringExpr :: String !PredefinedSymbols -> Expression
 makeStringExpr str predefs
-	#! {pds_ident, pds_module, pds_def} = predefs.[PD_StringType]
+	#! {pds_module, pds_def} = predefs.[PD_StringType]
+	#! pds_ident = predefined_idents.[PD_StringType]
 	#! type_symb = MakeTypeSymbIdent { glob_module = pds_module, glob_object = pds_def } pds_ident 0
 	=  BasicExpr (BVS str) (BT_String (TA type_symb []))
 

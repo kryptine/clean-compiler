@@ -138,11 +138,13 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 					True
 						# arity = 2
 						// get tuple arity 2 constructor
-						# ({pds_module, pds_def, pds_ident}, predefined_symbols)	= predefined_symbols![GetTupleConsIndex arity]
+						# ({pds_module, pds_def}, predefined_symbols)	= predefined_symbols![GetTupleConsIndex arity]
+						# pds_ident = predefined_idents.[GetTupleConsIndex arity]
 						# twoTuple_symb	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
 						
 						// get tuple, type and value selectors
-						# ({pds_def, pds_ident}, predefined_symbols) = predefined_symbols![GetTupleConsIndex arity]
+						# ({pds_def}, predefined_symbols) = predefined_symbols![GetTupleConsIndex arity]
+						# pds_ident = predefined_idents.[GetTupleConsIndex arity]
 						# twotuple = {ds_ident = pds_ident, ds_arity = arity, ds_index = pds_def}
 						# type_selector	= TupleSelect twotuple 1
 						# value_selector = TupleSelect twotuple 0
@@ -933,7 +935,8 @@ where
 
 		# (ci=:{ci_predef_symb})
 			= ci;
-		# ({pds_module, pds_def, pds_ident}, ci_predef_symb)	= ci_predef_symb![PD_ModuleConsSymbol]
+		# ({pds_module, pds_def}, ci_predef_symb)	= ci_predef_symb![PD_ModuleConsSymbol]
+		# pds_ident = predefined_idents.[PD_ModuleConsSymbol]
 		# module_symb1	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 0 }
 		# ci
 			= { ci & ci_predef_symb = ci_predef_symb };
@@ -1187,13 +1190,15 @@ getResultType case_info_ptr ci=:{ci_expr_heap}
 
 getSymbol :: Index ((Global Index) -> SymbKind) Int !*ConversionInfo -> (SymbIdent, !*ConversionInfo)
 getSymbol index symb_kind arity ci=:{ci_predef_symb}
-	# ({pds_module, pds_def, pds_ident}, ci_predef_symb) = ci_predef_symb![index]
+	# ({pds_module, pds_def}, ci_predef_symb) = ci_predef_symb![index]
+	# pds_ident = predefined_idents.[index]
 	  ci = {ci & ci_predef_symb = ci_predef_symb}
 	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
 	= (symbol, ci)
 
 getTupleSymbol arity ci=:{ci_predef_symb}
-	# ({pds_def, pds_ident}, ci_predef_symb) = ci_predef_symb![GetTupleConsIndex arity]
+	# ({pds_def}, ci_predef_symb) = ci_predef_symb![GetTupleConsIndex arity]
+	# pds_ident = predefined_idents.[GetTupleConsIndex arity]
     = ( {ds_ident = pds_ident, ds_arity = arity, ds_index = pds_def}, {ci & ci_predef_symb = ci_predef_symb })
 
 getGlobalIndex :: Index !*ConversionInfo -> (Global Index, !*ConversionInfo)
@@ -1203,7 +1208,8 @@ getGlobalIndex index ci=:{ci_predef_symb}
 
 getConstructor :: Index Int !*ConversionInfo -> (Global DefinedSymbol, !*ConversionInfo)
 getConstructor index arity ci=:{ci_predef_symb}
-	# ({pds_module, pds_def, pds_ident}, ci_predef_symb) = ci_predef_symb![index]
+	# ({pds_module, pds_def}, ci_predef_symb) = ci_predef_symb![index]
+	# pds_ident = predefined_idents.[index]
 	  defined_symbol = { ds_ident = pds_ident, ds_arity = arity, ds_index = pds_def}
 	= (	{glob_object = defined_symbol, glob_module = pds_module} , {ci & ci_predef_symb = ci_predef_symb} )
 
@@ -1274,14 +1280,16 @@ where
 get_module_id_app :: !*PredefinedSymbols -> (App,Expression,!*PredefinedSymbols)
 get_module_id_app predef_symbols
 	// get module id symbol
-	# ({pds_module, pds_def, pds_ident}, predef_symbols)	= predef_symbols![PD_ModuleConsSymbol]
+	# ({pds_module, pds_def}, predef_symbols)	= predef_symbols![PD_ModuleConsSymbol]
+	# pds_ident = predefined_idents.[PD_ModuleConsSymbol]
 	# module_symb = 
 		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 0 }
 		,	app_args 		= []
 		,	app_info_ptr	= nilPtr
 		}
 
-	# ({pds_module, pds_def, pds_ident}, predef_symbols)	= predef_symbols![PD_ModuleID]
+	# ({pds_module, pds_def}, predef_symbols)	= predef_symbols![PD_ModuleID]
+	# pds_ident = predefined_idents.[PD_ModuleID]
 	# module_id_symb = 
 		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 1 }
 		,	app_args 		= [App module_symb]

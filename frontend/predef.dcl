@@ -6,10 +6,9 @@ cPredefinedModuleIndex :== 1
 
 ::	PredefinedSymbols	:== {# PredefinedSymbol}
 
-::	PredefinedSymbol =
-	{	pds_ident	:: !Ident
-	,	pds_module	:: !Index
-	,	pds_def		:: !Index
+::	PredefinedSymbol = {
+		pds_module	:: !Index,
+		pds_def		:: !Index
 	}
 
 /* identifiers not present the hastable */
@@ -185,9 +184,9 @@ PD_NrOfPredefSymbols		:== 201
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
 
-init_identifiers :: *SymbolTable -> *SymbolTable
+init_identifiers :: !*SymbolTable !*World -> (!*SymbolTable,!*World)
 
-cons_and_nil_idents :: {!Ident}
+predefined_idents :: {!Ident}
 
 buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
 

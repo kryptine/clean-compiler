@@ -376,12 +376,12 @@ where
 				# index=glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
 				| index==PD_OverloadedConsSymbol
 					# new_cons_index=pd_cons_symbol-FirstConstructorPredefinedSymbolIndex
-					# new_cons_ident=cons_and_nil_idents.[new_cons_index]
+					# new_cons_ident=predefined_idents.[pd_cons_symbol]
 					# glob_object = {glob_object & ds_index=new_cons_index,ds_ident=new_cons_ident}
 					= {pattern & ap_symbol.glob_object=glob_object}
 				| index==PD_OverloadedNilSymbol
 					# new_nil_index=pd_nil_symbol-FirstConstructorPredefinedSymbolIndex
-					# new_nil_ident=cons_and_nil_idents.[new_nil_index]
+					# new_nil_ident=predefined_idents.[pd_nil_symbol]
 					# glob_object = {glob_object & ds_index=new_nil_index,ds_ident=new_nil_ident}
 					= {pattern & ap_symbol.glob_object=glob_object}
 					= abort "replace_overloaded_symbol_in_pattern"

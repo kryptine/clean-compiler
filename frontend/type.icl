@@ -1735,10 +1735,12 @@ where
 				# fresh_var = TempV var_store
 				  tdt_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = fresh_var }
 
-				# ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeClass]
+				# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeClass]
+				# pds_ident = predefined_idents.[PD_TypeCodeClass]
 		  		  tc_class_symb = {glob_module = pds_module, glob_object = {ds_ident = pds_ident, ds_arity = 1, ds_index = pds_def }}
  				  (pds, predef_symbols) = predef_symbols![PD_TypeCodeMember]
-		  		  ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeMember]
+		  		  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeMember]
+ 		  		  pds_ident = predefined_idents.[PD_TypeCodeMember]
 				  tc_member_symb = { symb_name = pds_ident, symb_kind = SK_OverloadedFunction {glob_module = pds_module, glob_object = pds_def }, symb_arity = 0}
 		 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
 				  context = {tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
@@ -1795,9 +1797,11 @@ where
 				-> (var_heap, var_store)
 	
 	determine_context_and_expr_ptr global_vars (var_heap, expr_heap, type_var_heap, predef_symbols)
-		# ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeClass]
+		# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeClass]
+		# pds_ident = predefined_idents.[PD_TypeCodeClass]
 		  tc_class_symb = {glob_module = pds_module, glob_object = {ds_ident = pds_ident, ds_arity = 1, ds_index = pds_def }}
-		  ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeMember]
+		  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeMember]
+  		  pds_ident = predefined_idents.[PD_TypeCodeMember]
 		  tc_member_symb = { symb_name	= pds_ident, symb_kind = SK_TypeCode, symb_arity = 0}
 		  (contexts, (var_heap, type_var_heap)) = mapSt (build_type_context tc_class_symb) global_vars (var_heap, type_var_heap)
 		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -2415,7 +2419,8 @@ where
 		convert_array_instances array_instances common_defs fun_defs predef_symbols type_heaps error
 			| isEmpty array_instances
 				= ([],fun_defs, predef_symbols, type_heaps, error)
-				# ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
+				# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
+				# pds_ident = predefined_idents.[PD_UnboxedArrayType]
 				  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
 				  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
 				  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
