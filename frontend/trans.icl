@@ -887,20 +887,23 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 								[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] case_default ro ti
 			| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
 				# zipped = zip2 ap_vars app_args
-				  linear_args = filterWith linearity zipped
-				  not_linearity = map not linearity
-				  non_linear_args = filterWith not_linearity zipped
-				  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) linear_args ti.ti_var_heap
-				  (new_expr, ti_symbol_heap) = possibly_add_let non_linear_args ap_expr not_linearity glob_module ds_index ro ti.ti_symbol_heap
-//												True -> (ap_expr, ti.ti_symbol_heap)
-//								(let_expr non_linear_args ap_expr ro.ro_common_defs.[glob_module].com_cons_defs.[glob_index])
+				  unfoldables = [ linear || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args ]
+				  unfoldable_args = filterWith unfoldables zipped
+				  not_unfoldable = map not unfoldables
+				  non_unfoldable_args = filterWith not_unfoldable zipped
+				  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
+				  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module ds_index ro ti.ti_symbol_heap
 				  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,
 									us_cleanup_info=ti.ti_cleanup_info, us_subst_vars = True, us_handle_aci_free_vars = LeaveThem }
 				  (unfolded_expr, unfold_state) = unfold new_expr unfold_state
 				  (final_expr, ti) = transform unfolded_expr { ro & ro_root_case_mode = NotRootCase } (unfold_state_to_ti unfold_state ti)
 				= (Yes final_expr, ti)
-				= match_and_instantiate linearities cons_index app_args guards case_default ro ti
+			= match_and_instantiate linearities cons_index app_args guards case_default ro ti
 		  where
+		  	in_normal_form (Var _)			= True
+		  	in_normal_form (BasicExpr _ _)	= True
+		  	in_normal_form _				= False
+		  	
 			filterWith [True:t2] [h1:t1]
 				= [h1:filterWith t2 t1]
 			filterWith [False:t2] [h1:t1]
@@ -910,12 +913,12 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			
 			possibly_add_let [] ap_expr _ _ _ _ ti_symbol_heap
 				= (ap_expr, ti_symbol_heap)
-			possibly_add_let non_linear_args ap_expr not_linearity glob_module glob_index ro ti_symbol_heap
+			possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module glob_index ro ti_symbol_heap
 				# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_index]
-				  let_type = filterWith not_linearity cons_type.st_args
+				  let_type = filterWith not_unfoldable cons_type.st_args
 				  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
 				= ( Let	{	let_strict		= False
-						,	let_binds		= [ {bind_src=bind_src, bind_dst=bind_dst} \\ (bind_dst,bind_src)<-non_linear_args]
+						,	let_binds		= [ {bind_src=bind_src, bind_dst=bind_dst} \\ (bind_dst,bind_src)<-non_unfoldable_args]
 						,	let_expr		= ap_expr
 						,	let_info_ptr	= new_info_ptr
 						}
