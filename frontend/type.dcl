@@ -10,6 +10,8 @@ typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !Common
 
 addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);
 
+tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
+
 ::	PropState =
 	{	prop_type_heaps	:: !.TypeHeaps
 	,	prop_td_infos	:: !.TypeDefInfos
@@ -28,6 +30,7 @@ instance unify AType
 	,	ti_main_dcl_module_n :: !Int
 	}
 
-class arraySubst type :: !type !u:{!Type} -> (!type, !u:{! Type})
+class arraySubst type :: !type !u:{!Type} -> (!Bool,!type, !u:{! Type})
+//class arraySubst type :: !type !u:{!Type} -> (!type, !u:{! Type})
 
 instance arraySubst AType

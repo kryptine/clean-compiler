@@ -386,18 +386,6 @@ where
 			= write_type_info type_arity tcl_file wtis
 		= (tcl_file,wtis)
 		
-/*2.0
-instance WriteTypeInfo String
-where
-        write_type_info s tcl_file wtis
-                # tcl_file
-                        = fwritei (size s) tcl_file
-                = (fwrites s tcl_file,wtis)
-        // warning:
-        // Should be identical to the code in Ident
-
-0.2*/
-
 
 // basic and structural write_type_info's
 instance WriteTypeInfo Int 
@@ -409,7 +397,7 @@ where
 instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b
 //3.1
 /*2.0
-instance WriteTypeInfo {#b} | WriteTypeInfo b & Array {#} b
+instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b
 0.2*/
 where
 	write_type_info unboxed_array tcl_file wtis

@@ -497,7 +497,7 @@ cIsALocalVar	:== False
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro
 
-::	VarInfo  =	VI_Empty |VI_Type !AType !(Optional CoercionPosition) | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
+::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
@@ -789,7 +789,7 @@ cNotVarNumber :== -1
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
-//			|	TFA [ATypeVar] Type
+			|	TFA [ATypeVar] Type
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
@@ -1408,7 +1408,7 @@ where
 instance <<< BoundVar
 where
 	(<<<) file {var_name,var_info_ptr,var_expr_ptr}
-		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr <<< '>'
+		= file <<< var_name <<< "<I" <<< ptrToInt var_info_ptr <<< ", E" <<< ptrToInt var_expr_ptr <<< '>'
 
 instance <<< (Bind a b) | <<< a & <<< b 
 where

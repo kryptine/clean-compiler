@@ -512,7 +512,7 @@ cIsALocalVar	:== False
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro
 
-::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
+::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
@@ -818,7 +818,7 @@ cNonRecursiveAppl	:== False
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
-//			|	TFA [ATypeVar] Type
+			|	TFA [ATypeVar] Type				/* Universally quantified types */
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar

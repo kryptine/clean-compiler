@@ -21,7 +21,7 @@ where
 instance WriteTypeInfo CommonDefs, Char, [a] | WriteTypeInfo a
 
 /*2.0
-instance WriteTypeInfo String
+instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b 
 0.2*/
 
 //1.3

@@ -1352,7 +1352,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  (_, (st_args,st_result), ti_type_heaps)
 	  		= substitute (st_args,st_result) ti_type_heaps
 	  (new_fun_args, new_arg_types_array, next_attr_nr,
-	    new_linear_bits, new_cons_args, uniqueness_requirements, subst, ti_type_heaps=:{th_vars, th_attrs},
+	    new_linear_bits, new_cons_args, uniqueness_requirements, subst, ti_type_heaps=:{th_vars},
 	    ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
 			= determine_args cc_linear_bits cc_args 0 prods opt_sound_function_producer_types tb_args
 							(st_args_array st_args)
@@ -1364,8 +1364,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 					(createArray (inc (BITINDEX nr_of_all_type_vars)) 0, th_vars)
 //	| False--->("subst before", [el\\el<-:subst], "cons_vars", [el\\el<-:cons_vars])
 //		= undef
-	# (subst, next_attr_nr, th_vars, ti_type_def_infos)
-	  		= liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr th_vars ti_type_def_infos
+	# (subst, next_attr_nr, ti_type_heaps=:{th_attrs}, ti_type_def_infos)
+	  		= liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr { ti_type_heaps & th_vars = th_vars } ti_type_def_infos
 //	| False--->("subst after lifting", [el\\el<-:subst])
 //		= undef
 	# coer_demanded
@@ -1385,7 +1385,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 		  			uniqueness_requirements coercions
 	  (subst, coercions, ti_type_def_infos, ti_type_heaps)
 	  		= foldSt (coerce_types ro.ro_common_defs cons_vars) uniqueness_requirements
-	  				(subst, coercions, ti_type_def_infos, { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs })
+	  				(subst, coercions, ti_type_def_infos, { ti_type_heaps & th_attrs = th_attrs })
 //	| False--->("cons_vars", [el\\el<-:cons_vars])
 //		= undef
 //	  expansion_state
@@ -1883,11 +1883,14 @@ where
 
 	expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
 		| is_dictionary atype ti_type_def_infos
-			# (atype, subst) = arraySubst atype subst
+///* Sjaak */	# (atype, subst) = arraySubst atype subst
+			# (_, atype, subst) = arraySubst atype subst
 			= (atype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
 		# es
 	  			= { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
-		  (btype, (subst, es))
+/* Sjaak */
+		  (_, btype, (subst, es))
+//		  (btype, (subst, es))
 		  		= expandType ro_common_defs cons_vars atype (subst, es)
  		  { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
 				= es

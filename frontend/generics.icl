@@ -903,7 +903,7 @@ where
 		= ([fi:fis], [fd:fds], gs) 
 
 	build_cons_info {ds_index,ds_arity} cons_num type_info_def_sym group_index common_defs gs
-		# {cons_symb, cons_arity, cons_pos} = common_defs.com_cons_defs.[ds_index]		
+		# {cons_symb, cons_pos} = common_defs.com_cons_defs.[ds_index]		
 		# (fun_index, gs) = newFunIndex gs		
 		# def_sym = 
 			{	ds_ident = makeIdent ("cons_info_" +++ cons_symb.id_name)
@@ -3154,7 +3154,7 @@ copyExpr expr heaps=:{hp_var_heap, hp_expression_heap}
 	= (expr, {heaps & hp_var_heap = us_var_heap, hp_expression_heap = us_symbol_heap})
 		//---> ("copy Expr")
 
-mapExprSt :: (Expression .st->(Expression, .st)) Expression .st -> (Expression, .st)
+//mapExprSt :: (Expression .st->(Expression, .st)) Expression .st -> (Expression, .st)
 mapExprSt f (App app=:{app_args}) st
 		# (app_args, st) = mapSt (mapExprSt f) app_args st
 		= f (App { app & app_args = app_args }) st

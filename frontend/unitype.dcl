@@ -54,13 +54,15 @@ tryToMakeUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 
 uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
 
-liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeVarHeap !*TypeDefInfos -> (*{! Type}, !Int, !*TypeVarHeap, !*TypeDefInfos)
+liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 
 ::	ExpansionState = 
 	{	es_type_heaps	:: !.TypeHeaps
 	,	es_td_infos		:: !.TypeDefInfos
 	}
 
-class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!a, !*(!u:{! Type}, !*ExpansionState))
+class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!Bool, !a, !*(!u:{! Type}, !*ExpansionState))
+//class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!a, !*(!u:{! Type}, !*ExpansionState))
+
 
 instance expandType AType

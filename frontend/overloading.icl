@@ -506,9 +506,13 @@ where
 	match defs (TA cons_id1 cons_args1) (TA cons_id2 cons_args2) type_heaps
 		| cons_id1 == cons_id2
 			= match defs cons_args1 cons_args2 type_heaps
-//			# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs cons_id1 cons_args1 type_heaps
+			# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs cons_id1 cons_args1 type_heaps
 			# (succ2, type2, type_heaps) = tryToExpandTypeSyn defs cons_id2 cons_args2 type_heaps
+			| succ1 || succ2
+				= match defs type1 type2 type_heaps
+/*
 			| succ2
+			
 				= case type2 of
 					TA cons_id2 cons_args2
 						| cons_id1 == cons_id2
@@ -516,6 +520,8 @@ where
 							-> (False, type_heaps)
 					_
 							-> (False, type_heaps)
+
+*/
 				= (False, type_heaps)
 	match defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) type_heaps
 		= match defs (arg_type1,res_type1) (arg_type2,res_type2) type_heaps
@@ -928,6 +934,7 @@ where
 		  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb,fun_pos} = fun_def
 	
 		  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
+//		  										---> ("determine_class_argument", st_context)
 		  error = setErrorAdmin (newPosition fun_symb fun_pos) error
 		  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 		  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error) /* MV */ rev_variables

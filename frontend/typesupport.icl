@@ -207,10 +207,6 @@ errorHeading  error_kind err=:{ea_file,ea_loc = []}
 errorHeading  error_kind err=:{ea_file,ea_loc = [ loc : _ ]}
 	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< loc <<< ':', ea_ok = False }
 
-overloadingError class_symb err
-	# err = errorHeading "Overloading error" err
-	= { err & ea_file = err.ea_file <<< " internal overloading of class \"" <<< class_symb <<< "\" is unsolvable\n" }
-
 contextError class_symb err
 	# err = errorHeading "Overloading error" err
 	= { err & ea_file = err.ea_file <<< " unresolved class \"" <<< class_symb <<< "\" not occurring in specified type\n"}
@@ -329,7 +325,6 @@ where
 	clean_up_type_context tc=:{tc_types} (collected_contexts, env, error)
 		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
 		| checkCleanUpResult cur cUndefinedVar
-//			= ([{ tc & tc_types = tc_types } : collected_contexts], env, overloadingError tc.tc_class.glob_object.ds_ident error)
 			= (collected_contexts, env, error)
 		| checkCleanUpResult cur cLiftedVar
 			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, liftedContextError tc.tc_class.glob_object.ds_ident error)

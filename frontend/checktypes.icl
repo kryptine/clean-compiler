@@ -867,7 +867,8 @@ where
 	check_context_types tc_class [] cs=:{cs_error}
 		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
 	check_context_types tc_class [((CV {tv_name}) :@: _):_] cs=:{cs_error}
-		= { cs & cs_error = checkError tv_name "not allowed as higher order type variable in context" cs_error}
+		= cs
+//		= { cs & cs_error = checkError tv_name "not allowed as higher order type variable in context" cs_error}
 	check_context_types tc_class [TV _ : types] cs
 		= cs
 	check_context_types tc_class [type : types] cs
@@ -1141,11 +1142,11 @@ where
 addExistentionalTypeVariablesToSymbolTable :: !TypeAttribute ![ATypeVar] !*TypeHeaps !*CheckState
 	-> (![ATypeVar], !(!*TypeHeaps, !*CheckState))
 addExistentionalTypeVariablesToSymbolTable root_attr type_vars heaps cs
-	= mapSt (add_type_variable_to_symbol_table root_attr) type_vars (heaps, cs)
+	= mapSt (add_exi_variable_to_symbol_table root_attr) type_vars (heaps, cs)
 where
-	add_type_variable_to_symbol_table :: !TypeAttribute !ATypeVar !(!*TypeHeaps, !*CheckState)
+	add_exi_variable_to_symbol_table :: !TypeAttribute !ATypeVar !(!*TypeHeaps, !*CheckState)
 		-> (!ATypeVar, !(!*TypeHeaps, !*CheckState))
-	add_type_variable_to_symbol_table root_attr atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
+	add_exi_variable_to_symbol_table root_attr atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute}
 		(heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error /* TD ... */, cs_x={x_type_var_position} /* ... TD */})
 		# tv_info = tv_name.id_info
 		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table

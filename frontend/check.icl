@@ -1635,6 +1635,7 @@ remove_function_conversion_table main_dcl_module_n dcl_modules
 			# dcl_modules = {dcl_modules & [main_dcl_module_n].dcl_conversions=Yes conversion_table}
 			-> (function_conversions,dcl_modules)
 
+// add_function_conversion_table :: {#Int} Int *(a DclModule) -> *(a DclModule) | Array a DclModule
 add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n dcl_modules
 	# (dcl_mod,dcl_modules) = dcl_modules![main_dcl_module_n]
 	= case dcl_mod.dcl_conversions of

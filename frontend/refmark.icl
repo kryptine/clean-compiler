@@ -74,7 +74,7 @@ where
 
 refMarkOfVariable free_vars sel (VI_Occurrence var_occ) var_name var_info_ptr var_expr_ptr var_heap
 	# occ_ref_count = adjustRefCount sel var_occ.occ_ref_count var_expr_ptr
-	= case var_occ.occ_bind of // ---> (var_name,var_expr_ptr,occ_ref_count,var_occ.occ_ref_count) of
+	= case var_occ.occ_bind of // ---> ("refMarkOfVariable", var_name,occ_ref_count,var_occ.occ_ref_count) of
 		OB_OpenLet let_expr
 			# var_heap = var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count, occ_bind = OB_LockedLet let_expr })
 			-> refMark free_vars sel let_expr var_heap
@@ -100,7 +100,6 @@ where
 		= refMark free_vars NotASelector args (refMark free_vars NotASelector fun var_heap)
 	refMark free_vars sel (Let {let_strict_binds,let_lazy_binds,let_expr}) var_heap
 		| isEmpty let_lazy_binds
-// MW0			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ] : free_vars]
 			# new_free_vars = [ [ lb_dst \\ {lb_dst} <- let_strict_binds ] : free_vars]
 			# (observing, var_heap) = binds_are_observing let_strict_binds var_heap
 			| observing
@@ -110,7 +109,6 @@ where
 				  var_heap = refMark new_free_vars sel let_expr var_heap
 				= let_combine free_vars var_heap
 				= refMark new_free_vars sel let_expr (refMark new_free_vars NotASelector let_strict_binds var_heap)
-// MW0			# new_free_vars = [ [ bind_dst \\ {bind_dst} <- let_strict_binds ++ let_lazy_binds ] : free_vars]
 			# new_free_vars = [ [ lb_dst \\ {lb_dst} <- let_strict_binds ++ let_lazy_binds ] : free_vars]
 			  var_heap = foldSt bind_variable let_strict_binds var_heap
 			  var_heap = foldSt bind_variable let_lazy_binds var_heap
@@ -120,7 +118,6 @@ where
 		    binds_are_observing binds var_heap
 		    	= foldr bind_is_observing (True, var_heap) binds
 			where
-// MW0				bind_is_observing {bind_dst={fv_info_ptr}} (observe, var_heap) 
 				bind_is_observing {lb_dst={fv_info_ptr}} (observe, var_heap) 
 					# (VI_Occurrence {occ_observing}, var_heap) = readPtr fv_info_ptr var_heap
 					= (occ_observing && observe, var_heap)
@@ -134,11 +131,8 @@ where
 					  comb_ref_count = parCombineRefCount (seqCombineRefCount occ_ref_count prev_ref_count) pre_pref_recount
 					= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses })
 
-// MW0			bind_variable {bind_src,bind_dst={fv_info_ptr}} var_heap
 			bind_variable {lb_src,lb_dst={fv_info_ptr}} var_heap
 				# (VI_Occurrence occ, var_heap) = readPtr fv_info_ptr var_heap
-//				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_bind = OB_OpenLet bind_src })
-// MW0				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_bind = OB_OpenLet bind_src })
 				= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_bind = OB_OpenLet lb_src })
 
 	refMark free_vars sel (Case {case_expr,case_guards,case_default}) var_heap
@@ -151,7 +145,9 @@ where
 		field_number _
 			= NotASelector	
 	refMark free_vars sel (Update expr1 selectors expr2) var_heap
-		= refMark free_vars NotASelector expr2 (refMark free_vars NotASelector expr1 var_heap)
+		# var_heap = refMark free_vars NotASelector expr1 var_heap
+		  var_heap = refMark free_vars NotASelector selectors var_heap
+		= refMark free_vars NotASelector expr2 var_heap
 	refMark free_vars sel (RecordUpdate cons_symbol expression expressions) var_heap
 		= ref_mark_of_record_expression free_vars expression expressions var_heap
 	where
@@ -203,6 +199,8 @@ instance refMark Selection
 where
 	refMark free_vars _ (ArraySelection _ _ index_expr) var_heap
 		= refMark free_vars NotASelector index_expr var_heap
+	refMark free_vars _ _ var_heap
+		= var_heap
 
 collectUsedFreeVariables free_vars var_heap
 	= foldSt collectUsedVariables free_vars ([], var_heap)
@@ -497,7 +495,6 @@ where
 	# variables = tb_args ++ fi_local_vars
 	  (subst, type_def_infos, var_heap, expr_heap) = clear_occurrences variables subst type_def_infos var_heap expr_heap
 	  var_heap = refMark [tb_args] NotASelector tb_rhs var_heap // (tb_rhs ---> ("makeSharedReferencesNonUnique", fun_symb, tb_rhs)) var_heap
-	//tb_rhs var_heap //   
 	  position = newPosition fun_symb fun_pos
 	  (coercion_env, var_heap, expr_heap, error) = make_shared_vars_non_unique variables coercion_env var_heap expr_heap
 	  		(setErrorAdmin position error)
@@ -517,6 +514,7 @@ where
 								-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
 										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
 											occ_observing = is_oberving, occ_bind = OB_Empty }), expr_heap)
+//											 	---> ("initial_occurrence",fv_name, fv_info_ptr, is_oberving)
 							_
 								-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
 										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
@@ -549,7 +547,7 @@ where
 					EI_Attribute sa_attr_nr
 						# (succ, coercion_env) = tryToMakeNonUnique sa_attr_nr coercion_env
 						| succ
-//								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr)
+//								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr, sa_attr_nr)
 							-> (coercion_env, expr_heap, error)
 							-> (coercion_env, expr_heap, uniquenessError (CP_Expression (FreeVar free_var)) " demanded attribute cannot be offered by shared object" error)
 					_
