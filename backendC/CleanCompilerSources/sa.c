@@ -2472,26 +2472,31 @@ static Exp ConvertNode (Node node, NodeId nid)
 		}
 		case MatchNode:
 		{
-			Exp exp;
 			Symbol symbol;
-
-			exp = ConvertNode (node->node_arguments->arg_node, Null);
 
 			symbol=node->node_symbol;
 			if	(symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR && 
-				symbol->symb_def->sdef_arity==1)
+				 symbol->symb_def->sdef_arity==1)
 			{
 				Exp selexp;
 				
 				selexp = NewValueExp (selectsym[0], False, 1);
-				selexp->e_args[0] = exp;
-				exp = selexp;
+				if (nid)
+					nid->nid_exp_ = selexp;
+
+				selexp->e_args[0] = ConvertNode (node->node_arguments->arg_node,NULL);
+
+				return selexp;
+			} else {
+				if (nid)
+					nid->nid_exp_ = NULL;
+				
+				node=node->node_arguments->arg_node;
+				if (node->node_kind==NodeIdNode)
+					return ConvertNodeId (node->node_node_id);
+				else
+					return ConvertNode (node,nid);
 			}
-			
-			if (nid)
-				nid->nid_exp_ = exp;
-			
-			return exp;
 		}
 		default:
 			DoFatalError ("ConvertNode (SA): unknown node kind");
