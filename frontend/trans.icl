@@ -14,6 +14,7 @@ SwitchFunctionFusion		fuse dont_fuse :== fuse
 SwitchConstructorFusion		fuse dont_fuse :== dont_fuse // fuse
 SwitchCurriedFusion			fuse dont_fuse :== fuse
 SwitchUnusedFusion			fuse dont_fuse :== fuse
+SwitchSpecialFusion			fuse dont_fuse :== fuse
 
 (-!->) infix
 (-!->) a b :== a // ---> b
@@ -1980,10 +1981,11 @@ transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Exp
 transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
 	| is_SK_Function_or_SK_LocalMacroFunction symb_kind // otherwise GOTO next alternative	
-		# { glob_module, glob_object }
+		# gi
 			= case symb_kind of
 				SK_Function global_index -> global_index
 				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
+		# { glob_module, glob_object } = gi
 		| glob_module == ro.ro_main_dcl_module_n
 			| glob_object < size ti_cons_args
 				#! cons_class = ti_cons_args.[glob_object]
@@ -2015,16 +2017,54 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 					_
 						-> (expr @ args,ti)
 		// This function is imported
-			| isEmpty extra_args
-				= (App app, ti)
-				# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-				  form_arity = ft_arity + length ft_type.st_context
-				  ar_diff = form_arity - length app_args
-				  nr_of_extra_args = length extra_args
-				| nr_of_extra_args <= ar_diff
-					= (App {app  &  app_args = app_args ++ extra_args }, ti)
-					= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
+		| SwitchSpecialFusion
+				(not (isEmpty app_args) )
+				False
+			// Check imported overloaded function application for specials...
+			# {ft_specials}						= ro.ro_imported_funs.[glob_module].[glob_object]
+			# specials							= case ft_specials of
+													(SP_ContextTypes s)	-> s
+													_	-> []
+			| not (isEmpty specials)
+				# (ei,ti_symbol_heap)			= mapSt readAppInfo app_args ti.ti_symbol_heap
+					with
+						readAppInfo (App {app_info_ptr}) heap
+							| isNilPtr app_info_ptr
+								= (EI_Empty,heap)
+							= readPtr app_info_ptr heap
+						readAppInfo _ heap = (EI_Empty,heap)
+				# ti							= {ti & ti_symbol_heap = ti_symbol_heap}
+				# context						= ro.ro_imported_funs.[glob_module].[glob_object].ft_type.st_context
+				# insts							= resolveContext context ei
+				# (num_special_args,special_gi)	= findInstInSpecials insts specials
+				| foundSpecial special_gi
+					= build_application {app & app_symb.symb_kind = SK_Function gi} (drop num_special_args app_args) extra_args special_gi ti
+				= build_application app app_args extra_args gi ti
+			= build_application app app_args extra_args gi ti
+		= build_application app app_args extra_args gi ti
 	where
+		build_application app app_args extra_args {glob_module,glob_object} ti
+			| isEmpty extra_args
+				= (App {app & app_args = app_args}, ti)
+			# {ft_arity,ft_type}	= ro.ro_imported_funs.[glob_module].[glob_object]
+			  form_arity			= ft_arity + length ft_type.st_context
+			  ar_diff				= form_arity - length app_args
+			  nr_of_extra_args		= length extra_args
+			| nr_of_extra_args <= ar_diff
+				= (App {app  &  app_args = app_args ++ extra_args }, ti)
+				= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
+		
+		build_special_application app app_args extra_args {glob_module,glob_object} ro ti
+			| isEmpty extra_args
+				= (App {app & app_args = app_args}, ti)
+			# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+			  form_arity = ft_arity + length ft_type.st_context
+			  ar_diff = form_arity - length app_args
+			  nr_of_extra_args = length extra_args
+			| nr_of_extra_args <= ar_diff
+				= (App {app  &  app_args = app_args ++ extra_args }, ti)
+				= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
+
 		find_member_n i member_string a
 			| i<size a
 				| a.[i].ds_ident.id_name % (0,size member_string-1)==member_string
@@ -2509,9 +2549,11 @@ where
 			= (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 
 	expand_abstract_syn_types_in_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
-		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs) = fun_defs![fun_index]
+		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
+					= fun_defs![fun_index]
+		  rem_annot	= fi_properties bitand FI_HasTypeSpec == 0
 		  (fun_type,contains_unexpanded_abs_syn_type,imported_types, collected_imports, type_heaps, var_heap)
-	  		= convertSymbolType_ (if (fi_properties bitand FI_HasTypeSpec == 0) (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
+	  		= convertSymbolType_ (if rem_annot (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	  	  fun_def = { fun_def & fun_type = Yes fun_type}
 	  	  fun_defs = { fun_defs & [fun_index] = fun_def }
 		= (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
@@ -2626,13 +2668,11 @@ where
 		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
 	expandSynTypes rem_annots common_defs type=:(TAS type_symb types _) ets
 		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
-// Sjaak 240801 ...
 	expandSynTypes rem_annots common_defs tfa_type=:(TFA vars type) ets
 		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
 		| changed
 			= (True,TFA vars type, ets)
 			= (False,tfa_type, ets)
-// ... Sjaak
 	expandSynTypes rem_annots common_defs type ets
 		= (False,type, ets)
 
@@ -3303,3 +3343,61 @@ instance <<< {!Type}
 where
 	(<<<) file subst
 		= file <<< "{"<<<[s\\s<-:subst] <<< "}\n"
+
+// SPECIAL...
+instance <<< Specials
+where
+	(<<<) file spec = case spec of
+		(SP_ParsedSubstitutions 	_)	-> file <<< "SP_ParsedSubstitutions"
+		(SP_Substitutions 		 	_)	-> file <<< "SP_Substitutions"
+		(SP_ContextTypes			l)	-> file <<< "(SP_ContextTypes: " <<< l <<< ")"
+		(SP_FunIndex				i)	-> file <<< "(SP_FunIndex: " <<< i <<< ")"
+		(SP_TypeOffset				_)	-> file <<< "SP_TypeOffset"
+		SP_None							-> file <<< "SP_None"
+
+instance <<< Special
+where
+	(<<<) file {spec_index,spec_types,spec_vars,spec_attrs}
+		= file <<< "spec_index" <<< spec_index <<< "spec_types" <<< spec_types <<< "spec_vars" <<< spec_vars <<< "spec_attrs" <<< spec_attrs
+
+instance <<< ExprInfo
+where
+	(<<<) file EI_Empty = file <<< "EI_Empty"
+	(<<<) file (EI_DictionaryType t) = file <<< "<EI_DictionaryType: " <<< t <<< ">"
+//	(<<<) file (EI_Instance symb exprs) = file <<< symb <<< exprs
+//	(<<<) file (EI_Selection sels var_ptr exprs) = file <<< sels <<< var_ptr <<< exprs
+//	(<<<) file (EI_Context exprs) = file <<< exprs
+	(<<<) file _ = file <<< "EI_Other"
+
+instance <<< TypeContext
+where
+	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
+
+resolveContext :: [TypeContext] [ExprInfo] -> [[Type]]
+resolveContext [tc:tcs] [EI_DictionaryType t:eis]
+	= minimiseContext tc t ++ resolveContext tcs eis
+resolveContext _ _ = []
+
+minimiseContext {tc_class = TCClass gds} (TA ti ts)
+	# tc_index = {glob_module = gds.glob_module, glob_object = gds.glob_object.ds_index}
+	| tc_index == ti.type_index
+		= [[at_type \\ {at_type} <- ts]]
+		= []
+minimiseContext _ _ = []
+
+findInstInSpecials insts []
+	= (0,{glob_object= -1,glob_module = -1})
+findInstInSpecials insts [{spec_types,spec_index}:specials]
+	| matchTypes insts spec_types
+		= (length spec_types, spec_index)
+	= findInstInSpecials insts specials
+
+matchTypes [] [] = True
+matchTypes [l:ls] [r:rs]
+	= l == r && matchTypes ls rs
+matchTypes _ _ = False
+
+foundSpecial {glob_object= -1,glob_module = -1}	= False
+foundSpecial _ = True	
+
+// ...SPECIAL
