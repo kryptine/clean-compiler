@@ -116,10 +116,10 @@ cNope			:== -1
 	Unification of classifications is done on-the-fly
 */
 
-cPassive   		:== -1
-cActive			:== -2
-cAccumulating   :== -3
-cVarOfWeirdCase	:== -4
+cPassive   				:== -1
+cActive					:== -2
+cAccumulating   		:== -3
+cVarOfMultimatchCase	:== -4
 
 IsAVariable cons_class :== cons_class >= 0
 
@@ -320,13 +320,13 @@ instance consumerRequirements Case where
 		  (ccgs, unsafe_bits, ai) = consumer_requirements_of_guards case_guards common_defs ai
 		  has_default = case case_default of { Yes _ -> True; _ -> False }
 		  (ccd, default_is_unsafe, ai) = consumerRequirements case_default common_defs ai
-		  (every_constructor_appears_in_safe_pattern, ambiguity_exists) = inspect_patterns common_defs has_default case_guards unsafe_bits
+		  (every_constructor_appears_in_safe_pattern, is_multimatch) = inspect_patterns common_defs has_default case_guards unsafe_bits
 		  safe = (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
-		  ai_class_subst = unifyClassifications (if ambiguity_exists cVarOfWeirdCase cActive) cce ai.ai_class_subst
+		  ai_class_subst = unifyClassifications (if is_multimatch cVarOfMultimatchCase cActive) cce ai.ai_class_subst
 		  ai = { ai & ai_class_subst = ai_class_subst }
 		  ai = case case_expr of
 				(Var {var_info_ptr})
-					-> case ambiguity_exists of
+					-> case is_multimatch of
 						False -> { ai & ai_cases_of_vars_for_function=[kees:ai.ai_cases_of_vars_for_function] }
 						True  -> ai
 				_	-> ai
@@ -341,7 +341,7 @@ instance consumerRequirements Case where
 			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
 			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
 			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (quicksort (<) all_constructors)
-			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, ambiguity_loop has_default sorted_pattern_constructors)
+			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, multimatch_loop has_default sorted_pattern_constructors)
 		  where
 			is_sorted [x]
 				= True
@@ -351,7 +351,7 @@ instance consumerRequirements Case where
 			# bools_indices = [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
 			  sorted_pattern_constructors = sort bools_indices unsafe_bits
 			= (appearance_loop [0,1] sorted_pattern_constructors,
-				ambiguity_loop has_default sorted_pattern_constructors)
+				multimatch_loop has_default sorted_pattern_constructors)
 		inspect_patterns _ _ _ _
 			= (False, True)
 
@@ -381,9 +381,9 @@ instance consumerRequirements Case where
 			// the constructor will match safely. Skip over patterns with the same constructor and test the following constructor
 			= appearance_loop constructors_in_type (dropWhile (\(ds_index,_,_)->ds_index==constructor_in_pattern) constructors_in_pattern)
 
-		ambiguity_loop has_default []
+		multimatch_loop has_default []
 			= False
-		ambiguity_loop has_default [(cip, _, iup):t]
+		multimatch_loop has_default [(cip, _, iup):t]
 			= a_loop has_default cip iup t
 		  where
 			a_loop has_default cip iup []
@@ -395,7 +395,7 @@ instance consumerRequirements Case where
 					= a_loop has_default constructor_in_pattern is_unsafe_pattern constructors_in_pattern
 				| iup
 					= True
-				= ambiguity_loop has_default (dropWhile (\(ds_index,_,_)->ds_index==cip) constructors_in_pattern)
+				= multimatch_loop has_default (dropWhile (\(ds_index,_,_)->ds_index==cip) constructors_in_pattern)
 
 instance consumerRequirements DynamicExpr where
 	consumerRequirements {dyn_expr} common_defs ai
@@ -519,7 +519,7 @@ where
 			  ({cc_size, cc_args, cc_linear_bits},class_env) = class_env![fun_index]
 			  (aci_linearity_of_patterns, var_heap) = get_linearity_info cc_linear_bits case_guards var_heap
 			| /*XXX*/arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==cActive) && cc_linear_bits!!arg_position
-				// mark non weird cases whose case_expr is an active linear function argument
+				// mark non multimatch cases whose case_expr is an active linear function argument
 				# aci = { aci_params = [], aci_opt_unfolder = No, aci_free_vars=No, aci_linearity_of_patterns = aci_linearity_of_patterns }
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 					set_extended_expr_info case_info_ptr (EEI_ActiveCase aci) expr_heap)
@@ -740,7 +740,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 				-> case app_symb.symb_kind of
 					SK_Constructor cons_index
 						| not is_active
-							-> skip_over this_case ro ti // XXX currently only active cases are matched at runtime (ambiguity problem)
+							-> skip_over this_case ro ti // XXX currently only active cases are matched at runtime (multimatch problem)
 						# algebraicPatterns = getAlgebraicPatterns case_guards
 						  aci = case opt_aci of { Yes aci -> aci }
 						  (may_be_match_expr, ti) = match_and_instantiate aci.aci_linearity_of_patterns cons_index app_args algebraicPatterns case_default ro ti
@@ -777,7 +777,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 							No	-> skip_over this_case ro ti
 			BasicExpr basic_value _
 				| not is_active
-					-> skip_over this_case ro ti // XXX currently only active cases are matched at runtime (ambiguity problem)
+					-> skip_over this_case ro ti // XXX currently only active cases are matched at runtime (multimatch problem)
 				# basicPatterns = getBasicPatterns case_guards
 				  may_be_match_pattern = dropWhile (\{bp_value} -> bp_value<>basic_value) basicPatterns
 				| isEmpty may_be_match_pattern
@@ -906,39 +906,6 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 				  , ti_symbol_heap
 				  ) 
 
-/* ExprInfo
-					| EI_LetType ![AType]
-::	CommonDefs =
-	{	com_type_defs 		:: !.{# CheckedTypeDef}
-	,	com_cons_defs		:: !.{# ConsDef}
-	,	com_selector_defs	:: !.{# SelectorDef}
-	,	com_class_defs		:: !.{# ClassDef}
-	,	com_member_defs		:: !.{# MemberDef}
-	,	com_instance_defs	:: !.{# ClassInstance}
-//	,	com_instance_types	:: !.{ SymbolType}
-	}
-::	ConsDef =
-	{	cons_symb			:: !Ident
-	,	cons_type			:: !SymbolType
-	,	cons_arg_vars		:: ![[ATypeVar]]
-	,	cons_priority		:: !Priority
-	,	cons_index			:: !Index
-	,	cons_type_index		:: !Index
-	,	cons_exi_vars		:: ![ATypeVar]
-//	,	cons_exi_attrs		:: ![AttributeVar]
-	,	cons_type_ptr		:: !VarInfoPtr
-	,	cons_pos			:: !Position
-	}
-::	SymbolType =
-	{	st_vars			:: ![TypeVar]
-	,	st_args			:: ![AType]
-	,	st_arity		:: !Int
-	,	st_result		:: !AType
-	,	st_context		:: ![TypeContext]
-	,	st_attr_vars	:: ![AttributeVar]
-	,	st_attr_env		:: ![AttrInequality]
-	}
-*/
 		match_and_instantiate [linearity:linearities] cons_index app_args [guard : guards] case_default ro ti
 			= match_and_instantiate linearities cons_index app_args guards case_default ro ti
 		match_and_instantiate _ cons_index app_args [] default_expr ro ti

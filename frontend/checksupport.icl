@@ -327,8 +327,10 @@ retrieveImportsFromSymbolTable [] decls modules symbol_table
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeFieldFromSelectorDefinition {id_info} field_mod field_index symbol_table 
 	# (entry, symbol_table) = readPtr id_info symbol_table
-	  (STE_Selector selector_list) = entry.ste_kind
-	= symbol_table <:= (id_info, { entry & ste_kind = STE_Selector (remove_field field_mod field_index selector_list) })
+	= case entry.ste_kind of
+	  	STE_Selector selector_list
+			-> symbol_table <:= (id_info, { entry & ste_kind = STE_Selector (remove_field field_mod field_index selector_list) })
+		_	-> symbol_table
 where	
 	remove_field field_mod field_index [field=:{glob_module, glob_object} : fields]
 		| field_mod == glob_module && field_index == glob_object

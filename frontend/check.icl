@@ -718,9 +718,8 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_symb o
 where
 	determine_pattern_symbol mod_index id_index STE_Constructor id_name cons_defs modules error
 		#! cons_def = cons_defs.[id_index]
-		# {cons_symb, cons_type={st_arity},cons_priority, cons_type_index} = cons_def
+		# {cons_type={st_arity},cons_priority, cons_type_index} = cons_def
 		= (id_index, mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
-//			---> ("determine_pattern_symbol", id_name, cons_symb)
 	determine_pattern_symbol mod_index id_index (STE_Imported STE_Constructor import_mod_index) id_name cons_defs modules error
 		#! {dcl_common,dcl_conversions} = modules.[import_mod_index]
 		#! cons_def = dcl_common.com_cons_defs.[id_index]
@@ -2235,7 +2234,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		  }
 		, icl_sizes
 		, { cs & cs_symbol_table = cs_symbol_table }
-		)
+		)->>("conversion_table",conversion_table)
 
 where
 	add_to_conversion_table first_macro_index decl=:{dcl_ident=dcl_ident=:{id_info},dcl_kind,dcl_index,dcl_pos}
@@ -2266,8 +2265,7 @@ where
 
 	can_be_only_in_dcl def_kind
 		=	def_kind == cTypeDefs	|| def_kind == cConstructorDefs || def_kind == cSelectorDefs
-//		||	def_kind == cClassDefs	|| def_kind == cMemberDefs
-
+		||	def_kind == cClassDefs	|| def_kind == cMemberDefs
 
 	add_dcl_declaration info_ptr entry dcl def_index dcl_index (conversion_table, icl_sizes, icl_defs, symbol_table)
 		# (icl_index, icl_sizes) = icl_sizes![def_index]
@@ -2296,20 +2294,13 @@ where
 			# (rt_constructor, cs) = redirect_defined_symbol STE_Constructor td_pos rt_constructor cs
 			  (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
 			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ], cs)
-		add_type_def td=:{td_name, td_pos} new_type_defs cs
+// MW was		add_type_def td=:{td_name, td_pos} new_type_defs cs
+		add_type_def td=:{td_name, td_pos, td_rhs = AbstractType _} new_type_defs cs
 			# cs_error = checkError "definition module" "abstract type not defined in implementation module"
 					(setErrorAdmin (newPosition td_name td_pos) cs.cs_error)
 			= (new_type_defs, { cs & cs_error = cs_error })
 		add_type_def td new_type_defs cs
 			= ([td : new_type_defs], cs) 
-
-		redirect_defined_symbol req_kind pos ds=:{ds_ident} cs
-			# ({ste_kind,ste_index}, cs_symbol_table) = readPtr ds_ident.id_info cs.cs_symbol_table
-			| ste_kind == req_kind
-				= ({ ds & ds_index = ste_index }, { cs & cs_symbol_table = cs_symbol_table })
-				# cs_error = checkError "definition module" "conflicting definition in implementation module"
-								(setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
-				= ({ ds & ds_index = ste_index }, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
 		redirect_field_symbols pos fields cs
 			# new_fields = { field \\ field <-: fields }
@@ -2333,9 +2324,30 @@ where
 	add_dcl_definition {com_selector_defs} dcl=:{dcl_kind = STE_Field _, dcl_index} 
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[dcl_index] : new_selector_defs ], new_member_defs, cs)
+	add_dcl_definition {com_class_defs} dcl=:{dcl_kind = STE_Class, dcl_index, dcl_pos} 
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
+		# class_def = com_class_defs.[dcl_index]
+		  (new_class_defs, cs) = add_class_def dcl_pos class_def new_class_defs cs
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
+	  where
+		add_class_def dcl_pos cd=:{class_members} new_class_defs cs
+			# (new_class_members, cs) = mapSt (redirect_defined_symbol STE_Member dcl_pos) [ cm \\ cm<-:class_members ] cs
+			= ([{cd & class_members={cm \\ cm<-new_class_members}}:new_class_defs], cs)
+	add_dcl_definition {com_member_defs} dcl=:{dcl_kind = STE_Member, dcl_index, dcl_pos} 
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
+		# member_def = com_member_defs.[dcl_index]
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, [member_def:new_member_defs], cs)
 	add_dcl_definition _ _ 
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
+
+	redirect_defined_symbol req_kind pos ds=:{ds_ident} cs
+		# ({ste_kind,ste_index}, cs_symbol_table) = readPtr ds_ident.id_info cs.cs_symbol_table
+		| ste_kind == req_kind
+			= ({ ds & ds_index = ste_index }, { cs & cs_symbol_table = cs_symbol_table })
+			# cs_error = checkError "definition module" ("conflicting definition in implementation module"->>("ste_kind",ste_kind,ptrToInt ds_ident.id_info))
+							(setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
+			= ({ ds & ds_index = ste_index }, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
 	my_append front []
 		= front
