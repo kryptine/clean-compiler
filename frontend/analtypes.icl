@@ -243,11 +243,11 @@ where
 	check_types_of_cons :: ![AType] !Bool !Index  !Level ![TypeVar] !TypeAttribute ![AttrInequality] !Conditions !*TypeSymbols !*TypeInfo !*CheckState
 		-> *(![AType], ![[ATypeVar]], ![AttrInequality], !TypeProperties, !Conditions, !Int, !*TypeSymbols, !*TypeInfo, !*CheckState)
 */
-	new_local_kind_variables :: .[ATypeVar] *(*Heap TypeVarInfo,*Heap .KindInfo) -> (!Bool,!.Heap TypeVarInfo,!.Heap KindInfo);
+	new_local_kind_variables :: .[ATypeVar] *(*Heap TypeVarInfo,*Heap KindInfo) -> (!Bool,!.Heap TypeVarInfo,!.Heap KindInfo);
 	new_local_kind_variables td_args (type_var_heap, as_kind_heap)
 		= foldSt new_kind td_args (True, type_var_heap, as_kind_heap)
 	where
-		new_kind :: ATypeVar *(.Bool,*Heap TypeVarInfo,*Heap .KindInfo) -> (!Bool,!.Heap TypeVarInfo,!.Heap KindInfo);
+		new_kind :: ATypeVar *(.Bool,*Heap TypeVarInfo,*Heap KindInfo) -> (!Bool,!.Heap TypeVarInfo,!.Heap KindInfo);
 		new_kind {atv_variable={tv_info_ptr},atv_attribute} (coercible, type_var_heap, kind_heap)
 			# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 			= (coercible && is_not_a_variable atv_attribute, type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr),
@@ -295,7 +295,7 @@ emptyIdent name :== { id_name = name, id_info = nilPtr }
 newKindVariables td_args (type_var_heap, as_kind_heap)
 	= mapSt new_kind td_args (type_var_heap, as_kind_heap)
 where
-	new_kind :: ATypeVar *(*Heap TypeVarInfo,*Heap .KindInfo) -> (!.TypeKind,!(!.Heap TypeVarInfo,!.Heap KindInfo));
+	new_kind :: ATypeVar *(*Heap TypeVarInfo,*Heap KindInfo) -> (!.TypeKind,!(!.Heap TypeVarInfo,!.Heap KindInfo));
 	new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
 		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 		= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))

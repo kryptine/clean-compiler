@@ -95,6 +95,7 @@ where
 	,	ai_next_var						:: !Int
 	,	ai_next_var_of_fun				:: !Int
 	,	ai_cases_of_vars_for_function	:: ![Case]
+	, ai_main_dcl_module_n :: !Int
 	}
 
 ::	SharedAI =
@@ -295,31 +296,30 @@ where
 		= ai
 			
 instance consumerRequirements App where
-	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name}, app_args} common_defs ai=:{ai_cons_class}
-		| glob_module == cIclModIndex
+	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name}, app_args} common_defs ai=:{ai_cons_class,ai_main_dcl_module_n}
+		| glob_module == ai_main_dcl_module_n
 			| glob_object < size ai_cons_class
 				#! fun_class = ai_cons_class.[glob_object]
 				= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
 				= consumerRequirements app_args common_defs ai
 			= consumerRequirements app_args common_defs ai
-	where
-		reqs_of_args _ [] cumm_arg_class _ ai
-			= (cumm_arg_class, False, ai)
-		reqs_of_args [] _ cumm_arg_class _ ai
-			= (cumm_arg_class, False, ai)
-		reqs_of_args [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
-			# (act_cc, _, ai) = consumerRequirements arg common_defs ai
-			  ai_class_subst = unifyClassifications form_cc act_cc ai.ai_class_subst
-			= reqs_of_args ccs args (combineClasses act_cc cumm_arg_class) common_defs { ai & ai_class_subst = ai_class_subst }
-
-/*
-	consumerRequirements {app_symb={symb_kind = SK_InternalFunction _}, app_args=[arg:_]} ai
-		# (cc, ai) = consumerRequirements arg ai
-		  ai_class_subst = unifyClassifications cActive cc ai.ai_class_subst
-		= (cPassive, { ai & ai_class_subst = ai_class_subst })
-*/
+	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name}, app_args} common_defs ai=:{ai_cons_class,ai_main_dcl_module_n}
+		| glob_object < size ai_cons_class
+			#! fun_class = ai_cons_class.[glob_object]
+			= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
+			= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_args} common_defs ai
 		=  not_an_unsafe_pattern (consumerRequirements app_args common_defs ai)
+
+reqs_of_args _ [] cumm_arg_class _ ai
+	= (cumm_arg_class, False, ai)
+reqs_of_args [] _ cumm_arg_class _ ai
+	= (cumm_arg_class, False, ai)
+reqs_of_args [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
+	# (act_cc, _, ai) = consumerRequirements arg common_defs ai
+	  ai_class_subst = unifyClassifications form_cc act_cc ai.ai_class_subst
+	= reqs_of_args ccs args (combineClasses act_cc cumm_arg_class) common_defs { ai & ai_class_subst = ai_class_subst }
+
 
 instance consumerRequirements Case where
 	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr} common_defs ai
@@ -483,9 +483,9 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 	unify_ref_counts 2 _ = 2
 
 
-analyseGroups	:: !{# CommonDefs} !IndexRange !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
+analyseGroups	:: !{# CommonDefs} !IndexRange !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
-analyseGroups common_defs {ir_from, ir_to} groups fun_defs var_heap expr_heap
+analyseGroups common_defs {ir_from, ir_to} main_dcl_module_n groups fun_defs var_heap expr_heap
 	#! nr_of_funs = size fun_defs + ir_from - ir_to /* Sjaak */
 	   nr_of_groups = size groups
 	= iFoldSt (analyse_group common_defs) 0 nr_of_groups
@@ -502,7 +502,8 @@ where
 							ai_cur_ref_counts = {}, ai_class_subst = initial_subst,
 							ai_next_var = nr_of_vars,
 							ai_next_var_of_fun = 0,
-							ai_cases_of_vars_for_function = [] } fun_defs
+							ai_cases_of_vars_for_function = [],
+							ai_main_dcl_module_n=main_dcl_module_n } fun_defs
 		  class_env = collect_classifications group_members ai.ai_cons_class ai.ai_class_subst
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap)
 				 = foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group) (cleanup_info,class_env, fun_defs, ai.ai_var_heap, expr_heap)
@@ -614,6 +615,7 @@ mapAndLength f []
 	,	ro_root_case_mode	:: !RootCaseMode
 	,	ro_fun				:: !SymbIdent
 	,	ro_fun_args			:: ![FreeVar]
+	,	ro_main_dcl_module_n :: !Int
 	}
 
 ::	RootCaseMode = NotRootCase | RootCase | RootCaseOfZombie
@@ -791,6 +793,8 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 	where
 		equal (SK_Function glob_index1) (SK_Function glob_index2)
 			= glob_index1==glob_index2
+		equal (SK_LocalMacroFunction glob_index1) (SK_LocalMacroFunction glob_index2)
+			= glob_index1==glob_index2
 		equal (SK_GeneratedFunction _ index1) (SK_GeneratedFunction _ index2)
 			= index1==index2
 		equal _ _
@@ -958,6 +962,9 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 
 	get_fun_def_and_cons_args :: !SymbKind !{!ConsClasses} !u:{# FunDef} !*FunctionHeap -> (!FunDef, !ConsClasses, !u:{# FunDef}, !*FunctionHeap)
 	get_fun_def_and_cons_args (SK_Function {glob_object}) cons_args fun_defs fun_heap
+		# (fun_def, fun_defs) = fun_defs![glob_object]
+		= (fun_def, cons_args.[glob_object], fun_defs, fun_heap)
+	get_fun_def_and_cons_args (SK_LocalMacroFunction glob_object) cons_args fun_defs fun_heap
 		# (fun_def, fun_defs) = fun_defs![glob_object]
 		= (fun_def, cons_args.[glob_object], fun_defs, fun_heap)
 	get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr fun_index) cons_args fun_defs fun_heap
@@ -1341,13 +1348,13 @@ where
 			  (opt_body, var_names, fun_defs, fun_heap)
 			  		= case producer of
 			  			(PR_Curried {symb_arity, symb_kind=SK_Function {glob_module}})
-			  				| glob_module <> cIclModIndex
+			  				| glob_module <> ro.ro_main_dcl_module_n
 			  					// we do not have good names for the formal variables of that function: invent some
 			  					-> (NoBody, repeatn symb_arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
 			  				// go further with next alternative
 			  			_
 							# ({fun_body=fun_body=:TransformedBody tb}, fun_defs, fun_heap)
-									= get_fun_def symbol.symb_kind fun_defs fun_heap
+									= get_fun_def symbol.symb_kind ro.ro_main_dcl_module_n fun_defs fun_heap
 							-> (fun_body, take nr_of_applied_args [ fv_name \\ {fv_name}<-tb.tb_args ], fun_defs, fun_heap)
 			  (form_vars, act_vars, var_heap) 
 			  		= build_var_args (reverse var_names) vars [] var_heap
@@ -1382,13 +1389,16 @@ where
 				= symbol
 			
 			get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
-				| glob_module == cIclModIndex
+				| glob_module == ro.ro_main_dcl_module_n
 					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
 					= (symbol_type, fun_defs, fun_heap)
 				# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
 				  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
 				= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
 					fun_defs, fun_heap)
+			get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
+				# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
+				= (symbol_type, fun_defs, fun_heap)
 			get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
 				# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
 				= (symbol_type, fun_defs, fun_heap)
@@ -1397,7 +1407,11 @@ where
 				# (opt_cons_classes, fun_heap)
 						= case symb_kind of
 							SK_Function {glob_module, glob_object}
-								| glob_module == cIclModIndex && glob_object < size ti_cons_args
+								| glob_module == ro.ro_main_dcl_module_n && glob_object < size ti_cons_args
+									-> (Yes ti_cons_args.[glob_object], fun_heap)
+								-> (No, fun_heap)
+							SK_LocalMacroFunction glob_object
+								| glob_object < size ti_cons_args
 									-> (Yes ti_cons_args.[glob_object], fun_heap)
 								-> (No, fun_heap)
 							SK_GeneratedFunction fun_ptr fun_index
@@ -1417,12 +1431,15 @@ where
 						-> ({cc_size = symb_arity, cc_args = repeatn symb_arity cPassive,
 								cc_linear_bits = repeatn symb_arity linear_bit}, fun_heap)
 
-			get_fun_def (SK_Function {glob_module, glob_object}) fun_defs fun_heap
-				| glob_module<>cIclModIndex
+			get_fun_def (SK_Function {glob_module, glob_object}) main_dcl_module_n fun_defs fun_heap
+				| glob_module<>main_dcl_module_n
 					= abort "sanity check 2 failed in module trans"
 				# (fun_def, fun_defs) = fun_defs![glob_object]
 				= (fun_def, fun_defs, fun_heap)
-			get_fun_def (SK_GeneratedFunction fun_ptr _) fun_defs fun_heap
+			get_fun_def (SK_LocalMacroFunction glob_object) main_dcl_module_n fun_defs fun_heap
+				# (fun_def, fun_defs) = fun_defs![glob_object]
+				= (fun_def, fun_defs, fun_heap)
+			get_fun_def (SK_GeneratedFunction fun_ptr _) main_dcl_module_n fun_defs fun_heap
 				# (FI_Function {gf_fun_def}, fun_heap) = readPtr fun_ptr fun_heap
 				= (gf_fun_def, fun_defs, fun_heap)
 				
@@ -1482,12 +1499,19 @@ where
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
 
+	ro_main_dcl_module_n = ro.ro_main_dcl_module_n
+
 	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
-		| mod_index == cIclModIndex
+		| mod_index == ro_main_dcl_module_n
 			| fun_index < size cons_args
 				# {fun_info = {fi_group_index}} = fun_defs.[fun_index]
 				= max fi_group_index current_max
 			= current_max
+		= current_max
+	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_name, symb_kind = SK_LocalMacroFunction fun_index}}) 
+		| fun_index < size cons_args
+			# {fun_info = {fi_group_index}} = fun_defs.[fun_index]
+			= max fi_group_index current_max
 		= current_max
 	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_kind = SK_GeneratedFunction fun_ptr _ }})
 		# (FI_Function {gf_fun_def={fun_info = {fi_group_index}}}) = sreadPtr fun_ptr fun_heap
@@ -1726,7 +1750,7 @@ where
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module, glob_object},symb_arity}, app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
-	| glob_module == cIclModIndex
+	| glob_module == ro.ro_main_dcl_module_n
 		| glob_object < size ti_cons_args
 			#! cons_class = ti_cons_args.[glob_object]
 			   (instances, ti_instances) = ti_instances![glob_object]
@@ -1820,7 +1844,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args ], ti)
 	#! max_index = size ti.ti_cons_args
-	| glob_module <> cIclModIndex || glob_object >= max_index /* Sjaak, to skip array functions */
+	| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
 		= (producers, [App app : new_args ], ti)
 	# ({fun_body}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
 	  ti = { ti & ti_fun_defs=ti_fun_defs }
@@ -1831,7 +1855,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 	= (producers, [App app : new_args ], ti)
   where
 	get_fun_arity glob_module glob_object ro ti
-		| glob_module <> cIclModIndex
+		| glob_module <> ro.ro_main_dcl_module_n
 			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
 			= (st_arity+length st_context, ti)
 		// for imported functions you have to add ft_arity and length st_context, but for unimported
@@ -1908,11 +1932,11 @@ where
 
 ::	ImportedConstructors	:== [Global Index]
 
-transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
+transformGroups :: !CleanupInfo !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 
-transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs imported_types collected_imports var_heap type_heaps symbol_heap
+transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_defs imported_funs imported_types collected_imports var_heap type_heaps symbol_heap
 	#! (nr_of_funs, fun_defs) = usize fun_defs
 	# (groups, imported_types, collected_imports, ti)
 		= transform_groups 0 groups common_defs imported_funs imported_types collected_imports
@@ -1949,12 +1973,13 @@ where
 				,	ro_root_case_mode	= get_root_case_mode tb
 				,	ro_fun				= fun_def_to_symb_ident fun fun_def
 				,	ro_fun_args			= tb.tb_args
+				, ro_main_dcl_module_n = main_dcl_module_n
 				}
 		  (fun_rhs, ti) = transform tb.tb_rhs ro { ti & ti_fun_defs = ti_fun_defs }
 		= { ti & ti_fun_defs = {ti.ti_fun_defs & [fun] = { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}}}
 	  where
 		fun_def_to_symb_ident fun_index {fun_symb,fun_arity}
-			= { symb_name=fun_symb, symb_kind=SK_Function {glob_object=fun_index, glob_module=cIclModIndex } , symb_arity=fun_arity }
+			= { symb_name=fun_symb, symb_kind=SK_Function {glob_object=fun_index, glob_module=main_dcl_module_n } , symb_arity=fun_arity }
 
 		get_root_case_mode {tb_rhs=Case _}	= RootCase
 		get_root_case_mode _ 				= NotRootCase
@@ -1966,7 +1991,8 @@ where
 		  group_index = gf_fun_def.fun_info.fi_group_index
 		# (Yes ft=:{st_args,st_result}) = gf_fun_def.fun_type
 		  ((st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypes common_defs (st_result,st_args)
-		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps = type_heaps, ets_var_heap = var_heap }
+		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps = type_heaps, ets_var_heap = var_heap,
+		  		  ets_main_dcl_module_n=main_dcl_module_n }
 		# (group, groups) = groups![group_index]
 		= ({ groups & [group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
 				[ { gf_fun_def & fun_type = Yes { ft &  st_result = st_result, st_args = st_args }} : fun_defs],
@@ -1975,7 +2001,7 @@ where
 	convert_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (fun_def=:{fun_type = Yes fun_type}, fun_defs) = fun_defs![fun_index]
 		  (fun_type, imported_types, collected_imports, type_heaps, var_heap)
-		  		= convertSymbolType common_defs fun_type imported_types collected_imports type_heaps var_heap
+		  		= convertSymbolType common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
 		= ({ fun_defs & [fun_index] = { fun_def & fun_type = Yes fun_type }}, imported_types, collected_imports, type_heaps, var_heap)
 
 	cleanup expr_info_ptr symbol_heap
@@ -1991,11 +2017,12 @@ set_extended_expr_info expr_info_ptr extension expr_info_heap
 			-> expr_info_heap <:= (expr_info_ptr, EI_Extended extension ei)
 		ei	-> expr_info_heap <:= (expr_info_ptr, EI_Extended extension ei)
 		
-convertSymbolType :: !{# CommonDefs} !SymbolType !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
+convertSymbolType :: !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-convertSymbolType  common_defs st imported_types collected_imports type_heaps var_heap
+convertSymbolType  common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	# (st, {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypes common_defs st
-		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps= type_heaps, ets_var_heap = var_heap }
+		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps= type_heaps, ets_var_heap = var_heap,
+		  		  ets_main_dcl_module_n=main_dcl_module_n }
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
 ::	ExpandTypeState =
@@ -2003,6 +2030,7 @@ convertSymbolType  common_defs st imported_types collected_imports type_heaps va
 	,	ets_collected_conses	:: !ImportedConstructors
 	,	ets_type_heaps			:: !.TypeHeaps
 	,	ets_var_heap			:: !.VarHeap
+	,	ets_main_dcl_module_n :: !Int
 	}
 
 addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
@@ -2071,7 +2099,7 @@ expand_syn_types_in_TA common_defs type_symb=:{type_index={glob_object,glob_modu
 			-> expandSynTypes common_defs type { ets & ets_type_heaps = ets_type_heaps }
 		_
 			# (types, ets) = expandSynTypes common_defs types ets
-			| glob_module == cIclModIndex
+			| glob_module == ets.ets_main_dcl_module_n
 				-> ( TA type_symb types, ets)
 				-> ( TA type_symb types, collect_imported_constructors common_defs glob_module td_rhs ets)
 where

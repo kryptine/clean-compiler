@@ -2523,14 +2523,23 @@ where
 		# ({fun_symb, fun_pos}, fun_defs) = fun_defs![dcl_index]
 		= ([{ dcl_ident = fun_symb, dcl_pos = fun_pos, dcl_kind = STE_FunctionOrMacro [], dcl_index = dcl_index } : defs], fun_defs)
 
+gimme_a_lazy_array_type :: !u:{.a} -> v:{.a}, [u<=v]
+gimme_a_lazy_array_type a = a
+
+gimme_a_strict_array_type :: !u:{!.a} -> v:{!.a}, [u<=v]
+gimme_a_strict_array_type a = a
+
+renumber_icl_definitions_as_dcl_definitions :: !ModuleKind ![Declaration] !*{#DclModule} !*CommonDefs !{#Int} !*CheckState
+											-> (![Declaration], !.{#DclModule}, !.CommonDefs, !.CheckState)
 renumber_icl_definitions_as_dcl_definitions MK_Main icl_decl_symbols modules cdefs icl_sizes cs
 	= (icl_decl_symbols,modules,cdefs,cs)
 renumber_icl_definitions_as_dcl_definitions _ icl_decl_symbols modules cdefs icl_sizes cs
 	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
 	# (dcl_mod,modules) = modules![main_dcl_module_n]
 	# (Yes conversion_table) = dcl_mod.dcl_conversions
-	# icl_to_dcl_index_table = {create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table \\ table_size <-: icl_sizes & dcl_to_icl_table <-: conversion_table }
+	# icl_to_dcl_index_table = gimme_a_lazy_array_type {create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table \\ table_size <-: icl_sizes & dcl_to_icl_table <-: conversion_table }
 		with
+			create_icl_to_dcl_index_table_for_kind :: !Int !{#Int} -> {#Int}
 			create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table
 				# icl_to_dcl_index_table_for_kind = {createArray table_size NoIndex & [dcl_to_icl_table.[dcl_index]]=dcl_index \\ dcl_index<- [0..size dcl_to_icl_table-1]}
 				#! max_index=size icl_to_dcl_index_table_for_kind-1
@@ -2769,7 +2778,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 	  first_inst_index = length fun_defs + size functions_and_macros
 	  (inst_fun_defs, def_instances) = convert_class_instances cdefs.def_instances first_inst_index
 
-	  new_icl_functions = { next_fun \\ next_fun <- fun_defs ++ inst_fun_defs }
+	  new_icl_functions = gimme_a_strict_array_type { next_fun \\ next_fun <- fun_defs ++ inst_fun_defs }
 	  
 	  icl_functions = {if (i<size functions_and_macros) functions_and_macros.[i] new_icl_functions.[i-size functions_and_macros] \\ i<-[0..size functions_and_macros+size new_icl_functions-1]}
 
@@ -2785,8 +2794,8 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 
 	  (scanned_modules, icl_functions, cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules (size dcl_modules) icl_functions cs
 
-	  init_new_dcl_modules = { initialDclModule scanned_module module_n \\ scanned_module <- scanned_modules & module_n<-[size dcl_modules..]}
-
+	  init_new_dcl_modules = gimme_a_strict_array_type { initialDclModule scanned_module module_n \\ scanned_module <- scanned_modules & module_n<-[size dcl_modules..]}
+			
 	  init_dcl_modules = {if (i<size dcl_modules) dcl_modules.[i] init_new_dcl_modules.[i-size dcl_modules] \\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
 	= (mod_name,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,local_defs,icl_functions,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 
@@ -2882,6 +2891,7 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 	# (Yes dcl_to_icl_table) = dcl_conversions
 	# macro_renumber_table = create_icl_to_dcl_index_table_for_kind dcl_to_icl_table.[cMacroDefs]
 		with
+			create_icl_to_dcl_index_table_for_kind :: !{#Int} -> {#Int}
 			create_icl_to_dcl_index_table_for_kind dcl_to_icl_table
 				= {createArray (end_icl_macro_index-first_icl_macro_index) NoIndex & [dcl_to_icl_table.[dcl_index]-first_icl_macro_index]=dcl_index \\ dcl_index<- [0..size dcl_to_icl_table-1]}
 	# decls = replace_icl_macros_by_dcl_macros decls
@@ -2900,7 +2910,11 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 			= []
 	= (decls,dcl_modules,cs)
 
-check_module2 :: Ident [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int (Optional (Module a)) [.Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) *{#.Int} *Heaps *CheckState -> (!Bool,!.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File);
+check_module2 :: Ident [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int 
+				(Optional (Module a)) [.Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
+				*{#.Int} *Heaps *CheckState 
+			-> (!Bool,!.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},
+				!.Heap SymbolTableEntry,!.File);
 check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 	# (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
 	  (dcl_modules, local_defs, cdefs, icl_sizes, cs)
@@ -2925,12 +2939,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 //	  ii_modules = print_imported_modules 0 ii_modules
 	  (used_module_numbers,ii_modules) = compute_used_module_numbers imported_module_numbers imported_module_numbers ii_modules
 	#
-//	  (nr_of_modules, (f_consequences, ii_modules, icl_functions, hp_expression_heap, cs))
-//	  	= check_completeness_of_all_dcl_modules ii_modules icl_functions heaps.hp_expression_heap cs
-
 	  (nr_of_modules, ii_modules)	= usize ii_modules
-	  (nr_functions, icl_functions)	= usize icl_functions
-	  f_consequences = create_empty_consequences_array nr_functions
 	  hp_expression_heap = heaps.hp_expression_heap
 
 	  (dcls_explicit, dcl_modules, cs)	= addImportsToSymbolTable mod_imports [] ii_modules cs
@@ -3408,14 +3417,9 @@ checkDclModule is_on_cycle {mod_name,mod_imports,mod_defs} mod_index modules icl
 	  nr_of_dcl_functions 			= size dcl_mod.dcl_functions
 
 
-	  (nr_functions, icl_functions)	= usize icl_functions
-	  f_consequences = create_empty_consequences_array nr_functions
-//	  dcls_explicit	= flatten [dcls_explicit \\ (_,{dcls_explicit})<-imports]
 	  dcls_explicit	= flatten [[dcls_explicit\\dcls_explicit<-:dcls_explicit] \\ (_,{dcls_explicit})<-imports]
 
 	#! main_dcl_module_n = cs.cs_x.x_main_dcl_module_n
-//	# (_,modules,icl_functions,hp_expression_heap,cs)
-//	  	= check_completeness_of_module mod_index main_dcl_module_n dcls_explicit (mod_name.id_name+++".dcl") (f_consequences, modules, icl_functions, hp_expression_heap, cs)
 
 	# (dcl_common, modules, hp_type_heaps, hp_var_heap, cs)
 	  		= checkCommonDefinitions cIsADclModule mod_index dcl_common modules hp_type_heaps hp_var_heap cs
@@ -3423,7 +3427,6 @@ checkDclModule is_on_cycle {mod_name,mod_imports,mod_defs} mod_index modules icl
 	  		= determineTypesOfInstances nr_of_dcl_functions  mod_index dcl_common modules hp_type_heaps hp_var_heap cs
 	  (nr_of_dcl_funs_insts_and_specs, rev_function_list, rev_special_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 	  		= checkDclFunctions mod_index nr_of_dcl_functions_and_instances mod_defs.def_funtypes
-//	  			dcl_common.com_type_defs dcl_common.com_class_defs modules { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap } cs
 	  			dcl_common.com_type_defs dcl_common.com_class_defs modules { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap} cs
 
 	  (nr_of_dcl_funs_insts_and_specs, new_class_instances, rev_special_defs, all_spec_types, heaps, cs_error)
