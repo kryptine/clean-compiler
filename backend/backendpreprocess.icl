@@ -72,8 +72,17 @@ instance sequence (Optional a) | sequence a where
 instance sequence FunctionBody where
 	sequence (BackendBody backEndBodies)
 		=	sequence backEndBodies
+	sequence (TransformedBody transformedBody)
+		=	sequence transformedBody
 	sequence body
 		=	abort "preprocess (FunctionBody): unknown body" <<- body
+
+// case test ...
+instance sequence TransformedBody where
+	sequence body
+		=	sequence body.tb_args
+		o`	sequence body.tb_rhs
+// ... case test
 
 instance sequence BackendBody where
 	sequence body
@@ -102,8 +111,31 @@ instance sequence Expression where
 		o`	sequence selections
 	sequence (AnyCodeExpr _ outParams _)
 		=	foldState (\{bind_dst}->sequence bind_dst) outParams
+	sequence (Case caseExpr)
+		=	sequence caseExpr 
 	sequence _
 		=	identity
+
+instance sequence Case where
+	sequence {case_expr, case_guards, case_default}
+		=	sequence case_expr
+		o`	sequence case_guards
+		o`	sequence case_default
+
+instance sequence CasePatterns where
+	sequence (AlgebraicPatterns _ patterns)
+		=	sequence patterns
+	sequence (BasicPatterns _ patterns)
+		=	sequence patterns
+
+instance sequence AlgebraicPattern where
+	sequence {ap_vars, ap_expr}
+		=	sequence ap_vars
+		o`	sequence ap_expr
+
+instance sequence BasicPattern where
+	sequence {bp_expr}
+		=	sequence bp_expr
 
 instance sequence Selection where
 	sequence (RecordSelection _ _)
