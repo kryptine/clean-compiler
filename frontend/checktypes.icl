@@ -1,7 +1,8 @@
 implementation module checktypes
 
 import StdEnv
-import syntax, checksupport, check, typesupport, utilities //, RWSDebug
+import syntax, checksupport, check, typesupport, utilities,
+		compilerSwitches //, RWSDebug
 
 
 ::	TypeSymbols = 
@@ -863,6 +864,8 @@ checkTypeContext mod_index tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_
 where	
 	check_context_types tc_class [] cs=:{cs_error}
 		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
+	check_context_types tc_class [((CV {tv_name}) :@: _):_] cs=:{cs_error}
+		= { cs & cs_error = checkError tv_name "not allowed as higher order type variable in context" cs_error}
 	check_context_types tc_class [TV _ : types] cs
 		= cs
 	check_context_types tc_class [type : types] cs
