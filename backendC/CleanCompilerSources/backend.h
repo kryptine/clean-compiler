@@ -1,8 +1,8 @@
 /* version info */
 
-# define	kBEVersionCurrent		0x02000203
-# define	kBEVersionOldestDefinition	0x02000203
-# define	kBEVersionOldestImplementation	0x02000203
+# define	kBEVersionCurrent		0x02000204
+# define	kBEVersionOldestDefinition	0x02000204
+# define	kBEVersionOldestImplementation	0x02000204
 
 # define	kBEDebug	1
 
@@ -424,3 +424,6 @@ Clean (BEExportFunction :: Int Int BackEnd -> BackEnd)
 
 void BEDefineImportedObjsAndLibs (BEStringListP objs, BEStringListP libs);
 Clean (BEDefineImportedObjsAndLibs :: BEStringListP BEStringListP BackEnd -> BackEnd)
+
+void BESetMainDclModuleN (int main_dcl_module_n_parameter);
+Clean (BESetMainDclModuleN :: Int BackEnd -> BackEnd)

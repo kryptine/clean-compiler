@@ -1,6 +1,8 @@
 definition module backend;
 
+//1.3
 from StdString import String;
+//3.1
 
 :: *UWorld :== Int;
 :: *BackEnd; // :== Int;
@@ -216,11 +218,12 @@ BEExportFunction :: !Int !Int !BackEnd -> BackEnd;
 // void BEExportFunction(int dclFunctionIndex,int iclFunctionIndex);
 BEDefineImportedObjsAndLibs :: !BEStringListP !BEStringListP !BackEnd -> BackEnd;
 // void BEDefineImportedObjsAndLibs(BEStringListP objs,BEStringListP libs);
-kBEVersionCurrent:==0x02000203;
-kBEVersionOldestDefinition:==0x02000203;
-kBEVersionOldestImplementation:==0x02000203;
+BESetMainDclModuleN :: !Int !BackEnd -> BackEnd;
+// void BESetMainDclModuleN(int main_dcl_module_n_parameter);
+kBEVersionCurrent:==0x02000204;
+kBEVersionOldestDefinition:==0x02000204;
+kBEVersionOldestImplementation:==0x02000204;
 kBEDebug:==1;
-kIclModuleIndex:==0;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;
 BEStrictAnnot:==1;
