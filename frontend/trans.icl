@@ -437,10 +437,9 @@ transCase is_active opt_aci this_case=:{case_expr = case_expr=:(App app=:{app_sy
 		SK_Constructor cons_index
 			| not is_active
 				-> skip_over this_case ro ti // XXX currently only active cases are matched at runtime (multimatch problem)
-			# algebraicPatterns = getAlgebraicPatterns case_guards
-			  aci = case opt_aci of
+			# aci = case opt_aci of
 			  			Yes aci -> aci
-			  (may_be_match_expr, ti) = match_and_instantiate aci.aci_linearity_of_patterns cons_index app_args algebraicPatterns case_default ro ti
+			  (may_be_match_expr, ti) = match_and_instantiate aci.aci_linearity_of_patterns cons_index app_args case_guards case_default ro ti
 			-> case may_be_match_expr of
 				Yes match_expr
 					-> (match_expr, ti)
@@ -533,36 +532,61 @@ where
 				= [h_act_pars:replacement producer_vars t_act_pars form_pars]
 			= replacement producer_vars t_act_pars form_pars
 
-	getAlgebraicPatterns (AlgebraicPatterns _ algebraicPatterns)
-		= algebraicPatterns
-	getAlgebraicPatterns (OverloadedListPatterns _ _ algebraicPatterns)
-		= algebraicPatterns
-
-	match_and_instantiate [linearity:linearities] cons_index app_args 
-							[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
-							case_default ro ti
-		| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
-			# zipped = zip2 ap_vars app_args
-			  {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
-			  unfoldables = [ ((not (arg_is_strict i cons_type.st_args_strictness)) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
-			  unfoldable_args = filterWith unfoldables zipped
-			  not_unfoldable = map not unfoldables
-			  non_unfoldable_args = filterWith not_unfoldable zipped
-			  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
-			  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type ro ti.ti_symbol_heap
-			  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
-			  				   us_local_macro_functions = No }
-			  ui= {ui_handle_aci_free_vars = LeaveThem }
-			  (unfolded_expr, unfold_state) = unfold new_expr ui unfold_state
-			  (final_expr, ti) = transform unfolded_expr
-			  						{ ro & ro_root_case_mode = NotRootCase }
-			  						{ ti & ti_var_heap = unfold_state.us_var_heap, ti_symbol_heap = unfold_state.us_symbol_heap,ti_cleanup_info=unfold_state.us_cleanup_info }
-			= (Yes final_expr, ti)
-		= match_and_instantiate linearities cons_index app_args guards case_default ro ti
-	match_and_instantiate [linearity:linearities] cons_index app_args [guard : guards] case_default ro ti
-		= match_and_instantiate linearities cons_index app_args guards case_default ro ti
-	match_and_instantiate _ cons_index app_args [] default_expr ro ti
-		= transform default_expr { ro & ro_root_case_mode = NotRootCase } ti
+	match_and_instantiate linearities cons_index app_args (AlgebraicPatterns _ algebraicPatterns) case_default ro ti
+		= match_and_instantiate_algebraic_type linearities cons_index app_args algebraicPatterns case_default ro ti
+		where
+			match_and_instantiate_algebraic_type [linearity:linearities] cons_index app_args 
+									[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
+									case_default ro ti
+				| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
+					# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
+					= instantiate linearity app_args ap_vars ap_expr cons_type ti
+				= match_and_instantiate_algebraic_type linearities cons_index app_args guards case_default ro ti
+			match_and_instantiate_algebraic_type [linearity:linearities] cons_index app_args [guard : guards] case_default ro ti
+				= match_and_instantiate_algebraic_type linearities cons_index app_args guards case_default ro ti
+			match_and_instantiate_algebraic_type _ cons_index app_args [] case_default ro ti
+				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
+	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _ _) _ algebraicPatterns) case_default ro ti
+		= match_and_instantiate_overloaded_list linearities cons_index app_args algebraicPatterns case_default ro ti
+		where
+			match_and_instantiate_overloaded_list [linearity:linearities] cons_index app_args 
+									[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
+									case_default ro ti
+				| equal_list_contructor glob_module ds_index cons_index
+					# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
+					= instantiate linearity app_args ap_vars ap_expr cons_type ti
+					= match_and_instantiate_overloaded_list linearities cons_index app_args guards case_default ro ti
+					where
+						equal_list_contructor glob_module ds_index {glob_module=cons_glob_module,glob_object=cons_ds_index}
+							| glob_module==cPredefinedModuleIndex && cons_glob_module==cPredefinedModuleIndex
+								# index=ds_index+FirstConstructorPredefinedSymbolIndex
+								# cons_index=cons_ds_index+FirstConstructorPredefinedSymbolIndex
+								| index==PD_OverloadedConsSymbol
+									= cons_index==PD_ConsSymbol || cons_index==PD_StrictConsSymbol || cons_index==PD_TailStrictConsSymbol || cons_index==PD_StrictTailStrictConsSymbol;
+								| index==PD_OverloadedNilSymbol
+									= cons_index==PD_NilSymbol || cons_index==PD_StrictNilSymbol || cons_index==PD_TailStrictNilSymbol || cons_index==PD_StrictTailStrictNilSymbol;
+									= abort "equal_list_contructor"
+			match_and_instantiate_overloaded_list [linearity:linearities] cons_index app_args [guard : guards] case_default ro ti
+				= match_and_instantiate_overloaded_list linearities cons_index app_args guards case_default ro ti
+			match_and_instantiate_overloaded_list _ cons_index app_args [] case_default ro ti
+				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
+	
+	instantiate linearity app_args ap_vars ap_expr cons_type ti
+		# zipped = zip2 ap_vars app_args
+		  unfoldables = [ ((not (arg_is_strict i cons_type.st_args_strictness)) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
+		  unfoldable_args = filterWith unfoldables zipped
+		  not_unfoldable = map not unfoldables
+		  non_unfoldable_args = filterWith not_unfoldable zipped
+		  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
+		  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type ro ti.ti_symbol_heap
+		  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
+		  				   us_local_macro_functions = No }
+		  ui= {ui_handle_aci_free_vars = LeaveThem }
+		  (unfolded_expr, unfold_state) = unfold new_expr ui unfold_state
+		  (final_expr, ti) = transform unfolded_expr
+		  						{ ro & ro_root_case_mode = NotRootCase }
+		  						{ ti & ti_var_heap = unfold_state.us_var_heap, ti_symbol_heap = unfold_state.us_symbol_heap,ti_cleanup_info=unfold_state.us_cleanup_info }
+		= (Yes final_expr, ti)
 
 transCase is_active opt_aci this_case=:{case_expr = (BasicExpr basic_value),case_guards,case_default} ro ti
 	| not is_active
