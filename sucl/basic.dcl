@@ -118,6 +118,9 @@ mappair :: .(.a -> .b) .(.c -> .d) !(.a,.c) -> (.b,.d)
 // Map a function onto the second element of a 2-tuple.
 mapsnd :: v:(.a -> .b) -> u:((.c,.a) -> (.c,.b)), [u <= v]
 
+// Map a function on the second element of a triple.
+mapsnd3 :: v:(.a -> .b) -> u:((.c,.a,.d) -> (.c,.b,.d)), [u <= v]
+
 // Map a function onto the tail of a list.
 maptl :: .(x:[.a] -> u:[.a]) !w:[.a] -> v:[.a], [u <= v, w <= x]
 

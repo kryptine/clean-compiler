@@ -198,6 +198,9 @@ mappair f g (x,y) = (f x,g y)
 mapsnd :: v:(.a -> .b) -> u:((.c,.a) -> (.c,.b)), [u <= v]
 mapsnd f = app2 (id,f)
 
+mapsnd3 :: v:(.a -> .b) -> u:((.c,.a,.d) -> (.c,.b,.d)), [u <= v]
+mapsnd3 f = app3 (id,f,id)
+
 maptl :: .(x:[.a] -> u:[.a]) !w:[.a] -> v:[.a], [u <= v, w <= x]
 maptl f []     = []
 maptl f [x:xs] = [x:f xs]
