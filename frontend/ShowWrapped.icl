@@ -3,78 +3,90 @@ implementation module ShowWrapped
 import StdEnv
 import Wrap
 
-ShowWrapped :: WrappedNode -> [{#Char}]
-ShowWrapped node
-	=	Show False node
+ShowParentheses
+	:==	True
+Don`tShowParentheses
+	:==	False
 
-Show _ (WrappedInt i)
+showWrapped :: WrappedNode -> [{#Char}]
+showWrapped node
+	=	show Don`tShowParentheses node
+
+show :: Bool WrappedNode -> [{#Char}]
+show _ (WrappedInt i)
 	=	[toString i]
-Show _ (WrappedChar c)
+show _ (WrappedChar c)
 	=	["\'" +++ toString c +++ "\'"]
-Show _ (WrappedBool b)
+show _ (WrappedBool b)
 	=	[toString b]
-Show _ (WrappedReal r)
+show _ (WrappedReal r)
 	=	[toString r]
-Show _ (WrappedFile f)
-	=	[toString f]
-Show _ (WrappedString s)
+show _ (WrappedFile _)
+	=	["File"]
+show _ (WrappedString s)
 	=	["\"" +++ s +++ "\""]
-Show _ (WrappedIntArray a)
-	=	ShowBasicArray a
-Show _ (WrappedBoolArray a)
-	=	ShowBasicArray a
-Show _ (WrappedRealArray a)
-	=	ShowBasicArray a
-Show _ (WrappedFileArray a)
-	=	ShowBasicArray a
-Show _ (WrappedArray a)
-	=	["{" : flatten (Separate [", "] [Show False el \\ el <-: a])] ++ ["}"]
-Show _ (WrappedRecord descriptor args)
-	=	["{" : flatten (Separate [" "] [[ShowDescriptor descriptor] : [Show True arg \\ arg <-: args]])] ++ ["}"]
-Show _ (WrappedOther WrappedDescriptorCons args)
+show _ (WrappedIntArray a)
+	=	showBasicArray a
+show _ (WrappedBoolArray a)
+	=	showBasicArray a
+show _ (WrappedRealArray a)
+	=	showBasicArray a
+show _ (WrappedFileArray a)
+	=	showBasicArray a
+show _ (WrappedArray a)
+	=	["{" : flatten (separate [", "] [show Don`tShowParentheses el \\ el <-: a])] ++ ["}"]
+show _ (WrappedRecord descriptor args)
+	=	["{" : flatten (separate [" "] [[showDescriptor descriptor] : [show ShowParentheses arg \\ arg <-: args]])] ++ ["}"]
+show _ (WrappedOther WrappedDescriptorCons args)
 	| size args == 2
-	=	["[" : flatten [Show False args.[0] : ShowTail args.[1]]] ++ ["]"]
+		=	["[" : flatten [show Don`tShowParentheses args.[0] : showTail args.[1]]] ++ ["]"]
 	where
-		ShowTail (WrappedOther WrappedDescriptorCons args)
+		showTail :: WrappedNode -> [[{#Char}]]
+		showTail (WrappedOther WrappedDescriptorCons args)
 			| size args == 2
-				=	[[", "], Show False args.[0] : ShowTail args.[1]]
-		ShowTail (WrappedOther WrappedDescriptorNil args)
+				=	[[", "], show Don`tShowParentheses args.[0] : showTail args.[1]]
+		showTail (WrappedOther WrappedDescriptorNil args)
 			| size args == 0
 				=	[]
-		ShowTail graph // abnormal list
-			=	[[" : " : Show False graph]]
-Show _ (WrappedOther WrappedDescriptorTuple args)
-	=	["(" : flatten (Separate [", "] [Show False arg \\ arg <-: args])] ++ [")"]
-Show pars (WrappedOther descriptor args)
-	| pars && size args > 0
+		showTail node // abnormal list
+			=	[[" : " : show Don`tShowParentheses node]]
+show _ (WrappedOther WrappedDescriptorTuple args)
+	=	["(" : flatten (separate [", "] [show Don`tShowParentheses arg \\ arg <-: args])] ++ [")"]
+show parentheses (WrappedOther descriptor args)
+	| parentheses && size args > 0
 		=	["(" : application] ++ [")"]
 	// otherwise
 		=	application
 	where
 		application
-			=	flatten (Separate [" "] [[ShowDescriptor descriptor] : [Show True arg \\ arg <-: args]])
+			=	flatten (separate [" "] [[showDescriptor descriptor] : [show ShowParentheses arg \\ arg <-: args]])
 
-ShowDescriptor (WrappedDescriptorOther id)
+showDescriptor :: WrappedDescriptor -> {#Char}
+showDescriptor (WrappedDescriptorOther id)
 	=	toString id
-ShowDescriptor WrappedDescriptorNil
+showDescriptor WrappedDescriptorNil
 	=	"[]"
-ShowDescriptor WrappedDescriptorCons
+showDescriptor WrappedDescriptorCons
 	=	"[:]"
-ShowDescriptor WrappedDescriptorTuple
+showDescriptor WrappedDescriptorTuple
 	=	"(..)"
 
-ShowBasicArray a
-	=	["{" : Separate ", " [toString el \\ el <-: a]] ++ ["}"]
-ShowWrappedArray a
-	=	["{" : flatten (Separate [", "] [Show False el \\ el <-: a])] ++ ["}"]
+showBasicArray :: {#a} -> [{#Char}] | toString, ArrayElem a
+showBasicArray a
+	=	["{" : separate ", " [toString el \\ el <-: a]] ++ ["}"]
 
-Separate :: a [a] -> [a]
-Separate separator [a : t=:[b : _]]
-	=	[a, separator : Separate separator t]
-Separate _ l
+showWrappedArray :: {WrappedNode} -> [{#Char}]
+showWrappedArray a
+	=	["{" : flatten (separate [", "] [show Don`tShowParentheses el \\ el <-: a])] ++ ["}"]
+
+separate :: a [a] -> [a]
+separate separator [a : t=:[b : _]]
+	=	[a, separator : separate separator t]
+separate _ l
 	=	l
 
 instance toString File
 where
+	toString :: File -> {#Char}
 	toString _
 		=	"File"

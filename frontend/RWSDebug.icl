@@ -2,8 +2,8 @@ implementation module RWSDebug
 
 import Debug
 
-show
-	=	debugShowWithOptions [] // [DebugMaxChars 80, DebugMaxDepth 5]
+show x
+	=	debugShowWithOptions [DebugMaxChars 80, DebugMaxDepth 5] x
 
 (->>) :: !.a !.b -> .a
 (->>) value debugValue

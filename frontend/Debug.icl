@@ -44,7 +44,7 @@ debugValue show value
 
 debugShow :: DebugShowFunction .a
 debugShow
-	=	\debugValue -> ShowWrapped (Wrap debugValue) ++ ["\n"]
+	=	\debugValue -> showWrapped (wrapNode debugValue) ++ ["\n"]
 
 
 :: DebugOptionRecord
@@ -63,7 +63,7 @@ MaxInt
 
 debugShowWithOptions :: [DebugShowOption] -> DebugShowFunction .a
 debugShowWithOptions debugOptions 
-	=	\debug -> chop maxChars (ShowWrapped (pruneWrappedNode maxDepth maxBreadth (Wrap debug))) ++ [terminator]
+	=	\debug -> chop maxChars (showWrapped (pruneWrappedNode maxDepth maxBreadth (wrapNode debug))) ++ [terminator]
 	where
 		{maxDepth, maxBreadth, maxChars, terminator}
 			=	set debugOptions DebugDefaultOptions
@@ -88,9 +88,9 @@ MaxCharsString
 MaxBreadthString
 	:== "..."
 MaxBreadthIndicator
-	:==	Wrap ...
+	:==	wrapNode ...
 MaxDepthIndicator
-	:==	Wrap .+.
+	:==	wrapNode .+.
 
 pruneWrappedNode :: !Int !Int !WrappedNode -> !WrappedNode
 pruneWrappedNode maxDepth maxBreadth value
@@ -137,9 +137,9 @@ pruneWrappedNode maxDepth maxBreadth value
 		pruneBasicArray :: !Int !(a b) -> WrappedNode | Array .a & ArrayElem b
 		pruneBasicArray depth a
 			| size a > maxBreadth
-				=	WrappedArray (pruneArray depth {Wrap e \\ e <-: a & i <- [0 .. maxBreadth]})
+				=	WrappedArray (pruneArray depth {wrapNode e \\ e <-: a & i <- [0 .. maxBreadth]})
 			// otherwise
-				=	WrappedArray {Wrap e \\ e <-: a}
+				=	WrappedArray {wrapNode e \\ e <-: a}
 
 chop :: !Int ![{#Char}] -> [{#Char}]
 chop _ []
