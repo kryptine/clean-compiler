@@ -1818,7 +1818,7 @@ where
 				# (new_info_ptr,symbol_heap) = newPtr (EI_CaseType case_type) cos.cos_symbol_heap
 				# kase = Case {	case_expr=e1, case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr=e2,bp_position=NoPos}],
 								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos,
-								case_explicit = True }
+								case_explicit = False }
 				= (kase,{cos & cos_symbol_heap=symbol_heap});
 			
 			two_args [_,_]
