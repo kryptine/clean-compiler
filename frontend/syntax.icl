@@ -516,10 +516,11 @@ cNotVarNumber :== -1
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
 ::	Producer	= PR_Empty
-				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application (XXX possibly superfluous (already contained in SymbIdent))
+				| PR_Function !SymbIdent !Index
 				| PR_Class !App ![BoundVar] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
-				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application (XXX possibly superfluous (already contained in SymbIdent))
+				| PR_GeneratedFunction !SymbIdent !Index
+				| PR_Curried !SymbIdent
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
@@ -1276,7 +1277,7 @@ where
 instance <<< BoundVar
 where
 	(<<<) file {var_name,var_info_ptr,var_expr_ptr}
-		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr <<< ',' <<< ptrToInt var_expr_ptr <<< '>'
+		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr <<< '>'
 
 instance <<< (Bind a b) | <<< a & <<< b 
 where

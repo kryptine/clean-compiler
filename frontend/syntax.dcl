@@ -422,8 +422,8 @@ cIsALocalVar	:== False
 
 ::	ConsClasses =
 	{	cc_size			::!Int
-	,	cc_args			::![ConsClass]	// the lists have the
-	,	cc_linear_bits	::![Bool]		// same length
+	,	cc_args			::![ConsClass]
+	,	cc_linear_bits	::![Bool]
 	}
 					
 ::	ConsClass	:== Int
@@ -548,10 +548,11 @@ cNonRecursiveAppl	:== False
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
 ::	Producer	= PR_Empty
-				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application
+				| PR_Function !SymbIdent !Index
 				| PR_Class !App ![BoundVar] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
-				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application
+				| PR_GeneratedFunction !SymbIdent !Index
+				| PR_Curried !SymbIdent
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 

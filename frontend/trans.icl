@@ -1199,13 +1199,15 @@ where
 			= Smaller
 			= Greater
 	where
-		compare_constructor_arguments (PR_Function _ index1 _) (PR_Function _ index2 _)
+		compare_constructor_arguments (PR_Function _ index1) (PR_Function _ index2)
 			= index1 =< index2
-		compare_constructor_arguments (PR_GeneratedFunction _ index1 _) (PR_GeneratedFunction _ index2 _)
+		compare_constructor_arguments (PR_GeneratedFunction _ index1) (PR_GeneratedFunction _ index2)
 			= index1 =< index2
 		compare_constructor_arguments (PR_Class app1 _ _) (PR_Class app2 _ _) 
 			= app1.app_args =< app2.app_args
-		compare_constructor_arguments _ _
+		compare_constructor_arguments (PR_Curried symb_ident1) (PR_Curried symb_ident2)
+			= symb_ident1 =< symb_ident2
+		compare_constructor_arguments PR_Empty PR_Empty
 			= Equal
 
 cIsANewFunction		:== True
@@ -1254,7 +1256,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  ti_type_heaps = { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  
 	  (new_fun_args, new_arg_types_array, new_result_type, new_linear_bits, new_cons_args, ti_type_heaps, ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
-			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args_array st_args) st_result (ti_cons_args, tb_rhs) ti_type_heaps
+			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args_array st_args) st_result (ti_cons_args, tb_rhs, ro) ti_type_heaps
 							 ti_symbol_heap ti_fun_defs ti_fun_heap ti_var_heap
 	  new_arg_types = flatten [ el \\ el<-:new_arg_types_array ]
 	  fun_arity = length new_fun_args
@@ -1283,6 +1285,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  			ti_next_fun_nr = inc ti_next_fun_nr, ti_new_functions = [fun_def_ptr : ti_new_functions],
 				ti_fun_defs = ti_fun_defs, ti_type_heaps = type_heaps, ti_cleanup_info = us_cleanup_info, ti_trace=ti_trace }
 	  new_fd = { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
+//	| False--->("generated function", new_fd, '\n', new_fd.fun_type)
+//		= undef
 	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
 where
 	st_args_array :: ![AType] -> .{![AType]}
@@ -1306,7 +1310,7 @@ where
 	where
 		build_var_args [] form_vars act_vars var_heap
 			= (form_vars, act_vars, var_heap)
-		build_var_args [{fv_name=new_name}:new_names] form_vars act_vars var_heap
+		build_var_args [new_name:new_names] form_vars act_vars var_heap
 			# (info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  form_var = { fv_name = new_name, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
 			  act_var = { var_name = new_name, var_info_ptr = info_ptr, var_expr_ptr = nilPtr }
@@ -1340,28 +1344,48 @@ where
 			  , writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) var_heap
 			  )
 
-		determine_arg producer {fv_info_ptr,fv_name} prod_index (_,(ti_cons_args, consumer_body_rhs))
+		determine_arg producer {fv_info_ptr,fv_name} prod_index ((linear_bit, _),(ti_cons_args, consumer_body_rhs, ro))
 						(vars, arg_types, result_type, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
-			# ((symbol, nr_of_applied_args, fun_def, {cc_args, cc_linear_bits}), fun_defs, fun_heap)
-					= from_function_or_generated_function producer ti_cons_args fun_defs fun_heap
-			  (TransformedBody tb) = fun_def.fun_body
-			  (form_vars, act_vars, var_heap) = build_var_args (reverse (take nr_of_applied_args tb.tb_args)) vars [] var_heap
-			  (Yes symbol_type) = fun_def.fun_type
+			# symbol = get_producer_symbol producer
+			  (symbol_type, fun_defs, fun_heap)
+					= get_producer_type symbol ro fun_defs fun_heap
+			  curried = is_curried producer
+			#! size_fun_defs = size fun_defs
+			# ({cc_args, cc_linear_bits}, fun_heap) = calc_cons_args curried symbol ti_cons_args linear_bit size_fun_defs fun_heap
+			  nr_of_applied_args = symbol.symb_arity
 			  application_type = build_application_type symbol_type nr_of_applied_args
 			  (arg_type, arg_types) = arg_types![prod_index]
 			  th_vars = createBindingsForUnifiedTypes application_type (hd arg_type) type_heaps.th_vars
 			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = take nr_of_applied_args symbol_type.st_args }
 			  								{ type_heaps & th_vars = th_vars }
 			  (result_type, type_heaps) = substitute result_type type_heaps
-			  (expr_to_unfold, var_heap) 
-					= case (nr_of_applied_args==length tb.tb_args) of
-						True	-> (VI_Body symbol tb (take nr_of_applied_args form_vars), var_heap)
-						False	-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), var_heap)
+			  (opt_body, var_names, fun_defs, fun_heap)
+			  		= case producer of
+			  			(PR_Curried {symb_arity, symb_kind=SK_Function {glob_module}})
+			  				| glob_module <> cIclModIndex
+			  					// we do not have good names for the formal variables of that function: invent some
+			  					-> (NoBody, repeatn symb_arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
+			  				// go further with next alternative
+			  			_
+							# ({fun_body=fun_body=:TransformedBody tb}, fun_defs, fun_heap)
+									= get_fun_def symbol.symb_kind fun_defs fun_heap
+							-> (fun_body, take nr_of_applied_args [ fv_name \\ {fv_name}<-tb.tb_args ], fun_defs, fun_heap)
+			  (form_vars, act_vars, var_heap) 
+			  		= build_var_args (reverse var_names) vars [] var_heap
+			  (expr_to_unfold, var_heap)
+					= case producer of
+						(PR_Curried _)
+							-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), var_heap)
+						_ // function or generated function
+							# (TransformedBody tb) = opt_body
+							-> (VI_Body symbol tb (take nr_of_applied_args form_vars), var_heap)
+			| nr_of_applied_args<>length cc_linear_bits || nr_of_applied_args<>length cc_args
+				= abort "Martin REALLY missed something XXX"
 			= (	form_vars
 			  , arg_types
 			  , result_type
-			  , (take nr_of_applied_args cc_linear_bits)++new_linear_bits
-			  , (take nr_of_applied_args cc_args)++new_cons_args
+			  , cc_linear_bits++new_linear_bits
+			  , cc_args++new_cons_args
 			  , type_heaps
 			  , symbol_heap
 			  , fun_defs
@@ -1369,25 +1393,84 @@ where
 			  ,	writeVarInfo fv_info_ptr expr_to_unfold var_heap
 			  ) 
 		  where
-			from_function_or_generated_function (PR_Function symbol index nr_of_applied_args) ti_cons_args fun_defs fun_heap
-				# (fun_def, fun_defs) = fun_defs![index]
-				= ((symbol, nr_of_applied_args, fun_def, ti_cons_args.[index]), fun_defs, fun_heap)
-			from_function_or_generated_function (PR_GeneratedFunction symbol=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index} _ nr_of_applied_args)
-												ti_cons_args fun_defs fun_heap
-				| fun_index < size fun_defs
-					# (fun_def, fun_defs) = fun_defs![fun_index]
-					= ((symbol, nr_of_applied_args, fun_def, ti_cons_args.[fun_index]), fun_defs, fun_heap)
-				# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
-				= ((symbol, nr_of_applied_args, generated_function.gf_fun_def, generated_function.gf_cons_args), fun_defs, fun_heap)
+			get_producer_symbol (PR_Curried symbol)
+				= symbol
+			get_producer_symbol (PR_Function symbol _)
+				= symbol
+			get_producer_symbol (PR_GeneratedFunction symbol _)
+				= symbol
+			
+			get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
+				| glob_module == cIclModIndex
+					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
+					= (symbol_type, fun_defs, fun_heap)
+				# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+				= (ft_type, fun_defs, fun_heap)
+			get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
+				# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
+				= (symbol_type, fun_defs, fun_heap)
+
+			calc_cons_args curried {symb_kind, symb_arity} ti_cons_args linear_bit size_fun_defs fun_heap
+				# (opt_cons_classes, fun_heap)
+						= case symb_kind of
+							SK_Function {glob_module, glob_object}
+								| glob_module == cIclModIndex && glob_object < size ti_cons_args
+									-> (Yes ti_cons_args.[glob_object], fun_heap)
+								-> (No, fun_heap)
+							SK_GeneratedFunction fun_ptr fun_index
+								| fun_index < size ti_cons_args
+									-> (Yes ti_cons_args.[fun_index], fun_heap)
+								| fun_index < size_fun_defs
+									-> abort "sanity check failed in module trans"
+								# (FI_Function {gf_cons_args}, fun_heap) = readPtr fun_ptr fun_heap
+								-> (Yes gf_cons_args, fun_heap)
+				= case opt_cons_classes of
+					Yes cons_classes
+						| curried
+							-> ({ cc_size = symb_arity, cc_args = take symb_arity cons_classes.cc_args, 
+					  				cc_linear_bits = repeatn symb_arity linear_bit}, fun_heap)
+						-> (cons_classes, fun_heap)
+					No
+						-> ({cc_size = symb_arity, cc_args = repeatn symb_arity cPassive,
+								cc_linear_bits = repeatn symb_arity linear_bit}, fun_heap)
+
 /*
-			from_function_or_generated_function (PR_Function symbol index nr_of_applied_args) fun_defs fun_heap
-				# (fun_def, fun_defs) = fun_defs![index]
-				= ((symbol, nr_of_applied_args, fun_def, ti_cons_args.[index]), fun_defs, fun_heap)
-			from_function_or_generated_function (PR_GeneratedFunction symbol=:{ symb_kind = SK_GeneratedFunction fun_ptr _} _ nr_of_applied_args)
-												fun_defs fun_heap
-				# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
-				= ((symbol, nr_of_applied_args, generated_function.gf_fun_def, generated_function.gf_cons_args), fun_defs, fun_heap)
+			get_producer_info (PR_Curried symbol=:{symb_arity, symb_kind=SK_Function {glob_module, glob_object}}) ti_cons_args 
+												linear_bit ro fun_defs fun_heap
+				| glob_module == cIclModIndex
+					  cons_classes = { cc_size = symb_arity, cc_args = take symb_arity ti_cons_args.[glob_object].cc_args, 
+					  					cc_linear_bits = repeatn symb_arity linear_bit}
+					= (symbol, symbol_type, cons_classes, fun_defs, fun_heap)
+				  cons_classes = {cc_size = symb_arity, cc_args = repeatn symb_arity cPassive, 
+				  					cc_linear_bits = repeatn symb_arity linear_bit}
+				= (symbol, ft_type, cons_classes, fun_defs, fun_heap)
+			get_producer_info (PR_Curried symbol=:{symb_arity, symb_kind=SK_GeneratedFunction fun_ptr fun_index}) ti_cons_args 
+												linear_bit ro fun_defs fun_heap
+				= abort "from_function_or_generated_function NYI"
+			get_producer_info (PR_Function symbol index) ti_cons_args _ _ fun_defs fun_heap
+				# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![index]
+				= (symbol, symbol_type, ti_cons_args.[index], fun_defs, fun_heap)
+			get_producer_info (PR_GeneratedFunction symbol=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index} _)
+												ti_cons_args _ _ fun_defs fun_heap
+				| fun_index < size ti_cons_args
+					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![fun_index]
+					= (symbol, symbol_type, ti_cons_args.[fun_index], fun_defs, fun_heap)
+				# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}, gf_cons_args}, fun_heap) = readPtr fun_ptr fun_heap
+				= (symbol, symbol_type, gf_cons_args, fun_defs, fun_heap)
 */
+
+			get_fun_def (SK_Function {glob_module, glob_object}) fun_defs fun_heap
+				| glob_module<>cIclModIndex
+					= abort "sanity check 2 failed in module trans"
+				# (fun_def, fun_defs) = fun_defs![glob_object]
+				= (fun_def, fun_defs, fun_heap)
+			get_fun_def (SK_GeneratedFunction fun_ptr _) fun_defs fun_heap
+				# (FI_Function {gf_fun_def}, fun_heap) = readPtr fun_ptr fun_heap
+				= (gf_fun_def, fun_defs, fun_heap)
+				
+			is_curried (PR_Curried _) = True
+			is_curried _ = False
+			
 		substituteArr :: !*{![AType]} !*TypeHeaps -> (!.{![AType]}, !.TypeHeaps)
 		// apply substitute on every array element
 		substituteArr arg_types type_heaps
@@ -1400,12 +1483,14 @@ where
 				= ({ arg_types & [i] = arg_type }, type_heaps)
 
 		build_application_type :: !SymbolType !Int -> AType
-		build_application_type symbol_type=:{st_arity, st_result, st_args} nr_of_applied_args
-			| st_arity==nr_of_applied_args
+		build_application_type symbol_type=:{st_arity, st_context, st_result, st_args} nr_of_applied_args
+			# nr_context_args = length st_context
+			| st_arity+nr_context_args==nr_of_applied_args
 				= st_result
-// XXX ask Sjaak, whether this is correct
+			| nr_of_applied_args<nr_context_args
+				= abort "sanity check nr 234 failed in module trans"
 			= foldr (\atype1 atype2->{at_attribute=TA_None, at_annotation=AN_None, at_type=atype1-->atype2})
-					st_result (drop nr_of_applied_args st_args)
+					st_result (drop (nr_of_applied_args-nr_context_args) st_args)
 
 		bind_class_types (TA _ context_types) (TA _ instance_types) type_heaps=:{th_vars}
 			# th_vars = bind_context_types context_types instance_types th_vars
@@ -1453,10 +1538,12 @@ where
 		= current_max
 	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
 		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
-	max_group_index_of_producer (PR_Function _ fun_index _) current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Curried _) current_max fun_defs fun_heap cons_args
+		= current_max
+	max_group_index_of_producer (PR_Function _ fun_index) current_max fun_defs fun_heap cons_args
 		# (fun_def, fun_defs) = fun_defs![fun_index]
 		= max fun_def.fun_info.fi_group_index current_max
-	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _ _)
+	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _)
 								current_max fun_defs fun_heap cons_args
 		| fun_index < size fun_defs
 			# {fun_info} = fun_defs.[fun_index] 
@@ -1659,7 +1746,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 				  (app_symb, app_args, extra_args) = complete_application app_symb fun_arity new_args extra_args
 	  			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
 	  			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index, symb_arity = length new_args}
+				  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index, symb_arity = length new_args}
 				  (app_symb, app_args, extra_args) = complete_application app_symb gf_fun_def.fun_arity new_args extra_args
 	  			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, {ti & ti_fun_heap = ti_fun_heap })
 			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
@@ -1771,107 +1858,78 @@ determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app
 	# (app_args, (new_vars, ti_var_heap)) = renewVariables app_args ([], ti.ti_var_heap)
 	  (new_args, ti_var_heap) = mapAppendSt retrieve_old_var new_vars new_args ti_var_heap
 	= ({ producers & [prod_index] = PR_Class { app & app_args = app_args } new_vars type}, new_args, { ti & ti_var_heap = ti_var_heap })
-where
+  where
 	retrieve_old_var {var_info_ptr} var_heap
 		# (var_info, var_heap) = readVarInfo var_info_ptr var_heap
 		  (VI_Forward var) = var_info
 		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }}, app_args} _
+determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }, symb_arity}, app_args} _
 				  new_args prod_index producers ro ti
+	# (fun_arity, is_overloaded, ti) = get_fun_arity glob_module glob_object ro ti
+	| is_overloaded // XXX this restriction (producers must not be overloaded) is just temporary 
+		= (producers, [App app : new_args ], ti)
+	| symb_arity<>fun_arity
+		| is_applied_to_macro_fun
+			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+		= (producers, [App app : new_args ], ti)
 	#! max_index = size ti.ti_cons_args
 	| glob_module <> cIclModIndex || glob_object >= max_index /* Sjaak, to skip array functions */
 		= (producers, [App app : new_args ], ti)
-	# (fun_def, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
+	# ({fun_body}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
 	  ti = { ti & ti_fun_defs=ti_fun_defs }
-	  nr_of_app_args = length app_args
-	= determineFunAppProducer fun_def nr_of_app_args (PR_Function symb glob_object nr_of_app_args)
-								is_applied_to_macro_fun linear_bit app new_args prod_index producers ti
+	  (TransformedBody {tb_rhs}) = fun_body
+	  is_good_producer = SwitchFusion (linear_bit && is_sexy_body tb_rhs) False
+	| is_good_producer
+		= ({ producers & [prod_index] = (PR_Function symb glob_object)}, app_args ++ new_args, ti)
+	= (producers, [App app : new_args ], ti)
   where
 	get_fun_arity glob_module glob_object ro ti
 		| glob_module <> cIclModIndex
-			= (ro.ro_imported_funs.[glob_module].[glob_object].ft_arity, ti)
-		# ({fun_arity}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
-		= (fun_arity, { ti & ti_fun_defs=ti_fun_defs })
-			
-		
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
+			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
+			  nr_dictionaries = length st_context
+			= (st_arity+nr_dictionaries, nr_dictionaries>0, ti)
+		// crazy: for imported functions you have to add ft_arity and length st_context, but for unimported
+		// functions fun_arity alone is sufficient
+		# ({fun_symb, fun_arity, fun_type=Yes {st_context}}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
+		= (fun_arity, (length st_context)>0, { ti & ti_fun_defs=ti_fun_defs })
+determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index, symb_arity}, app_args} _
 				  new_args prod_index producers ro ti
-	# (FI_Function {gf_fun_def}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+	# (FI_Function {gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
-	  nr_of_app_args = length app_args
-	= determineFunAppProducer gf_fun_def nr_of_app_args (PR_GeneratedFunction symb fun_index nr_of_app_args)
-								is_applied_to_macro_fun linear_bit app new_args prod_index producers ti
+	  is_overloaded = length symbol_type.st_context>0
+	| is_overloaded // XXX this restriction (producers must not be overloaded) is just temporary 
+		= (producers, [App app : new_args ], ti)
+	| symb_arity<>fun_arity
+		| is_applied_to_macro_fun
+			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+		= (producers, [App app : new_args ], ti)
+	# is_good_producer
+		= case fun_body of
+			Expanding _
+				-> False
+			(TransformedBody {tb_rhs})
+				-> SwitchFusion (linear_bit && is_sexy_body tb_rhs) False
+	| is_good_producer
+		= ({ producers & [prod_index] = (PR_GeneratedFunction symb fun_index)}, app_args ++ new_args, ti)
+	= (producers, [App app : new_args ], ti)
 // XXX determineProducer {app_symb = symb=:{symb_kind = SK_Constructor glob_index}, app_args} new_args prod_index producers ti
 //	= ({ producers & [prod_index] = PR_Constructor symb app_args}, new_args, ti)
 // XXX */
 determineProducer _ _ app _ new_args _ producers _ ti
 	= (producers, [App app : new_args ], ti)
 	
-determineFunAppProducer {fun_body, fun_arity} nr_of_app_args new_producer
-					is_applied_to_macro_fun linear_bit app=:{app_args} new_args prod_index producers ti
-	# is_curried = fun_arity<>nr_of_app_args
-	  is_expanding = case fun_body of
-	  					Expanding _
-	  						-> True
-	  					_	-> False
-	  is_good_producer =	not is_expanding
-	  					 && (implies is_curried is_applied_to_macro_fun)
-	  					 && (implies (not is_curried) (SwitchFusion (linear_bit && is_sexy_body tb_rhs) False))
-			// curried applications may be fused with non linear consumers in functions local to a macro
-	| is_good_producer
-		= ({ producers & [prod_index] = new_producer}, app_args ++ new_args, ti)
-	= (producers, [App app : new_args ], ti)
-  where
-	(TransformedBody {tb_rhs}) = fun_body
-	
-	// when two function bodies have fusion with each other this only leads into satisfaction if one body
-	// fulfills the following sexyness property
-	is_sexy_body (AnyCodeExpr _ _ _) = False	
-	is_sexy_body (ABCCodeExpr _ _) = False	
-	is_sexy_body (Let {let_strict_binds}) = isEmpty let_strict_binds	
-		// currently a producer's body must not be a let with strict bindings. The code sharing elimination algorithm assumes that
-		// all strict let bindings are on the top level expression (see "convertCasesOfFunctionsIntoPatterns"). This assumption
-		// could otherwise be violated during fusion.
-		// -> Here is place for optimisation: Either the fusion algorithm or the code sharing elimination algorithm could be
-		// extended to generate new functions when a strict let ends up during fusion in a non top level position (MW)
-	is_sexy_body _ = True	
+// when two function bodies have fusion with each other this only leads into satisfaction if one body
+// fulfills the following sexyness property
+is_sexy_body (AnyCodeExpr _ _ _) = False	
+is_sexy_body (ABCCodeExpr _ _) = False	
+is_sexy_body (Let {let_strict_binds}) = isEmpty let_strict_binds	
+	// currently a producer's body must not be a let with strict bindings. The code sharing elimination algorithm assumes that
+	// all strict let bindings are on the top level expression (see "convertCasesOfFunctionsIntoPatterns"). This assumption
+	// could otherwise be violated during fusion.
+	// -> Here is place for optimisation: Either the fusion algorithm or the code sharing elimination algorithm could be
+	// extended to generate new functions when a strict let ends up during fusion in a non top level position (MW)
+is_sexy_body _ = True	
 
-/*
-	verify_class_members [ App {app_symb, app_args} : mems]
-		= verify_class_members app_args && verify_class_members mems
-	verify_class_members [ _ : mems]
-		= False
-	verify_class_members []
-		= True
-	
-
-	verify_function fun_nr act_arity ti=:{ti_fun_defs,ti_new_functions}
-		| fun_nr < size ti_fun_defs
-			#! fd = ti_fun_defs.[fun_nr]
-			= (True, ti)
-			= (verify_new_function fun_nr act_arity ti_new_functions, ti)
-	where
-		verify_new_function fun_nr act_arity [{nf_fun_def={fun_index,fun_arity}}:new_functions]
-			| fun_nr == fun_index
-				= True
-				= verify_new_function fun_nr act_arity new_functions
-		verify_new_function fun_nr _ []
-			= False
-/*
-	verify_function fun_nr act_arity ti=:{ti_fun_defs,ti_new_functions}
-		| fun_nr < size ti_fun_defs
-			#! fd = ti_fun_defs.[fun_nr]
-			= (fd.fun_arity > act_arity, ti)
-			= (verify_new_function fun_nr act_arity ti_new_functions, ti)
-	where
-		verify_new_function fun_nr act_arity [{nf_fun_def={fun_index,fun_arity}}:new_functions]
-			| fun_nr == fun_index
-				= fun_arity > act_arity
-				= verify_new_function fun_nr act_arity new_functions
-		verify_new_function fun_nr _ []
-			= False ---> fun_nr
-*/
-*/
 
 containsProducer prod_index producers
 	| prod_index == 0
@@ -2393,12 +2451,13 @@ where
 // XXX	
 instance <<< Producer
 where
-	(<<<) file (PR_Function symbol index _)
-		= file <<< "F" <<< symbol.symb_name
-	(<<<) file (PR_GeneratedFunction symbol index _)
-		= file <<< "G" <<< symbol.symb_name <<< index
+	(<<<) file (PR_Function symbol index)
+		= file <<< "(F)" <<< symbol.symb_name
+	(<<<) file (PR_GeneratedFunction symbol index)
+		= file <<< "(G)" <<< symbol.symb_name <<< index
 	(<<<) file PR_Empty = file <<< 'E'
-	(<<<) file (PR_Class _ _ _) = file <<< 'C'
+	(<<<) file (PR_Class _ _ _) = file <<< "(Class)"
+	(<<<) file (PR_Curried {symb_name}) = file <<< "(Curried)" <<< symb_name
 	(<<<) file _ = file
 
 instance <<< FunCall

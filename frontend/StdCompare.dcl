@@ -11,7 +11,7 @@ class (=<) infix 4 a :: !a !a -> CompareValue
 
 instance =< Int, Expression, {# Char}, Ident, [a] | =< a, BasicType //, (Global a) | =< a
 
-instance =< Type
+instance =< Type, SymbIdent
 
 instance == BasicType, TypeVar, TypeSymbIdent, DefinedSymbol, TypeContext , BasicValue,
 			FunKind, (Global a) | == a, Priority, Assoc
