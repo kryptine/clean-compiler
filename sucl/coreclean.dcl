@@ -31,6 +31,7 @@ sucltypeheap :: [SuclTypeVariable]
 :: SuclSymbol
  = SuclUser SymbolPtr
  | SuclCase ExprInfoPtr
+ | SuclApply Int
  | SuclInt Int
  | SuclChar Char
  | SuclBool Bool

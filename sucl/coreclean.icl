@@ -25,6 +25,7 @@ sucltypeheap =: map SuclANONYMOUS [0..]
 :: SuclSymbol
  = SuclUser SymbolPtr
  | SuclCase ExprInfoPtr
+ | SuclApply Int
  | SuclInt Int
  | SuclChar Char
  | SuclBool Bool

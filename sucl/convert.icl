@@ -191,6 +191,13 @@ convert_expression bounds (App appinfo) ((heap0,seen0),(nodes0,fundefs0,globals0
           = convert_expressions bounds appinfo.app_args ((heap1,seen0),(nodes0,fundefs0,globals0))
          nodes2 = [(root,(SuclUser appinfo.app_symb.symb_name.id_info,args0)):nodes1]
 
+convert_expression bounds (expr @ exprs) ((heap0,seen0),(nodes0,fundefs0,globals0,rest))
+ = ((heap2,seen1),(nodes2,fundefs1,globals1,[root:rest]))
+   where [root:heap1] = heap0
+         ((heap2,seen1),(nodes1,fundefs1,globals1,args0))
+          = convert_expressions bounds [expr:exprs] ((heap1,seen0),(nodes0,fundefs0,globals0))
+         nodes2 = [(root,(SuclApply (length exprs),args0)):nodes1]
+
 convert_expression bounds (Var varinfo) ((heap0,seen0),(nodes0,fundefs0,globals0,rest))
  = foldmap oldvip newvip seen0 vip
    where // oldvip: We've already seen this Var, reuse it and don't do anything else
@@ -235,6 +242,7 @@ convert_expression bounds (Case caseinfo) ((heap0,seen0),(nodes6,fundefs5,global
          ((heap4,seen3),(nodes7,fundefs6,globals7,defaultroots))
           = foldoptional id (convert_expression bounds) caseinfo.case_default ((heap3,seen2),(nodes6,fundefs5,globals6,[]))
          // (1) convert branches
+         globals8 = removeDup (innerglobals++globals7)
          ((heap3,seen2),(innerglobals,fundefs7,alternatives))
           = case caseinfo.case_guards
             of AlgebraicPatterns _ branches
@@ -243,7 +251,6 @@ convert_expression bounds (Case caseinfo) ((heap0,seen0),(nodes6,fundefs5,global
                 -> foldlr convert_basic_branch ((heap2,seen1),([],fundefs6,[])) branches
                _
                 -> ((heap2,seen1),([],fundefs6,abort "convert: convert_expression: unhandled CasePatterns constructor"))
-         globals8 = removeDup (innerglobals++globals7)
          // (0.5) Convert selector
          ((heap2,seen1),(nodes8,fundefs8,globals9,selectorroots))
           = convert_expression bounds caseinfo.case_expr ((heap1,seen0),(nodes7,fundefs7,globals8,[]))
