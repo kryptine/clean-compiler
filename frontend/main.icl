@@ -309,7 +309,9 @@ where
 		= (fun_defs, file <<< '\n')
 	show_types [fun:funs] fun_defs file
 		#! fun_def = fun_defs.[fun]
-		= show_types funs fun_defs (file <<< '\n' <<< fun_def.fun_type)
+		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
+		  (Yes ftype) = fun_def.fun_type
+		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype) <<< '\n' )
 
 converFileToListOfStrings file_name files error
 	# (ok, file, files) = fopen file_name FReadText files
