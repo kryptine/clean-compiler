@@ -969,7 +969,7 @@ checkBoundPattern {bind_src,bind_dst} opt_var p_input var_env ps e_info cs=:{cs_
 		= case opt_var of
 			Yes bind
 				-> checkPattern bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) p_input var_env ps
-					 	e_info { cs & cs_error = checkError bind.bind_src "pattern already bound" cs.cs_error }
+					 	e_info { cs & cs_error = checkError bind.bind_src "pattern may be bound once only" cs.cs_error }
 			No
 				-> checkPattern bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) p_input var_env ps e_info cs
 	= checkPattern bind_src opt_var p_input var_env ps e_info { cs & cs_error = checkError bind_dst "variable expected" cs.cs_error }
@@ -1212,7 +1212,6 @@ checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_leve
 checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info cs
 	# (pattern_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] case_ident.id_name e_input e_state e_info cs
-//	  (guards, pattern_variables, defaul, free_vars, e_state, e_info, cs) = check_guarded_expressions free_vars alts [] e_input e_state e_info cs
 	  (pattern_expr, binds, es_expression_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expression_heap
 	  (case_expr, es_expression_heap) = build_case guards defaul pattern_expr case_ident es_expression_heap
 	  (result_expr, es_expression_heap) = buildLetExpression binds cIsNotStrict case_expr es_expression_heap
@@ -1227,18 +1226,7 @@ where
 		  (gs, pattern_scheme, pattern_variables, defaul, free_vars, e_state, e_info, cs)
 		  	= check_guarded_expressions free_vars gs pattern_variables case_name e_input e_state e_info cs
 		= check_guarded_expression free_vars g gs pattern_scheme pattern_variables defaul case_name e_input e_state e_info cs 
-/*
-	check_guarded_expressions free_vars [g] pattern_variables e_input=:{ei_expr_level} e_state e_info cs
-		# e_input = { e_input & ei_expr_level = inc ei_expr_level }
-		= check_guarded_expression free_vars g NoPattern pattern_variables No e_input e_state e_info cs 
-	check_guarded_expressions free_vars [g : gs] pattern_variables e_input=:{ei_expr_level} e_state e_info cs
-		# e_input = { e_input & ei_expr_level = inc ei_expr_level }
-		  (gs, pattern_variables, defaul, free_vars, e_state, e_info, cs)
-		  	= check_guarded_expressions free_vars gs pattern_variables e_input e_state e_info cs
-		= check_guarded_expression free_vars g gs pattern_variables defaul e_input e_state e_info cs 
-*/
 	check_guarded_expression free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals}} patterns pattern_scheme pattern_variables defaul case_name 
-//	check_guarded_expression free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals}} patterns pattern_variables defaul case_name 
 				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap} e_info cs
 		# (pattern, var_env, {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern calt_pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } []
@@ -1247,21 +1235,14 @@ where
 		  (expr, free_vars, e_state=:{es_dynamics,es_expression_heap,es_var_heap}, e_info, cs) = checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
 		  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
 		  (guarded_expr, pattern_scheme, pattern_variables, defaul, es_var_heap, es_expression_heap, dynamics_in_patterns, cs)
-//		  (guarded_expr, pattern_variables, defaul, es_var_heap, es_expression_heap, dynamics_in_patterns, cs)
 		  		= transform_pattern pattern patterns pattern_scheme pattern_variables defaul expr case_name es_var_heap es_expression_heap es_dynamics { cs & cs_symbol_table = cs_symbol_table }
 		= (guarded_expr, pattern_scheme, pattern_variables, defaul, free_vars,
-//		= (guarded_expr, pattern_variables, defaul, free_vars,
 			{ e_state & es_var_heap = es_var_heap, es_expression_heap = es_expression_heap, es_dynamics = dynamics_in_patterns },
 				e_info, cs) 
 
-	transform_pattern :: !AuxiliaryPattern !CasePatterns !CasePatterns !(Env Ident VarInfoPtr) !(Optional (![FreeVar], !Expression)) !Expression
+	transform_pattern :: !AuxiliaryPattern !CasePatterns !CasePatterns !(Env Ident VarInfoPtr) !(Optional (!Optional FreeVar, !Expression)) !Expression
 			!String !*VarHeap !*ExpressionHeap ![DynamicPtr] !*CheckState
-				-> (!CasePatterns, !CasePatterns, !Env Ident VarInfoPtr, !Optional (![FreeVar],!Expression), !*VarHeap, !*ExpressionHeap, ![DynamicPtr], !*CheckState)
-/*
-	transform_pattern :: !AuxiliaryPattern !CasePatterns !(Env Ident VarInfoPtr) !(Optional (Optional FreeVar, Expression)) !Expression
-			!*VarHeap !*ExpressionHeap ![DynamicPtr] !*CheckState
-				-> (!CasePatterns, !Env Ident VarInfoPtr, !Optional (Optional FreeVar,Expression), !*VarHeap, !*ExpressionHeap, ![DynamicPtr], !*CheckState)
-*/
+				-> (!CasePatterns, !CasePatterns, !Env Ident VarInfoPtr, !Optional (!Optional FreeVar,!Expression), !*VarHeap, !*ExpressionHeap, ![DynamicPtr], !*CheckState)
 	transform_pattern (AP_Algebraic cons_symbol type_index args opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ var_store expr_heap opt_dynamics cs
 		# (var_args, result_expr, var_store, expr_heap, opt_dynamics, cs) = convertSubPatterns args result_expr var_store expr_heap opt_dynamics cs
 		  type_symbol = { glob_module = cons_symbol.glob_module, glob_object = type_index}
@@ -1279,19 +1260,6 @@ where
 			_
 				-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
 						{ cs & cs_error = checkError cons_symbol.glob_object.ds_ident "illegal combination of patterns" cs.cs_error })
-/*
-		= case patterns of
-			AlgebraicPatterns alg_type alg_patterns
-				| type_symbol == alg_type
-					-> (AlgebraicPatterns type_symbol [pattern : alg_patterns], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-					-> (patterns, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-								{ cs & cs_error = checkError cons_symbol.glob_object.ds_ident "incompatible types of patterns" cs.cs_error })
-			NoPattern
-				-> (AlgebraicPatterns type_symbol [pattern], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-			_
-				-> (patterns, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-						{ cs & cs_error = checkError cons_symbol.glob_object.ds_ident "illegal combination of patterns" cs.cs_error })
-*/
 	transform_pattern (AP_Basic basic_val opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ var_store expr_heap opt_dynamics cs
 		# pattern = { bp_value = basic_val, bp_expr = result_expr}
 		  pattern_variables = cons_optional opt_var pattern_variables
@@ -1324,24 +1292,21 @@ where
 						{ cs & cs_error = checkError "<dynamic pattern>" "illegal combination of patterns" cs.cs_error })
 	transform_pattern (AP_Variable name var_info opt_var) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
 		= ( NoPattern, pattern_scheme, cons_optional opt_var pattern_variables, 
-		  	Yes ([{ fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }], result_expr),
+		  	Yes (Yes { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr),
 			var_store, expr_heap, opt_dynamics, cs)		
 	transform_pattern (AP_Variable name var_info opt_var) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
-		# vars_as_patterns = fst_optional defaul
-		  default_expr = snd_optional defaul
-		  free_var = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
+		# free_var = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
 		  (new_bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  case_ident = { id_name = case_name, id_info = nilPtr }
 		  (new_case, expr_heap) = build_case patterns defaul (Var new_bound_var) case_ident expr_heap
 		  new_defaul = insert_as_default new_case result_expr
-		// if (!has_been_inserted) checkWarning("pattern won't match");
-		= (NoPattern, pattern_scheme, (cons_optional opt_var pattern_variables), Yes (cons_opt free_var vars_as_patterns, new_defaul),
+		= (NoPattern, pattern_scheme, (cons_optional opt_var pattern_variables), Yes (Yes free_var, new_defaul),
 			var_store, expr_heap, opt_dynamics, cs)
 	transform_pattern (AP_WildCard (Yes opt_var)) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
 		= transform_pattern (AP_Variable opt_var.bind_src opt_var.bind_dst No) patterns pattern_scheme pattern_variables defaul
 							result_expr case_name var_store expr_heap opt_dynamics cs
 	transform_pattern (AP_WildCard no) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
-		= (NoPattern, pattern_scheme, pattern_variables, Yes ([], result_expr), var_store, expr_heap, opt_dynamics, cs)
+		= (NoPattern, pattern_scheme, pattern_variables, Yes (No, result_expr), var_store, expr_heap, opt_dynamics, cs)
 	transform_pattern (AP_WildCard _) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
 		# (new_info_ptr, var_store) = newPtr VI_Empty var_store
 		= transform_pattern (AP_Variable (newVarId "wc") new_info_ptr No) patterns pattern_scheme pattern_variables defaul
@@ -1357,58 +1322,56 @@ where
 		= case case_default of
 			No			-> Case { kees & case_default = Yes to_insert }
 			Yes defaul	-> Case { kees & case_default = Yes (insert_as_default to_insert defaul)}
-	insert_as_default _ expr = expr
+	insert_as_default _ expr = expr // checkWarning "pattern won't match"
 
 	build_case NoPattern defaul expr case_ident expr_heap
 		= case defaul of
-			Yes (vars, result)
-				| isEmpty vars
-					-> (result, expr_heap)
-				# (let_expression, expr_heap) = bind_default_variables expr vars result expr_heap
-				-> (let_expression, expr_heap)
+			Yes (opt_var, result)
+				-> case opt_var of
+					Yes var
+						# (let_expression, expr_heap) = bind_default_variable expr var result expr_heap
+						-> (let_expression, expr_heap)
+					No
+						-> (result, expr_heap)
 			No
 				-> (EE, expr_heap)
 	build_case (DynamicPatterns patterns) defaul expr case_ident expr_heap
 		= case defaul of
-			Yes (vars, result)
-				-> case vars of
-					[]	# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-						-> (buildTypeCase expr patterns (Yes result) type_case_info_ptr, expr_heap)
-					[var:_]
+			Yes (opt_var, result)
+				-> case opt_var of
+					Yes var
 						# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
 						  (bound_var, expr_heap) = allocate_bound_var var expr_heap
 						  result = buildTypeCase (Var bound_var) patterns (Yes result) type_case_info_ptr
-						  (case_expression, expr_heap) = bind_default_variables expr vars result expr_heap
+						  (case_expression, expr_heap) = bind_default_variable expr var result expr_heap
 					 	-> (case_expression, expr_heap)
+					No
+						# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
+						-> (buildTypeCase expr patterns (Yes result) type_case_info_ptr, expr_heap)
 			No
 				# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
 				-> (buildTypeCase expr patterns No type_case_info_ptr, expr_heap)
-	build_case patterns (Yes (vars,result)) expr case_ident expr_heap
-		= case vars of
-			[]	#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				-> (Case {case_expr = expr, case_guards = patterns, case_default = Yes result,
-						case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
-			[var:_]
+	build_case patterns (Yes (opt_var,result)) expr case_ident expr_heap
+		= case opt_var of
+			Yes var
 				# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 				  (bound_var, expr_heap) = allocate_bound_var var expr_heap
 				  result = Case {case_expr = Var bound_var, case_guards = patterns, case_default = Yes result,
 								 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr}
-				  (case_expression, expr_heap) = bind_default_variables expr (reverse vars) result expr_heap
+				  (case_expression, expr_heap) = bind_default_variable expr var result expr_heap
 				-> (case_expression, expr_heap)
+			No
+				#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+				-> (Case {case_expr = expr, case_guards = patterns, case_default = Yes result,
+						case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
 	build_case patterns No expr case_ident expr_heap
 		# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident, case_info_ptr = case_expr_ptr }, expr_heap)
-	bind_default_variables expr vars result_expr expr_heap
+
+	bind_default_variable bind_src bind_dst result_expr expr_heap
 		#  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		   (var_binds, expr_heap) = build_binds vars [] expr_heap
-		   let_binds = [{ bind_src = expr, bind_dst = hd vars }:var_binds]
-		= (Let {let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
-	  where
-		build_binds [var] accu expr_heap
-			= (accu, expr_heap)
-		build_binds [var1:tl=:[var2:vars]] accu expr_heap
-			# (bound_var, expr_heap) = allocate_bound_var var1 expr_heap
-			= build_binds tl [{ bind_src = Var bound_var, bind_dst = var2 }:accu] expr_heap
+		= (Let {let_strict_binds = [{ bind_src = bind_src, bind_dst = bind_dst }], let_lazy_binds = [],
+				let_expr = result_expr, let_info_ptr = let_expr_ptr }, expr_heap)
 
 	bind_pattern_variables [] pattern_expr expr_heap
 		= (pattern_expr, [], expr_heap)
@@ -1423,18 +1386,6 @@ where
 	cons_optional No variables
 		= variables
 
-	cons_opt x No		= [x]
-	cons_opt x (Yes l)	= [x:l]
-
-	fst_optional (Yes (x,_))	= Yes x
-	fst_optional no				= No
-
-	snd_optional (Yes (_,x))	= Yes x
-	snd_optional no				= No
-
-	opt_to_list (Yes x)			= x
-	opt_to_list no				= []
-	
 checkExpression free_vars (PE_Selection is_unique expr [PS_Array index_expr]) e_input e_state e_info cs	
 	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	| is_unique

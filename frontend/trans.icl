@@ -803,10 +803,11 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			Let lad
 				| not is_active
 					-> skip_over this_case ro ti
-				# (let_strict_binds, ti) = transform lad.let_strict_binds { ro & ro_root_case_mode = NotRootCase } ti
-				  (let_lazy_binds, ti) = transform lad.let_lazy_binds { ro & ro_root_case_mode = NotRootCase } ti
+				# ro_not_root = { ro & ro_root_case_mode = NotRootCase }
+				  (new_let_strict_binds, ti) = transform lad.let_strict_binds ro_not_root ti
+				  (new_let_lazy_binds, ti) = transform lad.let_lazy_binds ro_not_root ti
 				  (new_let_expr, ti) = transform (Case { this_case & case_expr = lad.let_expr }) ro ti
-				-> (Let { lad & let_expr = new_let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, ti)
+				-> (Let { lad & let_expr = new_let_expr, let_strict_binds = new_let_strict_binds, let_lazy_binds = new_let_lazy_binds }, ti)
 		  	_	-> skip_over this_case ro ti
 	where
 		equal (SK_Function glob_index1) (SK_Function glob_index2)

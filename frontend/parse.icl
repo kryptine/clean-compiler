@@ -2322,7 +2322,8 @@ where
 					(assignments, (optionalIdent, final_record_type,pState2))
 						= mapSt (transform_update level) groupedUpdates (No, record_type,pState)
 					updateExpr
-						= build_update record_type optionalIdent expr assignments
+						= build_update final_record_type optionalIdent expr assignments
+// MW was				= build_update record_type optionalIdent expr assignments
 					// transform one group of nested updates with the same first field
 					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
 					//  (id is ident to shared expression that's being updated)
@@ -2336,7 +2337,6 @@ where
 							=	make_ident optionalIdent level pState
 						  select
 						  	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
-						//	=	PE_Selection cNonUniqueSelection (PE_Ident shareIdent) [PS_Record fieldIdent field_record_type]
 						  (update_expr, pState)
 						  	=	transform_record_or_array_update No select (map sub_update updates) (level+1) pState
 						=	({bind_dst = fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
