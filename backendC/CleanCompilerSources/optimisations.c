@@ -1741,6 +1741,8 @@ static int ChangeArgumentNodeStatesIfStricter (NodeP node_p,StateP demanded_stat
 
 #ifdef REUSE_UNIQUE_NODES
 
+
+
 static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int node_size)
 {
 	NodeP node_copy;
@@ -1771,6 +1773,79 @@ static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int no
 	return node_copy;
 }
 
+static int compute_n_not_updated_words (NodeP push_node,NodeP node,int node_a_size)
+{
+	NodeIdListElementP node_id_list;
+	unsigned long n_not_updated_words;
+	ArgP node_arg_p;
+	unsigned int n,arity;
+	int a_size1,b_size1,a_size2,b_size2;
+	int total_a_size2,total_b_size2;
+	
+	total_a_size2=0;
+	total_b_size2=0;
+	
+	for_l (node_id_list,push_node->node_node_ids,nidl_next){
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+		AddSizeOfState (*node_id_list->nidl_node_id->nid_lhs_state_p,&total_a_size2,&total_b_size2);
+# else
+		AddSizeOfState (node_id_list->nidl_node_id->nid_state,&total_a_size2,&total_b_size2);	
+# endif	
+	}	
+	
+	n_not_updated_words=0;
+	node_arg_p=node->node_arguments;
+	arity=node->node_arity;
+	node_id_list=push_node->node_node_ids;
+
+	a_size1=0;
+	b_size1=0;
+	a_size2=0;
+	b_size2=0;
+	
+	for (n=0; n<arity; ++n){
+		if (node_id_list!=NULL){
+			NodeIdP node_id_p;
+			StateP arg_node_id_state_p;
+			
+			node_id_p=node_id_list->nidl_node_id;
+			
+			if (node_arg_p->arg_node->node_kind==NodeIdNode && node_arg_p->arg_node->node_node_id==node_id_list->nidl_node_id){
+				int e_a_size1,e_b_size1,e_a_size2,e_b_size2;
+				
+				DetermineSizeOfState (node_arg_p->arg_state,&e_a_size1,&e_b_size1);
+
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+				DetermineSizeOfState (*node_id_p->nid_lhs_state_p,&e_a_size2,&e_b_size2);
+# else
+				DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
+# endif
+				if (! (e_a_size1!=e_a_size2 || e_b_size1!=e_b_size2 ||
+					((e_a_size1 | e_a_size2)!=0 && a_size1!=a_size2) ||
+					((e_b_size1 | e_b_size2)!=0 && b_size1+node_a_size!=b_size2+total_a_size2)))
+				{
+					n_not_updated_words += e_a_size1+e_b_size1;
+				}
+			}
+			
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+			arg_node_id_state_p=node_id_p->nid_lhs_state_p;
+# else
+			arg_node_id_state_p=&node_id_p->nid_state;
+# endif	
+			AddSizeOfState (*arg_node_id_state_p,&a_size2,&b_size2);
+
+			node_id_list=node_id_list->nidl_next;
+		}
+
+		AddSizeOfState (node_arg_p->arg_state,&a_size1,&b_size1);
+		
+		node_arg_p=node_arg_p->arg_next;
+	}
+	
+	return n_not_updated_words;
+}
+
 static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,int node_a_size,int node_b_size)
 {
 	FreeUniqueNodeIdsP f_node_id;
@@ -1785,6 +1860,41 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 
 	arity=node->node_arity;
 
+#if 1
+	/* optimization: update node with fewest number of words to be updated */
+	{
+		FreeUniqueNodeIdsP *f_node_id_h,*found_f_node_id_h;
+		int found_size,found_n_not_updated_words;
+		
+		found_f_node_id_h=NULL;
+		f_node_id_h=f_node_ids;
+		
+		while ((f_node_id=*f_node_id_h)!=NULL){
+			int new_found_size;
+			
+			new_found_size=f_node_id->fnid_node_size;
+			if (new_found_size>=node_size){
+				int new_found_n_not_updated_words;
+				
+				new_found_n_not_updated_words=compute_n_not_updated_words (f_node_id->fnid_push_node,node,node_a_size);
+				
+				if (found_f_node_id_h==NULL || new_found_size<found_size || new_found_n_not_updated_words>found_n_not_updated_words){
+					found_f_node_id_h=f_node_id_h;
+					found_size=new_found_size;
+					found_n_not_updated_words=new_found_n_not_updated_words;
+				}
+			}
+
+			f_node_id_h=&f_node_id->fnid_next;
+		}
+		
+		if (found_f_node_id_h==NULL)
+			return False;
+		
+		f_node_id=*found_f_node_id_h;
+		*found_f_node_id_h=f_node_id->fnid_next;
+	}
+#else
 	f_node_id=*f_node_ids;
 	
 	if (f_node_id->fnid_node_size>=node_size)
@@ -1803,7 +1913,8 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 		
 		prev_f_node_id->fnid_next=f_node_id->fnid_next;
 	}
-	
+#endif
+
 	push_node=f_node_id->fnid_push_node;
 	
 	node_copy=replace_node_by_unique_fill_node (node,push_node,f_node_id->fnid_node_size);
