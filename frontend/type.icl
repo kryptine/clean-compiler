@@ -2,7 +2,7 @@ implementation module type
 
 import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
-import cheat, compilerSwitches
+import compilerSwitches
 import generics // AA
 
 ::	TypeInput =
@@ -2225,7 +2225,7 @@ where
 					# (error=:{ea_file})
 							= errorHeading "Uniqueness error" error
 					  (coercion_env, copy_coercion_env)
-					  		= uniqueCopy coercion_env
+					  		= arrayCopy coercion_env
 					  format
 					  		= { form_properties = cMarkAttribute,
 					  			form_attr_position = Yes (reverse positions, copy_coercion_env) }			

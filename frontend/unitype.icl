@@ -5,7 +5,7 @@ import StdEnv
 import syntax, analunitypes, type, utilities, checktypes,
 		compilerSwitches //, RWSDebug
 
-import cheat
+// import cheat
 
 AttrUni			:== 0
 AttrMulti		:== 1

@@ -3,7 +3,7 @@ implementation module explicitimports
 
 import StdEnv
 
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, cheat,
+import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef,
 		compilerSwitches//, RWSDebug
 
 cUndef :== (-1)
