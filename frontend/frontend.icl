@@ -213,7 +213,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 
 //	# (components, fun_defs, error) = showComponents2 components 0 fun_defs acc_args error
 
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, acc_args)
 	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion
 
 	| options.feo_up_to_phase == FrontEndPhaseTransformGroups
@@ -324,10 +324,19 @@ where
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] fun_defs acc_args file
 		# (fd, fun_defs) = fun_defs![fun]
+		| fun >= size acc_args
+			# file = file <<< fd.fun_symb <<< '.' <<< fun <<< " ???"
+			= show_component funs fun_defs acc_args file
 		# file = file <<< fd.fun_symb <<< '.' <<< fun <<< " ("
+		# file = show_producer_status acc_args.[fun].cc_producer file
 		# file = show_accumulating_arguments acc_args.[fun].cc_args file
 		# file = show_linear_arguments acc_args.[fun].cc_linear_bits file
 		= show_component funs fun_defs acc_args (file <<< ") ")
+	
+	show_producer_status pc file
+		| pc == True
+			= file <<< "+:"
+			= file <<< "-:"
 	
 	show_accumulating_arguments [ cc : ccs] file
 		| cc == cPassive
