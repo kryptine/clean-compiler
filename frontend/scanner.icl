@@ -687,8 +687,8 @@ Scan c0=:'+' input co
 Scan c0=:'=' input co
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (EqualToken, input)
-	| c == ':'				= (DefinesColonToken, input)
-	| c == '>'				= (DoubleArrowToken, input)
+	| c == ':'				= possibleKeyToken DefinesColonToken [c, c0] co input
+	| c == '>'				= possibleKeyToken DoubleArrowToken [c, c0] co input
 	| isSpecialChar c		= ScanOperator 1 input [c, c0] co
 							= (EqualToken, charBack input)
 Scan c0=:':' input co
@@ -725,6 +725,13 @@ Scan c    input co
 //		= ScanIdent 0 input [c] co
 	| isSpecialChar c		= ScanOperator 0 input [c] co
 							= (ErrorToken ScanErrIllegal, input)
+
+possibleKeyToken :: !Token ![Char] !Context !Input -> (!Token, !Input)
+possibleKeyToken token reversedPrefix context input
+	# (eof, c, input)		= ReadNormalChar input
+	| eof					= (token, input)
+	| isSpecialChar c		= ScanOperator 2 input [c : reversedPrefix] context
+							= (token, charBack input)
 
 new_exp_char ',' = True
 new_exp_char '[' = True
