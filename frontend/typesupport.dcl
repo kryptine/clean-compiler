@@ -12,13 +12,14 @@ errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 class (<::) infixl a :: !*File (!Format, !a) -> *File
 
 :: Format =
-	{	form_properties :: !BITVECT
-	,	form_position	:: ![Int]
+	{	form_properties 	:: !BITVECT
+	,	form_attr_position	:: Optional ([Int], Coercions)
 	}
 
 cNoProperties		:== 0
-cAttributed			:== 4
-cAnnotated			:== 8
+cAttributed			:== 1
+cAnnotated			:== 2
+cMarkAttribute		:== 4
 
 instance <:: SymbolType, Type, AType, [a] | <:: a
 
