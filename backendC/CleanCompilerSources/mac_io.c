@@ -804,7 +804,6 @@ extern char *clean_abc_path; /* imported from clm.c */
 	}
 #endif
 
-<<<<<<< mac_io.c
 #if defined (GNU_C)
 static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
 {
@@ -829,46 +828,6 @@ static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
 # define fopen fopen_with_file_name_conversion
 #endif
 
-=======
-#if defined (GNU_C)
-static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
-{
-	FSSpec fs_spec;
-	FSRef fs_ref;
-	CFURLRef CFURL_ref;
-	char buffer[512+1];
-	int string_size;
-	Boolean r;
-	OSErr e;
-
-	buffer[0]=strlen (file_name);
-	strcpy (&buffer[1],file_name);
-
-	e=FSMakeFSSpec (0/*vRefNum*/,0/*dirID*/,buffer,&fs_spec);
-	if (e!=noErr)
-		return NULL;
-	
-	e=FSpMakeFSRef (&fs_spec,&fs_ref);
-	if (e!=noErr)
-		return NULL;
-
-	CFURL_ref=CFURLCreateFromFSRef (NULL,&fs_ref);
-
-	string_size=512;
-	r=CFURLGetFileSystemRepresentation (CFURL_ref,1,buffer,string_size);
-	
-	if (!r)
-		return NULL;
-	
-	file_name=buffer;
-
-	return fopen (file_name,mode);
-}
-
-# define fopen fopen_with_file_name_conversion
-#endif
-
->>>>>>> 1.4
 #if WRITE_DCL_MODIFICATION_TIME
 File FOpenWithFileTime (char *file_name,FileKind kind, char *mode,FileTime *file_time_p)
 {
