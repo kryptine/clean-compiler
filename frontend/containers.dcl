@@ -32,8 +32,9 @@ first_n_strict :: !Int -> StrictnessList
 insert_n_strictness_values_at_beginning :: !Int !StrictnessList -> StrictnessList
 insert_n_lazy_values_at_beginning :: !Int !StrictnessList -> StrictnessList
 arg_strictness_annotation :: !Int !StrictnessList -> Annotation;
-is_not_strict :: !StrictnessList -> Bool
 arg_is_strict :: !Int !StrictnessList -> Bool;
+is_not_strict :: !StrictnessList -> Bool
+equal_strictness_lists :: !StrictnessList !StrictnessList -> Bool
 add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 add_next_not_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 append_strictness :: !Int !StrictnessList -> StrictnessList

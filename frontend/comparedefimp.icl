@@ -235,15 +235,6 @@ where
 	compare strictness1 strictness2 comp_st
 		= (equal_strictness_lists strictness1 strictness2,comp_st)
 
-equal_strictness_lists NotStrict NotStrict
-	= True
-equal_strictness_lists NotStrict (Strict s)
-	= s==0
-equal_strictness_lists (Strict s) NotStrict
-	= s==0
-equal_strictness_lists (Strict s1) (Strict s2)
-	= s1==s2
-	
 instance compare AttributeVar
 where
 	compare {av_info_ptr = dcl_info_ptr} {av_info_ptr = icl_info_ptr} comp_st=:{comp_attr_var_heap}

@@ -286,6 +286,26 @@ is_not_strict NotStrict = True
 is_not_strict (Strict s) = s==0
 is_not_strict (StrictList s l) = s==0 && is_not_strict l
 
+equal_strictness_lists :: !StrictnessList !StrictnessList -> Bool
+equal_strictness_lists NotStrict NotStrict
+	= True
+equal_strictness_lists NotStrict (Strict s)
+	= s==0
+equal_strictness_lists NotStrict (StrictList s l)
+	= s==0 && is_not_strict l
+equal_strictness_lists (Strict s) NotStrict
+	= s==0
+equal_strictness_lists (Strict s1) (Strict s2)
+	= s1==s2
+equal_strictness_lists (Strict s1) (StrictList s2 l)
+	= s1==s2 && is_not_strict l
+equal_strictness_lists (StrictList s l) NotStrict
+	= s==0 && is_not_strict l
+equal_strictness_lists (StrictList s1 l) (Strict s2)
+	= s1==s2 && is_not_strict l
+equal_strictness_lists (StrictList s1 l1) (StrictList s2 l2)
+	= s1==s2 && equal_strictness_lists l1 l2
+
 add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 add_next_strict strictness_index strictness strictness_list
 	| strictness_index<32
