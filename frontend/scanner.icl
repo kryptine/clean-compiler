@@ -1918,7 +1918,5 @@ freadPreprocessedLine file
 		= loop pattern line (i-1)
 	replace_beginning_with :: !String !*String -> .String
 	replace_beginning_with replacement string
-		# result = { string & [i] = replacement.[i] \\ i<-[0..size replacement-1] }
-		| True--->("replaced", result)
-			= result
+		= { string & [i] = replacement.[i] \\ i<-[0..size replacement-1] }
 // ..MW8
