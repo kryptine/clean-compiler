@@ -1807,7 +1807,13 @@ where
 		where
 			if_expression :: Expression Expression Expression *CollectState -> (!Expression,!.CollectState);
 			if_expression e1 e2 e3 cos
-				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
+//				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
+				# case_type =
+					{	ct_pattern_type	= MakeAttributedType (TB BT_Bool)
+					,	ct_result_type	= MakeAttributedType (TB BT_Bool)
+					,	ct_cons_types 	= [[MakeAttributedType (TB BT_Bool)]]
+					}
+				# (new_info_ptr,symbol_heap) = newPtr (EI_CaseType case_type) cos.cos_symbol_heap
 				# kase = Case {	case_expr=e1, case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr=e2,bp_position=NoPos}],
 								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos,
 								case_explicit = True }
