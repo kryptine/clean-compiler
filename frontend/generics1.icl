@@ -1455,8 +1455,7 @@ where
 		    class_pos = gen_pos, 
 		    class_members = createArray 1 class_member, 
 		    class_cons_vars = 0, // dotted class variables
-		    class_dictionary = class_dictionary,
-		    class_arg_kinds = [kind]
+		    class_dictionary = class_dictionary
 		    }	 
 			
 		= class_def	
