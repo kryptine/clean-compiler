@@ -33,7 +33,7 @@ supercompile dcl_mods main_dcl_module_n fun_defs0 var_heap expression_heap
         // Build abstract CLI module
         sucl_module = mkcli sucl_typerules sucl_stricts sucl_exports sucl_constrs sucl_bodies
         // Generate fresh function symbols
-        (n_fun_defs,fun_defs3) = usize_u fun_defs1
+        (n_fun_defs,fun_defs3) = usize fun_defs1
         fresh_symbols = [SuclUser (SK_Function (mkglobal main_dcl_module_n i)) \\ i<-[n_fun_defs..]]
         // Do the job!
         symredresults = fullsymred fresh_symbols sucl_module
