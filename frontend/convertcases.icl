@@ -251,6 +251,8 @@ where
 		= rs
 	weightedRefCount rci (NoBind ptr) rs
 		= rs
+	weightedRefCount rci (FailExpr _) rs
+		= rs
 	weightedRefCount rci expr rs
 		= abort ("weightedRefCount [Expression] (convertcases, 864))" -*-> expr)
 
@@ -566,6 +568,8 @@ where
 		= (EE, ds)
 	distributeLets depth (NoBind ptr) ds
 		= (NoBind ptr, ds)
+	distributeLets depth (FailExpr id) ds
+		= (FailExpr id, ds)
 
 instance distributeLets Case
 where 
