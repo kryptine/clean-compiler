@@ -3469,20 +3469,7 @@ static NodeDefs *CollectSharedNodeIdsInNode (Node* node_p,NodeId parent_node_id,
 			last = CollectSharedNodeIdsInNode (&at_node,parent_node_id,last);
 		}
 
-		if (node->node_kind!=IfNode){
-			ArgP arg;
-
-#ifdef ADD_ARGUMENTS_TO_HIGHER_ORDER_FUNCTIONS
-			if (node->node_kind==NormalNode && node->node_symbol->symb_kind==apply_symb)
-				(void) create_new_function_with_more_arguments (node,1);
-#endif
-			
-			for_l (arg,node->node_arguments,arg_next){
-				arg->arg_state=LazyState;
-				last = CollectSharedNodeIdsInNode (&arg->arg_node,parent_node_id,last);
-			}
-		/* RWS SwitchNode */
-		} else {
+		if (node->node_kind==IfNode){
 			NodeDefs *shared;
 			Args cond_arg,then_arg,else_arg;
 			int local_scope;
@@ -3539,6 +3526,23 @@ static NodeDefs *CollectSharedNodeIdsInNode (Node* node_p,NodeId parent_node_id,
 
 			AddStrictLhsNodeIdsToNodeDefs (node->node_then_strict_node_ids,&node->node_then_node_defs);
 			AddStrictLhsNodeIdsToNodeDefs (node->node_else_strict_node_ids,&node->node_else_node_defs);
+		}
+		else if (node->node_kind==SwitchNode)
+		{
+			error_in_function ("CollectSharedNodeIdsInNode");
+		}
+		else {
+			ArgP arg;
+
+#ifdef ADD_ARGUMENTS_TO_HIGHER_ORDER_FUNCTIONS
+			if (node->node_kind==NormalNode && node->node_symbol->symb_kind==apply_symb)
+				(void) create_new_function_with_more_arguments (node,1);
+#endif
+			
+			for_l (arg,node->node_arguments,arg_next){
+				arg->arg_state=LazyState;
+				last = CollectSharedNodeIdsInNode (&arg->arg_node,parent_node_id,last);
+			}
 		}
 	}
 
@@ -3775,16 +3779,47 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 				node_id->nid_node->node_annotation=StrictAnnot;
 	}
 	
-	/* RWS SwitchNode */
-	if (node->node_kind==IfNode){
-		ArgS *arg;
-	
-		arg=node->node_arguments;
-		AnnotateStrictNodeIds (arg->arg_node,NULL,NULL);
-		arg = arg->arg_next;
-		AnnotateStrictNodeIds (arg->arg_node,node->node_then_strict_node_ids,&node->node_then_node_defs);
-		arg = arg->arg_next;
-		AnnotateStrictNodeIds (arg->arg_node,node->node_else_strict_node_ids,&node->node_else_node_defs);
+	switch (node->node_kind) 
+	{
+		case IfNode:
+		{
+			ArgS *arg;
+		
+			arg=node->node_arguments;
+			AnnotateStrictNodeIds (arg->arg_node,NULL,NULL);
+			arg = arg->arg_next;
+			AnnotateStrictNodeIds (arg->arg_node,node->node_then_strict_node_ids,&node->node_then_node_defs);
+			arg = arg->arg_next;
+			AnnotateStrictNodeIds (arg->arg_node,node->node_else_strict_node_ids,&node->node_else_node_defs);
+			break;
+		}
+		case SwitchNode:
+		{
+			ArgS *arg_p;
+
+			for_l (arg_p,node->node_arguments,arg_next){
+				NodeP node;
+
+				node=arg_p->arg_node;
+				if (node->node_kind==CaseNode){
+					NodeP case_alt_node_p;
+
+					case_alt_node_p=node->node_arguments->arg_node;
+		/*	Codewarrior bug			if (case_alt_node_p->node_kind==PushNode){  */
+					if (node->node_arguments->arg_node->node_kind==PushNode)
+						AnnotateStrictNodeIds (case_alt_node_p->node_arguments->arg_next->arg_node,node->node_strict_node_ids,&node->node_node_defs);
+					else
+						AnnotateStrictNodeIds (node->node_arguments->arg_node,node->node_strict_node_ids,&node->node_node_defs);
+				} else if (node->node_kind==DefaultNode){
+					AnnotateStrictNodeIds (node->node_arguments->arg_node,node->node_strict_node_ids,&node->node_node_defs);
+				} else
+					error_in_function ("AnnotateStrictNodeIds");
+			}
+			break;
+		}
+		default:
+			break;
+
 	}
 }
 
