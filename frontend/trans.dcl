@@ -11,10 +11,6 @@ transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !*{!.ConsClass
 
 partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{! Group}, !*{# FunDef})
 
-::	ImportedConstructors	:== [Global Index]
-::	ImportedFunctions		:== [Global Index]
-::	ImportedTypes			:== {#{# CheckedTypeDef}}
-
 convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 

@@ -882,6 +882,12 @@ tryToFindInstance new_prods II_Empty fun_heap
 	# (fun_def_ptr, fun_heap) = newPtr FI_Empty fun_heap
 	= (cIsANewFunction, fun_def_ptr, II_Node new_prods fun_def_ptr II_Empty II_Empty, fun_heap)
 tryToFindInstance new_prods instances=:(II_Node prods fun_def_ptr left right) fun_heap
+	| size new_prods > size prods
+		# (is_new, new_fun_def_ptr, right, fun_heap) = tryToFindInstance new_prods right fun_heap
+		= (is_new, new_fun_def_ptr, II_Node prods fun_def_ptr left right, fun_heap)
+	| size new_prods < size prods
+		# (is_new, new_fun_def_ptr, left, fun_heap) = tryToFindInstance new_prods left fun_heap
+		= (is_new, new_fun_def_ptr, II_Node prods fun_def_ptr left right, fun_heap)
 	# cmp = compareProducers new_prods prods
 	| cmp == Equal
 		= (cIsNotANewFunction, fun_def_ptr, instances, fun_heap)
@@ -926,6 +932,8 @@ where
 		compare_constructor_arguments (PR_Curried symb_ident1 _) (PR_Curried symb_ident2 _)
 			= symb_ident1 =< symb_ident2
 		compare_constructor_arguments PR_Empty PR_Empty
+			= Equal
+		compare_constructor_arguments PR_Unused PR_Unused
 			= Equal
 		compare_constructor_arguments (PR_Constructor symb_ident1 _ _) (PR_Constructor symb_ident2 _ _)
 			= symb_ident1 =< symb_ident2
@@ -2290,10 +2298,6 @@ add_let_binds free_vars rhss original_binds
 		\\ lb_dst <- free_vars & lb_src <- rhss & original_bind <- original_binds]
 
 //@	transformGroups
-
-::	ImportedConstructors	:== [Global Index]
-::	ImportedFunctions		:== [Global Index]
-::	ImportedTypes			:== {#{# CheckedTypeDef}}
 
 transformGroups :: !CleanupInfo !Int !Int !*{! Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool

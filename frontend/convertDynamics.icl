@@ -3,7 +3,7 @@
 */
 implementation module convertDynamics
 
-import syntax, transform, utilities, convertcases, compilerSwitches
+import syntax, transform, utilities, convertcases, compilerSwitches, trans
 from type_io_common import PredefinedModuleName
 // Optional
 USE_TUPLES tuple b :== b;					// change also StdDynamic.icl and recompile all applications

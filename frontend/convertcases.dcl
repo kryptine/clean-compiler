@@ -3,7 +3,7 @@
 */
 definition module convertcases
 
-import syntax, transform, trans
+import syntax, transform
 
 convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap

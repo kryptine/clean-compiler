@@ -582,6 +582,10 @@ cIsALocalVar	:== False
 
 pIsSafe			:== True
 
+::	ImportedConstructors	:== [Global Index]
+::	ImportedFunctions		:== [Global Index]
+::	ImportedTypes			:== {#{# CheckedTypeDef}}
+
 ::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
 
 :: 	AuxiliaryPattern
