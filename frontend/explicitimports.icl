@@ -312,21 +312,34 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						eii_declaring_modules (bitvectResetAll visited_modules)
 		= case opt_decl of
 			Yes di=:{di_decl, di_instances}
-				# new_eii_declaring_modules
-				  		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index 
-				  					{di_decl = di_decl, di_instances = [], di_belonging=EndNumbers} eei_dm)
-				  				path eii_declaring_modules
-				  new_belonging_accu
-				  		= case getBelongingSymbolsFromID ini.ini_imp_decl of
-				  			No
-				  				-> belonging_accu
-				  			Yes _
-				  				-> [(di_decl, ini, imported_mod):belonging_accu]
-				  new_eii
-				  			= ExplImpInfo eii_ident new_eii_declaring_modules
-				-> (True, ([di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
-							{ expl_imp_info & [ini_symbol_nr] = new_eii }))
-			No
+				| switch_import_syntax 
+					True
+					( case di_decl of
+			  			Declaration {decl_kind}
+			  				-> case decl_kind of
+			  					STE_Imported STE_Member _
+			  						-> False
+			  					STE_Member
+			  						-> False
+			  					_
+			  						-> True
+			  		)
+					# new_eii_declaring_modules
+					  		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index 
+					  					{di_decl = di_decl, di_instances = [], di_belonging=EndNumbers} eei_dm)
+					  				path eii_declaring_modules
+					  new_belonging_accu
+					  		= case getBelongingSymbolsFromID ini.ini_imp_decl of
+					  			No
+					  				-> belonging_accu
+					  			Yes _
+					  				-> [(di_decl, ini, imported_mod):belonging_accu]
+					  new_eii
+					  			= ExplImpInfo eii_ident new_eii_declaring_modules
+					-> (True, ([di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
+								{ expl_imp_info & [ini_symbol_nr] = new_eii }))
+				// otherwise GOTO next alternative
+			_
 				# eii
 				  		= ExplImpInfo eii_ident eii_declaring_modules
 				-> (False, (decls_accu, belonging_accu, visited_modules, { expl_imp_info & [ini_symbol_nr] = eii }))
