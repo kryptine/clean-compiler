@@ -1,6 +1,6 @@
 /* version info */
 
-# define	kBEVersionCurrent		0x02000204
+# define	kBEVersionCurrent		0x02000205
 # define	kBEVersionOldestDefinition	0x02000204
 # define	kBEVersionOldestImplementation	0x02000204
 

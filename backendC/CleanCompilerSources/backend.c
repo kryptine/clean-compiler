@@ -402,11 +402,18 @@ BEDeclareDclModule (int moduleIndex, CleanString name, int isSystemModule, int n
 	char	*cName;
 	SymbolP	moduleNameSymbol;
 	DefMod	dclModule;
+	SymbolP	saveSymbols;
 
 	cName	= ConvertCleanString (name);
 
 	moduleNameSymbol	= ConvertAllocType (SymbolS);
 	moduleNameSymbol->symb_ident	= Identifier (cName);
+
+	if (moduleIndex == main_dcl_module_n)
+	{
+		saveSymbols	= gBEState.be_allSymbols;
+		gBEState.be_allSymbols	= NULL;
+	}
 
 	DeclareModule (moduleIndex, cName, isSystemModule, nFunctions, nTypes, nConstructors, nFields);
 
@@ -417,6 +424,8 @@ BEDeclareDclModule (int moduleIndex, CleanString name, int isSystemModule, int n
 
 	if (moduleIndex != main_dcl_module_n)
 		AddOpenDefinitionModule (moduleNameSymbol, dclModule);
+	else
+		gBEState.be_allSymbols	= saveSymbols;
 } /* BEDeclareDclModule */
 
 void
