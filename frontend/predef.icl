@@ -148,12 +148,13 @@ predefined_idents
 					[PD_ConsCONS] = i "CONS",
 					[PD_TypeFIELD] = i "FIELD",
 					[PD_ConsFIELD] = i "FIELD",
-					[PD_TypeREC] = i "REC",
-					[PD_ConsREC] = i "REC",
+					[PD_TypeOBJECT] = i "OBJECT",
+					[PD_ConsOBJECT] = i "OBJECT",
 					[PD_GenericInfo] = i "GenericInfo",
 					[PD_NoGenericInfo] = i "NoGenericInfo",
 					[PD_GenericConsInfo] = i "GenericConsInfo",
 					[PD_GenericFieldInfo] = i "GenericFieldInfo",
+					[PD_GenericTypeInfo] = i "GenericTypeDefInfo",
 					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
 					[PD_CGenericConsDescriptor] = i "_GenericConsDescriptor",
 					[PD_TGenericFieldDescriptor] = i "GenericFieldDescriptor",
@@ -376,13 +377,14 @@ where
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeCONS)					
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsCONS)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeFIELD)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsREC)
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeREC)					
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsFIELD)					
+					<<- (local_predefined_idents,				IC_Type, 		PD_TypeOBJECT)					
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsOBJECT)
 					<<- (local_predefined_idents,				IC_Type, 		PD_GenericInfo)					
 					<<- (local_predefined_idents,				IC_Expression,	PD_NoGenericInfo)
 					<<- (local_predefined_idents,				IC_Expression,	PD_GenericConsInfo)
 					<<- (local_predefined_idents,				IC_Expression,	PD_GenericFieldInfo)
+					<<- (local_predefined_idents,				IC_Expression,	PD_GenericTypeInfo)
 					<<- (local_predefined_idents,				IC_Type,		PD_TGenericConsDescriptor)
 					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericConsDescriptor)
 					<<- (local_predefined_idents,				IC_Type,		PD_TGenericFieldDescriptor)

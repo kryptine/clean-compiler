@@ -305,7 +305,6 @@ where
 									//---> ("build generic representation", type_ident)
 	on_gencase _ _ st = st
 
-
 :: ConsInfo = {ci_cons_info :: DefinedSymbol, ci_field_infos :: [DefinedSymbol]}
 	
 buildGenericTypeRep :: 
@@ -329,11 +328,11 @@ buildGenericTypeRep type_index funs_and_groups
 		
 	# (type_def, gs_modules) = gs_modules![type_index.gi_module].com_type_defs.[type_index.gi_index]
 
-	# (cons_infos, funs_and_groups, gs_modules, heaps, gs_error) 
+	# (type_info, cons_infos, funs_and_groups, gs_modules, heaps, gs_error) 
 		= buildTypeDefInfo type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups gs_modules heaps gs_error
 
 	# (atype, (gs_modules, gs_td_infos, heaps, gs_error)) 
-		= buildStructType type_index cons_infos gs_predefs (gs_modules, gs_td_infos, heaps, gs_error)
+		= buildStructType type_index type_info cons_infos gs_predefs (gs_modules, gs_td_infos, heaps, gs_error)
 	
 	# (from_fun_ds, funs_and_groups, heaps, gs_error)
 		= buildConversionFrom type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups heaps gs_error
@@ -375,10 +374,13 @@ where
 	convert {at_type=(CV tv) :@: args} st
 		#! (args, st) = mapSt convert args st
 		= (GTSAppVar tv args, st)  
+
 	convert {at_type=x --> y} st
 		#! (x, st) = convert x st
 		#! (y, st) = convert y st
-		= (GTSAppCons (KindArrow [KindConst, KindConst]) [x,y], st)  
+		//= (GTSAppCons (KindArrow [KindConst, KindConst]) [x,y], st)  
+		= (GTSArrow x y, st)  
+		
 	convert {at_type=TV tv} st
 		= (GTSVar tv, st)  
 	convert {at_type=TB _} st
@@ -406,33 +408,100 @@ where
 					#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
 					-> (GTSAppCons kind args, st)  
 
+// the structure type of a genric type can often be simplified
+// because bimaps for types not containing generic variables are indentity bimaps
+simplifyStructOfGenType :: ![TypeVar] !GenTypeStruct !*Heaps -> (!GenTypeStruct, !*Heaps)
+simplifyStructOfGenType gvars type heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}} 
+	| True
+		#! th_vars = foldSt mark_type_var gvars th_vars
+		#! (type, th_vars) = simplify type th_vars
+		#! th_vars = foldSt clear_type_var gvars th_vars 
+		= (type, { heaps & hp_type_heaps = { hp_type_heaps & th_vars = th_vars}})
+	| otherwise
+		= (type, heaps)			
+where
+	simplify t=:(GTSAppCons KindConst [])  st
+		= (t, st)
+	simplify (GTSAppCons kind=:(KindArrow kinds) args) st
+		# formal_arity = length kinds
+		# actual_arity = length args
+		# (contains_gen_vars, st) = occurs_list args st
+		| formal_arity == actual_arity && not contains_gen_vars
+			= (GTSAppCons KindConst [], st)
+		| otherwise
+			# (args, st) = mapSt simplify args st
+			=(GTSAppCons kind args, st)
+	simplify (GTSArrow x y) st
+		# (x, st) = simplify x st
+		# (y, st) = simplify y st
+		= (GTSArrow x y, st)		
+	simplify (GTSAppVar tv args) st
+		# (args, st) = mapSt simplify args st
+		= (GTSAppVar tv args, st)	
+	simplify t=:(GTSVar tv) st
+		= (t, st)
+	simplify t st 
+		= abort "invalid generic type structure\n"
+			//---> ("invalid generic type structure", t)
+		
+	occurs (GTSAppCons _ args) st 	= occurs_list args st
+	occurs (GTSAppVar tv args) st 	= occurs_list [GTSVar tv: args] st		
+	occurs (GTSVar tv) st			= type_var_occurs tv st
+	occurs (GTSArrow x y) st 		= occurs_list [x,y] st
+	occurs (GTSCons _ arg) st 		= occurs arg st	
+	occurs (GTSField _ arg) st 		= occurs arg st	
+	occurs (GTSObject _ arg) st 	= occurs arg st	
+	occurs GTSE st 					= (False, st)
 
+	occurs_list [] st = (False, st)
+	occurs_list [x:xs] st 
+		# (x, st) = occurs x st
+		# (xs, st) = occurs_list xs st
+		= (x || xs, st)   
 
+	type_var_occurs tv th_vars
+		# (tv_info, th_vars) = readPtr tv.tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Empty = (False, th_vars) 
+			TVI_Used = (True, th_vars)
+			_ = abort "invalid type var info"	
+				---> ("type var is not empty", tv, tv_info)		
+
+	mark_type_var tv=:{tv_info_ptr} th_vars 
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Empty = writePtr tv_info_ptr TVI_Used th_vars 
+			_ = abort "type var is not empty"
+				--->  ("type var is not empty", tv, tv_info)
+
+	clear_type_var {tv_info_ptr} th_vars
+		= writePtr tv_info_ptr TVI_Empty th_vars 
+
+	
 buildStructType ::
-		!GlobalIndex				// type def global index 
+		!GlobalIndex				// type def global index
+		!DefinedSymbol 				// type_info
 		![ConsInfo]					// constructor and field info symbols
 		!PredefinedSymbols
 		(!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 	-> 	( !GenTypeStruct			// the structure type
 		, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 		)
-buildStructType {gi_module,gi_index} cons_infos predefs (modules, td_infos, heaps, error)
+buildStructType {gi_module,gi_index} type_info cons_infos predefs (modules, td_infos, heaps, error)
 	# (type_def=:{td_ident}, modules) = modules![gi_module].com_type_defs.[gi_index]	
 	//# (common_defs, modules) = modules ! [gi_module]	
-	= build_type type_def cons_infos (modules, td_infos, heaps, error)	
+	= build_type type_def type_info cons_infos (modules, td_infos, heaps, error)	
 		//---> ("buildStructureType", td_ident, atype)	
 where
-	build_type {td_rhs=AlgType alts, td_ident, td_pos} cons_infos st
+	build_type {td_rhs=AlgType alts, td_ident, td_pos} type_info cons_infos st
 		# (cons_args, st) = zipWithSt (build_alt td_ident td_pos) alts cons_infos st
-		= (build_sum_type cons_args, st) 
+		# type = build_sum_type cons_args
+		# type = SwitchGenericInfo (GTSObject type_info type) type
+		= (type, st) 
 
-/*
-	build_type {td_rhs=RecordType {rt_constructor}, td_ident, td_pos} [cdi] st		
-		= build_alt td_ident td_pos rt_constructor cdi st
-*/
 	build_type 
 			{td_rhs=RecordType {rt_constructor}, td_ident, td_pos} 
-			[{ci_cons_info, ci_field_infos}] 
+			type_info  [{ci_cons_info, ci_field_infos}] 
 			(modules, td_infos, heaps, error)		
 		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]	
 		# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)
@@ -440,17 +509,18 @@ where
 		# args = SwitchGenericInfo [GTSField fi arg \\ arg <- args & fi <- ci_field_infos] args
 			
 		# prod_type = build_prod_type args		
-		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type		
+		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type
+		# type = SwitchGenericInfo (GTSObject type_info type) type
 		= (type, st)		
 
 /*		
 	build_type {td_rhs=SynType type,td_ident, td_pos} cons_infos common_defs st
 		= convertATypeToGenTypeStruct td_ident td_pos type st
 */
-	build_type {td_rhs=SynType type,td_ident, td_pos} cons_infos (modules, td_infos, heaps, error)
+	build_type {td_rhs=SynType type,td_ident, td_pos} type_info cons_infos (modules, td_infos, heaps, error)
 		# error = reportError td_ident td_pos "cannot build a generic representation of a synonym type" error
 		= (GTSE, (modules, td_infos, heaps, error))
-	build_type td=:{td_rhs=(AbstractType _),td_ident, td_arity, td_args, td_pos} cdis (modules, td_infos, heaps, error)
+	build_type td=:{td_rhs=(AbstractType _),td_ident, td_arity, td_args, td_pos} type_info cdis (modules, td_infos, heaps, error)
 		# error = reportError td_ident td_pos "cannot build a generic representation of an abstract type" error
 		= (GTSE, (modules, td_infos, heaps, error))
 		
@@ -521,7 +591,8 @@ buildTypeDefInfo ::
 		!*Modules
 		!*Heaps
 		!*ErrorAdmin
-	-> 	( ![ConsInfo]
+	-> 	( DefinedSymbol	// type info
+		, ![ConsInfo]
 		, !FunsAndGroups
 		, !*Modules
 		, !*Heaps
@@ -581,6 +652,9 @@ buildTypeDefInfo1 td_module {td_ident, td_pos, td_arity} alts fields main_module
 	# new_funs = (reverse field_dsc_funs) ++ (reverse cons_dsc_funs) ++ [type_def_dsc_fun] ++ funs 
 	
 	# funs_and_groups = (new_fun_index, new_group_index, new_funs, new_groups)
+
+	# (type_info_ds, (funs_and_groups, heaps)) 
+		= build_type_info type_def_dsc_ds (funs_and_groups, heaps)
 	
 	# (cons_info_dss, (funs_and_groups, heaps)) 
 		= mapSt build_cons_info cons_dsc_dss (funs_and_groups, heaps)
@@ -593,7 +667,8 @@ buildTypeDefInfo1 td_module {td_ident, td_pos, td_arity} alts fields main_module
 		(cons_info_dss, []) -> [{ci_cons_info=x,ci_field_infos=[]}\\x<-cons_info_dss]
 		_ -> abort "generics.icl sanity check: fields in non-record type\n"
 
-	= (cons_infos, funs_and_groups, modules, heaps, error)
+
+	= (type_info_ds, cons_infos, funs_and_groups, modules, heaps, error)
 where
 
 	build_type_def_dsc group_index cons_info_dss {ds_index, ds_ident}  heaps	
@@ -756,6 +831,19 @@ where
 		# (def_sym, funs_and_groups) = buildFunAndGroup ident [] body_expr No main_module_index td_pos funs_and_groups
 		= (def_sym, (funs_and_groups, heaps))
 
+	build_type_info type_dsc_ds (funs_and_groups, heaps)
+		# ident = makeIdent ("g"+++type_dsc_ds.ds_ident.id_name)	
+
+		# (type_dsc_expr, heaps) = buildFunApp main_module_index type_dsc_ds [] heaps
+
+		# (body_expr, heaps) 
+			= buildPredefConsApp PD_GenericTypeInfo [type_dsc_expr] predefs heaps		
+
+		# (def_sym, funs_and_groups) = buildFunAndGroup ident [] body_expr No main_module_index td_pos funs_and_groups
+		= (def_sym, (funs_and_groups, heaps))
+
+
+
 //========================================================================================
 //	conversions functions
 //========================================================================================
@@ -892,6 +980,10 @@ where
 				build_cons expr heaps = buildPredefConsApp PD_ConsCONS [expr] predefs heaps						
 		#! (expr, heaps) = build_sum i n expr predefs heaps
 				
+		#! (expr, heaps) = SwitchGenericInfo (build_object expr heaps) (expr, heaps)
+			with 
+				build_object expr heaps = buildPredefConsApp PD_ConsOBJECT [expr] predefs heaps						
+						
 		#! alg_pattern = {
 			ap_symbol = {glob_module = type_def_mod, glob_object = cons_def_sym},
 			ap_vars = vars,
@@ -975,9 +1067,18 @@ where
 			, !*ErrorAdmin
 			)		
 	build_expr_for_type_rhs type_def_mod (AlgType def_symbols) heaps error
-		= build_sum False type_def_mod def_symbols heaps error
+		#! (expr, var, heaps, error) = build_sum False type_def_mod def_symbols heaps error
+		#! (expr, var, heaps) = SwitchGenericInfo 
+			(build_case_object var expr heaps)
+			(expr, var, heaps)
+		= (expr, var, heaps, error)
 	build_expr_for_type_rhs type_def_mod (RecordType {rt_constructor}) heaps error				
-		= build_sum True type_def_mod [rt_constructor] heaps	error
+		# (expr, var, heaps, error) = build_sum True type_def_mod [rt_constructor] heaps	error
+		#! (expr, var, heaps) = SwitchGenericInfo 
+			(build_case_object var expr heaps)
+			(expr, var, heaps)
+		= (expr, var, heaps, error)
+		
 	build_expr_for_type_rhs type_def_mod (AbstractType _) heaps error
 		#! error = reportError td_ident td_pos "cannot build isomorphisms for an abstract type" error
 		# dummy_fv = {fv_def_level=(-1), fv_count=0, fv_ident=makeIdent "dummy", fv_info_ptr=nilPtr}
@@ -1090,10 +1191,10 @@ where
 		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
 		= build_case_expr case_patterns heaps 
 	
-	// REC case
-	build_case_rec var body_expr heaps
-		# pat = buildPredefConsPattern PD_ConsREC [var] body_expr predefs	
-		# {pds_module, pds_def} = predefs.[PD_TypeREC]
+	// OBJECT case
+	build_case_object var body_expr heaps
+		# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
+		# {pds_module, pds_def} = predefs.[PD_TypeOBJECT]
 		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
 		= build_case_expr case_patterns heaps 
 		
@@ -2000,6 +2101,9 @@ where
 
 		#! (struct_gen_type, (modules, td_infos, heaps, error)) = convertATypeToGenTypeStruct 
 				bimap_ident gc_pos predefs curried_gen_type (modules, td_infos, heaps, error)  
+				
+		#! (struct_gen_type, heaps) = simplifyStructOfGenType gen_vars struct_gen_type heaps
+				
 		#! (bimap_expr, (td_infos, heaps, error)) 
 			= specializeGeneric {gi_module=bimap_module,gi_index=bimap_index} struct_gen_type spec_env bimap_ident gc_pos main_module_index predefs (td_infos, heaps, error)
 
@@ -2291,6 +2395,10 @@ where
 		= (expr @ arg_exprs, st)
 	specialize (GTSVar tv) st
 		= specialize_type_var tv st
+	specialize (GTSArrow x y) st
+		#! (x, st) = specialize x st 
+		#! (y, st) = specialize y st 
+		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] st
 
 	specialize (GTSCons cons_info_ds arg_type) st
 		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
@@ -2314,6 +2422,16 @@ where
 
 		= (expr, (td_infos, heaps, error))
 	
+	specialize (GTSObject type_info_ds arg_type) st
+		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+
+		#! (generic_info_expr, heaps) = buildFunApp main_module_index type_info_ds [] heaps 
+		
+		#! (expr, heaps) = buildGenericApp 
+				gen_index.gi_module gen_index.gi_index gen_ident 
+				(KindArrow [KindConst]) [generic_info_expr, arg_expr] heaps
+
+		= (expr, (td_infos, heaps, error))
 
 	specialize type (td_infos, heaps, error)
 		#! error = reportError gen_ident gen_pos "cannot specialize " error 
@@ -2340,7 +2458,7 @@ where
 //****************************************************************************************
 
 // kind indexing:
-// t_* a1 ... an 			= t a1 ... an 
+// t_{*} a1 ... an 			= t a1 ... an 
 // t_{k->l} a1 ... an		= forall b1...bn.(t_k b1 ... bn) -> (t_l (a1 b1) ... (an bn)) 
 buildKindIndexedType :: 
 		!SymbolType			// symbol type to kind-index
@@ -2504,14 +2622,27 @@ where
 	build_body st gatvs arg_gatvss  th
 		# th = clearSymbolType st th
 		# th = fold2St subst_gatv gatvs arg_gatvss th
-		= applySubstInSymbolType st th 
+		# (st, th) = applySubstInSymbolType st th 
+		//# st = add_propagating_inequalities st gatvs arg_gatvss 
+		= (st, th)
 	where
 		subst_gatv gatv=:{atv_variable} arg_gatvs th=:{th_vars}
 			#! type_args = [ makeAType (TV atv_variable) atv_attribute 
 							\\ {atv_variable, atv_attribute} <- arg_gatvs]
 			#! type = (CV atv_variable) :@: type_args
 			#! th_vars = writePtr atv_variable.tv_info_ptr (TVI_Type type) th_vars
-			= {th & th_vars = th_vars}	
+			= {th & th_vars = th_vars}
+			
+		add_propagating_inequalities st gatvs arg_gatvss
+			# inequalities = zipWith make_inequalities gatvs arg_gatvss 
+			= {st & st_attr_env = st.st_attr_env ++ flatten inequalities}
+		where	
+			make_inequalities gatv arg_gatvs 
+				= filterOptionals (map (make_inequality gatv) arg_gatvs)
+			make_inequality {atv_attribute=TA_Var x} {atv_attribute=TA_Var y} 
+				= Yes {ai_offered = x, ai_demanded = y}	// offered <= demanded = outer<=inner = x<=y
+			make_inequality _ _
+				= No
 		
 reportError name pos msg error=:{ea_file} 
 	//= checkErrorWithIdentPos (newPosition name pos) msg error
@@ -3846,6 +3977,10 @@ mapOptionalSt f No st = (No, st)
 mapOptionalSt f (Yes x) st 
 	# (y, st) = f x st
 	= (Yes y, st)
+
+filterOptionals [] = []
+filterOptionals [No : xs] 	= filterOptionals xs
+filterOptionals [Yes x : xs] = [x : filterOptionals xs]
 	
 mapSt2 f [] st1 st2 		= ([], st1, st2) 
 mapSt2 f [x:xs] st1 st2

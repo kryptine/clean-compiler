@@ -463,9 +463,10 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	= GTSAppCons TypeKind [GenTypeStruct]
 	| GTSAppVar TypeVar [GenTypeStruct] 
 	| GTSVar TypeVar
+	| GTSArrow GenTypeStruct GenTypeStruct	// needed for simplifying bimaps
  	| GTSCons DefinedSymbol GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
- 	| GTSRec GenTypeStruct
+ 	| GTSObject DefinedSymbol GenTypeStruct
  	| GTSE
  
 :: GenericTypeRep = 

@@ -471,6 +471,7 @@ where
 				# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
 				# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
 				# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState
+				# (type_OBJECT_ident, pState)= stringToIdent "OBJECT" IC_Type pState
 				# (generic_ident, pState) = stringToIdent name IC_Generic pState					
 
 				# (type_cons, pState) = get_type_cons type pState
@@ -504,6 +505,9 @@ where
 									| type_ident == type_FIELD_ident 
 										# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
 										-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)
+									| type_ident == type_OBJECT_ident 
+										# (cons_OBJECT_ident, pState) = stringToIdent "GenericTypeDefInfo" IC_Expression pState 
+										-> (PE_List [PE_Ident cons_OBJECT_ident, geninfo_arg], pState)
 								_
 									| otherwise
 										-> (geninfo_arg, pState)
