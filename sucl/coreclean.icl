@@ -5,10 +5,22 @@ implementation module coreclean
 import syntax
 
 :: SuclTypeSymbol
- = SuclINT
+ = SuclUSER TypeSymbIdent
+ | SuclFN
+ | SuclINT
+ | SuclCHAR
+ | SuclREAL
+ | SuclBOOL
+ | SuclDYNAMIC
+ | SuclFILE
+ | SuclWORLD
 
 :: SuclTypeVariable
  = SuclANONYMOUS Int
+ | SuclNAMED TypeVar
+
+sucltypeheap :: [SuclTypeVariable]
+sucltypeheap =: map SuclANONYMOUS [0..]
 
 :: SuclSymbol
  = SuclUser Ident

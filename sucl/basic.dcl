@@ -14,6 +14,7 @@ Basic types and functions.
 
 */
 
+from general import Optional
 import StdOverloaded
 import StdString
 
@@ -26,7 +27,8 @@ Implementation
 
 // The optional type of type t is a type like t
 // where the actual t value may be present or absent.
-:: Optional t = Absent | Present t
+//:: Optional t = Absent | Present t
+//Now using Optional from cocl's general module
 
 
 // Adjust a function for a single argument

@@ -23,7 +23,9 @@ Implementation
 
 */
 
-:: Optional t = Absent | Present t
+//:: Optional t = Absent | Present t
+// Now using Optional type from cocl's general module
+from general import Optional,No,Yes
 
 
 // Adjust a function for a single argument
@@ -91,8 +93,8 @@ foldmap f d
     where foldmap` (x,y) g v = if (x==v) (f y) (g v)
 
 foldoptional :: .res .(.t -> .res) !(Optional .t) -> .res
-foldoptional absent present Absent = absent
-foldoptional absent present (Present x) = present x
+foldoptional no yes No = no
+foldoptional no yes (Yes x) = yes x
 
 forget :: val -> .(![.(val,res)] -> .[(val,res)]) | == val
 forget x = filter (neq x o fst)
@@ -161,8 +163,8 @@ power n f
 =   f o power (n-1) f
 
 printoptional :: .(.t -> String) !(Optional .t) -> String
-printoptional printa  Absent     = ""
-printoptional printa (Present a) = printa a
+printoptional printa  No     = ""
+printoptional printa (Yes a) = printa a
 
 proc :: .((w:elem -> .(.res -> .res)) -> v:(![w:elem] -> u:(.res -> .res))), [u <= v, u <= w]
 proc = flip o foldr
@@ -178,8 +180,8 @@ maphd f []     = []
 maphd f [x:xs] = [f x:xs]
 
 mapoptional :: .(.a -> .b) !(Optional .a) -> Optional .b
-mapoptional f Absent      = Absent
-mapoptional f (Present x) = Present (f x)
+mapoptional f No      = No
+mapoptional f (Yes x) = Yes (f x)
 
 mappair :: .(.a -> .b) .(.c -> .d) !(.a,.c) -> (.b,.d)
 mappair f g (x,y) = (f x,g y)
@@ -219,8 +221,8 @@ showbool :: .(!.Bool -> a) | fromBool a
 showbool = fromBool
 
 showoptional :: .(.a -> .String) !(Optional .a) -> String
-showoptional showa Absent      = "Absent"
-showoptional showa (Present a) = "(Present "+++showa a+++")"
+showoptional showa No      = "No"
+showoptional showa (Yes a) = "(Yes "+++showa a+++")"
 
 showpair :: !.(.a -> .String) !.(.b -> .String) !(.a,.b) -> String
 showpair showa showb (a,b) = "("+++showa a+++","+++showb b+++")"

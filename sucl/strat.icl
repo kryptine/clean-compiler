@@ -9,6 +9,7 @@ import rule
 import graph
 import pfun
 import basic
+from general import No,Yes
 import StdEnv
 
 /*
@@ -110,8 +111,8 @@ makernfstrategy
 
 makernfstrategy hist strat rnfnodes node graph
 = substrat [] spinecont rnfanswer node
-  where spinecont spine = Present spine
-        rnfanswer = Absent
+  where spinecont spine = Yes spine
+        rnfanswer = No
 
         substrat spinenodes spinecont rnfanswer node
         | isMember node spinenodes
