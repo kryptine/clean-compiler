@@ -1459,6 +1459,10 @@ convertTypeNode (TempV n)
 	=	beVarTypeNode ("_tv" +++ toString n)
 convertTypeNode (a --> b) 
 	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a, b])
+convertTypeNode (TArrow1 a) 
+	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a])
+convertTypeNode TArrow 
+	=	beNormalTypeNode (beBasicSymbol BEFunType) beNoTypeArgs
 convertTypeNode (a :@: b)
 	=	beNormalTypeNode (beBasicSymbol BEApplySymb) (convertTypeArgs [{at_attribute=TA_Multi, at_type = consVariableToType a} : b])
 convertTypeNode TE
