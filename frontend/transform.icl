@@ -186,8 +186,8 @@ where
 		# (dp_rhs, ls) = lift dp_rhs ls
 		= ({ pattern & dp_rhs = dp_rhs }, ls)
 
-unfoldVariable :: !BoundVar !*UnfoldState -> (!Expression, !*UnfoldState)
-unfoldVariable var=:{var_name,var_info_ptr} us
+unfoldVariable :: !BoundVar UnfoldInfo !*UnfoldState -> (!Expression, !*UnfoldState)
+unfoldVariable var=:{var_name,var_info_ptr} ui us
 	#! (var_info, us) = readVarInfo var_info_ptr us
 	= case var_info of 
 		VI_Expression expr
@@ -203,8 +203,9 @@ unfoldVariable var=:{var_name,var_info_ptr} us
 		VI_Dictionary app_symb app_args class_type
 			# (new_class_type, us_opt_type_heaps) = substitute_class_types class_type us.us_opt_type_heaps
 			  (new_info_ptr, us_symbol_heap) = newPtr (EI_DictionaryType new_class_type) us.us_symbol_heap
-			-> (App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr },
-				{ us & us_opt_type_heaps = us_opt_type_heaps, us_symbol_heap = us_symbol_heap })
+			  app = App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr }
+			  us = { us & us_opt_type_heaps = us_opt_type_heaps, us_symbol_heap = us_symbol_heap }
+			-> unfold app ui us
 		_
 			-> (Var var, us)
   where
@@ -213,6 +214,7 @@ unfoldVariable var=:{var_name,var_info_ptr} us
 	substitute_class_types class_types (Yes type_heaps)
 		# (_,new_class_types, type_heaps) = substitute class_types type_heaps
 		= (new_class_types, Yes type_heaps)
+
 
 readVarInfo var_info_ptr us
 	#! var_info = sreadPtr var_info_ptr us.us_var_heap
@@ -260,7 +262,7 @@ class unfold a :: !a !UnfoldInfo !*UnfoldState -> (!a, !*UnfoldState)
 instance unfold Expression
 where
 	unfold (Var var) ui us
-		= unfoldVariable var us
+		= unfoldVariable var ui us
 	unfold (App app) ui us
 		# (app, us) = unfold app ui us
 		= (App app, us)
@@ -312,7 +314,7 @@ where
 	unfold (DictionarySelection var selectors expr_ptr index_expr) ui us=:{us_symbol_heap}
 		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
 		  (index_expr, us) = unfold index_expr ui { us & us_symbol_heap = us_symbol_heap}
-		  (var_expr, us) = unfoldVariable var us
+		  (var_expr, us) = unfoldVariable var ui us
 		= case var_expr of 
 			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
 				# [RecordSelection _ field_index:_] = selectors
@@ -458,8 +460,7 @@ where
 																		No		-> (No, us)
 																		Yes fvs	# (fvs_subst, us) = mapSt unfoldBoundVar fvs us
 																				-> (Yes fvs_subst, us)
-					  (var_info, us_var_heap) = readPtr var_info_ptr us.us_var_heap
-					  us = { us & us_var_heap = us_var_heap }
+					  (var_info, us) = readVarInfo var_info_ptr us
 					-> case var_info of
 						VI_Body fun_symb {tb_args, tb_rhs} new_aci_params
 							# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
