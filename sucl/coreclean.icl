@@ -17,7 +17,7 @@ block func = mstub func "blocked"
 
 :: SuclTypeSymbol
  = SuclUSER (Global Index)
- | SuclFN Int
+ | SuclFN
  | SuclINT
  | SuclCHAR
  | SuclREAL
@@ -62,7 +62,7 @@ suclheap =: map SuclAnonymous [0..]
 
 instance == SuclTypeSymbol
 where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
-      (==) (SuclFN   arity1) (SuclFN   arity2) = arity1==arity2
+      (==)  SuclFN            SuclFN           = True
       (==)  SuclINT           SuclINT          = True
       (==)  SuclCHAR          SuclCHAR         = True
       (==)  SuclREAL          SuclREAL         = True
@@ -76,7 +76,7 @@ where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
 
 instance toString SuclTypeSymbol
 where toString (SuclUSER tsid ) = toString tsid
-      toString (SuclFN   arity) = "Arrow/"+++toString arity
+      toString  SuclFN          = "Arrow/2"
       toString  SuclINT         = "Int"
       toString  SuclCHAR        = "Char"
       toString  SuclREAL        = "Real"
@@ -195,13 +195,14 @@ corestricts sym
 
 coretyperule :: !SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 coretyperule (SuclApply argc)
- = ((mkrule [infunctype,argtype] outfunctype` (updategraph infunctype (SuclFN ((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins"),[argtype:argtypes]++[restype]) outfuncgraph) <--- "coreclean.coretyperule.Apply ends") <--- "coreclean.coretyperule ends (Apply)") ---> "coreclean.coretyperule.Apply begins"
-   where [infunctype,outfunctype,argtype,restype:sucltypeheap`] = sucltypeheap
-         argtypes = take ((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins") sucltypeheap`
-         (outfunctype`,outfuncgraph)
-          = if (((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins")==0)
-               (restype,emptygraph)
-               (outfunctype,updategraph outfunctype (SuclFN (((argc<---"coreclean.coretyperule.Apply.argc ends")--->"coreclean.coretyperule.Apply.argc begins")-1),argtypes++[restype]) emptygraph)
+= mkrule [functype:argtypes] restype typegraph
+  where (functype,argtypes,typegraph) = mkfuncargtypes sucltypeheap` argc (restype,[],emptygraph)
+        [restype:sucltypeheap`] = sucltypeheap
+        mkfuncargtypes typeheap 0 rat
+        = rat
+        mkfuncargtypes [functype,argtype:typeheap] n rat
+        = (functype,[argtype:argtypes],updategraph functype (SuclFN,[argtype,restype]) typegraph)
+          where (restype,argtypes,typegraph) = mkfuncargtypes typeheap (n-1) rat
 coretyperule (SuclInt _) = consttyperule SuclINT <--- "coreclean.coretyperule ends (Int)"
 coretyperule (SuclChar _) = consttyperule SuclCHAR <--- "coreclean.coretyperule ends (Char)"
 coretyperule (SuclReal _) = consttyperule SuclREAL <--- "coreclean.coretyperule ends (Real)"
@@ -216,7 +217,7 @@ consttyperule tsym
 corecomplete :: SuclTypeSymbol -> [SuclSymbol] -> Bool
 
 corecomplete (SuclUSER tsid) = const False  // Must be an abstype...
-corecomplete (SuclFN arity) = const False
+corecomplete SuclFN = const False
 corecomplete SuclINT = const False
 corecomplete SuclCHAR = superset (map (SuclChar o toChar) [0..255]) // 256 alternatives... doubtful is this is useful, but hey...
 corecomplete SuclREAL = const False

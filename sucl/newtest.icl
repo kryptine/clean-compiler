@@ -547,7 +547,7 @@ sym with the given arguments, curried if there are too few.
 */
 
 ctyperule ::
-    (Int -> tsym)           // The arrow type symbol for functions of given arity
+    tsym                    // The arrow type symbol
     [tvar]                  // Fresh type variables
     (sym->Rule tsym tvar)   // Type rule of a symbol
     (sym,[var])             // Node to abstract
@@ -561,7 +561,7 @@ ctyperule fn typeheap typerule (sym,args)
         (targs`,targs``) = claim args targs
         (troot`,tgraph`,_) = foldr build (troot,tgraph,typeheap--varlist tgraph [troot:targs]) targs``
         build targ (troot,tgraph,[tnode:tnodes])
-        = (tnode,updategraph tnode (fn 1,[targ,troot]) tgraph,tnodes)
+        = (tnode,updategraph tnode (fn,[targ,troot]) tgraph,tnodes)
 
 /*
 >   newsymbols main = map (User main.("New_"++)) identifiers
