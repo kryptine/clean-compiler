@@ -11,7 +11,7 @@ import checksupport, transform, overloading
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
 		,	fe_globalFunctions :: !IndexRange
-		,	fe_arrayInstances :: !IndexRange
+		,	fe_arrayInstances :: !ArrayAndListInstances
 		}
 
 :: FrontEndPhase
