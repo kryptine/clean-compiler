@@ -2,8 +2,8 @@ definition module checktypes
 
 import checksupport, typesupport
 
-checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !Int !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*TypeHeaps !*CheckState
-	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*TypeHeaps, !*CheckState)
+checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
+	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
 
 checkSymbolType :: !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!SymbolType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
@@ -17,7 +17,7 @@ checkInstanceType :: !Index !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# 
 checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType) !u:{# CheckedTypeDef} !u:{# DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
 	-> (!u:{# CheckedTypeDef}, !u:{# DclModule}, !*TypeHeaps, !*ExpressionHeap, !*CheckState)
 
-createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !Int !*TypeVarHeap !*VarHeap !*CheckState
+createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*CheckState
 	-> (!*{#ClassDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*CheckState)
 
 isATopConsVar cv		:== cv < 0

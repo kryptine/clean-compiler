@@ -88,8 +88,8 @@ where toString {import_module} = toString import_module
 
 ::	CollectedDefinitions instance_kind macro_defs =
 	{	def_types 			:: ![TypeDef TypeRhs]
-	,	def_constructors	:: ![ParsedConstructor]
-	,	def_selectors		:: ![ParsedSelector]
+	,	def_constructors	:: ![ConsDef]
+	,	def_selectors		:: ![SelectorDef]
 	,	def_macros			:: !macro_defs
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
@@ -1772,17 +1772,17 @@ MakeTypeSymbIdent type_index name arity
 MakeSymbIdent name arity	:== { symb_name = name, symb_kind = SK_Unknown, symb_arity = arity }
 MakeConstant name			:== MakeSymbIdent name 0
 
-ParsedSelectorToSelectorDef ps var_ptr :==
+ParsedSelectorToSelectorDef ps :==
 	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = NoIndex,
-		sd_exi_vars = [], /* sd_exi_attrs = [], */ sd_type_ptr = var_ptr, sd_field = ps.ps_field_name,
+		sd_exi_vars = [], sd_type_ptr = nilPtr, sd_field = ps.ps_field_name,
 		sd_type	= { st_vars = [], st_args = [], st_result = ps.ps_field_type, st_arity = 0, st_context = [],
 				    st_attr_env = [], st_attr_vars = [] }}
 
-ParsedConstructorToConsDef pc var_ptr :==
+ParsedConstructorToConsDef pc :==
 	{	cons_symb = pc.pc_cons_name, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_index = NoIndex, cons_type_index = NoIndex,
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_result = MakeAttributedType TE, 
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
-		cons_exi_vars = pc.pc_exi_vars, /* cons_exi_attrs = [], */ cons_type_ptr = var_ptr, cons_arg_vars = [] }
+		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr, cons_arg_vars = [] }
 
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 

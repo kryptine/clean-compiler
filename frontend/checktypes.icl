@@ -12,7 +12,8 @@ import syntax, checksupport, check, typesupport, utilities, RWSDebug
 	}
 	
 ::	TypeInfo =
-	{	ti_heaps		:: !.TypeHeaps
+	{	ti_var_heap			:: !.VarHeap
+	,	ti_type_heaps		:: !.TypeHeaps
 	}
 
 ::	CurrentTypeInfo =
@@ -138,19 +139,20 @@ bindTypesOfCons :: !Index !Index ![TypeVar] ![AttributeVar] !AType ![DefinedSymb
 
 bindTypesOfConstructors _ _ _ _ _ [] ts_ti_cs
 	= ts_ti_cs
-bindTypesOfConstructors cti=:{cti_lhs_attribute} cons_index free_vars free_attrs type_lhs [{ds_index}:conses] (ts=:{ts_cons_defs}, ti=:{ti_heaps}, cs)
+bindTypesOfConstructors cti=:{cti_lhs_attribute} cons_index free_vars free_attrs type_lhs [{ds_index}:conses] (ts=:{ts_cons_defs}, ti=:{ti_type_heaps}, cs)
 	#! cons_def = ts_cons_defs.[ds_index]
-	# (exi_vars, (ti_heaps, cs))
-	  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_heaps cs
+	# (exi_vars, (ti_type_heaps, cs))
+	  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
 	  (st_args, cons_arg_vars, st_attr_env, (ts, ti, cs))
-	  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] (ts, { ti  & ti_heaps = ti_heaps }, cs)
+	  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] (ts, { ti  & ti_type_heaps = ti_type_heaps }, cs)
 	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cOuterMostLevel exi_vars cs.cs_symbol_table
 	  (ts, ti, cs) = bindTypesOfConstructors cti (inc cons_index) free_vars free_attrs type_lhs conses
 							(ts, ti, { cs & cs_symbol_table = cs_symbol_table }) 
 	  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = free_attrs, st_attr_env = st_attr_env }
+	  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
 	= ({ ts & ts_cons_defs = { ts.ts_cons_defs & [ds_index] =
 			{ cons_def & cons_type = cons_type, cons_index = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
-						 cons_arg_vars = cons_arg_vars }}}, ti, cs)
+					cons_type_ptr = new_type_ptr, cons_arg_vars = cons_arg_vars }}}, { ti & ti_var_heap = ti_var_heap }, cs)
 where
 /*
 	check_types_of_cons :: ![AType] !Bool !Index  !Level ![TypeVar] !TypeAttribute ![AttrInequality] !Conditions !*TypeSymbols !*TypeInfo !*CheckState
@@ -175,10 +177,6 @@ where
 						symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
 
 
-/*
-checkRhsOfTypeDef :: !CheckedTypeDef ![AttributeVar] !Bool !Index !Level !TypeAttribute !Index !Conditions !*TypeSymbols !*TypeInfo !*CheckState
-	-> (!TypeRhs, !TypeProperties, !Conditions, !Int, !*TypeSymbols, !*TypeInfo, !*CheckState)
-*/
 checkRhsOfTypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:AlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} ts_ti_cs
 	# type_lhs = { at_annotation = AN_None, at_attribute = cti_lhs_attribute,
 			  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_name td_arity)
@@ -195,23 +193,25 @@ checkRhsOfTypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_cons
 	  						attr_vars type_lhs [rec_cons] ts_ti_cs
 	#! rec_cons_def = ts.ts_cons_defs.[ds_index]
 	# {cons_type = { st_vars,st_args,st_result,st_attr_vars }, cons_exi_vars} = rec_cons_def
-	  (ts_selector_defs, cs_error) = check_selectors 0 rt_fields cti_type_index st_args st_result st_vars st_attr_vars cons_exi_vars ts.ts_selector_defs cs.cs_error
-	= (td_rhs, ({ ts & ts_selector_defs = ts_selector_defs }, ti, { cs & cs_error = cs_error}))
+	  (ts_selector_defs, ti_var_heap, cs_error) = check_selectors 0 rt_fields cti_type_index st_args st_result st_vars st_attr_vars cons_exi_vars
+				ts.ts_selector_defs ti.ti_var_heap cs.cs_error
+	= (td_rhs, ({ ts & ts_selector_defs = ts_selector_defs }, { ti & ti_var_heap = ti_var_heap }, { cs & cs_error = cs_error}))
 where
-	check_selectors :: !Index !{# FieldSymbol} !Index ![AType] !AType ![TypeVar] ![AttributeVar] ![ATypeVar] !*{#SelectorDef} !*ErrorAdmin
-		-> (!*{#SelectorDef},!*ErrorAdmin)
-	check_selectors field_nr fields rec_type_index sel_types rec_type st_vars st_attr_vars exi_vars selector_defs error
+	check_selectors :: !Index !{# FieldSymbol} !Index ![AType] !AType ![TypeVar] ![AttributeVar] ![ATypeVar] !*{#SelectorDef} !*VarHeap !*ErrorAdmin
+		-> (!*{#SelectorDef}, !*VarHeap, !*ErrorAdmin)
+	check_selectors field_nr fields rec_type_index sel_types rec_type st_vars st_attr_vars exi_vars selector_defs var_heap error
 		| field_nr < size fields
 			# {fs_index} = fields.[field_nr]
 			#! sel_def = selector_defs.[fs_index]
 			# [sel_type:sel_types] = sel_types
 			# (st_attr_env, error) = addToAttributeEnviron sel_type.at_attribute rec_type.at_attribute [] error
+			# (new_type_ptr, var_heap) = newPtr VI_Empty var_heap
 			  sd_type = { sel_def.sd_type &  st_arity = 1, st_args = [rec_type], st_result = sel_type, st_vars = st_vars,
 			  				st_attr_vars = st_attr_vars, st_attr_env = st_attr_env }
 			  selector_defs = { selector_defs & [fs_index] = { sel_def & sd_type = sd_type, sd_field_nr = field_nr, sd_type_index = rec_type_index,
-			  									sd_exi_vars = exi_vars  } }
-			= check_selectors (inc field_nr) fields rec_type_index sel_types  rec_type st_vars st_attr_vars exi_vars selector_defs error
-			= (selector_defs, error)
+			  									sd_type_ptr = new_type_ptr, sd_exi_vars = exi_vars  } }
+			= check_selectors (inc field_nr) fields rec_type_index sel_types  rec_type st_vars st_attr_vars exi_vars selector_defs var_heap error
+			= (selector_defs, var_heap, error)
 checkRhsOfTypeDef {td_rhs = SynType type} _ cti ts_ti_cs
 	# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
 	= (SynType type, ts_ti_cs)
@@ -224,18 +224,17 @@ isATopConsVar cv		:== cv < 0
 encodeTopConsVar cv		:== dec (~cv)
 decodeTopConsVar cv		:== ~(inc cv)
 
-// checkTypeDef :: !Bool !Index !Index  !*TypeSymbols !*TypeInfo !*CheckState -> (!Int, !Conditions, !*TypeSymbols, !*TypeInfo, !*CheckState);
-checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_heaps} cs=:{cs_error}
+checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
 	#! type_def = ts_type_defs.[type_index]
 	# {td_name,td_pos,td_args,td_attribute,td_properties} = type_def
 	  position = newPosition td_name td_pos
 	  cs_error = pushErrorAdmin position cs_error
-	  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_name.id_name ti_heaps.th_attrs
-	  (type_vars, (attr_vars, ti_heaps, cs))
-	  		= addTypeVariablesToSymbolTable td_args attr_vars { ti_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
+	  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_name.id_name ti_type_heaps.th_attrs
+	  (type_vars, (attr_vars, ti_type_heaps, cs))
+	  		= addTypeVariablesToSymbolTable td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
 	  type_def = {	type_def & td_args = type_vars, td_index = type_index, td_attrs = attr_vars, td_attribute = td_attribute }
 	  (td_rhs, (ts, ti, cs)) = checkRhsOfTypeDef type_def attr_vars
-			{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute } (ts,{ ti & ti_heaps = ti_heaps}, cs)
+			{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute } (ts,{ ti & ti_type_heaps = ti_type_heaps}, cs)
 	= ({ ts & ts_type_defs = { ts.ts_type_defs & [type_index] = { type_def & td_rhs = td_rhs }}}, ti,
 				{ cs &	cs_error = popErrorAdmin cs.cs_error,
 						cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cOuterMostLevel type_vars cs.cs_symbol_table })
@@ -406,21 +405,23 @@ where
 		kind_list_to_string [] = ""
 		kind_list_to_string [k:ks] = " -> " +++ toString k +++ kind_list_to_string ks
 */
-checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !Int !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*TypeHeaps !*CheckState
-	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*TypeHeaps, !*CheckState)
-checkTypeDefs is_main_dcl type_defs module_index nr_of_types cons_defs selector_defs modules heaps cs
+
+checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
+	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
+checkTypeDefs is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
+	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
-	   ti = { ti_heaps = heaps  }
+	   ti = { ti_type_heaps = type_heaps, ti_var_heap = var_heap  }
 	= check_type_defs is_main_dcl 0 nr_of_types module_index ts ti cs
 where
-	check_type_defs is_main_dcl type_index nr_of_types module_index ts ti=:{ti_heaps} cs
+	check_type_defs is_main_dcl type_index nr_of_types module_index ts ti=:{ti_type_heaps,ti_var_heap} cs
 		| type_index == nr_of_types
 			| cs.cs_error.ea_ok && not is_main_dcl
 				# marks = createArray nr_of_types CS_NotChecked
 				  (type_defs, modules, cs) = expand_syn_types module_index 0 nr_of_types
 				  		{ sti_type_defs = ts.ts_type_defs, sti_modules = ts.ts_modules, sti_marks = marks } cs
-				= (type_defs, ts.ts_cons_defs, ts.ts_selector_defs, modules, ti_heaps, cs)
-			= (ts.ts_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, ts.ts_modules, ti_heaps, cs)
+				= (type_defs, ts.ts_cons_defs, ts.ts_selector_defs, modules, ti_var_heap, ti_type_heaps, cs)
+			= (ts.ts_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, ts.ts_modules, ti_var_heap, ti_type_heaps, cs)
 			# (ts, ti, cs) = checkTypeDef type_index module_index ts ti cs
 			= check_type_defs is_main_dcl (inc type_index) nr_of_types module_index ts ti cs
 
@@ -1047,9 +1048,9 @@ removeVariablesFromSymbolTable scope vars symbol_table
 
 makeAttributedType attr annot type :== { at_attribute = attr, at_annotation = annot, at_type = type }
 
-createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !Int  !*TypeVarHeap !*VarHeap !*CheckState
+createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*CheckState
 	-> (!*{#ClassDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*CheckState)
-createClassDictionaries mod_index class_defs modules first_type_index first_selector_index first_cons_index upper_limit type_var_heap var_heap cs
+createClassDictionaries mod_index class_defs modules first_type_index first_selector_index first_cons_index type_var_heap var_heap cs
 	# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs) = create_class_dictionaries mod_index 0  class_defs modules []
 			{ index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index } type_var_heap var_heap cs
 	  (type_defs, sel_defs, cons_defs, cs_symbol_table) = foldSt collect_type_def rev_dictionary_list  ([], [], [], cs.cs_symbol_table)
@@ -1070,8 +1071,7 @@ where
 				= ( sel_defs, symbol_table)
 	
 	create_class_dictionaries mod_index class_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-// MW was			| class_index < size class_defs
-		| class_index < upper_limit
+		| class_index < size class_defs
 			# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs) = 
 					create_class_dictionary mod_index class_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
 			= create_class_dictionaries mod_index (inc class_index) class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs

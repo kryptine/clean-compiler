@@ -617,7 +617,9 @@ reorganizeDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs
 	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganizeDefinitions icl_module defs cons_count sel_count mem_count ca
 	  type_def = { type_def & td_rhs = AlgType 	cons_symbs }
-	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = cons_defs ++ c_defs.def_constructors }
+/* Sjaak ... */
+	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors }
+/* ... Sjaak */
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 where
 	determine_symbols_of_conses [{pc_cons_name,pc_cons_arity} : conses] next_cons_index
@@ -634,8 +636,10 @@ reorganizeDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorL
 	  				pc_arg_types = [ ps_field_type \\ {ps_field_type} <- sel_defs ], pc_exi_vars = exivars }
 	  type_def = { type_def & td_rhs = RecordType {rt_constructor = { ds_ident = td_name, ds_arity = cons_arity, ds_index = cons_count },
 	  							rt_fields =  { sel \\ sel <- sel_syms }}}
-	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [cons_def : c_defs.def_constructors],
-	  				def_selectors = sel_defs ++ c_defs.def_selectors }
+/* Sjaak ... */
+	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors],
+	  				def_selectors = mapAppend ParsedSelectorToSelectorDef sel_defs c_defs.def_selectors }
+/* ... Sjaak */
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 where
 	determine_symbols_of_selectors [{ps_field_name,ps_field_var} : sels] next_selector_index
@@ -671,7 +675,7 @@ where
 	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context ca
 		# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
 		| isEmpty bodies
-			# mem_def = { me_symb = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
+			# mem_def = {	me_symb = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
 							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 			  ( mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
 			= ([mem_def : mem_defs], mem_macros, ca)

@@ -3,7 +3,7 @@ definition module checksupport
 import StdEnv
 import syntax, predef
 
-cIclModIndex 			:== 0 // MW++
+cIclModIndex 	:== 0
 
 CS_NotChecked 	:== -1
 NotFound		:== -1
@@ -11,8 +11,8 @@ NotFound		:== -1
 cModuleScope	:== 0
 cGlobalScope	:== 1
 
-cIsNotADclModule 	:== False // MW++
-cIsADclModule 		:== True  // MW++
+cIsNotADclModule 	:== False
+cIsADclModule 		:== True
 
 ::	VarHeap :== Heap VarInfo
 
@@ -55,6 +55,7 @@ cConversionTableSize	:== 8
 
 ::	Declaration =
 	{	dcl_ident	:: !Ident
+	,	dcl_pos		:: !Position
 	,	dcl_kind	:: !STE_Kind
 	,	dcl_index	:: !Index
 	}
@@ -62,7 +63,7 @@ cConversionTableSize	:== 8
 ::	Declarations =
 	{	dcls_import		::![Declaration]
 	,	dcls_local		::![Declaration]
-	,	dcls_explicit	::![(!Declaration, !LineNr)] // MW++
+	,	dcls_explicit	::![(!Declaration, !LineNr)]
 	}
 
 ::	IclModule  =
@@ -72,9 +73,7 @@ cConversionTableSize	:== 8
 	,	icl_specials		:: !IndexRange
 	,	icl_common			:: !.CommonDefs
 	,	icl_declared		:: !Declarations
-// RWS ...
 	,	icl_imported_objects	:: ![ImportedObject]
-// ... RWS
 	}
 
 ::	DclModule =
@@ -85,6 +84,7 @@ cConversionTableSize	:== 8
 	,	dcl_class_specials	:: !IndexRange
 	,	dcl_specials		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
+	,	dcl_sizes			:: !{# Int}
 	,	dcl_declared		:: !Declarations
 	,	dcl_conversions		:: !Optional ConversionTable
 	,	dcl_is_system		:: !Bool

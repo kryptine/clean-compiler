@@ -214,7 +214,8 @@ buildPredefinedModule pre_def_symbols
 	  (class_def, member_def, pre_def_symbols) = make_TC_class_def pre_def_symbols
 	= ({ mod_name = pre_mod_id, mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
 		 mod_defs = {
-			def_types = [string_def, list_def : type_defs], def_constructors = [cons_def, nil_def : cons_defs], def_selectors = [], def_classes = [class_def],
+			def_types = [string_def, list_def : type_defs], def_constructors
+						= [ParsedConstructorToConsDef cons_def, ParsedConstructorToConsDef nil_def : cons_defs], def_selectors = [], def_classes = [class_def],
 			def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def], def_funtypes = [], def_instances = [] }}, pre_def_symbols)
 where
 	add_tuple_defs pre_mod_id tup_arity type_defs cons_defs pre_def_symbols
@@ -226,7 +227,7 @@ where
 			  (tuple_type_def, pre_def_symbols)	= make_type_def (GetTupleTypeIndex tup_arity) type_vars (AlgType [tuple_cons_symb]) pre_def_symbols
 			  tuple_cons_def	= { pc_cons_name = tuple_id.pds_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
 			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars], pc_cons_prio =  NoPrio, pc_exi_vars = []}
-			= add_tuple_defs pre_mod_id (dec tup_arity) [tuple_type_def : type_defs] [tuple_cons_def : cons_defs] pre_def_symbols
+			= add_tuple_defs pre_mod_id (dec tup_arity) [tuple_type_def : type_defs] [ParsedConstructorToConsDef tuple_cons_def : cons_defs] pre_def_symbols
 			= (type_defs, cons_defs, pre_def_symbols)
 	where
 		make_type_vars nr_of_vars type_vars pre_def_symbols

@@ -64,6 +64,7 @@ where
 
 ::	Declaration =
 	{	dcl_ident	:: !Ident
+	,	dcl_pos		:: !Position
 	,	dcl_kind	:: !STE_Kind
 	,	dcl_index	:: !Index
 	}
@@ -94,6 +95,7 @@ where
 	,	dcl_class_specials	:: !IndexRange
 	,	dcl_specials		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
+	,	dcl_sizes			:: !{# Int}
 	,	dcl_declared		:: !Declarations
 	,	dcl_conversions		:: !Optional ConversionTable
 	,	dcl_is_system		:: !Bool

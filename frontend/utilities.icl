@@ -158,6 +158,7 @@ foldSt op r l :== fold_st r l
 		fold_st [] st		= st
 		fold_st [a:x] st	= fold_st x (op a st)
 
+// iFoldSt :: (Int -> .(.b -> .b)) !Int !Int .b -> .b
 iFoldSt op fr to st :== i_fold_st fr to st
 	where
 		i_fold_st fr to st
