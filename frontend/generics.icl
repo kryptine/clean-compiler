@@ -802,8 +802,8 @@ determineMemberTypes module_index ins_index
 		
 		
 	// determine type of the member instance		
-	# (symbol_type, _, hp_type_heaps) = 
-		determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps
+	# (symbol_type, _, hp_type_heaps, _) = 
+		determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No
 	# (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
 	# symbol_type = {symbol_type & st_context = st_context}			
 	
@@ -946,8 +946,8 @@ buildMemberType generic_def=:{gen_name,gen_type,gen_args} kind class_var type_he
 	#! (gen_type, type_heaps) = generate_member_type gen_type gen_args kind class_vars type_heaps
 
 	// run the real susbstitution
-	#! (fresh_st_args, type_heaps) = substitute gen_type.st_args type_heaps
-	#! (fresh_st_result, type_heaps) = substitute gen_type.st_result type_heaps	
+	#! (_, fresh_st_args, type_heaps) = substitute gen_type.st_args type_heaps
+	#! (_, fresh_st_result, type_heaps) = substitute gen_type.st_result type_heaps	
 	
 	#! member_type = {gen_type &
 		st_vars = gen_type.st_vars ++ fresh_st_vars,
@@ -963,8 +963,8 @@ where
 			gen_type gen_args 
 			kind class_vars type_heaps
 		#! (gen_type_varss, type_heaps) = subst_generic_vars gen_args class_vars kind type_heaps
-		#! (fresh_st_args, type_heaps) = substitute gen_type.st_args type_heaps
-		#! (fresh_st_result, type_heaps) = substitute gen_type.st_result type_heaps	
+		#! (_, fresh_st_args, type_heaps) = substitute gen_type.st_args type_heaps
+		#! (_, fresh_st_result, type_heaps) = substitute gen_type.st_result type_heaps	
 
 		#! gen_type_varss = transpose gen_type_varss
 		#! (arg_types, type_heaps) = generate_args gen_type gen_args kind gen_type_varss type_heaps
@@ -1738,10 +1738,10 @@ freshSymbolType postfix st type_heaps
 	# (new_st_vars, type_heaps) = subst_type_vars postfix st_vars type_heaps
 	# (new_st_attr_vars, type_heaps) = subst_attr_vars postfix st_attr_vars type_heaps
 
-	# (new_st_args, type_heaps) = 		substitute st_args 		type_heaps
-	# (new_st_result, type_heaps) = 	substitute st_result 	type_heaps
-	# (new_st_context, type_heaps) = 	substitute st_context 	type_heaps
-	# (new_st_attr_env, type_heaps) = 	substitute st_attr_env 	type_heaps
+	# (_, new_st_args, type_heaps) = 		substitute st_args 		type_heaps
+	# (_, new_st_result, type_heaps) = 		substitute st_result 	type_heaps
+	# (_, new_st_context, type_heaps) = 	substitute st_context 	type_heaps
+	# (_, new_st_attr_env, type_heaps) = 	substitute st_attr_env 	type_heaps
 
 	# new_st = { st &	
 			st_vars = new_st_vars

@@ -68,7 +68,7 @@ beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHe
 
 updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*ExpressionHeap -> (!*TypeHeaps, !*ExpressionHeap)
 
-class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
+class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 
 instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a,
 			(a,b) | substitute a & substitute b

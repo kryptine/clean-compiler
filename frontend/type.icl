@@ -2308,8 +2308,8 @@ where
 	
 			create_instance_type members array_members unboxed_array_type offset_table record_type member_index (array_defs, type_heaps)
 				# {me_type,me_symb,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
-				  (instance_type, _, type_heaps) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
-														it_types = [unboxed_array_type, record_type]} SP_None type_heaps
+				  (instance_type, _, type_heaps, _) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
+														it_types = [unboxed_array_type, record_type]} SP_None type_heaps No
 				  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
 				  fun = 
 					{	fun_symb		= me_symb

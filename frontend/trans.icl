@@ -987,8 +987,8 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		  {th_vars,th_attrs} = ti.ti_type_heaps
 		  (type_variables, th_vars) = getTypeVars [ct_result_type:arg_types] th_vars
 		  (fresh_type_vars, th_vars) = mapSt bind_to_fresh_type_variable type_variables th_vars
-		  (fresh_arg_types, ti_type_heaps) = substitute arg_types { th_vars = th_vars, th_attrs = th_attrs }
-		  (fresh_result_type, ti_type_heaps) = substitute ct_result_type ti_type_heaps
+		  (_, fresh_arg_types, ti_type_heaps) = substitute arg_types { th_vars = th_vars, th_attrs = th_attrs }
+		  (_, fresh_result_type, ti_type_heaps) = substitute ct_result_type ti_type_heaps
 		  us = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = Yes ti_type_heaps, 
 					us_cleanup_info=ti.ti_cleanup_info }
 		  ui = {ui_handle_aci_free_vars = SubstituteThem, ui_convert_module_n= -1,ui_conversion_table=No }
@@ -1315,7 +1315,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  		= foldSt bind_to_temp_attr_var st_attr_vars (FirstAttrVar, ti_type_heaps.th_attrs)
 	  ti_type_heaps
 	  		= { ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars }
-	  ((st_args,st_result), ti_type_heaps)
+	  (_, (st_args,st_result), ti_type_heaps)
 	  		= substitute (st_args,st_result) ti_type_heaps
 	  (new_fun_args, new_arg_types_array, next_attr_nr,
 	    new_linear_bits, new_cons_args, uniqueness_requirements, subst, ti_type_heaps=:{th_vars, th_attrs},
@@ -1507,7 +1507,7 @@ where
 						uniqueness_requirements, subst, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
 			# (arg_type, arg_types)
 					= arg_types![prod_index]
-			  (int_class_type, type_heaps)
+			  (_, int_class_type, type_heaps)
 			  		= substitute class_type type_heaps
 			  type_input
 			  		= { ti_common_defs = ro.ro_common_defs
@@ -1568,7 +1568,7 @@ where
 			  (next_attr_nr, th_attrs)
 			  		= foldSt bind_to_temp_attr_var st_attr_vars (next_attr_nr, th_attrs)
 			  		// prepare for substitute calls
-			  ((st_args, st_result), type_heaps)
+			  (_, (st_args, st_result), type_heaps)
 			  		= substitute (st_args, st_result) { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 			  nr_of_applied_args
 			  		= symbol.symb_arity
@@ -1726,9 +1726,9 @@ where
 				= mapSt bind_to_fresh_type_variable st_vars th_vars
 		  (fresh_st_attr_vars, th_attrs)
 				= mapSt bind_to_fresh_attr_variable st_attr_vars th_attrs
-		  ([fresh_st_result:fresh_st_args], ti_type_heaps)
+		  (_, [fresh_st_result:fresh_st_args], ti_type_heaps)
 		  		= substitute [st_result:st_args] { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-		  (fresh_st_attr_env, ti_type_heaps)
+		  (_, fresh_st_attr_env, ti_type_heaps)
 		  		= substitute st_attr_env ti_type_heaps
 		= (Yes { symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
 				st_result = fresh_st_result, st_attr_env = fresh_st_attr_env}, ti_type_heaps)
@@ -1873,7 +1873,7 @@ where
 	max_group_index_of_producer PR_Empty current_max fun_defs fun_heap cons_args
 		= current_max
 	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
-		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
+		= foldSt (foldrExprSt (max_group_index_of_member fun_defs fun_heap cons_args)) app_args current_max
 	max_group_index_of_producer (PR_Curried {symb_kind=SK_Function {glob_object=fun_index, glob_module}}) current_max fun_defs fun_heap cons_args
 		| glob_module<>ro_main_dcl_module_n
 			= current_max
@@ -1890,32 +1890,31 @@ where
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
 	ro_main_dcl_module_n = ro.ro_main_dcl_module_n
-
-	max_group_index_of_member fun_defs fun_heap cons_args current_max 
+	
+	max_group_index_of_member fun_defs fun_heap cons_args 
 				(App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
+				current_max
 		| mod_index == ro_main_dcl_module_n
 			| fun_index < size cons_args
 				# {fun_info = {fi_group_index}} = fun_defs.[fun_index]
 				= max fi_group_index current_max
 			= current_max
 		= current_max
-	max_group_index_of_member fun_defs fun_heap cons_args current_max 
-				(App {app_symb = {symb_name, symb_kind = SK_LocalMacroFunction fun_index}}) 
+	max_group_index_of_member fun_defs fun_heap cons_args
+				(App {app_symb = {symb_name, symb_kind = SK_LocalMacroFunction fun_index}})
+				current_max
 		| fun_index < size cons_args
 			# {fun_info = {fi_group_index}} = fun_defs.[fun_index]
 			= max fi_group_index current_max
 		= current_max
-	max_group_index_of_member fun_defs fun_heap cons_args current_max 
+	max_group_index_of_member fun_defs fun_heap cons_args
 				(App {app_symb = {symb_kind = SK_GeneratedFunction fun_ptr _ }})
+				current_max
 		# (FI_Function {gf_fun_def={fun_info = {fi_group_index}}}) = sreadPtr fun_ptr fun_heap
 		= max fi_group_index current_max
-	max_group_index_of_member fun_defs fun_heap cons_args current_max 
-				(App {app_symb = {symb_kind = SK_Constructor _}, app_args}) 
-		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
+	max_group_index_of_member fun_defs fun_heap cons_args _ current_max
+		= current_max
 
-	max_group_index_of_members members current_max fun_defs fun_heap cons_args
-		= foldl (max_group_index_of_member fun_defs fun_heap cons_args) current_max members
-			
 	max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
 		# fun_def = fun_defs.[fun_index]
 		= max fun_def.fun_info.fi_group_index current_max
@@ -2446,7 +2445,7 @@ expand_syn_types_in_TA rem_annots common_defs type_symb=:{type_index={glob_objec
 		SynType rhs_type
 			# ets_type_heaps = bind_attr td_attribute attribute ets.ets_type_heaps
 			  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
-			  (type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
+			  (_, type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
 			-> expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
 		_
 			# (types, ets) = expandSynTypes rem_annots common_defs types ets
@@ -2767,18 +2766,33 @@ mapExprSt map_expr map_free_var postprocess_free_var expr st :== map_expr_st exp
 		  		= map_expr let_expr st
 		  st = foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_lazy_binds st
 		  st = foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_strict_binds st
-		= ( Let { lad & let_lazy_binds = combine lazy_free_vars lazy_rhss let_lazy_binds,
-						let_strict_binds = combine strict_free_vars strict_rhss let_strict_binds,
-						let_expr = let_expr
-				}
-		  , st
-		  )
+		= map_expr ( Let { lad & let_lazy_binds = combine lazy_free_vars lazy_rhss let_lazy_binds,
+							let_strict_binds = combine strict_free_vars strict_rhss let_strict_binds,
+							let_expr = let_expr
+						 })
+					st
 	map_expr_st (Selection a expr b) st
 		# (expr, st) = map_expr expr st
-		= (Selection a expr b, st)
+		= map_expr (Selection a expr b) st
 
 combine :: [FreeVar] [Expression] [LetBind] -> [LetBind]
 combine free_vars rhss original_binds
 	= [{ original_bind & lb_dst = lb_dst, lb_src = lb_src}
 		\\ lb_dst <- free_vars & lb_src <- rhss & original_bind <- original_binds]
 
+foldrExprSt f expr st :== foldr_expr_st expr st
+  where
+	foldr_expr_st expr=:(Var _) st
+		= f expr st
+	foldr_expr_st app=:(App {app_args}) st
+		= f app (foldSt foldr_expr_st app_args st)
+	foldr_expr_st lad=:(Let {let_lazy_binds, let_strict_binds, let_expr}) st
+		# st
+		  		= foldSt (\{lb_src} st -> foldr_expr_st lb_src st) let_lazy_binds st
+		  st
+		  		= foldSt (\{lb_src} st -> foldr_expr_st lb_src st) let_strict_binds st
+		  st
+		  		= f let_expr st
+		= f lad st
+	foldr_expr_st sel=:(Selection a expr b) st
+		= f sel (foldr_expr_st expr st)

@@ -29,7 +29,8 @@ instance bindTypes AType
 where
 	bindTypes cti atype=:{at_attribute,at_type} ts_ti_cs
 		# (at_type, type_attr, (ts, ti, cs)) = bindTypes cti at_type ts_ti_cs
-		  (combined_attribute, cs_error) = check_type_attribute at_attribute type_attr cti.cti_lhs_attribute cs.cs_error
+		  cs_error = check_attr_of_type_var at_attribute at_type cs.cs_error
+		  (combined_attribute, cs_error) = check_type_attribute at_attribute type_attr cti.cti_lhs_attribute cs_error
 		= ({ atype & at_attribute = combined_attribute, at_type = at_type }, combined_attribute, (ts, ti, { cs & cs_error = cs_error }))
 	where
 		check_type_attribute :: !TypeAttribute !TypeAttribute !TypeAttribute !*ErrorAdmin -> (!TypeAttribute,!*ErrorAdmin)
@@ -60,6 +61,13 @@ where
 		try_to_combine_attributes _ _
 			= False
 
+		check_attr_of_type_var :: !TypeAttribute !Type !*ErrorAdmin -> .ErrorAdmin 
+		check_attr_of_type_var TA_Unique (TV var) error
+			// the case "TA_Var" is catched by check_type_attribute
+			= checkError var "uniqueness attribute not allowed" error
+		check_attr_of_type_var attr _ error
+			= error
+		
 instance bindTypes TypeVar
 where
 	bindTypes cti tv=:{tv_name=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table /* TD ... */, cs_x={x_type_var_position,x_is_dcl_module} /* ... TD */ })

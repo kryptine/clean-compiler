@@ -23,13 +23,15 @@ import syntax, parse, check, unitype, utilities, checktypes, RWSDebug
 				 | UncheckedType !TempSymbolType | ExpandedType !SymbolType !TempSymbolType !TempSymbolType  | EmptyFunctionType
 
 
-simplifyTypeApplication :: !Type ![AType] -> Type
+simplifyTypeApplication :: !Type ![AType] -> (!Bool, !Type)
 simplifyTypeApplication (TA type_cons=:{type_arity} cons_args) type_args
-	= TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args)
+	= (True, TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args))
 simplifyTypeApplication (TV tv) type_args
-	= CV tv :@: type_args
+	= (True, CV tv :@: type_args)
 simplifyTypeApplication (CV tv :@: type_args1) type_args2
-	= CV tv :@: (type_args1 ++ type_args2)
+	= (True, CV tv :@: (type_args1 ++ type_args2))
+simplifyTypeApplication (TB _) _
+	= (False, TE)
 
 ::	AttributeEnv	:== {! TypeAttribute }
 ::	VarEnv 			:== {! Type }
@@ -104,7 +106,7 @@ where
 		# (type, cus) = cus!cus_var_env.[tempvar]
 		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
 		  (types, cus) = clean_up cui types cus
-		= (simplifyTypeApplication type types, cus)
+		= (snd (simplifyTypeApplication type types), cus)
 	clean_up cui (TempQCV tempvar :@: types) cus
 		# (type, cus) = cus!cus_var_env.[tempvar]
 		# (TV tv, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
@@ -178,7 +180,7 @@ where
 		| checkCleanUpResult cur1 cUndefinedVar
 			= (cur1, TempCV tv_number :@: types, env)
 			# (cur2, types, env) = cleanUpClosed types env
-            = (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
+            = (combineCleanUpResults cur1 cur2, snd (simplifyTypeApplication type types), env)
 	cleanUpClosed t env
 		= (cClosed, t, env)
 
@@ -439,13 +441,13 @@ where
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
 		= case info of
 			EI_CaseType case_type
-				# (case_type, type_heaps) = substitute case_type type_heaps
+				# (_, case_type, type_heaps) = substitute case_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseType case_type))
 			EI_LetType let_type
-				# (let_type, type_heaps) = substitute let_type type_heaps
+				# (_, let_type, type_heaps) = substitute let_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type))
 			EI_DictionaryType dict_type
-				# (dict_type, type_heaps) = substitute dict_type type_heaps
+				# (_, dict_type, type_heaps) = substitute dict_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
 
 
@@ -482,13 +484,13 @@ instance bindInstances AType
 			= bindInstances t1 t2 type_var_heap
 
 
-class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
+class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 
 instance substitute AType
 where
 	substitute atype=:{at_attribute,at_type} heaps
-		# ((at_attribute,at_type), heaps)  = substitute (at_attribute,at_type) heaps
-		= ({ atype & at_attribute = at_attribute, at_type = at_type }, heaps)
+		# (ok, (at_attribute,at_type), heaps)  = substitute (at_attribute,at_type) heaps
+		= (ok, { atype & at_attribute = at_attribute, at_type = at_type }, heaps)
 
 instance substitute TypeAttribute
 where
@@ -496,36 +498,36 @@ where
 		#! av_info = sreadPtr av_info_ptr th_attrs
 		= case av_info of
 			AVI_Attr attr
-				-> (attr, heaps)
+				-> (True, attr, heaps)
 			_
-				-> (TA_Multi, heaps)
+				-> (True, TA_Multi, heaps)
 	substitute TA_None heaps
-		= (TA_Multi, heaps)
+		= (True, TA_Multi, heaps)
 	substitute attr heaps
-		= (attr, heaps)
+		= (True, attr, heaps)
 
 instance substitute (a,b) | substitute a & substitute b
 where
 	substitute (x,y) heaps
-		# (x, heaps) = substitute x heaps
-		  (y, heaps) = substitute y heaps
-		= ((x,y), heaps)
+		# (ok_x, x, heaps) = substitute x heaps
+		  (ok_y, y, heaps) = substitute y heaps
+		= (ok_x && ok_y, (x,y), heaps)
 	
 instance substitute [a] | substitute a
 where
 	substitute [] heaps
-		= ([], heaps)
+		= (True, [], heaps)
 	substitute [t:ts] heaps
-		# (t, heaps) = substitute t heaps
-		  (ts, heaps) = substitute ts heaps
-		= ([t:ts], heaps)
+		# (ok_t, t, heaps) = substitute t heaps
+		  (ok_ts, ts, heaps) = substitute ts heaps
+		= (ok_t && ok_ts, [t:ts], heaps)
 
 
 instance substitute TypeContext
 where
 	substitute tc=:{tc_types} heaps
-		# (tc_types, heaps) = substitute tc_types heaps
-		= ({ tc & tc_types = tc_types }, heaps)
+		# (ok, tc_types, heaps) = substitute tc_types heaps
+		= (ok, { tc & tc_types = tc_types }, heaps)
 
 substituteTypeVariable tv=:{tv_name,tv_info_ptr} heaps=:{th_vars}
 	# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
@@ -539,31 +541,27 @@ substituteTypeVariable tv=:{tv_name,tv_info_ptr} heaps=:{th_vars}
 instance substitute Type
 where
 	substitute (TV tv) heaps
-		= substituteTypeVariable tv heaps
+		# (type, heaps) = substituteTypeVariable tv heaps
+		= (True, type, heaps)
 	substitute (arg_type --> res_type) heaps
-		# ((arg_type, res_type), heaps) = substitute (arg_type, res_type) heaps
-		= (arg_type --> res_type, heaps)
+		# (ok, (arg_type, res_type), heaps) = substitute (arg_type, res_type) heaps
+		= (ok, arg_type --> res_type, heaps)
 	substitute (TA cons_id cons_args) heaps
-		# (cons_args, heaps) = substitute cons_args heaps
-		= (TA cons_id cons_args,  heaps)
-/* MW3 was
-	substitute (CV type_var :@: types) heaps
-		# (type, heaps) = substituteTypeVariable type_var heaps
-		  (types, heaps) = substitute types heaps
-		= (simplifyTypeApplication type types, heaps)
-*/
+		# (ok, cons_args, heaps) = substitute cons_args heaps
+		= (ok, TA cons_id cons_args,  heaps)
 	substitute (CV type_var :@: types) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
 		  heaps = { heaps & th_vars = th_vars }
-		  (types, heaps) = substitute types heaps
+		  (ok1, types, heaps) = substitute types heaps
 		= case tv_info of
 			TVI_Type tv=:(TempV i)
-				-> (TempCV i :@: types, heaps)
+				-> (ok1, TempCV i :@: types, heaps)
 			_
 				# (type, heaps) = substituteTypeVariable type_var heaps
-				-> (simplifyTypeApplication type types, heaps)
+				  (ok2, simplified_type) = simplifyTypeApplication type types
+				-> (ok1 && ok2, simplified_type, heaps)
 	substitute type heaps
-		= (type, heaps)
+		= (True, type, heaps)
 
 instance substitute AttributeVar
 where
@@ -571,24 +569,24 @@ where
 		#! av_info = sreadPtr av_info_ptr th_attrs
 		= case av_info of
 			AVI_Attr (TA_Var attr_var)
-				-> (attr_var, heaps)
+				-> (True, attr_var, heaps)
 			_
-				-> (av, heaps)
+				-> (True, av, heaps)
 
 instance substitute AttrInequality
 where
 	substitute {ai_demanded,ai_offered} heaps
-		# ((ai_demanded, ai_offered), heaps) = substitute (ai_demanded, ai_offered) heaps
-		= ({ai_demanded = ai_demanded, ai_offered = ai_offered}, heaps)
+		# (ok, (ai_demanded, ai_offered), heaps) = substitute (ai_demanded, ai_offered) heaps
+		= (ok, {ai_demanded = ai_demanded, ai_offered = ai_offered}, heaps)
 
 instance substitute CaseType
 where
 	substitute {ct_pattern_type, ct_result_type, ct_cons_types} heaps 
-		# (ct_pattern_type, heaps) = substitute ct_pattern_type heaps
-		  (ct_result_type, heaps) = substitute ct_result_type heaps
-		  (ct_cons_types, heaps) = substitute ct_cons_types heaps
-		= ({ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, ct_cons_types = ct_cons_types}, heaps)
-
+		# (ok1, ct_pattern_type, heaps) = substitute ct_pattern_type heaps
+		  (ok2, ct_result_type, heaps) = substitute ct_result_type heaps
+		  (ok3, ct_cons_types, heaps) = substitute ct_cons_types heaps
+		= (ok1 && ok2 && ok3, {ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, 
+								ct_cons_types = ct_cons_types}, heaps)
 
 class removeAnnotations a :: !a  -> (!Bool, !a)
 
@@ -654,7 +652,7 @@ where
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
 	# type_heaps = bindTypeVarsAndAttributes form_attr act_attr type_args arg_types type_heaps 
-	  (exp_type, type_heaps) = substitute type_rhs type_heaps
+	  (_, exp_type, type_heaps) = substitute type_rhs type_heaps
 	= (exp_type, clearBindingsOfTypeVarsAndAttributes form_attr type_args type_heaps)
 
 VarIdTable :: {# String}

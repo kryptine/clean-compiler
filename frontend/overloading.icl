@@ -339,7 +339,7 @@ where
 		= mapSt fresh_context contexts heaps
 	where
 		fresh_context tc=:{tc_types} (var_heap, type_heaps)
-			# (tc_types, type_heaps) = substitute tc_types type_heaps
+			# (_, tc_types, type_heaps) = substitute tc_types type_heaps
 //			  (tc_var, var_heap) = newPtr VI_Empty var_heap
 //			= ({ tc & tc_types = tc_types, tc_var = tc_var }, (var_heap, type_heaps))
 			= ({ tc & tc_types = tc_types }, (var_heap, type_heaps))
@@ -491,7 +491,7 @@ tryToExpandTypeSyn defs cons_id=:{type_name,type_index={glob_object,glob_module}
 
 expandTypeSyn td_attribute td_args type_args td_rhs type_heaps
 	# type_heaps = bindTypeVarsAndAttributes td_attribute TA_Multi td_args type_args type_heaps
-	  (expanded_type, type_heaps) = substitute td_rhs type_heaps
+	  (_, expanded_type, type_heaps) = substitute td_rhs type_heaps
 	= (expanded_type, clearBindingsOfTypeVarsAndAttributes td_attribute td_args type_heaps)
 
 class match type ::  !{# CommonDefs} !type !type !*TypeHeaps -> (!Bool, !*TypeHeaps)
@@ -647,7 +647,7 @@ where
 			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
 		  
 		subst_context_and_generate_super_classes class_context (super_classes, type_heaps)
-			# (super_class, type_heaps) = substitute class_context type_heaps
+			# (_, super_class, type_heaps) = substitute class_context type_heaps
 			| containsContext super_class super_classes
 				= (super_classes, type_heaps)
 				= generate_super_classes super_class ([super_class : super_classes], type_heaps) 
@@ -854,7 +854,7 @@ where
 			# {tc_class={glob_object={ds_index},glob_module}} = tc2
 			  {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 			  th_vars = foldr2 (\{tv_info_ptr} type -> writePtr tv_info_ptr (TVI_Type type)) th_vars class_args tc2.tc_types
-			  (super_instances, type_heaps) = substitute class_context { type_heaps & th_vars = th_vars } 
+			  (_, super_instances, type_heaps) = substitute class_context { type_heaps & th_vars = th_vars } 
 			= find_super_instance tc1 super_instances (size class_members) address glob_module class_dictionary.ds_index defs type_heaps
 	where
 		find_super_instance :: !TypeContext ![TypeContext] !Index ![(Int, Global DefinedSymbol)] !Index !Index !{#CommonDefs} !*TypeHeaps

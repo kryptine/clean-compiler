@@ -58,7 +58,6 @@ where toString {import_module} = toString import_module
 				| STE_DictCons !ConsDef
 				| STE_DictField !SelectorDef
 				| STE_Called ![Index] /* used during macro expansion to indicate that this function is called */
-				| STE_ExplImp !Bool !(Optional ImportDeclaration) !STE_Kind !Bool /* auxiliary used in module explicitimports. */
 				| STE_ExplImpSymbol !Int
 				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
 				| STE_BelongingSymbol !Int
