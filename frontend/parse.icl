@@ -2675,16 +2675,14 @@ where
 		  (lhs_expr, pState) = wantExpression cIsAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == LeftArrowToken
-//MW3 was:			= want_generators IsListGenerator (toLineAndColumn qual_position) lhs_expr pState
 			= want_generators IsListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+		| token == LeftArrowWithBarToken
+			= want_generators IsOverloadedListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 		| token == LeftArrowColonToken
-//MW3 was:			= want_generators IsArrayGenerator (toLineAndColumn qual_position) lhs_expr pState
 			= want_generators IsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 			= ({qual_generators = [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)
 
-//MW3 was:	want_generators :: !GeneratorKind !LineAndColumn !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
-//MW3 was:	want_generators gen_kind qual_position pattern_exp pState
 	want_generators :: !GeneratorKind !LineAndColumn !FileName !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
 	want_generators gen_kind qual_position qual_filename pattern_exp pState
 		# (gen_position, pState)			= getPosition pState

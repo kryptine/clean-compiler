@@ -48,6 +48,7 @@ instance <<< FilePosition
 	|	DoubleBackSlashToken	//		\\
 	|	LeftArrowToken			//		<-
 	|	LeftArrowColonToken		//		<-:
+	|	LeftArrowWithBarToken	//		<|-
 	|	DotDotToken				//		..
 	|	AndToken				//		&
 	|	HashToken				//		#
