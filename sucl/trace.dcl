@@ -162,13 +162,16 @@ Implementation
    | Stop
    | Instantiate (Trace sym var pvar)
                  (Trace sym var pvar)
+
+/* Disable the new abstraction node for now...
+
    | Abstract [Abstraction sym var pvar]
 
 :: Abstraction sym var pvar
    = NewAbstraction (Trace sym var pvar)
    | KnownAbstraction (Rule sym var)
 
-/* Alternatives for the Abstract constructor:
+   Alternatives for the Abstract constructor:
 
      Abstract [Trace sym var pvar]
      together with: Backpointer (Trace sym var pvar)
