@@ -150,6 +150,9 @@ imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Type def_
 						_
 							-> dcl_ident.id_name)
 	= (Yes dcl_string, dcl_modules)
+imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Generic def_mod_index
+		dcl_modules
+	= (Yes ("generic "+++dcl_ident.id_name+++"(..)"), dcl_modules)	
 
 // only for portToNewSyntax
 type_to_string (TA {type_name} _) = possibly_replace_predef_symbols type_name.id_name
