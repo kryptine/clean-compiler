@@ -53,14 +53,14 @@ frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#F
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
 frontEndInterface options mod_ident search_paths cached_dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
 // 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
-	# (ok, mod, hash_table, error, predef_symbols, files)
-		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths predef_symbols modtimefunction files
+	# (ok, mod, hash_table, error, files)
+		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths modtimefunction files
 	| not ok
 		= (No,{},{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
-	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, predef_symbols, files)
-		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics hash_table error search_paths predef_symbols modtimefunction files
+	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, files)
+		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics hash_table error search_paths modtimefunction files
 	/* JVG: */
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
@@ -84,7 +84,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# {icl_global_functions,icl_instances,icl_specials,icl_common,icl_import,icl_name,icl_imported_objects,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
-//	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
+	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
 	/*	
 	  (n_functions,icl_functions) = usize icl_functions
 	  (icl_functions,f) = showFunctions {ir_from=0,ir_to=n_functions} icl_functions f
