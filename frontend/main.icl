@@ -114,9 +114,9 @@ DoCommand ['c':_] argument symbol_heap ms
 
 DoCommand ['m':_] argument symbol_heap ms 
 	# (file_name, rest_input) = SplitAtLayoutChar (dropWhile isSpace argument)
-	# mod_name = toString file_name
+	# mod_ident = toString file_name
 	# dcl_cache=empty_cache symbol_heap
-  	# (proj, ms) = makeProject { proj_main_module=mod_name,
+  	# (proj, ms) = makeProject { proj_main_module=mod_ident,
   									proj_modules=NoModules,
   									proj_cache=dcl_cache} ms
 	= (False, proj.proj_cache.hash_table.hte_symbol_heap, ms)
@@ -169,8 +169,8 @@ where
 	(word, rest_input) = SplitAtLayoutChar xs
 
 compileModule :: String *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
-compileModule mod_name dcl_cache ms
-	# (mod_ident, hash_table) = putIdentInHashTable mod_name IC_Module dcl_cache.hash_table
+compileModule mod_ident dcl_cache ms
+	# (mod_ident, hash_table) = putIdentInHashTable mod_ident IC_Module dcl_cache.hash_table
 	  dcl_cache = {dcl_cache & hash_table=hash_table}
 	= loadModule mod_ident.boxed_ident dcl_cache ms
 
@@ -308,7 +308,7 @@ where
 		| show_types
 			= show_component funs show_types fun_defs (file <<< '\n' <<< fun_def)
 			= show_component funs show_types fun_defs (file <<< fun_def)
-//		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
+//		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
 
 showComponents2 :: !{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{# FunDef},!*File)
 showComponents2 comps comp_index fun_defs acc_args file
@@ -321,7 +321,7 @@ where
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] fun_defs acc_args file
 		#! fd = fun_defs.[fun]
-		# file = show_accumulating_arguments acc_args.[fun].cc_args (file <<< fd.fun_symb <<< '.' <<< fun <<< " (")
+		# file = show_accumulating_arguments acc_args.[fun].cc_args (file <<< fd.fun_ident <<< '.' <<< fun <<< " (")
 		= show_component funs fun_defs acc_args (file <<< ") ")
 	
 	show_accumulating_arguments [ cc : ccs] file
@@ -355,7 +355,7 @@ where
 		#! fun_def = fun_defs.[fun]
 		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
 		  (Yes ftype) = fun_def.fun_type
-		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype) <<< '\n' )
+		= show_types funs fun_defs (file <<< fun_def.fun_ident <<< " :: " <:: (properties, ftype) <<< '\n' )
 */
 
 converFileToListOfStrings file_name files error

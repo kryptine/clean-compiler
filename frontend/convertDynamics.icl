@@ -224,7 +224,7 @@ instance convertDynamics TransformedBody where
 							# (bind_global_tpv_symb, ci) 
 								=	getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
 							# type_code
-								=	{var_name = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+								=	{var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
 							# (unify_subst_var, ci)
 							  	=	newVariable "gtpv_subst" VI_Empty ci
 							  unify_subst_fv
@@ -641,9 +641,9 @@ where
 	constructorExp :: Index ((Global Index) -> SymbKind) Int !*ConversionState
 		-> (Expression, !*ConversionState)
 	constructorExp index symb_kind arity ci
-		# (cons_symb, ci)
+		# (cons_ident, ci)
 			=	getSymbol index symb_kind arity ci
-		=	(App {app_symb = cons_symb, app_args = [], app_info_ptr = nilPtr}, ci)
+		=	(App {app_symb = cons_ident, app_args = [], app_info_ptr = nilPtr}, ci)
 		
 	typeConstructor (GTT_PredefTypeConstructor {glob_object=type_index}) ci
 		| PD_Arity2TupleTypeIndex <= type_index && type_index <= PD_Arity32TupleTypeIndex
@@ -656,8 +656,8 @@ where
 			# predef_type_index
 				=	type_index + FirstTypePredefinedSymbolIndex
 			=	constructorExp (predefinedTypeConstructor predef_type_index) SK_Function 0 ci
-	typeConstructor (GTT_Constructor cons_symb _) ci
-		=	(App {app_symb = cons_symb, app_args = [], app_info_ptr = nilPtr}, ci)
+	typeConstructor (GTT_Constructor cons_ident _) ci
+		=	(App {app_symb = cons_ident, app_args = [], app_info_ptr = nilPtr}, ci)
 	typeConstructor (GTT_Basic basic_type) ci
 		=	constructorExp (basicTypeConstructor basic_type) SK_Function 0 ci
 	typeConstructor GTT_Function ci
@@ -757,18 +757,18 @@ createTypePatternVariable ci
 /**************************************************************************************************/
 
 newVariable :: String !VarInfo !*ConversionState -> *(!BoundVar,!*ConversionState)
-newVariable var_name var_info ci=:{ci_var_heap}
+newVariable var_ident var_info ci=:{ci_var_heap}
 	# (var_info_ptr, ci_var_heap) = newPtr var_info ci_var_heap
-	= ( { var_name = {id_name = var_name, id_info = nilPtr},  var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},
+	= ( { var_ident = {id_name = var_ident, id_info = nilPtr},  var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},
 	    { ci & ci_var_heap = ci_var_heap })	
 
 varToFreeVar :: BoundVar Int -> FreeVar
-varToFreeVar {var_name, var_info_ptr} count
-	= {fv_def_level = NotALevel, fv_name = var_name, fv_info_ptr = var_info_ptr, fv_count = count}
+varToFreeVar {var_ident, var_info_ptr} count
+	= {fv_def_level = NotALevel, fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_count = count}
 
 freeVarToVar ::  FreeVar -> BoundVar
-freeVarToVar {fv_name, fv_info_ptr}
-	= { var_name = fv_name,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+freeVarToVar {fv_ident, fv_info_ptr}
+	= { var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
 
 
 getResultType :: ExprInfoPtr !*ConversionState -> (!AType, !*ConversionState)
@@ -781,7 +781,7 @@ getSymbol index symb_kind arity ci=:{ci_predef_symb}
 	# ({pds_module, pds_def}, ci_predef_symb) = ci_predef_symb![index]
 	# pds_ident = predefined_idents.[index]
 	  ci = {ci & ci_predef_symb = ci_predef_symb}
-	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def} }
+	  symbol = { symb_ident = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def} }
 	= (symbol, ci)
 
 getTupleSymbol arity ci=:{ci_predef_symb}
@@ -846,7 +846,7 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 
 		# dynamic_temp_symb_ident
 			= { SymbIdent |
-				symb_name	= rt_constructor.ds_ident
+				symb_ident	= rt_constructor.ds_ident
 			,	symb_kind 	= SK_Constructor {glob_module = pds_module1, glob_object = rt_constructor.ds_index} 
 			}
 		= ({	dr_type_ident		= dynamic_temp_symb_ident

@@ -96,7 +96,7 @@ where
 			= case td_rhs of
 				SynType type
 					# (opt_type, type_defs, type_heaps, error)
-						= try_to_expand_synonym_type (newPosition td.td_name td.td_pos) type td_attribute (type_defs, type_heaps, error)
+						= try_to_expand_synonym_type (newPosition td.td_ident td.td_pos) type td_attribute (type_defs, type_heaps, error)
 					-> case opt_type of
 						Yes type
 							# type_defs = { type_defs & [gi_module, gi_index] = { td & td_rhs = SynType type}}
@@ -120,18 +120,18 @@ where
 					# (ok, subst_rhs, type_heaps) = substituteType used_td.td_attribute attribute used_td.td_args types at_type type_heaps
 					| ok
 						-> (Yes {type & at_type = subst_rhs }, type_defs, type_heaps, error)
-					  	# error = popErrorAdmin (typeSynonymError used_td.td_name "kind conflict in argument of type synonym" (pushErrorAdmin pos error))
+					  	# error = popErrorAdmin (typeSynonymError used_td.td_ident "kind conflict in argument of type synonym" (pushErrorAdmin pos error))
 						-> (No, type_defs, type_heaps, error)
 				_
 					-> (No, type_defs, type_heaps, error)
 
 		try_to_expand_synonym_type_in_main_dcl main_dcl_module_index {gi_module,gi_index} (type_defs, main_dcl_type_defs, type_heaps, error)
 			| main_dcl_module_index == main_dcl_module_index && gi_index < size main_dcl_type_defs
-				# (td=:{td_rhs,td_attribute,td_name,td_pos}, main_dcl_type_defs) = main_dcl_type_defs![gi_index]
+				# (td=:{td_rhs,td_attribute,td_ident,td_pos}, main_dcl_type_defs) = main_dcl_type_defs![gi_index]
 				= case td_rhs of
 					SynType type
 						# (opt_type, type_defs, type_heaps, error)
-							= try_to_expand_synonym_type (newPosition td_name td_pos) type td_attribute (type_defs, type_heaps, error)
+							= try_to_expand_synonym_type (newPosition td_ident td_pos) type td_attribute (type_defs, type_heaps, error)
 						-> case opt_type of
 							Yes type
 								-> (type_defs, { main_dcl_type_defs & [gi_index] = { td & td_rhs = SynType type}}, type_heaps, error)
@@ -158,7 +158,7 @@ where
 
 		
 partitionateTypeDef gi=:{gi_module,gi_index} pi=:{pi_type_defs}
-	# ({td_name,td_pos,td_used_types}, pi) = pi!pi_type_defs.[gi_module].[gi_index]
+	# ({td_ident,td_pos,td_used_types}, pi) = pi!pi_type_defs.[gi_module].[gi_index]
 	  pi = push_on_dep_stack gi pi
 	  (min_dep, pi) = foldSt visit_type td_used_types (cMAXINT, pi)
 	= try_to_close_group gi min_dep pi
@@ -195,13 +195,13 @@ where
 	where
 		check_cyclic_type_def td=:{gi_module,gi_index} (group, marks, typedefs, error)
 			# (mark, marks) = marks![gi_module,gi_index]
-			# ({td_name,td_pos,td_used_types,td_rhs}, typedefs) = typedefs![gi_module].[gi_index]
+			# ({td_ident,td_pos,td_used_types,td_rhs}, typedefs) = typedefs![gi_module].[gi_index]
 			| mark == cChecking
-				= (group, marks, typedefs, typeSynonymError td_name "cyclic dependency between type synonyms" error)
+				= (group, marks, typedefs, typeSynonymError td_ident "cyclic dependency between type synonyms" error)
 			| mark < cMAXINT
 				| is_synonym_type td_rhs
 					# marks = { marks & [gi_module,gi_index] = cChecking }
-					  error = pushErrorAdmin (newPosition td_name td_pos) error
+					  error = pushErrorAdmin (newPosition td_ident td_pos) error
 					  (group, marks, typedefs, error) = check_cyclic_type_defs td_used_types [td : group] marks typedefs error
 					  error = popErrorAdmin error
 					= (group, { marks & [gi_module,gi_index] = cMAXINT }, typedefs, error)
@@ -373,8 +373,8 @@ where
 
 analTypes_for_TA :: Ident Int Int Int [AType] !Bool !{#CommonDefs} ![KindInfoPtr] !Conditions !*AnalyseState
 	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
-analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
-	# {td_arity, td_name} = modules.[glob_module].com_type_defs.[glob_object]
+analTypes_for_TA type_ident glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
+	# {td_arity, td_ident} = modules.[glob_module].com_type_defs.[glob_object]
 	  ({tdi_kinds, tdi_properties}, as) = as!as_td_infos.[glob_module].[glob_object]
 	| type_arity <= td_arity
 		# kind = kindArrowToKindInfo (drop type_arity tdi_kinds)
@@ -384,8 +384,8 @@ analTypes_for_TA type_name glob_module glob_object type_arity types has_root_att
 			# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
 			  new_properties = condCombineTypeProperties has_root_attr type_properties tdi_properties
 			= (kind, new_properties, conds_as)
-//				---> ("analTypes_for_TA", td_name, type_properties, tdi_properties, new_properties, has_root_attr)
-		= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_name type_appl_error as.as_error }))
+//				---> ("analTypes_for_TA", td_ident, type_properties, tdi_properties, new_properties, has_root_attr)
+		= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_ident type_appl_error as.as_error }))
 where
 	anal_types_of_rec_type_cons modules form_tvs [] _ conds_as
 		= (cIsHyperStrict, conds_as)
@@ -421,10 +421,10 @@ instance analTypes Type
 where
 	analTypes has_root_attr modules form_tvs (TV tv) conds_as
 		= analTypes has_root_attr modules form_tvs tv conds_as
-	analTypes has_root_attr modules form_tvs type=:(TA {type_name,type_index={glob_module,glob_object},type_arity} types) (conds, as)
-		= analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
-	analTypes has_root_attr modules form_tvs type=:(TAS {type_name,type_index={glob_module,glob_object},type_arity} types _) (conds, as)
-		= analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
+	analTypes has_root_attr modules form_tvs type=:(TA {type_ident,type_index={glob_module,glob_object},type_arity} types) (conds, as)
+		= analTypes_for_TA type_ident glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
+	analTypes has_root_attr modules form_tvs type=:(TAS {type_ident,type_index={glob_module,glob_object},type_arity} types _) (conds, as)
+		= analTypes_for_TA type_ident glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
 	analTypes has_root_attr modules form_tvs (arg_type --> res_type) conds_as
 		# (arg_kind, arg_type_props, conds_as) = analTypes has_root_attr modules form_tvs arg_type conds_as
 		  (res_kind, res_type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs res_type conds_as
@@ -582,8 +582,8 @@ where
 
 	anal_type_def modules gi=:{gi_module,gi_index} (group_properties, conds, as=:{as_error})
 		# {com_type_defs,com_cons_defs} = modules.[gi_module]
-		  {td_name,td_pos,td_args,td_rhs} = com_type_defs.[gi_index]
-		  as_error = pushErrorAdmin (newPosition td_name td_pos) as_error
+		  {td_ident,td_pos,td_args,td_rhs} = com_type_defs.[gi_index]
+		  as_error = pushErrorAdmin (newPosition td_ident td_pos) as_error
 		  (type_properties, (conds, as)) = anal_rhs_of_type_def modules com_cons_defs td_rhs (conds, { as & as_error = as_error })
 		= (combineTypeProperties group_properties type_properties, conds, {as & as_error = popErrorAdmin as.as_error })
 	where
@@ -654,8 +654,8 @@ where
 		update_type_def_info modules type_properties top_vars {gi_module,gi_index} updated_kinds
 				(kind_store, kind_heap, td_infos)
 //			# {com_type_defs} = modules.[gi_module]
-//			  {td_name} = com_type_defs.[gi_index]
-			# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module].[gi_index] // ---> ("update_type_def_info", td_name, type_properties)
+//			  {td_ident} = com_type_defs.[gi_index]
+			# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module].[gi_index] // ---> ("update_type_def_info", td_ident, type_properties)
 			# (group_vars, cons_vars, kind_store, kind_heap) = determine_type_def_info tdi_kinds updated_kinds top_vars kind_store kind_heap
 			= (kind_store, kind_heap, { td_infos & [gi_module,gi_index] =
 					{td_info & tdi_properties = type_properties, tdi_kinds = updated_kinds, tdi_group_vars = group_vars, tdi_cons_vars = cons_vars }})
@@ -681,12 +681,12 @@ where
 
 	check_dcl_properties modules dcl_types dcl_mod_index properties {gi_module, gi_index} as
 		| gi_module == dcl_mod_index && gi_index < size dcl_types
-			# {td_name, td_rhs, td_args, td_pos} = dcl_types.[gi_index]
+			# {td_ident, td_rhs, td_args, td_pos} = dcl_types.[gi_index]
 			= case td_rhs of
 				AbstractType spec_properties
-					# as_error = pushErrorAdmin (newPosition td_name td_pos) as.as_error
+					# as_error = pushErrorAdmin (newPosition td_ident td_pos) as.as_error
 					| check_coercibility  spec_properties properties
-//						---> ("check_coercibility", td_name, spec_properties, properties)
+//						---> ("check_coercibility", td_ident, spec_properties, properties)
 						|check_hyperstrictness spec_properties properties
 							| spec_properties bitand cIsNonCoercible == 0
 								# (as_type_var_heap, as_td_infos, as_error) = check_positive_sign gi_module gi_index modules td_args as.as_type_var_heap as.as_td_infos as_error
@@ -793,10 +793,10 @@ where
 	determine_kinds_of_class modules class_module class_index (class_infos, as)
 		| isEmpty class_infos.[class_module,class_index]
 			# {com_class_defs,com_member_defs} = modules.[class_module]
-			  {class_args,class_context,class_members,class_arity,class_pos,class_name} = com_class_defs.[class_index]
+			  {class_args,class_context,class_members,class_arity,class_pos,class_ident} = com_class_defs.[class_index]
 			  (class_kind_vars, as_kind_heap) = fresh_kind_vars class_arity [] as.as_kind_heap
 			  as_type_var_heap = bind_kind_vars class_args class_kind_vars as.as_type_var_heap
-			  as_error = pushErrorAdmin (newPosition class_name class_pos) as.as_error
+			  as_error = pushErrorAdmin (newPosition class_ident class_pos) as.as_error
 			  class_infos = { class_infos & [class_module,class_index] = cyclicClassInfoMark }
 			  (class_infos, as) = determine_kinds_of_context_classes class_context (class_infos,
 			  								{ as & as_kind_heap = as_kind_heap, as_type_var_heap = as_type_var_heap, as_error = as_error })
@@ -805,12 +805,12 @@ where
 				  (class_infos, as) = determine_kinds_of_members modules class_members com_member_defs class_kind_vars (class_infos, as)
 				  (class_kinds, as_kind_heap) = retrieve_class_kinds class_kind_vars as.as_kind_heap
 				= ({class_infos & [class_module,class_index] = class_kinds }, { as & as_kind_heap = as_kind_heap, as_error = popErrorAdmin as.as_error})
-//						---> ("determine_kinds_of_class", class_name, class_kinds)
+//						---> ("determine_kinds_of_class", class_ident, class_kinds)
 				= ({class_infos & [class_module,class_index] = [ KindConst \\ _ <- [1..class_arity]] }, { as & as_error = popErrorAdmin as.as_error })
 		| isCyclicClass class_infos.[class_module,class_index]
-			# {class_name,class_arity} = modules.[class_module].com_class_defs.[class_index]
+			# {class_ident,class_arity} = modules.[class_module].com_class_defs.[class_index]
 			= ({ class_infos & [class_module,class_index] = [ KindConst \\ _ <- [1..class_arity]]},
-				{ as & as_error = checkError class_name class_def_error as.as_error })
+				{ as & as_error = checkError class_ident class_def_error as.as_error })
 			= (class_infos, as)
 	where
 		fresh_kind_vars nr_of_vars fresh_vars kind_heap
@@ -948,8 +948,8 @@ where
 			= check_kinds_of_generics common_defs (inc index) generic_defs class_infos gen_heap as
 	where
 		check_kinds_of_generic :: !{#CommonDefs} !GenericDef  !*ClassDefInfos !*GenericHeap !*AnalyseState -> (!*ClassDefInfos, !*GenericHeap, !*AnalyseState)
-		check_kinds_of_generic common_defs {gen_type, gen_name, gen_pos, gen_vars, gen_info_ptr} class_infos gen_heap as					
-			# as = {as & as_error = pushErrorAdmin (newPosition gen_name gen_pos) as.as_error}
+		check_kinds_of_generic common_defs {gen_type, gen_ident, gen_pos, gen_vars, gen_info_ptr} class_infos gen_heap as					
+			# as = {as & as_error = pushErrorAdmin (newPosition gen_ident gen_pos) as.as_error}
 			# (class_infos, as) = check_kinds_of_symbol_type common_defs gen_type class_infos as			
 			# (kinds, as) = mapSt retrieve_tv_kind gen_type.st_vars as
 			# as = check_kinds_of_generic_vars (take (length gen_vars) kinds) as
@@ -998,11 +998,11 @@ where
 			= as
 
 	check_kinds_of_icl_fuction common_defs fun_index (icl_fun_defs, class_infos, expression_heap, as)
-		# ({fun_type,fun_symb,fun_info,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
+		# ({fun_type,fun_ident,fun_info,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
 		  (expression_heap, as) = check_kinds_of_dynamics common_defs fun_info.fi_dynamics expression_heap as
 		= case fun_type of
 			Yes symbol_type
-				# as_error = pushErrorAdmin (newPosition fun_symb fun_pos) as.as_error
+				# as_error = pushErrorAdmin (newPosition fun_ident fun_pos) as.as_error
 				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos { as & as_error = as_error }
 				-> (icl_fun_defs, class_infos, expression_heap, { as & as_error = popErrorAdmin as.as_error })
 			No
@@ -1015,8 +1015,8 @@ where
 		= (dcl_modules, class_infos, as)
 	where
 		check_kinds_of_dcl_fuction common_defs dcl_functions fun_index (class_infos, as)
-			# {ft_type,ft_symb,ft_pos} = dcl_functions.[fun_index]
-			  as_error = pushErrorAdmin (newPosition ft_symb ft_pos) as.as_error
+			# {ft_type,ft_ident,ft_pos} = dcl_functions.[fun_index]
+			  as_error = pushErrorAdmin (newPosition ft_ident ft_pos) as.as_error
 			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos
 			  							{ as & as_error = as_error }			  								
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
@@ -1073,13 +1073,13 @@ where
 checkLeftRootAttributionOfTypeDef :: !{# CommonDefs} GlobalIndex !(!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 		-> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 checkLeftRootAttributionOfTypeDef common_defs {gi_module,gi_index} (td_infos, th_vars, error)
-	# {td_rhs, td_attribute, td_name, td_pos} = common_defs.[gi_module].com_type_defs.[gi_index]
+	# {td_rhs, td_attribute, td_ident, td_pos} = common_defs.[gi_module].com_type_defs.[gi_index]
 	| isUniqueAttr td_attribute
 		= (td_infos, th_vars, error)
 	# (is_unique, (td_infos, th_vars))
 			= isUniqueTypeRhs common_defs gi_module td_rhs (td_infos, th_vars)
 	| is_unique
-		= (td_infos, th_vars, checkErrorWithIdentPos (newPosition td_name td_pos) 
+		= (td_infos, th_vars, checkErrorWithIdentPos (newPosition td_ident td_pos) 
 								" left root * attribute expected" error)
 		= (td_infos, th_vars, error)
 		

@@ -304,7 +304,7 @@ class consumerRequirements a :: !a !ConsumerAnalysisRO !AnalyseInfo -> (!ConsCla
 
 instance consumerRequirements BoundVar
 where
-	consumerRequirements {var_name,var_info_ptr} _ ai=:{ai_var_heap}
+	consumerRequirements {var_ident,var_info_ptr} _ ai=:{ai_var_heap}
 		# (var_info, ai_var_heap)	= readPtr var_info_ptr ai_var_heap
 		  ai						= { ai & ai_var_heap=ai_var_heap }
 		= case var_info of
@@ -313,7 +313,7 @@ where
 				   ai				= { ai & ai_cur_ref_counts.[arg_position] = inc_ref_count ref_count }
 				-> (temp_var, False, ai)
 			_
-				-> abort ("consumerRequirements [BoundVar] " ---> (var_name,var_info_ptr))
+				-> abort ("consumerRequirements [BoundVar] " ---> (var_ident,var_info_ptr))
 
 instance consumerRequirements Expression where
 	consumerRequirements (Var var) common_defs ai
@@ -410,7 +410,7 @@ where
 		= ai
 			
 instance consumerRequirements App where
-	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_name}, app_args}
+	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_ident}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs})
 			ai=:{ai_cons_class,ai_group_members}
 
@@ -466,7 +466,7 @@ instance consumerRequirements App where
 ...*/
 // ...ACTIVATE DICTIONARIES
 		= consumerRequirements app_args common_defs ai
-	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object,symb_name}, app_args}
+	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object,symb_ident}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
 			ai=:{ai_cons_class,ai_group_members}
 		| glob_object < size ai_cons_class
@@ -477,7 +477,7 @@ instance consumerRequirements App where
 		= consumerRequirements app_args common_defs ai
 	
 	// new alternative for generated function + reanalysis...
-	consumerRequirements {app_symb={symb_kind = SK_GeneratedFunction fun_info_ptr index,symb_name}, app_args}
+	consumerRequirements {app_symb={symb_kind = SK_GeneratedFunction fun_info_ptr index,symb_ident}, app_args}
 			common_defs
 			ai=:{ai_group_members}
 		# (FI_Function {gf_cons_args={cc_args,cc_linear_bits},gf_fun_def}, ai_fun_heap)
@@ -509,7 +509,7 @@ reqs_of_args fun_idx arg_idx [form_cc : ccs] [(Var arg): args] cumm_arg_class co
 		  ai = aiUnifyClassifications form_cc act_cc ai
 		= reqs_of_args fun_idx (inc arg_idx) ccs args (combineClasses act_cc cumm_arg_class) common_defs ai
 where
-	consumerRequirements` {var_info_ptr,var_name} _ ai
+	consumerRequirements` {var_info_ptr,var_ident} _ ai
 		# (var_info, ai_var_heap)	= readPtr var_info_ptr ai.ai_var_heap
 		  ai						= { ai & ai_var_heap=ai_var_heap }
 		= case var_info of
@@ -518,7 +518,7 @@ where
 				   ai				= { ai & ai_cur_ref_counts.[arg_position] = add_dep_count (fun_idx,arg_idx) ref_count }
 				-> (temp_var, False, ai)
 			_
-				-> abort ("reqs_of_args [BoundVar] " ---> (var_name))
+				-> abort ("reqs_of_args [BoundVar] " ---> (var_ident))
 
 reqs_of_args fun_idx arg_idx [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
 	# (act_cc, _, ai) = consumerRequirements arg common_defs ai

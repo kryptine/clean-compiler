@@ -57,7 +57,7 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		  		= { dcl_mods & [mod_index].dcl_common.com_class_defs 
 		  				= { el \\ el <- class_defs_with_cacheable_kind_info }}
 		= (dcl_mods, th_vars, td_infos, error_admin)
-	check_class com_member_defs class_def=:{class_name, class_args, class_members}
+	check_class com_member_defs class_def=:{class_ident, class_args, class_members}
 			(class_defs_accu, th_vars, td_infos, error_admin)
 		# th_vars
 				= init_type_vars class_args th_vars
@@ -70,10 +70,10 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		  		= mapFilterYesSt get_opt_kind class_args th_vars
 		= ([{ class_def & class_arg_kinds = derived_kinds }:class_defs_accu], th_vars, td_infos, error_admin)
 	check_member_without_context class_args
-				{me_symb, me_pos, me_class_vars, me_type=me_type=:{st_vars, st_args, st_result}}
+				{me_ident, me_pos, me_class_vars, me_type=me_type=:{st_vars, st_args, st_result}}
 				(th_vars, td_infos, error_admin)
 		# error_admin
-				= setErrorAdmin (newPosition me_symb me_pos) error_admin
+				= setErrorAdmin (newPosition me_ident me_pos) error_admin
 		  th_vars
 				= init_type_vars st_vars th_vars
 		  th_vars
@@ -137,7 +137,7 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		  		= mapSt get_tvi class_args th_vars
 		= (expected_kinds, bv_uninitialized_mods, th_vars)
 
-	write_kind_info {class_name, class_args, class_arg_kinds} th_vars
+	write_kind_info {class_ident, class_args, class_arg_kinds} th_vars
 		= write_ki class_args class_arg_kinds th_vars
 
 	write_ki [{tv_info_ptr}:class_args] [class_arg_kind:class_arg_kinds] th_vars
@@ -153,10 +153,10 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 	possibly_check_type (TVI_Kind expected_kind) arg_nr type state
 		= check_type expected_kind arg_nr type state
 	check_class_context_and_member_contexts common_defs com_member_defs
-				{class_name, class_pos, class_context, class_members, class_args} 
+				{class_ident, class_pos, class_context, class_members, class_args} 
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# error_admin
-				= setErrorAdmin (newPosition class_name class_pos) error_admin
+				= setErrorAdmin (newPosition class_ident class_pos) error_admin
 		  state
 				= foldSt (check_context common_defs) class_context
 						(bv_uninitialized_mods, th_vars, td_infos, error_admin)
@@ -166,10 +166,10 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		= state
 	check_member_context common_defs com_member_defs {ds_index}
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
-		# {me_symb, me_pos, me_type}
+		# {me_ident, me_pos, me_type}
 				= com_member_defs.[ds_index]
 		  error_admin
-		  		= setErrorAdmin (newPosition me_symb me_pos) error_admin
+		  		= setErrorAdmin (newPosition me_ident me_pos) error_admin
 		= foldSt (check_context common_defs) me_type.st_context 
 				(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	get_tvi {tv_info_ptr} th_vars
@@ -190,7 +190,7 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 				-> (fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 			Yes st
 				# (bv_uninitialized_mods, th_vars, td_infos, error_admin)
-						= check_symbol_type common_defs fun_def.fun_symb fun_def.fun_pos
+						= check_symbol_type common_defs fun_def.fun_ident fun_def.fun_pos
 								st (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 				-> (fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	check_dcl_functions common_defs mod_index
@@ -201,16 +201,16 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		  		= iFoldSt (\i state
 							-> if (in_index_range i dcl_instances || in_index_range i dcl_macros) // yawn
 								  state
-								  (let ({ft_symb, ft_pos, ft_type}) = dcl_functions.[i]
-								    in check_symbol_type common_defs ft_symb ft_pos ft_type 
+								  (let ({ft_ident, ft_pos, ft_type}) = dcl_functions.[i]
+								    in check_symbol_type common_defs ft_ident ft_pos ft_type 
 								    		state))
 							0 (size dcl_functions) (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		= (dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
-	check_symbol_type common_defs fun_symb fun_pos
+	check_symbol_type common_defs fun_ident fun_pos
 			st=:{st_vars, st_args, st_result, st_context}
 			(bv_uninitialized_mods, th_vars, td_infos, error_admin)
 		# error_admin
-				= setErrorAdmin (newPosition fun_symb fun_pos) error_admin
+				= setErrorAdmin (newPosition fun_ident fun_pos) error_admin
 		  th_vars
 				= init_type_vars st_vars th_vars
 		  (th_vars, td_infos, error_admin)
@@ -222,7 +222,7 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		= (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	check_atype expected_kind arg_nr {at_type} state
 		= check_type expected_kind arg_nr at_type state
-	check_type expected_kind arg_nr (TA {type_name,type_index} args)
+	check_type expected_kind arg_nr (TA {type_ident,type_index} args)
 					(th_vars, td_infos, error_admin)
 		# ({tdi_kinds}, td_infos)
 				= td_infos![type_index.glob_module,type_index.glob_object]
@@ -304,7 +304,7 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 		init_type_var {tv_info_ptr} tv_heap
 			= tv_heap <:= (tv_info_ptr, TVI_Empty)
 		
-	unify_var_kinds expected_kind tv=:{tv_name, tv_info_ptr} th_vars error_admin
+	unify_var_kinds expected_kind tv=:{tv_ident, tv_info_ptr} th_vars error_admin
 		# (tvi, th_vars)
 				= readPtr tv_info_ptr th_vars
 		= case tvi of
@@ -314,7 +314,7 @@ checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances com
 				| expected_kind==kind
 					-> (th_vars, error_admin)
 				-> (th_vars, checkError "cannot consistently assign a kind to type variable"
-										tv_name.id_name error_admin)
+										tv_ident.id_name error_admin)
 	check_equality_of_kinds arg_nr expected_kind kind error_admin
 		| expected_kind==kind
 			= error_admin

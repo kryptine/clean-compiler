@@ -96,14 +96,14 @@ printFunctionTypes all attr info components functions attrHeap file backEnd
 			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: components & componentIndex <- [1..]]
 
 printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap, *File, *BackEnd) -> (*AttrVarHeap, *File, *BackEnd)
-printFunctionType all attr info (functionIndex, {fun_symb,fun_type=Yes type}) (attrHeap, file, backEnd)
+printFunctionType all attr info (functionIndex, {fun_ident,fun_type=Yes type}) (attrHeap, file, backEnd)
 	| not all && functionIndex >= size info.dtic_dclModules.[info.dtci_iclModuleIndex].dcl_functions
 		=	(attrHeap, file, backEnd)
 
-//	| trace_tn (toString fun_symb) && True ---> type.st_args
+//	| trace_tn (toString fun_ident) && True ---> type.st_args
 
 	# (strictnessAdded, type, backEnd)
-		=	addStrictnessFromBackEnd functionIndex fun_symb.id_name backEnd type
+		=	addStrictnessFromBackEnd functionIndex fun_ident.id_name backEnd type
 	| not strictnessAdded && not all
 		=	(attrHeap, file, backEnd)
 	// FIXME: shouldn't have to repair the invariant here
@@ -114,7 +114,7 @@ printFunctionType all attr info (functionIndex, {fun_symb,fun_type=Yes type}) (a
 	# (type, attrHeap)
 		=	beautifulizeAttributes type attrHeap
 	# file
-		=	file <<< fun_symb <<< " :: "
+		=	file <<< fun_ident <<< " :: "
 				<:: ({ form_properties = (if attr cAttributed 0) bitor cAnnotated, form_attr_position = No }, type, Yes initialTypeVarBeautifulizer) <<< '\n'
 	=	(attrHeap, file, backEnd)
 
@@ -388,10 +388,10 @@ where
 		=	{tc_class = TCClass klass, tc_types = [at_type \\ {at_type} <- args], tc_var = nilPtr}
 
 typeToClass :: DictionaryToClassInfo TypeSymbIdent -> Optional (Global DefinedSymbol)
-typeToClass info {type_name, type_arity, type_index={glob_module, glob_object}}
+typeToClass info {type_ident, type_arity, type_index={glob_module, glob_object}}
 	=	case typeIndexToClassIndex info glob_module glob_object of
 			Yes classIndex
-				->	Yes {glob_module=glob_module, glob_object = {ds_ident = type_name, ds_arity = type_arity, ds_index = glob_object}}
+				->	Yes {glob_module=glob_module, glob_object = {ds_ident = type_ident, ds_arity = type_arity, ds_index = glob_object}}
 			No
 				->	No
 	where

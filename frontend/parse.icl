@@ -292,7 +292,7 @@ wantModule iclmodule file_id=:{id_name} import_file_position support_generics ha
 			# hash_table=set_hte_mark 0 hash_table
 			->(ok,mod,hash_table,file,files)
 		(No, files)
-			-> let mod = { mod_name = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
+			-> let mod = { mod_ident = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
 			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
 where
 	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
@@ -300,7 +300,7 @@ where
 	initModule :: String String ScanState !*HashTable !*File *Files
 				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
 	initModule file_name modification_time scanState hash_table error files
-		# (succ, mod_type, mod_name, scanState) = try_module_header iclmodule scanState
+		# (succ, mod_type, mod_ident, scanState) = try_module_header iclmodule scanState
 		| succ
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
@@ -308,8 +308,8 @@ where
 										, ps_hash_table = hash_table
 										, ps_support_generics = support_generics
 										}
-			  pState				= verify_name mod_name id_name file_name pState
-		  	  (mod_ident, pState)	= stringToIdent mod_name IC_Module pState
+			  pState				= verify_name mod_ident id_name file_name pState
+		  	  (mod_ident, pState)	= stringToIdent mod_ident IC_Module pState
 		  	  pState				= check_layout_rule pState
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
 			  {ps_scanState,ps_hash_table,ps_error}
@@ -317,7 +317,7 @@ where
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
 						[PD_Import imports \\ PD_Import imports <- defs]
 						defs
-			  mod					= { mod_name = mod_ident, mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
+			  mod					= { mod_ident = mod_ident, mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
 			= ( ps_error.pea_ok
 			  , mod, ps_hash_table
 			  , ps_error.pea_file
@@ -325,7 +325,7 @@ where
 			  )
 		// otherwise // ~ succ
 		# ({fp_line}, scanState) = getPosition scanState
-		  mod = { mod_name = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
+		  mod = { mod_ident = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
 		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
 			closeScanner scanState files)
 
@@ -497,11 +497,11 @@ where
 						# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 						| ok 
 							-> case type_cons of
-								(TypeConsSymb {type_name})
-									| type_name == type_CONS_ident
+								(TypeConsSymb {type_ident})
+									| type_ident == type_CONS_ident
 										# (cons_CONS_ident, pState) = stringToIdent "GenericConsInfo" IC_Expression pState 
 										-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
-									| type_name == type_FIELD_ident 
+									| type_ident == type_FIELD_ident 
 										# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
 										-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)
 								_
@@ -534,8 +534,8 @@ where
 			    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
 
 				# generic_case = 
-					{ gc_name = ident
-					, gc_gname = generic_ident
+					{ gc_ident = ident
+					, gc_gident = generic_ident
 					, gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
 					, gc_arity = length args
 					, gc_pos = pos
@@ -1068,8 +1068,8 @@ wantImports pState
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
-	# (mod_name, pState) = wantModuleName pState
-	  (mod_ident, pState) = stringToIdent mod_name IC_Module pState
+	# (mod_ident, pState) = wantModuleName pState
+	  (mod_ident, pState) = stringToIdent mod_ident IC_Module pState
 	  pState = wantToken GeneralContext "from imports" ImportToken pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  (import_symbols, pState) = wantSequence CommaToken GeneralContext pState
@@ -1139,12 +1139,12 @@ want_2_0_import_declaration token pState
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } (Yes members), pState)
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, tokenBack pState)
 			InstanceToken
-				#	(class_name, pState)	= want pState
+				#	(class_ident, pState)	= want pState
 //					(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
 					ii_extended				= False
 					(types, pState)			= wantList "instance types" tryBrackType pState
-					(class_id, pState)		= stringToIdent class_name IC_Class pState
-					(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
+					(class_id, pState)		= stringToIdent class_ident IC_Class pState
+					(inst_id, pState)		= stringToIdent class_ident (IC_Instance types) pState
 					(context, pState)		= optionalContext pState
 				->	(ID_Instance { ii_ident = class_id, ii_extended = ii_extended } inst_id (types,context), pState)
 			IdentToken fun_name
@@ -1221,7 +1221,7 @@ wantClassDefinition parseContext pos pState
 		| begin_members
 			# (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
 		 	  (members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
-  		  	  class_def = { class_name = class_id, class_arity = class_arity, class_args = class_args,
+  		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex},
 							class_arg_kinds = [] }
@@ -1232,7 +1232,7 @@ wantClassDefinition parseContext pos pState
 		// otherwise
 			# pState = tokenBack pState
 			  (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
-  			  class_def = { class_name = class_id, class_arity = class_arity, class_args = class_args,
+  			  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars, 
 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex },
 							class_arg_kinds = []}
@@ -1268,8 +1268,8 @@ wantClassDefinition parseContext pos pState
 				  (token, pState) = nextToken FunctionContext pState
 				  (prio, pState) = optionalPriority cIsInfix token pState  
 				= (cIsNotAClass, member_name, prio, pState)
- 				# (class_name, pState) = want_name token pState
-				= (cMightBeAClass, class_name, NoPrio, pState)
+ 				# (class_ident, pState) = want_name token pState
+				= (cMightBeAClass, class_ident, NoPrio, pState)
 		where
 			want_name (IdentToken name) pState
 				= (name, pState)
@@ -1281,7 +1281,7 @@ wantClassDefinition parseContext pos pState
 			  (member_id, pState) = stringToIdent member_name IC_Expression pState
 			  (class_id, pState) = stringToIdent member_name IC_Class pState
 			  member = PD_TypeSpec pos member_id prio (Yes tspec) SP_None
-			  class_def = {	class_name = class_id, class_arity = class_arity, class_args = class_args,
+			  class_def = {	class_ident = class_id, class_arity = class_arity, class_args = class_args,
 		    				class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
    							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex },
    							class_arg_kinds = []}
@@ -1306,10 +1306,10 @@ wantClassDefinition parseContext pos pState
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState
-	# (class_name, pState) = want pState
-	  (pi_class, pState) = stringToIdent class_name IC_Class pState
+	# (class_ident, pState) = want pState
+	  (pi_class, pState) = stringToIdent class_ident IC_Class pState
 	  ((pi_types, pi_context), pState) = want_instance_type pState
-	  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
+	  (pi_ident, pState) = stringToIdent class_ident (IC_Instance pi_types) pState
 // AA..
 	# (token, pState) = nextToken TypeContext pState
 /*
@@ -1329,7 +1329,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 	// otherwise // ~ (isIclContext parseContext)
 		| token == CommaToken
 			# (pi_types_and_contexts, pState)	= want_instance_types pState
-			  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
+			  (idents, pState)		= seqList [stringToIdent class_ident (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
 			= (PD_Instances
 //				[	{ pi_class = pi_class, pi_ident = pi_ident, pi_types = type, pi_context = context // voor martin
 				[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
@@ -1401,9 +1401,9 @@ where
 	where
 		build_contexts [] types arity pState
 			= ([], pState)
-		build_contexts [class_name : class_names] types arity pState
+		build_contexts [class_ident : class_names] types arity pState
 			# (contexts, pState) = build_contexts class_names types arity pState
-			  (class_ident, pState) = stringToIdent class_name IC_Class pState
+			  (class_ident, pState) = stringToIdent class_ident IC_Class pState
 			  tc_class = { glob_object = MakeDefinedSymbol class_ident NoIndex (length types), glob_module = NoIndex }
 			= ([{ tc_class = tc_class, tc_types = types, tc_var = nilPtr } : contexts], pState)
 */
@@ -1476,13 +1476,13 @@ optionalCoercions pState
 				# (more_inequals, pState) = want_inequalities pState
 				= (inequals ++ more_inequals, pState)
 				= (inequals, tokenBack pState)
-		want_attr_inequality (IdentToken var_name) pState
-			| isLowerCaseName var_name
-				# (off_ident, pState) = stringToIdent var_name IC_TypeAttr pState
+		want_attr_inequality (IdentToken var_ident) pState
+			| isLowerCaseName var_ident
+				# (off_ident, pState) = stringToIdent var_ident IC_TypeAttr pState
 				  (token, pState) = nextToken  TypeContext pState
 				| token == LessThanOrEqualToken
-					# (var_name, pState) = wantLowerCaseName "attribute inequality" pState
-					  (dem_ident, pState) = stringToIdent var_name IC_TypeAttr pState
+					# (var_ident, pState) = wantLowerCaseName "attribute inequality" pState
+					  (dem_ident, pState) = stringToIdent var_ident IC_TypeAttr pState
 					  ai_demanded = makeAttributeVar dem_ident
 					= (ai_demanded, [{ ai_demanded = ai_demanded, ai_offered = makeAttributeVar off_ident }], pState)				
 					# (ai_demanded, inequals, pState) = want_attr_inequality token pState
@@ -1516,8 +1516,8 @@ wantGenericDefinition parseContext pos pState
 	# (type, pState) = want_type pState		//	SymbolType
 	# pState = wantEndOfDefinition "generic definition" pState
 	# gen_def = 
-		{	gen_name = ident
-		,	gen_member_name = member_ident 
+		{	gen_ident = ident
+		,	gen_member_ident = member_ident 
 		,	gen_type = type
 		,	gen_vars = arg_vars
 		,	gen_pos = pos
@@ -1570,8 +1570,8 @@ where
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState
 		# (type_cons, pState) = get_type_cons type pState
 		# derive_def = 
-			{	gc_name	= ident
-			, 	gc_gname = generic_ident
+			{	gc_ident	= ident
+			, 	gc_gident = generic_ident
 			, 	gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
 			,	gc_arity = 0
 			,	gc_pos = pos
@@ -1650,8 +1650,8 @@ where
 		= (MakeTypeDef ident args (ConsList []) attr contexts pos, annot, pState)
 
 	want_type_rhs :: !ParseContext !ParsedTypeDef !Token !Annotation !ParseState -> (ParsedDefinition, !ParseState)
-	want_type_rhs parseContext td=:{td_name,td_attribute} EqualToken annot pState
-		# name					= td_name.id_name
+	want_type_rhs parseContext td=:{td_ident,td_attribute} EqualToken annot pState
+		# name					= td_ident.id_name
 		  pState				= verify_annot_attr annot td_attribute name pState
 		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
 		  (token, pState)		= nextToken GeneralContext pState // should be TypeContext
@@ -1677,13 +1677,13 @@ where
 	 		  		->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
 		where
 			want_record_type_rhs name is_boxed_record exi_vars pState
-				#	(fields, pState)			= wantFields td_name pState
+				#	(fields, pState)			= wantFields td_ident pState
 					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
 				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
 				=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
 
 	want_type_rhs parseContext td=:{td_attribute} ColonDefinesToken annot pState // type Macro
-		# name				= td.td_name.id_name
+		# name				= td.td_ident.id_name
 		  pState			= verify_annot_attr annot td_attribute name pState
 		  (atype, pState)	= want pState // Atype
 		  td				= {td & td_rhs = TypeSpec atype}
@@ -1694,7 +1694,7 @@ where
 	want_type_rhs parseContext td=:{td_attribute} token=:DefinesColonToken annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
-		# name				= td.td_name.id_name
+		# name				= td.td_ident.id_name
 		  (atype, pState)	= want pState // Atype
 		# (td_attribute, properties) = determine_properties annot td_attribute
 		  td				= {td & td_rhs = AbstractTypeSpec properties atype, td_attribute=td_attribute}
@@ -1711,7 +1711,7 @@ where
 				# (td_attribute, properties) = determine_properties annot td_attribute
 				# td = { td & td_attribute = td_attribute, td_rhs = EmptyRhs properties}
 				= (PD_Type td, tokenBack pState)
-				# name = td.td_name.id_name
+				# name = td.td_ident.id_name
 				= (PD_Type  { td & td_rhs = EmptyRhs cAllBitsClear}, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
 	
 	verify_annot_attr :: !Annotation !TypeAttribute !String !ParseState -> ParseState
@@ -1735,9 +1735,9 @@ where
 	want_constructor_list :: ![ATypeVar] !Token !ParseState -> (.[ParsedConstructor],ParseState)
 	want_constructor_list exi_vars token pState
 		# token = basic_type_to_constructor token
-		# (pc_cons_name,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
+		# (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
 		  (pc_arg_types, pState) = parseList tryBrackSAType pState
-		  cons = { pc_cons_name = pc_cons_name, pc_arg_types = atypes_from_satypes pc_arg_types, pc_args_strictness=strictness_from_satypes pc_arg_types, pc_cons_arity = length pc_arg_types,
+		  cons = { pc_cons_ident = pc_cons_ident, pc_arg_types = atypes_from_satypes pc_arg_types, pc_args_strictness=strictness_from_satypes pc_arg_types, pc_cons_arity = length pc_arg_types,
 		  			pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
@@ -1784,7 +1784,7 @@ where
 	basic_type_to_constructor DynamicTypeToken	= IdentToken "Dynamic"
 	basic_type_to_constructor token				= token
 
-makeAttributeVar name :== { av_name = name, av_info_ptr = nilPtr }
+makeAttributeVar name :== { av_ident = name, av_info_ptr = nilPtr }
 
 optionalAnnot :: !ParseState -> (!Bool,!Annotation, !ParseState)
 optionalAnnot pState
@@ -1889,13 +1889,13 @@ wantFields record_type pState
 		want_field record_type pState
 			# (field_name, pState) 			= wantLowerCaseName "record field" pState
 			  (fname, linenr, pState)		= getFileAndLineNr pState
-			  (ps_field_name, pState) 		= stringToIdent field_name (IC_Field record_type) pState
-			  (ps_selector_name, pState) 	= stringToIdent field_name IC_Selector pState
+			  (ps_field_ident, pState) 		= stringToIdent field_name (IC_Field record_type) pState
+			  (ps_selector_ident, pState) 	= stringToIdent field_name IC_Selector pState
 			  (ps_field_var, pState) 		= stringToIdent field_name IC_Expression pState
 			  pState          				= wantToken TypeContext "record field" DoubleColonToken pState
 //			  (ps_field_type, pState)  		= want pState // wantAType
 			  (annotation,ps_field_type, pState) = wantAnnotatedAType pState
-			= ({ ps_field_name = ps_field_name, ps_selector_name = ps_selector_name, ps_field_type = ps_field_type,
+			= ({ ps_field_ident = ps_field_ident, ps_selector_ident = ps_selector_ident, ps_field_type = ps_field_type,
 					ps_field_annotation = annotation,
 					ps_field_var = ps_field_var, ps_field_pos = LinePos fname linenr}, pState)
 
@@ -2023,10 +2023,10 @@ where
 // Sjaak 210801 ...
 
 adjustAttribute :: !TypeAttribute Type *ParseState -> (!TypeAttribute, !*ParseState)
-adjustAttribute attr (TV {tv_name}) pState
-	= adjustAttributeOfTypeVariable attr tv_name pState
-adjustAttribute attr (GTV {tv_name}) pState
-	= adjustAttributeOfTypeVariable attr tv_name pState
+adjustAttribute attr (TV {tv_ident}) pState
+	= adjustAttributeOfTypeVariable attr tv_ident pState
+adjustAttribute attr (GTV {tv_ident}) pState
+	= adjustAttributeOfTypeVariable attr tv_ident pState
 adjustAttribute attr type pState
 	= (attr, pState)
 
@@ -2230,8 +2230,8 @@ convertAAType [atype:atypes] attr pState
 	# (attr, pState)	= determAttr_ attr atype.at_attribute type pState
 		with
 			determAttr_ :: !TypeAttribute !TypeAttribute !Type !ParseState -> (!TypeAttribute, !ParseState)
-			determAttr_ TA_None (TA_Var {av_name}) (TV {tv_name}) pState
-				| av_name.id_name==tv_name.id_name
+			determAttr_ TA_None (TA_Var {av_ident}) (TV {tv_ident}) pState
+				| av_ident.id_name==tv_ident.id_name
 					= (TA_Anonymous,pState)
 			determAttr_ attr1 attr2 type pState
 				=  determAttr attr1 attr2 type pState
@@ -2496,7 +2496,7 @@ tryQuantifiedTypeVar pState
  	  (succ, attr, pState)		= try_attribute token pState
  	| succ
 		# (typevar, pState)	= wantTypeVar pState
-		  (attr, pState)	= adjustAttributeOfTypeVariable attr typevar.tv_name pState
+		  (attr, pState)	= adjustAttributeOfTypeVariable attr typevar.tv_ident pState
 		= (True, {atv_attribute = attr, atv_variable = typevar}, pState)
 	# (succ, typevar, pState) = tryTypeVarT token pState
 	| succ

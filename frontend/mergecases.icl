@@ -198,9 +198,9 @@ where
 		  (expr, us) = unfold expr ui us
 		= (expr, us.us_var_heap, us.us_symbol_heap)
 
-	new_variable fv=:{fv_name, fv_info_ptr} var_heap
+	new_variable fv=:{fv_ident, fv_info_ptr} var_heap
 		# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-		= ({fv & fv_info_ptr = new_info_ptr}, var_heap <:= (fv_info_ptr, VI_Variable fv_name new_info_ptr))
+		= ({fv & fv_info_ptr = new_info_ptr}, var_heap <:= (fv_info_ptr, VI_Variable fv_ident new_info_ptr))
 		
 	rebuild_let_expression lad expr var_heap expr_heap
 		# (rev_let_lazy_binds, var_heap) = foldSt renew_let_var lad.let_lazy_binds ([], var_heap)
@@ -365,8 +365,8 @@ where
 		  (expr, us) = unfold expr ui us
 		= (expr, us.us_var_heap, us.us_symbol_heap)
 	where
-		build_aliases [var1 : vars1] [ {fv_name,fv_info_ptr} : vars2 ] var_heap
-			= build_aliases vars1 vars2 (writePtr var1.fv_info_ptr (VI_Variable fv_name fv_info_ptr) var_heap)
+		build_aliases [var1 : vars1] [ {fv_ident,fv_info_ptr} : vars2 ] var_heap
+			= build_aliases vars1 vars2 (writePtr var1.fv_info_ptr (VI_Variable fv_ident fv_info_ptr) var_heap)
 		build_aliases [] [] var_heap
 			= var_heap
 

@@ -229,8 +229,8 @@ predefined_idents
 		build_variables var_number max_arity idents
 			| var_number == max_arity
 				= idents
-				# var_name = "a" +++ toString var_number
-				# idents = {idents & [PD_TypeVar_a0 + var_number] = i var_name}
+				# var_ident = "a" +++ toString var_number
+				# idents = {idents & [PD_TypeVar_a0 + var_number] = i var_ident}
 				= build_variables (inc var_number) max_arity idents
 
 init_identifiers :: !*SymbolTable !*World -> (!*SymbolTable,!*World)
@@ -467,13 +467,13 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  nil_ident = predefined_idents.[nil_pre_def_symbol_index]
 	  list_ident = predefined_idents.[list_type_pre_def_symbol_index] 
 	  
-	  cons_symb = { ds_ident = cons_ident, ds_arity = 2, ds_index = cons_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
+	  cons_ds = { ds_ident = cons_ident, ds_arity = 2, ds_index = cons_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
 	  nil_symb = { ds_ident = nil_ident, ds_arity=0 ,ds_index = nil_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
-	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_symb,nil_symb]) pre_def_symbols	
+	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_ds,nil_symb]) pre_def_symbols	
 	  list_type = MakeAttributedType (TA (MakeNewTypeSymbIdent list_ident 1) [type_var_with_attr])
-	  cons_def = {	pc_cons_name = cons_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type],
+	  cons_def = {	pc_cons_ident = cons_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type],
 				 	pc_args_strictness=cons_strictness,	pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
-	  nil_def = {	pc_cons_name = nil_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict,
+	  nil_def = {	pc_cons_ident = nil_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict,
 	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
@@ -513,7 +513,7 @@ buildPredefinedModule pre_def_symbols
 	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_ident MaxTupleArity [array_def,strict_def,unboxed_def] [] pre_def_symbols
 	  alias_dummy_type = make_identity_fun_type alias_dummy_ident type_var
 	  (class_def, member_def, pre_def_symbols) = make_TC_class_def pre_def_symbols
-	= ({ mod_name = pre_mod_ident, mod_modification_time = "", mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
+	= ({ mod_ident = pre_mod_ident, mod_modification_time = "", mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
 		 mod_defs = {
 			def_types = [string_def, list_def,strict_list_def,unboxed_list_def,tail_strict_list_def,strict_tail_strict_list_def,unboxed_tail_strict_list_def,overloaded_list_def : type_defs],
 						def_constructors = [cons_def,strict_cons_def,unboxed_cons_def,tail_strict_cons_def,strict_tail_strict_cons_def,unboxed_tail_strict_cons_def,overloaded_cons_def,
@@ -530,7 +530,7 @@ where
 			  tuple_cons_symb					= { ds_ident = tuple_ident, ds_index = MakeTupleConsSymbIndex tup_arity, ds_arity = tup_arity }
 			  
 			  (tuple_type_def, pre_def_symbols)	= make_type_def (GetTupleTypeIndex tup_arity) type_vars (AlgType [tuple_cons_symb]) pre_def_symbols
-			  tuple_cons_def	= { pc_cons_name = tuple_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
+			  tuple_cons_def	= { pc_cons_ident = tuple_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
 			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars],
 			  						pc_args_strictness = NotStrict,
 			  						pc_cons_prio =  NoPrio, pc_exi_vars = []}
@@ -557,10 +557,10 @@ where
 					   				tc_types = [ TV class_var ], tc_var = nilPtr}],
 					  st_attr_vars = [], st_attr_env = [] }
 
-		  member_def = { me_symb = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,
+		  member_def = { me_ident = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,
 						 me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 		
-		  class_def = { class_name = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
+		  class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
 		  				class_members = {{ds_ident = tc_member_name, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
 						class_dictionary = { ds_ident = { tc_class_name & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos,
 						class_arg_kinds = [] }
@@ -572,7 +572,7 @@ where
 		# a = { at_attribute = TA_Anonymous, at_type = TV type_var }
 		  id_symbol_type = { st_vars = [], st_args = [a], st_args_strictness = Strict 1, st_arity = 1, st_result = a, st_context = [], 
 							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
-		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
+		= { ft_ident = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
 			ft_specials = SP_None, ft_type_ptr = nilPtr }
 
 DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		

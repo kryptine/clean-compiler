@@ -29,7 +29,7 @@ typeProperties type_index module_index hio_signs hio_props defs type_var_heap td
 	  (tsp_propagation, type_var_heap, td_infos) = determinePropClassOfTypeDef type_index module_index td_info hio_props defs type_var_heap td_infos
 	  tsp_coercible = (td_info.tdi_properties bitand cIsNonCoercible) == 0
 	= ({tsp_sign = tsp_sign, tsp_propagation = tsp_propagation, tsp_coercible = tsp_coercible }, type_var_heap, td_infos)
-//		---> ("typeProperties", (defs.[module_index].com_type_defs.[type_index].td_name, type_index, module_index), tsp_sign, tsp_propagation)
+//		---> ("typeProperties", (defs.[module_index].com_type_defs.[type_index].td_ident, type_index, module_index), tsp_sign, tsp_propagation)
 		
 signClassification :: !Index !Index ![SignClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!SignClassification, !*TypeVarHeap, !*TypeDefInfos)
@@ -38,7 +38,7 @@ signClassification type_index module_index hio_signs defs type_var_heap td_infos
 	# (tsp_sign, type_var_heap, td_infos)
 		= determineSignClassOfTypeDef type_index module_index td_info hio_signs defs type_var_heap td_infos
 	= (tsp_sign, type_var_heap, td_infos)
-//		---> ("signClassification", defs.[module_index].com_type_defs.[type_index].td_name, tsp_sign)
+//		---> ("signClassification", defs.[module_index].com_type_defs.[type_index].td_ident, tsp_sign)
 
 
 removeTopClasses [cv : cvs] [tc : tcs] 
@@ -131,8 +131,8 @@ where
 	where			
 		collect_sign_class_of_type_def group_nr signs_of_group_vars ci {gi_module,gi_index} (sign_requirements, type_var_heap, td_infos)
 			# ({tdi_group_vars,tdi_kinds,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
-			  {td_name,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
-//			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args (tdi_group_vars ---> ("bind_type_vars_to_signs",td_name, tdi_group_vars)) tdi_kinds signs_of_group_vars ([], type_var_heap)
+			  {td_ident,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
+//			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args (tdi_group_vars ---> ("bind_type_vars_to_signs",td_ident, tdi_group_vars)) tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args tdi_group_vars tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (sign_env, scs) = sign_class_of_type_def gi_module td_rhs group_nr ci 
 		  								{scs_type_var_heap = type_var_heap, scs_type_def_infos = td_infos, scs_rec_appls = [] }
@@ -222,7 +222,7 @@ IsArrowKind (KindArrow _) = True
 IsArrowKind _ = False
 
 signClassOfTypeVariable :: !TypeVar !{#CommonDefs} !*SignClassState -> (!SignClassification,!SignClassification,!*SignClassState)
-signClassOfTypeVariable {tv_name,tv_info_ptr} ci scs=:{scs_type_var_heap}
+signClassOfTypeVariable {tv_ident,tv_info_ptr} ci scs=:{scs_type_var_heap}
 	# (var_info, scs_type_var_heap) = readPtr tv_info_ptr scs_type_var_heap
 	  scs = { scs & scs_type_var_heap = scs_type_var_heap }
 	= case var_info of
@@ -243,7 +243,7 @@ signClassOfType_for_TA glob_module glob_object types sign use_top_sign group_nr 
 	# (td_info=:{tdi_group_nr,tdi_index_in_group,tdi_kinds}, scs) = scs!scs_type_def_infos.[glob_module].[glob_object]
 	| tdi_group_nr == group_nr
 		= sign_class_of_type_list_of_rec_type types sign use_top_sign tdi_index_in_group ci [] scs 
-		# {td_arity,td_name} = ci.[glob_module].com_type_defs.[glob_object]
+		# {td_arity,td_ident} = ci.[glob_module].com_type_defs.[glob_object]
 		  (sign_classes, hio_signs, scs) = collect_sign_classes_of_type_list types tdi_kinds group_nr ci scs 
 		  (type_class, scs_type_var_heap, scs_type_def_infos)
 		  		= determineSignClassOfTypeDef glob_object glob_module td_info hio_signs ci scs.scs_type_var_heap scs.scs_type_def_infos
@@ -327,7 +327,7 @@ propClassification type_index module_index hio_props defs type_var_heap td_infos
 			# (tsp_prop, type_var_heap, td_infos)
 				= determinePropClassOfTypeDef type_index module_index td_info hio_props defs type_var_heap td_infos
 			= (tsp_prop, type_var_heap, td_infos)
-//				---> ("propClassification", defs.[module_index].com_type_defs.[type_index].td_name, tsp_prop)
+//				---> ("propClassification", defs.[module_index].com_type_defs.[type_index].td_ident, tsp_prop)
 
 determinePropClassOfTypeDef :: !Int !Int !TypeDefInfo ![PropClassification] !{# CommonDefs} !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification,!*TypeVarHeap, !*TypeDefInfos)
@@ -406,7 +406,7 @@ where
 	where			
 		collect_sign_class_of_type_def group_nr props_of_group_vars ci {gi_module,gi_index} (prop_requirements, type_var_heap, td_infos)
 			# ({tdi_group_vars,tdi_kinds,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
-			  {td_name,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
+			  {td_ident,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
 			  (rev_hio_props, type_var_heap) = bind_type_vars_to_props td_args tdi_group_vars tdi_kinds props_of_group_vars ([], type_var_heap)
 			  (prop_env, pcs) = prop_class_of_type_def gi_module td_rhs group_nr ci 
 		  								{pcs_type_var_heap = type_var_heap, pcs_type_def_infos = td_infos, pcs_rec_appls = [] }

@@ -83,8 +83,8 @@ postfixIdent :: !Ident !String -> Ident
 postfixIdent {id_name} postfix = makeIdent (id_name +++ postfix)
 
 genericIdentToClassIdent :: !Ident !TypeKind -> Ident
-genericIdentToClassIdent gen_name kind
-	= postfixIdent gen_name ("_" +++ kind_to_str kind) 
+genericIdentToClassIdent gen_ident kind
+	= postfixIdent gen_ident ("_" +++ kind_to_str kind) 
 where
 	kind_to_str KindConst = "s"
 	kind_to_str (KindArrow kinds) 
@@ -94,15 +94,15 @@ where
 	kinds_to_str [k:ks] = "o" +++ (kind_to_str k) +++ "c" +++ kinds_to_str ks	
 
 genericIdentToMemberIdent :: !Ident !TypeKind -> Ident
-genericIdentToMemberIdent gen_name kind
-	= genericIdentToClassIdent gen_name kind
+genericIdentToMemberIdent gen_ident kind
+	= genericIdentToClassIdent gen_ident kind
 
 genericIdentToFunIdent :: !Ident !TypeCons -> Ident
-genericIdentToFunIdent gen_name type_cons
-	= postfixIdent gen_name ("_" +++ type_cons_to_str type_cons)
+genericIdentToFunIdent gen_ident type_cons
+	= postfixIdent gen_ident ("_" +++ type_cons_to_str type_cons)
 where
-	type_cons_to_str (TypeConsSymb {type_name}) = toString type_name
+	type_cons_to_str (TypeConsSymb {type_ident}) = toString type_ident
 	type_cons_to_str (TypeConsBasic bt) = toString bt
 	type_cons_to_str TypeConsArrow = "ARROW"
-	type_cons_to_str (TypeConsVar tv) = tv.tv_name.id_name
+	type_cons_to_str (TypeConsVar tv) = tv.tv_ident.id_name
 		 	

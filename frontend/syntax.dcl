@@ -90,7 +90,7 @@ instance == FunctionOrMacroIndex
 	}
 	
 ::	Module defs = 
-	{	mod_name		:: !Ident
+	{	mod_ident		:: !Ident
 	,	mod_modification_time		:: {#Char}
 	,	mod_type		:: !ModuleKind
 	, 	mod_imports		:: ![ParsedImport]
@@ -187,8 +187,8 @@ cNameNotLocationDependent :== False
 cNameLocationDependent :== True
 
 ::	ParsedSelector =
-	{	ps_field_name		:: !Ident
-	,	ps_selector_name	:: !Ident
+	{	ps_field_ident		:: !Ident
+	,	ps_selector_ident	:: !Ident
 	,	ps_field_annotation	:: !Annotation
 	,	ps_field_type		:: !AType
 	,	ps_field_var		:: !Ident
@@ -196,7 +196,7 @@ cNameLocationDependent :== True
 	}
 
 ::	ParsedConstructor =
-	{	pc_cons_name 	:: !Ident
+	{	pc_cons_ident 	:: !Ident
 	,	pc_cons_arity	:: !Int
 	,	pc_exi_vars		:: ![ATypeVar]
 	,	pc_arg_types	:: ![AType]
@@ -260,7 +260,7 @@ cNameLocationDependent :== True
 	}
 
 ::	ClassDef =
- 	{	class_name			:: !Ident
+ 	{	class_ident			:: !Ident
 	,	class_arity			:: !Int
 	,	class_args			:: ![TypeVar]
 	,	class_context		:: ![TypeContext]
@@ -274,7 +274,7 @@ cNameLocationDependent :== True
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
 
 ::	MemberDef =
-	{	me_symb			:: !Ident
+	{	me_ident			:: !Ident
 	,	me_class		:: !Global Index
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
@@ -287,8 +287,8 @@ cNameLocationDependent :== True
 // AA ... 
 
 :: GenericDef = 
-	{	gen_name		:: !Ident		// the generics name in IC_Class 
-	,	gen_member_name	:: !Ident		// the generics name in IC_Member
+	{	gen_ident		:: !Ident		// the generics name in IC_Class 
+	,	gen_member_ident	:: !Ident		// the generics name in IC_Member
 	, 	gen_pos			:: !Position
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
@@ -319,8 +319,8 @@ cNameLocationDependent :== True
 	| TypeConsVar TypeVar 
 
 :: GenericCaseDef = 
-	{	gc_name			:: !Ident				// name in IC_GenricCase namespace
-	,	gc_gname		:: !Ident  				// name in IC_Generic namespace
+	{	gc_ident			:: !Ident				// name in IC_GenricCase namespace
+	,	gc_gident		:: !Ident  				// name in IC_Generic namespace
 	,	gc_generic		:: !GlobalIndex  		// index of the generic
 	,	gc_arity		:: !Int					// arity of the function
 	,	gc_pos			:: !Position			// position in the source file
@@ -406,7 +406,7 @@ cIsImportedObject :== False
 	}
 	
 ::	FieldSymbol =
-	{	fs_name			:: !Ident
+	{	fs_ident			:: !Ident
 	,	fs_var			:: !Ident
 	,	fs_index		:: !Index
 	}
@@ -433,7 +433,7 @@ cIsAnalysed				:== 4
 NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}	
 
 ::	TypeDef type_rhs =
- 	{	td_name			:: !Ident
+ 	{	td_ident			:: !Ident
 	,	td_index		:: !Int
 	,	td_arity		:: !Int
 	,	td_args			:: ![ATypeVar]
@@ -478,7 +478,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 ::	TypeDefInfos :== {# .{# TypeDefInfo}}
 
 ::	FunType =
-	{	ft_symb			:: !Ident
+	{	ft_ident			:: !Ident
 	,	ft_arity		:: !Int
 	,	ft_priority		:: !Priority
 	,	ft_type			:: !SymbolType
@@ -489,7 +489,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 
 ::	FreeVar =
 	{	fv_def_level	:: !Level
-	,	fv_name			:: !Ident
+	,	fv_ident			:: !Ident
 	,	fv_info_ptr		:: !VarInfoPtr
 //	,	fv_expr_ptr		:: !ExprInfoPtr
 	,	fv_count		:: !Int
@@ -556,7 +556,7 @@ FI_IsUnboxedListOfRecordsConsOrNil :== 8
 	}
 
 ::	FunDef =
-	{	fun_symb		:: !Ident
+	{	fun_ident		:: !Ident
 	,	fun_arity		:: !Int
 	,	fun_priority	:: !Priority
 	,	fun_body		:: !FunctionBody
@@ -649,7 +649,7 @@ from convertcases import :: LetVarInfo, :: LetExpressionInfo,
 cNotVarNumber :== -1
 
 ::	BoundVar = 
-	{	var_name		:: !Ident
+	{	var_ident		:: !Ident
 	,	var_info_ptr	:: !VarInfoPtr
 	,	var_expr_ptr	:: !ExprInfoPtr
 	}
@@ -662,7 +662,7 @@ cNonRecursiveAppl	:== False
 */
  
 ::	TypeSymbIdent =
-	{	type_name		:: !Ident
+	{	type_ident		:: !Ident
 	,	type_arity		:: !Int
 	,	type_index		:: !Global Index
 	,	type_prop		:: !TypeSymbProperties
@@ -821,12 +821,12 @@ cNonRecursiveAppl	:== False
 	}
 		
 ::	SymbIdent =
-	{	symb_name		:: !Ident
+	{	symb_ident		:: !Ident
 	,	symb_kind		:: !SymbKind
 	}
 
 ::	ConsDef =
-	{	cons_symb			:: !Ident
+	{	cons_ident			:: !Ident
 	,	cons_type			:: !SymbolType
 	,	cons_arg_vars		:: ![[ATypeVar]]
 	,	cons_priority		:: !Priority
@@ -839,7 +839,7 @@ cNonRecursiveAppl	:== False
 	}
 
 ::	SelectorDef =
-	{	sd_symb			:: !Ident
+	{	sd__ident			:: !Ident
 	,	sd_field		:: !Ident
 	,	sd_type			:: !SymbolType
 	,	sd_exi_vars		:: ![ATypeVar]
@@ -971,7 +971,7 @@ cNonRecursiveAppl	:== False
 	}
 
 ::	TypeVar =
-	{	tv_name				:: !Ident
+	{	tv_ident				:: !Ident
 	,	tv_info_ptr			:: !TypeVarInfoPtr
 	}
 
@@ -987,7 +987,7 @@ cNonRecursiveAppl	:== False
 					| TA_PA_BUG
 							
 ::	AttributeVar =
-	{	av_name			:: !Ident
+	{	av_ident			:: !Ident
 	,	av_info_ptr		:: !AttrVarInfoPtr
 	}
 
@@ -1383,8 +1383,8 @@ cNotAGroupNumber :== -1
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
 					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_mark=False, tdi_gen_rep = No }
 
-MakeTypeVar name	:== { tv_name = name, tv_info_ptr = nilPtr }
-MakeVar name		:== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
+MakeTypeVar name	:== { tv_ident = name, tv_info_ptr = nilPtr }
+MakeVar name		:== { var_ident = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
 
 MakeAttributedType type :== { at_attribute = TA_None, at_type = type }
 MakeAttributedTypeVar type_var :== { atv_attribute = TA_None, atv_variable = type_var }
@@ -1401,19 +1401,19 @@ PropClass			:== bitnot 0
 newTypeSymbIdentCAF :: TypeSymbIdent;
 
 MakeNewTypeSymbIdent name arity
-	:== {newTypeSymbIdentCAF & type_name=name, type_arity=arity }
+	:== {newTypeSymbIdentCAF & type_ident=name, type_arity=arity }
 
 MakeTypeSymbIdent type_index name arity
-	:== {	newTypeSymbIdentCAF & type_name = name, type_arity = arity, type_index = type_index }
+	:== {	newTypeSymbIdentCAF & type_ident = name, type_arity = arity, type_index = type_index }
 
 ParsedSelectorToSelectorDef sd_type_index ps :==
-	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,
-		sd_exi_vars = [], sd_type_ptr = nilPtr, sd_field = ps.ps_field_name,
+	{	sd__ident = ps.ps_selector_ident, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,
+		sd_exi_vars = [], sd_type_ptr = nilPtr, sd_field = ps.ps_field_ident,
 		sd_type	= { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_result = ps.ps_field_type, st_arity = 0, st_context = [],
 				    st_attr_env = [], st_attr_vars = [] }}
 
 ParsedConstructorToConsDef pc :==
-	{	cons_symb = pc.pc_cons_name, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_index = NoIndex, cons_type_index = NoIndex,
+	{	cons_ident = pc.pc_cons_ident, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_index = NoIndex, cons_type_index = NoIndex,
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_args_strictness=pc.pc_args_strictness, st_result = MakeAttributedType TE, 
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr, cons_arg_vars = [] }
@@ -1425,12 +1425,12 @@ ParsedInstanceToClassInstance pi members :==
  		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
-	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,
+	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,
 		td_pos = pos, td_rhs = rhs, td_used_types = [] }
 
 MakeDefinedSymbol ident index arity :== { ds_ident = ident, ds_arity = arity, ds_index = index }
 
 MakeNewFunctionType name arity prio type pos specials var_ptr
-	:== { ft_symb = name, ft_arity = arity, ft_priority = prio, ft_type = type, ft_pos = pos, ft_specials = specials, ft_type_ptr = var_ptr  }
+	:== { ft_ident = name, ft_arity = arity, ft_priority = prio, ft_type = type, ft_pos = pos, ft_specials = specials, ft_type_ptr = var_ptr  }
 
 backslash :== '\\'

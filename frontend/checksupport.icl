@@ -199,7 +199,7 @@ class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 instance envLookUp TypeVar
 where
 	envLookUp var [bind:binds]
-		| var.tv_name == bind.bind_src
+		| var.tv_ident == bind.bind_src
 			= (True, bind.bind_dst)
 			= envLookUp var binds
 	envLookUp var []
@@ -208,7 +208,7 @@ where
 instance envLookUp AttributeVar
 where
 	envLookUp var [bind:binds]
-		| var.av_name == bind.bind_src
+		| var.av_ident == bind.bind_src
 			= (True, bind.bind_dst)
 			= envLookUp var binds
 	envLookUp var []
@@ -217,7 +217,7 @@ where
 instance envLookUp ATypeVar
 where
 	envLookUp var=:{atv_variable} [bind:binds]
-		| atv_variable.tv_name == bind.bind_src
+		| atv_variable.tv_ident == bind.bind_src
 			= (True, bind.bind_dst)
 			= envLookUp var binds
 	envLookUp var []
@@ -323,7 +323,7 @@ addLocalFunctionDefsToSymbolTable level from_index to_index is_macro_fun fun_def
 	| from_index == to_index
 		= (fun_defs, symbol_table, error)	
 		# (fun_def, fun_defs) = fun_defs![from_index]
-		# (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_symb (STE_FunctionOrMacro []) symbol_table error
+		# (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_ident (STE_FunctionOrMacro []) symbol_table error
 		| is_macro_fun
 			# fun_defs = {fun_defs & [from_index].fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_IsMacroFun }
 			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
@@ -334,7 +334,7 @@ addLocalDclMacroDefsToSymbolTable level module_index from_index to_index macro_d
 	| from_index == to_index
 		= (macro_defs, symbol_table, error)	
 		# (macro_def, macro_defs) = macro_defs![module_index,from_index]
-		# (symbol_table, error) = addDefToSymbolTable level from_index macro_def.fun_symb (STE_DclMacroOrLocalMacroFunction []) symbol_table error
+		# (symbol_table, error) = addDefToSymbolTable level from_index macro_def.fun_ident (STE_DclMacroOrLocalMacroFunction []) symbol_table error
 		# macro_defs = {macro_defs & [module_index].[from_index].fun_info.fi_properties = macro_def.fun_info.fi_properties bitor FI_IsMacroFun }
 		= addLocalDclMacroDefsToSymbolTable level module_index (inc from_index) to_index macro_defs symbol_table error
 
@@ -574,23 +574,23 @@ class toIdent a :: !a -> Ident
 
 instance toIdent SymbIdent
 where
-	toIdent symb = symb.symb_name
+	toIdent symb = symb.symb_ident
 
 instance toIdent TypeSymbIdent
 where
-	toIdent type_symb = type_symb.type_name
+	toIdent type_symb = type_symb.type_ident
 
 instance toIdent BoundVar
 where
-	toIdent var = var.var_name
+	toIdent var = var.var_ident
 
 instance toIdent TypeVar
 where
-	toIdent tvar = tvar.tv_name
+	toIdent tvar = tvar.tv_ident
 
 instance toIdent ATypeVar
 where
-	toIdent {atv_variable} = atv_variable.tv_name
+	toIdent {atv_variable} = atv_variable.tv_ident
 
 
 instance toIdent Ident
@@ -599,27 +599,27 @@ where
 
 instance toIdent ConsDef
 where
-	toIdent cons = cons.cons_symb
+	toIdent cons = cons.cons_ident
 
 instance toIdent (TypeDef a)
 where
-	toIdent td = td.td_name
+	toIdent td = td.td_ident
 
 instance toIdent ClassDef
 where
-	toIdent cl = cl.class_name
+	toIdent cl = cl.class_ident
 
 instance toIdent MemberDef
 where
-	toIdent me = me.me_symb
+	toIdent me = me.me_ident
 
 instance toIdent FunDef
 where
-	toIdent fun = fun.fun_symb
+	toIdent fun = fun.fun_ident
 
 instance toIdent SelectorDef
 where
-	toIdent sd = sd.sd_symb
+	toIdent sd = sd.sd__ident
 
 /*
 instance toIdent DeltaRule

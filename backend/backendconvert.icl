@@ -414,17 +414,17 @@ backEndConvertModulesH predefs {fe_icl =
 				(	"dcl conversions"
 				,	currentDcl.dcl_conversions
 				,	"dcl constructors"
-				,	[constructor.cons_symb.id_name \\ constructor <-: currentDcl.dcl_common.com_cons_defs]
+				,	[constructor.cons_ident.id_name \\ constructor <-: currentDcl.dcl_common.com_cons_defs]
 				,	"dcl selectors"
-				,	[selector.sd_symb.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
+				,	[selector.sd__ident.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
 				,	"dcl types"
-				,	[type.td_name.id_name \\ type <-: currentDcl.dcl_common.com_type_defs]
+				,	[type.td_ident.id_name \\ type <-: currentDcl.dcl_common.com_type_defs]
 				,	"icl constructors"
-				,	[constructor.cons_symb.id_name \\ constructor <-: icl_common.com_cons_defs]
+				,	[constructor.cons_ident.id_name \\ constructor <-: icl_common.com_cons_defs]
 				,	"icl selectors"
-				,	[selector.sd_symb.id_name \\ selector <-: icl_common.com_selector_defs]
+				,	[selector.sd__ident.id_name \\ selector <-: icl_common.com_selector_defs]
 				,	"icl types"
-				,	[type.td_name.id_name \\ type <-: icl_common.com_type_defs]
+				,	[type.td_ident.id_name \\ type <-: icl_common.com_type_defs]
 				)
 */
 	#! backEnd
@@ -539,7 +539,7 @@ where
 			= foldStateWithIndexA (removeExpandedTypesFromFunType moduleIndex)  dcl_functions
 			where
 				removeExpandedTypesFromFunType :: ModuleIndex Index FunType -> BackEnder
-				removeExpandedTypesFromFunType moduleIndex functionIndex {ft_symb, ft_type_ptr}
+				removeExpandedTypesFromFunType moduleIndex functionIndex {ft_ident, ft_type_ptr}
 					= \be0 ->	let (ft_type,be) = read_from_var_heap ft_type_ptr be0 in
 						(case ft_type of
 							VI_ExpandedType expandedType
@@ -563,16 +563,16 @@ instance declareVars (Ptr VarInfo) where
 instance declareVars FreeVar where
 	declareVars :: FreeVar !DeclVarsInput -> BackEnder
 	declareVars freeVar _
-		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
+		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
 
 instance declareVars LetBind where
 	declareVars :: LetBind !DeclVarsInput -> BackEnder
 	declareVars {lb_src=App {app_symb, app_args=[Var _:_]}, lb_dst=freeVar} aliasDummyId
-		| not (isNilPtr app_symb.symb_name.id_info) && app_symb.symb_name==aliasDummyId
+		| not (isNilPtr app_symb.symb_ident.id_info) && app_symb.symb_ident==aliasDummyId
 			= identity		// we have an alias. Don't declare the same variable twice
-		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
 	declareVars {lb_dst=freeVar} _
-		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
 
 declareVariable :: Int (Ptr VarInfo) {#Char} -> BackEnder
 declareVariable lhsOrRhs varInfoPtr name
@@ -614,7 +614,7 @@ instance declareVars Expression where
 		=	foldState declVar outParams 
 	  where
 		declVar {bind_dst=freeVar} 
-			= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name
+			= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
 	declareVars _ _
 		=	identity
 
@@ -666,7 +666,7 @@ declareFunctionSymbols functions functionIndices globalFunctions backEnd
 	=	foldl declare backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
 	where
 		declare backEnd (functionIndex, componentIndex, function)
-			=	appBackEnd (BEDeclareFunction (functionName function.fun_symb.id_name functionIndex globalFunctions) 
+			=	appBackEnd (BEDeclareFunction (functionName function.fun_ident.id_name functionIndex globalFunctions) 
 					function.fun_arity functionIndex componentIndex) backEnd
 			where
 				functionName :: {#Char} Int [IndexRange] -> {#Char}
@@ -720,7 +720,7 @@ declareArrayInstances array_first_instance_indices /*{ir_from, ir_to}*/ predefs 
 				= declareArrayInstances (member_n+1) first_member_index backend
 
 		declareArrayInstance :: Index FunDef -> BackEnder
-		declareArrayInstance index {fun_symb={id_name}, fun_type=Yes type}
+		declareArrayInstance index {fun_ident={id_name}, fun_type=Yes type}
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
@@ -745,7 +745,7 @@ declareListInstances array_first_instance_indices predef_list_class_index predef
 				= declareListInstances (member_n+1) first_member_index backend
 
 		declareListInstance :: Index FunDef -> BackEnder
-		declareListInstance index {fun_symb={id_name}, fun_type=Yes type}
+		declareListInstance index {fun_ident={id_name}, fun_type=Yes type}
 //			| trace_tn ("declareListInstance "+++toString index+++" "+++toString main_dcl_module_n)
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
@@ -758,20 +758,20 @@ instance declare CommonDefs where
 
 instance declareWithIndex (TypeDef a) where
 	declareWithIndex :: Index ModuleIndex (TypeDef a) -> BackEnder
-	declareWithIndex typeIndex moduleIndex {td_name}
-		=	appBackEnd (BEDeclareType typeIndex moduleIndex td_name.id_name)
+	declareWithIndex typeIndex moduleIndex {td_ident}
+		=	appBackEnd (BEDeclareType typeIndex moduleIndex td_ident.id_name)
 
 declareFunTypes :: ModuleIndex {#FunType} Int -> BackEnder
 declareFunTypes moduleIndex funTypes nrOfDclFunctions
 		=	foldStateWithIndexA (declareFunType moduleIndex nrOfDclFunctions) funTypes
 
 declareFunType :: ModuleIndex Index Int FunType -> BackEnder
-declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
+declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_ident, ft_type_ptr}
 	= \be0 -> let (vi,be) = read_from_var_heap ft_type_ptr be0 in
 					(case vi of
 						VI_ExpandedType expandedType
-							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_symb.id_name functionIndex nrOfDclFunctions)
-//							->	beDeclareRuleType functionIndex moduleIndex (functionName moduleIndex ft_symb.id_name functionIndex nrOfDclFunctions)
+							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex nrOfDclFunctions)
+//							->	beDeclareRuleType functionIndex moduleIndex (functionName moduleIndex ft_ident.id_name functionIndex nrOfDclFunctions)
 							o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
 						_
 							->	identity) be
@@ -809,17 +809,17 @@ convertTypeVars typeVars
 
 convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
 convertTypeVar typeVar
-	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_name.id_name) (convertAttribution typeVar.atv_attribute)
+	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_ident.id_name) (convertAttribution typeVar.atv_attribute)
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef *BackEndState -> *BackEndState
-defineType moduleIndex constructors _ typeIndex {td_name, td_attribute, td_args, td_rhs=AlgType constructorSymbols} be
+defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} be
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_attribute td_args be
 	# (constructors, be)
-		=	convertConstructors typeIndex td_name.id_name moduleIndex constructors constructorSymbols be
+		=	convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
 	=	appBackEnd (BEAlgebraicType flatType constructors) be
 defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}} be
-//	| trace_tn constructorDef.cons_symb
+//	| trace_tn constructorDef.cons_ident
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_attribute td_args be
 	# (fields, be)
@@ -858,7 +858,7 @@ convertConstructors typeIndex typeName moduleIndex constructors symbols
 convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol -> BEMonad BEConstructorListP
 convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index}
 	= \be0 -> let (constructorType,be) = constructorTypeFunction be0 in
-		(appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_symb.id_name) // +++ remove declare
+		(appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_ident.id_name) // +++ remove declare
 		o`	beConstructor
 			(beNormalTypeNode
 				(beConstructorSymbol moduleIndex ds_index)
@@ -870,9 +870,9 @@ convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index}
 			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
 					(case cons_type of
 						VI_ExpandedType expandedType
-							->	(expandedType,be) // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, expandedType)
+							->	(expandedType,be) // ->> (typeName, typeIndex, constructorDef.cons_ident.id_name, ds_index, expandedType)
 						_
-							->	(constructorDef.cons_type,be)) // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, constructorDef.cons_type)
+							->	(constructorDef.cons_type,be)) // ->> (typeName, typeIndex, constructorDef.cons_ident.id_name, ds_index, constructorDef.cons_type)
 
 
 foldrAi function result array
@@ -897,7 +897,7 @@ convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFiel
 //convertSelector moduleIndex selectorDefs {fs_index}
 convertSelector moduleIndex selectorDefs is_strict {fs_index}
 	= \be0 -> let (selectorType,be) = selectorTypeFunction be0 in
-		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_symb.id_name)
+		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd__ident.id_name)
 //		o`	beField fs_index moduleIndex (convertAnnotTypeNode (selectorType.st_result))) be
 		o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) (selectorType.st_result))) be
 	where
@@ -1253,10 +1253,10 @@ convertRules rules main_dcl_module_n aliasDummyId be
 			=	convert t rulesP be
 
 convertRule :: Ident (Int,FunDef) Int -> BEMonad BEImpRuleP
-convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb, fun_info}) main_dcl_module_n
-//	| trace_tn fun_symb.id_name
+convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_ident, fun_info}) main_dcl_module_n
+//	| trace_tn fun_ident.id_name
 	=	beRule index (cafness fun_kind)
-			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_symb.id_name, index, type, (fun_info.fi_group_index, body))))
+			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_ident.id_name, index, type, (fun_info.fi_group_index, body))))
 			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
 	where
 		cafness :: FunKind -> Int
@@ -1376,7 +1376,7 @@ nextAttributeNumber state=:{bes_attr_number}
 	=	(bes_attr_number + BEFirstUniVarNumber, {state & bes_attr_number = bes_attr_number+1})
 
 convertAttributeVar :: AttributeVar *BackEndState -> (BEAttribution, *BackEndState)
-convertAttributeVar {av_info_ptr, av_name} state=:{bes_attr_number}
+convertAttributeVar {av_info_ptr, av_ident} state=:{bes_attr_number}
 	# (attrInfo, state)
 		=	read_from_attr_heap av_info_ptr state
 	=	case attrInfo of
@@ -1447,8 +1447,8 @@ convertTypeNode (TA typeSymbolIdent typeArgs)
 convertTypeNode (TAS typeSymbolIdent typeArgs strictness)
 //	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedTypeArgs typeArgs strictness)
-convertTypeNode (TV {tv_name})
-	=	beVarTypeNode tv_name.id_name
+convertTypeNode (TV {tv_ident})
+	=	beVarTypeNode tv_ident.id_name
 convertTypeNode (TempQV n)
 	=	beVarTypeNode ("_tqv" +++ toString n)
 convertTypeNode (TempV n)
@@ -1746,7 +1746,7 @@ collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
 	filterStrictAlias [] let_lazy_binds
 		= let_lazy_binds
 	filterStrictAlias [strict_bind=:{lb_src=App app}:strict_binds] let_lazy_binds
-		| not (isNilPtr app.app_symb.symb_name.id_info) && app.app_symb.symb_name==aliasDummyId
+		| not (isNilPtr app.app_symb.symb_ident.id_info) && app.app_symb.symb_ident==aliasDummyId
 			// the compiled source was a strict alias like "#! x = y"
 			= case hd app.app_args of
 				Var _

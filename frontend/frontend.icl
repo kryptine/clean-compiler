@@ -326,7 +326,7 @@ where
 		| show_types
 			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
 			= show_component funs show_types fun_defs (file <<< fun_def)
-//		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
+//		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
 
 //show_components comps fun_defs = map (show_component fun_defs) comps
 
@@ -347,7 +347,7 @@ where
 		# (fun_def, fun_defs) = fun_defs![fun]
 		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
 		  (Yes ftype) = fun_def.fun_type
-		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype, No) <<< '\n' )
+		= show_types funs fun_defs (file <<< fun_def.fun_ident <<< " :: " <:: (properties, ftype, No) <<< '\n' )
 
 showDclModules :: !u:{#DclModule} !*File -> (!u:{#DclModule}, !*File)
 showDclModules dcl_mods file
@@ -372,8 +372,8 @@ where
 		| otherwise
 			# file = show_dcl_function dcl_functions.[fun_index] file
 			= show_dcl_functions (inc fun_index) dcl_functions file 
-	show_dcl_function {ft_symb, ft_type} file
-		= file <<< ft_symb <<< " :: " <<< ft_type <<< "\n"			
+	show_dcl_function {ft_ident, ft_type} file
+		= file <<< ft_ident <<< " :: " <<< ft_type <<< "\n"			
 		
 instance == ListTypesKind where
 	(==) ListTypesNone ListTypesNone

@@ -258,7 +258,7 @@ typeIsNonCoercible _ _
 
 class lift a :: !{# CommonDefs } !{# BOOLVECT } !a !*{! Type} !*LiftState -> (!Bool,!a, !*{! Type}, !*LiftState)
 
-liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_name,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
+liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
 	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
 	# (changed,cons_args, sign_classes, prop_classes, subst, ls=:{ls_type_heaps}) = lift_list modules cons_vars cons_args tdi_kinds subst ls
 	| changed
@@ -272,7 +272,7 @@ liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_name,type_index={gl
 		| equal_type_prop type_prop type_prop0
 			= (False, t0, subst, ls)
 			= (True, TA { cons_id & type_prop = type_prop } cons_args, subst, ls)
-liftTypeApplication modules cons_vars t0=:(TAS cons_id=:{type_name,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args strictness) subst ls
+liftTypeApplication modules cons_vars t0=:(TAS cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args strictness) subst ls
 	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
 	# (changed,cons_args, sign_classes, prop_classes, subst, ls=:{ls_type_heaps}) = lift_list modules cons_vars cons_args tdi_kinds subst ls
 	| changed
@@ -426,12 +426,12 @@ where
 				= (False, attr_type, subst_and_es)
 	where
 		expand_attribute :: TypeAttribute *(Heap AttrVarInfo) -> (!.Bool,TypeAttribute,!.Heap AttrVarInfo);
-		expand_attribute (TA_Var {av_name,av_info_ptr}) attr_var_heap
+		expand_attribute (TA_Var {av_ident,av_info_ptr}) attr_var_heap
 			= case (readPtr av_info_ptr attr_var_heap) of
 				(AVI_Attr attr, attr_var_heap)
 					-> (True, attr, attr_var_heap)
 				(info, attr_var_heap)
-					-> abort ("expand_attribute (unitype.icl)" )//---> (av_name <<- info ))
+					-> abort ("expand_attribute (unitype.icl)" )//---> (av_ident <<- info ))
 		expand_attribute attr attr_var_heap
 			= (False, attr, attr_var_heap)
 	
@@ -476,7 +476,7 @@ where
 			= (True, TArrow1 arg_type, es)
 			= (False, type, es)	
 //..AA					
-	expandType modules cons_vars t0=:(TA cons_id=:{type_name, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args) (subst, es)
+	expandType modules cons_vars t0=:(TA cons_id=:{type_ident, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args) (subst, es)
 		# ({tdi_kinds}, es) = es!es_td_infos.[glob_module].[glob_object]
 		  (changed,cons_args, hio_signs, hio_props, (subst,es=:{es_td_infos,es_type_heaps})) = expand_type_list modules cons_vars cons_args tdi_kinds (subst, es)
 		| changed
@@ -492,7 +492,7 @@ where
 				= (False,t0, (subst, es))
 			  	# es = { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}
 				= (True,TA { cons_id & type_prop = type_prop } cons_args, (subst, es))
-	expandType modules cons_vars t0=:(TAS cons_id=:{type_name, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args strictness) (subst, es)
+	expandType modules cons_vars t0=:(TAS cons_id=:{type_ident, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args strictness) (subst, es)
 		# ({tdi_kinds}, es) = es!es_td_infos.[glob_module].[glob_object]
 		  (changed,cons_args, hio_signs, hio_props, (subst,es=:{es_td_infos,es_type_heaps})) = expand_type_list modules cons_vars cons_args tdi_kinds (subst, es)
 		| changed
@@ -821,11 +821,11 @@ where
 				= TopSign
 		adjust_sign sign (_ :@: _) cons_vars
 			= TopSign
-		adjust_sign sign (TA {type_name, type_prop={tsp_coercible}} _) cons_vars
+		adjust_sign sign (TA {type_ident, type_prop={tsp_coercible}} _) cons_vars
 			| tsp_coercible
 				= sign
 				= TopSign
-		adjust_sign sign (TAS {type_name, type_prop={tsp_coercible}} _ _) cons_vars
+		adjust_sign sign (TAS {type_ident, type_prop={tsp_coercible}} _ _) cons_vars
 			| tsp_coercible
 				= sign
 				= TopSign
@@ -864,7 +864,7 @@ where
 tryToExpandTypeSyn :: !{#CommonDefs} !{#BOOLVECT} !Type !TypeSymbIdent ![AType] !TypeAttribute !*TypeHeaps !*TypeDefInfos
 	-> (!Bool, !Type, !*TypeHeaps, !*TypeDefInfos)
 tryToExpandTypeSyn defs cons_vars type cons_id=:{type_index={glob_object,glob_module}} type_args attribute type_heaps td_infos
-	# {td_rhs,td_args,td_attribute,td_name} = defs.[glob_module].com_type_defs.[glob_object]
+	# {td_rhs,td_args,td_attribute,td_ident} = defs.[glob_module].com_type_defs.[glob_object]
 	= case td_rhs of
 		SynType {at_type}			
 			# type_heaps = bindTypeVarsAndAttributes td_attribute attribute td_args type_args type_heaps

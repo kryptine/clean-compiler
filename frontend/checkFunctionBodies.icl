@@ -74,7 +74,7 @@ make_unboxed_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
 	# unboxed_list=UnboxedList type_symbol stdStrictLists_index decons_u_index nil_u_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_name=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	# decons_expr = App {app_symb={symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_unboxed_tail_strict_list_indices_and_decons_uts_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
@@ -91,7 +91,7 @@ make_unboxed_tail_strict_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
 	# unboxed_list=UnboxedTailStrictList type_symbol stdStrictLists_index decons_uts_index nil_uts_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_name=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	# decons_expr = App {app_symb={symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_overloaded_list_indices_and_decons_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
@@ -108,7 +108,7 @@ make_overloaded_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_index,decons_index,nil_index,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
 	# overloaded_list=OverloadedList type_symbol stdStrictLists_index decons_index nil_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_name=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	# decons_expr = App {app_symb={symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
 make_case_guards cons_symbol type_symbol alg_patterns expr_heap cs
@@ -157,21 +157,21 @@ where
 		= ([], accus, var_store, e_info, cs)
 
 	determine_function_arg (AP_Variable name var_info (Yes {bind_src, bind_dst})) var_store
-		= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
+		= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
 	determine_function_arg (AP_Variable name var_info No) var_store
-		= ({ fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, var_store)
+		= ({ fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, var_store)
 	determine_function_arg (AP_Algebraic _ _ _ opt_var) var_store
 		# ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
-		= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
+		= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
 	determine_function_arg (AP_Basic _ opt_var) var_store
 		# ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
-		= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
+		= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
 	determine_function_arg (AP_Dynamic _ _ opt_var) var_store
 		# ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
-		= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
+		= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
 	determine_function_arg _ var_store
 		# ({bind_src,bind_dst}, var_store) = determinePatternVariable No var_store
-		= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
+		= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
 	
 	check_function_bodies free_vars fun_args [{pb_args,pb_rhs={rhs_alts,rhs_locals},pb_position} : bodies]
 							e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap,es_fun_defs} e_info cs
@@ -217,7 +217,7 @@ where
 
 	transform_pattern_into_cases :: !AuxiliaryPattern !FreeVar !Expression !Position !*VarHeap !*ExpressionHeap ![DynamicPtr] !*CheckState
 		-> (!Expression, !Position, !*VarHeap, !*ExpressionHeap, ![DynamicPtr], !*CheckState)
-	transform_pattern_into_cases (AP_Variable name var_info opt_var) fun_arg=:{fv_info_ptr,fv_name} result_expr pattern_position
+	transform_pattern_into_cases (AP_Variable name var_info opt_var) fun_arg=:{fv_info_ptr,fv_ident} result_expr pattern_position
 									var_store expr_heap opt_dynamics cs
 		= case opt_var of
 			Yes {bind_src, bind_dst}
@@ -225,8 +225,8 @@ where
 					# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					-> (Let { let_strict_binds = [], let_lazy_binds= [
-								{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
-									lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+								{ lb_src = Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
+									lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
 									lb_position = NoPos }],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, 
 						pattern_position, var_store, expr_heap, opt_dynamics, cs)
@@ -234,11 +234,11 @@ where
 					  (var_expr_ptr2, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					-> (Let { let_strict_binds = [], let_lazy_binds= [
-								{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
-									lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+								{ lb_src = Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
+									lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
 									lb_position = NoPos },
-								{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
-									lb_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+								{ lb_src = Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
+									lb_dst = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
 									lb_position = NoPos }],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, 
 						pattern_position, var_store, expr_heap, opt_dynamics, cs)
@@ -248,8 +248,8 @@ where
 					# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 					-> (Let { let_strict_binds = [], let_lazy_binds=
-									[{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
-										 lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+									[{ lb_src = Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr },
+										 lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
 										 lb_position = NoPos }],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos },
 						pattern_position, var_store, expr_heap, opt_dynamics, cs)
@@ -292,22 +292,22 @@ where
 
 	transform_pattern_variable :: !FreeVar !(Optional (Bind Ident VarInfoPtr)) !Expression !*ExpressionHeap
 		-> (!Expression, !Expression, !*ExpressionHeap)
-	transform_pattern_variable {fv_info_ptr,fv_name} (Yes {bind_src,bind_dst}) result_expr expr_heap
+	transform_pattern_variable {fv_info_ptr,fv_ident} (Yes {bind_src,bind_dst}) result_expr expr_heap
 		| bind_dst == fv_info_ptr
 			# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-			= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
+			= (Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
 			# (var_expr_ptr1, expr_heap) = newPtr EI_Empty expr_heap
 			  (var_expr_ptr2, expr_heap) = newPtr EI_Empty expr_heap
 			  (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-			= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
+			= (Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr1 },
 						Let { let_strict_binds = [], let_lazy_binds =
-						 		[{ lb_src = Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
-									lb_dst = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+						 		[{ lb_src = Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr2 },
+									lb_dst = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
 									lb_position = NoPos }],
 							  let_expr = result_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }, expr_heap)
-	transform_pattern_variable {fv_info_ptr,fv_name} No result_expr expr_heap
+	transform_pattern_variable {fv_info_ptr,fv_ident} No result_expr expr_heap
 		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
+		= (Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
 
 checkFunctionBodies  GeneratedBody function_ident_for_errors e_input e_state e_info cs
 	= (GeneratedBody, [], e_state, e_info, cs)
@@ -507,7 +507,7 @@ where
 		= "first argument of infix operator missing"
 
 	build_expression [Constant symb _ (Prio _ _) _ , _: _] e_state cs_error
-		= (EE, e_state, checkError symb.symb_name first_argument_of_infix_operator_missing cs_error)
+		= (EE, e_state, checkError symb.symb_ident first_argument_of_infix_operator_missing cs_error)
 	build_expression [Constant symb arity _ is_fun] e_state cs_error
 		= buildApplication symb arity 0 is_fun [] e_state cs_error
 	build_expression [expr] e_state cs_error
@@ -519,7 +519,7 @@ where
 			Yes (symb, prio, is_fun, right)
 				-> case right of
 					[Constant symb _ (Prio _ _) _:_]
-						-> (EE, e_state, checkError symb.symb_name first_argument_of_infix_operator_missing cs_error)
+						-> (EE, e_state, checkError symb.symb_ident first_argument_of_infix_operator_missing cs_error)
 					_
 						-> build_operator_expression [] left_expr (symb, prio, is_fun) right e_state cs_error
 			No
@@ -529,7 +529,7 @@ where
 			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
 			= split_at_operator [appl_exp : left] exprs e_state cs_error
 		split_at_operator left [Constant symb arity (Prio _ _) is_fun] e_state cs_error
-			= (No, left, e_state, checkError symb.symb_name "second argument of infix operator missing" cs_error)
+			= (No, left, e_state, checkError symb.symb_ident "second argument of infix operator missing" cs_error)
 		split_at_operator left [Constant symb arity prio is_fun] e_state cs_error
 			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
 			= (No, [appl_exp : left], e_state, cs_error)
@@ -569,7 +569,7 @@ where
 								-> build_operator_expression [(symb1, prio1, is_fun1, left1) : left_appls]
 										middle_exp (symb2, prio2, is_fun2) right e_state cs_error
 						No
-							-> (EE, e_state, checkError symb1.symb_name "conflicting priorities" cs_error)
+							-> (EE, e_state, checkError symb1.symb_ident "conflicting priorities" cs_error)
 				No
 					# (right, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
 					  (result_expr, e_state, cs_error) = buildApplication symb1 2 2 is_fun1 [left1,right] e_state cs_error
@@ -586,7 +586,7 @@ where
 						-> build_left_operand left_appls prior result_expr e_state cs_error
 						-> (la, result_expr, e_state, cs_error)
 				No
-					-> (la, EE, e_state, checkError symb.symb_name "conflicting priorities" cs_error)
+					-> (la, EE, e_state, checkError symb.symb_ident "conflicting priorities" cs_error)
 		
 		build_final_expression [] result_expr e_state cs_error
 			= (result_expr, e_state, cs_error)		
@@ -848,10 +848,10 @@ where
 						{ cs & cs_error = checkError "<dynamic pattern>" "illegal combination of patterns" cs.cs_error })
 	transform_pattern (AP_Variable name var_info opt_var) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
 		= ( NoPattern, pattern_scheme, cons_optional opt_var pattern_variables, 
-		  	Yes (Yes { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr),
+		  	Yes (Yes { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr),
 			var_store, expr_heap, opt_dynamics, cs)		
 	transform_pattern (AP_Variable name var_info opt_var) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
-		# free_var = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
+		# free_var = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
 		  (new_bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  case_ident = { id_name = case_name, id_info = nilPtr }
 		  (new_case, var_store, expr_heap, cs_error) = build_and_share_case patterns defaul (Var new_bound_var) case_ident cCaseExplicit var_store expr_heap cs.cs_error
@@ -960,7 +960,7 @@ where
 	bind_pattern_variables [] pattern_expr expr_heap
 		= (pattern_expr, [], expr_heap)
 	bind_pattern_variables [{bind_src,bind_dst} : variables] this_pattern_expr expr_heap
-		# free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
+		# free_var = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
 		  (bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  (pattern_expr, binds, expr_heap) = bind_pattern_variables variables (Var bound_var) expr_heap
 		= (pattern_expr, [{lb_src = this_pattern_expr, lb_dst = free_var, lb_position = NoPos } : binds], expr_heap)
@@ -998,7 +998,7 @@ checkExpression free_vars (PE_Tuple exprs) e_input e_state e_info cs
 	# (exprs, arity, free_vars, e_state, e_info, cs) = check_expression_list free_vars exprs e_input e_state e_info cs
 	  ({glob_object={ds_ident,ds_index},glob_module}, cs)
 	  		= getPredefinedGlobalSymbol (GetTupleConsIndex arity) PD_PredefinedModule STE_Constructor arity cs
-	= (App { app_symb = { symb_name = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }},
+	= (App { app_symb = { symb_ident = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }},
 			 app_args = exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
 where
 	check_expression_list free_vars [] e_input e_state e_info cs
@@ -1013,7 +1013,7 @@ checkExpression free_vars rec=:(PE_Record record opt_type fields) e_input=:{ei_e
 	= case opt_record_and_fields of
 		Yes (cons=:{glob_module, glob_object}, _, new_fields)
 			# {ds_ident,ds_index} = glob_object
-			  rec_cons = { symb_name = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module } }
+			  rec_cons = { symb_ident = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module } }
 			-> case record of
 				PE_Empty
 					# (exprs, free_vars, e_state, e_info, cs) = check_field_exprs free_vars new_fields 0 RK_Constructor e_input e_state e_info cs
@@ -1037,12 +1037,12 @@ where
 		= ([expr : exprs], free_vars, e_state, e_info, cs)
 
 	check_field_expr :: [FreeVar] (Bind ParsedExpr (Global FieldSymbol)) Int RecordKind ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!.Bind Expression (Global FieldSymbol),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-	check_field_expr free_vars field=:{bind_src = PE_Empty, bind_dst={glob_object={fs_var,fs_name,fs_index},glob_module}} field_nr record_kind e_input e_state e_info cs
+	check_field_expr free_vars field=:{bind_src = PE_Empty, bind_dst={glob_object={fs_var,fs_ident,fs_index},glob_module}} field_nr record_kind e_input e_state e_info cs
 		# (expr, free_vars, e_state, e_info, cs)
 			= checkIdentExpression cIsNotInExpressionList free_vars fs_var e_input e_state e_info cs
 		= ({ field & bind_src = expr }, free_vars, e_state, e_info, cs)
-	check_field_expr free_vars field=:{bind_src = PE_WildCard, bind_dst={glob_object=fs_name}} field_nr RK_Constructor e_input e_state e_info cs
-		= ({ field & bind_src = NoBind nilPtr }, free_vars, e_state, e_info, { cs & cs_error = checkError fs_name "field not specified" cs.cs_error })
+	check_field_expr free_vars field=:{bind_src = PE_WildCard, bind_dst={glob_object=fs_ident}} field_nr RK_Constructor e_input e_state e_info cs
+		= ({ field & bind_src = NoBind nilPtr }, free_vars, e_state, e_info, { cs & cs_error = checkError fs_ident "field not specified" cs.cs_error })
 	check_field_expr free_vars field=:{bind_src = PE_WildCard} field_nr RK_Update e_input e_state=:{es_expr_heap} e_info cs
 		# (bind_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		= ({ field & bind_src = NoBind bind_expr_ptr }, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
@@ -1091,7 +1091,7 @@ where
 			Var var
 				-> ({ bind_dst = var, bind_src = bind_src }, (free_vars, e_state, e_info, cs))
 			_
-				-> ({ bind_dst = { var_name = bind_dst, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }, bind_src = bind_src }, (free_vars, e_state, e_info,
+				-> ({ bind_dst = { var_ident = bind_dst, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }, bind_src = bind_src }, (free_vars, e_state, e_info,
 						{ cs & cs_error = checkError bind_src "bound variable expected" cs.cs_error }))
 
 	check_out_parameters expr_level params es_cs
@@ -1102,9 +1102,9 @@ where
 			# (entry, cs_symbol_table) = readPtr bind_dst.id_info cs.cs_symbol_table
 			# (new_info_ptr, es_var_heap) = newPtr VI_Empty e_state.es_var_heap
 			  cs = checkPatternVariable expr_level entry bind_dst new_info_ptr { cs & cs_symbol_table = cs_symbol_table }
-			= (	{ bind & bind_dst = { fv_def_level = expr_level, fv_name = bind_dst, fv_info_ptr = new_info_ptr, fv_count = 0 }},
+			= (	{ bind & bind_dst = { fv_def_level = expr_level, fv_ident = bind_dst, fv_info_ptr = new_info_ptr, fv_count = 0 }},
 					( { e_state & es_var_heap = es_var_heap }, cs))
-			= ( { bind & bind_dst = { fv_def_level = expr_level, fv_name = bind_dst, fv_info_ptr = nilPtr, fv_count = 0 }},
+			= ( { bind & bind_dst = { fv_def_level = expr_level, fv_ident = bind_dst, fv_info_ptr = nilPtr, fv_count = 0 }},
 					( e_state, { cs & cs_error = checkError bind_src "variable expected" cs.cs_error }))
 
 	remove_out_parameters_from_symbol_table expr_level idents symbol_table
@@ -1157,7 +1157,7 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 				([generic_info_expr], es_expr_heap, cs) 
 				([], es_expr_heap, cs) 		
 			#! symb_kind = SK_Generic { glob_object = gen_index, glob_module = mod_index} kind
-		  	#! symbol = { symb_name = id, symb_kind = symb_kind }			
+		  	#! symbol = { symb_ident = id, symb_kind = symb_kind }			
 			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 			#! app = { app_symb = symbol, app_args = app_args, app_info_ptr = new_info_ptr }
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
@@ -1171,7 +1171,7 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 				#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 				#! app = 
 					{ app_symb = 
-						{ symb_name = pds_ident
+						{ symb_ident = pds_ident
 						, symb_kind = SK_Constructor {glob_module=pds_module, glob_object=pds_def} 
 						}
 					, app_args = []
@@ -1239,11 +1239,11 @@ where
 		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })
 	check_id_expression {ste_kind = STE_Variable info_ptr,ste_def_level} is_expr_list free_vars id e_input=:{ei_fun_level} e_state=:{es_expr_heap} e_info cs
 		| ste_def_level < ei_fun_level
-			# free_var = { fv_def_level = ste_def_level, fv_name = id, fv_info_ptr = info_ptr, fv_count = 0 }
+			# free_var = { fv_def_level = ste_def_level, fv_ident = id, fv_info_ptr = info_ptr, fv_count = 0 }
 			  (free_var_added, free_vars) = newFreeVariable free_var free_vars
 			= (FreeVar free_var, free_vars, e_state, e_info, cs)
 			#! (var_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-			= (Var {var_name = id, var_info_ptr = info_ptr, var_expr_ptr = var_expr_ptr}, free_vars,
+			= (Var {var_ident = id, var_info_ptr = info_ptr, var_expr_ptr = var_expr_ptr}, free_vars,
 					{e_state & es_expr_heap = es_expr_heap}, e_info, cs)
 	check_id_expression {ste_kind = STE_Generic} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
 		= (EE, free_vars, e_state, e_info, 
@@ -1253,7 +1253,7 @@ where
 			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})								
 	check_id_expression entry is_expr_list free_vars id=:{id_info} e_input e_state e_info cs
 		# (symb_kind, arity, priority, is_a_function, e_state, e_info, cs) = determine_info_of_symbol entry id_info e_input e_state e_info cs
-		  symbol = { symb_name = id, symb_kind = symb_kind }
+		  symbol = { symb_ident = id, symb_kind = symb_kind }
   		| is_expr_list
 			= (Constant symbol arity priority is_a_function, free_vars, e_state, e_info, cs)
 			# (app_expr, e_state, cs_error) = buildApplication symbol arity 0 is_a_function [] e_state cs.cs_error
@@ -1264,7 +1264,7 @@ where
 	determine_info_of_symbol entry=:{ste_kind=STE_FunctionOrMacro calls,ste_index,ste_def_level} symb_info
 				e_input=:{ei_fun_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table,cs_x}
 		# (fun_def,e_state) = e_state!es_fun_defs.[ste_index]
-		# {fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=fun_def 
+		# {fun_ident,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=fun_def 
 		# index = { glob_object = ste_index, glob_module = cs_x.x_main_dcl_module_n }
 		# symbol_kind = convert_DefOrImpFunKind_to_icl_SymbKind fun_kind index fi_properties
 		| is_called_before ei_fun_index calls
@@ -1275,7 +1275,7 @@ where
 	determine_info_of_symbol entry=:{ste_kind=STE_DclMacroOrLocalMacroFunction calls,ste_index,ste_def_level} symb_info
 				e_input=:{ei_fun_index, ei_mod_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table}
 		# (macro_def,e_info) = e_info!ef_macro_defs.[ei_mod_index,ste_index]
-		# {fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
+		# {fun_ident,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
 		# index = { glob_object = ste_index, glob_module = ei_mod_index }
 		# symbol_kind = convert_DefOrImpFunKind_to_dcl_SymbKind fun_kind index fi_properties
 		| is_called_before ei_fun_index calls
@@ -1286,7 +1286,7 @@ where
 	determine_info_of_symbol entry=:{ste_kind=STE_Imported (STE_DclMacroOrLocalMacroFunction calls) macro_mod_index,ste_index,ste_def_level} symb_info
 				e_input=:{ei_fun_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table}
 		# (macro_def,e_info) = e_info!ef_macro_defs.[macro_mod_index,ste_index]
-		# {fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
+		# {fun_ident,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
 		# index = { glob_object = ste_index, glob_module = macro_mod_index }
 		# symbol_kind = convert_DefOrImpFunKind_to_dcl_SymbKind fun_kind index fi_properties
 		| is_called_before ei_fun_index calls
@@ -1598,17 +1598,17 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 checkPattern expr opt_var p_input accus ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
-checkMacroPatternConstructor macro=:{fun_symb,fun_arity,fun_kind,fun_priority} macro_mod_index mod_index is_dcl_macro is_expr_list ste_index ident opt_var ps e_info cs=:{cs_error}
+checkMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_priority} macro_mod_index mod_index is_dcl_macro is_expr_list ste_index ident opt_var ps e_info cs=:{cs_error}
 	| case fun_kind of FK_Macro->True; _ -> False
 		| is_expr_list
-			# macro_symbol = { glob_object = MakeDefinedSymbol fun_symb ste_index fun_arity, glob_module = macro_mod_index }
+			# macro_symbol = { glob_object = MakeDefinedSymbol fun_ident ste_index fun_arity, glob_module = macro_mod_index }
 	 		= (AP_Constant (APK_Macro is_dcl_macro) macro_symbol fun_priority, ps, e_info, cs)
 		| fun_arity == 0
 			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
 					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
 			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
 			= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
-		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_symb "not allowed in a pattern" cs_error })
+		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_ident "not allowed in a pattern" cs_error })
 
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
@@ -1623,17 +1623,17 @@ checkPatternConstructor mod_index is_expr_list {ste_kind = STE_DclMacroOrLocalMa
 checkPatternConstructor mod_index is_expr_list {ste_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction _) macro_module_index,ste_index} ident opt_var ps e_info cs
 	# (macro,e_info) = e_info!ef_macro_defs.[macro_module_index,ste_index]
 	= checkMacroPatternConstructor macro macro_module_index mod_index True is_expr_list ste_index ident opt_var ps e_info cs
-checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_symb opt_var ps
+checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_ident opt_var ps
 		e_info=:{ef_cons_defs,ef_modules} cs=:{cs_error}
 	# (cons_index, cons_module, cons_arity, cons_priority, cons_type_index, ef_cons_defs, ef_modules, cs_error)
-			= determine_pattern_symbol mod_index ste_index ste_kind cons_symb.id_name ef_cons_defs ef_modules cs_error
+			= determine_pattern_symbol mod_index ste_index ste_kind cons_ident.id_name ef_cons_defs ef_modules cs_error
 	  e_info = { e_info & ef_cons_defs = ef_cons_defs, ef_modules = ef_modules }
-	  cons_symbol = { glob_object = MakeDefinedSymbol cons_symb cons_index cons_arity, glob_module = cons_module }
+	  cons_symbol = { glob_object = MakeDefinedSymbol cons_ident cons_index cons_arity, glob_module = cons_module }
    	| is_expr_list
 		= (AP_Constant (APK_Constructor cons_type_index) cons_symbol cons_priority, ps, e_info, { cs & cs_error = cs_error })
 	| cons_arity == 0
 		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = cs_error })
-		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = checkError cons_symb "constructor arguments are missing" cs_error })
+		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = checkError cons_ident "constructor arguments are missing" cs_error })
 where
 	determine_pattern_symbol mod_index id_index STE_Constructor id_name cons_defs modules error
 		# ({cons_type={st_arity},cons_priority, cons_type_index}, cons_defs) = cons_defs![id_index]
@@ -1692,14 +1692,14 @@ convertSubPatterns [pattern : patterns] result_expr pattern_position var_store e
 convertSubPattern :: AuxiliaryPattern Expression Position *(Heap VarInfo) *(Heap ExprInfo) u:[Ptr ExprInfo] *CheckState -> *(!FreeVar,!Expression,!Position,!*Heap VarInfo,!*Heap ExprInfo,!u:[Ptr ExprInfo],!*CheckState);
 convertSubPattern (AP_Variable name var_info (Yes {bind_src,bind_dst})) result_expr pattern_position var_store expr_heap opt_dynamics cs
 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-	  bound_var = { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
-	  free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
+	  bound_var = { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
+	  free_var = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
 	  (let_expr, expr_heap)	= buildLetExpression [] [{lb_src = Var bound_var,
-	  			lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
+	  			lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 },
 	  			lb_position = NoPos }] result_expr NoPos expr_heap
 	= (free_var, let_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Variable name var_info No) result_expr pattern_position var_store expr_heap opt_dynamics cs
-	= ({ fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr, pattern_position, 
+	= ({ fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }, result_expr, pattern_position, 
 		var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Algebraic cons_symbol type_index args opt_var) result_expr pattern_position
 					var_store expr_heap opt_dynamics cs
@@ -1711,8 +1711,8 @@ convertSubPattern (AP_Algebraic cons_symbol type_index args opt_var) result_expr
 	  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	# alg_patterns = [{ ap_symbol = cons_symbol, ap_vars = var_args, ap_expr = result_expr, ap_position = pattern_position }]
 	# (case_guards,expr_heap,cs) = make_case_guards cons_symbol type_symbol alg_patterns expr_heap cs
-	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
-		Case { case_expr = Var { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr },
+	= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+		Case { case_expr = Var { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr },
 				case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr,
 				case_explicit = cCaseNotExplicit,
 				case_default_pos = NoPos },
@@ -1723,8 +1723,8 @@ convertSubPattern (AP_Basic basic_val opt_var) result_expr pattern_position var_
   	  ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
 	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
-		Case { case_expr = Var { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr },
+	= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+		Case { case_expr = Var { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr },
 			  case_guards = case_guards, case_default = No, case_ident = No, case_info_ptr = case_expr_ptr,
 			  case_explicit = cCaseNotExplicit,
 			  case_default_pos = NoPos},
@@ -1738,13 +1738,13 @@ convertSubPattern (AP_Dynamic pattern type opt_var) result_expr pattern_position
 	  (dynamic_info_ptr, expr_heap) = newPtr (EI_DynamicType type opt_dynamics) expr_heap
  	  type_case_patterns = [{ dp_var = var_arg, dp_type = dynamic_info_ptr, dp_rhs = result_expr, dp_type_patterns_vars = [],
  	  						dp_type_code = TCE_Empty, dp_position = pattern_position }]
-	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
-		buildTypeCase (Var { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }) 
+	= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
+		buildTypeCase (Var { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }) 
 							type_case_patterns No type_case_info_ptr cCaseNotExplicit,
 		NoPos, var_store, expr_heap, [dynamic_info_ptr], cs)
 convertSubPattern (AP_WildCard opt_var) result_expr pattern_position var_store expr_heap opt_dynamics cs
  	# ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
-	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0  }, result_expr, pattern_position,
+	= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0  }, result_expr, pattern_position,
 		var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Empty _) result_expr pattern_position var_store expr_heap opt_dynamics cs
 	= convertSubPattern (AP_WildCard No) EE pattern_position var_store expr_heap opt_dynamics cs
@@ -1765,7 +1765,7 @@ checkAndTransformPatternIntoBind free_vars [] e_input e_state e_info cs
 transfromPatternIntoBind :: !Index !Level !AuxiliaryPattern !Expression !Position !*VarHeap !*ExpressionHeap !*ExpressionInfo !*CheckState
 	-> *(![LetBind], !*VarHeap, !*ExpressionHeap,  !*ExpressionInfo, !*CheckState)
 transfromPatternIntoBind mod_index def_level (AP_Variable name var_info _) src_expr position var_store expr_heap e_info cs
-	# bind = {lb_src = src_expr, lb_dst = { fv_name = name, fv_info_ptr = var_info, fv_def_level = def_level, fv_count = 0 }, lb_position = position }
+	# bind = {lb_src = src_expr, lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = def_level, fv_count = 0 }, lb_position = position }
 	= ([bind], var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_module,glob_object=ds_cons=:{ds_arity, ds_index, ds_ident}} type_index args opt_var)
 		src_expr position var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
@@ -1802,17 +1802,17 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 									| pd_cons_index==PD_UnboxedConsSymbol			
 										# (stdStrictLists_index,_,decons_u_index,_,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
 										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-										# decons_u_expr = App {app_symb={symb_name=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}			
+										# decons_u_expr = App {app_symb={symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}			
 										= (decons_u_expr,expr_heap,cs)
 									| pd_cons_index==PD_UnboxedTailStrictConsSymbol
 										# (stdStrictLists_index,_,decons_uts_index,_,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
 										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-										# decons_uts_expr = App {app_symb={symb_name=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+										# decons_uts_expr = App {app_symb={symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
 										= (decons_uts_expr,expr_heap,cs)
 									| pd_cons_index==PD_OverloadedConsSymbol
 										# (stdStrictLists_index,_,decons_index,_,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
 										# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-										# decons_expr = App {app_symb={symb_name=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+										# decons_expr = App {app_symb={symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
 										= (decons_expr,expr_heap,cs)
 										= (src_expr,expr_heap,cs)
 									= (src_expr,expr_heap,cs)
@@ -1847,8 +1847,8 @@ where
 
 	transform_sub_patterns_of_record mod_index def_level [pattern : patterns] fields field_module field_index record_expr
 			all_binds position var_store expr_heap e_info cs
-		# {fs_name, fs_index} = fields.[field_index]
-		  selector = { glob_module = field_module, glob_object = MakeDefinedSymbol fs_name fs_index 1}
+		# {fs_ident, fs_index} = fields.[field_index]
+		  selector = { glob_module = field_module, glob_object = MakeDefinedSymbol fs_ident fs_index 1}
 		  (this_record_expr, expr_heap) = adjust_match_expression record_expr expr_heap
 		  (binds, var_store, expr_heap, e_info, cs)
 				= transfromPatternIntoBind mod_index def_level pattern (Selection NormalSelector this_record_expr [ RecordSelection selector field_index ])
@@ -1859,9 +1859,9 @@ where
 		= (binds, var_store, expr_heap, e_info, cs)
 
 	bind_opt_var (Yes {bind_src,bind_dst}) src_expr position var_heap expr_heap
-		# free_var = { fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
+		# free_var = { fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }
 		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		  bound_var = { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
+		  bound_var = { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }
 		= (Var bound_var, [{lb_src = src_expr, lb_dst = free_var, lb_position = position}], var_heap <:= (bind_dst, VI_Empty), expr_heap)
 	bind_opt_var No src_expr _ var_heap expr_heap
 		= (src_expr, [], var_heap, expr_heap)
@@ -1872,8 +1872,8 @@ where
 		# new_name = newVarId "_x"
 		  (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
 //		  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		  bound_var = { var_name = new_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
-		  free_var = { fv_name = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
+		  bound_var = { var_ident = new_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }
+		  free_var = { fv_ident = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
 		= (Var bound_var, [{lb_src = match_expr, lb_dst = free_var, lb_position = position } : opt_var_bind], var_heap, expr_heap)
 
 	adjust_match_expression (Var var) expr_heap
@@ -1894,9 +1894,9 @@ unfoldPatternMacro macro=:{fun_body=TransformedBody {tb_args,tb_rhs}} mod_index 
 					(all_macro_args, []) 
 					(splitAt length_macro_args all_macro_args)
 		  ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
-		  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_symb opt_var extra_args tb_rhs ums
+		  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_ident opt_var extra_args tb_rhs ums
 		= (pattern, { ps & ps_var_heap = ums_var_heap}, ums_modules, ums_cons_defs, ums_error)
-		= (AP_Empty macro.fun_symb, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_symb "sharing not allowed" error)
+		= (AP_Empty macro.fun_ident, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "sharing not allowed" error)
 where
 	no_sharing [{fv_count} : args]
 		= fv_count <= 1 && no_sharing args
@@ -1906,7 +1906,7 @@ where
 	bind_var {fv_info_ptr} pattern ps_var_heap
 		= ps_var_heap <:= (fv_info_ptr, VI_Pattern pattern)
 
-	unfold_pattern_macro mod_index macro_ident _ extra_args (Var {var_name,var_info_ptr}) ums=:{ums_var_heap, ums_error}
+	unfold_pattern_macro mod_index macro_ident _ extra_args (Var {var_ident,var_info_ptr}) ums=:{ums_var_heap, ums_error}
 		| not (isEmpty extra_args)
 			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too much arguments for pattern macro" ums_error })
 		# (VI_Pattern pattern, ums_var_heap) = readPtr var_info_ptr ums_var_heap
@@ -1914,15 +1914,15 @@ where
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb,app_args}) ums
 		= unfold_application  mod_index macro_ident opt_var extra_args app_symb app_args ums
 	where
-		unfold_application  mod_index macro_ident opt_var extra_args {symb_kind=SK_Constructor {glob_module,glob_object},symb_name} app_args
+		unfold_application  mod_index macro_ident opt_var extra_args {symb_kind=SK_Constructor {glob_module,glob_object},symb_ident} app_args
 										ums=:{ums_cons_defs, ums_modules,ums_error}
 				# (cons_def, cons_index, ums_cons_defs, ums_modules) = get_cons_def mod_index glob_module glob_object ums_cons_defs ums_modules
 				| cons_def.cons_type.st_arity == length app_args+length extra_args
 					# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
-					  cons_symbol = { glob_object = MakeDefinedSymbol symb_name cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
+					  cons_symbol = { glob_object = MakeDefinedSymbol symb_ident cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
 					= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
-					= (AP_Empty cons_def.cons_symb, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
-							ums_error = checkError cons_def.cons_symb "wrong number of arguments" ums_error })
+					= (AP_Empty cons_def.cons_ident, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
+							ums_error = checkError cons_def.cons_ident "wrong number of arguments" ums_error })
 
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			| mod_index == cons_mod
@@ -1939,7 +1939,7 @@ where
 	unfold_pattern_macro mod_index macro_ident opt_var _ expr ums=:{ums_error}
 		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
 unfoldPatternMacro macro mod_index all_macro_args opt_var ps=:{ps_var_heap} modules cons_defs error
-	= (AP_Empty macro.fun_symb, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_symb "illegal macro in pattern" error)
+	= (AP_Empty macro.fun_ident, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "illegal macro in pattern" error)
 
 checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_state e_info cs
 	| isEmpty selectors
@@ -2175,7 +2175,7 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 	  		= case ap_opt_var of
 	  			Yes { bind_src = opt_var_ident, bind_dst = opt_var_var_info_ptr }
 					# (bound_array_var, es_expr_heap) = allocate_bound_var ap_array_var e_state.es_expr_heap
-					  free_var = { fv_name = opt_var_ident, fv_info_ptr = opt_var_var_info_ptr, fv_def_level = NotALevel,
+					  free_var = { fv_ident = opt_var_ident, fv_info_ptr = opt_var_var_info_ptr, fv_def_level = NotALevel,
 					  				fv_count = 0 }
 	  				-> ([{ lb_dst = free_var, lb_src = Var bound_array_var, lb_position = NoPos }: lazy_binds],
 	  					{ e_state & es_expr_heap = es_expr_heap })
@@ -2186,7 +2186,7 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		# (var_for_uselect_result, es_var_heap)
 				= allocate_free_var { id_name = "_x", id_info = nilPtr } e_state.es_var_heap
 		  (new_array_var, es_var_heap)
-		  		= allocate_free_var ap_array_var.fv_name es_var_heap
+		  		= allocate_free_var ap_array_var.fv_ident es_var_heap
 		  (bound_array_var, es_expr_heap)
 		  		= allocate_bound_var ap_array_var e_state.es_expr_heap
 		  (bound_var_for_uselect_result, es_expr_heap)
@@ -2246,11 +2246,11 @@ buildApplication symbol form_arity act_arity is_fun args e_state=:{es_expr_heap}
 			= (App app, { e_state & es_expr_heap = es_expr_heap }, error)
 		# app = App { app_symb = symbol , app_args = args, app_info_ptr = nilPtr }
 		| form_arity < act_arity
-			= (app, e_state, checkError symbol.symb_name "used with too many arguments" error)
+			= (app, e_state, checkError symbol.symb_ident "used with too many arguments" error)
 			= (app, e_state, error)
 
-buildPattern mod_index (APK_Constructor type_index) cons_symb args opt_var ps e_info cs
-	= (AP_Algebraic cons_symb type_index args opt_var, ps, e_info, cs)
+buildPattern mod_index (APK_Constructor type_index) cons_ident args opt_var ps e_info cs
+	= (AP_Algebraic cons_ident type_index args opt_var, ps, e_info, cs)
 buildPattern mod_index (APK_Macro is_dcl_macro) {glob_module,glob_object} args opt_var ps e_info=:{ef_modules,ef_macro_defs,ef_cons_defs} cs=:{cs_error}
 	| is_dcl_macro
 		# (macro,ef_macro_defs) = ef_macro_defs![glob_module,glob_object.ds_index]
@@ -2325,15 +2325,15 @@ pushErrorAdmin2 string pos=:(LinePos _ _) cs
 
 
 allocate_bound_var :: !FreeVar !*ExpressionHeap -> (!BoundVar, !.ExpressionHeap)
-allocate_bound_var {fv_name, fv_info_ptr} expr_heap
+allocate_bound_var {fv_ident, fv_info_ptr} expr_heap
 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-	= ({ var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, expr_heap)
+	= ({ var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, expr_heap)
 
 
 
 allocate_free_var ident var_heap
 	# (new_var_info_ptr, var_heap) = newPtr VI_Empty var_heap
-	= ({ fv_def_level = NotALevel, fv_name = ident, fv_info_ptr = new_var_info_ptr,	fv_count = 0 }, var_heap)
+	= ({ fv_def_level = NotALevel, fv_ident = ident, fv_info_ptr = new_var_info_ptr,	fv_count = 0 }, var_heap)
 
 
 

@@ -224,12 +224,12 @@ where
 instance =< BoundVar
 where
 	(=<) bv1 bv2
-		= bv1.var_name =< bv2.var_name
+		= bv1.var_ident =< bv2.var_ident
 	
 instance =< FreeVar
 where
 	(=<) fv1 fv2
-		= fv1.fv_name =< fv2.fv_name
+		= fv1.fv_ident =< fv2.fv_ident
 	
 instance =< Ident
 where
@@ -244,7 +244,7 @@ where
 instance =< TypeSymbIdent
 where
 	(=<) s1 s2
-		= s1.type_name =< s2.type_name
+		= s1.type_ident =< s2.type_ident
 
 instance =< Type
 where
@@ -316,5 +316,5 @@ where
 
 instance < MemberDef
 where
-	(<) md1 md2 = md1.me_symb.id_name < md2.me_symb.id_name
+	(<) md1 md2 = md1.me_ident.id_name < md2.me_ident.id_name
 

@@ -60,7 +60,7 @@ where
 	
 instance WriteTypeInfo ConsDef
 where 
-	write_type_info {cons_symb,cons_type,cons_arg_vars,cons_priority,cons_index,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
+	write_type_info {cons_ident,cons_type,cons_arg_vars,cons_priority,cons_index,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
  		// normalize ...
  		# (th_vars,wtis)
  			= sel_type_var_heap wtis
@@ -71,7 +71,7 @@ where
  		// ... normalize
 
 		# (tcl_file,wtis)
-			= write_type_info cons_symb tcl_file wtis
+			= write_type_info cons_ident tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info cons_type tcl_file wtis
 		
@@ -93,7 +93,7 @@ instance WriteTypeInfo TypeDef TypeRhs
 instance WriteTypeInfo (TypeDef TypeRhs)
 0.2*/
 where 
-	write_type_info {td_name,td_arity,td_args,td_rhs} tcl_file wtis
+	write_type_info {td_ident,td_arity,td_args,td_rhs} tcl_file wtis
 		// normalize ...
  		# (th_vars,wtis)
  			= sel_type_var_heap wtis
@@ -107,7 +107,7 @@ where
  		// ... normalize
  		
  		# (tcl_file,wtis)
- 			= write_type_info td_name tcl_file wtis
+ 			= write_type_info td_ident tcl_file wtis
 		# (tcl_file,wtis)
  			= write_type_info td_arity tcl_file wtis 				
  		# (tcl_file,wtis)
@@ -211,9 +211,9 @@ where
 		
 instance WriteTypeInfo FieldSymbol
 where
-	write_type_info {fs_name,fs_var,fs_index} tcl_file wtis
+	write_type_info {fs_ident,fs_var,fs_index} tcl_file wtis
 		# (tcl_file,wtis)
-			= write_type_info fs_name tcl_file wtis
+			= write_type_info fs_ident tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info fs_var tcl_file wtis
 		# (tcl_file,wtis)
@@ -385,14 +385,14 @@ where
 
 instance WriteTypeInfo TypeSymbIdent
 where
-	write_type_info tsi=:{type_name,type_arity,type_index={glob_module,glob_object}} tcl_file wtis=:{wtis_predefined_module_def}
+	write_type_info tsi=:{type_ident,type_arity,type_index={glob_module,glob_object}} tcl_file wtis=:{wtis_predefined_module_def}
 		# is_type_without_definition
 			= glob_module == wtis_predefined_module_def
 		# tcl_file
 			= fwritec (if is_type_without_definition TypeSymbIdentWithoutDefinition TypeSymbIdentWithDefinition) tcl_file
 
 		# (tcl_file,wtis)
-			= write_type_info type_name tcl_file wtis
+			= write_type_info type_ident tcl_file wtis
 		# (tcl_file,wtis)		 
 			= write_type_info type_arity tcl_file wtis
 		# (tcl_file,wtis)

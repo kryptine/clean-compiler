@@ -126,7 +126,7 @@ where
 
 	clean_up_attribute_variable av_group_nr (TA_None, cus=:{cus_heaps,cus_attr_store,cus_attr_env})
 		# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
-		  new_attr_var = TA_Var { av_name = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
+		  new_attr_var = TA_Var { av_ident = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
 		= (new_attr_var, { cus &	cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
 				 					cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})	
 	clean_up_attribute_variable av_group_nr attr_and_cus
@@ -200,7 +200,7 @@ where
 
 cleanUpVariable _ TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cus_heaps.th_vars
-	  new_var = TV { tv_name = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr }
+	  new_var = TV { tv_ident = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr }
 	= (new_var, { cus & cus_var_env = { cus_var_env & [tv_number] = new_var},
 				cus_heaps = { cus_heaps & th_vars = th_vars }, cus_var_store = inc cus_var_store})
 cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
@@ -330,9 +330,9 @@ newAttributedVariables var_number attributed_variables clean_state=:(_,_,_) /* T
 
 newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th_attrs})
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
-	  new_var = { tv_name = NewVarId var_number, tv_info_ptr = tv_info_ptr }
+	  new_var = { tv_ident = NewVarId var_number, tv_info_ptr = tv_info_ptr }
 	  (av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
-	  new_attr_var = { av_name = NewAttrVarId var_number, av_info_ptr = av_info_ptr }
+	  new_attr_var = { av_ident = NewAttrVarId var_number, av_info_ptr = av_info_ptr }
 	= ({ at_attribute = TA_Var new_attr_var, at_type = TV new_var},
 		([ new_var : variables ], [ new_attr_var : attributes ], { type_heaps & th_vars = th_vars, th_attrs = th_attrs }))
 
@@ -684,7 +684,7 @@ where
 
 instance substitute TypeAttribute
 where
-	substitute (TA_Var {av_name, av_info_ptr}) heaps=:{th_attrs}
+	substitute (TA_Var {av_ident, av_info_ptr}) heaps=:{th_attrs}
 		#! av_info = sreadPtr av_info_ptr th_attrs
 		= case av_info of
 			AVI_Attr attr
@@ -1353,44 +1353,44 @@ where
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
 writeTypeTA :: !*File !(Optional TypeVarBeautifulizer) !Format !TypeSymbIdent !a -> (!*File, !Optional TypeVarBeautifulizer) | writeType a
-writeTypeTA	file opt_beautifulizer form {type_name,type_index,type_arity} types
+writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
 	| is_predefined type_index
-		| type_name.id_name=="_List"
+		| type_ident.id_name=="_List"
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_name.id_name=="_!List"
+		| type_ident.id_name=="_!List"
 			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_name.id_name=="_#List"
+		| type_ident.id_name=="_#List"
 			= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_name.id_name=="_List!"
+		| type_ident.id_name=="_List!"
 			= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_name.id_name=="_!List!"
+		| type_ident.id_name=="_!List!"
 			= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_name.id_name=="_#List!"
+		| type_ident.id_name=="_#List!"
 			= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_lazy_array type_name
+		| is_lazy_array type_ident
 			= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_strict_array type_name
+		| is_strict_array type_ident
 			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_unboxed_array type_name
+		| is_unboxed_array type_ident
 			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_tuple type_name type_arity
+		| is_tuple type_ident type_arity
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_string_type type_name
+		| is_string_type type_ident
 			= (file <<< "String", opt_beautifulizer)
 		| type_arity == 0
-			= (file <<< type_name, opt_beautifulizer)
+			= (file <<< type_ident, opt_beautifulizer)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)
-					= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
+					= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
 			= (file <<< ')', opt_beautifulizer)
-			= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
+			= writeType (file <<< type_ident <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
 	| type_arity == 0
-		= (file <<< type_name, opt_beautifulizer)
+		= (file <<< type_ident, opt_beautifulizer)
 	| checkProperty form cBrackets
 		# (file, opt_beautifulizer)
-				= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
+				= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
 		= (file <<< ')', opt_beautifulizer)
-		= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
+		= writeType (file <<< type_ident <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
 where
 		is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
 

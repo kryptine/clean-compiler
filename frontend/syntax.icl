@@ -24,7 +24,7 @@ class needs_brackets a :: a -> Bool
 instance == BoundVar
 where
 	(==) varid1 varid2
-		= varid1.var_name == varid2.var_name
+		= varid1.var_ident == varid2.var_ident
 
 instance == Ident
 where
@@ -88,18 +88,18 @@ where
 
 instance <<< TypeVar
 where
-//	(<<<) file varid = file <<< varid.tv_name 
-	(<<<) file varid = file <<< varid.tv_name <<< "<" <<< varid.tv_info_ptr <<< ">"
+//	(<<<) file varid = file <<< varid.tv_ident 
+	(<<<) file varid = file <<< varid.tv_ident <<< "<" <<< varid.tv_info_ptr <<< ">"
 
 instance <<< AttributeVar
 where
-	(<<<) file {av_name,av_info_ptr} = file <<< av_name <<< "[" <<< av_info_ptr <<< "]"
-//	(<<<) file {av_name,av_info_ptr} = file <<< av_name
+	(<<<) file {av_ident,av_info_ptr} = file <<< av_ident <<< "[" <<< av_info_ptr <<< "]"
+//	(<<<) file {av_ident,av_info_ptr} = file <<< av_ident
 
 instance toString AttributeVar
 where
-	toString {av_name,av_info_ptr} = toString av_name + "[" + toString (ptrToInt av_info_ptr) + "]"
-//	toString {av_name,av_info_ptr} = toString av_name
+	toString {av_ident,av_info_ptr} = toString av_ident + "[" + toString (ptrToInt av_info_ptr) + "]"
+//	toString {av_ident,av_info_ptr} = toString av_ident
 
 instance <<< AType
 where
@@ -262,21 +262,21 @@ where
 instance <<< SymbIdent
 where
 	(<<<) file symb=:{symb_kind = SK_Function symb_index }
-		= file <<< symb.symb_name <<<  '@' <<< symb_index
+		= file <<< symb.symb_ident <<<  '@' <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_LocalMacroFunction symb_index }
-		= file <<< symb.symb_name <<<  "[lm]@" <<< symb_index
+		= file <<< symb.symb_ident <<<  "[lm]@" <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index }
-		= file <<< symb.symb_name <<<  "[g]@" <<< symb_index
+		= file <<< symb.symb_ident <<<  "[g]@" <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_LocalDclMacroFunction symb_index }
-		= file <<< symb.symb_name <<<  "[ldm]@" <<< symb_index
+		= file <<< symb.symb_ident <<<  "[ldm]@" <<< symb_index
 	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index }
-		= file <<< symb.symb_name <<<  "[o]@" <<< symb_index
+		= file <<< symb.symb_ident <<<  "[o]@" <<< symb_index
 	(<<<) file symb
-		= file <<< symb.symb_name 
+		= file <<< symb.symb_ident 
 
 instance <<< TypeSymbIdent
 where
-	(<<<) file symb	= file <<< symb.type_name <<< '.' <<< symb.type_index
+	(<<<) file symb	= file <<< symb.type_ident <<< '.' <<< symb.type_index
 /*
 instance <<< ClassSymbIdent
 where
@@ -284,8 +284,8 @@ where
 */
 instance <<< BoundVar
 where
-	(<<<) file {var_name,var_info_ptr,var_expr_ptr}
-		= file <<< var_name <<< "<I" <<< var_info_ptr <<< ", E" <<< var_expr_ptr <<< '>'
+	(<<<) file {var_ident,var_info_ptr,var_expr_ptr}
+		= file <<< var_ident <<< "<I" <<< var_info_ptr <<< ", E" <<< var_expr_ptr <<< '>'
 
 instance <<< (Bind a b) | <<< a & <<< b 
 where
@@ -397,7 +397,7 @@ where
 	(<<<) file (ABCCodeExpr code_sequence do_inline)      = file <<< (if do_inline "code inline\n" "code\n") <<< code_sequence
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
 
-	(<<<) file (FreeVar {fv_name})         	= file <<< fv_name
+	(<<<) file (FreeVar {fv_ident})         	= file <<< fv_ident
 	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< info_ptr
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
@@ -560,25 +560,25 @@ where
 
 instance <<< FunType 
 where
-	(<<<) file {ft_symb,ft_type} = file <<< ft_symb <<< "::" <<< ft_type
+	(<<<) file {ft_ident,ft_type} = file <<< ft_ident <<< "::" <<< ft_type
 
 instance <<< FunDef
 where
-	(<<<) file {fun_symb,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< ' ' <<< bodies 
-	(<<<) file {fun_symb,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
+	(<<<) file {fun_ident,fun_body=ParsedBody bodies} = file <<< fun_ident <<< '.' <<< ' ' <<< bodies 
+	(<<<) file {fun_ident,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_ident <<< '.'
 			<<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
-	(<<<) file {fun_symb,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
-		= file <<< fun_symb <<< '.' <<< "T "  
+	(<<<) file {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
+		= file <<< fun_ident <<< '.' <<< "T "  
 //			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
 			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n\t= " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_symb,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
-			<<< fun_symb <<< '.' <<< body <<< '\n'
-	(<<<) file {fun_symb,fun_body=NoBody,fun_type=Yes type} = file // <<< type <<< '\n'
-			<<< fun_symb <<< '.' <<< "Array function\n"
+	(<<<) file {fun_ident,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
+			<<< fun_ident <<< '.' <<< body <<< '\n'
+	(<<<) file {fun_ident,fun_body=NoBody,fun_type=Yes type} = file // <<< type <<< '\n'
+			<<< fun_ident <<< '.' <<< "Array function\n"
 
-	(<<<) file {fun_symb} = file <<< fun_symb <<< "???" <<< '\n'
+	(<<<) file {fun_ident} = file <<< fun_ident <<< "???" <<< '\n'
 
 instance <<< FunctionBody
 where
@@ -602,7 +602,7 @@ where
 
 instance <<< FreeVar
 where
-	(<<<) file {fv_name,fv_info_ptr,fv_count} = file <<< fv_name <<< '.' <<< fv_count <<< '<' <<< fv_info_ptr <<< '>'
+	(<<<) file {fv_ident,fv_info_ptr,fv_count} = file <<< fv_ident <<< '.' <<< fv_count <<< '<' <<< fv_info_ptr <<< '>'
 
 instance <<< DynamicType
 where
@@ -672,8 +672,8 @@ where
 
 instance <<< (TypeDef a) | <<< a
 where
-	(<<<) file {td_name, td_args, td_rhs}
-		= file <<< ":: " <<< td_name <<< ' ' <<< td_args <<< td_rhs
+	(<<<) file {td_ident, td_args, td_rhs}
+		= file <<< ":: " <<< td_ident <<< ' ' <<< td_args <<< td_rhs
 
 instance <<< TypeRhs
 where
@@ -693,7 +693,7 @@ where
 
 instance <<< FieldSymbol
 where
-	(<<<) file {fs_name} = file <<< fs_name
+	(<<<) file {fs_ident} = file <<< fs_ident
 
 /*
 	where
@@ -720,11 +720,11 @@ where
 
 instance <<< ParsedConstructor
 where
-	(<<<) file {pc_cons_name,pc_arg_types} = file <<< pc_cons_name <<< pc_arg_types
+	(<<<) file {pc_cons_ident,pc_arg_types} = file <<< pc_cons_ident <<< pc_arg_types
 
 instance <<< ParsedSelector
 where
-	(<<<) file {ps_field_name,ps_field_type} = file <<< ps_field_name <<< ps_field_type
+	(<<<) file {ps_field_ident,ps_field_type} = file <<< ps_field_ident <<< ps_field_type
 
 
 instance <<< ModuleKind
@@ -733,15 +733,15 @@ where
 
 instance <<< ConsDef
 where
-	(<<<) file {cons_symb,cons_type} = file <<< cons_symb <<< " :: " <<< cons_type
+	(<<<) file {cons_ident,cons_type} = file <<< cons_ident <<< " :: " <<< cons_type
 
 instance <<< SelectorDef
 where
-	(<<<) file {sd_symb} = file <<< sd_symb
+	(<<<) file {sd__ident} = file <<< sd__ident
 
 instance <<< ClassDef
 where
-	(<<<) file {class_name} = file <<< class_name
+	(<<<) file {class_ident} = file <<< class_ident
 
 instance <<< ClassInstance
 where
@@ -754,7 +754,7 @@ where
 	
 instance <<< (Module a) | <<< a
 where
-	(<<<) file {mod_name,mod_type,mod_defs} = file <<< mod_type <<< mod_name <<< mod_defs
+	(<<<) file {mod_ident,mod_type,mod_defs} = file <<< mod_type <<< mod_ident <<< mod_defs
 
 instance <<< (CollectedDefinitions a b) | <<< a & <<< b
 where
@@ -767,8 +767,8 @@ where
 	(<<<) file (PD_NodeDef  _ pattern rhs) = file <<< pattern <<< " =: " <<< rhs
 	(<<<) file (PD_TypeSpec _ name prio st sp) = file <<< name <<< st
 	(<<<) file (PD_Type td) = file <<< td
-	(<<<) file (PD_Generic {gen_name}) = file <<< "generic " <<< gen_name
-	(<<<) file (PD_GenericCase {gc_name,gc_type_cons}) = file <<< gc_name <<< "{|" <<< gc_type_cons <<< "|}"
+	(<<<) file (PD_Generic {gen_ident}) = file <<< "generic " <<< gen_ident
+	(<<<) file (PD_GenericCase {gc_ident,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
 	 
 	(<<<) file _ = file
 
@@ -866,14 +866,14 @@ where
 		= file <<< "lifted argument " <<< arg_name <<< " of " <<< readable fun_name
 	(<<<) file (CP_Expression expression) = show_expression file expression
 	where
-		show_expression file (Var {var_name})
-			= file <<< var_name
-		show_expression file (FreeVar {fv_name})
-			= file <<< fv_name
-		show_expression file (App {app_symb={symb_name}, app_args})
-			| symb_name.id_name=="_dummyForStrictAlias"
+		show_expression file (Var {var_ident})
+			= file <<< var_ident
+		show_expression file (FreeVar {fv_ident})
+			= file <<< fv_ident
+		show_expression file (App {app_symb={symb_ident}, app_args})
+			| symb_ident.id_name=="_dummyForStrictAlias"
 				= show_expression file (hd app_args)
-			= file <<< readable symb_name
+			= file <<< readable symb_ident
 		show_expression file (fun @ fun_args)
 			= show_expression file fun
 		show_expression file (Case {case_ident=No})
@@ -1016,5 +1016,5 @@ newTypeSymbIdentCAF :: TypeSymbIdent;
 newTypeSymbIdentCAF =: MakeTypeSymbIdentMacro { glob_object = NoIndex, glob_module = NoIndex } {id_name="",id_info=nilPtr} 0
 
 MakeTypeSymbIdentMacro type_index name arity
-	:== {	type_name = name, type_arity = arity, type_index = type_index,
+	:== {	type_ident = name, type_arity = arity, type_index = type_index,
 			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}

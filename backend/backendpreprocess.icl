@@ -164,8 +164,8 @@ instance sequence LetBind where
 		= sequence` app lb_dst
 	  where
 	  	sequence` {app_symb, app_args} lb_dst sequenceState=:{ss_aliasDummyId}
-			| not (isNilPtr app_symb.symb_name.id_info) // nilPtr's are generated for Case's with case_ident=No in convertcases
-				&& app_symb.symb_name==ss_aliasDummyId
+			| not (isNilPtr app_symb.symb_ident.id_info) // nilPtr's are generated for Case's with case_ident=No in convertcases
+				&& app_symb.symb_ident==ss_aliasDummyId
 				// the compiled source was a strict alias like "#! x = y"
 				= case hd app_args of
 					Var bound_var=:{var_info_ptr}

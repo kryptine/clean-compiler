@@ -100,7 +100,7 @@ foldlBelongingSymbols f bs st
 			BS_Constructors constructors
 				-> foldSt (\{ds_ident} st -> f ds_ident st) constructors st 
 			BS_Fields fields
-				-> foldlArraySt (\{fs_name} st -> f fs_name st) fields st 
+				-> foldlArraySt (\{fs_ident} st -> f fs_ident st) fields st 
 			BS_Members members
 				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
 			BS_Nothing
@@ -228,11 +228,11 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						decl_kind = STE_Imported STE_Constructor def_mod_index,
 						decl_index = ds_index }, dcl_modules)
 			BS_Fields rt_fields
-				# {fs_name, fs_index} = rt_fields.[belong_nr]
-				  ({sd_symb}, dcl_modules)
+				# {fs_ident, fs_index} = rt_fields.[belong_nr]
+				  ({sd__ident}, dcl_modules)
 						= dcl_modules![def_mod_index].dcl_common.com_selector_defs.[fs_index]
-				-> (Declaration { decl_ident = fs_name, decl_pos = position, 
-						decl_kind = STE_Imported (STE_Field sd_symb) def_mod_index,
+				-> (Declaration { decl_ident = fs_ident, decl_pos = position, 
+						decl_kind = STE_Imported (STE_Field sd__ident) def_mod_index,
 						decl_index = fs_index }, dcl_modules)
 			BS_Members class_members
 				# {ds_ident, ds_index} = class_members.[belong_nr]
@@ -247,7 +247,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			BS_Constructors constructors
 				-> ([ds_ident \\ {ds_ident}<-constructors], dcl_modules)
 			BS_Fields rt_fields
-				-> ([fs_name \\ {fs_name}<-:rt_fields], dcl_modules)
+				-> ([fs_ident \\ {fs_ident}<-:rt_fields], dcl_modules)
 			BS_Members class_members
 				# (STE_Imported _ def_mod_index) = decl_kind
 				  ({class_members}, dcl_modules)
@@ -740,26 +740,26 @@ instance check_completeness SelectorDef where
 		= check_completeness sd_type cci ccs
 
 instance check_completeness SymbIdent where
-	check_completeness {symb_name, symb_kind} cci ccs
+	check_completeness {symb_ident, symb_kind} cci ccs
 		= case symb_kind of
 			SK_Constructor _
-				-> check_whether_ident_is_imported symb_name STE_Constructor cci ccs
+				-> check_whether_ident_is_imported symb_ident STE_Constructor cci ccs
 			SK_Function global_index			
-				-> check_completeness_for_function symb_name global_index cci ccs
+				-> check_completeness_for_function symb_ident global_index cci ccs
   			SK_DclMacro global_index
-				-> check_completeness_for_macro symb_name global_index cci ccs
+				-> check_completeness_for_macro symb_ident global_index cci ccs
 			SK_LocalDclMacroFunction global_index
-				-> check_completeness_for_local_dcl_macro symb_name global_index cci ccs
+				-> check_completeness_for_local_dcl_macro symb_ident global_index cci ccs
 			SK_LocalMacroFunction function_index
-				-> check_completeness_for_local_macro_function symb_name function_index cci ccs
+				-> check_completeness_for_local_macro_function symb_ident function_index cci ccs
 			SK_OverloadedFunction global_index
-				-> check_whether_ident_is_imported symb_name STE_Member cci ccs
+				-> check_whether_ident_is_imported symb_ident STE_Member cci ccs
   	  where
-		check_completeness_for_function symb_name {glob_object,glob_module} cci ccs
+		check_completeness_for_function symb_ident {glob_object,glob_module} cci ccs
 			| glob_module<>cci.box_cci.cci_main_dcl_module_n
 				// the function that is referred from within a macro is a DclFunction
 				// -> must be global -> has to be imported
-				= check_whether_ident_is_imported symb_name (STE_FunctionOrMacro []) cci ccs
+				= check_whether_ident_is_imported symb_ident (STE_FunctionOrMacro []) cci ccs
 			// otherwise the function was defined locally in a macro
 			// it is not a consequence, but it's type and body are consequences !
 			#! (already_visited, ccs) = ccs!box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
@@ -769,12 +769,12 @@ instance check_completeness SymbIdent where
 				# (fun_def, ccs)	= ccs!box_ccs.ccs_icl_functions.[glob_object]
 				= check_completeness fun_def cci ccs
 
-		check_completeness_for_macro symb_name global_index cci ccs
+		check_completeness_for_macro symb_ident global_index cci ccs
 			| global_index.glob_module<>cci.box_cci.cci_main_dcl_module_n
-				= check_whether_ident_is_imported symb_name (STE_DclMacroOrLocalMacroFunction []) cci ccs
-				= check_completeness_for_local_dcl_macro symb_name global_index cci ccs
+				= check_whether_ident_is_imported symb_ident (STE_DclMacroOrLocalMacroFunction []) cci ccs
+				= check_completeness_for_local_dcl_macro symb_ident global_index cci ccs
 
-		check_completeness_for_local_dcl_macro symb_name {glob_module,glob_object} cci ccs
+		check_completeness_for_local_dcl_macro symb_ident {glob_module,glob_object} cci ccs
 			| size ccs.box_ccs.ccs_set_of_visited_macros.[glob_module]==0
 //				#! n_macros_in_dcl_module=size ccs.box_ccs.ccs_macro_defs.[glob_module]
 				# (n_macros_in_dcl_module,ccs) = get_n_macros_in_dcl_module ccs glob_module
@@ -793,7 +793,7 @@ instance check_completeness SymbIdent where
 				# (macro_def, ccs) = ccs!box_ccs.ccs_macro_defs.[glob_module,glob_object]
 				= check_completeness macro_def cci ccs
 
-		check_completeness_for_local_macro_function symb_name glob_object cci ccs
+		check_completeness_for_local_macro_function symb_ident glob_object cci ccs
 			// otherwise the function was defined locally in a macro
 			// it is not a consequence, but it's type and body are consequences !
 			| ccs.box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
@@ -814,12 +814,12 @@ instance check_completeness TransformedBody where
 		= check_completeness tb_rhs cci ccs
 
 instance check_completeness Type where
-	check_completeness (TA {type_name} arguments) cci ccs
+	check_completeness (TA {type_ident} arguments) cci ccs
 		= check_completeness arguments cci
-		  (check_whether_ident_is_imported type_name STE_Type cci ccs)
-	check_completeness (TAS {type_name} arguments _) cci ccs
+		  (check_whether_ident_is_imported type_ident STE_Type cci ccs)
+	check_completeness (TAS {type_ident} arguments _) cci ccs
 		= check_completeness arguments cci
-		  (check_whether_ident_is_imported type_name STE_Type cci ccs)
+		  (check_whether_ident_is_imported type_ident STE_Type cci ccs)
 	check_completeness (l --> r) cci ccs
 		= check_completeness l cci
 		  (check_completeness r cci ccs)

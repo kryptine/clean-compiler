@@ -34,9 +34,9 @@ where
 			  (ok, icl_cons_defs, comp_st) = compare_rhs_of_types dcl_type_def.td_rhs icl_type_def.td_rhs dcl_cons_defs icl_cons_defs comp_st
 			| ok && dcl_type_def.td_arity==icl_type_def.td_arity
 				= (icl_type_defs, icl_cons_defs, comp_st)
-				# comp_error = compareError type_def_error (newPosition icl_type_def.td_name icl_type_def.td_pos) comp_st.comp_error
+				# comp_error = compareError type_def_error (newPosition icl_type_def.td_ident icl_type_def.td_pos) comp_st.comp_error
 				= (icl_type_defs, icl_cons_defs, { comp_st & comp_error = comp_error })
-//						 ---> ("compare_type_defs", dcl_type_def.td_name, dcl_type_def.td_rhs, icl_type_def.td_name, icl_type_def.td_rhs)
+//						 ---> ("compare_type_defs", dcl_type_def.td_ident, dcl_type_def.td_rhs, icl_type_def.td_ident, icl_type_def.td_rhs)
 			= (icl_type_defs, icl_cons_defs, comp_st)
 
 	compare_rhs_of_types (AlgType dclConstructors) (AlgType iclConstructors) dcl_cons_defs icl_cons_defs comp_st
@@ -111,9 +111,9 @@ where
 			# dcl_class_def = dcl_class_defs.[class_index]
 			  (icl_class_def, icl_class_defs) = icl_class_defs![class_index]
 			# (ok, icl_member_defs, comp_st) = compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st
-			| ok // ---> ("compare_class_defs",  dcl_class_def.class_name, icl_class_def.class_name)
+			| ok // ---> ("compare_class_defs",  dcl_class_def.class_ident, icl_class_def.class_ident)
 				= (icl_class_defs, icl_member_defs, comp_st)
-				# comp_error = compareError class_def_error (newPosition icl_class_def.class_name icl_class_def.class_pos) comp_st.comp_error
+				# comp_error = compareError class_def_error (newPosition icl_class_def.class_ident icl_class_def.class_pos) comp_st.comp_error
 				= (icl_class_defs, icl_member_defs, { comp_st & comp_error = comp_error })
 			= (icl_class_defs, icl_member_defs, comp_st)
 
@@ -176,7 +176,7 @@ where
 			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st			
 			| ok1 && ok2 
 				= (icl_generic_defs, comp_st)
-				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_name icl_generic_def.gen_pos) comp_st.comp_error
+				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_ident icl_generic_def.gen_pos) comp_st.comp_error
 				= (icl_generic_defs, { comp_st & comp_error = comp_error })
 		| otherwise
 			= (icl_generic_defs, comp_st)
@@ -480,7 +480,7 @@ compareTwoFunctionTypes /*conversions*/	dcl_fun_types dclIndex (icl_functions, t
 	= case fun_type of
 		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
 		Yes icl_symbol_type
-			# {ft_type=dcl_symbol_type, ft_priority,ft_symb} = dcl_fun_types.[dclIndex]			
+			# {ft_type=dcl_symbol_type, ft_priority,ft_ident} = dcl_fun_types.[dclIndex]			
 			# tc_state = init_symbol_type_vars dcl_symbol_type icl_symbol_type tc_state
 			  (corresponds, tc_state)
 					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
@@ -583,38 +583,38 @@ compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_funct
 	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
 	| dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun ||
 	  dcl_function.fun_priority<>icl_function.fun_priority
-		# ec_state = give_error dcl_function.fun_symb ec_state
+		# ec_state = give_error dcl_function.fun_ident ec_state
 		= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin } 
 	# ec_state = e_corresponds dcl_function.fun_body icl_function.fun_body ec_state
 	= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
 
 instance getIdentPos (TypeDef a) where
-	getIdentPos {td_name, td_pos}
-		= newPosition td_name td_pos
+	getIdentPos {td_ident, td_pos}
+		= newPosition td_ident td_pos
 
 instance getIdentPos ConsDef where
-	getIdentPos {cons_symb, cons_pos}
-		= newPosition cons_symb cons_pos
+	getIdentPos {cons_ident, cons_pos}
+		= newPosition cons_ident cons_pos
 
 instance getIdentPos SelectorDef where
-	getIdentPos {sd_symb, sd_pos}
-		= newPosition sd_symb sd_pos
+	getIdentPos {sd__ident, sd_pos}
+		= newPosition sd__ident sd_pos
 
 instance getIdentPos ClassDef where
-	getIdentPos {class_name, class_pos}
-		= newPosition class_name class_pos
+	getIdentPos {class_ident, class_pos}
+		= newPosition class_ident class_pos
 
 instance getIdentPos MemberDef where
-	getIdentPos {me_symb, me_pos}
-		= newPosition me_symb me_pos
+	getIdentPos {me_ident, me_pos}
+		= newPosition me_ident me_pos
 
 instance getIdentPos ClassInstance where
 	getIdentPos {ins_ident, ins_pos}
 		= newPosition ins_ident ins_pos
 
 instance getIdentPos FunDef where
-	getIdentPos {fun_symb, fun_pos}
-		= newPosition fun_symb fun_pos
+	getIdentPos {fun_ident, fun_pos}
+		= newPosition fun_ident fun_pos
 
 instance CorrespondenceNumber VarInfo where
 	toCorrespondenceNumber (VI_CorrespondenceNumber number)
@@ -804,21 +804,21 @@ instance t_corresponds AttributeVar where
 
 instance t_corresponds Type where
 	t_corresponds (TA dclIdent dclArgs) icl_type=:(TA iclIdent iclArgs)
-		=	equal dclIdent.type_name iclIdent.type_name
+		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
 		&&& t_corresponds dclArgs iclArgs
 	t_corresponds (TA dclIdent dclArgs) icl_type=:(TAS iclIdent iclArgs iclStrictness)
-		=	equal dclIdent.type_name iclIdent.type_name
+		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
 		&&& return (equal_strictness_lists NotStrict iclStrictness)
 		&&& t_corresponds dclArgs iclArgs
 	t_corresponds (TAS dclIdent dclArgs dclStrictness) icl_type=:(TA iclIdent iclArgs)
-		=	equal dclIdent.type_name iclIdent.type_name
+		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
 		&&& return (equal_strictness_lists dclStrictness NotStrict)
 		&&& t_corresponds dclArgs iclArgs
 	t_corresponds (TAS dclIdent dclArgs dclStrictness) icl_type=:(TAS iclIdent iclArgs iclStrictness)
-		=	equal dclIdent.type_name iclIdent.type_name
+		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
 		&&& return (equal_strictness_lists dclStrictness iclStrictness)
 		&&& t_corresponds dclArgs iclArgs
@@ -881,13 +881,13 @@ instance t_corresponds RecordType where
 
 instance t_corresponds FieldSymbol where
 	t_corresponds dclField iclField
-		=	equal dclField.fs_name iclField.fs_name
+		=	equal dclField.fs_ident iclField.fs_ident
 
 instance t_corresponds ConsDef where
 	t_corresponds dclDef iclDef
 		=	do (init_atype_vars (dclDef.cons_exi_vars++iclDef.cons_exi_vars))
 		&&&	t_corresponds dclDef.cons_type iclDef.cons_type
-		&&& equal dclDef.cons_symb iclDef.cons_symb
+		&&& equal dclDef.cons_ident iclDef.cons_ident
 		&&& equal dclDef.cons_priority iclDef.cons_priority
 
 instance t_corresponds SelectorDef where
@@ -920,7 +920,7 @@ instance t_corresponds AttrInequality where
 instance t_corresponds ClassDef where
 	t_corresponds dclDef iclDef
 		=	do (init_type_vars (dclDef.class_args++iclDef.class_args))
-		&&&	equal dclDef.class_name iclDef.class_name
+		&&&	equal dclDef.class_ident iclDef.class_ident
 		&&&	t_corresponds dclDef.class_args iclDef.class_args
 		&&&	t_corresponds dclDef.class_context iclDef.class_context
 		&&&	t_corresponds dclDef.class_members iclDef.class_members
@@ -929,7 +929,7 @@ instance t_corresponds MemberDef where
 	t_corresponds dclDef iclDef
 		=	do (init_type_vars (dclDef.me_type.st_vars++iclDef.me_type.st_vars))
 		&&&	do (init_attr_vars (dclDef.me_type.st_attr_vars++iclDef.me_type.st_attr_vars))
-		&&& equal dclDef.me_symb iclDef.me_symb
+		&&& equal dclDef.me_ident iclDef.me_ident
 		&&&	equal dclDef.me_offset iclDef.me_offset
 		&&&	equal dclDef.me_priority iclDef.me_priority
 		&&&	t_corresponds dclDef.me_type iclDef.me_type
@@ -994,7 +994,7 @@ instance e_corresponds FunctionBody where
 		
 instance e_corresponds FreeVar where
 	e_corresponds dclVar iclVar
-		=	e_corresponds_VarInfoPtr iclVar.fv_name dclVar.fv_info_ptr iclVar.fv_info_ptr
+		=	e_corresponds_VarInfoPtr iclVar.fv_ident dclVar.fv_info_ptr iclVar.fv_info_ptr
 
 instance e_corresponds Expression where
 	// the following alternatives don't occur anymore: Lambda, Conditional, WildCard
@@ -1161,11 +1161,11 @@ instance e_corresponds {#Char} where
 
 instance e_corresponds BoundVar where
 	e_corresponds dcl icl
-		= e_corresponds_VarInfoPtr icl.var_name dcl.var_info_ptr icl.var_info_ptr
+		= e_corresponds_VarInfoPtr icl.var_ident dcl.var_info_ptr icl.var_info_ptr
 		
 instance e_corresponds FieldSymbol where
 	e_corresponds dclField iclField
-		= equal2 dclField.fs_name iclField.fs_name
+		= equal2 dclField.fs_ident iclField.fs_ident
 
 e_corresponds_VarInfoPtr ident dclPtr iclPtr ec_state=:{ec_var_heap}
 	# (unifiable, ec_var_heap) = tryToUnifyVars dclPtr iclPtr ec_var_heap
@@ -1178,59 +1178,59 @@ e_corresponds_VarInfoPtr ident dclPtr iclPtr ec_state=:{ec_var_heap}
 	The problem: also different symbols can correspond with each other, because for macros
 	all local functions (also lambda functions) will be generated twice.
 */
-e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Function dcl_glob_index} 
+e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_Function dcl_glob_index} 
 					icl_app_symb=:{symb_kind=SK_Function icl_glob_index}
 					ec_state
 	#! main_dcl_module_n = ec_state.ec_main_dcl_module_n
 	| dcl_glob_index.glob_module==main_dcl_module_n && icl_glob_index.glob_module==main_dcl_module_n
 		| dcl_glob_index.glob_object<>icl_glob_index.glob_object
-			= give_error symb_name ec_state
+			= give_error symb_ident ec_state
 		= ec_state
 	| dcl_glob_index<>icl_glob_index
-		= give_error symb_name ec_state
+		= give_error symb_ident ec_state
 	= ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_OverloadedFunction dcl_glob_index} 
+e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_OverloadedFunction dcl_glob_index} 
 					icl_app_symb=:{symb_kind=SK_OverloadedFunction icl_glob_index}
 					ec_state
 	| dcl_glob_index<>icl_glob_index
-		= give_error symb_name ec_state
+		= give_error symb_ident ec_state
 	= ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Generic dcl_glob_index dcl_kind} 
+e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_Generic dcl_glob_index dcl_kind} 
 					icl_app_symb=:{symb_kind=SK_Generic icl_glob_index icl_kind}
 					ec_state
 	| dcl_glob_index<>icl_glob_index || dcl_kind <> icl_kind
-		= give_error symb_name ec_state
+		= give_error symb_ident ec_state
 	= ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_IclMacro icl_index} ec_state
 	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_name,symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_DclMacro icl_glob_index} ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_ident,symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_DclMacro icl_glob_index} ec_state
 	| dcl_glob_index==icl_glob_index
 		= ec_state
-		= give_error symb_name ec_state
+		= give_error symb_ident ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalDclMacroFunction dcl_glob_index} icl_app_symb=:{symb_kind=SK_LocalMacroFunction icl_index} ec_state
 	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
-e_corresponds_app_symb {symb_name=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index} {symb_name=icl_symb_name, symb_kind=SK_Constructor icl_glob_index} ec_state
+e_corresponds_app_symb {symb_ident=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index} {symb_ident=icl_symb_name, symb_kind=SK_Constructor icl_glob_index} ec_state
 	| dcl_glob_index.glob_module==icl_glob_index.glob_module && dcl_symb_name.id_name==icl_symb_name.id_name
 		= ec_state
 		= give_error icl_symb_name ec_state
-//e_corresponds_app_symb {symb_name} _ ec_state
-e_corresponds_app_symb {symb_name,symb_kind} {symb_kind=symb_kind2} ec_state
-	= give_error symb_name ec_state
+//e_corresponds_app_symb {symb_ident} _ ec_state
+e_corresponds_app_symb {symb_ident,symb_kind} {symb_kind=symb_kind2} ec_state
+	= give_error symb_ident ec_state
 
 continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_module_index dcl_index icl_app_symb icl_index ec_state
 	| icl_index==NoIndex
 		= ec_state
 	// two different functions were referenced. In case of macro functions they still could correspond
 	| not (names_are_compatible dcl_index icl_index ec_state.ec_icl_functions ec_state.ec_macro_defs)
-		= give_error icl_app_symb.symb_name ec_state
+		= give_error icl_app_symb.symb_ident ec_state
 	| dcl_module_index<>ec_state.ec_main_dcl_module_n
-		= give_error icl_app_symb.symb_name ec_state
+		= give_error icl_app_symb.symb_ident ec_state
 	| ec_state.ec_dcl_correspondences.[dcl_index]==icl_index && ec_state.ec_icl_correspondences.[icl_index]==dcl_index
 		= ec_state
 	| ec_state.ec_dcl_correspondences.[dcl_index]==cNoCorrespondence && ec_state.ec_icl_correspondences.[icl_index]==cNoCorrespondence
 		// going into recursion is save
 		= compareTwoMacroFuns dcl_module_index dcl_index icl_index ec_state
-	= give_error icl_app_symb.symb_name ec_state
+	= give_error icl_app_symb.symb_ident ec_state
   where
 	names_are_compatible :: Int Int {#FunDef} {#{#FunDef}} -> Bool;
 	names_are_compatible dcl_index icl_index icl_functions macro_defs
@@ -1239,7 +1239,7 @@ continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_module_index dcl
 		  dcl_name_is_loc_dependent = name_is_location_dependent dcl_function.fun_kind
 		  icl_name_is_loc_dependent = name_is_location_dependent icl_function.fun_kind
 		=	(dcl_name_is_loc_dependent==icl_name_is_loc_dependent)
-		 && (implies (not dcl_name_is_loc_dependent) (dcl_function.fun_symb.id_name==icl_function.fun_symb.id_name))
+		 && (implies (not dcl_name_is_loc_dependent) (dcl_function.fun_ident.id_name==icl_function.fun_ident.id_name))
 		// functions that originate from e.g. lambda expressions can correspond although their names differ
 	  where
 		name_is_location_dependent (FK_Function name_is_loc_dependent)

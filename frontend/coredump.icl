@@ -50,9 +50,9 @@ where
 		show_component [fun:funs] fun_defs acc_args file
 			# (fd, fun_defs) = fun_defs![fun]
 			| fun >= acc_max && fun < acc_min
-				# file = file <<< fd.fun_symb <<< '@' <<< fun <<< " ???"
+				# file = file <<< fd.fun_ident <<< '@' <<< fun <<< " ???"
 				= show_component funs fun_defs acc_args file
-			# file = file <<< fd.fun_symb <<< '@' <<< fun <<< " ("
+			# file = file <<< fd.fun_ident <<< '@' <<< fun <<< " ("
 			# (acc_arg,acc_args)
 				 = case fun < acc_min of
 							True	-> acc_args![fun]
@@ -292,11 +292,11 @@ where
 
 instance <#< TypeVar
 where
-	(<#<) pp_state varid = pp_state <#< varid.tv_name 
+	(<#<) pp_state varid = pp_state <#< varid.tv_ident 
 
 instance <#< AttributeVar
 where
-	(<#<) pp_state {av_name,av_info_ptr} = pp_state <#< av_name 
+	(<#<) pp_state {av_ident,av_info_ptr} = pp_state <#< av_ident 
 
 instance <#< AType
 where
@@ -411,20 +411,20 @@ where
 	
 instance <#< SymbIdent
 where
-	(<#<) pp_state symb=:{symb_kind = SK_Function symb_index } = pp_state <#< symb.symb_name <#<  '@' <#< symb_index
-	(<#<) pp_state symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = pp_state <#< symb.symb_name <#<  '@' <#< symb_index
-	(<#<) pp_state symb=:{symb_kind = SK_OverloadedFunction symb_index } = pp_state  <#< symb.symb_name <#<  "[o]@" <#< symb_index
-	(<#<) pp_state symb=:{symb_kind = SK_LocalMacroFunction symb_index } = pp_state <#< symb.symb_name <#<  '@' <#< symb_index
-	(<#<) pp_state symb = pp_state <#< symb.symb_name <#< '?'
+	(<#<) pp_state symb=:{symb_kind = SK_Function symb_index } = pp_state <#< symb.symb_ident <#<  '@' <#< symb_index
+	(<#<) pp_state symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = pp_state <#< symb.symb_ident <#<  '@' <#< symb_index
+	(<#<) pp_state symb=:{symb_kind = SK_OverloadedFunction symb_index } = pp_state  <#< symb.symb_ident <#<  "[o]@" <#< symb_index
+	(<#<) pp_state symb=:{symb_kind = SK_LocalMacroFunction symb_index } = pp_state <#< symb.symb_ident <#<  '@' <#< symb_index
+	(<#<) pp_state symb = pp_state <#< symb.symb_ident <#< '?'
 
 instance <#< TypeSymbIdent
 where
-	(<#<) pp_state symb	= pp_state <#< symb.type_name <#< '.' <#< symb.type_index
+	(<#<) pp_state symb	= pp_state <#< symb.type_ident <#< '.' <#< symb.type_index
 
 instance <#< BoundVar
 where
-	(<#<) pp_state {var_name,var_info_ptr,var_expr_ptr}
-		= pp_state <#< var_name <#< '<' <#< ptrToInt var_info_ptr <#< '>'
+	(<#<) pp_state {var_ident,var_info_ptr,var_expr_ptr}
+		= pp_state <#< var_ident <#< '<' <#< ptrToInt var_info_ptr <#< '>'
 
 instance <#< (Bind a b) | <#< a & <#< b 
 where
@@ -577,7 +577,7 @@ where
 	(<#<) pp_state (Constant symb _ _ _)         = pp_state <#<  "** Constant **" <#< symb
 	(<#<) pp_state (ABCCodeExpr code_sequence do_inline)      = pp_state <#< (if do_inline "code inline\n" "code\n") <#< code_sequence
 	(<#<) pp_state (AnyCodeExpr input output code_sequence)   = pp_state <#< "code\n" <#< input <#< '\n' <#< "" <#< output <#< '\n' <#< "" <#< code_sequence
-	(<#<) pp_state (FreeVar {fv_name})         	= pp_state <#< fv_name
+	(<#<) pp_state (FreeVar {fv_ident})         	= pp_state <#< fv_ident
 	(<#<) pp_state (ClassVariable info_ptr)     = pp_state <#< "ClassVariable " <#< ptrToInt info_ptr
 	(<#<) pp_state expr         				= abort ("<#< (Expression) [line 1290]" )
 	
@@ -644,9 +644,9 @@ where
 
 instance <#< FunDef
 where
-	(<#<) pp_state=:{function_index} {fun_symb,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} 
+	(<#<) pp_state=:{function_index} {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} 
 		# pp_state
-			=  pp_state <#< "\nFunction: " <#< fun_symb <#< '@' <#< function_index <#< '\n' <#< tb_args <#< '[' <#< fi_calls <#< ']' <#< " = "
+			=  pp_state <#< "\nFunction: " <#< fun_ident <#< '@' <#< function_index <#< '\n' <#< tb_args <#< '[' <#< fi_calls <#< ']' <#< " = "
 		# pp_state
 			= IndentLevelForward pp_state
 		# pp_state
@@ -654,10 +654,10 @@ where
 		# pp_state
 			= IndentLevelBackward pp_state
 		= pp_state
-	(<#<) pp_state=:{function_index} {fun_symb,fun_body=NoBody,fun_type=Yes type}
-		= pp_state <#< type <#< '\n' <#< fun_symb <#< '.'	<#< function_index <#< "Array function\n"
-	(<#<) pp_state=:{function_index} {fun_symb,fun_body=Expanding vars,fun_type=Yes type}
-		= pp_state <#< type <#< '\n' <#< fun_symb <#< '.'	<#< function_index <#< "Expanding function\n"
+	(<#<) pp_state=:{function_index} {fun_ident,fun_body=NoBody,fun_type=Yes type}
+		= pp_state <#< type <#< '\n' <#< fun_ident <#< '.'	<#< function_index <#< "Array function\n"
+	(<#<) pp_state=:{function_index} {fun_ident,fun_body=Expanding vars,fun_type=Yes type}
+		= pp_state <#< type <#< '\n' <#< fun_ident <#< '.'	<#< function_index <#< "Expanding function\n"
 
 instance <#< FunCall
 where
@@ -670,8 +670,8 @@ where
 
 instance <#< FreeVar
 where
-	(<#<) pp_state {fv_name,fv_info_ptr,fv_count}
-			= pp_state <#< fv_name <#< '.' <#< fv_count <#< '<' <#< ptrToInt fv_info_ptr <#< '>'
+	(<#<) pp_state {fv_ident,fv_info_ptr,fv_count}
+			= pp_state <#< fv_ident <#< '.' <#< fv_count <#< '<' <#< ptrToInt fv_info_ptr <#< '>'
 
 instance <#< DynamicType
 where
@@ -726,8 +726,8 @@ where
 
 instance <#< (TypeDef a) | <#< a
 where
-	(<#<) pp_state {td_name, td_args, td_rhs}
-		= pp_state <#< ":: " <#< td_name <#< ' ' <#< td_args <#< td_rhs
+	(<#<) pp_state {td_ident, td_args, td_rhs}
+		= pp_state <#< ":: " <#< td_ident <#< ' ' <#< td_args <#< td_rhs
 
 instance <#< TypeRhs
 where
@@ -746,7 +746,7 @@ where
 
 instance <#< FieldSymbol
 where
-	(<#<) pp_state {fs_name} = pp_state <#< fs_name
+	(<#<) pp_state {fs_ident} = pp_state <#< fs_ident
 
 instance <#< InstanceType
 where
@@ -758,15 +758,15 @@ where
 
 instance <#< ConsDef
 where
-	(<#<) pp_state {cons_symb,cons_type} = pp_state <#< cons_symb <#< " :: " <#< cons_type
+	(<#<) pp_state {cons_ident,cons_type} = pp_state <#< cons_ident <#< " :: " <#< cons_type
 
 instance <#< SelectorDef
 where
-	(<#<) pp_state {sd_symb} = pp_state <#< sd_symb
+	(<#<) pp_state {sd__ident} = pp_state <#< sd__ident
 
 instance <#< ClassDef
 where
-	(<#<) pp_state {class_name} = pp_state <#< class_name
+	(<#<) pp_state {class_ident} = pp_state <#< class_ident
 
 instance <#< ClassInstance
 where
@@ -779,7 +779,7 @@ where
 	
 instance <#< (Module a) | <#< a
 where
-	(<#<) pp_state {mod_name,mod_type,mod_defs} = pp_state <#< mod_type <#< mod_name <#< mod_defs
+	(<#<) pp_state {mod_ident,mod_type,mod_defs} = pp_state <#< mod_type <#< mod_ident <#< mod_defs
 
 instance <#< (CollectedDefinitions a b) | <#< a & <#< b
 where

@@ -109,7 +109,7 @@ addFunctionsRange fun_defs ca
 				}
 
 MakeNewImpOrDefFunction name arity body kind prio opt_type pos
-	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
+	:== { fun_ident = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
@@ -127,9 +127,9 @@ where
 		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos] ca
 		= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = range, loc_nodes = [], loc_in_icl_module=icl_module })
 				(PE_Ident lam_ident), ca)
-	collectFunctions (PE_Record rec_expr type_name fields) icl_module ca
+	collectFunctions (PE_Record rec_expr type_ident fields) icl_module ca
 		# ((rec_expr,fields), ca) = collectFunctions (rec_expr,fields) icl_module ca
-		= (PE_Record rec_expr type_name fields, ca)
+		= (PE_Record rec_expr type_ident fields, ca)
 	collectFunctions (PE_Tuple exprs) icl_module ca
 		# (exprs, ca) = collectFunctions exprs icl_module ca
 		= (PE_Tuple exprs, ca)
@@ -1045,12 +1045,12 @@ where
 	try_to_find mod_id []
 		= (False,MK_None)
 	try_to_find mod_id [pmod : pmods]
-		| mod_id == pmod.mod_name
+		| mod_id == pmod.mod_ident
 			= (True,pmod.mod_type)
 			= try_to_find mod_id pmods
 
 MakeEmptyModule name mod_type
-	:== { mod_name = name, mod_modification_time = "", mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs =
+	:== { mod_ident = name, mod_modification_time = "", mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs =
 				{	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macro_indices={ir_from=0,ir_to=0},
 					def_macros=[],def_members = [], def_funtypes = [], def_instances = [], 
 					def_generics = [], def_generic_cases = []} }
@@ -1063,7 +1063,7 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
 	| parse_ok
 		= scan_dcl_module mod parsed_modules searchPaths modtimefunction files ca
-		= (False, [MakeEmptyModule mod.mod_name MK_None: parsed_modules],files, ca)
+		= (False, [MakeEmptyModule mod.mod_ident MK_None: parsed_modules],files, ca)
 where
 	scan_dcl_module :: ParsedModule [ScannedModule] !SearchPaths (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
 	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
@@ -1082,7 +1082,7 @@ where
 
 scanModule :: !ParsedModule ![Ident] !Bool !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
 	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!Int,!*HashTable, !*File, !*Files)
-scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
+scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
 	# predefIdents = predefined_idents
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
 			,	ca_fun_count	= 0
@@ -1094,7 +1094,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_gene
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
-	  		= scan_main_dcl_module mod_name mod_type modtimefunction files ca
+	  		= scan_main_dcl_module mod_ident mod_type modtimefunction files ca
 	  (import_dcls_ok, parsed_modules, files, ca)
 	  		= scanModules imports parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 
@@ -1135,30 +1135,30 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_gene
 	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,n_functions_and_macros_in_dcl_modules,hash_table, err_file, files)
 where
 	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
-	scan_main_dcl_module mod_name MK_Main _ files ca
-		= (True, No,NoIndex,[MakeEmptyModule mod_name MK_NoMainDcl], cached_modules,files, ca)
-	scan_main_dcl_module mod_name MK_None _ files ca
+	scan_main_dcl_module mod_ident MK_Main _ files ca
+		= (True, No,NoIndex,[MakeEmptyModule mod_ident MK_NoMainDcl], cached_modules,files, ca)
+	scan_main_dcl_module mod_ident MK_None _ files ca
 		= (True, No,NoIndex,[], cached_modules,files, ca)
-	scan_main_dcl_module mod_name kind modtimefunction files ca
+	scan_main_dcl_module mod_ident kind modtimefunction files ca
 		# module_n_in_cache = in_cache 0 cached_modules;
 			with
 			in_cache module_n []
 				= NoIndex
 			in_cache module_n [cached_module_ident : pmods]
-				| mod_name==cached_module_ident
+				| mod_ident==cached_module_ident
 					= module_n
 					= in_cache (module_n+1) pmods
 		| module_n_in_cache<>NoIndex
 			= (True,No,module_n_in_cache,[],cached_modules,files,ca)
 		# {ca_error, ca_hash_table} = ca
-		# (parse_ok, mod, hash_table, err_file, /*predefs,*/ files) = wantModule cWantDclFile mod_name NoPos support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
+		# (parse_ok, mod, hash_table, err_file, /*predefs,*/ files) = wantModule cWantDclFile mod_ident NoPos support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
 		# ca = {ca & ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}}
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
 			# (_, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
-			# cached_modules = [mod.mod_name:cached_modules]
+			# cached_modules = [mod.mod_ident:cached_modules]
 			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
 
@@ -1172,7 +1172,7 @@ where
 	 = (pea_ok,Yes mod,ca)
 	collect_main_dcl_module No dcl_module_n ca
 		| dcl_module_n==NoIndex
-			 =	(True,Yes (MakeEmptyModule mod_name MK_None),ca)
+			 =	(True,Yes (MakeEmptyModule mod_ident MK_None),ca)
 			 =	(True,No,ca)
 
 MakeNewParsedDef ident args rhs pos
@@ -1207,7 +1207,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 collectGenericBodies :: !GenericCaseDef ![ParsedDefinition] !*CollectAdmin
 	-> (![ParsedBody], ![ParsedDefinition], !*CollectAdmin)
 collectGenericBodies first_case all_defs=:[PD_GenericCase gc : defs] ca
-	| first_case.gc_name == gc.gc_name && first_case.gc_type_cons == gc.gc_type_cons		
+	| first_case.gc_ident == gc.gc_ident && first_case.gc_type_cons == gc.gc_type_cons		
 		#! (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
 		# (GCB_ParsedBody args rhs) = gc.gc_body
 		#! body = 
@@ -1292,18 +1292,18 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 where
 	determine_symbols_of_conses :: [ParsedConstructor] Index -> ([DefinedSymbol], Index)
-	determine_symbols_of_conses [{pc_cons_name,pc_cons_arity} : conses] next_cons_index
-		# cons = { ds_ident = pc_cons_name, ds_arity = pc_cons_arity, ds_index = next_cons_index }
+	determine_symbols_of_conses [{pc_cons_ident,pc_cons_arity} : conses] next_cons_index
+		# cons = { ds_ident = pc_cons_ident, ds_arity = pc_cons_arity, ds_index = next_cons_index }
 		  (conses, next_cons_index) = determine_symbols_of_conses conses (inc next_cons_index)
 		= ([cons : conses], next_cons_index)
 	determine_symbols_of_conses [] next_cons_index
 		= ([], next_cons_index)
-reorganiseDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorList rec_cons_id exivars is_boxed_record sel_defs, td_pos } : defs] cons_count sel_count mem_count type_count ca
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_ident, td_rhs = SelectorList rec_cons_id exivars is_boxed_record sel_defs, td_pos } : defs] cons_count sel_count mem_count type_count ca
 	# (sel_syms, new_count) = determine_symbols_of_selectors sel_defs sel_count
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs (inc cons_count) new_count mem_count (type_count+1) ca
 	  cons_arity = new_count - sel_count
 	  pc_arg_types = [ ps_field_type \\ {ps_field_type} <- sel_defs ]
-	  cons_def = {	pc_cons_name = rec_cons_id, pc_cons_prio = NoPrio, pc_cons_arity = cons_arity, pc_cons_pos = td_pos,
+	  cons_def = {	pc_cons_ident = rec_cons_id, pc_cons_prio = NoPrio, pc_cons_arity = cons_arity, pc_cons_pos = td_pos,
 	  				pc_arg_types = pc_arg_types, pc_args_strictness=strictness_from_fields sel_defs,pc_exi_vars = exivars }
 	  type_def = { type_def & td_rhs = RecordType {rt_constructor = { ds_ident = rec_cons_id, ds_arity = cons_arity, ds_index = cons_count },
 	  							rt_fields =  { sel \\ sel <- sel_syms }, rt_is_boxed_record = is_boxed_record}}
@@ -1312,8 +1312,8 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorL
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 where
 	determine_symbols_of_selectors :: [ParsedSelector] Index -> ([FieldSymbol], Index)
-	determine_symbols_of_selectors [{ps_field_name,ps_field_var} : sels] next_selector_index
-		# field = { fs_name = ps_field_name, fs_var = ps_field_var, fs_index = next_selector_index }
+	determine_symbols_of_selectors [{ps_field_ident,ps_field_var} : sels] next_selector_index
+		# field = { fs_ident = ps_field_ident, fs_var = ps_field_var, fs_index = next_selector_index }
 		  (fields, next_selector_index) = determine_symbols_of_selectors sels (inc next_selector_index)
 		= ([field : fields], next_selector_index)
 	determine_symbols_of_selectors [] next_selector_index
@@ -1333,8 +1333,8 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = AbstractTypeSpec p
 	  type_def = { type_def & td_rhs = AbstractSynType properties type }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
-reorganiseDefinitions icl_module [PD_Class class_def=:{class_name,class_arity,class_args} members : defs] cons_count sel_count mem_count type_count ca
-	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_name, ds_arity = class_arity, ds_index = NoIndex }},
+reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] cons_count sel_count mem_count type_count ca
+	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
 					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}
 	  (mem_defs, mem_macros, ca) = check_symbols_of_class_members members type_context ca
 	  (mem_symbs, mem_defs, class_size) = reorganise_member_defs mem_defs mem_count
@@ -1348,7 +1348,7 @@ where
 	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context ca
 		# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
 		| isEmpty bodies
-			# mem_def = {	me_symb = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
+			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
 							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 			  ( mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
 			= ([mem_def : mem_defs], mem_macros, ca)
@@ -1385,9 +1385,9 @@ where
 		= determine_indexes_of_class_members mem_defs first_mem_index 0
 		
 	determine_indexes_of_class_members :: [MemberDef] Index Index -> ([DefinedSymbol], [MemberDef], Index)
-	determine_indexes_of_class_members [member=:{me_symb,me_type}:members] first_mem_index mem_offset
+	determine_indexes_of_class_members [member=:{me_ident,me_type}:members] first_mem_index mem_offset
 		#! (member_symbols, member_defs, last_mem_offset) = determine_indexes_of_class_members members first_mem_index (inc mem_offset)
-		= ([{ds_ident = me_symb, ds_index = first_mem_index + mem_offset, ds_arity = me_type.st_arity } : member_symbols],
+		= ([{ds_ident = me_ident, ds_index = first_mem_index + mem_offset, ds_arity = me_type.st_arity } : member_symbols],
 			[ { member & me_offset = mem_offset } : member_defs], last_mem_offset)
 	determine_indexes_of_class_members [] first_mem_index last_mem_offset
 		= ([], [], last_mem_offset)
@@ -1439,7 +1439,7 @@ reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count
 		, pb_position = gc.gc_pos 
 		}
 	#! bodies = [body : bodies ]
-	#! fun_name = genericIdentToFunIdent gc.gc_name gc.gc_type_cons 
+	#! fun_name = genericIdentToFunIdent gc.gc_ident gc.gc_type_cons 
 	#! fun = MakeNewImpOrDefFunction fun_name gc.gc_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
 	#! inst = { gc & gc_body = GCB_FunDef fun } 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
@@ -1480,37 +1480,37 @@ reorganiseDefinitionsAndAddTypes support_dynamics icl_module defs ca
 		addTypeConstructors [def : defs] rev_defs ca
 			=	addTypeConstructors defs [def : rev_defs] ca
 
-addTypeConstructor def=:{td_name, td_attribute, td_attrs, td_args, td_arity, td_pos} ca=:{ca_hash_table}
-	# tc_name = "TC;" +++ td_name.id_name
+addTypeConstructor def=:{td_ident, td_attribute, td_attrs, td_args, td_arity, td_pos} ca=:{ca_hash_table}
+	# tc_name = "TC;" +++ td_ident.id_name
 	# ({boxed_ident=tc_cons_ident}, ca_hash_table) = putIdentInHashTable tc_name IC_Expression ca_hash_table
 	# ({boxed_ident=tc_type_ident}, ca_hash_table) = putIdentInHashTable tc_name IC_Type ca_hash_table
-	=	(def, type_tc_def tc_type_ident tc_cons_ident td_name td_attribute td_attrs td_args
+	=	(def, type_tc_def tc_type_ident tc_cons_ident td_ident td_attribute td_attrs td_args
 												td_arity td_pos, { ca & ca_hash_table = ca_hash_table })
 	where
-		type_tc_def type_ident cons_ident type_name attr attrs args arity position
-			= 	{	td_name	= type_ident
+		type_tc_def ident cons_ident type_ident attr attrs args arity position
+			= 	{	td_ident	= ident
 				,	td_index = NoIndex
 				,	td_arity = arity
 				,	td_args	= args
 				,	td_attrs = attrs
 				,	td_context = []
-				,	td_rhs = ConsList [type_tc_cons cons_ident type_name args arity position]
+				,	td_rhs = ConsList [type_tc_cons cons_ident type_ident args arity position]
 				,	td_attribute = attr
 				,	td_pos = position
 				,	td_used_types = []
 				}
-		type_tc_cons cons_ident type_name args arity position
-			=	{	pc_cons_name = cons_ident
+		type_tc_cons cons_ident type_ident args arity position
+			=	{	pc_cons_ident = cons_ident
 				,	pc_cons_arity = 1
 				,	pc_exi_vars	= []
-				,	pc_arg_types = [type type_name args arity]
+				,	pc_arg_types = [type type_ident args arity]
 				,	pc_args_strictness	= NotStrict
 				,	pc_cons_prio = NoPrio
 				,	pc_cons_pos	= position
 				}
-		type type_name args arity
+		type type_ident args arity
 			=	{	at_attribute = TA_None
-				,	at_type = TA (MakeNewTypeSymbIdent type_name arity)
+				,	at_type = TA (MakeNewTypeSymbIdent type_ident arity)
 						[{at_attribute = TA_None, at_type = TV arg.atv_variable} \\ arg <- args]
 				}
 

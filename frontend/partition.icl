@@ -52,7 +52,7 @@ where
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 				
 				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
-					= abort ("visit_functions "+++toString fd.fun_symb+++" "+++toString module_index+++" "+++toString fc_index)
+					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
 				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
@@ -188,7 +188,7 @@ where
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 				
 				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
-					= abort ("visit_functions "+++toString fd.fun_symb+++" "+++toString module_index+++" "+++toString fc_index)
+					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
 				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
@@ -322,7 +322,7 @@ where
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
 				
 				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs fun_heap pi
-					= abort ("visit_functions "+++toString fd.fun_symb+++" "+++toString module_index+++" "+++toString fc_index)
+					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
 				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs fun_heap pi
 					= visit_functions funs min_dep max_fun_nr fun_defs fun_heap pi
@@ -580,7 +580,7 @@ import StdDebug
 ref_null fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
 //	| not (fst (ferror (stderr <<< fd)))
 	
-//	# tb_args = tb_args ---> ("ref_null",fd.fun_symb,tb_args,tb_rhs)
+//	# tb_args = tb_args ---> ("ref_null",fd.fun_ident,tb_args,tb_rhs)
 	# (new_rhs, new_args, _, _, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs pi_collect
 	# fd = {fd & fun_body=TransformedBody {tb_args=new_args,tb_rhs=new_rhs}}
 	= (fd,pi_collect)

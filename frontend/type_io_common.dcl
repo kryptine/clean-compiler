@@ -79,10 +79,10 @@ FunctionTypeConstructorAsString	:== " -> "
  
 // instance toString GlobalTCType
 
-create_type_string type_name module_name
-	:== if (type_name == FunctionTypeConstructorAsString)
-			type_name
-			(type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) ""))
+create_type_string type_ident module_name
+	:== if (type_ident == FunctionTypeConstructorAsString)
+			type_ident
+			(type_ident +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) ""))
 
 get_type_name_and_module_name_from_type_string :: !String -> (!String,!String)
 
