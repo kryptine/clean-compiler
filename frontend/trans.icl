@@ -1259,28 +1259,47 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  new_fd
 	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
 //	| False -!-> ("generated function", new_fd, new_cons_args)		= undef
-// DvA...
-	// producer requirements for generated function here...
-	#! prs	=
-		{ prs_group				= [dec ti_next_fun_nr]
-		, prs_cons_args 		= ti.ti_cons_args
-		, prs_main_dcl_module_n	= ro.ro_main_dcl_module_n
-		, prs_fun_heap			= ti.ti_fun_heap
-		, prs_fun_defs			= ti.ti_fun_defs
-		, prs_group_index		= fi_group_index
-		}
-	# (safe,prs)	= producerRequirements new_fun_rhs prs
-	# fun_heap = prs.prs_fun_heap
-// ...DvA
-	# new_gen_fd = { new_gen_fd & gf_fun_def = new_fd, gf_cons_args = {new_fd_cons_args & cc_producer = safe}}
+
+	# new_gen_fd = { new_gen_fd & gf_fun_def = new_fd, gf_cons_args = new_fd_cons_args}
+	# (new_gen_fd,fun_defs,var_heap,fun_heap,cons_args)
+		= SwitchReanalyseFunction
+					(reanalyse_function new_gen_fd ti_next_fun_nr ti.ti_cons_args ti.ti_fun_heap ti.ti_fun_defs ti.ti_var_heap fi_group_index new_fun_rhs
+					)
+					(new_gen_fd,ti.ti_fun_defs,ti.ti_var_heap,ti.ti_fun_heap,ti.ti_cons_args)
+
 	# ti =
 		{ ti
-		& ti_fun_heap = fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
-		, ti_cons_args= prs.prs_cons_args
-		, ti_fun_defs	= prs.prs_fun_defs
+		& ti_fun_heap 	= fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
+		, ti_cons_args	= cons_args
+		, ti_fun_defs	= fun_defs
+		, ti_var_heap	= var_heap
 		}
 	= (ti_next_fun_nr, new_fun_arity, ti)
 where
+	reanalyse_function new_gen_fd ti_next_fun_nr ti_cons_args ti_fun_heap ti_fun_defs ti_var_heap fi_group_index new_fun_rhs
+		# prs	=
+			{ prs_group				= [dec ti_next_fun_nr]
+			, prs_cons_args 		= ti_cons_args
+			, prs_main_dcl_module_n	= ro.ro_main_dcl_module_n
+			, prs_fun_heap			= ti_fun_heap
+			, prs_fun_defs			= ti_fun_defs
+			, prs_group_index		= fi_group_index
+			}
+		# (safe,prs)	= producerRequirements new_fun_rhs prs
+		# (new_fd_cons_args`,fun_defs,var_heap,fun_heap,cons_args) = reanalyseFunction
+					ti_next_fun_nr
+					fun_def_ptr
+					ro.ro_common_defs
+					ro.ro_imported_funs
+					ro.ro_main_dcl_module_n
+					ro.ro_stdStrictLists_module_n
+					prs.prs_fun_defs
+					ti_var_heap
+					(prs.prs_fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd))
+					prs.prs_cons_args
+		# new_gen_fd = { new_gen_fd & gf_cons_args = {new_fd_cons_args` & cc_producer = safe}}
+		= (new_gen_fd,fun_defs,var_heap,fun_heap,cons_args)
+
 	st_args_array :: ![AType] !StrictnessList -> .{#ATypesWithStrictness}
 	st_args_array st_args args_strictness
 		# strict1=Strict 1
