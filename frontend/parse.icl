@@ -552,10 +552,12 @@ where
 wantCodeRhs :: !ParseState -> (Rhs, !ParseState)
 wantCodeRhs pState
 	# (expr, pState)	= want_code_expr pState
+	  (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
 	= (	{ rhs_alts		= UnGuardedExpr
 							{ ewl_nodes		= []
 							, ewl_locals	= LocalParsedDefs []
 							, ewl_expr		= expr
+							, ewl_position	= LinePos file_name line_nr // MW++
 							}
 		, rhs_locals	= LocalParsedDefs []
 		}
@@ -645,7 +647,7 @@ where
 	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
 	want_FunctionBody BarToken nodeDefs alts sep pState
 //		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
-		#	(guard_position, pState)	= getPosition pState // MW4++
+		#	(file_name, line_nr, pState)= getFileAndLineNr pState // MW4++
 			(token, pState)				= nextToken FunctionContext pState
 		|	token == OtherwiseToken
 			#	(token, pState)				= nextToken FunctionContext pState
@@ -668,7 +670,7 @@ where
 				pState						= wantEndNestedGuard (default_found expr) offside pState
 // MW4 was:				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
-												alt_ident = guard_ident guard_position.fp_line }
+												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
 			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
@@ -676,7 +678,7 @@ where
 			#	(expr, pState)				= root_expression True token nodeDefs2 [] sep pState
 // MW4 was:				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
-												alt_ident = guard_ident guard_position.fp_line }
+												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
 			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
@@ -690,10 +692,12 @@ where
 	
 	root_expression :: !Bool !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
 	root_expression withExpected token nodeDefs [] sep pState
-		#	(expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
+		# (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
+		  (expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
 		=	case expr of
 				Yes expr -> ( UnGuardedExpr expr, pState)
-				No		 -> ( UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs []}
+				No		 -> ( UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs [],
+												ewl_position = LinePos file_name line_nr}
 							, parseError "RHS: root expression" (Yes token) "= <ExprWithLocals>" pState
 							)
 	root_expression withExpected token nodeDefs alts sep pState
@@ -708,12 +712,14 @@ where
 		= want_OptExprWithLocals True EqualToken nodeDefs sep (replaceToken EqualToken pState)
 	want_OptExprWithLocals withExpected token nodeDefs sep pState
 		| sep token
-		# (expr, pState)	= wantExpression cIsNotAPattern pState
+		# (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
+		  (expr, pState)	= wantExpression cIsNotAPattern pState
 		  pState			= wantEndRootExpression pState
 		  (locals,pState)	= optionalLocals WithToken withExpected pState
 		= ( Yes	{ ewl_nodes		= nodeDefs
 				, ewl_expr		= expr
 				, ewl_locals	= locals
+				, ewl_position	= LinePos file_name line_nr // MW++
 				}
 		  , pState
 		  )
@@ -753,6 +759,8 @@ where
 		# (succ, lhs_exp, pState)	= trySimpleLhsExpression pState
 		| succ
 			# pState			= wantToken FunctionContext "let definition" EqualToken pState
+			  (file_name, line_nr, pState)
+			  					= getFileAndLineNr pState // MW++
 			  (rhs_exp, pState) = wantExpression cIsNotAPattern pState
 			  pState			= wantEndRootExpression pState -->> ("#",lhs_exp,"=",rhs_exp)
 	  	  	  (locals , pState) = optionalLocals WithToken localsExpected pState
@@ -762,6 +770,8 @@ where
 				  				  , bind_src = rhs_exp
 				  				  }
 				  , ndwl_locals	= locals
+				  , ndwl_position
+				  				= LinePos file_name line_nr // MW++
 				  }
 				, pState
 				)
@@ -2225,6 +2235,7 @@ buildNodeDef lhsExpr rhsExpr
 					{ ewl_nodes		= []
 					, ewl_locals	= LocalParsedDefs []
 					, ewl_expr		= rhsExpr
+					, ewl_position	= NoPos // MW++
 					}
 			, rhs_locals
 				= LocalParsedDefs []

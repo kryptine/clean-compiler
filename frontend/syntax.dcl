@@ -112,7 +112,8 @@ NotALevel 	:==  -1
 ::	NodeDef dst =
 	{	nd_dst		::!dst,
 		nd_alts		::!OptGuardedAlts,
-		nd_locals	::!LocalDefs
+		nd_locals	::!LocalDefs,
+		nd_position	::!Position		
 	}
 
 ::	Rhs =
@@ -882,18 +883,21 @@ cNonRecursiveAppl	:== False
 	,	alt_guard	:: !ParsedExpr
 	,	alt_expr	:: !OptGuardedAlts
 	,	alt_ident	:: !Ident
+	,	alt_position:: !Position
 	}
 
 ::	ExprWithLocalDefs = 
 	{	ewl_nodes	:: ![NodeDefWithLocals]
 	,	ewl_expr	:: !ParsedExpr
 	,	ewl_locals	:: !LocalDefs
+	,	ewl_position:: !Position
 	}
 
 ::	NodeDefWithLocals =
-	{	ndwl_strict	:: !Bool
-	,	ndwl_def	:: !Bind ParsedExpr ParsedExpr
-	,	ndwl_locals	:: !LocalDefs
+	{	ndwl_strict		:: !Bool
+	,	ndwl_def		:: !Bind ParsedExpr ParsedExpr
+	,	ndwl_locals		:: !LocalDefs
+	,	ndwl_position	:: !Position
 	}
 
 ::	CaseAlt =
@@ -985,6 +989,7 @@ cIsNotStrict	:== False
 				| Let !Let
 				| Case !Case
 				| Selection !(Optional (Global DefinedSymbol)) !Expression ![Selection]
+							// Yes: a "!" selection
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression

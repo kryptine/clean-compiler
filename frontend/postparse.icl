@@ -49,6 +49,7 @@ exprToRhs expr
  						{	ewl_nodes	= []
 						,	ewl_expr	= expr
 						,	ewl_locals = LocalParsedDefs []
+						,	ewl_position= NoPos
 						}
 		,	rhs_locals	= LocalParsedDefs []
 		}
@@ -304,7 +305,8 @@ NoCollectedLocalDefs :== CollectedLocalDefs { loc_functions = { ir_from = 0, ir_
 transformLambda :: Ident [ParsedExpr] ParsedExpr Position -> FunDef
 // MW was:transformLambda lam_ident args result
 transformLambda lam_ident args result pos
-	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs },
+	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs,
+												ewl_position = NoPos },
 	  			  rhs_locals = NoCollectedLocalDefs }
 // MW4 was:	  lam_body = [{pb_args = args, pb_rhs = lam_rhs }]
 	  lam_body = [{pb_args = args, pb_rhs = lam_rhs, pb_position = pos }]
@@ -589,8 +591,9 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 								->	optGuardedAltToRhs (GuardedAlts [
 										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
 // MW4 was:												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []}}] No)
-												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []},
-											alt_ident = { id_name ="_f;" +++ toString line_nr +++ ";", id_info = nilPtr }}] No)
+												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs [], ewl_position = NoPos },
+											alt_ident = { id_name ="_f;" +++ toString line_nr +++ ";", id_info = nilPtr },
+											alt_position = NoPos}] No)
 							No
 								->	exprToRhs success
 				(LinePos _ line_nr) = fun_pos
@@ -1012,7 +1015,7 @@ reorganiseDefinitions icl_module [] _ _ _ ca
 reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
 reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
 	# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-	= (fun_defs, [(No, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals }) : node_defs], ca)
+	= (fun_defs, [(No, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
 reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
@@ -1034,7 +1037,7 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 		[PD_NodeDef pos pattern=:(PE_Ident id)  {rhs_alts,rhs_locals} : defs]
 			| belongsToTypeSpec name1 prio id False
 				# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-				-> (fun_defs, [(type, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals }) : node_defs], ca)
+				-> (fun_defs, [(type, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
 				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
 		_
 			-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)

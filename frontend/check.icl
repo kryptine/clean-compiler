@@ -1721,13 +1721,14 @@ checkRhssAndTransformLocalDefs free_vars loc_defs rhs_expr e_input e_state e_inf
 	  (rhs_expr, es_expr_heap) = buildLetExpression [] binds rhs_expr e_state.es_expr_heap
 	= (rhs_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
-checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals,nd_position} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+	# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} nd_position) cs
 	# (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals e_input e_state e_info cs	
 	  (binds_of_bind, es_var_heap, es_expr_heap, e_info, cs)
 			= transfromPatternIntoBind ei_mod_index ei_expr_level nd_dst bind_src e_state.es_var_heap e_state.es_expr_heap e_info cs
 	  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 	  (binds_of_local_defs, free_vars, e_state, e_info, cs) = checkAndTransformPatternIntoBind free_vars local_defs e_input e_state e_info cs
-	= (binds_of_bind ++ binds_of_local_defs, free_vars, e_state, e_info, cs)
+	= (binds_of_bind ++ binds_of_local_defs, free_vars, e_state, e_info, popErrorAdmin cs)
 checkAndTransformPatternIntoBind free_vars [] e_input e_state e_info cs
 	= ([], free_vars, e_state, e_info, cs)
 
@@ -1890,23 +1891,27 @@ where
 	check_guarded_expressions free_vars [] let_vars_list rev_guarded_exprs {ei_expr_level} e_state e_info cs
 		= (let_vars_list, rev_guarded_exprs, ei_expr_level, free_vars, e_state, e_info, cs)
 
-	check_guarded_expression free_vars {alt_nodes,alt_guard,alt_expr,alt_ident}
+	check_guarded_expression free_vars {alt_nodes,alt_guard,alt_expr,alt_ident,alt_position}
 			let_vars_list rev_guarded_exprs e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# (let_binds, let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars alt_nodes let_vars_list
 		  		{ e_input & ei_expr_level = inc ei_expr_level } e_state e_info cs
 		  e_input = { e_input & ei_expr_level = ei_expr_level }
+		  cs = pushErrorAdmin (newPosition { id_name = "guard", id_info = nilPtr } alt_position) cs
 	  	  (guard, free_vars, e_state, e_info, cs) = checkExpression free_vars alt_guard e_input e_state e_info cs
+		  cs = popErrorAdmin cs
 		  (expr, free_vars, e_state, e_info, cs) = check_opt_guarded_alts free_vars alt_expr e_input e_state e_info cs
 	  	= (let_vars_list, [(let_binds, guard, expr, alt_ident) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
 
 	// JVG: added type
 	check_unguarded_expression :: [FreeVar] ExprWithLocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-	check_unguarded_expression free_vars {ewl_nodes,ewl_expr,ewl_locals} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+	check_unguarded_expression free_vars {ewl_nodes,ewl_expr,ewl_locals,ewl_position} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# this_expr_level = inc ei_expr_level
 		  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
 		 		= checkLhssOfLocalDefs this_expr_level ei_mod_index ewl_locals e_state e_info cs
 		  (binds, let_vars_list, rhs_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars ewl_nodes [] { e_input & ei_expr_level = this_expr_level } e_state e_info cs
+		  cs = pushErrorAdmin (newPosition { id_name = "", id_info = nilPtr } ewl_position) cs
 	  	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars ewl_expr { e_input & ei_expr_level = rhs_expr_level } e_state e_info cs
+		  cs = popErrorAdmin cs
 		  (expr, free_vars, e_state, e_info, cs)
 				= addArraySelections array_patterns expr free_vars e_input e_state e_info cs
 		  cs = { cs & cs_symbol_table = remove_seq_let_vars rhs_expr_level let_vars_list cs.cs_symbol_table }
@@ -1926,17 +1931,22 @@ where
 		= remove_seq_let_vars (dec level) let_vars_list (removeLocalIdentsFromSymbolTable level let_vars symbol_table)
 		
 	check_sequential_lets free_vars [seq_let:seq_lets] let_vars_list e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
-		# ei_expr_level = inc ei_expr_level
-		  e_input = { e_input & ei_expr_level = ei_expr_level }
-		  (src_expr, pattern_expr, (let_vars, array_patterns), free_vars, e_state, e_info, cs) = check_sequential_let free_vars seq_let e_input e_state e_info cs
+		# ei_expr_level
+				= inc ei_expr_level
+		  e_input
+		  		= { e_input & ei_expr_level = ei_expr_level }
+		  (src_expr, pattern_expr, (let_vars, array_patterns), free_vars, e_state, e_info, cs)
+		  		= check_sequential_let free_vars seq_let e_input e_state e_info cs
 	      (binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	      		= check_sequential_lets free_vars seq_lets [let_vars : let_vars_list] e_input e_state e_info cs
 		  (let_binds, es_var_heap, es_expr_heap, e_info, cs)
 				= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr e_state.es_var_heap e_state.es_expr_heap e_info cs
-		  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
+		  e_state
+		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 		  (strict_array_pattern_binds, lazy_array_pattern_binds, free_vars, e_state, e_info, cs)
 				= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
-		  all_binds = [if seq_let.ndwl_strict (s, l) ([],let_binds), (strict_array_pattern_binds, lazy_array_pattern_binds) : binds]
+		  all_binds
+		  		= [if seq_let.ndwl_strict (s, l) ([],let_binds), (strict_array_pattern_binds, lazy_array_pattern_binds) : binds]
 		    with (l,s) = splitAt ((length let_binds)-1) let_binds
 	    = (all_binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	check_sequential_lets free_vars [] let_vars_list e_input=:{ei_expr_level} e_state e_info cs
@@ -1944,8 +1954,9 @@ where
 
 	// JVG: added type
 	check_sequential_let :: [FreeVar] NodeDefWithLocals ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,!AuxiliaryPattern,!(![Ident],![ArrayPattern]),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
-		# (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals e_state e_info cs
+	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals, ndwl_position} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+		# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} ndwl_position) cs
+		  (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars bind_src e_input e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs)
 				= addArraySelections loc_array_patterns src_expr free_vars e_input e_state e_info cs
@@ -1958,7 +1969,7 @@ where
 				= checkPattern bind_dst No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = True } ([], []) 
 					{ps_var_heap = hp_var_heap, ps_fun_defs = es_fun_defs } e_info { cs & cs_symbol_table = cs_symbol_table }
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps, es_fun_defs = ps_fun_defs }
-		= (src_expr, pattern, accus, free_vars, e_state, e_info, cs)
+		= (src_expr, pattern, accus, free_vars, e_state, e_info, popErrorAdmin cs)
 	
 	build_sequential_lets :: ![(![Bind Expression FreeVar],![Bind Expression FreeVar])] !Expression !*ExpressionHeap -> (!Expression, !*ExpressionHeap)
 	build_sequential_lets [] expr expr_heap
@@ -3230,9 +3241,7 @@ where
 				<=< adjust_predef_symbol PD_TypeConsSymbol		mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_variablePlaceholder mod_index STE_Constructor
 				<=< adjust_predef_symbol PD_unify				mod_index STE_DclFunction
-// MV ..
 				<=< adjust_predef_symbol PD_coerce				mod_index STE_DclFunction
-// .. MV
 				<=< adjust_predef_symbol PD_undo_indirections	mod_index STE_DclFunction)
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})
 	where
