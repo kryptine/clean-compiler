@@ -1669,7 +1669,7 @@ where
 				=	[(BESelector_F, selection) : addMoreKinds selections]
 				where
 					addMoreKinds selections
-						=	[(BESelector_U, selection) \\ selection <- selections]
+						=	[(BESelector_N, selection) \\ selection <- selections]
 			addKinds []
 				=	[]
 	convertExpr (TupleSelect {ds_arity} n expr)
