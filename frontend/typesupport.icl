@@ -842,8 +842,10 @@ class writeType a :: !*File !(Optional TypeVarBeautifulizer) (!Format, !a) -> (!
 
 instance writeType AttributeVar
 where
-	writeType file opt_beautifulizer (form, av)
-		= (file <<< av, opt_beautifulizer)
+	writeType file No (_, av)
+		= (file <<< av, No)
+	writeType file (Yes beautifulizer) (_, av)
+		= writeBeautifulAttrVar file beautifulizer (TA_Var av)
 
 instance writeType SymbolType
 where
@@ -871,7 +873,7 @@ where
 			= file_opt_beautifulizer
 		show_context form contexts (file, opt_beautifulizer)
 			= writeType (file <<< " | ") opt_beautifulizer (setProperty form cAndSeparator, contexts)
-		// grouped takes care that inequalityies like [a<=c, b<=c] are printed like [a b <= c]
+		// grouped takes care that inequalities like [a<=c, b<=c] are printed like [a b <= c]
 		grouped group_var accu []
 			= [{ ig_offered = accu, ig_demanded = group_var}]
 		grouped group_var accu [{ai_offered, ai_demanded}:ineqs]
@@ -896,11 +898,6 @@ where
 	writeType file opt_beautifulizer (form, {tc_class={glob_object={ds_ident}}, tc_types})
 		= writeType (file <<< ds_ident <<< ' ') opt_beautifulizer (form, tc_types)
 
-instance writeType AttrInequality
-where
-	writeType file opt_beautifulizer (form, {ai_demanded, ai_offered})
-		= (file <<< ai_offered <<< " <= " <<< ai_demanded, opt_beautifulizer)
-
 instance writeType AType
 where
 	writeType file opt_beautifulizer (form, {at_attribute, at_annotation, at_type})
@@ -911,36 +908,53 @@ where
 		show_attributed_type file opt_beautifulizer form TA_Multi type
 			| checkProperty form cMarkAttribute
 				# (file, opt_beautifulizer)
-					= show_marked_attribute TA_Multi form file opt_beautifulizer
+					= show_marked_attribute file opt_beautifulizer (form, TA_Multi)
 				= writeType file opt_beautifulizer (form, type)
 				= writeType file opt_beautifulizer (form, type) 
 		show_attributed_type file opt_beautifulizer form attr type
 			| checkProperty form cAttributed
-				= writeType (file <<< attr) opt_beautifulizer (setProperty form cBrackets, type)
+				# (file, opt_beautifulizer)
+					= writeType file opt_beautifulizer (form, attr)
+				= writeType file opt_beautifulizer (setProperty form cBrackets, type)
 			| checkProperty form cMarkAttribute
 				# (file, opt_beautifulizer)
-					= show_marked_attribute attr form file opt_beautifulizer
+					= show_marked_attribute file opt_beautifulizer (form, attr)
 				= writeType file opt_beautifulizer (setProperty form cBrackets, type)
 				= writeType file opt_beautifulizer (form, type)
 
-		show_marked_attribute attr {form_attr_position = Yes (positions, coercions)} file opt_beautifulizer
+		show_marked_attribute file opt_beautifulizer (form=:{form_attr_position = Yes (positions, coercions)}, attr)
 			| isEmpty positions
-				= show_attribute attr coercions (file <<< "^ ") opt_beautifulizer
-				= show_attribute attr coercions file opt_beautifulizer
-//				= (file, opt_beautifulizer)
+				= show_attribute coercions (file <<< "^ ") opt_beautifulizer (form, attr)
+				= show_attribute coercions file opt_beautifulizer (form, attr)
 
-		show_attribute TA_Unique coercions file opt_beautifulizer
-			= (file <<< '*' , opt_beautifulizer)
-		show_attribute TA_Multi coercions file opt_beautifulizer
-			= (file, opt_beautifulizer)
-		show_attribute (TA_TempVar av_number) coercions file opt_beautifulizer
+		show_attribute coercions file opt_beautifulizer (form, ta=:(TA_TempVar av_number)) 
 			| isUniqueAttribute av_number coercions
-				= (file <<< '*', opt_beautifulizer)
+				= writeType file opt_beautifulizer (form, TA_Unique)
 			| isNonUniqueAttribute av_number coercions
-				= (file, opt_beautifulizer)
-				= (file <<< '.' <<< "[[" <<< av_number <<< "]]", opt_beautifulizer)
-		show_attribute TA_TempExVar coercions file opt_beautifulizer
-			= PA_BUG (file <<< "(E)", opt_beautifulizer) (abort "show_attribute TA_TempExVar")
+				= writeType file opt_beautifulizer (form, TA_Multi)
+			= writeType file opt_beautifulizer (form, ta)
+		show_attribute coercions file opt_beautifulizer (form, ta)
+			= writeType file opt_beautifulizer (form, ta)
+
+instance writeType TypeAttribute
+  where
+	writeType file (Yes beautifulizer) (form, ta=:TA_Var _)
+		= writeBeautifulAttrVarAndColon file beautifulizer ta
+	writeType file (Yes beautifulizer) (form, TA_RootVar av)
+		= writeBeautifulAttrVarAndColon file beautifulizer (TA_Var av)
+	writeType file (Yes beautifulizer) (form, ta=:TA_TempVar _)
+		= writeBeautifulAttrVarAndColon file beautifulizer ta
+	writeType file yes_beautifulizer=:(Yes _) (form, TA_Multi)
+		= (file, yes_beautifulizer)
+	writeType file opt_beautifulizer (form, TA_TempExVar)
+		= PA_BUG (file <<< "(E)", opt_beautifulizer) (abort "writeType (TypeAttribute) TA_TempExVar")
+	writeType file opt_beautifulizer (_, ta)
+		= (file <<< ta, opt_beautifulizer)
+
+writeBeautifulAttrVarAndColon file beautifulizer ta
+	# (file, yes_beautifulizer)
+			= writeBeautifulAttrVar file beautifulizer ta
+	= (file <<< ':', yes_beautifulizer)
 
 instance writeType Type
 where
@@ -1012,8 +1026,12 @@ where
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TE)
 		= (file <<< "__", opt_beautifulizer)
-	writeType file (Yes beautifulizer) (form, type_variable)
-		= writeBeautifulTypeVar file beautifulizer type_variable
+	writeType file (Yes beautifulizer) (_, type_var=:TV _)
+		= writeBeautifulTypeVar file beautifulizer type_var
+	writeType file (Yes beautifulizer) (_, GTV tv)
+		= writeBeautifulTypeVar file beautifulizer (TV tv)
+	writeType file (Yes beautifulizer) (_, type_var=:TempV _)
+		= writeBeautifulTypeVar file beautifulizer type_var
 	writeType file _ (form, type)
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
@@ -1022,57 +1040,60 @@ writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
 			= writeType (file <<< br_open) opt_beautifulizer (form, types)
 	= (file <<< br_close, opt_beautifulizer)
 
-writeBeautifulTypeVar file beautifulizer=:{tvb_visited_typevars, tvb_fresh_vars} type_variable
-	| sanity_check_failed type_variable
+writeBeautifulTypeVar file beautifulizer=:{tvb_visited_type_vars, tvb_fresh_type_vars} type
+	| sanity_check_failed type
 		= abort "bug nr 12345 in module typesupport"
-	# type_var_ptr = toTypeVarPtr type_variable
-	= case assoc_list_lookup type_var_ptr tvb_visited_typevars of
+	= case assoc_list_lookup (==) type tvb_visited_type_vars of
 		No
-			-> (file <<< hd tvb_fresh_vars, 
+			-> (file <<< hd tvb_fresh_type_vars, 
 				Yes { beautifulizer &
-						tvb_visited_typevars = [(type_var_ptr, hd tvb_fresh_vars):tvb_visited_typevars],
-						tvb_fresh_vars = tl tvb_fresh_vars })
+						tvb_visited_type_vars = [(type, hd tvb_fresh_type_vars):tvb_visited_type_vars],
+						tvb_fresh_type_vars = tl tvb_fresh_type_vars })
 		Yes (_, beautiful_var_name)
 			-> (file <<< beautiful_var_name, Yes beautifulizer)
   where
-	sanity_check_failed (GTV _)		= False
 	sanity_check_failed (TV _)		= False
 	sanity_check_failed (TempV _)	= False
-	sanity_check_failed (TQV _)		= False
-	sanity_check_failed (TempQV _)	= False
-	sanity_check_failed (TLifted _)	= False
 	sanity_check_failed _			= True
 	
+writeBeautifulAttrVar file beautifulizer=:{tvb_visited_attr_vars, tvb_fresh_attr_vars} attribute
+	| sanity_check_failed attribute
+		= abort "bug nr 123456 in module typesupport"
+	= case assoc_list_lookup equal_attributes attribute tvb_visited_attr_vars of
+		No
+			-> (file <<< hd tvb_fresh_attr_vars, 
+				Yes { beautifulizer &
+						tvb_visited_attr_vars = [(attribute, hd tvb_fresh_attr_vars):tvb_visited_attr_vars],
+						tvb_fresh_attr_vars = tl tvb_fresh_attr_vars })
+		Yes (_, beautiful_var_name)
+			-> (file <<< beautiful_var_name, Yes beautifulizer)
+  where
+	sanity_check_failed (TA_Var _)		= False
+	sanity_check_failed (TA_TempVar _)	= False
+	sanity_check_failed _				= True
+
+	equal_attributes (TA_Var {av_info_ptr=p1}) (TA_Var {av_info_ptr=p2})
+		= p1==p2
+	equal_attributes (TA_TempVar i1) (TA_TempVar i2)
+		= i1==i2
+	equal_attributes _ _
+		= False
+
 instance writeType ConsVariable where
 	writeType file No (_, cons_variable)
 		= (file <<< cons_variable, No)
 	writeType file yes_beautifulizer (_, cv=:(TempQCV _))
 		= (file <<< cv, yes_beautifulizer)
-	writeType file yes_beautifulizer=:(Yes beautifulizer=:{tvb_visited_typevars, tvb_fresh_vars}) 
-			(_, cons_variable)
-		# cons_var_ptr = toTypeVarPtrCV cons_variable
-		= case assoc_list_lookup cons_var_ptr tvb_visited_typevars of
-			No
-				-> (file <<< hd tvb_fresh_vars, 
-					Yes { beautifulizer &
-							tvb_visited_typevars = [(cons_var_ptr, hd tvb_fresh_vars):tvb_visited_typevars],
-							tvb_fresh_vars = tl tvb_fresh_vars })
-			Yes (_, beautiful_var_name)
-				-> (file <<< beautiful_var_name, yes_beautifulizer)
+	writeType file (Yes beautifulizer) (_, CV tv)
+		= writeBeautifulTypeVar file beautifulizer (TV tv)
+	writeType file (Yes beautifulizer) (_, TempCV i)
+		= writeBeautifulTypeVar file beautifulizer (TempV i)
 
-toTypeVarPtrCV (CV {tv_info_ptr}) = tv_info_ptr
-toTypeVarPtrCV _ = nilPtr
-
-toTypeVarPtr (TV {tv_info_ptr}) = tv_info_ptr
-toTypeVarPtr (GTV {tv_info_ptr}) = tv_info_ptr
-toTypeVarPtr (TQV {tv_info_ptr}) = tv_info_ptr
-toTypeVarPtr _ = nilPtr
-
-assoc_list_lookup _ [] = No
-assoc_list_lookup t1 [hd=:(t2, _):tl]
-	| t1==t2
+assoc_list_lookup _ _ [] = No
+assoc_list_lookup equal t1 [hd=:(t2, _):tl]
+	| equal t1 t2
 		= Yes hd
-	= assoc_list_lookup t1 tl
+	= assoc_list_lookup equal t1 tl
 
 
 cNoPosition :== -1
@@ -1137,18 +1158,21 @@ where
 
 // MW4..
 :: TypeVarBeautifulizer =
-	{	tvb_visited_typevars 	:: ![(TypeVarInfoPtr, String)]
-	,	tvb_fresh_vars			::	![String]
+	{	tvb_visited_type_vars 	:: ![(Type, String)]			// only TV and TempV
+	,	tvb_fresh_type_vars		:: ![String]
+	,	tvb_visited_attr_vars	:: ![(TypeAttribute, String)]	// only TA_Var and TA_TempVar
+	,	tvb_fresh_attr_vars		:: ![String]
 	}
 
 initialTypeVarBeautifulizer :: TypeVarBeautifulizer
 initialTypeVarBeautifulizer 
-	= {	tvb_visited_typevars = [(nilPtr,"??")], tvb_fresh_vars = fresh_vars 'a' (-1) }
+	= {	tvb_visited_type_vars = [], tvb_fresh_type_vars = fresh_vars 'a' 'i' 'a' (-1),
+		tvb_visited_attr_vars = [], tvb_fresh_attr_vars = fresh_vars 'u' (inc 'z') 'u' (-1) }
   where
-	fresh_vars 'i' i
-		= fresh_vars 'a' (i+1)
-	fresh_vars ch i
-		= [if (i==(-1)) (toString ch) (toString ch+++toString i): fresh_vars (inc ch) i]
+	fresh_vars min max1 ch i
+		| ch==max1
+			= fresh_vars min max1 min (i+1)
+		= [if (i==(-1)) (toString ch) (toString ch+++toString i): fresh_vars min max1 (inc ch) i]
 
 getImplicitAttrInequalities :: !SymbolType -> [AttrInequality]
 	// retrieve those inequalities  that are implied by propagation
