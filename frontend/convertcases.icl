@@ -730,7 +730,7 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 			,	fun_body		= fun_bodies
 			,	fun_type		= Yes fun_type
 			,	fun_pos			= NoPos
-			,	fun_kind		= FK_ImpFunction cNameNotLocationDependent
+			,	fun_kind		= FK_Function cNameNotLocationDependent
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}

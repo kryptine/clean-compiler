@@ -2,11 +2,15 @@ definition module check
 
 import syntax, transform, checksupport, typesupport, predef
 
-checkModule :: !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !{#FunDef} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
-	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File /* TD */, [String])
+checkModule :: !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
+	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 
-checkFunctions :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState)
+checkFunctions :: !Index !Level !Index !Index !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
+											   -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState)
 
+checkDclMacros :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
+										  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState)
+										  
 determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 		-> (!SymbolType, !Specials, !*TypeHeaps, !u:Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
 

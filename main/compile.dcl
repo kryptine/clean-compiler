@@ -10,7 +10,7 @@ compile :: ![{#Char}] !*DclCache !*Files -> (!Bool,!*DclCache,!*Files)
 
 :: DclCache = {
 	dcl_modules::!{#DclModule},
-	functions_and_macros::!{#FunDef},
+	functions_and_macros::!.{#.{#FunDef}},
 	predef_symbols::!.PredefinedSymbols,
 	hash_table::!.HashTable,
 	heaps::!.Heaps

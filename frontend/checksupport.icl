@@ -3,7 +3,6 @@ implementation module checksupport
 import StdEnv, compare_constructor
 import syntax, predef, containers
 import utilities
-from check import checkFunctions
 
 //import RWSDebug
 
@@ -60,6 +59,7 @@ where
 	toInt (STE_Instance _)			= cInstanceDefs
 	toInt STE_DclFunction			= cFunctionDefs
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
+	toInt (STE_DclMacroOrLocalMacroFunction _)= cMacroDefs
 	toInt _							= NoIndex
 
 ::	CommonDefs =
@@ -101,7 +101,8 @@ where
 ::	IclModule  =
 	{	icl_name				:: !Ident
 	,	icl_functions			:: !.{# FunDef }
-	,	icl_instances			:: !IndexRange
+	,	icl_global_functions	:: ![IndexRange]
+	,	icl_instances			:: ![IndexRange]
 	,	icl_specials			:: !IndexRange
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
@@ -121,14 +122,15 @@ where
 	,	dcl_specials		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
 	,	dcl_sizes			:: !{# Int}
+	,	dcl_dictionary_info	:: !DictionaryInfo
 	,	dcl_declared		:: !Declarations
-	,	dcl_conversions		:: !Optional ConversionTable
-// RWS ...	,	dcl_is_system		:: !Bool
+	,	dcl_macro_conversions :: !Optional {#Index}
 	,	dcl_module_kind		:: !ModuleKind
 	,	dcl_modification_time:: !{#Char}
-// ... RWS
 	,	dcl_imported_module_numbers :: !NumberSet
 	}
+
+::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
 class Erroradmin state // PK...
 where
@@ -221,16 +223,19 @@ where
 	,	ef_cons_defs		:: !.{# ConsDef}
 	,	ef_member_defs		:: !.{# MemberDef}
 	,	ef_class_defs		:: !.{# ClassDef}
-	,	ef_generic_defs		:: !.{# GenericDef} // AA
+	,	ef_generic_defs		:: !.{# GenericDef}
 	,	ef_modules			:: !.{# DclModule}
+	,	ef_macro_defs		:: !.{#.{#FunDef}}
 	,	ef_is_macro_fun		:: !Bool
 	}
 
+/*
 convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 convertIndex index table_index (Yes tables)
 	= tables.[table_index].[index]
 convertIndex index table_index No
 	= index
+*/
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
 retrieveGlobalDefinition {ste_kind = STE_Imported kind decl_index, ste_def_level, ste_index} requ_kind mod_index
@@ -316,6 +321,15 @@ addLocalFunctionDefsToSymbolTable level from_index to_index is_macro_fun fun_def
 			# fun_defs = {fun_defs & [from_index].fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_IsMacroFun }
 			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
 			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
+
+addLocalDclMacroDefsToSymbolTable :: !Level !Int !Index !Index !*{#*{#FunDef}} !*SymbolTable !*ErrorAdmin -> (!*{#*{#FunDef}}, !*SymbolTable, !*ErrorAdmin)
+addLocalDclMacroDefsToSymbolTable level module_index from_index to_index macro_defs symbol_table error
+	| from_index == to_index
+		= (macro_defs, symbol_table, error)	
+		# (macro_def, macro_defs) = macro_defs![module_index,from_index]
+		# (symbol_table, error) = addDefToSymbolTable level from_index macro_def.fun_symb (STE_DclMacroOrLocalMacroFunction []) symbol_table error
+		# macro_defs = {macro_defs & [module_index].[from_index].fun_info.fi_properties = macro_def.fun_info.fi_properties bitor FI_IsMacroFun }
+		= addLocalDclMacroDefsToSymbolTable level module_index (inc from_index) to_index macro_defs symbol_table error
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
@@ -498,21 +512,33 @@ removeIdentFromSymbolTable level {id_name,id_info} symbol_table
 		= symbol_table <:= (id_info,ste_previous) // ---> ("removeIdentFromSymbolTable", id_name)
 		= symbol_table // ---> ("NO removeIdentFromSymbolTable", id_name)
 
-removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap SymbolTableEntry)
-			-> (!u:{# FunDef}, !.Heap SymbolTableEntry)
-removeLocalsFromSymbolTable level loc_vars (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) defs symbol_table
-	= remove_defs_from_symbol_table level ir_from ir_to defs (removeLocalIdentsFromSymbolTable level loc_vars symbol_table)
+removeLocalDclMacrosFromSymbolTable :: !Level !Index !IndexRange !*{#*{#FunDef}} !*(Heap SymbolTableEntry) -> (!.{#.{#FunDef}}, !.Heap SymbolTableEntry)
+removeLocalDclMacrosFromSymbolTable level module_index {ir_from,ir_to} defs symbol_table
+	= remove_macro_defs_from_symbol_table level ir_from ir_to defs symbol_table
 where
-	remove_defs_from_symbol_table level from_index to_index defs symbol_table
+	remove_macro_defs_from_symbol_table level from_index to_index defs symbol_table
+		| from_index == to_index
+			= (defs, symbol_table)	
+			#! def = defs.[module_index,from_index]
+			   id_info = (toIdent def).id_info
+			   entry = sreadPtr id_info symbol_table
+			| level == entry.ste_def_level
+				= remove_macro_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
+				= remove_macro_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
+
+removeLocalFunctionsFromSymbolTable :: !Level !IndexRange !*{# FunDef} !*(Heap SymbolTableEntry) -> (!.{# FunDef}, !.Heap SymbolTableEntry)
+removeLocalFunctionsFromSymbolTable level {ir_from,ir_to} defs symbol_table
+	= remove_fun_defs_from_symbol_table level ir_from ir_to defs symbol_table
+where
+	remove_fun_defs_from_symbol_table level from_index to_index defs symbol_table
 		| from_index == to_index
 			= (defs, symbol_table)	
 			#! def = defs.[from_index]
 			   id_info = (toIdent def).id_info
 			#  (entry, symbol_table) = readPtr id_info symbol_table
 			| level == entry.ste_def_level
-				= remove_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
-				= remove_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
-
+				= remove_fun_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
+				= remove_fun_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
 newFreeVariable new_var vars=:[free_var=:{fv_def_level,fv_info_ptr}: free_vars]
@@ -601,7 +627,9 @@ where
 instance == STE_Kind
 where
 	(==) (STE_FunctionOrMacro _) STE_DclFunction	= True
+	(==) (STE_FunctionOrMacro _) (STE_DclMacroOrLocalMacroFunction _) = True
 	(==) STE_DclFunction (STE_FunctionOrMacro _)	= True
+	(==) (STE_DclMacroOrLocalMacroFunction _) (STE_FunctionOrMacro _)	= True
 	(==) sk1 sk2 									= equal_constructor sk1 sk2
 
 instance <<< IdentPos

@@ -385,10 +385,12 @@ backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
 	# {bes_varHeap,bes_attrHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n {bes_varHeap=var_heap,bes_attrHeap=attr_var_heap,bes_backEnd=be, bes_attr_number = 0}
 	= (bes_varHeap,bes_attrHeap,bes_backEnd)
 
+import RWSDebug
+
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
 backEndConvertModulesH predefs {fe_icl = 
-	fe_icl =: {icl_name, icl_modification_time, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers},
-	fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions}
+	fe_icl =: {icl_name, icl_functions, icl_common,icl_global_functions,icl_imported_objects,icl_used_module_numbers, icl_modification_time},
+	fe_components, fe_dcls, fe_arrayInstances}
 	main_dcl_module_n backEnd
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
@@ -410,11 +412,7 @@ backEndConvertModulesH predefs {fe_icl =
 
 	#  currentDcl
 	   	=	fe_dcls.[main_dcl_module_n]
-	   typeConversions
-		=	currentModuleTypeConversions icl_common.com_class_defs currentDcl.dcl_common.com_class_defs currentDcl.dcl_conversions
 /*
-	# 	rstypes = reshuffleTypes (size icl_common.com_type_defs) typeConversions {type.td_name.id_name \\ type <-: currentDcl.dcl_common.com_type_defs}
-		types = {type.td_name.id_name \\ type <-: icl_common.com_type_defs}
 	#  backEnd
 		=	backEnd ->>
 				(	"dcl conversions"
@@ -425,14 +423,12 @@ backEndConvertModulesH predefs {fe_icl =
 				,	[selector.sd_symb.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
 				,	"dcl types"
 				,	[type.td_name.id_name \\ type <-: currentDcl.dcl_common.com_type_defs]
-				,	"icl selectors"
+				,	"icl constructors"
 				,	[constructor.cons_symb.id_name \\ constructor <-: icl_common.com_cons_defs]
-				,	"icl fields"
+				,	"icl selectors"
 				,	[selector.sd_symb.id_name \\ selector <-: icl_common.com_selector_defs]
 				,	"icl types"
 				,	[type.td_name.id_name \\ type <-: icl_common.com_type_defs]
-				,	"compare names"
-				,	(rstypes, types)
 				)
 */
 	#! backEnd
@@ -447,20 +443,12 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		=	defineDclModule main_dcl_module_n fe_dcls.[main_dcl_module_n] (backEnd -*-> "defineDclModule(cIclMoIndex)")
 	#! backEnd
-		=	reshuffleTypes (size icl_common.com_type_defs) typeConversions (backEnd -*-> "reshuffleTypes")
-	#! backEnd
 		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers (backEnd -*-> "defineOtherDclModules")
 
 	#! backEnd
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
 	#! backEnd
-		=	declareFunctionSymbols icl_functions (getConversions fe_iclDclConversions) functionIndices fe_globalFunctions (backEnd -*-> "declareFunctionSymbols")
-		with
-			getConversions :: (Optional {#Int}) -> {#Int}
-			getConversions No
-				=	{}
-			getConversions (Yes conversions)
-				=	conversions
+		=	declareFunctionSymbols icl_functions functionIndices icl_global_functions (backEnd -*-> "declareFunctionSymbols")
 	#! backEnd
 		=	declare main_dcl_module_n icl_common (backEnd -*-> "declare (main_dcl_module_n)")
 	#! backEnd
@@ -483,7 +471,7 @@ backEndConvertModulesH predefs {fe_icl =
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | imported.io_is_library])
 				(backEnd -*-> "beDefineImportedObjsAndLibs")
 	#! backEnd
-		=	markExports fe_dcls.[main_dcl_module_n] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs fe_dclIclConversions (backEnd -*-> "markExports")
+		=	markExports fe_dcls.[main_dcl_module_n] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs (backEnd -*-> "markExports")
 			with
 				dcl_common
 					=	currentDcl.dcl_common
@@ -562,49 +550,6 @@ where
 								->	write_to_var_heap ft_type_ptr VI_Empty	
 							_
 								->	identity) be
-
-// move types from their dcl to icl positions
-
-class swapTypes a :: Int Int *a -> *a
-
-instance swapTypes BackEndState where
-//instance swapTypes BackEnd where
-	swapTypes i j be
-		=	appBackEnd (BESwapTypes i j) be
-
-instance swapTypes {{#Char}} where
-	swapTypes i j a
-		=	swap i j a
-
-swap i j a
-	#! iValue = a.[i]
-	#! jValue = a.[j]
-	=	{a & [i] = jValue, [j] = iValue}
-
-reshuffleTypes :: Int {#Int} *a -> *a | swapTypes a
-reshuffleTypes nIclTypes dclIclConversions be
-	=	thd3 (foldStateWithIndexA (swapType nDclTypes) dclIclConversions (idP nDclTypes, idP nIclTypes, be))
-	where
-		nDclTypes
-			=	size dclIclConversions
-
-		idP :: Int -> .{#Int}
-		idP n
-			=	{i \\ i <- [0 .. n-1]}
-
-		swapType :: Int Int Int (*{#Int}, *{#Int},  *a) -> (*{#Int}, *{#Int},  *a) | swapTypes a
-		swapType nDclTypes dclIndex iclIndex state=:(p,p`,be)
-			#! frm
-				=	p.[dclIndex]
-			#! to
-				=	iclIndex
-			| frm == to
-				=	state
-			// otherwise
-				#! frm` = dclIndex
-				#! to` = p`.[iclIndex]
-				#! to` = if (to` >= nDclTypes) frm` to`
-				=	(swap frm` to` p, swap frm to p`, swapTypes frm to be)
 
 :: DeclVarsInput :== Ident
 
@@ -728,21 +673,25 @@ instance declare {#a} | declareWithIndex a & Array {#} a where
 	declare moduleIndex array
 		=	foldStateWithIndexA (\i -> declareWithIndex i moduleIndex) array
 
-declareFunctionSymbols :: {#FunDef} {#Int} [(Int, Int)] IndexRange *BackEndState -> *BackEndState
-declareFunctionSymbols functions iclDclConversions functionIndices globalFunctions backEnd
-	=	foldl (declare iclDclConversions) backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
+declareFunctionSymbols :: {#FunDef} [(Int, Int)] [IndexRange] *BackEndState -> *BackEndState
+declareFunctionSymbols functions functionIndices globalFunctions backEnd
+	=	foldl declare backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
 	where
-		declare iclDclConversions backEnd (functionIndex, componentIndex, function)
-			=	appBackEnd (BEDeclareFunction (functionName function.fun_symb.id_name functionIndex iclDclConversions globalFunctions) 
+		declare backEnd (functionIndex, componentIndex, function)
+			=	appBackEnd (BEDeclareFunction (functionName function.fun_symb.id_name functionIndex globalFunctions) 
 					function.fun_arity functionIndex componentIndex) backEnd
 			where
-				functionName :: {#Char} Int {#Int} IndexRange -> {#Char}
-				functionName name functionIndex iclDclConversions {ir_from, ir_to}
-//				| trace_t ("|"+++toString functionIndex)
-					| functionIndex >= ir_to || functionIndex < ir_from
-						=	(name +++ ";" +++ toString iclDclConversions.[functionIndex])
-					// otherwise
+				functionName :: {#Char} Int [IndexRange] -> {#Char}
+				functionName name functionIndex icl_global_functions
+//					| trace_t ("|"+++toString functionIndex)
+					| index_in_ranges functionIndex icl_global_functions
 						=	name
+						=	(name +++ ";" +++ toString functionIndex)
+					where
+						index_in_ranges index [{ir_from, ir_to}:ranges]
+							= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
+						index_in_ranges index []
+							= False
 
 // move to backendsupport
 foldStateWithIndexRangeA function frm to array
@@ -850,48 +799,7 @@ declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
 				// otherwise
 					=	name +++ ";" +++ toString functionIndex
 
-currentModuleTypeConversions :: {#ClassDef} {#ClassDef} (Optional ConversionTable) -> {#Int}
-currentModuleTypeConversions iclClasses dclClasses (Yes conversionTable)
-	// sanity check ...
-	| sort [dclClass.class_dictionary.ds_index \\ dclClass <-: dclClasses]
-				<> [size typeConversions .. size typeConversions + size dclClasses - 1]
-		=	abort "backendconvert, currentModuleTypeConversions wrong index range for dcl dictionary types"
-	// ... sanity check
-	| nDclClasses == 0
-		=	typeConversions
-	// otherwise
-		=	{createArray (nDclTypes + nDclClasses) NoIndex
-				& [i] = typeConversion
-					\\ typeConversion <-: typeConversions & i <- [0..]}
-			:-  foldStateWithIndexA (updateDictionaryTypeIndex classConversions) classConversions
-	where
-		typeConversions
-			=	conversionTable.[cTypeDefs]
-		nDclTypes
-			=	size typeConversions
-		classConversions
-			=	conversionTable.[cClassDefs]
-		nDclClasses
-			=	size classConversions
-
-		updateDictionaryTypeIndex :: {#Int} Int Int *{#Int} -> *{#Int}
-		updateDictionaryTypeIndex classConversions dclClassIndex iclClassIndex allTypeConversions
-			// sanity check ...
-			# (oldIndex, allTypeConversions)
-				=	uselect allTypeConversions dclTypeIndex
-			| oldIndex <> NoIndex
-				=	abort "backendconvert, updateDictionaryTypeIndex wrong index overwritten"
-			// ... sanity chechk
-			=	{allTypeConversions & [dclTypeIndex] = iclTypeIndex}
-			where
-				dclTypeIndex
-					=	dclClasses.[dclClassIndex].class_dictionary.ds_index
-				iclClassIndex
-					=	classConversions.[dclClassIndex]
-				iclTypeIndex
-					=	iclClasses.[iclClassIndex].class_dictionary.ds_index
-currentModuleTypeConversions _ _ No
-	=	{}
+import StdDebug
 
 /*
 declareCurrentDclModuleTypes :: {#CheckedTypeDef} {#Int} -> BackEnder
@@ -1338,16 +1246,12 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_symb.id_name, index, type)))
 			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
 	where
-		cafness :: DefOrImpFunKind -> Int
-		cafness (FK_DefFunction _)
+		cafness :: FunKind -> Int
+		cafness (FK_Function _)
 			=	BEIsNotACaf
-		cafness (FK_ImpFunction _)
+		cafness FK_Macro
 			=	BEIsNotACaf
-		cafness FK_DefMacro
-			=	BEIsNotACaf
-		cafness FK_ImpMacro
-			=	BEIsNotACaf
-		cafness FK_ImpCaf
+		cafness FK_Caf
 			=	BEIsACaf
 		cafness funKind
 			=	BEIsNotACaf // <<- ("backendconvert, cafness: unknown fun kind", funKind)
@@ -2222,13 +2126,23 @@ getVariableSequenceNumber varInfoPtr be
 		vi
 			-> abort "getVariableSequenceNumber" // <<- vi
 
-markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} (Optional {#Int}) -> BackEnder
-markExports {dcl_conversions = Yes conversionTable} dclClasses dclTypes iclClasses iclTypes (Yes functionConversions)
-	=	foldStateA (\icl -> beExportType icl icl) conversionTable.[cTypeDefs]
-	o	foldStateWithIndexA beExportConstructor conversionTable.[cConstructorDefs]
-	o	foldStateWithIndexA beExportField conversionTable.[cSelectorDefs]
-	o	foldStateWithIndexA (exportDictionary iclClasses iclTypes) conversionTable.[cClassDefs]
-	o	foldStateWithIndexA beExportFunction functionConversions
+foldStateWithIndexTwice function n
+	:== foldStateWithIndexTwice 0
+	where
+		foldStateWithIndexTwice index
+			| index == n
+				=	identity
+			// otherwise
+				=	function index index
+				o`	foldStateWithIndexTwice (index+1)
+
+markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} -> BackEnder
+markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_defs,com_class_defs}} dclClasses dclTypes iclClasses iclTypes
+	=	foldStateWithIndexTwice beExportType (size com_type_defs)
+	o	foldStateWithIndexTwice beExportConstructor (size com_cons_defs)
+	o	foldStateWithIndexTwice beExportField (size com_selector_defs)
+	o	foldStateWithIndexTwice (exportDictionary iclClasses iclTypes) (size com_class_defs)
+	o	foldStateWithIndexTwice beExportFunction (size dcl_functions)
 	where
 		exportDictionary :: {#ClassDef} {#CheckedTypeDef} Index Index -> BackEnder
 		exportDictionary iclClasses iclTypes dclClassIndex iclClassIndex
@@ -2245,5 +2159,5 @@ markExports {dcl_conversions = Yes conversionTable} dclClasses dclTypes iclClass
 				exportDictionaryField :: FieldSymbol -> BackEnder
 				exportDictionaryField {fs_index}
 					=	beExportField (-1) fs_index	// remove -1 hack
-markExports _ _ _ _ _ _
+markExports _ _ _ _ _
 	=	identity

@@ -8,15 +8,16 @@ import syntax, checksupport
 
 :: PredefSymbolsForTransform = { predef_alias_dummy :: !PredefinedSymbol, predef_and :: !PredefinedSymbol, predef_or :: !PredefinedSymbol };
 
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
+partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*{#DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																   -> (!*{#FunDef},!*{#*{#FunDef}},!.{#DclModule},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
 
-partitionateMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-	-> (!*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
+partitionateIclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*{#DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																   -> (!*{#FunDef},!*{#*{#FunDef}},!.{#DclModule},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
+
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*{#DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																-> (!*{!Group}, !*{#FunDef},!*{#*{#FunDef}},!.{#DclModule},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
 
 ::	CopiedLocalFunctions
-
-// AA..
 
 ::	CollectState =
 	{	cos_var_heap	:: !.VarHeap
@@ -27,8 +28,6 @@ partitionateMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{# FunDef}
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
-
-// ..AA
 
 ::	UnfoldState =
 	{	us_var_heap				:: !.VarHeap
@@ -41,7 +40,7 @@ determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Exp
 ::	UnfoldInfo =
 	{	ui_handle_aci_free_vars	:: !AciFreeVarHandleMode,
 		ui_convert_module_n :: !Int, // -1 if no conversion
-		ui_conversion_table :: !Optional ConversionTable
+		ui_conversion_table :: !Optional {#Int}
 	}
 
 :: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem

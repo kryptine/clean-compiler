@@ -9,16 +9,15 @@ import syntax, checksupport
 	,	es_calls			:: ![FunCall]
 	,	es_dynamics			:: ![ExprInfoPtr]
 	,	es_fun_defs			:: !.{# FunDef}
-// MV ...
  	,	es_dynamic_expr_count	:: !Int				// used to give each dynamic expr an unique id
-// ... MV
 	}
 	
 ::	ExpressionInput =
 	{	ei_expr_level	:: !Level
-	,	ei_fun_index	:: !Index
+	,	ei_fun_index	:: !FunctionOrMacroIndex
 	,	ei_fun_level	:: !Level
 	,	ei_mod_index	:: !Index
+	,	ei_local_functions_index_offset :: !Int
 	}
 
 checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState

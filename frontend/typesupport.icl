@@ -1274,6 +1274,7 @@ where
 			= writeWithinBrackets "(" ")" file opt_beautifulizer
 									(clearProperty (setProperty form cArrowSeparator) cBrackets, [arg_type, res_type])
 			= writeType file opt_beautifulizer (setProperty form (cBrackets bitor cArrowSeparator), [arg_type, res_type])
+
 	writeType file opt_beautifulizer (form, type :@: types)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)

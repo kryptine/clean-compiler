@@ -41,23 +41,21 @@ cConstructorDefs		:== 1
 cSelectorDefs			:== 2
 cClassDefs				:== 3
 cMemberDefs				:== 4
-cGenericDefs			:== 5 // AA
+cGenericDefs			:== 5
 cInstanceDefs			:== 6
 cFunctionDefs			:== 7
 cMacroDefs				:== 8
 
-cConversionTableSize	:== 9 // AA
+cConversionTableSize	:== 9
 
 ::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
-//	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
 	,	com_cons_defs		:: !.{# ConsDef}
 	,	com_selector_defs	:: !.{# SelectorDef}
 	,	com_class_defs		:: !.{# ClassDef}
 	,	com_member_defs		:: !.{# MemberDef}
 	,	com_instance_defs	:: !.{# ClassInstance}
-//	,	com_instance_types	:: !.{ SymbolType}
-	,	com_generic_defs	:: !.{# GenericDef} // AA
+	,	com_generic_defs	:: !.{# GenericDef}
 	}
 
 ::	Declarations = {
@@ -88,7 +86,8 @@ cConversionTableSize	:== 9 // AA
 ::	IclModule  =
 	{	icl_name				:: !Ident
 	,	icl_functions			:: !.{# FunDef }
-	,	icl_instances			:: !IndexRange
+	,	icl_global_functions	:: ![IndexRange]
+	,	icl_instances			:: ![IndexRange]
 	,	icl_specials			:: !IndexRange
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
@@ -108,14 +107,15 @@ cConversionTableSize	:== 9 // AA
 	,	dcl_specials		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
 	,	dcl_sizes			:: !{# Int}
+	,	dcl_dictionary_info	:: !DictionaryInfo
 	,	dcl_declared		:: !Declarations
-	,	dcl_conversions		:: !Optional ConversionTable
-// RWS ...	,	dcl_is_system		:: !Bool
+	,	dcl_macro_conversions :: !Optional {#Index}
 	,	dcl_module_kind		:: !ModuleKind
 	,	dcl_modification_time:: !{#Char}
-// ... RWS
 	,	dcl_imported_module_numbers :: !NumberSet
 	}
+
+::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
 class Erroradmin state
 where
@@ -149,30 +149,32 @@ instance <<< IdentPos, ExplImpInfo, DeclarationInfo
 	,	ef_cons_defs		:: !.{# ConsDef}
 	,	ef_member_defs		:: !.{# MemberDef}
 	,	ef_class_defs		:: !.{# ClassDef}
-	,	ef_generic_defs		:: !.{# GenericDef} // AA
+	,	ef_generic_defs		:: !.{# GenericDef}
 	,	ef_modules			:: !.{# DclModule}
+	,	ef_macro_defs		:: !.{#.{#FunDef}}
 	,	ef_is_macro_fun		:: !Bool
 	}
 
-convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
+//convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
-//retrieveAndRemoveImportsFromSymbolTable :: !Index  ![(.a,.Declarations)] !Int ![Declaration] !*ExplImpInfos !*(Heap SymbolTableEntry)
-//		-> (!Int, ![Declaration], !.ExplImpInfos, !.Heap SymbolTableEntry);
+
 addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !Bool !*{#FunDef} !*SymbolTable !*ErrorAdmin -> (!*{# FunDef}, !*SymbolTable, !*ErrorAdmin)
+addLocalDclMacroDefsToSymbolTable :: !Level !Int !Index !Index !*{#*{#FunDef}} !*SymbolTable !*ErrorAdmin -> (!*{#*{#FunDef}}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
 addDeclarationsOfDclModToSymbolTable :: .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
 addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
 addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*CheckState -> (!Bool, !.CheckState)
+
 removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
-removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap SymbolTableEntry)
-			-> (!u:{# FunDef}, !.Heap SymbolTableEntry)
+removeLocalFunctionsFromSymbolTable :: !Level !IndexRange !*{# FunDef} !*(Heap SymbolTableEntry) -> (!.{# FunDef}, !.Heap SymbolTableEntry)
+removeLocalDclMacrosFromSymbolTable :: !Level !Index !IndexRange !*{#*{#FunDef}} !*(Heap SymbolTableEntry) -> (!.{#.{#FunDef}}, !.Heap SymbolTableEntry)
 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
 

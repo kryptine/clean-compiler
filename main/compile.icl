@@ -8,20 +8,16 @@ import portToNewSyntax
 //import RWSDebug
 
 ::	CoclOptions =
-	{
-		moduleName:: {#Char}
+	{	moduleName:: {#Char}
 	,	pathName ::{#Char}
 	,	errorPath:: {#Char}
 	,	errorMode::	Int
 	,	outPath:: {#Char}
 	,	outMode::	Int
 	,	searchPaths:: SearchPaths
-// MV ...
 	,	compile_for_dynamics	:: !Bool
-// ... MV
-// DvA ...
+	,	support_generics :: !Bool
 	,	compile_with_fusion		:: !Bool
-// ... DvA
 	}
 
 InitialCoclOptions =
@@ -32,17 +28,14 @@ InitialCoclOptions =
 	,	outPath=	"out"
 	,	outMode=	FWriteText
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
-// MV ...
 	,	compile_for_dynamics	= False
-// ... MV
-// DvA ...
+	, 	support_generics = False
 	,	compile_with_fusion		= False
-// ... DvA
 	}
 
 :: DclCache = {
 	dcl_modules::!{#DclModule},
-	functions_and_macros::!{#FunDef},
+	functions_and_macros::!.{#.{#FunDef}},
 	predef_symbols::!.PredefinedSymbols,
 	hash_table::!.HashTable,
 	heaps::!.Heaps
@@ -85,18 +78,14 @@ parseCommandLine ["-id",compiler_id_string : args] options
 	# compiler_id=toInt compiler_id_string
 	| set_compiler_id compiler_id==compiler_id
 		= parseCommandLine args options
-// MV ...
 parseCommandLine [arg1=:"-dynamics":args] options
-	// generates for each icl an tcl (which contains the type information for that module)
-	# (args,modules,options)=	parseCommandLine args {options & compile_for_dynamics = True}
-	= (args,modules,options)
-// ... MV
-// DvA ...
+	// generates for each .icl module a .tcl file (which contains the type information for that module)
+	=	parseCommandLine args {options & compile_for_dynamics = True}
+parseCommandLine [arg1=:"-generics":args] options
+    = parseCommandLine args {options & support_generics = True}
 parseCommandLine [arg1=:"-fusion":args] options
 	// switch on fusion transformations
-	# (args,modules,options)=	parseCommandLine args {options & compile_with_fusion = True}
-	= (args,modules,options)
-// ... DvA
+	=	parseCommandLine args {options & compile_with_fusion = True}
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -250,7 +239,7 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	| not closed
 		=	abort ("couldn't close error file \"" +++ options.errorPath +++ "\"\n")
 	| success
-		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_conversions=No}
+		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_macro_conversions=No}
 		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
 		# cache={dcl_modules=cached_dcl_mods,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}

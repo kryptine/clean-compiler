@@ -30,15 +30,32 @@ partionateAndExpandTypes :: !NumberSet !Index !*CommonDefs !*{#DclModule} !*Type
 	-> (!TypeGroups, !*{# CommonDefs}, !*TypeDefInfos, !*CommonDefs, !*{#DclModule}, !*TypeHeaps, !*ErrorAdmin)
 partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{com_type_defs,com_class_defs} dcl_modules type_heaps error
 	#! nr_of_modules = size dcl_modules
-	#! nr_of_types_in_icl_mod = size com_type_defs - size com_class_defs
+//	#! nr_of_types_in_icl_mod = size com_type_defs - size com_class_defs
+	#! n_exported_dictionaries = size dcl_modules.[main_dcl_module_index].dcl_common.com_class_defs
+	#! index_of_first_not_exported_type_or_dictionary = size dcl_modules.[main_dcl_module_index].dcl_common.com_type_defs
+	#! n_exported_icl_types = index_of_first_not_exported_type_or_dictionary - n_exported_dictionaries
+	#! n_types_without_not_exported_dictionaries = size com_type_defs - (size com_class_defs - n_exported_dictionaries)
 	# (dcl_type_defs, dcl_modules, new_type_defs, new_marks, type_def_infos)
-		= copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod nr_of_modules (com_type_defs, dcl_modules)
+		= copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules (com_type_defs, dcl_modules)
 
 	  pi = {pi_marks = new_marks, pi_type_defs = new_type_defs, pi_type_def_infos = type_def_infos, 
 			pi_next_num = 0, pi_deps = [], pi_next_group_num = 0, pi_groups = [], pi_error = error }
 
 	  {pi_error,pi_groups,pi_type_defs,pi_type_def_infos} = iFoldSt partionate_type_defs 0 nr_of_modules pi
-
+		with
+			partionate_type_defs mod_index pi=:{pi_marks}
+				#! nr_of_typedefs_to_be_examined = size pi_marks.[mod_index]
+				| mod_index == main_dcl_module_index
+					# pi = iFoldSt (partitionate_type_def mod_index) 0 n_exported_icl_types pi
+					= iFoldSt (partitionate_type_def mod_index) index_of_first_not_exported_type_or_dictionary nr_of_typedefs_to_be_examined pi
+					= iFoldSt (partitionate_type_def mod_index) 0 nr_of_typedefs_to_be_examined pi
+			where
+				partitionate_type_def module_index type_index pi=:{pi_marks}
+					# mark = pi_marks.[module_index, type_index]
+					| mark == cNotPartitionated
+						# (_, pi) = partitionateTypeDef {gi_module = module_index, gi_index = type_index} pi
+						= pi
+						= pi
 	| not pi_error.ea_ok
 		# (icl_type_defs, type_defs) = replace pi_type_defs main_dcl_module_index dcl_type_defs
 		  (dcl_modules, common_defs) = update_modules_and_create_commondefs used_module_numbers type_defs nr_of_modules dcl_modules
@@ -50,37 +67,26 @@ partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{
 		  (dcl_modules, common_defs) = update_modules_and_create_commondefs used_module_numbers type_defs nr_of_modules dcl_modules
 		= (reverse pi_groups, common_defs, pi_type_def_infos, {icl_common & com_type_defs = icl_type_defs}, dcl_modules, type_heaps, error)
 where
-	copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod nr_of_modules  (icl_type_defs, dcl_modules)
+	copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules  (icl_type_defs, dcl_modules)
 		# type_defs 		= { {}	\\ module_nr <- [1..nr_of_modules] }
 		  marks				= { {}	\\ module_nr <- [1..nr_of_modules] }
 	  	  type_def_infos	= { {}	\\ module_nr <- [1..nr_of_modules] }
-		= iFoldSt (copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod) 0 nr_of_modules
+		= iFoldSt (copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries) 0 nr_of_modules
 				(icl_type_defs, dcl_modules, type_defs, marks, type_def_infos)
 	where
-		copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod module_index 
+		copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries module_index 
 						(icl_type_defs, dcl_modules, type_defs, marks, type_def_infos)
 			| inNumberSet module_index used_module_numbers
 				# ({com_type_defs,com_class_defs}, dcl_modules) = dcl_modules![module_index].dcl_common
 				| module_index == main_dcl_module_index
 					= ( { type_def \\ type_def <-: com_type_defs }, dcl_modules, { type_defs & [module_index] = icl_type_defs },
-							{ marks				& [module_index] = createArray nr_of_types_in_icl_mod cNotPartitionated },
-							{ type_def_infos	& [module_index] = createArray nr_of_types_in_icl_mod EmptyTypeDefInfo })
+							{ marks				& [module_index] = createArray n_types_without_not_exported_dictionaries cNotPartitionated },
+							{ type_def_infos	& [module_index] = createArray n_types_without_not_exported_dictionaries EmptyTypeDefInfo })
 					# nr_of_types = size com_type_defs - size com_class_defs
 					= (	icl_type_defs, dcl_modules,  { type_defs & [module_index] = { type_def \\ type_def <-: com_type_defs }},
 							{ marks				& [module_index] = createArray nr_of_types cNotPartitionated },
 							{ type_def_infos	& [module_index] = createArray nr_of_types EmptyTypeDefInfo })
 				= (icl_type_defs, dcl_modules, type_defs, marks,type_def_infos)
-
-	partionate_type_defs mod_index pi=:{pi_marks}
-		#! nr_of_typedefs_to_be_examined = size pi_marks.[mod_index]
-		= iFoldSt (partitionate_type_def mod_index) 0 nr_of_typedefs_to_be_examined pi
-	where
-		partitionate_type_def module_index type_index pi=:{pi_marks}
-			# mark = pi_marks.[module_index, type_index]
-			| mark == cNotPartitionated
-				# (_, pi) = partitionateTypeDef {gi_module = module_index, gi_index = type_index} pi
-				= pi
-				= pi
 
 	expand_synonym_types_of_group main_dcl_module_index group_members (type_defs, main_dcl_type_defs, type_heaps, error)
 		= foldSt (expand_synonym_type main_dcl_module_index) group_members (type_defs, main_dcl_type_defs, type_heaps, error)
@@ -800,9 +806,9 @@ where
 		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 		= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
 
-checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet !IndexRange !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
+checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
 	!*TypeVarHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
-checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_module_numbers icl_fun_def_range common_defs icl_fun_defs dcl_modules
+checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs icl_fun_defs dcl_modules
 			type_def_infos class_infos type_var_heap error
 	# as =
 	  	{	as_td_infos			= type_def_infos
@@ -812,16 +818,19 @@ checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_
 		}
 
 	# (icl_fun_defs, dcl_modules, class_infos, as)
-		= iFoldSt (check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_range common_defs)
+		= iFoldSt (check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs)
 						0 (size common_defs) (icl_fun_defs, dcl_modules, class_infos, as)
 	= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, as.as_error)
 where
-	check_kinds_of_module first_uncached_module main_module_index used_module_numbers {ir_from,ir_to} common_defs module_index
+	check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs module_index
 					(icl_fun_defs, dcl_modules, class_infos, as) 
 		| inNumberSet module_index used_module_numbers
 			| module_index == main_module_index
 				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
-				  (icl_fun_defs, class_infos, as) = iFoldSt (check_kinds_of_icl_fuction common_defs) ir_from ir_to (icl_fun_defs, class_infos, as)
+				# (icl_fun_defs, class_infos, as) = foldSt (check_kinds_of_icl_fuctions common_defs) icl_fun_def_ranges (icl_fun_defs, class_infos, as)
+					with
+						check_kinds_of_icl_fuctions common_defs {ir_from,ir_to} (icl_fun_defs, class_infos, as)
+							= iFoldSt (check_kinds_of_icl_fuction common_defs) ir_from ir_to (icl_fun_defs, class_infos, as)
 				= (icl_fun_defs, dcl_modules, class_infos, as)
 			| module_index >= first_uncached_module
 				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as

@@ -309,38 +309,24 @@ where
 		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
 	
 :: TypesCorrespondState =
-		{	tc_type_vars
-				:: !.HeapWithNumber TypeVarInfo
-		,	tc_attr_vars
-				:: !.HeapWithNumber AttrVarInfo
-		,	tc_ignore_strictness
-				:: !Bool
+		{	tc_type_vars :: !.HeapWithNumber TypeVarInfo
+		,	tc_attr_vars :: !.HeapWithNumber AttrVarInfo
+		,	tc_ignore_strictness :: !Bool
 		}
 
 :: TypesCorrespondMonad
 		:==	!*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
 
 :: ExpressionsCorrespondState =
-		{	ec_correspondences	// ec_correspondences.[i]==j <=> (functions i and j are already compared 
-				::	!.{# Int }	//									|| j==cNoCorrespondence)
-		,	ec_var_heap
-				::	!.HeapWithNumber VarInfo
-		,	ec_expr_heap
-				::	!.ExpressionHeap
-		,	ec_icl_functions
-				::	!.{# FunDef }
-		,	ec_error_admin
-				::	!.ErrorAdmin
-		,	ec_tc_state
-				::	!.TypesCorrespondState
-		,	ec_untransformed
-				::	!{! FunctionBody }
-		,	ec_function_conversions
-				::	!Conversions
-		,	ec_main_dcl_module_n
-				::	!Int
-		,	ec_dcl_macro_range
-				::	!IndexRange
+		{	ec_icl_correspondences ::	!.{# Int },
+			ec_dcl_correspondences ::	!.{# Int }
+		,	ec_var_heap ::	!.HeapWithNumber VarInfo
+		,	ec_expr_heap ::	!.ExpressionHeap
+		,	ec_icl_functions :: !.{#FunDef}
+		,	ec_macro_defs :: !.{#.{#FunDef}}
+		,	ec_error_admin ::	!.ErrorAdmin
+		,	ec_tc_state ::	!.TypesCorrespondState
+		,	ec_main_dcl_module_n ::	!Int
 		}
 		
 :: ExpressionsCorrespondMonad
@@ -349,10 +335,8 @@ where
 :: Conversions :== {#Index}
 
 :: HeapWithNumber a
-	=	{	hwn_heap
-				::	!.Heap a
-		,	hwn_number
-				::	!Int
+	=	{	hwn_heap ::	!.Heap a
+		,	hwn_number ::	!Int
 		}
 
 :: OptionalCorrespondenceNumber = CorrespondenceNumber !Int | Unbound
@@ -366,9 +350,9 @@ CEC_ContextNotOK :== -3
 CEC_AttrEnvNotOK :== -4
 
 class t_corresponds a :: !a !a -> *TypesCorrespondMonad
-	// whether two types correspond
 class e_corresponds a :: !a !a -> ExpressionsCorrespondMonad
 	// check for correspondence of expressions
+	// whether two types correspond
 
 class getIdentPos a :: a -> IdentPos
 
@@ -378,136 +362,78 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !{#Int} !{!FunctionBody} !Int !DclModule !*IclModule !*Heaps !*ErrorAdmin 
-				-> (!.IclModule,!.Heaps,!.ErrorAdmin)
-compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n main_dcl_module 
-			icl_module heaps error_admin
+compareDefImp :: !Int !DclModule !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
+								  -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
+compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=No} n_exported_global_functions icl_module macro_defs heaps error_admin
+	= (icl_module, macro_defs,heaps, error_admin)
+compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=Yes macro_conversion_table} n_exported_global_functions icl_module macro_defs heaps error_admin
+//	| print_function_body_array icl_module.icl_functions
+//		&& print_function_body_array macro_defs.[main_dcl_module_n]
 
-	= case main_dcl_module.dcl_conversions of
-		No	-> (icl_module, heaps, error_admin)
-		Yes conversion_table
-			# {dcl_functions, dcl_macros, dcl_common} = main_dcl_module
-			  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs}}
-					= icl_module
-			  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
-			  		= heaps
-			  { com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
-				com_selector_defs=icl_com_selector_defs, com_class_defs = icl_com_class_defs,
-				com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
-					= icl_common
-			  comp_st
-			  	=	{	comp_type_var_heap	= th_vars
-			  		,	comp_attr_var_heap	= th_attrs
-			  		,	comp_error			= error_admin
-			  		}
+	# {dcl_functions,dcl_macros,dcl_common} = main_dcl_module
+	  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs}}
+			= icl_module
+	  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
+	  		= heaps
+	  { com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
+		com_selector_defs=icl_com_selector_defs, com_class_defs = icl_com_class_defs,
+		com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
+			= icl_common
+	  comp_st
+	  	=	{	comp_type_var_heap	= th_vars
+	  		,	comp_attr_var_heap	= th_attrs
+	  		,	comp_error			= error_admin
+	  		}
 
-			  (icl_com_type_defs, icl_com_cons_defs, comp_st)
-			  		= compareTypeDefs main_dcl_module.dcl_sizes copied_type_defs	dcl_common.com_type_defs dcl_common.com_cons_defs
-			  																		icl_com_type_defs icl_com_cons_defs comp_st
-			  (icl_com_class_defs, icl_com_member_defs, comp_st)
-			  		= compareClassDefs main_dcl_module.dcl_sizes copied_class_defs 	dcl_common.com_class_defs dcl_common.com_member_defs
-			  																		icl_com_class_defs icl_com_member_defs comp_st
+	  (icl_com_type_defs, icl_com_cons_defs, comp_st)
+	  		= compareTypeDefs main_dcl_module.dcl_sizes copied_type_defs	dcl_common.com_type_defs dcl_common.com_cons_defs
+	  																		icl_com_type_defs icl_com_cons_defs comp_st
+	  (icl_com_class_defs, icl_com_member_defs, comp_st)
+	  		= compareClassDefs main_dcl_module.dcl_sizes copied_class_defs 	dcl_common.com_class_defs dcl_common.com_member_defs
+	  																		icl_com_class_defs icl_com_member_defs comp_st
 
-			  (icl_com_instance_defs, comp_st)
-			  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs comp_st
+	  (icl_com_instance_defs, comp_st)
+	  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs comp_st
 
+	  {	comp_type_var_heap = th_vars, comp_attr_var_heap = th_attrs, comp_error = error_admin } = comp_st
 
-/*
-			  (icl_com_type_defs, tc_state, error_admin)
-					= compareWithConversions 
-						size_uncopied_icl_defs.[cTypeDefs] conversion_table.[cTypeDefs]
-//						dcl_common.com_unexpanded_type_defs icl_com_type_defs tc_state error_admin
-						dcl_common.com_type_defs icl_com_type_defs tc_state error_admin
-			  (icl_com_cons_defs, tc_state, error_admin)
-					= compareWithConversions 
-						size_uncopied_icl_defs.[cConstructorDefs] conversion_table.[cConstructorDefs]
-						dcl_common.com_cons_defs icl_com_cons_defs tc_state error_admin
-			  (icl_com_selector_defs, tc_state, error_admin)
-					= compareWithConversions
-						size_uncopied_icl_defs.[cSelectorDefs] conversion_table.[cSelectorDefs]
-						dcl_common.com_selector_defs icl_com_selector_defs tc_state error_admin
-			  (icl_com_class_defs, tc_state, error_admin)
-					= compareWithConversions
-						size_uncopied_icl_defs.[cClassDefs] conversion_table.[cClassDefs]
-						dcl_common.com_class_defs icl_com_class_defs tc_state error_admin
-			  (icl_com_member_defs, tc_state, error_admin)
-					= compareWithConversions
-						size_uncopied_icl_defs.[cMemberDefs] conversion_table.[cMemberDefs]
-						dcl_common.com_member_defs icl_com_member_defs tc_state error_admin
-			  (icl_com_instance_defs, tc_state, error_admin)
-					= compareWithConversions
-						size_uncopied_icl_defs.[cInstanceDefs] conversion_table.[cInstanceDefs]
-						dcl_common.com_instance_defs icl_com_instance_defs tc_state error_admin
-*/
+	  tc_state
+	  		=	{ tc_type_vars = initial_hwn th_vars
+				, tc_attr_vars = initial_hwn th_attrs
+				, tc_ignore_strictness = False
+				}
+	  (icl_functions, macro_defs, hp_var_heap, hp_expression_heap, tc_state, error_admin)
+			= compareMacrosWithConversion main_dcl_module_n macro_conversion_table dcl_macros icl_functions macro_defs hp_var_heap hp_expression_heap tc_state error_admin
+	  (icl_functions, tc_state, error_admin)
+	  		= compareFunctionTypes n_exported_global_functions dcl_functions icl_functions tc_state error_admin
+	  { tc_type_vars, tc_attr_vars } 
+	   		= tc_state
+	  icl_common
+	  		= { icl_common & com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
+	  			com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
+	  			com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
+	  heaps
+	  		= { hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap,
+	  			hp_type_heaps = { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}}
+	= ({ icl_module & icl_common = icl_common, icl_functions = icl_functions },macro_defs,heaps, error_admin )
 
-			  {	comp_type_var_heap = th_vars, comp_attr_var_heap = th_attrs, comp_error = error_admin } = comp_st
+compareFunctionTypes n_exported_global_functions dcl_fun_types icl_functions tc_state error_admin
+	= iFoldSt (compareTwoFunctionTypes dcl_fun_types) 0 n_exported_global_functions (icl_functions, tc_state, error_admin)
 
-			  tc_state
-			  		=	{ tc_type_vars = initial_hwn th_vars
-						, tc_attr_vars = initial_hwn th_attrs
-						, tc_ignore_strictness = False
-						}
-			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
-					= compareMacrosWithConversion main_dcl_module_n
-												conversion_table.[cMacroDefs] conversion_table.[cFunctionDefs]
-												dcl_macros untransformed
-								 				icl_functions hp_var_heap hp_expression_heap tc_state error_admin
-			  (icl_functions, tc_state, error_admin)
-			  		= compareFunctionTypesWithConversions conversion_table.[cFunctionDefs]
-			  			dcl_functions icl_functions tc_state error_admin
-			  { tc_type_vars, tc_attr_vars } 
-			   		= tc_state
-			  icl_common
-			  		= { icl_common & com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
-			  			com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
-			  			com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
-			  heaps
-			  		= { hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap,
-			  			hp_type_heaps = { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}}
-			-> ({ icl_module & icl_common = icl_common, icl_functions = icl_functions },
-					heaps, error_admin )
-
-compareWithConversions size_uncopied_icl_defs conversions dclDefs iclDefs tc_state error_admin 
-	= iFoldSt (compareWithConversion size_uncopied_icl_defs conversions dclDefs) 0 (size conversions)
-			(iclDefs, tc_state, error_admin)
-
-compareWithConversion :: !Int !{#Int} !(d c) !Int !(!u:(b c), !*TypesCorrespondState, !*ErrorAdmin)
-						-> (!u:(b c), !.TypesCorrespondState, !.ErrorAdmin)
-//1.3
-						| Array b & Array d & getIdentPos , select_u , t_corresponds , uselect_u c
-//3.1
-/*2.0
-						| Array b c & Array d c & t_corresponds, getIdentPos c
-0.2*/
-compareWithConversion size_uncopied_icl_defs conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
-	# icl_index = conversions.[dclIndex]
-	| icl_index>=size_uncopied_icl_defs
-		= (iclDefs, tc_state, error_admin)
-	# (iclDef, iclDefs) = iclDefs![icl_index]
-	  (corresponds, tc_state) = t_corresponds dclDefs.[dclIndex] iclDef tc_state
-	| corresponds
-		= (iclDefs, tc_state, error_admin)
-	= generate_error error_message iclDef iclDefs tc_state error_admin
-
-compareFunctionTypesWithConversions conversions	dcl_fun_types icl_functions tc_state error_admin
-	= iFoldSt (compareTwoFunctionTypes conversions dcl_fun_types) 0 (size conversions)
-				(icl_functions, tc_state, error_admin)
-
-compareTwoFunctionTypes :: !{#Int} !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondState,!*ErrorAdmin) 
+compareTwoFunctionTypes :: /*!{#Int}*/ !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondState,!*ErrorAdmin) 
 						-> (!v:{#FunDef},!.TypesCorrespondState,!.ErrorAdmin) , [u <= v]
-compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
-	# (fun_def=:{fun_type, fun_priority}, icl_functions) = icl_functions![conversions.[dclIndex]]
+compareTwoFunctionTypes /*conversions*/	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
+	# (fun_def=:{fun_type, fun_priority}, icl_functions) = icl_functions![dclIndex]
 	= case fun_type of
 		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
 		Yes icl_symbol_type
-			# {ft_type=dcl_symbol_type, ft_priority} = dcl_fun_types.[dclIndex]
-			  tc_state
-			  		= init_symbol_type_vars dcl_symbol_type icl_symbol_type tc_state
+			# {ft_type=dcl_symbol_type, ft_priority,ft_symb} = dcl_fun_types.[dclIndex]			
+			# tc_state = init_symbol_type_vars dcl_symbol_type icl_symbol_type tc_state
 			  (corresponds, tc_state)
 					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
 			| corresponds && fun_priority==ft_priority
 				-> (icl_functions, tc_state, error_admin)
-			-> generate_error error_message fun_def icl_functions tc_state error_admin
+			-> generate_error ErrorMessage fun_def icl_functions tc_state error_admin
 
 symbolTypesCorrespond :: !SymbolType !SymbolType !*TypeHeaps -> (!ComparisionErrorCode, !.TypeHeaps)
 symbolTypesCorrespond symbol_type_1 symbol_type_2 type_heaps=:{th_vars, th_attrs}
@@ -564,34 +490,33 @@ generate_error message iclDef iclDefs tc_state error_admin
 	  error_admin = checkError ident_pos.ip_ident message error_admin
 	= (iclDefs, tc_state, popErrorAdmin error_admin)
 
-compareMacrosWithConversion main_dcl_module_n conversions function_conversions macro_range untransformed
-			icl_functions var_heap expr_heap tc_state error_admin
-	#! nr_of_functions = size icl_functions
-	# correspondences = createArray nr_of_functions cNoCorrespondence
-	  ec_state = { ec_correspondences = correspondences, ec_var_heap = initial_hwn var_heap, 
-	  				ec_expr_heap = expr_heap, ec_icl_functions = icl_functions,
+compareMacrosWithConversion main_dcl_module_n conversions macro_range icl_functions macro_defs var_heap expr_heap tc_state error_admin
+	#! n_icl_functions = size icl_functions
+	#! n_dcl_macros_and_functions = size macro_defs.[main_dcl_module_n]
+	# ec_state = {	ec_icl_correspondences = createArray n_icl_functions cNoCorrespondence,
+	  				ec_dcl_correspondences = createArray n_dcl_macros_and_functions cNoCorrespondence,
+	  				ec_var_heap = initial_hwn var_heap, 
+	  				ec_expr_heap = expr_heap, ec_icl_functions = icl_functions,ec_macro_defs=macro_defs,
 	  				ec_error_admin = error_admin, ec_tc_state = tc_state,
-	  				ec_untransformed = untransformed,
-	  				ec_function_conversions = function_conversions,
-					ec_main_dcl_module_n = main_dcl_module_n,
-					ec_dcl_macro_range = macro_range }
-	  ec_state = iFoldSt (compareMacroWithConversion conversions macro_range.ir_from) macro_range.ir_from macro_range.ir_to
-	  						ec_state
-	  {ec_icl_functions, ec_var_heap, ec_expr_heap, ec_error_admin, ec_tc_state} = ec_state
-	= (ec_icl_functions, ec_var_heap.hwn_heap, ec_expr_heap, ec_tc_state, ec_error_admin)
-	
-compareMacroWithConversion conversions ir_from dclIndex ec_state
-	= compareTwoMacroFuns dclIndex conversions.[dclIndex-ir_from] ec_state
+					ec_main_dcl_module_n = main_dcl_module_n }
+	  ec_state = iFoldSt (compareMacroWithConversion conversions macro_range.ir_from) macro_range.ir_from macro_range.ir_to ec_state
+	  	with
+	  		compareMacroWithConversion conversions ir_from dclIndex ec_state=:{ec_main_dcl_module_n}
+				= compareTwoMacroFuns ec_main_dcl_module_n dclIndex conversions.[dclIndex-ir_from] ec_state
+	  {ec_icl_functions,ec_macro_defs,ec_var_heap, ec_expr_heap, ec_error_admin, ec_tc_state} = ec_state
+	= (ec_icl_functions,ec_macro_defs, ec_var_heap.hwn_heap, ec_expr_heap, ec_tc_state, ec_error_admin)
 
-compareTwoMacroFuns :: !.Int !.Int !*ExpressionsCorrespondState -> .ExpressionsCorrespondState;
-compareTwoMacroFuns dclIndex iclIndex
-					ec_state=:{ec_correspondences, ec_icl_functions, ec_untransformed}
-	| dclIndex==iclIndex
+compareTwoMacroFuns :: !Int !Int !Int !*ExpressionsCorrespondState -> .ExpressionsCorrespondState;
+compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_functions,ec_macro_defs,ec_main_dcl_module_n}
+	| macro_module_index<>ec_main_dcl_module_n
+		# (dcl_function,ec_macro_defs) = ec_macro_defs![macro_module_index,dclIndex]
+		= { ec_state & ec_macro_defs=ec_macro_defs,ec_error_admin = checkErrorWithIdentPos (getIdentPos dcl_function) ErrorMessage ec_state.ec_error_admin }
+	| iclIndex==NoIndex
 		= ec_state
-	# (dcl_function, ec_icl_functions) = ec_icl_functions![dclIndex]
+	# (dcl_function, ec_macro_defs) = ec_macro_defs![macro_module_index,dclIndex]
 	  (icl_function, ec_icl_functions) = ec_icl_functions![iclIndex]
-	  ec_correspondences = { ec_correspondences & [dclIndex]=iclIndex, [iclIndex]=dclIndex }
-	  ec_state = { ec_state & ec_correspondences = ec_correspondences, ec_icl_functions = ec_icl_functions }
+	  ec_state = { ec_state & ec_icl_correspondences.[iclIndex]=dclIndex, ec_dcl_correspondences.[dclIndex]=iclIndex,
+	  						  ec_icl_functions = ec_icl_functions,ec_macro_defs=ec_macro_defs }
 	  need_to_be_compared
 	  		= case (dcl_function.fun_body, icl_function.fun_body) of
 	  			(TransformedBody _, CheckedBody _)
@@ -600,22 +525,14 @@ compareTwoMacroFuns dclIndex iclIndex
 	  			_	-> True
 	| not need_to_be_compared
 		= ec_state
-	# adjusted_icl_body
-	  		= case (dcl_function.fun_body, icl_function.fun_body) of
-	  			(CheckedBody _, TransformedBody _)
-					// the macro definition in the icl module is has been transformed but not the dcl
-					// module's definition: use the untransformed icl original for comparision
-	  				-> ec_untransformed.[iclIndex]
-	  			_	-> icl_function.fun_body
-	  ident_pos = getIdentPos dcl_function
+	# ident_pos = getIdentPos dcl_function
 	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
 	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
-// Sjaak :	| dcl_function.fun_info.fi_is_macro_fun<>icl_function.fun_info.fi_is_macro_fun ||
 	| dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun ||
 	  dcl_function.fun_priority<>icl_function.fun_priority
 		# ec_state = give_error dcl_function.fun_symb ec_state
-		= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
-	# ec_state = e_corresponds dcl_function.fun_body adjusted_icl_body ec_state
+		= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin } 
+	# ec_state = e_corresponds dcl_function.fun_body icl_function.fun_body ec_state
 	= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
 
 instance getIdentPos (TypeDef a) where
@@ -1049,7 +966,6 @@ instance e_corresponds Expression where
 	e_corresponds _ _
 		= give_error ""
 
-
 instance e_corresponds Let where
 	e_corresponds dclLet iclLet
 		=	e_corresponds dclLet.let_strict_binds iclLet.let_strict_binds
@@ -1168,7 +1084,7 @@ e_corresponds_VarInfoPtr ident dclPtr iclPtr ec_state=:{ec_var_heap}
 	# (unifiable, ec_var_heap) = tryToUnifyVars dclPtr iclPtr ec_var_heap
 	  ec_state = { ec_state & ec_var_heap = ec_var_heap }
 	| not unifiable
-		= { ec_state & ec_error_admin = checkError ident error_message ec_state.ec_error_admin }
+		= { ec_state & ec_error_admin = checkError ident ErrorMessage ec_state.ec_error_admin }
 	= ec_state
 
 /*	e_corresponds_app_symb checks correspondence of the function symbols in an App expression.
@@ -1180,15 +1096,7 @@ e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_Function dcl_glob_
 					ec_state
 	#! main_dcl_module_n = ec_state.ec_main_dcl_module_n
 	| dcl_glob_index.glob_module==main_dcl_module_n && icl_glob_index.glob_module==main_dcl_module_n
-		# dcl_glob_object = dcl_glob_index.glob_object
-/*
-		  is_indeed_a_macro =    ec_state.ec_dcl_macro_range.ir_from <= dcl_glob_object
-		                      && dcl_glob_object < ec_state.ec_dcl_macro_range.ir_to
-		| is_indeed_a_macro
-			= continuation_for_possibly_twice_defined_macros
-					dcl_app_symb dcl_glob_object icl_app_symb icl_glob_index.glob_object ec_state
-*/
-		| ec_state.ec_function_conversions.[dcl_glob_object]<>icl_glob_index.glob_object
+		| dcl_glob_index.glob_object<>icl_glob_index.glob_object
 			= give_error symb_name ec_state
 		= ec_state
 	| dcl_glob_index<>icl_glob_index
@@ -1200,42 +1108,40 @@ e_corresponds_app_symb dcl_app_symb=:{symb_name, symb_kind=SK_OverloadedFunction
 	| dcl_glob_index<>icl_glob_index
 		= give_error symb_name ec_state
 	= ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalMacroFunction dcl_index} 
-					icl_app_symb=:{symb_kind=SK_LocalMacroFunction icl_index}
-					ec_state
-	= continuation_for_possibly_twice_defined_macros
-			dcl_app_symb dcl_index icl_app_symb icl_index ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_Macro dcl_glob_index}
-					icl_app_symb=:{symb_kind=SK_Macro icl_glob_index}
-					ec_state
-	= continuation_for_possibly_twice_defined_macros 
-			dcl_app_symb dcl_glob_index.glob_object icl_app_symb icl_glob_index.glob_object ec_state
-e_corresponds_app_symb {symb_name=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index}
-						{symb_name=icl_symb_name, symb_kind=SK_Constructor icl_glob_index}
-						ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_IclMacro icl_index} ec_state
+	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_name,symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_DclMacro icl_glob_index} ec_state
+	| dcl_glob_index==icl_glob_index
+		= ec_state
+		= give_error symb_name ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalDclMacroFunction dcl_glob_index} icl_app_symb=:{symb_kind=SK_LocalMacroFunction icl_index} ec_state
+	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
+e_corresponds_app_symb {symb_name=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index} {symb_name=icl_symb_name, symb_kind=SK_Constructor icl_glob_index} ec_state
 	| dcl_glob_index.glob_module==icl_glob_index.glob_module && dcl_symb_name.id_name==icl_symb_name.id_name
 		= ec_state
-	= give_error icl_symb_name ec_state
-e_corresponds_app_symb {symb_name} _ ec_state
+		= give_error icl_symb_name ec_state
+//e_corresponds_app_symb {symb_name} _ ec_state
+e_corresponds_app_symb {symb_name,symb_kind} {symb_kind=symb_kind2} ec_state
 	= give_error symb_name ec_state
 
-continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_index icl_app_symb icl_index
-											ec_state
-	| dcl_index==icl_index
+continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_module_index dcl_index icl_app_symb icl_index ec_state
+	| icl_index==NoIndex
 		= ec_state
 	// two different functions were referenced. In case of macro functions they still could correspond
-	| not (names_are_compatible dcl_index icl_index ec_state.ec_icl_functions)
+	| not (names_are_compatible dcl_index icl_index ec_state.ec_icl_functions ec_state.ec_macro_defs)
 		= give_error icl_app_symb.symb_name ec_state
-	| both_funs_have_not_been_checked_before dcl_index icl_index ec_state.ec_correspondences
-		// going into recursion is save
-		= compareTwoMacroFuns dcl_index icl_index ec_state
-	| both_funs_correspond dcl_index icl_index ec_state.ec_correspondences
+	| dcl_module_index<>ec_state.ec_main_dcl_module_n
+		= give_error icl_app_symb.symb_name ec_state
+	| ec_state.ec_dcl_correspondences.[dcl_index]==icl_index && ec_state.ec_icl_correspondences.[icl_index]==dcl_index
 		= ec_state
+	| ec_state.ec_dcl_correspondences.[dcl_index]==cNoCorrespondence && ec_state.ec_icl_correspondences.[icl_index]==cNoCorrespondence
+		// going into recursion is save
+		= compareTwoMacroFuns dcl_module_index dcl_index icl_index ec_state
 	= give_error icl_app_symb.symb_name ec_state
   where
-	names_are_compatible :: Int Int {#FunDef} -> Bool;
-	names_are_compatible dcl_index icl_index icl_functions
-		# dcl_function = icl_functions.[dcl_index]
+	names_are_compatible :: Int Int {#FunDef} {#{#FunDef}} -> Bool;
+	names_are_compatible dcl_index icl_index icl_functions macro_defs
+		# dcl_function = macro_defs.[dcl_module_index,dcl_index]
 		  icl_function = icl_functions.[icl_index]
 		  dcl_name_is_loc_dependent = name_is_location_dependent dcl_function.fun_kind
 		  icl_name_is_loc_dependent = name_is_location_dependent icl_function.fun_kind
@@ -1243,18 +1149,10 @@ continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_index icl_app_sy
 		 && (implies (not dcl_name_is_loc_dependent) (dcl_function.fun_symb.id_name==icl_function.fun_symb.id_name))
 		// functions that originate from e.g. lambda expressions can correspond although their names differ
 	  where
-		name_is_location_dependent (FK_ImpFunction name_is_loc_dependent)
-			= name_is_loc_dependent
-		name_is_location_dependent (FK_DefFunction name_is_loc_dependent)
+		name_is_location_dependent (FK_Function name_is_loc_dependent)
 			= name_is_loc_dependent
 		name_is_location_dependent _
 		 	= False
-		 	
-	both_funs_have_not_been_checked_before dcl_index icl_index correspondences
-		= correspondences.[dcl_index]==cNoCorrespondence && correspondences.[icl_index]==cNoCorrespondence
-
-	both_funs_correspond dcl_index icl_index correspondences
-		= correspondences.[dcl_index]==icl_index && correspondences.[icl_index]==dcl_index
 
 init_attr_vars attr_vars tc_state=:{tc_attr_vars}
 	# hwn_heap = foldSt init_attr_var attr_vars tc_attr_vars.hwn_heap
@@ -1264,7 +1162,7 @@ init_attr_vars attr_vars tc_state=:{tc_attr_vars}
 	init_attr_var {av_info_ptr} attr_heap
 		= writePtr av_info_ptr AVI_Empty attr_heap
 
-error_message		:== "definition in the impl module conflicts with the def module"
+ErrorMessage = "definition in the impl module conflicts with the def module"
 cNoCorrespondence	:== -1
 implies a b 		:== not a || b
 	
@@ -1295,7 +1193,16 @@ do_nothing ec_state
 	= ec_state
 
 give_error s ec_state
-	= { ec_state & ec_error_admin = checkError s error_message ec_state.ec_error_admin }
+	= { ec_state & ec_error_admin = checkError s ErrorMessage ec_state.ec_error_admin }
+
+/*
+instance <<< Priority
+	where
+		(<<<) file NoPrio = file <<< "NoPrio"		
+		(<<<) file (Prio LeftAssoc i) = file <<< "Prio LeftAssoc " <<< i
+		(<<<) file (Prio RightAssoc i) = file <<< "Prio RightAssoc " <<< i
+		(<<<) file (Prio NoAssoc i) = file <<< "Prio NoAssoc " <<< i
+*/
 
 /*
 print_function_body_array function_bodies

@@ -2,7 +2,7 @@ implementation module checkFunctionBodies
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef //, RWSDebug
 import explicitimports, comparedefimp, mergecases
-from check import checkFunctions
+from check import checkFunctions,checkDclMacros
 
 cIsInExpressionList		:== True
 cIsNotInExpressionList	:== False
@@ -17,22 +17,20 @@ cEndWithSelection		:== False
 	,	es_calls			:: ![FunCall]
 	,	es_dynamics			:: ![ExprInfoPtr]
 	,	es_fun_defs			:: !.{# FunDef}
-// MV ...
  	,	es_dynamic_expr_count	:: !Int				// used to give each dynamic expr an unique id
-// ... MV
 	}
 	
 ::	ExpressionInput =
 	{	ei_expr_level	:: !Level
-	,	ei_fun_index	:: !Index
+	,	ei_fun_index	:: !FunctionOrMacroIndex
 	,	ei_fun_level	:: !Level
 	,	ei_mod_index	:: !Index
-//	,	ei_fun_kind		:: !FunKind
+	,	ei_local_functions_index_offset :: !Int
 	}
 
 ::	PatternState =
 	{	ps_var_heap :: !.VarHeap
-	,	ps_fun_defs :: !.{# FunDef}
+	,	ps_fun_defs :: !.{#FunDef}
 	}
 
 ::	PatternInput =
@@ -125,8 +123,7 @@ make_case_guards cons_symbol type_symbol alg_patterns expr_heap cs
 checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState -> (FunctionBody,[FreeVar],!.ExpressionState,.ExpressionInfo,!.CheckState);
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
-		
-	# (aux_patterns, (var_env, array_patterns), {ps_var_heap, ps_fun_defs}, e_info, cs)
+	# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} ([], [])
 							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs 
 
@@ -174,11 +171,11 @@ where
 	check_function_bodies free_vars fun_args [{pb_args,pb_rhs={rhs_alts,rhs_locals},pb_position} : bodies]
 							e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap,es_fun_defs} e_info cs
 		# cs = pushErrorAdmin (newPosition function_ident_for_errors pb_position) cs
-		# (aux_patterns, (var_env, array_patterns), {ps_var_heap, ps_fun_defs}, e_info, cs)
+		# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 				= check_patterns pb_args { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
-					{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
+					{ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs} e_info cs
 		# cs = popErrorAdmin cs
-		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs}
+		  e_state = { e_state & es_var_heap = ps_var_heap,es_fun_defs = ps_fun_defs}
 		  (rhs_expr, free_vars, e_state, e_info, cs) = checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
 		  (rhs_expr, free_vars, e_state=:{es_dynamics=dynamics_in_rhs}, e_info, cs)
 				= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
@@ -311,12 +308,27 @@ where
 		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
 
+checkFunctionBodies  _ function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap, es_fun_defs} e_info cs
+	= abort ("checkFunctionBodies "+++toString function_ident_for_errors)
+
+
+removeLocalsFromSymbolTable :: !Index !Level ![Ident] !LocalDefs !Int !*{#FunDef} !*{#*{#FunDef}} !*(Heap SymbolTableEntry)
+																  -> (!.{#FunDef},!.{#.{#FunDef}},!.Heap SymbolTableEntry)
+removeLocalsFromSymbolTable module_index level loc_vars (CollectedLocalDefs {loc_functions,loc_in_icl_module}) local_functions_index_offset fun_defs macro_defs symbol_table	
+	# loc_functions={ir_from=loc_functions.ir_from+local_functions_index_offset,ir_to=loc_functions.ir_to+local_functions_index_offset}
+	# symbol_table=removeLocalIdentsFromSymbolTable level loc_vars symbol_table
+	| loc_in_icl_module
+		# (fun_defs,symbol_table) = removeLocalFunctionsFromSymbolTable level loc_functions fun_defs symbol_table
+		= (fun_defs,macro_defs,symbol_table)
+		# (macro_defs,symbol_table) = removeLocalDclMacrosFromSymbolTable level module_index loc_functions macro_defs symbol_table
+		= (fun_defs,macro_defs,symbol_table)
+
 checkRhs :: [FreeVar] OptGuardedAlts LocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 	# ei_expr_level = inc ei_expr_level
-	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index rhs_locals e_state e_info cs
+	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index rhs_locals ei_local_functions_index_offset e_state e_info cs
 	  (es_fun_defs, e_info, heaps, cs)
-	  		= checkLocalFunctions ei_mod_index ei_expr_level rhs_locals e_state.es_fun_defs e_info
+	  		= checkLocalFunctions ei_mod_index ei_expr_level rhs_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
 	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
 	  (rhs_expr, free_vars, e_state, e_info, cs) 
 	  		= check_opt_guarded_alts free_vars rhs_alts { e_input & ei_expr_level = ei_expr_level }
@@ -325,8 +337,8 @@ checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index} e_s
 	  (expr, free_vars, e_state, e_info, cs)
 			= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs expr e_input e_state e_info cs
-	  (es_fun_defs, cs_symbol_table) = removeLocalsFromSymbolTable ei_expr_level var_env rhs_locals e_state.es_fun_defs cs.cs_symbol_table
-	= (expr, free_vars, { e_state & es_fun_defs = es_fun_defs}, e_info, { cs & cs_symbol_table = cs_symbol_table })
+	  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index ei_expr_level var_env rhs_locals ei_local_functions_index_offset e_state.es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
+	= (expr, free_vars, { e_state & es_fun_defs = es_fun_defs}, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table })
 where
 	check_opt_guarded_alts free_vars (GuardedAlts guarded_alts default_expr) e_input e_state e_info cs
 		# (let_vars_list, rev_guarded_exprs, last_expr_level, free_vars, e_state, e_info, cs)
@@ -386,10 +398,10 @@ where
 	  	= (let_vars_list, [(let_binds, guard, expr, alt_ident) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
 
 	check_unguarded_expression :: [FreeVar] ExprWithLocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-	check_unguarded_expression free_vars {ewl_nodes,ewl_expr,ewl_locals,ewl_position} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+	check_unguarded_expression free_vars {ewl_nodes,ewl_expr,ewl_locals,ewl_position} e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 		# this_expr_level = inc ei_expr_level
 		  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
-		 		= checkLhssOfLocalDefs this_expr_level ei_mod_index ewl_locals e_state e_info cs
+		 		= checkLhssOfLocalDefs this_expr_level ei_mod_index ewl_locals ei_local_functions_index_offset e_state e_info cs
 		  (binds, let_vars_list, rhs_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars ewl_nodes [] { e_input & ei_expr_level = this_expr_level } e_state e_info cs
 		  cs = pushErrorAdmin2 "" ewl_position cs
 	  	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars ewl_expr { e_input & ei_expr_level = rhs_expr_level } e_state e_info cs
@@ -401,11 +413,11 @@ where
 	  	  (expr, free_vars, e_state, e_info, cs)
 				= checkRhssAndTransformLocalDefs free_vars loc_defs seq_let_expr e_input { e_state & es_expr_heap = es_expr_heap} e_info cs
 	  	  (es_fun_defs, e_info, heaps, cs)
-	  	  		= checkLocalFunctions ei_mod_index rhs_expr_level ewl_locals e_state.es_fun_defs e_info 
+	  	  		= checkLocalFunctions ei_mod_index rhs_expr_level ewl_locals ei_local_functions_index_offset e_state.es_fun_defs e_info 
 	  	  		{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
-		  (es_fun_defs, cs_symbol_table) = removeLocalsFromSymbolTable this_expr_level var_env ewl_locals es_fun_defs cs.cs_symbol_table
+		  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index this_expr_level var_env ewl_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	  	= (expr, free_vars, {e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap,
-	  			es_expr_heap = heaps.hp_expression_heap, es_type_heaps = heaps.hp_type_heaps }, e_info, { cs & cs_symbol_table = cs_symbol_table} )
+	  			es_expr_heap = heaps.hp_expression_heap, es_type_heaps = heaps.hp_type_heaps }, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table} )
 	
 	remove_seq_let_vars level [] symbol_table
 		= symbol_table
@@ -438,21 +450,21 @@ where
 		= ([], let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs)
 
 	check_sequential_let :: [FreeVar] NodeDefWithLocals ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,!AuxiliaryPattern,!(![Ident],![ArrayPattern]),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals, ndwl_position} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals, ndwl_position} e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 		# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} ndwl_position) cs
-		  (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals e_state e_info cs
+		  (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals ei_local_functions_index_offset e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars bind_src e_input e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs)
 				= addArraySelections loc_array_patterns src_expr free_vars e_input e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs src_expr e_input e_state e_info cs
 		  (es_fun_defs, e_info, {hp_var_heap,hp_expression_heap,hp_type_heaps}, cs)
-				= checkLocalFunctions ei_mod_index ei_expr_level ndwl_locals e_state.es_fun_defs e_info
+				= checkLocalFunctions ei_mod_index ei_expr_level ndwl_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
 	  				{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
-	  	  (es_fun_defs, cs_symbol_table) = removeLocalsFromSymbolTable ei_expr_level loc_env ndwl_locals es_fun_defs cs.cs_symbol_table
+	  	  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index ei_expr_level loc_env ndwl_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 		  (pattern, accus, {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern bind_dst No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = True } ([], []) 
-					{ps_var_heap = hp_var_heap, ps_fun_defs = es_fun_defs } e_info { cs & cs_symbol_table = cs_symbol_table }
-		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps, es_fun_defs = ps_fun_defs }
+					{ps_var_heap = hp_var_heap,ps_fun_defs = es_fun_defs } {e_info & ef_macro_defs=macro_defs} { cs & cs_symbol_table = cs_symbol_table }
+		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,es_fun_defs = ps_fun_defs }
 		= (src_expr, pattern, accus, free_vars, e_state, e_info, popErrorAdmin cs)
 	
 	build_sequential_lets :: ![(![LetBind],![LetBind])] !Expression !Position !*ExpressionHeap -> (!Position, !Expression, !*ExpressionHeap)
@@ -463,10 +475,14 @@ where
 	  	  (let_expr, expr_heap) = buildLetExpression strict_binds lazy_binds let_expr let_expr_position expr_heap
 		= (if (isEmpty strict_binds && isEmpty lazy_binds) let_expr_position NoPos, let_expr, expr_heap)
 
-checkLocalFunctions :: !Index !Level !LocalDefs !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
-					-> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
-checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) fun_defs e_info heaps cs
-	= checkFunctions mod_index level ir_from ir_to fun_defs e_info heaps cs
+checkLocalFunctions :: !Index !Level !LocalDefs !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
+												 -> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
+checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_in_icl_module}) local_functions_index_offset fun_defs e_info heaps cs
+	# ir_from=ir_from+local_functions_index_offset
+	# ir_to=ir_to+local_functions_index_offset
+	| loc_in_icl_module
+		= checkFunctions mod_index level ir_from ir_to local_functions_index_offset fun_defs e_info heaps cs
+		= checkDclMacros mod_index level ir_from ir_to fun_defs e_info heaps cs
 
 checkExpression :: ![FreeVar] !ParsedExpr !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
 	-> *(!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState);
@@ -579,22 +595,22 @@ where
 			# (result_expr, e_state, cs_error) = buildApplication symb 2 2 is_fun [left,result_expr] e_state cs_error
 			= build_final_expression left_appls result_expr e_state cs_error
 					
-checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 	# ei_expr_level = inc ei_expr_level
 	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
-	  		= checkLhssOfLocalDefs ei_expr_level ei_mod_index let_locals e_state e_info cs
+	  		= checkLhssOfLocalDefs ei_expr_level ei_mod_index let_locals ei_local_functions_index_offset e_state e_info cs
 	  e_input = { e_input & ei_expr_level = ei_expr_level }
 	  (let_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  (expr, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
 			= addArraySelections array_patterns let_expr free_vars e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs expr e_input e_state e_info cs
 	  (es_fun_defs, e_info, heaps, cs)
-			= checkLocalFunctions ei_mod_index ei_expr_level let_locals e_state.es_fun_defs e_info
+			= checkLocalFunctions ei_mod_index ei_expr_level let_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
 	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
-	  (es_fun_defs, cs_symbol_table) = removeLocalsFromSymbolTable ei_expr_level var_env let_locals es_fun_defs cs.cs_symbol_table
+	  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index ei_expr_level var_env let_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	= (expr, free_vars,
 		{ e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap, es_expr_heap = heaps.hp_expression_heap,
-			es_type_heaps = heaps.hp_type_heaps }, e_info, { cs & cs_symbol_table = cs_symbol_table })
+			es_type_heaps = heaps.hp_type_heaps }, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table })
 
 checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info cs
 	# (pattern_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
@@ -619,8 +635,8 @@ where
 				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap} e_info cs
 		# (pattern, (var_env, array_patterns), {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern calt_pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
-					{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
-		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs }
+					{ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs} e_info cs
+		  e_state = { e_state & es_var_heap = ps_var_heap,es_fun_defs = ps_fun_defs }
 		  (rhs_expr, free_vars, e_state, e_info, cs)
 		  		= checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
 		  (expr_with_array_selections, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
@@ -1156,7 +1172,6 @@ where
 
 checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 	= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
-// AA..
 checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_state e_info cs=:{cs_symbol_table, cs_x}
 	//= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
@@ -1213,7 +1228,6 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			#! th_vars = writePtr gen_kinds_ptr (TVI_Kinds kinds) th_vars
 			#! e_state = { e_state & es_type_heaps = {es_type_heaps & th_vars = th_vars}}
 			= (generic_defs, e_state) 									 
-// ..AA
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl, line 868)" // <<- expr
 
@@ -1258,15 +1272,12 @@ where
 			#! (var_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 			= (Var {var_name = id, var_info_ptr = info_ptr, var_expr_ptr = var_expr_ptr}, free_vars,
 					{e_state & es_expr_heap = es_expr_heap}, e_info, cs)
-// AA..
 	check_id_expression {ste_kind = STE_Generic} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
 		= (EE, free_vars, e_state, e_info, 
 			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})
 	check_id_expression {ste_kind = STE_Imported STE_Generic _} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
 		= (EE, free_vars, e_state, e_info, 
-			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})			
-// ..AA					
-					
+			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})								
 	check_id_expression entry is_expr_list free_vars id=:{id_info} e_input e_state e_info cs
 		# (symb_kind, arity, priority, is_a_function, e_state, e_info, cs) = determine_info_of_symbol entry id_info e_input e_state e_info cs
 		  symbol = { symb_name = id, symb_kind = symb_kind, symb_arity = 0 }
@@ -1278,51 +1289,53 @@ where
 	determine_info_of_symbol :: !SymbolTableEntry !SymbolPtr !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 		-> (!SymbKind, !Int, !Priority, !Bool, !*ExpressionState, !u:ExpressionInfo,!*CheckState)
 	determine_info_of_symbol entry=:{ste_kind=STE_FunctionOrMacro calls,ste_index,ste_def_level} symb_info
-				e_input=:{ei_fun_index, ei_mod_index} e_state=:{es_fun_defs,es_calls} e_info cs=:{cs_symbol_table,cs_x}
-		# ({fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}, es_fun_defs) = es_fun_defs![ste_index]
+				e_input=:{ei_fun_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table,cs_x}
+		# (fun_def,e_state) = e_state!es_fun_defs.[ste_index]
+		# {fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=fun_def 
 		# index = { glob_object = ste_index, glob_module = cs_x.x_main_dcl_module_n }
+		# symbol_kind = convert_DefOrImpFunKind_to_icl_SymbKind fun_kind index fi_properties
 		| is_called_before ei_fun_index calls
-			| case fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
-				= (SK_Macro index, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
-				# symbol_kind = if (fi_properties bitand FI_IsMacroFun <> 0) (SK_LocalMacroFunction ste_index) (SK_Function index)
-				= (symbol_kind, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
-			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
-			  e_state = { e_state & es_fun_defs = es_fun_defs, es_calls = [{ fc_index = ste_index, fc_level = ste_def_level} : es_calls ]}
-			# symbol_kind = case fun_kind of
-				FK_DefMacro
-					-> SK_Macro index;
-				FK_ImpMacro
-					-> SK_Macro index;
-				_
-					| fi_properties bitand FI_IsMacroFun <> 0
-						-> SK_LocalMacroFunction ste_index
-						-> SK_Function index
 			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
-	where
-		is_called_before caller_index []
-			= False
-		is_called_before caller_index [called_index : calls]
-			= caller_index == called_index || is_called_before caller_index calls
-
+			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
+			# e_state = { e_state & es_calls = [FunCall ste_index ste_def_level : es_calls ]}
+			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
+	determine_info_of_symbol entry=:{ste_kind=STE_DclMacroOrLocalMacroFunction calls,ste_index,ste_def_level} symb_info
+				e_input=:{ei_fun_index, ei_mod_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table}
+		# (macro_def,e_info) = e_info!ef_macro_defs.[ei_mod_index,ste_index]
+		# {fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
+		# index = { glob_object = ste_index, glob_module = ei_mod_index }
+		# symbol_kind = convert_DefOrImpFunKind_to_dcl_SymbKind fun_kind index fi_properties
+		| is_called_before ei_fun_index calls
+			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
+			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]})}
+			# e_state = { e_state & es_calls = [MacroCall ei_mod_index ste_index ste_def_level : es_calls ]}
+			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
+	determine_info_of_symbol entry=:{ste_kind=STE_Imported (STE_DclMacroOrLocalMacroFunction calls) macro_mod_index,ste_index,ste_def_level} symb_info
+				e_input=:{ei_fun_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table}
+		# (macro_def,e_info) = e_info!ef_macro_defs.[macro_mod_index,ste_index]
+		# {fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
+		# index = { glob_object = ste_index, glob_module = macro_mod_index }
+		# symbol_kind = convert_DefOrImpFunKind_to_dcl_SymbKind fun_kind index fi_properties
+		| is_called_before ei_fun_index calls
+			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
+			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]) macro_mod_index})}
+			# e_state = { e_state & es_calls = [MacroCall macro_mod_index ste_index ste_def_level : es_calls ]}
+			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
 	determine_info_of_symbol entry=:{ste_kind=STE_Imported kind mod_index,ste_index} symb_index e_input e_state e_info=:{ef_modules} cs
 		# (mod_def, ef_modules) = ef_modules![mod_index]
 		# (kind, arity, priotity, is_fun) = ste_kind_to_symbol_kind kind ste_index mod_index mod_def
 		= (kind, arity, priotity, is_fun, e_state, { e_info & ef_modules = ef_modules }, cs)
 	where
 		ste_kind_to_symbol_kind :: !STE_Kind !Index !Index !DclModule -> (!SymbKind, !Int, !Priority, !Bool);
-		ste_kind_to_symbol_kind STE_DclFunction def_index mod_index {dcl_functions,dcl_conversions}
+		ste_kind_to_symbol_kind STE_DclFunction def_index mod_index {dcl_functions}
 			# {ft_type={st_arity},ft_priority} = dcl_functions.[def_index]
-			# def_index = convertIndex def_index (toInt STE_DclFunction) dcl_conversions
 			= (SK_Function { glob_object = def_index, glob_module = mod_index }, st_arity, ft_priority, cIsAFunction)
-		ste_kind_to_symbol_kind STE_Member def_index mod_index {dcl_common={com_member_defs},dcl_conversions}
+		ste_kind_to_symbol_kind STE_Member def_index mod_index {dcl_common={com_member_defs}}
 			# {me_type={st_arity},me_priority} = com_member_defs.[def_index]
-			# def_index = convertIndex def_index (toInt STE_Member) dcl_conversions
 			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority, cIsAFunction)
-		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs},dcl_conversions}
+		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs}}
 			# {cons_type={st_arity},cons_priority} = com_cons_defs.[def_index]
-			# def_index = convertIndex def_index (toInt STE_Constructor) dcl_conversions
 			= (SK_Constructor { glob_object = def_index, glob_module = mod_index }, st_arity, cons_priority, cIsNotAFunction)
-
 	determine_info_of_symbol {ste_kind=STE_Member, ste_index} _ e_input=:{ei_mod_index} e_state e_info=:{ef_member_defs} cs
 		# ({me_type={st_arity},me_priority}, ef_member_defs) = ef_member_defs![ste_index]
 		= (SK_OverloadedFunction { glob_object = ste_index, glob_module = ei_mod_index}, st_arity, me_priority, cIsAFunction,
@@ -1334,9 +1347,27 @@ where
 	determine_info_of_symbol {ste_kind=STE_DclFunction, ste_index} _ e_input=:{ei_mod_index} e_state e_info=:{ef_modules} cs
 		# (mod_def, ef_modules) = ef_modules![ei_mod_index]
 		# {ft_type={st_arity},ft_priority} = mod_def.dcl_functions.[ste_index]
-		  def_index = convertIndex ste_index (toInt STE_DclFunction) mod_def.dcl_conversions
-		= (SK_Function { glob_object = def_index, glob_module =  ei_mod_index}, st_arity, ft_priority, cIsAFunction,
+		= (SK_Function { glob_object = ste_index, glob_module =  ei_mod_index}, st_arity, ft_priority, cIsAFunction,
 				e_state, { e_info & ef_modules = ef_modules }, cs)
+
+	is_called_before caller_index []
+		= False
+	is_called_before caller_index [called_index : calls]
+		= caller_index == called_index || is_called_before caller_index calls
+
+	convert_DefOrImpFunKind_to_icl_SymbKind FK_Macro index fi_properties
+		= SK_IclMacro index.glob_object;
+	convert_DefOrImpFunKind_to_icl_SymbKind _ index fi_properties
+		| fi_properties bitand FI_IsMacroFun <> 0
+			= SK_LocalMacroFunction index.glob_object
+			= SK_Function index
+
+	convert_DefOrImpFunKind_to_dcl_SymbKind FK_Macro index fi_properties
+		= SK_DclMacro index;
+	convert_DefOrImpFunKind_to_dcl_SymbKind _ index fi_properties
+		| fi_properties bitand FI_IsMacroFun <> 0
+			= SK_LocalDclMacroFunction index
+			= SK_Function index
 
 checkPattern :: !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 									-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)
@@ -1443,7 +1474,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 			= case first_expr of
 				AP_Constant kind constant=:{glob_object={ds_ident,ds_arity}} _
 					| ds_arity == nr_of_args || (case kind of
-												  APK_Macro -> True
+												  APK_Macro _ -> True
 												  _ -> False)
 						# (pattern, ps, e_info, cs) = buildPattern mod_index kind constant args opt_var ps e_info cs
 						-> (pattern, ps, e_info, cs)
@@ -1572,23 +1603,31 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 checkPattern expr opt_var p_input accus ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
+checkMacroPatternConstructor macro=:{fun_symb,fun_arity,fun_kind,fun_priority} macro_mod_index mod_index is_dcl_macro is_expr_list ste_index ident opt_var ps e_info cs=:{cs_error}
+	| case fun_kind of FK_Macro->True; _ -> False
+		| is_expr_list
+			# macro_symbol = { glob_object = MakeDefinedSymbol fun_symb ste_index fun_arity, glob_module = macro_mod_index }
+	 		= (AP_Constant (APK_Macro is_dcl_macro) macro_symbol fun_priority, ps, e_info, cs)
+		| fun_arity == 0
+			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
+					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
+			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
+			= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
+		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_symb "not allowed in a pattern" cs_error })
+
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkPatternConstructor _ _ {ste_kind = STE_Empty} ident _  ps e_info cs=:{cs_error}
 	= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
-checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _,ste_index} ident opt_var  ps=:{ps_fun_defs} e_info cs=:{cs_error,cs_x}
-	# ({fun_symb,fun_arity,fun_kind,fun_priority},ps_fun_defs) = ps_fun_defs![ste_index]
-	  ps = { ps & ps_fun_defs = ps_fun_defs }
-	| case fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
-		| is_expr_list
-			# macro_symbol = { glob_object = MakeDefinedSymbol fun_symb ste_index fun_arity, glob_module = cs_x.x_main_dcl_module_n }
-	 		= (AP_Constant APK_Macro macro_symbol fun_priority, ps, e_info, cs)
-		| fun_arity == 0
-			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
-					= unfoldPatternMacro mod_index ste_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
-			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
-			= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
-		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_symb "not allowed in a pattern" cs_error })
+checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _,ste_index} ident opt_var ps e_info cs=:{cs_x}
+	# (macro,ps) = ps!ps_fun_defs.[ste_index]
+	= checkMacroPatternConstructor macro cs_x.x_main_dcl_module_n mod_index False is_expr_list ste_index ident opt_var ps e_info cs
+checkPatternConstructor mod_index is_expr_list {ste_kind = STE_DclMacroOrLocalMacroFunction _,ste_index} ident opt_var ps e_info cs=:{cs_x}
+	# (macro,e_info) = e_info!ef_macro_defs.[mod_index,ste_index]
+	= checkMacroPatternConstructor macro mod_index mod_index True is_expr_list ste_index ident opt_var ps e_info cs
+checkPatternConstructor mod_index is_expr_list {ste_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction _) macro_module_index,ste_index} ident opt_var ps e_info cs
+	# (macro,e_info) = e_info!ef_macro_defs.[macro_module_index,ste_index]
+	= checkMacroPatternConstructor macro macro_module_index mod_index True is_expr_list ste_index ident opt_var ps e_info cs
 checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_symb opt_var ps
 		e_info=:{ef_cons_defs,ef_modules} cs=:{cs_error}
 	# (cons_index, cons_module, cons_arity, cons_priority, cons_type_index, ef_cons_defs, ef_modules, cs_error)
@@ -1605,9 +1644,8 @@ where
 		# ({cons_type={st_arity},cons_priority, cons_type_index}, cons_defs) = cons_defs![id_index]
 		= (id_index, mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
 	determine_pattern_symbol mod_index id_index (STE_Imported STE_Constructor import_mod_index) id_name cons_defs modules error
-		# ({dcl_common,dcl_conversions},modules) = modules![import_mod_index]
+		# ({dcl_common},modules) = modules![import_mod_index]
 		  {cons_type={st_arity},cons_priority, cons_type_index} = dcl_common.com_cons_defs.[id_index]
-		  id_index = convertIndex id_index (toInt STE_Constructor) dcl_conversions
 		= (id_index, import_mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
 	determine_pattern_symbol mod_index id_index id_kind id_name cons_defs modules error
 		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError id_name "constructor expected" error)
@@ -1835,26 +1873,17 @@ transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr _ var_stor
 transfromPatternIntoBind _ _ pattern src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" "illegal node pattern" cs.cs_error})
 
-
-
-unfoldPatternMacro mod_index macro_index all_macro_args opt_var ps=:{ps_var_heap, ps_fun_defs} modules cons_defs error
-	# (macro, ps_fun_defs) = ps_fun_defs![macro_index]
-	= case macro.fun_body of
-		TransformedBody {tb_args,tb_rhs}
-			| no_sharing tb_args
-				# length_macro_args = length tb_args
-				  (macro_args, extra_args)
-					= if (length all_macro_args==length_macro_args) 
-							(all_macro_args, []) 
-							(splitAt length_macro_args all_macro_args)
-				  ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
-				  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_symb opt_var extra_args tb_rhs ums
-				-> (pattern, { ps_fun_defs = ps_fun_defs, ps_var_heap = ums_var_heap}, ums_modules, ums_cons_defs, ums_error)
-				-> (AP_Empty macro.fun_symb, { ps_fun_defs = ps_fun_defs, ps_var_heap = ps_var_heap},
-						modules, cons_defs, checkError macro.fun_symb "sharing not allowed" error)
-		_
-			-> (AP_Empty macro.fun_symb, { ps_fun_defs = ps_fun_defs, ps_var_heap = ps_var_heap},
-					modules, cons_defs, checkError macro.fun_symb "illegal macro in pattern" error)
+unfoldPatternMacro macro=:{fun_body=TransformedBody {tb_args,tb_rhs}} mod_index all_macro_args opt_var ps=:{ps_var_heap} modules cons_defs error
+	| no_sharing tb_args
+		# length_macro_args = length tb_args
+		  (macro_args, extra_args)
+			= if (length all_macro_args==length_macro_args) 
+					(all_macro_args, []) 
+					(splitAt length_macro_args all_macro_args)
+		  ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
+		  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_symb opt_var extra_args tb_rhs ums
+		= (pattern, { ps & ps_var_heap = ums_var_heap}, ums_modules, ums_cons_defs, ums_error)
+		= (AP_Empty macro.fun_symb, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_symb "sharing not allowed" error)
 where
 	no_sharing [{fv_count} : args]
 		= fv_count <= 1 && no_sharing args
@@ -1886,9 +1915,9 @@ where
 			| mod_index == cons_mod
 				# (cons_def, cons_defs) = cons_defs![cons_index]
 				= (cons_def, cons_index, cons_defs, modules)
-				# ({dcl_common,dcl_conversions}, modules) = modules![cons_mod]
+				# ({dcl_common}, modules) = modules![cons_mod]
 				  cons_def = dcl_common.com_cons_defs.[cons_index]
-				= (cons_def, convertIndex cons_index (toInt STE_Constructor) dcl_conversions, cons_defs, modules)
+				= (cons_def, cons_index, cons_defs, modules)
 
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv bt) ums=:{ums_error}
 		| not (isEmpty extra_args)
@@ -1896,7 +1925,9 @@ where
 		= (AP_Basic bv opt_var, ums)
 	unfold_pattern_macro mod_index macro_ident opt_var _ expr ums=:{ums_error}
 		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
-			
+unfoldPatternMacro macro mod_index all_macro_args opt_var ps=:{ps_var_heap} modules cons_defs error
+	= (AP_Empty macro.fun_symb, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_symb "illegal macro in pattern" error)
+
 checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_state e_info cs
 	| isEmpty selectors
 		# (selector, free_vars, e_state, e_info, cs) = check_selector end_with_update free_vars selector e_input e_state e_info cs
@@ -2059,8 +2090,6 @@ where
 		field_error {bind_dst=(field_id,_)} error
 			= checkError field_id "field is either multiply used or not a part of this record" error
 
-
-
 checkRhssAndTransformLocalDefs free_vars [] rhs_expr e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 checkRhssAndTransformLocalDefs free_vars loc_defs rhs_expr e_input e_state e_info cs
@@ -2068,13 +2097,18 @@ checkRhssAndTransformLocalDefs free_vars loc_defs rhs_expr e_input e_state e_inf
 	  (rhs_expr, es_expr_heap) = buildLetExpression [] binds rhs_expr NoPos e_state.es_expr_heap
 	= (rhs_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
-checkLhssOfLocalDefs :: .Int .Int LocalDefs *ExpressionState *ExpressionInfo *CheckState -> (!.[NodeDef AuxiliaryPattern],!(![Ident],![ArrayPattern]),!.ExpressionState,!.ExpressionInfo,!.CheckState);
-checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info=:{ef_is_macro_fun} cs
+checkLhssOfLocalDefs :: .Int .Int LocalDefs Int *ExpressionState *ExpressionInfo *CheckState -> (!.[NodeDef AuxiliaryPattern],!(![Ident],![ArrayPattern]),!.ExpressionState,!.ExpressionInfo,!.CheckState);
+checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes,loc_in_icl_module}) local_functions_index_offset e_state=:{es_var_heap,es_fun_defs} e_info=:{ef_is_macro_fun} cs
+	# ir_from=ir_from+local_functions_index_offset
+	# ir_to=ir_to+local_functions_index_offset
 	# (loc_defs, accus, {ps_fun_defs,ps_var_heap}, e_info, cs)
 			= check_patterns loc_nodes {pi_def_level = def_level, pi_mod_index = mod_index, pi_is_node_pattern = True } ([], [])
 					{ps_fun_defs = es_fun_defs, ps_var_heap = es_var_heap} e_info cs
-	  (es_fun_defs, cs_symbol_table, cs_error) = addLocalFunctionDefsToSymbolTable def_level ir_from ir_to ef_is_macro_fun ps_fun_defs cs.cs_symbol_table cs.cs_error
-	= (loc_defs, accus, { e_state & es_fun_defs = es_fun_defs, es_var_heap = ps_var_heap }, e_info, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
+	| loc_in_icl_module
+		# (fun_defs, cs_symbol_table, cs_error) = addLocalFunctionDefsToSymbolTable def_level ir_from ir_to ef_is_macro_fun ps_fun_defs cs.cs_symbol_table cs.cs_error
+		= (loc_defs, accus, { e_state & es_fun_defs = fun_defs, es_var_heap = ps_var_heap }, e_info, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
+		# (macro_defs, cs_symbol_table, cs_error) = addLocalDclMacroDefsToSymbolTable def_level mod_index ir_from ir_to e_info.ef_macro_defs cs.cs_symbol_table cs.cs_error
+		= (loc_defs, accus, { e_state & es_fun_defs = ps_fun_defs, es_var_heap = ps_var_heap }, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
 where
 	check_patterns [ node_def : node_defs ] p_input accus var_store e_info cs
 		# (pattern, accus, var_store, e_info, cs) = checkPattern node_def.nd_dst No p_input accus var_store e_info cs
@@ -2170,8 +2204,6 @@ buildLetExpression let_strict_binds let_lazy_binds expr let_expr_position expr_h
 	= (Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = expr,
 			let_info_ptr = let_expr_ptr, let_expr_position = let_expr_position }, expr_heap)
 
-
-
 buildApplication :: !SymbIdent !Int !Int !Bool ![Expression] !*ExpressionState !*ErrorAdmin -> (!Expression,!*ExpressionState,!*ErrorAdmin)
 buildApplication symbol form_arity act_arity is_fun args e_state=:{es_expr_heap} error
 	| is_fun
@@ -2188,10 +2220,16 @@ buildApplication symbol form_arity act_arity is_fun args e_state=:{es_expr_heap}
 
 buildPattern mod_index (APK_Constructor type_index) cons_symb args opt_var ps e_info cs
 	= (AP_Algebraic cons_symb type_index args opt_var, ps, e_info, cs)
-buildPattern mod_index APK_Macro {glob_object} args opt_var ps e_info=:{ef_modules,ef_cons_defs} cs=:{cs_error}
-	# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
-			= unfoldPatternMacro mod_index glob_object.ds_index args opt_var ps ef_modules ef_cons_defs cs_error
-	= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
+buildPattern mod_index (APK_Macro is_dcl_macro) {glob_module,glob_object} args opt_var ps e_info=:{ef_modules,ef_macro_defs,ef_cons_defs} cs=:{cs_error}
+	| is_dcl_macro
+		# (macro,ef_macro_defs) = ef_macro_defs![glob_module,glob_object.ds_index]
+		# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
+				= unfoldPatternMacro macro mod_index args opt_var ps ef_modules ef_cons_defs cs_error
+		= (pattern, ps, { e_info & ef_modules = ef_modules, ef_macro_defs=ef_macro_defs, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
+		# (macro,ps) = ps!ps_fun_defs.[glob_object.ds_index]
+		# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
+				= unfoldPatternMacro macro mod_index args opt_var ps ef_modules ef_cons_defs cs_error
+		= (pattern, ps, { e_info & ef_modules = ef_modules, ef_macro_defs=ef_macro_defs, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
 
 getPredefinedGlobalSymbol :: !Index !Index !STE_Kind !Int !*CheckState -> (!Global DefinedSymbol, !*CheckState)
 getPredefinedGlobalSymbol symb_index module_index req_ste_kind arity cs=:{cs_predef_symbols,cs_symbol_table}

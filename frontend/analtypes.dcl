@@ -12,7 +12,7 @@ analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeVarHeap !*Err
 determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
 	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 
-checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet !IndexRange !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
+checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
 	!*TypeVarHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 
 isATopConsVar cv		:== cv < 0

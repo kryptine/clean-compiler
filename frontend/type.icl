@@ -1958,7 +1958,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [main_dcl_module_n] = icl_defs }
 	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: modules }	  
 
-	  type_def_sizes =  [ size com_type_defs \\ {com_type_defs} <-: ti_common_defs ]
+//	  type_def_sizes =  [ size com_type_defs \\ {com_type_defs} <-: ti_common_defs ]
       class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
       class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
 	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
@@ -2400,7 +2400,7 @@ where
 		  			| n_new_elements==0
 		  				= fun_defs
 			  			# dummy_fun_def = { fun_symb = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
-										  				fun_kind=FK_DefOrImpUnknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
+										  				fun_kind=FK_Unknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
 			  			= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
 		  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
 		  		= convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps	error  
@@ -2452,7 +2452,7 @@ where
 						,	fun_body		= NoBody
 						,	fun_type		= Yes instance_type
 						,	fun_pos			= me_pos
-						,	fun_kind		= FK_DefOrImpUnknown
+						,	fun_kind		= FK_Unknown
 						,	fun_lifted		= 0
 						,	fun_info		= EmptyFunInfo
 						}
@@ -2494,7 +2494,7 @@ where
 						,	fun_body		= NoBody
 						,	fun_type		= Yes instance_type
 						,	fun_pos			= me_pos
-						,	fun_kind		= FK_DefOrImpUnknown
+						,	fun_kind		= FK_Unknown
 						,	fun_lifted		= 0
 						,	fun_info		= EmptyFunInfo
 						}

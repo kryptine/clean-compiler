@@ -446,8 +446,9 @@ buildPredefinedModule pre_def_symbols
 						def_constructors = [cons_def,strict_cons_def,unboxed_cons_def,tail_strict_cons_def,strict_tail_strict_cons_def,unboxed_tail_strict_cons_def,overloaded_cons_def,
 											nil_def,strict_nil_def,unboxed_nil_def,tail_strict_nil_def,strict_tail_strict_nil_def,unboxed_tail_strict_nil_def,overloaded_nil_def : cons_defs],
 						def_selectors = [], def_classes = [class_def],
-			def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [], /* AA */ def_generics = [] }}, pre_def_symbols)
+			def_macro_indices= { ir_from = 0, ir_to = 0 },def_macros=[],def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [], def_generics = [] }}, pre_def_symbols)
 where
+
 	add_tuple_defs pre_mod_id tup_arity type_defs cons_defs pre_def_symbols
 		| tup_arity >= 2
 			# (type_vars, pre_def_symbols)		= make_type_vars tup_arity [] pre_def_symbols

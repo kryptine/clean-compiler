@@ -310,9 +310,11 @@ propClassification :: !Index !Index ![PropClassification] !{# CommonDefs } !*Typ
 propClassification type_index module_index hio_props defs type_var_heap td_infos
 	| type_index >= size td_infos.[module_index]
 		= (0, type_var_heap, td_infos)
-		# {td_args, td_name} = defs.[module_index].com_type_defs.[type_index]
-		  (td_info, td_infos) = td_infos![module_index].[type_index]
-		= determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
+		# (td_info, td_infos) = td_infos![module_index].[type_index]
+		| td_info.tdi_group_nr== (-1) // is an exported dictionary ?
+			= (0, type_var_heap, td_infos)
+			# {td_args, td_name} = defs.[module_index].com_type_defs.[type_index]
+			= determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
 
 determinePropClassOfTypeDef :: !Int !Int ![ATypeVar] !TypeDefInfo ![PropClassification] !{# CommonDefs} !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification,!*TypeVarHeap, !*TypeDefInfos)

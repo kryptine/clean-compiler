@@ -1260,7 +1260,7 @@ where
 	,	x_module_id		:: Optional LetBind
 // ... MV
 	}
-
+	
 class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
 
 instance updateExpression Expression
@@ -1357,12 +1357,12 @@ where
 				= ui
 		where
 			add_call fun_num []
-				= [{ fc_level = 0, fc_index = fun_num }]
-			add_call fun_num funs=:[call=:{fc_index} : ui]
+				= [FunCall fun_num 0]
+			add_call fun_num funs=:[call=:(FunCall fc_index _) : ui]
 				| fun_num == fc_index
 					= funs
 				| fun_num < fc_index
-					= [{ fc_level = 0, fc_index = fun_num } : funs]
+					= [FunCall fun_num 0 : funs]
 					= [call : add_call fun_num ui]
 	
 		examine_calls [expr : exprs] ui
@@ -1737,10 +1737,6 @@ where
 instance <<< TypeContext
 where
 	(<<<) file tc = file <<< tc.tc_class.glob_object.ds_ident <<< ' ' <<< tc.tc_types <<< " <" <<< tc.tc_var <<< '>'
-
-instance <<< FunCall
-where
-	(<<<) file {fc_index} = file <<< fc_index
 
 instance <<< Special
 where

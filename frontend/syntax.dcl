@@ -26,9 +26,14 @@ instance toString Ident
 	,	ste_previous	:: SymbolTableEntry
 	}
 
+:: FunctionOrMacroIndex = FunctionOrIclMacroIndex !Int | DclMacroIndex /*module_n*/ !Int /*macro_n_in_module*/ !Int;
+
+instance == FunctionOrMacroIndex
+
 ::	STE_BoundTypeVariable	= { stv_count :: !Int, stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr }
 
-::	STE_Kind	= STE_FunctionOrMacro ![Index]
+::	STE_Kind	= STE_FunctionOrMacro ![FunctionOrMacroIndex]
+				| STE_DclMacroOrLocalMacroFunction ![FunctionOrMacroIndex]
 				| STE_Type
 				| STE_Constructor
 				| STE_Selector ![Global Index]
@@ -50,7 +55,7 @@ instance toString Ident
 				| STE_DictType !CheckedTypeDef
 				| STE_DictCons !ConsDef
 				| STE_DictField !SelectorDef
-				| STE_Called ![Index] /* used during macro expansion to indicate that this function is called */
+				| STE_Called ![FunctionOrMacroIndex] /* used during macro expansion to indicate that this function is called */
 				| STE_ExplImpSymbol !Int
 				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
 					/*	stores the numbers of all module components that import the symbol from
@@ -100,11 +105,12 @@ instance toString Ident
 					| TypeSpec !AType
 					| EmptyRhs !BITVECT
 
-::	CollectedDefinitions instance_kind macro_defs =
+::	CollectedDefinitions instance_kind def_macros =
 	{	def_types 			:: ![TypeDef TypeRhs]
 	,	def_constructors	:: ![ConsDef]
 	,	def_selectors		:: ![SelectorDef]
-	,	def_macros			:: !macro_defs
+	,	def_macros			:: ![FunDef]
+	,	def_macro_indices	:: !IndexRange
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
 	,	def_generics		:: ![GenericDef] // AA
@@ -134,6 +140,7 @@ NotALevel 	:==  -1
 ::	CollectedLocalDefs =
 	{	loc_functions	:: !IndexRange
 	,	loc_nodes		:: ![NodeDef ParsedExpr]
+	,	loc_in_icl_module :: !Bool // False for local functions in macros in dcl modules, otherwise True
 	}
 
 ::	NodeDef dst =
@@ -166,8 +173,6 @@ cIsNotAFunction :== False
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
-
-::	DefOrImpFunKind = FK_DefFunction !Bool| FK_ImpFunction !Bool | FK_DefMacro | FK_ImpMacro | FK_ImpCaf | FK_DefOrImpUnknown
 
 cNameNotLocationDependent :== False
 cNameLocationDependent :== True
@@ -429,10 +434,12 @@ cIsAnalysed				:== 4
 	,	fv_count		:: !Int
 	}
 	
-::	FunCall =
+::	FunCall = FunCall !Index !Level | MacroCall !Index !Index Level;
+/*
 	{	fc_level	:: !Level
 	,	fc_index	:: !Index
 	}
+*/
 
 /* Sjaak 19-3-2001 ... */
 
@@ -475,8 +482,8 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 ::	FunctionBody	= ParsedBody ![ParsedBody]
 					| CheckedBody !CheckedBody
 	/* The next three constructors are used during macro expansion (module transform) */
-					| PartioningMacro
-					| PartioningFunction !CheckedBody !Int
+					| PartitioningMacro
+					| PartitioningFunction !CheckedBody !Int
 					| RhsMacroBody !CheckedBody
 	/* macro expansion transforms a CheckedBody into a TransformedBody */
 					| TransformedBody !TransformedBody
@@ -496,7 +503,7 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 	,	fun_body		:: !FunctionBody
 	,	fun_type		:: !Optional SymbolType
 	,	fun_pos			:: !Position
-	,	fun_kind		:: !DefOrImpFunKind
+	,	fun_kind		:: !FunKind
 	,	fun_lifted		:: !Int
 	,	fun_info		:: !FunInfo
 	}
@@ -528,7 +535,7 @@ pIsSafe			:== True
 		| AP_WildCard !OptionalVariable
 		| AP_Empty !Ident
 
-:: AP_Kind = APK_Constructor !Index | APK_Macro
+:: AP_Kind = APK_Constructor !Index | APK_Macro !Bool // is_dcl_macro
 
 ::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
@@ -621,13 +628,14 @@ cNonRecursiveAppl	:== False
 
 ::	SymbKind	= SK_Unknown
 				| SK_Function !(Global Index)
+				| SK_IclMacro !Index
 				| SK_LocalMacroFunction !Index
+				| SK_DclMacro !(Global Index)
+				| SK_LocalDclMacroFunction !(Global Index)
 				| SK_OverloadedFunction !(Global Index)
-				| SK_Generic !(Global Index) !TypeKind		// AA
-				| SK_Constructor !(Global Index)
-				| SK_Macro !(Global Index)
-//				| SK_RecordSelector !(Global Index)
 				| SK_GeneratedFunction !FunctionInfoPtr !Index
+				| SK_Constructor !(Global Index)
+				| SK_Generic !(Global Index) !TypeKind
 				| SK_TypeCode
 
 /*	Some auxiliary type definitions used during fusion. Actually, these definitions
@@ -1291,10 +1299,7 @@ instance == TypeAttribute
 instance == Annotation
 instance == GlobalIndex
 
-/*
-ErrorToString :: Error -> String
-
-*/
+instance <<< FunCall
 
 EmptySymbolTableEntry :== EmptySymbolTableEntryCAF.boxed_symbol_table_entry
 

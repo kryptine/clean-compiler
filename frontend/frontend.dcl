@@ -17,9 +17,6 @@ import checksupport, transform, overloading
 	=	{	fe_icl					:: !IclModule
 		,	fe_dcls					:: !{#DclModule}
 		,	fe_components			:: !{!Group}
-		,	fe_dclIclConversions	:: !Optional {# Index}
-		,	fe_iclDclConversions	:: !Optional {# Index}
-		,	fe_globalFunctions		:: !IndexRange
 		,	fe_arrayInstances		:: !ArrayAndListInstances
 		}
 
@@ -31,5 +28,5 @@ import checksupport, transform, overloading
 	|	FrontEndPhaseConvertModules
 	|	FrontEndPhaseAll
 
-frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !{#FunDef} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File (!Optional !*File) !*Heaps
-  	-> ( !Optional *FrontEndSyntaxTree,!*{# FunDef },!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 
+frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File (!Optional !*File) !*Heaps
+	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional !*File, !*Heaps) 

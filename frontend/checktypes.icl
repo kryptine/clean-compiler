@@ -388,9 +388,8 @@ getTypeDef type_index type_module module_index type_defs modules
 	| type_module == module_index
 		# (type_def, type_defs) = type_defs![type_index]
 		= (type_def, type_index, type_defs, modules)
-		# ({dcl_common={com_type_defs},dcl_conversions}, modules) = modules![type_module]
+		# ({dcl_common={com_type_defs}}, modules) = modules![type_module]
 		  type_def = com_type_defs.[type_index]
-		  type_index = convertIndex type_index (toInt STE_Type) dcl_conversions
 		= (type_def, type_index, type_defs, modules)
 
 checkArityOfType act_arity form_arity (SynType _)
@@ -404,9 +403,8 @@ getClassDef class_index type_module module_index class_defs modules
 		#! si = size class_defs
 		# (class_def, class_defs) = class_defs![class_index]
 		= (class_def, class_index, class_defs, modules)
-		# ({dcl_common={com_class_defs},dcl_conversions}, modules) = modules![type_module]
+		# ({dcl_common={com_class_defs}}, modules) = modules![type_module]
 		  class_def = com_class_defs.[class_index]
-		  class_index = convertIndex class_index (toInt STE_Class) dcl_conversions
 		= (class_def, class_index, class_defs, modules)
 
 getGenericDef :: !Index !Index !Index !u:{# GenericDef} !v:{# DclModule} -> (!GenericDef, !Index , !u:{# GenericDef}, !v:{# DclModule})
@@ -415,9 +413,8 @@ getGenericDef generic_index type_module module_index generic_defs modules
 		#! si = size generic_defs
 		# (generic_def, generic_defs) = generic_defs![generic_index]
 		= (generic_def, generic_index, generic_defs, modules)
-		# ({dcl_common={com_generic_defs},dcl_conversions}, modules) = modules![type_module]
+		# ({dcl_common={com_generic_defs}}, modules) = modules![type_module]
 		  generic_def = com_generic_defs.[generic_index]
-		  generic_index = convertIndex generic_index (toInt STE_Generic) dcl_conversions
 		= (generic_def, generic_index, generic_defs, modules)
 
 checkTypeVar :: !Level !DemandedAttributeKind !TypeVar !TypeAttribute !(!*OpenTypeInfo, !*CheckState)
@@ -1196,41 +1193,107 @@ removeVariablesFromSymbolTable scope vars symbol_table
 
 makeAttributedType attr annot type :== { at_attribute = attr, at_annotation = annot, at_type = type }
 
-createClassDictionaries :: !Index !*{#ClassDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*SymbolTable
-	-> (!*{#ClassDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*SymbolTable)
-createClassDictionaries mod_index class_defs modules first_type_index first_selector_index first_cons_index type_var_heap var_heap symbol_table
-	# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
-			= create_class_dictionaries mod_index 0  class_defs modules []
-				{ index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index } type_var_heap var_heap symbol_table
-	  (type_defs, sel_defs, cons_defs, symbol_table) = foldSt collect_type_def rev_dictionary_list  ([], [], [], symbol_table)
-	= (class_defs, modules, type_defs, sel_defs, cons_defs, type_var_heap, var_heap, symbol_table)
-where			
+createClassDictionaries ::		  !Bool !Index !Index !Index !Index !*{#CheckedTypeDef} !*{# SelectorDef} !*{# ConsDef} !*{#ClassDef} !*{#DclModule} !*TypeVarHeap !*VarHeap !*SymbolTable
+	-> (![CheckedTypeDef],![SelectorDef],![ConsDef],!DictionaryInfo,!*{#CheckedTypeDef},!*{# SelectorDef},!*{# ConsDef},!*{#ClassDef},!*{#DclModule},!*TypeVarHeap,!*VarHeap,!*SymbolTable)
+createClassDictionaries is_dcl mod_index first_type_index first_selector_index first_cons_index type_defs selector_defs cons_defs class_defs modules type_var_heap var_heap symbol_table
+	| is_dcl
+		# indexes = { index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index }
+		# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
+				= create_class_dictionaries mod_index 0 class_defs modules [] indexes type_var_heap var_heap symbol_table
+		  (type_def_list, sel_def_list, cons_def_list, symbol_table) = foldSt collect_type_def rev_dictionary_list  ([], [], [], symbol_table)
+		  dictionary_info = {	n_dictionary_types = indexes.index_type-first_type_index,
+		  						n_dictionary_constructors = indexes.index_cons-first_cons_index,
+		  						n_dictionary_selectors = indexes.index_selector-first_selector_index
+		  					}
+		= (type_def_list, sel_def_list, cons_def_list, dictionary_info, type_defs, selector_defs, cons_defs, class_defs, modules, type_var_heap, var_heap, symbol_table)
+
+		# (dcl_class_defs,modules) = modules![mod_index].dcl_common.com_class_defs
+		
+		#! first_dcl_dictionary_cons_index = modules.[mod_index].dcl_sizes.[cConstructorDefs]
+		#! first_dcl_dictionary_selector_index = modules.[mod_index].dcl_sizes.[cSelectorDefs]
+
+		# indexes = { index_type = first_type_index, index_cons = first_dcl_dictionary_cons_index, index_selector = first_dcl_dictionary_selector_index }
+		# (type_defs, class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
+				= create_exported_icl_class_dictionaries mod_index 0 dcl_class_defs type_defs class_defs modules [] indexes type_var_heap var_heap symbol_table
+
+		# indexes = { index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index }
+		# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
+				= create_icl_class_dictionaries mod_index 0 class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
+
+		# (size_type_defs,type_defs) = usize type_defs
+		  (type_def_list, sel_def_list, cons_def_list, selector_defs, cons_defs, symbol_table)
+		  	= foldSt (collect_type_def_in_icl_module size_type_defs) rev_dictionary_list ([], [], [], selector_defs, cons_defs, symbol_table)
+		# (dictionary_info,modules)=modules![mod_index].dcl_dictionary_info
+		= (type_def_list, sel_def_list, cons_def_list, dictionary_info, type_defs, selector_defs, cons_defs, class_defs, modules, type_var_heap, var_heap, symbol_table)
+where
 	collect_type_def type_ptr (type_defs, sel_defs, cons_defs, symbol_table)
 		# ({ ste_kind = STE_DictType type_def }, symbol_table) = readPtr type_ptr symbol_table
 		  (RecordType {rt_constructor, rt_fields}) = type_def.td_rhs
 		  ({ ste_kind = STE_DictCons cons_def }, symbol_table) = readPtr rt_constructor.ds_ident.id_info symbol_table
 	 	  (sel_defs, symbol_table) = collect_fields 0 rt_fields (sel_defs, symbol_table)
 	 	= ( [type_def : type_defs ] , sel_defs, [cons_def : cons_defs], symbol_table)
-	 where
-		collect_fields field_nr fields (sel_defs, symbol_table)
-			| field_nr < size fields
-				# (sel_defs, symbol_table) = collect_fields (inc field_nr) fields (sel_defs, symbol_table)
-				  ({ ste_kind = STE_DictField sel_def }, symbol_table) = readPtr fields.[field_nr].fs_name.id_info symbol_table
-				= ( [ sel_def : sel_defs ], symbol_table)
-				= ( sel_defs, symbol_table)
-	
+
+	collect_type_def_in_icl_module size_type_defs type_ptr (type_defs, sel_def_list, cons_def_list, selector_defs, cons_defs, symbol_table)
+		# ({ ste_kind = STE_DictType type_def,ste_index}, symbol_table) = readPtr type_ptr symbol_table
+		  (RecordType {rt_constructor, rt_fields}) = type_def.td_rhs
+		  ({ ste_kind = STE_DictCons cons_def }, symbol_table) = readPtr rt_constructor.ds_ident.id_info symbol_table
+	 	| ste_index < size_type_defs	 		
+			# cons_defs = {cons_defs & [rt_constructor.ds_index] = cons_def}
+			# (selector_defs, symbol_table) = store_fields_in_selector_array 0 rt_fields (selector_defs, symbol_table)
+			= (type_defs , sel_def_list, cons_def_list, selector_defs, cons_defs, symbol_table)
+			# (sel_def_list, symbol_table) = collect_fields 0 rt_fields (sel_def_list, symbol_table)
+			= ([type_def : type_defs ] , sel_def_list, [cons_def : cons_def_list], selector_defs, cons_defs, symbol_table)
+
+	collect_fields field_nr fields (sel_defs, symbol_table)
+		| field_nr < size fields
+			# (sel_defs, symbol_table) = collect_fields (inc field_nr) fields (sel_defs, symbol_table)
+			  ({ ste_kind = STE_DictField sel_def }, symbol_table) = readPtr fields.[field_nr].fs_name.id_info symbol_table
+			= ( [ sel_def : sel_defs ], symbol_table)
+			= ( sel_defs, symbol_table)
+
+	store_fields_in_selector_array field_nr fields (sel_defs, symbol_table)
+		| field_nr < size fields
+			# field = fields.[field_nr]
+			# ({ ste_kind = STE_DictField sel_def }, symbol_table) = readPtr field.fs_name.id_info symbol_table
+			# sel_defs = {sel_defs & [field.fs_index] = sel_def }
+			= store_fields_in_selector_array (inc field_nr) fields (sel_defs, symbol_table)
+			= ( sel_defs, symbol_table)
+
 	create_class_dictionaries mod_index class_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
 		| class_index < size class_defs
-			# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs) = 
-					create_class_dictionary mod_index class_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
+			# (class_defs, modules, type_id_info, indexes, type_var_heap, var_heap, cs)
+				= create_class_dictionary mod_index class_index class_defs modules indexes type_var_heap var_heap cs
+			# rev_dictionary_list = [ type_id_info : rev_dictionary_list ]
 			= create_class_dictionaries mod_index (inc class_index) class_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)			
+			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)
 
-	create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !v:[SymbolPtr] !u:Indexes !*TypeVarHeap !*VarHeap !*SymbolTable 
-		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*SymbolTable)
-	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } modules rev_dictionary_list
-			indexes type_var_heap var_heap symbol_table
-		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name}}} = class_def
+	create_exported_icl_class_dictionaries mod_index dcl_class_index dcl_class_defs type_defs class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
+		| dcl_class_index < size dcl_class_defs
+			# icl_class_index = dcl_class_index
+			# dcl_dictionary_index = dcl_class_defs.[dcl_class_index].class_dictionary.ds_index
+			# indexes = {indexes & index_type=dcl_dictionary_index}
+			# (class_defs, modules, type_id_info, indexes, type_var_heap, var_heap, symbol_table)
+				= create_class_dictionary mod_index icl_class_index class_defs modules indexes type_var_heap var_heap symbol_table
+			# ({ ste_kind = STE_DictType type_def }, symbol_table) = readPtr type_id_info symbol_table
+			# type_defs = {type_defs & [type_def.td_index]=type_def}
+			# rev_dictionary_list = [ type_id_info : rev_dictionary_list ]
+			= create_exported_icl_class_dictionaries mod_index (inc dcl_class_index) dcl_class_defs type_defs class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
+			= (type_defs, class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
+
+	create_icl_class_dictionaries mod_index class_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
+		| class_index < size class_defs 
+			| class_defs.[class_index].class_dictionary.ds_index==NoIndex
+				# (class_defs, modules, type_id_info, indexes, type_var_heap, var_heap, symbol_table)
+					= create_class_dictionary mod_index class_index class_defs modules indexes type_var_heap var_heap symbol_table
+				# rev_dictionary_list = [ type_id_info : rev_dictionary_list ]
+				= create_icl_class_dictionaries mod_index (inc class_index) class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
+				= create_icl_class_dictionaries mod_index (inc class_index) class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
+			= (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)			
+
+	create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !u:Indexes !*TypeVarHeap !*VarHeap !*SymbolTable 
+		-> (!*{#ClassDef}, !w:{#DclModule}, !SymbolPtr, !u:Indexes, !*TypeVarHeap, !*VarHeap, !*SymbolTable)
+	create_class_dictionary mod_index class_index class_defs =:{[class_index] = class_def } modules indexes type_var_heap var_heap symbol_table
+		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}}} = class_def
 		# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 		  nr_of_members = size class_members
 		  nr_of_fields = nr_of_members + length class_context
@@ -1257,7 +1320,6 @@ where
 
 		  (td_args, type_var_heap) = mapSt new_attributed_type_variable class_args type_var_heap
 		  
-
   		  type_def =
 		 	{	td_name			= rec_type_id
 			,	td_index		= index_type
@@ -1285,7 +1347,7 @@ where
 			}
 
 		= ({ class_defs & [class_index] = { class_def & class_dictionary = { class_dictionary & ds_index = index_type }}}, modules,
-				 [ type_id_info : rev_dictionary_list ], { index_type = inc index_type, index_cons = inc index_cons, index_selector = index_selector },
+				 type_id_info, { index_type = inc index_type, index_cons = inc index_cons, index_selector = index_selector },
 					type_var_heap, var_heap,
 						symbol_table <:= (type_id_info, { ste_kind = STE_DictType type_def, ste_index = index_type,
 												ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })

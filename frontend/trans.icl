@@ -47,6 +47,20 @@ where
 		# (fd, fun_defs) = fun_defs![fun_index]
 		# {fi_calls} = fd.fun_info
 		  (min_dep, fun_defs, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs (push_on_dep_stack fun_index pi)
+			with
+				visit_functions :: ![FunCall] !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
+				visit_functions [FunCall fc_index _:funs] min_dep max_fun_nr fun_defs pi=:{pi_marks} 
+					#! mark = pi_marks.[fc_index]
+					| mark == NotChecked
+						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs  pi
+						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
+						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
+				
+				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
+					= abort ("visit_functions "+++toString fd.fun_symb+++" "+++toString module_index+++" "+++toString fc_index)
+				
+				visit_functions [] min_dep max_fun_nr fun_defs pi
+					= (min_dep, fun_defs, pi)
 		= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
 
 /*				  
@@ -63,16 +77,6 @@ where
 	push_on_dep_stack fun_index pi=:{pi_deps,pi_marks,pi_next_num}
 		= { pi & pi_deps = [fun_index : pi_deps], pi_marks = { pi_marks & [fun_index] = pi_next_num}, pi_next_num = inc pi_next_num}
 
-	visit_functions :: ![FunCall] !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
-	visit_functions [{fc_index}:funs] min_dep max_fun_nr fun_defs pi=:{pi_marks} 
-		#! mark = pi_marks.[fc_index]
-		| mark == NotChecked
-			# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs  pi
-			= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-			= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-	visit_functions [] min_dep max_fun_nr fun_defs pi
-		= (min_dep, fun_defs, pi)
-		
 
 	try_to_close_group :: !Int !Int !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
 	try_to_close_group fun_index fun_nr min_dep max_fun_nr fun_defs pi=:{pi_marks, pi_deps, pi_groups, pi_next_group}
@@ -316,17 +320,13 @@ instance consumerRequirements App where
 				= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
 				= consumerRequirements app_args common_defs ai
 
-		| glob_module==stdStrictLists_module_n && symb_arity>0
-			# name=symb_name.id_name
-			| is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
-//				&& trace_tn ("consumerRequirements "+++name+++" "+++toString imported_funs.[glob_module].[glob_object].ft_type.st_arity)
-				# [app_arg:app_args]=app_args;
-				# (cc, _, ai) = consumerRequirements app_arg common_defs ai
-				# ai_class_subst = unifyClassifications cActive cc ai.ai_class_subst
-				# ai={ ai & ai_class_subst = ai_class_subst }
-				= consumerRequirements app_args common_defs ai
-
-				= consumerRequirements app_args common_defs ai
+		| glob_module==stdStrictLists_module_n && symb_arity>0 && is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
+//			&& trace_tn ("consumerRequirements "+++symb_name.id_name+++" "+++toString imported_funs.[glob_module].[glob_object].ft_type.st_arity)
+			# [app_arg:app_args]=app_args;
+			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
+			# ai_class_subst = unifyClassifications cActive cc ai.ai_class_subst
+			# ai={ ai & ai_class_subst = ai_class_subst }
+			= consumerRequirements app_args common_defs ai
 
 			= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
@@ -1168,7 +1168,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 					,	fun_body = TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
 					,	fun_type = Yes fun_type
 					,	fun_pos = NoPos
-					,	fun_kind = FK_ImpFunction cNameNotLocationDependent
+					,	fun_kind = FK_Function cNameNotLocationDependent
 					,	fun_lifted = undeff
 					,	fun_info = 	{	fi_calls = []
 									,	fi_group_index = outer_fun_def.fun_info.fi_group_index
@@ -1667,7 +1667,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	= (ti_next_fun_nr, fun_arity, ti)
 where
 	is_dictionary {at_type=TA {type_index} _} es_td_infos
-		= type_index.glob_object>=size es_td_infos.[type_index.glob_module]
+		#! td_infos_of_module=es_td_infos.[type_index.glob_module]
+		= type_index.glob_object>=size td_infos_of_module || td_infos_of_module.[type_index.glob_object].tdi_group_nr==(-1)
 	is_dictionary _ es_td_infos
 		= False
 
@@ -3085,14 +3086,10 @@ where
 	(<<<) file (SK_LocalMacroFunction gi) = file <<< gi
 	(<<<) file (SK_OverloadedFunction gi) = file <<< "(SK_OverloadedFunction)" <<< gi
 	(<<<) file (SK_Constructor gi) = file <<< gi
-	(<<<) file (SK_Macro gi) = file <<< gi
+	(<<<) file (SK_DclMacro gi) = file <<< gi
+	(<<<) file (SK_IclMacro gi) = file <<< gi
 	(<<<) file (SK_GeneratedFunction _ gi) = file <<< "(SK_GeneratedFunction)" <<< gi
 	(<<<) file _ = file
-
-
-instance <<< FunCall
-where
-	(<<<) file {fc_index} = file <<< fc_index
 	
 instance <<< ConsClasses
 where

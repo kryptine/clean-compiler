@@ -26,6 +26,6 @@ solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) 
 				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
 			-> (!.SolvedImports,!(!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 
-checkExplicitImportCompleteness :: ![([Declaration], Position)] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
-			-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
+checkExplicitImportCompleteness :: ![([Declaration], Position)] !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
+															-> (!.{#DclModule},!.{#FunDef},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 

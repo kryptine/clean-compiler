@@ -264,22 +264,25 @@ where
 			heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}, hp_var_heap}
 			symbol_table 
 		#! (common_defs, modules) = modules![module_index]
-		#! class_defs = { x \\ x <-: common_defs.com_class_defs } // make unique copy		
-		#! (class_defs, dcl_modules, new_type_defs, new_selector_defs, new_cons_defs, th_vars, hp_var_heap, symbol_table) =
-				createClassDictionaries 
+		#! class_defs = { x \\ x <-: common_defs.com_class_defs } // make unique copy
+		#  type_defs = { x \\ x <-: common_defs.com_type_defs } // make unique copy
+		#  cons_defs = { x \\ x <-: common_defs.com_cons_defs } // make unique copy
+		#  selector_defs = { x \\ x <-: common_defs.com_selector_defs } // make unique copy
+		#  (size_type_defs,type_defs) = usize type_defs 
+		#! (new_type_defs, new_selector_defs, new_cons_defs,_,type_defs,selector_defs,cons_defs,class_defs, dcl_modules, th_vars, hp_var_heap, symbol_table) =
+				createClassDictionaries
+					(abort "create_class_dictionaries1 True or False ?")
 					module_index 
-					class_defs 
-					dcl_modules 
-					(size common_defs.com_type_defs) 
+					size_type_defs
 					(size common_defs.com_selector_defs) 
 					(size common_defs.com_cons_defs) 
-					th_vars hp_var_heap symbol_table
+					type_defs selector_defs cons_defs class_defs dcl_modules th_vars hp_var_heap symbol_table
 
 		#! common_defs = { common_defs & 
 			com_class_defs = class_defs, 
-			com_type_defs = arrayPlusList common_defs.com_type_defs new_type_defs,
-			com_selector_defs = arrayPlusList common_defs.com_selector_defs new_selector_defs,
-			com_cons_defs = arrayPlusList common_defs.com_cons_defs new_cons_defs}
+			com_type_defs = arrayPlusList type_defs new_type_defs,
+			com_selector_defs = arrayPlusList selector_defs new_selector_defs,
+			com_cons_defs = arrayPlusList cons_defs new_cons_defs}
 
 		#! heaps = {heaps & hp_var_heap = hp_var_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}} 
 		#! modules = { modules & [module_index] = common_defs } 		
@@ -953,9 +956,19 @@ where
 			ds_index  = to_fun_index,
 			ds_arity  = 1	
 			}
+		# gtd_info = GTDI_Generic { 
+			gt_type 		= generic_rep_type,
+			gt_type_args	= [atv_variable \\ {atv_variable} <- type_def.td_args], 
+			gt_iso 			= iso_def_sym,
+			gt_isomap_group	= NoIndex,
+			gt_isomap		= EmptyDefinedSymbol,		
+			gt_isomap_from	= EmptyDefinedSymbol,		
+			gt_isomap_to	= EmptyDefinedSymbol		
+			}
 
 		# (from_fun_def, gs) = buildIsoFrom from_def_sym from_group_index module_index type_def gs	
 		# (to_fun_def, gs) = buildIsoTo to_def_sym to_group_index module_index type_def cons_infos gs	
+
 		# (iso_fun_def, gs) = 
 			//buildUndefFunction iso_fun_index iso_group_index iso_name 1 gs_predefs gs_heaps	
 			buildIsoRecord iso_def_sym iso_group_index from_def_sym to_def_sym gs	
@@ -1258,7 +1271,7 @@ where
 		#! gtd_infos = {gtd_infos & [gi_module, gi_index] = gtd_info}
 		= update_group group_index type_def_global_indexes gtd_infos
 
-/// ... Sjaak
+
 buildIsomapsForGenerics :: !*GenericState
 	-> (![FunDef], ![Group], !*GenericState)
 buildIsomapsForGenerics gs
@@ -1347,13 +1360,14 @@ where
 			#! (fun_def, fun_def_sym, gs) = build_instance_fun instance_def gs
 			#! instance_def = { instance_def & ins_members = {fun_def_sym} }		
 			#! instance_defs = {instance_defs & [instance_index] = instance_def} 
-			
 			# (dcl_fun_index, gs) = get_dcl_member_index instance_index gs
 				with
 			 		get_dcl_member_index icl_instance_index gs=:{gs_dcl_modules, gs_main_dcl_module_n}			 		
 			 			# ({dcl_conversions, dcl_common}, gs_dcl_modules) = gs_dcl_modules![gs_main_dcl_module_n] 
 						# gs = {gs & gs_dcl_modules = gs_dcl_modules}
-						# dcl_index = case dcl_conversions of 
+//						# dcl_index = case dcl_conversions of
+						# dcl_index = NoIndex
+/*
 			 				No 	-> NoIndex
 			 				Yes conversion_table 
 					 			# instance_table = conversion_table.[cInstanceDefs]
@@ -1364,6 +1378,7 @@ where
 					 				# dcl_instance = dcl_common.com_instance_defs.[dcl_instance_index]
 					 				# dcl_index = dcl_instance.ins_members.[0].ds_index			 			 				 			
 					 				-> dcl_index
+*/
 					 	= (dcl_index, gs)						 				
 			 		where
 			 			find_dcl_instance_index icl_instance_index index instance_table
@@ -1377,10 +1392,10 @@ where
 			# gs = case dcl_fun_index of
 					NoIndex -> gs
 					_ 
-						# gs = update_dcl_icl_conversions dcl_fun_index fun_def_sym.ds_index gs
-						# gs = update_dcl_fun_conversions module_index dcl_fun_index fun_def_sym.ds_index gs
+//						# gs = update_dcl_icl_conversions dcl_fun_index fun_def_sym.ds_index gs
+//						# gs = update_dcl_fun_conversions module_index dcl_fun_index fun_def_sym.ds_index gs
 						-> gs
-			 	with
+/*			 	with
 			 		update_dcl_icl_conversions dcl_index icl_index gs=:{gs_opt_dcl_icl_conversions=No}
 			 			= gs
 			 		update_dcl_icl_conversions dcl_index icl_index gs=:{gs_opt_dcl_icl_conversions=Yes cs}
@@ -1406,7 +1421,7 @@ where
 			 						-> Yes table
 			 			# dcl_module = { dcl_module & dcl_conversions = dcl_conversions} 			 			
 			 			= {gs & gs_dcl_modules = {gs_dcl_modules & [module_index] = dcl_module }}
-			 					 						
+*/			 					 						
 			= ([fun_def], [{group_members = [fun_def_sym.ds_index]}], instance_defs, gs)
 
 		| supportPartialInstances && instance_def.ins_partial			
@@ -1442,7 +1457,7 @@ where
 			, 	fun_info =
 				{	ins_fun_def.fun_info 
 				& 	fi_calls = 
-					[	{fc_level = NotALevel, fc_index = gen_fun_ds.ds_index}
+					[	FunCall gen_fun_ds.ds_index NotALevel
 					:	ins_fun_def.fun_info.fi_calls ]
 				} 
 			}
@@ -3293,10 +3308,10 @@ makeFunction {ds_index, ds_arity, ds_ident} group_index arg_vars body_expr opt_s
 			},
 		fun_type = opt_sym_type,
 		fun_pos = fun_pos,
-		fun_kind  = FK_ImpFunction cNameNotLocationDependent,
+		fun_kind  = FK_Function cNameNotLocationDependent,
 		fun_lifted = 0,
 		fun_info = {	
-			fi_calls = [{fc_level = NotALevel, fc_index = ind} \\ ind <- fun_call_indexes],	
+			fi_calls = [FunCall ind NotALevel \\ ind <- fun_call_indexes],	
 			fi_group_index = group_index,
 			fi_def_level = NotALevel,
 			fi_free_vars =  [],
@@ -3838,4 +3853,3 @@ unzip3 [(x1,x2,x3):xs]
 reportError name pos msg error
 	= checkErrorWithIdentPos (newPosition name pos) msg error
 
-		
