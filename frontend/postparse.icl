@@ -1064,7 +1064,7 @@ where
  					# fun_arity = determineArity args type
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (fun_defs, ca) = collect_member_instances defs ca
-					  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type pos
+					  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type fun_pos
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
