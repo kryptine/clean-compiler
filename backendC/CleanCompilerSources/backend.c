@@ -41,6 +41,9 @@ BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation)
 	*oldestImplementation	= kBEVersionOldestImplementation;
 }
 
+#if STRICT_LISTS
+ PolyList unboxed_record_cons_list,unboxed_record_decons_list;
+#endif
 
 extern PolyList UserDefinedArrayFunctions;	/* typechecker.c */
 extern StdOutReopened, StdErrorReopened;	/* cocl.c */
@@ -494,10 +497,11 @@ BEFunctionSymbol (int functionIndex, int moduleIndex)
 
 	Assert ((unsigned int) functionIndex < module->bem_nFunctions);
 	functionSymbol	= &module->bem_functions [functionIndex];
-	Assert (functionSymbol->symb_kind == definition
+	Assert (functionSymbol->symb_kind == definition || functionSymbol->symb_kind == cons_symb || functionSymbol->symb_kind == nil_symb
 				|| (moduleIndex == kPredefinedModuleIndex && functionSymbol->symb_kind != erroneous_symb));
 
-	functionSymbol->symb_def->sdef_isused	= True;
+	if (functionSymbol->symb_kind!=cons_symb && functionSymbol->symb_kind!=nil_symb)
+		functionSymbol->symb_def->sdef_isused	= True;
 
 	return (functionSymbol);
 } /* BEFunctionSymbol */
@@ -978,10 +982,10 @@ BEConstructorSymbol (int constructorIndex, int moduleIndex)
 	if (constructorSymbol->symb_kind == erroneous_symb)
 		return (constructorSymbol);
 
-	Assert (constructorSymbol->symb_kind == definition
+	Assert (constructorSymbol->symb_kind == definition || constructorSymbol->symb_kind == cons_symb
 				|| (moduleIndex == kPredefinedModuleIndex && constructorSymbol->symb_kind != erroneous_symb));
 
-	if (moduleIndex != kPredefinedModuleIndex)
+	if (moduleIndex != kPredefinedModuleIndex && constructorSymbol->symb_kind!=cons_symb)
 		constructorSymbol->symb_def->sdef_isused	= True;
 
 	return (constructorSymbol);
@@ -1036,8 +1040,14 @@ BELiteralSymbol (BESymbKind kind, CleanString value)
 	return (symbol);
 } /* BELiteralSymbol */
 
+# define	nid_ref_count_sign	nid_scope
+
 #if STRICT_LISTS
-void BEPredefineListConstructorSymbol(int arity,int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
+static SymbolS unboxed_list_symbols[Nr_Of_Predef_Types][2];
+
+static SymbolP strict_list_cons_symbols[8];
+
+void BEPredefineListConstructorSymbol (int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
 {
 	BEModuleP	module;
 	SymbolP symbol_p;
@@ -1045,21 +1055,21 @@ void BEPredefineListConstructorSymbol(int arity,int constructorIndex,int moduleI
 	Assert (moduleIndex == kPredefinedModuleIndex);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
-	module	= &gBEState.be_modules [moduleIndex];
+	module = &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
 	
 	symbol_p=module->bem_constructors [constructorIndex];
-	
-	Assert (symbol_p->symb_kind == erroneous_symb);
 
 	symbol_p->symb_kind	= symbolKind;
-	symbol_p->symb_arity	= arity;
 	symbol_p->symb_head_strictness=head_strictness;
 	symbol_p->symb_tail_strictness=tail_strictness;
+
+	if (symbolKind==BEConsSymb && head_strictness<4)
+		strict_list_cons_symbols[(head_strictness<<1)+tail_strictness]=symbol_p;
 }
 
-void BEPredefineListTypeSymbol(int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
+void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
 {
 	BEModuleP	module;
 	SymbolP symbol_p;
@@ -1067,18 +1077,206 @@ void BEPredefineListTypeSymbol(int typeIndex,int moduleIndex,BESymbKind symbolKi
 	Assert (moduleIndex == kPredefinedModuleIndex);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
-	module	= &gBEState.be_modules [moduleIndex];
+	module = &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
 
 	symbol_p=module->bem_types [typeIndex];
 
-	Assert (symbol_p->symb_kind == erroneous_symb);
-
-	symbol_p->symb_kind		= symbolKind;
-	symbol_p->symb_arity	= 1;
+	symbol_p->symb_kind = symbolKind;
+	symbol_p->symb_arity = 1;
 	symbol_p->symb_head_strictness=head_strictness;
 	symbol_p->symb_tail_strictness=tail_strictness;
+}
+
+void BEAdjustStrictListConsInstance (int functionIndex,int moduleIndex)
+{
+	SymbolP symbol_p;
+
+	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
+
+	if (symbol_p->symb_kind==definition){
+		TypeNode element_type_p,list_type_p;
+		SymbDef sdef;
+		TypeArgs type_args_p;
+		
+		sdef=symbol_p->symb_def;
+		type_args_p=sdef->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+		element_type_p=type_args_p->type_arg_node;
+		list_type_p=type_args_p->type_arg_next->type_arg_node;
+		
+		Assert (list_type_p->type_node_is_var==0);
+		Assert (list_type_p->type_node_symbol->symb_kind==list_type);
+
+		symbol_p->symb_head_strictness=list_type_p->type_node_symbol->symb_head_strictness;
+		symbol_p->symb_tail_strictness=list_type_p->type_node_symbol->symb_tail_strictness;
+
+		if (list_type_p->type_node_symbol->symb_head_strictness==3){
+			int element_symbol_kind;
+			struct unboxed_cons *unboxed_cons_p;
+
+			Assert (element_type_p->type_node_is_var==0);
+
+			element_symbol_kind=element_type_p->type_node_symbol->symb_kind;
+
+			symbol_p->symb_head_strictness=4;
+
+			unboxed_cons_p=ConvertAllocType (struct unboxed_cons);
+
+			unboxed_cons_p->unboxed_cons_sdef_p=sdef;
+
+			if (element_symbol_kind < Nr_Of_Predef_Types)
+				unboxed_cons_p->unboxed_cons_state_p = unboxed_list_symbols[element_symbol_kind][symbol_p->symb_tail_strictness].symb_state_p;
+			else if (element_symbol_kind==definition && element_type_p->type_node_symbol->symb_def->sdef_kind==RECORDTYPE){
+				PolyList new_unboxed_record_cons_element;
+				SymbDef record_sdef;
+				
+				record_sdef=element_type_p->type_node_symbol->symb_def;
+				record_sdef->sdef_isused=True;
+				sdef->sdef_isused=True;
+				unboxed_cons_p->unboxed_cons_state_p = &record_sdef->sdef_record_state;
+				
+				new_unboxed_record_cons_element=ConvertAllocType (struct poly_list);
+				new_unboxed_record_cons_element->pl_elem = sdef;
+				new_unboxed_record_cons_element->pl_next = unboxed_record_cons_list;
+				unboxed_record_cons_list = new_unboxed_record_cons_element;
+				
+				sdef->sdef_module=NULL;
+			} else
+				unboxed_cons_p->unboxed_cons_state_p = &StrictState;
+			
+			symbol_p->symb_unboxed_cons_p=unboxed_cons_p;
+		}
+	} else {
+		Assert (symbol_p->symb_kind==definition);
+		
+		debug_message ("BEAdjustStrictListInstance: !(symbol_p->symb_kind==definition) %d %d %d\n",functionIndex,moduleIndex,symbol_p->symb_kind);
+
+		symbol_p->symb_head_strictness=0;
+		symbol_p->symb_tail_strictness=0;
+	}
+	
+	symbol_p->symb_kind = cons_symb;
+	/* symbol_p->symb_arity = 2; no symb_arity for cons_symb, because symb_state_p is used of this union */
+}
+
+void BEAdjustUnboxedListDeconsInstance (int functionIndex,int moduleIndex)
+{
+	SymbolP symbol_p,cons_symbol_p;
+	SymbDefP sdef_p;
+	TypeNode element_type_p,list_type_p;
+	PolyList new_unboxed_record_decons_element;
+
+	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
+
+	Assert (symbol_p->symb_kind==definition);
+	sdef_p=symbol_p->symb_def;
+	
+	list_type_p=sdef_p->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments->type_arg_node;
+	element_type_p=list_type_p->type_node_arguments->type_arg_node;
+	
+	Assert (list_type_p->type_node_is_var==0);
+	Assert (list_type_p->type_node_symbol->symb_kind==list_type);
+	Assert (list_type_p->type_node_symbol->symb_head_strictness==3);
+	Assert (element_type_p->type_node_symbol->symb_def->sdef_kind==RECORDTYPE);
+	
+	cons_symbol_p=ConvertAllocType (SymbolS);
+
+	cons_symbol_p->symb_kind = cons_symb;
+	cons_symbol_p->symb_head_strictness=4;
+	cons_symbol_p->symb_tail_strictness=list_type_p->type_node_symbol->symb_tail_strictness;
+	cons_symbol_p->symb_state_p=&element_type_p->type_node_symbol->symb_def->sdef_record_state;
+
+	sdef_p->sdef_unboxed_cons_symbol=cons_symbol_p;
+	
+	new_unboxed_record_decons_element=ConvertAllocType (struct poly_list);
+	new_unboxed_record_decons_element->pl_elem = sdef_p;
+	new_unboxed_record_decons_element->pl_next = unboxed_record_decons_list;
+	unboxed_record_decons_list = new_unboxed_record_decons_element;
+}
+
+void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex)
+{
+	SymbolP symbol_p;
+
+	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
+
+	symbol_p->symb_head_strictness=1;
+	symbol_p->symb_tail_strictness=0;
+	
+	symbol_p->symb_kind = nil_symb;
+}
+
+BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex)
+{
+	BEModuleP module,decons_module;
+	SymbolP constructor_symbol,decons_symbol,list_type_symbol;
+	TypeNode list_type,element_type;
+
+	Assert ((unsigned int) deconsModuleIndex < gBEState.be_nModules);
+	decons_module = &gBEState.be_modules [deconsModuleIndex];
+
+	Assert ((unsigned int) deconsIndex < decons_module->bem_nFunctions);
+	decons_symbol = &decons_module->bem_functions [deconsIndex];
+
+	Assert (decons_symbol->symb_kind==definition);
+	
+	list_type=decons_symbol->symb_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments->type_arg_node;
+	element_type=list_type->type_node_arguments->type_arg_node;
+	
+	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
+	module = &gBEState.be_modules [moduleIndex];
+
+	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
+	constructor_symbol = module->bem_constructors [constructorIndex];
+
+	Assert (constructor_symbol->symb_kind==definition
+				|| (moduleIndex==kPredefinedModuleIndex && constructor_symbol->symb_kind!=erroneous_symb));
+
+	if (moduleIndex != kPredefinedModuleIndex)
+		constructor_symbol->symb_def->sdef_isused = True;
+
+	list_type_symbol=list_type->type_node_symbol;
+
+	if (constructor_symbol->symb_head_strictness==1 && list_type_symbol->symb_head_strictness<4)
+		constructor_symbol=strict_list_cons_symbols[(list_type_symbol->symb_head_strictness<<1)+list_type_symbol->symb_tail_strictness];
+
+	if (list_type_symbol->symb_head_strictness==3){
+		int element_symbol_kind;
+		
+		Assert (element_type->type_node_is_var==0);
+
+		element_symbol_kind=element_type->type_node_symbol->symb_kind;
+
+		if (element_symbol_kind<Nr_Of_Predef_Types)
+			constructor_symbol=&unboxed_list_symbols[element_symbol_kind][list_type_symbol->symb_tail_strictness];
+		else if (element_symbol_kind==definition && element_type->type_node_symbol->symb_def->sdef_kind==RECORDTYPE)
+			constructor_symbol=decons_symbol->symb_def->sdef_unboxed_cons_symbol;
+	}
+	
+	return constructor_symbol;
+}
+
+BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENodeIdListP nodeIds,BENodeP decons_node)
+{
+	NodeP	push_node;
+
+	push_node	= ConvertAllocType (NodeS);
+
+	push_node->node_kind		= PushNode;
+	push_node->node_arity		= arity;
+	push_node->node_arguments	= arguments;
+	push_node->node_push_symbol = symbol;
+	push_node->node_decons_node = decons_node;
+	push_node->node_node_ids	= nodeIds;
+	push_node->node_number		= 0;
+
+	Assert (arguments->arg_node->node_kind == NodeIdNode);
+	Assert (arguments->arg_node->node_node_id->nid_ref_count_sign == -1);
+		
+	arguments->arg_node->node_node_id->nid_refcount++;
+	
+	return push_node;
 }
 #endif
 
@@ -1460,9 +1658,6 @@ static int gCurrentScope = 0;
 static	NodeIdRefCountListP	gRefCountLists [kMaxScope];
 static	NodeIdRefCountListP	gRefCountList;
 
-# define	nid_ref_count_sign	nid_scope
-
-
 static void
 AddRefCount (NodeIdP nodeId)
 {
@@ -1731,7 +1926,11 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 	pushNode->node_kind			= PushNode;
 	pushNode->node_arity		= arity;
 	pushNode->node_arguments	= arguments;
+#if STRICT_LISTS
+	pushNode->node_push_symbol = symbol;
+#else
 	pushNode->node_record_symbol= symbol;
+#endif
 	pushNode->node_node_ids		= nodeIds;
 	pushNode->node_number		= 0;
 /*
@@ -1748,6 +1947,7 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 */
 	Assert (arguments->arg_node->node_kind == NodeIdNode);
 	Assert (arguments->arg_node->node_node_id->nid_ref_count_sign == -1);
+
 	arguments->arg_node->node_node_id->nid_refcount++;
 	
 	return (pushNode);
@@ -3229,6 +3429,62 @@ BEArg (CleanString arg)
 	}
 } /* BEArg */
 
+#if STRICT_LISTS
+static void init_unboxed_list_symbols (void)
+{
+	StateP array_state_p,strict_array_state_p,unboxed_array_state_p;
+	int i;
+	
+	for (i=0; i<Nr_Of_Predef_Types; ++i){
+		SymbolP symbol_p;
+		
+		symbol_p=&unboxed_list_symbols[i][0];
+		symbol_p->symb_kind=cons_symb;
+		symbol_p->symb_head_strictness=4;
+		symbol_p->symb_tail_strictness=0;
+		symbol_p->symb_state_p=&BasicSymbolStates[i];
+		symbol_p->symb_next=NULL;
+		
+		symbol_p=&unboxed_list_symbols[i][1];
+		symbol_p->symb_kind=cons_symb;
+		symbol_p->symb_head_strictness=4;
+		symbol_p->symb_tail_strictness=1;
+		symbol_p->symb_state_p=&BasicSymbolStates[i];
+		symbol_p->symb_next=NULL;
+	}
+
+	array_state_p=ConvertAllocType (StateS);
+	array_state_p->state_type = ArrayState;
+	array_state_p->state_arity = 1;
+	array_state_p->state_array_arguments = ConvertAllocType (StateS);
+	array_state_p->state_mark = 0;
+	SetUnaryState (&array_state_p->state_array_arguments[0],OnA,UnknownObj);
+
+	unboxed_list_symbols[array_type][0].symb_state_p=array_state_p;
+	unboxed_list_symbols[array_type][1].symb_state_p=array_state_p;
+
+	strict_array_state_p=ConvertAllocType (StateS);
+	strict_array_state_p->state_type = ArrayState;
+	strict_array_state_p->state_arity = 1;
+	strict_array_state_p->state_array_arguments = ConvertAllocType (StateS);
+	strict_array_state_p->state_mark = 0;
+	strict_array_state_p->state_array_arguments[0] = StrictState;
+
+	unboxed_list_symbols[strict_array_type][0].symb_state_p=strict_array_state_p;
+	unboxed_list_symbols[strict_array_type][1].symb_state_p=strict_array_state_p;
+
+	unboxed_array_state_p=ConvertAllocType (StateS);
+	unboxed_array_state_p->state_type = ArrayState;
+	unboxed_array_state_p->state_arity = 1;
+	unboxed_array_state_p->state_array_arguments = ConvertAllocType (StateS);
+	unboxed_array_state_p->state_mark = STATE_UNBOXED_ARRAY_MASK;
+	unboxed_array_state_p->state_array_arguments [0] = StrictState;
+
+	unboxed_list_symbols[unboxed_array_type][0].symb_state_p=unboxed_array_state_p;
+	unboxed_list_symbols[unboxed_array_type][1].symb_state_p=unboxed_array_state_p;
+}
+#endif
+
 BackEnd
 BEInit (int argc)
 {
@@ -3256,6 +3512,10 @@ BEInit (int argc)
 #endif
 
 	UserDefinedArrayFunctions	= NULL;
+#if STRICT_LISTS
+	unboxed_record_cons_list=NULL;
+	unboxed_record_decons_list=NULL;
+#endif
 
 	InitPredefinedSymbols ();
 
@@ -3265,6 +3525,10 @@ BEInit (int argc)
 	InitStatesGen ();
 	InitCoding ();
 	InitInstructions ();
+
+#if STRICT_LISTS
+	init_unboxed_list_symbols();
+#endif
 
 	CheckBEEnumTypes ();
 

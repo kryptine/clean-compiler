@@ -18,6 +18,6 @@
 
 #define WRITE_DCL_MODIFICATION_TIME 1
 
-#define STRICT_LISTS 0
+#define STRICT_LISTS 1
 
 #undef KARBON

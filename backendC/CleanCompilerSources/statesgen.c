@@ -1193,6 +1193,10 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 	}
 }
 
+#if STRICT_LISTS
+extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
+#endif
+
 void ExamineTypesAndLhsOfSymbols (Symbol symbs)
 {
 	next_def_number = 1;
@@ -1203,6 +1207,16 @@ void ExamineTypesAndLhsOfSymbols (Symbol symbs)
 
 		symbs=symbs->symb_next;
 	}
+#if STRICT_LISTS
+	{
+		PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
+		
+		for_l (unboxed_record_cons_elem,unboxed_record_cons_list,pl_next)
+			ExamineTypesAndLhsOfSymbolDefinition (unboxed_record_cons_elem->pl_elem);
+		for_l (unboxed_record_decons_elem,unboxed_record_decons_list,pl_next)
+			ExamineTypesAndLhsOfSymbolDefinition (unboxed_record_decons_elem->pl_elem);
+	}
+#endif
 }
 
 extern PolyList UserDefinedArrayFunctions;
@@ -1740,8 +1754,11 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 			case cons_symb:
 #if STRICT_LISTS
 				if (node->node_arity==2){
-					if (rootsymb->symb_head_strictness)
-						parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+					if (rootsymb->symb_head_strictness>1)
+						if (rootsymb->symb_head_strictness==4)
+							parallel = DetermineStrictArgContext (node->node_arguments,*rootsymb->symb_unboxed_cons_state_p,local_scope);
+						else
+							parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
 					if (rootsymb->symb_tail_strictness)
 						parallel = DetermineStrictArgContext (node->node_arguments->arg_next,StrictState,local_scope);
 				}
@@ -1749,6 +1766,11 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				if (ShouldDecrRefCount)
 					DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
 			case nil_symb:
+#if STRICT_LISTS
+				if (rootsymb->symb_head_strictness & 1)
+					parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+#endif
+
 				SetUnaryState (&node->node_state, StrictOnA, ListObj);
 				break;
 			case apply_symb:
@@ -2589,30 +2611,30 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 # ifdef REUSE_UNIQUE_NODES
 							if (symbol->symb_kind==cons_symb && (node_id_state_p->state_mark & STATE_UNIQUE_MASK) && case_alt_node_p->node_arity==2){
 								NodeIdP node_id_p;
+								StateP element_state_p;
 								
 								node_id_p=node_ids->nidl_node_id;
 								node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
-								
+#  if STRICT_LISTS
+								if (symbol->symb_head_strictness>1)
+									if (symbol->symb_head_strictness==4)
+										element_state_p=symbol->symb_state_p;
+									else
+										element_state_p=&StrictState;
+								else
+#  endif
+								element_state_p=&LazyState;
+
 								if ((node_id_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) && (node_id_state_p->state_unq_type_args & 1)){
 									StateP unique_state_p;
 									
 									unique_state_p=CompAllocType (StateS);
-#  if STRICT_LISTS
-									if (symbol->symb_head_strictness)
-										*unique_state_p=StrictState;
-									else
-#  endif
-									*unique_state_p=LazyState;
+									*unique_state_p=*element_state_p;
 									unique_state_p->state_mark |= STATE_UNIQUE_MASK;
 
 									node_id_p->nid_lhs_state_p_=unique_state_p;
 								} else
-#  if STRICT_LISTS
-									if (symbol->symb_head_strictness)
-										node_id_p->nid_lhs_state_p_=&StrictState;
-									else
-#  endif
-									node_id_p->nid_lhs_state_p_=&LazyState;
+									node_id_p->nid_lhs_state_p_=element_state_p;
 																
 								node_ids=node_ids->nidl_next;
 								
@@ -2629,6 +2651,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 									else
 #  endif
 									*unique_state_p=LazyState;
+									
 									unique_state_p->state_mark |= STATE_UNIQUE_MASK;
 									if ((node_id_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) && (node_id_state_p->state_unq_type_args & 1)){
 										unique_state_p->state_mark |= STATE_UNIQUE_TYPE_ARGUMENTS_MASK;
@@ -2661,11 +2684,11 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 							} else
 # endif
 # if STRICT_LISTS
-							if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness || symbol->symb_tail_strictness) && case_alt_node_p->node_arity==2){
+							if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness) && case_alt_node_p->node_arity==2){
 								NodeIdP node_id_p;
 							
 								node_id_p=node_ids->nidl_node_id;
-								node_id_p->nid_lhs_state_p_= symbol->symb_head_strictness ? &StrictState : &LazyState;
+								node_id_p->nid_lhs_state_p_= symbol->symb_head_strictness>1 ? (symbol->symb_head_strictness==4 ? symbol->symb_state_p : &StrictState) : &LazyState;
 								node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
 
 								node_id_p=node_ids->nidl_next->nidl_node_id;

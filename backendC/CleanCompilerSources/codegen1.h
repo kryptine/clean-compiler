@@ -17,7 +17,7 @@ extern LabDef
 	cycle_lab, reserve_lab, type_error_lab, indirection_lab, ind_lab,
 	hnf_lab, cons_lab, nil_lab, tuple_lab, empty_lab, add_arg_lab, match_error_lab,
 #if STRICT_LISTS
-	conss_lab,consts_lab,conssts_lab,
+	conss_lab,consts_lab,conssts_lab,unboxed_cons_labels[][2],unboxed_cons_array_label,
 #endif
 #ifdef CLEAN2
 	select_with_dictionary_lab, update_with_dictionary_lab,
@@ -100,7 +100,9 @@ extern Bool ConvertExternalToInternalCall (int arity,StateS *const ext_function_
 										Bool skip_entry,int intasp,int intbsp,Label ealab,Label extlab,Bool root_node_needed);
 extern void GenerateCodeForLazyTupleSelectorEntries (Bool *selectors);
 extern void GenerateCodeForLazyArrayFunctionEntries (void);
-
+#if STRICT_LISTS
+void GenerateCodeForLazyUnboxedRecordListFunctions (void);
+#endif
 extern int next_update_function_n,next_match_function_n;
 
 extern ImpRuleS *first_update_function,**update_function_p;

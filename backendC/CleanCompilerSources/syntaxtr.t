@@ -4,8 +4,6 @@
 
 #include "compiledefines.h"
 
-#define D 0
-
 #define	class	class_is_keyword
 #define	new		new_is_keyword
 
@@ -77,33 +75,6 @@ typedef enum {
 	erroneous_symb
 } SymbKind;
 
-#if D
-
-STRUCT (state,State){
-	union {
-		struct {
-			StateKind 				arg_kind;				/* for SimpleState */
-			ObjectKind				arg_object;
-		} state_arg;
-		struct state *				state_args;			/* for TupleState and ArrayState */
-		struct record_state_descr *	state_rs;			/* for RecordState */
-	};
-	short							state_arity;
-	unsigned char					state_type;		/* StateType */
-	unsigned char					state_mark;
-};
-
-#define state_kind					state_arg.arg_kind
-#define state_object				state_arg.arg_object
-
-#define state_record_symbol			state_rs->rs_symb
-#define state_record_arguments		state_rs->rs_args
-#define state_record_desc			state_rs
-#define state_tuple_arguments		state_args
-#define state_array_arguments		state_args
-
-#else
-
 STRUCT (state,State){
 	union {
 		struct state *				sd_args;		/* for TupleState and ArrayState */
@@ -126,7 +97,6 @@ STRUCT (state,State){
 # define state_record_desc			state_descr.sd_rs
 # define state_tuple_arguments		state_descr.sd_args
 # define state_array_arguments		state_descr.sd_args
-#endif
 
 typedef struct state		*States;
 
@@ -157,7 +127,18 @@ typedef union symb_value {
 	struct symbol_type *			val_type;		/* for cons_symb, nil_symb apply_symbol ? */
 	struct symbol *					val_symb;		/* for field_symbol_list */
 	struct overloaded_instance *	val_instance;
+#if STRICT_LISTS
+	struct state *					val_state_p;		/* element state for unboxed list cons in lhs */
+	struct unboxed_cons *			val_unboxed_cons_p;	/* state and symbol definition for unboxed list cons in rhs */
+#endif
 } SymbValue;
+
+#if STRICT_LISTS
+struct unboxed_cons {
+	struct state *					unboxed_cons_state_p;
+	struct symbol_def *				unboxed_cons_sdef_p;
+};
+#endif
 
 STRUCT (symbol,Symbol) {
 	SymbValue			symb_val;
@@ -169,8 +150,13 @@ STRUCT (symbol,Symbol) {
 };
 
 #if STRICT_LISTS
-# define symb_head_strictness symb_infix_priority /* 0=lazy,1=strict,2=unboxed */
+# define symb_head_strictness symb_infix_priority /* 0=lazy,1=overloaded,2=strict,3=unboxed overloaded,4=unboxed*/
 # define symb_tail_strictness symb_infix_assoc /* 0=lazy,1=strict */
+
+# define symb_state_p symb_val.val_state_p
+# define symb_unboxed_cons_p symb_val.val_unboxed_cons_p
+# define symb_unboxed_cons_state_p symb_val.val_unboxed_cons_p->unboxed_cons_state_p
+# define symb_unboxed_cons_sdef_p symb_val.val_unboxed_cons_p->unboxed_cons_sdef_p
 #endif
 
 #define symb_ident symb_val.val_ident
@@ -289,141 +275,6 @@ typedef struct {
 
 struct _exp;
 
-#if D
-
-extern void error (void);
-
-#define UNION_FIELD(type,field,field_i,field_n)\
-	inline type const &field (void){ return field_i!=field_n ? error(),_##field : _##field; };\
-	inline type &field##_ (void){ field_i=field_n; return _##field; }
-
-#define UNION2(i,t1,f1,t2,f2)\
-	union {\
-		t1 _##f1;\
-		t2 _##f2;\
-	};\
-	UNION_FIELD(t1,f1,i,1);\
-	UNION_FIELD(t2,f2,i,2)
-
-#define UNION4(i,t1,f1,t2,f2,t3,f3,t4,f4)\
-	union {\
-		t1 _##f1;\
-		t2 _##f2;\
-		t3 _##f3;\
-		t4 _##f4;\
-	};\
-	UNION_FIELD(t1,f1,i,1);\
-	UNION_FIELD(t2,f2,i,2);\
-	UNION_FIELD(t3,f3,i,3);\
-	UNION_FIELD(t4,f4,i,4)
-
-STRUCT (node_id,NodeId){
-private:
-	unsigned int nid_u1:4;
-	unsigned int nid_u2:4;
-	unsigned int nid_u3:4;
-	unsigned int nid_u4:4;
-	unsigned int nid_u5:4;
-public:
-	node_id (void) {
-		nid_u1=0;
-		nid_u2=0;
-		nid_u3=0;
-		nid_u4=0;
-		nid_u5=0;
-	};
-
-	Ident			nid_ident;
-	unsigned short	nid_mark;
-	unsigned short	nid_mark2;
-	int				nid_refcount;
-	int				nid_number;
-
-	UNION4 (nid_u1,
-		struct node_id *				,nid_forward_node_id,
-		struct type_cell *				,nid_type,
-		Index							,nid_index,
-		struct node_id_ref_count_list *	,nid_node_id_ref_count_element	/* pattern_match: graph */
-	);
-	#define nid_forward_node_id nid_forward_node_id()
-	#define nid_forward_node_id_ nid_forward_node_id_()
-	#define nid_type nid_type()
-	#define nid_type_ nid_type_()
-	#define nid_index nid_index()
-	#define nid_index_ nid_index_()
-	#define nid_node_id_ref_count_element nid_node_id_ref_count_element()
-	#define nid_node_id_ref_count_element_ nid_node_id_ref_count_element_()
-
-	union {
-		struct {
-			union {
-				struct node *			s1_subst_node;
-				struct node_id *		s1_subst_node_id;
-				struct reference_info *	s1_ref_info;
-			};
-			int	s1_ref_count_copy;
-		} nid_s1;
-		StateS			_nid_state;
-	};
-
-	inline struct node *const &nid_subst_node (void){ return nid_u4!=1 ? error(),nid_s1.s1_subst_node : nid_s1.s1_subst_node; };
-	inline struct node * &nid_subst_node_ (void){ nid_u4=1; return nid_s1.s1_subst_node; }
-	#define nid_subst_node nid_subst_node()
-	#define nid_subst_node_ nid_subst_node_()
-
-	inline struct node_id *const &nid_subst_node_id (void){ return (nid_u4!=2 || nid_u5!=1) ? error(),nid_s1.s1_subst_node_id : nid_s1.s1_subst_node_id; };
-	inline struct node_id * &nid_subst_node_id_ (void){ nid_u4=2; return nid_s1.s1_subst_node_id; }
-	#define nid_subst_node_id nid_subst_node_id()
-	#define nid_subst_node_id_ nid_subst_node_id_()
-
-	inline struct reference_info *const &nid_ref_info (void){ return (nid_u4!=3 || nid_u5!=1) ? error(),nid_s1.s1_ref_info : nid_s1.s1_ref_info; };
-	inline struct reference_info * &nid_ref_info_ (void){ nid_u4=3; return nid_s1.s1_ref_info; }
-	#define nid_reference_info nid_ref_info()
-	#define nid_reference_info_ nid_ref_info_()
-
-	inline int const &nid_ref_count_copy (void){ return nid_u5!=1 ? error(),nid_s1.s1_ref_count_copy : nid_s1.s1_ref_count_copy; };
-	inline int &nid_ref_count_copy_ (void){ nid_u5=1; return nid_s1.s1_ref_count_copy; }
-	inline int &nid_ref_count_copy__ (void){ return nid_u5!=1 ? error(),nid_s1.s1_ref_count_copy : nid_s1.s1_ref_count_copy; };
-	#define nid_ref_count_copy nid_ref_count_copy()
-	#define nid_ref_count_copy_ nid_ref_count_copy_()
-	#define nid_ref_count_copy__ nid_ref_count_copy__()
-
-	inline StateS const &nid_state (void){ return (nid_u4!=4 || nid_u5!=2) ? error(),_nid_state : _nid_state; };
-	inline StateS &nid_state_ (void){ nid_u4=4; nid_u5=2; return _nid_state; }
-	inline StateS &nid_state__ (void){ return (nid_u4!=4 || nid_u5!=2) ? error(),_nid_state : _nid_state; };
-	#define nid_state nid_state()
-	#define nid_state_ nid_state_()
-	#define nid_state__ nid_state__()
-
-	int				nid_scope;
-	struct node *	nid_node;
-
-	UNION2(nid_u2,
-		struct _exp *	,nid_exp,
-		struct node_id*	,nid_lhs_tuple_node_id
-	);
-	#define nid_exp nid_exp()
-	#define nid_exp_ nid_exp_()
-	#define nid_lhs_tuple_node_id nid_lhs_tuple_node_id()
-	#define nid_lhs_tuple_node_id_ nid_lhs_tuple_node_id_()
-
-	UNION2(nid_u3,
-		NodeDefs		,nid_node_def,		/* only for rhs */
-		struct state *	,nid_lhs_state_p	/* only for lhs */
-	);
-	#define nid_node_def nid_node_def()
-	#define nid_node_def_ nid_node_def_()
-	#define nid_lhs_state_p nid_lhs_state_p()
-	#define nid_lhs_state_p_ nid_lhs_state_p_()
-};
-
-#define nid_a_index	nid_index.index_a	/* codegen2,instructions */
-#define nid_a_index_ nid_index_.index_a	/* codegen2,instructions */
-#define nid_b_index nid_index.index_b	/* codegen2,instructions */
-#define nid_b_index_ nid_index_.index_b	/* codegen2,instructions */
-
-#else
-
 STRUCT (node_id,NodeId){
 	Ident			nid_ident;
 	unsigned short	nid_mark;
@@ -499,7 +350,6 @@ STRUCT (node_id,NodeId){
 #define nid_exp_				nid_exp
 #define nid_lhs_state_p_		nid_lhs_state_p
 #define nid_reference_info_		nid_reference_info
-#endif
 
 /*	Masks for nid_mark */
 
@@ -630,7 +480,7 @@ STRUCT (node,Node){
 				struct recursive_call *		u_recursive_call;			/* typechecker */
 				struct overloaded_function *u_overloaded_application;	/* typechecker */
 			} s_u;
-			int								s_line;						/* size for PushNode */
+			int								s_line;						/* size for PushNode if not STRICT_LISTS) */
 		} su_s;
 		struct {
 			struct node_def *			 	u_node_defs;		/* for CaseNode,DefaultNode and GuardNode */
@@ -644,6 +494,15 @@ STRUCT (node,Node){
 			struct node_def *			scope_node_defs;
 			struct imp_rule *			scope_imp_rules;
 		} su_scope;												/* for ScopeNode */
+#if STRICT_LISTS
+		struct {
+			SymbolP						push_symbol;
+			union {
+				NodeP					pu_decons_node;			/* if overloaded push */
+				int						pu_size;				/* if unique non overloaded push */
+			} push_pu;
+		} su_push;												/* for PushNode */
+#endif
 	} node_su;
 
 	short			node_arity;
@@ -686,6 +545,12 @@ STRUCT (node,Node){
 
 #define node_scope_node_defs		node_su.su_scope.scope_node_defs
 #define node_scope_imp_rules		node_su.su_scope.scope_imp_rules
+
+#if STRICT_LISTS
+# define node_push_symbol			node_su.su_push.push_symbol
+# define node_decons_node			node_su.su_push.push_pu.pu_decons_node
+# define node_push_size				node_su.su_push.push_pu.pu_size
+#endif
 
 #define node_then_observer_list		node_contents.contents_if->if_then_observer_list
 #define node_else_observer_list		node_contents.contents_if->if_else_observer_list
@@ -911,7 +776,9 @@ STRUCT (symbol_def,SymbDef){
 		StateS					typeinfo_record_state;
 		struct
 		{	FieldList	fieldinfo_sel_field;
+#ifndef CLEAN2
 			Node		fieldinfo_sel_node;
+#endif
 			int			fieldinfo_sel_field_number;
 		} sdef_fieldinfo;
 		struct constructor_list * typeinfo_constructor;	/* for CONSTRUCTOR */
@@ -926,7 +793,12 @@ STRUCT (symbol_def,SymbDef){
 
 	union {
 		struct _fun *	u3_sa_fun;					/* sa.c */
+#ifdef CLEAN2
+		SymbolP			u3_unboxed_cons_symbol;		/* backend.c */
+#endif
+#ifndef CLEAN2
 		unsigned		u3_instantiation_depth;
+#endif
 	} sdef_u3;
 
 	struct symbol_def *	sdef_dcl_icl;					/* to dcl if sdef_exported, to icl if sdef_main_dcl */
@@ -1011,6 +883,9 @@ STRUCT (symbol_def,SymbDef){
 
 #define sdef_instantiation_depth	sdef_u3.u3_instantiation_depth
 #define sdef_sa_fun					sdef_u3.u3_sa_fun
+#ifdef CLEAN2
+ #define sdef_unboxed_cons_symbol sdef_u3.u3_unboxed_cons_symbol
+#endif
 
 #define sdef_next_scc			sdef_u1.u1_next_scc
 #define sdef_subst_symbol		sdef_u1.u1_subst_symbol	/* macros */

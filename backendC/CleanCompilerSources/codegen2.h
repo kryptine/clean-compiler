@@ -15,6 +15,8 @@ extern int ObjectSizes [];
 #define IsOnACycle(nodenum) (nodenum < 0)
 #define IsOnBStack(state) (! IsSimpleState (state) || (state).state_kind == OnB)
 
+extern LabDef *unboxed_cons_label (SymbolP cons_symbol_p);
+
 extern void ScanInlineFile (char *fname);
 
 extern Bool EqualState (StateS st1, StateS st2);

@@ -209,13 +209,28 @@ Clean (BEBoolSymbol :: Bool BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BELiteralSymbol (BESymbKind kind, CleanString value);
 Clean (BELiteralSymbol :: BESymbKind String BackEnd -> (BESymbolP, BackEnd))
 
-/*
-void BEPredefineListConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
-Clean (BEPredefineListConstructorSymbol :: Int Int Int BESymbKind Int Int BackEnd -> BackEnd)
+
+void BEPredefineListConstructorSymbol (int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
+Clean (BEPredefineListConstructorSymbol :: Int Int BESymbKind Int Int BackEnd -> BackEnd)
 
 void BEPredefineListTypeSymbol (int typeIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
 Clean (BEPredefineListTypeSymbol :: Int Int BESymbKind Int Int BackEnd -> BackEnd)
-*/
+
+void BEAdjustStrictListConsInstance (int functionIndex, int moduleIndex);
+Clean (BEAdjustStrictListConsInstance :: Int Int BackEnd -> BackEnd)
+
+void BEAdjustUnboxedListDeconsInstance (int functionIndex, int moduleIndex);
+Clean (BEAdjustUnboxedListDeconsInstance :: Int Int BackEnd -> BackEnd)
+
+void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex);
+Clean (BEAdjustOverloadedNilFunction :: Int Int BackEnd -> BackEnd)
+
+BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex);
+Clean (BEOverloadedConsSymbol :: Int Int Int Int BackEnd -> (BESymbolP,BackEnd))
+
+BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENodeIdListP nodeIds,BENodeP decons_node);
+Clean (BEOverloadedPushNode :: Int BESymbolP BEArgP BENodeIdListP BENodeP BackEnd -> (BENodeP, BackEnd))
+
 
 void BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind);
 Clean (BEPredefineConstructorSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)

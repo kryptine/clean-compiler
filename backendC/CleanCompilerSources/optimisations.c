@@ -1552,7 +1552,7 @@ static void optimise_normal_node (Node node)
 		if ((BETWEEN (int_denot,real_denot,symbol->symb_kind)
 			 || symbol->symb_kind==string_denot
 # if STRICT_LISTS
-			 || (BETWEEN (tuple_symb,nil_symb,symbol->symb_kind) && !(symbol->symb_kind==cons_symb && (symbol->symb_head_strictness || symbol->symb_tail_strictness)))
+			 || (BETWEEN (tuple_symb,nil_symb,symbol->symb_kind) && !(symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness)))
 # else
 			 || BETWEEN (tuple_symb,nil_symb,symbol->symb_kind)
 # endif
@@ -1759,7 +1759,11 @@ static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int no
 	node->node_arguments=arg_p;
 	node->node_arity=1;
 
+#if STRICT_LISTS
+	push_node->node_push_size=node_size;
+#else
 	push_node->node_line=node_size;
+#endif
 	
 	--push_node->node_arguments->arg_node->node_node_id->nid_refcount;
 	push_node->node_number=1;
@@ -1910,8 +1914,20 @@ static Bool try_insert_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f
 			}
 			case cons_symb:
 #if STRICT_LISTS
-				if ((node->node_symbol->symb_head_strictness || node->node_symbol->symb_tail_strictness) && IsLazyStateKind (node->node_state.state_kind))
-					return False;
+				if (node->node_symbol->symb_head_strictness>1 || node->node_symbol->symb_tail_strictness){
+					if (!IsLazyStateKind (node->node_state.state_kind) && !(node->node_symbol->symb_head_strictness & 1) && node->node_arity==2){
+						if (node->node_symbol->symb_head_strictness!=4)
+							return insert_unique_fill_node (node,f_node_ids,2,0);			
+						else {
+							int a_size,b_size;
+
+							DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+															
+							return insert_unique_fill_node (node,f_node_ids,a_size,b_size);
+						}
+					} else
+						return False;
+				} else
 #endif
 				return insert_unique_fill_node (node,f_node_ids,2,0);
 			case tuple_symb:
@@ -2428,6 +2444,11 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 static FreeUniqueNodeIdsP check_unique_push_node (NodeP node,FreeUniqueNodeIdsP f_node_ids,int switch_node_id_refcount)
 {
 	NodeIdP node_id_p;
+
+# if STRICT_LISTS
+	if (node->node_symbol->symb_kind==cons_symb && (node->node_symbol->symb_head_strictness & 1))
+		return f_node_ids;
+#endif
 
 	node_id_p=node->node_arguments->arg_node->node_node_id;
 

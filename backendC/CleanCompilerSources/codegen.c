@@ -1191,7 +1191,9 @@ void CodeGeneration (ImpMod imod, char *fname)
 
 			GenerateCodeForLazyTupleSelectorEntries (LazyTupleSelectors);
 			GenerateCodeForLazyArrayFunctionEntries();
-
+#if STRICT_LISTS
+			GenerateCodeForLazyUnboxedRecordListFunctions();
+#endif
 			WriteLastNewlineToABCFile();
 
 			CloseABCFile (fname);

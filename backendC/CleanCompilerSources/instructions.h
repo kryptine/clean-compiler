@@ -17,6 +17,7 @@ void IsString (SymbValue val);
 void PushBasic (ObjectKind obj, SymbValue val);
 
 void EqBasic (ObjectKind obj, SymbValue val, int offset);
+void GenNotB(void);
 
 void PushBasicFromAOnB (ObjectKind kind,int offset);
 void GenPushD_a (int a_offset);
@@ -165,6 +166,9 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 void GenLazyRecordDescriptorAndExport (SymbDef sdef);
 void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry);
 void GenRecordDescriptor (SymbDef sdef);
+#ifdef STRICT_LISTS
+void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict);
+#endif
 void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_state_p);
 void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity);
 

@@ -2193,7 +2193,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 					break;
 				case cons_symb:
 #if STRICT_LISTS
-					if (node->node_symbol->symb_head_strictness){
+					if (node->node_symbol->symb_head_strictness>1){
 						e->e_fun = node->node_symbol->symb_tail_strictness ? strict_tail_strict_cons_sym : strict_cons_sym;
 						break;
 					} else if (node->node_symbol->symb_tail_strictness){
@@ -2503,7 +2503,7 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 			break;
 		case cons_symb:
 #if STRICT_LISTS
-			if (symbol_p->symb_head_strictness){
+			if (symbol_p->symb_head_strictness>1){
 				e->e_fun = symbol_p->symb_tail_strictness ? strict_tail_strict_cons_sym : strict_cons_sym;
 				break;
 			} else if (symbol_p->symb_tail_strictness){
@@ -5126,7 +5126,7 @@ static void FindStrictPropertiesOfFunction (Fun *f)
 
 	if (! IsAnalysableFun (f))
 		return;
-	
+		
 	max_depth_reached = False;
 	max_time_reached  = False;
 	CurrentName       = f->fun_symbol->sdef_ident->ident_name;

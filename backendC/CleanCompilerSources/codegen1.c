@@ -93,6 +93,17 @@ LabDef match_error_lab		= {NULL, "", False, "_match_error", 0};
 LabDef conss_lab			= {NULL, "", False, "_Conss", 0};
 LabDef consts_lab			= {NULL, "", False, "_Consts", 0};
 LabDef conssts_lab			= {NULL, "", False, "_Conssts", 0};
+
+LabDef unboxed_cons_labels[][2] = {
+	/*IntObj*/	{{NULL, "", False, "_Consi", 0}, {NULL, "", False, "_Consits", 0}},
+	/*BoolObj*/	{{NULL, "", False, "_Consb", 0}, {NULL, "", False, "_Consbts", 0}},
+	/*CharObj*/	{{NULL, "", False, "_Consc", 0}, {NULL, "", False, "_Conscts", 0}},
+	/*RealObj*/	{{NULL, "", False, "_Consr", 0}, {NULL, "", False, "_Consrts", 0}},
+	/*FileObj*/	{{NULL, "", False, "_Consf", 0}, {NULL, "", False, "_Consfts", 0}}
+	};
+
+LabDef unboxed_cons_array_label = {NULL, "", False, "_Consa", 0};
+
 #endif
 #ifdef CLEAN2
 LabDef select_with_dictionary_lab	= {NULL, "", False, "_select_with_dictionary", 0};
@@ -688,7 +699,7 @@ static void CopyEntry (int offset, int *sp, int offframe [])
 		GenPushA (*sp-offset); 
 	else
 		GenPushB (*sp-offset); 
-	(*sp)++;
+	++ *sp;
 	UpdateFrame  (offframe, *sp, offframe[offset], offframe);
 }
 
@@ -1107,46 +1118,109 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 	 }
 }
 
-static void GenLazyArrayFunction (SymbDef arr_fun_def)
+static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int n_result_nodes_on_a_stack,int *a_size_p,int *b_size_p)
 {
 	LabDef ealab;
 	int asize,bsize,maxasize;
-	RuleTypes af_type;
+	RuleTypes rule_type;
 	int arity;
 
 	asize = 0;
 	bsize = 0;
 	maxasize = 0;
 
-	af_type	= arr_fun_def->sdef_rule_type;
-	arity = arr_fun_def->sdef_arity;
+	rule_type	= fun_def->sdef_rule_type;
+	arity = fun_def->sdef_arity;
 
-	MakeSymbolLabel (&CurrentAltLabel,NULL,no_pref,arr_fun_def,0);
+	MakeSymbolLabel (&CurrentAltLabel,NULL,no_pref,fun_def,0);
 
 	ealab			= CurrentAltLabel;
 	ealab.lab_pref	= ea_pref;
 	
-	AddStateSizesAndMaxFrameSizes (arity,af_type->rule_type_state_p,&maxasize,&asize,&bsize);
+	AddStateSizesAndMaxFrameSizes (arity,rule_type->rule_type_state_p,&maxasize,&asize,&bsize);
 
-	if ((arr_fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
-		GenArrayFunctionDescriptor (arr_fun_def,&CurrentAltLabel,arity);
-
-	if (DoTimeProfiling)
-		GenPB (arr_fun_def->sdef_ident->ident_name);
-
-	if (arr_fun_def->sdef_mark & SDEF_USED_CURRIED_MASK)
-		ApplyEntry (af_type->rule_type_state_p,arity,&ealab,!(arr_fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
-
-	if (arr_fun_def->sdef_mark & SDEF_USED_LAZILY_MASK)
-		NodeEntry (af_type->rule_type_state_p,arity,&ealab,arr_fun_def);
-
-	EvalArgsEntry (af_type->rule_type_state_p,arr_fun_def,maxasize,&ealab,0);
-
-	CallArrayFunction (arr_fun_def,False,&af_type->rule_type_state_p[-1]);
+	if ((fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
+		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
 
 	if (DoTimeProfiling)
-		GenPE();
+		GenPB (fun_def->sdef_ident->ident_name);
+
+	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK)
+		ApplyEntry (rule_type->rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+
+	if (fun_def->sdef_mark & SDEF_USED_LAZILY_MASK)
+		NodeEntry (rule_type->rule_type_state_p,arity,&ealab,fun_def);
+
+	EvalArgsEntry (rule_type->rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
+	
+	*a_size_p=asize;
+	*b_size_p=bsize;
 }
+
+#if STRICT_LISTS
+extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
+
+void GenerateCodeForLazyUnboxedRecordListFunctions (void)
+{
+	PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
+	
+	for_l (unboxed_record_cons_elem,unboxed_record_cons_list,pl_next){
+		SymbDef fun_def;
+		
+		fun_def=unboxed_record_cons_elem->pl_elem;
+		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
+			int a_size,b_size;
+			TypeArgs type_node_arguments_p;
+			LabDef unboxed_record_cons_lab;
+			int tail_strict;
+
+			GenUnboxedRecordApplyAndNodeEntries (fun_def,1,&a_size,&b_size);
+					
+			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
+			
+			unboxed_record_cons_lab.lab_mod=NULL;
+			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
+			unboxed_record_cons_lab.lab_issymbol=False;
+			unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_ident->ident_name;
+			unboxed_record_cons_lab.lab_post='\0';
+							
+			GenFillR (&unboxed_record_cons_lab,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
+
+			GenRtn (1,0,OnAState);
+			
+			if (DoTimeProfiling)
+				GenPE();
+		}
+	}
+
+	for_l (unboxed_record_decons_elem,unboxed_record_decons_list,pl_next){
+		SymbDef fun_def;
+		
+		fun_def=unboxed_record_decons_elem->pl_elem;
+		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
+			int a_size,b_size;
+			StateP result_state_p;
+
+			GenUnboxedRecordApplyAndNodeEntries (fun_def,0,&a_size,&b_size);
+			
+			result_state_p=&fun_def->sdef_rule_type->rule_type_state_p[-1];
+
+			DetermineSizeOfState (*result_state_p,&a_size,&b_size);
+			
+			if (b_size==0)
+				GenReplArgs (a_size,a_size);
+			else
+				GenReplRArgs (a_size,b_size);
+					
+			GenRtn (a_size,b_size,*result_state_p);
+			
+			if (DoTimeProfiling)
+				GenPE();
+		}
+	}
+}
+#endif
 
 extern PolyList UserDefinedArrayFunctions;
 
@@ -1154,20 +1228,36 @@ void GenerateCodeForLazyArrayFunctionEntries (void)
 {
 	PolyList next_fun;
 	
-	for (next_fun = UserDefinedArrayFunctions; next_fun; next_fun = next_fun -> pl_next)
-	{	SymbDef fun_def = ((Symbol) next_fun -> pl_elem) -> symb_def;
-		if (fun_def ->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))
-			GenLazyArrayFunction (fun_def);
+	for (next_fun = UserDefinedArrayFunctions; next_fun; next_fun = next_fun -> pl_next){
+		SymbDef arr_fun_def;
+		
+		arr_fun_def = ((Symbol)next_fun->pl_elem)->symb_def;
+
+		if (arr_fun_def ->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
+			int a_size,b_size;
+			
+			GenUnboxedRecordApplyAndNodeEntries (arr_fun_def,0,&a_size,&b_size);
+
+			CallArrayFunction (arr_fun_def,False,&arr_fun_def->sdef_rule_type->rule_type_state_p[-1]);
+
+			if (DoTimeProfiling)
+				GenPE();
+		}
 	}
 }
 
-void GenerateCodeForConstructorsAndRecords (Symbol symbs)
+void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 {
-	for ( ; symbs; symbs = symbs->symb_next){
-		if (symbs->symb_kind==definition){
+	Symbol symbol_p;
+#if STRICT_LISTS
+	PolyList unboxed_record_cons_element;
+#endif
+	
+	for_l (symbol_p,symbols,symb_next){
+		if (symbol_p->symb_kind==definition){
 			SymbDef def;
 		
-			def = symbs->symb_def;
+			def = symbol_p->symb_def;
 
 			if (def->sdef_module==CurrentModule){
 				if (def->sdef_kind==TYPE){
@@ -1194,6 +1284,21 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbs)
 			}
 		}
 	}
+
+#if STRICT_LISTS
+	for_l (unboxed_record_cons_element,unboxed_record_cons_list,pl_next){
+		SymbDef cons_instance_sdef,record_sdef;
+		TypeArgs type_node_arguments_p;
+		int tail_strict;
+		
+		cons_instance_sdef=unboxed_record_cons_element->pl_elem;
+		type_node_arguments_p=cons_instance_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+		record_sdef=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def;
+		tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
+		
+		GenUnboxedConsRecordDescriptor (record_sdef,tail_strict);
+	}
+#endif
 }
 
 Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef rootsymb)
@@ -3195,8 +3300,16 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								GenJmp (&case_label);
 								matches_always=1;
 							} else {
-								GenEqDesc (&cons_lab,case_node->node_arity,asp-a_index);
-								GenJmpTrue (&case_label);
+#if STRICT_LISTS
+								if (symbol->symb_head_strictness==1 || symbol->symb_head_strictness>=3){
+									GenEqDesc (&nil_lab,0,asp-a_index);
+									GenJmpFalse (&case_label);
+								} else
+#endif
+								{
+									GenEqDesc (&cons_lab,case_node->node_arity,asp-a_index);
+									GenJmpTrue (&case_label);
+								}
 							}
 							break;
 						case nil_symb:
@@ -3289,8 +3402,12 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 									GenJmpTrue (&case_label);
 								} else
 									error_in_function ("generate_code_for_switch_node");
-							} else
-								error_in_function ("generate_code_for_switch_node");
+							} else {
+								static char s[256];
+								
+								sprintf (s,"generate_code_for_switch_node %d %d",(int)symbol->symb_kind,(int)symbol);
+								error_in_function (s);
+							}
 					}
 					
 					++NewLabelNr;
@@ -3422,6 +3539,36 @@ int unused_node_id_ (NodeId node_id)
 
 	return False;
 }
+
+#if STRICT_LISTS
+static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
+{
+	CodeGenNodeIdsS code_gen_node_ids;
+	LabDef apply_label;
+	
+	code_gen_node_ids.saved_nid_state_l=save_states_p;
+	code_gen_node_ids.free_node_ids=ab_node_ids_p->free_node_ids;
+	code_gen_node_ids.moved_node_ids_l=NULL;
+	code_gen_node_ids.a_node_ids=ab_node_ids_p->a_node_ids;
+	code_gen_node_ids.b_node_ids=ab_node_ids_p->b_node_ids;
+	code_gen_node_ids.doesnt_fail=0;
+	
+	Build (node_p->node_decons_node,asp_p,bsp_p,&code_gen_node_ids);
+
+	*asp_p -= 2;
+
+	ab_node_ids_p->free_node_ids=code_gen_node_ids.free_node_ids;
+	ab_node_ids_p->a_node_ids=code_gen_node_ids.a_node_ids;
+	ab_node_ids_p->b_node_ids=code_gen_node_ids.b_node_ids;
+
+	GenDAStackLayout (2);
+	MakeSymbolLabel (&apply_label,ApplyDef->sdef_module,s_pref,ApplyDef, 0);
+	GenJsr (&apply_label);
+	GenOAStackLayout (1);
+
+	GenReplArgs (2,2);	
+}
+#endif
 
 static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *esc_p,NodeDefs defs,StateP result_state_p,
 										SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
@@ -3563,9 +3710,14 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 
 		if (unused_node_id (node_id_p)){
 			if (node_id_p->nid_a_index==asp){
-				if (b_size==0)
+				if (b_size==0){
+#if STRICT_LISTS
+					if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1)){
+						repl_overloaded_cons_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+					} else
+#endif
 					GenReplArgs (a_size,a_size);
-				else
+				} else
 					GenReplRArgs (a_size,b_size);
 
 				if (ab_node_ids.a_node_ids!=NULL && ab_node_ids.a_node_ids->nidl_node_id==node_id_p)
@@ -3585,9 +3737,17 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 
 				--asp;
 			} else {
-				if (b_size==0)
+				if (b_size==0){
+#if STRICT_LISTS
+					if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1)){
+						GenPushA (asp-node_id_p->nid_a_index);
+						++asp;
+						
+						repl_overloaded_cons_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+					} else
+#endif
 					GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);
-				else
+				} else
 					GenPushRArgs (asp-node_id_p->nid_a_index,a_size,b_size);
 				
 				GenBuildh (&nil_lab,0);
@@ -3595,9 +3755,17 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 				GenPopA (1);
 			}
 		} else {
-			if (b_size==0)
+			if (b_size==0){
+#if STRICT_LISTS
+				if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1)){
+					GenPushA (asp-node_id_p->nid_a_index);
+					++asp;
+						
+					repl_overloaded_cons_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+				} else
+#endif
 				GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);
-			else
+}			else
 				GenPushRArgs (asp-node_id_p->nid_a_index,a_size,b_size);
 		}
 

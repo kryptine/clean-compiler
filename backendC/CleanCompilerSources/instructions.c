@@ -151,8 +151,6 @@ static Bool DescriptorNeeded (SymbDef sdef)
 			((DoParallel || DoDescriptors) && (sdef->sdef_mark & (SDEF_USED_CURRIED_MASK | SDEF_USED_LAZILY_MASK)));
 }
 
-/* extern Ident StdArrayId; */
-
 static void GenLabel (Label label)
 {
 	if (label->lab_issymbol){
@@ -160,8 +158,6 @@ static void GenLabel (Label label)
 		char *module_name;
 
 		def=label->lab_symbol;
-/*		module_name = def->sdef_arfun<NoArrayFun ? StdArrayId->ident_name : label->lab_mod; */
-
 		module_name = label->lab_mod;
 		
 		if (module_name!=NULL)
@@ -192,7 +188,6 @@ static void GenDescriptorOrNodeEntryLabel (Label label)
 		char *module_name;
 
 		def=label->lab_symbol;
-
 		module_name = label->lab_mod;
 		
 		if (module_name!=NULL)
@@ -543,6 +538,8 @@ enum {
 #define IeqC_b "eqC_b"
 #define IeqI_b "eqI_b"
 #define IeqR_b "eqR_b"
+
+#define InotB "notB"
 
 #define IpushB "pushB"
 #define IpushI "pushI"
@@ -929,6 +926,11 @@ void EqBasic (ObjectKind obj, SymbValue val, int offset)
 			error_in_function ("EqBasic");
 			return;
 	}
+}
+
+void GenNotB (void)
+{
+	put_instruction (InotB);
 }
 
 void PushBasicFromAOnB (ObjectKind kind,int offset)
@@ -2752,10 +2754,49 @@ void GenRecordDescriptor (SymbDef sdef)
 	
 	GenABStackElems (recstate);
 
-	DetermineSizeOfState  (recstate,&asize,&bsize);
+	DetermineSizeOfState (recstate,&asize,&bsize);
 	
 	FPrintF (OutFile, " %d %d \"%s\"",asize,bsize,name);
 }
+
+#ifdef STRICT_LISTS
+void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
+{
+	int asize,bsize;
+	char *name,*unboxed_record_cons_prefix;
+	StateS tuple_state,tuple_arguments_state[2];
+
+	name = sdef->sdef_ident->ident_name;
+	
+	unboxed_record_cons_prefix=tail_strict ? "r_Cons#!" : "r_Cons#";
+	
+	if (sdef->sdef_exported || ExportLocalLabels){
+		put_directive_ (Dexport);
+		FPrintF (OutFile, "e_%s_%s%s",CurrentModule,unboxed_record_cons_prefix,name);
+		put_directive_ (Drecord);
+		FPrintF (OutFile, "e_%s_%s%s ",CurrentModule,unboxed_record_cons_prefix,name);
+	} else if (DoDebug){
+		put_directive_ (Drecord);
+		FPrintF (OutFile, "%s%s ",unboxed_record_cons_prefix,name);
+	} else {
+		put_directive_ (Drecord);
+		FPrintF (OutFile, "%s%u ",unboxed_record_cons_prefix,sdef->sdef_number);
+	}
+
+	tuple_state.state_type=TupleState;
+	tuple_state.state_arity=2;
+	tuple_state.state_tuple_arguments=tuple_arguments_state;
+
+	tuple_arguments_state[0] = sdef->sdef_record_state;
+	tuple_arguments_state[1] = LazyState;
+	
+	GenABStackElems (tuple_state);
+
+	DetermineSizeOfState (tuple_state,&asize,&bsize);
+	
+	FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
+}
+#endif
 
 void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_state_p)
 {

@@ -478,9 +478,9 @@ static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool p
 	case list_type:
 		FPutC ('[', StdListTypes);
 #if STRICT_LISTS
-		if (node->type_node_symbol->symb_head_strictness==1)
+		if (node->type_node_symbol->symb_head_strictness==2)
 			FPutC ('!', StdListTypes);			
-		else if (node->type_node_symbol->symb_head_strictness==2)
+		else if (node->type_node_symbol->symb_head_strictness==3 || node->type_node_symbol->symb_head_strictness==4)
 			FPutC ('#', StdListTypes);
 #endif
 		PrintArguments (node -> type_node_arguments, ',', cDontPrintBrackets, cNotInAStrictContext, NULL);

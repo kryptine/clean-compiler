@@ -2744,6 +2744,30 @@ static void fill_strict_if_node (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP
 }
 #endif
 
+#if STRICT_LISTS
+#include "backendsupport.h"
+
+LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
+{ 
+	static LabDef unboxed_record_cons_lab;
+	
+	if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==SimpleState && BETWEEN (IntObj,FileObj,cons_symbol_p->symb_unboxed_cons_state_p->state_object))
+		return &unboxed_cons_labels[cons_symbol_p->symb_unboxed_cons_state_p->state_object-IntObj][cons_symbol_p->symb_tail_strictness];
+	else if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==RecordState){
+		unboxed_record_cons_lab.lab_mod=NULL;
+		unboxed_record_cons_lab.lab_pref=cons_symbol_p->symb_tail_strictness ? "r_Cons#!" : "r_Cons#";
+		unboxed_record_cons_lab.lab_issymbol=False;
+		unboxed_record_cons_lab.lab_name=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_ident->ident_name;
+		unboxed_record_cons_lab.lab_post='\0';
+
+		return &unboxed_record_cons_lab;
+	} else if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==ArrayState){		
+		return &unboxed_cons_array_label;
+	} else
+		error_in_function ("unboxed_cons_label");
+}
+#endif
+
 static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	Symbol symb;
@@ -2782,6 +2806,140 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			}
 			return;
 		case cons_symb:
+#if STRICT_LISTS
+			if (symb->symb_head_strictness>1 || symb->symb_tail_strictness){
+				if (symb->symb_head_strictness==4 && node->node_arity<2){
+					FillSymbol (node,symb->symb_unboxed_cons_sdef_p,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
+					return;
+				} else {
+					int lazy_fill;
+					
+					if (node->node_arity==2){
+						lazy_fill=IsLazyState (node->node_state);
+
+						if (lazy_fill){
+							int has_unevaluated_strict_arg;
+							
+							has_unevaluated_strict_arg=0;
+							
+							if (symb->symb_head_strictness>1){
+								NodeP arg_node_p;
+								
+								arg_node_p=node->node_arguments->arg_node;
+								if (arg_node_p->node_kind!=NodeIdNode){
+									if (arg_node_p->node_kind==NormalNode &&
+										(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
+										;
+									else
+										if (IsLazyState (arg_node_p->node_state))
+											has_unevaluated_strict_arg=1;
+								} else
+									if (IsLazyState (arg_node_p->node_node_id->nid_state))
+										has_unevaluated_strict_arg=1;
+							}
+
+							if (symb->symb_tail_strictness){
+								NodeP arg_node_p;
+
+								arg_node_p=node->node_arguments->arg_next->arg_node;
+								if (arg_node_p->node_kind!=NodeIdNode){
+									if (IsLazyState (arg_node_p->node_state))
+										has_unevaluated_strict_arg=1;
+								} else
+									if (IsLazyState (arg_node_p->node_node_id->nid_state))
+										has_unevaluated_strict_arg=1;
+							}
+
+							if (!has_unevaluated_strict_arg){
+								if (symb->symb_head_strictness>1){
+									NodeP arg_node_p;
+									StateP element_state_p;
+
+									if (symb->symb_head_strictness==4)
+										element_state_p=symb->symb_unboxed_cons_state_p;
+									else
+										element_state_p=&StrictState;
+									
+									arg_node_p=node->node_arguments->arg_node;
+									if (arg_node_p->node_kind==NormalNode &&
+										(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
+									{
+										arg_node_p->node_state=*element_state_p;
+									}
+									
+									node->node_arguments->arg_state=*element_state_p;
+								}
+
+								if (symb->symb_tail_strictness)
+									node->node_arguments->arg_next->arg_state=StrictState;
+
+								lazy_fill=0;
+							}
+						}
+					} else
+						lazy_fill=0;
+
+					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+
+					{
+						LabDef *strict_cons_lab_p,strict_cons_lab;
+						int a_size,b_size;
+												
+						if (symb->symb_head_strictness==4){
+							if (lazy_fill){
+								MakeSymbolLabel (&strict_cons_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
+								strict_cons_lab_p=&strict_cons_lab;
+							} else
+								strict_cons_lab_p=unboxed_cons_label (symb);
+
+							DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+						} else {
+							if (symb->symb_head_strictness>1){
+								if (symb->symb_tail_strictness)
+									strict_cons_lab_p=&conssts_lab;
+								else
+									strict_cons_lab_p=&conss_lab;
+							} else
+								strict_cons_lab_p=&consts_lab;
+
+							a_size=node->node_arity;
+							b_size=0;
+						}
+
+						if (lazy_fill){
+							LabDef n_strict_cons_lab;
+								
+							n_strict_cons_lab = *strict_cons_lab_p;
+							n_strict_cons_lab.lab_pref = n_pref;
+							
+							if (update_node_id==NULL){
+								*asp_p+=1-a_size;
+								GenBuild (strict_cons_lab_p,a_size,&n_strict_cons_lab);
+							} else {
+								GenFill (strict_cons_lab_p,a_size,&n_strict_cons_lab,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill);
+								*asp_p-=a_size;
+							}
+						} else {
+							if (update_node_id==NULL){
+								*asp_p+=1-a_size;
+								if (symb->symb_head_strictness==4)
+									GenBuildR (strict_cons_lab_p,a_size,b_size,0,0,True);
+								else
+									GenBuildh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size);									
+							} else {
+								if (symb->symb_head_strictness==4)
+									GenFillR (strict_cons_lab_p,a_size,b_size,*asp_p+a_size-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
+								else
+									GenFillh (strict_cons_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
+								*asp_p-=a_size;
+							}
+						}
+						*bsp_p-=b_size;
+					}
+					return;
+				}
+			}
+#endif
 			BuildLazyArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 			if (update_node_id==NULL){
 				*asp_p+=1-node->node_arity;
@@ -2793,12 +2951,18 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			}
 			return;
 		case nil_symb:
+#if STRICT_LISTS
+			if (symb->symb_head_strictness & 1){
+				BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+				GenPopA (1);
+				--*asp_p;
+			}
+#endif
 			if (update_node_id==NULL){
 				*asp_p+=1;
-				GenBuildh (&nil_lab,node->node_arity);
+				GenBuildh (&nil_lab,0);
 			} else
-				GenFillh (&nil_lab,node->node_arity,*asp_p-update_node_id->nid_a_index,
-					node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
+				GenFillh (&nil_lab,0,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
 			return;
 		case string_denot:
 			GenBuildString (symb->symb_val);
@@ -3773,6 +3937,12 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 
 		switch (symbol->symb_kind){
 			case cons_symb:
+#if STRICT_LISTS
+				if (symbol->symb_head_strictness==1 || symbol->symb_head_strictness>=3){
+					GenEqDesc (&nil_lab,0,0);
+					GenNotB();
+				} else
+#endif
 				GenEqDesc (&cons_lab,2,0);
 				break;
 			case definition:
@@ -3877,8 +4047,8 @@ static
 #else
 	void
 #endif
-	compute_bits_and_remove_unused_arguments (NodeP node,char bits[],unsigned int argument_overwrite_bits,
-													  int *a_size_p,int *b_size_p,int *n_a_fill_bits_p,int *n_b_fill_bits_p)
+	compute_bits_and_remove_unused_arguments_for_strict_node (NodeP node,char bits[],unsigned int argument_overwrite_bits,
+															  int *a_size_p,int *b_size_p,int *n_a_fill_bits_p,int *n_b_fill_bits_p)
 {
 	unsigned int a_bits,b_bits,a_size,b_size,n,arg_n;
 	int n_a_fill_bits,n_b_fill_bits,node_arity;
@@ -3948,15 +4118,95 @@ static
 #endif
 }
 
+
+static
+#if GENERATE_CODE_AGAIN
+	ArgP
+#else
+	void
+#endif
+	compute_bits_and_remove_unused_arguments (NodeP node,char bits[],unsigned int argument_overwrite_bits,unsigned int *n_args_p)
+{
+	unsigned int arg_n;
+	int node_arity,n_args;
+	ArgS **arg_l;
+#if GENERATE_CODE_AGAIN
+	ArgP removed_args,*removed_args_l;
+	
+	removed_args_l=&removed_args;
+#endif
+
+	arg_l=&node->node_arguments;
+	node_arity=node->node_arity;
+
+	n_args=0;
+	
+	for (arg_n=0; arg_n<node_arity; ++arg_n){
+		ArgP arg_p;
+		
+		arg_p=*arg_l;
+		if (argument_overwrite_bits & (1<<arg_n)){
+			bits[arg_n+1]='1';
+			arg_l=&(arg_p->arg_next);
+			++n_args;
+		} else {
+			bits[arg_n+1]='0';
+			*arg_l=arg_p->arg_next;
+#if GENERATE_CODE_AGAIN
+			*removed_args_l=arg_p;
+			removed_args_l=&arg_p->arg_next;
+#endif
+		}
+	}
+
+	bits[arg_n+1]='\0';
+	*n_args_p=n_args;
+
+#if GENERATE_CODE_AGAIN
+	*removed_args_l=NULL;
+
+	return removed_args;
+#endif
+}
+
+static void fill_strict_unique_node (NodeP node,NodeP update_node,char bits[],LabDef *label_p,NodeIdP free_unique_node_id,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
+{
+	int a_size,b_size,n_a_fill_bits,n_b_fill_bits;
+#if GENERATE_CODE_AGAIN
+	ArgP removed_args=
+#endif
+	compute_bits_and_remove_unused_arguments_for_strict_node (node,bits,update_node->node_arguments->arg_occurrence,
+															  &a_size,&b_size,&n_a_fill_bits,&n_b_fill_bits);
+		
+	BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+
+#if GENERATE_CODE_AGAIN
+	if (call_code_generator_again)
+		restore_removed_arguments (&node->node_arguments,removed_args,update_node->node_arguments->arg_occurrence,node->node_arity);
+#endif
+	
+	if (a_size+b_size>2)
+		GenFill2R (label_p,a_size,b_size,*asp_p-free_unique_node_id->nid_a_index,bits);
+	else
+		GenFill1R (label_p,a_size,b_size,*asp_p-free_unique_node_id->nid_a_index,bits);
+
+	*asp_p-=n_a_fill_bits;
+	*bsp_p-=n_b_fill_bits;
+
+	GenPushA (*asp_p-free_unique_node_id->nid_a_index);
+	*asp_p+=1;
+
+	decrement_reference_count_of_node_id (free_unique_node_id,&code_gen_node_ids_p->free_node_ids);
+}
+
 static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
 {
-	unsigned int argument_overwrite_bits,n_args,node_arity,arg_n;
+	unsigned int n_args,node_arity;
 	char bits[MaxNodeArity+2];
 	NodeIdP free_unique_node_id;
 	NodeP node,push_node;
 	LabDef name,*label_p;
 	SymbolP symbol;
-	ArgS **arg_l;
 
 	node=update_node->node_arguments->arg_node;
 	push_node=update_node->node_node;
@@ -3981,35 +4231,10 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 						bits[0]='1';
 					
 					if (sdef->sdef_strict_constructor){
-						int a_size,b_size,n_a_fill_bits,n_b_fill_bits;
-#if GENERATE_CODE_AGAIN
-						ArgP removed_args=
-#endif
-						compute_bits_and_remove_unused_arguments (node,bits,update_node->node_arguments->arg_occurrence,
-																  &a_size,&b_size,&n_a_fill_bits,&n_b_fill_bits);
-							
-						BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-
-#if GENERATE_CODE_AGAIN
-						if (call_code_generator_again)
-							restore_removed_arguments (&node->node_arguments,removed_args,update_node->node_arguments->arg_occurrence,node->node_arity);
-#endif
-						
 						ConvertSymbolToKLabel (&name,sdef);
 						
-						if (a_size+b_size>2)
-							GenFill2R (&name,a_size,b_size,*asp_p-free_unique_node_id->nid_a_index,bits);
-						else
-							GenFill1R (&name,a_size,b_size,*asp_p-free_unique_node_id->nid_a_index,bits);
-
-						*asp_p-=n_a_fill_bits;
-						*bsp_p-=n_b_fill_bits;
-
-						GenPushA (*asp_p-free_unique_node_id->nid_a_index);
-						*asp_p+=1;
-
-						decrement_reference_count_of_node_id (free_unique_node_id,&code_gen_node_ids_p->free_node_ids);
-
+						fill_strict_unique_node (node,update_node,bits,&name,free_unique_node_id,asp_p,bsp_p,code_gen_node_ids_p);
+						
 						return;
 					} else {
 						ConvertSymbolToConstructorDLabel (&name,sdef);
@@ -4017,46 +4242,16 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 					}
 					break;
 				case RECORDTYPE:
-				{
-					int a_size,b_size,n_a_fill_bits,n_b_fill_bits;
-#if GENERATE_CODE_AGAIN
-					ArgP removed_args;
-#endif				
 					if (push_node->node_record_symbol==node->node_symbol && push_node->node_arity==node_arity)
 						bits[0]='0';
 					else
 						bits[0]='1';
 
-#if GENERATE_CODE_AGAIN
-					removed_args=
-#endif
-					compute_bits_and_remove_unused_arguments (node,bits,update_node->node_arguments->arg_occurrence,
-															  &a_size,&b_size,&n_a_fill_bits,&n_b_fill_bits);
-						
-					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-
-#if GENERATE_CODE_AGAIN
-					if (call_code_generator_again)
-						restore_removed_arguments (&node->node_arguments,removed_args,update_node->node_arguments->arg_occurrence,node->node_arity);
-#endif
-
 					ConvertSymbolToRLabel (&name,sdef);
+
+					fill_strict_unique_node (node,update_node,bits,&name,free_unique_node_id,asp_p,bsp_p,code_gen_node_ids_p);
 					
-					if (a_size+b_size>2)
-						GenFill2R (&name,a_size,b_size,*asp_p-free_unique_node_id->nid_a_index,bits);
-					else
-						GenFill1R (&name,a_size,b_size,*asp_p-free_unique_node_id->nid_a_index,bits);
-
-					*asp_p-=n_a_fill_bits;
-					*bsp_p-=n_b_fill_bits;
-
-					GenPushA (*asp_p-free_unique_node_id->nid_a_index);
-					*asp_p+=1;
-
-					decrement_reference_count_of_node_id (free_unique_node_id,&code_gen_node_ids_p->free_node_ids);
-
 					return;
-				}
 				case IMPRULE:
 				case DEFRULE:
 				case SYSRULE:
@@ -4135,6 +4330,51 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 		case cons_symb:
 			node_arity=2;
 
+#if STRICT_LISTS
+			if (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness){
+				SymbolP pattern_symbol_p;
+				
+				pattern_symbol_p=push_node->node_push_symbol;
+				if (pattern_symbol_p->symb_kind==cons_symb && push_node->node_arity==node_arity
+					&& ((pattern_symbol_p->symb_head_strictness<3 && symbol->symb_head_strictness<3)
+						|| (pattern_symbol_p->symb_head_strictness==4 && symbol->symb_head_strictness==4
+							&& pattern_symbol_p->symb_tail_strictness==symbol->symb_tail_strictness
+							&& EqualState (*pattern_symbol_p->symb_state_p,*symbol->symb_unboxed_cons_state_p))))
+					bits[0]='0';
+				else
+					bits[0]='1';
+
+				if (symbol->symb_head_strictness==4){
+					LabDef *strict_cons_lab_p;
+					
+					strict_cons_lab_p=unboxed_cons_label (symbol);
+						
+					fill_strict_unique_node (node,update_node,bits,strict_cons_lab_p,free_unique_node_id,asp_p,bsp_p,code_gen_node_ids_p);
+				} else {					
+#if GENERATE_CODE_AGAIN
+					ArgP removed_args=
+#endif
+					compute_bits_and_remove_unused_arguments (node,bits,update_node->node_arguments->arg_occurrence,&n_args);
+
+					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+
+#if GENERATE_CODE_AGAIN
+					if (call_code_generator_again)
+						restore_removed_arguments (&node->node_arguments,removed_args,update_node->node_arguments->arg_occurrence,node_arity);
+#endif
+					GenFill1 (&cons_lab,node_arity,*asp_p-free_unique_node_id->nid_a_index,bits);
+
+					*asp_p-=n_args;
+
+					GenPushA (*asp_p-free_unique_node_id->nid_a_index);
+					*asp_p+=1;
+
+					decrement_reference_count_of_node_id (free_unique_node_id,&code_gen_node_ids_p->free_node_ids);
+				}								
+				return;
+			}
+#endif
+
 			if (push_node->node_record_symbol->symb_kind==cons_symb && push_node->node_arity==node_arity)
 				bits[0]='0';
 			else
@@ -4157,42 +4397,11 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 			return;
 	}
 
-	arg_l=&node->node_arguments;
-
-	argument_overwrite_bits=update_node->node_arguments->arg_occurrence;
-		
-	n_args=0;
-
 #if GENERATE_CODE_AGAIN
 	{
-	ArgP removed_args,*removed_args_l;
-	
-	removed_args_l=&removed_args;
+	ArgP removed_args=
 #endif
-	
-	for (arg_n=0; arg_n<node_arity; ++arg_n){
-		ArgP arg_p;
-		
-		arg_p=*arg_l;
-		if (argument_overwrite_bits & (1<<arg_n)){
-			bits[arg_n+1]='1';
-			arg_l=&(arg_p->arg_next);
-			++n_args;
-		} else {
-			bits[arg_n+1]='0';
-			*arg_l=arg_p->arg_next;
-#if GENERATE_CODE_AGAIN
-			*removed_args_l=arg_p;
-			removed_args_l=&arg_p->arg_next;
-#endif
-		}
-	}
-
-#if GENERATE_CODE_AGAIN
-	*removed_args_l=NULL;
-#endif
-
-	bits[arg_n+1]='\0';
+	compute_bits_and_remove_unused_arguments (node,bits,update_node->node_arguments->arg_occurrence,&n_args);
 
 	BuildLazyArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 

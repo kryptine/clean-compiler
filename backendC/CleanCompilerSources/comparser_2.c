@@ -132,11 +132,11 @@ InitParser (void)
 	NilSymbol->symb_tail_strictness=0;
 
 	StrictListSymbol= NewSymbol (list_type);
-	StrictListSymbol->symb_head_strictness=1;
+	StrictListSymbol->symb_head_strictness=2;
 	StrictListSymbol->symb_tail_strictness=0;
 
 	UnboxedListSymbol= NewSymbol (list_type);
-	UnboxedListSymbol->symb_head_strictness=2;
+	UnboxedListSymbol->symb_head_strictness=3;
 	UnboxedListSymbol->symb_tail_strictness=0;
 
 	TailStrictListSymbol= NewSymbol (list_type);
@@ -144,19 +144,19 @@ InitParser (void)
 	TailStrictListSymbol->symb_tail_strictness=1;
 
 	StrictTailStrictListSymbol= NewSymbol (list_type);
-	StrictTailStrictListSymbol->symb_head_strictness=1;
+	StrictTailStrictListSymbol->symb_head_strictness=2;
 	StrictTailStrictListSymbol->symb_tail_strictness=1;
 
 	UnboxedTailStrictListSymbol= NewSymbol (list_type);
-	UnboxedTailStrictListSymbol->symb_head_strictness=2;
+	UnboxedTailStrictListSymbol->symb_head_strictness=3;
 	UnboxedTailStrictListSymbol->symb_tail_strictness=1;
 
 	StrictConsSymbol= NewSymbol (cons_symb);
-	StrictConsSymbol->symb_head_strictness=1;
+	StrictConsSymbol->symb_head_strictness=2;
 	StrictConsSymbol->symb_tail_strictness=0;
 
 	UnboxedConsSymbol= NewSymbol (cons_symb);
-	UnboxedConsSymbol->symb_head_strictness=2;
+	UnboxedConsSymbol->symb_head_strictness=3;
 	UnboxedConsSymbol->symb_tail_strictness=0;
 
 	TailStrictConsSymbol= NewSymbol (cons_symb);
@@ -164,19 +164,19 @@ InitParser (void)
 	TailStrictConsSymbol->symb_tail_strictness=1;
 
 	StrictTailStrictConsSymbol= NewSymbol (cons_symb);
-	StrictTailStrictConsSymbol->symb_head_strictness=1;
+	StrictTailStrictConsSymbol->symb_head_strictness=2;
 	StrictTailStrictConsSymbol->symb_tail_strictness=1;
 
 	UnboxedTailStrictConsSymbol= NewSymbol (cons_symb);
-	UnboxedTailStrictConsSymbol->symb_head_strictness=2;
+	UnboxedTailStrictConsSymbol->symb_head_strictness=3;
 	UnboxedTailStrictConsSymbol->symb_tail_strictness=1;
 
 	StrictNilSymbol	= NewSymbol (nil_symb);	
-	StrictNilSymbol->symb_head_strictness=1;
+	StrictNilSymbol->symb_head_strictness=2;
 	StrictNilSymbol->symb_tail_strictness=0;
 
 	UnboxedNilSymbol = NewSymbol (nil_symb);	
-	UnboxedNilSymbol->symb_head_strictness=2;
+	UnboxedNilSymbol->symb_head_strictness=3;
 	UnboxedNilSymbol->symb_tail_strictness=0;
 
 	TailStrictNilSymbol	= NewSymbol (nil_symb);	
@@ -184,11 +184,11 @@ InitParser (void)
 	TailStrictNilSymbol->symb_tail_strictness=1;
 
 	StrictTailStrictNilSymbol = NewSymbol (nil_symb);
-	StrictTailStrictNilSymbol->symb_head_strictness=1;
+	StrictTailStrictNilSymbol->symb_head_strictness=2;
 	StrictTailStrictNilSymbol->symb_tail_strictness=1;
 
 	UnboxedTailStrictNilSymbol = NewSymbol (nil_symb);
-	UnboxedTailStrictNilSymbol->symb_head_strictness=2;
+	UnboxedTailStrictNilSymbol->symb_head_strictness=3;
 	UnboxedTailStrictNilSymbol->symb_tail_strictness=1;
 #endif
 
