@@ -30,15 +30,15 @@ isNotEmpty :: ![a] -> Bool
 
 //mapSt :: !(.a -> (.st -> (.c,.st))) ![.a] !.st -> (![.c],!.st)
 
-mapSt f l s :== mapSt l s
+mapSt f l s :== map_st l s
 where
-	mapSt [x : xs] s
+	map_st [x : xs] s
 	 	# (x, s) = f x s
-		  mapSt_result = mapSt xs s
+		  mapSt_result = map_st xs s
 		  (xs, _) = mapSt_result
 		#! s = second_of_2_tuple mapSt_result
 		= ([x : xs], s)
-	mapSt [] s
+	map_st [] s
 	 	= ([], s)
 	
 second_of_2_tuple t :== e2
