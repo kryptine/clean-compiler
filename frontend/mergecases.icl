@@ -3,7 +3,7 @@
 */
 implementation module mergecases
 
-import syntax, check, StdCompare, utilities //, RWSDebug
+import syntax, check, StdCompare, utilities
 
 /*
 cContainsFreeVars 	:== True
@@ -33,9 +33,9 @@ instance GetSetPatternRhs DynamicPattern
 		get_pattern_rhs p = p.dp_rhs
 		set_pattern_rhs p expr = {p & dp_rhs=expr}
 
- 
+
 mergeCases :: !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
-			-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+									-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 mergeCases expr_and_pos [] var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, error)
 mergeCases (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
@@ -47,7 +47,7 @@ mergeCases (case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_d
 		# (split_result, var_heap, symbol_heap) = split_case var_info_ptr expr var_heap symbol_heap
 		= case split_result of
 			Yes {case_guards,case_default, case_explicit, case_ident}
-				# (case_guards, var_heap, symbol_heap, error) = merge_guards first_case.case_guards case_guards var_heap symbol_heap error
+				# (case_guards, var_heap, symbol_heap, error) = merge_guards first_case.case_guards case_guards var_heap symbol_heap error				
 				-> mergeCases (Case { first_case & case_guards = case_guards, case_default = case_default, case_explicit =  case_explicit, case_ident = case_ident}, NoPos)
 							exprs var_heap symbol_heap error
 			No
@@ -58,39 +58,42 @@ where
 	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default, case_explicit}) var_heap symbol_heap
 		| split_var_info_ptr == skip_alias var_info_ptr var_heap
 			= (Yes this_case, var_heap, symbol_heap)
-		| has_no_default case_default
+		| has_no_default case_default 
 			= case case_guards of
 				AlgebraicPatterns type [alg_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr alg_pattern.ap_expr var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
-							# (cees,symbol_heap) = push_expression_into_guards_and_default
-													( \ guard_expr -> { this_case & case_guards = AlgebraicPatterns type [{ alg_pattern & ap_expr = guard_expr }] } )
-														split_case symbol_heap
-							-> (Yes cees, var_heap, symbol_heap)
-
+							| not split_case.case_explicit
+								# (cees,symbol_heap) = push_expression_into_guards_and_default
+														( \ guard_expr -> { this_case & case_guards = AlgebraicPatterns type [{ alg_pattern & ap_expr = guard_expr }] } )
+															split_case symbol_heap
+								-> (Yes cees, var_heap, symbol_heap)
+								-> (No, var_heap, symbol_heap) 
 						No
 							-> (No, var_heap, symbol_heap) 
 				BasicPatterns type [basic_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr basic_pattern.bp_expr var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
-							# (cees,symbol_heap) = push_expression_into_guards_and_default
-													( \ guard_expr -> { this_case & case_guards = BasicPatterns type [ { basic_pattern & bp_expr = guard_expr }] })
-													split_case symbol_heap
-							-> (Yes cees, var_heap, symbol_heap)
-
+							| not split_case.case_explicit
+								# (cees,symbol_heap) = push_expression_into_guards_and_default
+														( \ guard_expr -> { this_case & case_guards = BasicPatterns type [ { basic_pattern & bp_expr = guard_expr }] })
+														split_case symbol_heap
+								-> (Yes cees, var_heap, symbol_heap)
+								-> (No, var_heap, symbol_heap)	
 						No
 							-> (No, var_heap, symbol_heap)
 				OverloadedListPatterns type decons_expr [overloaded_list_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr overloaded_list_pattern.ap_expr var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
-							# (cees,symbol_heap) = push_expression_into_guards_and_default
-													( \ guard_expr -> { this_case & case_guards = OverloadedListPatterns type decons_expr [{ overloaded_list_pattern & ap_expr = guard_expr }] } )
-														split_case symbol_heap
-							-> (Yes cees, var_heap, symbol_heap)
-
+							| not split_case.case_explicit
+								# (cees,symbol_heap) = push_expression_into_guards_and_default
+														( \ guard_expr -> { this_case & case_guards = OverloadedListPatterns type decons_expr [{ overloaded_list_pattern & ap_expr = guard_expr }] } )
+															split_case symbol_heap
+								-> (Yes cees, var_heap, symbol_heap)
+								-> (No, var_heap, symbol_heap) 	
 						No
 							-> (No, var_heap, symbol_heap) 
 				DynamicPatterns [dynamic_pattern]
@@ -110,15 +113,15 @@ where
 	are reversed.
 
 
-					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr dynamic_pattern.dp_rhs var_heap symbol_heap
-					-> case split_result of
-						Yes split_case
-							# (cees,symbol_heap) = push_expression_into_guards_and_default
-										( \ guard_expr -> { this_case & case_guards = DynamicPatterns [ { dynamic_pattern & dp_rhs = guard_expr }] })
-										split_case symbol_heap
-							-> (Yes cees, var_heap, symbol_heap)
-
-						No
+				# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr dynamic_pattern.dp_rhs var_heap symbol_heap
+				-> case split_result of
+					Yes split_case
+						# (cees,symbol_heap) = push_expression_into_guards_and_default
+									( \ guard_expr -> { this_case & case_guards = DynamicPatterns [ { dynamic_pattern & dp_rhs = guard_expr }] })
+									split_case symbol_heap
+						-> (Yes cees, var_heap, symbol_heap)
+			
+					No
  */
 							-> (No, var_heap, symbol_heap)
 				_
