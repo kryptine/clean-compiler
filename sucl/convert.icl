@@ -576,9 +576,9 @@ stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex expr
         = { fi_calls       = []         // This is a lie. Undef would be better.
           , fi_group_index = 0
           , fi_def_level   = NotALevel
-          , fi_free_vars   = []
-          , fi_local_vars  = []
-          , fi_dynamics    = []
+          , fi_free_vars   = []         // Variables bound outside function's scope (such functions must be lifted)
+          , fi_local_vars  = []         // Variables bound in Case's and Let's
+          , fi_dynamics    = []         // Expressions used in dynamics (?)
           , fi_properties  = 0
           }
         (n_oldfundefs,oldfundefs1) = usize oldfundefs0
@@ -605,15 +605,15 @@ store_newfuns stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 va
   of (SuclUser (SK_Function {glob_module=modi,glob_object=funindex}))
       | modi == main_dcl_module_n
         -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype getconsdef main_dcl_module_n firstnewindex exprheap1 varalloc1 srrs fundefs1<---"convert.store_newfuns ends (srr in main module)"
-           where (exprheap1,varalloc1,funbody,freevars,localvars,eips)
+           where (exprheap1,varalloc1,funbody,localvars,_)
                  = stc_funcdef stringtype getconsdef exprheap0 varalloc0 srr.srr_function_def
                  funinfo
                  = { fi_calls       = collect_calls main_dcl_module_n funbody
                    , fi_group_index = 0
                    , fi_def_level   = NotALevel
-                   , fi_free_vars   = freevars
-                   , fi_local_vars  = localvars
-                   , fi_dynamics    = [] // eips
+                   , fi_free_vars   = []        // Variables bound outside function's scope (such functions must be lifted)
+                   , fi_local_vars  = localvars // Variables bound in Case's and Let's
+                   , fi_dynamics    = []        // Expressions used in dynamics (?)
                    , fi_properties  = 0
                    }
                  fundefs1 = create_or_update_fundefs funindex funbody funinfo fundefs0
@@ -659,22 +659,22 @@ stc_funcdef ::
  -> ( *ExpressionHeap                   // Remaining expression space
     , *VarAlloc                         // Remaining variable space
     , FunctionBody                      // Converted function body
-    , [FreeVar]                         // List of free variables in the function body (from function arguments and case pattern arguments)
-    , [FreeVar]                         // List of local variables in the function body (from lets)
+    , [FreeVar]                         // List of local variables in the function body (from lets and cases)
     , [ExprInfoPtr]                     // List of expression pointers from the function body
     )
 
 // stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body) = block "stc_funcdef"
 stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body)
-= (exprheap1,varalloc2,TransformedBody tb,tb.tb_args++freevars,localvars,eips)
+= (exprheap1,varalloc2,TransformedBody tb,/*tb.tb_args++*/localvars,eips)
+    ---> ("convert.stc_funcdef localvars",tb.tb_args)
   where tb
         = { tb_args = map (mkfreevar 0 o varenv) args
           , tb_rhs  = expr
           }
-        (exprheap1,varalloc2,expr,freevars,localvars,eips)
-        = convert_funcbody stringtype getconsdef 1 args varenv exprheap0 varalloc1 [] [] [] body
+        (exprheap1,varalloc2,expr,localvars,eips)
+        = convert_funcbody stringtype getconsdef 1 args varenv exprheap0 varalloc1 [] [] body
         (varenv,varalloc1)
-        = allocate_freevars "_farg" noexpr varalloc0 args
+        = allocate_vars "_farg" noexpr varalloc0 args
         noexpr = mstub "std_funcdef" "open variable in rhs but not lhs"
 
 mkfreevar :: Level (Ident,VarInfoPtr) -> FreeVar
@@ -728,68 +728,84 @@ convert_funcbody ::
     (SuclVariable -> (Ident,VarInfoPtr))    // Mapping from free nodes to variables
     *ExpressionHeap                         // Fresh expression space
     *VarAlloc                               // Fresh variable space
-    [FreeVar]                               // Accumulator for list of free variables in the function body (from function arguments and case pattern arguments)
-    [FreeVar]                               // Accumulator for list of local variables in the function body (from lets)
+    [FreeVar]                               // Accumulator for list of local variables in the function body (from lets and cases)
     [ExprInfoPtr]                           // Accumulator for list of expression pointers from the function body
     !(FuncBody SuclSymbol SuclVariable)     // Function body to convert
  -> ( *ExpressionHeap                       // Modified expression space
     , *VarAlloc                             // Modified variable space
     , Expression                            // Resulting expression
-    , [FreeVar]                             // List of free variables in the function body (from function arguments and case pattern arguments)
-    , [FreeVar]                             // List of local variables in the function body (from lets)
+    , [FreeVar]                             // List of local variables in the function body (from lets and cases)
     , [ExprInfoPtr]                         // List of expression pointers from the function body
     )
 
-convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 freevars0 localvars0 eips0 (MatchPattern pattern yesbody nobody)
-= (exprheap4,varalloc3,match_expression,freevars2,[default_freevar:localvars2],[letinfoptr,default_expr_ptr:eips2])
-  where (exprheap3,varalloc1,case_expression,default_refcount,freevars2,localvars2,eips2)
-        = convert_matchpatterns getconsdef build_casebranch patnodes varenv exprheap2 varalloc0 default_expression pgraph level freevars1 localvars1 eips1 [proot]
+convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (MatchPattern pattern yesbody nobody)
+= (exprheap3,varalloc3,match_expression,[default_freevar:localvars2],eips3)
+    ---> ("convert.convert_funcbody localvars",default_freevar)
+  where (exprheap3,([match_expression:_],eips1))
+        = mk_match_expression (exprheap2,([],eips0))
+        (exprheap2,varalloc3,match_failure_expression,localvars1,eips2)
+        = convert_funcbody stringtype getconsdef (level+1) patnodes varenv exprheap1 varalloc2 localvars0 eips1 nobody
+        (exprheap1,varalloc1,case_expression,default_refcount,localvars2,eips3)
+        = convert_matchpatterns getconsdef build_casebranch patnodes varenv exprheap0 varalloc0 mk_default_expression pgraph level localvars1 eips2 [proot]
+
         pgraph = rgraphgraph pattern
         proot = rgraphroot pattern
-        default_boundvar
-        = { var_name = default_ident
-          , var_info_ptr = default_info_ptr
-          , var_expr_ptr = default_expr_ptr
-          }
-        ((default_ident,default_info_ptr),varalloc2) = newvar "_defaultvar" varalloc1
-        (letinfoptr,exprheap1) = newPtr EI_Empty exprheap0
-        (default_expr_ptr,exprheap2) = newPtr EI_Empty exprheap1
-        li
-        = { let_strict_binds = []
-          , let_lazy_binds = [{lb_dst=default_freevar,lb_src=match_failure_expression,lb_position=NoPos}]
-          , let_expr = case_expression
-          , let_info_ptr = letinfoptr
-          , let_expr_position = NoPos
-          }
+
+        ((default_ident,default_info_ptr),varalloc2) = newvar "_default" varalloc1
         default_freevar
         = { fv_def_level=level
           , fv_name=default_ident
           , fv_info_ptr=default_info_ptr
           , fv_count=default_refcount
           }
-        build_casebranch level` patnodes` varenv` freevars0` localvars0` eips0` exprheap0` varalloc0`
-        = (exprheap1`,varalloc1`,expr`,0,freevars1`,localvars1`,eips1`)
-          where (exprheap1`,varalloc1`,expr`,freevars1`,localvars1`,eips1`)
-                = convert_funcbody stringtype getconsdef level` patnodes` varenv` exprheap0` varalloc0` freevars0` localvars0` eips0` yesbody
-        (exprheap4,varalloc3,match_failure_expression,freevars1,localvars1,eips1)
-        = convert_funcbody stringtype getconsdef (level+1) patnodes varenv exprheap3 varalloc2 freevars0 localvars0 eips0 nobody
-        (default_expression,match_expression)
-        = if (default_refcount==1)
-             (match_failure_expression,case_expression)
-             (match_failure_reference,let_expression)
-        let_expression = Let li
-        match_failure_reference = Var default_boundvar
 
-convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 freevars0 localvars0 eips0 (BuildGraph srgraph)
-= new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 freevars0 localvars0 eips0
+        build_casebranch level` patnodes` varenv` localvars0` eips0` exprheap0` varalloc0`
+        = (exprheap1`,varalloc1`,expr`,0--->("convert.convert_funcbody.build_casebranch.refcount=0"),localvars1`,eips1`)
+          where (exprheap1`,varalloc1`,expr`,localvars1`,eips1`)
+                = convert_funcbody stringtype getconsdef level` patnodes` varenv` exprheap0` varalloc0` localvars0` eips0` yesbody
+
+        (mk_default_expression,mk_match_expression)
+        = if (default_refcount==1)
+             (mk_match_failure_expression,mk_case_expression)
+             (mk_match_failure_reference,mk_let_expression)
+
+        mk_match_failure_expression (exprheap`0,(rest,eips`0))
+        = (exprheap`0,([match_failure_expression:rest],eips`0))
+        mk_case_expression (exprheap`0,(rest,eips`0))
+        = (exprheap`0,([case_expression:rest],eips`0))
+
+        mk_match_failure_reference (exprheap`0,(rest,eips`0))
+        = (exprheap`1,([match_failure_reference:rest],eips`1))
+          where match_failure_reference = Var default_boundvar
+                default_boundvar
+                = { var_name = default_ident
+                  , var_info_ptr = default_info_ptr
+                  , var_expr_ptr = default_expr_ptr
+                  }
+                (default_expr_ptr,exprheap`1) = newPtr EI_Empty exprheap`0
+                eips`1 = [default_expr_ptr:eips`0]
+        mk_let_expression (exprheap`0,(rest,eips`0))
+        = (exprheap`1,([let_expression:rest],eips`1))
+          where let_expression = Let li
+                li
+                = { let_strict_binds = []
+                  , let_lazy_binds = [{lb_dst=default_freevar,lb_src=match_failure_expression,lb_position=NoPos}]
+                  , let_expr = case_expression
+                  , let_info_ptr = letinfoptr
+                  , let_expr_position = NoPos
+                  }
+                (letinfoptr,exprheap`1) = newPtr EI_Empty exprheap`0
+                eips`1 = [letinfoptr:eips`0]
+
+convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (BuildGraph srgraph)
+= new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 localvars0 eips0
 
 convert_matchpatterns ::
     ((Global Index) -> ConsDef)             // Get ConsDef from environment
     (  Int                                  // Level to assign to free variables
        [SuclVariable]                       // List of pattern nodes
        (SuclVariable->(Ident,VarInfoPtr))   // Assigning FreeVars to variables from the environment
-       [FreeVar]                            // Accumulator for list of free variables in the function body (from function arguments and case pattern arguments)
-       [FreeVar]                            // Accumulator for list of local variables in the function body (from lets)
+       [FreeVar]                            // Accumulator for list of local variables in the function body (from lets and cases)
        [ExprInfoPtr]                        // Accumulator for list of expression pointers from the function body
        *ExpressionHeap                      // Initial expression heap for case branch
     ->*(  *VarAlloc                         // Initial variable heap for case branch
@@ -797,8 +813,7 @@ convert_matchpatterns ::
           , *VarAlloc                       // Modified variable heap from case branch
           , Expression                      // Resulting branch expression
           , Int                             // Reference count to default expression
-          , [FreeVar]                       // List of free variables in the function body (from function arguments and case pattern arguments)
-          , [FreeVar]                       // List of local variables in the function body (from lets)
+          , [FreeVar]                       // List of local variables in the function body (from lets and cases)
           , [ExprInfoPtr]                   // List of expression pointers from the function body
           )
        )
@@ -807,42 +822,41 @@ convert_matchpatterns ::
     (SuclVariable->(Ident,VarInfoPtr))      // Assigning FreeVars to variables from the environment
     *ExpressionHeap                         // Initial expression heap
     *VarAlloc                               // Initial variable heap
-    Expression                              // Default expression
+    (  (*ExpressionHeap,([Expression],[ExprInfoPtr]))
+    -> (*ExpressionHeap,([Expression],[ExprInfoPtr]))
+    )                                       // Default expression builder
     (Graph SuclSymbol SuclVariable)         // Case pattern to convert
     Level                                   // Level to assign to fresh free variables
-    [FreeVar]                               // Accumulator for list of free variables in the function body (from function arguments and case pattern arguments)
-    [FreeVar]                               // Accumulator for list of local variables in the function body (from lets)
+    [FreeVar]                               // Accumulator for list of local variables in the function body (from lets and cases)
     [ExprInfoPtr]                           // Accumulator for list of expression pointers from the function body
     [SuclVariable]                          // Subsequent variables in pattern to match
  -> ( *ExpressionHeap                       // Modified expression heap
     , *VarAlloc                             // Modified variable heap
     , Expression                            // Resulting (case) expression
     , Int                                   // Modified reference count to default expression
-    , [FreeVar]                             // List of free variables in the function body (from function arguments and case pattern arguments)
-    , [FreeVar]                             // List of local variables in the function body (from lets)
+    , [FreeVar]                             // List of local variables in the function body (from lets and cases)
     , [ExprInfoPtr]                         // List of expression pointers from the function body
     )
 
-convert_matchpatterns getconsdef build_casebranch patnodes varenv exprheap0 varalloc0 default_expression pgraph level freevars0 localvars0 eips0 []
-= (exprheap1,varalloc1,case_expression,refcount,freevars1,localvars1,eips1)
-  where (exprheap1,varalloc1,case_expression,refcount,freevars1,localvars1,eips1)
-        = build_casebranch level patnodes varenv freevars0 localvars0 eips0 exprheap0 varalloc0
+convert_matchpatterns getconsdef build_casebranch patnodes varenv exprheap0 varalloc0 mk_default_expression pgraph level localvars0 eips0 []
+= (exprheap1,varalloc1,case_expression,refcount,localvars1,eips1)
+  where (exprheap1,varalloc1,case_expression,refcount,localvars1,eips1)
+        = build_casebranch level patnodes varenv localvars0 eips0 exprheap0 varalloc0
 
-convert_matchpatterns getconsdef build_casebranch0 patnodes0 varenv0 exprheap0 varalloc0 default_expression pgraph level freevars0 localvars0 eips0 [pnode:pnodes]
+convert_matchpatterns getconsdef build_casebranch0 patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level localvars0 eips0 [pnode:pnodes]
 | pdef
-  = convert_matchpattern getconsdef build_remaining_matcher patnodes0 varenv0 exprheap0 varalloc0 default_expression pgraph level pnode psym freevars0 localvars0 eips0 pargs
-= build_remaining_matcher level patnodes0 varenv0 freevars0 localvars0 eips0 exprheap0 varalloc0
+  = convert_matchpattern getconsdef build_remaining_matcher patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
+= build_remaining_matcher level patnodes0 varenv0 localvars0 eips0 exprheap0 varalloc0
   where (pdef,(psym,pargs)) = varcontents pgraph pnode
-        build_remaining_matcher level` patnodes` varenv` freevars` localvars` eips` exprheap` varalloc`
-        = convert_matchpatterns getconsdef build_casebranch0 patnodes` varenv` exprheap` varalloc` default_expression pgraph level` freevars` localvars` eips` pnodes
+        build_remaining_matcher level` patnodes` varenv` localvars` eips` exprheap` varalloc`
+        = convert_matchpatterns getconsdef build_casebranch0 patnodes` varenv` exprheap` varalloc` mk_default_expression pgraph level` localvars` eips` pnodes
 
 convert_matchpattern ::
     ((Global Index) -> ConsDef)             // Get ConsDef from environment
     (  Level                                // Level to assign to free variables
        [SuclVariable]                       // List of pattern nodes
        (SuclVariable->(Ident,VarInfoPtr))   // Assigning FreeVars to variables from the environment
-       [FreeVar]                            // Accumulator for list of free variables in the function body (from function arguments and case pattern arguments)
-       [FreeVar]                            // Accumulator for list of local variables in the function body (from lets)
+       [FreeVar]                            // Accumulator for list of local variables in the function body (from lets and cases)
        [ExprInfoPtr]                        // Accumulator for list of expression pointers from the function body
        *ExpressionHeap                      // Initial expression heap for case branch
     ->*(  *VarAlloc                         // Initial variable heap for case branch
@@ -850,8 +864,7 @@ convert_matchpattern ::
           , *VarAlloc                       // Modified variable heap from case branch
           , Expression                      // Resulting branch expression
           , Int                             // Reference count to default expression
-          , [FreeVar]                       // List of free variables in the function body (from function arguments and case pattern arguments)
-          , [FreeVar]                       // List of local variables in the function body (from lets)
+          , [FreeVar]                       // List of local variables in the function body (from lets and cases)
           , [ExprInfoPtr]                   // List of expression pointers from the function body
           )
        )
@@ -860,31 +873,33 @@ convert_matchpattern ::
     (SuclVariable->(Ident,VarInfoPtr))      // Assigning FreeVars to variables from the environment
     *ExpressionHeap                         // Initial expression heap
     *VarAlloc                               // Initial variable heap
-    Expression                              // Default expression
+    (  (*ExpressionHeap,([Expression],[ExprInfoPtr]))
+    -> (*ExpressionHeap,([Expression],[ExprInfoPtr]))
+    )                                       // Default expression builder
     (Graph SuclSymbol SuclVariable)         // Case pattern to convert
     Level                                   // Level to assign to fresh free variables
     SuclVariable
     SuclSymbol
-    [FreeVar]                               // Accumulator for list of free variables in the function body (from function arguments and case pattern arguments)
-    [FreeVar]                               // Accumulator for list of local variables in the function body (from lets)
+    [FreeVar]                               // Accumulator for list of local variables in the function body (from lets and cases)
     [ExprInfoPtr]                           // Accumulator for list of expression pointers from the function body
     [SuclVariable]                          // Subsequent variables in pattern to match
  -> ( *ExpressionHeap                       // Modified expression heap
     , *VarAlloc                             // Modified variable heap
     , Expression                            // Resulting (case) expression
     , Int                                   // Modified reference count to default expression
-    , [FreeVar]                             // List of free variables in the function body (from function arguments and case pattern arguments)
-    , [FreeVar]                             // List of local variables in the function body (from lets)
+    , [FreeVar]                             // List of local variables in the function body (from lets and cases)
     , [ExprInfoPtr]                         // List of expression pointers from the function body
     )
 
-convert_matchpattern getconsdef build_casebranch patnodes0 varenv0 exprheap0 varalloc0 default_expression pgraph level pnode psym freevars0 localvars0 eips0 pargs
-= (exprheap3,varalloc2,case_expression,1+refcount,freevars++freevars1,localvars1,[cip,bvip:eips1])
-  where (exprheap3,varalloc2,branch_expression,refcount,freevars1,localvars1,eips1)
-        = convert_matchpatterns getconsdef build_casebranch patnodes1 varenv1 exprheap2 varalloc1 default_expression pgraph (level+1) freevars0 localvars0 eips0 pargs
+convert_matchpattern getconsdef build_casebranch patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
+= (exprheap4,varalloc2,case_expression,1+refcount,freevars++localvars1,[cip,bvip:eips2])
+    ---> (("convert.convert_matchpattern localvars",freevars),("refcount",refcount,"->",1+refcount))
+  where (exprheap3,varalloc2,branch_expression,refcount,localvars1,eips2)
+        = convert_matchpatterns getconsdef build_casebranch patnodes1 varenv1 exprheap2 varalloc1 mk_default_expression pgraph (level+1) localvars0 eips1 pargs
         (cip,exprheap1) = newPtr EI_Empty exprheap0
         (bvip,exprheap2) = newPtr EI_Empty exprheap1
-        case_expression = Case ci
+        case_expression
+        = Case ci
         ci
         = { case_expr = Var (mkboundvar bvip (varenv0 pnode))
           , case_guards = cps
@@ -893,13 +908,15 @@ convert_matchpattern getconsdef build_casebranch patnodes0 varenv0 exprheap0 var
           , case_info_ptr = cip
           , case_default_pos = NoPos
           }
+        (exprheap4,([default_expression:_],eips1))
+        = mk_default_expression (exprheap3,([],eips0))
         cps = convert_constructor getconsdef psym freevars branch_expression
         (varenv1,varalloc1)
-        = allocate_freevars "_parg" varenv0 varalloc0 pargs
+        = allocate_vars "_parg" varenv0 varalloc0 pargs
         patnodes1 = pargs++patnodes0
         freevars = map (mkfreevar level o varenv1) pargs
 
-allocate_freevars ::
+allocate_vars ::
     {#.Char}
     (SuclVariable->(Ident,VarInfoPtr))
     *VarAlloc
@@ -908,13 +925,13 @@ allocate_freevars ::
     , .VarAlloc
     )
 
-allocate_freevars prefix varenv0 varalloc0 []
+allocate_vars prefix varenv0 varalloc0 []
 = (varenv0,varalloc0)
-allocate_freevars prefix varenv0 varalloc0 [pnode:pnodes]
+allocate_vars prefix varenv0 varalloc0 [pnode:pnodes]
 = (varenv2,varalloc2)
   where ((ident,varinfoptr),varalloc1) = newvar prefix varalloc0
         (varenv1,varalloc2)
-        = allocate_freevars prefix varenv0 varalloc1 pnodes
+        = allocate_vars prefix varenv0 varalloc1 pnodes
         varenv2 = adjust pnode (ident,varinfoptr) varenv1
 
 convert_constructor :: ((Global Index) -> ConsDef) SuclSymbol [FreeVar] Expression -> CasePatterns
@@ -987,21 +1004,19 @@ new_convert_graph ::
     (Rgraph .SuclSymbol .SuclVariable)      // Rooted graph (replacement of rule) to convert
     *VarAlloc                               // Variable allocation information (heap)
     *ExpressionHeap                         // Expression allocation information (heap)
-    .freevars                               // Heap-allocated free variables (accumulator argument) (just passed on)
-    u:[FreeVar]                             // Heap-allocated bound variables (accumulator argument)
+    u:[FreeVar]                             // Heap-allocated bound variables (from lets) (accumulator argument)
     .[ExprInfoPtr]                          // Heap-allocated expressions (accumulator argument)
  -> ( .ExpressionHeap                       // Reduced expression heap
     , .VarAlloc                             // Reduced variable allocation info
     , Expression                            // Resulting expression
-    , .freevars                             // Heap-allocated free variables
-    , v:[FreeVar]                           // Heap-allocated bound variables
+    , v:[FreeVar]                           // Heap-allocated bound variables (from lets)
     , [ExprInfoPtr]                         // Heap-allocated expressions
     )
  ,  [u <= v]
 
-new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 freevars0 localvars0 eips0
-= ((exprheap4,varalloc1,expression,freevars0,localvars1,eips4) <--- "convert.new_convert_graph ends") ---> ("convert.new_convert_graph begins with patnodes "+++listToString patnodes)
-  where (closeds,opens) = graphvars sgraph [sroot]
+new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 localvars0 eips0
+= ((exprheap4,varalloc1,expression,localvars1,eips4) <--- "convert.new_convert_graph ends") ---> ("convert.new_convert_graph begins with patnodes "+++listToString patnodes)
+  where (closeds,_) = graphvars sgraph [sroot]
         sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
         refcounter = refcount sgraph [sroot]
         shareds = [var \\ var <- closeds | refcounter var>1] -- patnodes
@@ -1047,7 +1062,8 @@ buildletexpr letbinds (exprheap0,(rootexpression,eips0))
         eips1 = [letinfoptr:eips0]
 
 bind_a_variable refcounter level lookup_unshared var (varalloc0,(defaultmksubexpr,rest,localvars0))
-= ((varalloc1,(mksubexpr,[lb:rest],localvars1)) <--- "convert.bind_a_variable ends") ---> "convert.bind_a_variable begins"
+= (((varalloc1,(mksubexpr,[lb:rest],localvars1)) <--- "convert.bind_a_variable ends") ---> "convert.bind_a_variable begins")
+    ---> ("convert.bind_a_variable localvars",freevar)
   where lb
         = { lb_dst = freevar
           , lb_src = lookup_unshared var
@@ -1152,8 +1168,6 @@ makeStringExpr stringtype str
   where {pds_ident, pds_module, pds_def} = stringtype
         type_symb = MakeTypeSymbIdent { glob_module = pds_module, glob_object = pds_def } pds_ident 0
 
-mkbe bv bt = BasicExpr bv bt
-
 //collect_calls :: Int FunctionBody -> [FunCall]
 collect_calls main_dcl_module_n (TransformedBody tb)
 = foldr (addfuncall main_dcl_module_n) [] symbidents
@@ -1229,3 +1243,7 @@ where (<<<) file {ds_ident,ds_arity,ds_index}
 instance <<< AlgebraicPattern
 where (<<<) file {ap_symbol,ap_vars,ap_expr,ap_position}
       = file <<< "{ap_symbol=" <<< ap_symbol <<< ",ap_vars=" <<< ap_vars <<< ",ap_expr=" <<< ap_expr <<< ",ap_position=" <<< ap_position <<< "}"
+
+instance toString FreeVar
+where toString {fv_def_level,fv_name,fv_info_ptr,fv_count}
+      = "{fv_def_level=" +++ toString fv_def_level +++ ",fv_name=" +++ toString fv_name +++ ",fv_info_ptr=" +++ toString fv_info_ptr +++ ",fv_count=" +++ toString fv_count +++ "}"
