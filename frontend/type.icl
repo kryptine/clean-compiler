@@ -1132,7 +1132,7 @@ where
 		= case var_info of
 			VI_Type type _
 				-> (type, Yes var_expr_ptr, (reqs, ts))
-			VI_FAType vars type
+			VI_FAType vars type _
 				# ts = foldSt bind_var_and_attr vars ts
 		  		  (fresh_type, ts_type_heaps) = freshCopy type ts.ts_type_heaps
 		  		-> (fresh_type, Yes var_expr_ptr, (reqs, { ts & ts_type_heaps = ts_type_heaps }))
@@ -1594,8 +1594,8 @@ makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr} : vars] [type : types]
 		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type (Yes (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
 		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type No ts_var_heap)
 
-addToBase info_ptr atype=:{at_type = TFA atvs type} _ ts_var_heap 
-	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type})
+addToBase info_ptr atype=:{at_type = TFA atvs type} optional_position ts_var_heap 
+	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type} optional_position)
 addToBase info_ptr type optional_position ts_var_heap
 	= ts_var_heap  <:= (info_ptr, VI_Type type optional_position)
 	
@@ -2487,13 +2487,13 @@ is_rare_name {id_name}
 	= id_name.[0]=='_'
 
 getPositionOfExpr expr=:(Var {var_info_ptr}) var_heap
-	# (VI_Type _ opt_position, var_heap) = readPtr var_info_ptr var_heap
-	= (case opt_position of
-		Yes position
-			-> position
-		No
-			-> CP_Expression expr,
-	   var_heap)
+	= case readPtr var_info_ptr var_heap of
+		(VI_Type _ (Yes position), var_heap)
+			-> (position, var_heap)
+		(VI_FAType _ _ (Yes position), var_heap)
+			-> (position, var_heap)
+		(_, var_heap)
+			-> (CP_Expression expr, var_heap)
 getPositionOfExpr expr var_heap
 	= (CP_Expression expr, var_heap)
 

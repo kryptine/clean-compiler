@@ -1765,9 +1765,12 @@ tryAType tryAA annot attr pState
 		| isEmpty vars
 			= ( True, atype, pState)
 			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
-	// otherwise
-		# pState	= tokenBack pState
-		= tryApplicationType types annot attr pState
+	// otherwise (not that types is non-empty)
+// Sjaak	
+	# (atype, pState) = convertAAType types annot attr (tokenBack pState)
+	| isEmpty vars
+		= (True, atype, pState)
+		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
 /* PK
 tryFunctionType :: ![AType] !Annotation !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
 tryFunctionType types annot attr pState
@@ -1784,22 +1787,17 @@ where
 		= {at_annotation = annot, at_attribute = attr, at_type = t1 --> make_curry_type AN_None TA_None tr res_type}
 	make_curry_type _ _ _ _ = abort "make_curry_type: wrong assumption"
 
-tryApplicationType :: ![AType] !Annotation !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
-tryApplicationType [type1:types_rest] annot attr pState
-	#	(annot, pState)	= determAnnot annot type1.at_annotation pState
-		type			= type1.at_type
-		(attr, pState)	= determAttr attr type1.at_attribute type pState
-	| isEmpty types_rest
-		= ( True
-		  , {at_annotation = annot, at_attribute = attr, at_type = type}
-		  , pState
-		  )
+// Sjaak ...
+convertAAType :: ![AType] !Annotation !TypeAttribute !ParseState -> (!AType,!ParseState)
+convertAAType [atype:atypes] annot attr pState
+	#	(annot, pState)	= determAnnot annot atype.at_annotation pState
+		type			= atype.at_type
+		(attr, pState)	= determAttr attr atype.at_attribute type pState
+	| isEmpty atypes
+		= ( {at_annotation = annot, at_attribute = attr, at_type = type}, pState)
 	// otherwise // type application
-		# (type, pState)	= convert_list_of_types type1.at_type types_rest pState
-		= ( True
-		  , {at_annotation = annot, at_attribute = attr, at_type = type}
-		  , pState
-		  )
+		# (type, pState)	= convert_list_of_types atype.at_type atypes pState
+		= ({at_annotation = annot, at_attribute = attr, at_type = type}, pState)
 where
 	convert_list_of_types (TA sym []) types pState
 		= (TA { sym & type_arity = length types } types, pState)
@@ -1815,9 +1813,11 @@ where
 //..AA
 	convert_list_of_types _ types pState
 		= (TE, parseError "Type" No "ordinary type variable" pState)
+// ... Sjaak
+/*
 tryApplicationType _ annot attr pState
 	= (False, {at_annotation = annot, at_attribute = attr, at_type = TE}, pState)
-
+*/
 tryBrackType :: !ParseState -> (!Bool, Type, !ParseState)
 tryBrackType pState
 	# (succ, atype, pState) 	= trySimpleType AN_None TA_None pState

@@ -13,6 +13,65 @@ AS_NotChecked :== -1
 kindError kind1 kind2 error
 	= checkError "conflicting kinds: " (toString kind1 +++ " and " +++ toString kind2) error
 
+skipIndirections (KI_Var kind_info_ptr) kind_heap
+	# (kind, kind_heap) = readPtr kind_info_ptr kind_heap
+	= skip_indirections kind_info_ptr kind kind_heap
+where
+	skip_indirections this_info_ptr kind=:(KI_Var kind_info_ptr) kind_heap
+		| this_info_ptr == kind_info_ptr
+			= (kind, kind_heap)
+			# (kind, kind_heap) = readPtr kind_info_ptr kind_heap
+			= skip_indirections kind_info_ptr kind kind_heap
+	skip_indirections this_info_ptr kind kind_heap
+		= (kind, kind_heap)
+skipIndirections kind kind_heap
+	= (kind, kind_heap)
+
+unifyKinds  :: !KindInfo !KindInfo !*UnifyKindsInfo -> *UnifyKindsInfo
+unifyKinds kind1 kind2 uni_info=:{uki_kind_heap}
+	# (kind1, uki_kind_heap) = skipIndirections kind1 uki_kind_heap
+	# (kind2, uki_kind_heap) = skipIndirections kind2 uki_kind_heap
+	= unify_kinds kind1 kind2 { uni_info & uki_kind_heap = uki_kind_heap }
+where	
+	unify_kinds kind1=:(KI_Var info_ptr1) kind2 uni_info
+		= case kind2 of
+			KI_Var info_ptr2
+				| info_ptr1 == info_ptr2
+					-> uni_info
+					-> { uni_info & uki_kind_heap = uni_info.uki_kind_heap <:= (info_ptr1, kind2) }
+			_
+				# (found, uki_kind_heap) = contains_kind_ptr info_ptr1 kind2 uni_info.uki_kind_heap
+				| found
+					-> { uni_info & uki_kind_heap = uki_kind_heap, uki_error = kindError kind1 kind2 uni_info.uki_error }
+					-> { uni_info & uki_kind_heap = uki_kind_heap <:= (info_ptr1, kind2)  }
+		where
+			contains_kind_ptr info_ptr (KI_Arrow kinds) kind_heap
+				= kinds_contains_kind_ptr info_ptr kinds kind_heap
+			contains_kind_ptr info_ptr (KI_Var kind_info_ptr) kind_heap
+				= (info_ptr == kind_info_ptr, kind_heap)
+			contains_kind_ptr info_ptr (KI_Const) kind_heap
+				= (False, kind_heap)
+
+			kinds_contains_kind_ptr info_ptr [ kind : kinds ] kind_heap
+				# (kind, kind_heap) = skipIndirections kind kind_heap
+				  (found, kind_heap) = contains_kind_ptr info_ptr kind kind_heap
+				| found
+					= (True, kind_heap)
+					= kinds_contains_kind_ptr info_ptr kinds kind_heap
+			kinds_contains_kind_ptr info_ptr [] kind_heap
+				= (False, kind_heap)
+	unify_kinds kind k1=:(KI_Var info_ptr1) uni_info
+		= unify_kinds k1 kind  uni_info
+	unify_kinds kind1=:(KI_Arrow kinds1) kind2=:(KI_Arrow kinds2) uni_info=:{uki_error}
+		| length kinds1 == length kinds2
+			= fold2St unifyKinds kinds1 kinds2 uni_info
+			= { uni_info & uki_error = kindError kind1 kind2 uki_error }
+	unify_kinds KI_Const KI_Const uni_info
+		= uni_info
+	unify_kinds kind1 kind2 uni_info=:{uki_error}
+		= { uni_info & uki_error = kindError kind1 kind2 uki_error }
+
+/*
 unifyKinds  :: !KindInfo !KindInfo !*UnifyKindsInfo -> *UnifyKindsInfo
 unifyKinds (KI_Indirection kind1) kind2 uni_info=:{uki_kind_heap}
 	= unifyKinds kind1 kind2 uni_info
@@ -35,7 +94,6 @@ where
 		= info_ptr1 == kind_info_ptr
 	contains_kind_ptr info_ptr uki_kind_heap (KI_Const)
 		= False
-
 unifyKinds kind k1=:(KI_Var info_ptr1) uni_info
 	= unifyKinds k1 kind  uni_info
 unifyKinds kind1=:(KI_Arrow kinds1) kind2=:(KI_Arrow kinds2) uni_info=:{uki_error}
@@ -46,6 +104,7 @@ unifyKinds KI_Const KI_Const uni_info
 	= uni_info
 unifyKinds kind1 kind2 uni_info=:{uki_error}
 	= { uni_info & uki_error = kindError kind1 kind2 uki_error }
+*/
 
 class toKindInfo a :: !a -> KindInfo
 
@@ -114,16 +173,11 @@ where
 	analTypes has_root_attr modules form_tvs {tv_info_ptr}  (conds=:{con_var_binds}, as=:{as_heaps, as_kind_heap})
 		# (TVI_TypeKind kind_info_ptr, th_vars) = readPtr tv_info_ptr as_heaps.th_vars
 		  (kind_info, as_kind_heap) = readPtr kind_info_ptr as_kind_heap
-		  kind_info = skip_indirections kind_info
+		  (kind_info, as_kind_heap) = skipIndirections kind_info as_kind_heap
 		| isEmpty form_tvs
 			= (cMAXINT, kind_info, cIsHyperStrict, (conds, { as & as_heaps = { as_heaps & th_vars = th_vars }, as_kind_heap = as_kind_heap }))
 			= (cMAXINT, kind_info, cIsHyperStrict, ({ conds & con_var_binds = [{vb_var = kind_info_ptr, vb_vars = form_tvs } : con_var_binds] },
 						 { as & as_heaps = { as_heaps & th_vars = th_vars }, as_kind_heap = as_kind_heap }))
-	where
-		skip_indirections (KI_Indirection kind)
-			= skip_indirections kind
-		skip_indirections kind
-			= kind
 
 instance analTypes Type
 where
@@ -365,15 +419,16 @@ where
 				
 		retrieve_kind (KindVar kind_info_ptr) kind_heap
 			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
-			= (determine_kind kind_info, kind_heap)
+			= determine_kind kind_info kind_heap
 		where
-			determine_kind (KI_Indirection kind) 
-				= determine_kind kind
-			determine_kind (KI_Arrow kinds)
-				//AA: = KindArrow (length kinds)
-				= KindArrow [determine_kind k \\ k <- kinds]
-			determine_kind kind
-				= KindConst
+			determine_kind kind kind_heap
+				# (kind, kind_heap) = skipIndirections kind kind_heap
+				= case kind of
+					KI_Arrow kinds
+						# (kinds, kind_heap) = mapSt determine_kind kinds kind_heap
+						-> (KindArrow kinds, kind_heap)
+					_
+						-> (KindConst, kind_heap)
 			   
 	unify_var_binds :: ![VarBind] !*KindHeap -> *KindHeap
 	unify_var_binds binds kind_heap

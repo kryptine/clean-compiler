@@ -267,7 +267,7 @@ checkTypeDef :: !Index !Index !*TypeSymbols !*TypeInfo !*CheckState -> (!*TypeSy
 checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
 	# (type_def, ts_type_defs) = ts_type_defs![type_index]
 	# {td_name,td_pos,td_args,td_attribute} = type_def
-	  position = newPosition td_name td_pos
+	# position = newPosition td_name td_pos
 	  cs_error = pushErrorAdmin position cs_error
 	  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_name.id_name ti_type_heaps.th_attrs
 	  (type_vars, (attr_vars, ti_type_heaps, cs))
@@ -286,6 +286,7 @@ where
 		= (TA_Var new_var, [new_var], attr_var_heap)
 	determine_root_attribute TA_Unique name attr_var_heap
 		= (TA_Unique, [], attr_var_heap)
+
 
 CS_Checked	:== 1
 CS_Checking	:== 0

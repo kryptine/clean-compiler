@@ -579,7 +579,7 @@ where
 				
 		has_observing_base_type (VI_Type {at_type} _) type_def_infos subst
 			= has_observing_type at_type type_def_infos subst
-		has_observing_base_type (VI_FAType _ {at_type}) type_def_infos subst
+		has_observing_base_type (VI_FAType _ {at_type} _) type_def_infos subst
 			= has_observing_type at_type type_def_infos subst
 		has_observing_base_type _ type_def_infos subst
 			= abort "has_observing_base_type (refmark.icl)"
