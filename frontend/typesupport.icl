@@ -796,6 +796,8 @@ where
 			= file <<< '*' 
 		show_attribute TA_Multi coercions file 
 			= file 
+		show_attribute TA_TempExVar coercions file 
+			= file <<< "(E)" 
 		show_attribute (TA_TempVar av_number) coercions file 
 			| isUniqueAttribute av_number coercions
 				= file <<< '*' 
