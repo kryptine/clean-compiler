@@ -8,9 +8,6 @@
 
 #include "MAIN_CLM.d"
 
-/* for interrupts in comsupport.c */
-Bool InCommandInterpreter = False;
-
 static char usage[]=
 	"Usage: \'cocl [options] [-o file] file\'\n"
 	"Options: [-v] [-w] [-tc] [-d] [-sl] [-p] [-sa] [-lt] [-lset] [-lat] [-lattr]";

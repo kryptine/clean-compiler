@@ -18,7 +18,6 @@
 #include "types.t"
 #include "system.h"
 #include "sizes.h"
-#include "cmdline.h"
 
 #include "settings.h"
 #include "syntaxtr.t"
@@ -614,10 +613,6 @@ void ExitOnInterrupt (void)
 				FClose (OpenedFile);
 			OpenedFile = (File) NIL;
 		}
-#ifdef _STANDALONE_
-		if (InCommandInterpreter)
-			FPrintF (StdOut, "<interrupt>\n");
-#endif
 		longjmp (ExitEnv, 1);
 	}
 }
