@@ -134,11 +134,8 @@ addToAttributeEnviron (TA_RootVar attr_var) root_attr attr_env error
 addToAttributeEnviron _ _ attr_env error
 	= (attr_env, checkError "" "inconsistent attribution of type definition" error)
 
-/*
-bindTypesOfCons :: !Index !Index ![TypeVar] ![AttributeVar] !AType ![DefinedSymbol] !Bool !Index !Level !TypeAttribute !Conditions !*TypeSymbols !*TypeInfo !*CheckState
-	-> *(!TypeProperties, !Conditions, !Int, !*TypeSymbols, !*TypeInfo, !*CheckState)
-*/
-
+bindTypesOfConstructors :: !CurrentTypeInfo !Index ![TypeVar] ![AttributeVar] !AType ![DefinedSymbol] !(!*TypeSymbols,!*TypeInfo,!*CheckState)
+	-> (!*TypeSymbols, !*TypeInfo, !*CheckState)
 bindTypesOfConstructors _ _ _ _ _ [] ts_ti_cs
 	= ts_ti_cs
 bindTypesOfConstructors cti=:{cti_lhs_attribute} cons_index free_vars free_attrs type_lhs [{ds_index}:conses] (ts=:{ts_cons_defs}, ti=:{ti_type_heaps}, cs)
@@ -157,11 +154,8 @@ bindTypesOfConstructors cti=:{cti_lhs_attribute} cons_index free_vars free_attrs
 			{ cons_def & cons_type = cons_type, cons_index = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
 					cons_type_ptr = new_type_ptr, cons_arg_vars = cons_arg_vars }}}, { ti & ti_var_heap = ti_var_heap }, cs)
 where
-/*
-	check_types_of_cons :: ![AType] !Bool !Index  !Level ![TypeVar] !TypeAttribute ![AttrInequality] !Conditions !*TypeSymbols !*TypeInfo !*CheckState
-		-> *(![AType], ![[ATypeVar]], ![AttrInequality], !TypeProperties, !Conditions, !Int, !*TypeSymbols, !*TypeInfo, !*CheckState)
-*/
-
+	bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
+		-> !(![AType], ![[ATypeVar]], ![AttrInequality], !(!*TypeSymbols, !*TypeInfo, !*CheckState))
 	bind_types_of_cons [] cti free_vars attr_env ts_ti_cs
 		= ([], [], attr_env, ts_ti_cs)
 	bind_types_of_cons [type : types] cti free_vars attr_env ts_ti_cs
@@ -179,14 +173,16 @@ where
 				= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr }, atv_attribute = stv_attribute, atv_annotation = AN_None } : local_vars],
 						symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
 
-
+//
+checkRhsOfTypeDef :: !CheckedTypeDef ![AttributeVar] !CurrentTypeInfo !(!*TypeSymbols, !*TypeInfo, !*CheckState)
+	-> (!TypeRhs, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+//
 checkRhsOfTypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:AlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} ts_ti_cs
 	# type_lhs = { at_annotation = AN_None, at_attribute = cti_lhs_attribute,
 			  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_name td_arity)
 								[{at_annotation = AN_None, at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
 	  ts_ti_cs = bindTypesOfConstructors cti 0 [ atv_variable \\ {atv_variable} <- td_args] attr_vars type_lhs conses ts_ti_cs
 	= (td_rhs, ts_ti_cs)
-
 checkRhsOfTypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_constructor=rec_cons=:{ds_index}, rt_fields}}
 		attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} ts_ti_cs
 	# type_lhs = {	at_annotation = AN_None, at_attribute = cti_lhs_attribute,
@@ -478,8 +474,7 @@ determineAttributeVariable attr_var=:{av_name=attr_name=:{id_info}} oti=:{oti_he
 
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
 
-// JVG: added type:
-newAttribute :: !.DemandedAttributeKind .{#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute,!.OpenTypeInfo,!.CheckState);
+newAttribute :: !DemandedAttributeKind {#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute, !*OpenTypeInfo, !*CheckState)
 newAttribute DAK_Ignore var_name _ oti cs
 	= (TA_Multi, oti, cs)
 newAttribute DAK_Unique var_name new_attr  oti cs
@@ -600,8 +595,8 @@ where
 	check_attribute var_name dem_attr _ this_attr oti cs
 		= (TA_Multi, oti, cs)
 
-//JVG: added type
-checkOpenAType :: Int Int DemandedAttributeKind AType !*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState) -> *(!AType,!*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState));
+checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+	-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
 	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
@@ -629,7 +624,7 @@ where
 							-> (var, global_vars, var_heap, entry)
 			# (var, global_vars, var_heap, ste_previous) = retrieve_global_variable var ste_previous global_vars var_heap
 			= (var, global_vars, var_heap, { entry & ste_previous = ste_previous })
-
+//
 checkOpenAType mod_index scope dem_attr type=:{ at_type=TA type_cons=:{type_name=type_name=:{id_name,id_info}} types, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
@@ -646,16 +641,8 @@ checkOpenAType mod_index scope dem_attr type=:{ at_type=TA type_cons=:{type_name
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
 where
-/*
-	check_args_of_type_cons mod_index scope dem_attr [] _ cot_state
-		= ([], cot_state)
-	check_args_of_type_cons mod_index scope dem_attr [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
-		# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute dem_attr atv_attribute) arg_type cot_state
-		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr arg_types td_args cot_state
-		= ([arg_type : arg_types], cot_state)
-*/
-	// JVG: added type:
-	check_args_of_type_cons :: Int Int [AType] [ATypeVar] !*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState) -> *(!.[AType],!*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState));
+	check_args_of_type_cons :: !Index !Int ![AType] ![ATypeVar] !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+		-> (![AType], !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 	check_args_of_type_cons mod_index scope [] _ cot_state
 		= ([], cot_state)
 	check_args_of_type_cons mod_index scope [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
@@ -677,11 +664,7 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_typ
 	= ({ type & at_type = arg_type --> result_type, at_attribute = new_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, _, (oti, cs)) =  checkTypeVar scope DAK_None tv TA_Multi (oti, cs)
-// JVG
 	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
-//	  dak_None = DAK_None
-//	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope dak_None) types (ots, oti, cs)
-	
 	  (new_attr, oti, cs) = newAttribute dem_attr ":@:" at_attribute oti cs
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = new_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_attribute} (ots, oti, cs)
@@ -696,10 +679,7 @@ checkOpenType mod_index scope dem_attr type cot_state
 	= (at_type, cot_state)
 	
 checkOpenATypes mod_index scope types cot_state
-// JVG
 	= mapSt (checkOpenAType mod_index scope DAK_None) types cot_state
-//	# dak_None=DAK_None
-//	= mapSt (checkOpenAType mod_index scope dak_None) types cot_state
 
 checkInstanceType :: !Index !(Global DefinedSymbol) !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!InstanceType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
@@ -805,19 +785,6 @@ where
 		-> (!TypeContext,!z:{#CheckedTypeDef},!x:{#ClassDef},!w:{#DclModule},!*TypeHeaps,!*CheckState), [u v <= w, v u <= z]
 	check_type_context tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
 		mod_index type_defs class_defs modules heaps cs=:{cs_symbol_table, cs_predef_symbols}
-/*
-// MW..
-  		# ({pds_ident},cs_predef_symbols) = cs_predef_symbols![PD_TypeCodeClass]	
-		  (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_PredefinedModule]
-		  cs = { cs & cs_predef_symbols = cs_predef_symbols }
-		# (modules, cs) = case ds_ident==pds_ident of
-							True	# ({dcl_name}, modules) = modules![mod_index]
-									| pre_mod.pds_def <> mod_index
-										-> (modules, { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdDynamics })
-									-> (modules, cs) // the predefined module does not have to import StdDynamics
-							_	 	-> (modules, cs)
-// .. MW 
-*/
 		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
@@ -825,7 +792,8 @@ where
 			# (class_def, class_index, class_defs, modules) = getClassDef class_index class_module mod_index class_defs modules
 			  ots = { ots_modules = modules, ots_type_defs = type_defs }
 			  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
-			  (tc_types, (ots, {oti_all_vars,oti_all_attrs,oti_heaps}, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)		
+			  (tc_types, (ots, {oti_all_vars,oti_all_attrs,oti_heaps}, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
+			  cs = check_context_types 	class_def.class_name tc_types cs
 			  cs = foldr (\ {tv_name} cs=:{cs_symbol_table,cs_error} -> 
 						 { cs & cs_symbol_table =  removeDefinitionFromSymbolTable cGlobalScope tv_name cs_symbol_table,
 						   cs_error = checkError tv_name " undefined" cs_error}) cs oti_all_vars 
@@ -837,6 +805,14 @@ where
 				= (tc, ots.ots_type_defs, class_defs, ots.ots_modules, oti_heaps, cs)
 				= (tc, ots.ots_type_defs, class_defs, ots.ots_modules, oti_heaps, {  cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error })
 			= (tc, type_defs, class_defs, modules, heaps, { cs & cs_error = checkError id_name "undefined" cs.cs_error })
+	
+	check_context_types tc_class [] cs=:{cs_error}
+		= { cs & cs_error = checkError tc_class " type context should contain one or more type variables" cs_error}
+	check_context_types tc_class [TV _ : types] cs
+		= cs
+	check_context_types tc_class [type : types] cs
+		= check_context_types tc_class types cs
+
 checkTypeContexts [] _ type_defs class_defs modules heaps cs
 	= ([], type_defs, class_defs, modules, heaps, cs)
 
