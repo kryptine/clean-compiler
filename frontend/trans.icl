@@ -410,18 +410,6 @@ instance consumerRequirements DynamicExpr where
 	consumerRequirements {dyn_expr} common_defs ai
 		= consumerRequirements dyn_expr common_defs ai
 
-/*
-instance consumerRequirements TypeCase where
-	consumerRequirements {type_case_dynamic,type_case_patterns,type_case_default} ai
-		# (_, ai) = consumerRequirements type_case_dynamic ai
-		  (ccgs, ai) = consumerRequirements (type_case_patterns,type_case_default) ai
-		= (ccgs, ai)
-*/
-
-instance consumerRequirements DynamicPattern where
-	consumerRequirements {dp_rhs} common_defs ai
-		= consumerRequirements dp_rhs common_defs ai
-
 bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
 	| fv_count > 0
 		= bindPatternVars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
@@ -437,12 +425,6 @@ consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 	= independentConsumerRequirements pattern_exprs common_defs ai
 consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
 	# pattern_exprs = [ bp_expr \\ {bp_expr}<-patterns]
-	= independentConsumerRequirements pattern_exprs common_defs ai
-consumer_requirements_of_guards (DynamicPatterns dyn_patterns) common_defs ai
-	# pattern_exprs = [ dp_rhs \\ {dp_rhs}<-dyn_patterns]
-	  pattern_vars = [ dp_var \\ {dp_var}<-dyn_patterns]
-	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
-	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
 	= independentConsumerRequirements pattern_exprs common_defs ai
 
 instance consumerRequirements BasicPattern where
@@ -677,10 +659,6 @@ where
 					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 				BasicPatterns _ _
 					-> ti // no variables occur
-				DynamicPatterns dynamic_patterns
-					# (EI_CaseType {ct_cons_types},ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
-					  ti_var_heap = foldSt store_type_info_of_dyn_pattern (zip2 ct_cons_types dynamic_patterns) ti.ti_var_heap
-					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 				NoPattern
 					-> ti
 		store_type_info_of_alg_pattern (var_types,{ap_vars}) var_heap
@@ -692,7 +670,7 @@ where
 
 	transform (Selection opt_type expr selectors) ro ti
 		# (expr, ti) = transform expr ro ti
-		= transformSelection opt_type selectors expr ro ti
+		= transformSelection opt_type selectors expr ti
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
@@ -711,11 +689,6 @@ instance transform DynamicExpr where
 	transform dyn=:{dyn_expr} ro ti
 		# (dyn_expr, ti) = transform dyn_expr ro ti
 		= ({dyn & dyn_expr = dyn_expr}, ti)
-
-instance transform DynamicPattern where
-	transform dp=:{dp_rhs} ro ti
-		# (dp_rhs, ti) = transform dp_rhs ro ti
-		= ({ dp & dp_rhs = dp_rhs }, ti)
 
 unfold_state_to_ti us ti
 	:== { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = us.us_symbol_heap, ti_cleanup_info=us.us_cleanup_info }
@@ -1158,9 +1131,6 @@ where
 	transform (BasicPatterns type patterns) ro ti
 		# (patterns, ti) = transform patterns ro ti
 		= (BasicPatterns type patterns, ti)
-	transform (DynamicPatterns patterns) ro ti
-		# (patterns, ti) = transform patterns ro ti
-		= (DynamicPatterns patterns, ti)
 
 instance transform (Optional a) | transform a
 where
@@ -1794,17 +1764,20 @@ transformApplication app extra_args ro ti
 	= (App app @ extra_args, ti)
 
 transformSelection No s=:[RecordSelection _ field_index : selectors] 
-					app=:(App {app_symb={symb_kind= SK_Constructor {glob_object, glob_module} }, app_args})
-					ro ti=:{ti_var_heap, ti_type_heaps}
-	# cons_def
-			= ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object]
-    | isEmpty [i \\ {at_annotation=AN_Strict} <- cons_def.cons_type.st_args & i<-[0..] 
-				| i<>field_index]
-    	= transformSelection No selectors (app_args !! field_index) ro ti
-	= (Selection No app s, ti)
-transformSelection No [] expr ro ti
+					app=:(App {app_symb={symb_kind= SK_Constructor _ }, app_args, app_info_ptr})
+					ti=:{ti_symbol_heap}
+	| isNilPtr app_info_ptr
+		= (Selection No app s, ti)
+	# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti_symbol_heap
+	  ti = { ti & ti_symbol_heap = ti_symbol_heap }
+	= case app_info of
+		EI_DictionaryType _
+			-> transformSelection No selectors (app_args !! field_index) ti
+		_
+			-> (Selection No app s, ti)
+transformSelection No [] expr ti
 	= (expr, ti)
-transformSelection opt_type selectors expr _ ti
+transformSelection opt_type selectors expr ti
 	= (Selection opt_type expr selectors, ti)
 
 // XXX store linear_bits and cc_args together ?
@@ -2313,14 +2286,6 @@ where
 	where
 		free_variables_of_basic_pattern {bp_expr} fvi
 			= freeVariables bp_expr fvi
-
-	free_variables_of_guards (DynamicPatterns dynamic_patterns) fvi
-		= foldSt free_variables_of_dynamic_pattern dynamic_patterns fvi
-	where
-		free_variables_of_dynamic_pattern {dp_var, dp_rhs} fvi=:{fvi_variables}
-			# fvi = freeVariables dp_rhs { fvi & fvi_variables = [] }
-			  (fvi_variables, fvi_var_heap) = removeLocalVariables [dp_var] fvi.fvi_variables fvi_variables fvi.fvi_var_heap
-			= { fvi & fvi_var_heap = fvi_var_heap, fvi_variables = fvi_variables }
 
 app_EEI_ActiveCase transformer expr_info_ptr expr_heap
 	# (expr_info, expr_heap) = readPtr expr_info_ptr expr_heap
