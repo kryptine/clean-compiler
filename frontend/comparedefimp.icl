@@ -409,6 +409,8 @@ instance t_corresponds AType where
 		= t_corresponds_at_type dclDef iclDef
 	  where
 		t_corresponds_at_type dclDef iclDef tc_state
+			| dclDef.at_annotation<>iclDef.at_annotation
+				= (False, tc_state)
 			# (corresponds, tc_state) = simple_corresponds dclDef iclDef tc_state
 			| corresponds
 				= (corresponds, tc_state)
@@ -419,13 +421,13 @@ instance t_corresponds AType where
 					#! x = sreadPtr tv_info_ptr tc_state.tc_type_vars.hwn_heap
 					-> case x of
 						TVI_AType dcl_atype
-							-> t_corresponds dcl_atype iclDef tc_state
+							-> t_corresponds { dcl_atype & at_annotation = dclDef.at_annotation } iclDef tc_state
 						_	-> (False, tc_state)
 				_	-> (False, tc_state)
 		  where
+
 			simple_corresponds dclDef iclDef
 				=	t_corresponds dclDef.at_attribute iclDef.at_attribute
-				&&&	equal dclDef.at_annotation iclDef.at_annotation
 				&&&	t_corresponds dclDef.at_type iclDef.at_type
 
 			corresponds_with_expanded_syn_type {glob_module, glob_object} dclArgs icl_atype
@@ -472,7 +474,7 @@ instance t_corresponds AType where
 					# (actual_arg, type_var_heap) = possibly_dereference actual_arg type_var_heap
 					= bind_type_vars` formal_args actual_args
 							(writePtr atv_variable.tv_info_ptr (TVI_AType actual_arg) type_var_heap)
-							//	--->("binding", atv_variable.tv_name,"to",actual_arg)
+//								--->("binding", atv_variable.tv_name,"to",actual_arg)
 				bind_type_vars` _ _ type_var_heap
 					= type_var_heap
 				

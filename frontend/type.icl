@@ -1371,9 +1371,11 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	,	fe_location		:: !IdentPos
 	}
 
-typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
+// MW0 was typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
+typeProgram :: !ModuleKind !{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
-typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
+// MW0 was typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
+typeProgram mod_type comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
 	#! fun_env_size = size fun_defs
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
 
@@ -1393,11 +1395,18 @@ typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_ex
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
-	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
-	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
+// MW0 was	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
+	  (type_error, fun_defs, predef_symbols, special_instances, ts=:{ts_error})
+	  		= type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
+// MW0 was	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
+	  (fun_defs, ts_fun_env, ts_error=:{ea_ok=no_start_rule_error}) = update_function_types 0 comps ts.ts_fun_env fun_defs ts_error
+	    
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
-			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
-				{ ts & ts_fun_env = ts_fun_env })
+// MW0 was			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
+// MW0 was				{ ts & ts_fun_env = ts_fun_env })
+			= type_instances specials.ir_from specials.ir_to class_instances ti
+				(type_error || not no_start_rule_error, fun_defs, predef_symbols, special_instances,
+					{ ts & ts_fun_env = ts_fun_env, ts_error = { ts_error & ea_ok = True }})
 	  {si_array_instances, si_next_array_member_index, si_next_TC_member_index, si_TC_instances}= special_instances
 	  (fun_defs, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs fun_defs predef_symbols ts_type_heaps
 	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
@@ -1654,31 +1663,49 @@ where
 		= (subst, ts_fun_env)
 			
 
-	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-	update_function_types group_index comps fun_env fun_defs
+// MW0 was	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} !*ErrorAdmin -> (!*{#FunDef}, !*{!FunctionType}, !.ErrorAdmin)
+	update_function_types group_index comps fun_env fun_defs error_admin
 		| group_index == size comps
-			= (fun_defs, fun_env)
+// MW0 was			= (fun_defs, fun_env)
+			= (fun_defs, fun_env, error_admin)
 			#! comp = comps.[group_index]	
-			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
-			= update_function_types (inc group_index) comps fun_env fun_defs
+// MW0 was			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
+			# (fun_defs, fun_env, error_admin) = update_function_types_in_component comp.group_members fun_env fun_defs error_admin
+// MW0 was			= update_function_types (inc group_index) comps fun_env fun_defs
+			= update_function_types (inc group_index) comps fun_env fun_defs error_admin
 
 	where
-		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs
+// MW0 was		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} !*ErrorAdmin
+											-> (!*{#FunDef}, !*{!FunctionType}, !.ErrorAdmin)
+// MW0 was		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs
+		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs error_admin
 			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
 			#! fd = fun_defs.[fun_index]
+// MW0..
+			# is_start_rule  = fd.fun_symb.id_name=="Start" && fd.fun_info.fi_def_level==1 && mod_type==MK_Main
+			  error_admin = case is_start_rule  of
+			  					False	-> error_admin
+			  					_		-> check_type_of_start_rule fd checked_fun_type error_admin
+// ..MW0
 			= case fd.fun_type of
 				No
-					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
+// MW0 was					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
+					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }} error_admin
 				Yes fun_type
 					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
 					| nr_of_lifted_arguments > 0
 						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
 									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
-						-> update_function_types_in_component funs fun_env fun_defs
-		update_function_types_in_component [] fun_env fun_defs
-			= (fun_defs, fun_env)
+// MW0 was						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
+						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }} error_admin
+// MW0 was						-> update_function_types_in_component funs fun_env fun_defs
+						-> update_function_types_in_component funs fun_env fun_defs error_admin
+// MW0 was		update_function_types_in_component [] fun_env fun_defs
+// MW0 was			= (fun_defs, fun_env)
+		update_function_types_in_component [] fun_env fun_defs error_admin
+			= (fun_defs, fun_env, error_admin)
 	
 	type_functions group ti cons_variables fun_defs ts
 		= mapSt (type_function ti) group (cons_variables, fun_defs, ts) // ((cons_variables, fun_defs, ts) ---> "[(") ---> ")]"
@@ -1768,6 +1795,23 @@ where
 				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
 			CheckedType _
 				-> ts
+
+// MW0..
+	check_type_of_start_rule fd checked_fun_type error_admin
+		| not (isEmpty checked_fun_type.st_context)
+			= checkErrorWithIdentPos (newPosition fd.fun_symb fd.fun_pos) "must not be overloaded" error_admin
+		| isEmpty checked_fun_type.st_args
+			= error_admin
+		| length checked_fun_type.st_args > 1
+			= checkErrorWithIdentPos (newPosition fd.fun_symb fd.fun_pos) "should have arity 0 or 1" error_admin
+		= case checked_fun_type.st_args of
+			[]	-> error_admin
+			[{at_type=TB BT_World}] 
+				-> error_admin
+			[{at_type=TV _}]
+				-> error_admin
+			_	-> checkErrorWithIdentPos (newPosition fd.fun_symb fd.fun_pos) "argument must be of type World" error_admin
+// ..MW0
 
 instance <<< AttrCoercion
 where

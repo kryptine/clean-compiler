@@ -2611,7 +2611,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 	  (icl_functions, e_info, heaps, cs) = checkMacros cIclModIndex cdefs.def_macros icl_functions e_info heaps cs
 	  (icl_functions, e_info, heaps, cs) = checkFunctions cIclModIndex cGlobalScope 0 nr_of_global_funs icl_functions e_info heaps cs
 
-	  (e_info, cs) = check_needed_modules_are_imported mod_name ".icl" e_info cs
+	  cs = check_needed_modules_are_imported mod_name ".icl" cs
 
 	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error})
 	  	= checkInstanceBodies {ir_from = first_inst_index, ir_to = nr_of_functions} icl_functions e_info heaps cs
@@ -2831,28 +2831,31 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 				  (Yes symbol_type) = inst_def.fun_type
 				= { instance_defs & [ds_index] = { inst_def & fun_type = Yes (makeElemTypeOfArrayFunctionStrict symbol_type ins_offset offset_table) } }
 
-check_needed_modules_are_imported mod_name extension e_info cs=:{cs_needed_modules}
-	# (e_info, cs) = case cs_needed_modules bitand cNeedStdDynamics of
-						0 -> (e_info, cs)
-						_ -> check_it PD_StdDynamics mod_name extension e_info cs
-	# (e_info, cs) = case cs_needed_modules bitand cNeedStdArray of
-						0 -> (e_info, cs)
-						_ -> check_it PD_StdArray mod_name extension e_info cs
-	# (e_info, cs) = case cs_needed_modules bitand cNeedStdEnum of
-						0 -> (e_info, cs)
-						_ -> check_it PD_StdEnum mod_name extension e_info cs
-	= (e_info, cs)
+check_needed_modules_are_imported mod_name extension cs=:{cs_needed_modules}
+	# cs = case cs_needed_modules bitand cNeedStdDynamics of
+			0 -> cs
+			_ -> check_it PD_StdDynamics mod_name extension cs
+	# cs = case cs_needed_modules bitand cNeedStdArray of
+			0 -> cs
+			_ -> check_it PD_StdArray mod_name extension cs
+	# cs = case cs_needed_modules bitand cNeedStdEnum of
+			0 -> cs
+			_ -> check_it PD_StdEnum mod_name extension cs
+	= cs
   where
-	check_it pd mod_name extension e_info=:{ef_modules} cs=:{cs_predef_symbols}
+	check_it pd mod_name extension cs=:{cs_predef_symbols, cs_symbol_table}
   		#! {pds_ident} = cs_predef_symbols.[pd]	
-		   is_imported = any ((==) pds_ident) [ dcl_name \\ {dcl_name}<-:ef_modules ]
-		| is_imported
-			= (e_info, cs)
-		# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
-		  cs_error = pushErrorAdmin error_location cs.cs_error
-		  cs_error = checkError pds_ident "not imported" cs_error
-		  cs_error = popErrorAdmin cs_error
-		= (e_info, { cs & cs_error = cs_error })
+		# ({ste_kind}, cs_symbol_table) = readPtr pds_ident.id_info cs_symbol_table
+		  cs = { cs & cs_symbol_table = cs_symbol_table }
+		= case ste_kind of
+			STE_ClosedModule
+				-> cs
+			STE_Empty
+				# error_location = { ip_ident = mod_name, ip_line = 1, ip_file = mod_name.id_name+++extension}
+				  cs_error = pushErrorAdmin error_location cs.cs_error
+				  cs_error = checkError pds_ident "not imported" cs_error
+				  cs_error = popErrorAdmin cs_error
+				-> { cs & cs_error = cs_error }
 
 arrayFunOffsetToPD_IndexTable :: !{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !{#MemberDef}, !v:{#PredefinedSymbol})
 arrayFunOffsetToPD_IndexTable member_defs predef_symbols
@@ -2992,7 +2995,7 @@ checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions h
 	  (icl_functions, e_info, heaps, cs)
 			= checkMacros mod_index dcl_macros icl_functions e_info heaps { cs & cs_error = cs_error }
 
-	  (e_info, cs) = check_needed_modules_are_imported mod_name ".dcl" e_info cs
+	  cs = check_needed_modules_are_imported mod_name ".dcl" cs
 
 	  com_instance_defs = dcl_common.com_instance_defs
 	  com_instance_defs = { inst_def \\ inst_def <- [ inst_def \\ inst_def <-: com_instance_defs ] ++ new_class_instances }

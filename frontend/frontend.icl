@@ -22,6 +22,7 @@ frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident (hash_table ---> ("Parsing:", mod_ident)) error search_paths predef_symbols files
+	#! mod_type = mod.mod_type
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 	# (ok, mod, nr_of_global_funs, mod_functions, dcl_mod, predef_mod, modules, hash_table, error, predef_symbols, files)
@@ -37,7 +38,7 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 	# {icl_functions,icl_instances,icl_specials,icl_common,icl_declared={dcls_import}} = icl_mod
 //	  (components, icl_functions, error) = showComponents components 0 True icl_functions error
 	  (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error)
-		= typeProgram (components -*-> "Typing") icl_functions icl_specials icl_common dcls_import dcl_mods heaps predef_symbols error
+		= typeProgram mod_type (components -*-> "Typing") icl_functions icl_specials icl_common dcls_import dcl_mods heaps predef_symbols error
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 

@@ -783,8 +783,8 @@ instance consequences Expression
 instance consequences FunctionBody
   where	consequences (CheckedBody body) = consequences body
 		consequences (TransformedBody body) = consequences body
-		consequences (RhsMacroBody body) = consequences body
-		
+		// other alternatives should not occur
+				
 instance consequences FunType
   where
 	consequences {ft_type}	= consequences ft_type	

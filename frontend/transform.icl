@@ -549,9 +549,9 @@ partitionateMacros {ir_from,ir_to} mod_index fun_defs modules var_heap symbol_he
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
 							pi_symbol_table = symbol_table,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
-	  (fun_defs, modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_error, pi_next_group, pi_groups, pi_marks})
+	  (fun_defs, modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_error, pi_next_group, pi_groups, pi_marks, pi_deps})
 	  		= iFoldSt (pationate_macro mod_index max_fun_nr) ir_from ir_to (fun_defs, modules, partitioning_info)
-	= (iFoldSt reset_body_of_rhs_macro ir_from ir_to fun_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
+	= (foldSt reset_body_of_rhs_macro pi_deps fun_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 where
 	
 	reset_body_of_rhs_macro macro_index macro_defs
@@ -592,6 +592,7 @@ where
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
 			= ({ macro_defs & [macro_index] = macro }, modules,
 					{ pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_error = es_error })
+			# pi = { pi & pi_deps = [macro_index:pi.pi_deps] }
 			= ({ macro_defs & [macro_index] = { macro & fun_body = RhsMacroBody body }}, modules, pi)
 
 	macros_are_simple [] macro_defs
