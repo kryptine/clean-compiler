@@ -5431,6 +5431,9 @@ int init_strictness_analysis (ImpMod imod)
 	DBPrinting      = False;
 #endif
 
+#if CLEAN2
+	strict_positions	= NULL;
+#endif
 	max_memuse   = 0;
 	found_strict = 0;
 	initialising = True;
