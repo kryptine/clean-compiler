@@ -16,17 +16,13 @@ bitvectToNumberSet :: !LargeBitvect -> .NumberSet
 
 bitvectSelect :: !Int !LargeBitvect -> Bool
 bitvectSet :: !Int !*LargeBitvect -> .LargeBitvect 
+bitvectReset :: !Int !*LargeBitvect -> .LargeBitvect
 bitvectCreate :: !Int -> .LargeBitvect 
-bitvectReset :: !*LargeBitvect -> .LargeBitvect 
+bitvectResetAll :: !*LargeBitvect -> .LargeBitvect 
 
 :: IntKey :== Int
 
-:: IntKeyHashtable a =
-	{	ikh_rehash_threshold	:: !Int
-	,	ikh_nr_of_entries		:: !Int
-	,	ikh_bitmask				:: !Int
-	,	ikh_entries				:: !.{!.IntKeyTree a}
-	}
+:: IntKeyHashtable a = IntKeyHashtable !Int !Int !Int !.{!.IntKeyTree a}
 	
 :: IntKeyTree a = IKT_Leaf | IKT_Node !IntKey a !.(IntKeyTree a) !.(IntKeyTree a)
 
@@ -44,6 +40,6 @@ iktUInsert :: !Bool !IntKey a !*(IntKeyTree a) -> (!Bool, !.IntKeyTree a)
 iktFlatten :: !(IntKeyTree a) -> [(IntKey, a)]
 iktSearch :: !IntKey !(IntKeyTree a) -> .Optional a
 iktSearch` :: !IntKey !(IntKeyTree a) -> a
-iktUSearch :: !IntKey !*(IntKeyTree a) -> (!.Optional a,.IntKeyTree a)
+iktUSearch :: !IntKey !*(IntKeyTree a) -> (!.Optional a,!.IntKeyTree a)
 
 instance toString (IntKeyTree a) | toString a, (IntKeyHashtable a) | toString a
