@@ -238,6 +238,8 @@ where
 				= (lifted_function_called, free_vars, fun_defs,macro_defs)
 				# (free_vars_added, free_vars) = add_free_variables fun_def_level fi_free_vars (False, free_vars)
 				= (True, free_vars, fun_defs,macro_defs)
+		add_free_vars_of_non_recursive_call fun_def_level group_index (DclFunCall _ _) (lifted_function_called, free_vars, fun_defs,macro_defs)
+			= (lifted_function_called, free_vars, fun_defs,macro_defs)
 
 	add_free_vars_of_recursive_calls_to_functions group_index group (fun_defs,macro_defs)
 		= foldSt (add_free_vars_of_recursive_calls_to_function group_index) group (False, (fun_defs,macro_defs))
@@ -269,6 +271,8 @@ where
 			# (free_vars_added, free_vars) = add_free_variables fun_def_level fi_free_vars (free_vars_added, free_vars)
 			= (free_vars_added, free_vars, fun_defs,macro_defs)
 			= (free_vars_added, free_vars, fun_defs,macro_defs)
+	add_free_vars_of_recursive_call fun_def_level group_index (DclFunCall _ _) (free_vars_added, free_vars, fun_defs,macro_defs)
+		= (free_vars_added, free_vars, fun_defs,macro_defs)
 
 	add_free_variables fun_level new_vars (free_vars_added, free_vars)
 		= add_free_global_variables (skip_local_variables fun_level new_vars) (free_vars_added, free_vars)
@@ -744,7 +748,7 @@ updateFunctionCalls calls collected_calls fun_defs symbol_table
 	= foldSt add_function_call calls (collected_calls, fun_defs, symbol_table)
 where
 	add_function_call fc=:(FunCall fc_index _) (collected_calls, fun_defs, symbol_table)
-//		# fc_index = trace ("add_function_call: "+++toString fc_index+++" ") fc_index
+//		# fc_index = trace_n ("add_function_call: "+++toString fc_index+++" ") fc_index
 		# ({fun_symb}, fun_defs) = fun_defs![fc_index]
 		  (collected_calls, symbol_table) = examineFunctionCall fun_symb fc (collected_calls, symbol_table) 
 		= (collected_calls, fun_defs, symbol_table)
@@ -871,6 +875,8 @@ where
 			= contains_old_function_n local_functions
 		contains_old_function_n []
 			= False
+	remove_old_calls [call=:(DclFunCall _ _):calls]
+			= [call:remove_old_calls calls]
 	remove_old_calls []
 		= []
 	
@@ -940,7 +946,7 @@ unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {
 					# (result_expr,us) = unfold tb_rhs ui us
 					= (result_expr,dcl_modules,us)
 					
-	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_dcl_modules=dcl_modules}
+	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_dcl_modules=dcl_modules}	
 	# fi_calls = update_calls fi_calls us_local_macro_functions
 	# (new_functions,us_local_macro_functions,es) = copy_local_functions_of_macro us_local_macro_functions is_def_macro [] es
 	# {es_symbol_heap,es_symbol_table,es_fun_defs,es_new_fun_def_numbers} = es
@@ -1038,27 +1044,29 @@ expand_simple_macro mod_index macro=:{fun_body = CheckedBody body, fun_info, fun
 
 expand_dcl_macro_if_simple mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info}
 		predef_symbols_for_transform (modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error})
-	| macros_are_simple fun_info.fi_calls pi_fun_defs pi_macro_defs && has_no_curried_macro body.cb_rhs pi_fun_defs pi_macro_defs
+	| macros_are_simple fun_info.fi_calls mod_index pi_fun_defs pi_macro_defs && has_no_curried_macro body.cb_rhs pi_fun_defs pi_macro_defs
 		# (macro,modules,pi) = expand_simple_macro mod_index macro False predef_symbols_for_transform modules pi
 		= (modules, { pi & pi_macro_defs.[mod_index,macro_index] = macro })
 		= (modules, { pi & pi_deps = [DclMacroIndex mod_index macro_index:pi.pi_deps], pi_macro_defs.[mod_index,macro_index] = { macro & fun_body = RhsMacroBody body }}) 
 
 expand_icl_macro_if_simple mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info}
 		predef_symbols_for_transform (modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error})
-	| macros_are_simple fun_info.fi_calls pi_fun_defs pi_macro_defs && has_no_curried_macro body.cb_rhs pi_fun_defs pi_macro_defs
+	| macros_are_simple fun_info.fi_calls mod_index pi_fun_defs pi_macro_defs && has_no_curried_macro body.cb_rhs pi_fun_defs pi_macro_defs
 		# (macro,modules,pi) = expand_simple_macro mod_index macro True predef_symbols_for_transform modules pi
 		= (modules, { pi & pi_fun_defs.[macro_index] = macro })
 		= (modules, { pi & pi_deps = [FunctionOrIclMacroIndex macro_index:pi.pi_deps], pi_fun_defs.[macro_index] = { macro & fun_body = RhsMacroBody body }}) 
 
-macros_are_simple :: [FunCall] {#FunDef} {#{#FunDef}} -> Bool;
-macros_are_simple [] fun_defs macro_defs
+macros_are_simple :: [FunCall] Int {#FunDef} {#{#FunDef}} -> Bool;
+macros_are_simple [] mod_index fun_defs macro_defs
 	= True
-macros_are_simple [FunCall fc_index _ : calls ] fun_defs macro_defs
+macros_are_simple [FunCall fc_index _ : calls ] mod_index fun_defs macro_defs
 	# {fun_kind,fun_body, fun_symb} = fun_defs.[fc_index]
-	= is_a_pattern_macro fun_kind fun_body && macros_are_simple calls fun_defs macro_defs
-macros_are_simple [MacroCall module_index fc_index _ : calls ] fun_defs macro_defs
+	= is_a_pattern_macro fun_kind fun_body && macros_are_simple calls mod_index fun_defs macro_defs
+macros_are_simple [MacroCall module_index fc_index _ : calls ] mod_index fun_defs macro_defs
 	# {fun_kind,fun_body, fun_symb} = macro_defs.[module_index,fc_index]
-	= is_a_pattern_macro fun_kind fun_body && macros_are_simple calls fun_defs macro_defs
+	= is_a_pattern_macro fun_kind fun_body && macros_are_simple calls mod_index fun_defs macro_defs
+macros_are_simple [DclFunCall dcl_fun_index _ : calls ] mod_index fun_defs macro_defs
+	= dcl_fun_index<>mod_index && macros_are_simple calls mod_index fun_defs macro_defs
 
 is_a_pattern_macro FK_Macro (TransformedBody {tb_args})
 	= True
@@ -1069,6 +1077,8 @@ visit_macro mod_index max_fun_nr predef_symbols_for_transform (FunCall fc_index 
 	= partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform fc_index modules_pi
 visit_macro mod_index max_fun_nr predef_symbols_for_transform (MacroCall macro_module_index fc_index _) modules_pi
 	= partitionate_dcl_macro macro_module_index max_fun_nr predef_symbols_for_transform fc_index modules_pi
+visit_macro mod_index max_fun_nr predef_symbols_for_transform (DclFunCall _ _) modules_pi
+	= modules_pi
 
 partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index (modules, pi)
 	# (macro_def, pi) = pi!pi_macro_defs.[mod_index,macro_index]
@@ -1378,6 +1388,11 @@ where
 	visit_function mod_index max_fun_nr (MacroCall macro_module_index fc_index _) (min_dep, modules_pi)
 		# (next_min, modules_pi) = partitionate_macro mod_index max_fun_nr macro_module_index fc_index modules_pi
 		= (min next_min min_dep, modules_pi)
+	visit_function mod_index max_fun_nr (DclFunCall dcl_fun_module_index dcl_fun_index) (min_dep, modules_pi)
+		| mod_index==dcl_fun_module_index
+			# (next_min, modules_pi) = partitionate_function mod_index max_fun_nr dcl_fun_index modules_pi
+			= (min next_min min_dep, modules_pi)
+			= (min_dep, modules_pi)
 
 	try_to_close_group mod_index max_fun_nr macro_module_index fun_index fun_number min_dep (modules,
 					pi=:{pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs,pi_macro_defs,pi_deps, pi_groups, pi_next_group, pi_error,pi_unexpanded_dcl_macros})
@@ -1459,7 +1474,7 @@ where
 		= foldSt add_called_macro calls pi
 	where
 		add_called_macro (FunCall fc_index _) pi
-//			# fc_index = trace ("add_called_macro: "+++toString fc_index+++" ") fc_index
+//			# fc_index = trace_n ("add_called_macro: "+++toString fc_index+++" ") fc_index
 			# (macro_def, pi) = pi!pi_fun_defs.[fc_index]
 			= case macro_def.fun_body of
 				TransformedBody _
@@ -1486,6 +1501,8 @@ where
 				-> ([fc : collected_calls], fun_defs,macro_defs,
 					symbol_table <:= (id_info, { ste_kind = STE_Called [FunctionOrIclMacroIndex fc_index], ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = entry }))
 	add_function_call_to_symbol_table (MacroCall _ _ _) (collected_calls, fun_defs,macro_defs, symbol_table)
+		= (collected_calls, fun_defs,macro_defs,symbol_table)
+	add_function_call_to_symbol_table (DclFunCall _ _) (collected_calls, fun_defs,macro_defs, symbol_table)
 		= (collected_calls, fun_defs,macro_defs,symbol_table)
 
 removeFunctionCallsFromSymbolTable calls fun_defs symbol_table
