@@ -496,22 +496,9 @@ analyseGroups common_defs groups fun_defs var_heap expr_heap
 	   nr_of_groups = size groups
 	= iFoldSt (analyse_group common_defs) 0 nr_of_groups
 				([], createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = []}, groups, fun_defs, var_heap, expr_heap)
-//	= analyse_groups 0 groups (createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = []})
-//						fun_defs var_heap expr_heap
 where	
-/*	analyse_groups group_nr groups class_env fun_defs var_heap expr_heap
-		| group_nr == size groups
-			= (class_env, groups, fun_defs, var_heap, expr_heap)
-			#! fun_indexes = groups.[group_nr]
-			# (class_env, fun_defs, var_heap, expr_heap)
-				= analyse_group fun_indexes.group_members class_env fun_defs var_heap expr_heap
-			= analyse_groups (inc group_nr) groups class_env fun_defs var_heap expr_heap
-
-*/
 	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 		#! {group_members} = groups.[group_nr]
-		| False->>("analyse_group",group_nr)
-			= undef
 		# (nr_of_vars, nr_of_local_vars, var_heap, class_env, fun_defs) = initial_cons_class group_members 0 0 var_heap class_env fun_defs
 		  initial_subst = createArray (nr_of_vars + nr_of_local_vars) cPassive
 		  (ai_cases_of_vars_for_group, ai, fun_defs)
