@@ -1,7 +1,8 @@
 definition module predef
 
-	
 import syntax, hashtable
+
+cPredefinedModuleIndex :== 1
 
 ::	PredefinedSymbols	:== {# PredefinedSymbol}
 
@@ -13,130 +14,177 @@ import syntax, hashtable
 
 /* identifiers not present the hastable */
 
-
 PD_PredefinedModule			:== 0
 
+FirstTypePredefinedSymbolIndex:==PD_StringType; // to compute index in com_type_defs
+
 PD_StringType				:== 1
-PD_ListType					:== 2
-PD_Arity2TupleType			:== 3
-PD_Arity32TupleType			:== 33
 
-PD_LazyArrayType			:== 34
-PD_StrictArrayType			:== 35
-PD_UnboxedArrayType			:== 36
+PD_ListType :== 2
+PD_StrictListType :== 3
+PD_UnboxedListType :== 4
+PD_TailStrictListType :== 5
+PD_StrictTailStrictListType :== 6
+PD_UnboxedTailStrictListType :== 7
+PD_OverloadedListType :== 8
 
-PD_ConsSymbol				:== 37
-PD_NilSymbol				:== 38
-PD_Arity2TupleSymbol		:== 39
-PD_Arity32TupleSymbol		:== 69
+PD_Arity2TupleType			:== 9
+PD_Arity32TupleType			:== 39
 
-PD_TypeVar_a0				:== 70
-PD_TypeVar_a31				:== 101
+PD_LazyArrayType			:== 40
+PD_StrictArrayType			:== 41
+PD_UnboxedArrayType			:== 42
+
+// constructors:
+
+FirstConstructorPredefinedSymbolIndex :== PD_ConsSymbol; // to compute index in com_cons_defs
+
+PD_ConsSymbol :== 43
+PD_StrictConsSymbol :== 44
+PD_UnboxedConsSymbol :== 45
+PD_TailStrictConsSymbol :== 46
+PD_StrictTailStrictConsSymbol :== 47
+PD_UnboxedTailStrictConsSymbol :== 48
+PD_OverloadedConsSymbol :== 49
+
+PD_NilSymbol :== 50
+PD_StrictNilSymbol :== 51
+PD_UnboxedNilSymbol :== 52
+PD_TailStrictNilSymbol :== 53
+PD_StrictTailStrictNilSymbol :== 54
+PD_UnboxedTailStrictNilSymbol :== 55
+PD_OverloadedNilSymbol :== 56
+
+PD_Arity2TupleSymbol		:== 57
+PD_Arity32TupleSymbol		:== 87
+
+// end constructors
+
+PD_TypeVar_a0				:== 88
+PD_TypeVar_a31				:== 119
 
 /* Dynamics */
 
-PD_TypeCodeMember			:== 102
-// MV ...
-PD_DynamicTemp				:== 103
-PD_DynamicValue				:== 104
-PD_DynamicType				:== 105
-// ... MV
+PD_TypeCodeMember			:== 120
+PD_DynamicTemp				:== 121
+PD_DynamicValue				:== 122
+PD_DynamicType				:== 123
 
-/* identifiers present in the hastable */
+/* identifiers present in the hashtable */
 
-PD_StdArray					:== 106
-PD_StdEnum					:== 107
-PD_StdBool					:== 108
+PD_StdArray					:== 124
+PD_StdEnum					:== 125
+PD_StdBool					:== 126
 
-PD_AndOp					:== 109
-PD_OrOp						:== 110
-
+PD_AndOp					:== 127
+PD_OrOp						:== 128
 
 /* Array functions */
 
-PD_ArrayClass				:== 111
+PD_ArrayClass				:== 129
 
-PD_CreateArrayFun			:== 112
-PD__CreateArrayFun			:== 113
-PD_ArraySelectFun			:== 114
-PD_UnqArraySelectFun		:== 115
-PD_ArrayUpdateFun			:== 116
-PD_ArrayReplaceFun			:== 117
-PD_ArraySizeFun				:== 118
-PD_UnqArraySizeFun			:== 119
+PD_CreateArrayFun			:== 130
+PD__CreateArrayFun			:== 131
+PD_ArraySelectFun			:== 132
+PD_UnqArraySelectFun		:== 133
+PD_ArrayUpdateFun			:== 134
+PD_ArrayReplaceFun			:== 135
+PD_ArraySizeFun				:== 136
+PD_UnqArraySizeFun			:== 137
 
 /* Enum/Comprehension functions */
 
-PD_SmallerFun				:== 120
-PD_LessOrEqualFun:== 121
-PD_SubFun:==122
-PD_IncFun					:== 123
-PD_From						:== 124
-PD_FromThen					:== 125
-PD_FromTo					:== 126
-PD_FromThenTo				:== 127
+PD_SmallerFun				:== 138
+PD_LessOrEqualFun			:== 139
+PD_IncFun					:== 140
+PD_SubFun:== 141
+PD_From						:== 142
+PD_FromThen					:== 143
+PD_FromTo					:== 144
+PD_FromThenTo				:== 145
+
+/* StdMisc */
+PD_StdMisc					:== 146
+PD_abort					:== 147
+PD_undef					:== 148
+
+PD_Start					:== 149
+
+PD_DummyForStrictAliasFun	:== 150
+
+PD_StdStrictLists:==151
+
+PD_cons:==152
+PD_decons:==153
+
+PD_cons_u:==154
+PD_decons_u:==155
+
+PD_cons_uts:==156
+PD_decons_uts:==157
+
+PD_nil:==158
+PD_nil_u:==159
+PD_nil_uts:==160
+
+PD_ListClass :== 161
+PD_UListClass :== 162
+PD_UTSListClass :== 163
 
 /* Dynamics */
 
-PD_TypeCodeClass			:== 128
+PD_StdDynamic				:== 164
 
-PD_TypeObjectType			:== 129
-PD_TypeConsSymbol			:== 130
-PD_unify					:== 131
-// MV ..
-PD_coerce					:== 132
-PD_variablePlaceholder		:== 133
-PD_StdDynamic				:== 134
-PD_undo_indirections		:== 135
+PD_TypeCodeClass			:== 165
+PD_TypeObjectType			:== 166
+PD_TypeConsSymbol			:== 167
+PD_unify					:== 168
+PD_coerce					:== 169
+PD_variablePlaceholder		:== 170
+PD_undo_indirections		:== 171
 
-// MV ...
-PD_TypeID					:== 136
-PD_ModuleID					:== 137
-PD_ModuleConsSymbol			:== 138
-// ... MV
+PD_TypeID					:== 172
+PD_ModuleID					:== 173
+PD_ModuleConsSymbol			:== 174
 
 /* Generics */
-PD_StdGeneric				:== 139
-PD_TypeISO					:== 140
-PD_ConsISO					:== 141
-PD_iso_to					:== 142
-PD_iso_from					:== 143
 
-PD_TypeUNIT					:== 144
-PD_ConsUNIT					:== 145
-PD_TypeEITHER				:== 146
-PD_ConsLEFT					:== 147
-PD_ConsRIGHT				:== 148
-PD_TypePAIR					:== 149
-PD_ConsPAIR					:== 150
-PD_TypeARROW				:== 151
-PD_ConsARROW				:== 152
+PD_StdGeneric				:== 175
 
-PD_TypeConsDefInfo			:== 153 
-PD_ConsConsDefInfo			:== 154
-PD_TypeTypeDefInfo			:== 155 
-PD_ConsTypeDefInfo			:== 156
-PD_cons_info				:== 157
-PD_TypeCONS					:== 158
-PD_ConsCONS					:== 159
+PD_TypeISO					:== 176
+PD_ConsISO					:== 177
+PD_iso_to					:== 178
+PD_iso_from					:== 179
 
-PD_isomap_ARROW_			:== 160
-PD_isomap_ID				:== 161
+PD_TypeUNIT					:== 180
+PD_ConsUNIT					:== 181
+PD_TypeEITHER				:== 182
+PD_ConsLEFT					:== 183
+PD_ConsRIGHT				:== 184
+PD_TypePAIR					:== 185
+PD_ConsPAIR					:== 186
+PD_TypeARROW				:== 187
+PD_ConsARROW				:== 188
 
-/* StdMisc */
-PD_StdMisc					:== 162
-PD_abort					:== 163
-PD_undef					:== 164
+PD_TypeConsDefInfo			:== 189 
+PD_ConsConsDefInfo			:== 190
+PD_TypeTypeDefInfo			:== 191 
+PD_ConsTypeDefInfo			:== 192
+PD_cons_info				:== 193
+PD_TypeCONS					:== 194
+PD_ConsCONS					:== 195
 
-PD_Start					:== 165
+PD_isomap_ARROW_			:== 196
+PD_isomap_ID				:== 197
 
-PD_DummyForStrictAliasFun	:== 166
-
-PD_NrOfPredefSymbols		:== 167
-
+PD_NrOfPredefSymbols		:== 198
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
+
+init_identifiers :: *SymbolTable -> *SymbolTable
+
+cons_and_nil_idents :: {!Ident}
 
 buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
 
