@@ -1236,12 +1236,8 @@ where
 				| lei.lei_count == 1
 //						 ==> (var_name, var_info_ptr, lei.lei_count, (lei.lei_expression, lei.lei_depth, depth))
 					# (lei_updated_expr, dl_info) = distributeLets depth lei.lei_expression dl_info
-					| lei.lei_strict
-						-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, { dl_info & di_lets = [ var_info_ptr : dl_info.di_lets ],
-									di_var_heap = dl_info.di_var_heap <:= (var_info_ptr, VI_LetExpression
-										{ lei & lei_status = LES_Updated lei_updated_expr }) })
-						-> (lei_updated_expr, { dl_info &  di_var_heap = dl_info.di_var_heap <:=
-								(var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_updated_expr }) })
+					-> (lei_updated_expr, { dl_info &  di_var_heap = dl_info.di_var_heap <:=
+							(var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_updated_expr }) })
 				| lei.lei_depth == depth
 					# dl_info = distributeLetsInLetExpression depth var_info_ptr lei dl_info
 					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, dl_info)
@@ -1303,8 +1299,8 @@ where
 	where
 		set_let_expression_info depth [(let_strict, {bind_src,bind_dst}):binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			  lei = { lei_count = ref_count, lei_depth = depth, lei_strict = let_strict, /* lei_moved = False, */
-					  lei_var = { bind_dst & fv_info_ptr = new_info_ptr }, lei_expression = bind_src, lei_type = type, lei_status = LES_Untouched }
+			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { bind_dst & fv_info_ptr = new_info_ptr },
+					  lei_expression = bind_src, lei_type = type, lei_status = LES_Untouched }
 			= set_let_expression_info depth binds ref_counts types (var_heap <:= (bind_dst.fv_info_ptr, VI_LetExpression lei))
 		set_let_expression_info depth [] _ _ var_heap
 			= var_heap
@@ -1456,14 +1452,12 @@ where
 		-> (!Env Expression FreeVar, ![AType], !*VarHeap)
 	build_bind info_ptr (lazy_binds, lazy_binds_types, var_heap)
 		# (let_info, var_heap) = readPtr info_ptr var_heap
-		# (VI_LetExpression lei=:{lei_strict,lei_var,lei_expression,lei_status,lei_type}) = let_info
+		# (VI_LetExpression lei=:{lei_var,lei_expression,lei_status,lei_type}) = let_info
 		  (LES_Updated updated_expr) = lei_status
 		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap 
 		  var_heap = var_heap <:= (info_ptr, VI_LetExpression { lei & lei_status = LES_Untouched, lei_var = { lei_var & fv_info_ptr = new_info_ptr }})
 //			==> (lei_var.fv_name, info_ptr, new_info_ptr)
-		| lei_strict
-			= abort "assertion 1 failed in module convercases"
-			= ([{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
+		= ([{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
 
 instance distributeLets Selection
 where
