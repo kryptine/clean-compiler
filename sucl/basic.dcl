@@ -210,6 +210,9 @@ zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 // Strict version of --->, which evaluates its lhs first
 (<---) infix :: !.a !b -> .a | <<< b
 
+// Tracing evaluation of a value, otherwise acts like identity
+tracevalue :: !String !String .a -> .a
+
 // Sequential evaluation of left and right arguments
 ($) infixr :: !.a .b -> .b
 

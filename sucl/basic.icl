@@ -308,6 +308,11 @@ zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
 (<---) infix :: !.a !b -> .a | <<< b
 (<---) value message = value ---> message
 
+// Tracing evaluation of a value, otherwise acts like identity
+tracevalue :: !String !String .a -> .a
+tracevalue contextdesc valuedesc value
+= (value <--- (contextdesc+++" <<== "+++valuedesc)) ---> (contextdesc+++" ==>> "+++valuedesc)
+
 ($) infixr :: !.a .b -> .b
 ($) x y = y
 
