@@ -35,10 +35,10 @@ splitBy char string
 		stringSize
 			=	size string
 
-openTclFile :: !Bool !String !*Files -> (Optional .File, !*Files)
-openTclFile False icl_mod_pathname files
-	= (No,files)
-openTclFile compile_for_dynamics icl_mod_pathname files
+openTclFile :: !Bool !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
+openTclFile False icl_mod_pathname error files
+	= (True,No,error,files)
+openTclFile compile_for_dynamics icl_mod_pathname error files
 	# csf_path
 		= directoryName icl_mod_pathname +++ "Clean System Files"
 	# tcl_path
@@ -46,17 +46,19 @@ openTclFile compile_for_dynamics icl_mod_pathname files
 	# (opened, tcl_file, files)
 		= fopen tcl_path FWriteData files
 	| opened
-		= (Yes tcl_file, files)
+		= (True, Yes tcl_file, error, files)
 	// try again after creating Clean System Files folder
 	# (ok, files)
 		= ensureCleanSystemFilesExists csf_path files
 	| not ok
-		= abort ("can't create folder \"" +++ csf_path +++"\"\n")
+		# error = fwrites ("can't create folder \"" +++ csf_path +++"\"\n") error
+		= (False, No, error, files)
 	# (opened, tcl_file, files)
 		= fopen tcl_path FWriteData files
-	| opened
-		=(Yes tcl_file, files)
-	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
+	| not opened
+		# error = fwrites ("couldn't open file \"" +++ tcl_path +++ "\"\n") error
+		= (False, No, error, files)
+	= (True, Yes tcl_file, error, files)
 
 closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
 closeTclFile (Yes tcl_file) files
@@ -241,7 +243,7 @@ openPath path mode files
 		=	fopen path mode files
 
 compileModule :: CoclOptions [{#Char}] *DclCache *Files -> (!Bool,!*DclCache,!*Files)
-compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files
+compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files
 	# (opened, error, files)
 		=	openPath options.errorPath options.errorMode files
 	| not opened
@@ -250,9 +252,19 @@ compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbo
 		=	openPath options.outPath options.outMode files
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
-	# (tcl_file, files)
-		= openTclFile options.compile_for_dynamics options.pathName files
- 	# (io, files)
+	# (optional_tcl_opened, tcl_file, error, files)
+		= openTclFile options.compile_for_dynamics options.pathName error files
+ 	| not optional_tcl_opened
+		# (closed, files)
+			=	fclose out files
+		| not closed
+			=	abort ("couldn't close stdio")
+		# (closed, files)
+			=	fclose error files
+		| not closed
+			=	abort ("couldn't close out file \"" +++ options.outPath +++ "\"\n")
+		=	(False, cache, files)
+	# (io, files)
 		=	stdio files
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# list_inferred_types
