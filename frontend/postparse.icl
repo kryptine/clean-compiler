@@ -565,14 +565,17 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 			  failure
 				=	continue
 			  rhs
-			  	=	build_rhs generators success optional_filter failure end
+// MW4 was:			  	=	build_rhs generators success optional_filter failure end
+			  	=	build_rhs generators success optional_filter failure end fun_pos
 			  parsed_def
 // MW3 was:			  	=	MakeNewParsedDef fun_ident lhsArgs rhs 
 			  	=	MakeNewParsedDef fun_ident lhsArgs rhs fun_pos
 			= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) call_comprehension, ca)
 
-		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
-		build_rhs [generator : generators] success optional_filter failure end
+// MW4 was:		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
+		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
+// MW4 was:		build_rhs [generator : generators] success optional_filter failure end
+		build_rhs [generator : generators] success optional_filter failure end fun_pos
 			=	case_with_default generator.tg_case1 generator.tg_case_end_expr generator.tg_case_end_pattern
 					(foldr (case_end end)
 						(case_with_default generator.tg_case2 generator.tg_element generator.tg_pattern
@@ -585,9 +588,12 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 							Yes filter
 								->	optGuardedAltToRhs (GuardedAlts [
 										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
-												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []}}] No)
+// MW4 was:												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []}}] No)
+												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []},
+											alt_ident = { id_name ="_f;" +++ toString line_nr +++ ";", id_info = nilPtr }}] No)
 							No
 								->	exprToRhs success
+				(LinePos _ line_nr) = fun_pos
 
 	/* +++ remove code duplication (bug in 2.0 with nested cases)
 		case_end :: TransformedGenerator Rhs -> Rhs

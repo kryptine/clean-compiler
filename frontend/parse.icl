@@ -115,7 +115,9 @@ stringToIdent ident ident_class pState=:{ps_hash_table}
 internalIdent :: !String !*ParseState -> (!Ident, !*ParseState)
 internalIdent prefix pState
 	# ({fp_line,fp_col},pState=:{ps_hash_table})	= getPosition pState
-	  case_string									= prefix +++ toString fp_line +++ "_" +++ toString fp_col
+// MW4 was: (changed to make it compatible with conventions used in postparse)
+// 	  case_string									= prefix +++ toString fp_line +++ "_" +++ toString fp_col
+	  case_string									= prefix +++ ";" +++ toString fp_line +++ ";" +++ toString fp_col
 	  (case_ident, ps_hash_table)					= putIdentInHashTable case_string IC_Expression ps_hash_table
 	= (case_ident, { pState & ps_hash_table = ps_hash_table } )
 
@@ -643,7 +645,8 @@ where
 	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
 	want_FunctionBody BarToken nodeDefs alts sep pState
 //		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
-		#	(token, pState)				= nextToken FunctionContext pState
+		#	(guard_position, pState)	= getPosition pState // MW4++
+			(token, pState)				= nextToken FunctionContext pState
 		|	token == OtherwiseToken
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token pState
@@ -663,16 +666,25 @@ where
 				offside						= position.fp_col
 				(expr, pState)				= want_FunctionBody token nodeDefs2 [] sep pState
 				pState						= wantEndNestedGuard (default_found expr) offside pState
-				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
+// MW4 was:				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
+				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
+												alt_ident = guard_ident guard_position.fp_line }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
 			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
 		// otherwise
 			#	(expr, pState)				= root_expression True token nodeDefs2 [] sep pState
-				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
+// MW4 was:				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
+				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
+												alt_ident = guard_ident guard_position.fp_line }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
 			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
+// MW4..
+	  where
+	  	guard_ident line_nr
+			= { id_name = "_g;" +++ toString line_nr +++ ";", id_info = nilPtr }
+// ..MW4
 	want_FunctionBody token nodeDefs alts sep pState
 		=	root_expression localsExpected token nodeDefs (reverse alts) sep pState
 	

@@ -49,5 +49,3 @@ uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
 
 liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeVarHeap !*TypeDefInfos -> (*{! Type}, !Int, !*TypeVarHeap, !*TypeDefInfos)
 
-instance <<< CoercionPosition
-

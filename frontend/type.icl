@@ -19,6 +19,7 @@ import RWSDebug
 	,	ts_expr_heap	:: !.ExpressionHeap 
 	,	ts_td_infos		:: !.TypeDefInfos
 	,	ts_error		:: !.ErrorAdmin
+	,	ts_out			:: !.File // MW4++
 	}
 
 ::	TypeCoercion =
@@ -167,12 +168,84 @@ where
 	contains_var var_id _
 		= False
 
+type_error =: "Type error" // MW4++
+type_error_format =: { form_properties = cNoProperties, form_attr_position = No } // MW4++
+
+/* MW4 was:
 cannotUnify t1 t2 position err 
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< optionalFrontPosition position <<< " cannot unify " <:: (format, t1) 
 							<<< " with " <:: (format, t2) <<< position <<< '\n' }
+*/
 
+cannotUnify t1 t2 position=:(CP_Expression expr) err=:{ea_loc=[ip:_]} 
+	= case tryToOptimizePosition expr ip of
+		Yes ident_pos
+			# err = pushErrorAdmin ident_pos err
+			  err = errorHeading type_error err
+			  err = popErrorAdmin err
+			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
+											<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer) <<< '\n' }
+		_
+			-> cannot_unify t1 t2 position err 
+cannotUnify t1 t2 position err 
+	= cannot_unify t1 t2 position err 
+
+cannot_unify t1 t2 position err
+	# (err=:{ea_file}) = errorHeading type_error err
+	  ea_file = case position of
+				CP_FunArg _ _
+					-> ea_file <<< "\"" <<< position <<< "\""
+				_
+					-> ea_file
+	  ea_file = ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
+						<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer)
+	  ea_file = case position of
+	  			CP_FunArg _ _
+	  				-> ea_file
+  				_
+	  				-> ea_file <<< " near " <<< position
+	= { err & ea_file = ea_file <<< '\n' }
+
+// MW4..
+tryToOptimizePosition (Case {case_ident=Yes {id_name}}) ip
+	= tryToOptimizePositionFromString id_name ip
+tryToOptimizePosition (App {app_symb={symb_name}}) ip
+	= tryToOptimizePositionFromString symb_name.id_name ip
+tryToOptimizePosition (fun @ _) ip
+	= tryToOptimizePosition fun ip
+
+tryToOptimizePositionFromString id_name ip
+	# fst_semicolon_index = searchlArrElt ((==) ';') id_name 0
+	| fst_semicolon_index < size id_name
+		# snd_semicolon_index = searchlArrElt ((==) ';') id_name (fst_semicolon_index+1)
+		  prefix = id_name % (0, fst_semicolon_index-1)
+		  line = toInt (id_name % (fst_semicolon_index+1, snd_semicolon_index-1))
+		= Yes { ip & ip_ident = { id_name = prefix_to_readable_name prefix, id_info = nilPtr }, ip_line = line }
+	= No
+  where
+	prefix_to_readable_name "_c"	= "case"
+	prefix_to_readable_name "_g"	= "guard"
+	prefix_to_readable_name "_f"	= "filter"
+	prefix_to_readable_name prefix
+		| prefix.[0] == 'c'
+			= "comprehension"
+		| prefix.[0] == 'g'
+			= "generator"
+	prefix_to_readable_name _		= abort "fatal error 21 in type.icl"
+
+// search for an element in an array
+searchlArrElt p s i
+	:== searchl s i
+  where
+	searchl s i
+		| i>=size s
+			= i
+		| p s.[i]
+			= i
+		= searchl s (i+1)
+// ..MW4
 
 class unify a :: !a !a !TypeInput !*{! Type} !*TypeHeaps -> (!Bool, !*{! Type}, !*TypeHeaps)
 
@@ -1438,18 +1511,24 @@ where
 specification_error type err
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cAttributed, form_attr_position = No}
-	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " <:: (format, type) <<< '\n' }
+// MW4 was:	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " <:: (format, type) <<< '\n' }
+	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " 
+									<:: (format, type, Yes initialTypeVarBeautifulizer) <<< '\n' }
 
 
-cleanUpAndCheckFunctionTypes [] _ _ start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+// MW4 was:cleanUpAndCheckFunctionTypes [] _ _ start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+cleanUpAndCheckFunctionTypes [] _ _ start_index _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 	= (fun_defs, ts)
-cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] dict_types start_index defs type_contexts coercion_env
+// MW4 was:cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] dict_types start_index defs type_contexts coercion_env
+cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] dict_types start_index list_inferred_types defs type_contexts coercion_env
 				attr_partition type_var_env attr_var_env (fun_defs, ts)
 	# (fd, fun_defs) = fun_defs![fun]
 	  dict_ptrs = get_dict_ptrs fun dict_types
-	  (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun (start_index == fun) defs type_contexts
+// MW4 was:	  (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun (start_index == fun) defs type_contexts
+	  (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun (start_index == fun) list_inferred_types defs type_contexts
 													(dict_ptrs ++ req_case_and_let_exprs) coercion_env attr_partition type_var_env attr_var_env ts
-	= cleanUpAndCheckFunctionTypes funs reqs dict_types start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+// MW4 was:	= cleanUpAndCheckFunctionTypes funs reqs dict_types start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+	= cleanUpAndCheckFunctionTypes funs reqs dict_types start_index list_inferred_types defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 where
 	get_dict_ptrs fun_index []
 		= []
@@ -1458,7 +1537,8 @@ where
 			= ptrs
 			= get_dict_ptrs fun_index dict_types
 		
-	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun is_start_rule defs type_contexts type_ptrs
+// MW4 was:	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun is_start_rule defs type_contexts type_ptrs
+	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun is_start_rule list_inferred_types defs type_contexts type_ptrs
 					coercion_env attr_partition type_var_env attr_var_env ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_symb fun_pos) ts.ts_error}
@@ -1476,11 +1556,22 @@ where
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+// MW4..
+				  ts_out = ts.ts_out
+				  ts_out = case list_inferred_types of
+				  			False
+				  				-> ts_out
+				  			_
+								# form = { form_properties = cNoProperties, form_attr_position = No }
+				  				-> ts_out <<< fun_symb <<< " :: " 
+				  						<:: (form, clean_fun_type, Yes initialTypeVarBeautifulizer) <<< '\n'
+// ..MW4
 				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
-				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
+// MW4 was:				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
+				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error, ts_out = ts_out })
 
 	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} type_ptrs
-				defs fun_env attr_var_env type_heaps expr_heap error
+						defs fun_env attr_var_env type_heaps expr_heap error
 		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type (length fun_type.st_context) defs attr_var_env type_heaps
 		| equi
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context
@@ -1507,12 +1598,14 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	,	fe_location		:: !IdentPos
 	}
 
-typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
-	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
-typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
+// MW4 was:typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
+typeProgram ::!{! Group} !*{# FunDef} !IndexRange !Bool !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File !*File
+// MW4 was:	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
+	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File, !*File)
+// MW4 was:typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
+typeProgram comps fun_defs specials list_inferred_types icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out
 	#! fun_env_size = size fun_defs
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
-
 	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [cIclModIndex] = icl_defs }
 	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: modules }
 
@@ -1526,19 +1619,24 @@ typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_ex
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar,
-	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error }
+// MW4 was:	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error }
+	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
-	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
+// MW4 was:	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
+	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
-	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
-			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
-				{ ts & ts_fun_env = ts_fun_env })
+// MW4 was:	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
+	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_out})
+// MW4 was:			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
+			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
+							{ ts & ts_fun_env = ts_fun_env })
 	  {si_array_instances, si_next_array_member_index, si_next_TC_member_index, si_TC_instances}= special_instances
 	  (fun_defs, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs fun_defs predef_symbols ts_type_heaps
 	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
 	= (not type_error, fun_defs, { ir_from = fun_env_size, ir_to = si_next_array_member_index }, type_code_instances, ti_common_defs, ti_functions,
-			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file)
+// MW4 was:			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file)
+			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file, ts_out)
 //				---> ("typeProgram", array_inst_types)
 where
 	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
@@ -1611,18 +1709,24 @@ where
 			= (error, IT_Node ins it_less it_greater)
 			= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
 
-	type_instances ir_from ir_to class_instances ti funs_and_state
+// MW4 was:	type_instances ir_from ir_to class_instances ti funs_and_state
+	type_instances list_inferred_types ir_from ir_to class_instances ti funs_and_state
 		| ir_from == ir_to
 			= funs_and_state
-			# funs_and_state = type_component [ir_from] class_instances ti funs_and_state
-			= type_instances (inc ir_from) ir_to class_instances ti funs_and_state
+// MW4 was:			# funs_and_state = type_component [ir_from] class_instances ti funs_and_state
+			# funs_and_state = type_component list_inferred_types [ir_from] class_instances ti funs_and_state
+// MW4 was:			= type_instances (inc ir_from) ir_to class_instances ti funs_and_state
+			= type_instances list_inferred_types (inc ir_from) ir_to class_instances ti funs_and_state
 
-	type_components group_index comps class_instances ti funs_and_state
+// MW4 was:	type_components group_index comps class_instances ti funs_and_state
+	type_components list_inferred_types group_index comps class_instances ti funs_and_state
 		| group_index == size comps
 			= funs_and_state
 			#! comp = comps.[group_index]	
-			# funs_and_state = type_component comp.group_members  class_instances ti funs_and_state
-			= type_components (inc group_index) comps class_instances ti funs_and_state
+// MW4 was:			# funs_and_state = type_component comp.group_members  class_instances ti funs_and_state
+			# funs_and_state = type_component list_inferred_types comp.group_members  class_instances ti funs_and_state
+// MW4 was:			= type_components (inc group_index) comps class_instances ti funs_and_state
+			= type_components list_inferred_types (inc group_index) comps class_instances ti funs_and_state
 
 	show_component comp fun_defs
 		= foldSt show_fun comp ([], fun_defs)
@@ -1637,7 +1741,8 @@ where
 			= (pds_def, predef_symbols)
 			= (NoIndex, predef_symbols)
 	
-	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
+// MW4 was:	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
+	type_component list_inferred_types comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (fun_defs, predef_symbols, [], ts)
 		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
@@ -1671,7 +1776,8 @@ where
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
-		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
+// MW4 was:		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
+		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 									(fun_defs,  { ts &	ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps,
 		  												ts_td_infos = ts_td_infos, ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap })
 		| not ts.ts_error.ea_ok

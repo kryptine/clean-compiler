@@ -59,14 +59,20 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 	  		 { crc_type_heaps = es_type_heaps, crc_coercions = coercions, crc_td_infos = es_td_infos}
 	= case result of
 		Yes positions
-			# error = errorHeading "Uniqueness error" error
+			# (error=:{ea_file}) = errorHeading "Uniqueness error" error
 			  (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
 
 			  format = { form_properties = cMarkAttribute, form_attr_position = Yes (reverse positions, copy_crc_coercions) }			
 // MW3 was:			  ea_file = error.ea_file <<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) <<< '\n'
-			  ea_file = error.ea_file <<< optionalFrontPosition position 
-			  					<<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) 
-			  					<<< position <<< '\n'
+			  
+			  ea_file = 
+			  	case position of
+			  		CP_FunArg _ _
+			  			-> ea_file <<< "\"" <<< position <<< "\" "
+			  		_
+			  			-> ea_file
+			  ea_file = ea_file	<<< "attribute at indicated position could not be coerced "
+			  					 <:: (format, exp_off_type, Yes initialTypeVarBeautifulizer) <<< '\n'
 
 			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, { error & ea_file = ea_file })
 				
@@ -725,55 +731,6 @@ where
 	(<<<) file CT_Unique = file <<< "CT_Unique"
 	(<<<) file CT_NonUnique = file <<< "CT_NonUnique"
 	(<<<) file CT_Empty = file <<< "##"
-
-/* MW3 was:
-instance <<< CoercionPosition
-where
-	(<<<) file {cp_expression} = show_expression file cp_expression
-*/
-instance <<< CoercionPosition
-where
-	(<<<) file (CP_FunArg fun_ident arg_nr) = file
-	(<<<) file (CP_Expression expression) = show_expression (file <<< " near ") expression
-	where
-		show_expression file (Var {var_name})
-			= file <<< var_name
-		show_expression file (FreeVar {fv_name})
-			= file <<< fv_name
-		show_expression file (App {app_symb={symb_name}})
-			= file <<< symb_name
-		show_expression file (fun @ fun_args)
-			= show_expression file fun
-		show_expression file (Case {case_ident})
-			= case case_ident of
-				Yes {id_name}
-					# (line, pos) = get_line_and_col "_c" id_name
-					-> file <<< "case [" <<< line <<< ',' <<< pos <<< ']'
-				No
-					-> file <<< "(case ... )"
-		show_expression file (Selection _ expr selectors)
-			= file <<< "selection"
-		show_expression file (Update expr1 selectors expr2)
-			= file <<< "update"
-		show_expression file (TupleSelect {ds_arity} elem_nr expr)
-			= file <<< "argument" <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
-		show_expression file (BasicExpr bv _)
-			= file <<< bv
-		show_expression file (MatchExpr _ _ expr)
-			= file <<< "match expression"
-		show_expression file _
-			= file
-
-		
-		get_line_and_col prefix ident
-			# ident = ident % (0, size prefix - 1)
-			  del_pos = find_delimiter '_' 0 ident
-			= (toInt (ident % (0, del_pos - 1)), toInt (ident % (del_pos + 1, size ident - 1)))
-		where
-			find_delimiter del_char del_pos ident
-				| del_char == ident.[del_pos]
-					= del_pos
-					= find_delimiter del_char (inc del_pos) ident
 
 file_to_true :: !File -> Bool
 file_to_true file = code {

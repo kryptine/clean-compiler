@@ -72,8 +72,8 @@ instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
-frontEndInterface upToPhase mod_ident search_paths predef_symbols hash_table files error io out
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !Bool !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
+frontEndInterface upToPhase mod_ident search_paths list_inferred_types predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident NoPos (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
 	| not ok
@@ -101,8 +101,9 @@ frontEndInterface upToPhase mod_ident search_paths predef_symbols hash_table fil
 		=	frontSyntaxTree predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances
 				var_heap optional_dcl_icl_conversions global_fun_range
 
-	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error)
-		= typeProgram (components -*-> "Typing") fun_defs icl_specials icl_common icl_declared.dcls_import dcl_mods heaps predef_symbols error
+	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error, out)
+		= typeProgram (components -*-> "Typing") fun_defs icl_specials list_inferred_types icl_common 
+					icl_declared.dcls_import dcl_mods heaps predef_symbols error out
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
@@ -227,4 +228,4 @@ where
 		# (fun_def, fun_defs) = fun_defs![fun]
 		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
 		  (Yes ftype) = fun_def.fun_type
-		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype) <<< '\n' )
+		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype, No) <<< '\n' )

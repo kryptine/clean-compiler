@@ -74,6 +74,14 @@ where
 			= type1 == type2 && types1 == types2
 		equal_constructor_args (TQV varid1) (TQV varid2)
 			= varid1 == varid2
+// MW4..
+		equal_constructor_args (GTV varid1) (GTV varid2)
+			= varid1 == varid2
+		equal_constructor_args (TempQV varid1) (TempQV varid2)
+			= varid1 == varid2
+		equal_constructor_args (TLifted varid1) (TLifted varid2)
+			= varid1 == varid2
+// ..MW4
 		equal_constructor_args type1 type2
 			= True
 

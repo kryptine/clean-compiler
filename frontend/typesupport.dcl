@@ -9,7 +9,10 @@ SwitchFusion fuse dont_fuse :== dont_fuse
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
-class (<::) infixl a :: !*File (!Format, !a) -> *File
+// MW4 was:class (<::) infixl a :: !*File (!Format, !a) -> *File
+(<::) infixl :: !*File (!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
+
+class writeType a :: !*File !(Optional TypeVarBeautifulizer) (!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
 
 :: Format =
 	{	form_properties 	:: !BITVECT
@@ -21,7 +24,11 @@ cAttributed			:== 1
 cAnnotated			:== 2
 cMarkAttribute		:== 4
 
-instance <:: SymbolType, Type, AType, [a] | <:: a
+:: TypeVarBeautifulizer // MW++
+
+instance writeType SymbolType, Type, AType, [a] | writeType a
+
+initialTypeVarBeautifulizer :: TypeVarBeautifulizer // MW4++
 
 ::	AttributeEnv	:== {! TypeAttribute }
 ::	VarEnv 			:== {! Type }
@@ -65,5 +72,3 @@ class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a
 
 instance <<< TempSymbolType
-
-optionalFrontPosition :: !CoercionPosition -> String // MW3++

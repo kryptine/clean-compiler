@@ -55,7 +55,7 @@ instance toString Ident
 				| STE_DictCons !ConsDef
 				| STE_DictField !SelectorDef
 				| STE_Called ![Index] /* used during macro expansion to indicate that this function is called */
-
+				
 ::	Global object =
 	{	glob_object	:: !object
 	,	glob_module	:: !Index
@@ -876,6 +876,7 @@ cNonRecursiveAppl	:== False
 	{	alt_nodes	:: ![NodeDefWithLocals]
 	,	alt_guard	:: !ParsedExpr
 	,	alt_expr	:: !OptGuardedAlts
+	,	alt_ident	:: !Ident
 	}
 
 ::	ExprWithLocalDefs = 
@@ -1126,7 +1127,7 @@ cIsNotStrict	:== False
 ::	CoercionPosition
 	=	CP_Expression !Expression
 	|	CP_FunArg !Ident !Int // Function symbol, argument position (>=1)
-
+	
 ::	IdentPos =
 	{	ip_ident	:: !Ident
 	,	ip_line		:: !Int
@@ -1148,7 +1149,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression
+			 TypeCodeExpression, CoercionPosition
 
 instance == TypeAttribute
 instance == Annotation

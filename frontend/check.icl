@@ -1867,19 +1867,19 @@ where
 	check_default_expr free_vars No e_input e_state e_info cs
 		= (No, free_vars, e_state, e_info, cs)
 		
-	convert_guards_to_cases [(let_binds, guard, expr)] result_expr es_expr_heap
+	convert_guards_to_cases [(let_binds, guard, expr, guard_ident)] result_expr es_expr_heap
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
-		  		case_default = result_expr, case_ident = No, case_info_ptr = case_expr_ptr,
-		  		case_default_pos = NoPos }
+		  		case_default = result_expr, case_ident = Yes guard_ident,
+		  		case_info_ptr = case_expr_ptr, case_default_pos = NoPos }
 		= build_sequential_lets let_binds case_expr es_expr_heap
-	convert_guards_to_cases [(let_binds, guard, expr) : rev_guarded_exprs] result_expr es_expr_heap
+	convert_guards_to_cases [(let_binds, guard, expr, guard_ident) : rev_guarded_exprs] result_expr es_expr_heap
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
-		  		case_default = result_expr, case_ident = No, case_info_ptr = case_expr_ptr,
-		  		case_default_pos = NoPos }
+		  		case_default = result_expr, case_ident = Yes guard_ident,
+		  		case_info_ptr = case_expr_ptr, case_default_pos = NoPos }
 		  (result_expr, es_expr_heap) = build_sequential_lets let_binds case_expr es_expr_heap
 		= convert_guards_to_cases rev_guarded_exprs (Yes result_expr) es_expr_heap
 	
@@ -1890,14 +1890,14 @@ where
 	check_guarded_expressions free_vars [] let_vars_list rev_guarded_exprs {ei_expr_level} e_state e_info cs
 		= (let_vars_list, rev_guarded_exprs, ei_expr_level, free_vars, e_state, e_info, cs)
 
-	check_guarded_expression free_vars {alt_nodes,alt_guard,alt_expr}
+	check_guarded_expression free_vars {alt_nodes,alt_guard,alt_expr,alt_ident}
 			let_vars_list rev_guarded_exprs e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# (let_binds, let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs) = check_sequential_lets free_vars alt_nodes let_vars_list
 		  		{ e_input & ei_expr_level = inc ei_expr_level } e_state e_info cs
 		  e_input = { e_input & ei_expr_level = ei_expr_level }
 	  	  (guard, free_vars, e_state, e_info, cs) = checkExpression free_vars alt_guard e_input e_state e_info cs
 		  (expr, free_vars, e_state, e_info, cs) = check_opt_guarded_alts free_vars alt_expr e_input e_state e_info cs
-	  	= (let_vars_list, [(let_binds, guard, expr) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
+	  	= (let_vars_list, [(let_binds, guard, expr, alt_ident) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
 
 	// JVG: added type
 	check_unguarded_expression :: [FreeVar] ExprWithLocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);

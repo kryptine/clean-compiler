@@ -827,100 +827,123 @@ checkProperty	form property	:== not (form.form_properties bitand property == 0)
 setProperty		form property	:== {form & form_properties = form.form_properties bitor property}
 clearProperty	form property	:== {form & form_properties = form.form_properties bitand (bitnot property)}
 
-class (<::) infixl a :: !*File (!Format, !a) -> *File
-
-instance <:: SymbolType
-where
-	(<::) file (form, {st_args, st_arity, st_result, st_context, st_attr_env})
-		| st_arity > 0
-			= show_environment form (show_context form (file <:: (form, st_args) <<< " -> " <:: (form, st_result)) st_context) st_attr_env
-			= show_environment form ((show_context form (file <:: (form, st_result))) st_context) st_attr_env
-	where
-		show_context form file []
-			= file
-		show_context form file contexts
-			= file <<<  " | " <:: (setProperty form cCommaSeparator, contexts)
+(<::) infixl :: !*File (!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
+(<::) file (format, a, opt_beautifulizer)
+	# (file, _) = writeType file opt_beautifulizer (format, a)
+	= file
 	
-		show_environment form file []
-			= file
-		show_environment form file environ
-			= file <<<  ", " <:: (setProperty form cCommaSeparator, environ)
+class writeType a :: !*File !(Optional TypeVarBeautifulizer) (!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
 
-instance <:: TypeContext
+instance writeType SymbolType
 where
-	(<::) file (form, {tc_class={glob_object={ds_ident}}, tc_types})
-		= file <<< ds_ident <<< ' ' <:: (form, tc_types)
-
-instance <:: AttrInequality
-where
-	(<::) file (form, {ai_demanded, ai_offered})
-		= file <<< ai_offered <<< " <= " <<< ai_demanded
-
-instance <:: AType
-where
-	(<::) file (form, {at_attribute, at_annotation, at_type})
-		| checkProperty form cAnnotated
-			= show_attributed_type (file <<< at_annotation) form at_attribute at_type
-			= show_attributed_type file form at_attribute at_type
+	writeType file opt_beautifulizer (form, {st_args, st_arity, st_result, st_context, st_attr_env})
+		# file_opt_beautifulizer
+				= case st_arity of
+					0
+						-> writeType file opt_beautifulizer (form, st_result)
+					_
+						# (file, opt_beautifulizer)
+								= writeType file opt_beautifulizer (form, st_args)
+						-> writeType (file <<< " -> ") opt_beautifulizer (form, st_result)
+		  (file, opt_beautifulizer)
+				= show_context form st_context file_opt_beautifulizer
+		= case isEmpty st_attr_env || not (checkProperty form cAttributed) of
+			True
+				-> (file, opt_beautifulizer)
+			False
+				# (file, opt_beautifulizer)
+					= writeType (file <<< ", [") opt_beautifulizer 
+								(setProperty form cCommaSeparator, st_attr_env)
+				-> (file <<< ']', opt_beautifulizer)
 	where
-		show_attributed_type file form TA_Multi type
-			| checkProperty form cMarkAttribute
-				= show_marked_attribute TA_Multi form file <:: (form, type) 
-				= file <:: (form, type) 
-		show_attributed_type file form attr type
-			| checkProperty form cAttributed
-				= file <<< attr <:: (setProperty form cBrackets, type)
-			| checkProperty form cMarkAttribute
-				= show_marked_attribute attr form file <:: (setProperty form cBrackets, type)
-				= file <:: (form, type)
+		show_context form [] file_opt_beautifulizer
+			= file_opt_beautifulizer
+		show_context form contexts (file, opt_beautifulizer)
+			= writeType (file <<< " | ") opt_beautifulizer (setProperty form cCommaSeparator, contexts)
 
-		show_marked_attribute attr {form_attr_position = Yes (positions, coercions)} file
+instance writeType TypeContext
+where
+	writeType file opt_beautifulizer (form, {tc_class={glob_object={ds_ident}}, tc_types})
+		= writeType (file <<< ds_ident <<< ' ') opt_beautifulizer (form, tc_types)
+
+instance writeType AttrInequality
+where
+	writeType file opt_beautifulizer (form, {ai_demanded, ai_offered})
+		= (file <<< ai_offered <<< " <= " <<< ai_demanded, opt_beautifulizer)
+
+instance writeType AType
+where
+	writeType file opt_beautifulizer (form, {at_attribute, at_annotation, at_type})
+		| checkProperty form cAnnotated
+			= show_attributed_type (file <<< at_annotation) opt_beautifulizer form at_attribute at_type
+			= show_attributed_type file opt_beautifulizer form at_attribute at_type
+	where
+		show_attributed_type file opt_beautifulizer form TA_Multi type
+			| checkProperty form cMarkAttribute
+				# (file, opt_beautifulizer)
+					= show_marked_attribute TA_Multi form file opt_beautifulizer
+				= writeType file opt_beautifulizer (form, type)
+				= writeType file opt_beautifulizer (form, type) 
+		show_attributed_type file opt_beautifulizer form attr type
+			| checkProperty form cAttributed
+				= writeType (file <<< attr) opt_beautifulizer (setProperty form cBrackets, type)
+			| checkProperty form cMarkAttribute
+				# (file, opt_beautifulizer)
+					= show_marked_attribute attr form file opt_beautifulizer
+				= writeType file opt_beautifulizer (setProperty form cBrackets, type)
+				= writeType file opt_beautifulizer (form, type)
+
+		show_marked_attribute attr {form_attr_position = Yes (positions, coercions)} file opt_beautifulizer
 			| isEmpty positions
-				= show_attribute attr coercions (file <<< "^ ") 
-				= show_attribute attr coercions file
+				= show_attribute attr coercions (file <<< "^ ") opt_beautifulizer
+				= show_attribute attr coercions file opt_beautifulizer
 					 
 
-		show_attribute TA_Unique coercions file 
-			= file <<< '*' 
-		show_attribute TA_Multi coercions file 
-			= file 
-		show_attribute (TA_TempVar av_number) coercions file 
+		show_attribute TA_Unique coercions file opt_beautifulizer
+			= (file <<< '*' , opt_beautifulizer)
+		show_attribute TA_Multi coercions file opt_beautifulizer
+			= (file, opt_beautifulizer)
+		show_attribute (TA_TempVar av_number) coercions file opt_beautifulizer
 			| isUniqueAttribute av_number coercions
-				= file <<< '*' 
+				= (file <<< '*', opt_beautifulizer)
 			| isNonUniqueAttribute av_number coercions
-				= file 
-				= file <<< '.' <<< "[[" <<< av_number <<< "]]"
-		show_attribute TA_TempExVar coercions file 
-			= PA_BUG (file <<< "(E)") (abort "show_attribute TA_TempExVar")
+				= (file, opt_beautifulizer)
+				= (file <<< '.' <<< "[[" <<< av_number <<< "]]", opt_beautifulizer)
+		show_attribute TA_TempExVar coercions file opt_beautifulizer
+			= PA_BUG (file <<< "(E)", opt_beautifulizer) (abort "show_attribute TA_TempExVar")
 
-instance <:: Type
+instance writeType Type
 where
-	(<::) file (form, TV varid)
-		= file <<< varid
-	(<::) file (form, TempV tv_number)
-		= file  <<< 'v' <<< tv_number
-	(<::) file (form, TA {type_name,type_index,type_arity} types)
+	writeType file No (form, TV varid)
+		= (file <<< varid, No)
+	writeType file No (form, TempV tv_number)
+		= (file  <<< 'v' <<< tv_number, No)
+	writeType file opt_beautifulizer (form, TA {type_name,type_index,type_arity} types)
 		| is_predefined type_index
 			| is_list type_name
-				= file <<< '[' <:: (setProperty form cCommaSeparator, types) <<< ']'
+				= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_lazy_array type_name
-				= file <<< '{' <:: (setProperty form cCommaSeparator, types) <<< '}'
+				= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_strict_array type_name
-				= file <<< "{!" <:: (setProperty form cCommaSeparator, types) <<< '}'
+				= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_unboxed_array type_name
-				= file <<< "{#" <:: (setProperty form cCommaSeparator, types) <<< '}'
+				= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_tuple type_name type_arity
-				= file <<< '(' <:: (setProperty form cCommaSeparator, types) <<< ')'
+				= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| type_arity == 0
-				= file <<< type_name
+				= (file <<< type_name, opt_beautifulizer)
 			| checkProperty form cBrackets
-				= file <<< '(' <<< type_name <<< ' ' <:: (form, types) <<< ')'
-				= file <<< type_name <<< ' ' <:: (setProperty form cBrackets, types)
+				# (file, opt_beautifulizer)
+						= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
+				= (file <<< ')', opt_beautifulizer)
+				= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
 		| type_arity == 0
-			= file <<< type_name
+			= (file <<< type_name, opt_beautifulizer)
 		| checkProperty form cBrackets
-			= file <<< '(' <<< type_name <<< ' ' <:: (form, types) <<< ')'
-			= file <<< type_name <<< ' ' <:: (setProperty form cBrackets, types)
+			# (file, opt_beautifulizer)
+					= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
+			= (file <<< ')', opt_beautifulizer)
+			= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
 	where
 			is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
 
@@ -930,59 +953,94 @@ where
 			is_strict_array {id_name} 		= id_name == "_!array"
 			is_unboxed_array {id_name} 		= id_name == "_#array"
 
-	(<::) file (form, arg_type --> res_type)
+// MW4 was:	writeType file (form, arg_type --> res_type)
+	writeType file opt_beautifulizer (form, arg_type --> res_type)
 		| checkProperty form cBrackets
-			= file  <<< '(' <:: (clearProperty (setProperty form cArrowSeparator) cBrackets, [arg_type, res_type])  <<< ')'
-			= file  <:: (setProperty form (cBrackets bitor cArrowSeparator), [arg_type, res_type])
-	(<::) file (form, type :@: types)
+			= writeWithinBrackets "(" ")" file opt_beautifulizer
+									(clearProperty (setProperty form cArrowSeparator) cBrackets, [arg_type, res_type])
+			= writeType file opt_beautifulizer (setProperty form (cBrackets bitor cArrowSeparator), [arg_type, res_type])
+	writeType file opt_beautifulizer (form, type :@: types)
 		| checkProperty form cBrackets
-			= file <<< '(' <<< type <<< ' ' <:: (form, types)  <<< ')'
-			= file <<< type <<< ' ' <:: (setProperty form cBrackets, types) 
-	(<::) file (form, TB tb)
-		= file <<< tb
-	(<::) file (form, TQV varid)
-		= file <<< "E." <<< varid
-	(<::) file (form, TempQV tv_number)
-		= file  <<< "E." <<< tv_number <<< ' ' 
-	(<::) file (form, TE)
-		= file <<< "__"
-	(<::) file (form, type)
+			# (file, opt_beautifulizer)
+					= writeType (file <<< '(' <<< type <<< ' ') opt_beautifulizer (form, types)
+			= (file <<< ')', opt_beautifulizer)
+			= writeType (file <<< type <<< ' ') opt_beautifulizer (setProperty form cBrackets, types) 
+	writeType file opt_beautifulizer (form, TB tb)
+		= (file <<< tb, opt_beautifulizer)
+	writeType file No (form, TQV varid)
+		= (file <<< "E." <<< varid, No)
+	writeType file No (form, TempQV tv_number)
+		= (file  <<< "E." <<< tv_number <<< ' ', No)
+	writeType file opt_beautifulizer (form, TE)
+		= (file <<< "__", opt_beautifulizer)
+	writeType file (Yes beautifulizer) (form, type_variable)
+		= writeBeautifulTypeVar file beautifulizer type_variable
+	writeType file _ (form, type)
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
+writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
+	# (file, opt_beautifulizer) 
+			= writeType (file <<< br_open) opt_beautifulizer (form, types)
+	= (file <<< br_close, opt_beautifulizer)
 
+writeBeautifulTypeVar file beautifulizer=:{tvb_visited, tvb_fresh_vars} type_variable
+	| sanity_check_failed type_variable
+		= abort "bug nr 12345 in module typesupport"
+	= case lookup type_variable tvb_visited of
+		No
+			-> (file <<< hd tvb_fresh_vars, Yes { tvb_visited = [(type_variable, hd tvb_fresh_vars):tvb_visited],
+													tvb_fresh_vars = tl tvb_fresh_vars })
+		Yes (_, beautiful_var_name)
+			-> (file <<< beautiful_var_name, Yes beautifulizer)
+  where
+	lookup _ [] = No
+	lookup t1 [hd=:(t2, _):tl]
+		| t1==t2
+			= Yes hd
+		= lookup t1 tl
+
+	sanity_check_failed (GTV _)		= False
+	sanity_check_failed (TV _)		= False
+	sanity_check_failed (TempV _)	= False
+	sanity_check_failed (TQV _)		= False
+	sanity_check_failed (TempQV _)	= False
+	sanity_check_failed (TLifted _)	= False
+	sanity_check_failed _			= True
+	
 cNoPosition :== -1
 	 
-instance <:: [a] | <:: a
+instance writeType [a] | writeType a
 where
-	(<::) file (form, types)
-		= show_list 0 form types file
+	writeType file opt_beautifulizer (form, types)
+		= show_list 0 form types (file, opt_beautifulizer)
 	where
-		show_list elem_number form [type] file
+		show_list elem_number form [type] file_opt_beautifulizer
 			| checkProperty form cCommaSeparator
-				= show_elem elem_number (clearProperty form cCommaSeparator) type file
+				= show_elem elem_number (clearProperty form cCommaSeparator) type file_opt_beautifulizer
 			| checkProperty form cArrowSeparator
-				= show_elem elem_number (clearProperty form cArrowSeparator) type file
-				= show_elem elem_number (setProperty form cBrackets) type file
-		show_list elem_number form [type : types] file
-			| checkProperty form cCommaSeparator
-				= show_list (inc elem_number) form types (show_elem elem_number (clearProperty form cCommaSeparator) type file <<< ',')
-			| checkProperty form cArrowSeparator
-				= show_list (inc elem_number) form types (show_elem elem_number (clearProperty form cArrowSeparator) type file <<< " -> ")
-				= show_list (inc elem_number) form types (show_elem elem_number (setProperty form cBrackets) type file <<< ' ')
+				= show_elem elem_number (clearProperty form cArrowSeparator) type file_opt_beautifulizer
+				= show_elem elem_number (setProperty form cBrackets) type file_opt_beautifulizer
+		show_list elem_number form [type : types] file_opt_beautifulizer
+			# (elem_format, seperator)
+					= if (checkProperty form cCommaSeparator) (clearProperty form cCommaSeparator, ",")
+						(if (checkProperty form cArrowSeparator) (clearProperty form cArrowSeparator, " -> ")
+							(setProperty form cBrackets, " "))
+			  (file, opt_beautifulizer)
+			  		= show_elem elem_number elem_format type file_opt_beautifulizer
+			= show_list (inc elem_number) form types (file <<< seperator, opt_beautifulizer)
 		show_list elem_number form [] file
 			= file
 
-		show_elem elem_nr form=:{form_attr_position = No} type file
-			= file <:: (form, type)
-		show_elem elem_nr form=:{form_attr_position = Yes ([pos : positions], coercions)} type file
+		show_elem elem_nr form=:{form_attr_position = No} type (file, opt_beautifulizer)
+			= writeType file opt_beautifulizer (form, type)
+		show_elem elem_nr form=:{form_attr_position = Yes ([pos : positions], coercions)} type (file, opt_beautifulizer)
 			| elem_nr == pos
-				= file <:: ({form & form_attr_position = Yes (positions, coercions)}, type)
+				= writeType file opt_beautifulizer ({form & form_attr_position = Yes (positions, coercions)}, type)
 			| pos == cNoPosition
-				= file <:: (form, type)
-				= file <:: ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
-		show_elem elem_nr form=:{form_attr_position = Yes ([], coercions)} type file
-			= file <:: ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
-
+				= writeType file opt_beautifulizer (form, type)
+				= writeType file opt_beautifulizer ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
+		show_elem elem_nr form=:{form_attr_position = Yes ([], coercions)} type (file, opt_beautifulizer)
+			= writeType file opt_beautifulizer ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
 
 from compare_constructor import equal_constructor	
 
@@ -1006,10 +1064,19 @@ where
 			= file <<< tst_result <<< " | " <<< tst_context <<< " [" <<< tst_attr_env <<< ']'
 			= file <<< tst_args <<< " -> " <<< tst_result <<< " | " <<< tst_context <<< " [" <<< tst_attr_env <<< ']'
 
-// MW3..
-optionalFrontPosition :: !CoercionPosition -> String
-optionalFrontPosition (CP_Expression _)
-	= ""
-optionalFrontPosition (CP_FunArg {id_name} arg_nr)
-	= "\"argument "+++toString arg_nr+++" of "+++id_name+++"\""
-// ..MW3
+// MW4..
+:: TypeVarBeautifulizer =
+	{	tvb_visited 	:: ![(Type, String)]
+			// associates type variables with strings, the type should be only GTV, TV, TempV, TQV, TempQV, TLifted.
+			// (associations lists are slow but cool)
+	,	tvb_fresh_vars	::	![String]
+	}
+
+initialTypeVarBeautifulizer :: TypeVarBeautifulizer
+initialTypeVarBeautifulizer 
+	= {	tvb_visited = [], tvb_fresh_vars = fresh_vars 'a' (-1) }
+  where
+	fresh_vars 'i' i
+		= fresh_vars 'a' (i+1)
+	fresh_vars ch i
+		= [if (i==(-1)) (toString ch) (toString ch+++toString i): fresh_vars (inc ch) i]

@@ -840,6 +840,7 @@ cNotVarNumber :== -1
 	{	alt_nodes	:: ![NodeDefWithLocals]
 	,	alt_guard	:: !ParsedExpr
 	,	alt_expr	:: !OptGuardedAlts
+	,	alt_ident	:: !Ident
 	}
 
 ::	ExprWithLocalDefs = 
@@ -1761,6 +1762,44 @@ where
 	(<<<) file (ID_Type ident optIdents)	= file <<< ":: " <<< ident <<< optIdents
 	(<<<) file (ID_Record ident optIdents)	= file <<< ident <<< " { " <<< optIdents <<< " } "
 	(<<<) file (ID_Instance i1 i2 tup)		= file <<< "instance " <<< i1 <<< i2 <<< tup // !ImportedIdent !Ident !(![Type],![TypeContext])
+
+instance <<< CoercionPosition
+where
+	(<<<) file (CP_FunArg fun_name arg_nr) = file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_Expression expression) = show_expression file expression
+	where
+		show_expression file (Var {var_name})
+			= file <<< var_name
+		show_expression file (FreeVar {fv_name})
+			= file <<< fv_name
+		show_expression file (App {app_symb={symb_name}, app_args})
+			| symb_name.id_name=="_dummyForStrictAlias"
+				= show_expression file (hd app_args)
+			= file <<< readable symb_name
+		show_expression file (fun @ fun_args)
+			= show_expression file fun
+		show_expression file (Case {case_ident=No})
+			= file <<< "(case ... )"
+		show_expression file (Selection _ expr selectors)
+			= file <<< "selection"
+		show_expression file (Update expr1 selectors expr2)
+			= file <<< "update"
+		show_expression file (TupleSelect {ds_arity} elem_nr expr)
+			= file <<< "argument" <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
+		show_expression file (BasicExpr bv _)
+			= file <<< bv
+		show_expression file (MatchExpr _ _ expr)
+			= file <<< "match expression"
+		show_expression file _
+			= file
+		
+readable :: !Ident -> String // somewhat hacky
+readable {id_name}
+	| id_name=="_cons" || id_name=="_nil"
+		= "list constructor"
+	| id_name % (0,5) == "_tuple"
+		= "tuple"
+	= id_name
 
 instance <<< ImportedIdent
 where

@@ -93,19 +93,24 @@ where
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
-	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type " <:: (format, types) <<< '\n' }
+// MW4 was:	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type " <:: (format, types) <<< '\n' }
+	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type "
+									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
 
 
 uniqueError symbol types err
 	# err = errorHeading "Overloading/Uniqueness error" err
 	  format = { form_properties = cAnnotated, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol
-			<<< "\" uniqueness specification of instance conflicts with current application " <:: (format, types) <<< '\n'}
+// MW4 was:			<<< "\" uniqueness specification of instance conflicts with current application " <:: (format, types) <<< '\n'}
+			<<< "\" uniqueness specification of instance conflicts with current application "
+			<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n'}
 
 unboxError type err
 	# err = errorHeading "Overloading error of Array class" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
-	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type) <<< " instance cannot be unboxed\n"}
+// MW4 was:	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type) <<< " instance cannot be unboxed\n"}
+	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type, Yes initialTypeVarBeautifulizer) <<< " instance cannot be unboxed\n"}
 
 overloadingError op_symb err
 	# err = errorHeading "Overloading error" err
