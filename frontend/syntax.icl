@@ -857,7 +857,6 @@ cNonUniqueSelection	:== False
 				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr
 				| PE_Tuple ![ParsedExpr]				
 				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
-				| PE_Array  !ParsedExpr ![ElemAssignment]  // RWS +++ remove PE_Array (not really used anymore) ![Qualifier] 
 				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
 				| PE_Selection !Bool !ParsedExpr ![ParsedSelection]

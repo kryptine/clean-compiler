@@ -149,8 +149,6 @@ where
 		# (compr, ca)
 			= transformComprehension gen_kind expr qualifiers ca
 		=	collectFunctions compr ca
-	collectFunctions (PE_Array expr assignments) ca=:{ca_predefs}
-		= collectFunctions (transformArrayUpdate expr assignments ca_predefs) ca
 	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) ca
 		# (compr, ca)
 			= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
@@ -625,9 +623,10 @@ transformArrayUpdate expr updates pi
 
 transformArrayDenot :: [ParsedExpr] PredefinedIdents -> ParsedExpr
 transformArrayDenot exprs pi
-	=	PE_Array
+	=	transformArrayUpdate
 			((predef PD__CreateArrayFun ` length exprs) pi)
 			[{bind_dst=toParsedExpr i pi, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+			pi
 
 scanModules :: [ParsedImport] [ScannedModule] Int *HashTable *File SearchPaths *PredefinedSymbols *Files -> (Bool, [ScannedModule],[FunDef],Int, *HashTable, *File, *PredefinedSymbols, *Files)
 scanModules [] parsed_modules fun_count hash_table err_file searchPaths predefs files 
