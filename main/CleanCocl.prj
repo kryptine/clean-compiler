@@ -3,7 +3,7 @@ Global
 	Built:	True
 	CodeGen
 		CheckStacks:	False
-		CheckIndexes:	False
+		CheckIndexes:	True
 		KeepABC:	False
 		TargetProcessor:	CurrentProcessor
 	Application
@@ -121,4 +121,3 @@ MainModule
 		Module:	syntax
 		Module:	typeproperties
 		Module:	utilities
-OtherModules
