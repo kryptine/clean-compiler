@@ -439,7 +439,6 @@ checkAbstractType _ _									= False
 getClassDef :: !Index !Index !Index !u:{# ClassDef} !v:{# DclModule} -> (!ClassDef, !Index , !u:{# ClassDef}, !v:{# DclModule})
 getClassDef class_index type_module module_index class_defs modules
 	| type_module == module_index
-		#! si = size class_defs
 		# (class_def, class_defs) = class_defs![class_index]
 		= (class_def, class_index, class_defs, modules)
 		# ({dcl_common={com_class_defs}}, modules) = modules![type_module]
@@ -449,7 +448,6 @@ getClassDef class_index type_module module_index class_defs modules
 getGenericDef :: !Index !Index !Index !u:{# GenericDef} !v:{# DclModule} -> (!GenericDef, !Index , !u:{# GenericDef}, !v:{# DclModule})
 getGenericDef generic_index type_module module_index generic_defs modules
 	| type_module == module_index
-		#! si = size generic_defs
 		# (generic_def, generic_defs) = generic_defs![generic_index]
 		= (generic_def, generic_index, generic_defs, modules)
 		# ({dcl_common={com_generic_defs}}, modules) = modules![type_module]
@@ -757,14 +755,14 @@ checkMemberType mod_index st type_defs class_defs modules heaps cs
 	= (checked_st, type_defs, class_defs, modules, heaps, cs) 
 
 checkSymbolType :: !Bool !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (!SymbolType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
+							-> (!SymbolType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
 checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_env} specials type_defs class_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (st_args, cot_state) = checkOpenATypes mod_index cGlobalScope st_args (ots, oti, cs)
 //	   ---> ("checkSymbolType", st_args))
-	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars}, cs))
-	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state
+	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars,oti_global_vars}, cs))
+	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state	  
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [] }
 	  (st_context, type_defs, class_defs, modules, heaps, cs) = check_type_contexts is_function st_context mod_index class_defs ots oti cs
 	  (st_attr_env, cs) = mapSt check_attr_inequality st_attr_env cs
@@ -908,6 +906,11 @@ where
 	check_context_types tc_class [type : types] cs
 		= check_context_types tc_class types cs
 
+check_no_global_type_vars [] cs
+	= cs
+check_no_global_type_vars [{tv_ident}:global_vars] cs=:{cs_error}
+	# cs = {cs & cs_error = checkError tv_ident ": type variable with ^ only allowed in dynamic types" cs_error }
+	= check_no_global_type_vars global_vars cs
 
 checkTypeContexts :: ![TypeContext] !Index !v:{# ClassDef} !u:OpenTypeSymbols !*OpenTypeInfo !*CheckState
 	-> (![TypeContext], !u:{# CheckedTypeDef}, !v:{# ClassDef}, u:{# DclModule}, !*TypeHeaps, !*CheckState)
@@ -915,6 +918,7 @@ checkTypeContexts tcs mod_index class_defs ots oti cs
 	# (tcs, (class_defs, { ots_modules, ots_type_defs}, oti, cs)) = mapSt (checkTypeContext mod_index) tcs (class_defs, ots, oti, cs)
 	  cs = check_class_variables oti.oti_all_vars cs
 	  cs = check_class_attributes oti.oti_all_attrs cs
+	  cs = check_no_global_type_vars oti.oti_global_vars cs
 	= (tcs, ots_type_defs, class_defs, ots_modules, oti.oti_heaps, cs)
 where
 	check_class_variables class_variables cs
@@ -1118,10 +1122,11 @@ checkSpecialTypes mod_index (SP_ParsedSubstitutions envs) type_defs modules heap
 where
 	check_environment mod_index env (heaps, ots, cs)
 	 	# oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
-	 	  (env, (ots, {oti_heaps,oti_all_vars,oti_all_attrs}, cs)) = mapSt (check_substituted_type mod_index) env (ots, oti, cs)
+	 	  (env, (ots, {oti_heaps,oti_all_vars,oti_all_attrs,oti_global_vars}, cs)) = mapSt (check_substituted_type mod_index) env (ots, oti, cs)
 	  	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope oti_all_vars cs.cs_symbol_table
 		  cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
-		= ({ ss_environ = env, ss_context = [], ss_vars = oti_all_vars, ss_attrs = oti_all_attrs}, (oti_heaps, ots, { cs & cs_symbol_table = cs_symbol_table }))
+	  	  cs = check_no_global_type_vars oti_global_vars {cs & cs_symbol_table = cs_symbol_table}
+		= ({ ss_environ = env, ss_context = [], ss_vars = oti_all_vars, ss_attrs = oti_all_attrs}, (oti_heaps, ots, cs))
 
 	check_substituted_type mod_index bind=:{bind_src} cot_state
 		 # (bind_src, cot_state) = checkOpenType mod_index cGlobalScope DAK_Ignore bind_src cot_state
