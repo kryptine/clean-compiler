@@ -750,7 +750,6 @@ where
 	add_new_function_to_group fun_heap common_defs fun_ptr (groups, fun_defs, imported_types, imported_conses, type_heaps, var_heap)
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
 		  {fun_type = Yes ft, fun_info = {fi_group_index, fi_properties}} = gf_fun_def
-		  (Yes ft) = gf_fun_def.fun_type
 		  (ft, imported_types, imported_conses, type_heaps, var_heap)
 		  		= convertSymbolType (fi_properties bitand FI_HasTypeSpec == 0) common_defs ft main_dcl_module_n
 		  		 			imported_types imported_conses type_heaps var_heap
