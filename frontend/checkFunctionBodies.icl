@@ -2163,8 +2163,9 @@ addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  , cs
 	  )
 
-
-
+buildSelections e_input {ap_selections=[]}
+	  (strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
+	= (strict_binds, lazy_binds, free_vars, e_state, e_info, cs) // if an error occurs in checkPattern
 buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 					(strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
 	# (ap_array_var, [last_array_selection:lazy_binds], free_vars, e_state, e_info, cs)
