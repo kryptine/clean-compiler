@@ -288,7 +288,7 @@ where
 	transform_pattern_into_cases (AP_WildCard _) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
 		= (result_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)	
 	transform_pattern_into_cases (AP_Empty name) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
-		= (result_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)
+		= (EE, pattern_position, var_store, expr_heap, opt_dynamics, cs)
 
 	transform_pattern_variable :: !FreeVar !(Optional (Bind Ident VarInfoPtr)) !Expression !*ExpressionHeap
 		-> (!Expression, !Expression, !*ExpressionHeap)
