@@ -92,3 +92,4 @@ BEDictionaryUpdateFunSymbol
 BEGetVersion
 BEAbsType
 BESwapTypes
+BESetMainDclModuleN
