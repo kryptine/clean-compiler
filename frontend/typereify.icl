@@ -211,7 +211,8 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 		=	common_defs.[main].com_type_defs
 	# (type_funs, bs_state)
 		=	build 0 (size type_defs) type_defs icl_functions bs_state 
-	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, bs_state.bs_type_heaps)
+	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, 
+			bs_state.bs_type_heaps)
 	where
 		build i n type_defs functions bs_state
 			| i < n
@@ -417,7 +418,7 @@ instance reify TypeRhs where
 		=	cons PD_CTAlgType ` get constructors
 		where
 			get constructors state=:{bs_common_defs, bs_main}
-				=	reify [common_defs.[ds_index] \\ {ds_index} <- constructors] state
+				=	reify [(ds_index,common_defs.[ds_index]) \\ {ds_index} <- constructors] state
 				where
 					common_defs
 						=	bs_common_defs.[bs_main].com_cons_defs
@@ -426,17 +427,17 @@ instance reify TypeRhs where
 	reify (SynType _)
 		=	cons PD_CTSynType
 
-instance reify ConsDef where
-	reify {cons_ident, cons_index, cons_type, cons_exi_vars}
+instance reify (Int, ConsDef) where
+	reify (ds_index, {cons_ident, cons_type, cons_exi_vars})
 		=	(record PD_CTConsDef
-				` (function PD__CTToCons ` consSymbol cons_ident cons_index)
+				` (function PD__CTToCons ` consSymbol cons_ident ds_index)
 				` cons_type.st_args ` length cons_exi_vars)
 		o	numberTypeVariables cons_exi_vars
 		where
-			consSymbol cons_ident cons_index state=:{bs_main}
+			consSymbol cons_ident ds_index state=:{bs_main}
 				# cons_symb =
 					{	symb_ident = cons_ident
-					,	symb_kind = SK_Constructor { glob_module = bs_main, glob_object = cons_index}
+					,	symb_kind = SK_Constructor { glob_module = bs_main, glob_object = ds_index}
 					}
 				=	reify cons_symb state
 
