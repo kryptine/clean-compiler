@@ -109,8 +109,8 @@ where
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types, cti_lhs_attribute, ts_ti_cs)
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types,
 								determine_type_attribute td_attribute, ts_ti_cs)
-				= (type, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name " used with wrong arity" cs.cs_error }))
-			= (type, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name " undefined" cs.cs_error}))
+				= (TE /* JVG was: type */, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name " used with wrong arity" cs.cs_error }))
+			= (TE /* JVG was: type */, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name " undefined" cs.cs_error}))
 	where
 		determine_type_attribute TA_Unique		= TA_Unique
 		determine_type_attribute _				= TA_Multi
