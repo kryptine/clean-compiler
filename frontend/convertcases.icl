@@ -23,7 +23,7 @@ getIdent No fun_nr
 addLetVars :: [LetBind] [AType] [(FreeVar, AType)] -> [(FreeVar, AType)]
 addLetVars [{lb_dst} : binds] [bind_type : bind_types] bound_vars
 	= addLetVars binds bind_types [ (lb_dst, bind_type) : bound_vars ]
-addLetVars [] _ bound_vars
+addLetVars [] [] bound_vars
 	= bound_vars
 
 convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
@@ -62,7 +62,7 @@ where
 				  rcs_imports = collected_imports} 
 		  	-*-> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
 		  ds = { ds_lets = [], ds_var_heap = rcs_var_heap, ds_expr_heap = rcs_expr_heap}
-		  (tb_rhs, ds) = distributeLets 1 tb_rhs ds -*-> "dis"
+		  (tb_rhs, ds) = distributeLets {di_depth=1,di_explicit_case_depth=0} tb_rhs ds -*-> "dis"
 		  (tb_rhs, {ds_var_heap, ds_expr_heap}) = buildLetExpr tb_rhs ds -*-> "build"
 
 		  (_, {ss_expr_heap, ss_var_heap})
@@ -78,6 +78,74 @@ where
 	split (SK_Constructor cons_symb) (collected_functions, collected_conses)
 		= (collected_functions, [ cons_symb : collected_conses])
 
+// sanity check ...
+class checkCaseTypes a :: !a !*ExpressionHeap -> (!Bool, !*ExpressionHeap)
+
+instance checkCaseTypes Expression where
+	checkCaseTypes (Let {let_expr}) expr_heap
+		= checkCaseTypes let_expr expr_heap
+	checkCaseTypes (Case kees) expr_heap
+		= checkCaseTypes kees expr_heap
+	checkCaseTypes _ expr_heap
+		=	(True, expr_heap)
+
+instance checkCaseTypes Case where
+	checkCaseTypes kees=:{case_expr, case_guards, case_default, case_explicit, case_info_ptr} expr_heap
+		# (info, expr_heap)
+			= readPtr case_info_ptr expr_heap
+		# {ct_cons_types}
+			= case_type info
+		# (guards_ok, expr_heap) = checkCaseTypesCasePatterns case_guards ct_cons_types expr_heap
+	  	# (default_ok, expr_heap)= checkCaseTypes case_default expr_heap
+		= (guards_ok && default_ok, expr_heap)
+
+	where
+		case_type (EI_CaseTypeAndSplits type _)
+			=	type
+		case_type (EI_CaseType type)
+			=	type
+
+checkCaseTypesCasePatterns :: CasePatterns [[AType]] *ExpressionHeap -> (Bool, *ExpressionHeap)
+checkCaseTypesCasePatterns (BasicPatterns bt patterns) _ expr_heap
+	=	(True, expr_heap)
+checkCaseTypesCasePatterns (AlgebraicPatterns gi patterns) arg_types expr_heap
+	| length patterns <> length arg_types
+		=	abort ("checkCaseTypesCasePatterns error number of cases " +++ toString (length patterns) +++ " <> " +++ toString (length arg_types)) <<- arg_types
+	=	checkCaseTypesAlgebraicPatterns (exactZip patterns arg_types) expr_heap
+checkCaseTypesCasePatterns (OverloadedListPatterns type decons_expr patterns) arg_types expr_heap
+	| length patterns <> length arg_types
+		=	abort ("checkCaseTypesCasePatterns error number of cases " +++ toString (length patterns) +++ " <> " +++ toString (length arg_types)) <<- arg_types
+	=	checkCaseTypesAlgebraicPatterns (exactZip patterns arg_types) expr_heap
+
+checkCaseTypesAlgebraicPatterns :: [(AlgebraicPattern, [AType])] *ExpressionHeap -> (Bool, *ExpressionHeap)
+checkCaseTypesAlgebraicPatterns l expr_heap
+	# (oks, expr_heap)
+		=	mapSt checkCaseTypesAlgebraicPattern l expr_heap
+	=	(and oks, expr_heap)
+where
+	checkCaseTypesAlgebraicPattern :: (AlgebraicPattern, [AType]) *ExpressionHeap -> (Bool, *ExpressionHeap)
+	checkCaseTypesAlgebraicPattern (pattern=:{ap_expr, ap_vars}, arg_types) expr_heap
+		| length ap_vars <> length arg_types
+			=	abort ("checkCaseTypesCasePattern error number of pattern args " +++ toString (length ap_vars) +++ " <> " +++ toString (length arg_types)) <<- arg_types
+		=	(length ap_vars == length arg_types, expr_heap)
+
+instance checkCaseTypes (Optional a) | checkCaseTypes a where
+	checkCaseTypes (Yes expr) cs
+		= checkCaseTypes expr cs
+	checkCaseTypes No cs
+		= (True, cs)
+
+instance checkCaseTypes [a] | checkCaseTypes a where
+	checkCaseTypes l cs
+		# (oks, expr_heap)
+			=	mapSt checkCaseTypes l cs 
+		=	(and oks, expr_heap)
+
+instance checkCaseTypes BasicPattern where
+	checkCaseTypes pattern=:{bp_expr} cs
+		=	checkCaseTypes bp_expr cs
+
+// ... sanity check
 :: CaseLevel = CaseLevelRoot | CaseLevelAfterGuardRoot
 
 :: ConvertInfo =
@@ -238,6 +306,13 @@ where
 		  	= (lvi_count, var_heap)
 //				-*-> (fv_name,fv_info_ptr,lvi_count)
 	weightedRefCount rci (Case case_expr) rs=:{rcs_expr_heap}
+/*
+// sanity check ...
+		# (ok, rcs_expr_heap) = checkCaseTypes case_expr rcs_expr_heap
+		| not ok
+			=	abort "error in case types (weightedRefCount)"
+// ... sanity check
+*/
 		# (case_info, rcs_expr_heap) = readPtr case_expr.case_info_ptr rcs_expr_heap
 		= weightedRefCountOfCase rci case_expr case_info { rs & rcs_expr_heap = rcs_expr_heap }
 	weightedRefCount rci expr=:(BasicExpr _) rs
@@ -460,26 +535,31 @@ where
 	,   lei_type			:: !AType
 	}
 
+::	DistributeInfo =
+	{	di_depth 				:: !Int
+	,	di_explicit_case_depth	:: !Int
+	}
+
 ::	DistributeState =
 	{	ds_lets			:: ![VarInfoPtr]
 	,	ds_var_heap		:: !.VarHeap
 	,	ds_expr_heap	:: !.ExpressionHeap
 	}
 
-class distributeLets e :: !Int !e !*DistributeState -> (!e, !*DistributeState)
+class distributeLets e :: !DistributeInfo !e !*DistributeState -> (!e, !*DistributeState)
 
 instance distributeLets Expression
 where
-	distributeLets depth (Var var=:{var_name,var_info_ptr}) ds=:{ds_var_heap}
+	distributeLets di=:{di_depth} (Var var=:{var_name,var_info_ptr}) ds=:{ds_var_heap}
 		#! var_info = sreadPtr var_info_ptr ds_var_heap
 		= case var_info of
 			VI_LetExpression lei
-				| lei.lei_depth == depth
+				| lei.lei_depth == di_depth
 					| lei.lei_count == 1 && (case lei.lei_status of LES_Updated _ -> False; _ -> True)
-						# (lei_updated_expr, ds) = distributeLets depth lei.lei_expression ds
+						# (lei_updated_expr, ds) = distributeLets di lei.lei_expression ds
 						-> (lei_updated_expr, { ds &  ds_var_heap = ds.ds_var_heap <:=
 								(var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_updated_expr }) })
-						# ds = distributeLetsInLetExpression depth var_info_ptr lei ds
+						# ds = distributeLetsInLetExpression di var_info_ptr lei ds
 						-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, ds)
 				// otherwise
 					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, ds)
@@ -487,45 +567,46 @@ where
 				-> (Var { var & var_info_ptr = var_info_ptr }, ds)
 			_
 				-> (Var var, ds)
-	distributeLets depth (Case kees) ds
-		# (kees, ds) = distributeLets depth kees ds
+	distributeLets di (Case kees) ds
+		# (kees, ds) = distributeLets di kees ds
 		= (Case kees, ds)
-	distributeLets depth (App app=:{app_args}) ds
-		# (app_args, ds) = distributeLets depth app_args ds
+	distributeLets di (App app=:{app_args}) ds
+		# (app_args, ds) = distributeLets di app_args ds
 		= (App {app & app_args = app_args}, ds)
-	distributeLets depth (fun_expr @ exprs) ds
-		# (fun_expr, ds) = distributeLets depth fun_expr ds
-		  (exprs, ds) = distributeLets depth exprs ds
+	distributeLets di (fun_expr @ exprs) ds
+		# (fun_expr, ds) = distributeLets di fun_expr ds
+		  (exprs, ds) = distributeLets di exprs ds
 		= (fun_expr @ exprs, ds)
-	distributeLets depth expr=:(BasicExpr _) ds
+	distributeLets di expr=:(BasicExpr _) ds
 		= (expr, ds)
-	distributeLets depth (MatchExpr constructor expr) ds
-		# (expr, ds) = distributeLets depth expr ds
+	distributeLets di (MatchExpr constructor expr) ds
+		# (expr, ds) = distributeLets di expr ds
 		= (MatchExpr constructor expr, ds)
-	distributeLets depth (Selection opt_tuple expr selectors) ds
-		# (expr, ds) = distributeLets depth expr ds
-		# (selectors, ds) = distributeLets depth selectors ds
+	distributeLets di (Selection opt_tuple expr selectors) ds
+		# (expr, ds) = distributeLets di expr ds
+		# (selectors, ds) = distributeLets di selectors ds
 		= (Selection opt_tuple expr selectors, ds)
-	distributeLets depth (Update expr1 selectors expr2) ds
-		# (expr1, ds) = distributeLets depth expr1 ds
-		# (selectors, ds) = distributeLets depth selectors ds
-		# (expr2, ds) = distributeLets depth expr2 ds
+	distributeLets di (Update expr1 selectors expr2) ds
+		# (expr1, ds) = distributeLets di expr1 ds
+		# (selectors, ds) = distributeLets di selectors ds
+		# (expr2, ds) = distributeLets di expr2 ds
 		= (Update expr1 selectors expr2, ds)
-	distributeLets depth (RecordUpdate cons_symbol expr exprs) ds
-		# (expr, ds) = distributeLets depth expr ds
-		# (exprs, ds) = distributeLets depth exprs ds
+	distributeLets di (RecordUpdate cons_symbol expr exprs) ds
+		# (expr, ds) = distributeLets di expr ds
+		# (exprs, ds) = distributeLets di exprs ds
 		= (RecordUpdate cons_symbol expr exprs, ds)
-	distributeLets depth (TupleSelect tuple_symbol arg_nr expr) ds
-		# (expr, ds) = distributeLets depth expr ds
+	distributeLets di (TupleSelect tuple_symbol arg_nr expr) ds
+		# (expr, ds) = distributeLets di expr ds
 		= (TupleSelect tuple_symbol arg_nr expr, ds)
-	distributeLets depth (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) ds=:{ds_expr_heap,ds_var_heap}
+	distributeLets di=:{di_depth} (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) ds=:{ds_expr_heap,ds_var_heap}
 		# (let_info, ds_expr_heap) = readPtr let_info_ptr ds_expr_heap
 		# (EI_LetTypeAndRefCounts let_type ref_counts) = let_info
 		  nr_of_strict_lets = length let_strict_binds
-		  ds_var_heap = set_let_expr_info depth let_lazy_binds ref_counts (drop nr_of_strict_lets let_type) ds_var_heap
-		  (let_expr, ds) = distributeLets depth let_expr { ds & ds_var_heap = ds_var_heap, ds_expr_heap = ds_expr_heap }
-		  (let_strict_binds, ds) = distributeLets depth let_strict_binds ds
-		  ds = foldSt (distribute_lets_in_non_distributed_let depth) let_lazy_binds ds
+		  ds_var_heap = set_let_expr_info di_depth let_lazy_binds ref_counts (drop nr_of_strict_lets let_type) ds_var_heap
+		  ds_var_heap = foldSt set_strict_let_expr_info let_strict_binds ds_var_heap
+		  (let_expr, ds) = distributeLets di let_expr { ds & ds_var_heap = ds_var_heap, ds_expr_heap = ds_expr_heap }
+		  (let_strict_binds, ds) = distributeLets di let_strict_binds ds
+		  ds = foldSt (distribute_lets_in_non_distributed_let di) let_lazy_binds ds
 		| nr_of_strict_lets == 0
 		    = (let_expr, ds)
 		// otherwise
@@ -543,26 +624,30 @@ where
 						{ds & ds_expr_heap = ds_expr_heap})
 	where
 		set_let_expr_info depth [{lb_src,lb_dst}:binds] [ref_count:ref_counts] [type:types] var_heap
-			# (new_info_ptr, var_heap) = newPtr (VI_Labelled_Empty "set_let_expr_info") var_heap
+			# (new_info_ptr, var_heap) = newPtr VI_LocalLetVar var_heap
 			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { lb_dst & fv_info_ptr = new_info_ptr },
 			  			lei_expression = lb_src, lei_type = type, lei_status =  LES_Untouched }
-			  				-*-> ("set_let_expr_info", lb_dst.fv_info_ptr, new_info_ptr)
+//			  				-*-> ("set_let_expr_info", lb_dst.fv_info_ptr, new_info_ptr)
+			  				->> ("set_let_expr_info", lb_dst.fv_name.id_name, depth)
 			= set_let_expr_info depth binds ref_counts types (var_heap <:= (lb_dst.fv_info_ptr, VI_LetExpression lei))
-		set_let_expr_info depth [] _ _ var_heap
+		set_let_expr_info _ [] _ _ var_heap
 			= var_heap
 
-		distribute_lets_in_non_distributed_let depth {lb_dst={fv_name,fv_info_ptr}} ds=:{ds_var_heap}
+		set_strict_let_expr_info {lb_dst} var_heap
+			= var_heap <:= (lb_dst.fv_info_ptr, VI_LocalLetVar)
+	
+		distribute_lets_in_non_distributed_let di {lb_dst={fv_name,fv_info_ptr}} ds=:{ds_var_heap}
 			# (VI_LetExpression lei=:{lei_count}, ds_var_heap) = readPtr fv_info_ptr ds_var_heap
 			| lei_count > 0
 //			| not lei_moved && lei_count > 0
-				= distributeLetsInLetExpression depth fv_info_ptr lei { ds & ds_var_heap = ds_var_heap }
+				= distributeLetsInLetExpression di fv_info_ptr lei { ds & ds_var_heap = ds_var_heap }
 			// otherwise
 				= { ds & ds_var_heap = ds_var_heap }
 					-*-> ("distribute_lets_in_non_distributed_let (moved or not used)", lei_count, fv_name)
 
-	distributeLets depth expr=:(TypeCodeExpression _) ds
+	distributeLets _ expr=:(TypeCodeExpression _) ds
 		= (expr, ds)
-	distributeLets depth (AnyCodeExpr in_params out_params code_expr) ds=:{ds_var_heap}
+	distributeLets _ (AnyCodeExpr in_params out_params code_expr) ds=:{ds_var_heap}
 		# (in_params, ds_var_heap) = mapSt determine_input_parameter in_params ds_var_heap
 		= (AnyCodeExpr in_params out_params code_expr, { ds & ds_var_heap = ds_var_heap })
 		where
@@ -573,26 +658,29 @@ where
 						-> ({ bind & bind_dst = { bind_dst & var_info_ptr = new_info_ptr }}, var_heap)
 					_
 						-> (bind, var_heap)
-	distributeLets depth expr=:(ABCCodeExpr _ _) ds
+	distributeLets _ expr=:(ABCCodeExpr _ _) ds
 		= (expr, ds)
-	distributeLets depth EE ds
+	distributeLets _ EE ds
 		= (EE, ds)
-	distributeLets depth (NoBind ptr) ds
+	distributeLets _ (NoBind ptr) ds
 		= (NoBind ptr, ds)
-	distributeLets depth (FailExpr id) ds
+	distributeLets _ (FailExpr id) ds
 		= (FailExpr id, ds)
 
 instance distributeLets Case
 where 
-	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr,case_explicit} ds=:{ds_var_heap, ds_expr_heap}
-		# (case_info, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
-		  (EI_CaseTypeAndRefCounts _
+	distributeLets di=:{di_depth,di_explicit_case_depth} kees=:{case_info_ptr,case_guards,case_default,case_expr,case_explicit} ds=:{ds_var_heap, ds_expr_heap}
+		# (case_old_info, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
+		  (EI_CaseTypeAndRefCounts type
 		  	{	rcc_all_variables = tot_ref_counts ,
 		  		rcc_default_variables = ref_counts_in_default,
-		  		rcc_pattern_variables = ref_counts_in_patterns }) = case_info
-//		  ds_expr_heap = ds_expr_heap <:= (case_info_ptr, EI_CaseType case_type)
-		  new_depth = depth + 1
-
+		  		rcc_pattern_variables = ref_counts_in_patterns }) = case_old_info
+		  new_depth = di_depth + 1
+		  new_di
+		  	=	{	di
+		  		&	di_depth = new_depth
+		  		,	di_explicit_case_depth = if case_explicit new_depth di_explicit_case_depth
+		  		}
 		  (local_lets, ds_var_heap) = mark_local_let_vars new_depth tot_ref_counts ds_var_heap
 										  	// -*-> ("ref_counts", case_expr, tot_ref_counts, ref_counts_in_patterns)
 		  	with
@@ -605,38 +693,69 @@ where
 						= foldSt (mark_local_let_var new_depth) tot_ref_counts ([],var_heap)
 		  	
 	 	  ds = {ds & ds_var_heap=ds_var_heap, ds_expr_heap=ds_expr_heap}
-		  (case_guards, ds)  = distribute_lets_in_patterns new_depth ref_counts_in_patterns case_guards ds
-		  (case_default, ds=:{ds_var_heap}) = distribute_lets_in_default new_depth ref_counts_in_default case_default ds
-		  ds_var_heap = foldSt reset_local_let_var local_lets ds.ds_var_heap
-		  (case_expr, ds) = distributeLets depth case_expr { ds & ds_var_heap = ds_var_heap}
-		  (case_info_ptr, ds_expr_heap) = newPtr case_info ds.ds_expr_heap
-		= ({ kees & case_guards = case_guards, case_expr = case_expr,
-				case_default = case_default, case_info_ptr = case_info_ptr }, { ds & ds_expr_heap = ds_expr_heap})
+		  (case_guards, ds)  = distribute_lets_in_patterns new_di ref_counts_in_patterns case_guards ds
+		  (case_default, ds=:{ds_var_heap}) = distribute_lets_in_default new_di ref_counts_in_default case_default ds
+		  (outer_vars, ds_var_heap) = foldSt (is_outer_var new_di) tot_ref_counts (False, ds.ds_var_heap)
+		# ds_var_heap = foldSt reset_local_let_var local_lets ds_var_heap ->> ("outer_vars", di_depth, outer_vars)
+		  (case_expr, ds) = distributeLets di case_expr { ds & ds_var_heap = ds_var_heap}
+		  kees = { kees & case_guards = case_guards, case_expr = case_expr,
+				case_default = case_default}
+		  (kind, ds_var_heap) = case_kind outer_vars kees ds.ds_var_heap
+		  case_new_info = EI_CaseTypeAndSplits type {sic_splits = [], sic_next_alt = No, sic_case_kind = kind}
+		  (case_info_ptr, ds_expr_heap) = newPtr case_new_info ds.ds_expr_heap ->> ("case_kind", di_depth, kind)
+		  kees = { kees & case_info_ptr = case_info_ptr }
+		= (kees, { ds & ds_expr_heap = ds_expr_heap, ds_var_heap = ds_var_heap})
 	where
-		distribute_lets_in_patterns depth ref_counts (AlgebraicPatterns conses patterns) ds
-			# (patterns, ds) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) ds
+		case_kind _ {case_guards, case_default, case_explicit, case_expr} var_heap
+			| is_guard case_guards case_default case_explicit case_expr
+				=	(CaseKindGuard, var_heap)
+		case_kind outer_vars {case_expr, case_explicit}  var_heap
+			|  case_explicit || outer_vars || not (is_lhs_var case_expr var_heap)
+				=	(CaseKindTransform, var_heap)
+			// otherwise
+				=	(CaseKindLeave, var_heap)
+			where
+
+				is_lhs_var (Var {var_info_ptr, var_name}) var_heap
+					= 	case sreadPtr var_info_ptr var_heap of
+							VI_LocalLetVar
+								->	False ->> (var_name.id_name, "rhs1")
+							VI_LetExpression _
+								->	False ->> (var_name.id_name, "rhs2")
+							info
+								->	True ->> (var_name.id_name, "lhs", info)
+				is_lhs_var _ _
+					=	False
+		
+		is_guard (BasicPatterns BT_Bool patterns) case_default case_explicit case_expr
+			=	is_guard_case patterns case_default case_explicit case_expr
+		is_guard _ _ _ _
+			=	False
+
+		distribute_lets_in_patterns di ref_counts (AlgebraicPatterns conses patterns) ds
+			# (patterns, ds) = mapSt (distribute_lets_in_alg_pattern di) (exactZip ref_counts patterns) ds
 			= (AlgebraicPatterns conses patterns, ds)
-		distribute_lets_in_patterns depth ref_counts (BasicPatterns type patterns) ds
-			# (patterns, ds) = mapSt (distribute_lets_in_basic_pattern depth) (exactZip ref_counts patterns) ds
+		distribute_lets_in_patterns di ref_counts (BasicPatterns type patterns) ds
+			# (patterns, ds) = mapSt (distribute_lets_in_basic_pattern di) (exactZip ref_counts patterns) ds
 			= (BasicPatterns type patterns, ds)
 		where
-			distribute_lets_in_basic_pattern depth (ref_counts,pattern) ds
-				# (bp_expr, ds) = distribute_lets_in_pattern_expr depth ref_counts pattern.bp_expr ds
+			distribute_lets_in_basic_pattern di (ref_counts,pattern) ds
+				# (bp_expr, ds) = distribute_lets_in_pattern_expr di ref_counts pattern.bp_expr ds
 				= ({ pattern & bp_expr = bp_expr }, ds)
-		distribute_lets_in_patterns depth ref_counts (OverloadedListPatterns conses decons_expr patterns) heaps
-			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) heaps
+		distribute_lets_in_patterns di ref_counts (OverloadedListPatterns conses decons_expr patterns) heaps
+			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern di) (exactZip ref_counts patterns) heaps
 			= (OverloadedListPatterns conses decons_expr patterns, heaps)
 
-		distribute_lets_in_alg_pattern depth (ref_counts,pattern) ds=:{ds_var_heap}
+		distribute_lets_in_alg_pattern di (ref_counts,pattern) ds=:{ds_var_heap}
 			# (ap_vars, ds_var_heap) = mapSt refresh_variable pattern.ap_vars ds_var_heap
 			  ds = {ds & ds_var_heap = ds_var_heap}
-			  (ap_expr, ds) = distribute_lets_in_pattern_expr depth ref_counts pattern.ap_expr ds
+			  (ap_expr, ds) = distribute_lets_in_pattern_expr di ref_counts pattern.ap_expr ds
 			= ({ pattern & ap_vars = ap_vars, ap_expr = ap_expr }, ds) 
 
-		distribute_lets_in_default depth ref_counts_in_default (Yes expr) ds
-			# (expr, ds) = distribute_lets_in_pattern_expr depth ref_counts_in_default expr ds
+		distribute_lets_in_default di ref_counts_in_default (Yes expr) ds
+			# (expr, ds) = distribute_lets_in_pattern_expr di ref_counts_in_default expr ds
 			= (Yes expr, ds)
-		distribute_lets_in_default depth ref_counts_in_default No ds
+		distribute_lets_in_default _ ref_counts_in_default No ds
 			= (No, ds)
 
 		refresh_variable fv=:{fv_info_ptr} var_heap
@@ -644,10 +763,11 @@ where
 			= ({ fv & fv_info_ptr = new_info_ptr }, var_heap <:= (fv_info_ptr, VI_CaseVar new_info_ptr))
 
 		mark_local_let_var depth {cv_variable, cv_count} (local_vars, var_heap)
-			# (VI_LetExpression lei=:{lei_count,lei_depth}, var_heap) = readPtr cv_variable var_heap
+			# (VI_LetExpression lei=:{lei_count,lei_depth,lei_var}, var_heap) = readPtr cv_variable var_heap
 			| lei_count == cv_count && lei_depth==depth-1	// -*-> ("mark_test", lei_count, cv_count)
 				= ([(cv_variable, lei_count, lei_depth) : local_vars ], var_heap <:= (cv_variable, VI_LetExpression { lei & lei_depth = depth}))
-						-*-> ("mark_local_let_var ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
+//						-*-> ("mark_local_let_var ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
+						->> ("mark_local_let_var ", lei_var.fv_name.id_name, lei_depth, " ->> ", depth)
 			// otherwise
 				= (local_vars, var_heap)
 
@@ -697,15 +817,21 @@ where
 		reset_local_let_var (var_info_ptr, lei_count, lei_depth)  var_heap
 			# (VI_LetExpression lei, var_heap) = readPtr var_info_ptr var_heap
 			= var_heap <:= (var_info_ptr, VI_LetExpression { lei & lei_depth = lei_depth, lei_count = lei_count, lei_status = LES_Moved })
-					-*-> ("reset_local_let_var", var_info_ptr)
+//					-*-> ("reset_local_let_var", var_info_ptr)
+					->> ("reset_local_let_var", lei.lei_var.fv_name.id_name, lei.lei_depth, lei.lei_count, " ->> ", lei_depth, lei_count)
 
-		distribute_lets_in_pattern_expr depth local_vars pattern_expr ds=:{ds_var_heap}
-			# ds_var_heap = foldSt (mark_local_let_var_of_pattern_expr depth) local_vars ds_var_heap
+		is_outer_var {di_depth, di_explicit_case_depth} {cv_variable}  (outer, var_heap)
+			# (VI_LetExpression lei=:{lei_depth}, var_heap) = readPtr cv_variable var_heap
+			= (outer || ((di_explicit_case_depth < lei_depth) && (lei_depth <= di_depth)), var_heap)
+					->> ("is_outer_var", lei.lei_var.fv_name.id_name, lei.lei_depth, di_depth, di_explicit_case_depth)
+
+		distribute_lets_in_pattern_expr di=:{di_depth} local_vars pattern_expr ds=:{ds_var_heap}
+			# ds_var_heap = foldSt (mark_local_let_var_of_pattern_expr di_depth) local_vars ds_var_heap
 			  (ds=:{ds_lets}) = {ds & ds_var_heap = ds_var_heap}
 			  ds = {ds & ds_lets = []}
-			  (pattern_expr, ds) = distributeLets depth pattern_expr ds
+			  (pattern_expr, ds) = distributeLets di pattern_expr ds
 			  (ds_lets2, ds) = ds!ds_lets
-			  ds = foldSt (reexamine_local_let_expr depth) local_vars ds
+			  ds = foldSt (reexamine_local_let_expr di) local_vars ds
 			# (letExpr, ds) = buildLetExpr pattern_expr ds
 				-*-> ("distribute_lets_in_pattern_expr", ds_lets2)
 			  ds = {ds & ds_lets = ds_lets}
@@ -719,22 +845,22 @@ where
 			// otherwise
 				= var_heap
 
-		reexamine_local_let_expr depth {cv_variable, cv_count} ds=:{ds_var_heap}
+		reexamine_local_let_expr di=:{di_depth} {cv_variable, cv_count} ds=:{ds_var_heap}
 			| cv_count >= 1
 				# (VI_LetExpression lei, ds_var_heap) = readPtr cv_variable ds_var_heap
-				| depth == lei.lei_depth
-					= distributeLetsInLetExpression depth cv_variable lei { ds & ds_var_heap = ds_var_heap }
+				| di_depth == lei.lei_depth
+					= distributeLetsInLetExpression di cv_variable lei { ds & ds_var_heap = ds_var_heap }
 					= { ds & ds_var_heap = ds_var_heap }
 				= ds
 
-distributeLetsInLetExpression :: Int VarInfoPtr LetExpressionInfo *DistributeState -> *DistributeState
+distributeLetsInLetExpression :: DistributeInfo VarInfoPtr LetExpressionInfo *DistributeState -> *DistributeState
 distributeLetsInLetExpression _ let_var_info_ptr {lei_status = LES_Moved, lei_var} ds
 	= ds -*-> ("distributeLetsInLetExpression, LES_Moved", lei_var.fv_name.id_name, let_var_info_ptr)
 distributeLetsInLetExpression _ let_var_info_ptr {lei_status = LES_Updated _, lei_var} ds
 	= ds -*-> ("distributeLetsInLetExpression, LES_Updated", lei_var.fv_name.id_name, let_var_info_ptr)
-distributeLetsInLetExpression depth let_var_info_ptr lei=:{lei_expression, lei_status = LES_Untouched, lei_var} ds=:{ds_var_heap}
+distributeLetsInLetExpression di let_var_info_ptr lei=:{lei_expression, lei_status = LES_Untouched, lei_var} ds=:{ds_var_heap}
 	# ds_var_heap = ds_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated EE}) /* to prevent doing this expr twice */ -*-> ("distributeLetsInLetExpression, LES_Untouched", lei_var.fv_name.id_name, let_var_info_ptr)
-      (lei_expression, ds) = distributeLets depth lei_expression { ds & ds_var_heap = ds_var_heap }
+      (lei_expression, ds) = distributeLets di lei_expression { ds & ds_var_heap = ds_var_heap }
 	= { ds & ds_lets = [ let_var_info_ptr : ds.ds_lets ],
 		 ds_var_heap = ds.ds_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated lei_expression })}
 
@@ -770,30 +896,30 @@ where
 
 instance distributeLets Selection
 where
-	distributeLets depth (ArraySelection selector expr_ptr expr) cp_info
-		# (expr, cp_info) = distributeLets depth expr cp_info
+	distributeLets di (ArraySelection selector expr_ptr expr) cp_info
+		# (expr, cp_info) = distributeLets di expr cp_info
 		= (ArraySelection selector expr_ptr expr, cp_info)
-	distributeLets depth (DictionarySelection var selectors expr_ptr expr) cp_info
-		# (selectors, cp_info) = distributeLets depth selectors cp_info
-		# (expr, cp_info) = distributeLets depth expr cp_info
+	distributeLets di (DictionarySelection var selectors expr_ptr expr) cp_info
+		# (selectors, cp_info) = distributeLets di selectors cp_info
+		# (expr, cp_info) = distributeLets di expr cp_info
 		= (DictionarySelection var selectors expr_ptr expr, cp_info)
-	distributeLets depth selection cp_info
+	distributeLets _ selection cp_info
 		= (selection, cp_info)
 
 instance distributeLets [a] | distributeLets a
 where
-	distributeLets depth l cp_info = mapSt (distributeLets depth) l cp_info 
+	distributeLets di l cp_info = mapSt (distributeLets di) l cp_info 
 
 instance distributeLets LetBind
 where
-	distributeLets depth bind=:{lb_src} cp_info
-		# (lb_src, cp_info) = distributeLets depth lb_src cp_info
+	distributeLets di bind=:{lb_src} cp_info
+		# (lb_src, cp_info) = distributeLets di lb_src cp_info
 		= ({ bind & lb_src = lb_src }, cp_info)
 	
 instance distributeLets (Bind a b) | distributeLets a
 where
-	distributeLets depth bind=:{bind_src} cp_info
-		# (bind_src, cp_info) = distributeLets depth bind_src cp_info
+	distributeLets di bind=:{bind_src} cp_info
+		# (bind_src, cp_info) = distributeLets di bind_src cp_info
 		= ({ bind & bind_src = bind_src }, cp_info)
 
 /*
@@ -912,10 +1038,29 @@ where
 						// default alternative is indicated by the number of the last
 						// alternative + 1
 
+:: CaseKind
+	=	CaseKindUnknown {#Char}
+	|	CaseKindGuard		// a boolean case that can be handled by the backend
+	|	CaseKindLeave		// a case that can be handled by the backend
+	|	CaseKindTransform	// a case that should be transformed
+
+instance == CaseKind where
+	(==) (CaseKindUnknown _) (CaseKindUnknown _)
+		=	True
+	(==) CaseKindGuard CaseKindGuard
+		=	True
+	(==) CaseKindLeave CaseKindLeave
+		=	True
+	(==) CaseKindTransform CaseKindTransform
+		=	True
+	(==)  _ _
+		=	False
+
 :: SplitsInCase =
 	{	sic_next_alt	:: Optional NextAlt	// the alternative of an outer default, to which
 											// control should pass
 	,	sic_splits		:: [SplitCase]		// the positions where this case should be split
+	,	sic_case_kind	:: CaseKind
 	}
 
 ::	SplitState =
@@ -949,9 +1094,7 @@ instance findSplitCases Expression where
 		=	(False, ss) <<- "findSplitCases (Exp _)"
 
 instance findSplitCases Case where
-	findSplitCases si kees=:{case_info_ptr, case_guards, case_default} ss
-		# ss
-			=	init_case_split_info case_info_ptr ss <<- "findSplitCases (Case)"
+	findSplitCases si kees=:{case_info_ptr, case_guards, case_default, case_explicit} ss
 		# (f2, ss)
 			=	split_guards {si & si_next_alt = first_next_alt, si_moved = False} use_outer_alt case_guards (False, ss)
 		# (split, ss)
@@ -963,22 +1106,7 @@ instance findSplitCases Case where
 			first_next_alt
 				=	Yes {na_case = case_info_ptr, na_alt_nr = 1}
 			use_outer_alt
-				=	use_outer_alt_for_last_alt case_default si
-
-			init_case_split_info case_info_ptr ss=:{ss_expr_heap}
-				# (case_info, ss_expr_heap)
-					=	readPtr case_info_ptr ss_expr_heap
-				# type = case_type case_info
-			  	  ss_expr_heap
-			  	  	=	ss_expr_heap <:= (case_info_ptr,
-	  			  			EI_CaseTypeAndSplits type {sic_splits = [], sic_next_alt = No})
-				=	{ss & ss_expr_heap = ss_expr_heap}
-//						->> (toString kees.case_ident, " = ", ptrToInt case_info_ptr)
-				where
-					case_type (EI_CaseTypeAndRefCounts type _)
-						=	type
-					case_type info
-						=	abort "case_type???" <<- info
+				=	use_outer_alt_for_last_alt case_default si			
 
 //			split_guards :: SplitInfo (Optional (Optional NextAlt)) CasePatterns *SplitState -> (Bool, *SplitState)
 			split_guards si use_outer_alt (AlgebraicPatterns _ alts) ss
@@ -1006,7 +1134,7 @@ instance findSplitCases Case where
 					This case has no default. If the last alternative fails,
 					control is passed to the outer case.
 				*/
-				=	Yes si // {si_next_alt, si_moved}
+				=	Yes si
 			use_outer_alt_for_last_alt (Yes _) si
 				=	No
 
@@ -1052,16 +1180,15 @@ instance findSplitCases Let where
 
 nextAlts :: SplitInfo Case *SplitState -> (Bool, *SplitState)
 nextAlts si=:{si_next_alt=Yes next_alt, si_moved} kees=:{case_info_ptr} ss
+	# (EI_CaseTypeAndSplits type splits, ss_expr_heap)
+		=	readPtr case_info_ptr ss.ss_expr_heap
 	# (jumps, ss=:{ss_expr_heap})
-		=	jumps_to_next_alt si_moved kees ss
+		=	jumps_to_next_alt si_moved splits.sic_case_kind kees {ss & ss_expr_heap = ss_expr_heap}
 	| jumps
 		// update the info for this case
-		# (EI_CaseTypeAndSplits type splits, ss_expr_heap)
-			=	readPtr case_info_ptr ss_expr_heap
-	  	  ss_expr_heap
+	  	# ss_expr_heap
 	  	  	=	ss_expr_heap <:= (case_info_ptr,
 	  	  			EI_CaseTypeAndSplits type {splits & sic_next_alt = Yes next_alt})
-
 		// update the info for the outer case
 		# (EI_CaseTypeAndSplits type splits, ss_expr_heap)
 			=	readPtr next_alt.na_case ss_expr_heap
@@ -1078,6 +1205,8 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_moved} kees=:{case_info_ptr} ss
 		=	(True, {ss & ss_expr_heap = ss_expr_heap})
 	// otherwise
 		= (False, ss)
+
+
 	where
 /* stress test, convert all cases without a default
 		jumps_to_next_alt _ {case_default = No} ss
@@ -1087,22 +1216,12 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_moved} kees=:{case_info_ptr} ss
 		jumps_to_next_alt _ {case_default = No, case_explicit = True, case_expr}
 			=	 (True, ss)	->> (toString (ptrToInt case_info_ptr) +++ " jumps, because explicit")
 */
-		jumps_to_next_alt True {case_default = No} ss
+		jumps_to_next_alt True _ {case_default = No} ss
 			=	(True, ss)	->> (toString (ptrToInt case_info_ptr) +++ " jumps, because alt was moved")
-		jumps_to_next_alt _ {case_default = No, case_explicit = False, case_expr} ss
-			| not (is_lhs_var case_expr ss.ss_var_heap)
-				=	(True, ss) ->> (toString (ptrToInt case_info_ptr) +++ " jumps, because implicit no lhs var")
-		jumps_to_next_alt moved _ ss
+		jumps_to_next_alt _ CaseKindTransform {case_default = No, case_explicit = False, case_expr} ss
+			=	(True, ss) ->> (toString (ptrToInt case_info_ptr) +++ " jumps, because implicit no lhs var")
+		jumps_to_next_alt moved _ _ ss
 			=	(False, ss) 	->> (toString (ptrToInt case_info_ptr) +++ " doesn't jumps" +++ toString moved +++ toString kees.case_explicit)
-
-		is_lhs_var (Var {var_info_ptr}) var_heap
-			= 	case sreadPtr var_info_ptr var_heap of
-					VI_LocalLetVar
-						->	False
-					_
-						->	True
-		is_lhs_var _ _
-			=	False
 
 nextAlts {si_moved} kees ss
 	=	(False, ss) ->> ("nextAlts no outerdefault" +++ toString si_moved +++ toString kees.case_explicit)
@@ -1173,10 +1292,6 @@ where
 	,	cs_expr_heap		:: !.ExpressionHeap
 	,	cs_next_fun_nr		:: !Index
 	}
-
-markLocalLetVar :: LetBind *VarHeap -> *VarHeap
-markLocalLetVar {lb_dst={fv_info_ptr}} varHeap
-	=	varHeap <:= (fv_info_ptr, VI_LocalLetVar)
 
 is_guard_case [{bp_value=BVB True,bp_expr},{bp_value=BVB False,bp_expr=false_expr}] (Yes _) False case_expr
 	= is_then_or_else bp_expr && is_then_or_else false_expr
@@ -1272,54 +1387,41 @@ instance convertRootCases TransformedBody where
 
 instance convertRootCases Expression where
 	convertRootCases ci (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) cs=:{cs_var_heap}
-		# cs = {cs & cs_var_heap = foldSt markLocalLetVar (let_strict_binds ++ let_lazy_binds) cs_var_heap}
 		# (let_strict_binds,let_lazy_binds,ci,cs) = convert_let_binds let_strict_binds let_lazy_binds let_info_ptr ci cs
-//		  (let_expr, cs)			= (if (isEmpty let_strict_binds) convertRootCases convertCases) ci let_expr cs
 		  (let_expr, cs)			= convertRootCases (if (isEmpty let_strict_binds) ci {ci & ci_case_level=CaseLevelAfterGuardRoot}) let_expr cs
 		= (Let { lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cs)
 
 	convertRootCases ci caseExpr=:(Case kees=:{case_expr, case_guards, case_default, case_explicit, case_info_ptr}) cs
-		= case case_guards of // -*-> "convertRootCases, guards???" of
-			BasicPatterns BT_Bool patterns
-				| is_guard_case patterns case_default case_explicit case_expr
-					# ({case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
-						=	splitCase ci kees cs
-					-> convert_boolean_case_into_guard ci case_expr patterns case_default case_info_ptr cs
-			_
-				-> case case_expr of
-					(Var var)
-						| not case_explicit || (case ci.ci_case_level of
-													CaseLevelAfterGuardRoot -> False 
-													_ -> True)
-							# (varInfo, cs_var_heap) = readPtr var.var_info_ptr cs.cs_var_heap
-							# cs = {cs & cs_var_heap=cs_var_heap} // -*-> varInfo
-							-> case varInfo of
-								VI_LocalLetVar
-									->	convertNonRootCase ci kees cs // -*-> "convertRootCases, no guards"
-								_
-//									| True <<- ("convertRootCases",varInfo)
-									# (kees=:{case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
-										=	splitCase ci kees cs
-									# (EI_CaseTypeAndSplits case_type _, cs_expr_heap)
-											= readPtr case_info_ptr cs.cs_expr_heap
-									# cs = {cs & cs_expr_heap=cs_expr_heap} // -*-> varInfo
-
-							  		# (case_expr, cs)	= convertCases ci case_expr cs
-									# (case_guards, cs) = convertRootCasesCasePatterns ci case_guards case_type.ct_cons_types cs
-							  		# (case_default, cs)= convertRootCases ci case_default cs
-									-> (Case {kees & case_expr=case_expr,
-												case_guards=case_guards, case_default=case_default}, cs)
-						// otherwise
-							-> convertNonRootCase ci kees cs
-					expr
-//						->	convertCases ci caseExpr cs // -*-> "convertRootCases, no guards"
-						-> convertNonRootCase ci kees cs
+		# (EI_CaseTypeAndSplits _ {sic_case_kind}, cs_expr_heap)
+			= readPtr case_info_ptr cs.cs_expr_heap
+		  cs = {cs & cs_expr_heap = cs_expr_heap}
+		| sic_case_kind == CaseKindGuard
+			=	case case_guards of
+					BasicPatterns BT_Bool patterns
+						# ({case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
+							=	splitCase ci kees cs
+						->	convert_boolean_case_into_guard ci case_expr patterns case_default case_info_ptr cs
+					_
+						->	abort "convertcases, convertRootCases: bool patterns expected"
+		| sic_case_kind == CaseKindLeave
+			# (kees=:{case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
+					=	splitCase ci kees cs
+			# (EI_CaseTypeAndSplits case_type _, cs_expr_heap)
+				= readPtr case_info_ptr cs.cs_expr_heap
+	  		# (case_expr, cs)	= convertCases ci case_expr {cs & cs_expr_heap=cs_expr_heap}
+			# (case_guards, cs) = convertRootCasesCasePatterns ci case_guards case_type.ct_cons_types cs
+	  		# (case_default, cs)= convertRootCases ci case_default cs
+			= (Case {kees & case_expr=case_expr,
+						case_guards=case_guards, case_default=case_default}, cs)
+		| sic_case_kind == CaseKindTransform
+			=	convertNonRootCase ci kees cs
+		// otherwise
+			= case sic_case_kind of
+				CaseKindUnknown label
+					->	abort ("convertRootCases, unknown casekind " +++ label)
 	where
 		convert_boolean_case_into_guard ci guard [ alt=:{bp_value=BVB sign_of_then_part,bp_expr} : alts ] case_default case_info_ptr cs
-//			# (guard, cs) = convertCases ci guard cs
 			# (guard, cs) = convert_guard guard ci cs
-//			# (EI_CaseTypeAndRefCounts case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
-//			# {cs &cs_expr_heap=cs_expr_heap}
 			# (then_part, cs) = convertRootCases {ci & ci_case_level=CaseLevelAfterGuardRoot} bp_expr cs			
 			# (opt_else_part, cs) = convert_to_else_part ci sign_of_then_part alts case_default cs
 			= (build_conditional sign_of_then_part guard then_part opt_else_part, cs)
@@ -1375,8 +1477,8 @@ splitCase ci kees=:{case_info_ptr} cs=:{cs_expr_heap}
 class split a :: ConvertInfo a (Case, CaseType, *ConvertState) -> (Case, CaseType, *ConvertState)
 
 instance split [a] | split a where
-	split ci splits (kees, case_type, cs)
-		=	foldSt (split ci) splits (kees, case_type, cs)
+	split ci splits state
+		=	foldSt (split ci) splits state
 
 instance split SplitCase where
 	split ci split=:{sc_alt_nr} (kees, case_type, cs=:{cs_expr_heap})
@@ -1385,7 +1487,7 @@ instance split SplitCase where
 		# (case_type1, case_type2)
 			=	splitIt sc_alt_nr case_type
 		# case_type_and_splits2
-			=	EI_CaseTypeAndSplits case_type2 {sic_splits = [], sic_next_alt = No}
+			=	EI_CaseTypeAndSplits case_type2 {sic_splits = [], sic_next_alt = No, sic_case_kind = CaseKindUnknown "2"}
 		# (case_info_ptr2, cs_expr_heap)
 			=	newPtr case_type_and_splits2 cs_expr_heap
 
@@ -1497,6 +1599,8 @@ convertRootCasesCasePatterns ci (BasicPatterns bt patterns) _ cs
 		=	convertRootCases ci patterns cs
 	=	(BasicPatterns bt patterns, cs)
 convertRootCasesCasePatterns ci (AlgebraicPatterns gi patterns) arg_types cs
+	| length patterns <> length arg_types
+		=	abort ("convertRootCasesCasePatterns error number of cases " +++ toString (length patterns) +++ " <> " +++ toString (length arg_types)) <<- arg_types
 	# (patterns, cs)
 		=	convertRootCasesAlgebraicPatterns ci (exactZip patterns arg_types) cs
 	=	(AlgebraicPatterns gi patterns, cs)
@@ -1700,7 +1804,8 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 
 	// otherwise
 
-	# (EI_CaseTypeAndSplits case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
+	# (EI_CaseTypeAndSplits case_type splits, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
+	  cs_expr_heap = writePtr case_info_ptr (EI_CaseTypeAndSplits case_type {splits & sic_case_kind=CaseKindLeave}) cs_expr_heap
 	  cs = { cs & cs_expr_heap = cs_expr_heap }
 
 	  (new_info_ptr, cs_var_heap) = newPtr (VI_LocalVar) cs.cs_var_heap
@@ -1903,7 +2008,7 @@ where
 	copy (NoBind ptr) cp_info
 		= (NoBind ptr, cp_info)
 	copy expr cp_info
-		= abort ("copy (Expression) does not match" -*-> expr)
+		= abort ("copy (Expression) does not match" ->> expr)
 
 instance copy (Optional a) | copy a
 where
@@ -2007,6 +2112,9 @@ where
 
 (-*->) infixl
 (-*->) a b :== a // ---> b
+
+//import RWSDebug
+
 (->>) infixl
 (->>) a b :== a // ---> b
 (<<-) infixl
