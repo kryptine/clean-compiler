@@ -38,17 +38,28 @@ revCharListToString [hd:tl] = revCharListToString tl +++ toString hd
 revCharListToString []      = ""
 */
 
-isUpperCaseName :: ! String -> Bool
-isUpperCaseName id
-	= ('A' <= c  &&  c <= 'Z') || c == '_' 
-   	  where
-   	  c =: id.[0]
+NoUnderscores		:== False
+UnderscoresAllowed	:== True
 
-isLowerCaseName :: ! String -> Bool
-isLowerCaseName id
+skipUnderscores :: !Int !Int !String -> Char
+skipUnderscores i size s
+	| i < size
+		#! c = s.[i]
+		| c == '_'
+			= skipUnderscores (i+1) size s
+			= c
+	// otherwise: i >= size
+		= '_'
+
+isUpperCaseName :: ! String !Bool -> Bool
+isUpperCaseName id underscoresAllowed
+	#! c = if underscoresAllowed (skipUnderscores 0 (size id) id) (id.[0])
+	= 'A' <= c  &&  c <= 'Z' 
+
+isLowerCaseName :: ! String !Bool -> Bool
+isLowerCaseName id underscoresAllowed
+	#! c = if underscoresAllowed (skipUnderscores 0 (size id) id) (id.[0])
 	= 'a' <= c  &&  c <= 'z' 
-   	  where
-   	  c =: id.[0]
 
 isFunnyIdName :: ! String -> Bool
 isFunnyIdName id

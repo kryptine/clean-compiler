@@ -103,7 +103,9 @@ instance <<< FilePosition
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
 
-	
+	|	ExistsToken				//		E.
+	|	ForAllToken				//		A.
+
 :: Context
 	=	GeneralContext
 	|	TypeContext

@@ -18,8 +18,11 @@ stringToCharList	:: !String -> [Char]
 charListToString	:: ![Char] -> String
 revCharListToString	:: !Int ![Char] -> String
 
-isUpperCaseName :: ! String -> Bool
-isLowerCaseName :: ! String -> Bool
+NoUnderscores		:== False
+UnderscoresAllowed	:== True
+
+isUpperCaseName :: ! String !Bool -> Bool
+isLowerCaseName :: ! String !Bool -> Bool
 isFunnyIdName 	:: ! String -> Bool
 isSpecialChar	:: ! Char	-> Bool
 
