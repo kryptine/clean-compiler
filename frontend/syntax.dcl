@@ -267,14 +267,18 @@ cNameLocationDependent :== True
 ::	GenericDef = 
 	{	gen_name		:: !Ident				// the generics name in the IC_Class
 	,	gen_member_name	:: !Ident				// the generics name in the IC_Member
-	,	gen_args		:: ![TypeVar]
-	, 	gen_arity 		:: !Int					// number of gen_args
-	,	gen_type		:: !SymbolType
+	,	gen_type		:: !GenericType
 	, 	gen_pos			:: !Position
 	, 	gen_classes		:: !GenericClassInfos 	// generated classes
 	,	gen_isomap		:: !DefinedSymbol		// isomap function
 	}
 
+:: GenericType = 
+	{	gt_type 		:: !SymbolType
+	,	gt_vars			:: ![TypeVar]			// generic arguments
+	,	gt_arity		:: !Int					// number of generic arguments	
+	}
+	
 :: GenericClassInfo = 
 	{	gci_kind 	:: !TypeKind
 	,	gci_class	:: !DefinedSymbol

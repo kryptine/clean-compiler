@@ -477,11 +477,6 @@ where
 		= iFoldSt (checkLeftRootAttributionOfTypeDef modules mod_index)
 						0 siz (as_td_infos, th_vars, as_error)
 
-
-instance == AttributeVar
-where
-	(==) av1 av2 = av1.av_info_ptr == av2.av_info_ptr
-
 instance <<< DynamicType
 where
 	(<<<) file {dt_global_vars,dt_type} = file <<< dt_global_vars <<< dt_type

@@ -1219,15 +1219,17 @@ wantGenericDefinition context pos pState
 	# pState = wantToken TypeContext "generic definition" DoubleColonToken pState
 	# (type, pState) = want_type pState		//	SymbolType
 	# pState = wantEndOfDefinition "generic definition" pState
-	# gen_def = {
-		gen_name = ident,
-		gen_member_name = member_ident, 
-		gen_type = type, 
-		gen_args = arg_vars,
-		gen_arity = length arg_vars,
-		gen_pos = pos, 
-		gen_classes = [],
-		gen_isomap = MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0
+	# gen_def = 
+		{	gen_name = ident
+		,	gen_member_name = member_ident 
+		,	gen_type = 
+				{	gt_type = type			 
+				,	gt_vars = arg_vars
+				,	gt_arity = length arg_vars
+				}
+		,	gen_pos = pos
+		,	gen_classes = []
+		,	gen_isomap = MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0
 		}
 	= (PD_Generic gen_def, pState)	
 	where
@@ -2009,29 +2011,6 @@ trySimpleExpression is_pattern pState
 
 trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 
-
-// AA..
-/*
-trySimpleExpressionT (IdentToken name) is_pattern pState
-	| isLowerCaseName name
-	# (id, pState) = stringToIdent name IC_Expression pState
-	| is_pattern
-		# (token, pState) = nextToken FunctionContext pState
-		| token == DefinesColonToken
-			# (succ, expr, pState) = trySimpleExpression is_pattern pState
-			| succ
-				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
-				= (True, PE_Empty, parseError "simple expression" No "expression" pState)
-			// token <> DefinesColonToken
-			= (True, PE_Ident id, tokenBack pState)
-		// not is_pattern
-		= (True, PE_Ident id, pState)
-trySimpleExpressionT (IdentToken name) is_pattern pState
-//	| isUpperCaseName name || ~ is_pattern
-	# (id, pState) = stringToIdent name IC_Expression pState
-	= (True, PE_Ident id, pState)
-*/
-
 trySimpleExpressionT (IdentToken name) is_pattern pState
 	| isLowerCaseName name
 	# (id, pState) = stringToIdent name IC_Expression pState
@@ -2059,8 +2038,6 @@ trySimpleExpressionT (IdentToken name) is_pattern pState
 		# (kind, pState) = wantKind pState	
 		= (True, PE_Generic id kind, pState)
 		= (True, PE_Ident id, tokenBack pState)
-
-// ..AA
 
 trySimpleExpressionT SquareOpenToken is_pattern pState
 	# (list_expr, pState) = wantListExp is_pattern pState

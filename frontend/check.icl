@@ -23,37 +23,41 @@ checkGenerics
 	| gen_index == size generic_defs
 		= (generic_defs, class_defs, type_defs, modules, type_heaps, cs)
 	// otherwise
-		# (gen_def=:{gen_name, gen_args, gen_type,gen_pos}, generic_defs) = generic_defs![gen_index]
+		# (gen_def=:{gen_name, gen_type, gen_pos}, generic_defs) = generic_defs![gen_index]
 		# position = newPosition gen_name gen_pos
 		# cs_error = setErrorAdmin position cs_error
+			//---> ("checkGenerics generic type 1", gen_type.gt_type)
 
-		# (gen_args, cs_symbol_table, th_vars, cs_error)
-		  	= add_vars_to_symbol_table gen_args cs_symbol_table th_vars cs_error
-		
 		# cs = {cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }
 		# type_heaps = {type_heaps & th_vars = th_vars}
-/*
-		# (gen_type, specials, type_defs, class_defs, modules, type_heaps, cs) =
-			checkSymbolType module_index gen_type SP_None type_defs class_defs modules type_heaps cs
-*/
-		# cs = {cs & cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope gen_args cs.cs_symbol_table}
+		//# (gt_type, _, type_defs, class_defs, modules, type_heaps, cs) =
+		//	checkSymbolType module_index gen_type.gt_type SP_None type_defs class_defs modules type_heaps cs
+		# (gt_type, type_defs, class_defs, modules, type_heaps, cs) =
+			checkMemberType module_index gen_type.gt_type type_defs class_defs modules type_heaps cs
 
-		# generic_defs = {generic_defs & [gen_index] = {gen_def & gen_type = gen_type, gen_args = gen_args}}		
+		#! {cs_error} = cs
+		#! (gt_vars, st_vars, cs_error) = split_vars gen_type.gt_vars  gt_type.st_vars cs_error
+		#! cs = {cs & cs_error = cs_error}
+		#! gt_type = {gt_type & st_vars = st_vars}
+
+		# generic_defs = {generic_defs & [gen_index] . gen_type = { gen_type & gt_vars = gt_vars, gt_type = gt_type }}				
+			//---> ("checkGenerics generic type 2", gt_type)
 		= checkGenerics (inc gen_index) module_index generic_defs class_defs type_defs modules type_heaps cs
 where	
-	add_vars_to_symbol_table [] symbol_table th_vars error = ([], symbol_table, th_vars, error)	
-	add_vars_to_symbol_table [var=:{tv_name={id_name,id_info}} : vars] symbol_table th_vars error
-	  	# (entry, symbol_table) = readPtr id_info symbol_table
-		| entry.ste_kind == STE_Empty || entry.ste_def_level < cGlobalScope
-			# (new_var_ptr, th_vars) = newPtr TVI_Empty th_vars
-			# symbol_table = NewEntry symbol_table id_info (STE_TypeVariable new_var_ptr) NoIndex cGlobalScope entry
-			# var = { var & tv_info_ptr = new_var_ptr}
-			# (vars, symbol_table, th_vars, error) = add_vars_to_symbol_table vars  symbol_table th_vars error
-			= ([var:vars], symbol_table, th_vars, error)
-		// otherwise
-			= add_vars_to_symbol_table vars symbol_table th_vars (checkError id_name "(variable) already defined" error)
-						  
-// ..AA
+	split_vars [] st_vars error
+		= ([], st_vars, error)
+	split_vars [gv:gvs] st_vars error
+		# (gv, st_vars, error) = find gv st_vars error
+		# (gvs, st_vars, error) = split_vars gvs st_vars error
+		= ([gv:gvs], st_vars, error) 
+	where
+		find gv [] error = (gv, [], checkError gv.tv_name.id_name "generic variable not used" error)
+		find gv	[st_var:st_vars] error
+			| st_var.tv_name.id_name == gv.tv_name.id_name
+				= (st_var, st_vars, error)
+				# (gv, st_vars, error) = find gv st_vars error 
+				= (gv, [st_var:st_vars], error)
+				
 
 checkTypeClasses :: !Index !Index !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*TypeHeaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*TypeHeaps, !*CheckState)
@@ -301,58 +305,6 @@ where
 			# cs = {cs & cs_error = cs_error}
 			= (ins, is, type_heaps, cs)
 						 
-/*
-checkInstanceDefs :: !Index !*{#ClassInstance} !u:{#CheckedTypeDef} !u:{#ClassDef} !u:{#MemberDef} !u:{#DclModule} !*TypeHeaps !*CheckState
-	-> (!.{#ClassInstance},!u:{#CheckedTypeDef},!u:{#ClassDef},!u:{#MemberDef},!u:{#DclModule},!.TypeHeaps,!.CheckState)
-checkInstanceDefs mod_index instance_defs type_defs class_defs member_defs modules type_heaps cs
-	# is = { is_type_defs = type_defs, is_class_defs = class_defs, is_member_defs = member_defs, is_modules = modules }
-	  (instance_defs, is, type_heaps, cs) = check_instance_defs 0 mod_index instance_defs is type_heaps cs
-	= (instance_defs, is.is_type_defs, is.is_class_defs, is.is_member_defs, is.is_modules, type_heaps, cs)
-where	
-	check_instance_defs :: !Index !Index !*{# ClassInstance} !u:InstanceSymbols !*TypeHeaps !*CheckState
-		-> (!*{# ClassInstance},!u:InstanceSymbols,!*TypeHeaps,!*CheckState)
-	check_instance_defs inst_index mod_index instance_defs is type_heaps cs
-		| inst_index < size instance_defs
-			# (instance_def, instance_defs) = instance_defs![inst_index]
-			  (instance_def, is, type_heaps, cs) = check_instance mod_index instance_def is type_heaps cs
-			= check_instance_defs (inc inst_index) mod_index { instance_defs & [inst_index] = instance_def } is type_heaps cs
-			= (instance_defs, is, type_heaps, cs)
-
-	check_instance :: !Index !ClassInstance !u:InstanceSymbols !*TypeHeaps !*CheckState -> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
-	check_instance module_index
-			ins=:{ins_members,ins_class={glob_object = class_name =: {ds_ident = {id_name,id_info},ds_arity}},ins_type,ins_specials,ins_pos,ins_ident}
-			is=:{is_class_defs,is_modules} type_heaps cs=:{cs_symbol_table}
-		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-		# (class_index, class_mod_index, class_def, is_class_defs, is_modules) = get_class_def entry module_index is_class_defs is_modules
-		  is = { is & is_class_defs = is_class_defs, is_modules = is_modules }
-		  cs = pushErrorAdmin (newPosition ins_ident ins_pos) { cs & cs_symbol_table = cs_symbol_table }
-		| class_index <> NotFound
-			| class_def.class_arity == ds_arity
-				# ins_class = { glob_object = { class_name & ds_index = class_index }, glob_module = class_mod_index}
-				  (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs)
-				  		= checkInstanceType module_index ins_class ins_type ins_specials
-								is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
-				  is = { is & is_type_defs = is_type_defs, is_class_defs = is_class_defs, is_modules = is_modules }
-				= ({ins & ins_class = ins_class, ins_type = ins_type, ins_specials = ins_specials}, is, type_heaps, popErrorAdmin cs)
-				= ( ins
-				  , is
-				  , type_heaps
-				  , popErrorAdmin { cs & cs_error = checkError id_name ("wrong arity: expected "+++toString class_def.class_arity+++" found "+++toString ds_arity) cs.cs_error }
-				  )
-			= (ins, is, type_heaps, popErrorAdmin { cs & cs_error = checkError id_name "class undefined" cs.cs_error })
-
-	get_class_def :: !SymbolTableEntry !Index v:{# ClassDef} u:{# DclModule} -> (!Index,!Index,ClassDef,!v:{# ClassDef},!u:{# DclModule})
-	get_class_def {ste_kind = STE_Class, ste_index} mod_index class_defs modules
-		# (class_def, class_defs) = class_defs![ste_index]
-		= (ste_index, mod_index, class_def, class_defs, modules)
-	get_class_def {ste_kind = STE_Imported STE_Class decl_index, ste_index, ste_def_level} mod_index  class_defs modules
-		# (dcl_mod, modules) = modules![decl_index]
-		# class_def = dcl_mod.dcl_common.com_class_defs.[ste_index]
-		= (ste_index, decl_index, class_def, class_defs, modules)
-	get_class_def _ mod_index class_defs modules
-		= (NotFound, -1/*cIclModIndex*/, abort "no class definition", class_defs, modules)
-*/
-
 checkInstances :: !Index !*CommonDefs !u:{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (![(Index,SymbolType)], !*CommonDefs, !u:{# DclModule}, !*VarHeap , !*TypeHeaps, !*CheckState)
 checkInstances mod_index icl_common=:{com_instance_defs,com_class_defs,com_member_defs,com_generic_defs,com_type_defs} modules var_heap type_heaps cs=:{cs_error}
@@ -367,19 +319,6 @@ where
 		!*VarHeap !*TypeHeaps !*CheckState
 			-> (![(Index,SymbolType)], !x:{# ClassInstance}, !w:{# ClassDef}, !v:{# MemberDef}, /*AA*/!w:{# GenericDef}, !nerd:{# CheckedTypeDef}, !u:{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
 	check_instances inst_index mod_index instance_types instance_defs class_defs member_defs generic_defs type_defs modules var_heap type_heaps cs
-/*
-		| inst_index < size instance_defs
-			# ({ins_class,ins_members,ins_type, /*AA*/ins_generic}, instance_defs) = instance_defs![inst_index]
-			# ({class_members,class_name}, class_defs, modules) = getClassDef ins_class mod_index class_defs modules
-			  class_size = size class_members
-			| class_size == size ins_members
-				# (instance_types, member_defs, modules, var_heap, type_heaps, cs) = check_member_instances mod_index ins_class.glob_module
-			  	         0 class_size ins_members class_members ins_type instance_types member_defs modules var_heap type_heaps cs
-				= check_instances (inc inst_index) mod_index instance_types instance_defs class_defs member_defs /*AA*/generic_defs modules var_heap type_heaps cs
-				= check_instances (inc inst_index) mod_index instance_types instance_defs class_defs member_defs /*AA*/generic_defs modules var_heap type_heaps
-						{ cs & cs_error = checkError class_name "different number of members specified" cs.cs_error }
-			= (instance_types, instance_defs, class_defs, member_defs, /*AA*/generic_defs, modules, var_heap, type_heaps, cs)
-*/
 // AA..
 		| inst_index < size instance_defs
 			# (instance_def=:{ins_ident,ins_is_generic, ins_pos}, instance_defs) = instance_defs![inst_index]

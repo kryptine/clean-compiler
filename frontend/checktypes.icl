@@ -800,6 +800,10 @@ where
 		 	= checkTypeContexts st_context mod_index class_defs ots oti cs
 			= check_member_contexts st_context mod_index class_defs ots oti cs
 
+// AA.. generic members do not have a context at the moment of checking
+	check_member_contexts [] mod_index class_defs ots oti cs
+		= checkTypeContexts [] mod_index class_defs ots oti cs
+// ..AA
 	check_member_contexts [tc : tcs] mod_index class_defs ots oti cs
 		# (tc, (class_defs, ots, oti, cs)) = checkTypeContext mod_index tc  (class_defs, ots, oti, cs)
 		  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope [ tv \\ (TV tv) <- tc.tc_types] cs.cs_symbol_table
@@ -1407,10 +1411,6 @@ where
 instance toVariable AttributeVar
 where
 	toVariable (STE_TypeAttribute info_ptr) ident = { av_name = ident, av_info_ptr = info_ptr }
-
-instance == AttributeVar
-where
-	(==) av1 av2 = av1.av_info_ptr == av2.av_info_ptr
 
 instance <<< DynamicType
 where

@@ -13,7 +13,7 @@ instance =< Int, Expression, {# Char}, Ident, [a] | =< a, BasicType //, (Global 
 
 instance =< Type, SymbIdent
 
-instance == BasicType, TypeVar, TypeSymbIdent, DefinedSymbol, TypeContext , BasicValue,
+instance == BasicType, TypeVar, AttributeVar, TypeSymbIdent, DefinedSymbol, TypeContext , BasicValue,
 			FunKind, (Global a) | == a, Priority, Assoc, Type, ConsVariable, SignClassification
 
 instance < MemberDef

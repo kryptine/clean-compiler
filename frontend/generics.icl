@@ -7,7 +7,6 @@ import checksupport
 import checktypes
 import check
 from transform import Group
-from type import buildCurriedType
 import analtypes
 
 :: *GenericState = {
@@ -28,29 +27,29 @@ import analtypes
 
 :: GenericTypeDefInfo  
 	= GTDI_Empty 							// no generic rep needed
-	| GTDI_Generic GenericType				// generic representataion
+	| GTDI_Generic GenericTypeRep				// generic representataion
 
 :: GenericTypeDefInfos :== {# .{GenericTypeDefInfo}}
 
-:: GenericType = {
-	gt_type 				:: !AType,			// generic type representation
-	gt_type_args			:: ![TypeVar],		// same as in td_info
-	gt_iso					:: !DefinedSymbol,	// isomorphim function index 		
-	gt_isomap_group			:: !Index, 			// isomap function group
-	gt_isomap				:: !DefinedSymbol,	// isomap function for the type
- 	gt_isomap_from			:: !DefinedSymbol,	// from-part of isomap
-	gt_isomap_to			:: !DefinedSymbol 	// to-part 
+:: GenericTypeRep = {
+	gtr_type 				:: !AType,			// generic type representation
+	gtr_type_args			:: ![TypeVar],		// same as in td_info
+	gtr_iso					:: !DefinedSymbol,	// isomorphim function index 		
+	gtr_isomap_group		:: !Index, 			// isomap function group
+	gtr_isomap				:: !DefinedSymbol,	// isomap function for the type
+ 	gtr_isomap_from			:: !DefinedSymbol,	// from-part of isomap
+	gtr_isomap_to			:: !DefinedSymbol 	// to-part 
 	}
 
 EmptyDefinedSymbol :== MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0	
 EmptyGenericType :== {
-	gt_type 		= makeAType TE TA_Multi,
-	gt_type_args	= [], 
-	gt_iso 			= EmptyDefinedSymbol, 
-	gt_isomap_group = NoIndex, 
-	gt_isomap 		= EmptyDefinedSymbol,
-	gt_isomap_from 	= EmptyDefinedSymbol,
-	gt_isomap_to 	= EmptyDefinedSymbol
+	gtr_type 		= makeAType TE TA_None,
+	gtr_type_args	= [], 
+	gtr_iso 			= EmptyDefinedSymbol, 
+	gtr_isomap_group = NoIndex, 
+	gtr_isomap 		= EmptyDefinedSymbol,
+	gtr_isomap_from 	= EmptyDefinedSymbol,
+	gtr_isomap_to 	= EmptyDefinedSymbol
 	}
 
 :: IsoDirection = IsoTo | IsoFrom
@@ -254,7 +253,7 @@ where
 		#! size_generic_defs = size generic_defs
 		| generic_index == size_generic_defs
 			= collect_in_modules (inc module_index) 0 gs_modules
-		# {gen_type={st_args, st_result}} = generic_defs . [generic_index]
+		# {gen_type={gt_type={st_args, st_result}}} = generic_defs . [generic_index]
 		# (types, gs_modules) = collect_in_modules module_index (inc generic_index) gs_modules
 		= ([at_type \\ {at_type} <- [st_result:st_args]] ++ types, gs_modules)	
 
@@ -393,13 +392,13 @@ where
 			ds_arity  = 1	
 			}
 		# gtd_info = GTDI_Generic { 
-			gt_type 		= generic_rep_type,
-			gt_type_args	= [atv_variable \\ {atv_variable} <- type_def.td_args], 
-			gt_iso 			= iso_def_sym,
-			gt_isomap_group	= NoIndex,
-			gt_isomap		= EmptyDefinedSymbol,		
-			gt_isomap_from	= EmptyDefinedSymbol,		
-			gt_isomap_to	= EmptyDefinedSymbol		
+			gtr_type 		= generic_rep_type,
+			gtr_type_args	= [atv_variable \\ {atv_variable} <- type_def.td_args], 
+			gtr_iso 			= iso_def_sym,
+			gtr_isomap_group	= NoIndex,
+			gtr_isomap		= EmptyDefinedSymbol,		
+			gtr_isomap_from	= EmptyDefinedSymbol,		
+			gtr_isomap_to	= EmptyDefinedSymbol		
 			}
 	
 		# gs_gtd_infos = {gs_gtd_infos & [glob_module, glob_object] = gtd_info} 
@@ -448,17 +447,17 @@ where
 		# (GTDI_Generic gt, gs_gtd_infos) = gs_gtd_infos ! [glob_module, glob_object]
 
 		# gtd_info = GTDI_Generic {gt & 
-			gt_isomap_from 	= { 
+			gtr_isomap_from 	= { 
 				ds_ident = {id_name="isomap_from:"+++td_name.id_name, id_info=nilPtr}, 
 				ds_index = from_fun_index, 
 				ds_arity = (td_arity + 1)
 				},
-			gt_isomap_to 	= { 
+			gtr_isomap_to 	= { 
 				ds_ident = {id_name="isomap_to:"+++td_name.id_name, id_info=nilPtr}, 
 				ds_index = to_fun_index, 
 				ds_arity = (td_arity + 1)
 				},
-			gt_isomap 		= { 
+			gtr_isomap 		= { 
 				ds_ident = {id_name="isomap:"+++td_name.id_name, id_info=nilPtr}, 
 				ds_index = rec_fun_index, 
 				ds_arity = td_arity
@@ -482,17 +481,17 @@ where
 		# {gs_modules, gs_gtd_infos} = gs
 		# (type_def=:{td_name}, gs_modules) = getTypeDef module_index type_def_index gs_modules
 		
-		# (GTDI_Generic {gt_isomap, gt_isomap_to, gt_isomap_from}, gs_gtd_infos) 
+		# (GTDI_Generic {gtr_isomap, gtr_isomap_to, gtr_isomap_from}, gs_gtd_infos) 
 			= gs_gtd_infos![module_index, type_def_index]
 		
 		# gs = { gs & gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules } 
 
 		# (from_fun_def, gs) = 
-			buildIsomapFromTo IsoFrom gt_isomap_from group_index module_index type_def_index gs
+			buildIsomapFromTo IsoFrom gtr_isomap_from group_index module_index type_def_index gs
 		# (to_fun_def, gs) = 
-			buildIsomapFromTo IsoTo gt_isomap_to group_index module_index type_def_index gs
+			buildIsomapFromTo IsoTo gtr_isomap_to group_index module_index type_def_index gs
 		# (rec_fun_def, gs) = 
-			buildIsomapForTypeDef gt_isomap group_index module_index type_def gt_isomap_from gt_isomap_to gs
+			buildIsomapForTypeDef gtr_isomap group_index module_index type_def gtr_isomap_from gtr_isomap_to gs
 		
 		# funs = [ from_fun_def, to_fun_def, rec_fun_def ]		
 		= (funs, gs)
@@ -512,8 +511,8 @@ where
 	get_group module_index type_def_index gs=:{gs_gtd_infos}
 		#! gtd_info = gs_gtd_infos . [module_index, type_def_index]
 		# (GTDI_Generic gt) = gtd_info
-		| gt.gt_isomap_group <> NoIndex // group index already allocated
-			= (gt.gt_isomap_group, gs)
+		| gt.gtr_isomap_group <> NoIndex // group index already allocated
+			= (gt.gtr_isomap_group, gs)
 					
 		# (group_index, gs=:{gs_td_infos, gs_gtd_infos}) 
 			= newGroupIndex {gs & gs_gtd_infos = gs_gtd_infos}
@@ -529,9 +528,9 @@ where
 	update_group group_index [{glob_module, glob_object}:type_def_global_indexes] gtd_infos
 		# (gtd_info, gtd_infos) = gtd_infos ! [glob_module, glob_object]
 		# (GTDI_Generic gt) = gtd_info
-		| gt.gt_isomap_group <> NoIndex 
+		| gt.gtr_isomap_group <> NoIndex 
 			= abort "sanity check: updating already updated group\n"
-		# gtd_info = GTDI_Generic {gt & gt_isomap_group = group_index }
+		# gtd_info = GTDI_Generic {gt & gtr_isomap_group = group_index }
 		# gtd_infos = {gtd_infos & [glob_module, glob_object] = gtd_info}
 		= update_group group_index type_def_global_indexes gtd_infos
 
@@ -564,12 +563,12 @@ where
 		= (new_funs ++ funs, new_groups ++ groups, generic_defs, gs)	
 
 	build_isomap module_index generic_index generic_defs gs				
-		# (generic_def=:{gen_name, gen_type, gen_arity}, generic_defs) = generic_defs ! [generic_index] 		
+		# (generic_def=:{gen_name, gen_type}, generic_defs) = generic_defs ! [generic_index] 		
 		# (fun_index, group_index, gs) = newFunAndGroupIndex gs 		
 		# def_sym = {
 			ds_ident = {id_name="isomap:"+++gen_name.id_name, id_info = nilPtr}, 
 			ds_index = fun_index, 
-			ds_arity = gen_arity
+			ds_arity = gen_type.gt_arity
 			}
 		# generic_defs = {generic_defs & [generic_index] = {generic_def & gen_isomap = def_sym}}				
 		# (fun_def, gs) = buildIsomapForGeneric def_sym group_index generic_def gs
@@ -633,8 +632,8 @@ where
 			ds_arity = member_def.me_type.st_arity
 			}
 						
-		# (fun_def, gs) = build_dummy_instance fun_def_sym group_index gs	
-		//# (fun_def, gs) = buildInstance fun_def_sym group_index instance_def generic_def gs
+		//# (fun_def, gs) = build_dummy_instance fun_def_sym group_index gs	
+		# (fun_def, gs) = buildInstance fun_def_sym group_index instance_def generic_def gs
 
 		# instance_def = { instance_def & ins_members = {fun_def_sym} }		
 		# instance_defs = {instance_defs & [instance_index] = instance_def} 
@@ -872,8 +871,8 @@ buildClassDef
 		tc_var = tc_var_ptr 				// ???
 		}
 	#! hp_type_heaps = {hp_type_heaps & th_vars = th_vars}	
-	#! (member_type, hp_type_heaps) = buildMemberType generic_def kind class_arg hp_type_heaps
-	#! member_type = { member_type & st_context = [type_context : gen_type.st_context] }
+	#! (member_type, hp_type_heaps) = buildMemberType1 generic_def kind class_arg hp_type_heaps
+	#! member_type = { member_type & st_context = [type_context : gen_type.gt_type.st_context] }
 	#! member_def = {
 		me_symb = ident,
 		me_class = {glob_module = glob_module, glob_object = class_index},
@@ -933,112 +932,274 @@ where
 0.2*/
 	copy_array array = {x \\ x <-: array}	
 
-// create an instance of a polykinded (generic) type of a given kind
-buildMemberType :: !GenericDef !TypeKind !TypeVar !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
-buildMemberType generic_def=:{gen_name,gen_type,gen_args} kind class_var type_heaps 
-	// each generic type variable is replaced by the class var
-	#! class_vars = repeatn (length gen_args) class_var		
-
-	// each free type variable is substitued by a fresh var
-	#! (fresh_st_vars, type_heaps) = mapSt subst_fresh_type_var gen_type.st_vars type_heaps 
-
-	// each generic variable is substituted by generic application
-	#! (gen_type, type_heaps) = generate_member_type gen_type gen_args kind class_vars type_heaps
-
-	// run the real susbstitution
-	#! (_, fresh_st_args, type_heaps) = substitute gen_type.st_args type_heaps
-	#! (_, fresh_st_result, type_heaps) = substitute gen_type.st_result type_heaps	
+currySymbolType :: !SymbolType !String !*TypeHeaps 
+	-> (!AType, ![AttributeVar], ![AttrInequality], !*TypeHeaps)
+currySymbolType {st_args=[], st_result} attr_var_name th
+	= (st_result, [], [], th)
+currySymbolType {st_args, st_result} attr_var_name th=:{th_attrs}
+	#! (first_cum_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"1")) th_attrs
+	#! (at, attr_vars, ais, index, th_attrs) = curry_type st_args st_result (TA_Var first_cum_av) 2 th_attrs
+	= (at, [first_cum_av:attr_vars], ais, {th & th_attrs = th_attrs})
+where
+	curry_type [] type cum_attr index th_attrs 
+		= (type, [], [], index, th_attrs)
+	curry_type [at=:{at_attribute}] type cum_attr index th_attrs
+		#! t = makeAType (at --> type) cum_attr
+		= (t, [], [], index, th_attrs) 						 
+	curry_type [at=:{at_attribute}:ats] type cum_attr index th_attrs
+		#! (next_cum_attr, avs1, ais1, index, th_attrs) = combine_attributes at_attribute cum_attr index th_attrs
+		#! (res_type, avs2, ais2, index, th_attrs) = curry_type ats type next_cum_attr index th_attrs 
+		#! t = makeAType (at --> res_type) cum_attr
+		= (t, avs1 ++ avs2, ais1 ++ ais2, index, th_attrs) 
 	
-	#! member_type = {gen_type &
-		st_vars = gen_type.st_vars ++ fresh_st_vars,
-		st_args = fresh_st_args,
-		st_result = fresh_st_result
+	combine_attributes TA_Unique cum_attr index th_attrs
+		= (TA_Unique, [], [], index, th_attrs)
+	combine_attributes (TA_Var av) (TA_Var cum_av) index th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		#! ais = [
+			{ai_offered=new_av, ai_demanded=av},
+			{ai_offered=new_av, ai_demanded=cum_av}]
+		= (TA_Var new_av, [new_av], ais, (inc index), th_attrs)
+	combine_attributes (TA_Var _) cum_attr index th_attrs
+		= (cum_attr, [], [], index, th_attrs)
+	combine_attributes _ (TA_Var cum_av) index th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		= (TA_Var new_av, [new_av], [{ai_offered=new_av, ai_demanded=cum_av}], (inc index), th_attrs)
+	combine_attributes _ cum_attr index th_attrs
+		= (cum_attr, [], [], index, th_attrs)
+
+
+currySymbolType1 :: !SymbolType !String !*TypeHeaps 
+	-> (!AType, ![AttributeVar], ![AttrInequality], !*TypeHeaps)
+currySymbolType1 {st_args=[], st_result} attr_var_name th
+	= (st_result, [], [], th)
+currySymbolType1 {st_args, st_result} attr_var_name th=:{th_attrs}
+	// TA_None indicates top-level attribute
+	#! (at, attr_vars, ais, index, th_attrs) = curry_type st_args st_result TA_None 2 th_attrs
+	= (at, attr_vars, ais, {th & th_attrs = th_attrs})
+where
+	curry_type [] type cum_attr index th_attrs 
+		= (type, [], [], index, th_attrs)
+	curry_type [at=:{at_attribute}] type cum_attr index th_attrs
+		#! t = makeAType (at --> type) (if (cum_attr == TA_None) TA_Multi cum_attr)
+		= (t, [], [], index, th_attrs)		 						 
+	curry_type [at=:{at_attribute}:ats] type cum_attr index th_attrs
+		#! (next_cum_attr, avs1, ais1, index, th_attrs) = combine_attributes at_attribute cum_attr index th_attrs
+		#! (res_type, avs2, ais2, index, th_attrs) = curry_type ats type next_cum_attr index th_attrs 
+		#! t = makeAType (at --> res_type) cum_attr
+		= (t, avs1 ++ avs2, ais1 ++ ais2, index, th_attrs) 
+	
+	combine_attributes TA_Unique cum_attr index th_attrs
+		= (TA_Unique, [], [], index, th_attrs)
+	combine_attributes (TA_Var av) (TA_Var cum_av) index th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		#! ais = [
+			{ai_offered=new_av, ai_demanded=av},
+			{ai_offered=new_av, ai_demanded=cum_av}]
+		= (TA_Var new_av, [new_av], ais, (inc index), th_attrs)
+	combine_attributes (TA_Var av) TA_None index th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		= (TA_Var new_av, [new_av], [{ai_offered=new_av, ai_demanded=av}], (inc index), th_attrs)		
+	combine_attributes (TA_Var _) cum_attr index th_attrs
+		= (cum_attr, [], [], index, th_attrs)
+	combine_attributes _ (TA_Var cum_av) index th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		= (TA_Var new_av, [new_av], [{ai_offered=new_av, ai_demanded=cum_av}], (inc index), th_attrs)
+	combine_attributes _ TA_None index th_attrs
+		#! (new_av, th_attrs) = freshAttrVar (makeIdent (attr_var_name+++"_"+++toString index)) th_attrs
+		= (TA_Var new_av, [new_av], [], (inc index), th_attrs)
+	combine_attributes _ cum_attr index th_attrs
+		= (cum_attr, [], [], index, th_attrs)
+
+
+buildMemberType1 :: !GenericDef !TypeKind !TypeVar !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
+buildMemberType1 generic_def=:{gen_name,gen_type} kind class_var th 
+
+	#! (gen_type, th) = freshGenericType gen_type th
+
+	// Collect attributes of generic variables. 
+	// The attributes are instantiated along with the variables.
+	#! (gen_vars_with_attrs, generic_avs, th) = collect_generic_var_attrs gen_type th
+	
+	// build additional arguments that emerge due to lifting
+	#! (new_args, atvss, new_avs, attr_inequalities, th) = build_args gen_type gen_vars_with_attrs kind th
+
+	#! atvss = case atvss of 
+		[] 		-> repeatn gen_type.gt_arity []
+		atvss	-> transpose atvss
+	
+	// substitute generic variables for types
+	// all non-generic variables must be left intact
+	#! th = clearSymbolType gen_type.gt_type th	
+ 	#! th = build_generic_var_substs gen_vars_with_attrs class_var atvss kind th
+	#! th = build_attr_var_substs gen_type.gt_type.st_attr_vars generic_avs kind th
+	#! (st, th) = substituteInSymbolType gen_type.gt_type th
+
+	// update generated fields
+	#! instantiation_tvs	 = [atv_variable \\ {atv_variable} <- (flatten atvss)]
+	#! st = { st &
+			st_vars 		= [class_var : instantiation_tvs ++ st.st_vars]
+		,	st_arity 		= (length new_args) + st.st_arity
+		,	st_args 		= new_args ++ st.st_args  
+		, 	st_attr_vars 	= st.st_attr_vars ++ new_avs
+		,	st_attr_env 	= st.st_attr_env ++ attr_inequalities
 		}
+	= (st, th)
+		//---> ("member type", gen_name, kind, st)
+where
 
-	= (member_type, type_heaps)
-		---> ("member type ", member_type)
-where		
-	generate_member_type :: !SymbolType ![TypeVar] !TypeKind ![TypeVar] !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
-	generate_member_type 
-			gen_type gen_args 
-			kind class_vars type_heaps
-		#! (gen_type_varss, type_heaps) = subst_generic_vars gen_args class_vars kind type_heaps
-		#! (_, fresh_st_args, type_heaps) = substitute gen_type.st_args type_heaps
-		#! (_, fresh_st_result, type_heaps) = substitute gen_type.st_result type_heaps	
+	collect_generic_var_attrs {gt_type, gt_vars} th
+		#! th = clearSymbolType gt_type th		
+		#! th = setTypeVarAttrs gt_type th
+		
+		#! (attributed_vars, (avs, th)) = mapSt get_attr gt_vars ([], th)
+			with 
+				get_attr tv=:{tv_info_ptr} (avs, th=:{th_vars})
+					#! (TVI_Attribute attr, th_vars) = readPtr tv_info_ptr th_vars
+					#! avs = (collect_attr_var attr) ++ avs
+					#! th = {th & th_vars = th_vars}
+					= (	{atv_attribute=attr, atv_variable=tv, atv_annotation=AN_None},
+						(avs, th))
+				collect_attr_var (TA_Var av)	= [av]
+				collect_attr_var _ 				= []
+					 
+		= (attributed_vars, avs, th)
 
-		#! gen_type_varss = transpose gen_type_varss
-		#! (arg_types, type_heaps) = generate_args gen_type gen_args kind gen_type_varss type_heaps
-		#! generated_symbol_type = {gen_type & 
-			st_vars = (removeDup class_vars) ++ (flatten gen_type_varss), 
-			st_args = arg_types ++ fresh_st_args,
-			st_arity = gen_type.st_arity + (length arg_types), 
-			st_result = fresh_st_result
-			}
-		= (generated_symbol_type, type_heaps)
-			//---> ("generated member type", type)
-			
-	subst_generic_vars :: ![TypeVar] ![TypeVar] !TypeKind !*TypeHeaps -> (![[TypeVar]], !*TypeHeaps) 
-	subst_generic_vars [] [] _ type_heaps = ([], type_heaps)
-	subst_generic_vars [type_var:type_vars] [class_var:class_vars] kind type_heaps
-		# (new_type_vars, type_heaps) = subst_generic_var type_var class_var kind type_heaps
-		# (new_type_varss, type_heaps) = subst_generic_vars type_vars class_vars kind type_heaps
-		= ([new_type_vars : new_type_varss], type_heaps)
-	subst_generic_vars _ _ _ type_heaps 
-		= abort "inconsistent number of type variables to be substituted"
-	
-	// create substitution of variable for cons var application
-	// a => (t a1 .. ak), where k is arity of kind	
-	subst_generic_var :: !TypeVar !TypeVar !TypeKind !*TypeHeaps -> (![TypeVar], !*TypeHeaps)
-	subst_generic_var type_var type_cons_var KindConst type_heaps=:{th_vars}
-		# th_vars = th_vars <:= (type_var.tv_info_ptr, TVI_Type (TV type_cons_var))
-		= ([], {type_heaps & th_vars = th_vars})
-			//---> ("subst var for kind *", type_var, type_cons_var) 		
-	subst_generic_var type_var type_cons_var kind=:(KindArrow kinds) type_heaps=:{th_vars}
-		# (new_vars, th_vars) = fresh_type_vars ((length kinds) - 1) type_var th_vars
-		# type = (CV type_cons_var) :@: (map (\tv -> makeAType (TV tv) TA_Multi) new_vars)
-		# th_vars = th_vars <:= (type_var.tv_info_ptr, TVI_Type type)
-		= (new_vars, {type_heaps & th_vars = th_vars})
-			//---> ("subst var for kind " +++ toString kind, type_var, type) 		
-				 										
-	fresh_type_vars :: !Int !TypeVar !*TypeVarHeap -> (![TypeVar], !*TypeVarHeap)
-	fresh_type_vars num type_var th_vars
-		= mapSt (\i st->fresh_var i type_var st) [1..num] th_vars
-		where 
-			fresh_var i type_var th_vars
-				# id_name = type_var.tv_name.id_name +++ "_" +++ (toString i)
-				# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars 
-				# var = {tv_name = {id_name = id_name, id_info = nilPtr}, tv_info_ptr = tv_info_ptr}	
-				= (var, th_vars)
-
-	subst_fresh_type_var :: !TypeVar !*TypeHeaps -> (!TypeVar, !*TypeHeaps) 
-	subst_fresh_type_var type_var=:{tv_name,tv_info_ptr} type_heaps=:{th_vars}
-		# (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars 
-		# new_type_var = {tv_name={id_name=tv_name.id_name,id_info=nilPtr}, tv_info_ptr = new_tv_info_ptr }
-		//# th_vars = writePtr tv_info_ptr (TVI_Type (TV new_type_var)) th_vars
-		# th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV new_type_var))
-		= (new_type_var, {type_heaps & th_vars = th_vars})
-
-	// generate additional arguments that appear due to lifting
-	generate_args :: !SymbolType ![TypeVar] !TypeKind ![[TypeVar]] !*TypeHeaps -> (![AType], !*TypeHeaps)				
-	generate_args gen_type gen_args KindConst _ type_heaps 
-		= ([], type_heaps)
-	generate_args gen_type gen_args (KindArrow kinds) type_varss type_heaps
-		= generate gen_type gen_args (init kinds) type_varss type_heaps
+	build_attr_var_substs avs generic_avs kind th
+ 		= foldSt build_subst (determine_attr_vars kind avs generic_avs)  th
 	where
-		generate gen_type gen_args [] [] type_heaps = ([], type_heaps)
-		generate gen_type gen_args [kind:kinds] [type_vars:type_varss] type_heaps
-			# (symbol_type, type_heaps) = generate_member_type gen_type gen_args kind type_vars type_heaps
-				//---> ("generate arg for kind " +++ toString kind, type_vars)
-			# type = curry_symbol_type symbol_type					
-			# (types, type_heaps) = generate gen_type gen_args kinds type_varss type_heaps
-			= ([type:types], type_heaps)
-		generate gen_type gen_args kinds type_varss type_heaps 
-			= abort "inconsistent kind and type var lists"   
+		determine_attr_vars KindConst avs generic_avs
+			= removeMembers avs generic_avs 
+		determine_attr_vars kind avs generic_avs
+			= avs
+		build_subst av=:{av_info_ptr} th=:{th_attrs}
+			= { th & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr (TA_Var av))}
+			
+			 
+	build_generic_var_substs [] class_var [] kind th
+		= th
+	build_generic_var_substs [gv:gvs] class_var [tvs:tvss] kind th
+		#! th = build_generic_var_subst gv class_var tvs kind th
+		#! th = build_generic_var_substs gvs class_var tvss kind th
+		= th	
 
-	curry_symbol_type :: SymbolType -> AType 
-	curry_symbol_type {st_args, st_result} 
-		#(type, _, _) = buildCurriedType st_args st_result TA_Multi [] 0
-		= type
+	build_generic_var_subst {atv_variable={tv_info_ptr}} class_var [] KindConst th=:{th_vars}
+		#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV class_var))
+		= {th & th_vars = th_vars}		
+	build_generic_var_subst {atv_variable={tv_info_ptr}} class_var atvs (KindArrow ks) th=:{th_vars}
+		#! arity = (length ks) - 1
+		| arity <> length atvs = abort "sanity check: invalid number of type variables"
+
+		#! type_args = [ makeAType (TV atv_variable) atv_attribute \\ {atv_variable, atv_attribute} <- atvs]
+		#! type = (CV class_var) :@: type_args
+		#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type type)			
+		= {th & th_vars = th_vars}
+			
+	build_args gen_type agvs KindConst th
+		= ([], [], [], [], th)
+	build_args gen_type agvs (KindArrow ks) th	
+		#! arity = (length ks) - 1
+		#! postfixes = ["_" +++ toString i \\ i <- [1..arity]]
+		#! (ats, atvss, new_avs, ais, th) = build_generic_args gen_type agvs postfixes th
+		= (ats, atvss, new_avs, ais, th)
+	
+ 	build_generic_args :: !GenericType ![ATypeVar] ![String] !*TypeHeaps 
+ 		-> (![AType], ![[ATypeVar]], ![AttributeVar], ![AttrInequality], !*TypeHeaps)
+	build_generic_args gen_type agvs [] th 
+		= ([], [], [], [], th)	
+	build_generic_args gen_type agvs [postfix:postfixes] th
+		#! (at, atvs, new_avs, ais, th) = build_generic_arg gen_type agvs postfix th
+		#! (ats, atvss, new_avs1, ais1, th) = build_generic_args gen_type agvs postfixes th
+		= ([at:ats], [atvs:atvss], new_avs ++ new_avs1, ais ++ ais1, th)  	
+ 	
+ 	build_generic_arg :: !GenericType ![ATypeVar] !String !*TypeHeaps 
+ 		-> (!AType, ![ATypeVar], ![AttributeVar], ![AttrInequality], !*TypeHeaps)
+	build_generic_arg {gt_type, gt_vars, gt_arity} agvs postfix th=:{th_vars, th_attrs}
+		#! th = clearSymbolType gt_type th
+		#! {th_vars, th_attrs} = th
+		
+		// replace all generic variables with fresh variables
+		#! (tvs, th_vars) = mapSt build_subst gt_vars th_vars			
+			with
+				build_subst gv=:{tv_name,tv_info_ptr} th_vars					
+					#! name = makeIdent (tv_name.id_name +++ postfix)
+					#! (tv, th_vars) = freshTypeVar name th_vars 					
+					#! th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv))	
+					= (tv, th_vars)
+		
+		// leave all non-generic attribute variables intact
+		#! th_attrs = foldSt build_subst gt_type.st_attr_vars th_attrs
+			with
+				build_subst av=:{av_info_ptr} th_attrs
+					= th_attrs <:= (av_info_ptr, AVI_Attr (TA_Var av))
+
+		// all attribute variables at generic arguments must be taken afresh
+		#! (attrs, (instantiated_avs, th_attrs)) = mapSt build_subst agvs ([], th_attrs)
+			with
+				build_subst {atv_attribute=TA_Unique} st = (TA_Unique, st)
+				build_subst {atv_attribute=TA_Multi} st = (TA_Multi, st)
+				build_subst {atv_attribute=TA_Var {av_name, av_info_ptr}} (avs, th_attrs)
+					#! (fresh_av, th_attrs) = freshAttrVar (makeIdent (av_name.id_name+++postfix)) th_attrs
+					#! attr = TA_Var fresh_av					
+					#! th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr attr)
+					= (attr, ([fresh_av:avs], th_attrs))
+		#! (st, th) = substituteInSymbolType gt_type {th & th_vars = th_vars, th_attrs = th_attrs}
+
+		#! atvs = [{atv_attribute=attr, atv_variable=tv, atv_annotation=AN_None} \\
+			attr 	<- attrs &
+			tv 		<- tvs]
+		
+		#! (at, curry_avs, ais, th) = currySymbolType1 st ("arg"+++postfix) th		
+		#! th = clearSymbolType gt_type th
+		= (at, atvs, instantiated_avs ++ curry_avs, ais, th)
+
+/*
+instantiateGenericVar :: !TypeAttribute !TypeVar !TypeKind !String !*TypeHeaps
+	-> (!AType, !*TypeHeaps) 
+instantiateGenericVar attr tv kind postfix th=:{th_vars, th_attrs}	
+	#! (fresh_tv, th_vars) = freshTypeVar (makeIdent tv.tv_name.id_name +++ postfix) th_vars
+	#! (fresh_attr, th_attrs) = build_fresh_attr attr postfix th_attrs    	
+	= do_it fresh_attr fresh_tv kind {th & th_vars = th_vars, th_attrs = th_attrs}
+where
+	do_it attr tv KindConst postfix th
+		= (makeAType fresh_tv fresh_attr, th)
+	
+	do_it attr tv (KindArrow kinds) postfix type_var th		
+		#! postfixes = [makeIdent ("_" +++ toString i) \\ i <- [1..(length kinds) - 1]]
+		#! (arg_types, th) = build_args attr (init kinds) postfixes th				
+		= (makeAType ((CV type_var) :@: arg_types) attr, th
+	
+	build_fresh_attr (TA_Var av) postfix th_attrs 
+		= freshAttrVar (makeIdent av.av_name.id_name +++ postfix) th_attrs
+	build_fresh_attr TA_Unique postfix th_attrs = (TA_Unique, th_attrs)
+	build_fresh_attr TA_Multi  postfix th_attrs = (TA_Multi, th_attrs)
+
+	build_args attr tv [] [] th = ([], th)
+	build_args attr tv [k:ks] [postfix:postfixes] postfix th
+		#! (t, th) = instantiateGenericVar attr tv k postfix th
+		#! (ts, th) = instantiate_generic_vars attr tv ks postfixes th 		 
+		= ([t:ts], th) 	
+		
+instantiateAType :: !AType !TypeKind !TypeVar !GenericType !TypeHeaps
+	-> (!AType, !TypeHeaps)
+instantiateAType atype=:{at_type=(TV tv)} KindConst type_var gen_type th
+	= ({atype & at_type = TV tv}, th)  	
+
+
+buildMemberType1 :: !GenericType !TypeKind !TypeVar !*TypeHeaps 
+	-> (!SymbolType, !*TypeHeaps) 
+buildMemberType1 gen_type kind class_var th
+
+	// instantiate 
+
+	#! (gen_var_types, th) = instantiate_generic_vars gen_type.gt_vars kind th
+
+	// substitute all type variables in the st_args and st_result
+
+	// build lifting arguments
+
+	// 
+*/	 
 		 
 buildGenericRepType :: !TypeRhs !PredefinedSymbols !CommonDefs 
 	-> AType
@@ -1335,8 +1496,10 @@ where
 	
 		#! ({td_arity, td_name}, gs_modules) = getTypeDef module_index type_def_index gs_modules 		
 	
-		# (arg_types, tvs1, tvs2, gs_heaps) = build_arg_types gs_predefs [1 .. td_arity] gs_heaps
-						
+		# (tvs1, gs_heaps) = mapSt (\n->build_type_var ("a"+++toString n)) [1..td_arity] gs_heaps 
+		# (tvs2, gs_heaps) = mapSt (\n->build_type_var ("b"+++toString n)) [1..td_arity] gs_heaps 
+		# (iso_args) = [buildATypeISO t1 t2 gs_predefs \\ t1 <- tvs1 & t2 <- tvs2] 
+	
 		# type_symb_ident = {
 			type_name = td_name,
 			type_index = { glob_module = module_index, glob_object = type_def_index },
@@ -1346,39 +1509,38 @@ where
 				tsp_propagation = cAllBitsClear, 
 				tsp_coercible = False
 				}
-			}				
-		# type1 = makeAType (TA type_symb_ident [makeAType (TV tv) TA_Multi \\ tv <- tvs1]) TA_Multi 
-		# type2 = makeAType (TA type_symb_ident [makeAType (TV tv) TA_Multi \\ tv <- tvs2]) TA_Multi
+			}
+			
+		# (av1, gs_heaps) = buildAttrVar "u1" gs_heaps
+		# (av2, gs_heaps) = buildAttrVar "u2" gs_heaps							
+		# type1 = makeAType (TA type_symb_ident tvs1) (TA_Var av1) 
+		# type2 = makeAType (TA type_symb_ident tvs2) (TA_Var av2)
 		# (arg_type, res_type) = case iso_dir of
 			IsoTo 	-> (type1, type2)
 			IsoFrom -> (type2, type1)
 			 
 		# symbol_type = {
-			st_vars = tvs1 ++ tvs2,
-			st_args = arg_types ++ [arg_type],
+			st_vars = 	
+				[tv \\ {at_type=(TV tv)} <- tvs1] ++ 
+				[tv \\ {at_type=(TV tv)} <- tvs2],
+			st_args = iso_args ++ [arg_type],
 			st_arity = td_arity + 1,
 			st_result = res_type,
 			st_context = [],
-			st_attr_vars = [],
+			st_attr_vars = 
+				[av \\ {at_attribute=(TA_Var av)} <- tvs1] ++ 
+				[av \\ {at_attribute=(TA_Var av)} <- tvs2] ++
+				[av1, av2],
 			st_attr_env = []
 			}
 		#! gs = {gs & gs_heaps = gs_heaps, gs_modules = gs_modules}
 		= (symbol_type, gs)
-	 	
-	build_arg_type predefs arg_no heaps
-		# (type_var1, heaps) = buildTypeVar ("a"+++toString arg_no) heaps
-		# type1 = makeAType (TV type_var1) TA_Multi
-		# (type_var2, heaps) = buildTypeVar ("b"+++toString arg_no) heaps
-		# type2 = makeAType (TV type_var2) TA_Multi
-		# iso_type = buildATypeISO type1 type2 predefs 
-		= (iso_type, type_var1, type_var2, heaps)
-		
-	build_arg_types predefs [] heaps
-		= ([], [], [], heaps)
-	build_arg_types predefs [n:ns] heaps
-		# (t, tv1, tv2, heaps) = build_arg_type predefs n heaps
-		# (ts, tvs1, tvs2, heaps) = build_arg_types predefs ns heaps
-		= ([t:ts], [tv1:tvs1], [tv2:tvs2], heaps)	
+			//---> ("isomap to/from type", symbol_type)
+	
+	build_type_var name heaps
+		# (av, heaps) = buildAttrVar name heaps 
+		# (tv, heaps) = buildTypeVar name heaps
+		= (makeAType (TV tv) (TA_Var av), heaps)	
 
 buildIsomapForTypeDef :: !DefinedSymbol !Int !Int !CheckedTypeDef !DefinedSymbol !DefinedSymbol !*GenericState
 	-> (!FunDef, !*GenericState)
@@ -1398,53 +1560,19 @@ buildIsomapForTypeDef
 
 buildIsomapForGeneric :: !DefinedSymbol !Int !GenericDef !*GenericState
 	-> (!FunDef, !*GenericState)
-buildIsomapForGeneric def_sym group_index {gen_type, gen_arity, gen_args} gs=:{gs_heaps}
-	#! arg_names = [ "iso" +++ toString n \\ n <- [1 .. gen_arity]]
+buildIsomapForGeneric def_sym group_index {gen_type} gs=:{gs_heaps}
+	#! arg_names = [ "iso" +++ toString n \\ n <- [1 .. gen_type.gt_arity]]
 	#! (arg_vars, gs_heaps) = buildFreeVars arg_names gs_heaps
-	#! curried_gen_type = curry_symbol_type gen_type
-	//#! (fun_type, gs_heaps) = build_type gen_type gen_args gs_heaps 
-	#! (body_expr, gs) = buildIsomapExpr curried_gen_type gen_args arg_vars {gs & gs_heaps = gs_heaps} 	
+	#! curried_gt_type = curry_symbol_type gen_type.gt_type
+	#! gs = {gs & gs_heaps = gs_heaps }
+	#! (body_expr, gs) = buildIsomapExpr curried_gt_type gen_type.gt_vars arg_vars gs 	
 	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] []					
 	= (fun_def, gs) 	
-where 
-/*	
-	build_type :: !SymbolType ![TypeVar ]!*GenericState -> (!SymbolType, !*GenericState)
-	build_type gen_type gen_args gs=:{gs_predefs, gs_heaps={hp_type_heaps}} 
-	
-		# (gen_type, gen_args, hp_type_vars) = fresh_generic_type gen_type gen_args hp_type_heaps
-		# (st1, hp_type_heaps) = freshSymbolType "_1" gen_type hp_type_heaps
-		# (st2, hp_type_heaps) = freshSymbolType "_2" gen_type hp_type_heaps
-			
-		# iso_args = [ buildATypeISO (makeAType (TV tv1) TA_Multi) (makeAType (TV tv2) TA_Multi) gs_predefs 
-			\\ tv1 <- st1.st_vars & tv2 <- st2.st_vars ]
-	
-		# curried_st1 = curry_symbol_type st1
-		# curried_st2 = curry_symbol_type st2		
-		# iso_result = buildATypeISO curried_st1 curried_st2 gs_predefs	
-		
-		# st = {
-				st_vars = removeDup (gen_args ++ st1.st_vars ++ st2.st_vars)
-			,	st_args = iso_args
-			,	st_arity = length iso_args
-			,	st_result = iso_result
-			,	st_context = []
-			,	st_attr_vars = removeDup (st1.st_attr_vars ++ st2.st_attr_vars)
-			,	st_attr_env = removeDup (st1.st_attr_env ++ st2.st_attr_env)
-			}
-	
-		= (st, {gs & gs_heaps.hp_type_heaps = hp_type_heaps})
-
-	fresh_generic_type gen_type=:{st_vars} gen_vars type_heaps	
-		# gen_type = { gen_type & st_vars = gen_vars ++ st_vars } 
-		# (fresh_gen_type, type_heaps) = freshSymbolType "" gen_type type_heaps
-		# (fresh_gen_vars, st_vars) = splitAt (length gen_vars) fresh_gen_type.st_vars	
-		= ({fresh_gen_type & st_vars = st_vars }, fresh_gen_vars, type_heaps) 
-*/
-
-	curry_symbol_type :: SymbolType -> AType 
-	curry_symbol_type {st_args, st_result} 
-		#(type, _, _) = buildCurriedType st_args st_result TA_Multi [] 0
-		= type
+where
+	// no uniqueness stuff is needed to build the
+	// expression using the type
+	curry_symbol_type {st_args, st_result}
+		= foldr (\x y -> makeAType (x --> y) TA_Multi) st_result st_args 
 
 // expression that does mapping of a type
 buildIsomapExpr :: !AType ![TypeVar] ![FreeVar] !*GenericState
@@ -1462,7 +1590,7 @@ where
 		# gt = case gtd_info of
 			 		(GTDI_Generic gt) -> gt
 			 		_ 	-> abort ("not a generic type " +++ type_name.id_name) 
-		# (expr, gs_heaps) = buildFunApp gs_main_dcl_module_n gt.gt_isomap arg_exprs gs_heaps			
+		# (expr, gs_heaps) = buildFunApp gs_main_dcl_module_n gt.gtr_isomap arg_exprs gs_heaps			
 		= (expr, {gs & gs_heaps = gs_heaps, gs_gtd_infos = gs_gtd_infos})
 	
 	build_expr (arg --> res) arg_type_vars arg_vars gs
@@ -1515,8 +1643,8 @@ buildInstance
 		generic_def=:{gen_name, gen_type, gen_isomap} 
 		gs=:{gs_heaps}	
 
-	#! original_arity 	= gen_type.st_arity
-	#! generated_arity 	= def_sym.ds_arity - original_arity // depends on kind
+	#! original_arity 	= gen_type.gt_type.st_arity
+	#! generated_arity 	= def_sym.ds_arity - original_arity // arity of kind
 	
 	#! generated_arg_names = [ "f"/*gen_name.id_name*/ +++ toString n \\ n <- [1 .. generated_arity]]
 	#! (generated_arg_vars, gs_heaps) = buildFreeVars generated_arg_names gs_heaps	
@@ -1524,7 +1652,7 @@ buildInstance
 	#! (original_arg_exprs, original_arg_vars, gs_heaps) = buildVarExprs original_arg_names gs_heaps	
 	#! arg_vars = generated_arg_vars ++ original_arg_vars
 	
-	#! (gt=:{gt_type, gt_type_args}, gs) = get_generic_type ins_type {gs & gs_heaps = gs_heaps } 	
+	#! (gt=:{gtr_type, gtr_type_args}, gs) = get_generic_type ins_type {gs & gs_heaps = gs_heaps } 	
 	#! gen_glob_def_sym = {
 		glob_module = ins_generic.glob_module,
 		glob_object = {
@@ -1535,15 +1663,16 @@ buildInstance
 		} 
 		
 	#! (adaptor_expr, gs)	 = build_adaptor_expr gt gen_isomap gs  
-		//---> ("generic type", gt_type)
-	#! (instance_expr, gs)	 = build_instance_expr gt_type gt_type_args generated_arg_vars gen_glob_def_sym gs 
+		//---> ("generic type", gtr_type)
+	#! (instance_expr, gs)	 = build_instance_expr gtr_type gtr_type_args generated_arg_vars gen_glob_def_sym gs 
+		//---> ("build_instance_expr", gtr_type_args, generated_arg_vars)
 	#! body_expr = (adaptor_expr @ [instance_expr]) @ original_arg_exprs
 
 	#! fun_def = makeFunction def_sym group_index arg_vars body_expr No [] []					
 	= (fun_def, gs) 	
 where
 	get_generic_type :: !InstanceType !*GenericState 
-		-> (GenericType, !*GenericState)
+		-> (GenericTypeRep, !*GenericState)
 	get_generic_type ins_type gs=:{gs_modules, gs_gtd_infos}
 		# instance_type = hd ins_type.it_types
 		# {type_index} = case instance_type of 
@@ -1554,9 +1683,9 @@ where
 		# (GTDI_Generic gt) = gtd_info 
 		= (gt, {gs & gs_gtd_infos = gs_gtd_infos, gs_modules = gs_modules})
 	
-	build_adaptor_expr {gt_iso, gt_type} gen_isomap gs=:{gs_heaps, gs_main_dcl_module_n, gs_predefs}
+	build_adaptor_expr {gtr_iso, gtr_type} gen_isomap gs=:{gs_heaps, gs_main_dcl_module_n, gs_predefs}
 		// create n iso applications 
-		# (iso_exprs, gs_heaps) = build_iso_exprs gen_isomap.ds_arity gt_iso gs_main_dcl_module_n gs_heaps		
+		# (iso_exprs, gs_heaps) = build_iso_exprs gen_isomap.ds_arity gtr_iso gs_main_dcl_module_n gs_heaps		
 		# (isomap_expr, gs_heaps) = buildFunApp gs_main_dcl_module_n gen_isomap iso_exprs gs_heaps
 		# sel_expr = buildIsoFromSelectionExpr isomap_expr gs_predefs 
 		= (sel_expr, {gs & gs_heaps = gs_heaps})
@@ -1722,6 +1851,10 @@ buildTypeVar name heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}}
 	# (tv, th_vars) = freshTypeVar {id_name=name,id_info=nilPtr} th_vars
 	= (	tv, {heaps & hp_type_heaps = {hp_type_heaps & th_vars = th_vars}})
 
+buildAttrVar name heaps=:{hp_type_heaps=hp_type_heaps=:{th_attrs}}
+	# (av, th_attrs) = freshAttrVar {id_name=name,id_info=nilPtr} th_attrs
+	= (	av, {heaps & hp_type_heaps = {hp_type_heaps & th_attrs = th_attrs}})
+
 freshTypeVar :: !Ident  !*TypeVarHeap -> (!TypeVar, !*TypeVarHeap) 
 freshTypeVar name th_vars 
 	# (info_ptr, th_vars) = newPtr TVI_Empty th_vars
@@ -1731,6 +1864,7 @@ freshAttrVar :: !Ident !*AttrVarHeap -> (!AttributeVar, !*AttrVarHeap)
 freshAttrVar name th_attrs
 	# (info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
 	= ({av_name = name, av_info_ptr = info_ptr}, th_attrs)
+
 
 freshSymbolType :: String !SymbolType !*TypeHeaps -> (!SymbolType, !*TypeHeaps) 
 freshSymbolType postfix st type_heaps
@@ -1768,6 +1902,78 @@ where
 		# (avs, th_attrs) = mapSt (subst_attr_var postfix) avs th_attrs
 		= (avs, {type_heaps & th_attrs = th_attrs})
 
+// all variables are taken afresh
+freshGenericType :: !GenericType !*TypeHeaps
+	-> (!GenericType, !*TypeHeaps)
+freshGenericType gen_type=:{gt_type, gt_vars, gt_arity} type_heaps
+	// set variables that have to be taken fresh, i.e. 
+	// both generic variables and non-variables
+	# {st_vars} = gt_type	
+	# symbol_type = { gt_type & st_vars = gt_vars ++ st_vars } 
+	# (fresh_symbol_type, type_heaps) = freshSymbolType "" symbol_type type_heaps
+		
+	// split fresh variables into generic and non-generic variables
+	# (fresh_gt_vars, st_vars) = splitAt gt_arity fresh_symbol_type.st_vars
+	# fresh_gen_type = { gen_type & 
+		gt_vars = fresh_gt_vars, gt_type = {fresh_symbol_type & st_vars = st_vars}}
+	= (fresh_gen_type, type_heaps) 
+
+// Only generic variables are taken afresh
+// Non generic variables are supposed to be shared by
+// generic subtypes of a type
+freshGenericSubtype :: !String !GenericType !*TypeHeaps
+	-> (!GenericType, !*TypeHeaps)
+freshGenericSubtype postfix gen_type=:{gt_vars, gt_type, gt_arity} type_heaps 
+	// set variables that have to be taken afresh, i.e. generic variables
+	#! {st_vars} = gt_type
+	#! symbol_type = {gt_type & st_vars = gt_vars}
+
+	#! (fresh_symbol_type, type_heaps) = freshSymbolType postfix symbol_type type_heaps
+		
+	// restore non-generic variables 
+	#! fresh_gt_vars = fresh_symbol_type.st_vars
+	#! fresh_gen_type = { gen_type & 
+		gt_vars = fresh_gt_vars, gt_type = {fresh_symbol_type & st_vars = st_vars}}
+	= (fresh_gen_type, type_heaps)
+
+
+clearAType :: !AType !*TypeHeaps -> !*TypeHeaps 		
+clearAType type th=:{th_vars, th_attrs}
+	#! th_vars	 = performOnTypeVars initializeToTVI_Empty type th_vars
+	#! th_attrs  = performOnAttrVars initializeToAVI_Empty type th_attrs
+	= {th & th_vars = th_vars, th_attrs = th_attrs}			
+
+clearSymbolType :: !SymbolType !*TypeHeaps -> !*TypeHeaps
+clearSymbolType {st_args, st_result} th
+	#! th = foldSt clearAType st_args th
+	= clearAType st_result th
+
+substituteInSymbolType :: !SymbolType !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
+substituteInSymbolType st=:{st_args, st_result, st_attr_env, st_context} th
+	#! (_, st_args, th) 		= substitute st.st_args th
+	#! (_, st_result, th) 		= substitute st.st_result th	
+	#! (_, st_context, th) 	= substitute st.st_context th	
+	#! (_, st_attr_env, th)	= substitute st.st_attr_env th		
+	#! st = { st &
+		st_args = st_args,
+		st_result = st_result,
+		st_context = st_context,
+		st_attr_env = st_attr_env
+		}
+	= (st, th)	
+
+// sets ATV_Attribute in all variables
+setTypeVarAttrs :: !SymbolType !*TypeHeaps -> !*TypeHeaps
+setTypeVarAttrs {st_args, st_result} th=:{th_vars}
+	#! th_vars = foldSt set_in_atype st_args th_vars
+	#! th_vars = set_in_atype st_result th_vars
+	= {th & th_vars = th_vars}
+where
+	set_in_atype at th_vars
+		= performOnTypeVars on_type_var at th_vars
+	on_type_var ta tv=:{tv_info_ptr} th_vars
+		= writePtr tv_info_ptr (TVI_Attribute ta) th_vars
+		
 buildPredefTypeApp :: !Int [AType] !PredefinedSymbols -> !AType
 buildPredefTypeApp predef_index args predefs
 	# {pds_ident, pds_module, pds_def} = predefs.[predef_index]
@@ -2129,7 +2335,8 @@ buildBoundVarExprs [free_var:free_vars] heaps
 	= ([expr:exprs], [free_var:free_vars], heaps)
 
 
-
+makeIdent :: String -> Ident
+makeIdent str = {id_name = str, id_info = nilPtr} 
 
 transpose []             = []
 transpose [[] : xss]     = transpose xss

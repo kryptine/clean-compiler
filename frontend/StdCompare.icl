@@ -7,6 +7,12 @@ instance == TypeVar
 where
 	(==) varid1 varid2 = varid1.tv_info_ptr == varid2.tv_info_ptr
 
+//AA..
+instance == AttributeVar 
+where
+	(==) varid1 varid2 = varid1.av_info_ptr == varid2.av_info_ptr
+//..AA
+
 instance == FunKind
 where
 	(==) fk1 fk2 = equal_constructor fk1 fk2
