@@ -436,7 +436,8 @@ cIsALocalVar	:== False
 				VI_Default !Int | VI_Indirection !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
-				VI_Extended !ExtendedVarInfo !VarInfo
+				VI_Extended !ExtendedVarInfo !VarInfo |
+				VI_Defined /* for marking type code variables during overloading */ | VI_LocallyDefined
 
 ::	ExtendedVarInfo = EVI_VarType !AType
 

@@ -1182,15 +1182,15 @@ where
 				{ prop_type_heaps = ts_type_heaps, prop_td_infos = ts_td_infos,
 				  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = ts_error}
 		  (st_result, _, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error,prop_attr_env}) = addPropagationAttributesToAType common_defs st_result ps
-		  ft = { ft & st_args = st_args, st_result = st_result, st_attr_vars = prop_attr_vars, st_attr_env = prop_attr_env }
+		  ft_with_prop = { ft & st_args = st_args, st_result = st_result, st_attr_vars = prop_attr_vars, st_attr_env = prop_attr_env }
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (prop_type_heaps.th_vars, ts.ts_expr_heap)
-		  (fresh_fun_type, cons_variables, ts) = freshSymbolType cWithoutFreshContextVars ft common_defs { ts & ts_type_heaps = { prop_type_heaps & th_vars = th_vars }, ts_expr_heap = ts_expr_heap,
+		  (fresh_fun_type, cons_variables, ts) = freshSymbolType cWithoutFreshContextVars ft_with_prop common_defs { ts & ts_type_heaps = { prop_type_heaps & th_vars = th_vars }, ts_expr_heap = ts_expr_heap,
 		  		 ts_td_infos = prop_td_infos, ts_error = prop_error }
 		  (lifted_args, ts) = fresh_non_unique_type_variables fun_lifted [] ts
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
 		  		= fresh_dynamics fi_dynamics (ts.ts_var_store, ts.ts_type_heaps, ts.ts_var_heap, ts.ts_expr_heap, pre_def_symbols)
 		= (pre_def_symbols, [ cons_variables : req_cons_variables],
-				{ ts & ts_fun_env = { ts.ts_fun_env & [fun] = SpecifiedType ft lifted_args
+				{ ts & ts_fun_env = { ts.ts_fun_env & [fun] = SpecifiedType ft_with_prop lifted_args
 					{ fresh_fun_type & tst_arity = st_arity + fun_lifted, tst_args = lifted_args ++ fresh_fun_type.tst_args, tst_lifted = fun_lifted }},
 						ts_var_heap = ts_var_heap, ts_var_store = ts_var_store, ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps })
 	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}} (pre_def_symbols, req_cons_variables, ts)
