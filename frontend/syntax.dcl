@@ -129,7 +129,7 @@ NotALevel 	:==  -1
 
 ::	CollectedLocalDefs =
 	{	loc_functions	:: !IndexRange
-	,	loc_nodes		:: ![(Optional SymbolType, NodeDef ParsedExpr)]
+	,	loc_nodes		:: ![NodeDef ParsedExpr]
 	}
 
 ::	NodeDef dst =

@@ -281,10 +281,10 @@ where
 		  (range, ca) = addFunctionsRange fun_defs ca
 		= (CollectedLocalDefs { loc_functions = range, loc_nodes = node_defs }, ca)
 	where
-		reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
+		reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[NodeDef ParsedExpr],*CollectAdmin)
 		reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
 			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-			= (fun_defs, [(No, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
+			= (fun_defs, [{ nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
 		reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
 			# prio = if is_infix (Prio NoAssoc 9) NoPrio
 			  fun_arity = length args
@@ -292,6 +292,7 @@ where
 			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 			= ([ fun : fun_defs ], node_defs, ca)
+
 		reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 			= case defs of
 				[PD_Function pos name is_infix args rhs fun_kind : _]
@@ -302,21 +303,29 @@ where
 						  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type pos
 						-> ([fun : fun_defs], node_defs, ca)
 						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
-				[PD_NodeDef pos pattern=:(PE_Ident id)  {rhs_alts,rhs_locals} : defs]
-					| belongsToTypeSpec name1 prio id False
-						# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-						-> (fun_defs, [(type, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
+				[PD_NodeDef pos pattern=:(PE_Ident id) rhs : defs]
+					| not (belongsToTypeSpec name1 prio id False)
 						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+					| arity type<>0
+						-> reorganiseLocalDefinitions defs (postParseError pos "this alternative has not enough arguments" ca)
+					# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+					  fun = MakeNewImpOrDefFunction icl_module id 0 
+					  				[{ pb_args = [], pb_rhs = rhs, pb_position = pos }]
+					  				(FK_Function cNameNotLocationDependent) prio type pos
+					-> ([fun : fun_defs], node_defs, ca)
 				_
 					-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
+		  where
+			arity (Yes {st_arity}) = st_arity
+			arity No = 2 // it was specified as infix
 		reorganiseLocalDefinitions [] ca
 			= ([], [], ca)
 
-		collect_functions_in_node_defs :: [(Optional SymbolType,NodeDef ParsedExpr)] *CollectAdmin -> ([(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
-		collect_functions_in_node_defs [ (node_def_type, bind) : node_defs ] ca
+		collect_functions_in_node_defs :: [NodeDef ParsedExpr] *CollectAdmin -> ([NodeDef ParsedExpr],*CollectAdmin)
+		collect_functions_in_node_defs [ bind : node_defs ] ca
 			# (bind, ca) = collectFunctions bind icl_module ca
 			  (node_defs, ca) = collect_functions_in_node_defs node_defs ca
-			= ([(node_def_type, bind):node_defs], ca)
+			= ([bind:node_defs], ca)
 		collect_functions_in_node_defs [] ca
 			= ([], ca)
 // RWS ... +++ remove recollection
@@ -433,7 +442,6 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
 		  transformed_generator
 		  	=	{	tg_expr = PE_Tuple [PE_Basic (BVI "0"), PE_List [PE_Ident usize, gen_expr]]
 		  		,	tg_lhs_arg = PE_Tuple [i, PE_Tuple [n, array]]
-// MW50		  		,	tg_case_end_expr = PE_List [PE_Ident smaller, i, n]
 		  		,	tg_case_end_expr = PE_List [PE_List [PE_Ident smaller], i, n]
 		  		,	tg_case_end_pattern = PE_Basic (BVB True)
 				,	tg_element = PE_List [PE_Ident uselect, array, i]
@@ -453,11 +461,10 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
 	,	tq_success :: ParsedExpr
 	,	tq_end :: ParsedExpr
 	,	tq_fun_id :: Ident
-	,	tq_fun_pos :: !Position // MW3++
+	,	tq_fun_pos :: !Position
 	}
 
 transformQualifier :: Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
-//MW3 was:transformQualifier {qual_generators, qual_filter, qual_position} ca
 transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators, ca)
 		=	mapSt transformGenerator qual_generators ca
@@ -471,7 +478,7 @@ transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} 
 		,	tq_success = PE_Empty
 		,	tq_end = PE_Empty
 		,	tq_fun_id = qual_fun_id
-		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
+		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line
 		}, ca)
 
 // =array&callArray are misnomers (can also be records)
@@ -489,7 +496,7 @@ transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_pos
 		,	tq_success = PE_Empty
 		,	tq_end = PE_Empty
 		,	tq_fun_id = qual_fun_id
-		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
+		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line
 		}, ca)
 
 transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
@@ -544,7 +551,7 @@ computeLength qualifiers qual_position qual_filename ca
 	  	=	makeConsExpression PE_WildCard (PE_Ident tail_ident) ca
 	  (inc, ca)
 		=	get_predef_id PD_IncFun ca
-	  new_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
+	  new_fun_pos = LinePos qual_filename qual_position.lc_line
 	  parsedFunction1
 		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] 
 						(exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
@@ -580,15 +587,11 @@ transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca
 makeComprehensions :: [TransformedQualifier] ParsedExpr (Optional ParsedExpr) *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 makeComprehensions [] success _ ca
 	=	(success, ca)
-// MW3 was:makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id} : qualifiers] success threading ca
 makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
 	# (success, ca)
 		=	makeComprehensions qualifiers success threading ca
-// MW3 was:  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id ca
   	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id tq_fun_pos ca
 	where
-// MW3 was:		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr (Optional ParsedExpr) ParsedExpr Ident *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-// MW3 was:		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident ca
 		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr
 									(Optional ParsedExpr) ParsedExpr Ident Position *CollectAdmin 
 								 -> (ParsedExpr, *CollectAdmin)
@@ -603,16 +606,12 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 			  failure
 				=	continue
 			  rhs
-// MW4 was:			  	=	build_rhs generators success optional_filter failure end
 			  	=	build_rhs generators success optional_filter failure end fun_pos
 			  parsed_def
-// MW3 was:			  	=	MakeNewParsedDef fun_ident lhsArgs rhs 
 			  	=	MakeNewParsedDef fun_ident lhsArgs rhs fun_pos
 			= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) call_comprehension, ca)
 
-// MW4 was:		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
 		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
-// MW4 was:		build_rhs [generator : generators] success optional_filter failure end
 		build_rhs [generator : generators] success optional_filter failure end fun_pos
 			=	case_with_default generator.tg_case1 generator.tg_case_end_expr generator.tg_case_end_pattern
 					(foldr (case_end end)
@@ -626,7 +625,6 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 							Yes filter
 								->	optGuardedAltToRhs (GuardedAlts [
 										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
-// MW4 was:												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []}}] No)
 												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs [], ewl_position = NoPos },
 											alt_ident = { id_name ="_f;" +++ toString line_nr +++ ";", id_info = nilPtr },
 											alt_position = NoPos}] No)
@@ -735,7 +733,6 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 	  hash_table = ca_hash_table
 	  pea_file = ca_error.pea_file
 	  predefs = ca_u_predefs
-// MW3 was:	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module hash_table pea_file searchPaths predefs files
 	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module import_file_position hash_table pea_file searchPaths predefs files
 	# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
 	| parse_ok
@@ -860,12 +857,6 @@ fun_kind_to_def_or_imp_fun_kind icl_module FK_Macro
 fun_kind_to_def_or_imp_fun_kind icl_module FK_Caf = FK_ImpCaf
 fun_kind_to_def_or_imp_fun_kind icl_module FK_Unknown = FK_DefOrImpUnknown
 
-/* MW3 was
-// +++ position
-MakeNewParsedDef ident args rhs 
-	:==	PD_Function NoPos ident False args rhs (FK_Function cNameLocationDependent)
-*/
-// +++ position <------------ AHAAAAAAAAAAA !!!!!!!!!!!!!
 MakeNewParsedDef ident args rhs pos
 	:==	PD_Function pos ident False args rhs (FK_Function cNameLocationDependent)
 
@@ -877,9 +868,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 		  (bodies, new_fun_kind, rest_defs, ca) = collectFunctionBodies fun_name fun_arity fun_prio new_fun_kind defs ca
 		  act_arity	= length args
 		| fun_arity == act_arity
-// MW4 was:			= ([{ pb_args = args, pb_rhs = rhs } : bodies ], new_fun_kind, rest_defs, ca)
 			= ([{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ], new_fun_kind, rest_defs, ca)
-// MW4 was:			= ([{ pb_args = args, pb_rhs = rhs } : bodies ], new_fun_kind, rest_defs, 
 			= ([{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ], new_fun_kind, rest_defs, 
 			    postParseError pos	("This alternative has " + toString act_arity +
 			  						 (if (act_arity == 1)" argument instead of " " arguments instead of ") + toString fun_arity
