@@ -53,6 +53,8 @@ import RWSDebug
 				::	!.ErrorAdmin
 		,	ec_tc_state
 				::	!.TypesCorrespondState
+		,	ec_untransformed
+				::	!(!Int, !{ FunDef })
 		}
 		
 :: ExpressionsCorrespondMonad
@@ -82,9 +84,9 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
+compareDefImp :: !(!Int, !{FunDef}) !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
 				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin)
-compareDefImp dcl_modules icl_module heaps error_admin
+compareDefImp untransformed dcl_modules icl_module heaps error_admin
 	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
 	= case main_dcl_module.dcl_conversions of
 		No	-> (dcl_modules, icl_module, heaps, error_admin)
@@ -98,7 +100,7 @@ compareDefImp dcl_modules icl_module heaps error_admin
 				com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
 				com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
 					= icl_common
-			  (icl_type_defs, icl_com_type_defs) = copy icl_com_type_defs
+			  (icl_type_defs, icl_com_type_defs) = memcpy icl_com_type_defs
 			  tc_state
 			  		=	{ tc_type_vars = initial_hwn th_vars
 						, tc_attr_vars = initial_hwn th_attrs
@@ -125,11 +127,10 @@ compareDefImp dcl_modules icl_module heaps error_admin
 			  (icl_com_instance_defs, tc_state, error_admin)
 					= compareWithConversions conversion_table.[cInstanceDefs]
 						dcl_common.com_instance_defs icl_com_instance_defs tc_state error_admin
-/* XXX macro comparision doesn't work yet
 			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
-					= compareMacrosWithConversion conversion_table.[cMacroDefs] dcl_macros
+					= compareMacrosWithConversion conversion_table.[cMacroDefs] dcl_macros untransformed
 								 				 icl_functions hp_var_heap hp_expression_heap tc_state error_admin
-*/
+
 			  (icl_functions, tc_state, error_admin)
 			  		= compareFunctionTypesWithConversions conversion_table.[cFunctionDefs]
 			  			dcl_functions icl_functions tc_state error_admin
@@ -145,17 +146,11 @@ compareDefImp dcl_modules icl_module heaps error_admin
 			-> ( tc_dcl_modules, { icl_module & icl_common = icl_common, icl_functions = icl_functions },
 					heaps, error_admin )
   where
-	copy original
+	memcpy :: !*{#CheckedTypeDef} -> (!.{CheckedTypeDef}, !.{#CheckedTypeDef})
+	memcpy original
 		#! size = size original
 		# new = createArray size (abort "don't make that array strict !")
-		= memcpy size new original
-	memcpy :: !Int !*{CheckedTypeDef} !*{#CheckedTypeDef} -> (!.{CheckedTypeDef}, !.{#CheckedTypeDef})
-	memcpy 0 dst src
-		= (dst, src)
-	memcpy i dst src
-		# i1 = i-1
-		  (src_i1, src) = src![i1]
-		= memcpy i1 { dst & [i1] = src_i1 } src		  
+		= iFoldSt (\i (dst, src=:{[i]=src_i}) -> ({ dst & [i] = src_i }, src)) 0 size (new, original)
 
 compareWithConversions conversions dclDefs iclDefs tc_state error_admin 
 	= iFoldSt (compareWithConversion conversions dclDefs) 0 (size conversions) (iclDefs, tc_state, error_admin)
@@ -164,7 +159,10 @@ compareWithConversion :: !w:(a x:Int) !.(b c) !Int !(!u:(d c), !*TypesCorrespond
 						-> (!v:(d c), !.TypesCorrespondState, !.ErrorAdmin)
 						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c & Array .d & Array .a, [u <= v, w <= x];
 compareWithConversion conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
-	# (iclDef, iclDefs) = iclDefs![conversions.[dclIndex]]
+	# icl_index = conversions.[dclIndex]
+	| icl_index==dclIndex
+		= (iclDefs, tc_state, error_admin)
+	# (iclDef, iclDefs) = iclDefs![icl_index]
 	  (corresponds, tc_state) = t_corresponds dclDefs.[dclIndex] iclDef tc_state
 	| corresponds
 		= (iclDefs, tc_state, error_admin)
@@ -208,12 +206,13 @@ generate_error message iclDef iclDefs tc_state error_admin
 	  error_admin = checkError ident_pos.ip_ident message error_admin
 	= (iclDefs, tc_state, popErrorAdmin error_admin)
 
-compareMacrosWithConversion conversions macro_range icl_functions var_heap expr_heap tc_state error_admin
+compareMacrosWithConversion conversions macro_range untransformed icl_functions var_heap expr_heap tc_state error_admin
 	#! nr_of_functions = size icl_functions
 	# correspondences = createArray nr_of_functions cNoCorrespondence
 	  ec_state = { ec_correspondences = correspondences, ec_var_heap = initial_hwn var_heap, 
 	  				ec_expr_heap = expr_heap, ec_icl_functions = icl_functions,
-	  				ec_error_admin = error_admin, ec_tc_state = tc_state }
+	  				ec_error_admin = error_admin, ec_tc_state = tc_state,
+	  				ec_untransformed = untransformed }
 	  ec_state = iFoldSt (compareMacroWithConversion conversions macro_range.ir_from) macro_range.ir_from macro_range.ir_to
 	  						ec_state
 	  {ec_icl_functions, ec_var_heap, ec_expr_heap, ec_error_admin, ec_tc_state} = ec_state
@@ -224,15 +223,32 @@ compareMacroWithConversion conversions ir_from dclIndex ec_state
 
 compareTwoMacroFuns :: !.Int !.Int !*ExpressionsCorrespondState -> .ExpressionsCorrespondState;
 compareTwoMacroFuns dclIndex iclIndex
-					ec_state=:{ec_correspondences, ec_icl_functions, ec_error_admin}
+					ec_state=:{ec_correspondences, ec_icl_functions, ec_untransformed}
+	| dclIndex==iclIndex
+		= ec_state
 	# (dcl_function, ec_icl_functions) = ec_icl_functions![dclIndex]
 	  (icl_function, ec_icl_functions) = ec_icl_functions![iclIndex]
 	  ec_correspondences = { ec_correspondences & [dclIndex]=iclIndex, [iclIndex]=dclIndex }
+	  ec_state = { ec_state & ec_correspondences = ec_correspondences, ec_icl_functions = ec_icl_functions }
+	  need_to_be_compared
+	  		= case (dcl_function.fun_body, icl_function.fun_body) of
+	  			(TransformedBody _, CheckedBody _)
+					// the macro definition in the icl module is not used, so we don't need to compare
+	  				-> False
+	  			_	-> True
+	| not need_to_be_compared
+		= ec_state
+	# adjusted_icl_function
+	  		= case (dcl_function.fun_body, icl_function.fun_body) of
+	  			(CheckedBody _, TransformedBody _)
+					// the macro definition in the icl module is has been transformed but not the dcl
+					// module's definition: use the untransformed icl original for comparision
+	  				# (offset, untransformed_icl_functions) = ec_untransformed
+	  				-> untransformed_icl_functions.[iclIndex-offset]
+	  			_	-> icl_function
 	  ident_pos = getIdentPos dcl_function
-	  ec_error_admin = pushErrorAdmin ident_pos ec_error_admin
-	  ec_state = { ec_state & ec_correspondences = ec_correspondences, 
-	  					ec_icl_functions = ec_icl_functions, ec_error_admin = ec_error_admin }
-	  ec_state = e_corresponds dcl_function icl_function ec_state
+	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
+	  ec_state = e_corresponds dcl_function adjusted_icl_function { ec_state & ec_error_admin = ec_error_admin }
 	= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
 
 instance getIdentPos (TypeDef a) where
@@ -266,7 +282,9 @@ instance getIdentPos FunDef where
 instance CorrespondenceNumber VarInfo where
 	toCorrespondenceNumber (VI_CorrespondenceNumber number)
 		=	CorrespondenceNumber number
-	toCorrespondenceNumber VI_Empty
+	toCorrespondenceNumber _
+		// VarInfoPtrs are not initialized in this module. This doesnt harm because VI_CorrespondenceNumber should
+		// not be used outside this module 
 		=	Unbound
 		
 	fromCorrespondenceNumber number
@@ -350,12 +368,6 @@ instance t_corresponds (TypeDef TypeRhs) where
 		= t_corresponds_TypeDef dclDef iclDef
 	  where
 		t_corresponds_TypeDef dclDef iclDef tc_state
-		// sanity check ...
-			| dclDef.td_arity <> length dclDef.td_args
-				= undef <<- "t_corresponds (TypeDef): dclDef.td_arity <> length dclDef.td_args"
-			| iclDef.td_arity <> length iclDef.td_args
-				= undef <<- "t_corresponds (TypeDef): iclDef.td_arity <> length iclDef.td_args"
-		// ... sanity check
 			# tc_state = { tc_state & tc_visited_syn_types.[dclDef.td_index] = True }
 			  tc_state = init_attr_vars dclDef.td_attrs tc_state 
 			  tc_state = init_attr_vars iclDef.td_attrs tc_state 
@@ -548,17 +560,8 @@ instance t_corresponds Type where
 		=	t_corresponds dclDef iclDef
 	t_corresponds (GTV dclDef) (GTV iclDef)
 		=	t_corresponds dclDef iclDef
-	t_corresponds dclDef iclDef
-		= type_var_bindings_correspond dclDef iclDef
-	  where
-		type_var_bindings_correspond (TV {tv_info_ptr}) icl_type tc_state
-			#! tvi = sreadPtr tv_info_ptr tc_state.tc_type_vars.hwn_heap
-			= case tvi of
-				TVI_Type dcl_type
-					-> t_corresponds dcl_type icl_type tc_state
-				_	-> (True, tc_state)
-		type_var_bindings_correspond _ _ tc_state
-			= (False, tc_state)
+	t_corresponds _ _
+		= return False
 		
 instance t_corresponds ConsVariable where
 	t_corresponds (CV dclVar) (CV iclVar)
@@ -700,12 +703,15 @@ instance e_corresponds DefinedSymbol where
 		= equal2 dclDef.ds_ident iclDef.ds_ident
 
 instance e_corresponds FunDef where
+	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
-		= e_corresponds (fromBody dclDef.fun_body) (fromBody iclDef.fun_body)
+//		| False--->("compare", dclDef, iclDef)
+//			= undef
+		=	e_corresponds (from_body dclDef.fun_body) (from_body iclDef.fun_body)
 	  where
-		fromBody (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
-		fromBody (CheckedBody {cb_args, cb_rhs}) = (cb_args, cb_rhs)
-		
+		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
+		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, cb_rhs)
+
 instance e_corresponds TransformedBody where
 	e_corresponds dclDef iclDef
 		=	e_corresponds dclDef.tb_args iclDef.tb_args
@@ -767,6 +773,8 @@ instance e_corresponds Expression where
 		= e_corresponds dcl icl
 	e_corresponds (TypeCodeExpression dcl) (TypeCodeExpression icl)
 		= e_corresponds dcl icl
+	e_corresponds EE EE
+		= do_nothing
 	e_corresponds _ _
 		= give_error ""
 
