@@ -562,16 +562,12 @@ instance declareVars FreeVar where
 	declareVars freeVar (_, varHeap)
 		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
 
-// MW0instance declareVars (Bind Expression FreeVar) where
 instance declareVars LetBind where
-// MW0	declareVars :: (Bind Expression FreeVar) !DeclVarsInput -> BackEnder
 	declareVars :: LetBind !DeclVarsInput -> BackEnder
-// MW0	declareVars {bind_src=App {app_symb, app_args=[Var _:_]}, bind_dst=freeVar} (aliasDummyId, varHeap)
 	declareVars {lb_src=App {app_symb, app_args=[Var _:_]}, lb_dst=freeVar} (aliasDummyId, varHeap)
-		| app_symb.symb_name==aliasDummyId
+		| not (isNilPtr app_symb.symb_name.id_info) && app_symb.symb_name==aliasDummyId
 			= identity		// we have an alias. Don't declare the same variable twice
 		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
-// MW0	declareVars {bind_dst=freeVar} (_, varHeap)
 	declareVars {lb_dst=freeVar} (_, varHeap)
 		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
 
@@ -605,8 +601,9 @@ instance declareVars Expression where
 		=	declareVars let_strict_binds dvInput
 		o`	declareVars let_lazy_binds dvInput
 		o`	declareVars let_expr dvInput
-	declareVars (Conditional {if_then, if_else}) dvInput
-		=	declareVars if_then dvInput
+	declareVars (Conditional {if_cond, if_then, if_else}) dvInput
+		=	declareVars if_cond dvInput
+		o`	declareVars if_then dvInput
 		o`	declareVars if_else dvInput
 	declareVars (Case caseExpr) dvInput
 		=	declareVars caseExpr dvInput
@@ -1329,7 +1326,7 @@ convertRootExpr aliasDummyId (Let {let_expr}) main_dcl_module_n varHeap
 	=	convertRootExpr aliasDummyId let_expr main_dcl_module_n varHeap
 convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n varHeap
 	=	beGuardNode
-			(convertCondExpr cond main_dcl_module_n varHeap)
+			(convertRootExpr aliasDummyId cond main_dcl_module_n varHeap)
 			(convertRhsNodeDefs aliasDummyId then main_dcl_module_n varHeap)
 			(convertRhsStrictNodeIds then varHeap)
 			(convertRootExpr aliasDummyId then main_dcl_module_n varHeap)
@@ -1338,7 +1335,7 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Y
 			(convertRootExpr aliasDummyId else main_dcl_module_n varHeap)
 convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=No}) main_dcl_module_n varHeap
 		=	beGuardNode
-				(convertCondExpr cond main_dcl_module_n varHeap)
+				(convertRootExpr aliasDummyId cond main_dcl_module_n varHeap)
 				(convertRhsNodeDefs aliasDummyId then main_dcl_module_n varHeap)
 				(convertRhsStrictNodeIds then varHeap)
 				(convertRootExpr aliasDummyId then main_dcl_module_n varHeap)
@@ -1400,9 +1397,8 @@ collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
   where
 	filterStrictAlias [] let_lazy_binds
 		= let_lazy_binds
-// MW0	filterStrictAlias [strict_bind=:{bind_src=App app}:strict_binds] let_lazy_binds
 	filterStrictAlias [strict_bind=:{lb_src=App app}:strict_binds] let_lazy_binds
-		| app.app_symb.symb_name==aliasDummyId
+		| not (isNilPtr app.app_symb.symb_name.id_info) && app.app_symb.symb_name==aliasDummyId
 			// the compiled source was a strict alias like "#! x = y"
 			= case hd app.app_args of
 				Var _
@@ -1410,7 +1406,6 @@ collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
 					-> filterStrictAlias strict_binds let_lazy_binds
 				hd_app_args
 					// the node is not an alias anymore: remove just the _dummyForStrictAlias call
-// MW0					-> [{ strict_bind & bind_src = hd_app_args } : filterStrictAlias strict_binds let_lazy_binds]
 					-> [{ strict_bind & lb_src = hd_app_args } : filterStrictAlias strict_binds let_lazy_binds]
 	filterStrictAlias [strict_bind:strict_binds] let_lazy_binds
 		= [strict_bind: filterStrictAlias strict_binds let_lazy_binds]
