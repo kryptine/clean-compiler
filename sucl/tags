@@ -1,0 +1,16 @@
+!_DUMMY	tags	//	;" vi:set ts=24 noet:
+!_DUMMY	tags	//	;" $Id$
+CheckedTypeDef	../compiler/syntax.dcl	/::\tCheckedTypeDef/
+CommonDefs	../compiler/checksupport.dcl	/::\tCommonDefs/
+Expression	../compiler/syntax.dcl	/::\tExpression/
+ExpressionHeap	../compiler/syntax.dcl	/::\tExpressionHeap/
+FunDef	../compiler/syntax.dcl	/::\tFunDef/
+FunType	../compiler/syntax.dcl	/::\tFunType/
+Group	../compiler/transform.dcl	/::\tGroup/
+ImportedConstructors	../compiler/trans.dcl	/::\tImportedConstructors/
+ImportedFunctions	../compiler/trans.dcl	/::\tImportedFunctions/
+IndexRange	../compiler/syntax.dcl	/::\tIndexRange/
+TypeDefInfos	../compiler/syntax.dcl	/::\tTypeDefInfos/
+TypeHeaps	../compiler/syntax.dcl	/::\tTypeHeaps/
+VarHeap	../compiler/checksupport.dcl	/::\tVarHeap/
+supercompile	supercompile.icl	/^supercompile/
