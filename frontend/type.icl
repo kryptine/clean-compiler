@@ -1897,7 +1897,7 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 
 typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !ModuleNumberSet !*Heaps !*PredefinedSymbols !*File !*File
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File, !*File)
-typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out
+typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out
 	#! fun_env_size = size fun_defs
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
 	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [main_dcl_module_n] = icl_defs }
@@ -1909,7 +1909,12 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  
 	  (td_infos, hp_type_heaps, ts_error) = analTypeDefs ti_common_defs used_module_numbers hp_type_heaps ts_error
 
-	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
+// MW234..
+	| not ts_error.ea_ok
+		= (ts_error.ea_ok, fun_defs, { ir_from = 0, ir_to = 0 }, {}, ti_common_defs, ti_functions,
+			{ heaps & hp_type_heaps = hp_type_heaps }, predef_symbols, ts_error.ea_file, out)
+// ..MW234
+	# state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar,
@@ -1944,36 +1949,37 @@ where
 		= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
 
 	update_instances_of_class common_defs mod_index ins_index (dummy, error, class_instances, type_var_heap, td_infos)
-		# {ins_class={glob_object={ds_index},glob_module},ins_type={it_types}} = common_defs.[mod_index].com_instance_defs.[ins_index]
+		# {ins_class={glob_object={ds_index},glob_module},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
 		  (mod_instances, class_instances) = replace class_instances glob_module dummy
 		  (instances, mod_instances) = replace mod_instances ds_index IT_Empty
 		  (error, instances) = insert it_types ins_index mod_index common_defs error instances
 		  (_, mod_instances) = replace mod_instances ds_index instances
 		  (dummy, class_instances) = replace class_instances glob_module mod_instances
 		  (error, type_var_heap, td_infos)
-					= check_types_of_instances common_defs glob_module ds_index it_types (error, type_var_heap, td_infos)
+					= check_types_of_instances ins_pos common_defs glob_module ds_index it_types (error, type_var_heap, td_infos)
 		= (dummy, error, class_instances, type_var_heap, td_infos)
 
-	check_types_of_instances common_defs class_module class_index types state
+	check_types_of_instances ins_pos common_defs class_module class_index types state
 		# {class_arity,class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
-		= check_instances_of_constructor_variables common_defs class_cons_vars (dec class_arity) types state
+		= check_instances_of_constructor_variables ins_pos common_defs class_cons_vars (dec class_arity) types state
 	where
-		check_instances_of_constructor_variables common_defs cons_vars arg_nr [type : types] state
+		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [type : types] state
 			| cons_vars bitand (1 << arg_nr) <> 0
-				# state = check_type_of_constructor_variable common_defs type state
-				= check_instances_of_constructor_variables common_defs cons_vars (dec arg_nr) types state
-				= check_instances_of_constructor_variables common_defs cons_vars (dec arg_nr) types state
-		check_instances_of_constructor_variables common_defs cons_vars arg_nr [] state
+				# state = check_type_of_constructor_variable ins_pos common_defs type state
+				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (dec arg_nr) types state
+				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (dec arg_nr) types state
+		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [] state
 			= state
 
-		check_type_of_constructor_variable common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
+		check_type_of_constructor_variable ins_pos common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
 			# {td_arity} = common_defs.[glob_module].com_type_defs.[glob_object]
 			  ({tdi_properties,tdi_cons_vars}, td_infos) = td_infos![glob_module].[glob_object]
 			| tdi_properties bitand cIsNonCoercible == 0
 				# ({sc_neg_vect}, type_var_heap, td_infos)
 					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
 				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)			
-				= (checkError type " instance type should be coercible" error, type_var_heap, td_infos)
+				= (checkErrorWithIdentPos (newPosition empty_id ins_pos)
+					 " instance type should be coercible" error, type_var_heap, td_infos)
 		where
 			check_sign type neg_signs arg_nr error
 				| arg_nr == 0
@@ -1981,11 +1987,13 @@ where
 					| neg_signs bitand 1 == 0
 						= check_sign type (neg_signs >> 1) (dec arg_nr) error
 						= checkError type " all arguments of an instance type should have a non-negative sign" error
-		check_type_of_constructor_variable common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
-			= (checkError type " instance type should be coercible" error, type_var_heap, td_infos)
-		check_type_of_constructor_variable common_defs type=:(cv :@: types) (error, type_var_heap, td_infos)
-			= (checkError type " instance type should be coercible" error, type_var_heap, td_infos)
-		check_type_of_constructor_variable common_defs type state
+		check_type_of_constructor_variable ins_pos common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
+			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
+				type_var_heap, td_infos)
+		check_type_of_constructor_variable ins_pos common_defs type=:(cv :@: types) (error, type_var_heap, td_infos)
+			= (checkError (newPosition empty_id ins_pos) " instance type should be coercible" error,
+				type_var_heap, td_infos)
+		check_type_of_constructor_variable ins_pos common_defs type state
 			= state
 			
 	insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
@@ -2355,6 +2363,8 @@ getPositionOfExpr expr=:(Var {var_info_ptr}) var_heap
 	   var_heap)
 getPositionOfExpr expr var_heap
 	= (CP_Expression expr, var_heap)
+
+empty_id =: { id_name = "", id_info = nilPtr }
 
 instance <<< AttrCoercion
 where
