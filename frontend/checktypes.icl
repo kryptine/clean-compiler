@@ -613,17 +613,25 @@ checkOpenAType mod_index scope dem_attr type=:{ at_type=TA type_cons=:{type_name
 		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
 		| type_cons.type_arity <= td_arity
 			# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
-			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr types td_args (ots, oti, cs)
+			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope /* dem_attr */ types td_args (ots, oti, cs)
 			  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr td_attribute) id_name at_attribute oti cs
 			= ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs)) 
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
 where
+/*
 	check_args_of_type_cons mod_index scope dem_attr [] _ cot_state
 		= ([], cot_state)
 	check_args_of_type_cons mod_index scope dem_attr [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
 		# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute dem_attr atv_attribute) arg_type cot_state
 		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr arg_types td_args cot_state
+		= ([arg_type : arg_types], cot_state)
+*/
+	check_args_of_type_cons mod_index scope [] _ cot_state
+		= ([], cot_state)
+	check_args_of_type_cons mod_index scope [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
+		# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute DAK_None atv_attribute) arg_type cot_state
+		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope arg_types td_args cot_state
 		= ([arg_type : arg_types], cot_state)
 
 	new_demanded_attribute DAK_Ignore _
@@ -684,8 +692,10 @@ checkSymbolType  mod_index st=:{st_args,st_result,st_context,st_attr_env} specia
 	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope oti_all_vars cs.cs_symbol_table
 	  cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
 	  (specials, type_defs, modules, heaps, cs) = checkSpecialTypes mod_index specials type_defs modules heaps { cs & cs_symbol_table = cs_symbol_table }
-	= ({st & st_vars = oti_all_vars, st_args = st_args, st_result = st_result, st_context = st_context,
-	    st_attr_vars = oti_all_attrs, st_attr_env = st_attr_env }, specials, type_defs, class_defs, modules, heaps, cs)// ---> (st, "--->", st_args, st_result)
+	  checked_st = {st & st_vars = oti_all_vars, st_args = st_args, st_result = st_result, st_context = st_context,
+	    					st_attr_vars = oti_all_attrs, st_attr_env = st_attr_env }
+	= (checked_st, specials, type_defs, class_defs, modules, heaps, cs)
+		//  ---> ("checkSymbolType", st, checked_st)
 where
 	check_attr_inequalities [ineq : ineqs] cs
 		# (ineq, cs) = check_attr_inequality ineq cs
