@@ -596,9 +596,21 @@ BESetMainDclModuleN a0 a1 = code {
 	ccall BESetMainDclModuleN "I:V:I"
 };
 // void BESetMainDclModuleN(int main_dcl_module_n_parameter);
-kBEVersionCurrent:==0x02000204;
+
+BEDeclareDynamicTypeSymbol :: !Int !Int !BackEnd -> BackEnd;
+BEDeclareDynamicTypeSymbol a0 a1 a2 = code {
+	ccall BEDeclareDynamicTypeSymbol "II:V:I"
+};
+// void BEDeclareDynamicTypeSymbol(int typeIndex,int moduleIndex);
+
+BEDynamicTempTypeSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
+BEDynamicTempTypeSymbol a0 = code {
+	ccall BEDynamicTempTypeSymbol ":I:I"
+};
+// BESymbolP BEDynamicTempTypeSymbol();
+kBEVersionCurrent:==0x02000206;
 kBEVersionOldestDefinition:==0x02000204;
-kBEVersionOldestImplementation:==0x02000204;
+kBEVersionOldestImplementation:==0x02000206;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;

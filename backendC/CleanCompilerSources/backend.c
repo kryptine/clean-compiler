@@ -133,6 +133,10 @@ STRUCT (be_state, BEState)
 	SymbolP			be_dontCareSymbol;
 	SymbolP			be_dictionarySelectFunSymbol;
 	SymbolP			be_dictionaryUpdateFunSymbol;
+
+	// temporary hack
+	int				be_dynamicTypeIndex;
+	int				be_dynamicModuleIndex;
 };
 
 static BEStateS	gBEState = {False /* ... */};
@@ -2708,3 +2712,20 @@ BEFree (BackEnd backEnd)
 	if (StdOutReopened)
 		fclose (StdOut);
 } /* BEFree */
+
+
+// temporary hack
+
+void
+BEDeclareDynamicTypeSymbol (int typeIndex, int moduleIndex)
+{
+	gBEState.be_dynamicTypeIndex	= moduleIndex;
+	gBEState.be_dynamicModuleIndex	= typeIndex;
+} /* BEDeclareDynamicTypeSymbol */
+
+
+BESymbolP
+BEDynamicTempTypeSymbol (void)
+{
+	return (BETypeSymbol (gBEState.be_dynamicTypeIndex, gBEState.be_dynamicModuleIndex));
+} /* BEDynamicTemp */
