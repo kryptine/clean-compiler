@@ -178,8 +178,6 @@ refcount graph roots
           where count` = inccounter var count
                 (def,(_,args)) = varcontents graph var
 
-inccounter m f n = if (n==m) (f n+1) (f n)
-
 /*
 
 Compilegraph compiles a graph from parts.
