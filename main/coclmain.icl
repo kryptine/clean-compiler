@@ -112,6 +112,8 @@ coclMainWithVersionCheck  currentVersion latestDefVersion latestImpVersion testA
 					where
 						n
 							=	size s
+		getArgs commandArgs
+			=	commandArgs
 
 CoclArgsFile :== "coclargs.txt"
 
