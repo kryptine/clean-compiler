@@ -529,13 +529,15 @@ checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions macro_de
 	
 instance toString STE_Kind where
 	toString (STE_FunctionOrMacro _)	= "function/macro"
+	toString (STE_DclMacroOrLocalMacroFunction _) = "macro"
 	toString STE_Type 					= "type"
 	toString STE_Constructor 			= "constructor"
 	toString (STE_Field _) 				= "field"
 	toString STE_Class 					= "class"
-	toString STE_Generic 				= "generic"			//AA
 	toString STE_Member 				= "class member"
+	toString STE_Generic 				= "generic"			//AA
 	toString (STE_Instance _)			= "instance"
+	toString ste						= "<<unknown symbol kind>>"
 
 check_whether_ident_is_imported :: !Ident !STE_Kind !CheckCompletenessInputBox !*CheckCompletenessStateBox 
 								-> *CheckCompletenessStateBox
