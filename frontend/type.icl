@@ -215,6 +215,8 @@ tryToOptimizePosition (App {app_symb={symb_name}}) ip
 	= tryToOptimizePositionFromString symb_name.id_name ip
 tryToOptimizePosition (fun @ _) ip
 	= tryToOptimizePosition fun ip
+tryToOptimizePosition _ _
+	= No
 
 tryToOptimizePositionFromString id_name ip
 	# fst_semicolon_index = searchlArrElt ((==) ';') id_name 0
