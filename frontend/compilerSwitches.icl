@@ -15,5 +15,5 @@ SwitchGenerics on off :== off
 
 USE_DummyModuleName yes no :== yes
 
-switch_dynamics on off :== off;		// to turn dynamics on or off
+switch_dynamics on off :== on;		// to turn dynamics on or off
 // ...MV
