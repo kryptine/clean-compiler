@@ -477,6 +477,15 @@ where
 			= fwritec c tcl_file;
 		= (tcl_file,wtis);
 
+instance WriteTypeInfo (a,b) | WriteTypeInfo a & WriteTypeInfo b
+where
+	write_type_info (c1,c2) tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info c1 tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info c2 tcl_file wtis
+		= (tcl_file,wtis)
+
 // MV ...
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 

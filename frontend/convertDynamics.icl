@@ -26,16 +26,17 @@ from type_io_common import class toString (..),instance toString GlobalTCType;
 	,	ci_next_fun_nr		:: !Index
 	
 	//	data needed to generate coercions
-	,	ci_placeholders_and_tc_args				:: [(!BoundVar,Ptr VarInfo)]
-	,	ci_generated_global_tc_placeholders		:: !Bool
-	,	ci_used_tcs								:: [Ptr VarInfo]
-	,	ci_symb_ident							:: SymbIdent
-	,	ci_sel_type_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
-	,	ci_sel_value_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
-	,	ci_module_id_symbol						:: Expression
-	,	ci_internal_type_id						:: Expression
-	,	ci_module_id							:: Optional LetBind
-	,	ci_type_id								:: !Optional !TypeSymbIdent
+	,	ci_placeholders_and_tc_args						:: [(!BoundVar,Ptr VarInfo)]
+	,	ci_generated_global_tc_placeholders				:: !Bool
+	,	ci_used_tcs										:: [Ptr VarInfo]
+	,	ci_symb_ident									:: SymbIdent
+	,	ci_sel_type_field								:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_sel_value_field								:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
+	,	ci_module_id_symbol								:: Expression
+	,	ci_internal_type_id								:: Expression
+	,	ci_module_id									:: Optional LetBind
+	,	ci_type_id										:: !Optional !TypeSymbIdent
+	,	ci_type_constructor_used_in_dynamic_patterns	:: !*{#Bool}
 	}
 
 ::	ConversionInput =
@@ -64,8 +65,9 @@ F a b = b
 
 
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
-write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
-write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules type_heaps predefined_symbols
+//write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] _ _ !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
+write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps predefined_symbols
+
 	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
 		= { WriteTypeInfoState |
@@ -75,28 +77,46 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		};
 	# (j,tcl_file)
 		= fposition tcl_file
-//	| True
-//		= abort ("TypeVar " +++ toString j)
-				
+
 	#! (tcl_file,write_type_info_state)
 		= write_type_info common_defs tcl_file write_type_info_state2
 	#! (tcl_file,write_type_info_state)
 		= write_type_info directly_imported_dcl_modules tcl_file write_type_info_state
+
+	// dynamic pattern matches
+	#! type_constructors_in_dynamic_patterns
+		= collect_type_constructors_in_dynamic_patterns 0 (size global_type_instances) []
+	#! (tcl_file,write_type_info_state)
+		= write_type_info type_constructors_in_dynamic_patterns tcl_file write_type_info_state
 		
 	#! (type_heaps,_)
-		= f write_type_info_state //!type_heaps;
-		
+		= f write_type_info_state;	
 		
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_cons_defs) tcl_file
+		
 	= (True,tcl_file,type_heaps,predefined_symbols) 
-	
 where
+	collect_type_constructors_in_dynamic_patterns :: !Int !Int [(!TypeSymbIdent,!String)] -> [(!TypeSymbIdent,!String)]
+	collect_type_constructors_in_dynamic_patterns i limit type_constructors_in_dynamic_patterns
+		| i == limit
+			= type_constructors_in_dynamic_patterns
+			
+			| isGTT_Constructor global_type_instances.[i]
+				# (GTT_Constructor type_name=:{type_name={id_name}} module_name used_in_application_of_type_dependent_function)
+					= global_type_instances.[i]
+				| used_in_application_of_type_dependent_function || ci_type_constructor_used_in_dynamic_patterns.[i]
+					= collect_type_constructors_in_dynamic_patterns (inc i) limit [(type_name,module_name):type_constructors_in_dynamic_patterns]
+					= collect_type_constructors_in_dynamic_patterns (inc i) limit type_constructors_in_dynamic_patterns
+				= collect_type_constructors_in_dynamic_patterns (inc i) limit type_constructors_in_dynamic_patterns
+	where
+		isGTT_Constructor (GTT_Constructor _ _ _)	= True
+		isGTT_Constructor _							= False
+		
 	f write_type_info_state=:{wtis_type_heaps}
 		= (wtis_type_heaps,{write_type_info_state & wtis_type_heaps = abort "convertDynamics.icl"});
-//---> ("dcl",size main_dcl_module.dcl_common.com_type_defs, "icl", size common_defs.com_type_defs);
 
 /*2.0
 f (Yes tcl_file)
@@ -106,22 +126,6 @@ f (Yes tcl_file)
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional !*File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional !*File))
 convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
-	# (tcl_file,type_heaps,predefined_symbols)
-		= case tcl_file of
-			No
-				-> (No,type_heaps,predefined_symbols)
-/*2.0
-			_ 
-				# tcl_file = f tcl_file;
-0.2*/
-//1.3
-			(Yes tcl_file)
-//3.1
-				# (ok,tcl_file,type_heaps,predefined_symbols)
-					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules type_heaps predefined_symbols
-				| not ok
-					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
-					-> (Yes tcl_file,type_heaps,predefined_symbols)
 	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamic]
 	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)
 		= case (pds_module == (-1) || pds_def == (-1)) of
@@ -211,8 +215,9 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 				-> Yes ci_type_id
 						
 	#! nr_of_funs = size fun_defs
+	#! s_global_type_instances = size global_type_instances
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
-	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_fun_heap, ci_new_functions}))
+	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_fun_heap, ci_new_functions, ci_type_constructor_used_in_dynamic_patterns}))
 			= convert_groups 0 groups global_type_instances (fun_defs, {	
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
 							ci_new_functions = [], ci_new_variables = [], ci_fun_heap = newHeap, ci_next_fun_nr = nr_of_funs, ci_placeholders_and_tc_args = [],
@@ -221,9 +226,30 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							ci_module_id_symbol = App module_symb,
 							ci_internal_type_id = module_id_app,
 							ci_module_id		  = No,
-							ci_type_id		      = ci_type_id })
+							ci_type_id		      = ci_type_id,
+							ci_type_constructor_used_in_dynamic_patterns	= createArray s_global_type_instances False
+							})
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
 			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions main_dcl_module_n groups imported_types [] type_heaps ci_var_heap
+			
+	// store type info			
+	# (tcl_file,type_heaps,ci_predef_symb)
+		= case tcl_file of
+			No
+				-> (No,type_heaps,ci_predef_symb)
+/*2.0
+			_ 
+				# tcl_file = f tcl_file;
+0.2*/
+//1.3
+			(Yes tcl_file)
+//3.1
+				# (ok,tcl_file,type_heaps,ci_predef_symb)
+					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps ci_predef_symb
+				| not ok
+					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
+					-> (Yes tcl_file,type_heaps,ci_predef_symb)
+
 	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
 where
 	convert_groups group_nr groups global_type_instances fun_defs_and_ci
@@ -472,7 +498,7 @@ where
 		= (MatchExpr symb expression, ci)
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_type_code}) ci=:{ci_symb_ident}
 		#  (dyn_expr,      ci) 			= convertDynamics cinp bound_vars default_expr dyn_expr ci
-		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False PD_UV_Placeholder [] [] ci
+		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False [] [] ci
 		= (App {	app_symb		= ci_symb_ident,
 					app_args 		= [dyn_expr, dyn_type_code],
 					app_info_ptr	= nilPtr }, ci)
@@ -482,31 +508,36 @@ where
 		= (EE, ci)
 	convertDynamics cinp bound_vars default_expr expr=:(NoBind _) ci
 		= (expr,ci)
+
 /*
-	replace all references in a type code expression which refer to an argument i.e. the argument contains a
-	type to their placeholders. Return is a list of (placeholder,argument) list. Each tuple is used later as
-	arguments to the coerce relation. This should be optional
 	
-
+	is_dynamic_pattern (is_dynamic_pattern)
+		True
+			1) replace TC-references passed as an argument to the current function, in a type code expression by placeholders. A 
+			   (placeholder,argument)-list is returned to generate the coercion later on.
+			2) A PD_UPV_Placeholder is generated for each TCE_UniType-variable occuring in the type code expression.
+			3) store type constructors in ci_type_constructor_used_in_dynamic_patterns
+		False
+			1) do *not* replace TC-reference
+			2) A PD_UV_Placeholder is generated for each TCE_UniType-variable occuring in the type code expression.
+			3) do *not* store type constructors
 */
-
-convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
-		# (let_binds,     ci) 	= createUniversalVariables uni_placeholder uni_vars [] ci
+convertTypecode2 cinp (TCE_UniType uni_vars type_code) is_dynamic_pattern binds placeholders_and_tc_args ci
+		# (let_binds,     ci) 	= createUniversalVariables (if is_dynamic_pattern PD_UPV_Placeholder PD_UV_Placeholder) uni_vars [] ci
 		  (let_info_ptr,  ci)	= let_ptr (length let_binds) ci
-		  (e, type_code_expr, binds, placeholders_and_tc_args, ci)	= convertTypecode2 cinp type_code False uni_placeholder [] [] ci
+		  (e, type_code_expr, binds, placeholders_and_tc_args, ci)	= convertTypecode2 cinp type_code is_dynamic_pattern [] [] ci
 		= (e, Let {	let_strict_binds	= [],
 					let_lazy_binds		= let_binds,
 					let_expr			= type_code_expr,
 					let_info_ptr		= let_info_ptr,
 					let_expr_position	= NoPos}, binds, placeholders_and_tc_args, ci) 
 
-// ci_placeholders_and_tc_args
-convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
+convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci
 	#! cinp_st_args
 		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
 	| isEmpty cinp_st_args
 		#! (e,binds,placeholders_and_tc_args,ci)
-			= convertTypecode cinp t replace_tc_args binds placeholders_and_tc_args ci
+			= convertTypecode cinp t is_dynamic_pattern binds placeholders_and_tc_args ci
 		= (False,e,binds,placeholders_and_tc_args,ci)
 		
 		/*
@@ -516,12 +547,12 @@ convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args 
 		*/
 		= (True,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args,ci)
 
-convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
+convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci
 	#! cinp_st_args
 		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
 	| isEmpty cinp_st_args
 		#! (e,binds,placeholders_and_tc_args,ci)
-			= convertTypecode cinp t replace_tc_args binds placeholders_and_tc_args ci
+			= convertTypecode cinp t is_dynamic_pattern binds placeholders_and_tc_args ci
 		= (False,e,binds,placeholders_and_tc_args,ci)
 		
 		/*
@@ -531,18 +562,16 @@ convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) replace_tc_
 		*/
 		= (True,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args,ci)
 
-//		= convertTypecode2 cinp t replace_tc_args binds placeholders_and_tc_args ci
-
-convertTypecode2 cinp t replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
+convertTypecode2 cinp t is_dynamic_pattern binds placeholders_and_tc_args ci
 	#! (e,binds,placeholders_and_tc_args,ci)
-		= convertTypecode cinp t replace_tc_args binds placeholders_and_tc_args ci
+		= convertTypecode cinp t is_dynamic_pattern binds placeholders_and_tc_args ci
 	= (False,e,binds,placeholders_and_tc_args,ci)
 
-convertTypecode cinp TCE_Empty replace_tc_args binds placeholders_and_tc_args ci 
+convertTypecode cinp TCE_Empty is_dynamic_pattern binds placeholders_and_tc_args ci 
 	= (EE,binds,placeholders_and_tc_args,ci)
 
-convertTypecode cinp=:{cinp_st_args} (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci=:{ci_placeholders_and_tc_args,ci_var_heap}
-	| not replace_tc_args
+convertTypecode cinp=:{cinp_st_args} (TCE_Var var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci=:{ci_placeholders_and_tc_args,ci_var_heap}
+	| not is_dynamic_pattern
 		= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args, ci)
 
 	// check if tc_arg has already been replaced by a placeholder
@@ -570,19 +599,19 @@ where
 // 2. It is also a argument of the function
 // Thus a tc argument variable.
 // This forms a special case: instead of an unify, a coerce can be generated
-convertTypecode cinp (TCE_TypeTerm var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+convertTypecode cinp (TCE_TypeTerm var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci
 	/*
 	** TCE_Var and TCE_TypeTerm are not equivalent. A TCE_TypeTerm is used for an argument which contains
 	** a type representation. A TCE_Var is an existential quantified type variable. In previous phases no
 	** clear distinction is made. It should be possible to generate the proper type code expression for
 	** these two but it would involve changing a lot of small things. 
 	*/
-	= convertTypecode cinp (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+	= convertTypecode cinp (TCE_Var var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci
 
-convertTypecode cinp (TCE_Constructor index typecode_exprs) replace_tc_args binds placeholders_and_tc_args ci=:{ci_internal_type_id}
+convertTypecode cinp (TCE_Constructor index typecode_exprs) is_dynamic_pattern binds placeholders_and_tc_args ci=:{ci_internal_type_id}
 	# (typecons_symb,  ci) 									=  getSymbol PD_TypeConsSymbol SK_Constructor (USE_DummyModuleName 3 2) ci
-	  constructor											= get_constructor cinp.cinp_glob_type_inst index
-	  (typecode_exprs,binds,placeholders_and_tc_args,ci)	= convertTypecodes cinp typecode_exprs replace_tc_args binds placeholders_and_tc_args ci
+	# (constructor,ci)										= get_constructor cinp.cinp_glob_type_inst index ci
+	  (typecode_exprs,binds,placeholders_and_tc_args,ci)	= convertTypecodes cinp typecode_exprs is_dynamic_pattern binds placeholders_and_tc_args ci
 	# (ci_internal_type_id,ci)
 		= get_module_id ci
 	= (App {app_symb		= typecons_symb,
@@ -591,26 +620,36 @@ convertTypecode cinp (TCE_Constructor index typecode_exprs) replace_tc_args bind
 where
 	get_module_id ci=:{ci_module_id=Yes {lb_dst}}
 		= (Var (freeVarToVar lb_dst),ci)
+		
+	get_constructor :: !{!GlobalTCType} Index !*ConversionInfo -> (Expression,!*ConversionInfo)
+	get_constructor glob_type_inst index ci=:{ci_type_constructor_used_in_dynamic_patterns}
+		# ci 
+			= case is_dynamic_pattern of
+				True	-> { ci & ci_type_constructor_used_in_dynamic_patterns.[index] = True }
+				_		-> ci
+		= (BasicExpr (BVS ("\"" +++ toString  glob_type_inst.[index] +++ "\"")),ci)
+		
+	convertTypecodes _ [] is_dynamic_pattern binds placeholders_and_tc_args ci
+		# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
+		= (App {	app_symb		= nil_symb,
+					app_args 		= [],
+					app_info_ptr	= nilPtr},binds,placeholders_and_tc_args, ci)
+	
+	convertTypecodes cinp [typecode_expr : typecode_exprs] is_dynamic_pattern binds placeholders_and_tc_args ci
+		# (cons_symb, ci) = getSymbol PD_ConsSymbol SK_Constructor 2 ci
+		# (expr,binds,placeholders_and_tc_args, ci) = convertTypecode  cinp typecode_expr  is_dynamic_pattern binds placeholders_and_tc_args ci
+		# (exprs,binds,placeholders_and_tc_args,ci) = convertTypecodes cinp typecode_exprs is_dynamic_pattern binds placeholders_and_tc_args ci
+		= (App {	app_symb		= cons_symb,
+					app_args 		= [expr , exprs],
+					app_info_ptr	= nilPtr}, binds,placeholders_and_tc_args, ci)
 
-convertTypecode cinp (TCE_Selector selections var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+
+convertTypecode cinp (TCE_Selector selections var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci
 	#! (var,binds,placeholders_and_tc_args,ci)		
-		= convertTypecode cinp (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+		= convertTypecode cinp (TCE_Var var_info_ptr) is_dynamic_pattern binds placeholders_and_tc_args ci
 	= (Selection NormalSelector var selections,binds,placeholders_and_tc_args,ci)
 
 //convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
-convertTypecodes _ [] replace_tc_args binds placeholders_and_tc_args ci
-	# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
-	= (App {	app_symb		= nil_symb,
-				app_args 		= [],
-				app_info_ptr	= nilPtr},binds,placeholders_and_tc_args, ci)
-
-convertTypecodes cinp [typecode_expr : typecode_exprs] replace_tc_args binds placeholders_and_tc_args ci
-	# (cons_symb, ci) = getSymbol PD_ConsSymbol SK_Constructor 2 ci
-	# (expr,binds,placeholders_and_tc_args, ci) = convertTypecode  cinp typecode_expr  replace_tc_args binds placeholders_and_tc_args ci
-	# (exprs,binds,placeholders_and_tc_args,ci) = convertTypecodes cinp typecode_exprs replace_tc_args binds placeholders_and_tc_args ci
-	= (App {	app_symb		= cons_symb,
-				app_args 		= [expr , exprs],
-				app_info_ptr	= nilPtr}, binds,placeholders_and_tc_args, ci)
 
 determine_defaults :: (Optional Expression) DefaultExpression !*ConversionInfo -> (Optional Expression, DefaultExpression, !*ConversionInfo)
 /***
@@ -833,7 +872,7 @@ where
 		  /***  convert the elements of this pattern  ***/
 
 		  (a_ij_binds, ci)		= createTypePatternVariables dp_type_patterns_vars [] ci
-	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ PD_UPV_Placeholder [] [] ci //{ci & ci_module_id = No} // ci
+	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ [] [] ci //{ci & ci_module_id = No} // ci
 	
 	 	# (is_last_dynamic_pattern,dp_rhs) 
 	 		= isLastDynamicPattern dp_rhs;
@@ -1110,10 +1149,6 @@ freeVarToVar {fv_name, fv_info_ptr}
 addToBoundVars :: BoundVar AType BoundVariables -> BoundVariables
 addToBoundVars var type bound_vars
 	= [ { tv_free_var = varToFreeVar var 0, tv_type = type } : bound_vars ]
-
-get_constructor :: !{!GlobalTCType} Index -> Expression
-get_constructor glob_type_inst index
-	= BasicExpr (BVS ("\"" +++ toString  glob_type_inst.[index] +++ "\""))
 
 getResultType :: ExprInfoPtr !*ConversionInfo -> (!AType, !*ConversionInfo)
 getResultType case_info_ptr ci=:{ci_expr_heap}

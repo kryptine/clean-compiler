@@ -44,12 +44,13 @@ import genericsupport, compilerSwitches, type_io_common
 	}
 
 ::	SpecialInstances =
-	{	si_next_array_member_index		:: !Index
-	,	si_array_instances				:: ![ArrayInstance]
-	,	si_list_instances				:: ![ArrayInstance]
-	,	si_tail_strict_list_instances	:: ![ArrayInstance]
-	,	si_next_TC_member_index			:: !Index
-	,	si_TC_instances					:: ![GlobalTCInstance]
+	{	si_next_array_member_index			:: !Index
+	,	si_array_instances					:: ![ArrayInstance]
+	,	si_list_instances					:: ![ArrayInstance]
+	,	si_tail_strict_list_instances		:: ![ArrayInstance]
+	,	si_next_TC_member_index				:: !Index
+	,	si_TC_instances						:: ![GlobalTCInstance]
+	,	si_type_constructors_in_patterns	:: ![!Index]
 	}
 
 ::	LocalTypePatternVariable =
@@ -86,7 +87,7 @@ where
 	where
 		compare_types (GTT_Basic bt1) (GTT_Basic bt2)
 			= bt1 =< bt2
-		compare_types (GTT_Constructor cons1 _) (GTT_Constructor cons2 _) 
+		compare_types (GTT_Constructor cons1 _ _) (GTT_Constructor cons2 _ _) 
 			= cons1 =< cons2
 		compare_types _ _
 			= Equal
@@ -527,7 +528,7 @@ where
 			# defining_module_name
 				= dcl_modules.[glob_module].dcl_name.id_name
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
-			  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (si_next_TC_member_index, si_TC_instances)
+			  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name False) (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
@@ -535,7 +536,7 @@ where
 			# defining_module_name
 				= dcl_modules.[glob_module].dcl_name.id_name
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
-			  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (si_next_TC_member_index, si_TC_instances)
+			  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name False) (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
@@ -1291,14 +1292,14 @@ getTCDictionary symb_name var_info_ptr (var_heap, error)
 		_
 			-> (var_info_ptr, (var_heap, overloadingError symb_name error))
 
-		
 ::	TypeCodeInfo =
-	{	tci_next_index			:: !Index
-	,	tci_instances			:: ![GlobalTCInstance]
-	,	tci_type_var_heap		:: !.TypeVarHeap
-	,	tci_dcl_modules			:: !{# DclModule}
+	{	tci_next_index						:: !Index
+	,	tci_instances						:: ![GlobalTCInstance]
+	,	tci_type_var_heap					:: !.TypeVarHeap
+	,	tci_dcl_modules						:: !{# DclModule}
+	,	tci_type_constructors_in_patterns	:: ![!Index]
 	}
-	
+		
 class toTypeCodeExpression type :: !Ident type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
 
 instance toTypeCodeExpression Type
@@ -1307,14 +1308,14 @@ where
 		# defining_module_name
 			= tci_dcl_modules.[glob_module].dcl_name.id_name
 		# (inst_index, (tci_next_index, tci_instances))
-		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (tci_next_index, tci_instances)
+		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name False) (tci_next_index, tci_instances)
 		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
 		= (TCE_Constructor inst_index type_code_args, tci)
 	toTypeCodeExpression symb_name (TAS cons_id=:{type_index={glob_module}} type_args _) (tci=:{tci_next_index,tci_instances,tci_dcl_modules},var_heap,error)
 		# defining_module_name
 			= tci_dcl_modules.[glob_module].dcl_name.id_name
 		# (inst_index, (tci_next_index, tci_instances))
-		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (tci_next_index, tci_instances)
+		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name False) (tci_next_index, tci_instances)
 		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
 		= (TCE_Constructor inst_index type_code_args, tci)
 	toTypeCodeExpression symb_name (TB basic_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
@@ -1632,7 +1633,9 @@ where
 			# (var_info_ptr, (ui_var_heap,ui_error)) = getTCDictionary symb_name var_info_ptr (ui_var_heap, ui_error)
 			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error})
 // MV ...
-		convertTypecode (TCE_Constructor index typecode_exprs) ui=:{ui_x={x_internal_type_id}}
+		convertTypecode (TCE_Constructor index typecode_exprs) ui=:{ui_x={x_internal_type_id,x_type_code_info={tci_type_constructors_in_patterns} }}
+			# ui
+				= { ui & ui_x.x_type_code_info.tci_type_constructors_in_patterns = [index:tci_type_constructors_in_patterns] }
 			# (typecons_symb,ui) 		= getSymbol PD_TypeConsSymbol SK_Constructor ui
 			  (constructor,ui)			= get_constructor index ui
 			  (typecode_exprs,  ui)		= convertTypecodes typecode_exprs ui

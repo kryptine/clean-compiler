@@ -79,7 +79,7 @@ instance toString GlobalTCType
 where
 	toString (GTT_Basic basic_type)							= create_type_string (toString basic_type) PredefinedModuleName
 	toString GTT_Function									= " -> "
-	toString (GTT_Constructor type_symb_indent mod_name)	= create_type_string type_symb_indent.type_name.id_name mod_name
+	toString (GTT_Constructor type_symb_indent mod_name _)	= create_type_string type_symb_indent.type_name.id_name mod_name
 //	 +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
 
 create_type_string type_name module_name

@@ -2136,7 +2136,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
-	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
+	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [], si_next_TC_member_index = 0, si_TC_instances = [], si_type_constructors_in_patterns = [] }
 	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_out})
@@ -2324,22 +2324,22 @@ where
 		| isEmpty over_info 
 			# ts_type_heaps = ts.ts_type_heaps
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
-									tci_type_var_heap = ts_type_heaps.th_vars,  tci_dcl_modules = dcl_modules } 
-			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
+									tci_type_var_heap = ts_type_heaps.th_vars,  tci_dcl_modules = dcl_modules, tci_type_constructors_in_patterns = os_special_instances.si_type_constructors_in_patterns } 
+			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap,tci_type_constructors_in_patterns}, ts_var_heap, ts_error, os_predef_symbols)
 			  		= updateDynamics comp local_pattern_variables main_dcl_module_n fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok, 
-				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
+				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances, si_type_constructors_in_patterns = tci_type_constructors_in_patterns },
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 						ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env})
 			# ts_type_heaps = ts.ts_type_heaps
-			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
+			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances, tci_type_constructors_in_patterns = os_special_instances.si_type_constructors_in_patterns,
 									tci_type_var_heap = ts_type_heaps.th_vars, tci_dcl_modules = dcl_modules } 
-			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
+			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap,tci_type_constructors_in_patterns}, ts_var_heap, ts_error, os_predef_symbols)
 			  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n fun_defs ts.ts_fun_env
 			  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok,
-				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
+				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances, si_type_constructors_in_patterns = tci_type_constructors_in_patterns },
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 						ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env})
@@ -2576,7 +2576,7 @@ where
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
 
-	create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index,si_next_TC_member_index,si_TC_instances} fun_env_size common_defs fun_defs predef_symbols type_heaps error
+	create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index,si_next_TC_member_index,si_TC_instances,si_type_constructors_in_patterns} fun_env_size common_defs fun_defs predef_symbols type_heaps error
 		# fun_defs = add_extra_elements_to_fun_def_array (si_next_array_member_index-fun_env_size) fun_defs
 		  	with
 		  		add_extra_elements_to_fun_def_array n_new_elements fun_defs
@@ -2591,10 +2591,15 @@ where
 		  		= convert_list_instances si_list_instances PD_UListClass common_defs fun_defs predef_symbols type_heaps error
 		  (tail_strict_list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
 		  		= convert_list_instances si_tail_strict_list_instances PD_UTSListClass common_defs fun_defs predef_symbols type_heaps error
-		  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
+		  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = mark_used_type_constructors_in_applications_of_type_dependent_functions gtci \\ gtci=:{gtci_index, gtci_type} <- si_TC_instances}
 		  array_first_instance_indices = first_instance_indices si_array_instances
 		= (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,type_code_instances,predef_symbols,type_heaps,error)
 	where
+		mark_used_type_constructors_in_applications_of_type_dependent_functions {gtci_index, gtci_type=GTT_Constructor type_symb_ident module_name False}
+			= GTT_Constructor type_symb_ident module_name True
+		mark_used_type_constructors_in_applications_of_type_dependent_functions {gtci_type}
+			= gtci_type
+	
 		convert_array_instances array_instances common_defs fun_defs predef_symbols type_heaps error
 			| isEmpty array_instances
 				= ([],fun_defs, predef_symbols, type_heaps, error)

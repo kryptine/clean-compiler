@@ -1278,7 +1278,7 @@ instance == OverloadedListType
 						| TCE_Selector		![Selection]	!VarInfoPtr
 						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
 
-::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent !String | GTT_Function
+::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent !String !Bool | GTT_Function
 	
 
 ::	FunctionPattern	= FP_Basic !BasicValue !(Optional FreeVar)

@@ -18,12 +18,13 @@ import syntax, check, typesupport
 	}
 
 ::	SpecialInstances =
-	{	si_next_array_member_index		:: !Index
-	,	si_array_instances				:: ![ArrayInstance]
-	,	si_list_instances				:: ![ArrayInstance]
-	,	si_tail_strict_list_instances	:: ![ArrayInstance]
-	,	si_next_TC_member_index			:: !Index
-	,	si_TC_instances					:: ![GlobalTCInstance]
+	{	si_next_array_member_index			:: !Index
+	,	si_array_instances					:: ![ArrayInstance]
+	,	si_list_instances					:: ![ArrayInstance]
+	,	si_tail_strict_list_instances		:: ![ArrayInstance]
+	,	si_next_TC_member_index				:: !Index
+	,	si_TC_instances						:: ![GlobalTCInstance]
+	,	si_type_constructors_in_patterns	:: ![!Index]
 	}
 	
 ::	OverloadingState =
@@ -43,10 +44,11 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 
 ::	TypeCodeInfo =
-	{	tci_next_index			:: !Index
-	,	tci_instances			:: ![GlobalTCInstance]
-	,	tci_type_var_heap		:: !.TypeVarHeap
-	,	tci_dcl_modules			:: !{# DclModule}
+	{	tci_next_index						:: !Index
+	,	tci_instances						:: ![GlobalTCInstance]
+	,	tci_type_var_heap					:: !.TypeVarHeap
+	,	tci_dcl_modules						:: !{# DclModule}
+	,	tci_type_constructors_in_patterns	:: ![!Index]
 	}
 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap

@@ -41,3 +41,7 @@ instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b
 //1.3
 instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 
 //3.1
+
+instance WriteTypeInfo (a,b) | WriteTypeInfo a & WriteTypeInfo b
+
+instance WriteTypeInfo TypeSymbIdent
