@@ -665,7 +665,7 @@ stc_funcdef ::
 
 // stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body) = block "stc_funcdef"
 stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body)
-= (exprheap1,varalloc2,TransformedBody tb,/*tb.tb_args++*/localvars,eips)
+= (exprheap1,varalloc2,TransformedBody tb,/*tb.tb_args++*/(localvars--->("convert.stc_funcdef.localvars used",localvars)),eips)
     ---> ("convert.stc_funcdef localvars",tb.tb_args)
   where tb
         = { tb_args = map (mkfreevar 0 o varenv) args
@@ -680,6 +680,7 @@ stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body)
 mkfreevar :: Level (Ident,VarInfoPtr) -> FreeVar
 mkfreevar level identvarinfoptr
 = freevar
+    ---> ("convert.mkfreevar.freevar used",freevar)
   where freevar
         = { fv_def_level = level
           , fv_name      = ident
@@ -739,7 +740,7 @@ convert_funcbody ::
     )
 
 convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (MatchPattern pattern yesbody nobody)
-= (exprheap3,varalloc3,match_expression,[default_freevar:localvars2],eips3)
+= (exprheap3,varalloc3,match_expression,localvars3,eips3)
     ---> ("convert.convert_funcbody localvars",default_freevar)
   where (exprheap3,([match_expression:_],eips1))
         = mk_match_expression (exprheap2,([],eips0))
@@ -764,10 +765,10 @@ convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0
           where (exprheap1`,varalloc1`,expr`,localvars1`,eips1`)
                 = convert_funcbody stringtype getconsdef level` patnodes` varenv` exprheap0` varalloc0` localvars0` eips0` yesbody
 
-        (mk_default_expression,mk_match_expression)
+        (mk_default_expression,mk_match_expression,localvars3)
         = if (default_refcount==1)
-             (mk_match_failure_expression,mk_case_expression)
-             (mk_match_failure_reference,mk_let_expression)
+             (mk_match_failure_expression,mk_case_expression,localvars2)
+             (mk_match_failure_reference,mk_let_expression,[default_freevar:localvars2])
 
         mk_match_failure_expression (exprheap`0,(rest,eips`0))
         = (exprheap`0,([match_failure_expression:rest],eips`0))
@@ -892,7 +893,7 @@ convert_matchpattern ::
     )
 
 convert_matchpattern getconsdef build_casebranch patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
-= (exprheap4,varalloc2,case_expression,1+refcount,freevars++localvars1,[cip,bvip:eips2])
+= (exprheap4,varalloc2,case_expression,1+refcount,(freevars--->("convert.convert_matchpattern.freevars used",freevars))++localvars1,[cip,bvip:eips2])
     ---> (("convert.convert_matchpattern localvars",freevars),("refcount",refcount,"->",1+refcount))
   where (exprheap3,varalloc2,branch_expression,refcount,localvars1,eips2)
         = convert_matchpatterns getconsdef build_casebranch patnodes1 varenv1 exprheap2 varalloc1 mk_default_expression pgraph (level+1) localvars0 eips1 pargs
@@ -914,7 +915,7 @@ convert_matchpattern getconsdef build_casebranch patnodes0 varenv0 exprheap0 var
         (varenv1,varalloc1)
         = allocate_vars "_parg" varenv0 varalloc0 pargs
         patnodes1 = pargs++patnodes0
-        freevars = map (mkfreevar level o varenv1) pargs
+        freevars = map (flip (--->) "convert.convert_matchpattern.freevars.<freevar> used from freevars" o mkfreevar level o varenv1) pargs
 
 allocate_vars ::
     {#.Char}
@@ -1087,7 +1088,7 @@ bind_a_variable refcounter level lookup_unshared var (varalloc0,(defaultmksubexp
                 (varexprptr,exprheap1) = newPtr EI_Empty exprheap0
                 eips1 = [varexprptr:eips0]
         ((ident,varinfoptr),varalloc1) = newvar "_share" varalloc0
-        localvars1 = [freevar:localvars0]
+        localvars1 = [(freevar--->"convert.bind_a_variable.freevar used from localvars1"):localvars0]
 
 new_convert_graph_node ::
     .PredefinedSymbol
