@@ -119,7 +119,7 @@ static Fun
 # ifndef _DB_
 static
 # endif
-Fun *strict_cons_sym,*tail_strict_cons_sym,*strict_tail_strict_cons_sym;
+Fun *lazy_cons_sym0,*strict_cons_sym0,*tail_strict_cons_sym0,*strict_tail_strict_cons_sym0;
 #endif
 
 static ExpRepr top;
@@ -2194,15 +2194,18 @@ static Exp ConvertNode (Node node, NodeId nid)
 				case cons_symb:
 #if STRICT_LISTS
 					if (node->node_symbol->symb_head_strictness>1){
-						e->e_fun = node->node_symbol->symb_tail_strictness ? strict_tail_strict_cons_sym : strict_cons_sym;
+						e->e_fun = (node->node_symbol->symb_tail_strictness ? strict_tail_strict_cons_sym0 : strict_cons_sym0)+arity;
 						break;
 					} else if (node->node_symbol->symb_tail_strictness){
-						e->e_fun = tail_strict_cons_sym;
+						e->e_fun = tail_strict_cons_sym0+arity;
 						break;					
 					}
-#endif
+					e->e_hnf = True;
+					e->e_fun = lazy_cons_sym0+arity;
+#else
 					e->e_hnf = True;
 					e->e_fun = conssym;
+#endif
 					break;
 				case nil_symb:
 					e->e_hnf = True;
@@ -2517,15 +2520,18 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 		case cons_symb:
 #if STRICT_LISTS
 			if (symbol_p->symb_head_strictness>1){
-				e->e_fun = symbol_p->symb_tail_strictness ? strict_tail_strict_cons_sym : strict_cons_sym;
+				e->e_fun = (symbol_p->symb_tail_strictness ? strict_tail_strict_cons_sym0 : strict_cons_sym0)+arity;
 				break;
 			} else if (symbol_p->symb_tail_strictness){
-				e->e_fun = tail_strict_cons_sym;
+				e->e_fun = tail_strict_cons_sym0+arity;
 				break;					
 			}
-#endif
+			e->e_hnf = True;
+			e->e_fun = lazy_cons_sym0+arity;
+#else
 			e->e_hnf = True;
 			e->e_fun = conssym;
+#endif
 			break;
 		case nil_symb:
 			e->e_hnf = True;
@@ -3050,7 +3056,8 @@ static void init_predefined_symbols (void)
 	 */
 	nr_funs = MaxNodeArity + MaxNodeArity + MaxNrAnnots + 2 + 4 + 1
 #if STRICT_LISTS
-				+3
+				/* +3 */
+				+11
 #endif
 	;
 	if (StrictDoLists)
@@ -3117,6 +3124,7 @@ static void init_predefined_symbols (void)
 	InitStrictResult (& f->fun_strictresult);
 	f++;
 
+#if !STRICT_LISTS
 	conssym = f;
 	f->fun_symbol     = Null;
 	f->fun_arity      = 2;
@@ -3125,38 +3133,59 @@ static void init_predefined_symbols (void)
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
+#else
+	lazy_cons_sym0 = f;
 
-#if STRICT_LISTS
-	strict_cons_sym = f;
-	f->fun_symbol = NULL;
-	f->fun_arity = 2;
-	f->fun_kind = Constructor;
-	f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
-	f->fun_single = False;
-	InitStrictInfo (f->fun_strictargs,HnfStrict);
-	InitStrictResult (&f->fun_strictresult);
-	++f;
+	for (i=0; i<=2; ++i){
+		f->fun_symbol     = Null;
+		f->fun_arity      = i;
+		f->fun_kind       = Constructor;
+		f->fun_strictargs = Null;
+		f->fun_single     = False;
+		InitStrictResult (& f->fun_strictresult);
+		f++;
+	}
+	
+	strict_cons_sym0 = f;
 
-	tail_strict_cons_sym = f;
-	f->fun_symbol = NULL;
-	f->fun_arity = 2;
-	f->fun_kind = Constructor;
-	f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
-	f->fun_single = False;
-	InitStrictInfo (&f->fun_strictargs[1],HnfStrict);
-	InitStrictResult (&f->fun_strictresult);
-	++f;
+	for (i=0; i<=2; ++i){
+		f->fun_symbol = NULL;
+		f->fun_arity = i;
+		f->fun_kind = Constructor;
+		f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
+		f->fun_single = False;
+		InitStrictInfo (f->fun_strictargs,HnfStrict);
+		InitStrictResult (&f->fun_strictresult);
+		++f;
+	}
+	
+	tail_strict_cons_sym0 = f;
 
-	strict_tail_strict_cons_sym = f;
-	f->fun_symbol = NULL;
-	f->fun_arity = 2;
-	f->fun_kind = Constructor;
-	f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
-	f->fun_single = False;
-	InitStrictInfo (f->fun_strictargs,HnfStrict);
-	InitStrictInfo (&f->fun_strictargs[1],HnfStrict);
-	InitStrictResult (&f->fun_strictresult);
-	++f;
+	for (i=0; i<=2; ++i){
+		f->fun_symbol = NULL;
+		f->fun_arity = i;
+		f->fun_kind = Constructor;
+		f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
+		f->fun_single = False;
+		InitStrictInfo (&f->fun_strictargs[1],HnfStrict);
+		InitStrictResult (&f->fun_strictresult);
+		++f;
+	}
+	
+	strict_tail_strict_cons_sym0 = f;
+	for (i=0; i<=2; ++i){
+		f->fun_symbol = NULL;
+		f->fun_arity = i;
+		f->fun_kind = Constructor;
+		f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
+		f->fun_single = False;
+		InitStrictInfo (f->fun_strictargs,HnfStrict);
+		InitStrictInfo (&f->fun_strictargs[1],HnfStrict);
+		InitStrictResult (&f->fun_strictresult);
+		++f;
+	}
+
+	conssym = lazy_cons_sym0+2;
 #endif
 
 	if_sym = f;
@@ -3522,7 +3551,7 @@ static Path AddToPath (Exp e, Path p)
 		return p;
 
 	if (! StrictDoAllPaths && p && p->p_exp->e_kind == Value && p->p_exp->e_fun->fun_symbol &&
-	    p->p_exp->e_fun->fun_symbol->sdef_ancestor != e->e_fun->fun_symbol->sdef_ancestor)
+		p->p_exp->e_fun->fun_symbol->sdef_ancestor != e->e_fun->fun_symbol->sdef_ancestor)
 		return p;
 		
 	new = SAllocType (PathRepr);
@@ -5147,6 +5176,10 @@ static void FindStrictPropertiesOfFunction (Fun *f)
 	max_depth_reached = False;
 	max_time_reached  = False;
 	CurrentName       = f->fun_symbol->sdef_ident->ident_name;
+
+#if 0
+	printf ("%s\n",CurrentName);
+#endif
 
 #ifdef _DB_
 	DBPrinting = 1; /* strcmp ("catenate", CurrentName) == 0; */
