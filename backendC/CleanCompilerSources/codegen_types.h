@@ -22,6 +22,9 @@ STRUCT (node_id_ref_count_list,NodeIdRefCountList){
 	struct node_id_ref_count_list *	nrcl_next;
 	struct node_id *				nrcl_node_id;
 	int								nrcl_ref_count;
+#if BOXED_RECORDS
+	int								nrcl_mark2;
+#endif
 };
 
 STRUCT (free_unique_node_ids,FreeUniqueNodeIds){

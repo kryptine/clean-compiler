@@ -211,6 +211,11 @@ void ConvertAnnotationToState (Annotation annot,StateS *state_p)
 	}
 }
 
+#if 0
+# include "dbprint.h"
+extern File rules_file;
+#endif
+
 static void GenRecordState (SymbDef sdef);
 
 void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
@@ -226,7 +231,12 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 	} else if (symbol->symb_kind==definition && symbol->symb_def->sdef_kind==RECORDTYPE){
 		if (kind==StrictOnA){
 			GenRecordState (symbol->symb_def);
-			*state_p=symbol->symb_def->sdef_record_state;
+#if BOXED_RECORDS
+			if (symbol->symb_def->sdef_boxed_record)
+				SetUnaryState (state_p,StrictOnA,RecordObj);
+			else
+#endif
+				*state_p=symbol->symb_def->sdef_record_state;
 		} else
 			SetUnaryState (state_p,kind,RecordObj);
 	} else
@@ -1131,7 +1141,7 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 
 			def->sdef_rule->rule_state_p = allocate_function_state (def->sdef_arity);
 			rootstate = DetermineStatesOfRuleType (def->sdef_rule->rule_type,def->sdef_rule->rule_state_p);
-
+			
 			if (def->sdef_exported && def->sdef_dcl_icl!=NULL && def->sdef_dcl_icl->sdef_kind!=INSTANCE){
 				def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p = allocate_function_state (def->sdef_arity);
 				rootstate = DetermineStatesOfRuleType (def->sdef_dcl_icl->sdef_rule_type->rule_type_rule,def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p);
@@ -1529,11 +1539,6 @@ static Bool AdjustState (StateS *old_state_p, StateS newstate)
 		return False;
 }
 
-#if 0
-# include "dbprint.h"
-extern File rules_file;
-#endif
-
 static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs *t_or_e_defs, StateS demstate,int local_scope)
 {
 	Node node;
@@ -1691,10 +1696,12 @@ static Bool ArgsInAStrictContext (StateP arg_state_p,Args argn, int local_scope)
 	if (!semi_strict){
 #if DESTRUCTIVE_RECORD_UPDATES
 		if (demanded_state_p->state_type==SimpleState && 
-			demanded_state_p->state_kind==StrictOnA && 
-			demanded_state_p->state_object==RecordObj)
+			demanded_state_p->state_kind==StrictOnA
+/*			 && demanded_state_p->state_object==RecordObj */
+			)
 		{
 			node->node_state = *demanded_state_p;
+			node->node_state.state_object = RecordObj;
 		} else
 #endif	
 		node->node_state = record_sdef->sdef_record_state;
@@ -1702,10 +1709,24 @@ static Bool ArgsInAStrictContext (StateP arg_state_p,Args argn, int local_scope)
 
 	arg=node->node_arguments;
 	
-	if (semi_strict
-		? ArgInAStrictContext (arg,StrictState,True,local_scope) 
-		: DetermineStrictArgContext (arg, record_sdef->sdef_record_state,local_scope))
+	if (semi_strict){
+		if (ArgInAStrictContext (arg,StrictState,True,local_scope))
 			parallel = True;
+	} else {
+
+#if BOXED_RECORDS
+		if (record_sdef->sdef_boxed_record){
+			StateS boxed_record_state;
+				
+			SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
+			if (DetermineStrictArgContext (arg, boxed_record_state,local_scope))
+				parallel = True;			
+		} else
+#endif
+
+		if (DetermineStrictArgContext (arg, record_sdef->sdef_record_state,local_scope))
+			parallel = True;
+	}
 	
 	type_arg_number=0;
 
@@ -2067,6 +2088,11 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 							optimise_tuple_result_function (node,demanded_state);
 
 					if (sdef->sdef_kind==RECORDTYPE)
+#if BOXED_RECORDS
+						if (sdef->sdef_boxed_record)
+							SetUnaryState (&node->node_state,StrictOnA,RecordObj);
+						else
+#endif
 						node->node_state = sdef->sdef_record_state;
 					else
 						node->node_state = definition_state_p[-1];
@@ -2092,13 +2118,24 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 		}
 	} else if (node->node_kind==SelectorNode){
 		SymbDef ssymb;
-
+		StateP record_state_p,unboxed_record_state_p;
+#if BOXED_RECORDS
+		static StateS boxed_record_state;
+#endif		
 		ssymb = node->node_symbol->symb_def;
+
+		unboxed_record_state_p=&ssymb->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+#if BOXED_RECORDS		
+		if (ssymb->sdef_type->type_lhs->ft_symbol->symb_def->sdef_boxed_record){
+			SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
+			record_state_p = &boxed_record_state;
+		} else
+#endif
+		record_state_p=unboxed_record_state_p;
 		
 		if (node->node_arity>=SELECTOR_U){
-			StateP record_state_p,tuple_arg_states;
+			StateP tuple_arg_states;
 			
-			record_state_p=&ssymb->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
 			tuple_arg_states=NewArrayOfStates (2);
 
 			if (node->node_arity>=SELECTOR_L){
@@ -2135,11 +2172,10 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				tuple_arg_states[1]=*record_state_p;
 			}			
 
-			tuple_arg_states[0]=record_state_p->state_record_arguments[ssymb->sdef_sel_field_number];
+			tuple_arg_states[0]=unboxed_record_state_p->state_record_arguments[ssymb->sdef_sel_field_number];
 			SetTupleState (&node->node_state,tuple_arg_states,2);
 		} else {
-			parallel = DetermineStrictArgContext (node->node_arguments, 
-						ssymb->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state,local_scope);
+			parallel = DetermineStrictArgContext (node->node_arguments,*record_state_p,local_scope);
 			node->node_state=demanded_state;
 		}
 	} else if (node->node_kind==UpdateNode)
@@ -2441,9 +2477,16 @@ static void DetermineStatesOfNodeDefs (NodeDefs firstdef, int local_scope)
 		if (next->def_node)
 			if (! (next->def_id->nid_ref_count_copy<0 ||
 					(next->def_id->nid_ref_count_copy==0 && (next->def_id->nid_mark & ON_A_CYCLE_MASK))))
+#if 1
+				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbol->symb_def->sdef_ident->ident_name);
+#else
 			{
-				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbol->symb_def->sdef_ident->ident_name/*next->def_id->nid_ident->ident_name*/);
+				char s[20];
+				
+				sprintf (s,"%x %d %d",(int)next->def_id,next->def_id->nid_ref_count_copy,next->def_id->nid_refcount);
+				error_in_function_s ("DetermineStatesOfNodeDefs",/*CurrentSymbol->symb_def->sdef_ident->ident_name*/s/*next->def_id->nid_ident->ident_name*/);
 			}
+#endif
 }
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
