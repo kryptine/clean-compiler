@@ -2,6 +2,8 @@ implementation module coreclean
 
 // $Id$
 
+import syntax
+
 :: SuclTypeSymbol
  = SuclINT
 
@@ -9,7 +11,7 @@ implementation module coreclean
  = SuclANONYMOUS Int
 
 :: SuclSymbol
- = SuclInt Int
+ = SuclUser Ident
 
 :: SuclSymbolKind
  = SuclFunction
