@@ -2249,7 +2249,7 @@ get_producer_class (SK_Function { glob_module, glob_object }) ro fun_heap cons_a
 	# ({cc_producer},cons_args) = cons_args![glob_object]
 	= (cc_producer, fun_heap, cons_args)
 get_producer_class (SK_Constructor {glob_module, glob_object}) ro fun_heap cons_args
-	= (True, fun_heap, cons_args)
+	= (SwitchConstructorFusion True False, fun_heap, cons_args)
 
 //@ transformApplication
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
@@ -2474,12 +2474,34 @@ determineProducer _ _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, a
 	  , mapAppend Var free_vars new_args
 	  , { ti & ti_var_heap = ti_var_heap }
 	  )
-determineProducer _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructor _, symb_name}, app_args} _
+determineProducer _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_name}, app_args} _
 				  new_args prod_index producers ro ti
-	| SwitchConstructorFusion (ro.ro_transform_fusion && linear_bit) False
+	# {cons_type}								= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
+	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro	//---> ("rnf_args",symb_name)
+	| SwitchConstructorFusion
+		(ro.ro_transform_fusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
+		False
 		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
 	= ( producers, [App app : new_args ], ti)
+where
+	rnf_args [] index strictness ro = True
+	rnf_args [arg:args] index strictness ro
+		| arg_is_strict index strictness
+			= case arg of
+				BasicExpr _	-> rnf_args args (inc index) strictness ro			//---> ("rnf_arg","Basic")
+				App app		-> rnf_app_args app args index strictness ro		//---> ("rnf_arg","App")
+				_			-> False											//---> ("rnf_arg","Other")
+		= rnf_args args (inc index) strictness ro								//---> ("rnf_arg","Lazy")
+	
+	rnf_app_args {app_symb=symb=:{symb_kind = SK_Constructor cons_index, symb_name}, app_args} args index strictness ro
+		# {cons_type}		= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
+		| rnf_args app_args 0 cons_type.st_args_strictness ro					//---> ("rnf_args",symb_name)
+			= rnf_args args (inc index) strictness ro
+			= False
+	// what else is rnf => curried apps
+	rnf_app_args {app_symb=symb=:{symb_kind}, app_args} args index strictness ro
+		= False
 determineProducer is_applied_to_macro_fun consumer_is_curried linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
