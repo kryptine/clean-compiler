@@ -20,9 +20,9 @@ Start world
 					// Supercompilation
 				,	"-SC"
 					// paths
-				,	"-P", testDir +++ ";" +++ clean20Dir +++ "StdEnv" +++ ";" +++ clean20Dir +++ "IOInterface"
+				,	"-P", testDir +++ ";" +++ cleanDir +++ "IOInterface" +++ ";" +++ cleanDir +++ "StdEnv"
 				]
 		testDir
-			=	"c:\\Vincent\\Sucl\\"
-		clean20Dir
-			=	"e:\\Users\\Ronny\\Develop\\Clean 2.0\\"
+			=	"C:\\Vincent\\Sucl\\"
+		cleanDir
+			=	"C:\\Clean 1.3.3\\"
