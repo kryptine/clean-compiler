@@ -5,9 +5,10 @@ import StdEnv
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
 import genericsupport, compilerSwitches, type_io_common
 
-::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
-
-::	ClassInstanceInfo :== {# {! .InstanceTree}}
+::	LocalTypePatternVariable =
+	{	ltpv_var			:: !Int
+	,	ltpv_new_var		:: !VarInfoPtr
+	}
 
 ::	ReducedContext = 
 	{	rc_class			:: !Global DefinedSymbol
@@ -33,37 +34,6 @@ import genericsupport, compilerSwitches, type_io_common
 						| CA_GlobalTypeCode !TypeCodeInstance	/* for (global) type constructors */
 
 
-::	ArrayInstance =
-	{	ai_record		:: !TypeSymbIdent
-	,	ai_members		:: !{# DefinedSymbol}
-	}
-
-::	GlobalTCInstance =
-	{	gtci_type		:: !GlobalTCType
-	,	gtci_index		:: !Index
-	}
-
-::	SpecialInstances =
-	{	si_next_array_member_index			:: !Index
-	,	si_array_instances					:: ![ArrayInstance]
-	,	si_list_instances					:: ![ArrayInstance]
-	,	si_tail_strict_list_instances		:: ![ArrayInstance]
-	}
-
-::	LocalTypePatternVariable =
-	{	ltpv_var			:: !Int
-	,	ltpv_new_var		:: !VarInfoPtr
-	}
-
-::	OverloadingState =
-	{	os_type_heaps			:: !.TypeHeaps
-	,	os_var_heap				:: !.VarHeap
-	,	os_symbol_heap			:: !.ExpressionHeap
-	,	os_generic_heap			:: !.GenericHeap
-	,	os_predef_symbols		:: !.PredefinedSymbols
-	,	os_special_instances	:: !.SpecialInstances
-	,	os_error				:: !.ErrorAdmin				
-	}
 
 		
 instanceError symbol types err
@@ -743,8 +713,6 @@ where
 	specialized_types_in_context_match _ _ type_var_heap
 		= (False,type_var_heap);
 
-::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
-
 tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os dcl_modules
@@ -1261,14 +1229,6 @@ getTCDictionary symb_ident var_info_ptr (var_heap, error)
 			-> (new_info_ptr, (var_heap <:= (var_info_ptr, VI_ClassVar var_ident new_info_ptr (inc count)), error))
 		_
 			-> (var_info_ptr, (var_heap, overloadingError symb_ident error))
-
-::	TypeCodeInfo =
-	{	tci_type_var_heap					:: !.TypeVarHeap
-	,	tci_attr_var_heap					:: !.AttrVarHeap
-	,	tci_dcl_modules						:: !{# DclModule}
-	,	tci_common_defs						:: !{# CommonDefs }
-	}
-
 
 toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} common_defs
 	| module_index == cPredefinedModuleIndex
