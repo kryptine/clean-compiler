@@ -17,6 +17,7 @@ block func = mstub func "blocked"
 
 :: SuclTypeSymbol
  = SuclUSER (Global Index)
+ | SuclTCVAR ConsVariable   // A type constructor variable
  | SuclFN
  | SuclTUPLE Int            // The tuple type of the specified size
  | SuclINT
@@ -63,22 +64,24 @@ suclheap :: [SuclVariable]
 suclheap =: map SuclAnonymous [0..]
 
 instance == SuclTypeSymbol
-where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
-      (==)  SuclFN            SuclFN           = True
-      (==) (SuclTUPLE m)     (SuclTUPLE n)     = m==n
-      (==)  SuclINT           SuclINT          = True
-      (==)  SuclCHAR          SuclCHAR         = True
-      (==)  SuclREAL          SuclREAL         = True
-      (==)  SuclBOOL          SuclBOOL         = True
-      (==)  SuclSTRING        SuclSTRING       = True
-      (==)  SuclDYNAMIC       SuclDYNAMIC      = True
-      (==)  SuclFILE          SuclFILE         = True
-      (==)  SuclWORLD         SuclWORLD        = True
-      (==)  SuclERROR         SuclERROR        = True
-      (==)  _                 _                = False
+where (==) (SuclUSER tsid1) (SuclUSER tsid2) = tsid1==tsid2
+      (==) (SuclTCVAR tcv1) (SuclTCVAR tcv2) = tcv1==tcv2
+      (==)  SuclFN           SuclFN          = True
+      (==) (SuclTUPLE m)    (SuclTUPLE n)    = m==n
+      (==)  SuclINT          SuclINT         = True
+      (==)  SuclCHAR         SuclCHAR        = True
+      (==)  SuclREAL         SuclREAL        = True
+      (==)  SuclBOOL         SuclBOOL        = True
+      (==)  SuclSTRING       SuclSTRING      = True
+      (==)  SuclDYNAMIC      SuclDYNAMIC     = True
+      (==)  SuclFILE         SuclFILE        = True
+      (==)  SuclWORLD        SuclWORLD       = True
+      (==)  SuclERROR        SuclERROR       = True
+      (==)  _                _               = False
 
 instance toString SuclTypeSymbol
 where toString (SuclUSER tsid ) = toString tsid
+      toString (SuclTCVAR tcv1) = toString tcv1
       toString  SuclFN          = "Arrow/2"
       toString (SuclTUPLE n)    = "("+++toString (repeatn (dec n) ',')+++")"
       toString  SuclINT         = "Int"
@@ -105,6 +108,11 @@ where toString (SuclANONYMOUS i) = "V_"+++toString i
 
 instance toString TypeVar
 where toString tv = toString tv.tv_info_ptr
+
+instance toString ConsVariable
+where toString (CV tv)       = "CV ("     +++toString tv +++")"
+      toString (TempCV tvi)  = "TempCV (" +++toString tvi+++")"
+      toString (TempQCV tvi) = "TempQCV ("+++toString tvi+++")"
 
 instance <<< SuclTypeVariable
 where (<<<) file tvar = file <<< toString tvar
@@ -225,6 +233,7 @@ consttyperule tsym
 corecomplete :: SuclTypeSymbol -> [SuclSymbol] -> Bool
 
 corecomplete (SuclUSER tsid) = const False  // Must be an abstype...
+corecomplete (SuclTCVAR tcv) = abort ("Cannot determine completeness of a type constructor variable ("+++toString tcv+++")")
 corecomplete SuclFN = const False
 corecomplete (SuclTUPLE n) = not o isEmpty  // If there's anything in the list, it's the only tuple constructor
 corecomplete SuclINT = const False

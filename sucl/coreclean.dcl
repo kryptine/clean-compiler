@@ -12,13 +12,14 @@ from StdFile import <<<
 from strat import Substrategy
 from spine import Spine,Subspine
 from graph import Graph,Node
-from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo
+from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo,ConsVariable
 from general import BITVECT
 from Heap import Ptr,PtrN,HeapN
 from cleanversion import String
 
 :: SuclTypeSymbol
  = SuclUSER (Global Index)  // A user-defined type symbol (index into com_type_def array)
+ | SuclTCVAR ConsVariable   // A type constructor variable
  | SuclFN                   // THE function type for a function with specified arity
  | SuclTUPLE Int            // The tuple type of the specified size
  | SuclINT                  // Built-in integer

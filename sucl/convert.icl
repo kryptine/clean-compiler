@@ -188,6 +188,13 @@ convert_atype atype (heap,(graph,rest,srest))
                         [typevar:heap`] = heap
                         typesym = SuclUSER typename.type_index
 
+              // An type constructor application
+              tcvar :@: atypes
+               -> (heap``,updategraph typevar (typesym,typeargs) graph`,typevar)
+                  where (heap``,(graph`,typeargs,_)) = convert_atypes (heap`,graph) atypes // _ => forget annotations of subtypes
+                        [typevar:heap`] = heap
+                        typesym = SuclTCVAR tcvar
+
               // A function type (a->b)
               functype --> argtype
                -> (heap```,graph```,suclrestype)
