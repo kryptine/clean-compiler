@@ -770,8 +770,12 @@ markLocalLetVar :: LetBind *VarHeap -> *VarHeap
 markLocalLetVar {lb_dst={fv_info_ptr}} varHeap
 	=	varHeap <:= (fv_info_ptr, VI_LocalLetVar)
 
+is_guard_case [{bp_value=BVB True,bp_expr},{bp_value=BVB False,bp_expr=false_expr}] (Yes _) False
+	= is_then_or_else bp_expr && is_then_or_else false_expr
 is_guard_case [{bp_value=BVB True,bp_expr}:patterns] case_default False
 	= has_no_rooted_case bp_expr
+is_guard_case [{bp_value=BVB False,bp_expr},{bp_value=BVB True,bp_expr=true_expr}] (Yes _) False
+	= is_then_or_else bp_expr && is_then_or_else true_expr
 is_guard_case [{bp_value=BVB False,bp_expr}:patterns] case_default False
 	= then_part_exists_and_has_no_rooted_case patterns case_default
 	where
@@ -866,7 +870,6 @@ instance convertRootCases Expression where
 		= case case_guards of // -*-> "convertRootCases, guards???" of
 			BasicPatterns BT_Bool patterns
 				| is_guard_case patterns case_default case_explicit
-//				| caseFree patterns && (isTruePattern patterns || caseFree case_default)
 					-> convert_boolean_case_into_guard ci case_expr patterns case_default case_info_ptr cs
 			_
 				-> case case_expr of
@@ -892,11 +895,6 @@ instance convertRootCases Expression where
 //						->	convertCases ci caseExpr cs // -*-> "convertRootCases, no guards"
 						-> convertNonRootCase ci kees cs
 	where
-		isTruePattern [{bp_value=BVB True}:_]
-			= True
-		isTruePattern _
-			= False	
-
 		convert_boolean_case_into_guard ci guard [ alt=:{bp_value=BVB sign_of_then_part,bp_expr} : alts ] case_default case_info_ptr cs
 //			# (guard, cs) = convertCases ci guard cs
 			# (guard, cs) = convert_guard guard ci cs
