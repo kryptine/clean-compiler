@@ -54,6 +54,83 @@ static int use_clean_system_files_folder=1;
 
 char *PATHLIST = SEARCHPATH;
 
+static Bool file_exists (char *path)
+{
+	return access (path, F_OK) == 0;
+}
+
+extern char *path_parameter;
+
+static Bool findfilepath (char *fname,FileKind kind,char *mode,char *path)
+{
+    char *s,*path_elem,c,*pathlist,*ext;
+	int in_clean_system_files_folder;
+
+	if (path_parameter==NULL)
+	    pathlist=getenv ("CLEANPATH");
+	else
+		pathlist=path_parameter;
+
+    if (pathlist==NULL)
+		pathlist=".";
+
+	ext = GetFileExtension (kind);
+
+	in_clean_system_files_folder=0;
+
+	if (use_clean_system_files_folder)
+		switch (kind){
+			case abcFile:
+			case obj00File:
+			case obj20File:
+			case obj81File:
+				in_clean_system_files_folder=1;
+		}
+
+
+	if (! (fname[0]=='/')){
+		path_elem = pathlist;
+
+		s=path_elem;		
+		for (;;){
+			c = *s;
+			if (c == ':' || c == '\0'){
+				char *from_p,*dest_p;
+			
+				from_p=path_elem;
+				dest_p=path;
+				while (from_p<s)
+					*dest_p++ = *from_p++;
+				*dest_p = '\0';
+
+				if (in_clean_system_files_folder)
+					strcat (path,"/Clean System Files/");
+				else
+				    strcat (path,"/");
+			    strcat (path,fname);
+			    strcat (path,ext);
+				if (file_exists (path))
+					return True;
+		    
+			    if (c == '\0')
+			    	break;
+	
+				path_elem = ++s;
+			} else
+			    ++s;
+		}
+	}
+
+	if (in_clean_system_files_folder){
+		strcpy (path,"Clean System Files/");
+		strcat (path,fname);
+	} else
+		strcpy (path,fname);
+	strcat (path,ext);
+
+ 	return file_exists (path);
+}
+#if 0
 static Bool findfilepath (char *fname, FileKind kind, char *mode, char *path)
 {
 	int accmode;
@@ -138,6 +215,7 @@ static Bool findfilepath (char *fname, FileKind kind, char *mode, char *path)
 
  	return ((Bool) (access (path, accmode) == 0));
 }
+#endif
 
 File FOpen (char *wname, FileKind kind, char *mode)
 {
