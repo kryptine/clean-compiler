@@ -47,6 +47,11 @@ convert_fundef fundef (typerulemap,strictsmap,rulesmap,kindmap)
          rules = convert_functionbody fun_body
          kind = convert_kind fun_kind
 
+/* Convert the SymbolType data structure
+   This type describes the types of (function) symbols
+   We use the principal type
+   Strictness annotations are to be done yet
+*/
 convert_symboltype :: SymbolType -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
 convert_symboltype {st_vars,st_args,st_arity,st_result,st_context,st_attr_vars,st_attr_env}
  = (mkrule typeargs typeroot graph``,nostricts)
@@ -54,6 +59,12 @@ convert_symboltype {st_vars,st_args,st_arity,st_result,st_context,st_attr_vars,s
          (_,(graph`,[typeroot:_])) = convert_atype st_result (heap`,(emptygraph,[]))
          nostricts = abort "convert_symboltype: strictness info not implemented"
 
+/* Convert a list of attributed type (deriving its principal type for now)
+   Intended to be used by foldlr.
+   A type heap moves from left to right through the list, and is used recursively.
+   The graph is built from right to left, also recursively.
+   The converted types are collected so they may be used as argument to another type application.
+*/
 convert_atypes
  :: ( ([SuclTypeVariable])
     , (Graph SuclTypeSymbol SuclTypeVariable)
@@ -75,11 +86,16 @@ convert_atype
     )
 convert_atype atype (heap,(graph,rest))
  = case atype.at_type
-   of TA typename atypes
+   of
+
+      // An ordinary type application
+      TA typename atypes
        -> (heap``,(updategraph typevar (typesym,typeargs) graph`,[typevar:rest]))
           where (heap``,(graph`,typeargs)) = convert_atypes (heap`,graph) atypes
                 [typevar:heap`] = heap
                 typesym = SuclUSER typename
+
+      // A function type (a->b)
       functype --> argtype
        -> (heap```,(graph```,[suclrestype:rest]))
           where (heap``,(graph``,fnargs)) = convert_atype functype (heap`,(graph`,suclargtype))
@@ -87,19 +103,25 @@ convert_atype atype (heap,(graph,rest))
                 [suclrestype:heap`] = heap
                 graph``` = updategraph suclrestype (SuclFN,fnargs) graph``
 
+      // A basic type, which is translated to an application of a basic type symbol to the empty list of arguments
       TB basictype
        -> (heap`,(graph`,[suclbasictype:rest]))
           where [suclbasictype:heap`] = heap
                 graph` = updategraph suclbasictype (convert_btype basictype,[]) graph
+
+      // A type variable, used in polymorphism
       TV tvname
        -> (heap,(graph,[sucltypevar:rest]))
           where sucltypevar = SuclNAMED tvname
+
+      // Anything else will produce an error when actually used
       _
        -> (heap`,(graph`,[typevar:rest]))
           where [typevar:heap`] = heap
                 graph` = updategraph typevar notimpl graph
                 notimpl = abort "convert_atype: unknown form of Type"
 
+// Convert a basic type to a basic type symbol
 convert_btype :: BasicType -> SuclTypeSymbol
 convert_btype BT_Int = SuclINT
 convert_btype BT_Char = SuclCHAR
