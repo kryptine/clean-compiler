@@ -81,6 +81,9 @@ instance toString SuclVariable
 instance <<< SuclVariable
 instance toString SymbKind
 instance <<< SymbKind
+instance toString TypeVar
+instance toString ConsVariable
+instance toString (Global a) | toString a
 
 instance toString (Ptr a)
 instance <<< (Ptr a)
