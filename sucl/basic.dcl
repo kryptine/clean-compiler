@@ -184,3 +184,6 @@ stub :: .String .String .String -> .a
 
 // `Superset xs ys' determines whether ys is a superset (actually, super-multi-set or super-list) of xs.
 superset :: .[a] -> .(.[a] -> Bool) | == a
+
+// zipwith zips up two lists with a joining function
+zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]

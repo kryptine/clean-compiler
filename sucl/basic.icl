@@ -265,3 +265,6 @@ stub modulename functionname message
 
 superset :: .[a] -> .(.[a] -> Bool) | == a
 superset set = isEmpty o (removeMembers set)
+
+zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
+zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
