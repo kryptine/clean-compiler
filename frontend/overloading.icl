@@ -386,7 +386,7 @@ where
 				_
 					-> (False, No, (predef_symbols, type_heaps))				
 		try_to_unbox type _ predef_symbols_type_heaps
-			= (True, No, predef_symbols_type_heaps)
+			= (False, No, predef_symbols_type_heaps)
 
 		add_record_to_array_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#DefinedSymbol},!*SpecialInstances)
 		add_record_to_array_instances record members special_instances=:{si_next_array_member_index,si_array_instances}
