@@ -228,7 +228,7 @@ instance consumerRequirements Expression where
 					{ ai & ai_next_var = new_next_var, ai_next_var_of_fun = new_ai_next_var_of_fun, ai_var_heap = ai_var_heap }
 		= consumerRequirements let_expr common_defs ai // XXX why not not_an_unsafe_pattern
 		where
-			init_variables [{bind_dst={fv_name, fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
+			init_variables [{lb_dst={fv_name, fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
 				| fv_count > 0
 					= init_variables binds (inc ai_next_var) (inc ai_next_var_of_fun)
 						(writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap)
@@ -236,9 +236,9 @@ instance consumerRequirements Expression where
 			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
 				= (ai_next_var, ai_next_var_of_fun, ai_var_heap)
 				
-			acc_requirements_of_let_binds [ {bind_src, bind_dst} : binds ] ai_next_var common_defs ai
-				| bind_dst.fv_count > 0
-					# (bind_var, _, ai) = consumerRequirements bind_src common_defs ai
+			acc_requirements_of_let_binds [ {lb_src, lb_dst} : binds ] ai_next_var common_defs ai
+				| lb_dst.fv_count > 0
+					# (bind_var, _, ai) = consumerRequirements lb_src common_defs ai
 			  		  ai_class_subst = unifyClassifications ai_next_var bind_var ai.ai_class_subst
 					= acc_requirements_of_let_binds binds (inc ai_next_var) common_defs { ai & ai_class_subst = ai_class_subst }
 					= acc_requirements_of_let_binds binds ai_next_var common_defs ai
@@ -645,7 +645,7 @@ where
 		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
 			# let_binds = let_strict_binds ++ let_lazy_binds
 			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
-			  ti_var_heap = foldSt (\(var_type, {bind_dst={fv_info_ptr}}) var_heap
+			  ti_var_heap = foldSt (\(var_type, {lb_dst={fv_info_ptr}}) var_heap
 										 ->setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap)
 								   (zip2 var_types let_binds) ti.ti_var_heap
 			= { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
@@ -909,9 +909,11 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 				  let_type = filterWith not_unfoldable cons_type.st_args
 				  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
 				= ( Let	{	let_strict_binds	= []
-						,	let_lazy_binds		= [ {bind_src=bind_src, bind_dst=bind_dst} \\ (bind_dst,bind_src)<-non_unfoldable_args]
+						,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+													\\ (lb_dst,lb_src)<-non_unfoldable_args]
 						,	let_expr			= ap_expr
 						,	let_info_ptr		= new_info_ptr
+						,	let_expr_position	= NoPos
 						}
 				  , ti_symbol_heap
 				  ) 
@@ -1112,11 +1114,11 @@ writeExprInfo expr_info_ptr new_expr_info symbol_heap
 		EI_Extended extensions _	-> writePtr expr_info_ptr (EI_Extended extensions new_expr_info) symbol_heap
 		_							-> writePtr expr_info_ptr new_expr_info symbol_heap
 
-instance transform (Bind a b) | transform a
+instance transform LetBind
 where
-	transform bind=:{bind_src} ro ti
-		# (bind_src, ti) = transform bind_src ro ti
-		= ({ bind & bind_src = bind_src }, ti)
+	transform bind=:{lb_src} ro ti
+		# (lb_src, ti) = transform lb_src ro ti
+		= ({ bind & lb_src = lb_src }, ti)
 
 instance transform BasicPattern
 where
@@ -1181,8 +1183,9 @@ where
 			= index1 =< index2
 		compare_constructor_arguments (PR_GeneratedFunction _ index1) (PR_GeneratedFunction _ index2)
 			= index1 =< index2
-		compare_constructor_arguments (PR_Class app1 _ _) (PR_Class app2 _ _) 
-			= app1.app_args =< app2.app_args
+		compare_constructor_arguments (PR_Class app1 _ t1) (PR_Class app2 _ t2) 
+//			= app1.app_args =< app2.app_args
+			= smallerOrEqual t1 t2
 		compare_constructor_arguments (PR_Curried symb_ident1) (PR_Curried symb_ident2)
 			= symb_ident1 =< symb_ident2
 		compare_constructor_arguments PR_Empty PR_Empty
@@ -1266,7 +1269,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  			ti_next_fun_nr = inc ti_next_fun_nr, ti_new_functions = [fun_def_ptr : ti_new_functions],
 				ti_fun_defs = ti_fun_defs, ti_type_heaps = type_heaps, ti_cleanup_info = us_cleanup_info, ti_trace=ti_trace }
 	  new_fd = { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
-//	| False--->("generated function", new_fd, '\n', new_fd.fun_type)
+//	| (False--->("generated function", new_fd, '\n', new_fd.fun_type))
 //		= undef
 	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
 where
@@ -1351,7 +1354,7 @@ where
 			  				| glob_module <> ro.ro_main_dcl_module_n
 			  					// we do not have good names for the formal variables of that function: invent some
 			  					-> (NoBody, repeatn symb_arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
-			  				// go further with next alternative
+			  				// GOTO next alternative
 			  			_
 							# ({fun_body=fun_body=:TransformedBody tb}, fun_defs, fun_heap)
 									= get_fun_def symbol.symb_kind ro.ro_main_dcl_module_n fun_defs fun_heap
@@ -1484,6 +1487,26 @@ where
 		= current_max
 	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
 		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Curried {symb_kind=SK_Function {glob_object=fun_index, glob_module}}) current_max fun_defs fun_heap cons_args
+		| glob_module<>ro_main_dcl_module_n
+			= current_max
+		= max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
+	max_group_index_of_producer (PR_Curried {symb_kind=SK_LocalMacroFunction fun_index}) current_max fun_defs fun_heap cons_args
+		= max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
+	max_group_index_of_producer (PR_Curried { symb_kind = SK_GeneratedFunction fun_ptr fun_index}) current_max fun_defs fun_heap cons_args
+		= max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
+	max_group_index_of_producer (PR_Function _ fun_index) current_max fun_defs fun_heap cons_args
+		= max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
+	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _)
+								current_max fun_defs fun_heap cons_args
+		= max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
+	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
+		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
+/* was
+	max_group_index_of_producer PR_Empty current_max fun_defs fun_heap cons_args
+		= current_max
+	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
+		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
 	max_group_index_of_producer (PR_Curried _) current_max fun_defs fun_heap cons_args
 		= current_max
 	max_group_index_of_producer (PR_Function _ fun_index) current_max fun_defs fun_heap cons_args
@@ -1496,9 +1519,7 @@ where
 			= max fun_info.fi_group_index current_max
 			# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
 			= max generated_function.gf_fun_def.fun_info.fi_group_index current_max
-	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
-		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
-
+*/
 	ro_main_dcl_module_n = ro.ro_main_dcl_module_n
 
 	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
@@ -1522,6 +1543,16 @@ where
 	max_group_index_of_members members current_max fun_defs fun_heap cons_args
 		= foldl (max_group_index_of_member fun_defs fun_heap cons_args) current_max members
 			
+	max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
+		# fun_def = fun_defs.[fun_index]
+		= max fun_def.fun_info.fi_group_index current_max
+
+	max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
+		| fun_index < size fun_defs
+			# {fun_info} = fun_defs.[fun_index] 
+			= max fun_info.fi_group_index current_max
+			# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
+			= max generated_function.gf_fun_def.fun_info.fi_group_index current_max
 
 (-!->) infix :: !.a !b -> .a | <<< b
 (-!->) a b = a ---> b
@@ -1730,6 +1761,8 @@ where
 
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
 		 = { ti & ti_instances = { ti_instances & [glob_object] = instances } }
+	update_instance_info (SK_LocalMacroFunction glob_object) instances ti=:{ti_instances}
+		 = { ti & ti_instances = { ti_instances & [glob_object] = instances } }
 	update_instance_info (SK_GeneratedFunction fun_def_ptr fun_index) instances ti=:{ti_fun_heap, ti_instances}
 		| fun_index < size ti_instances
 			= { ti & ti_instances = { ti_instances & [fun_index] = instances } }
@@ -1748,30 +1781,34 @@ where
 		= App app @ extra_args
 		
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
-transformApplication app=:{app_symb=symb=:{symb_kind = SK_Function {glob_module, glob_object},symb_arity}, app_args} extra_args
+transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
-	| glob_module == ro.ro_main_dcl_module_n
-		| glob_object < size ti_cons_args
-			#! cons_class = ti_cons_args.[glob_object]
-			   (instances, ti_instances) = ti_instances![glob_object]
-			   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
-			= transformFunctionApplication fun_def instances cons_class app extra_args ro { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
-// It seems as if we have an array function 
+	| is_SK_Function_or_SK_LocalMacroFunction symb_kind // otherwise GOTO next alternative	
+		# { glob_module, glob_object }
+			= case symb_kind of
+				SK_Function global_index -> global_index
+				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
+		| glob_module == ro.ro_main_dcl_module_n
+			| glob_object < size ti_cons_args
+				#! cons_class = ti_cons_args.[glob_object]
+				   (instances, ti_instances) = ti_instances![glob_object]
+				   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
+				= transformFunctionApplication fun_def instances cons_class app extra_args ro { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
+		// It seems as if we have an array function 
+				| isEmpty extra_args
+					= (App app, ti)
+					= (App { app & app_symb = { symb & symb_arity = symb_arity + length extra_args}, app_args = app_args ++ extra_args}, ti)
+		// This function is imported
 			| isEmpty extra_args
 				= (App app, ti)
-				= (App { app & app_symb = { symb & symb_arity = symb_arity + length extra_args}, app_args = app_args ++ extra_args}, ti)
-// This function is imported
-		| isEmpty extra_args
-			= (App app, ti)
-			# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-			  form_arity = ft_arity + length ft_type.st_context
-			  ar_diff = form_arity - symb_arity
-			  nr_of_extra_args = length extra_args
-			| nr_of_extra_args <= ar_diff
-				= (App {app  &  app_args = app_args ++ extra_args, app_symb = { symb & symb_arity = symb_arity + nr_of_extra_args }}, ti)
-				= (App {app  &  app_args = app_args ++ take ar_diff extra_args, app_symb = { symb & symb_arity = symb_arity + ar_diff }} @
-						drop ar_diff extra_args, ti)
-				
+				# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+				  form_arity = ft_arity + length ft_type.st_context
+				  ar_diff = form_arity - symb_arity
+				  nr_of_extra_args = length extra_args
+				| nr_of_extra_args <= ar_diff
+					= (App {app  &  app_args = app_args ++ extra_args, app_symb = { symb & symb_arity = symb_arity + nr_of_extra_args }}, ti)
+					= (App {app  &  app_args = app_args ++ take ar_diff extra_args, app_symb = { symb & symb_arity = symb_arity + ar_diff }} @
+							drop ar_diff extra_args, ti)
 // XXX linear_bits field has to be added for generated functions
 transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
@@ -1836,32 +1873,6 @@ determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app
 		# (var_info, var_heap) = readVarInfo var_info_ptr var_heap
 		  (VI_Forward var) = var_info
 		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }, symb_arity}, app_args} _
-				  new_args prod_index producers ro ti
-	# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
-	| symb_arity<>fun_arity
-		| is_applied_to_macro_fun
-			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
-		= (producers, [App app : new_args ], ti)
-	#! max_index = size ti.ti_cons_args
-	| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
-		= (producers, [App app : new_args ], ti)
-	# ({fun_body}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
-	  ti = { ti & ti_fun_defs=ti_fun_defs }
-	  (TransformedBody {tb_rhs}) = fun_body
-	  is_good_producer = SwitchFusion (linear_bit && is_sexy_body tb_rhs) False
-	| is_good_producer
-		= ({ producers & [prod_index] = (PR_Function symb glob_object)}, app_args ++ new_args, ti)
-	= (producers, [App app : new_args ], ti)
-  where
-	get_fun_arity glob_module glob_object ro ti
-		| glob_module <> ro.ro_main_dcl_module_n
-			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
-			= (st_arity+length st_context, ti)
-		// for imported functions you have to add ft_arity and length st_context, but for unimported
-		// functions fun_arity alone is sufficient
-		# ({fun_arity}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
-		= (fun_arity, { ti & ti_fun_defs=ti_fun_defs })
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index, symb_arity}, app_args} _
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
@@ -1879,11 +1890,38 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 	| is_good_producer
 		= ({ producers & [prod_index] = (PR_GeneratedFunction symb fun_index)}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
-// XXX determineProducer {app_symb = symb=:{symb_kind = SK_Constructor glob_index}, app_args} new_args prod_index producers ti
-//	= ({ producers & [prod_index] = PR_Constructor symb app_args}, new_args, ti)
-// XXX */
-determineProducer _ _ app _ new_args _ producers _ ti
+determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind, symb_arity}, app_args} _
+				  new_args prod_index producers ro ti
+	| is_SK_Function_or_SK_LocalMacroFunction symb_kind
+		# { glob_module, glob_object }
+			= case symb_kind of
+				SK_Function global_index -> global_index
+				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
+		# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
+		| symb_arity<>fun_arity
+			| is_applied_to_macro_fun
+				= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+			= (producers, [App app : new_args ], ti)
+		#! max_index = size ti.ti_cons_args
+		| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
+			= (producers, [App app : new_args ], ti)
+		# ({fun_body}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
+		  ti = { ti & ti_fun_defs=ti_fun_defs }
+		  (TransformedBody {tb_rhs}) = fun_body
+		  is_good_producer = SwitchFusion (linear_bit && is_sexy_body tb_rhs) False
+		| is_good_producer
+			= ({ producers & [prod_index] = (PR_Function symb glob_object)}, app_args ++ new_args, ti)
+		= (producers, [App app : new_args ], ti)
 	= (producers, [App app : new_args ], ti)
+  where
+	get_fun_arity glob_module glob_object ro ti
+		| glob_module <> ro.ro_main_dcl_module_n
+			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
+			= (st_arity+length st_context, ti)
+		// for imported functions you have to add ft_arity and length st_context, but for unimported
+		// functions fun_arity alone is sufficient
+		# ({fun_arity}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
+		= (fun_arity, { ti & ti_fun_defs=ti_fun_defs })
 	
 // when two function bodies have fusion with each other this only leads into satisfaction if one body
 // fulfills the following sexyness property
@@ -1897,6 +1935,9 @@ is_sexy_body (Let {let_strict_binds}) = isEmpty let_strict_binds
 	// extended to generate new functions when a strict let ends up during fusion in a non top level position (MW)
 is_sexy_body _ = True	
 
+is_SK_Function_or_SK_LocalMacroFunction (SK_Function _) = True
+is_SK_Function_or_SK_LocalMacroFunction (SK_LocalMacroFunction _) = True
+is_SK_Function_or_SK_LocalMacroFunction _ = False
 
 containsProducer prod_index producers
 	| prod_index == 0
@@ -2162,6 +2203,11 @@ where
 	freeVariables list fvi
 		= foldSt freeVariables list fvi
 
+instance freeVariables LetBind
+where
+	freeVariables {lb_src} fvi
+		= freeVariables lb_src fvi
+
 instance freeVariables (Bind a b) | freeVariables a
 where
 	freeVariables {bind_src} fvi
@@ -2214,7 +2260,7 @@ where
 		  (removed_variables, fvi_var_heap) = removeVariables global_variables fvi.fvi_var_heap
 		  fvi = freeVariables let_binds { fvi & fvi_variables = [], fvi_var_heap = fvi_var_heap }
 		  {fvi_expr_heap, fvi_variables, fvi_var_heap, fvi_expr_ptrs} = freeVariables let_expr fvi
-		  (fvi_variables, fvi_var_heap) = removeLocalVariables [bind_dst \\ {bind_dst} <- let_binds] fvi_variables [] fvi_var_heap		
+		  (fvi_variables, fvi_var_heap) = removeLocalVariables [lb_dst \\ {lb_dst} <- let_binds] fvi_variables [] fvi_var_heap		
 		  (unbound_variables, fvi_var_heap) = determineGlobalVariables fvi_variables fvi_var_heap
 		  (fvi_variables, fvi_var_heap) = restoreVariables removed_variables fvi_variables fvi_var_heap
 		  (let_info, fvi_expr_heap) = readPtr let_info_ptr fvi_expr_heap

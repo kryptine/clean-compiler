@@ -18,3 +18,4 @@ instance == BasicType, TypeVar, TypeSymbIdent, DefinedSymbol, TypeContext , Basi
 
 instance < MemberDef
 
+smallerOrEqual :: !Type !Type -> CompareValue

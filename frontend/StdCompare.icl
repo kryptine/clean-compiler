@@ -220,6 +220,34 @@ where
 		compare_arguments (TA tc1 _) (TA tc2 _)	= tc1 =< tc2
 		compare_arguments _ _					= Equal
 
+smallerOrEqual :: !Type !Type -> CompareValue
+smallerOrEqual t1 t2
+		| equal_constructor t1 t2
+			= compare_arguments t1 t2
+		| less_constructor t1 t2
+			= Smaller
+			= Greater
+	where
+		compare_arguments (TA tc1 args1) (TA tc2 args2)
+			# cmp_app_symb = tc1 =< tc2
+			| cmp_app_symb==Equal
+				= args1 =< args2
+			= cmp_app_symb
+		compare_arguments (l1 --> r1) (l2 --> r2)
+			# cmp_app_symb = l1 =< l2
+			| cmp_app_symb==Equal
+				= r1 =< r2
+			= cmp_app_symb
+		compare_arguments (_ :@: args1) (_ :@: args2)
+			= args1 =< args2
+		compare_arguments (TB tb1) (TB tb2)		= tb1 =< tb2 
+		compare_arguments _ _					= Equal
+
+instance =< AType
+where
+	(=<) {at_type=at_type_1} {at_type=at_type_2}
+		= at_type_1 =< at_type_2
+
 instance =< BasicType
 where
 	(=<) bt1 bt2
