@@ -121,7 +121,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 			= convert_groups 0 groups global_type_instances dynamic_representation (fun_defs, {	
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
 							ci_new_variables = [],
-							ci_type_var_count = -1,
+							ci_type_var_count = 0,
 							ci_type_pattern_var_count = 0,
 							ci_type_constructor_used_in_dynamic_patterns	= createArray s_global_type_instances False
 							})
@@ -166,7 +166,7 @@ where
 			# (unify_subst_var, ci)
 			  	=	newVariable "unify_subst" VI_Empty ci
 			# ci
-				= {ci & ci_type_pattern_var_count = 0, ci_type_var_count = -1}
+				= {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
 
 			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
 					cinp_glob_type_inst = global_type_instances,
@@ -250,7 +250,7 @@ instance convertDynamics TransformedBody where
 					= { lb_src = App {	app_symb		= initial_unifier_symb,
 										app_args 		=
 												[	BasicExpr (BVInt ci_type_pattern_var_count)
-												,	BasicExpr (BVInt (~ci_type_var_count-1))
+												,	BasicExpr (BVInt ci_type_var_count)
 												],
 										app_info_ptr	= nilPtr }
 					,	lb_dst =  varToFreeVar subst 1
