@@ -125,6 +125,7 @@ instance <<< FilePosition
 ::	Assoc	= LeftAssoc | RightAssoc | NoAssoc
 
 ::	Priority = Prio Assoc Int | NoPrio
+DefaultPriority :: Priority
     
 class getFilename state :: !*state -> (!String,!*state)
 instance getFilename ScanState

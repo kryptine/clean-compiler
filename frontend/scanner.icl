@@ -1470,6 +1470,9 @@ where
 	(<) _ _ = True
 
 */
+DefaultPriority :: Priority
+DefaultPriority
+	=	Prio LeftAssoc 9
 
 determinePriority :: !Priority !Priority -> Optional Bool
 determinePriority (Prio assoc_left prio_left) (Prio assoc_right prio_right)

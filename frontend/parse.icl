@@ -239,7 +239,7 @@ optionalPriority isinfix (PriorityToken prio) pState
 	= (prio, pState)
 optionalPriority isinfix token pState
 	| isinfix
-		= (DummyPriority, tokenBack pState)
+		= (DefaultPriority, tokenBack pState)
 		= (NoPrio, tokenBack pState)
 
 /*
@@ -398,8 +398,6 @@ where
 wantDefinitions :: !ParseContext !ParseState -> (![ParsedDefinition], !ParseState)
 wantDefinitions parseContext pState
 	= parseList (tryDefinition parseContext) pState
-
-DummyPriority	:== Prio LeftAssoc 9
 
 cHasPriority 	:== True
 cHasNoPriority	:== False
@@ -601,8 +599,8 @@ where
 		  (tspec, pState) = want pState		//	SymbolType
 		| isDclContext parseContext
 			# (specials, pState) = optionalSpecials pState
-			= (PD_TypeSpec pos name (if is_infix DummyPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition (1)" pState)
-			= (PD_TypeSpec pos name (if is_infix DummyPriority NoPrio) (Yes tspec) SP_None, wantEndOfDefinition "type definition (2)" pState)
+			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition (1)" pState)
+			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) SP_None, wantEndOfDefinition "type definition (2)" pState)
 	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState

@@ -288,7 +288,7 @@ where
 			= (fun_defs, [{ nd_dst = PE_Ident name, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
 
 		reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
-			# prio = if is_infix (Prio NoAssoc 9) NoPrio
+			# prio = if is_infix DefaultPriority NoPrio
 			  fun_arity = length args
 			  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
