@@ -675,7 +675,7 @@ where
 		convert_reduced_context_to_expression defs contexts {rc_class, rc_inst_module, rc_inst_members, rc_red_contexts, rc_types} dictionary_args heaps
 			# (expressions, heaps) = convertClassApplsToExpressions defs contexts rc_red_contexts heaps
 			  context_size = length expressions
-			| size rc_inst_members > 1 && context_size > 0
+			| False // RWS test size rc_inst_members > 1 && context_size > 0
 				# (let_binds, let_types, rev_dicts, hp_var_heap, hp_expression_heap)
 						= foldSt (bind_shared_dictionary (size rc_inst_members)) expressions ([], [], [], heaps.hp_var_heap, heaps.hp_expression_heap)
 				  dictionary_args = build_class_members (size rc_inst_members) rc_inst_members rc_inst_module (reverse rev_dicts) context_size dictionary_args

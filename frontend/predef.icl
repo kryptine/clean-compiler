@@ -77,7 +77,9 @@ PD_variablePlaceholder		:== 127
 PD_StdDynamics				:== 128
 PD_undo_indirections		:== 129
 
-PD_NrOfPredefSymbols		:== 130
+PD_Start					:== 130
+
+PD_NrOfPredefSymbols		:== 131
 
 
 (<<=) infixl
@@ -146,6 +148,7 @@ where
 					<<- ("_unify",				IC_Expression, PD_unify)
 					<<- ("StdDynamics",			IC_Module, PD_StdDynamics)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
+					<<- ("Start",				IC_Expression, PD_Start)
 
 
 MakeTupleConsSymbIndex arity 	:== arity - 2 + cArity2TupleConsSymbIndex

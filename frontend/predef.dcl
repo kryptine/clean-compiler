@@ -79,7 +79,9 @@ PD_variablePlaceholder		:== 127
 PD_StdDynamics				:== 128
 PD_undo_indirections		:== 129
 
-PD_NrOfPredefSymbols		:== 130
+PD_Start					:== 130
+
+PD_NrOfPredefSymbols		:== 131
 
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2

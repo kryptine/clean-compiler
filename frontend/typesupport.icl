@@ -223,6 +223,10 @@ liftedError var err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< "type variable of type of lifted argument " <<< var <<< " appears in the specified type\n" }
 
+startRuleError mess err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< mess }
+
 extendSymbolType :: !SymbolType !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 extendSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars} nr_of_extra_args type_heaps
 	| nr_of_extra_args > 0
@@ -255,10 +259,10 @@ newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th
 cSpecifiedType	:== True
 cDerivedType	:== False
 
-cleanUpSymbolType :: !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
 						!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-cleanUpSymbolType spec_type tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
+cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
 		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
@@ -276,6 +280,7 @@ cleanUpSymbolType spec_type tst=:{tst_arity,tst_args,tst_result,tst_context,tst_
 				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env, cus_error = cus_error }
 	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
+	  cus_error = check_type_of_start_rule is_start_rule st cus_error
 	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
 					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, var_heap, expr_heap, cus_error)
 //					---> ("cleanUpSymbolType", st)
@@ -382,6 +387,21 @@ where
 				# (let_type, cus) = clean_up cui let_type cus
 				-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cus)
 
+ 	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
+ 		| is_start_rule
+ 			| isEmpty st_context
+	 			| st_arity > 0
+	 				| st_arity == 1
+		 				= case st_args of
+		 					[{at_type = TB BT_World} : _]
+		 						-> cus_error
+		 					_
+		 						-> startRuleError "argument of Start rule should have type World.\n" cus_error
+						= startRuleError "Start rule has too many arguments.\n" cus_error						
+					= cus_error						
+	 			= startRuleError "Start rule cannot be overloaded.\n" cus_error
+	 		= cus_error
+	 		
 instance clean_up CaseType
 where
 	clean_up cui ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cus

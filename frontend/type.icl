@@ -1169,14 +1169,14 @@ InitFunEnv nr_of_fun_defs
 	= createArray nr_of_fun_defs EmptyFunctionType
 
 //CreateInitialSymbolTypes :: ![Int] !u:{# FunDef} !{# CommonDefs } !*TypeState -> (!u:{# FunDef}, !*TypeState)
-CreateInitialSymbolTypes common_defs [] defs_and_state
+CreateInitialSymbolTypes start_index common_defs [] defs_and_state
 	= defs_and_state
-CreateInitialSymbolTypes common_defs [fun : funs] (fun_defs, pre_def_symbols, req_cons_variables, ts)
+CreateInitialSymbolTypes start_index common_defs [fun : funs] (fun_defs, pre_def_symbols, req_cons_variables, ts)
 	# (fd, fun_defs) = fun_defs![fun]
-	  (pre_def_symbols, req_cons_variables, ts) = initial_symbol_type common_defs fd (pre_def_symbols, req_cons_variables, ts)
-	= CreateInitialSymbolTypes common_defs funs (fun_defs, pre_def_symbols, req_cons_variables, ts)
+	  (pre_def_symbols, req_cons_variables, ts) = initial_symbol_type (start_index == fun) common_defs fd (pre_def_symbols, req_cons_variables, ts)
+	= CreateInitialSymbolTypes start_index common_defs funs (fun_defs, pre_def_symbols, req_cons_variables, ts)
 where 
-	initial_symbol_type common_defs {fun_type = Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env}, fun_lifted, fun_info = {fi_dynamics} }
+	initial_symbol_type is_start_rule common_defs {fun_type = Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env}, fun_lifted, fun_info = {fi_dynamics} }
 				(pre_def_symbols, req_cons_variables, ts=:{ts_type_heaps,ts_expr_heap,ts_td_infos,ts_error})
 		# (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
 				{ prop_type_heaps = ts_type_heaps, prop_td_infos = ts_td_infos,
@@ -1193,8 +1193,8 @@ where
 				{ ts & ts_fun_env = { ts.ts_fun_env & [fun] = SpecifiedType ft lifted_args
 					{ fresh_fun_type & tst_arity = st_arity + fun_lifted, tst_args = lifted_args ++ fresh_fun_type.tst_args, tst_lifted = fun_lifted }},
 						ts_var_heap = ts_var_heap, ts_var_store = ts_var_store, ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps })
-	initial_symbol_type common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}} (pre_def_symbols, req_cons_variables, ts)
-		# (st_gen, ts) = create_general_symboltype fun_arity fun_lifted ts
+	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}} (pre_def_symbols, req_cons_variables, ts)
+		# (st_gen, ts) = create_general_symboltype is_start_rule fun_arity fun_lifted ts
 		  ts_type_heaps = ts.ts_type_heaps 
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (ts_type_heaps.th_vars, ts.ts_expr_heap)
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
@@ -1204,12 +1204,16 @@ where
 					ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap})
 
 
-	create_general_symboltype :: !Int !Int !*TypeState -> (!TempSymbolType, !*TypeState)
-	create_general_symboltype nr_of_args nr_of_lifted_args ts
-		# (tst_args, ts) = fresh_attributed_type_variables nr_of_args [] ts
-		  (tst_args, ts) = fresh_attributed_type_variables nr_of_lifted_args tst_args ts
-		  (tst_result, ts) = freshAttributedVariable ts
-		= ({ tst_args = tst_args, tst_arity = nr_of_args + nr_of_lifted_args, tst_result = tst_result, tst_context = [], tst_attr_env = [], tst_lifted = 0 }, ts)
+	create_general_symboltype :: !Bool !Int !Int !*TypeState -> (!TempSymbolType, !*TypeState)
+	create_general_symboltype is_start_rule nr_of_args nr_of_lifted_args ts
+		| is_start_rule && nr_of_args > 0
+			# (tst_args, ts) = fresh_attributed_type_variables (nr_of_args - 1) [{at_attribute = TA_Unique, at_annotation = AN_Strict, at_type = TB BT_World }] ts
+			  (tst_result, ts) = freshAttributedVariable ts
+			= ({ tst_args = tst_args, tst_arity = 1, tst_result = tst_result, tst_context = [], tst_attr_env = [], tst_lifted = 0 }, ts)
+			# (tst_args, ts) = fresh_attributed_type_variables nr_of_args [] ts
+			  (tst_args, ts) = fresh_attributed_type_variables nr_of_lifted_args tst_args ts
+			  (tst_result, ts) = freshAttributedVariable ts
+			= ({ tst_args = tst_args, tst_arity = nr_of_args + nr_of_lifted_args, tst_result = tst_result, tst_context = [], tst_attr_env = [], tst_lifted = 0 }, ts)
 
 	fresh_attributed_type_variables :: !Int ![AType] !*TypeState -> (![AType], !*TypeState)
 	fresh_attributed_type_variables n vars ts
@@ -1321,23 +1325,23 @@ specification_error type err
 	  format = { form_properties = cAttributed, form_attr_position = No}
 	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " <:: (format, type) <<< '\n' }
 
-cleanUpAndCheckFunctionTypes [] _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+cleanUpAndCheckFunctionTypes [] _ start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 	= (fun_defs, ts)
-cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] defs type_contexts coercion_env
+cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] start_index defs type_contexts coercion_env
 				attr_partition type_var_env attr_var_env (fun_defs, ts)
 	# (fd, fun_defs) = fun_defs![fun]
-	# (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun defs type_contexts
+	# (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun (start_index == fun) defs type_contexts
 				req_case_and_let_exprs coercion_env attr_partition type_var_env attr_var_env ts
-	= cleanUpAndCheckFunctionTypes funs reqs defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+	= cleanUpAndCheckFunctionTypes funs reqs start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 where
-	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun defs type_contexts case_and_let_exprs
+	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun is_start_rule defs type_contexts case_and_let_exprs
 					coercion_env attr_partition type_var_env attr_var_env ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_symb fun_pos) ts.ts_error}
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
-					= cleanUpSymbolType cSpecifiedType exp_fun_type type_contexts case_and_let_exprs coercion_env 
+					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts case_and_let_exprs coercion_env 
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
@@ -1346,7 +1350,7 @@ where
 					-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error })
 		  	UncheckedType exp_fun_type
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
-					= cleanUpSymbolType cDerivedType exp_fun_type type_contexts case_and_let_exprs coercion_env
+					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts case_and_let_exprs coercion_env
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
 				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
@@ -1401,24 +1405,17 @@ typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_ex
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
-// MW0 was	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
-	  (type_error, fun_defs, predef_symbols, special_instances, ts=:{ts_error})
-	  		= type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
-// MW0 was	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
-	  (fun_defs, ts_fun_env, ts_error=:{ea_ok=no_start_rule_error}) = update_function_types 0 comps ts.ts_fun_env fun_defs ts_error
+	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
+	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
-// MW0 was			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
-// MW0 was				{ ts & ts_fun_env = ts_fun_env })
-			= type_instances specials.ir_from specials.ir_to class_instances ti
-				(type_error || not no_start_rule_error, fun_defs, predef_symbols, special_instances,
-					{ ts & ts_fun_env = ts_fun_env, ts_error = { ts_error & ea_ok = True }})
+			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
+				{ ts & ts_fun_env = ts_fun_env })
 	  {si_array_instances, si_next_array_member_index, si_next_TC_member_index, si_TC_instances}= special_instances
 	  (fun_defs, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs fun_defs predef_symbols ts_type_heaps
 	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
 	= (not type_error, fun_defs, { ir_from = fun_env_size, ir_to = si_next_array_member_index }, type_code_instances, ti_common_defs, ti_functions,
 			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file)
 where
-
 	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
 		= foldSt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
 
@@ -1509,11 +1506,16 @@ where
 			# ({fun_symb}, fun_defs) = fun_defs![fun_index]
 			= ([fun_symb : names], fun_defs)
 	
-
+	get_index_of_start_rule predef_symbols
+		# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
+		| pds_def <> NoIndex && pds_module == cIclModIndex
+			= (pds_def, predef_symbols)
+			= (NoIndex, predef_symbols)
+	
 	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
-		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes ti_common_defs comp (fun_defs, predef_symbols, [], ts)
-		  (names, fun_defs) = show_component comp fun_defs
-		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts /* (ts ---> names) */
+		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
+		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (fun_defs, predef_symbols, [], ts)
+		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
 		#! nr_of_type_variables = ts.ts_var_store
 										
 		# (subst, ts_type_heaps, ts_error)
@@ -1546,7 +1548,7 @@ where
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
-		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
+		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs start_index ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 									(fun_defs,  { ts &	ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps,
 		  												ts_td_infos = ts_td_infos, ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap })
 		| not ts.ts_error.ea_ok
@@ -1667,50 +1669,31 @@ where
 		= (subst, ts_fun_env)
 			
 
-// MW0 was	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} !*ErrorAdmin -> (!*{#FunDef}, !*{!FunctionType}, !.ErrorAdmin)
-// MW0 was	update_function_types group_index comps fun_env fun_defs
-	update_function_types group_index comps fun_env fun_defs error_admin
+	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+	update_function_types group_index comps fun_env fun_defs
 		| group_index == size comps
-// MW0 was			= (fun_defs, fun_env)
-			= (fun_defs, fun_env, error_admin)
+			= (fun_defs, fun_env)
 			#! comp = comps.[group_index]	
-// MW0 was			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
-			# (fun_defs, fun_env, error_admin) = update_function_types_in_component comp.group_members fun_env fun_defs error_admin
-// MW0 was			= update_function_types (inc group_index) comps fun_env fun_defs
-			= update_function_types (inc group_index) comps fun_env fun_defs error_admin
+			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
+			= update_function_types (inc group_index) comps fun_env fun_defs
 
 	where
-// MW0 was		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} !*ErrorAdmin
-											-> (!*{#FunDef}, !*{!FunctionType}, !.ErrorAdmin)
-// MW0 was		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs
-		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs error_admin
+		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs
 			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
 			# (fd, fun_defs) = fun_defs![fun_index]
-// MW0..
-			# is_start_rule  = fd.fun_symb.id_name=="Start" && fd.fun_info.fi_def_level==1
-			  error_admin = case is_start_rule  of
-			  					False	-> error_admin
-			  					_		-> check_type_of_start_rule fd checked_fun_type error_admin
-// ..MW0
 			= case fd.fun_type of
 				No
-// MW0 was					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
-					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }} error_admin
+					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
 				Yes fun_type
 					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
 					| nr_of_lifted_arguments > 0
 						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
 									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-// MW0 was						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
-						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }} error_admin
-// MW0 was						-> update_function_types_in_component funs fun_env fun_defs
-						-> update_function_types_in_component funs fun_env fun_defs error_admin
-// MW0 was		update_function_types_in_component [] fun_env fun_defs
-// MW0 was			= (fun_defs, fun_env)
-		update_function_types_in_component [] fun_env fun_defs error_admin
-			= (fun_defs, fun_env, error_admin)
+						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
+						-> update_function_types_in_component funs fun_env fun_defs
+		update_function_types_in_component [] fun_env fun_defs
+			= (fun_defs, fun_env)
 	
 	type_functions group ti cons_variables fun_defs ts
 		= mapSt (type_function ti) group (cons_variables, fun_defs, ts) // ((cons_variables, fun_defs, ts) ---> "[(") ---> ")]"
@@ -1801,23 +1784,6 @@ where
 				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
 			CheckedType _
 				-> ts
-
-// MW0..
-	check_type_of_start_rule fd checked_fun_type error_admin
-		| not (isEmpty checked_fun_type.st_context)
-			= checkErrorWithIdentPos (newPosition fd.fun_symb fd.fun_pos) "must not be overloaded" error_admin
-		| isEmpty checked_fun_type.st_args
-			= error_admin
-		| length checked_fun_type.st_args > 1
-			= checkErrorWithIdentPos (newPosition fd.fun_symb fd.fun_pos) "should have arity 0 or 1" error_admin
-		= case checked_fun_type.st_args of
-			[]	-> error_admin
-			[{at_type=TB BT_World}] 
-				-> error_admin
-			[{at_type=TV _}]
-				-> error_admin
-			_	-> checkErrorWithIdentPos (newPosition fd.fun_symb fd.fun_pos) "argument must be of type World" error_admin
-// ..MW0
 
 instance <<< AttrCoercion
 where

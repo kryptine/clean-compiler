@@ -4,7 +4,7 @@ import syntax, transform, checksupport, typesupport, predef
 
 cPredefinedModuleIndex 		:== 1
 
-checkModule :: !ScannedModule !Int ![FunDef] !ScannedModule !ScannedModule ![ScannedModule] !*PredefinedSymbols !*SymbolTable !*File
+checkModule :: !ScannedModule !IndexRange ![FunDef] !ScannedModule !ScannedModule ![ScannedModule] !*PredefinedSymbols !*SymbolTable !*File
 	-> (!Bool, !*IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File)
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)

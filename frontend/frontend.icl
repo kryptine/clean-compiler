@@ -21,16 +21,16 @@ import RWSDebug
 frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
-		= wantModule cWantIclFile mod_ident (hash_table ---> ("Parsing:", mod_ident)) error search_paths predef_symbols files
+		= wantModule cWantIclFile mod_ident (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
-	# (ok, mod, nr_of_global_funs, mod_functions, dcl_mod, predef_mod, modules, hash_table, error, predef_symbols, files)
+	# (ok, mod, global_fun_range, mod_functions, dcl_mod, predef_mod, modules, hash_table, error, predef_symbols, files)
 		= scanModule (mod -*-> "Scanning") hash_table error search_paths predef_symbols files
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
   	# symbol_table = hash_table.hte_symbol_heap
   	  (ok, icl_mod, dcl_mods, components, optional_dcl_icl_conversions, heaps, predef_symbols, symbol_table, error)
-  	  	= checkModule mod nr_of_global_funs mod_functions dcl_mod predef_mod modules predef_symbols (symbol_table -*-> "Checking") error
+  	  	= checkModule mod global_fun_range mod_functions dcl_mod predef_mod modules predef_symbols (symbol_table -*-> "Checking") error
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
@@ -41,7 +41,7 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
-	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
+	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ global_fun_range, icl_instances, icl_specials]
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 //	  (fun_defs, error)	= showFunctions array_instances fun_defs error
@@ -62,7 +62,7 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 					var_heap type_heaps expression_heap
 	  (dcl_types, type_heaps, var_heap)
 			= convertImportedTypeSpecifications dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
-	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
 	= (predef_symbols,hash_table,files,error,io,out,
 		Yes	{	fe_icl = {icl_mod & icl_functions=fun_defs }

@@ -309,7 +309,8 @@ analTypeDef modules type_module type_index as=:{as_error,as_heaps,as_kind_heap,a
 	| is_abs_type
 		# (tdi, as_td_infos) = as_td_infos![type_module].[type_index]
 		  tdi = {	tdi & tdi_kinds = [ KindConst \\ _ <- td_args ], tdi_group = [{glob_module = type_module, glob_object = type_index}], 
-		  			tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]], tdi_properties = abs_type_properties }
+		  			tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]], tdi_properties = abs_type_properties,
+		  			tdi_tmp_index = 0 }
 		= (cMAXINT, ({con_top_var_binds = [], con_var_binds = [] }, { as & as_td_infos = { as_td_infos & [type_module].[type_index] = tdi}}))
 		# position = newPosition td_name td_pos
 		  as_error = pushErrorAdmin position as_error
@@ -429,7 +430,7 @@ where
 		= (kind_store, kind_heap, { td_infos & [glob_module].[glob_object] =
 				{td_info & tdi_properties = type_properties, tdi_kinds = td_kinds, tdi_group = group,
 				 tdi_group_vars = group_vars, tdi_cons_vars = cons_vars, tdi_group_nr = group_nr, tdi_tmp_index = loc_type_index } })
-//					---> ("update_type_def_info", glob_module, glob_object, group_nr)
+//					---> ("update_type_def_info", glob_module, glob_object, (group_nr, loc_type_index))
 	where
 		determine_type_def_info [ KindVar kind_info_ptr : kind_vars ] [ kind : kinds ] top_vars kind_store kind_heap
 			#! kind_info = sreadPtr kind_info_ptr kind_heap

@@ -529,7 +529,7 @@ where
 					EI_Attribute sa_attr_nr
 						# (succ, coercion_env) = tryToMakeNonUnique sa_attr_nr coercion_env
 						| succ
-								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr)
+//								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr)
 							-> (coercion_env, expr_heap, error)
 							-> (coercion_env, expr_heap, uniquenessError { cp_expression = FreeVar free_var} " demanded attribute cannot be offered by shared object" error)
 					_
