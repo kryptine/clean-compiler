@@ -43,9 +43,11 @@ checkGenerics
 		#! {cs_error} = cs
 		#! (gt_vars, st_vars, cs_error) = split_vars gen_type.gt_vars  gt_type.st_vars cs_error
 
+/*
 		#! cs_error = case gt_type.st_context of
 			[] -> cs_error 
 			_  -> checkError "" "class contexts are not supported in generic types" cs_error   
+*/
 
 		#! cs = {cs & cs_error = cs_error}
 		#! gt_type = {gt_type & st_vars = st_vars}
@@ -2734,26 +2736,30 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_TypeISO				mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsISO				mod_index STE_Constructor				
-				<=< adjustPredefSymbol PD_iso_from			mod_index (STE_Field pd_type_iso.pds_ident)
+				<=< adjustPredefSymbol PD_iso_from				mod_index (STE_Field pd_type_iso.pds_ident)
 				<=< adjustPredefSymbol PD_iso_to				mod_index (STE_Field pd_type_iso.pds_ident)				
-				<=< adjustPredefSymbol PD_TypeUNIT			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsUNIT			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypePAIR			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsPAIR			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TypeUNIT				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsUNIT				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TypePAIR				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsPAIR				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_TypeEITHER			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsLEFT			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_ConsRIGHT			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypeARROW			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsARROW			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_isomap_ARROW_		mod_index STE_DclFunction				
-				<=< adjustPredefSymbol PD_isomap_ID			mod_index STE_DclFunction				
+				<=< adjustPredefSymbol PD_ConsLEFT				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_ConsRIGHT				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_TypeARROW				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsARROW				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_isomap_ARROW_			mod_index STE_DclFunction				
+				<=< adjustPredefSymbol PD_isomap_ID				mod_index STE_DclFunction				
 				<=< adjustPredefSymbol PD_TypeConsDefInfo		mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsConsDefInfo		mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_TypeTypeDefInfo		mod_index STE_Type
 				<=< adjustPredefSymbol PD_ConsTypeDefInfo		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypeCONS			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsCONS			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_cons_info			mod_index STE_DclFunction)
+				<=< adjustPredefSymbol PD_TypeCONS				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsCONS				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_cons_info				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_TypeType				mod_index STE_Type
+				<=< adjustPredefSymbol PD_ConsTypeApp			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_ConsTypeVar			mod_index STE_Constructor				
+				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}

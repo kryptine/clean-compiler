@@ -129,8 +129,7 @@ containsContext new_tc []
 	= False
 containsContext new_tc [tc : tcs]
 	= new_tc == tc || containsContext new_tc tcs
-
-
+		
 FoundObject object :== object.glob_module <> NotFound
 ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
@@ -268,6 +267,10 @@ where
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 	adjust_type_attribute defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) state
 		= adjust_attributes_and_subtypes defs [arg_type1, res_type1] [arg_type2, res_type2] state
+// AA..
+	adjust_type_attribute defs (TArrow1 x) (TArrow1 y) state
+		= adjust_attributes_and_subtypes defs [x] [y] state
+// ..AA
 	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
 		= adjust_attributes_and_subtypes defs types1 types2 state
 	adjust_type_attribute _ (TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
@@ -1698,6 +1701,12 @@ where
 		= equalTypeVars tv var_number type_var_heap
 	equalTypes (arg_type1 --> restype1) (arg_type2 --> restype2) type_var_heap
 		= equalTypes (arg_type1,restype1) (arg_type2,restype2) type_var_heap
+// AA ..
+	equalTypes TArrow TArrow type_var_heap
+		= (True, type_var_heap)
+	equalTypes (TArrow1 x) (TArrow1 y) type_var_heap
+		= equalTypes x y type_var_heap		
+// .. AA
 	equalTypes (TA tc1 types1) (TA tc2 types2) type_var_heap
 		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap

@@ -378,6 +378,8 @@ simplifyTypeApplication (TempQV tv_number) type_args
 //AA..
 simplifyTypeApplication TArrow [type1, type2] 
 	= (True, type1 --> type2)
+simplifyTypeApplication TArrow [type] 
+	= (True, TArrow1 type)
 simplifyTypeApplication (TArrow1 type1) [type2] 
 	= (True, type1 --> type2)
 //..AA
@@ -417,7 +419,7 @@ unifyCVwithType is_exist tv_number type_args type=:(TA type_cons cons_args) modu
 		    = (False, subst, heaps)
 		= (False, subst, heaps)
 
-// AA..		
+// AA..
 unifyCVwithType is_exist tv_number [type_arg1, type_arg2] type=:(atype1 --> atype2) modules subst heaps
 	# (succ, subst, heaps) = unify (type_arg1, type_arg2) (atype1, atype2) modules subst heaps
 	| succ
@@ -428,7 +430,21 @@ unifyCVwithType is_exist tv_number [type_arg] type=:(atype1 --> atype2) modules 
 	| succ
 		= unifyTypes (toTV is_exist tv_number) TA_Multi (TArrow1 atype1) TA_Multi modules subst heaps
 		= (False, subst, heaps)
+unifyCVwithType is_exist tv_number [] type=:(atype1 --> atype2) modules subst heaps
+	= unifyTypes (toTV is_exist tv_number) TA_Multi type TA_Multi modules subst heaps
+		
+unifyCVwithType is_exist tv_number [type_arg] type=:(TArrow1 atype) modules subst heaps
+	# (succ, subst, heaps) = unify type_arg atype modules subst heaps
+	| succ
+		= unifyTypes (toTV is_exist tv_number) TA_Multi TArrow TA_Multi modules subst heaps
+		= (False, subst, heaps)
+unifyCVwithType is_exist tv_number [] type=:(TArrow1 atype) modules subst heaps
+	= unifyTypes (toTV is_exist tv_number) TA_Multi type TA_Multi modules subst heaps
+
+unifyCVwithType is_exist tv_number [] TArrow modules subst heaps
+	= unifyTypes (toTV is_exist tv_number) TA_Multi TArrow TA_Multi modules subst heaps
 // ..AA 		
+
 unifyCVwithType is_exist tv_number type_args type modules subst heaps
 	= (False, subst, heaps)
 

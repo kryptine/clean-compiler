@@ -11,6 +11,10 @@ where
 instance == AttributeVar 
 where
 	(==) varid1 varid2 = varid1.av_info_ptr == varid2.av_info_ptr
+
+instance == AttrInequality
+where
+	(==) ai1 ai2 = ai1.ai_demanded == ai2.ai_demanded && ai1.ai_offered == ai2.ai_offered
 //..AA
 
 instance == FunKind
@@ -60,7 +64,7 @@ where
 instance == DefinedSymbol
 where
 	(==) ds1 ds2
-		= ds1.ds_ident == ds2.ds_ident && ds1.ds_index == ds2.ds_index
+		= ds1.ds_index == ds2.ds_index //&& ds1.ds_ident == ds2.ds_ident 
 
 instance == Type
 where

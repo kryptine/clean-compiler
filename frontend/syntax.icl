@@ -1281,18 +1281,18 @@ where
 
 instance <<< TypeVar
 where
-	(<<<) file varid = file <<< varid.tv_name 
-//	(<<<) file varid = file <<< varid.tv_name <<< "<" <<< varid.tv_info_ptr <<< ">"
+//	(<<<) file varid = file <<< varid.tv_name 
+	(<<<) file varid = file <<< varid.tv_name <<< "<" <<< varid.tv_info_ptr <<< ">"
 
 instance <<< AttributeVar
 where
-//	(<<<) file {av_name,av_info_ptr} = file <<< av_name <<< "[" <<< av_info_ptr <<< "]"
-	(<<<) file {av_name,av_info_ptr} = file <<< av_name
+	(<<<) file {av_name,av_info_ptr} = file <<< av_name <<< "[" <<< av_info_ptr <<< "]"
+//	(<<<) file {av_name,av_info_ptr} = file <<< av_name
 
 instance toString AttributeVar
 where
-//	toString {av_name,av_info_ptr} = toString av_name + "[" + toString (ptrToInt av_info_ptr) + "]"
-	toString {av_name,av_info_ptr} = toString av_name
+	toString {av_name,av_info_ptr} = toString av_name + "[" + toString (ptrToInt av_info_ptr) + "]"
+//	toString {av_name,av_info_ptr} = toString av_name
 
 instance <<< AType
 where

@@ -1,6 +1,6 @@
 implementation module compilerSwitches
 
-SwitchGenerics on off :== off
+SwitchGenerics on off :== on
 
 PA_BUG on off :== off
 

@@ -148,7 +148,6 @@ PD_ModuleID					:== 173
 PD_ModuleConsSymbol			:== 174
 
 /* Generics */
-
 PD_StdGeneric				:== 175
 
 PD_TypeISO					:== 176
@@ -177,7 +176,11 @@ PD_ConsCONS					:== 195
 PD_isomap_ARROW_			:== 196
 PD_isomap_ID				:== 197
 
-PD_NrOfPredefSymbols		:== 198
+PD_TypeType					:== 198
+PD_ConsTypeApp				:== 199
+PD_ConsTypeVar				:== 200
+
+PD_NrOfPredefSymbols		:== 201
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

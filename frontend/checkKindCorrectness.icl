@@ -257,6 +257,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		# (th_vars, error_admin)
 		  		= unify_var_kinds expected_kind tv th_vars error_admin
 		= (th_vars, td_infos, error_admin)
+					
 	check_type expected_kind arg_nr (l --> r) state
 		# state
 				= check_atype KindConst arg_nr l state

@@ -95,7 +95,7 @@ PD_UnqArraySizeFun			:== 137
 /* Enum/Comprehension functions */
 
 PD_SmallerFun				:== 138
-PD_LessOrEqualFun:== 139
+PD_LessOrEqualFun			:== 139
 PD_IncFun					:== 140
 PD_SubFun:== 141
 PD_From						:== 142
@@ -104,12 +104,12 @@ PD_FromTo					:== 144
 PD_FromThenTo				:== 145
 
 /* StdMisc */
-
 PD_StdMisc					:== 146
 PD_abort					:== 147
 PD_undef					:== 148
 
 PD_Start					:== 149
+
 PD_DummyForStrictAliasFun	:== 150
 
 PD_StdStrictLists:==151
@@ -148,7 +148,6 @@ PD_ModuleID					:== 173
 PD_ModuleConsSymbol			:== 174
 
 /* Generics */
-
 PD_StdGeneric				:== 175
 
 PD_TypeISO					:== 176
@@ -177,7 +176,11 @@ PD_ConsCONS					:== 195
 PD_isomap_ARROW_			:== 196
 PD_isomap_ID				:== 197
 
-PD_NrOfPredefSymbols		:== 198
+PD_TypeType					:== 198
+PD_ConsTypeApp				:== 199
+PD_ConsTypeVar				:== 200
+
+PD_NrOfPredefSymbols		:== 201
 
 (<<=) infixl
 (<<=) state val
@@ -346,7 +349,10 @@ where
 					<<- ("_TypeDefInfo",		IC_Expression,	PD_ConsTypeDefInfo)					
 					<<- ("CONS",				IC_Type, 		PD_TypeCONS)					
 					<<- ("CONS",				IC_Expression,	PD_ConsCONS)					
-					<<- ("_cons_info",			IC_Expression, 	PD_cons_info)										
+					<<- ("CONS_INFO",			IC_Expression, 	PD_cons_info)										
+					<<- ("Type",				IC_Type, 		PD_TypeType)										
+					<<- ("TypeApp",				IC_Expression, 	PD_ConsTypeApp)										
+					<<- ("TypeVar",				IC_Expression, 	PD_ConsTypeVar)										
 
 					<<- ("StdMisc",				IC_Module, 		PD_StdMisc)
 					<<- ("abort",				IC_Expression, 	PD_abort)

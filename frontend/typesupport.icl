@@ -894,6 +894,8 @@ where
 		= equiv (arg_type1,restype1) (arg_type2,restype2) heaps
 	equiv (TArrow1 arg_type1) (TArrow1 arg_type2) heaps
 		= equiv arg_type1 arg_type2 heaps
+	equiv TArrow TArrow heaps
+		= (True, heaps)
 	equiv (TA tc1 types1) (TA tc2 types2) heaps
 		| tc1 == tc2
 			= equiv types1 types2 heaps
