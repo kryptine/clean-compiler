@@ -27,6 +27,11 @@ Implementation
 // Now using Optional type from cocl's general module
 from general import Optional,No,Yes
 
+instance == (Optional a) | == a
+ where (==) No No = True
+       (==) (Yes x1) (Yes x2) = x1==x2
+       (==) _ _ = False
+
 
 // Adjust a function for a single argument
 
