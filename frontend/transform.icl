@@ -1530,7 +1530,8 @@ where
 					= foldSt collect_used_dynmic ptrs ([], cos_symbol_heap)
 				# cos_symbol_heap
 					= writePtr dyn_expr_ptr (EI_DynamicTypeWithVars type_vars dyn_type new_ptrs)
-				-> (used_dynamics, symbol_heap)
+				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
+
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
