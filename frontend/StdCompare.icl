@@ -5,7 +5,7 @@ import syntax
 
 instance == TypeVar
 where
-	(==) varid1 varid2 = varid1.tv_name == varid2.tv_name
+	(==) varid1 varid2 = varid1.tv_info_ptr == varid2.tv_info_ptr
 
 instance == FunKind
 where
