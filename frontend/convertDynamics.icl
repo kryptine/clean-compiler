@@ -3,13 +3,11 @@
 */
 implementation module convertDynamics
 
-import syntax, transform, utilities, convertcases /* MV ... */, compilerSwitches /* ... MV */
+import syntax, transform, utilities, convertcases, compilerSwitches
 from type_io_common import PredefinedModuleName
 // Optional
 USE_TUPLES tuple b :== b;					// change also StdDynamic.icl and recompile all applications
 extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
-
-//import pp;
 
 import type_io; 
 //import pp;
@@ -105,10 +103,9 @@ f (Yes tcl_file)
 	= tcl_file;
 0.2*/
 			
-convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */ (Optional !*File) {# DclModule} !IclModule /* TD */ [String]
-			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, /* TD */ (Optional !*File))
-convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap /* TD */ tcl_file dcl_mods icl_mod  /* TD */ directly_imported_dcl_modules
-	// TD ...
+convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional !*File) {# DclModule} !IclModule [String]
+			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional !*File))
+convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	# (tcl_file,type_heaps,predefined_symbols)
 		= case tcl_file of
 			No
@@ -121,13 +118,10 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 			(Yes tcl_file)
 //3.1
 				# (ok,tcl_file,type_heaps,predefined_symbols)
-					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file /* TD */ directly_imported_dcl_modules type_heaps predefined_symbols
+					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules type_heaps predefined_symbols
 				| not ok
 					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
 					-> (Yes tcl_file,type_heaps,predefined_symbols)
-
-				
-	// ... TD
 	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamic]
 	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)
 		= case (pds_module == (-1) || pds_def == (-1)) of
@@ -135,7 +129,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 				-> (undef,undef,undef,predefined_symbols)
 			_	
 				 
-				-> case (USE_TUPLES True False) /*(pds_module == (-1) || pds_def == (-1))*/ of
+				-> case (USE_TUPLES True False) of
 					True
 						# arity = 2
 						// get tuple arity 2 constructor
@@ -200,7 +194,6 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 	# (module_symb,module_id_app,predefined_symbols)
 		= get_module_id_app predefined_symbols
 
-// new...
 	# ({pds_module=pds_type_id_module, pds_def=pds_type_id_def} , predefined_symbols) = predefined_symbols![PD_TypeID]
 	# ci_type_id
 		= case (pds_type_id_module == NoIndex || pds_type_id_def == NoIndex) of
@@ -216,7 +209,6 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 					,	type_prop	= { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }
 					};
 				-> Yes ci_type_id
-// ...new
 						
 	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
@@ -261,7 +253,7 @@ where
 				= TransformedBody fun_body
 			
 			# ci 
-				= { ci & ci_used_tcs = [], ci_generated_global_tc_placeholders = False } //, ci_module_id = No }
+				= { ci & ci_used_tcs = [], ci_generated_global_tc_placeholders = False }
 			# (TransformedBody fun_body=:{tb_rhs}, ci) = convert_dynamics_in_body {cinp_st_args = [], cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
 			
 			# fun_body
@@ -304,19 +296,15 @@ where
 				= (letje,ci)
 
 
-// MV ..
 	convert_dynamics_in_body global_type_instances (TransformedBody {tb_args,tb_rhs}) (Yes {st_context, st_args}) ci
 		# vars_with_types = bindVarsToTypes2 st_context tb_args st_args [] common_defs
-// .. MV
 		  (tb_rhs, ci) = convertDynamics {global_type_instances & cinp_st_args = tb_args} vars_with_types No tb_rhs ci
 		= (TransformedBody {tb_args = tb_args,tb_rhs = tb_rhs}, ci)
 	convert_dynamics_in_body global_type_instances other fun_type ci
 		= abort "unexpected value in 'convert dynamics.convert_dynamics_in_body'"
 
-// MV ..
 bindVarsToTypes2 st_context vars types typed_vars common_defs
 	:== bindVarsToTypes vars (addTypesOfDictionaries common_defs st_context types) typed_vars
-// .. MV
 bindVarsToTypes vars types typed_vars
 	= fold2St bind_var_to_type vars types typed_vars
 where
@@ -380,7 +368,6 @@ where
 		= (expr @ exprs, ci)
 	convertDynamics cinp bound_vars default_expr (Let letje=:{let_strict_binds, let_lazy_binds, let_expr,let_info_ptr}) ci
 		# (let_types, ci) = determine_let_types let_info_ptr ci
-// MW0		  bound_vars = bindVarsToTypes [ bind.bind_dst \\ bind <- let_strict_binds ++ let_lazy_binds ] let_types bound_vars
 		  bound_vars = bindVarsToTypes [ bind.lb_dst \\ bind <- let_strict_binds ++ let_lazy_binds ] let_types bound_vars
 		  (let_strict_binds, ci)	= convertDynamics cinp bound_vars default_expr let_strict_binds ci
 		  (let_lazy_binds, ci)		= convertDynamics cinp bound_vars default_expr let_lazy_binds ci
@@ -399,7 +386,6 @@ where
 		  ci = { ci & ci_expr_heap = ci_expr_heap }
 		= case case_guards of
 			(AlgebraicPatterns type algebraic_patterns)
-// MV DEFAULT ...
 				| not (isNo this_case_default) && any (\algebraic_pattern -> is_case_without_default algebraic_pattern) algebraic_patterns
 					// a default to be moved inwards and a root positioned case not having a default
 					// 
@@ -410,7 +396,6 @@ where
 					//	loadandrun2 _ _ = abort "Loader: process and input do not match"
 					//
 					# (Yes old_case_default) = this_case_default
-//					# (let_info_ptr,  ci) = let_ptr ci
 					# (default_var, ci) = newVariable "s" (VI_BoundVar {at_attribute=TA_None,at_type=TE}) ci
 					# default_fv = varToFreeVar default_var 1
 					# ci
@@ -425,7 +410,6 @@ where
 						= map (patch_defaults new_case_default) algebraic_patterns
 					#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
 														(zip2 algebraic_patterns ct_cons_types) ci
-/* Sjaak */
 					# (let_info_ptr,  ci) = let_ptr 1 ci
 					# letje
 						= Let {
@@ -440,7 +424,6 @@ where
 					#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
 														(zip2 algebraic_patterns ct_cons_types) ci
 					-> (Case {keesje &  case_expr = case_expr, case_guards = AlgebraicPatterns type algebraic_patterns, case_default = this_case_default}, ci)
-// ... MV DEFAULT
 			(BasicPatterns type basic_patterns)
 				#  (basic_patterns, ci) = convertDynamics  cinp bound_vars nested_case_default basic_patterns ci
 				-> (Case {keesje &  case_expr = case_expr, case_guards = BasicPatterns type basic_patterns, case_default = this_case_default}, ci)
@@ -455,7 +438,6 @@ where
 				-> (Case {keesje &  case_expr = case_expr, case_guards = NoPattern, case_default = this_case_default}, ci)
 			_
 				-> abort "unexpected value in convertDynamics: 'convertDynamics.CasePatterns'"
-// MV DEFAULT ...
 	where
 		is_case_without_default {ap_expr=Case {case_default=No}}	= True
 		is_case_without_default _									= False
@@ -464,7 +446,6 @@ where
 			= { ap & ap_expr = Case {keesje & case_default = this_case_default} }
 		patch_defaults _ expr
 			= expr
-// ... MV DEFAULT
 			
 	convertDynamics cinp bound_vars default_expr (Selection opt_symb expression selections) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
@@ -489,34 +470,12 @@ where
 	convertDynamics cinp bound_vars default_expr (MatchExpr symb expression) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
 		= (MatchExpr symb expression, ci)
-/* Sjaak ... */
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_type_code}) ci=:{ci_symb_ident}
 		#  (dyn_expr,      ci) 			= convertDynamics cinp bound_vars default_expr dyn_expr ci
 		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False PD_UV_Placeholder [] [] ci
 		= (App {	app_symb		= ci_symb_ident,
 					app_args 		= [dyn_expr, dyn_type_code],
 					app_info_ptr	= nilPtr }, ci)
-
-/* ... Sjaak  */
-/* WAS ...
-	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_uni_vars, dyn_type_code}) ci=:{ci_symb_ident}
-		# (let_binds,     ci) 	= createVariables dyn_uni_vars [] ci
-		  (dyn_expr,      ci) 	= convertDynamics cinp bound_vars default_expr dyn_expr ci
-		  (_,dyn_type_code,_,_,ci) = convertTypecode2 cinp dyn_type_code False [] [] ci
-		= case let_binds of
-			[]	-> (App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident, //twoTuple_symb,
-							app_args 		= [dyn_expr, dyn_type_code],
-							app_info_ptr	= nilPtr }, ci)
-/* Sjaak */
-			_ 	#  (let_info_ptr,  ci) = let_ptr (length let_binds) ci
-				-> ( Let {	let_strict_binds	= [],
-							let_lazy_binds		= let_binds,
-							let_expr			= App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident,
-														app_args 		= [dyn_expr, dyn_type_code],
-														app_info_ptr	= nilPtr },
-							let_info_ptr		= let_info_ptr,
-							let_expr_position	= NoPos}, ci) 
-*/
 	convertDynamics cinp bound_vars default_expr (TypeCodeExpression type_code) ci
 		= abort "convertDynamics cinp bound_vars default_expr (TypeCodeExpression" //convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
@@ -532,7 +491,6 @@ where
 
 */
 
-/* Sjaak ... */
 convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
 		# (let_binds,     ci) 	= createUniversalVariables uni_placeholder uni_vars [] ci
 		  (let_info_ptr,  ci)	= let_ptr (length let_binds) ci
@@ -542,7 +500,6 @@ convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args uni_place
 					let_expr			= type_code_expr,
 					let_info_ptr		= let_info_ptr,
 					let_expr_position	= NoPos}, binds, placeholders_and_tc_args, ci) 
-/* ... Sjaak */
 
 // ci_placeholders_and_tc_args
 convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
@@ -702,12 +659,8 @@ open_dynamic dynamic_expr ci=:{ci_sel_type_field, ci_sel_value_field}
 	# (twotuple, ci) = getTupleSymbol 2 ci
 	  (dynamicType_var, ci) = newVariable "dt" VI_Empty ci
 	  dynamicType_fv = varToFreeVar dynamicType_var 1
-//	  sel_type = Selection No dynamic_expr [RecordSelection type_defined_symbol sd_type_field_nr]
-//	  sel_value = Selection No dynamic_expr [RecordSelection value_defined_symbol sd_value_field_nr]
-	= (	{ opened_dynamic_expr = ci_sel_value_field dynamic_expr /*USE_TUPLES (TupleSelect twotuple 0 dynamic_expr) sel_value*/, opened_dynamic_type = Var dynamicType_var },
-//  RecordSelection !(Global DefinedSymbol) !Int
-// MW0	  	{ bind_src = TupleSelect twotuple 1 dynamic_expr, bind_dst = dynamicType_fv },
-	  	{ lb_src = ci_sel_type_field dynamic_expr /*USE_TUPLES (TupleSelect twotuple 1 dynamic_expr) sel_type*/, lb_dst = dynamicType_fv, lb_position = NoPos },
+	= (	{ opened_dynamic_expr = ci_sel_value_field dynamic_expr, opened_dynamic_type = Var dynamicType_var },
+	  	{ lb_src = ci_sel_type_field dynamic_expr, lb_dst = dynamicType_fv, lb_position = NoPos },
 	  	{ ci & ci_new_variables = [ dynamicType_fv : ci.ci_new_variables ]})
 /**************************************************************************************************/
 
@@ -724,8 +677,7 @@ convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards =
       new_default = newDefault c_1 ind_0
       (result_type, ci) = getResultType case_info_ptr ci
     
-    #! // TC PLACEHOLDERS...
-  	  (tc_binds,(bound_vars,ci))
+    #! (tc_binds,(bound_vars,ci))
   	  	= case ci_generated_global_tc_placeholders of
   	  		True	-> ([],(bound_vars,ci))
   	  		_		
@@ -734,11 +686,9 @@ convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards =
   	  				#! ci
   	  					= { ci & ci_generated_global_tc_placeholders = True}
   	  				-> (tc_binds,(bound_vars,ci))
-      // ...TC PLACEHOLDERS
 
 	#
 
-// MW0      bound_vars = addToBoundVars (freeVarToVar dt_bind.bind_dst) empty_attributed_type (addToBoundVars ind_0 empty_attributed_type
       bound_vars = addToBoundVars (freeVarToVar dt_bind.lb_dst) empty_attributed_type (addToBoundVars ind_0 empty_attributed_type
       							  (addToBoundVars c_1 result_type (add_dynamic_bound_vars patterns bound_vars)))
 
@@ -748,14 +698,11 @@ convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards =
 		= { ci & ci_placeholders_and_tc_args=old_ci_placeholders_and_tc_args}
 	# (tc_binds,ci)
 		= foldSt remove_non_used_arg tc_binds ([],ci) 
-/* Sjaak */		
 	  (let_info_ptr, ci) = let_ptr (length  binds + length tc_binds + 1) ci
 
-// MW0	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr, let_info_ptr = let_info_ptr}, ci)
 	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr,
 			let_info_ptr = let_info_ptr, let_expr_position = NoPos }, ci)
 where
-// MW0	remove_non_used_arg :: (Bind Expression FreeVar) ([Bind Expression FreeVar],*ConversionInfo) -> ([Bind Expression FreeVar],*ConversionInfo)
 	remove_non_used_arg :: LetBind ([LetBind],*ConversionInfo) -> ([LetBind],*ConversionInfo)
 	remove_non_used_arg tc_bind=:{lb_dst={fv_info_ptr}} (l,ci=:{ci_var_heap})
 		# (VI_Indirection ref_count, ci_var_heap) = readPtr fv_info_ptr ci_var_heap
@@ -787,17 +734,14 @@ where
 			= addToBoundVars placeholder_var empty_attributed_type bound_vars
 		= (bind,(bound_vars2,ci));
 	where
-// MW0		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
 		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 		create_variable var_name var_info_ptr ci
 			# (placeholder_symb, ci) = getSymbol PD_PV_Placeholder SK_Constructor 2 ci
 			  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 			  cyclic_fv = varToFreeVar cyclic_var 1	
-// MW0			= ({ bind_src = App {	app_symb = placeholder_symb,
 			= ({ lb_src = App {	app_symb = placeholder_symb,
 								app_args = [Var cyclic_var, Var cyclic_var],
 								app_info_ptr = nilPtr },
-// MW0				 bind_dst = varToFreeVar cyclic_var 1
 				 lb_dst = varToFreeVar cyclic_var 1,
 				 lb_position = NoPos
 			   },
@@ -818,8 +762,6 @@ where
 		#		
 		  (coerce_symb, ci)		= getSymbol PD_coerce SK_Function (extended_unify_and_coerce 2 3) ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
-//Sjaak		  (case_info_ptr, ci)	= case_ptr ci
-		
 		  (coerce_result_var, ci)	= newVariable "result" VI_Empty ci
 		  coerce_result_fv 			= varToFreeVar coerce_result_var 1
 		  (coerce_bool_var, ci)		= newVariable "coerce_bool" VI_Empty ci
@@ -848,18 +790,15 @@ where
 			= toExpression this_default ci
 			
 		#! app_args2 = extended_unify_and_coerce [Var a_ij_var, Var a_ij_tc_var] [Var a_ij_var, Var a_ij_tc_var, ci_module_id_symbol ]
-/* Sjaak ... */
-
 		# let_lazy_binds		= (if (isNo this_default) [] [ {lb_src = opt opt_expr, lb_dst = c_inc_i_fv, lb_position = NoPos }]) ++ [
 										  { lb_src = App { app_symb = coerce_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
 										   lb_dst = coerce_result_fv, lb_position = NoPos }
 										   ,
-										 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var coerce_result_var) /*) sel_type*/,
+										 { lb_src = TupleSelect twotuple 0 (Var coerce_result_var),
 										   lb_dst = coerce_bool_fv, lb_position = NoPos } : let_binds
 										]
 		  (let_info_ptr, ci) 	= let_ptr (length let_lazy_binds) ci
 		  (case_info_ptr, ci)	= bool_case_ptr result_type ci
-/* ... Sjaak */
 
 		# let_expr
 			= Let {
@@ -871,12 +810,10 @@ where
 											case_default	= default_expr,
 											case_ident		= No,
 											case_info_ptr	= case_info_ptr,
-// RWS ...
 											case_explicit	= False,
-// ... RWS
-											case_default_pos= NoPos } // MW4++
+											case_default_pos= NoPos }
 				,	let_info_ptr = let_info_ptr	
-				,	let_expr_position = NoPos // MW0++
+				,	let_expr_position = NoPos
 				}
 		
 		// dp_rhs
@@ -885,7 +822,6 @@ where
 		opt (Yes x)		= x
 			
 	convert_dynamic_pattern :: !ConversionInput !BoundVariables DefaultExpression Int OpenedDynamic AType (Optional Expression) ![DynamicPattern] *ConversionInfo
-/// MW0		-> (Env Expression FreeVar, Expression, *ConversionInfo)
 		-> ([LetBind], Expression, *ConversionInfo)
 	convert_dynamic_pattern cinp bound_vars this_default pattern_number opened_dynamic result_type last_default
 																			[{ dp_var, dp_type_patterns_vars, dp_type_code, dp_rhs } : patterns] ci=:{ci_module_id_symbol}
@@ -900,30 +836,25 @@ where
 		  (a_ij_binds, ci)		= createTypePatternVariables dp_type_patterns_vars [] ci
 	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ PD_UPV_Placeholder [] [] ci //{ci & ci_module_id = No} // ci
 	
-		// collect ...
 	 	# (is_last_dynamic_pattern,dp_rhs) 
 	 		= isLastDynamicPattern dp_rhs;
 		# ci
 			= foldSt add_tcs martijn ci
-		// ... collect
 			
 	 	#	
 	 	  // walks through the patterns of the next alternative
 	 	  (dp_rhs, ci)			= convertDynamics cinp bound_vars this_default dp_rhs ci
 	 	  	 		
-		// collect ...
 		#! (ci_old_used_tcs,ci)
 			= ci!ci_used_tcs;
 	 	# ci
 	 		= { ci & ci_used_tcs = [] }
-		// ... collect
 			 		
 		  /***  recursively convert the other patterns in the other alternatives ***/
 
 	 	#!  (binds, ci)		= convert_other_patterns cinp bound_vars this_default pattern_number opened_dynamic result_type last_default patterns ci
 
 
-		// collect ...
 	 	# ci
 	 		= { ci & ci_used_tcs = ci_old_used_tcs }
 		# ci_used_tcs
@@ -943,12 +874,10 @@ where
 	 				-> (dp_rhs,ci)
 	 			False
 	 				-> (dp_rhs,ci)
-		// ... collect
 		#
 		  /***  generate the expression  ***/
 	 	  (unify_symb, ci) 		= getSymbol (if generate_coerce PD_coerce PD_unify ) SK_Function (extended_unify_and_coerce 2 3) /*3 was 2 */ ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
-//Sjaak		  (case_info_ptr, ci)	= case_ptr ci
 		  (default_expr, ci) 	= toExpression this_default ci
 		  
 		  // was coercions
@@ -960,20 +889,16 @@ where
 
 		  (let_binds, ci) 		= bind_indirection_var ind_var unify_result_var twotuple ci
 		  a_ij_binds			= add_x_i_bind opened_dynamic.opened_dynamic_expr dp_var a_ij_binds
-		  
-//		  sel_type	= Selection No (Var unify_result_var) [RecordSelection type_defined_symbol sd_type_field_nr]
 
-/* Sjaak ... */
 		  (let_info_ptr, ci) 	= let_ptr (2 + length let_binds) ci
 		  (case_info_ptr, ci)	= bool_case_ptr result_type ci
-/* ... Sjaak */
 
 		  app_args2 = extended_unify_and_coerce [opened_dynamic.opened_dynamic_type, type_code] [opened_dynamic.opened_dynamic_type, type_code, ci_module_id_symbol ]
 		  
 		  let_expr = Let {	let_strict_binds = [],
 		  					let_lazy_binds = [{ lb_src = App { app_symb = unify_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
 		  								   lb_dst = unify_result_fv, lb_position = NoPos },
-		  								 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var unify_result_var) /*) sel_type*/,
+		  								 { lb_src = TupleSelect twotuple 0 (Var unify_result_var),
 		  								   lb_dst = unify_bool_fv, lb_position = NoPos } : let_binds
 		  								],
 		  					let_expr = Case {	case_expr 		= Var unify_bool_var,
@@ -981,19 +906,15 @@ where
 												case_default	= default_expr,
 												case_ident		= No,
 												case_info_ptr	= case_info_ptr,
-// RWS ...
 												case_explicit	= False,
-// ... RWS
-												case_default_pos= NoPos }, // MW4++
+												case_default_pos= NoPos },
 		  					let_info_ptr = let_info_ptr,
 		  					let_expr_position = NoPos }
 		  					
 		= (a_ij_binds ++ binds,  let_expr,  { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
 	where
-// MW0		add_x_i_bind bind_src bind_dst=:{fv_count} binds
 		add_x_i_bind lb_src lb_dst=:{fv_count} binds
 			| fv_count > 0
-// MW0				= [ { bind_src = bind_src, bind_dst = bind_dst } : binds ]
 				= [ { lb_src = lb_src, lb_dst = lb_dst, lb_position = NoPos } : binds ]
 				= binds
 				
@@ -1010,7 +931,6 @@ where
 
 	// other alternatives
 	convert_other_patterns :: ConversionInput BoundVariables DefaultExpression Int OpenedDynamic AType !(Optional Expression) ![DynamicPattern] !*ConversionInfo
-// MW0			-> (Env Expression FreeVar, *ConversionInfo)
 			-> ([LetBind], *ConversionInfo)
 	convert_other_patterns _ _ _ _ _ _  No  []  ci
 		// no default and no alternatives left
@@ -1037,9 +957,7 @@ bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_h
 	# (VI_Indirection ref_count, ci_var_heap) = readPtr var_info_ptr ci_var_heap
 	| ref_count > 0
 		# ind_fv = varToFreeVar var ref_count
-// MW0  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
-//		  sel_value = Selection No (Var unify_result_var) [RecordSelection value_defined_symbol sd_value_field_nr]
-  		= ([{ lb_src = /*USE_TUPLES (*/TupleSelect twotuple 1 (Var unify_result_var) /*) sel_value*/, lb_dst = ind_fv, lb_position = NoPos }],
+  		= ([{ lb_src = TupleSelect twotuple 1 (Var unify_result_var), lb_dst = ind_fv, lb_position = NoPos }],
 				{ ci & ci_var_heap = ci_var_heap, ci_new_variables = [ ind_fv : ci_new_variables ]})
 		= ([], {ci & ci_var_heap = ci_var_heap})
 		
@@ -1049,13 +967,11 @@ bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_h
 	it is converted into a function. The references are replaced by an appropriate function application.
 
 */
-// MW0 generateBinding :: !ConversionInput BoundVariables BoundVar Expression AType !*ConversionInfo -> *(Bind Expression FreeVar, *ConversionInfo)
 generateBinding :: !ConversionInput BoundVariables BoundVar Expression AType !*ConversionInfo -> *(LetBind, *ConversionInfo)
 generateBinding cinp bound_vars var bind_expr result_type ci
 	# (ref_count, ci) = get_reference_count var ci
 	| ref_count == 0
 		# free_var = varToFreeVar var 1
-// MW0		= ({ bind_src = bind_expr, bind_dst = free_var }, { ci & ci_new_variables = [ free_var : ci.ci_new_variables ]})
 		= ({ lb_src = bind_expr, lb_dst = free_var, lb_position = NoPos }, { ci & ci_new_variables = [ free_var : ci.ci_new_variables ]})
 		# (saved_defaults, ci_var_heap) = foldSt save_default bound_vars ([], ci.ci_var_heap)
 		  (act_args, free_typed_vars, local_free_vars, tb_rhs, ci_var_heap) = copyExpression bound_vars bind_expr ci_var_heap
@@ -1068,11 +984,9 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 				= newFunction No (TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}) local_free_vars arg_types result_type cinp.cinp_group_index
 						(ci.ci_next_fun_nr, ci.ci_new_functions, ci.ci_fun_heap)
 		  free_var = varToFreeVar var (inc ref_count)
-// MW0		= ({	bind_src = App {	app_symb 		= fun_symb,
 		= ({	lb_src = App {	app_symb 		= fun_symb,
 								app_args 		= act_args,
 								app_info_ptr	= nilPtr },
-// MW0				bind_dst = free_var },
 				lb_dst = free_var,
 				lb_position = NoPos },
 		   { ci & ci_var_heap = ci_var_heap, ci_next_fun_nr = ci_next_fun_nr, ci_new_functions = ci_new_functions, ci_fun_heap = ci_fun_heap,
@@ -1107,7 +1021,6 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 
 /**************************************************************************************************/
 
-// MW0 createVariables :: [VarInfoPtr] !(Env Expression FreeVar) !*ConversionInfo -> (!Env Expression FreeVar, !*ConversionInfo)
 createUniversalVariables :: !Int [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
 createUniversalVariables kind var_info_ptrs binds ci
 	| kind == PD_UPV_Placeholder || kind == PD_UV_Placeholder
@@ -1121,18 +1034,15 @@ createVariables2 :: !Int [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind]
 createVariables2 universal_type_variable_kind var_info_ptrs binds ci
 	= mapAppendSt (create_variable a_ij_var_name) var_info_ptrs binds ci
 where 
-	// MW0create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
 	create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 	create_variable var_name var_info_ptr ci
 		# (placeholder_symb, ci) 
 			= getSymbol universal_type_variable_kind SK_Constructor 2 ci
 		  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 		  cyclic_fv = varToFreeVar cyclic_var 1	
-	// MW0	= ({ bind_src = App {	app_symb = placeholder_symb,
 		= ({ lb_src = App {	app_symb = placeholder_symb,
 								app_args = [Var cyclic_var, Var cyclic_var],
 								app_info_ptr = nilPtr },
-	// MW0		 bind_dst = varToFreeVar cyclic_var 1
 			 lb_dst = varToFreeVar cyclic_var 1,
 			 lb_position = NoPos
 		   },
@@ -1246,25 +1156,6 @@ v_tc_placeholder		:== "tc_placeholder"
 
 a_aij_tc_var_name 	:== { id_name = "a_ij_tc", id_info = nilPtr }
 
-/* Sjaak ...
-WAS
-
-case_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
-case_ptr ci=:{ci_expr_heap}
-	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = empty_attributed_type,
-															ct_result_type = empty_attributed_type,
-															ct_cons_types = repeat (repeat empty_attributed_type)}) ci_expr_heap
-	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
-
-let_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
-let_ptr ci=:{ci_expr_heap}
-	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeat empty_attributed_type)) ci_expr_heap
-	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
-
-REPLACED BY:
-Sjaak ... */
-
-
 bool_case_ptr :: !AType !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 bool_case_ptr result_type ci=:{ci_expr_heap}
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = toAType (TB BT_Bool),
@@ -1292,14 +1183,11 @@ let_ptr2 let_types ci=:{ci_expr_heap}
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType let_types) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
 
-/* Sjaak ... */
 toAType :: Type -> AType
 toAType type = { at_attribute = TA_Multi, at_type = type }
 
 empty_attributed_type :: AType
 empty_attributed_type = toAType TE
-/* ... Sjaak */
-
 
 isNo :: (Optional a) -> Bool
 isNo (Yes _) = False
