@@ -126,7 +126,7 @@ where
 				let_combine_ref_count {fv_info_ptr} var_heap
 					# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous=[prev_ref_count, pre_pref_recount:occ_previouses]}, var_heap)
 							= readPtr fv_info_ptr var_heap
-					  comb_ref_count = parCombineRefCount (seqCombineRefCount prev_ref_count occ_ref_count) pre_pref_recount
+					  comb_ref_count = parCombineRefCount (seqCombineRefCount occ_ref_count prev_ref_count) pre_pref_recount
 					= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses })
 
 			bind_variable {bind_src,bind_dst={fv_info_ptr}} var_heap
