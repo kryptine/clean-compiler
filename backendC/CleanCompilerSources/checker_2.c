@@ -29,11 +29,9 @@
 #include "typechecker.h"
 #include "transform.h"
 #include "checksupport.h"
-#include "checktypedefs.h"
 #include "overloading.h"
 #include "settings.h"
 #include "checker.h"
-#include "macros.h"
 #ifdef MOVE_FUNCTIONS_IN_LAMBDAS
 # include "optimise_lambda.h"
 #endif
@@ -169,8 +167,8 @@ static Ident SystemFunctionsId,StdArrayAbortId;
 void InitChecker (void)
 {
 	FreeDefs=NIL;
-	free_ldefs=NULL;
 #ifndef CLEAN2
+	free_ldefs=NULL;
 	free_depend_macros=NULL;
 #endif
 	AnnotatedId	= PutStringInHashTable ("_annotated", SymbolIdTable);
@@ -226,6 +224,7 @@ void InitChecker (void)
 	ArrayFunctionIds[_UnqArraySelectLastFun]= PutStringInHashTable ("_uselectl", SymbolIdTable);
 	ArrayFunctionIds[_ArrayUpdateFun]= PutStringInHashTable ("_updatei", SymbolIdTable);
 
+#ifndef CLEAN2
 	FunTypeClass.tac_uniprop = ALLBITSCLEAR;
 	FunTypeClass.tac_possign = BIT(1);
 	FunTypeClass.tac_negsign = BIT(0);
@@ -233,6 +232,7 @@ void InitChecker (void)
 	GeneralTypeClass.tac_uniprop = ALLBITSSET;
 	GeneralTypeClass.tac_possign = ALLBITSSET;
 	GeneralTypeClass.tac_negsign = ALLBITSCLEAR;
+#endif
 
 	OpenDefinitionModules	= NIL;
 }
