@@ -194,8 +194,9 @@ where
 
 instance collectFunctions Qualifier
 where
-	collectFunctions qual=:{qual_generators, qual_filter} icl_module ca
-		# ((qual_generators, qual_filter), ca) = collectFunctions (qual_generators, qual_filter) icl_module ca
+	collectFunctions qual=:{qual_generators,qual_let_defs,qual_filter} icl_module ca
+		# (qual_let_defs, ca) = collectFunctions qual_let_defs icl_module ca
+		# ((qual_generators,qual_filter), ca) = collectFunctions (qual_generators,qual_filter) icl_module ca
 		= ({ qual & qual_generators = qual_generators, qual_filter = qual_filter }, ca) 
 
 instance collectFunctions Generator
@@ -701,6 +702,7 @@ store_minimum_of_sizes_in_generator node_defs size_exp index_argument_n generato
 	{	tq_generators :: [TransformedGenerator]
 	,	tq_call :: ParsedExpr
 	,	tq_lhs_args :: [ParsedExpr]
+	,	tq_let_defs :: LocalDefs
 	,	tq_filter :: Optional ParsedExpr
 	,	tq_continue :: ParsedExpr
 	,	tq_success :: ParsedExpr
@@ -726,12 +728,13 @@ add_node_defs_to_exp [{tg_expr=(node_defs,_)}:generators] exp
 	= PE_Let cIsNotStrict (LocalParsedDefs node_defs) (add_node_defs_to_exp generators exp)
 
 transformQualifier :: Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
-transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} ca
+transformQualifier {qual_generators,qual_let_defs,qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators,index_generator,ca) = transformGenerators qual_generators qual_filename No ca
 	# (qual_fun_id, ca) = prefixAndPositionToIdent "c" qual_position ca
 	=	({	tq_generators = transformedGenerators
 		,	tq_call = add_node_defs_to_exp transformedGenerators (PE_List [PE_Ident qual_fun_id : expr_args_from_generators transformedGenerators])
 		,	tq_lhs_args = lhs_args_from_generators transformedGenerators
+		,	tq_let_defs = qual_let_defs
 		,	tq_filter = qual_filter
 		,	tq_continue = PE_List [PE_Ident qual_fun_id : rhs_continuation_args_from_generators transformedGenerators]
 		,	tq_success = PE_Empty
@@ -742,15 +745,16 @@ transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} 
 
 // =array&callArray are misnomers (can also be records)
 transformUpdateQualifier :: [ParsedExpr] [ParsedExpr] Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
-transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position, qual_filename} ca
+transformUpdateQualifier array callArray {qual_generators,qual_let_defs,qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators,index_generator,ca) = transformGenerators qual_generators qual_filename No ca
-	= CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_filter qual_position qual_filename ca
+	= CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_let_defs qual_filter qual_position qual_filename ca
 	
-CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_filter qual_position qual_filename ca
+CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_let_defs qual_filter qual_position qual_filename ca
 	# (qual_fun_id, ca) = prefixAndPositionToIdent "cu" qual_position ca
 	=	({	tq_generators = transformedGenerators
 		,	tq_call = add_node_defs_to_exp transformedGenerators (PE_List [PE_Ident qual_fun_id : callArray ++ expr_args_from_generators transformedGenerators])
 		,	tq_lhs_args = array ++ lhs_args_from_generators transformedGenerators
+		,	tq_let_defs=qual_let_defs
 		,	tq_filter = qual_filter
 		,	tq_continue = PE_List [PE_Ident qual_fun_id : array ++ rhs_continuation_args_from_generators transformedGenerators]
 		,	tq_success = PE_Empty
@@ -783,11 +787,11 @@ transformArrayComprehension expr qualifiers ca
 		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0))), gen_position=qual_position}
 		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
 		| size_of_generators_can_be_computed_quickly qualifiers
-			# {qual_generators,qual_filter,qual_position,qual_filename} = hd_qualifier
+			# {qual_generators,qual_let_defs,qual_filter,qual_position,qual_filename} = hd_qualifier
 			# qual_generators = [index_generator : qual_generators]
 			# (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
 			# new_array = PE_List [PE_Ident create_array,size_exp]
-			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_filter qual_position qual_filename ca
+			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
 			= makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier] ca
 
 			# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
@@ -895,56 +899,34 @@ makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_e
 makeComprehensions :: [TransformedQualifier] ParsedExpr [ParsedExpr] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 makeComprehensions [] success _ ca
 	=	(success, ca)
-makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
-	# (success, ca)
-		=	makeComprehensions qualifiers success threading ca
-  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id tq_fun_pos ca
+makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
+	# (success, ca) = makeComprehensions qualifiers success threading ca
+	# failure		= PE_List [PE_Ident tq_fun_id : threading ++ rhs_continuation_args_from_generators tq_generators]
+	  rhs	 		= build_rhs tq_generators success tq_let_defs tq_filter failure tq_end tq_fun_pos
+	  parsed_def 	= MakeNewParsedDef tq_fun_id tq_lhs_args rhs tq_fun_pos
+	= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) tq_call, ca)
 	where
-		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr
-									(Optional ParsedExpr) ParsedExpr Ident Position *CollectAdmin 
-								 -> (ParsedExpr, *CollectAdmin)
-		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident fun_pos ca
-			# continue
-				=	PE_List [PE_Ident fun_ident : threading ++ rhs_continuation_args_from_generators generators]
-			  failure
-				=	continue
-			  rhs
-			  	=	build_rhs generators success optional_filter failure end fun_pos
-			  parsed_def
-			  	=	MakeNewParsedDef fun_ident lhsArgs rhs fun_pos
-			= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) call_comprehension, ca)
-
-		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
-		build_rhs [generator : generators] success optional_filter failure end fun_pos
-			=	case_with_default generator.tg_case1 generator.tg_case_end_expr False generator.tg_case_end_pattern
-					(foldr (case_end end)
+		build_rhs :: [TransformedGenerator] ParsedExpr LocalDefs (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
+		build_rhs [generator : generators] success let_defs optional_filter failure end fun_pos
+			#	rhs2 = foldr (case_end end)
 						(case_with_default generator.tg_case2 generator.tg_element generator.tg_element_is_uselect generator.tg_pattern
 							(foldr (case_pattern failure) rhs generators)
 							failure)
-						generators)
-					end
+						generators
+			=	case_with_default generator.tg_case1 generator.tg_case_end_expr False generator.tg_case_end_pattern rhs2 end
 			where
 				rhs
 					=	case optional_filter of
 							Yes filter
-								->	optGuardedAltToRhs (GuardedAlts [
+								-> {rhs_alts = GuardedAlts [
 										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
-												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs [], ewl_position = NoPos },
+												{ewl_nodes = [], ewl_expr = success, ewl_locals	= LocalParsedDefs [], ewl_position = NoPos },
 											alt_ident = { id_name ="_f;" +++ toString line_nr +++ ";", id_info = nilPtr },
-											alt_position = NoPos}] No)
+										 alt_position = NoPos}] No
+									,	rhs_locals	= let_defs}
 							No
-								->	exprToRhs success
+								-> {rhs_alts=UnGuardedExpr {ewl_nodes=[],ewl_expr=success,ewl_locals=LocalParsedDefs [],ewl_position=NoPos},rhs_locals=let_defs}
 				(LinePos _ line_nr) = fun_pos
-
-	/* +++ remove code duplication (bug in 2.0 with nested cases)
-		case_end :: TransformedGenerator Rhs -> Rhs
-		case_end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
-			=	single_case tg_case1 tg_case_end_expr tg_case_end_pattern rhs
-	
-		case_pattern :: TransformedGenerator Rhs -> Rhs
-		case_pattern {tg_case2, tg_element, tg_pattern} rhs
-			=	single_case tg_case2 tg_element tg_pattern rhs
-	*/
 
 		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
@@ -953,12 +935,6 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_pattern failure {tg_case2, tg_element,tg_element_is_uselect, tg_pattern} rhs
 			=	case_with_default tg_case2 tg_element tg_element_is_uselect tg_pattern rhs failure
-
-		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
-		single_case case_ident expr pattern rhs
-			=	exprToRhs (PE_Case case_ident expr
-					[	{calt_pattern = pattern, calt_rhs = rhs}
-					])
 
 		case_with_default :: Ident ParsedExpr Bool ParsedExpr Rhs ParsedExpr -> Rhs
 		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
@@ -975,6 +951,24 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 					[	{calt_pattern = pattern, calt_rhs = rhs}
 					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs}
 					])
+
+	/* +++ remove code duplication (bug in 2.0 with nested cases)
+		case_end :: TransformedGenerator Rhs -> Rhs
+		case_end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
+			=	single_case tg_case1 tg_case_end_expr tg_case_end_pattern rhs
+	
+		case_pattern :: TransformedGenerator Rhs -> Rhs
+		case_pattern {tg_case2, tg_element, tg_pattern} rhs
+			=	single_case tg_case2 tg_element tg_pattern rhs
+
+	*/
+		/*
+		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
+		single_case case_ident expr pattern rhs
+			=	exprToRhs (PE_Case case_ident expr
+					[	{calt_pattern = pattern, calt_rhs = rhs}
+					])
+		*/
 
 transformSequence :: Sequence -> ParsedExpr
 transformSequence (SQ_FromThen pd_from_then frm then)

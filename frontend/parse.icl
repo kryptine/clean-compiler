@@ -3170,7 +3170,7 @@ where
 			= want_generators IsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 		| token == LeftArrowWithBarToken
 			= want_generators IsOverloadedListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
-			= ({qual_generators = [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
+			= ({qual_generators = [], qual_let_defs=LocalParsedDefs [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)
 
 	want_generators :: !GeneratorKind !LineAndColumn !FileName !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
@@ -3179,20 +3179,35 @@ where
 		# (gen_expr, pState) = wantExpression cIsNotAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		  generator = { gen_kind = gen_kind, gen_expr = gen_expr, gen_pattern = pattern_exp,
-							gen_position = toLineAndColumn gen_position
-			}
-		| token == BarToken
-			# (filter_expr, pState) = wantExpression cIsNotAPattern pState
-			= ( { qual_generators = [generator], qual_filter = Yes filter_expr
-				, qual_position = qual_position, qual_filename = qual_filename }
-			  , pState
-			  )
+						gen_position = toLineAndColumn gen_position }
 		| token == AndToken
 			# (qualifier, pState) = want_qualifier pState
 			= ({qualifier & qual_generators = [ generator : qualifier.qual_generators] }, pState)
-		= ( {qual_generators = [generator], qual_filter = No, qual_position = qual_position, qual_filename = qual_filename}
-		  ,	tokenBack pState
-		  )
+			# (let_defs,filter,pState)= parse_optional_lets_and_filter token pState
+			= ( {qual_generators = [generator], qual_let_defs=let_defs, qual_filter = filter, qual_position = qual_position, qual_filename = qual_filename}
+			  ,	pState )
+
+	parse_optional_lets_and_filter :: !Token !ParseState -> (!LocalDefs,!Optional ParsedExpr,!ParseState)
+	parse_optional_lets_and_filter BarToken pState
+		# (filter_expr, pState) = wantExpression cIsNotAPattern pState
+		= (LocalParsedDefs [], Yes filter_expr,pState)
+	parse_optional_lets_and_filter CommaToken pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token<>LetToken False
+			= (LocalParsedDefs [],No,tokenBack (tokenBack pState))
+		# (locals,pState) = wantLocals pState
+		# (token, pState) = nextToken FunctionContext pState
+		# (filter,pState) = parse_optional_filter token pState
+		= (locals,filter,pState);
+	parse_optional_lets_and_filter token pState
+		= (LocalParsedDefs [], No,tokenBack pState)
+
+	parse_optional_filter :: !Token !ParseState -> (!Optional ParsedExpr,!ParseState)
+	parse_optional_filter BarToken pState
+		# (filter_expr, pState) = wantExpression cIsNotAPattern pState
+		= (Yes filter_expr,pState)
+	parse_optional_filter token pState
+		= (No,tokenBack pState)
 
 /**
 	Case Expressions

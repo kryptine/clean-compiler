@@ -1139,6 +1139,7 @@ instance toString 	KindInfo
 
 ::	Qualifier	=
 	{	qual_generators	:: ![Generator]
+	,	qual_let_defs	:: !LocalDefs
 	,	qual_filter		:: !Optional ParsedExpr
 	,	qual_position	:: !LineAndColumn
 	,	qual_filename	:: !FileName
