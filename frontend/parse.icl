@@ -299,7 +299,7 @@ wantModule iclmodule file_id=:{id_name} import_file_position hash_table error se
 			->(ok,mod,hash_table,file,pre_def_symbols,files)
 		(No, files)
 			-> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
-			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": could not open " <<< file_name <<< "\n", pre_def_symbols, files)
+			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", pre_def_symbols, files)
 where
 	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
 	initModule :: String ScanState !*HashTable !*File !*PredefinedSymbols *Files
