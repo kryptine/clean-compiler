@@ -875,7 +875,6 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 	  					= unsafeFold2St (check_kind type_name modules) tdi_kinds cons_args (1, error_admin)
 	  				-> Yes error_admin
 	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
-// MW probably	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute, at_annotation = AN_None }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
 			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
 				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
 	where
@@ -2044,7 +2043,7 @@ where
 		#! nr_of_type_variables = ts.ts_var_store 
 		# (subst, ts_type_heaps, ts_error)
 		  		= unify_requirements_of_functions fun_reqs ti (createArray nr_of_type_variables TE) ts.ts_type_heaps ts.ts_error
-		| not ts_error.ea_ok //---> (("begin\n" ---> subst.[2]) ---> "\nend")
+		| not ts_error.ea_ok
 			= (True, fun_defs, predef_symbols, special_instances, create_erroneous_function_types comp
 				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar})
 		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_td_infos} = ts

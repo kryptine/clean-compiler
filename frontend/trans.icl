@@ -1012,7 +1012,8 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 									,	fi_free_vars =  []
 									,	fi_local_vars = []
 									,	fi_dynamics = []
-									,	fi_is_macro_fun = outer_fun_def.fun_info.fi_is_macro_fun
+// Sjaak: 							,	fi_is_macro_fun = outer_fun_def.fun_info.fi_is_macro_fun
+									,	fi_properties = outer_fun_def.fun_info.fi_properties
 									}	
 					}
 		  cc_args_from_outer_fun = [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
@@ -1820,12 +1821,17 @@ where
 
 	get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
 		| glob_module == ro.ro_main_dcl_module_n
-			# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
-			= (symbol_type, fun_defs, fun_heap)
-		# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-		  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
-		= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
-			fun_defs, fun_heap)
+// Sjaak ...
+			# ({fun_type=Yes symbol_type, fun_info={fi_properties}}, fun_defs) = fun_defs![glob_object]
+			|  fi_properties bitand FI_HasTypeSpec <> 0
+				# (_, symbol_type) = removeAnnotations symbol_type
+				= (symbol_type, fun_defs, fun_heap)
+				= (symbol_type, fun_defs, fun_heap)
+			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+			  (_, ft_type) = removeAnnotations ft_type
+			  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
+			= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] }, fun_defs, fun_heap)
+// ... Sjaak
 	get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
 		# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
 		= (symbol_type, fun_defs, fun_heap)
@@ -2008,7 +2014,8 @@ allocate_fresh_type_var i (accu, th_vars)
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_symb, app_args, extra_args) = complete_application app_symb fun_def.fun_arity app_args extra_args
 	| cc_size > 0
-	  	# (producers, new_args, ti) = determineProducers fun_def.fun_info.fi_is_macro_fun cc_linear_bits cc_args app_args
+// Sjaak:	  	# (producers, new_args, ti) = determineProducers fun_def.fun_info.fi_is_macro_fun cc_linear_bits cc_args app_args
+	  	# (producers, new_args, ti) = determineProducers (fun_def.fun_info.fi_properties bitand FI_IsMacroFun <> 0) cc_linear_bits cc_args app_args
 														 0 (createArray cc_size PR_Empty) ro ti
 	  	| containsProducer cc_size producers
 //			| False--->("determineProducers",(cc_linear_bits,cc_args,app_symb.symb_name, app_args),("\nresults in",II_Node producers nilPtr II_Empty II_Empty))
@@ -2331,20 +2338,21 @@ transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_
 		-> (!*{! Group}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 	add_new_function_to_group common_defs ti_fun_heap fun_ptr (groups, fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr ti_fun_heap
-		  group_index = gf_fun_def.fun_info.fi_group_index
-		# (Yes ft=:{st_args,st_result}) = gf_fun_def.fun_type
-		  ((st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypes common_defs (st_result,st_args)
-		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps = type_heaps, ets_var_heap = var_heap,
-		  		  ets_main_dcl_module_n=main_dcl_module_n }
-		# (group, groups) = groups![group_index]
-		= ({ groups & [group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
+// Sjaak
+		  {fun_type = Yes ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
+		  ((st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
+		  		= expandSynTypes (fi_properties bitand FI_HasTypeSpec == 0) common_defs (st_result,st_args)
+				  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps = type_heaps, ets_var_heap = var_heap,
+				  		  ets_main_dcl_module_n=main_dcl_module_n }
+		# (group, groups) = groups![fi_group_index]
+		= ({ groups & [fi_group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
 				[ { gf_fun_def & fun_type = Yes { ft &  st_result = st_result, st_args = st_args }} : fun_defs],
 					ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 	
 	convert_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
-		# (fun_def=:{fun_type = Yes fun_type}, fun_defs) = fun_defs![fun_index]
+		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs) = fun_defs![fun_index]
 		  (fun_type, imported_types, collected_imports, type_heaps, var_heap)
-		  		= convertSymbolType common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
+		  		= convertSymbolType (fi_properties bitand FI_HasTypeSpec == 0) common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
 		= ({ fun_defs & [fun_index] = { fun_def & fun_type = Yes fun_type }}, imported_types, collected_imports, type_heaps, var_heap)
 
 	cleanup_attributes expr_info_ptr symbol_heap
@@ -2360,10 +2368,10 @@ set_extended_expr_info expr_info_ptr extension expr_info_heap
 			-> expr_info_heap <:= (expr_info_ptr, EI_Extended extension ei)
 		ei	-> expr_info_heap <:= (expr_info_ptr, EI_Extended extension ei)
 		
-convertSymbolType :: !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
+convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-convertSymbolType  common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
-	# (st, {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypes common_defs st
+convertSymbolType  rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
+	# (st, {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypes rem_annots common_defs st
 		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps= type_heaps, ets_var_heap = var_heap,
 		  		  ets_main_dcl_module_n=main_dcl_module_n }
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
@@ -2395,56 +2403,53 @@ where
 						  	tc_types
 						  	class_cons_vars))}
 	
-class expandSynTypes a :: !{# CommonDefs} !a !*ExpandTypeState -> (!a, !*ExpandTypeState)
+class expandSynTypes a :: !Bool !{# CommonDefs} !a !*ExpandTypeState -> (!a, !*ExpandTypeState)
 
-/*
-class expandSynTypes a ::   !a (!*{#{#CheckedTypeDef}}, !*TypeHeaps) -> (!a, (!*{#{#CheckedTypeDef}}, !*TypeHeaps))
-*/
 
 instance expandSynTypes SymbolType
 where
-	expandSynTypes common_defs st=:{st_args,st_result,st_context} ets
-		# ((st_args,st_result), ets) = expandSynTypes common_defs (st_args,st_result) ets
+	expandSynTypes rem_annots common_defs st=:{st_args,st_result,st_context} ets
+		# ((st_args,st_result), ets) = expandSynTypes rem_annots common_defs (st_args,st_result) ets
 		  st_args = addTypesOfDictionaries common_defs st_context st_args
 		= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
 
 instance expandSynTypes Type
 where
-	expandSynTypes common_defs (arg_type --> res_type) ets
-		# ((arg_type, res_type), ets) = expandSynTypes common_defs (arg_type, res_type) ets
+	expandSynTypes rem_annots common_defs (arg_type --> res_type) ets
+		# ((arg_type, res_type), ets) = expandSynTypes rem_annots common_defs (arg_type, res_type) ets
 		= (arg_type --> res_type, ets)
-	expandSynTypes common_defs type=:(TB _) ets
+	expandSynTypes rem_annots common_defs type=:(TB _) ets
 		= (type, ets)
-	expandSynTypes common_defs (cons_var :@: types) ets
-		# (types, ets) = expandSynTypes common_defs types ets
+	expandSynTypes rem_annots common_defs (cons_var :@: types) ets
+		# (types, ets) = expandSynTypes rem_annots common_defs types ets
 		= (cons_var :@: types, ets) 
-	expandSynTypes common_defs type=:(TA type_symb types) ets
-		= expand_syn_types_in_TA common_defs type_symb types TA_Multi ets
-	expandSynTypes common_defs type ets
+	expandSynTypes rem_annots common_defs type=:(TA type_symb types) ets
+		= expand_syn_types_in_TA rem_annots common_defs type_symb types TA_Multi ets
+	expandSynTypes rem_annots common_defs type ets
 		= (type, ets)
 
 instance expandSynTypes [a] | expandSynTypes a
 where
-	expandSynTypes common_defs list ets
-		= mapSt (expandSynTypes common_defs) list ets
+	expandSynTypes rem_annots common_defs list ets
+		= mapSt (expandSynTypes rem_annots common_defs) list ets
 
 
 instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b
 where
-	expandSynTypes common_defs tuple ets
-		= app2St (expandSynTypes common_defs, expandSynTypes common_defs) tuple ets
+	expandSynTypes rem_annots common_defs tuple ets
+		= app2St (expandSynTypes rem_annots common_defs, expandSynTypes rem_annots common_defs) tuple ets
 
-expand_syn_types_in_TA common_defs type_symb=:{type_index={glob_object,glob_module},type_name} types attribute ets=:{ets_type_defs}
+expand_syn_types_in_TA rem_annots common_defs type_symb=:{type_index={glob_object,glob_module},type_name} types attribute ets=:{ets_type_defs}
 	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
 	  ets = { ets & ets_type_defs = ets_type_defs }
 	= case td_rhs of
 		SynType rhs_type
 			# ets_type_heaps = bind_attr td_attribute attribute ets.ets_type_heaps
 			  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
-			  (type, ets_type_heaps) = substitute rhs_type.at_type ets_type_heaps
-			-> expandSynTypes common_defs type { ets & ets_type_heaps = ets_type_heaps }
+			  (type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
+			-> expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
 		_
-			# (types, ets) = expandSynTypes common_defs types ets
+			# (types, ets) = expandSynTypes rem_annots common_defs types ets
 			| glob_module == ets.ets_main_dcl_module_n
 				-> ( TA type_symb types, ets)
 				-> ( TA type_symb types, collect_imported_constructors common_defs glob_module td_rhs ets)
@@ -2481,17 +2486,22 @@ where
 		has_been_collected (VI_ExpandedType _)	= True
 		has_been_collected _					= False
 
+		substitute_rhs rem_annots rhs_type type_heaps
+			| rem_annots
+				# (_, rhs_type) = removeAnnotations rhs_type
+			  	= substitute rhs_type type_heaps
+			  	= substitute rhs_type type_heaps
 
 instance expandSynTypes AType
 where
-	expandSynTypes common_defs atype ets
-		= expand_syn_types_in_a_type common_defs atype ets
+	expandSynTypes rem_annots common_defs atype ets
+		= expand_syn_types_in_a_type rem_annots common_defs atype ets
 	where
-		expand_syn_types_in_a_type common_defs atype=:{at_type = TA type_symb types, at_attribute} ets
-			# (at_type, ets) = expand_syn_types_in_TA common_defs type_symb types at_attribute ets
+		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = TA type_symb types, at_attribute} ets
+			# (at_type, ets) = expand_syn_types_in_TA rem_annots common_defs type_symb types at_attribute ets
 			= ({ atype & at_type = at_type }, ets)
-		expand_syn_types_in_a_type common_defs atype ets
-			# (at_type, ets) = expandSynTypes common_defs atype.at_type ets
+		expand_syn_types_in_a_type rem_annots common_defs atype ets
+			# (at_type, ets) = expandSynTypes rem_annots common_defs atype.at_type ets
 			= ({ atype & at_type = at_type }, ets)
 
 ::	FreeVarInfo =

@@ -32,9 +32,10 @@ checkGenerics
 		
 		# cs = {cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }
 		# type_heaps = {type_heaps & th_vars = th_vars}
+/*
 		# (gen_type, specials, type_defs, class_defs, modules, type_heaps, cs) =
 			checkSymbolType module_index gen_type SP_None type_defs class_defs modules type_heaps cs
-
+*/
 		# cs = {cs & cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope gen_args cs.cs_symbol_table}
 
 		# generic_defs = {generic_defs & [gen_index] = {gen_def & gen_type = gen_type, gen_args = gen_args}}		
@@ -57,41 +58,17 @@ where
 
 checkTypeClasses :: !Index !Index !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*TypeHeaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*TypeHeaps, !*CheckState)
-checkTypeClasses class_index module_index class_defs member_defs type_defs modules type_heaps=:{th_vars} cs=:{cs_symbol_table,cs_error}
+checkTypeClasses class_index module_index class_defs member_defs type_defs modules type_heaps cs=:{cs_symbol_table,cs_error}
 	| class_index == size class_defs
 		= (class_defs, member_defs, type_defs, modules, type_heaps, cs)
 		# (class_def=:{class_name,class_pos,class_args,class_context,class_members}, class_defs) = class_defs![class_index]
-		  position = newPosition class_name class_pos
-		  cs_error = setErrorAdmin position cs_error
-		  (rev_class_args, cs_symbol_table, th_vars, cs_error)
-		  		= add_variables_to_symbol_table cGlobalScope class_args [] cs_symbol_table th_vars cs_error
-		  cs = {cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }
-		  (class_context, type_defs, class_defs, modules, type_heaps, cs)
-		  		= checkTypeContexts class_context module_index type_defs class_defs modules { type_heaps & th_vars = th_vars } cs
-		  (class_args, cs_symbol_table) = retrieve_variables_from_symbol_table rev_class_args [] cs.cs_symbol_table
+		  cs = {cs & cs_error = setErrorAdmin (newPosition class_name class_pos) cs_error }
+		  (class_args, class_context, type_defs, class_defs, modules, type_heaps, cs)
+		  		= checkSuperClasses class_args class_context module_index type_defs class_defs modules type_heaps cs
 		  class_defs = { class_defs & [class_index] = { class_def & class_context = class_context, class_args = class_args }}
 		  member_defs = set_classes_in_member_defs 0 class_members {glob_object = class_index, glob_module = module_index} member_defs 
-		= checkTypeClasses (inc class_index) module_index class_defs member_defs type_defs modules type_heaps { cs & cs_symbol_table = cs_symbol_table }
+		= checkTypeClasses (inc class_index) module_index class_defs member_defs type_defs modules type_heaps cs
 where
-	add_variables_to_symbol_table :: !Level ![TypeVar] ![TypeVar] !*SymbolTable !*TypeVarHeap !*ErrorAdmin
-		-> (![TypeVar],!*SymbolTable,!*TypeVarHeap,!*ErrorAdmin)
-	add_variables_to_symbol_table level [] rev_class_args symbol_table th_vars error
-		= (rev_class_args, symbol_table, th_vars, error)
-	add_variables_to_symbol_table level [var=:{tv_name={id_name,id_info}} : vars] rev_class_args symbol_table th_vars error
-	  	# (entry, symbol_table) = readPtr id_info symbol_table
-		| entry.ste_kind == STE_Empty || entry.ste_def_level < level
-			# (new_var_ptr, th_vars) = newPtr TVI_Empty th_vars
-			# symbol_table = NewEntry symbol_table id_info (STE_TypeVariable new_var_ptr) NoIndex level entry
-			= add_variables_to_symbol_table level vars [{ var & tv_info_ptr = new_var_ptr} : rev_class_args] symbol_table th_vars error
-			= add_variables_to_symbol_table level  vars rev_class_args symbol_table th_vars (checkError id_name "(variable) already defined" error)
-
-	retrieve_variables_from_symbol_table :: ![TypeVar] ![TypeVar] !*SymbolTable -> (![TypeVar],!*SymbolTable)
-	retrieve_variables_from_symbol_table [var=:{tv_name={id_name,id_info}} : vars] class_args symbol_table
-		# (entry, symbol_table) = readPtr id_info symbol_table
-		= retrieve_variables_from_symbol_table vars [var : class_args] (symbol_table <:= (id_info,entry.ste_previous))
-	retrieve_variables_from_symbol_table [] class_args symbol_table
-		= (class_args, symbol_table)
-	
 	set_classes_in_member_defs mem_offset class_members glob_class_index member_defs
 		| mem_offset == size class_members
 			= member_defs
@@ -99,7 +76,6 @@ where
 			# (member_def, member_defs) = member_defs![ds_index]
 			= set_classes_in_member_defs (inc mem_offset) class_members glob_class_index { member_defs & [ds_index] = { member_def & me_class = glob_class_index }}
 
-	
 checkSpecial :: !Index !FunType !Index !SpecialSubstitution (!Index, ![FunType], !*Heaps, !*ErrorAdmin)
 	-> (!Special, (!Index, ![FunType], !*Heaps, !*ErrorAdmin))
 checkSpecial mod_index fun_type=:{ft_type} fun_index subst (next_inst_index, special_types, heaps, error)
@@ -131,7 +107,7 @@ where
 		# position = newPosition ft_symb ft_pos
 		  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
 		  (ft_type, ft_specials, type_defs,  class_defs, modules, hp_type_heaps, cs)
-		  		= checkSymbolType module_index ft_type ft_specials type_defs class_defs modules heaps.hp_type_heaps cs
+		  		= checkFunctionType module_index ft_type ft_specials type_defs class_defs modules heaps.hp_type_heaps cs
 		  (spec_types, next_inst_index, collected_instances, heaps, cs_error)
 		  		= check_specials module_index { fun_type & ft_type = ft_type } fun_index ft_specials next_inst_index collected_instances
 		  				{ heaps & hp_type_heaps = hp_type_heaps } cs.cs_error
@@ -198,13 +174,13 @@ where
 		# (member_def=:{me_symb,me_type,me_pos}, member_defs) = member_defs![member_index]
 		  position = newPosition me_symb me_pos
 		  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
-		  (me_type, _, type_defs, class_defs, modules, type_heaps, cs)
-		   		= checkSymbolType module_index me_type SP_None type_defs class_defs modules type_heaps cs
-		  me_class_vars = map (\(TV type_var) -> type_var) (hd me_type.st_context).tc_types
+		  (me_type, type_defs, class_defs, modules, type_heaps, cs)
+		   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
+		  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
 		  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
 		= ({ member_defs & [member_index] = { member_def & me_type = me_type, me_class_vars = me_class_vars, me_type_ptr = me_type_ptr }},
 				type_defs, class_defs, modules, type_heaps, var_heap, cs)
-
+	
 ::	InstanceSymbols =
 	{	is_type_defs		:: !.{# CheckedTypeDef}
 	,	is_class_defs		:: !.{# ClassDef}
@@ -696,8 +672,9 @@ checkFunction mod_index fun_index def_level fun_defs
 	  (ef_type_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
 	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_modules es_type_heaps es_expr_heap cs
 	  cs = { cs & cs_error = popErrorAdmin cs.cs_error }
+	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
 	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics,
-	  					fi_is_macro_fun = ef_is_macro_fun }
+	  								  fi_properties = fi_properties }
 	  fun_defs = { es_fun_defs & [fun_index] = { fun_def & fun_body = fun_body, fun_index = fun_index, fun_info = fun_info, fun_type = fun_type}}
 	  (fun_defs, cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls fun_defs cs.cs_symbol_table
 	= (fun_defs,
@@ -706,8 +683,11 @@ checkFunction mod_index fun_index def_level fun_defs
 			{ cs & cs_symbol_table = cs_symbol_table })
 
 where
+	has_type (Yes _) 	= FI_HasTypeSpec
+	has_type no 		= 0
+	
 	check_function_type (Yes ft) module_index type_defs class_defs modules var_heap type_heaps cs
-		# (ft, _, type_defs, class_defs, modules, type_heaps, cs) = checkSymbolType module_index ft SP_None type_defs class_defs modules type_heaps cs
+		# (ft, _, type_defs, class_defs, modules, type_heaps, cs) = checkFunctionType module_index ft SP_None type_defs class_defs modules type_heaps cs
 		  (st_context, var_heap) = initializeContextVariables ft.st_context var_heap
 		= (Yes { ft & st_context = st_context } , type_defs,  class_defs, modules, var_heap, type_heaps, cs)
 

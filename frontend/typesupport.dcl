@@ -132,3 +132,6 @@ appTypeVarHeap f type_heaps :== let th_vars = f type_heaps.th_vars in { type_hea
 accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, { type_heaps & th_vars = th_vars })
 accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r, { type_heaps & th_attrs = th_attrs })
 	
+class removeAnnotations a :: !a  -> (!Bool, !a)
+
+instance removeAnnotations Type, SymbolType

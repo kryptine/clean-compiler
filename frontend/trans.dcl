@@ -21,7 +21,7 @@ partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{! Group}, !*{# FunDef
 
 ::	ImportedConstructors	:== [Global Index]
 
-convertSymbolType :: !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap
+convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 
 addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]

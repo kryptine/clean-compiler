@@ -308,7 +308,7 @@ addLocalFunctionDefsToSymbolTable level from_index to_index is_macro_fun fun_def
 		# (fun_def, fun_defs) = fun_defs![from_index]
 		# (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_symb (STE_FunctionOrMacro []) symbol_table error
 		| is_macro_fun
-			# fun_defs = {fun_defs & [from_index].fun_info.fi_is_macro_fun=is_macro_fun}
+			# fun_defs = {fun_defs & [from_index].fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_IsMacroFun }
 			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
 			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
 

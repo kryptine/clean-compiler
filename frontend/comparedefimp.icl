@@ -252,7 +252,8 @@ compareTwoMacroFuns dclIndex iclIndex
 	  ident_pos = getIdentPos dcl_function
 	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
 	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
-	| dcl_function.fun_info.fi_is_macro_fun<>icl_function.fun_info.fi_is_macro_fun ||
+// Sjaak :	| dcl_function.fun_info.fi_is_macro_fun<>icl_function.fun_info.fi_is_macro_fun ||
+	| dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun ||
 	  dcl_function.fun_priority<>icl_function.fun_priority
 		# ec_state = give_error dcl_function.fun_symb ec_state
 		= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }

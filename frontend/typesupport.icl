@@ -56,7 +56,7 @@ where
 	clean_up cui atype=:{at_attribute,at_type} cus
 		# (at_attribute, cus) = clean_up cui at_attribute cus 
 		  (at_type, cus) = clean_up cui at_type cus
-		= ({atype & at_attribute = at_attribute, at_type = at_type}, cus)
+		= ({atype & at_attribute = at_attribute, at_type = at_type, at_annotation = AN_None}, cus)
 
 attrIsUndefined TA_None = True
 attrIsUndefined _ 		= False
@@ -588,6 +588,68 @@ where
 		  (ct_result_type, heaps) = substitute ct_result_type heaps
 		  (ct_cons_types, heaps) = substitute ct_cons_types heaps
 		= ({ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, ct_cons_types = ct_cons_types}, heaps)
+
+
+class removeAnnotations a :: !a  -> (!Bool, !a)
+
+instance removeAnnotations (a,b) | removeAnnotations a & removeAnnotations b
+where
+	removeAnnotations t=:(x,y)
+		# (rem_x, x) = removeAnnotations x
+		  (rem_y, y) = removeAnnotations y
+		| rem_x || rem_y
+			= (True, (x,y))
+			= (False, t)
+	
+instance removeAnnotations [a] | removeAnnotations a
+where
+	removeAnnotations l=:[x:xs]
+		# (rem_x, x) = removeAnnotations x
+		  (rem_xs, xs) = removeAnnotations xs
+		| rem_x || rem_xs
+			= (True, [x:xs])
+			= (False, l)
+	removeAnnotations el
+		= (False, el)
+
+instance removeAnnotations Type
+where
+	removeAnnotations t=:(arg_type --> res_type)
+		# (rem, (arg_type, res_type)) = removeAnnotations (arg_type, res_type)
+		| rem 
+			= (True, arg_type --> res_type)
+			= (False, t)
+	removeAnnotations t=:(TA cons_id cons_args)
+		# (rem, cons_args) = removeAnnotations cons_args
+		| rem 
+			= (True, TA cons_id cons_args)
+			= (False, t)
+	removeAnnotations t=:(cv :@: types)
+		# (rem, types) = removeAnnotations types
+		| rem 
+			= (True, cv :@: types)
+			= (False, t)
+	removeAnnotations type
+		= (False, type)
+
+
+instance removeAnnotations AType
+where
+	removeAnnotations atype=:{at_annotation,at_type}
+		# (rem, at_type) = removeAnnotations at_type
+		| rem
+			= (True, { atype & at_annotation = AN_None, at_type = at_type })
+		| at_annotation == AN_None
+			= (False, atype)
+			= (True, { atype & at_annotation = AN_None })
+
+instance removeAnnotations SymbolType
+where
+	removeAnnotations st=:{st_args,st_result}
+		# (rem, (st_args,st_result)) = removeAnnotations (st_args,st_result)
+		| rem
+			= (True, { st & st_args = st_args, st_result = st_result })
+			= (False, st)
 
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}

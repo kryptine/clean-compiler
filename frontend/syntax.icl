@@ -400,6 +400,11 @@ cMayBeNonCoercible		:== 4
 	,	fc_index		:: !Index
 	}
 
+/* Sjaak 19-3-2001 ... */
+
+FI_IsMacroFun	:== 1			// whether the function is a local function of a macro
+FI_HasTypeSpec	:== 2			// whether the function has u user defined type
+
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
 	,	fi_group_index		:: !Index
@@ -407,8 +412,9 @@ cMayBeNonCoercible		:== 4
 	,	fi_free_vars		:: ![FreeVar]
 	,	fi_local_vars		:: ![FreeVar]
 	,	fi_dynamics			:: ![ExprInfoPtr]
-	,	fi_is_macro_fun		:: !Bool // whether the function is a local function of a macro
+	,	fi_properties		:: !BITVECT
 	}
+/* ... Sjaak 19-3-2001 */
 
 ::	ParsedBody =
 	{	pb_args	:: ![ParsedExpr]
@@ -2022,7 +2028,7 @@ MakeAttributedType type :== { at_attribute = TA_None, at_annotation = AN_None, a
 MakeAttributedTypeVar type_var :== { atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = type_var }
 
 EmptyFunInfo :== { fi_calls = [], fi_group_index = NoIndex, fi_def_level = NotALevel,
-				   fi_free_vars = [], fi_local_vars = [], fi_dynamics = [], fi_is_macro_fun=False }
+				   fi_free_vars = [], fi_local_vars = [], fi_dynamics = [], fi_properties=0 }
 
 BottomSignClass		:== { sc_pos_vect = 0, sc_neg_vect = 0 }
 PostiveSignClass	:== { sc_pos_vect = bitnot 0, sc_neg_vect = 0 }

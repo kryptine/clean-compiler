@@ -68,7 +68,6 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap /* TD */ (Optional !*File) {# DclModule} !IclModule /* TD */ [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, /* TD */ (Optional !*File))
 convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap /* TD */ tcl_file dcl_mods icl_mod  /* TD */ directly_imported_dcl_modules
-
 	// TD ...
 	# tcl_file
 		= case tcl_file of
@@ -83,7 +82,6 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 
 				
 	// ... TD
-	
 	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamics]
 	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)
 		= case (pds_module == (-1) || pds_def == (-1)) of

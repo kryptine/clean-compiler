@@ -1817,7 +1817,8 @@ makeFunction {ds_index, ds_arity, ds_ident} group_index arg_vars body_expr opt_s
 			fi_free_vars =  [],
 			fi_local_vars = local_vars,
 			fi_dynamics = [],
-			fi_is_macro_fun = False
+// Sjaak	fi_is_macro_fun = False
+			fi_properties = 0
 			}	
 		}
 

@@ -959,12 +959,12 @@ where
 		-> (!SymbKind, !Int, !Priority, !Bool, !*ExpressionState, !u:ExpressionInfo,!*CheckState)
 	determine_info_of_symbol entry=:{ste_kind=STE_FunctionOrMacro calls,ste_index,ste_def_level} symb_info
 				e_input=:{ei_fun_index, ei_mod_index} e_state=:{es_fun_defs,es_calls} e_info cs=:{cs_symbol_table,cs_x}
-		# ({fun_symb,fun_arity,fun_kind,fun_priority,fun_info}, es_fun_defs) = es_fun_defs![ste_index]
+		# ({fun_symb,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}, es_fun_defs) = es_fun_defs![ste_index]
 		# index = { glob_object = ste_index, glob_module = cs_x.x_main_dcl_module_n }
 		| is_called_before ei_fun_index calls
 			| case fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
 				= (SK_Macro index, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
-				# symbol_kind = if fun_info.fi_is_macro_fun (SK_LocalMacroFunction ste_index) (SK_Function index)
+				# symbol_kind = if (fi_properties bitand FI_IsMacroFun <> 0) (SK_LocalMacroFunction ste_index) (SK_Function index)
 				= (symbol_kind, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
 			  e_state = { e_state & es_fun_defs = es_fun_defs, es_calls = [{ fc_index = ste_index, fc_level = ste_def_level} : es_calls ]}
@@ -974,7 +974,7 @@ where
 				FK_ImpMacro
 					-> SK_Macro index;
 				_
-					| fun_info.fi_is_macro_fun
+					| fi_properties bitand FI_IsMacroFun <> 0
 						-> SK_LocalMacroFunction ste_index
 						-> SK_Function index
 			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)

@@ -593,7 +593,7 @@ tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os d
 	# (reduced_contexts, contexts, coercion_env, type_pattern_vars, os) = foldSt (reduce_contexts defs instance_info) ocs ([], [], coercion_env, [], os)
 	| os.os_error.ea_ok
 		# (contexts, os_var_heap) = foldSt add_spec_contexts ocs (contexts, os.os_var_heap)
-		  (contexts, os_type_heaps) = remove_sub_classes contexts os.os_type_heaps
+		  (contexts, os_type_heaps) = remove_super_classes contexts os.os_type_heaps
 		  ({ hp_var_heap, hp_expression_heap, hp_type_heaps}, dict_types) = foldSt (convert_dictionaries defs contexts) reduced_contexts
 		  					({ hp_var_heap = os_var_heap, hp_expression_heap = os.os_symbol_heap, hp_type_heaps = os_type_heaps}, [])
 		= (contexts, coercion_env, type_pattern_vars, dict_types, { os & os_type_heaps = hp_type_heaps, os_symbol_heap = hp_expression_heap, os_var_heap = hp_var_heap} )
@@ -633,21 +633,24 @@ where
 					{ os & os_type_heaps = os_type_heaps, os_symbol_heap = os_symbol_heap, os_var_heap = os_var_heap,
 						   os_special_instances = os_special_instances, os_error = os_error, os_predef_symbols = os_predef_symbols })
 
-	remove_sub_classes contexts type_heaps
-		# (sub_classes, type_heaps) = foldSt generate_subclasses contexts ([], type_heaps)
-		= (foldSt (remove_doubles sub_classes) contexts [], type_heaps)
-		
-	generate_subclasses {tc_class={glob_object={ds_index},glob_module},tc_types} (sub_classes, type_heaps)
+	remove_super_classes contexts type_heaps
+		# (super_classes, type_heaps) = foldSt generate_super_classes contexts ([], type_heaps)
+		  sub_classes = foldSt (remove_doubles super_classes) contexts []
+		= (sub_classes, type_heaps)
+	
+	generate_super_classes {tc_class={glob_object={ds_index},glob_module},tc_types} (super_classes, type_heaps)
 		# {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 		  th_vars = fold2St set_type class_args tc_types type_heaps.th_vars
-		= foldSt subst_context class_context (sub_classes, { type_heaps & th_vars = th_vars })
+		= foldSt subst_context_and_generate_super_classes class_context (super_classes, { type_heaps & th_vars = th_vars })
 	where
 		set_type {tv_info_ptr} type type_var_heap
 			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
 		  
-		subst_context class_context (sub_classes, type_heaps)
-			# (sub_class, type_heaps) = substitute class_context type_heaps
-			= ([sub_class : sub_classes], type_heaps) 
+		subst_context_and_generate_super_classes class_context (super_classes, type_heaps)
+			# (super_class, type_heaps) = substitute class_context type_heaps
+			| containsContext super_class super_classes
+				= (super_classes, type_heaps)
+				= generate_super_classes super_class ([super_class : super_classes], type_heaps) 
 		 
 	remove_doubles sub_classes tc context
 		| containsContext tc sub_classes
@@ -921,7 +924,7 @@ removeOverloadedFunctions group type_pattern_vars main_dcl_module_n fun_defs fun
 where
 	remove_overloaded_function type_pattern_vars fun_index (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 		# (fun_def, fun_defs) = fun_defs![fun_index]  
-		  (CheckedType {st_context}, fun_env) = fun_env![fun_index]
+		  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
 		  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb,fun_pos} = fun_def
 	
 		  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
@@ -943,9 +946,6 @@ where
 		= case var_info of 
 			VI_ForwardClassVar var_info_ptr
 				# (var_info, var_heap) = readPtr var_info_ptr var_heap
-//				  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-//				-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name id_name) new_info_ptr 0 var_info))
-
 				-> case var_info of
 					VI_Empty
 						# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -1199,7 +1199,7 @@ where
 								{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 
 	where
-		build_context_arg symb {tc_var} (var_heap, error)
+		build_context_arg symb tc=:{tc_var} (var_heap, error)
 			# (var_info, var_heap) = readPtr tc_var var_heap
 			= case var_info of
 				VI_ForwardClassVar var_info_ptr
@@ -1209,7 +1209,7 @@ where
 					-> (Var { var_name = var_name, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
 								(var_heap <:= (tc_var, VI_ClassVar var_name new_info_ptr (inc count)), error))
 				_
-					-> abort "build_context_arg (overloading.icl)"
+					-> abort "build_context_arg (overloading.icl)" // ---> (tc <<- var_info))
 
 		get_recursive_fun_index :: !Index !SymbKind Int !{# FunDef} -> Index
 		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) main_dcl_module_n fun_defs
