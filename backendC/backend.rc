@@ -14,7 +14,7 @@
 # define kFileFlags VS_FF_DEBUG | VS_FF_PRERELEASE
 
 # define kFileFlagsMask VS_FF_DEBUG | VS_FF_PRERELEASE
-# define kFileVersionString "2.1.0.a.0"
+# define kFileVersionString "2.1.0.a.1"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION kFileVersion
@@ -37,7 +37,7 @@ BEGIN
 			VALUE "LegalTrademarks", "\0"
 			VALUE "OriginalFilename","backend.dll\0"
 			VALUE "ProductName",     "Clean System"
-			VALUE "ProductVersion",  "2.1.0.a.0"
+			VALUE "ProductVersion",  "2.1.0.a.1"
 			VALUE "OLESelfRegister", "\0"
 		END
 	
