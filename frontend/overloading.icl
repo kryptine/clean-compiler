@@ -539,13 +539,8 @@ where
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
 			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
-		reduce_tc_context type_code_class (TAS cons_id=:{type_index} cons_args _) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			# error
-				= disallow_abstract_types_in_dynamics type_index error
-			# type_constructor = toTypeCodeConstructor type_index defs
-			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
-			  		 (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
+		reduce_tc_context type_code_class (TAS cons_id cons_args _) state
+			=	reduce_tc_context type_code_class (TA cons_id cons_args) state
 		reduce_tc_context type_code_class (TB basic_type) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
 			= (CA_GlobalTypeCode { tci_constructor = GTT_Basic basic_type, tci_contexts = [] },
 					(new_contexts, type_pattern_vars, var_heap, type_heaps, error))
