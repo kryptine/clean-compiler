@@ -3196,7 +3196,7 @@ RemoveSpecialArrayFunctionsFromSymbolList (SymbolP *symbolH)
 #if 0
 File rules_file;
 #endif
-û
+
 int
 BEGenerateCode (CleanString outputFile)
 {
