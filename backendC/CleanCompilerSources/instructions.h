@@ -187,6 +187,9 @@ void InitFileInfo (ImpMod imod);
 /* void GenFileInfo (void); */
 
 void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated);
+#if CLEAN2
+void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp);
+#endif
 
 void InitInstructions (void);
 

@@ -860,9 +860,33 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			CodeRootSelection (root, rootid, asp, bsp,code_gen_node_ids_p,resultstate);
 			return;
 		case fail_symb:
+#if CLEAN2
+		{
+			IdentS case_ident_s;
+			SymbDefS case_def_s;
+
+			case_ident_s.ident_name=rootsymb->symb_string;
+			Assume (case_ident_s.ident_name != NULL, "codegen3", "CodeNormalRootNode (fail_symb)");
+
+			case_def_s.sdef_ident = &case_ident_s;
+			case_def_s.sdef_line = 0;
+
+			StaticMessage (FunctionMayFailIsError, "%D", "case may fail", &case_def_s);
+
+			if (! (IsOnBStack (resultstate) || 
+						(IsSimpleState (resultstate) && resultstate.state_kind==StrictRedirection)))
+				/* root needed */
+				asp++;
+
+			GenCaseNoMatchError (&case_def_s,asp,bsp);
+
+			return;
+		}
+#else /* ifndef CLEAN2 */
 			error_in_function ("CodeNormalRootNode");
 /*			JumpToNextAlternative (asp, bsp); */
 			return;
+#endif
 		case string_denot:
 			GenPopA (asp);
 			GenPopB (bsp);

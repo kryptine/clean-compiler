@@ -1083,7 +1083,7 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 	  case_free_var = {	fv_def_level = NotALevel, fv_name = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
 	  cs = { cs & cs_var_heap = cs_var_heap}
 
-	  kees = {kees & case_expr=case_var}
+	  kees = {kees & case_expr=case_var, case_explicit=False}
 
 	  (case_expr, cs) = convertCases ci case_expr cs
 

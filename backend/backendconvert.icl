@@ -1605,7 +1605,7 @@ convertBackEndLhs functionIndex patterns main_dcl_module_n
 convertStrings :: [{#Char}] -> BEMonad BEStringListP
 convertStrings strings
 	=	sfoldr (beStrings o beString) beNoStrings strings
-
+ 
 convertCodeParameters :: (CodeBinding a) -> BEMonad BECodeParameterP | varInfoPtr a
 convertCodeParameters codeParameters
 	=	sfoldr (beCodeParameters o convertCodeParameter) beNoCodeParameters codeParameters
@@ -1686,11 +1686,23 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=N
 				beNoNodeDefs
 				beNoStrictNodeIds
 				(beNormalNode (beBasicSymbol BEFailSymb) beNoArgs)
-convertRootExpr aliasDummyId (Case {case_expr, case_guards, case_default}) main_dcl_module_n
-	=	beSwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var case_default main_dcl_module_n)
+convertRootExpr aliasDummyId (Case kees=:{case_expr, case_guards}) main_dcl_module_n
+	=	beSwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var (defaultCase kees) main_dcl_module_n)
 	where
 		var
 			=	caseVar case_expr
+
+		defaultCase {case_default=Yes defaul} 
+			=	DefaultCase defaul
+		defaultCase {case_explicit, case_default=No, case_ident}
+			| case_explicit
+			 	=	case case_ident of
+			 			Yes ident
+			 				->	DefaultCaseFail ident
+			 			_
+			 				->	abort "backendconvert:defaultCase, case without id"
+			// otherwise
+			 	=	DefaultCaseNone
 convertRootExpr _ expr main_dcl_module_n
 	=	convertExpr expr main_dcl_module_n
 
@@ -1948,7 +1960,12 @@ caseVar (Var var)
 caseVar expr
 	=	undef // <<- ("backendconvert, caseVar: unknown expression", expr)
 
-class convertCases a :: a Ident BoundVar (Optional Expression) Int -> BEMonad BEArgP
+:: DefaultCase
+	=	DefaultCase Expression
+	|	DefaultCaseFail !Ident
+	|	DefaultCaseNone
+
+class convertCases a :: a Ident BoundVar DefaultCase Int -> BEMonad BEArgP
 
 instance convertCases CasePatterns where
 	convertCases (AlgebraicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n
@@ -1963,11 +1980,14 @@ instance convertCases [a] | convertCase a where
 	convertCases patterns aliasDummyId var optionalCase main_dcl_module_n
 		=	sfoldr (beArgs o convertCase main_dcl_module_n (localRefCounts patterns optionalCase)
 						 aliasDummyId var) (convertDefaultCase optionalCase aliasDummyId main_dcl_module_n) patterns
-	where
-		localRefCounts [x] No
-			=	False
-		localRefCounts _ _
-			=	True
+
+localRefCounts :: [pattern] DefaultCase -> Bool
+localRefCounts [_] DefaultCaseNone
+	=	False
+localRefCounts [_] (DefaultCaseFail _)
+	=	False
+localRefCounts _ _
+	=	True
 
 class convertCase a :: Int Bool Ident BoundVar a -> BEMonad BENodeP
 
@@ -2073,11 +2093,6 @@ convertOverloadedListPatterns patterns decons_expr aliasDummyId var optionalCase
 	=	sfoldr (beArgs o convertOverloadedListPattern decons_expr (localRefCounts patterns optionalCase))
 				(convertDefaultCase optionalCase aliasDummyId main_dcl_module_n) patterns
 where
-	localRefCounts [x] No
-		=	False
-	localRefCounts _ _
-		=	True
-
 	convertOverloadedListPattern :: Expression Bool AlgebraicPattern -> BEMonad BENodeP
 	convertOverloadedListPattern decons_expr localRefCounts {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars=[], ap_expr}
 		=	caseNode localRefCounts 0
@@ -2117,10 +2132,16 @@ convertPatternVar :: FreeVar -> BEMonad BENodeIdListP
 convertPatternVar freeVar
 	=	beNodeIdListElem (convertVar freeVar.fv_info_ptr)
 
-convertDefaultCase :: (Optional Expression) Ident Int -> BEMonad BEArgP
-convertDefaultCase No _ _
+convertDefaultCase DefaultCaseNone _ _
 	=	beNoArgs
-convertDefaultCase (Yes expr) aliasDummyId main_dcl_module_n
+convertDefaultCase (DefaultCaseFail ident) aliasDummyId main_dcl_module_n
+	=	beArgs
+			(defaultNode
+				beNoNodeDefs
+				beNoStrictNodeIds
+				(beNormalNode (beLiteralSymbol BEFailSymb ident.id_name) beNoArgs))
+			beNoArgs
+convertDefaultCase (DefaultCase expr) aliasDummyId main_dcl_module_n
 	=	beArgs
 			(defaultNode
 				(convertRhsNodeDefs aliasDummyId expr main_dcl_module_n)

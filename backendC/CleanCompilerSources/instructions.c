@@ -3393,6 +3393,31 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	}
 }
 
+#if CLEAN2
+void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
+{
+	static int case_number;
+
+	GenPopA (asp);
+	GenPopB (bsp);
+
+	put_instruction_b (pushD);
+	FPrintF (OutFile, "m_%s", CurrentModule);
+
+	put_instruction_b (pushD);
+	FPrintF (OutFile, "case_fail%u",case_number);
+
+	GenJmp (&match_error_lab);
+	
+	put_directive_ (Dstring);
+	FPrintF (OutFile, "case_fail%u \"",case_number);		
+	PrintSymbolOfIdent (case_def->sdef_ident,case_def->sdef_line,OutFile);
+	FPrintF (OutFile, "\"");		
+
+	case_number++;
+}
+#endif
+
 static void GenImpLab (char *label_name)
 {
 	put_directive_b (implab);

@@ -1,7 +1,7 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02000213
+# define	kBEVersionCurrent				0x02000214
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // upward compatible (for example when a function is added)
@@ -9,7 +9,7 @@
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02000213
+# define	kBEVersionOldestImplementation	0x02000214
 
 
 # define	kBEDebug	1
