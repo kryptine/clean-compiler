@@ -165,9 +165,9 @@ PD_ConsPAIR					:== 186
 PD_TypeARROW				:== 187
 PD_ConsARROW				:== 188
 
-PD_TypeConsDefInfo			:== 189 
+PD_TypeConsDefInfo			:== 189
 PD_ConsConsDefInfo			:== 190
-PD_TypeTypeDefInfo			:== 191 
+PD_TypeTypeDefInfo			:== 191
 PD_ConsTypeDefInfo			:== 192
 PD_cons_info				:== 193
 PD_TypeCONS					:== 194
@@ -200,7 +200,7 @@ PD_NrOfPredefSymbols		:== 201
 //	# (id, hash_table) = putIdentInHashTable name table_kind hash_table
 	# ({boxed_ident=id}, hash_table) = putIdentInHashTable name table_kind hash_table
 	= ({ array & [index] = { pds_ident = id, pds_module = NoIndex, pds_def = NoIndex } }, hash_table)
-	
+
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
 
@@ -241,7 +241,7 @@ buildPredefinedSymbols hash_table=:{hte_symbol_heap}
 	= fill_table_with_hashing (predef_symbol_table, { hash_table & hte_symbol_heap = hte_symbol_heap })
 where
 	local_cons_and_nil_idents = cons_and_nil_idents
-	
+
 	fill_table_without_hashing tables
 		= build_variables 0 32 (build_tuples 2 32 tables)
 			<<= ("_predefined", PD_PredefinedModule)
@@ -272,7 +272,7 @@ where
 				= build_variables (inc var_number) max_arity (tables <<= (var_name, PD_TypeVar_a0 + var_number))
 
 	fill_table_with_hashing tables
-		# (predefs, hash_table) = tables	
+		# (predefs, hash_table) = tables
 					<<- ("_SystemArray", IC_Module, PD_StdArray) <<- ("StdEnum", IC_Module, PD_StdEnum) <<- ("StdBool", IC_Module, PD_StdBool)
 					<<- ("&&", IC_Expression, PD_AndOp) <<- ("||", IC_Expression, PD_OrOp)
 					<<- ("Array", IC_Class, PD_ArrayClass)
@@ -301,7 +301,7 @@ where
 					<<- ("List", IC_Class, PD_ListClass)
 					<<- ("UList", IC_Class, PD_UListClass)
 					<<- ("UTSList", IC_Class, PD_UTSListClass)
-					
+
 // RWS ...					<<- ("_smaller", IC_Expression, PD_SmallerFun) <<- ("_inc", IC_Expression, PD_IncFun)
 					<<- ("<", IC_Expression, PD_SmallerFun)
 					<<- ("<=", IC_Expression, PD_LessOrEqualFun)
@@ -310,7 +310,7 @@ where
 // ... RWS
 					<<- ("_from", IC_Expression, PD_From) <<- ("_from_then", IC_Expression, PD_FromThen)
 					<<- ("_from_to", IC_Expression, PD_FromTo) <<- ("_from_then_to", IC_Expression, PD_FromThenTo)
-					
+
 					<<- ("TC", 					IC_Class, PD_TypeCodeClass)
 					<<- ("T_ypeObjectType",		IC_Type, PD_TypeObjectType)
 					<<- ("T_ypeConsSymbol",		IC_Expression, PD_TypeConsSymbol)
@@ -325,49 +325,49 @@ where
 					<<- ("T_ypeID",				IC_Type, PD_TypeID)
 					<<- ("ModuleID",			IC_Expression, PD_ModuleID)
 // ..MV
-					
+
 // AA..
 					<<- ("StdGeneric",			IC_Module, 		PD_StdGeneric)
 					<<- ("ISO",					IC_Type, 		PD_TypeISO)
-					<<- ("_ISO",				IC_Expression, 	PD_ConsISO)					
+					<<- ("_ISO",				IC_Expression, 	PD_ConsISO)
 					//<<- ("iso_from",			IC_Field {id_name="", id_info=nilPtr}, PD_iso_from)
-					//<<- ("iso_to",			IC_Field {id_name="", id_info=nilPtr}, PD_iso_to)					
+					//<<- ("iso_to",			IC_Field {id_name="", id_info=nilPtr}, PD_iso_to)
 					<<- ("UNIT",				IC_Type, 		PD_TypeUNIT)
 					<<- ("UNIT",				IC_Expression,	PD_ConsUNIT)
 					<<- ("EITHER",				IC_Type, 		PD_TypeEITHER)
 					<<- ("LEFT",				IC_Expression,	PD_ConsLEFT)
 					<<- ("RIGHT",				IC_Expression,	PD_ConsRIGHT)
-					<<- ("PAIR",				IC_Type, 		PD_TypePAIR)					
-					<<- ("PAIR",				IC_Expression,	PD_ConsPAIR)					
+					<<- ("PAIR",				IC_Type, 		PD_TypePAIR)
+					<<- ("PAIR",				IC_Expression,	PD_ConsPAIR)
 					<<- ("ARROW",				IC_Type, 		PD_TypeARROW)
-					<<- ("ARROW",				IC_Expression, 	PD_ConsARROW)										
-					<<- ("isomap_ARROW_",		IC_Expression, 	PD_isomap_ARROW_)										
-					<<- ("isomap_ID",			IC_Expression, 	PD_isomap_ID)										
-					<<- ("ConsDefInfo",			IC_Type, 		PD_TypeConsDefInfo)					
-					<<- ("_ConsDefInfo",		IC_Expression,	PD_ConsConsDefInfo)					
-					<<- ("TypeDefInfo",			IC_Type, 		PD_TypeTypeDefInfo)					
-					<<- ("_TypeDefInfo",		IC_Expression,	PD_ConsTypeDefInfo)					
-					<<- ("CONS",				IC_Type, 		PD_TypeCONS)					
-					<<- ("CONS",				IC_Expression,	PD_ConsCONS)					
-					<<- ("CONS_INFO",			IC_Expression, 	PD_cons_info)										
-					<<- ("Type",				IC_Type, 		PD_TypeType)										
-					<<- ("TypeApp",				IC_Expression, 	PD_ConsTypeApp)										
-					<<- ("TypeVar",				IC_Expression, 	PD_ConsTypeVar)										
+					<<- ("ARROW",				IC_Expression, 	PD_ConsARROW)
+					<<- ("isomap_ARROW_",		IC_Expression, 	PD_isomap_ARROW_)
+					<<- ("isomap_ID",			IC_Expression, 	PD_isomap_ID)
+					<<- ("ConsDefInfo",			IC_Type, 		PD_TypeConsDefInfo)
+					<<- ("_ConsDefInfo",		IC_Expression,	PD_ConsConsDefInfo)
+					<<- ("TypeDefInfo",			IC_Type, 		PD_TypeTypeDefInfo)
+					<<- ("_TypeDefInfo",		IC_Expression,	PD_ConsTypeDefInfo)
+					<<- ("CONS",				IC_Type, 		PD_TypeCONS)
+					<<- ("CONS",				IC_Expression,	PD_ConsCONS)
+					<<- ("CONS_INFO",			IC_Expression, 	PD_cons_info)
+					<<- ("Type",				IC_Type, 		PD_TypeType)
+					<<- ("TypeApp",				IC_Expression, 	PD_ConsTypeApp)
+					<<- ("TypeVar",				IC_Expression, 	PD_ConsTypeVar)
 
 					<<- ("StdMisc",				IC_Module, 		PD_StdMisc)
 					<<- ("abort",				IC_Expression, 	PD_abort)
-					<<- ("undef",				IC_Expression, 	PD_undef)					
-// ..AA					
-					
+					<<- ("undef",				IC_Expression, 	PD_undef)
+// ..AA
+
 					<<- ("Start",				IC_Expression, PD_Start)
 
 		# ({pds_ident}, predefs) = predefs![PD_TypeISO]
-		# (predefs, hash_table)= (predefs, hash_table) 
+		# (predefs, hash_table)= (predefs, hash_table)
 			<<- ("iso_from", 			IC_Field pds_ident, PD_iso_from)
 			<<- ("iso_to", 				IC_Field pds_ident, PD_iso_to)
 
 		# ({pds_ident}, predefs) = predefs![PD_DynamicTemp]
-		# (predefs, hash_table)= (predefs, hash_table) 
+		# (predefs, hash_table)= (predefs, hash_table)
 			<<- ("type",				IC_Field pds_ident, PD_DynamicType)
 			<<- ("value",				IC_Field pds_ident, PD_DynamicValue)
 			<<- ("Start",				IC_Expression, PD_Start)
@@ -395,7 +395,7 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  (list_id, pre_def_symbols) = pre_def_symbols![list_type_pre_def_symbol_index]
 	  cons_symb = { ds_ident = cons_id.pds_ident, ds_arity = 2, ds_index = cons_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
 	  nil_symb = { ds_ident = nil_id.pds_ident, ds_arity=0 ,ds_index = nil_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
-	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_symb,nil_symb]) pre_def_symbols	
+	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_symb,nil_symb]) pre_def_symbols
 	  list_type = MakeAttributedType (TA (MakeNewTypeSymbIdent list_id.pds_ident 1) [type_var_with_attr])
 	  cons_def = {	pc_cons_name = cons_id.pds_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type],
 	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
@@ -404,7 +404,7 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
 buildPredefinedModule :: !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
-buildPredefinedModule pre_def_symbols 
+buildPredefinedModule pre_def_symbols
 	# (type_var_id, pre_def_symbols)	= pre_def_symbols![PD_TypeVar_a0]
 	  (string_id, pre_def_symbols)		= pre_def_symbols![PD_StringType]
 	  (unb_array_id, pre_def_symbols)	= pre_def_symbols![PD_UnboxedArrayType]
@@ -417,7 +417,7 @@ buildPredefinedModule pre_def_symbols
 	  unb_arr_of_char_type			= MakeAttributedType (TA (MakeNewTypeSymbIdent unb_array_id.pds_ident 1) [MakeAttributedType (TB BT_Char)])
 
 	  (string_def, pre_def_symbols)	= make_type_def PD_StringType [] (SynType unb_arr_of_char_type) pre_def_symbols
-	
+
 	  (list_def,cons_def,nil_def,pre_def_symbols)
 		= make_list_definition PD_ListType PD_ConsSymbol PD_NilSymbol pre_mod_id type_var type_var_with_attr pre_def_symbols
 	  (strict_list_def,strict_cons_def,strict_nil_def,pre_def_symbols)
@@ -453,7 +453,7 @@ where
 			# (type_vars, pre_def_symbols)		= make_type_vars tup_arity [] pre_def_symbols
 			  (tuple_id, pre_def_symbols)		= pre_def_symbols![GetTupleConsIndex tup_arity]
 			  tuple_cons_symb					= { ds_ident = tuple_id.pds_ident, ds_index = MakeTupleConsSymbIndex tup_arity, ds_arity = tup_arity }
-			  
+
 			  (tuple_type_def, pre_def_symbols)	= make_type_def (GetTupleTypeIndex tup_arity) type_vars (AlgType [tuple_cons_symb]) pre_def_symbols
 			  tuple_cons_def	= { pc_cons_name = tuple_id.pds_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
 			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars], pc_cons_prio =  NoPrio, pc_exi_vars = []}
@@ -466,12 +466,12 @@ where
 				# nr_of_vars = dec nr_of_vars
 				# (var_id, pre_def_symbols) = pre_def_symbols![PD_TypeVar_a0 + nr_of_vars]
 				= make_type_vars nr_of_vars [MakeTypeVar var_id.pds_ident : type_vars] pre_def_symbols
-		
+
 	make_TC_class_def pre_def_symbols
 		# (tc_class_name, pre_def_symbols)		= pre_def_symbols![PD_TypeCodeClass]
 		  (type_var_id, pre_def_symbols)		= pre_def_symbols![PD_TypeVar_a0]
 		  (tc_member_name, pre_def_symbols)		= pre_def_symbols![PD_TypeCodeMember]
-		
+
 		  class_var = MakeTypeVar type_var_id.pds_ident
 
 		  me_type = { st_vars = [], st_args = [], st_arity = 0,
@@ -482,7 +482,7 @@ where
 
 		  member_def = { me_symb = tc_member_name.pds_ident, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,
 						 me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
-		
+
 		  class_def = { class_name = tc_class_name.pds_ident, class_arity = 1, class_args = [class_var], class_context = [],
 		  				class_members = {{ds_ident = tc_member_name.pds_ident, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
 						class_dictionary = { ds_ident = { tc_class_name.pds_ident & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos,
@@ -493,7 +493,7 @@ where
 // MW..
 	make_identity_fun_type alias_dummy_id type_var
 		# a = { at_attribute = TA_Anonymous, at_annotation = AN_Strict, at_type = TV type_var }
-		  id_symbol_type = { st_vars = [], st_args = [a], st_arity = 1, st_result = a, st_context = [], 
+		  id_symbol_type = { st_vars = [], st_args = [a], st_arity = 1, st_result = a, st_context = [],
 							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
 		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
 			ft_specials = SP_None, ft_type_ptr = nilPtr }
