@@ -1239,7 +1239,7 @@ beautifulizeAttributes symbol_type th_attrs
 	  st_attr_env
 	  		= coercionsToAttrEnv {el \\ el<-all_attr_vars } attr_env_coercions
 	  (symbol_type, th_attrs)
-	  		= anonymizeAttrVars { symbol_type & st_attr_env = st_attr_env } th_attrs
+	  		= anonymizeAttrVars { symbol_type & st_attr_env = st_attr_env } implicit_inequalities th_attrs
 	= (symbol_type, th_attrs)
   where
 	pointers_to_int {ai_offered, ai_demanded} th_attrs
@@ -1361,14 +1361,18 @@ flattenCoercionTree tree
 		  (accu, left) = flatten_ct ([i:accu], left)
 		= (accu, CT_Node i left right)
 
-anonymizeAttrVars :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
-anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} th_attrs
+anonymizeAttrVars :: !SymbolType ![AttrInequality] !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
+anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_inequalities th_attrs
 	# th_attrs
 	  		= countAttrVars st th_attrs
 	  th_attrs
 	  		= foldSt markUsedAttrVars st_attr_env th_attrs
-	  (st_args, th_attrs) = mapSt anonymize_atype st_args th_attrs
-	  (st_result, th_attrs) = anonymize_atype st_result th_attrs
+	  th_attrs
+	  		= foldSt mark_once_occurring_implicit_attr_var implicit_inequalities th_attrs
+	  (st_args, th_attrs)
+	  		= mapSt anonymize_atype st_args th_attrs
+	  (st_result, th_attrs)
+	  		= anonymize_atype st_result th_attrs
 	= ({ st & st_args = st_args, st_result = st_result }, th_attrs)
   where
 	anonymize_atype atype=:{at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
@@ -1381,6 +1385,8 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} th_attrs
 					// number of occurences doesn't matter for type variables
 					-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
 				-> ({ atype & at_type = at_type }, th_attrs)
+			AVI_Attr TA_None
+				-> ({ atype & at_type = at_type, at_attribute = TA_None }, th_attrs)
 			_
 				-> ({ atype & at_type = at_type }, th_attrs)
 	  where
@@ -1429,15 +1435,22 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} th_attrs
 		count_attr_vars_of_type _ th_attrs
 			= th_attrs
 
-		
+	markUsedAttrVars {ai_offered, ai_demanded} th_attrs
+		= writePtr ai_offered.av_info_ptr (AVI_Forward 0)
+			(writePtr ai_demanded.av_info_ptr (AVI_Forward 0) th_attrs)
+		// misuse AVI_Forward to indicate that this attribute variable is referenced in
+		// the attribute inequalities
+
+	mark_once_occurring_implicit_attr_var {ai_offered={av_info_ptr}} th_attrs
+		# (avi, th_attrs) = readPtr av_info_ptr th_attrs
+		= case avi of
+			AVI_Count 1
+				-> writePtr av_info_ptr (AVI_Attr TA_None) th_attrs
+			_
+				-> th_attrs
+				
 initialise_to_AVI_Empty {av_info_ptr} th_attrs
 	= writePtr av_info_ptr AVI_Empty th_attrs
-
-markUsedAttrVars {ai_offered, ai_demanded} th_attrs
-	= writePtr ai_offered.av_info_ptr (AVI_Forward 0)
-		(writePtr ai_demanded.av_info_ptr (AVI_Forward 0) th_attrs)
-	// misuse AVI_Forward to indicate that this attribute variable is referenced in
-	// the attribute inequalities
 
 removeInequality :: !Int !Int !*Coercions -> .Coercions
 removeInequality offered demanded attr_env_coercions=:{coer_offered, coer_demanded}

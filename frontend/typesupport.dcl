@@ -76,7 +76,6 @@ instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | su
 instance <<< TempSymbolType
 
 removeInequality :: !Int !Int !*Coercions -> .Coercions
-anonymizeAttrVars :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
 assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
 getImplicitAttrInequalities :: !SymbolType -> [AttrInequality]
