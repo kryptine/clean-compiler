@@ -860,7 +860,7 @@ where
 		# free_var = { fv_name = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
 		  (new_bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 		  case_ident = { id_name = case_name, id_info = nilPtr }
-		  (new_case, var_store, expr_heap, cs_error) = build_and_share_case patterns defaul (Var new_bound_var) case_ident False var_store expr_heap cs.cs_error
+		  (new_case, var_store, expr_heap, cs_error) = build_and_share_case patterns defaul (Var new_bound_var) case_ident True var_store expr_heap cs.cs_error
 		  cs = {cs & cs_error = cs_error}
 		  new_defaul = insert_as_default new_case result_expr
 		= (NoPattern, pattern_scheme, (cons_optional opt_var pattern_variables), Yes (Yes free_var, new_defaul),
