@@ -11,6 +11,8 @@ import checksupport, transform, overloading
 	=	{	feo_up_to_phase			:: !FrontEndPhase
 		,	feo_generics 			:: !Bool
 		,	feo_fusion	 			:: !Bool
+		,	feo_dump_core			:: !Bool
+		,	feo_strip_unused		:: !Bool
 		}
 
 :: FrontEndSyntaxTree

@@ -6,6 +6,8 @@ implementation module frontend
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics1
 
+//import coredump
+
 //import print
 
 // trace macro
@@ -149,15 +151,6 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	| not ok
 		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
-/*
-	# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "partitionateFunctions") (icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges)
-	# (_,f,files) = fopen "components" FWriteText files
-	  (components, fun_defs, f) = showComponents {x\\x<-:components} 0 True fun_defs f
-	  (ok,files) = fclose f files
-	| ok<>ok
-		= abort "";
-*/
-	
 	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
 		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs/*icl_functions*/ icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
 
@@ -166,11 +159,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			
 
 	# (fun_def_size, fun_defs) = usize fun_defs
-	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") (icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges)
-		
-//	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
-//	  (components, fun_defs, out)	= showComponents components 0 True fun_defs out
-//	  (fun_defs, error)	= showFunctions array_instances fun_defs error
+	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") 
+									(icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges)
 		
 	| options.feo_up_to_phase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
@@ -179,15 +169,11 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, tcl_file)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
 					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
-//	#  (components, fun_defs, error) = showComponents3 components 0 False fun_defs error
-//	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 
 	| options.feo_up_to_phase == FrontEndPhaseConvertDynamics
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap, hp_generic_heap=newHeap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
-
-//	  (components, fun_defs, error) = showComponents components 0 True fun_defs error
 
 	#  (stdStrictLists_module_n,predef_symbols) = get_StdStrictLists_module_n predef_symbols
 	  	with
@@ -198,10 +184,48 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 					= (-1,predef_symbols)
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
-//	# (components, fun_defs, error) = showComponents2 components 0 fun_defs acc_args error
 
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, acc_args)
-	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion
+	# (def_max, acc_args)		= usize acc_args
+	# (def_min, fun_defs)		= usize fun_defs
+
+	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, acc_args, error, predef_symbols)
+	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
+
+	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
+	# {dcl_instances,dcl_specials,dcl_gencases} = dcl_mods.[main_dcl_module_n]
+	# (start_rule_index,predef_symbols) = get_index_of_start_rule predef_symbols
+		with
+			get_index_of_start_rule predef_symbols
+				# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
+				| pds_def <> NoIndex && pds_module == main_dcl_module_n
+					= (pds_def, predef_symbols)
+					= (NoIndex, predef_symbols)
+
+	# [icl_exported_global_functions,icl_not_exported_global_functions:_] = icl_global_functions
+	# exported_global_functions = case start_rule_index of
+				NoIndex	-> [icl_exported_global_functions]
+				sri		-> [{ir_from=sri,ir_to=inc sri},icl_exported_global_functions]
+	# exported_functions = exported_global_functions ++  [dcl_instances,dcl_specials,dcl_gencases]
+	# (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin) 
+		= case options.feo_strip_unused of
+			True -> partitionateFunctions` (fun_defs -*-> "partitionateFunctions`")
+						exported_functions
+						main_dcl_module_n def_min def_max predef_symbols var_heap expression_heap error_admin
+			_ 
+				# (fun_defs,predef_symbols,var_heap,expression_heap,error_admin)
+						= stripStrictLets fun_defs predef_symbols var_heap expression_heap error_admin
+				-> (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin)
+
+	# error = error_admin.ea_file
+	| not error_admin.ea_ok
+		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
+		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+
+	# (components,fun_defs,files) = case options.feo_dump_core of
+//		True
+//			-> dumpCore components start_rule_index exported_global_functions icl_mod dcl_mods.[main_dcl_module_n] fun_defs acc_args def_min def_max files
+		_
+			-> (components,fun_defs,files)
 
 	| options.feo_up_to_phase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
@@ -302,54 +326,6 @@ where
 			= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
 
-showComponents2 :: !*{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{! Group},!*{# FunDef},!*File)
-showComponents2 comps comp_index fun_defs acc_args file
-	| comp_index >= (size comps)
-		= (comps, fun_defs, file)
-	# (comp, comps) = comps![comp_index]
-	# (fun_defs, file) = show_component comp.group_members fun_defs acc_args file
-	= showComponents2 comps (inc comp_index) fun_defs acc_args file
-where
-	show_component [] fun_defs _ file
-		= (fun_defs, file <<< '\n')
-	show_component [fun:funs] fun_defs acc_args file
-		# (fd, fun_defs) = fun_defs![fun]
-		| fun >= size acc_args
-			# file = file <<< fd.fun_symb <<< '.' <<< fun <<< " ???"
-			= show_component funs fun_defs acc_args file
-		# file = file <<< fd.fun_symb <<< '.' <<< fun <<< " ("
-		# file = show_producer_status acc_args.[fun].cc_producer file
-		# file = show_accumulating_arguments acc_args.[fun].cc_args file
-		# file = show_linear_arguments acc_args.[fun].cc_linear_bits file
-		= show_component funs fun_defs acc_args (file <<< ") ")
-	
-	show_producer_status pc file
-		| pc == True
-			= file <<< "+:"
-			= file <<< "-:"
-	
-	show_accumulating_arguments [ cc : ccs] file
-		| cc == CPassive
-			= show_accumulating_arguments ccs (file <<< 'p')
-		| cc == CActive
-			= show_accumulating_arguments ccs (file <<< 'c')
-		| cc == CAccumulating
-			= show_accumulating_arguments ccs (file <<< 'a')
-		| cc == CVarOfMultimatchCase
-			= show_accumulating_arguments ccs (file <<< 'm')
-		| cc == CUnused
-			= show_accumulating_arguments ccs (file <<< 'u')
-			= show_accumulating_arguments ccs (file <<< '?')
-	show_accumulating_arguments [] file
-		= file
-
-	show_linear_arguments [ cc : ccs] file
-		| cc == True
-			= show_linear_arguments ccs (file <<< 'l')
-			= show_linear_arguments ccs (file <<< 'n')
-	show_linear_arguments [] file
-		= file
-
 //show_components comps fun_defs = map (show_component fun_defs) comps
 
 show_component fun_defs [] = []
@@ -408,4 +384,3 @@ instance == ListTypesKind where
 		=	True
 	(==) _ _
 		=	False
-		  			
