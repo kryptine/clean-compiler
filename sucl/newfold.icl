@@ -408,3 +408,18 @@ where (<<<) file (MatchPattern pat yesbody nobody)
              <<< nobody
       (<<<) file (BuildGraph rgraph)
       = file <<< "Build: " <<< toString rgraph <<< nl
+
+printfuncdef :: (sym->String) (var->String) (FuncDef sym var) *File -> .File | == var
+printfuncdef showsym showvar funcdef file
+= printfuncbody showsym showvar "" body (file <<< "Arguments: " <<< showlist showvar args <<< nl)
+  where (args,body) = funcdef
+
+printfuncbody :: (sym->String) (var->String) String (FuncBody sym var) *File -> .File | == var
+printfuncbody showsym showvar indent (MatchPattern pattern yesbody nobody) file0
+= file3
+  where file3 = printfuncbody showsym showvar indent nobody (file2 <<< indent <<< "Otherwise:" <<< nl)
+        file2 = printfuncbody showsym showvar (indent+++"    ") yesbody file1
+        file1 = file0 <<< indent <<< "Match " <<< showvar (rgraphroot pattern) <<< " =?= " <<< showrgraph showsym showvar pattern <<< nl
+printfuncbody showsym showvar indent (BuildGraph replacement) file0
+= file1
+  where file1 = file0 <<< indent <<< showrgraph showsym showvar replacement <<< nl
