@@ -593,7 +593,7 @@ where
 	collect_classifications [fun : funs] class_env class_subst
 		# (fun_class, class_env) = class_env![fun]
 		# fun_class = determine_classification fun_class class_subst
-		= collect_classifications funs { class_env & [fun] = fun_class /*---> (fun, fun_class)*/} class_subst
+ 		= collect_classifications funs { class_env & [fun] = fun_class /*---> (fun, fun_class)*/} class_subst
 	where
 		determine_classification cc class_subst
 			# (cc_size, cc_args) = mapAndLength (skip_indirections class_subst) cc.cc_args
@@ -1251,16 +1251,15 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	# (Yes fun_type=:{st_vars,st_attr_vars,st_args,st_result}) = fd.fun_type
 	  th_vars = foldSt (\tv type_var_heap -> type_var_heap <:= (tv.tv_info_ptr, TVI_Type (TV tv))) st_vars ti_type_heaps.th_vars 
 	  th_attrs = foldSt (\av attr_var_heap -> attr_var_heap <:= (av.av_info_ptr, SwitchFusion AVI_Empty (AVI_Attr (TA_Var av)))) st_attr_vars ti_type_heaps.th_attrs 
-
-	  (new_fun_args, new_arg_types, new_linear_bits, new_cons_args, th_vars, ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
-//			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args ---> ("generateFunction", fd.fun_symb, fd.fun_index, fun_type)) (st_vars, ti_cons_args, tb_rhs) th_vars
-			= determine_args cc_linear_bits cc_args 0 prods tb_args st_args (st_vars, ti_cons_args, tb_rhs) th_vars
+	  ti_type_heaps = { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
+	  
+	  (new_fun_args, new_arg_types_array, new_result_type, new_linear_bits, new_cons_args, ti_type_heaps, ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
+			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args_array st_args) st_result (ti_cons_args, tb_rhs) ti_type_heaps
 							 ti_symbol_heap ti_fun_defs ti_fun_heap ti_var_heap
-	  (fresh_arg_types, ti_type_heaps) = substitute new_arg_types { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-	  (fresh_result_type, ti_type_heaps) = substitute st_result ti_type_heaps
+	  new_arg_types = flatten [ el \\ el<-:new_arg_types_array ]
 	  fun_arity = length new_fun_args
-	  new_fun_type = Yes { st_vars = getTypeVars [fresh_result_type:fresh_arg_types], st_args = fresh_arg_types, st_arity = fun_arity,
-							st_result = fresh_result_type, st_context = [], st_attr_vars = [], st_attr_env = [] }
+	  new_fun_type = Yes { st_vars = getTypeVars [new_result_type:new_arg_types], st_args = new_arg_types, st_arity = fun_arity,
+							st_result = new_result_type, st_context = [], st_attr_vars = [], st_attr_env = [] }
 
 	  new_fd_expanding = { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, fun_index = ti_next_fun_nr,
 								fun_info.fi_group_index = fi_group_index}
@@ -1286,19 +1285,23 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  new_fd = { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
 	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
 where
-	determine_args _ [] prod_index producers forms types _ type_var_heap symbol_heap fun_defs fun_heap var_heap
+	st_args_array :: ![AType] -> .{![AType]}
+	st_args_array st_args
+		= { [el] \\ el <- st_args }
+		
+	determine_args _ [] prod_index producers forms arg_types result_type _ type_heaps symbol_heap fun_defs fun_heap var_heap
 		# (vars, var_heap) = new_variables forms var_heap
-		= (vars, types, [], [], type_var_heap, symbol_heap, fun_defs, fun_heap, var_heap)
-	determine_args [linear_bit : linear_bits] [cons_arg : cons_args ] prod_index producers [form : forms] [type : types]
-					outer_type_vars type_var_heap symbol_heap fun_defs fun_heap var_heap
+		= (vars, arg_types, result_type, [], [], type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
+	determine_args [linear_bit : linear_bits] [cons_arg : cons_args ] prod_index producers [form : forms] arg_types result_type
+					input type_heaps symbol_heap fun_defs fun_heap var_heap
 		| cons_arg == cActive
-			# new_args = determine_args linear_bits cons_args (inc prod_index) prods forms types outer_type_vars type_var_heap 
+			# new_args = determine_args linear_bits cons_args (inc prod_index) prods forms arg_types result_type input type_heaps 
 									symbol_heap fun_defs fun_heap var_heap
-			= determine_arg producers.[prod_index] form type ((linear_bit,cons_arg),outer_type_vars) new_args
-			# (vars, types, new_linear_bits, new_cons_args, type_var_heap, symbol_heap, fun_defs, fun_heap, var_heap) 
-					= determine_args linear_bits cons_args (inc prod_index) prods forms types outer_type_vars type_var_heap symbol_heap fun_defs fun_heap var_heap
+			= determine_arg producers.[prod_index] form prod_index ((linear_bit,cons_arg), input) new_args
+			# (vars, arg_types, result_type, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap) 
+					= determine_args linear_bits cons_args (inc prod_index) prods forms arg_types result_type input type_heaps symbol_heap fun_defs fun_heap var_heap
 			  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			= ([{ form & fv_info_ptr = new_info_ptr } : vars], [type : types], [linear_bit : new_linear_bits], [cons_arg : new_cons_args], type_var_heap, symbol_heap, fun_defs,
+			= ([{ form & fv_info_ptr = new_info_ptr } : vars], arg_types, result_type, [linear_bit : new_linear_bits], [cons_arg : new_cons_args], type_heaps, symbol_heap, fun_defs,
 					fun_heap, writeVarInfo form.fv_info_ptr (VI_Variable form.fv_name new_info_ptr) var_heap)
 	where
 		build_var_args [] form_vars act_vars var_heap
@@ -1309,47 +1312,57 @@ where
 			  act_var = { var_name = new_name, var_info_ptr = info_ptr, var_expr_ptr = nilPtr }
 			= build_var_args new_names [form_var : form_vars] [Var act_var : act_vars] var_heap
 
-		determine_arg PR_Empty form=:{fv_name,fv_info_ptr} type ((linear_bit,cons_arg),_)
-						(vars, types, new_linear_bits, new_cons_args, type_var_heap, symbol_heap, fun_defs, fun_heap, var_heap)
+		determine_arg PR_Empty form=:{fv_name,fv_info_ptr} _ ((linear_bit,cons_arg), _)
+						(vars, arg_types, result_type, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			= (	[{ form & fv_info_ptr = new_info_ptr } : vars], [ type : types ], 
-				[linear_bit : new_linear_bits], [cons_arg /* was cActive*/ : new_cons_args], type_var_heap, symbol_heap, fun_defs, fun_heap,
+			= (	[{ form & fv_info_ptr = new_info_ptr } : vars], arg_types, result_type, 
+				[linear_bit : new_linear_bits], [cons_arg /* was cActive*/ : new_cons_args], type_heaps, symbol_heap, fun_defs, fun_heap,
 				writeVarInfo fv_info_ptr (VI_Variable fv_name new_info_ptr) var_heap)
 
-		determine_arg (PR_Class class_app free_vars class_type) {fv_info_ptr,fv_name} type _
-					  (vars, types, new_linear_bits, new_cons_args, type_var_heap, symbol_heap, fun_defs, fun_heap, var_heap)
+		determine_arg (PR_Class class_app free_vars class_type) {fv_info_ptr,fv_name} prod_index _
+					  (vars, arg_types, result_type, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
+			# (arg_type, arg_types) = arg_types![prod_index]
+			  type_heaps = bind_class_types (hd arg_type).at_type class_type type_heaps
+			  empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
+			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = repeatn (length free_vars) empty_atype} type_heaps
+			  (result_type, type_heaps) = substitute result_type type_heaps
 			= ( mapAppend (\{var_info_ptr,var_name} 
 							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
 						  free_vars vars
-			  , mapAppend (\_ -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }) free_vars types
+			  , arg_types
+			  , result_type
 			  , mapAppend (\_ -> True) free_vars new_linear_bits
 			  , mapAppend (\_ -> cActive) free_vars new_cons_args
-//			  , bind_class_types type.at_type (class_types ---> ("determine_arg", (class_app.app_symb.symb_name, class_app.app_args), type.at_type, class_types)) type_var_heap
-			  , bind_class_types type.at_type class_type type_var_heap
+			  , type_heaps
 			  , symbol_heap
 			  , fun_defs
 			  , fun_heap
 			  , writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) var_heap
 			  )
 
-		determine_arg producer {fv_info_ptr,fv_name} type (_,(outer_type_vars, ti_cons_args, consumer_body_rhs))
-						(vars, types, new_linear_bits, new_cons_args, type_var_heap, symbol_heap, fun_defs, fun_heap, var_heap)
+		determine_arg producer {fv_info_ptr,fv_name} prod_index (_,(ti_cons_args, consumer_body_rhs))
+						(vars, arg_types, result_type, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
 			# ((symbol, nr_of_applied_args, fun_def, {cc_args, cc_linear_bits}), fun_defs, fun_heap)
 					= from_function_or_generated_function producer ti_cons_args fun_defs fun_heap
 			  (TransformedBody tb) = fun_def.fun_body
 			  (form_vars, act_vars, var_heap) = build_var_args (reverse (take nr_of_applied_args tb.tb_args)) vars [] var_heap
 			  (Yes symbol_type) = fun_def.fun_type
 			  application_type = build_application_type symbol_type nr_of_applied_args
-			  type_var_heap = createBindingsForUnifiedTypes application_type type (symbol_type.st_vars++outer_type_vars) type_var_heap
+			  (arg_type, arg_types) = arg_types![prod_index]
+			  th_vars = createBindingsForUnifiedTypes application_type (hd arg_type) type_heaps.th_vars
+			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = take nr_of_applied_args symbol_type.st_args }
+			  								{ type_heaps & th_vars = th_vars }
+			  (result_type, type_heaps) = substitute result_type type_heaps
 			  (expr_to_unfold, var_heap) 
 					= case (nr_of_applied_args==length tb.tb_args) of
 						True	-> (VI_Body symbol tb (take nr_of_applied_args form_vars), var_heap)
 						False	-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), var_heap)
 			= (	form_vars
-			  , (take nr_of_applied_args symbol_type.st_args)++types
+			  , arg_types
+			  , result_type
 			  , (take nr_of_applied_args cc_linear_bits)++new_linear_bits
 			  , (take nr_of_applied_args cc_args)++new_cons_args
-			  , type_var_heap
+			  , type_heaps
 			  , symbol_heap
 			  , fun_defs
 			  , fun_heap
@@ -1375,6 +1388,17 @@ where
 				# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
 				= ((symbol, nr_of_applied_args, generated_function.gf_fun_def, generated_function.gf_cons_args), fun_defs, fun_heap)
 */
+		substituteArr :: !*{![AType]} !*TypeHeaps -> (!.{![AType]}, !.TypeHeaps)
+		// apply substitute on every array element
+		substituteArr arg_types type_heaps
+			#! size = size arg_types
+			= iFoldSt substitute_element 0 size (arg_types, type_heaps)
+		  where
+		  	substitute_element i (arg_types, type_heaps)
+		  		# (arg_type, arg_types) = arg_types![i]
+		  		  (arg_type, type_heaps) = substitute arg_type type_heaps
+				= ({ arg_types & [i] = arg_type }, type_heaps)
+
 		build_application_type :: !SymbolType !Int -> AType
 		build_application_type symbol_type=:{st_arity, st_result, st_args} nr_of_applied_args
 			| st_arity==nr_of_applied_args
@@ -1383,15 +1407,16 @@ where
 			= foldr (\atype1 atype2->{at_attribute=TA_None, at_annotation=AN_None, at_type=atype1-->atype2})
 					st_result (drop nr_of_applied_args st_args)
 
-		bind_class_types (TA _ context_types) (TA _ instance_types) type_var_heap
-			= bind_context_types context_types instance_types type_var_heap
+		bind_class_types (TA _ context_types) (TA _ instance_types) type_heaps=:{th_vars}
+			# th_vars = bind_context_types context_types instance_types th_vars
+			= { type_heaps & th_vars = th_vars }
 		where
-			bind_context_types [ctype : atypes] [itype : types] type_var_heap
-				= bind_context_types atypes types (bind_type ctype.at_type itype.at_type type_var_heap)
-			bind_context_types [] [] type_var_heap
-				= type_var_heap
-		bind_class_types _ _ type_var_heap
-			= type_var_heap
+			bind_context_types [ctype : atypes] [itype : types] th_vars
+				= bind_context_types atypes types (bind_type ctype.at_type itype.at_type th_vars)
+			bind_context_types [] [] th_vars
+				= th_vars
+		bind_class_types _ _ th_vars
+			= th_vars
 			
 		bind_type (TV {tv_info_ptr}) type type_var_heap
 			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
@@ -1468,10 +1493,11 @@ where
 (-!->) infix :: !.a !b -> .a | <<< b
 (-!->) a b = a ---> b
 
-createBindingsForUnifiedTypes :: !AType !AType !.[TypeVar] *TypeVarHeap -> .TypeVarHeap;
-createBindingsForUnifiedTypes type_1 type_2 all_type_vars type_var_heap
-	# type_var_heap = foldSt (\tv type_var_heap -> type_var_heap <:= (tv.tv_info_ptr, TVI_Empty)) all_type_vars type_var_heap
-	# type_var_heap = bind_and_unify_atypes type_1 type_2 type_var_heap
+createBindingsForUnifiedTypes :: !AType !AType *TypeVarHeap -> .TypeVarHeap;
+createBindingsForUnifiedTypes type_1 type_2 type_var_heap
+	# all_type_vars = getTypeVars (type_1, type_2)
+	  type_var_heap = foldSt (\tv type_var_heap -> type_var_heap <:= (tv.tv_info_ptr, TVI_Empty)) all_type_vars type_var_heap
+	  type_var_heap = bind_and_unify_atypes type_1 type_2 type_var_heap
 //	  type_var_heap = type_var_heap -!-> ""
 //	  type_var_heap = foldSt trace_type_var all_type_vars type_var_heap
 	  type_var_heap = foldSt (\ a b -> snd (set_root_tvi_to_non_variable_type_or_fresh_type_var a b)) all_type_vars type_var_heap
@@ -1621,7 +1647,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	# (app_symb, app_args, extra_args) = complete_application app_symb fun_def.fun_arity app_args extra_args
 	| cc_size > 0
 	  	# (producers, new_args, ti) = determineProducers fun_def.fun_info.fi_is_macro_fun cc_linear_bits cc_args app_args
-														 0 (createArray cc_size PR_Empty) ti
+														 0 (createArray cc_size PR_Empty) ro ti
 		| ti.ti_trace && False--->("determineProducers",(cc_linear_bits,cc_args,app_args),("results in",II_Node producers nilPtr II_Empty II_Empty))
 			= undef
 	  	| containsProducer cc_size producers
@@ -1720,27 +1746,28 @@ transformSelection opt_type selectors expr ti
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: !Bool ![Bool] ![Int] ![Expression] !Index !*{! Producer} !*TransformInfo -> (!*{! Producer},![Expression],!*TransformInfo)
-determineProducers _ _ _ [] _ producers ti
+determineProducers _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
-determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ti
-	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun linear_bits cons_args args (inc prod_index) producers ti
+determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
+	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun linear_bits cons_args args (inc prod_index) producers ro ti
 	| cons_arg == cActive
-		= determine_producer is_applied_to_macro_fun linear_bit arg new_args prod_index producers ti
+		= determine_producer is_applied_to_macro_fun linear_bit arg new_args prod_index producers ro ti
 	= (producers, [arg : new_args], ti)
 where
-	determine_producer is_applied_to_macro_fun linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ti
+	determine_producer is_applied_to_macro_fun linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
-			= determineProducer is_applied_to_macro_fun linear_bit app EI_Empty new_args prod_index producers ti
+			= determineProducer is_applied_to_macro_fun linear_bit app EI_Empty new_args prod_index producers ro ti
 // XXX XXX was			= (producers, [arg : new_args], ti)
 			# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
-			= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers { ti & ti_symbol_heap = ti_symbol_heap }
-	determine_producer _ _ arg new_args prod_index producers ti
+			= determineProducer is_applied_to_macro_fun linear_bit app app_info new_args prod_index producers ro { ti & ti_symbol_heap = ti_symbol_heap }
+	determine_producer _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
 
-determineProducer :: !Bool !Bool !App !ExprInfo ![Expression] !Index !*{! Producer} !*TransformInfo -> (!*{! Producer}, ![Expression], !*TransformInfo)
 // XXX check for linear_bit also in case of a constructor ?
-determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) new_args prod_index producers ti
+determineProducer _ _ {app_symb = {symb_arity}, app_args} _ new_args prod_index producers _ ti
+	| symb_arity<>length app_args
+		= abort "XXX Martin missed something"
+determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) new_args prod_index producers _ ti
 	# (app_args, (new_vars, ti_var_heap)) = renewVariables app_args ([], ti.ti_var_heap)
 	  (new_args, ti_var_heap) = mapAppendSt retrieve_old_var new_vars new_args ti_var_heap
 	= ({ producers & [prod_index] = PR_Class { app & app_args = app_args } new_vars type}, new_args, { ti & ti_var_heap = ti_var_heap })
@@ -1750,7 +1777,7 @@ where
 		  (VI_Forward var) = var_info
 		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }}, app_args} _
-				  new_args prod_index producers ti
+				  new_args prod_index producers ro ti
 	#! max_index = size ti.ti_cons_args
 	| glob_module <> cIclModIndex || glob_object >= max_index /* Sjaak, to skip array functions */
 		= (producers, [App app : new_args ], ti)
@@ -1759,8 +1786,16 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 	  nr_of_app_args = length app_args
 	= determineFunAppProducer fun_def nr_of_app_args (PR_Function symb glob_object nr_of_app_args)
 								is_applied_to_macro_fun linear_bit app new_args prod_index producers ti
+  where
+	get_fun_arity glob_module glob_object ro ti
+		| glob_module <> cIclModIndex
+			= (ro.ro_imported_funs.[glob_module].[glob_object].ft_arity, ti)
+		# ({fun_arity}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
+		= (fun_arity, { ti & ti_fun_defs=ti_fun_defs })
+			
+		
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
-				  new_args prod_index producers ti
+				  new_args prod_index producers ro ti
 	# (FI_Function {gf_fun_def}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
 	  nr_of_app_args = length app_args
@@ -1769,7 +1804,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 // XXX determineProducer {app_symb = symb=:{symb_kind = SK_Constructor glob_index}, app_args} new_args prod_index producers ti
 //	= ({ producers & [prod_index] = PR_Constructor symb app_args}, new_args, ti)
 // XXX */
-determineProducer _ _ app _ new_args _ producers ti
+determineProducer _ _ app _ new_args _ producers _ ti
 	= (producers, [App app : new_args ], ti)
 	
 determineFunAppProducer {fun_body, fun_arity} nr_of_app_args new_producer
@@ -2261,6 +2296,7 @@ getTypeVars types
 	= removeDuplicates smaller_type_vars type_variables
 
 removeDuplicates smaller l
+	// XXX speed this up by using heap
 	# sorted = quicksort smaller l
 	  partitions = partitionate sorted
 	= flatten [removeDup uneq partition \\ partition<-partitions]
@@ -2340,6 +2376,11 @@ instance get_type_vars [a] | get_type_vars a
 		= accu
 	get_type_vars [h:t] accu
 		= get_type_vars t (get_type_vars h accu)
+
+instance get_type_vars (a, b) | get_type_vars a & get_type_vars b
+  where
+	get_type_vars (a, b) accu
+		= get_type_vars a (get_type_vars b accu)
 
 
 /*
