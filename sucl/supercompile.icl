@@ -33,18 +33,23 @@ supercompile ::
 //supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0 = error "supercompile.supercompile: blocked for testing"
 supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0
   #  logfile = stderr
+     // First of all, derive a representation for symbols in the program
+  #  (showsuclsymbol,fun_defs1) = suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fun_defs0
      // Determine defined functions
-  #  (sucl_typerules,sucl_stricts,sucl_bodies,sucl_kinds,fun_defs1) = cts_function main_dcl_module_n fun_defs0
+  #  (sucl_typerules,sucl_stricts,sucl_bodies,sucl_kinds,fun_defs2) = cts_function main_dcl_module_n fun_defs1
      // Determine exported functions
   #  (predefs1,sucl_exports) = cts_exports dcl_mods predefs0 main_dcl_module_n
      // Get constructor lists of algebraic types
   // sucl_constrs :: [(tsym,[(sym,(rule tsym tvar,[Bool]))])]
   #  sucl_constrs = cts_getconstrs dcl_mods main_dcl_module_n icl_common
+     // Get arities of imported functions
+  // sucl_imports :: [(sym,Int)]
+  #  sucl_imports = cts_funtypes dcl_mods main_dcl_module_n
      // Build abstract CLI module
-  #  sucl_module = mkcli sucl_typerules sucl_stricts sucl_exports sucl_constrs sucl_bodies
+  #  sucl_module = mkcli showsuclsymbol sucl_typerules sucl_stricts sucl_exports sucl_imports sucl_constrs sucl_bodies
   #! logfile = logfile <<< sucl_module
      // Generate fresh function symbols
-  #  (n_fun_defs,fun_defs3) = usize fun_defs1
+  #  (n_fun_defs,fun_defs3) = usize fun_defs2
   #  fresh_symbols = [SuclUser (SK_Function (mkglobal main_dcl_module_n i)) \\ i<-[n_fun_defs..]]
      // Do the job!
   #  logfile = logfile <<< "Start fullsymred." <<< nl
@@ -56,13 +61,13 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
      // Create and fill new fundef array
   #  (pds,predefs2) = predefs1![PD_StringType]
-  #  (expression_heap`,var_heap`,fundefs4) = stc_funcdefs pds dcl_mods main_dcl_module_n icl_common n_fun_defs expression_heap var_heap symredresults fun_defs3
+  #  (expression_heap`,var_heap`,fun_defs4) = stc_funcdefs pds dcl_mods main_dcl_module_n icl_common n_fun_defs expression_heap var_heap symredresults fun_defs3
      // Determine which were the newly generated functions
-  #  (newlimit,fundefs5) = usize fundefs4
+  #  (newlimit,fun_defs5) = usize fun_defs4
   #  generated_range = {ir_from=n_fun_defs,ir_to=newlimit}
   #  logfile = logfile <<< "New functions from " <<< n_fun_defs <<< " to " <<< newlimit <<< " (not included)" <<< nl
   #  logfile = logfile <<< "Remaining " <<< (n_symredresults-(newlimit-n_fun_defs)) <<< " should be exported" <<< nl
-  #  (logfile,fundefs6) = showfundefs (logfile,fundefs5)
-= logfile $ (fundefs6,var_heap`,expression_heap`,generated_range,predefs2,logfile0)
+  #  (logfile,fun_defs6) = showfundefs (logfile,fun_defs5)
+= logfile $ (fun_defs6,var_heap`,expression_heap`,generated_range,predefs2,logfile0)
 
 mkglobal gmod gob = {glob_module = gmod, glob_object = gob}

@@ -17,6 +17,37 @@ import StdEnv
 mstub = stub "convert"
 block func = mstub func "blocked"
 
+// Derive a symbol representation function for the program
+suclsymbol_to_string ::
+    {#.DclModule}               // DCL modules used
+    .Index                      // Index of main module in DCL array
+    .CommonDefs                 // ICL definitions excluding function definitions
+    u:{#FunDef}                 // Function definitions in ICL
+ -> ( .(SuclSymbol -> String)   // Resulting representation function
+    , v:{#FunDef}               // Consulted function definitions
+    )
+ ,  [u<=v]
+
+suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fundefs0
+= (suclsymbol_to_funinfo (funinfo_to_string o get_funinfo), fundefs1)
+  where getcommon modindex = if (modindex==main_dcl_module_n) icl_common dcl_mods.[modindex].dcl_common
+        (oldinfos,fundefs1) = get_infos fundefs0
+        get_funinfo = get_formal_name_and_arity {env_dcls=dcl_mods,env_main=main_dcl_module_n,env_getcommon=getcommon,env_infos=oldinfos}
+
+funinfo_to_string (id,arity)
+= id.id_name+++"/"+++toString arity
+
+suclsymbol_to_funinfo symbkind_to_string sym
+= case sym
+  of SuclUser sk    -> symbkind_to_string sk
+     SuclCase eip   -> "_lifted_expression_"+++toString (ptrToInt eip)+++"/?"
+     SuclApply ar   -> "_apply/"+++toString ar
+     SuclInt i      -> toString i+++"/0"
+     SuclChar c     -> "'"+++toString c+++"'/0"
+     SuclReal r     -> toString r+++"/0"
+     SuclBool b     -> toString b+++"/0"
+     SuclString s   -> "\""+++toString s+++"\""+++"/0"
+
 // Cocl to Sucl for functions
 cts_function ::
     Int                                                     // Index of current module
@@ -33,10 +64,10 @@ cts_function ::
 cts_function main_dcl_module_n fundefs
 = (typerules,stricts,funbodies,funkinds,fundefs`)
   where ((typerules,stricts,funbodies,funkinds),fundefs`)
-        = foldrarray (convert_fundef main_dcl_module_n) ([],[],[],[]) fundefs
+        = foldrarray_u (convert_fundef main_dcl_module_n) ([],[],[],[]) fundefs
 
-//foldrarray :: (a .b -> .b) .b u:{#a} -> (.b,v:{#a}) | uselect_u,usize_u a, [u<=v]
-foldrarray f i xs
+//foldrarray_u :: (a .b -> .b) .b u:{#a} -> (.b,v:{#a}) | uselect_u,usize_u a, [u<=v]
+foldrarray_u f i xs
 = fold 0 (usize xs)
   where fold j (n,xs)
         | j>=n
@@ -191,6 +222,38 @@ convert_btype BT_Dynamic = SuclDYNAMIC
 convert_btype BT_File = SuclFILE
 convert_btype BT_World = SuclWORLD
 convert_btype _ = error "convert: convert_btype: unhandled BasicType constructor"
+
+
+/******************************************************************************
+*  IMPORTED FUNCTION CONVERSION                                               *
+******************************************************************************/
+
+// Get the arities of the imported functions
+cts_funtypes ::
+    {#.DclModule}           // DCL modules to read types from
+    .Index                  // Index of main module (because we must ignore its DCL)
+ -> [(.SuclSymbol,Int)]     // List of function symbols and their associated arities
+
+cts_funtypes dcl_mods main_dcl_module_n
+= flatten mod_arity_lists
+  where mod_arity_lists = maparrayindex mkaritylist dcl_mods
+        mkaritylist dcli dcl
+        | dcli==main_dcl_module_n
+          = []
+        = maparrayindex (mkarity dcli) dcl.dcl_functions
+        mkarity dcli fti ft
+        = (SuclUser (SK_Function {glob_module=dcli,glob_object=fti}),ft.ft_arity)
+
+// Map a function over an array, producing a list of equal length
+// The function also gets the element index
+maparrayindex :: (Int a -> .b) .{#a} -> [.b] | select_u,size_u a
+maparrayindex f xs
+= map 0
+  where map j
+        | j>=sizexs
+          = []
+        = [f j xs.[j]:map (j+1)]
+		sizexs = size xs
 
 
 /******************************************************************************
@@ -423,7 +486,7 @@ convert_expression _ _ _ (EE)                   _ = mstub "convert_expression" "
 convert_expression _ _ _ (NoBind _)             _ = mstub "convert_expression" "NoBind constructor not handled"
 
 convert_algebraic_branch ::
-    Int
+    Int                             // Index of main module
     SuclVariable                    // Root of pattern
     [(VarInfoPtr,SuclVariable)]     // Locally bound variables, with the expressions they're bound to
     AlgebraicPattern
@@ -447,7 +510,7 @@ convert_algebraic_branch main_dcl_module_n root bindings0 branch lrinfo
         // DON'T Claim root node of pattern
         heap1 = heap0
         // Determine constructor symbol
-        conssym = SuclUser (SK_Constructor {glob_module=main_dcl_module_n,glob_object=branch.ap_symbol.glob_object.ds_index})
+        conssym = SuclUser (SK_Constructor {glob_module=branch.ap_symbol.glob_module,glob_object=branch.ap_symbol.glob_object.ds_index})
         // Determine constructor argument variables
         consargs = [fv.fv_info_ptr \\ fv <- branch.ap_vars]
         // Map pattern's arguments to nodes

@@ -26,6 +26,17 @@ from containers import NumberSet
 from Heap import Heap
 
 
+// Derive a symbol representation function for the program
+suclsymbol_to_string ::
+    {#.DclModule}               // DCL modules used
+    .Index                      // Index of main module in DCL array
+    .CommonDefs                 // ICL definitions excluding function definitions
+    u:{#FunDef}                 // Function definitions in ICL
+ -> ( .(SuclSymbol -> String)   // Resulting representation function
+    , v:{#FunDef}               // Consulted function definitions
+    )
+ ,  [u<=v]
+
 // Cocl to Sucl for functions
 cts_function ::
     Int                                                     // Index of current module
@@ -37,6 +48,12 @@ cts_function ::
     , v:{#FunDef}                                           // Consulted function definitions
     )
  ,  [u<=v]
+
+// Get the arities of the imported functions
+cts_funtypes ::
+    {#.DclModule}           // DCL modules to read types from
+    .Index                  // Index of main module (because we must ignore its DCL)
+ -> [(.SuclSymbol,Int)]     // List of function symbols and their associated arities
 
 //Cocl to Sucl for exports (function decls from main dcl)
 cts_exports ::

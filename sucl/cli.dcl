@@ -8,6 +8,7 @@ from rule import Rule
 from graph import Graph
 from StdOverloaded import ==
 from StdFile import <<<
+from cleanversion import String
 
 // Transitive necessities
 
@@ -25,9 +26,11 @@ clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) ->
 
 // Build a cli structure
 mkcli ::
+    (SuclSymbol->String)                                                            // Symbol representation for debugging
     [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]                             // Type rules of local and imported functions
     [(SuclSymbol,[Bool])]                                                           // Strictness information derived from function types
     [SuclSymbol]                                                                    // Exported symbols
+    [(SuclSymbol,Int)]                                                              // Imported function symbols with their arities
     [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])] // (Algebraic) types with their constructors, and the constructors' type info
     [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]                             // Function bodies with their arities and their rules
  -> Cli

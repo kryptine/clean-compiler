@@ -107,7 +107,7 @@ Abstype implementation.
 >        stripexports :: [char] -> cli -> cli
 */
 
-:: Cli = CliAlias (Module SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable)
+:: Cli = CliAlias (SuclSymbol->String) (Module SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable)
 
 /*
 >   cli == module symbol node typesymbol typenode
@@ -123,11 +123,11 @@ Abstype implementation.
 */
 
 exports :: Cli -> [SuclSymbol]
-exports (CliAlias m) = m.exportedsymbols
+exports (CliAlias ss m) = m.exportedsymbols
 
 // Determine the arity of a core clean symbol
 arity :: Cli SuclSymbol -> Int
-arity (CliAlias m) sym
+arity (CliAlias ss m) sym
 = extendfn m.arities (length o arguments o (extendfn m.typerules (coretyperule--->"coreclean.coretyperule begins from cli.arity"))) sym
 
 /*
@@ -135,7 +135,7 @@ arity (CliAlias m) sym
 */
 
 typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
-typerule (CliAlias m) sym
+typerule (CliAlias ss m) sym
 = maxtyperule m.typerules sym
 
 /*
@@ -160,8 +160,8 @@ typerule (CliAlias m) sym
 */
 
 clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
-clistrategy (CliAlias {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) matchable
- = ( checkarity (extendfn as (typearity o maxtyperule ts))        // Checks curried occurrences and strict arguments
+clistrategy (CliAlias showsymbol {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) matchable
+ = ( checkarity getarity        // Checks curried occurrences and strict arguments
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
    o checkimport islocal                            // Checks for delta symbols
@@ -172,6 +172,9 @@ clistrategy (CliAlias {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) m
    where islocal rsym=:(SuclUser (SK_Function _)) = isMember rsym (map fst rs)  // User-defined function symbols can be imported, so they're known if we have a list of rules for them
          islocal _                                = True                        // Symbols in the language core (the rest) are always completely known
                                                                                 // This includes lifted case symbols; we lifted them ourselves, after all
+         getarity sym
+         = (arity <--- ("cli.clistrategy.getarity ends with "+++toString arity)) ---> ("cli.clistrategy.getarity begins for "+++showsymbol sym)
+           where arity = extendfn as (typearity o (maxtyperule--->"cli.clistrategy.getarity uses maxtyperule") ts) sym 
 
 typearity :: (Rule SuclTypeSymbol SuclTypeVariable) -> Int
 typearity ti = length (arguments ti)
@@ -192,7 +195,7 @@ maxstricts defs sym = extendfn defs corestricts sym
 */
 
 complete :: Cli -> [SuclSymbol] -> Bool
-complete (CliAlias m) = mkclicomplete m.typeconstructors (maxtyperule m.typerules)
+complete (CliAlias ss m) = mkclicomplete m.typeconstructors (maxtyperule m.typerules)
 
 /*
 >   showcli = printcli
@@ -328,16 +331,19 @@ Compiling clean parts into module information...
 */
 
 mkcli ::
+    (SuclSymbol->String)
     [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]
     [(SuclSymbol,[Bool])]
     [SuclSymbol]
+    [(SuclSymbol,Int)]
     [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])]
     [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
  -> Cli
 
-mkcli typerules stricts exports constrs bodies
+mkcli showsymbol typerules stricts exports imports constrs bodies
 = CliAlias
-  { arities          = map (mapsnd fst) bodies
+  showsymbol
+  { arities          = map (mapsnd fst) bodies++imports
   , typeconstructors = map (mapsnd (map fst)) constrs
   , exportedsymbols  = exports
   , typerules        = typerules++flatten ((map (map (mapsnd fst) o snd)) constrs)
@@ -346,10 +352,12 @@ mkcli typerules stricts exports constrs bodies
   }
 
 instance <<< Cli
-where (<<<) file (CliAlias m)
-      = file <<< "=== Arities ===" <<< nl
-             writeList m.arities
-             <<< "=== Type Rules ===" <<< nl
-             writeList m.typerules
-             <<< "=== Rules ===" <<< nl
-             writeList m.rules
+where (<<<) file (CliAlias showsymbol m)
+      # file = file <<< "=== Arities ===" <<< nl
+      # file = printlist (showpair showsymbol toString) "" m.arities file
+      # file = file <<< "=== Type Rules ===" <<< nl
+      # file = printlist (showpair showsymbol toString) "" m.typerules file
+      # file = file <<< "=== Rules ===" <<< nl
+      # file = printlist (showpair showsymbol (showlist showrule`)) "" m.rules file
+      = file
+      where showrule` rule = showruleanch showsymbol toString (map (const False) (arguments rule)) rule []
