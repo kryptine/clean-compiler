@@ -4,7 +4,7 @@ definition module newtest
 
 from cli import Cli
 from coreclean import SuclTypeSymbol,SuclTypeVariable,SuclSymbol,SuclVariable
-from newfold import FuncDef
+from newfold import FuncDef,FuncBody
 from trace import Trace,Transformation
 from spine import Answer,Spine,Subspine
 from history import History,HistoryAssociation,HistoryPattern

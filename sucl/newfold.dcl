@@ -10,7 +10,17 @@ from general import Optional
 from StdOverloaded import ==
 
 :: FuncDef sym var
-   :== [Rule sym var]
+   :== ( [var]              // Arguments of function
+       , FuncBody sym var   // Right hand side of function
+       )
+
+:: FuncBody sym var
+   = MatchPattern
+       (Rgraph sym var)     // Pattern to match
+       (FuncBody sym var)   // Right hand side for matching graph (case branch)
+       (FuncBody sym var)   // Right hand side for failed match (case default)
+   | BuildGraph
+       (Rgraph sym var)     // Right hand side to reduce to
 
 :: Etracer sym var pvar :==
        (Trace sym var pvar)
