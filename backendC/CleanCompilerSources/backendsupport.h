@@ -18,7 +18,12 @@ extern void fatal_backend_error (char *s);
 	Memory management
 	=================
 */
+#if 1
+extern void FreeConvertBuffers (void);
+extern void	*ConvertAlloc (SizeT size);
+#else
 # define FreeConvertBuffers()
 # define ConvertAlloc(size) CompAlloc (size)
+#endif
 # define ConvertAllocType(t) ((t*) ConvertAlloc (SizeOf (t)))
 # define ArraySize(array)	((unsigned) (sizeof (array) / sizeof (array[0])))
