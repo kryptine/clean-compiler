@@ -96,6 +96,23 @@ int use_clean_system_files;
 	*/
 #endif
 
+#if defined (_MAC_) && defined (GNU_C)
+extern char *convert_file_name (char *file_name,char *buffer);
+
+static FILE *freopen_with_file_name_conversion (char *file_name,char *mode,FILE *file_p)
+{
+	char buffer[512+1];
+
+	file_name=convert_file_name (file_name,buffer);
+	if (file_name==NULL)
+		return NULL;
+
+	return freopen (file_name,mode,file_p);
+}
+
+# define freopen freopen_with_file_name_conversion
+#endif
+
 #ifdef CLEAN2
 Bool ParseCommandArgs (int argc, char **argv, char **file_name_p, char **output_file_name_p)
 #else
