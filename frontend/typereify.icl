@@ -209,29 +209,31 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 		}
 	# type_defs
 		=	common_defs.[main].com_type_defs
+	# info
+		=	0
 	# (type_funs, bs_state)
-		=	build 0 (size type_defs) type_defs icl_functions bs_state 
+		=	build 0 (size type_defs) type_defs icl_functions info bs_state 
 	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, 
 			bs_state.bs_type_heaps)
 	where
-		build i n type_defs functions bs_state
+		build i n type_defs functions info bs_state
 			| i < n
 				# (functions, bs_state)
-					=	buildTypeFunction type_defs.[i] functions bs_state
-				=	build (i+1) n type_defs functions bs_state
+					=	buildTypeFunction type_defs.[i] functions info bs_state
+				=	build (i+1) n type_defs functions info bs_state
 			// otherwise
 				=	(functions, bs_state)
 
-buildTypeFunction :: CheckedTypeDef *{#FunDef} *BuildTypeFunState
+buildTypeFunction :: CheckedTypeDef *{#FunDef} Info *BuildTypeFunState
 	-> (*{#FunDef}, *BuildTypeFunState)
-buildTypeFunction type_def=:{td_fun_index, td_args} functions bs_state
+buildTypeFunction type_def=:{td_fun_index, td_args} functions info bs_state
 	| td_fun_index == NoIndex
 		=	(functions, bs_state)
 	// otherwise
 		# bs_state
-			=	numberTypeVariables td_args bs_state
+			=	numberTypeVariables td_args info bs_state
 		# (rhs, bs_state)
-			=	reify type_def bs_state
+			=	reify type_def info bs_state
 		# (new_info_ptr, bs_var_heap) = newPtr VI_Empty bs_state.bs_var_heap
 		# bs_state
 			=	{bs_state & bs_var_heap=bs_var_heap}
@@ -246,8 +248,8 @@ buildTypeFunction type_def=:{td_fun_index, td_args} functions bs_state
 			=	{functions & [td_fun_index].fun_body=TransformedBody body}
 		=	(functions, bs_state)
 
-numberTypeVariables :: a *BuildTypeFunState -> *BuildTypeFunState | numberTypeVars a
-numberTypeVariables x bs_state
+numberTypeVariables :: a Info *BuildTypeFunState -> *BuildTypeFunState | numberTypeVars a
+numberTypeVariables x info bs_state
 	# bs_type_heaps
 		=	bs_state.bs_type_heaps
 	# (_, th_vars)
@@ -351,16 +353,16 @@ apply f a
 lift symb
 	=	return (App {app_symb = symb, app_args = [], app_info_ptr = nilPtr})
 
-cons :: Index  *BuildTypeFunState
+cons :: Index Info *BuildTypeFunState
 			-> *(Expression, *BuildTypeFunState)
-cons cons_index bs=:{bs_predefs}
+cons cons_index info bs=:{bs_predefs}
 	# (symbol, bs_predefs)
 		=	getSymbol cons_index SK_Constructor bs_predefs
 	=	lift symbol {bs & bs_predefs=bs_predefs}
 
-record :: Index  *BuildTypeFunState
+record :: Index  Info *BuildTypeFunState
 			-> *(Expression, *BuildTypeFunState)
-record type_index bs=:{bs_common_defs, bs_predefs}
+record type_index info bs=:{bs_common_defs, bs_predefs}
 	# (symbol, bs_predefs)
 		=	predefRecordConstructor type_index bs_common_defs bs_predefs
 	=	lift symbol {bs & bs_predefs=bs_predefs}
@@ -369,22 +371,26 @@ quote :: {#Char} -> {#Char}
 quote string
 	=	"\"" +++ string +++ "\""
 
-function :: Index  *BuildTypeFunState
+(o`) infixr  9
+(o`) f g info x :== g info (f info x)
+
+function :: Index Info  *BuildTypeFunState
 			-> *(Expression, *BuildTypeFunState)
-function fun_index bs=:{bs_predefs}
+function fun_index info bs=:{bs_predefs}
 	# (symbol, bs_predefs)
 		=	getSymbol fun_index SK_Function bs_predefs
 	=	lift symbol {bs & bs_predefs=bs_predefs}
 
 (`) infixl 9
-(`) f a s
-	# (rf, s)
-		=	f s
-	# (ra, s)
-		=	reify a s
-	=	(apply rf ra, s)
+(`) f a info state
+	# (rf, state)
+		=	f info state
+	# (ra, state)
+		=	reify a info state
+	=	(apply rf ra, state)
 
-:: Riefier :== BMonad Expression
+:: Info :== Int
+:: Riefier :== Info -> BMonad Expression
 class reify a ::  a -> Riefier
 
 instance reify [a] | reify a where
@@ -419,8 +425,8 @@ instance reify TypeRhs where
 	reify (AlgType constructors)
 		=	cons PD_CTAlgType ` get constructors
 		where
-			get constructors state=:{bs_common_defs, bs_main}
-				=	reify [(ds_index,common_defs.[ds_index]) \\ {ds_index} <- constructors] state
+			get constructors info state=:{bs_common_defs, bs_main}
+				=	reify [(ds_index,common_defs.[ds_index]) \\ {ds_index} <- constructors] info state
 				where
 					common_defs
 						=	bs_common_defs.[bs_main].com_cons_defs
@@ -431,17 +437,17 @@ instance reify TypeRhs where
 
 instance reify (Int, ConsDef) where
 	reify (cons_index, {cons_ident, cons_type, cons_exi_vars})
-		=	(record PD_CTConsDef
+		=	numberTypeVariables cons_exi_vars
+		o`	(record PD_CTConsDef
 				` (function PD__CTToCons ` consSymbol cons_ident cons_index)
 				` cons_type.st_args ` length cons_exi_vars)
-		o	numberTypeVariables cons_exi_vars
 		where
-			consSymbol cons_ident cons_index state=:{bs_main}
+			consSymbol cons_ident cons_index info state=:{bs_main}
 				# cons_symb =
 					{	symb_ident = cons_ident
 					,	symb_kind = SK_Constructor { glob_module = bs_main, glob_object = cons_index}
 					}
-				=	reify cons_symb state
+				=	reify cons_symb info state
 
 instance reify RecordType where
 	reify {rt_fields} // +++ constructor ??? +++ is_boxed
@@ -451,13 +457,14 @@ instance reify FieldSymbol where
 	reify {fs_index}
 		=	selector fs_index
 		where
-			selector fs_index st=:{bs_main, bs_common_defs}
-				=	(record PD_CTFieldDef
+			selector fs_index info st=:{bs_main, bs_common_defs}
+				=	(numberTypeVariables def.sd_exi_vars
+				o`	numberTypeVariables def.sd_type.st_vars
+				o`	(record PD_CTFieldDef
 						` quote def.sd_ident.id_name
 						` length (def.sd_exi_vars)
-						` def.sd_type.st_result)
-					(numberTypeVariables def.sd_type.st_vars
-						(numberTypeVariables def.sd_exi_vars st))
+						` def.sd_type.st_result))
+					info st
 			where
 				def
 					=	bs_common_defs.[bs_main]
@@ -493,23 +500,24 @@ instance reify Type where
 	reify (TB basic_type)
 		=	reify basic_type
 	reify (TFA vars type)
-		=	reify type
-		o	numberTypeVariables vars
+		=	numberTypeVariables vars
+		o`	reify type
 	reify t
 		=	undef //  <<- ("reify", t)
 
-reifyApp :: TypeSymbIdent [AType] *BuildTypeFunState -> (Expression, *BuildTypeFunState)
-reifyApp symb args bs_state=:{bs_common_defs, bs_type_heaps}
+reifyApp :: TypeSymbIdent [AType] Info *BuildTypeFunState
+	-> (Expression, *BuildTypeFunState)
+reifyApp symb args info bs_state=:{bs_common_defs, bs_type_heaps}
 	# (expanded, expanded_type, bs_type_heaps)
 		=	expandTypeSynonym bs_common_defs symb args bs_type_heaps
 	# bs_state
 		=	{bs_state & bs_type_heaps=bs_type_heaps}
 	| expanded
-		=	reify expanded_type bs_state
+		=	reify expanded_type info bs_state
 	// otherwise
-		=	foldl` reifyApply (reify symb) args bs_state
+		=	foldl` reifyApply (reify symb) args info bs_state
 
-foldl` op r l = foldl r l // crash
+foldl` op r l = foldl r l // crashes if it's a macro
 	where
 		foldl r []		= r
 		foldl r [a:x]	= foldl (op r a) x
@@ -525,7 +533,7 @@ instance reify TypeVar where
 	reify {tv_info_ptr, tv_ident}
 		=	cons PD_Dyn_TypeVar ` typeVarNum tv_info_ptr
 		where
-			typeVarNum tv_info_ptr bs=:{bs_type_heaps}
+			typeVarNum tv_info_ptr info bs=:{bs_type_heaps}
 				# (tv_info, th_vars)
 					=	readPtr tv_info_ptr bs_type_heaps.th_vars
 				# tv_num
@@ -536,7 +544,7 @@ instance reify TypeVar where
 								->	abort "typeVar" // <<- (tv_ident.id_name, tv_info)
 				# bs_type_heaps
 					=	{bs_type_heaps & th_vars = th_vars}
-				=	reify tv_num {bs & bs_type_heaps = bs_type_heaps}
+				=	reify tv_num info {bs & bs_type_heaps = bs_type_heaps}
 
 instance reify BasicType where
 	reify (BT_String string_type)
@@ -565,11 +573,10 @@ instance reify SymbIdent where
 
 instance reify TypeSymbIdent where
 	reify symb
-		=	reifyTypeIdent symb `bind` \type
-		->	cons PD_Dyn_TypeCons ` type
+		=	cons PD_Dyn_TypeCons ` reifyTypeIdent symb
 		where
-			reifyTypeIdent {type_index} st=:{bs_common_defs}
-				=	(toTypeCodeConstructor type_index bs_common_defs, st)
+			reifyTypeIdent {type_index} info st=:{bs_common_defs}
+				=	reify (toTypeCodeConstructor type_index bs_common_defs) info st
 
 instance reify GlobalTCType where
 	reify (GTT_PredefTypeConstructor {glob_object=type_index})
@@ -612,11 +619,11 @@ instance reify App where
 
 instance reify Expression where
 	reify expr
-		=	return expr
+		=	\x -> return expr
 
 basic :: BasicValue -> Riefier
 basic value
-	=	return (BasicExpr value)
+	=	\x -> return (BasicExpr value)
 
 // copied and adopted from overloading
 toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} common_defs
