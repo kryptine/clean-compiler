@@ -159,7 +159,14 @@ ptrToInt2 p = code {
 
 instance == (Ptr a)
 where
-{	(==) p1 p2 = code {
+{	(==) p1 p2 = if (isNilPtr p1)
+				 (isNilPtr p2)
+				 (if (isNilPtr p2) False (eqptrnonil p1 p2))
+};
+
+eqptrnonil :: !(Ptr a) !(Ptr a) -> Bool;
+eqptrnonil p1 p2
+= code {
 	push_r_args_b 1 1 1 1 1
 	push_r_args_b 0 1 1 1 1
 	eqI
@@ -175,4 +182,3 @@ where
 	print "equal_pointer: Pointers to different heaps or a nilPtr"
 	halt	
 	}
-};

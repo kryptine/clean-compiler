@@ -14,64 +14,26 @@ Start world
 	=	(testArgs, coclMain testArgs world)
 	where
 		testArgs
-			=	[
-					// main module
-					testDir +++ "t"
-//				,	// unknown option
-//					"-xxx"
-//					// list all types
-				,	"-lat"
-					// generate readable abc code
-				,	"-d"
-					// time profiling
-				,	"-pt"
-					// reuse unique nodes
-				,	"-ou"
-					// redirect out
-//				,	"-RO", "messages.txt"	
-					// redirect errors
-//				,	"-RE", "errors.txt"
-					// paths
-				,	"-P", testDir +++ ";" +++ io08Dir +++ ";" +++ stdenvDir
-//				,	"-P", paths
-				]
+            =   [ "-SC"             // Supercompilation
+                , "-c"
+                , "-pt"
+                , "-desc"
+                , "-d"              // Generate readable abc code
+                , "-lat"            // List all types
+                , "-ou"
+                , iclFile           // Main module
+                , "-P",  paths      // Paths
+                , "-RE", errFile    // Error output
+                , "-RO", outFile    // Standard output
+                ]
 
-		baseDir
-			=	"d:\\Users\\Ronny\\Develop\\"
-		testDir
-			=	baseDir +++ "Clean Programs\\" +++ "testes\\" 
+        modname = "hello"
 
-		coclDir
-			=	baseDir +++ "CleanSystem\\cocl\\"
+        iclFile = testDir+++modname+++".icl"
+        outFile = testDir+++modname+++".out"
+        errFile = testDir+++modname+++".err"
 
-		cleanSystemDir
-			=	baseDir +++ "CleanSystem\\"
+        paths = testDir+++";;"+++cleanDir+++"StdEnv"
 
-		cleanVersion
-			=	"2.0 repository\\"
-
-		stdenvDir
-			=	cleanSystemDir +++ cleanVersion +++ "\\StdEnv\\"
-
-		io08Dir
-//			=	cleanSystemDir +++ cleanVersion +++ "\\IOInterface\\"
-			=	"d:\\Users\\Ronny\\Profile\\Desktop\\test\\IOInterface 0.8.2\\"
-		paths
-			=	foldl  (\a b -> a +++ ";" +++ b) ""
-				(
-					[	coclDir +++ path
-					\\	path <-
-						[	""
-						,	"compiler"
-						,	"main"
-						,	"main/Windows"
-						,	"backend"
-						,	"backendCModules"
-						,	"ArgEnvWindows"
-						,	"WrapDebug"
-						]
-					]
-				++
-					[	stdenvDir
-					]
-				)
+		testDir     =	"C:\\Vincent\\Sucl\\"
+		cleanDir    =	"C:\\Clean\\2.0 (beta 3)\\"

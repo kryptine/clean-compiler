@@ -1626,6 +1626,10 @@ makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr} : vars] [type : types]
 	| is_rare_name fv_name
 		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type (Yes (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
 		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type No ts_var_heap)
+makeBase fun_or_cons_ident arg_nr [] types ts_var_heap
+= abort ("type.makeBase: "+++fun_or_cons_ident.id_name+++": out of actual arguments, but "+++toString (length types)+++" argument type(s) left")
+makeBase fun_or_cons_ident arg_nr vars [] ts_var_heap
+= abort ("type.makeBase: "+++fun_or_cons_ident.id_name+++": out of argument types, but "+++toString (length vars)+++" actual argument(s) left")
 
 addToBase info_ptr atype=:{at_type = TFA atvs type} optional_position ts_var_heap 
 	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type} optional_position)

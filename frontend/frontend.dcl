@@ -3,6 +3,8 @@
 */
 definition module frontend
 
+// $Id$
+
 from scanner import SearchPaths
 from general import Optional, Yes, No
 import checksupport, transform, overloading
@@ -11,6 +13,7 @@ import checksupport, transform, overloading
 	=	{	feo_up_to_phase			:: !FrontEndPhase
 		,	feo_generics 			:: !Bool
 		,	feo_fusion	 			:: !Bool
+		,	feo_supercompilation	:: !Bool
 		}
 
 :: FrontEndSyntaxTree
