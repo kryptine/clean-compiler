@@ -79,14 +79,6 @@ instance toString SuclSymbolKind
 instance <<< SuclSymbolKind
 instance toString SuclVariable
 instance <<< SuclVariable
-instance toString SymbKind
-instance <<< SymbKind
-instance toString TypeVar
-instance toString ConsVariable
-instance toString (Global a) | toString a
-
-instance toString (Ptr a)
-instance <<< (Ptr a)
 
 // Get the type rule and strictness of a built in core clean symbol
 coretyperule :: !SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable

@@ -9,8 +9,8 @@ import graph
 import basic
 import StdCompare
 import syntax
-//import StdEnv
-import general
+import syntaxrepr
+import Heaprepr
 
 mstub = stub "coreclean"
 block func = mstub func "blocked"
@@ -106,14 +106,6 @@ instance toString SuclTypeVariable
 where toString (SuclANONYMOUS i) = "V_"+++toString i
       toString (SuclNAMED     p) = "N_"+++toString p
 
-instance toString TypeVar
-where toString tv = toString tv.tv_info_ptr
-
-instance toString ConsVariable
-where toString (CV tv)       = "CV ("     +++toString tv +++")"
-      toString (TempCV tvi)  = "TempCV (" +++toString tvi+++")"
-      toString (TempQCV tvi) = "TempQCV ("+++toString tvi+++")"
-
 instance <<< SuclTypeVariable
 where (<<<) file tvar = file <<< toString tvar
 
@@ -138,29 +130,6 @@ where toString (SuclUser  sk  ) = toString sk
 
 instance <<< SuclSymbol
 where (<<<) file sym = file <<< toString sym
-
-instance toString SymbKind
-where toString SK_Unknown = "Unknown"
-      toString (SK_Function gi) = "Function "+++toString gi
-      toString (SK_LocalMacroFunction i) = "LocalMacroFunction "+++toString i
-      toString (SK_OverloadedFunction gi) = "OverloadedFunction "+++toString gi
-      toString (SK_Generic gi tk) = "Generic "+++toString gi+++" "+++toString tk
-      toString (SK_Constructor gi) = "Constructor "+++toString gi
-      toString (SK_Macro gi) = "Macro "+++toString gi
-      toString (SK_GeneratedFunction fip i) = "GeneratedFunction "+++toString fip+++" "+++toString i
-      toString SK_TypeCode = "TypeCode"
-
-instance <<< SymbKind
-where (<<<) file sk = file <<< toString sk
-
-instance toString (Global a) | toString a
-where toString {glob_module,glob_object} = toString glob_module+++"."+++toString glob_object
-
-instance toString (Ptr a)
-where toString p = "p"+++toString (ptrToInt p)
-
-instance <<< (Ptr a)
-where (<<<) file p = file <<< toString p
 
 instance == SymbKind
 where (==) SK_Unknown                       SK_Unknown                      = True
