@@ -143,48 +143,49 @@ PD_TypeObjectType			:== 166
 PD_TypeConsSymbol			:== 167
 PD_unify					:== 168
 PD_coerce					:== 169
-PD_variablePlaceholder		:== 170
-PD_UvariablePlaceholder		:== 171
-PD_undo_indirections		:== 172
+PD_PV_Placeholder			:== 170		// Pattern variable (occurs only in pattern)
+PD_UPV_Placeholder			:== 171		// Universal Pattern Variable (occurs only in pattern; universally quantified variable)
+PD_UV_Placeholder			:== 172		// Universal Variable (occurs only in dynamic; universally quantified variable)					
+PD_undo_indirections		:== 173
 
-PD_TypeID					:== 173
-PD_ModuleID					:== 174
-PD_ModuleConsSymbol			:== 175
+PD_TypeID					:== 174
+PD_ModuleID					:== 175
+PD_ModuleConsSymbol			:== 176
 
 /* Generics */
-PD_StdGeneric				:== 176
+PD_StdGeneric				:== 177
 
-PD_TypeISO					:== 177
-PD_ConsISO					:== 178
-PD_iso_to					:== 179
-PD_iso_from					:== 180
+PD_TypeISO					:== 178
+PD_ConsISO					:== 179
+PD_iso_to					:== 180
+PD_iso_from					:== 181
 
-PD_TypeUNIT					:== 181
-PD_ConsUNIT					:== 182
-PD_TypeEITHER				:== 183
-PD_ConsLEFT					:== 184
-PD_ConsRIGHT				:== 185
-PD_TypePAIR					:== 186
-PD_ConsPAIR					:== 187
-PD_TypeARROW				:== 188
-PD_ConsARROW				:== 189
+PD_TypeUNIT					:== 182
+PD_ConsUNIT					:== 183
+PD_TypeEITHER				:== 184
+PD_ConsLEFT					:== 185
+PD_ConsRIGHT				:== 186
+PD_TypePAIR					:== 187
+PD_ConsPAIR					:== 188
+PD_TypeARROW				:== 189
+PD_ConsARROW				:== 190
 
-PD_TypeConsDefInfo			:== 190 
-PD_ConsConsDefInfo			:== 191
-PD_TypeTypeDefInfo			:== 192 
-PD_ConsTypeDefInfo			:== 193
-PD_cons_info				:== 194
-PD_TypeCONS					:== 195
-PD_ConsCONS					:== 196
+PD_TypeConsDefInfo			:== 191 
+PD_ConsConsDefInfo			:== 192
+PD_TypeTypeDefInfo			:== 193 
+PD_ConsTypeDefInfo			:== 194
+PD_cons_info				:== 195
+PD_TypeCONS					:== 196
+PD_ConsCONS					:== 197
 
-PD_isomap_ARROW_			:== 197
-PD_isomap_ID				:== 198
+PD_isomap_ARROW_			:== 198
+PD_isomap_ID				:== 199
 
-PD_TypeType					:== 199
-PD_ConsTypeApp				:== 200
-PD_ConsTypeVar				:== 201
+PD_TypeType					:== 200
+PD_ConsTypeApp				:== 201
+PD_ConsTypeVar				:== 202
 
-PD_NrOfPredefSymbols		:== 202
+PD_NrOfPredefSymbols		:== 203
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

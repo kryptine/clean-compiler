@@ -1702,7 +1702,7 @@ where
 		where
 			create_variable var_info_ptr ui
 				# (placeholder_symb, ui) 
-					= getSymbol PD_UvariablePlaceholder SK_Constructor ui
+					= getSymbol PD_UPV_Placeholder SK_Constructor ui
 				  cyclic_var = {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 				  cyclic_fv = varToFreeVar cyclic_var 1	
 				= ({ lb_src = App {	app_symb = placeholder_symb,

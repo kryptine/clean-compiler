@@ -3001,16 +3001,17 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_TypeObjectType		mod_index STE_Type
 				<=< adjustPredefSymbol PD_TypeConsSymbol		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_variablePlaceholder mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_UvariablePlaceholder mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_unify				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_PV_Placeholder 		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_UPV_Placeholder		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_UV_Placeholder		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_unify					mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_coerce				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_undo_indirections	mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_undo_indirections		mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_DynamicTemp			mod_index STE_Type
 				<=< adjustPredefSymbol PD_DynamicType			mod_index (STE_Field unused)
-				<=< adjustPredefSymbol PD_DynamicValue		mod_index (STE_Field unused)
+				<=< adjustPredefSymbol PD_DynamicValue			mod_index (STE_Field unused)
 				<=< adjustPredefSymbol PD_TypeID				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ModuleID			mod_index STE_Constructor)
+				<=< adjustPredefSymbol PD_ModuleID				mod_index STE_Constructor)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
 		# type_iso_ident = predefined_idents.[PD_TypeISO]	
 		| pre_mod.pds_def == mod_index

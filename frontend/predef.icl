@@ -143,48 +143,49 @@ PD_TypeObjectType			:== 166
 PD_TypeConsSymbol			:== 167
 PD_unify					:== 168
 PD_coerce					:== 169
-PD_variablePlaceholder		:== 170
-PD_UvariablePlaceholder		:== 171
-PD_undo_indirections		:== 172
+PD_PV_Placeholder			:== 170		// Pattern variable (occurs only in pattern)
+PD_UPV_Placeholder			:== 171		// Universal Pattern Variable (occurs only in pattern; universally quantified variable)
+PD_UV_Placeholder			:== 172		// Universal Variable (occurs only in dynamic; universally quantified variable)					
+PD_undo_indirections		:== 173
 
-PD_TypeID					:== 173
-PD_ModuleID					:== 174
-PD_ModuleConsSymbol			:== 175
+PD_TypeID					:== 174
+PD_ModuleID					:== 175
+PD_ModuleConsSymbol			:== 176
 
 /* Generics */
-PD_StdGeneric				:== 176
+PD_StdGeneric				:== 177
 
-PD_TypeISO					:== 177
-PD_ConsISO					:== 178
-PD_iso_to					:== 179
-PD_iso_from					:== 180
+PD_TypeISO					:== 178
+PD_ConsISO					:== 179
+PD_iso_to					:== 180
+PD_iso_from					:== 181
 
-PD_TypeUNIT					:== 181
-PD_ConsUNIT					:== 182
-PD_TypeEITHER				:== 183
-PD_ConsLEFT					:== 184
-PD_ConsRIGHT				:== 185
-PD_TypePAIR					:== 186
-PD_ConsPAIR					:== 187
-PD_TypeARROW				:== 188
-PD_ConsARROW				:== 189
+PD_TypeUNIT					:== 182
+PD_ConsUNIT					:== 183
+PD_TypeEITHER				:== 184
+PD_ConsLEFT					:== 185
+PD_ConsRIGHT				:== 186
+PD_TypePAIR					:== 187
+PD_ConsPAIR					:== 188
+PD_TypeARROW				:== 189
+PD_ConsARROW				:== 190
 
-PD_TypeConsDefInfo			:== 190 
-PD_ConsConsDefInfo			:== 191
-PD_TypeTypeDefInfo			:== 192 
-PD_ConsTypeDefInfo			:== 193
-PD_cons_info				:== 194
-PD_TypeCONS					:== 195
-PD_ConsCONS					:== 196
+PD_TypeConsDefInfo			:== 191 
+PD_ConsConsDefInfo			:== 192
+PD_TypeTypeDefInfo			:== 193 
+PD_ConsTypeDefInfo			:== 194
+PD_cons_info				:== 195
+PD_TypeCONS					:== 196
+PD_ConsCONS					:== 197
 
-PD_isomap_ARROW_			:== 197
-PD_isomap_ID				:== 198
+PD_isomap_ARROW_			:== 198
+PD_isomap_ID				:== 199
 
-PD_TypeType					:== 199
-PD_ConsTypeApp				:== 200
-PD_ConsTypeVar				:== 201
+PD_TypeType					:== 200
+PD_ConsTypeApp				:== 201
+PD_ConsTypeVar				:== 202
 
-PD_NrOfPredefSymbols		:== 202
+PD_NrOfPredefSymbols		:== 203
 
 (<<=) infixl
 (<<=) symbol_table val
@@ -282,8 +283,9 @@ predefined_idents
 					[PD_TypeCodeClass] = i "TC",
 					[PD_TypeObjectType] = i T_ypeObjectTypeRepresentation_String,
 					[PD_TypeConsSymbol] = i "T_ypeConsSymbol",
-					[PD_variablePlaceholder] = i "P_laceholder",
-					[PD_UvariablePlaceholder] = i "UP_laceholder",
+					[PD_PV_Placeholder] = i "PV_Placeholder",
+					[PD_UPV_Placeholder] = i "UPV_Placeholder",
+					[PD_UV_Placeholder] = i "UV_Placeholder",
 					[PD_unify] = i "_unify",
 					[PD_coerce] = i "_coerce",
 					[PD_StdDynamic] = i UnderscoreSystemDynamicModule_String,
@@ -446,8 +448,9 @@ where
 					<<- (local_predefined_idents,					 IC_Class, PD_TypeCodeClass)
 					<<- (local_predefined_idents,		IC_Type, PD_TypeObjectType)
 					<<- (local_predefined_idents,		IC_Expression, PD_TypeConsSymbol)
-					<<- (local_predefined_idents,		IC_Expression, PD_variablePlaceholder)
-					<<- (local_predefined_idents,		IC_Expression, PD_UvariablePlaceholder)
+					<<- (local_predefined_idents,		IC_Expression, PD_PV_Placeholder)
+					<<- (local_predefined_idents,		IC_Expression, PD_UPV_Placeholder)
+					<<- (local_predefined_idents,		IC_Expression, PD_UV_Placeholder)
 					<<- (local_predefined_idents,				IC_Expression, PD_unify)
 					<<-	(local_predefined_idents,				IC_Expression, PD_coerce) /* MV */
 					<<- (local_predefined_idents,		IC_Module, PD_StdDynamic)

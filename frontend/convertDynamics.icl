@@ -13,7 +13,6 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 
 import type_io; 
 //import pp;
-//import RWSDebug;
 
 /*2.0
 from type_io_common import class toString (..),instance toString GlobalTCType;
@@ -493,7 +492,7 @@ where
 /* Sjaak ... */
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_type_code}) ci=:{ci_symb_ident}
 		#  (dyn_expr,      ci) 			= convertDynamics cinp bound_vars default_expr dyn_expr ci
-		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False [] [] ci
+		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False PD_UV_Placeholder [] [] ci
 		= (App {	app_symb		= ci_symb_ident,
 					app_args 		= [dyn_expr, dyn_type_code],
 					app_info_ptr	= nilPtr }, ci)
@@ -525,7 +524,6 @@ where
 	convertDynamics cinp bound_vars default_expr expression ci
 		= abort "unexpected value in convertDynamics: 'convertDynamics.Expression'"
 	
-//convertTypecode ::  !ConversionInput TypeCodeExpression !*ConversionInfo  -> (Expression,!*ConversionInfo)
 /*
 	replace all references in a type code expression which refer to an argument i.e. the argument contains a
 	type to their placeholders. Return is a list of (placeholder,argument) list. Each tuple is used later as
@@ -535,10 +533,10 @@ where
 */
 
 /* Sjaak ... */
-convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args binds placeholders_and_tc_args ci
-		# (let_binds,     ci) 	= createUniversalVariables uni_vars [] ci
+convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
+		# (let_binds,     ci) 	= createUniversalVariables uni_placeholder uni_vars [] ci
 		  (let_info_ptr,  ci)	= let_ptr (length let_binds) ci
-		  (e, type_code_expr, binds, placeholders_and_tc_args, ci)	= convertTypecode2 cinp type_code False [] [] ci
+		  (e, type_code_expr, binds, placeholders_and_tc_args, ci)	= convertTypecode2 cinp type_code False uni_placeholder [] [] ci
 		= (e, Let {	let_strict_binds	= [],
 					let_lazy_binds		= let_binds,
 					let_expr			= type_code_expr,
@@ -547,7 +545,7 @@ convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args binds pla
 /* ... Sjaak */
 
 // ci_placeholders_and_tc_args
-convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
 	#! cinp_st_args
 		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
 	| isEmpty cinp_st_args
@@ -562,7 +560,7 @@ convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args 
 		*/
 		= (True,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args,ci)
 
-convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
 	#! cinp_st_args
 		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
 	| isEmpty cinp_st_args
@@ -579,7 +577,7 @@ convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_TypeTerm var_info_ptr) replace_tc_
 
 //		= convertTypecode2 cinp t replace_tc_args binds placeholders_and_tc_args ci
 
-convertTypecode2 cinp t replace_tc_args binds placeholders_and_tc_args ci
+convertTypecode2 cinp t replace_tc_args uni_placeholder binds placeholders_and_tc_args ci
 	#! (e,binds,placeholders_and_tc_args,ci)
 		= convertTypecode cinp t replace_tc_args binds placeholders_and_tc_args ci
 	= (False,e,binds,placeholders_and_tc_args,ci)
@@ -792,7 +790,7 @@ where
 // MW0		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
 		create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 		create_variable var_name var_info_ptr ci
-			# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 2 ci
+			# (placeholder_symb, ci) = getSymbol PD_PV_Placeholder SK_Constructor 2 ci
 			  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 			  cyclic_fv = varToFreeVar cyclic_var 1	
 // MW0			= ({ bind_src = App {	app_symb = placeholder_symb,
@@ -891,7 +889,6 @@ where
 		-> ([LetBind], Expression, *ConversionInfo)
 	convert_dynamic_pattern cinp bound_vars this_default pattern_number opened_dynamic result_type last_default
 																			[{ dp_var, dp_type_patterns_vars, dp_type_code, dp_rhs } : patterns] ci=:{ci_module_id_symbol}
-														
 		# /***  The last case may not have a default  ***/
 
 		  ind_var = getIndirectionVar this_default
@@ -901,7 +898,7 @@ where
 		  /***  convert the elements of this pattern  ***/
 
 		  (a_ij_binds, ci)		= createTypePatternVariables dp_type_patterns_vars [] ci
-	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ [] [] ci //{ci & ci_module_id = No} // ci
+	 	  (generate_coerce,type_code,_,martijn, ci)	= convertTypecode2 cinp dp_type_code True /* should be changed to True for type dependent functions */  /* WAS: a_ij_binds*/ PD_UPV_Placeholder [] [] ci //{ci & ci_module_id = No} // ci
 	
 		// collect ...
 	 	# (is_last_dynamic_pattern,dp_rhs) 
@@ -1111,25 +1108,24 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 /**************************************************************************************************/
 
 // MW0 createVariables :: [VarInfoPtr] !(Env Expression FreeVar) !*ConversionInfo -> (!Env Expression FreeVar, !*ConversionInfo)
-createUniversalVariables :: [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
-createUniversalVariables var_info_ptrs binds ci
-	= createVariables2 True var_info_ptrs binds ci;
+createUniversalVariables :: !Int [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
+createUniversalVariables kind var_info_ptrs binds ci
+	| kind == PD_UPV_Placeholder || kind == PD_UV_Placeholder
+		= createVariables2 /*PD_UPV_Placeholder*/ kind var_info_ptrs binds ci;
 	
 createTypePatternVariables :: [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
 createTypePatternVariables var_info_ptrs binds ci
-	= createVariables2 False var_info_ptrs binds ci;
+	= createVariables2 PD_PV_Placeholder var_info_ptrs binds ci;
 	
-createVariables2 :: !Bool [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
-createVariables2 generate_universal_type_variables var_info_ptrs binds ci
+createVariables2 :: !Int [VarInfoPtr] ![LetBind] !*ConversionInfo -> (![LetBind], !*ConversionInfo)
+createVariables2 universal_type_variable_kind var_info_ptrs binds ci
 	= mapAppendSt (create_variable a_ij_var_name) var_info_ptrs binds ci
 where 
 	// MW0create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
 	create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (LetBind, !*ConversionInfo)
 	create_variable var_name var_info_ptr ci
 		# (placeholder_symb, ci) 
-			= case generate_universal_type_variables of
-				False	-> getSymbol PD_variablePlaceholder SK_Constructor 2 ci
-				True 	-> getSymbol PD_UvariablePlaceholder SK_Constructor 2 ci
+			= getSymbol universal_type_variable_kind SK_Constructor 2 ci
 		  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 		  cyclic_fv = varToFreeVar cyclic_var 1	
 	// MW0	= ({ bind_src = App {	app_symb = placeholder_symb,
