@@ -1038,6 +1038,7 @@ ScanEndOfChar n chars input
 	# (eof, c, input)		= ReadChar input
 	| eof					= (ErrorToken "End of file inside char denotation", input)
 	| '\'' == c				= (CharToken (revCharListToString (n + 1) [c:chars]), input)
+	| '\\' == c				= ScanBSChar n chars input ScanCharList
 							= ScanCharList (n+1) [c:chars] input
 //							= (ErrorToken ScanErrCharErr, input)
 
