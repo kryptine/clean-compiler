@@ -323,3 +323,9 @@ zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
 (writeList) file [] = file
 (writeList) file [x:xs]
 = file <<< x <<< nl writeList xs
+
+printlist :: (elem->String) String [elem] *File -> .File
+printlist showelem indent [] file
+= file
+printlist showelem indent [x:xs] file
+= printlist showelem indent xs (file <<< indent <<< showelem x <<< nl)

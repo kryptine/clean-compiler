@@ -97,9 +97,3 @@ printhistoryassociation showsym showvar indent vargraphs file
 
 myshowrgraph showsym showvar rgraph
 = hd (printgraphBy showsym showvar (rgraphgraph rgraph) [rgraphroot rgraph])
-
-printlist :: (elem->String) String [elem] *File -> .File
-printlist showelem indent [] file
-= file
-printlist showelem indent [x:xs] file
-= printlist showelem indent xs (file <<< indent <<< showelem x <<< nl)
