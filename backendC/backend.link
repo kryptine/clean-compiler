@@ -123,3 +123,4 @@
 /EXPORT: BECopyInts
 /EXPORT: BEDeclareDynamicTypeSymbol
 /EXPORT: BEDynamicTempTypeSymbol
+/EXPORT: BEInsertForeignExport
