@@ -113,6 +113,7 @@ mapAppendSt f [x : xs] tail s
 mapAppendSt f [] tail s
 	= (tail, s)
 
+/*
 mapSt :: !(.a -> (.st -> (.c,.st))) ![.a] !.st -> (![.c],!.st)
 mapSt f [x : xs] s
  	# (x, s) = f x s
@@ -120,6 +121,22 @@ mapSt f [x : xs] s
 	= ([x : xs], s)
 mapSt f [] s
  	= ([], s)
+*/
+//mapSt :: !(.a -> (.st -> (.c,.st))) ![.a] !.st -> (![.c],!.st)
+mapSt f l s :== mapSt l s
+where
+	mapSt [x : xs] s
+	 	# (x, s) = f x s
+		  mapSt_result = mapSt xs s
+		  (xs, _) = mapSt_result
+		#! s = second_of_2_tuple mapSt_result
+		= ([x : xs], s)
+	mapSt [] s
+	 	= ([], s)
+
+second_of_2_tuple t :== e2
+	where
+		(_,e2) = t
 
 app2St :: !(!.(.a -> .(.st -> (.c,.st))),!.(.e -> .(.st -> (.f,.st)))) !(.a,.e) !.st -> (!(.c,.f),!.st)
 app2St (f,g) (x,y) s
