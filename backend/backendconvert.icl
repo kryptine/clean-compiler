@@ -319,7 +319,7 @@ backEndConvertModules p s main_dcl_module_n var_heap be
 	= (bes_varHeap,bes_backEnd)
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int VarHeap *BackEndState -> *BackEndState
-backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common, icl_imported_objects,icl_used_module_numbers}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions} main_dcl_module_n varHeap backEnd
+backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions} main_dcl_module_n varHeap backEnd
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
 //		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"
@@ -392,7 +392,7 @@ backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl
 	#! backEnd
 		=	declareArrayInstances fe_arrayInstances main_dcl_module_n icl_functions (backEnd -*-> "declareArrayInstances")
 	#! backEnd
-		=	adjustArrayFunctions predefs fe_arrayInstances main_dcl_module_n icl_functions fe_dcls icl_used_module_numbers varHeap (backEnd -*-> "adjustArrayFunctions")
+		=	adjustArrayFunctions predefs fe_arrayInstances main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers varHeap (backEnd -*-> "adjustArrayFunctions")
 	#! (rules, backEnd)
 		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefs.[PD_DummyForStrictAliasFun].pds_ident varHeap (backEnd -*-> "convertRules")
 	#! backEnd
@@ -628,6 +628,7 @@ declareFunctionSymbols functions iclDclConversions functionIndices globalFunctio
 			where
 				functionName :: {#Char} Int {#Int} IndexRange -> {#Char}
 				functionName name functionIndex iclDclConversions {ir_from, ir_to}
+//				| trace_t ("|"+++toString functionIndex)
 					| functionIndex >= ir_to || functionIndex < ir_from
 						=	(name +++ ";" +++ toString iclDclConversions.[functionIndex])
 					// otherwise
@@ -646,6 +647,7 @@ foldStateWithIndexRangeA function frm to array
 
 declareArrayInstances :: IndexRange Int {#FunDef} -> BackEnder
 declareArrayInstances {ir_from, ir_to} main_dcl_module_n functions
+//	| trace_tn ("declareArrayInstances "+++toString ir_from+++" "+++toString ir_to)
 	=	foldStateWithIndexRangeA declareArrayInstance ir_from ir_to functions
 	where
 		declareArrayInstance :: Index FunDef -> BackEnder
@@ -674,10 +676,16 @@ declareFunType moduleIndex varHeap nrOfDclFunctions functionIndex {ft_symb, ft_t
 					(case vi of
 						VI_ExpandedType expandedType
 							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_symb.id_name functionIndex nrOfDclFunctions)
+//							->	beDeclareRuleType functionIndex moduleIndex (functionName moduleIndex ft_symb.id_name functionIndex nrOfDclFunctions)
 							o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
 						_
 							->	identity) be
 		where
+/*
+			functionName :: Int {#Char} Int Int -> {#Char}
+			functionName moduleIndex name functionIndex nrOfDclFunctions 
+				| trace_t (":"+++toString moduleIndex+++" "+++toString functionIndex)
+*/
 			functionName :: {#Char} Int Int -> {#Char}
 			functionName name functionIndex nrOfDclFunctions 
 				| functionIndex < nrOfDclFunctions
@@ -869,9 +877,10 @@ predefineSymbols {dcl_common} predefs
 	,	asai_varHeap	 	:: !VarHeap
 	}
 
-adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} ModuleNumberSet VarHeap -> BackEnder
-adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcls used_module_numbers varHeap
-	=	adjustStdArray arrayInfo predefs stdArray.dcl_common.com_instance_defs
+adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} {#ClassInstance} ModuleNumberSet VarHeap -> BackEnder
+adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcls icl_instances used_module_numbers varHeap
+	=	adjustStdArray arrayInfo predefs
+				(if (arrayModuleIndex == main_dcl_module_n) icl_instances stdArray.dcl_common.com_instance_defs)
 	o`	adjustIclArrayInstances arrayInstancesRange arrayMemberMapping functions
 	where
 		arrayModuleIndex
@@ -923,6 +932,7 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 		adjustStdArray :: AdjustStdArrayInfo PredefinedSymbols {#ClassInstance} -> BackEnder
 		adjustStdArray arrayInfo predefs instances
 			| arrayModuleIndex == NoIndex || not (in_module_number_set arrayModuleIndex used_module_numbers)
+//				|| arrayModuleIndex <> main_dcl_module_n
 				=	identity
 			// otherwise
 				=	foldStateA (adjustStdArrayInstance arrayClassIndex arrayInfo) instances
@@ -935,17 +945,20 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 						=	identity
 					where
 						adjustArrayClassInstance :: AdjustStdArrayInfo ClassInstance -> BackEnder
-						adjustArrayClassInstance arrayInfo {ins_members}
+						adjustArrayClassInstance arrayInfo {ins_members, ins_ident}
 							=	foldStateWithIndexA (adjustMember arrayInfo) ins_members
 						where
 							adjustMember :: AdjustStdArrayInfo Int DefinedSymbol -> BackEnder
 							adjustMember {asai_moduleIndex, asai_mapping, asai_funs, asai_varHeap} offset {ds_index}
-								= \be0 ->	let (ft_type,be) = read_from_var_heap asai_funs.[ds_index].ft_type_ptr varHeap be0 in
-									(case ft_type of
-										VI_ExpandedType _
-											->	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
-										_
-											->	identity) be
+								| asai_moduleIndex == main_dcl_module_n
+									=	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
+								// otherwise
+									= \be0 ->	let (ft_type,be) = read_from_var_heap asai_funs.[ds_index].ft_type_ptr varHeap be0 in
+										(case ft_type of
+											VI_ExpandedType _
+												->	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
+											_
+												->	identity) be
 
 		adjustIclArrayInstances :: IndexRange {#BEArrayFunKind} {#FunDef} -> BackEnder
 		adjustIclArrayInstances  {ir_from, ir_to} mapping instances
@@ -987,12 +1000,16 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 			(convertTypeAlt index main_dcl_module_n (type /* ->> ("convertRule", fun_symb.id_name, index, type) */))
 			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n varHeap)
 	where
-		cafness :: FunKind -> Int
-		cafness (FK_Function _)
+		cafness :: DefOrImpFunKind -> Int
+		cafness (FK_DefFunction _)
 			=	BEIsNotACaf
-		cafness FK_Macro
+		cafness (FK_ImpFunction _)
 			=	BEIsNotACaf
-		cafness FK_Caf
+		cafness FK_DefMacro
+			=	BEIsNotACaf
+		cafness FK_ImpMacro
+			=	BEIsNotACaf
+		cafness FK_ImpCaf
 			=	BEIsACaf
 		cafness funKind
 			=	BEIsNotACaf <<- ("backendconvert, cafness: unknown fun kind", funKind)
