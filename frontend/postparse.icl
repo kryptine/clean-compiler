@@ -1000,8 +1000,15 @@ scanModules [] parsed_modules cached_modules searchPaths files ca
 scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths files ca
 	| in_cache import_module cached_modules
 		= scanModules mods parsed_modules cached_modules searchPaths files ca
-	| try_to_find import_module parsed_modules
-		= scanModules mods parsed_modules cached_modules searchPaths files ca
+	# (found_module,mod_type) = try_to_find import_module parsed_modules
+	| found_module
+		= case mod_type of
+			MK_NoMainDcl
+				# ca = postParseError import_file_position ("main module \'"+++import_module.id_name+++"\' does not have a definition module") ca
+				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths files ca
+				-> (False,parsed_modules,files,ca)
+			_
+				-> scanModules mods parsed_modules cached_modules searchPaths files ca
 		# (succ, parsed_modules, files, ca)
 				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths files ca
 		  (mods_succ, parsed_modules, files, ca)
@@ -1015,16 +1022,17 @@ where
 			=True
 			= in_cache mod_id pmods
 
- 	try_to_find :: Ident [ScannedModule] -> Bool
+ 	try_to_find :: Ident [ScannedModule] -> (Bool,ModuleKind)
 	try_to_find mod_id []
-		= False
+		= (False,MK_None)
 	try_to_find mod_id [pmod : pmods]
 		| mod_id == pmod.mod_name
-			=True
+			= (True,pmod.mod_type)
 			= try_to_find mod_id pmods
 
-MakeEmptyModule name :==  { mod_name = name, mod_type = MK_None, mod_imports = [], mod_imported_objects = [],
-	mod_defs = {	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macros = { ir_from = 0, ir_to = 0 },
+MakeEmptyModule name mod_type
+	:== { mod_name = name, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs =
+				{	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macros = { ir_from = 0, ir_to = 0 },
 					def_members = [], def_funtypes = [], def_instances = [], /* AA */ def_generics = [] } }
 
 parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !*Files !*CollectAdmin
@@ -1039,7 +1047,7 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 	# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
 	| parse_ok
 		= scan_dcl_module mod parsed_modules searchPaths files ca
-		= (False, [MakeEmptyModule mod.mod_name : parsed_modules], files, ca)
+		= (False, [MakeEmptyModule mod.mod_name MK_None: parsed_modules], files, ca)
 where
 	scan_dcl_module :: ParsedModule [ScannedModule] !SearchPaths *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
 	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths files ca
@@ -1072,7 +1080,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
-	  		= scan_dcl_module mod_name mod_type files ca
+	  		= scan_main_dcl_module mod_name mod_type files ca
 	  (import_dcls_ok, parsed_modules, files, ca)
 	  		= scanModules imports parsed_modules cached_modules searchPaths files ca
 
@@ -1080,7 +1088,11 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 
 	  (n_functions_and_macros_in_dcl_modules,ca) =ca!ca_fun_count
 
-	  modules = reverse parsed_modules
+	  modules = case (reverse parsed_modules) of
+						  	[{mod_type=MK_NoMainDcl}:modules]
+						  		-> modules
+						  	modules
+						  		-> modules
 
 	  import_dcl_ok = import_dcl_ok && pea_dcl_ok;
 
@@ -1102,12 +1114,12 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 //	  (pre_def_mod, ca_u_predefs) = buildPredefinedModule ca_u_predefs
 	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, reverse ca_rev_fun_defs, optional_dcl_mod, /*pre_def_mod,*/ modules, dcl_module_n,n_functions_and_macros_in_dcl_modules,hash_table, err_file, ca_u_predefs, files)
 where
-	scan_dcl_module :: Ident ModuleKind *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
-	scan_dcl_module mod_name MK_Main files ca
+	scan_main_dcl_module :: Ident ModuleKind *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
+	scan_main_dcl_module mod_name MK_Main files ca
+		= (True, No,NoIndex,[MakeEmptyModule mod_name MK_NoMainDcl], cached_modules,files, ca)
+	scan_main_dcl_module mod_name MK_None files ca
 		= (True, No,NoIndex,[], cached_modules,files, ca)
-	scan_dcl_module mod_name MK_None files ca
-		= (True, No,NoIndex,[], cached_modules,files, ca)
-	scan_dcl_module mod_name kind files ca
+	scan_main_dcl_module mod_name kind files ca
 		# module_n_in_cache = in_cache 0 cached_modules;
 			with
 			in_cache module_n []
@@ -1141,7 +1153,7 @@ where
 	 = (pea_ok,Yes mod,ca)
 	collect_main_dcl_module No dcl_module_n ca
 		| dcl_module_n==NoIndex
-			 =	(True,Yes (MakeEmptyModule mod_name),ca)
+			 =	(True,Yes (MakeEmptyModule mod_name MK_None),ca)
 			 =	(True,No,ca)
 
 MakeNewImpOrDefFunction icl_module name arity body kind prio opt_type pos

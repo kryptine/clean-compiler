@@ -88,7 +88,7 @@ where toString {import_module} = toString import_module
 ::	ParsedModule	:== Module  [ParsedDefinition]
 ::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef) IndexRange)
 
-::	ModuleKind	= MK_Main | MK_Module | MK_System | MK_None
+::	ModuleKind	= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
 ::	RhsDefsOfType	= ConsList ![ParsedConstructor]
 					| SelectorList !Ident ![ATypeVar] ![ParsedSelector]
