@@ -5,6 +5,8 @@ import StdEnv, compare_constructor // ,RWSDebug
 import scanner, general, Heap, typeproperties, utilities
 
 PA_BUG on off :== on
+switch_import_syntax one_point_three two_point_zero :== one_point_three
+SwitchFusion fuse dont_fuse :== dont_fuse
 
 ::	Ident =
 	{ 	id_name		:: !String
@@ -41,7 +43,7 @@ where toString {import_module} = toString import_module
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
-				| STE_Instance
+				| STE_Instance !Ident // the class (for explicit imports (1.3 syntax only))
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
@@ -57,6 +59,7 @@ where toString {import_module} = toString import_module
 				| STE_DictCons !ConsDef
 				| STE_DictField !SelectorDef
 				| STE_Called ![Index] /* used during macro expansion to indicate that this function is called */
+				| STE_ExplImp !Bool !(Optional ImportDeclaration) !STE_Kind !Bool /* auxiliary used in module explicitimports. */
 
 ::	Global object =
 	{	glob_object	:: !object
@@ -267,6 +270,7 @@ cNameLocationDependent :== True
 						| ID_Type !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Record !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Instance !ImportedIdent !Ident !(![Type],![TypeContext])
+						| ID_OldSyntax ![Ident]
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False

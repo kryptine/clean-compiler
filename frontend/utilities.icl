@@ -205,6 +205,38 @@ iterateSt op st :== iterate_st op st
 				= iterate_st op st
 				= st
 
+mapFilterYesSt f l st
+	:== map_filter_yes_st l st
+  where
+	map_filter_yes_st [] st
+		= ([], st)
+	map_filter_yes_st [h:t] st
+		#! (opt_f_h , st) = f h st
+		   (t2, st) = map_filter_yes_st t st
+		   f_h_t2 = optCons opt_f_h t2
+		   st = st
+		= (f_h_t2, st)
+				
+				
+iMapFilterYesSt f fr to st 
+	:== i_map_filter_yes_st fr to st
+  where
+	i_map_filter_yes_st fr to st
+		| fr >= to
+			= ([], st)
+		#! (opt_f_fr, st) = f fr st
+		   (t, st) = i_map_filter_yes_st (inc fr) to st
+		   f_fr_t2 = optCons opt_f_fr t
+		   st = st
+		= (f_fr_t2, st)
+				
+optCons :: !(Optional .a) !u:[.a] -> v:[.a] ,[u <= v]
+optCons No l
+	= l
+optCons (Yes x) l
+	= [x:l]
+
+
 eqMerge :: ![a] ![a] -> [a] | Eq a
 eqMerge [a : x] y
 	| isMember a y

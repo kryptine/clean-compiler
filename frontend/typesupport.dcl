@@ -4,9 +4,6 @@ import checksupport, StdCompare
 
 from unitype import Coercions, CoercionTree, AttributePartition, CT_Empty
 
-// MW: this switch is used to en(dis)able the fusion algorithm
-SwitchFusion fuse dont_fuse :== dont_fuse
-
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
 // MW4 was:class (<::) infixl a :: !*File (!Format, !a) -> *File

@@ -18,11 +18,9 @@ cGlobalScope	:== 1
 cIsNotADclModule 	:== False
 cIsADclModule 		:== True
 
-// MW..
 cNeedStdArray	:== 1
 cNeedStdEnum	:== 2
 cNeedStdDynamics:== 4
-// ..MW
 
 ::	Heaps =
 	{	hp_var_heap			::!.VarHeap
@@ -56,7 +54,7 @@ where
 	toInt (STE_Field _)				= cSelectorDefs
 	toInt STE_Class					= cClassDefs
 	toInt STE_Member				= cMemberDefs
-	toInt STE_Instance				= cInstanceDefs
+	toInt (STE_Instance _)				= cInstanceDefs
 	toInt STE_DclFunction			= cFunctionDefs
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
 	toInt _							= NoIndex
@@ -84,7 +82,7 @@ where
 	,	dcls_explicit	::!{!ExplicitImport}
 	}
 
-:: ExplicitImport = ExplicitImport !Declaration !LineNr;
+:: ExplicitImport = ExplicitImport !Declaration !Position
 	
 ::	IclModule  =
 	{	icl_name			:: !Ident
@@ -252,12 +250,12 @@ retrieveAndRemoveImportsFromSymbolTable []  all_decls symbol_table
 
 retrieveAndRemoveImportsOfModuleFromSymbolTable2 :: !{!.Declaration} !{!.Declaration} ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsOfModuleFromSymbolTable2 imports locals_for_import all_decls symbol_table
-	# (all_decls, symbol_table) = retrieve_declared_symbols_in_array 0 imports all_decls symbol_table
-	= retrieve_declared_symbols_in_array 0 locals_for_import all_decls symbol_table
+	# (all_decls, symbol_table) = retrieve_declared_symbols_in_array ((size imports)-1) imports all_decls symbol_table
+	= retrieve_declared_symbols_in_array ((size locals_for_import)-1) locals_for_import all_decls symbol_table
 
 retrieveAndRemoveImportsOfModuleFromSymbolTable :: !{!.Declaration} ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsOfModuleFromSymbolTable imports locals all_decls symbol_table
-	# (all_decls, symbol_table) = retrieve_declared_symbols_in_array 0 imports all_decls symbol_table
+	# (all_decls, symbol_table) = retrieve_declared_symbols_in_array ((size imports)-1) imports all_decls symbol_table
 	= retrieve_declared_symbols locals all_decls symbol_table
 where
 	retrieve_declared_symbols :: ![Declaration] ![Declaration] !*SymbolTable -> (![Declaration], !*SymbolTable)
@@ -292,13 +290,13 @@ where
 
 retrieve_declared_symbols_in_array :: !Int !{!Declaration} ![Declaration] !*SymbolTable -> (![Declaration], !*SymbolTable)
 retrieve_declared_symbols_in_array symbol_index symbols decls symbol_table
-	| symbol_index<size symbols
+	| symbol_index>=0
 		#! (declaration,symbols) = symbols![symbol_index]
 		# {dcl_ident=ident=:{id_info},dcl_kind}=declaration
 		#! entry = sreadPtr id_info symbol_table
 		# {ste_kind,ste_def_level} = entry
 		| ste_kind == STE_Empty || ste_def_level > cModuleScope
-			= retrieve_declared_symbols_in_array (symbol_index+1) symbols decls symbol_table
+			= retrieve_declared_symbols_in_array (symbol_index-1) symbols decls symbol_table
 			# symbol_table = symbol_table <:= (id_info, entry.ste_previous)
 			= case ste_kind of
 				STE_Field selector_id
@@ -307,29 +305,29 @@ retrieve_declared_symbols_in_array symbol_index symbols decls symbol_table
 							_ -> False
 						#! (declaration,symbols) = symbols![symbol_index]
 						#! dcl_index = symbols.[symbol_index].dcl_index
-						-> retrieve_declared_symbols_in_array (symbol_index+1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
+						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
 						#! (declaration,symbols) = symbols![symbol_index]
 						#! dcl_index = declaration.dcl_index
 						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols_in_array (symbol_index+1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
+						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
 				STE_Imported (STE_Field selector_id) def_mod
 					| case dcl_kind of
 							STE_Imported (STE_Field f) d -> d==def_mod && f==selector_id
 							_ -> False
 						#! (declaration,symbols) = symbols![symbol_index]
 						#! dcl_index = symbols.[symbol_index].dcl_index
-						-> retrieve_declared_symbols_in_array (symbol_index+1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
+						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
 						#! (declaration,symbols) = symbols![symbol_index]
 						#! dcl_index = declaration.dcl_index
 						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols_in_array (symbol_index+1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
+						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
 				_
 					| same_STE_Kind ste_kind dcl_kind
 						#! (declaration,symbols) = symbols![symbol_index]
-						-> retrieve_declared_symbols_in_array (symbol_index+1) symbols [declaration : decls ] symbol_table					
+						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] symbol_table					
 						#! (declaration,symbols) = symbols![symbol_index]
 						#! declaration = { declaration & dcl_kind = ste_kind }
-						-> retrieve_declared_symbols_in_array (symbol_index+1) symbols [declaration : decls ] symbol_table
+						-> retrieve_declared_symbols_in_array (symbol_index-1) symbols [declaration : decls ] symbol_table
 		= (decls, symbol_table)
 
 same_STE_Kind (STE_Imported s1 i1) (STE_Imported s2 i2) = i1==i2 && same_STE_Kind s1 s2
@@ -338,7 +336,7 @@ same_STE_Kind (STE_FunctionOrMacro []) (STE_FunctionOrMacro []) = True
 same_STE_Kind STE_Type STE_Type = True
 same_STE_Kind STE_Constructor STE_Constructor = True
 same_STE_Kind (STE_Field f1) (STE_Field f2) = f1==f2
-same_STE_Kind STE_Instance STE_Instance = True
+same_STE_Kind (STE_Instance _) (STE_Instance _) = True
 same_STE_Kind STE_Member STE_Member = True
 same_STE_Kind STE_Class STE_Class = True
 same_STE_Kind _ _ = False
@@ -631,6 +629,14 @@ newFreeVariable new_var []
 	= (True, [new_var])
 
 
+local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]
+local_declaration_for_import decl=:{dcl_kind=STE_FunctionOrMacro _} module_n
+	= decl
+local_declaration_for_import decl=:{dcl_kind=STE_Imported _ _} module_n
+	= abort "local_declaration_for_import"
+local_declaration_for_import decl=:{dcl_kind} module_n
+	= {decl & dcl_kind = STE_Imported dcl_kind module_n}
+
 	
 class toIdent a :: !a -> Ident
 
@@ -728,7 +734,7 @@ where
 		STE_Member
 			= file <<< "STE_Member"
 	(<<<) file
-		STE_Instance
+		(STE_Instance _)
 			= file <<< "STE_Instance"
 	(<<<) file
 		(STE_Variable _) 

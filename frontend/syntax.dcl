@@ -6,6 +6,11 @@ import scanner, general, typeproperties, Heap
 
 PA_BUG on off :== on
 
+switch_import_syntax one_point_three two_point_zero :== one_point_three
+	/* when finally removing this switch also remove the argument of STE_Instance and ID_OldSyntax */
+
+SwitchFusion fuse dont_fuse :== dont_fuse
+
 ::	Ident =
 	{ 	id_name		:: !String
 	,	id_info 	:: !SymbolPtr
@@ -37,7 +42,7 @@ instance toString Ident
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
-				| STE_Instance
+				| STE_Instance !Ident // argument: the class (used in explicitimports (1.3 syntax only))
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
@@ -55,6 +60,15 @@ instance toString Ident
 				| STE_DictCons !ConsDef
 				| STE_DictField !SelectorDef
 				| STE_Called ![Index] /* used during macro expansion to indicate that this function is called */
+				| STE_ExplImp !Bool !(Optional ImportDeclaration) !STE_Kind !Bool /* auxiliary used in module explicitimports. */
+					/*	1st arg: initialized with False and set to True when the searched symbol has been found to indicate.
+						2nd arg: Yes: the ImportDeclaration with which it was intended to import the symbol. 
+								 No: for symbols within a bracket (fields, constructors, members)
+						3rd arg: for error messages: the expected namespace of the intended imported symbol
+						4th arg: at first the idents for _all_ fields, constructors & members are added to the symbol table. In
+								 case of a selective import like "... import :: R {f1}" this bit is used to remove all
+								 fields different from "f1" from the symbol table again.
+					*/
 				
 ::	Global object =
 	{	glob_object	:: !object
@@ -277,6 +291,7 @@ instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
 						| ID_Type !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Record !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Instance !ImportedIdent !Ident !(![Type],![TypeContext])
+						| ID_OldSyntax ![Ident]
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False

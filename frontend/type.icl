@@ -1986,7 +1986,7 @@ where
 	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
 		= foldSt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
 
-	collect_imported_instance common_defs {dcl_ident, dcl_kind = STE_Imported STE_Instance mod_index, dcl_index } state
+	collect_imported_instance common_defs {dcl_ident, dcl_kind = STE_Imported (STE_Instance _) mod_index, dcl_index } state
 		= update_instances_of_class common_defs mod_index dcl_index state
 	collect_imported_instance common_defs _ state
 		= state

@@ -3,9 +3,6 @@ implementation module typesupport
 import StdEnv, StdCompare
 import syntax, parse, check, unitype, utilities, checktypes, RWSDebug
 
-// MW: this switch is used to en(dis)able the fusion algorithm
-SwitchFusion fuse dont_fuse :== dont_fuse
-
 ::	Store	:== Int
 
 ::	AttrCoercion =

@@ -75,7 +75,7 @@ cConversionTableSize	:== 8
 	,	dcls_explicit	::!{!ExplicitImport}
 	}
 
-:: ExplicitImport = ExplicitImport !Declaration !LineNr;
+:: ExplicitImport = ExplicitImport !Declaration !Position
 
 ::	IclModule  =
 	{	icl_name				:: !Ident
@@ -167,3 +167,5 @@ removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap 
 			-> (!u:{# FunDef}, !.Heap SymbolTableEntry)
 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
+
+local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]

@@ -856,6 +856,24 @@ instance want ImportDeclaration
 where
 	want pState
 		# (token, pState) = nextToken GeneralContext pState
+// MW5..
+		= (switch_import_syntax want_1_3_import_declaration want_2_0_import_declaration) token pState
+
+want_1_3_import_declaration token pState
+	= case token of
+			IdentToken name
+				#	(fun_id, pState)		= stringToIdent name IC_Expression pState
+					(type_id, pState)		= stringToIdent name IC_Type pState
+					(class_id, pState)		= stringToIdent name IC_Class pState
+				->	(ID_OldSyntax [fun_id, type_id, class_id], pState)
+			token
+				#	(fun_id, pState)		= stringToIdent "dummy" IC_Expression pState
+				->	( ID_Function { ii_ident = fun_id, ii_extended = False }
+					, parseError "from import" (Yes token) "imported item" pState
+					)
+
+want_2_0_import_declaration token pState
+// ..MW5
 		= case token of
 			DoubleColonToken
 				# (name, pState)				= wantUpperCaseName "import type" pState
