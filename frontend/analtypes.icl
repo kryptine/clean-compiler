@@ -208,6 +208,18 @@ where
 			  {uki_kind_heap, uki_error} = unifyKinds tk KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
 			  (ldep2, tks, is_non_coercible, conds_as) = check_type_list modules form_tvs types (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error })
 			= (min ldep1 ldep2, [tk : tks], is_non_coercible || (type_props bitand cIsNonCoercible <> 0), conds_as)
+	analTypes has_root_attr modules form_tvs (TFA vars type) (conds, as=:{as_heaps,as_kind_heap})
+		# (th_vars, as_kind_heap) = new_local_kind_variables vars (as_heaps.th_vars, as_kind_heap)
+		= analTypes has_root_attr modules form_tvs type (conds, { as & as_heaps = { as_heaps & th_vars = th_vars}, as_kind_heap = as_kind_heap})
+	where
+		new_local_kind_variables :: [ATypeVar] !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
+		new_local_kind_variables td_args (type_var_heap, as_kind_heap)
+			= foldSt new_kind td_args (type_var_heap, as_kind_heap)
+		where
+			new_kind :: !ATypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
+			new_kind {atv_variable={tv_info_ptr},atv_attribute} (type_var_heap, kind_heap)
+				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+				= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
 	analTypes has_root_attr modules form_tvs type conds_as
 		= (cMAXINT, KI_Const, cIsHyperStrict, conds_as)
 	
@@ -228,11 +240,11 @@ where
 	check_types_of_cons :: ![AType] !Bool !Index  !Level ![TypeVar] !TypeAttribute ![AttrInequality] !Conditions !*TypeSymbols !*TypeInfo !*CheckState
 		-> *(![AType], ![[ATypeVar]], ![AttrInequality], !TypeProperties, !Conditions, !Int, !*TypeSymbols, !*TypeInfo, !*CheckState)
 */
-	new_local_kind_variables :: .[ATypeVar] *(*Heap TypeVarInfo,*Heap KindInfo) -> (!Bool,!.Heap TypeVarInfo,!.Heap KindInfo);
+	new_local_kind_variables :: [ATypeVar] !(!*TypeVarHeap,!*KindHeap) -> (!Bool,!*TypeVarHeap,!*KindHeap)
 	new_local_kind_variables td_args (type_var_heap, as_kind_heap)
 		= foldSt new_kind td_args (True, type_var_heap, as_kind_heap)
 	where
-		new_kind :: ATypeVar *(.Bool,*Heap TypeVarInfo,*Heap KindInfo) -> (!Bool,!.Heap TypeVarInfo,!.Heap KindInfo);
+		new_kind :: !ATypeVar !(!Bool,!*TypeVarHeap,!*KindHeap) -> (!Bool,!*TypeVarHeap,!*KindHeap)
 		new_kind {atv_variable={tv_info_ptr},atv_attribute} (coercible, type_var_heap, kind_heap)
 			# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 			= (coercible && is_not_a_variable atv_attribute, type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr),

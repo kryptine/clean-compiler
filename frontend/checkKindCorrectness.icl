@@ -72,7 +72,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 	check_class com_member_defs class_def=:{class_name, class_args, class_members}
 			(class_defs_accu, th_vars, td_infos, error_admin)
 		# th_vars
-				= foldSt init_type_var class_args th_vars
+				= init_type_vars class_args th_vars
 		  (th_vars, td_infos, error_admin)
 		  		= foldlArraySt (\{ds_index} state
 									-> check_member_without_context class_args 
@@ -87,7 +87,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		# error_admin
 				= setErrorAdmin (newPosition me_symb me_pos) error_admin
 		  th_vars
-				= foldSt init_type_var st_vars th_vars
+				= init_type_vars st_vars th_vars
 		  th_vars
 		  		= fold2St copy_TVI class_args me_class_vars th_vars
 		  (th_vars, td_infos, error_admin)
@@ -121,7 +121,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		  error_admin
 		  		= setErrorAdmin (newPosition ins_ident ins_pos) error_admin
 		  th_vars
-		  		= foldSt init_type_var ins_type.it_vars th_vars
+		  		= init_type_vars ins_type.it_vars th_vars
 		  (th_vars, td_infos, error_admin)
 		  		= unsafeFold3St possibly_check_type expected_kinds [1..] 
 		  				ins_type.it_types (th_vars, td_infos, error_admin)
@@ -223,7 +223,7 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		# error_admin
 				= setErrorAdmin (newPosition fun_symb fun_pos) error_admin
 		  th_vars
-				= foldSt init_type_var st_vars th_vars
+				= init_type_vars st_vars th_vars
 		  (th_vars, td_infos, error_admin)
 		  		= unsafeFold2St (check_atype KindConst) 
 		  				[0..] [st_result:st_args] (th_vars, td_infos, error_admin)
@@ -291,6 +291,11 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 		# error_admin
 		  		= check_equality_of_kinds arg_nr expected_kind KindConst error_admin
 		= (th_vars, td_infos, error_admin)
+// Sjaak ... 170801
+	check_type expected_kind arg_nr (TFA vars type) (th_vars, td_infos, error_admin)
+		# th_vars = init_type_vars [ atv_variable \\ {atv_variable} <- vars ] th_vars
+		= check_type expected_kind arg_nr type (th_vars, td_infos, error_admin)
+// ... Sjaak 170801
 	
 	check_context common_defs {tc_class, tc_types} 
 			(bv_uninitialized_mods, th_vars, td_infos, error_admin)
@@ -303,8 +308,11 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 	  where
 		descending i = [i:descending (i-1)]
 		  
-	init_type_var {tv_info_ptr} th_vars
-		= writePtr tv_info_ptr TVI_Empty th_vars
+	init_type_vars vars tv_heap
+		= foldSt init_type_var vars tv_heap
+	where
+		init_type_var {tv_info_ptr} tv_heap
+			= tv_heap <:= (tv_info_ptr, TVI_Empty)
 		
 	unify_var_kinds expected_kind tv=:{tv_name, tv_info_ptr} th_vars error_admin
 		# (tvi, th_vars)

@@ -299,20 +299,20 @@ signClassOfType (arg_type --> res_type) sign use_top_sign group_nr ci scs
 	  (res_class, _, scs) = signClassOfType res_type.at_type PositiveSign use_top_sign group_nr ci scs
 	= (sign *+ (arg_class + res_class), BottomSignClass, scs)
 
+signClassOfType (TFA vars type) sign use_top_sign group_nr ci scs
+	= signClassOfType type sign use_top_sign group_nr ci scs
+
 signClassOfType type _ _ _ _ scs
 	= (BottomSignClass, BottomSignClass, scs)
 
 propClassification :: !Index !Index ![PropClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification, !*TypeVarHeap, !*TypeDefInfos)
 propClassification type_index module_index hio_props defs type_var_heap td_infos
-// MW3..
-	| type_index>=size td_infos.[module_index]
-		// must be a dictionary => doesn't propagate
+	| type_index >= size td_infos.[module_index]
 		= (0, type_var_heap, td_infos)
-// ..MW3
-	# {td_args, td_name} = defs.[module_index].com_type_defs.[type_index]
-	  (td_info, td_infos) = td_infos![module_index].[type_index]
-	= determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
+		# {td_args, td_name} = defs.[module_index].com_type_defs.[type_index]
+		  (td_info, td_infos) = td_infos![module_index].[type_index]
+		= determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
 
 determinePropClassOfTypeDef :: !Int !Int ![ATypeVar] !TypeDefInfo ![PropClassification] !{# CommonDefs} !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification,!*TypeVarHeap, !*TypeDefInfos)
@@ -541,6 +541,9 @@ where
 			= prop_class_of_type_list types cv_prop_class (inc type_index) group_nr ci cumm_class pcs
 	prop_class_of_type_list [] _ _ _ _ cumm_class pcs
 		= (cumm_class, pcs)
+
+propClassOfType (TFA vars type) group_nr ci pcs
+	= propClassOfType type group_nr ci pcs
 
 propClassOfType _ _ _ pcs
 	= (NoPropClass, NoPropClass, pcs)
