@@ -2495,7 +2495,7 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 									break;
 							}
 						
-						if (n_node_id_refs!=0)
+						if (n_node_id_refs==0)
 							return 1;
 					}
 				}
