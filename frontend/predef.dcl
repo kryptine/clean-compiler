@@ -214,13 +214,40 @@ PD_CGenTypeVar				:== 230
 PD_CGenTypeArrow			:== 231
 PD_CGenTypeApp				:== 232
 
-
 PD_GenericBimap				:== 233
 PD_bimapId					:== 234
 
 PD_TypeGenericDict 			:== 235
 
-PD_NrOfPredefSymbols		:== 236
+PD_FromS					:== 236
+PD_FromTS					:== 237
+PD_FromSTS					:== 238
+PD_FromU					:== 239
+PD_FromUTS					:== 240
+PD_FromO					:== 241
+
+PD_FromThenS				:== 242
+PD_FromThenTS				:== 243
+PD_FromThenSTS				:== 244
+PD_FromThenU				:== 245
+PD_FromThenUTS				:== 246
+PD_FromThenO				:== 247
+
+PD_FromToS					:== 248
+PD_FromToTS					:== 249
+PD_FromToSTS				:== 250
+PD_FromToU					:== 251
+PD_FromToUTS				:== 252
+PD_FromToO					:== 253
+
+PD_FromThenToS				:== 254
+PD_FromThenToTS				:== 255
+PD_FromThenToSTS			:== 256
+PD_FromThenToU				:== 257
+PD_FromThenToUTS			:== 258
+PD_FromThenToO				:== 259
+
+PD_NrOfPredefSymbols		:== 260
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

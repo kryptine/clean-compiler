@@ -182,7 +182,37 @@ predefined_idents
 					[PD_abort] = i "abort",
 					[PD_undef] = i "undef",
 					
-					[PD_Start] = i "Start"
+					[PD_Start] = i "Start",
+
+
+					[PD_FromS]= i "_from_s",
+					[PD_FromTS]= i "_from_ts",
+					[PD_FromSTS]= i "_from_sts",
+					[PD_FromU]= i "_from_u",
+					[PD_FromUTS]= i "_from_uts",
+					[PD_FromO]= i "_from_o",
+
+					[PD_FromThenS]= i "_from_then_s",
+					[PD_FromThenTS]= i "_from_then_ts",
+					[PD_FromThenSTS]= i "_from_then_sts",
+					[PD_FromThenU]= i "_from_then_u",
+					[PD_FromThenUTS]= i "_from_then_uts",
+					[PD_FromThenO]= i "_from_then_o",
+
+					[PD_FromToS]= i "_from_to_s",
+					[PD_FromToTS]= i "_from_to_ts",
+					[PD_FromToSTS]= i "_from_to_sts",
+					[PD_FromToU]= i "_from_to_u",
+					[PD_FromToUTS]= i "_from_to_uts",
+					[PD_FromToO]= i "_from_to_o",
+
+					[PD_FromThenToS]= i "_from_then_to_s",
+					[PD_FromThenToTS]= i "_from_then_to_ts",
+					[PD_FromThenToSTS]= i "_from_then_to_sts",
+					[PD_FromThenToU]= i "_from_then_to_u",
+					[PD_FromThenToUTS]= i "_from_then_to_uts",
+					[PD_FromThenToO]= i "_from_then_to_o"
+
 		}
 	=: idents
 	where
@@ -379,6 +409,34 @@ where
 					<<- (local_predefined_idents,				IC_Expression, 	PD_undef)					
 					
 					<<- (local_predefined_idents,				IC_Expression, PD_Start)
+
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromSTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromU)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromUTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromO)
+
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenSTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenU)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenUTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenO)
+
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToSTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToU)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToUTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToO)
+
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToSTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToU)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToUTS)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToO)
 
 		# bimap_type = local_predefined_idents.[PD_TypeBimap]
 		# hash_table = hash_table 
