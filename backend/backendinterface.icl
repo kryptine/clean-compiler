@@ -97,7 +97,7 @@ printFunctionTypes all attr info components functions attrHeap file backEnd
 
 printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap, *File, *BackEnd) -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionType all attr info (functionIndex, {fun_symb,fun_type=Yes type}) (attrHeap, file, backEnd)
-	| not all && functionIndex > size info.dtic_dclModules.[info.dtci_iclModuleIndex].dcl_functions
+	| not all && functionIndex >= size info.dtic_dclModules.[info.dtci_iclModuleIndex].dcl_functions
 		=	(attrHeap, file, backEnd)
 	# (strictnessAdded, type, backEnd)
 		=	addStrictnessFromBackEnd functionIndex fun_symb.id_name backEnd type
