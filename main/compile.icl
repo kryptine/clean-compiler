@@ -214,7 +214,9 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 	| not closed
 		=	abort ("couldn't close out file \"" +++ options.outPath +++ "\"\n")
 	# var_heap=heaps.hp_var_heap
-	# (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,error, files)
+	  hp_type_heaps=heaps.hp_type_heaps
+	  attrHeap=hp_type_heaps.th_attrs
+	# (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap,error, files)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
 				# dcl_modules=syntaxTree.fe_dcls
@@ -231,9 +233,9 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 				  					-> error <<< "Error: couldn't write ported versions of module "
 				  							 <<< options.moduleName <<< '\n')
 				  			error
-				# (success,var_heap,error, files)
-					= backEndInterface outputPath (map appendRedirection commandLineArgs) predef_symbols syntaxTree main_dcl_module_n var_heap error files
-				-> (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,error, files)
+				# (success, var_heap, attrHeap, error, files)
+					= backEndInterface outputPath (map appendRedirection commandLineArgs) predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
+				-> (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
 				with
 					appendRedirection arg
 						= case arg of
@@ -244,12 +246,12 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 							arg
 								->	arg
 			No
-				-> (False,{},{},0,var_heap,error, files)
+				-> (False,{},{},0,var_heap,attrHeap,error, files)
 		with
 			outputPath
 	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
 				=	baseName options.pathName
-	# heaps = {heaps & hp_var_heap=var_heap}
+	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}
 	# (closed, files)
 		=	fclose error files
 	| not closed

@@ -308,7 +308,7 @@ static Bool PrintAttribute (AttributeKind attr, Bool print_colon)
 	else if (DoShowAttributes)
 	{	Bool used_implicitly;
 		unsigned attr_nr = RetrieveRefCountInfo (attr - FirstUniVarNumber, & used_implicitly);
-		
+
 		if (attr_nr == 0)
 		{	if (! used_implicitly)
 			{	FPutC ('.', StdListTypes);
@@ -559,6 +559,7 @@ static void PrintAttributeEquations (UniVarEquations attr_equas)
 
 		for (next = attr_equas -> uve_offered ; ; )
 		{	unsigned	off_attr_nr = RetrieveRefCountInfo (next -> akl_elem - FirstUniVarNumber, & used_implicitly);
+
 			PrintAttributeVariable (off_attr_nr);
 			if ((next = next -> akl_next))
 				FPutC (' ', StdListTypes);
@@ -666,3 +667,18 @@ void PrintType (SymbDef tdef, TypeAlts type)
 	
 
 } /* PrintType */
+
+/******
+
+	Routines for printing types
+	
+******/
+
+
+void InitARC_Info (void)
+{
+	CurrentARC_Info = CompAllocType (struct attr_ref_count_info);
+	CurrentARC_Info -> arci_next = NULL;
+
+} /* InitARC_Info */
+

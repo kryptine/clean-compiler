@@ -19,8 +19,8 @@ checkVersion VersionObservedIsTooOld errorFile
 			=	fwrites "[Backend] the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
-backEndInterface :: !{#Char} [{#Char}] !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*File !*Files -> (!Bool,!*VarHeap, !*File, !*Files)
-backEndInterface outputFileName commandLineArgs predef_symbols syntaxTree=:{fe_icl,fe_components} main_dcl_module_n var_heap errorFile files
+backEndInterface :: !{#Char} [{#Char}] !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*Files -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*Files)
+backEndInterface outputFileName commandLineArgs predef_symbols syntaxTree=:{fe_icl,fe_components} main_dcl_module_n var_heap attrHeap errorFile files
 	# (observedCurrent, observedOldestDefinition, observedOldestImplementation)
 		=	BEGetVersion
 	  observedVersion =
@@ -42,7 +42,7 @@ backEndInterface outputFileName commandLineArgs predef_symbols syntaxTree=:{fe_i
 	# (compatible, errorFile)
 		=	checkVersion (versionCompare expectedVersion observedVersion) errorFile
 	| not compatible
-		=	(False, var_heap,errorFile, files)
+		=	(False, var_heap, attrHeap, errorFile, files)
 	# varHeap
 		=	backEndPreprocess predef_symbols.[PD_DummyForStrictAliasFun].pds_ident functionIndices fe_icl var_heap
 		with
@@ -54,10 +54,10 @@ backEndInterface outputFileName commandLineArgs predef_symbols syntaxTree=:{fe_i
 		=	BEInit (length commandLineArgs) backEndFiles
 	# backEnd
 		=	foldState BEArg commandLineArgs backEnd
-	# (var_heap,backEnd)
-		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n varHeap backEnd
+	# (var_heap, attrHeap, backEnd)
+		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n varHeap attrHeap backEnd
 	# (success, backEnd)
 		=	BEGenerateCode outputFileName backEnd
 	# backEndFiles
 		=	BEFree backEnd backEndFiles
-	=	(backEndFiles == 0 && success, var_heap,errorFile, files)
+	=	(backEndFiles == 0 && success, var_heap, attrHeap, errorFile, files)

@@ -18,6 +18,8 @@
 # include "comsupport.h" 	/* CurrentModule */
 # include "buildtree.h"		/* TupleSymbol, ApplySymbol */
 
+extern void InitARC_Info (void); /* from typeconv.h */
+
 # include "backendsupport.h"
 # define Clean(ignore)
 
@@ -1155,6 +1157,7 @@ BENormalTypeNode (BESymbolP symbol, BETypeArgP args)
 	return (node);
 } /* BENormalTypeNode */
 
+
 BETypeNodeP
 BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode)
 {
@@ -1163,6 +1166,63 @@ BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode)
 
 	return (typeNode);
 } /* BEAttributeTypeNode */
+
+BEAttributeKindList
+BEAttributeKind (BEAttribution attributeKind)
+{
+	AttributeKindList	new;
+
+	new	= ConvertAllocType (struct attr_kind_list);
+
+	new->akl_elem	= attributeKind;
+	new->akl_next	= NULL;
+
+	return (new);
+} /* BEAttributeKind */
+
+BEAttributeKindList
+BENoAttributeKinds (void)
+{
+	return (NULL);
+} /* BENoAttributeKinds */
+
+BEAttributeKindList
+BEAttributeKinds (BEAttributeKindList elem, BEAttributeKindList list)
+{
+	Assert (elem->akl_next == NULL);
+	elem->akl_next	= list;
+
+	return (elem);
+} /* BEAttributeKindList */
+
+BEUniVarEquations
+BEUniVarEquation (BEAttribution demanded, BEAttributeKindList offered)
+{
+	UniVarEquations	new;
+
+	new	= ConvertAllocType (struct uni_var_equats);
+
+	new->uve_demanded	= demanded;
+	new->uve_offered	= offered;
+	new->uve_next		= NULL;
+
+	return (new);
+} /* BEUniVarEquation */
+
+BEUniVarEquations
+BENoUniVarEquations (void)
+{
+	return (NULL);
+} /* BENoUniVarEquations */
+
+BEUniVarEquations
+BEUniVarEquationsList (BEUniVarEquations elem, BEUniVarEquations list)
+{
+	Assert (elem->uve_next == NULL);
+	elem->uve_next	= list;
+
+	return (elem);
+} /* BEUniVarEquations */
 
 BETypeNodeP
 BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)
@@ -1193,7 +1253,7 @@ BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs)
 } /* BETypeArgs */
 
 BETypeAltP
-BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs)
+BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquations)
 {
 	TypeAlt	*alt;
 
@@ -1203,7 +1263,7 @@ BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs)
 	alt->type_alt_rhs	= rhs;
 
 	alt->type_alt_type_context		= NULL;	/* used in PrintType */
-	alt->type_alt_attr_equations	= NULL; /* used in PrintType */
+	alt->type_alt_attr_equations	= attributeEquations; /* used in PrintType */
 
 	return (alt);
 } /* BETypeAlt */
@@ -2380,6 +2440,7 @@ BETypeVar (CleanString name)
 	ident->ident_tv	= typeVar;
 
 	typeVar->tv_ident		= ident;
+	typeVar->tv_mark		= 0;
 	typeVar->tv_argument_nr	= 0; /* ??? */
 
 	return (typeVar);
@@ -3200,6 +3261,7 @@ BEInit (int argc)
 
 	ClearOpenDefinitionModules ();
 
+	InitARC_Info ();
 	InitStatesGen ();
 	InitCoding ();
 	InitInstructions ();

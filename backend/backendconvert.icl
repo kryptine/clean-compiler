@@ -37,7 +37,7 @@ BackEndBody x :== BackendBody x
 :: BackEnder :== *BackEndState -> *BackEndState
 
 //
-:: *BackEndState = {bes_backEnd :: !BackEnd, bes_varHeap :: !*VarHeap}
+:: *BackEndState = {bes_backEnd :: !BackEnd, bes_varHeap :: !*VarHeap, bes_attrHeap :: !*AttrVarHeap, bes_attr_number :: !Int}
 
 appBackEnd f beState
 	:== {beState & bes_backEnd = bes_backEnd}
@@ -57,6 +57,13 @@ accVarHeap f beState
 	where
 		(result, varHeap) =	f beState.bes_varHeap
 
+accAttrHeap f beState
+	:== (result, {beState & bes_attrHeap = attrHeap})
+	where
+		(result, attrHeap) =	f beState.bes_attrHeap
+
+
+read_from_var_heap :: VarInfoPtr BackEndState -> (VarInfo, BackEndState)
 read_from_var_heap ptr beState
 	= (result, {beState & bes_varHeap = varHeap})
 where
@@ -64,6 +71,14 @@ where
 
 write_to_var_heap ptr v beState
 	= {beState & bes_varHeap = writePtr ptr v beState.bes_varHeap}
+
+read_from_attr_heap ptr beState
+	= (result, {beState & bes_attrHeap = attrHeap})
+where
+		(result, attrHeap) =	readPtr ptr beState.bes_attrHeap
+
+write_to_attr_heap ptr v beState
+	= {beState & bes_attrHeap = writePtr ptr v beState.bes_attrHeap}
 /*
 read_from_var_heap ptr heap be
 	= (sreadPtr ptr heap,be)
@@ -219,7 +234,7 @@ beNoRuleAlts
 beRuleAlts
 	:==	beFunction2 BERuleAlts
 beTypeAlt
-	:==	beFunction2 BETypeAlt
+	:==	beFunction3 BETypeAlt
 beRule index isCaf
 	:==	beFunction2 (BERule index isCaf)
 beNoRules
@@ -258,8 +273,8 @@ beField fieldIndex moduleIndex
 	:==	beFunction1 (BEField fieldIndex moduleIndex)
 beAnnotateTypeNode annotation
 	:==	beFunction1 (BEAnnotateTypeNode annotation)
-beAttributeTypeNode attribution
-	:==	beFunction1 (BEAttributeTypeNode attribution)
+beAttributeTypeNode
+	:==	beFunction2 BEAttributeTypeNode
 beDeclareRuleType functionIndex moduleIndex name
 	:==	beApFunction0 (BEDeclareRuleType functionIndex moduleIndex name)
 beDefineRuleType functionIndex moduleIndex
@@ -324,6 +339,19 @@ beNodeIds
 	:==	beFunction2 BENodeIds
 beNodeIdListElem
 	:==	beFunction1 BENodeIdListElem
+beAttributeKind
+	:== beFunction1 BEAttributeKind
+beNoAttributeKinds
+	:== beFunction0 BENoAttributeKinds
+beAttributeKinds
+	:== beFunction2 BEAttributeKinds
+beUniVarEquation
+	:== beFunction2 BEUniVarEquation
+beNoUniVarEquations
+	:== beFunction0 BENoUniVarEquations
+beUniVarEquationsList
+	:== beFunction2 BEUniVarEquationsList
+
 // temporary hack
 beDynamicTempTypeSymbol
 	:== beFunction0 BEDynamicTempTypeSymbol
@@ -332,17 +360,20 @@ notYetImplementedExpr :: Expression
 notYetImplementedExpr
 	=	(BasicExpr (BVS "\"error in compiler (something was not implemented by lazy Ronny)\"") BT_Int)
 
-backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree !Int *VarHeap *BackEnd -> (!*VarHeap,!*BackEnd)
+backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree !Int *VarHeap *AttrVarHeap *BackEnd -> (!*VarHeap, *AttrVarHeap, !*BackEnd)
 /*
 backEndConvertModules p s main_dcl_module_n v be
 	= (newHeap,backEndConvertModulesH p s v be)
 */
-backEndConvertModules p s main_dcl_module_n var_heap be
-	# {bes_varHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n {bes_varHeap=var_heap,bes_backEnd=be}
-	= (bes_varHeap,bes_backEnd)
+backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
+	# {bes_varHeap,bes_attrHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n {bes_varHeap=var_heap,bes_attrHeap=attr_var_heap,bes_backEnd=be, bes_attr_number = 0}
+	= (bes_varHeap,bes_attrHeap,bes_backEnd)
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
-backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions} main_dcl_module_n backEnd
+backEndConvertModulesH predefs {fe_icl = 
+	fe_icl =: {icl_name, icl_functions, icl_common,icl_imported_objects,icl_used_module_numbers},
+	fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions,fe_globalFunctions}
+	main_dcl_module_n backEnd
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
 //		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"
@@ -437,8 +468,6 @@ backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl
 	#! backEnd = removeExpandedTypesFromDclModules fe_dcls icl_used_module_numbers backEnd
 	=	(backEnd -*-> "backend done")
 	where
-		componentCount
-			=	length functionIndices
 		functionIndices
 			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: fe_components & componentIndex <- [0..]]
 
@@ -484,8 +513,8 @@ declareDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_module_ki
 /*
 defineCurrentDclModule :: IclModule DclModule {#Int} -> BackEnder
 defineCurrentDclModule {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions
-	=	declareCurrentDclModuleTypes icl_common.com_type_defs typeConversions varHeap
-	o`	defineCurrentDclModuleTypes dcl_common.com_cons_defs dcl_common.com_selector_defs dcl_common.com_type_defs typeConversions varHeap
+	=	declareCurrentDclModuleTypes icl_common.com_type_defs typeConversions
+	o`	defineCurrentDclModuleTypes dcl_common.com_cons_defs dcl_common.com_selector_defs dcl_common.com_type_defs typeConversions
 */
 defineDclModule :: ModuleIndex DclModule -> BackEnder
 defineDclModule moduleIndex {dcl_name, dcl_common, dcl_functions,dcl_instances}
@@ -564,7 +593,7 @@ instance declareVars [a] | declareVars a where
 		=	foldState (flip declareVars dvInput) list
 
 instance declareVars (Ptr VarInfo) where
-	declareVars varInfoPtr _ 
+	declareVars varInfoPtr _
 		=	declareVariable BELhsNodeId varInfoPtr "_var???"	// +++ name
 
 instance declareVars FreeVar where
@@ -704,7 +733,7 @@ foldStateWithIndexRangeA function frm to array
 declareArrayInstances :: IndexRange Int {#FunDef} -> BackEnder
 declareArrayInstances {ir_from, ir_to} main_dcl_module_n functions
 //	| trace_tn ("declareArrayInstances "+++toString ir_from+++" "+++toString ir_to)
-	=	foldStateWithIndexRangeA declareArrayInstance ir_from ir_to functions
+	=	foldStateWithIndexRangeA (declareArrayInstance) ir_from ir_to functions
 	where
 		declareArrayInstance :: Index FunDef -> BackEnder
 		declareArrayInstance index {fun_symb={id_name}, fun_type=Yes type}
@@ -1073,11 +1102,61 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 		positionToLineNumber _
 			=	-1
 
+beautifyAttributes :: SymbolType -> BEMonad SymbolType
+beautifyAttributes st
+	=	return st
+//	=	accAttrHeap (beautifulizeAttributes st)
+
 convertTypeAlt :: Int ModuleIndex SymbolType -> BEMonad BETypeAltP
-convertTypeAlt functionIndex moduleIndex symbol=:{st_result}
-	=	beTypeAlt
-			(beNormalTypeNode (beFunctionSymbol functionIndex moduleIndex) (convertSymbolTypeArgs symbol))
+convertTypeAlt functionIndex moduleIndex symbolType
+	=	beautifyAttributes (symbolType) ==> \symbolType=:{st_result, st_attr_env, st_attr_vars} 
+	->	resetAttrNumbers
+	o`	(beTypeAlt
+			(beNormalTypeNode (beFunctionSymbol functionIndex moduleIndex) (convertSymbolTypeArgs symbolType))
 			(convertAnnotTypeNode st_result)
+			(convertAttributeInequalities (group st_attr_env)))
+	where
+		group :: [AttrInequality] -> [InequalityGroup]
+		group []
+			=	[]
+		group [{ai_demanded, ai_offered} : t]
+			=	grouped ai_demanded [ai_offered] t
+
+		// copied grouped from typesupport.icl, apparently inequalities are already sorted by
+		// offered attributes
+		// grouped takes care that inequalities like [a<=c, b<=c] are printed like [a b <= c]
+		grouped :: AttributeVar [AttributeVar] [AttrInequality] -> [InequalityGroup]
+		grouped group_var accu []
+			= [{ ig_offered = accu, ig_demanded = group_var}]
+		grouped group_var accu [{ai_offered, ai_demanded}:ineqs]
+			| group_var==ai_demanded
+				= grouped group_var [ai_offered:accu] ineqs
+			=[{ ig_offered = accu, ig_demanded = group_var}: grouped ai_demanded [ai_offered] ineqs]
+		
+:: InequalityGroup =
+	{	ig_offered	:: ![AttributeVar] 
+	,	ig_demanded:: !AttributeVar
+	}
+
+resetAttrNumbers :: *BackEndState -> *BackEndState
+resetAttrNumbers state
+	=	{state & bes_attr_number = 0}
+
+convertAttributeInequalities :: [InequalityGroup] -> BEMonad BEUniVarEquations
+convertAttributeInequalities inequalities
+	=	sfoldr (beUniVarEquationsList o convertAttributeInequality) beNoUniVarEquations inequalities
+
+convertAttributeInequality :: InequalityGroup -> BEMonad BEUniVarEquations
+convertAttributeInequality {ig_demanded, ig_offered}
+	=	beUniVarEquation (convertAttributeVar ig_demanded) (convertAttributeKinds ig_offered)
+
+convertAttributeKinds :: [AttributeVar] -> BEMonad BEAttributeKindList
+convertAttributeKinds vars
+	=	sfoldr (beAttributeKinds o convertAttributeKind) beNoAttributeKinds vars
+
+convertAttributeKind :: AttributeVar -> BEMonad BEAttributeKindList
+convertAttributeKind attributeVar
+	=	beAttributeKind (convertAttributeVar attributeVar)
 
 convertSymbolTypeArgs :: SymbolType -> BEMonad BETypeArgP
 convertSymbolTypeArgs {st_args}
@@ -1108,11 +1187,40 @@ convertAnnotation AN_None
 convertAnnotation AN_Strict
 	=	BEStrictAnnot
 
-convertAttribution :: TypeAttribute -> BEAttribution
+
+nextAttributeNumber :: *BackEndState -> (BEAttribution, *BackEndState)
+nextAttributeNumber state=:{bes_attr_number}
+	=	(bes_attr_number + BEFirstUniVarNumber, {state & bes_attr_number = bes_attr_number+1})
+
+convertAttributeVar :: AttributeVar *BackEndState -> (BEAttribution, *BackEndState)
+convertAttributeVar {av_info_ptr, av_name} state=:{bes_attr_number}
+	# (attrInfo, state)
+		=	read_from_attr_heap av_info_ptr state
+	=	case attrInfo of
+			AVI_SequenceNumber number
+				->	(number, state)
+			_
+				# (attrNumber, state)
+					=	nextAttributeNumber state
+				->	(attrNumber, write_to_attr_heap av_info_ptr (AVI_SequenceNumber attrNumber) state)
+
+convertAttribution :: TypeAttribute -> BEMonad BEAttribution
 convertAttribution TA_Unique
-	=	BEUniqueAttr
-convertAttribution _ // +++ uni vars, etc.
-	=	BENoUniAttr
+	=	return BEUniqueAttr
+convertAttribution TA_None
+	=	return BENoUniAttr
+convertAttribution TA_Multi
+	=	return BENoUniAttr
+convertAttribution TA_Anonymous
+	=	nextAttributeNumber
+convertAttribution (TA_Var attrVar)
+	=	convertAttributeVar attrVar
+convertAttribution (TA_RootVar attrVar)
+	=	convertAttributeVar attrVar
+convertAttribution TA_MultiOfPropagatingConsVar
+	=	return BENoUniAttr
+convertAttribution attr
+	=	abort "backendconvert, convertAttribution: unknown TypeAttribute" <<- attr
 
 convertAnnotTypeNode :: AType -> BEMonad BETypeNodeP
 convertAnnotTypeNode {at_type, at_annotation, at_attribute}
@@ -1139,14 +1247,14 @@ convertTypeNode (TB BT_Dynamic)
 convertTypeNode (TB basicType)
 	=	beNormalTypeNode (beBasicSymbol (convertBasicTypeKind basicType)) beNoTypeArgs	
 convertTypeNode (TA typeSymbolIdent typeArgs)
-	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs)
+	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
 convertTypeNode (TV {tv_name})
 	=	beVarTypeNode tv_name.id_name
 convertTypeNode (TempQV n)
 	=	beVarTypeNode ("_tqv" +++ toString n)
 convertTypeNode (TempV n)
 	=	beVarTypeNode ("_tv" +++ toString n)
-convertTypeNode (a --> b)
+convertTypeNode (a --> b) 
 	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a, b])
 convertTypeNode (a :@: b)
 	=	beNormalTypeNode (beBasicSymbol BEApplySymb) (convertTypeArgs [{at_attribute=TA_Multi, at_annotation=AN_None, at_type = consVariableToType a} : b])
@@ -1292,8 +1400,8 @@ convertCodeParameter {bind_src, bind_dst}
 		=	beCodeParameter bind_src (convertVar (varInfoPtr bind_dst))
 /*
 convertTransformedLhs :: Int [FreeVar] -> BEMonad BENodeP
-convertTransformedLhs functionIndex freeVars varHeap
-	=	beNormalNode (beFunctionSymbol functionIndex cIclModIndex) (convertLhsArgs freeVars varHeap)
+convertTransformedLhs functionIndex freeVars
+	=	beNormalNode (beFunctionSymbol functionIndex cIclModIndex) (convertLhsArgs freeVars)
 */
 
 convertPatterns :: [FunctionPattern] -> BEMonad BEArgP
@@ -1341,7 +1449,7 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Y
 			(convertRhsNodeDefs aliasDummyId then main_dcl_module_n)
 			(convertRhsStrictNodeIds then)
 			(convertRootExpr aliasDummyId then main_dcl_module_n)
-			(convertRhsNodeDefs aliasDummyId else main_dcl_module_n)
+			(convertRhsNodeDefs aliasDummyId else main_dcl_module_n )
 			(convertRhsStrictNodeIds else)
 			(convertRootExpr aliasDummyId else main_dcl_module_n)
 convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=No}) main_dcl_module_n
@@ -1577,7 +1685,7 @@ where
 	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else})
 		=	beIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
 
-	convertExpr expr
+	convertExpr  expr
 		=	undef <<- ("backendconvert, convertExpr: unknown expression" , expr)
 
 	convertArgs :: [Expression] -> BEMonad BEArgP

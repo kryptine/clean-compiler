@@ -857,7 +857,7 @@ cNotVarNumber :== -1
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 					| AVI_Used
 					| AVI_Count !Int /* auxiliary used in module typesupport */
-					
+					| AVI_SequenceNumber !Int // RWS
 
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo

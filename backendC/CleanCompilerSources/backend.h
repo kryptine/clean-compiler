@@ -1,15 +1,15 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02000209
+# define	kBEVersionCurrent				0x02000210
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // upward compatible (for example when a function is added)
-# define	kBEVersionOldestDefinition		0x02000204
+# define	kBEVersionOldestDefinition		0x02000210
 
 // change this to the same value as kBEVersionCurrent if the new release is not
 // downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02000209
+# define	kBEVersionOldestImplementation	0x02000210
 
 
 # define	kBEDebug	1
@@ -88,7 +88,13 @@ Clean (:: BENodeIdListP :== CPtr)
 
 typedef struct node_id_ref_count_list *BENodeIdRefCountListP;
 Clean (:: BENodeIdRefCountListP :== CPtr)
- 
+
+typedef struct uni_var_equats *BEUniVarEquations;
+Clean (:: BEUniVarEquations :== CPtr)
+
+typedef struct attr_kind_list *BEAttributeKindList;
+Clean (:: BEAttributeKindList :== CPtr)
+
 /* constants */
 /*
 # define	kIclModuleIndex			0
@@ -238,14 +244,32 @@ Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, B
 BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
 Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
 
+BEAttributeKindList BEAttributeKind (BEAttribution attributeKind);
+Clean (BEAttributeKind :: BEAttribution BackEnd -> (BEAttributeKindList, BackEnd))
+
+BEAttributeKindList BENoAttributeKinds (void);
+Clean (BENoAttributeKinds :: BackEnd -> (BEAttributeKindList, BackEnd))
+
+BEAttributeKindList BEAttributeKinds (BEAttributeKindList elem, BEAttributeKindList list);
+Clean (BEAttributeKinds :: BEAttributeKindList BEAttributeKindList BackEnd -> (BEAttributeKindList, BackEnd))
+
+BEUniVarEquations BEUniVarEquation (BEAttribution demanded, BEAttributeKindList offered);
+Clean (BEUniVarEquation ::BEAttribution BEAttributeKindList BackEnd -> (BEUniVarEquations, BackEnd))
+
+BEUniVarEquations BENoUniVarEquations (void);
+Clean (BENoUniVarEquations :: BackEnd -> (BEUniVarEquations, BackEnd))
+
+BEUniVarEquations BEUniVarEquationsList (BEUniVarEquations elem, BEUniVarEquations list);
+Clean (BEUniVarEquationsList ::BEUniVarEquations BEUniVarEquations BackEnd -> (BEUniVarEquations, BackEnd))
+
 BETypeArgP BENoTypeArgs (void);
 Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))
 
 BETypeArgP BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs);
 Clean (BETypeArgs :: BETypeNodeP BETypeArgP BackEnd -> (BETypeArgP, BackEnd))
 
-BETypeAltP BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs);
-Clean (BETypeAlt :: BETypeNodeP BETypeNodeP BackEnd -> (BETypeAltP, BackEnd))
+BETypeAltP BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquations);
+Clean (BETypeAlt :: BETypeNodeP BETypeNodeP BEUniVarEquations BackEnd -> (BETypeAltP, BackEnd))
 
 BENodeP BENormalNode (BESymbolP symbol, BEArgP args);
 Clean (BENormalNode :: BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))

@@ -29,6 +29,8 @@ from StdString import String;
 :: BEStringListP :== CPtr;
 :: BENodeIdListP :== CPtr;
 :: BENodeIdRefCountListP :== CPtr;
+:: BEUniVarEquations :== CPtr;
+:: BEAttributeKindList :== CPtr;
 :: BEAnnotation :== Int;
 :: BEAttribution :== Int;
 :: BESymbKind :== Int;
@@ -180,6 +182,42 @@ BEAttributeTypeNode a0 a1 a2 = code {
 };
 // BETypeNodeP BEAttributeTypeNode (BEAttribution attribution,BETypeNodeP typeNode);
 
+BEAttributeKind :: !BEAttribution !BackEnd -> (!BEAttributeKindList,!BackEnd);
+BEAttributeKind a0 a1 = code {
+	ccall BEAttributeKind "I:I:I"
+};
+// BEAttributeKindList BEAttributeKind (BEAttribution attributeKind);
+
+BENoAttributeKinds :: !BackEnd -> (!BEAttributeKindList,!BackEnd);
+BENoAttributeKinds a0 = code {
+	ccall BENoAttributeKinds ":I:I"
+};
+// BEAttributeKindList BENoAttributeKinds ();
+
+BEAttributeKinds :: !BEAttributeKindList !BEAttributeKindList !BackEnd -> (!BEAttributeKindList,!BackEnd);
+BEAttributeKinds a0 a1 a2 = code {
+	ccall BEAttributeKinds "II:I:I"
+};
+// BEAttributeKindList BEAttributeKinds (BEAttributeKindList elem,BEAttributeKindList list);
+
+BEUniVarEquation :: !BEAttribution !BEAttributeKindList !BackEnd -> (!BEUniVarEquations,!BackEnd);
+BEUniVarEquation a0 a1 a2 = code {
+	ccall BEUniVarEquation "II:I:I"
+};
+// BEUniVarEquations BEUniVarEquation (BEAttribution demanded,BEAttributeKindList offered);
+
+BENoUniVarEquations :: !BackEnd -> (!BEUniVarEquations,!BackEnd);
+BENoUniVarEquations a0 = code {
+	ccall BENoUniVarEquations ":I:I"
+};
+// BEUniVarEquations BENoUniVarEquations ();
+
+BEUniVarEquationsList :: !BEUniVarEquations !BEUniVarEquations !BackEnd -> (!BEUniVarEquations,!BackEnd);
+BEUniVarEquationsList a0 a1 a2 = code {
+	ccall BEUniVarEquationsList "II:I:I"
+};
+// BEUniVarEquations BEUniVarEquationsList (BEUniVarEquations elem,BEUniVarEquations list);
+
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 BENoTypeArgs a0 = code {
 	ccall BENoTypeArgs ":I:I"
@@ -192,11 +230,11 @@ BETypeArgs a0 a1 a2 = code {
 };
 // BETypeArgP BETypeArgs (BETypeNodeP node,BETypeArgP nextArgs);
 
-BETypeAlt :: !BETypeNodeP !BETypeNodeP !BackEnd -> (!BETypeAltP,!BackEnd);
-BETypeAlt a0 a1 a2 = code {
-	ccall BETypeAlt "II:I:I"
+BETypeAlt :: !BETypeNodeP !BETypeNodeP !BEUniVarEquations !BackEnd -> (!BETypeAltP,!BackEnd);
+BETypeAlt a0 a1 a2 a3 = code {
+	ccall BETypeAlt "III:I:I"
 };
-// BETypeAltP BETypeAlt (BETypeNodeP lhs,BETypeNodeP rhs);
+// BETypeAltP BETypeAlt (BETypeNodeP lhs,BETypeNodeP rhs,BEUniVarEquations attributeEquations);
 
 BENormalNode :: !BESymbolP !BEArgP !BackEnd -> (!BENodeP,!BackEnd);
 BENormalNode a0 a1 a2 = code {
@@ -671,9 +709,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 };
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02000209;
-kBEVersionOldestDefinition:==0x02000204;
-kBEVersionOldestImplementation:==0x02000209;
+kBEVersionCurrent:==0x02000210;
+kBEVersionOldestDefinition:==0x02000210;
+kBEVersionOldestImplementation:==0x02000210;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;

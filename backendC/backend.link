@@ -22,6 +22,12 @@
 /EXPORT: BENormalTypeNode
 /EXPORT: BEAnnotateTypeNode
 /EXPORT: BEAttributeTypeNode
+/EXPORT: BEAttributeKind
+/EXPORT: BENoAttributeKinds
+/EXPORT: BEAttributeKinds
+/EXPORT: BEUniVarEquation
+/EXPORT: BENoUniVarEquations
+/EXPORT: BEUniVarEquationsList
 /EXPORT: BENoTypeArgs
 /EXPORT: BETypeArgs
 /EXPORT: BETypeAlt
