@@ -1333,9 +1333,14 @@ where
 
 instance copy AlgebraicPattern
 where
-	copy pattern=:{ap_vars,ap_expr} cp_info=:{cp_var_heap}
-		# (ap_expr, cp_info) = copy ap_expr { cp_info & cp_var_heap = foldSt (\{fv_info_ptr} -> writePtr fv_info_ptr VI_LocalVar) ap_vars cp_var_heap}
+	copy pattern=:{ap_vars,ap_expr} cp_info=:{cp_local_vars, cp_var_heap}
+		# (cp_local_vars, cp_var_heap) = foldSt bind_pattern_var ap_vars (cp_local_vars, cp_var_heap)
+		# (ap_expr, cp_info) = copy ap_expr { cp_info & cp_local_vars = cp_local_vars, cp_var_heap = cp_var_heap}
 		= ({ pattern & ap_expr = ap_expr }, cp_info) 
+	where
+
+		bind_pattern_var pattern_var=:{fv_info_ptr} (local_vars, var_heap)
+			= ([pattern_var : local_vars], var_heap <:= (fv_info_ptr, VI_LocalVar))
 
 instance copy BasicPattern
 where
