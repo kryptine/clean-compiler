@@ -340,8 +340,10 @@ STRUCT (node_id,NodeId){
 /* Masks for nid_mark2 */
 
 #define NID_SELECTION_NODE_ID				1
-#define NID_RECORD_USED_BY_UPDATE			2
-#define NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES 4
+#if BOXED_RECORDS
+# define NID_RECORD_USED_BY_UPDATE			2
+# define NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES 4
+#endif
 #define NID_FIELD_NAME_MASK					32			/* typechecker */
 
 #define NID_COMPONENT_DETERMINED_MASK		256				/* optimise_lambda */

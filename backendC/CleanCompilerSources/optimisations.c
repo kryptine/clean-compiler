@@ -2638,9 +2638,9 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 				node_id=arg->arg_node->node_node_id;
 				if ((node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && node_id->nid_refcount==-2)
 					++node_id->nid_number;
-
+# if BOXED_RECORDS
 				node_id->nid_mark2 |= NID_RECORD_USED_BY_UPDATE;
-
+# endif
 				arg=arg->arg_next;
 			}
 # if BOXED_RECORDS
@@ -2915,9 +2915,9 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 				node_id=arg->arg_node->node_node_id;
 				if ((node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && node_id->nid_refcount==-2)
 					++node_id->nid_number;
-
+# if BOXED_RECORDS
 				node_id->nid_mark2 |= NID_RECORD_USED_BY_UPDATE;
-
+# endif
 				arg=arg->arg_next;
 			}
 # if BOXED_RECORDS

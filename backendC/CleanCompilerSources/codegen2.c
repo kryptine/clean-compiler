@@ -3499,7 +3499,7 @@ int is_unique_record_update (NodeIdP record_node_id,NodeP record_node)
 #endif
 
 	if ((record_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0 &&
-#if 1
+#if BOXED_RECORDS
 		(
 			((record_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE 
 			&& record_node_id->nid_refcount==-2)
@@ -3516,7 +3516,7 @@ int is_unique_record_update (NodeIdP record_node_id,NodeP record_node)
 		return 1;
 	}
 
-# if 1
+#if BOXED_RECORDS
 #  if 0
 	printf ("%d %d %d %d\n",record_node_id->nid_state.state_type==SimpleState,record_node_id->nid_mark2,record_node_id->nid_mark,record_node_id->nid_refcount);
 #  endif
