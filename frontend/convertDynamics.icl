@@ -10,6 +10,9 @@ import syntax, transform, utilities, convertcases
 	,	ci_new_functions 	:: ![FunctionInfoPtr]
 	,	ci_fun_heap			:: !*FunctionHeap
 	,	ci_next_fun_nr		:: !Index
+	
+	//	data needed to generate coercions
+	,	ci_placeholders_and_tc_args		:: [(!BoundVar,Ptr VarInfo)]
 	}
 
 ::	ConversionInput =
@@ -37,7 +40,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs groups fu
 	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_fun_heap, ci_new_functions}))
 			= convert_groups 0 groups global_type_instances (fun_defs, {	
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
-							ci_new_functions = [], ci_new_variables = [], ci_fun_heap = newHeap, ci_next_fun_nr = nr_of_funs })
+							ci_new_functions = [], ci_new_variables = [], ci_fun_heap = newHeap, ci_next_fun_nr = nr_of_funs, ci_placeholders_and_tc_args = [] })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, ci_var_heap)
 			= addNewFunctionsToGroups common_defs ci_fun_heap ci_new_functions groups imported_types [] type_heaps ci_var_heap
 	= (groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }, ci_predef_symb, imported_types, imported_conses, ci_var_heap, type_heaps, ci_expr_heap)
@@ -183,7 +186,8 @@ where
 		# (twoTuple_symb, ci) 	= getSymbol (GetTupleConsIndex 2) SK_Constructor 2 ci
 		  (let_binds,     ci) 	= createVariables dyn_uni_vars [] ci
 		  (dyn_expr,      ci) 	= convertDynamics cinp bound_vars default_expr dyn_expr ci
-		  (_,dyn_type_code, ci) = convertTypecode cinp dyn_type_code ci
+		  (dyn_type_code,_,_,ci) = convertTypecode cinp dyn_type_code False [] [] ci
+//		  (_,dyn_type_code, ci) = convertTypecode cinp dyn_type_code ci
 		= case let_binds of
 			[]	-> (App {	app_symb		= twoTuple_symb,
 							app_args 		= [dyn_expr, dyn_type_code],
@@ -202,102 +206,93 @@ where
 	convertDynamics cinp bound_vars default_expr expression ci
 		= abort "unexpected value in convertDynamics: 'convertDynamics.Expression'"
 
-// FreeVar; fv_info_ptr
+
+
 //convertTypecode ::  !ConversionInput TypeCodeExpression !*ConversionInfo  -> (Expression,!*ConversionInfo)
-convertTypecode cinp TCE_Empty  ci 
-	= (True,EE, ci)
-convertTypecode cinp=:{cinp_st_args} (TCE_Var var_info_ptr) ci
-	#! cinp_st_args
-		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
-	= (isEmpty cinp_st_args,Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
-// MV ..
-convertTypecode cinp=:{cinp_st_args} (TCE_TypeTerm var_info_ptr) ci
-	#! cinp_st_args
-		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
-	= (isEmpty cinp_st_args,Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
-// .. MV
-
-convertTypecode cinp (TCE_Constructor index typecode_exprs) ci
-	# (typecons_symb,  ci) 			= getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
-	  constructor					= get_constructor cinp.cinp_glob_type_inst index
-	  (unify,typecode_exprs, ci)	= convertTypecodes cinp typecode_exprs ci
-	= (	unify,
-		App {app_symb		= typecons_symb,
-			app_args 		= [constructor , typecode_exprs],
-			app_info_ptr	= nilPtr}, ci)
-convertTypecode cinp=:{cinp_st_args} (TCE_Selector selections var_info_ptr) ci
-	#! cinp_st_args
-		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
-	= (isEmpty cinp_st_args,Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ci)
-
-//convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
-convertTypecodes _ [] ci
-	# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
-	= ( True,
-		App {	app_symb		= nil_symb,
-				app_args 		= [],
-				app_info_ptr	= nilPtr}, ci)
-convertTypecodes cinp [typecode_expr : typecode_exprs] ci
-	# (cons_symb, ci) = getSymbol PD_ConsSymbol SK_Constructor 2 ci
-	  (unify1,expr,      ci) = convertTypecode  cinp typecode_expr  ci
-	  (unify2,exprs,     ci) = convertTypecodes cinp typecode_exprs ci
-	= (unify1 && unify2,
-		App {	app_symb		= cons_symb,
-				app_args 		= [expr , exprs],
-				app_info_ptr	= nilPtr}, ci)
-
-
 /*
-// MV ..
-//mv_convertTypecode ::  !ConversionInput TypeCodeExpression !*ConversionInfo  -> (Expression,!*ConversionInfo)
-mv_convertTypecode cinp TCE_Empty ci
-	= (EE, ci)
-mv_convertTypecode cinp (TCE_Var var_info_ptr) ci
-	= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
-mv_convertTypecode cinp (TCE_TypeTerm var_info_ptr) ci
-	= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ci)
+	replace all references in a type code expression which refer to an argument i.e. the argument contains a
+	type to their placeholders. Return is a list of (placeholder,argument) list. Each tuple is used later as
+	arguments to the coerce relation. This should be optional
+	
 
-mv_convertTypecode cinp (TCE_Constructor index typecode_exprs) ci
-	# (typecons_symb,  ci) 	= mv_getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
-	  constructor			= mv_get_constructor cinp.cinp_glob_type_inst index
-	  (typecode_exprs, ci)	= mv_convertTypecodes cinp typecode_exprs ci
+*/
+// ci_placeholders_and_tc_args
+convertTypecode cinp TCE_Empty replace_tc_args binds placeholders_and_tc_args ci 
+	= (EE,binds,placeholders_and_tc_args,ci)
+
+convertTypecode cinp=:{cinp_st_args} (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci=:{ci_placeholders_and_tc_args}
+	| not replace_tc_args
+		= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args, ci)
+
+	// check if tc_arg has already been replaced by a placeholder
+	#! ci_placeholder_and_tc_arg
+		= filter (\(_,tc_args_ptr) -> tc_args_ptr == var_info_ptr) ci_placeholders_and_tc_args
+	| not (isEmpty ci_placeholder_and_tc_arg)
+		= (Var {var_name = v_tc_placeholder_ident, var_info_ptr = (fst (hd ci_placeholder_and_tc_arg)).var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args, ci)
+
+	
+	#! cinp_st_args
+		= filter (\{fv_info_ptr} -> fv_info_ptr == var_info_ptr) cinp_st_args
+	| isEmpty cinp_st_args
+		// type pattern variable is *not* an argument i.e. nothing to replace
+		= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},binds,placeholders_and_tc_args, ci)
+		
+		// type pattern variable is an argument i.e. contains a type code expression
+		#! (placeholder_var, ci) 
+			= newVariable v_tc_placeholder VI_Empty ci
+		#! placeholder_fv
+			= varToFreeVar placeholder_var 1 
+		#! (place_holder_and_tc_arg,ci)
+			= create_variable v_tc_placeholder_ident placeholder_var.var_info_ptr ci
+			
+		#! ci
+			= { ci & 
+				ci_placeholders_and_tc_args = [(placeholder_var /*.var_info_ptr*/,var_info_ptr):ci_placeholders_and_tc_args]
+			,	ci_new_variables			= [placeholder_fv:ci.ci_new_variables]	}
+			
+		= (Var placeholder_var,[place_holder_and_tc_arg:binds],[(placeholder_var.var_info_ptr,var_info_ptr):placeholders_and_tc_args], ci)
+
+// 1st component of tuple is true iff:
+// 1. The type is a TCE_Var or TCE_TypeTerm
+// 2. It is also a argument of the function
+// Thus a tc argument variable.
+// This forms a special case: instead of an unify, a coerce can be generated
+convertTypecode cinp (TCE_TypeTerm var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+	/*
+	** TCE_Var and TCE_TypeTerm are not equivalent. A TCE_TypeTerm is used for an argument which contains
+	** a type representation. A TCE_Var is an existential quantified type variable. In previous phases no
+	** clear distinction is made. It should be possible to generate the proper type code expression for
+	** these two but it would involve changing a lot of small things. 
+	*/
+	= convertTypecode cinp (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+
+convertTypecode cinp (TCE_Constructor index typecode_exprs) replace_tc_args binds placeholders_and_tc_args ci
+	# (typecons_symb,  ci) 									= getSymbol PD_TypeConsSymbol SK_Constructor 2 ci
+	  constructor											= get_constructor cinp.cinp_glob_type_inst index
+	  (typecode_exprs,binds,placeholders_and_tc_args,ci)	= convertTypecodes cinp typecode_exprs replace_tc_args binds placeholders_and_tc_args ci
 	= (App {app_symb		= typecons_symb,
 			app_args 		= [constructor , typecode_exprs],
-			app_info_ptr	= nilPtr}, ci)
+			app_info_ptr	= nilPtr},binds,placeholders_and_tc_args,ci)
 
-mv_convertTypecodes _ [] ci
-	= abort "dummy"
-*/	
-/*
-mv_convertTypecode cinp (TCE_Selector selections var_info_ptr) ci
-	= (Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ci)
+convertTypecode cinp (TCE_Selector selections var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+	#! (var,binds,placeholders_and_tc_args,ci)		
+		= convertTypecode cinp (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
+	= (Selection No var selections,binds,placeholders_and_tc_args,ci)
 
-mv_convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
-mv_convertTypecodes _ [] ci
+//convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
+convertTypecodes _ [] replace_tc_args binds placeholders_and_tc_args ci
 	# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
 	= (App {	app_symb		= nil_symb,
 				app_args 		= [],
-				app_info_ptr	= nilPtr}, ci)
-mv_convertTypecodes cinp [typecode_expr : typecode_exprs] ci
+				app_info_ptr	= nilPtr},binds,placeholders_and_tc_args, ci)
+
+convertTypecodes cinp [typecode_expr : typecode_exprs] replace_tc_args binds placeholders_and_tc_args ci
 	# (cons_symb, ci) = getSymbol PD_ConsSymbol SK_Constructor 2 ci
-	  (expr,      ci) = mv_convertTypecode  cinp typecode_expr  ci
-	  (exprs,     ci) = mv_convertTypecodes cinp typecode_exprs ci
+	# (expr,binds,placeholders_and_tc_args, ci) = convertTypecode  cinp typecode_expr  replace_tc_args binds placeholders_and_tc_args ci
+	# (exprs,binds,placeholders_and_tc_args,ci) = convertTypecodes cinp typecode_exprs replace_tc_args binds placeholders_and_tc_args ci
 	= (App {	app_symb		= cons_symb,
 				app_args 		= [expr , exprs],
-				app_info_ptr	= nilPtr}, ci)
-*/
-// Aux
-
-
-mv_getSymbol :: Index ((Global Index) -> SymbKind) Int !*PredefinedSymbols -> (SymbIdent, !*PredefinedSymbols)
-mv_getSymbol index symb_kind arity predef_symb
-	# ({pds_module, pds_def, pds_ident}, predef_symb) = predef_symb![index]
-	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
-	= (symbol,predef_symb)
-
-// .. MV
-
-
+				app_info_ptr	= nilPtr}, binds,placeholders_and_tc_args, ci)
 
 determine_defaults :: (Optional Expression) DefaultExpression !*ConversionInfo -> (Optional Expression, DefaultExpression, !*ConversionInfo)
 /***
@@ -306,9 +301,14 @@ determine_defaults :: case_default default_expr varheap -> (this_case_default, n
 						THEN that is now the default and its reference count must be increased.
 						ELSE it keeps this default
 	nested_case_default  = 	IF this case has no default
-		 					THEN the deault_expr remains default in the nested cases.
+		 					THEN the default_expr remains default in the nested cases.
 							ELSE nested cases get this default. This is semantically already the case, so nothing has to be changed.
+
 ***/
+
+
+
+// the case itself has no default but it has a surrounding default
 determine_defaults No default_expr=:(Yes (var=:{var_info_ptr}, indirection_var_list)) ci=:{ci_var_heap}
 	#! var_info = sreadPtr var_info_ptr ci_var_heap
 	# (expression, ci) = toExpression default_expr {ci & ci_var_heap = ci_var_heap}
@@ -362,7 +362,7 @@ where
 		-> (Env Expression FreeVar, Expression, *ConversionInfo)
 	convert_dynamic_pattern cinp bound_vars this_default pattern_number opened_dynamic result_type last_default
 																			[{ dp_var, dp_type_patterns_vars, dp_type_code, dp_rhs } : patterns] ci
-		# /***  The last case may noy have a default  ***/
+		# /***  The last case may not have a default  ***/
 
 		  ind_var = getIndirectionVar this_default
 	
@@ -371,20 +371,46 @@ where
 		  /***  convert the elements of this pattern  ***/
 
 		  (a_ij_binds, ci)		= createVariables dp_type_patterns_vars [] ci
-	 	  (unify,type_code, ci)	= convertTypecode cinp dp_type_code ci
+//	 	  (unify,type_code, ci)	= convertTypecode cinp dp_type_code ci
+	 	  (type_code,a_ij_binds ,_, ci)	= convertTypecode cinp dp_type_code True /* should be changed to True for type dependent functions */  a_ij_binds [] ci
+	 	  
+	 	# (ci_placeholders_and_tc_args,ci)
+	 		= ci!ci_placeholders_and_tc_args;
+	 		
+	 	// // foldSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
+
+	 	# bound_vars
+	 		= foldl (\bound_vars (place_holder,_) -> addToBoundVars place_holder empty_attributed_type bound_vars) bound_vars ci_placeholders_and_tc_args
+	 	  
+	 	  // walks through the patterns within one alternative
 	 	  (dp_rhs, ci)			= convertDynamics cinp bound_vars this_default dp_rhs ci
 	 	  
-		  /***  recursively convert the other patterns  ***/
+	 	  
+		  /***  recursively convert the other patterns in the other alternatives ***/
 
 	 	  (binds, ci)		= convert_other_patterns cinp bound_vars this_default pattern_number opened_dynamic result_type last_default patterns ci
+	 	  
+	 	  	 	 // coercions ..
+		# (bound_vars,dp_rhs,ci)
+			= case (isEmpty ci_placeholders_and_tc_args) of 
+				True
+					-> (bound_vars,dp_rhs,ci)
+				False
+					#! (bound_vars,new_dp_rhs,ci)
+						= gen_type_coercions result_type bound_vars this_default pattern_number 0 dp_rhs ci
+					-> (bound_vars,new_dp_rhs,ci)
+		  // .. coercions
+	 	  
 
 		  /***  generate the expression  ***/
-
-	 	  (unify_symb, ci) 		= getSymbol (if unify PD_unify PD_unify /*PD_coerce*/) SK_Function 2 ci
+	 	  (unify_symb, ci) 		= getSymbol PD_unify SK_Function 2 ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
 		  (let_info_ptr, ci) 	= let_ptr ci
 		  (case_info_ptr, ci)	= case_ptr ci
 		  (default_expr, ci) 	= toExpression this_default ci
+		  
+		  // was coercions
+		  
 		  (unify_result_var, ci)	= newVariable "result" VI_Empty ci
 		  unify_result_fv 			= varToFreeVar unify_result_var 1
 		  (unify_bool_var, ci)		= newVariable "unify_bool" VI_Empty ci
@@ -407,8 +433,12 @@ where
 												case_info_ptr	= case_info_ptr,
 												case_default_pos= NoPos }, // MW4++
 		  					let_info_ptr = let_info_ptr	}
+		  					
 		= (a_ij_binds ++ binds,  let_expr,  { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
 	where
+
+
+/*
 		bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_heap,ci_new_variables}
 			# (VI_Indirection ref_count, ci_var_heap) = readPtr var_info_ptr ci_var_heap
 			| ref_count > 0
@@ -416,17 +446,21 @@ where
 		  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
 						{ ci & ci_var_heap = ci_var_heap, ci_new_variables = [ ind_fv : ci_new_variables ]})
 				= ([], {ci & ci_var_heap = ci_var_heap})
+*/
 
 		add_x_i_bind bind_src bind_dst=:{fv_count} binds
 			| fv_count > 0
 				= [ { bind_src = bind_src, bind_dst = bind_dst } : binds ]
 				= binds
 
+	// other alternatives
 	convert_other_patterns :: ConversionInput BoundVariables DefaultExpression Int OpenedDynamic AType !(Optional Expression) ![DynamicPattern] !*ConversionInfo
 			-> (Env Expression FreeVar, *ConversionInfo)
 	convert_other_patterns _ _ _ _ _ _  No  []  ci
+		// no default and no alternatives left
 		= ([], ci)
 	convert_other_patterns cinp bound_vars this_default _ _ result_type (Yes last_default_expr) [] ci
+		// default without alternatives left
 		# c_i = getVariable this_default
 		  (c_bind, ci) = generateBinding cinp bound_vars c_i last_default_expr result_type ci
 		= ([c_bind], ci)
@@ -439,6 +473,120 @@ where
 		  c_i = getVariable this_default
 		  (c_bind, ci) = generateBinding cinp bound_vars c_i expr result_type ci
 	   = ([c_bind : binds], ci)
+	   
+	   
+	  /*
+	 		# (ind_i,   ci) = newVariable ("ind_"+++toString (pattern_number)) (VI_Indirection 0) ci
+		  (c_inc_i, ci) = newVariable ("c_"+++toString (inc pattern_number)) (VI_Default 0) ci
+	      new_default = newDefault c_inc_i ind_i
+	      bound_vars = addToBoundVars ind_i empty_attributed_type (addToBoundVars c_inc_i result_type bound_vars)
+	 	  (binds, expr, ci) = convert_dynamic_pattern cinp bound_vars new_default (inc pattern_number) opened_dynamic result_type last_default patterns ci
+		  c_i = getVariable this_default
+		  (c_bind, ci) = generateBinding cinp bound_vars c_i expr result_type ci
+	   = ([c_bind : binds], ci)
+	    
+	  
+	 */
+	
+bind_indirection_var var=:{var_info_ptr} unify_result_var twotuple ci=:{ci_var_heap,ci_new_variables}
+	# (VI_Indirection ref_count, ci_var_heap) = readPtr var_info_ptr ci_var_heap
+	| ref_count > 0
+		# ind_fv = varToFreeVar var ref_count
+  		= ([{ bind_src = TupleSelect twotuple 1 (Var unify_result_var), bind_dst = ind_fv }],
+				{ ci & ci_var_heap = ci_var_heap, ci_new_variables = [ ind_fv : ci_new_variables ]})
+		= ([], {ci & ci_var_heap = ci_var_heap})
+
+gen_type_coercions result_type bound_vars _ pattern_n coercion_n dp_rhs ci=:{ci_placeholders_and_tc_args=[]}
+	// there no more type coercions to carry out
+	= (bound_vars,dp_rhs,ci)
+gen_type_coercions result_type bound_vars this_default pattern_n coercion_n dp_rhs ci=:{ci_placeholders_and_tc_args=[({var_info_ptr=a_ij},a_ij_tc):rest]}
+	# let_binds
+		= []
+
+	// extra
+	# a_ij_var = {var_name = a_ij_var_name, var_info_ptr = a_ij, var_expr_ptr = nilPtr}	
+	# a_ij_tc_var = {var_name = a_aij_tc_var_name, var_info_ptr = a_ij_tc, var_expr_ptr = nilPtr}
+
+
+	// indirections
+	# (ind_i,   ci) = newVariable ("ind_!"+++toString pattern_n +++ "_" +++ toString coercion_n) (VI_Indirection 1) ci
+	  (c_inc_i, ci) = newVariable ("c_!"+++toString pattern_n +++ "_" +++ toString (inc coercion_n)) (VI_Default 0) ci
+	  new_default = newDefault c_inc_i ind_i
+
+	#		
+
+ 	  (coerce_symb, ci)		= getSymbol PD_coerce SK_Function 2 ci
+	  (twotuple, ci) 		= getTupleSymbol 2 ci
+	  (let_info_ptr, ci) 	= let_ptr ci
+	  (case_info_ptr, ci)	= case_ptr ci
+
+
+	  (coerce_result_var, ci)	= newVariable "result" VI_Empty ci
+	  coerce_result_fv 			= varToFreeVar coerce_result_var 1
+	  (coerce_bool_var, ci)		= newVariable "coerce_bool" VI_Empty ci
+	  coerce_bool_fv 			= varToFreeVar coerce_bool_var 1
+	  
+	# (let_binds, ci) 		= bind_indirection_var ind_i coerce_result_var twotuple ci
+
+	  
+
+
+/*
+newDefault :: BoundVar IndirectionVar -> DefaultExpression
+newDefault variable indirection_var = Yes (variable, [indirection_var])
+
+getVariable :: DefaultExpression -> BoundVar
+getVariable (Yes (variable, _)) = variable
+getVariable No = abort "unexpected value in convertDynamics: 'getVariable'"
+
+getIndirectionVar (Yes (_, [ind_var:_])) = ind_var
+getIndirectionVar No = abort "unexpected value in convertDynamics: 'getIndirectionVar'"
+
+toExpression :: DefaultExpression !*ConversionInfo -> (Optional Expression, !*ConversionInfo)
+t
+*/
+	  
+	  ind_i_fv = varToFreeVar ind_i 1
+	  c_inc_i_fv = varToFreeVar c_inc_i 1
+	  ci = { ci & ci_new_variables = [ c_inc_i_fv,ind_i_fv : ci.ci_new_variables ] }
+	  
+
+	# bound_vars
+		= (addToBoundVars ind_i empty_attributed_type (addToBoundVars c_inc_i result_type bound_vars))
+
+    #  (default_expr, ci) 	
+      	= MYtoExpression (newDefault (getVariable this_default) ind_i) ci // this_default ci
+	  
+	// extra
+	# (bound_vars,new_dp_rhs,ci)
+		= gen_type_coercions result_type bound_vars new_default pattern_n (inc coercion_n) dp_rhs { ci & ci_placeholders_and_tc_args = rest }
+
+	# let_expr
+		= Let {
+				let_strict_binds	= []
+			,	let_lazy_binds		= [{ bind_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
+  								   bind_dst = coerce_result_fv }
+  								   ,
+  								 { bind_src = TupleSelect twotuple 0 (Var coerce_result_var),
+  								   bind_dst = coerce_bool_fv } : let_binds
+  								],
+  					let_expr =
+  					 Case {	case_expr 		= Var coerce_bool_var,
+// MW was:												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs}],
+										case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = EE /*new_dp_rhs*/, bp_position = NoPos }],
+										case_default	= default_expr,
+										case_ident		= No,
+										case_info_ptr	= case_info_ptr,
+										case_default_pos= NoPos } // MW4++
+			,	let_info_ptr = let_info_ptr	
+  		}
+	
+	// dp_rhs
+	= (bound_vars,let_expr,{ ci & ci_new_variables = [coerce_result_fv, coerce_bool_fv : ci.ci_new_variables]}) //let_expr,ci)
+	
+	// { ci & ci_new_variables = [unify_result_fv, unify_bool_fv : ci.ci_new_variables]})
+
+
 
 generateBinding :: !ConversionInput BoundVariables BoundVar Expression AType !*ConversionInfo -> *(Bind Expression FreeVar, *ConversionInfo)
 generateBinding cinp bound_vars var bind_expr result_type ci
@@ -495,19 +643,19 @@ generateBinding cinp bound_vars var bind_expr result_type ci
 
 createVariables :: [VarInfoPtr] !(Env Expression FreeVar) !*ConversionInfo -> (!Env Expression FreeVar, !*ConversionInfo)
 createVariables var_info_ptrs binds ci
-	= mapAppendSt create_variable var_info_ptrs binds ci
-where
-	create_variable :: VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
-	create_variable var_info_ptr ci
-		# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 3 ci
-		  cyclic_var = {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
-		  cyclic_fv = varToFreeVar cyclic_var 1	
-		= ({ bind_src = App {	app_symb = placeholder_symb,
-								app_args = [Var cyclic_var, Var cyclic_var],
-								app_info_ptr = nilPtr },
-			 bind_dst = varToFreeVar cyclic_var 1
-		   },
-		   { ci & ci_new_variables = [ cyclic_fv : ci.ci_new_variables ]})
+	= mapAppendSt (create_variable a_ij_var_name) var_info_ptrs binds ci
+
+create_variable :: !Ident VarInfoPtr !*ConversionInfo -> (Bind Expression FreeVar, !*ConversionInfo)
+create_variable var_name var_info_ptr ci
+	# (placeholder_symb, ci) = getSymbol PD_variablePlaceholder SK_Constructor 3 ci
+	  cyclic_var = {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
+	  cyclic_fv = varToFreeVar cyclic_var 1	
+	= ({ bind_src = App {	app_symb = placeholder_symb,
+							app_args = [Var cyclic_var, Var cyclic_var],
+							app_info_ptr = nilPtr },
+		 bind_dst = varToFreeVar cyclic_var 1
+	   },
+	   { ci & ci_new_variables = [ cyclic_fv : ci.ci_new_variables ]})
 
 /**************************************************************************************************/
 
@@ -528,9 +676,37 @@ getVariable No = abort "unexpected value in convertDynamics: 'getVariable'"
 getIndirectionVar (Yes (_, [ind_var:_])) = ind_var
 getIndirectionVar No = abort "unexpected value in convertDynamics: 'getIndirectionVar'"
 
+MYtoExpression :: DefaultExpression !*ConversionInfo -> (Optional Expression, !*ConversionInfo)
+MYtoExpression No ci = (No, ci)
+MYtoExpression (Yes (variable, indirection_var_list)) ci
+	| length indirection_var_list <> 1
+		= abort "toExpression: meerdere indirectie variables"
+	# (expression, ci) = toExpression2 variable indirection_var_list ci
+	= (Yes expression, ci)
+where
+	toExpression2 variable [] ci = (Var variable, ci)
+	toExpression2 variable [indirection_var] ci
+		# (undo_symb, ci) = getSymbol PD_undo_indirections SK_Function 2 ci
+		= (App {	app_symb = undo_symb,
+					app_args = [Var variable, Var indirection_var],
+					app_info_ptr = nilPtr },  ci)
+		
+	
+/*
+	toExpression2 variable [indirection_var : indirection_vars] ci
+		# (expression, ci) = toExpression2 variable indirection_vars ci
+		  (undo_symb, ci) = getSymbol PD_undo_indirections SK_Function 2 ci
+	//	  ci_var_heap = ci.ci_var_heap //adjust_ref_count indirection_var ci.ci_var_heap
+		= (App {	app_symb = undo_symb,
+					app_args = [expression, Var indirection_var],
+					app_info_ptr = nilPtr }, /*{ ci & ci_var_heap = ci_var_heap }*/ ci)
+*/
+
 toExpression :: DefaultExpression !*ConversionInfo -> (Optional Expression, !*ConversionInfo)
 toExpression No ci = (No, ci)
 toExpression (Yes (variable, indirection_var_list)) ci
+	| length indirection_var_list <> 1
+		= abort "toExpression: meerdere indirectie variables"
 	# (expression, ci) = toExpression2 variable indirection_var_list ci
 	= (Yes expression, ci)
 where
@@ -614,6 +790,10 @@ getConstructor index arity ci=:{ci_predef_symb}
 
 a_ij_var_name :== { id_name = "a_ij", id_info = nilPtr }
 v_tc_name	  :== { id_name = "convertDynamicsvTC", id_info = nilPtr }
+v_tc_placeholder_ident	:== { id_name = v_tc_placeholder, id_info = nilPtr }
+v_tc_placeholder		:== "tc_placeholder"
+
+a_aij_tc_var_name 	:== { id_name = "a_ij_tc", id_info = nilPtr }
 
 case_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 case_ptr ci=:{ci_expr_heap}
@@ -630,7 +810,6 @@ let_ptr ci=:{ci_expr_heap}
 
 empty_attributed_type :: AType
 empty_attributed_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
-
 
 
 isNo :: (Optional a) -> Bool
