@@ -119,7 +119,12 @@ Abstype implementation.
 >   exports (tdefs,(es,as,ts,rs)) = es
 
 >   typerule (tdefs,(es,as,ts,rs)) = fst.maxtypeinfo ts
+*/
 
+typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+typerule _ _ = undef
+
+/*
 >   rules (tdefs,(es,as,ts,rs)) = foldmap Present Absent rs
 
 >   imports (tdefs,(es,as,ts,rs)) = [sym|(sym,tdef)<-ts;~member (map fst rs) sym]
