@@ -874,6 +874,7 @@ checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_
 	  checked_st = {st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_context = st_context,
 	    					st_attr_vars = st_attr_vars, st_attr_env = st_attr_env }
 	= (checked_st, specials, type_defs, class_defs, modules, heaps, cs)
+//			---> ("checkSymbolType", checked_st)
 where
 	check_attr_inequality ineq=:{ai_demanded=ai_demanded=:{av_name=dem_name},ai_offered=ai_offered=:{av_name=off_name}} cs=:{cs_symbol_table,cs_error}
 		# (dem_entry, cs_symbol_table) = readPtr dem_name.id_info cs_symbol_table
@@ -1330,7 +1331,7 @@ removeDefinitionFromSymbolTable level {id_info} symbol_table
 	| isNilPtr id_info
 		= symbol_table
 		# ({ste_def_level, ste_previous}, symbol_table) = readPtr id_info symbol_table
-		| ste_def_level == level
+		| ste_def_level >= level
 			= symbol_table <:= (id_info, ste_previous)
 			= symbol_table
 
