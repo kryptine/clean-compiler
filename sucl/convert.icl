@@ -488,7 +488,7 @@ convert_basic_branch main_dcl_module_n root bindings branch lrinfo
         // Create pattern's root node definition
         nodes1 = [(root,(convert_bvalue branch.bp_value,[])):nodes0]
         // Convert branch expression
-        (heap2,(nodes0,fundefs1,globals1,rest,_)) = (convert_expression--->"convert.convert_expression begins from convert.convert_basic_branch") main_dcl_module_n No [] branch.bp_expr (heap1,([],fundefs0,globals0,[],False))
+        (heap2,(nodes0,fundefs1,globals1,rest,_)) = (convert_expression--->"convert.convert_expression begins from convert.convert_basic_branch") main_dcl_module_n No bindings branch.bp_expr (heap1,([],fundefs0,globals0,[],False))
         alternatives1 = [(root,hd rest,nodes1):alternatives0]
 
 convert_bvalue :: BasicValue -> SuclSymbol
