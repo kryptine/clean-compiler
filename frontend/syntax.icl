@@ -1983,12 +1983,24 @@ where
 
 instance <<< TypeVarInfo
 where
-	(<<<) file TVI_Empty				= file <<< "TVI_Empty"
-	(<<<) file (TVI_Type _)				= file <<< "TVI_Type"
-	(<<<) file (TVI_Forward	_) 			= file <<< "TVI_Forward"
-	(<<<) file (TVI_TypeKind _)			= file <<< "TVI_TypeKind"
-	(<<<) file (TVI_SignClass _ _ _) 	= file <<< "TVI_SignClass"
-	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
+	(<<<) file TVI_Empty					= file <<< "TVI_Empty"
+	(<<<) file (TVI_Type type)				= file <<< "(TVI_Type " <<< type <<< ")"
+	(<<<) file (TVI_TypeVar _)              = file <<< "TVI_TypeVar"
+	(<<<) file (TVI_Forward	_) 				= file <<< "TVI_Forward"
+	(<<<) file (TVI_TypeKind kind)			= file <<< "(TVI_TypeKind " <<< kind <<< ")"
+	(<<<) file (TVI_SignClass _ _ _) 	 	= file <<< "TVI_SignClass"
+	(<<<) file (TVI_PropClass _ _ _) 	 	= file <<< "TVI_PropClass"
+	(<<<) file (TVI_Attribute _)            = file <<< "TVI_Attribute"
+	(<<<) file (TVI_CorrespondenceNumber _) = file <<< "TVI_CorrespondenceNumber"
+	(<<<) file (TVI_AType _)				= file <<< "TVI_AType"
+	(<<<) file TVI_Used						= file <<< "TVI_Used"
+	(<<<) file (TVI_TypeCode _)				= file <<< "TVI_TypeCode"
+	(<<<) file (TVI_CPSLocalTypeVar _)		= file <<< "TVI_CPSLocalTypeVar"
+	(<<<) file (TVI_Kinds _)				= file <<< "TVI_Kinds"
+	(<<<) file (TVI_Kind _)					= file <<< "TVI_Kind"
+	(<<<) file (TVI_ConsInstance _)			= file <<< "TVI_ConsInstance"
+	(<<<) file (TVI_Normalized _)			= file <<< "TVI_Normalized"
+	(<<<) file _                        	= file <<< "TVI_???"
 
 instance <<< (Import from_symbol) | <<< from_symbol
 where
