@@ -418,7 +418,7 @@ where
 		| type_index == nr_of_types
 			| cs.cs_error.ea_ok && not is_main_dcl
 				# marks = createArray nr_of_types CS_NotChecked
-				  {exp_type_defs,exp_modules,exp_type_heaps,exp_error} = (temp_try_a_new_thing_XXX id (expand_syn_types module_index 0 nr_of_types))
+				  {exp_type_defs,exp_modules,exp_type_heaps,exp_error} = (expand_syn_types_late_XXX id (expand_syn_types module_index 0 nr_of_types))
 				  		{	exp_type_defs = ts.ts_type_defs, exp_modules = ts.ts_modules, exp_marks = marks,
 				  			exp_type_heaps = ti_type_heaps, exp_error = cs.cs_error }
 				= (exp_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, exp_modules, ti_var_heap, exp_type_heaps, { cs & cs_error = exp_error })
@@ -437,7 +437,7 @@ expand_syn_types module_index type_index nr_of_types expst
 expandSynonymTypes :: !.Index !*{#CheckedTypeDef} !*{#.DclModule} !*TypeHeaps !*ErrorAdmin
 	-> (!.{#CheckedTypeDef},!.{#DclModule},!.TypeHeaps,!.ErrorAdmin)
 expandSynonymTypes module_index exp_type_defs exp_modules exp_type_heaps exp_error
-	| temp_try_a_new_thing_XXX False True
+	| expand_syn_types_late_XXX False True
 		= abort "expandSynonymTypes"
 	#! nr_of_types
 			= size exp_type_defs

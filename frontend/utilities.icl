@@ -1,4 +1,5 @@
 implementation module utilities
+// compile using the "reuse unique nodes option"
 
 import	StdEnv, general
 

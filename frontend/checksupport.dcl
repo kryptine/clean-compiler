@@ -150,8 +150,10 @@ retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Inde
 //		-> (!Int, ![Declaration], !.ExplImpInfos, !.Heap SymbolTableEntry);
 addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !Bool !*{#FunDef} !*SymbolTable !*ErrorAdmin -> (!*{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
-addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
+addDeclarationsOfDclModToSymbolTable :: .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
+addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
+addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*CheckState -> (!Bool, !.CheckState)
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
@@ -167,20 +169,16 @@ local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]
 get_ident :: !ImportDeclaration -> Ident
 getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
 
-mw_addIndirectlyImportedSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
-updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
-		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}},!.SymbolTable)
-
 :: BelongingSymbols
 	=	BS_Constructors ![DefinedSymbol]
 	|	BS_Fields !{#FieldSymbol}
 	|	BS_Members !{#DefinedSymbol}
 	|	BS_Nothing
 
-getBelongingSymbols :: !Declaration !{#x:DclModule} -> (!.BelongingSymbols, !{#x:DclModule})
+getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#DclModule})
 nrOfBelongingSymbols :: !BelongingSymbols -> Int
 
 import_ident :: Ident
 restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
 
-temp_try_a_new_thing_XXX yes no :== no
+expand_syn_types_late_XXX yes no :== no

@@ -9,6 +9,7 @@ import RWSDebug
 
 ::	VarHeap :== Heap VarInfo
 
+cUndef			:== -1
 CS_NotChecked 	:== -1
 NotFound		:== -1
 	
@@ -235,60 +236,7 @@ retrieveGlobalDefinition {ste_kind,ste_def_level,ste_index} requ_kind mod_index
 		= (NotFound, mod_index)
 
 
-updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
-		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
-updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
-			dcl_modules expl_imp_infos cs_symbol_table
-	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers
-			(dcl_modules, expl_imp_infos, cs_symbol_table)
-updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Instance class_ident} dcl_modules expl_imp_infos cs_symbol_table
-	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
-	# cs_symbol_table
-			= checkExplImpForInstance decl class_ident cs_symbol_table
-	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Imported (STE_Instance class_ident) _} dcl_modules expl_imp_infos cs_symbol_table
-	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
-	# cs_symbol_table
-			= checkExplImpForInstance decl class_ident cs_symbol_table
-	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
-	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-
-addExplImpInfo :: !Index Declaration ![Declaration] !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
-			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
-addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
-	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
-			= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
-	  (di_belonging, dcl_modules, cs_symbol_table)
-	  		= get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
-	  di
-	  		= { di_decl = decl, di_instances = instances, di_belonging = di_belonging }
-	  new_expl_imp_info
-	  		= ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
-	= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
-  where
-	get_belonging_symbol_nrs :: !Declaration !{#x:DclModule} !u:(Heap SymbolTableEntry) 
-			-> (!.NumberSet,!{#x:DclModule},!u:Heap SymbolTableEntry)
-	get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
-		# (all_belonging_symbols, dcl_modules)
-				= getBelongingSymbols decl dcl_modules
-		  nr_of_belongs
-				= nrOfBelongingSymbols all_belonging_symbols
-		  (_, belonging_bitvect, cs_symbol_table)
-				= foldlBelongingSymbols set_bit all_belonging_symbols (0, bitvectCreate nr_of_belongs, cs_symbol_table)
-		= (bitvectToNumberSet belonging_bitvect, dcl_modules, cs_symbol_table)
-
-	set_bit {id_info} (bit_nr, bitvect, cs_symbol_table)
-		# ({ste_kind}, cs_symbol_table)
-				= readPtr id_info cs_symbol_table
-		= ( bit_nr+1
-		  , case ste_kind of
-			 	STE_Empty -> bitvect
-				_ -> bitvectSet bit_nr bitvect
-		  , cs_symbol_table
-		  )
-
-getBelongingSymbols :: !Declaration !{#x:DclModule} -> (!.BelongingSymbols, !{#x:DclModule})
+getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#DclModule})
 getBelongingSymbols {dcl_kind=STE_Imported STE_Type def_mod_index, dcl_index} dcl_modules
 	# ({td_rhs}, dcl_modules)
 			= dcl_modules![def_mod_index].dcl_common.com_type_defs.[dcl_index]
@@ -322,55 +270,12 @@ nrOfBelongingSymbols BS_Nothing
 	|	BS_Members !{#DefinedSymbol}
 	|	BS_Nothing
 
-foldlBelongingSymbols f bs st
-	:== case bs of
-			BS_Constructors constructors
-				-> foldSt (\{ds_ident} st -> f ds_ident st) constructors st 
-			BS_Fields fields
-				-> foldlArraySt (\{fs_name} st -> f fs_name st) fields st 
-			BS_Members members
-				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
-			BS_Nothing
-				-> st
-
-checkExplImpForInstance decl class_ident cs_symbol_table
-	// this function is only for old syntax
-	| switch_import_syntax False True
-		= cs_symbol_table
-	# (class_ste, cs_symbol_table)
-			= readPtr class_ident.id_info cs_symbol_table
-	= case class_ste.ste_kind of
-		STE_ExplImpComponentNrs component_numbers inst_indices_accu
-			-> writePtr class_ident.id_info 
-					{ class_ste & ste_kind = STE_ExplImpComponentNrs component_numbers [decl:inst_indices_accu]}
-					cs_symbol_table
-		_
-			-> cs_symbol_table
-
-
 
 removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
-removeImportsAndLocalsOfModuleFromSymbolTable {dcls_import,dcls_local} symbol_table
+removeImportsAndLocalsOfModuleFromSymbolTable {dcls_import,dcls_local_for_import} symbol_table
 	# symbol_table = remove_declared_symbols_in_array 0 dcls_import symbol_table
-	= remove_declared_symbols dcls_local symbol_table
+	= remove_declared_symbols_in_array 0 dcls_local_for_import symbol_table
 where
-	remove_declared_symbols :: ![Declaration] !*SymbolTable -> !*SymbolTable
-	remove_declared_symbols [symbol=:{dcl_ident={id_info},dcl_index}:symbols] symbol_table
-		#! entry = sreadPtr id_info symbol_table
-		# {ste_kind,ste_def_level} = entry
-		| ste_kind == STE_Empty || ste_def_level > cModuleScope
-			= remove_declared_symbols symbols symbol_table
-			# symbol_table = symbol_table <:= (id_info, entry.ste_previous)
-			= case ste_kind of
-				STE_Field selector_id
-					-> remove_declared_symbols symbols (removeFieldFromSelectorDefinition selector_id NoIndex dcl_index symbol_table)
-				STE_Imported (STE_Field selector_id) def_mod
-					-> remove_declared_symbols symbols (removeFieldFromSelectorDefinition selector_id def_mod dcl_index symbol_table)
-				_
-					-> remove_declared_symbols symbols symbol_table					
-	remove_declared_symbols [] symbol_table
-		= symbol_table
-
 	remove_declared_symbols_in_array :: !Int !{!Declaration} !*SymbolTable -> !*SymbolTable
 	remove_declared_symbols_in_array symbol_index symbols symbol_table
 		| symbol_index<size symbols
@@ -414,49 +319,62 @@ addDefToSymbolTable level def_index def_ident=:{id_info} def_kind symbol_table e
 		= (symbol_table <:= (id_info,entry), error)
 		= (symbol_table, checkError def_ident " already defined" error)
 
-addDeclaredSymbolsToSymbolTable2 :: .Bool .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
-addDeclaredSymbolsToSymbolTable2 is_dcl_mod ste_index locals imported cs
-	# cs=add_imports_in_array_to_symbol_table 0 is_dcl_mod imported cs
+addDeclarationsOfDclModToSymbolTable :: .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
+addDeclarationsOfDclModToSymbolTable ste_index locals imported cs
+	# cs=add_imports_in_array_to_symbol_table 0 imported cs
 	= addLocalSymbolsForImportToSymbolTable 0 locals ste_index cs
-
-add_imports_in_array_to_symbol_table symbol_index is_dcl_mod symbols cs=:{cs_x}
-	| symbol_index<size symbols
-		#! ({dcl_ident,dcl_pos,dcl_kind},symbols) = symbols![symbol_index]
-		= case dcl_kind of
-			STE_Imported def_kind def_mod
-				| is_dcl_mod || def_mod <> cs_x.x_main_dcl_module_n
+  where
+	add_imports_in_array_to_symbol_table symbol_index symbols cs=:{cs_x}
+		| symbol_index<size symbols
+			#! ({dcl_ident,dcl_pos,dcl_kind},symbols) = symbols![symbol_index]
+			= case dcl_kind of
+				STE_Imported def_kind def_mod
 					#! dcl_index= symbols.[symbol_index].dcl_index
-					-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols (addIndirectlyImportedSymbolOld dcl_ident dcl_pos dcl_kind def_kind dcl_index def_mod cs)
-					-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols cs
-			STE_FunctionOrMacro _
+					   (_, cs)
+					   		= addSymbol No dcl_ident dcl_pos dcl_kind
+					   				def_kind dcl_index def_mod cUndef cs
+					-> add_imports_in_array_to_symbol_table (symbol_index+1) symbols cs
+				STE_FunctionOrMacro _
 					#! dcl_index= symbols.[symbol_index].dcl_index
-				-> add_imports_in_array_to_symbol_table (symbol_index+1) is_dcl_mod symbols (addImportedFunctionOrMacro dcl_ident dcl_index cs)
-		= cs
+					   (_, cs)
+					   		= addImportedFunctionOrMacro No dcl_ident dcl_index cs
+					-> add_imports_in_array_to_symbol_table (symbol_index+1) symbols cs
+			= cs
 
-addLocalSymbolsForImportToSymbolTable :: !Int !{!Declaration} Int !*CheckState -> .CheckState;
-addLocalSymbolsForImportToSymbolTable symbol_index symbols mod_index cs
-	| symbol_index<size symbols
-		# ({dcl_ident,dcl_pos,dcl_kind,dcl_index},symbols) = symbols![symbol_index]
-		= case dcl_kind of
-			STE_FunctionOrMacro _
-				-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index 
-						(addImportedFunctionOrMacro dcl_ident dcl_index cs)
-			STE_Imported def_kind def_mod
-				-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index 
-						(addIndirectlyImportedSymbolOld dcl_ident dcl_pos dcl_kind def_kind dcl_index mod_index cs)
-		= cs
-
-addImportedFunctionOrMacro :: !Ident .Int !*CheckState -> .CheckState;
-addImportedFunctionOrMacro ident=:{id_info} def_index cs=:{cs_symbol_table}
+	addLocalSymbolsForImportToSymbolTable :: !Int !{!Declaration} Int !*CheckState -> .CheckState;
+	addLocalSymbolsForImportToSymbolTable symbol_index symbols mod_index cs
+		| symbol_index<size symbols
+			# ({dcl_ident,dcl_pos,dcl_kind,dcl_index},symbols) = symbols![symbol_index]
+			= case dcl_kind of
+				STE_FunctionOrMacro _
+					# (_, cs)
+							= addImportedFunctionOrMacro No dcl_ident dcl_index cs
+					-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index cs
+				STE_Imported def_kind def_mod
+					# (_, cs)
+							= addSymbol No dcl_ident dcl_pos dcl_kind
+									def_kind dcl_index mod_index cUndef cs
+					-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index cs
+			= cs
+	
+addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*CheckState -> (!Bool, !.CheckState)
+addImportedFunctionOrMacro opt_dcl_macro_range ident=:{id_info} def_index cs=:{cs_symbol_table}
 	#! entry = sreadPtr id_info cs_symbol_table
 	= case entry.ste_kind of
 		STE_Empty
-			-> { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_FunctionOrMacro []) def_index cModuleScope entry}
+			-> (True, { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_FunctionOrMacro []) 
+													def_index cModuleScope entry})
 		STE_FunctionOrMacro _
-			| entry.ste_index == def_index
-				-> cs
+			| entry.ste_index == def_index || within_opt_range opt_dcl_macro_range def_index
+				-> (False, cs)
 		_
-			-> { cs & cs_error = checkError ident " multiply imported" cs.cs_error}
+			-> (False, { cs & cs_error = checkError ident "multiply defined" cs.cs_error})
+  where
+	within_opt_range (Yes {ir_from, ir_to}) i
+		= ir_from<=i && i<ir_to
+	within_opt_range No _
+		= False
+
 
 addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
 addFieldToSelectorDefinition {id_info} glob_field_index cs=:{cs_symbol_table}
@@ -468,28 +386,8 @@ addFieldToSelectorDefinition {id_info} glob_field_index cs=:{cs_symbol_table}
 		_
 			-> { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_Selector [glob_field_index]) NoIndex cModuleScope entry }
 
-addIndirectlyImportedSymbolOld :: !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !*CheckState -> .CheckState;
-addIndirectlyImportedSymbolOld ident pos dcl_kind def_kind def_index def_mod cs=:{cs_symbol_table}
-	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table
-	= add_indirectly_imported_symbol entry ident pos def_kind def_index def_mod { cs & cs_symbol_table = cs_symbol_table }
-	where
-		add_indirectly_imported_symbol /*entry=:*/{ste_kind = STE_Empty} {id_name,id_info} _ def_kind def_index def_mod cs=:{cs_symbol_table}
-			// JVG: read the entry again, because it is boxed
-			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-			# cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info dcl_kind def_index cModuleScope entry}
-			= case def_kind of
-				STE_Field selector_id
-					-> addFieldToSelectorDefinition selector_id	{ glob_module = def_mod, glob_object = def_index } cs
-				_
-					-> cs
-		add_indirectly_imported_symbol /*entry=:*/{ste_kind = STE_Imported kind mod_index, ste_index} ident=:{id_info} _ def_kind def_index def_mod cs
-			| kind == def_kind && mod_index == def_mod && ste_index == def_index
-				= cs
-		add_indirectly_imported_symbol	entry ident pos def_kind def_index def_mod cs=:{cs_error}
-			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident pos) " multiply imported" cs_error}
-
-mw_addIndirectlyImportedSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
-mw_addIndirectlyImportedSymbol yes_for_icl_module ident pos dcl_kind def_kind def_index def_mod importing_mod cs=:{cs_symbol_table}
+addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
+addSymbol yes_for_icl_module ident pos dcl_kind def_kind def_index def_mod importing_mod cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table
 	= add_indirectly_imported_symbol yes_for_icl_module entry ident pos def_kind def_index def_mod 
 			importing_mod { cs & cs_symbol_table = cs_symbol_table }
@@ -547,9 +445,9 @@ where
 
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
 removeDeclarationsFromSymbolTable decls scope symbol_table
-	= unsafeFold2St (remove_declaration scope) decls [1..] symbol_table
+	= foldSt (remove_declaration scope) decls symbol_table
 where
-	remove_declaration scope decl=:{dcl_ident={id_info}, dcl_index} decl_nr symbol_table
+	remove_declaration scope decl=:{dcl_ident={id_info}, dcl_index} symbol_table
 		# ({ste_kind,ste_previous}, symbol_table)
 				= readPtr id_info symbol_table
 		= case ste_kind of
@@ -723,4 +621,4 @@ restoreHeap {id_info} cs_symbol_table
 			= readPtr id_info cs_symbol_table
 	= writePtr id_info ste_previous cs_symbol_table
 
-temp_try_a_new_thing_XXX yes no :== no
+expand_syn_types_late_XXX yes no :== no

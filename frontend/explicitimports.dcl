@@ -13,9 +13,16 @@ import syntax, checksupport
 	}
 
 
+markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
+			-> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
+
+updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
+
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
-				!*(!{#x:DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
-			-> (!.SolvedImports,!(!{#x:DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
-checkExplicitImportCompleteness :: ![(Declaration, Position)] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
-				-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
+				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
+			-> (!.SolvedImports,!(!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
+
+checkExplicitImportCompleteness :: ![([Declaration], Position)] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
+			-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
 

@@ -29,10 +29,11 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare
 		,	tc_dcl_modules
 				:: !.{#DclModule}
 		,	tc_icl_type_defs
-				:: !{CheckedTypeDef}
+				:: !{#CheckedTypeDef}
 		,	tc_type_conversions
 				:: !Conversions
 		, 	tc_visited_syn_types	// to detect cycles in type synonyms
+			// only for no in expand_syn_types_late_XXX
 				:: !.{#Bool}
 		,	tc_main_dcl_module_n
 				:: !Int
@@ -73,7 +74,8 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare
 		}
 
 :: OptionalCorrespondenceNumber = CorrespondenceNumber !Int | Bound | Unbound
-
+	// Bound is only used for no case in expand_syn_types_late_XXX
+	
 class t_corresponds a :: !a !a -> *TypesCorrespondMonad
 	// whether two types correspond
 class e_corresponds a :: !a !a -> ExpressionsCorrespondMonad
@@ -87,26 +89,30 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !{#Int} !{!FunctionBody} !Int !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
+compareDefImp :: !{#Int} !{!FunctionBody} !Int {#CheckedTypeDef} !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
 				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin)
-compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n dcl_modules icl_module heaps error_admin
+compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n type_defs_of_icl_mod dcl_modules 
+			icl_module heaps error_admin
 	// icl definitions with indices >= size_uncopied_icl_defs.[def_type] don't have to be compared,
 	// because they are copies of definitions that appear exclusively in the dcl module
-//	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
 	# (main_dcl_module, dcl_modules) = dcl_modules![main_dcl_module_n]
 	= case main_dcl_module.dcl_conversions of
 		No	-> (dcl_modules, icl_module, heaps, error_admin)
 		Yes conversion_table
-			# {dcl_functions, dcl_macros, dcl_common, dcl_instances} = main_dcl_module
+			# {dcl_functions, dcl_macros, dcl_common} = main_dcl_module
 			  {icl_common, icl_functions}
 					= icl_module
 			  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
 			  		= heaps
-			  { com_type_defs=icl_com_type_defs, com_cons_defs=icl_com_cons_defs,
+			  { com_type_defs, com_cons_defs=icl_com_cons_defs,
 				com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
 				com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
 					= icl_common
-			  (icl_type_defs, icl_com_type_defs) = memcpy icl_com_type_defs
+			  icl_com_type_defs
+			  		= expand_syn_types_late_XXX type_defs_of_icl_mod com_type_defs
+			  (icl_type_defs, icl_com_type_defs)
+			  		= expand_syn_types_late_XXX (icl_com_type_defs, icl_com_type_defs)
+											   (memcpy icl_com_type_defs)
 			  tc_state
 			  		=	{ tc_type_vars = initial_hwn th_vars
 						, tc_attr_vars = initial_hwn th_attrs
@@ -150,7 +156,8 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n dcl_modules
 			  { tc_type_vars, tc_attr_vars, tc_dcl_modules }
 			  		= tc_state
 			  icl_common
-			  		= { icl_common & com_type_defs=icl_com_type_defs, com_cons_defs=icl_com_cons_defs,
+			  		= { icl_common & com_type_defs=expand_syn_types_late_XXX com_type_defs icl_com_type_defs,
+			  			com_cons_defs=icl_com_cons_defs,
 			  			com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
 			  			com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
 			  heaps
@@ -159,10 +166,16 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n dcl_modules
 			-> ( tc_dcl_modules, { icl_module & icl_common = icl_common, icl_functions = icl_functions },
 					heaps, error_admin )
   where
-	memcpy :: !*{#CheckedTypeDef} -> (!.{CheckedTypeDef}, !.{#CheckedTypeDef})
+	memcpy :: !u:{#CheckedTypeDef} -> (!.{#CheckedTypeDef}, !u:{#CheckedTypeDef})
 	memcpy original
+		| expand_syn_types_late_XXX True False
+			= abort "memcpy not used"
 		#! size = size original
-		# new = createArray size (abort "don't make that array strict !")
+		| size==0
+			= ({}, original)
+		# (el0, original)
+				= original![0]
+		# new = createArray size el0
 		= iFoldSt (\i (dst, src=:{[i]=src_i}) -> ({ dst & [i] = src_i }, src)) 0 size (new, original)
 
 compareWithConversions size_uncopied_icl_defs conversions dclDefs iclDefs tc_state error_admin 
@@ -314,7 +327,7 @@ instance CorrespondenceNumber TypeVarInfo where
 	toCorrespondenceNumber TVI_Empty
 		=	Unbound
 	toCorrespondenceNumber (TVI_AType _)
-		=	Bound
+		=	expand_syn_types_late_XXX (abort "not used!!!") Bound
 
 	fromCorrespondenceNumber number
 		=	TVI_CorrespondenceNumber number
@@ -354,6 +367,11 @@ instance t_corresponds [a] | t_corresponds a where
 		&&&	t_corresponds dclDefs iclDefs
 	t_corresponds _ _
 		=	return False
+
+instance t_corresponds (a, b) | t_corresponds a & t_corresponds b where 
+	t_corresponds (a1, b1) (a2, b2)
+		=	t_corresponds a1 a2
+		&&&	t_corresponds b1 b2
 
 
 /*2.0
@@ -397,7 +415,7 @@ instance t_corresponds (Global DefinedSymbol) where
 
 instance t_corresponds (TypeDef TypeRhs) where
 	t_corresponds dclDef iclDef
-		= t_corresponds_TypeDef dclDef iclDef
+		= (expand_syn_types_late_XXX t_corresponds_TypeDef` t_corresponds_TypeDef) dclDef iclDef
 	  where
 		t_corresponds_TypeDef dclDef iclDef tc_state
 //			| False--->("comparing:", dclDef, iclDef)
@@ -424,20 +442,30 @@ instance t_corresponds (TypeDef TypeRhs) where
 				= (corresponds, tc_state)
 			# attributes_correspond = (is_TA_Unique dclDef.td_attribute)==(is_TA_Unique iclDef.td_attribute)
 			= (attributes_correspond, tc_state)
-
-		root_has_anonymous_attr (TA_Var lhs_attr_var) syn_type=:(SynType a_type=:{at_attribute=TA_Var rhs_attr_var})
-			= rhs_attr_var.av_info_ptr==lhs_attr_var.av_info_ptr
-		root_has_anonymous_attr _ _
-			= False
+		  where
+			root_has_anonymous_attr (TA_Var lhs_attr_var) syn_type=:(SynType a_type=:{at_attribute=TA_Var rhs_attr_var})
+				= rhs_attr_var.av_info_ptr==lhs_attr_var.av_info_ptr
+			root_has_anonymous_attr _ _
+				= False
+			
+			coerce (SynType atype)
+				= SynType { atype & at_attribute = TA_Anonymous }
+			
+			isnt_abstract (AbstractType _) = False
+			isnt_abstract _ = True
+			
+			is_TA_Unique TA_Unique = True
+			is_TA_Unique _ = False
 		
-		coerce (SynType atype)
-			= SynType { atype & at_attribute = TA_Anonymous }
-		
-		isnt_abstract (AbstractType _) = False
-		isnt_abstract _ = True
-		
-		is_TA_Unique TA_Unique = True
-		is_TA_Unique _ = False
+		t_corresponds_TypeDef` dclDef iclDef tc_state
+//			| False--->("comparing:", dclDef, iclDef)
+//				= undef
+			# tc_state = init_attr_vars dclDef.td_attrs tc_state 
+			  tc_state = init_attr_vars iclDef.td_attrs tc_state 
+			  tc_state = init_atype_vars dclDef.td_args tc_state
+			  tc_state = init_atype_vars iclDef.td_args tc_state
+			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, (dclDef.td_context, dclDef.td_attribute)))
+			 				(iclDef.td_args, (iclDef.td_rhs, (iclDef.td_context, iclDef.td_attribute))) tc_state
 		
 instance t_corresponds TypeContext where
 	t_corresponds dclDef iclDef
@@ -456,8 +484,14 @@ instance t_corresponds ATypeVar where
 
 instance t_corresponds AType where
 	t_corresponds dclDef iclDef
-		= t_corresponds_at_type dclDef iclDef
+		= (expand_syn_types_late_XXX t_corresponds_at_type` t_corresponds_at_type) dclDef iclDef
 	  where
+		t_corresponds_at_type` dclDef iclDef
+			| dclDef.at_annotation<>iclDef.at_annotation
+				= return False
+			=	t_corresponds dclDef.at_attribute iclDef.at_attribute
+			&&&	t_corresponds dclDef.at_type iclDef.at_type
+
 		t_corresponds_at_type dclDef iclDef tc_state
 			| dclDef.at_annotation<>iclDef.at_annotation
 				= (False, tc_state)
@@ -561,7 +595,8 @@ instance t_corresponds TypeAttribute where
 	t_corresponds (TA_RootVar dclDef) (TA_RootVar iclDef)
 		= PA_BUG (return True) (t_corresponds dclDef iclDef)
 	t_corresponds _ TA_Anonymous
-		=	return True
+		| expand_syn_types_late_XXX False True
+			=	return True
 	t_corresponds TA_None icl
 		= case icl of
 			TA_Multi-> return True
@@ -745,8 +780,6 @@ instance e_corresponds DefinedSymbol where
 instance e_corresponds FunctionBody where
 	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
-//		| False--->("e_corresponds", from_body dclDef, from_body iclDef)
-//			= undef
 		=	e_corresponds (from_body dclDef) (from_body iclDef)
 	  where
 		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])

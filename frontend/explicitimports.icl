@@ -25,9 +25,130 @@ implies a b :== not a || b
 	,	si_implicit	:: ![(Index, Position)]	// module indices
 	}
 
+
+markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
+		-> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
+markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
+	#! nr_of_expl_imp_symbols
+			= size expl_imp_info.[component_nr]
+	   (new_symbols, expl_imp_info, cs_symbol_table)
+			= iFoldSt (mark_symbol component_nr) 0 nr_of_expl_imp_symbols ([], expl_imp_info, cs_symbol_table)
+	= (new_symbols, (expl_imp_info, cs_symbol_table))
+  where
+	mark_symbol component_nr i
+				(changed_symbols_accu, expl_imp_info, cs_symbol_table)
+		# (eii_ident, expl_imp_info)
+				= do_a_lot_just_to_read_an_array component_nr i expl_imp_info
+		  (ste, cs_symbol_table)
+				= readPtr eii_ident.id_info cs_symbol_table
+		  cai
+		  		= { cai_component_nr = component_nr, cai_index = i }
+		= case ste.ste_kind of
+			STE_ExplImpComponentNrs component_nrs _
+				# new_ste_kind
+						= STE_ExplImpComponentNrs [cai:component_nrs] []
+				  cs_symbol_table
+				  		= writePtr eii_ident.id_info { ste & ste_kind = new_ste_kind } cs_symbol_table
+				-> (changed_symbols_accu, expl_imp_info, cs_symbol_table)
+			_
+				# new_ste
+						= { ste & ste_kind = STE_ExplImpComponentNrs [cai] [], ste_previous = ste }
+				-> ([eii_ident:changed_symbols_accu], expl_imp_info, writePtr eii_ident.id_info new_ste cs_symbol_table)
+
+	do_a_lot_just_to_read_an_array component_nr i expl_imp_info
+		# (eii, expl_imp_info)
+				= replaceTwoDimArrElt component_nr i TemporarilyFetchedAway expl_imp_info
+		  (eii_ident, eii)
+		  		= get_eei_ident eii
+		= (eii_ident, { expl_imp_info & [component_nr, i] = eii })
+
+	
+				
+updateExplImpForMarkedSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
+		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
+updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
+			dcl_modules expl_imp_infos cs_symbol_table
+	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers
+			(dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Instance class_ident} dcl_modules expl_imp_infos cs_symbol_table
+	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
+	# cs_symbol_table
+			= optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol _ decl {ste_kind=STE_Imported (STE_Instance class_ident) _} dcl_modules expl_imp_infos cs_symbol_table
+	// this alternative is only for old syntax (cs_symbol_table argument is not necessary for new syntax)
+	# cs_symbol_table
+			= optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
+
+
+addExplImpInfo :: !Index Declaration ![Declaration] !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
+			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
+addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
+	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
+			= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
+	  (di_belonging, dcl_modules, cs_symbol_table)
+	  		= get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
+	  di
+	  		= { di_decl = decl, di_instances = instances, di_belonging = di_belonging }
+	  new_expl_imp_info
+	  		= ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
+	= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
+  where
+	get_belonging_symbol_nrs :: !Declaration !v:{#DclModule} !u:(Heap SymbolTableEntry) 
+			-> (!.NumberSet,!v:{#DclModule},!u:Heap SymbolTableEntry)
+	get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
+		# (all_belonging_symbols, dcl_modules)
+				= getBelongingSymbols decl dcl_modules
+		  nr_of_belongs
+				= nrOfBelongingSymbols all_belonging_symbols
+		  (_, belonging_bitvect, cs_symbol_table)
+				= foldlBelongingSymbols set_bit all_belonging_symbols (0, bitvectCreate nr_of_belongs, cs_symbol_table)
+		= (bitvectToNumberSet belonging_bitvect, dcl_modules, cs_symbol_table)
+
+	set_bit {id_info} (bit_nr, bitvect, cs_symbol_table)
+		# ({ste_kind}, cs_symbol_table)
+				= readPtr id_info cs_symbol_table
+		= ( bit_nr+1
+		  , case ste_kind of
+			 	STE_Empty -> bitvect
+				_ -> bitvectSet bit_nr bitvect
+		  , cs_symbol_table
+		  )
+
+
+optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
+	// this function is only for old syntax
+	| switch_import_syntax False True
+		= cs_symbol_table
+	# (class_ste, cs_symbol_table)
+			= readPtr class_ident.id_info cs_symbol_table
+	= case class_ste.ste_kind of
+		STE_ExplImpComponentNrs component_numbers inst_indices_accu
+			-> writePtr class_ident.id_info 
+					{ class_ste & ste_kind = STE_ExplImpComponentNrs component_numbers [decl:inst_indices_accu]}
+					cs_symbol_table
+		_
+			-> cs_symbol_table
+
+
+
+foldlBelongingSymbols f bs st
+	:== case bs of
+			BS_Constructors constructors
+				-> foldSt (\{ds_ident} st -> f ds_ident st) constructors st 
+			BS_Fields fields
+				-> foldlArraySt (\{fs_name} st -> f fs_name st) fields st 
+			BS_Members members
+				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
+			BS_Nothing
+				-> st
+
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
-				!*(!{#x:DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
-			-> (!.SolvedImports,!(!{#x:DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
+				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
+			-> (!.SolvedImports,!(!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod (dcl_modules, visited_modules, expl_imp_info, cs)
 	# import_indices
 			= ikhSearch` importing_mod expl_imp_indices_ikh
@@ -42,22 +163,18 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
   where
 	solve_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set importing_mod
 			(imported_mod, position, imported_symbols) (dcl_modules, visited_modules, expl_imp_info, cs)
-		# (decl_infos, (visited_modules, expl_imp_info))
+		# (successes, (decl_accu, unsolved_belonging, visited_modules, expl_imp_info))
 				= mapSt (search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod)
 						imported_symbols 
-						(visited_modules, expl_imp_info)
+						([], [], visited_modules, expl_imp_info)
 		  (expl_imp_info, cs_error)
-		  		= (switch_import_syntax check_triples check_singles position) decl_infos imported_symbols
+		  		= (switch_import_syntax check_triples check_singles position) successes imported_symbols
 		  				(expl_imp_info, cs.cs_error)
-		  belonging_to_solve
-		  		= [ (di_decl, ini, imported_mod) \\ Yes ({di_decl}, ini=:{ini_belonging=Yes _}, imported_mod) <- decl_infos]
-		  (belonging_decls, dcl_modules, visited_modules, expl_imp_info, cs)
+		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= foldSt (solve_belonging position expl_imp_indices_ikh modules_in_component_set importing_mod)
-		  				belonging_to_solve
-		  				([], dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error }) 
-// XXX alles Scheisse
-		= ((flatten [[di_decl:di_instances] \\ Yes ({di_decl,di_instances}, _, _) <- decl_infos]++belonging_decls, position),
-			(dcl_modules, visited_modules, expl_imp_info, cs))
+		  				unsolved_belonging
+		  				(decl_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error }) 
+		= ((decl_accu, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	solve_belonging position expl_imp_indices_ikh modules_in_component_set importing_mod
 			(decl, {ini_symbol_nr, ini_belonging=Yes belongs}, imported_mod)
@@ -97,7 +214,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		# (found, path, eii_declaring_modules, visited_modules)
 				=  depth_first_search expl_imp_indices_ikh modules_in_component_set
 						imported_mod ini_symbol_nr belong_nr belong_ident [importing_mod]
-						eii_declaring_modules (bitvectReset visited_modules)
+						eii_declaring_modules (bitvectResetAll visited_modules)
 		= case found of
 			Yes _
 				# eii_declaring_modules
@@ -188,26 +305,33 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				-> (No, (popErrorAdmin cs_error, cs_symbol_table))
 		
 	search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod
-			ini=:{ini_symbol_nr} (visited_modules, expl_imp_info)
+			ini=:{ini_symbol_nr} (decls_accu, belonging_accu, visited_modules, expl_imp_info)
 		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info)
 				= replace expl_imp_info ini_symbol_nr TemporarilyFetchedAway
 		  (opt_decl, path, eii_declaring_modules, visited_modules)
 				= depth_first_search expl_imp_indices_ikh modules_in_component_set imported_mod
 						ini_symbol_nr cUndef stupid_ident [importing_mod]
-						eii_declaring_modules (bitvectReset visited_modules)
+						eii_declaring_modules (bitvectResetAll visited_modules)
 		= case opt_decl of
-			Yes di=:{di_decl}
+			Yes di=:{di_decl, di_instances}
 				# new_eii_declaring_modules
 				  		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index 
 				  					{di_decl = di_decl, di_instances = [], di_belonging=EndNumbers} eei_dm)
 				  				path eii_declaring_modules
+				  new_belonging_accu
+				  		= case ini.ini_belonging of
+				  			No
+				  				-> belonging_accu
+				  			Yes _
+				  				-> [(di_decl, ini, imported_mod):belonging_accu]
 				  new_eii
-				  		= ExplImpInfo eii_ident new_eii_declaring_modules
-				-> (Yes (di, ini, imported_mod), (visited_modules, { expl_imp_info & [ini_symbol_nr] = new_eii }))
+				  			= ExplImpInfo eii_ident new_eii_declaring_modules
+				-> (True, ([di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
+							{ expl_imp_info & [ini_symbol_nr] = new_eii }))
 			No
 				# eii
 				  		= ExplImpInfo eii_ident eii_declaring_modules
-				-> (No, (visited_modules, { expl_imp_info & [ini_symbol_nr] = eii }))
+				-> (False, (decls_accu, belonging_accu, visited_modules, { expl_imp_info & [ini_symbol_nr] = eii }))
 
 	depth_first_search expl_imp_indices_ikh modules_in_component_set
 			imported_mod imported_symbol belong_nr belong_ident path eii_declaring_modules visited_modules
@@ -295,8 +419,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= True
 		= is_member belong_ident t
 
-	// No, No, No!
-	check_triples position [No, No, No: t1] [imported_symbol, _, _: t2] (expl_imp_info, cs_error)
+	check_triples position [False, False, False: t1] [imported_symbol, _, _: t2] (expl_imp_info, cs_error)
 		# (expl_imp_info, cs_error)
 				= give_error position imported_symbol (expl_imp_info, cs_error)
 		= check_triples position t1 t2 (expl_imp_info, cs_error)
@@ -305,7 +428,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	check_triples position [] [] (expl_imp_info, cs_error)
 		= (expl_imp_info, cs_error)
 		
-	check_singles position [No: t1] [imported_symbol: t2] (expl_imp_info, cs_error)
+	check_singles position [False: t1] [imported_symbol: t2] (expl_imp_info, cs_error)
 		# (expl_imp_info, cs_error)
 				= give_error position imported_symbol (expl_imp_info, cs_error)
 		= check_singles position t1 t2 (expl_imp_info, cs_error)
@@ -331,7 +454,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  		= get_eei_ident eii
 		= (eii_ident, { expl_imp_info & [i] = eii })
 
-	get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
+get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 	
 :: CheckCompletenessState =
 	{	ccs_dcl_modules				:: !.{#DclModule}
@@ -352,7 +475,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 
 :: CheckCompletenessInputBox = { box_cci :: !CheckCompletenessInput }
 
-checkExplicitImportCompleteness :: ![(Declaration, Position)] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
+checkExplicitImportCompleteness :: ![([Declaration], Position)] !*{#DclModule} !*{#FunDef} !*ExpressionHeap !*CheckState
 				-> (!.{#DclModule},!.{#FunDef},!.ExpressionHeap,!.CheckState)
 checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions expr_heap 
 								cs=:{cs_symbol_table, cs_error}
@@ -363,7 +486,11 @@ checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions expr_hea
 				ccs_error = cs_error, ccs_heap_changes_accu = [] }
 	   main_dcl_module_n
 	   		= cs.cs_x.x_main_dcl_module_n
-	   ccs = foldSt (checkCompleteness main_dcl_module_n) dcls_explicit { box_ccs = box_ccs }
+//	   ccs = foldSt (checkCompleteness main_dcl_module_n) dcls_explicit { box_ccs = box_ccs }
+	   ccs = foldSt (\(dcls, position) ccs
+	   					-> foldSt (checkCompleteness main_dcl_module_n position) dcls ccs)
+	   				dcls_explicit
+	   				{ box_ccs = box_ccs }
 	   { ccs_dcl_modules, ccs_icl_functions, ccs_expr_heap, ccs_symbol_table, ccs_error, ccs_heap_changes_accu }
 	   		= ccs.box_ccs
 	// repair heap contents
@@ -371,12 +498,12 @@ checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions expr_hea
 	   cs = { cs & cs_symbol_table = ccs_symbol_table, cs_error = ccs_error }
 	= (ccs_dcl_modules, ccs_icl_functions, ccs_expr_heap, cs)
   where
-	checkCompleteness :: !Int !(Declaration, Position) !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompleteness main_dcl_module_n ({dcl_ident, dcl_index, dcl_kind=STE_FunctionOrMacro _}, import_position) ccs 
+	checkCompleteness :: !Int !Position !Declaration !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
+	checkCompleteness main_dcl_module_n import_position {dcl_ident, dcl_index, dcl_kind=STE_FunctionOrMacro _} ccs 
 		= checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
-	checkCompleteness main_dcl_module_n ({dcl_ident, dcl_index, dcl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index}, import_position) ccs 
+	checkCompleteness main_dcl_module_n import_position {dcl_ident, dcl_index, dcl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index} ccs 
 		= checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
-	checkCompleteness main_dcl_module_n ({dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index}, import_position) ccs 
+	checkCompleteness main_dcl_module_n import_position {dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index} ccs 
 		#! ({dcl_common,dcl_functions}, ccs) = ccs!box_ccs.ccs_dcl_modules.[mod_index]
 		   cci = { box_cci = { cci_import_position = import_position, cci_main_dcl_module_n=main_dcl_module_n }}
 		= continuation expl_imp_kind dcl_common dcl_functions cci ccs

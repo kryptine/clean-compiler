@@ -94,6 +94,9 @@ instance == Assoc
 where
 	(==) a1 a2 = equal_constructor a1 a2
 
+instance == SignClassification where
+	(==) sc1 sc2 = sc1.sc_pos_vect == sc2.sc_pos_vect && sc1.sc_neg_vect == sc2.sc_neg_vect
+
 ::	CompareValue :== Int
 Smaller :== -1
 Greater	:== 1
