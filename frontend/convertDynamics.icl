@@ -44,7 +44,7 @@ where
 	convert_groups group_nr groups global_type_instances fun_defs_and_ci
 		| group_nr == size groups
 			= (groups, fun_defs_and_ci)
-			#! group = groups.[group_nr]
+			# (group, groups) = groups![group_nr]
 			= convert_groups (inc group_nr) groups global_type_instances (foldSt (convert_function group_nr global_type_instances) group.group_members fun_defs_and_ci)
 
 	convert_function group_nr global_type_instances fun (fun_defs, ci)
@@ -568,7 +568,7 @@ zipAppend2   xs       []     zs = zs
 zipAppend2 [x : xs] [y : ys] zs = [ (x,y)  :  zipAppend2 xs ys zs ]
 
 
-instance <<< Ptr a
+instance <<< (Ptr a)
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  
 

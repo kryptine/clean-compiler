@@ -23,7 +23,7 @@ addSelection var_expr_ptr sel []
 	= [ { su_field = sel, su_multiply = [], su_uniquely = [var_expr_ptr]  } ]
 addSelection var_expr_ptr sel sels=:[selection=:{ su_field,su_multiply,su_uniquely } : selections]
 	| sel == su_field
-		= [ { selection & su_multiply = su_multiply ++ [var_expr_ptr : su_multiply], su_uniquely = [] } : selections ]
+		= [ { selection & su_multiply = su_multiply ++ [var_expr_ptr : su_uniquely], su_uniquely = [] } : selections ]
 	| sel < su_field
 		= [ { su_field = sel, su_multiply = [], su_uniquely = [var_expr_ptr]  } : sels ]
 		= [ selection : addSelection var_expr_ptr sel selections ]
@@ -72,20 +72,23 @@ where
 							 rcu_selectively = [], rcu_uniquely = [] }
 				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
 
+refMarkOfVariable free_vars sel (VI_Occurrence var_occ) var_name var_info_ptr var_expr_ptr var_heap
+	# occ_ref_count = adjustRefCount sel var_occ.occ_ref_count var_expr_ptr
+	= case var_occ.occ_bind of // ---> (var_name,var_expr_ptr,occ_ref_count,var_occ.occ_ref_count) of
+		OB_OpenLet let_expr
+			# var_heap = var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count, occ_bind = OB_LockedLet let_expr })
+			-> refMark free_vars sel let_expr var_heap
+		OB_Pattern used_pattern_vars occ_bind
+			-> markPatternVariables sel used_pattern_vars (var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count }))
+		_
+			-> var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count })
+
 
 instance refMark BoundVar
 where
 	refMark free_vars sel {var_name,var_expr_ptr,var_info_ptr} var_heap
-		# (VI_Occurrence var_occ, var_heap) = readPtr var_info_ptr var_heap
-		  occ_ref_count = adjustRefCount sel var_occ.occ_ref_count var_expr_ptr
-		= case var_occ.occ_bind of
-			OB_OpenLet let_expr
-				# var_heap = var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count, occ_bind = OB_LockedLet let_expr })
-				-> refMark free_vars sel let_expr var_heap
-			OB_Pattern used_pattern_vars occ_bind
-				-> markPatternVariables sel used_pattern_vars (var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count }))
-			_
-				-> var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count })
+		# (var_occ, var_heap) = readPtr var_info_ptr var_heap
+		= refMarkOfVariable free_vars sel var_occ var_name var_info_ptr var_expr_ptr var_heap
 			
 instance refMark Expression
 where
@@ -116,8 +119,7 @@ where
 		    	= foldr bind_is_observing (True, var_heap) binds
 			where
 				bind_is_observing {bind_dst={fv_info_ptr}} (observe, var_heap) 
-					#! info = sreadPtr fv_info_ptr var_heap
-					# (VI_Occurrence {occ_observing}) = info
+					# (VI_Occurrence {occ_observing}, var_heap) = readPtr fv_info_ptr var_heap
 					= (occ_observing && observe, var_heap)
 			
 			let_combine free_vars var_heap
@@ -156,8 +158,9 @@ where
 	
 		ref_mark_of_fields field_nr free_vars [] var var_heap
 			= var_heap
-		ref_mark_of_fields field_nr free_vars [{bind_src = EE} : fields] var var_heap
-			# var_heap = refMark free_vars field_nr var var_heap
+		ref_mark_of_fields field_nr free_vars [{bind_src = NoBind expr_ptr} : fields] var=:{var_name,var_info_ptr} var_heap
+			# (var_occ, var_heap) = readPtr var_info_ptr var_heap
+			  var_heap = refMarkOfVariable free_vars field_nr var_occ var_name var_info_ptr expr_ptr var_heap
 			= ref_mark_of_fields (inc field_nr) free_vars fields var var_heap
 		ref_mark_of_fields field_nr free_vars [{bind_src} : fields] var var_heap
 			# var_heap = refMark free_vars NotASelector bind_src var_heap
@@ -179,7 +182,7 @@ where
 isUsed RC_Unused	= False				
 isUsed _			= True				
 
-instance refMark Bind a b | refMark a
+instance refMark (Bind a b) | refMark a
 where
 	refMark free_vars sel {bind_src} var_heap
 		= refMark free_vars NotASelector bind_src var_heap
@@ -210,20 +213,6 @@ where
 			= collect_used_vars pattern_vars (inc arg_nr) collected_vars
 	collect_used_vars [] arg_nr collected_vars
 		= collected_vars
-
-markVariables variables var_heap
-	= foldSt markVariable variables var_heap
-
-markVariable {fv_name,fv_info_ptr} var_heap
-	# (VI_Occurrence var_occ=:{occ_ref_count}, var_heap) = readPtr fv_info_ptr var_heap
-	= case occ_ref_count of
-		RC_Unused
-			-> var_heap
-		RC_Used {rcu_multiply,rcu_uniquely,rcu_selectively}
-			# rcu_multiply = collectAllSelections rcu_selectively (rcu_uniquely ++ rcu_multiply)
-			-> var_heap <:= (fv_info_ptr, VI_Occurrence { var_occ &
-							occ_ref_count = RC_Used {rcu_multiply = rcu_multiply, rcu_uniquely = [], rcu_selectively = [] }})
-//				---> ("markVariable", fv_name, rcu_multiply)
 
 collectLocalLetVars free_vars var_heap
 	= foldSt (foldSt collect_local_let_var) free_vars ([], var_heap)
@@ -375,8 +364,7 @@ parCombine free_vars var_heap
 	= foldSt (foldSt (par_combine)) free_vars var_heap
 where
 	par_combine {fv_info_ptr} var_heap
-		#! old_info = sreadPtr fv_info_ptr var_heap
-		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous=[prev_ref_count:prev_counts]}) = old_info
+		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous=[prev_ref_count:prev_counts]}, var_heap) = readPtr fv_info_ptr var_heap
 		= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ &
 				occ_ref_count = parCombineRefCount occ_ref_count prev_ref_count , occ_previous = prev_counts })
 
@@ -385,8 +373,7 @@ caseCombine do_par_combine free_vars var_heap depth
 	= foldSt (foldSt (case_combine do_par_combine depth)) free_vars var_heap
 where
 	case_combine do_par_combine depth {fv_name,fv_info_ptr} var_heap
-		#! old_info = sreadPtr fv_info_ptr var_heap
-		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous}) = old_info
+		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous}, var_heap) = readPtr fv_info_ptr var_heap
 		  (occ_ref_count, occ_previous) = case_combine_ref_counts do_par_combine occ_ref_count occ_previous (dec depth)
 		= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = occ_ref_count , occ_previous = occ_previous })
 //				---> ("case_combine", fv_name, occ_ref_count)
@@ -479,40 +466,41 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 		make_primary_selections_on_unique []
 			= []
 
-makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} !{# CommonDefs } !*VarHeap !*ExpressionHeap !*ErrorAdmin
-	-> (!u:{# FunDef}, !*Coercions, !w:{! Type}, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-makeSharedReferencesNonUnique [] fun_defs coercion_env subst defs var_heap expr_heap  error
-	= (fun_defs, coercion_env, subst, var_heap, expr_heap, error)
-makeSharedReferencesNonUnique [fun : funs] fun_defs coercion_env subst defs var_heap expr_heap error
-	#! fun_def = fun_defs.[fun] 
-	# (coercion_env, subst, var_heap, expr_heap, error)
-		= make_shared_references_of_funcion_non_unique fun_def coercion_env subst defs var_heap expr_heap error
-	= makeSharedReferencesNonUnique funs fun_defs coercion_env subst defs var_heap expr_heap error
+makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} !v:TypeDefInfos !*VarHeap !*ExpressionHeap !*ErrorAdmin
+	-> (!u:{# FunDef}, !*Coercions, !w:{! Type},  !v:TypeDefInfos, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+makeSharedReferencesNonUnique [] fun_defs coercion_env subst type_def_infos var_heap expr_heap  error
+	= (fun_defs, coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
+makeSharedReferencesNonUnique [fun : funs] fun_defs coercion_env subst type_def_infos var_heap expr_heap error
+	# (fun_def, fun_defs) = fun_defs![fun] 
+	# (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
+		= make_shared_references_of_funcion_non_unique fun_def coercion_env subst type_def_infos var_heap expr_heap error
+	= makeSharedReferencesNonUnique funs fun_defs coercion_env subst type_def_infos var_heap expr_heap error
 where
 	make_shared_references_of_funcion_non_unique {fun_symb, fun_pos, fun_body = TransformedBody {tb_args,tb_rhs},fun_info={fi_local_vars}}
-			coercion_env subst defs var_heap expr_heap error
+			coercion_env subst type_def_infos var_heap expr_heap error
 	# variables = tb_args ++ fi_local_vars
-	  (subst, var_heap, expr_heap) = clear_occurrences variables subst defs var_heap expr_heap
-	  var_heap = refMark [tb_args] NotASelector tb_rhs var_heap
+	  (subst, type_def_infos, var_heap, expr_heap) = clear_occurrences variables subst type_def_infos var_heap expr_heap
+	  var_heap = refMark [tb_args] NotASelector tb_rhs var_heap // (tb_rhs ---> ("makeSharedReferencesNonUnique", fun_symb, tb_rhs)) var_heap
+	//tb_rhs var_heap //   
 	  position = newPosition fun_symb fun_pos
 	  (coercion_env, var_heap, expr_heap, error) = make_shared_vars_non_unique variables coercion_env var_heap expr_heap
 	  		(setErrorAdmin position error)
-	= (coercion_env, subst, var_heap, expr_heap, error)
+	= (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
 	
 	where
-		clear_occurrences vars subst defs var_heap expr_heap
-			= foldSt (initial_occurrence defs) vars (subst, var_heap, expr_heap)
+		clear_occurrences vars subst type_def_infos var_heap expr_heap
+			= foldSt initial_occurrence vars (subst, type_def_infos, var_heap, expr_heap)
 		where
-			initial_occurrence defs {fv_name,fv_info_ptr} (subst, var_heap, expr_heap) 
+			initial_occurrence {fv_name,fv_info_ptr} (subst, type_def_infos, var_heap, expr_heap) 
 				# (VI_Type {at_type,at_attribute}, var_heap) = readPtr fv_info_ptr var_heap
 				= case at_type of
 					TempV tv_number
-						#! is_oberving = hasObservingType subst.[tv_number] defs
-						-> (subst, var_heap <:= (fv_info_ptr,
+						#! is_oberving = has_observing_type type_def_infos subst.[tv_number]
+						-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
 								VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
 									occ_observing = is_oberving, occ_bind = OB_Empty }), expr_heap)
 					_
-						-> (subst, var_heap <:= (fv_info_ptr,
+						-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
 								VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
 									occ_observing = False,  occ_bind = OB_Empty }), expr_heap)
 					
@@ -521,12 +509,11 @@ where
 			= foldl make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error) vars
 
 		make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error)  fv=:{fv_name,fv_info_ptr}
-			#! var_info = sreadPtr fv_info_ptr var_heap
-			# (VI_Occurrence occ) = var_info
+			# (VI_Occurrence occ, var_heap) = readPtr fv_info_ptr var_heap
 			= case occ.occ_ref_count of
 				RC_Used {rcu_multiply,rcu_selectively}
 					# (coercion_env, expr_heap, error) = make_shared_occurrences_non_unique fv rcu_multiply (coercion_env, expr_heap, error)
-//					  (coercion_env, expr_heap, error) = foldSt (make_selection_non_unique fv) rcu_selectively (coercion_env, expr_heap, error)  
+					  (coercion_env, expr_heap, error) = foldSt (make_selection_non_unique fv) rcu_selectively (coercion_env, expr_heap, error)  
 					-> (coercion_env, var_heap, expr_heap, error)
 				_
 					-> (coercion_env, var_heap, expr_heap, error)
@@ -537,29 +524,30 @@ where
 		make_shared_occurrence_non_unique free_var var_expr_ptr (coercion_env, expr_heap, error) 
 			| isNilPtr var_expr_ptr
 				= (coercion_env, expr_heap, error)
-				#! expr_info = sreadPtr var_expr_ptr expr_heap
-				# (EI_Attribute sa_attr_nr) = expr_info
-				# (succ, coercion_env) = tryToMakeNonUnique sa_attr_nr coercion_env
-				| succ
-//						 ---> ("make_shared_occurrence_non_unique", free_var)
-					= (coercion_env, expr_heap, error)
-					= (coercion_env, expr_heap, uniquenessError { cp_expression = FreeVar free_var} " demanded attribute cannot be offered by shared object" error)
-
+				# (expr_info, expr_heap) = readPtr var_expr_ptr expr_heap
+				= case expr_info of
+					EI_Attribute sa_attr_nr
+						# (succ, coercion_env) = tryToMakeNonUnique sa_attr_nr coercion_env
+						| succ
+								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr)
+							-> (coercion_env, expr_heap, error)
+							-> (coercion_env, expr_heap, uniquenessError { cp_expression = FreeVar free_var} " demanded attribute cannot be offered by shared object" error)
+					_
+						-> abort ("make_shared_occurrence_non_unique" ---> ((free_var, var_expr_ptr) <<- expr_info))
 		make_selection_non_unique fv {su_multiply} cee
 			= make_shared_occurrences_non_unique fv su_multiply cee
 
-hasObservingType TE defs
-	= True
-hasObservingType (TB basic_type) defs
-	= True
-hasObservingType (TempV var_number) defs 
-	= True
-hasObservingType (TA {type_index = {glob_object,glob_module}} type_args) defs
-	# {td_properties} = defs.[glob_module].com_type_defs.[glob_object]
-	= True
-//	= foldSt (\ {at_type} ok -> ok && hasObservingType at_type defs) type_args (td_properties bitand cIsHyperStrict <> 0)
-hasObservingType type defs
-	= False
+	has_observing_type type_def_infos TE
+		= True
+	has_observing_type type_def_infos (TB basic_type)
+		= True
+	has_observing_type type_def_infos (TempV var_number) 
+		= True
+	has_observing_type type_def_infos (TA {type_index = {glob_object,glob_module}} type_args)
+		# {tdi_properties} = type_def_infos.[glob_module].[glob_object]
+		= foldSt (\ {at_type} ok -> ok && has_observing_type type_def_infos at_type) type_args (tdi_properties bitand cIsHyperStrict <> 0)
+	has_observing_type type_def_infos type
+		= False
 
 					
 instance <<< ReferenceCount
@@ -573,19 +561,8 @@ where
 
 
 
-instance <<< Ptr v
+instance <<< (Ptr v)
 where
 	(<<<) file ptr = file <<< '[' <<< ptrToInt ptr <<< ']'
-
-
-import Debug
-
-show
-	=	debugShowWithOptions [DebugMaxChars 80, DebugMaxDepth 5]
-
-instance <<< VarInfo
-where
-	(<<<) file vi
-		 = file <<< show vi
 
 

@@ -7,7 +7,7 @@ import StdEnv
 	,	bind_dst :: !b
 	}	
 
-::	Env a b :== [Bind a b]
+::	Env a b :== [.Bind a b]
 
 ::	Optional x = Yes !x | No
 

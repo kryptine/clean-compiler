@@ -78,12 +78,12 @@ cConversionTableSize	:== 8
 	}
 
 ::	IclModule  =
-	{	icl_name			:: !Ident
-	,	icl_functions		:: !.{# FunDef }
-	,	icl_instances		:: !IndexRange
-	,	icl_specials		:: !IndexRange
-	,	icl_common			:: !.CommonDefs
-	,	icl_declared		:: !Declarations
+	{	icl_name				:: !Ident
+	,	icl_functions			:: !.{# FunDef }
+	,	icl_instances			:: !IndexRange
+	,	icl_specials			:: !IndexRange
+	,	icl_common				:: !.CommonDefs
+	,	icl_declared			:: !Declarations
 	,	icl_imported_objects	:: ![ImportedObject]
 	}
 
@@ -121,7 +121,7 @@ instance envLookUp TypeVar, AttributeVar, ATypeVar
 
 class toIdent a :: !a -> Ident
 
-instance toIdent ConsDef, TypeDef a, ClassDef, MemberDef, FunDef, SelectorDef // , ClassInstance
+instance toIdent ConsDef, (TypeDef a), ClassDef, MemberDef, FunDef, SelectorDef // , ClassInstance
 instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
@@ -129,7 +129,7 @@ instance <<< STE_Kind, IdentPos, Declaration
 
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
-addLocalFunctionDefsToSymbolTable :: Level Index .Index u:(a FunDef) *SymbolTable *ErrorAdmin -> (v:(a FunDef),.SymbolTable,.ErrorAdmin) | Array .a, [u <= v];
+addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !u:{#FunDef} !*SymbolTable !*ErrorAdmin -> (!u:{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
 addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] ![.Declaration] !*CheckState -> .CheckState;
 addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
@@ -139,5 +139,4 @@ retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{
 removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntry) -> *Heap SymbolTableEntry;
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
-removeLocalsFromSymbolTable :: .Level .[Ident] LocalDefs u:(a b) *(Heap SymbolTableEntry) -> (v:(a b),.Heap SymbolTableEntry) | Array .a & select_u , toIdent b, [u <= v];
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;

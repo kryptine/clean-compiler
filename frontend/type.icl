@@ -301,7 +301,7 @@ unifyTypeApplications cons_var1 type_args type=:(cons_var2 :@: types) modules su
 		      (types, subst) = arraySubst (drop diff types) subst
 		    = unify type_args types modules subst heaps
 			= (False, subst, heaps)
-	| otherwise
+//	| otherwise
 		# (succ, subst, heaps) = unifyTypes (cons_var1 :@: take diff type_args) TA_Multi (constructorVariableToTypeVariable cons_var2) TA_Multi modules subst heaps
 		| succ
 		    # (type_args, subst) = arraySubst (drop diff type_args) subst
@@ -371,13 +371,12 @@ cIsExistential 		:== True
 cIsNotExistential	:== False
 
 freshCopyOfTypeVariable {tv_name,tv_info_ptr} cs=:{copy_heaps}
-	#! tv_info 	= sreadPtr tv_info_ptr copy_heaps.th_vars
-	= case tv_info of
-		 TVI_Type fresh_var
-			-> (fresh_var, cs)
+	# (TVI_Type fresh_var, th_vars)	= readPtr tv_info_ptr copy_heaps.th_vars
+//	= (fresh_var, { cs & copy_heaps.th_vars = th_vars } ) // 2.0
+	= (fresh_var, { cs & copy_heaps = { copy_heaps & th_vars = th_vars }})
 
 freshConsVariable {tv_info_ptr} type_var_heap
-	#! tv_info 			= sreadPtr tv_info_ptr type_var_heap
+	# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 	= (to_constructor_variable tv_info, type_var_heap)
 	where
 		to_constructor_variable (TVI_Type (TempV temp_var_id))
@@ -429,7 +428,7 @@ freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_s
 //		---> ("freshAlgebraicType", alg_type, cons_types)
 where
 	fresh_symbol_types [{ap_symbol={glob_object}}] cons_defs var_store copy_heaps
-		# {cons_type = {st_args,st_attr_env,st_result}, cons_index, cons_exi_vars, cons_exi_attrs} = cons_defs.[glob_object.ds_index]
+		# {cons_type = {st_args,st_attr_env,st_result}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
 		  (th_vars, var_store)		= freshExistentialVariables  cons_exi_vars (copy_heaps.th_vars, var_store)
 	  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env ([], copy_heaps.th_attrs)
 	  	  (result_type, cs)			= freshCopy st_result { copy_heaps = { copy_heaps & th_attrs = th_attrs, th_vars = th_vars } }
@@ -738,7 +737,7 @@ determineSymbolTypeOfFunction ident act_arity st=:{st_args,st_result,st_attr_var
 			-> (curried_st, cons_variables, ts)
 
 standardFieldSelectorType {glob_object={ds_ident,ds_index},glob_module} {ti_common_defs} ts=:{ts_var_store,ts_type_heaps}
-	#! {sd_type,sd_exi_vars,sd_exi_attrs} = ti_common_defs.[glob_module].com_selector_defs.[ds_index]
+	#! {sd_type,sd_exi_vars} = ti_common_defs.[glob_module].com_selector_defs.[ds_index]
 	# (th_vars, ts_var_store) = freshExistentialVariables sd_exi_vars (ts_type_heaps.th_vars, ts_var_store)
 	  (inst, cons_variables, ts) = freshSymbolType cWithFreshContextVars sd_type ti_common_defs { ts & ts_type_heaps = { ts_type_heaps & th_vars = th_vars }, ts_var_store = ts_var_store }
 	= (inst, ts)
@@ -769,7 +768,7 @@ cIsRecursive :== True
 cIsNotRecursive :== False
 
 storeAttribute (Yes expt_ptr) type_attribute symbol_heap
-	= writePtr expt_ptr (EI_Attribute (toInt type_attribute)) symbol_heap
+	= symbol_heap <:=  (expt_ptr, EI_Attribute (toInt type_attribute))
 storeAttribute No type_attribute symbol_heap
 	= symbol_heap
 
@@ -1009,7 +1008,7 @@ where
 		= case result_type_symb of
 			Yes {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
 				# (var, ts) = freshAttributedVariable ts
-			  	  (result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False var expr opt_expr_ptr (reqs, ts)
+			  	  (result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False var expr (reqs, ts)
 				  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
 				  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
 				  req_type_coercions
@@ -1020,13 +1019,12 @@ where
 				-> (result_type, No, ({ reqs & req_type_coercions = req_type_coercions }, 
 						{ts & ts_var_store = inc ts.ts_var_store, ts_expr_heap = storeAttribute opt_expr_ptr TA_Multi ts.ts_expr_heap}))
 			_
-			  	# (result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors True expr_type expr opt_expr_ptr (reqs, ts)
-				-> ( result_type, No, (reqs, { ts & ts_expr_heap = storeAttribute opt_expr_ptr result_type.at_attribute ts.ts_expr_heap }))
-
+				# (result_type, reqs_ts) =  requirementsOfSelectors ti No expr selectors True expr_type expr (reqs, ts)
+				-> (result_type, opt_expr_ptr, reqs_ts)
 	requirements ti (Update composite_expr selectors elem_expr) reqs_ts
 		# (composite_expr_type, opt_composite_expr_ptr, reqs_ts) = requirements ti composite_expr reqs_ts
-		  (result_type, reqs_ts) =  requirementsOfSelectors ti (Yes elem_expr) composite_expr selectors True composite_expr_type composite_expr opt_composite_expr_ptr reqs_ts
-		= (composite_expr_type, No, reqs_ts)
+		  (result_type, reqs_ts) = requirementsOfSelectors ti (Yes elem_expr) composite_expr selectors True composite_expr_type composite_expr reqs_ts
+		= (composite_expr_type, opt_composite_expr_ptr, reqs_ts)
 
 	requirements ti (RecordUpdate {glob_module,glob_object={ds_index,ds_arity}} expression expressions) (reqs, ts)
 		# (lhs, ts) = standardLhsConstructorType ds_index glob_module ds_arity ti ts	
@@ -1044,8 +1042,9 @@ where
 			# reqs_ts = requirements_of_field ti expression field dem_type off_type reqs_ts
 			= requirements_of_fields ti expression fields dem_types off_types reqs_ts
 	
-		requirements_of_field ti expression {bind_src=EE} dem_field_type off_field_type (reqs=:{req_type_coercions}, ts)
-			# coercion = { tc_demanded = dem_field_type, tc_offered = off_field_type, tc_position = { cp_expression = expression }, tc_coercible = True }
+		requirements_of_field ti expression {bind_src=NoBind expr_ptr} dem_field_type off_field_type (reqs=:{req_type_coercions}, ts)
+			# ts = { ts & ts_expr_heap = ts.ts_expr_heap <:= (expr_ptr, EI_Attribute (toInt dem_field_type.at_attribute)) }
+			  coercion = { tc_demanded = dem_field_type, tc_offered = off_field_type, tc_position = { cp_expression = expression }, tc_coercible = True }
 			= ({ reqs & req_type_coercions = [ coercion : req_type_coercions ]}, ts)
 		requirements_of_field ti _ {bind_src} dem_field_type _ reqs_ts
 			# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti bind_src reqs_ts
@@ -1089,6 +1088,14 @@ where
 	requirements _ expr reqs_ts
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
 
+
+requirementsOfSelectors ti opt_expr expr [selector] tc_coercible sel_expr_type sel_expr reqs_ts 
+	= requirementsOfSelector ti opt_expr expr selector tc_coercible sel_expr_type sel_expr reqs_ts
+requirementsOfSelectors ti opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs_ts 
+	# (result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr reqs_ts
+	= requirementsOfSelectors ti opt_expr expr selectors tc_coercible result_type sel_expr reqs_ts 
+
+/*
 requirementsOfSelectors ti opt_expr expr [selector] tc_coercible sel_expr_type sel_expr opt_expr_ptr (reqs, ts)
 	# ts_expr_heap = storeAttribute opt_expr_ptr sel_expr_type.at_attribute ts.ts_expr_heap
 	= requirementsOfSelector ti opt_expr expr selector tc_coercible sel_expr_type sel_expr (reqs, { ts & ts_expr_heap = ts_expr_heap })
@@ -1102,10 +1109,10 @@ where
 	requirements_of_remaining_selectors ti opt_expr expr [selector : selectors] tc_coercible sel_expr_type sel_expr reqs_ts 
 		# (result_type, reqs_ts) = requirementsOfSelector ti No expr selector tc_coercible sel_expr_type sel_expr reqs_ts 
 		= requirements_of_remaining_selectors ti opt_expr expr selectors tc_coercible result_type sel_expr reqs_ts
-		  
-requirementsOfSelector ti _ expr (RecordSelection field filed_nr) tc_coercible sel_expr_type sel_expr (reqs, ts )
+*/		  
+requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible sel_expr_type sel_expr (reqs, ts )
 	# ({tst_args, tst_result, tst_attr_env}, ts) = standardFieldSelectorType field ti ts
-	  req_type_coercions = [{ tc_demanded = sel_expr_type, tc_offered = hd tst_args, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : 
+	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
 	= (tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
 requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible sel_expr_type sel_expr (reqs, ts) 
@@ -1114,9 +1121,10 @@ requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident
 	  (dem_array_type, dem_index_type, rest_type) = array_and_index_type tst_args
 	  reqs ={ reqs & req_attr_coercions = tst_attr_env ++ reqs.req_attr_coercions, req_cons_variables = [ cons_variables : reqs.req_cons_variables ]}
 	  (index_type, opt_expr_ptr, (reqs, ts)) = requirements ti index_expr (reqs, ts)
+	  ts_expr_heap = storeAttribute opt_expr_ptr dem_index_type.at_attribute ts.ts_expr_heap
       reqs = { reqs & req_type_coercions = [{ tc_demanded = dem_index_type, tc_offered = index_type, tc_position = { cp_expression = expr }, tc_coercible = True },
       			{ tc_demanded = dem_array_type, tc_offered = sel_expr_type, tc_position = { cp_expression = sel_expr }, tc_coercible = tc_coercible } : reqs.req_type_coercions ]}
-	  (reqs, ts) = requirements_of_update ti opt_expr rest_type (reqs, ts)
+	  (reqs, ts) = requirements_of_update ti opt_expr rest_type (reqs, { ts & ts_expr_heap = ts_expr_heap })
 	| isEmpty tst_context
 		= (tst_result, (reqs, ts))
 		= (tst_result, ({ reqs & req_overloaded_calls = [expr_ptr : reqs.req_overloaded_calls ]}, { ts & ts_expr_heap =
@@ -1164,8 +1172,8 @@ InitFunEnv nr_of_fun_defs
 CreateInitialSymbolTypes common_defs [] defs_and_state
 	= defs_and_state
 CreateInitialSymbolTypes common_defs [fun : funs] (fun_defs, pre_def_symbols, req_cons_variables, ts)
-	#! fd = fun_defs.[fun]
-	# (pre_def_symbols, req_cons_variables, ts) = initial_symbol_type common_defs fd (pre_def_symbols, req_cons_variables, ts)
+	# (fd, fun_defs) = fun_defs![fun]
+	  (pre_def_symbols, req_cons_variables, ts) = initial_symbol_type common_defs fd (pre_def_symbols, req_cons_variables, ts)
 	= CreateInitialSymbolTypes common_defs funs (fun_defs, pre_def_symbols, req_cons_variables, ts)
 where 
 	initial_symbol_type common_defs {fun_type = Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env}, fun_lifted, fun_info = {fi_dynamics} }
@@ -1317,14 +1325,14 @@ cleanUpAndCheckFunctionTypes [] _ defs type_contexts coercion_env attr_partition
 	= (fun_defs, ts)
 cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] defs type_contexts coercion_env
 				attr_partition type_var_env attr_var_env (fun_defs, ts)
-	#! fd = fun_defs.[fun]
+	# (fd, fun_defs) = fun_defs![fun]
 	# (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun defs type_contexts
 				req_case_and_let_exprs coercion_env attr_partition type_var_env attr_var_env ts
 	= cleanUpAndCheckFunctionTypes funs reqs defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 where
 	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun defs type_contexts case_and_let_exprs
 					coercion_env attr_partition type_var_env attr_var_env ts
-		#! env_type = ts.ts_fun_env.[fun]
+		# (env_type, ts) = ts!ts_fun_env.[fun]
 		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_symb fun_pos) ts.ts_error}
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
@@ -1371,11 +1379,9 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	,	fe_location		:: !IdentPos
 	}
 
-// MW0 was typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
-typeProgram :: !ModuleKind !{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
+typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
-// MW0 was typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
-typeProgram mod_type comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
+typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file
 	#! fun_env_size = size fun_defs
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
 
@@ -1400,7 +1406,6 @@ typeProgram mod_type comps fun_defs specials icl_defs imports modules {hp_var_he
 	  		= type_components 0 comps  class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 // MW0 was	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
 	  (fun_defs, ts_fun_env, ts_error=:{ea_ok=no_start_rule_error}) = update_function_types 0 comps ts.ts_fun_env fun_defs ts_error
-	    
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps})
 // MW0 was			= type_instances specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
 // MW0 was				{ ts & ts_fun_env = ts_fun_env })
@@ -1533,8 +1538,8 @@ where
 			= (True, fun_defs, os_predef_symbols, os_special_instances, create_erroneous_function_types comp { ts & ts_type_heaps = os_type_heaps,
 					ts_error = { os_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, 
 					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap })
-		# (fun_defs, coercion_env, subst, os_var_heap, os_symbol_heap, os_error)
-		  		= makeSharedReferencesNonUnique comp fun_defs coercion_env subst ti_common_defs os_var_heap os_symbol_heap os_error
+		# (fun_defs, coercion_env, subst, ts_td_infos, os_var_heap, os_symbol_heap, os_error)
+		  		= makeSharedReferencesNonUnique comp fun_defs coercion_env subst ts_td_infos os_var_heap os_symbol_heap os_error
 		  (subst, {coer_offered,coer_demanded}, ts_td_infos, ts_type_heaps, ts_error)
 		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
 		  (attr_partition, coer_demanded) = partitionateAttributes coer_offered coer_demanded
@@ -1640,18 +1645,17 @@ where
 		= expand_types_of_cases_and_lets reqs (foldl expand_case_or_let_type heap_and_subst req_case_and_let_exprs)
 
 	expand_case_or_let_type (expr_heap, subst) info_ptr
-		#! info = sreadPtr info_ptr expr_heap
-		= case info of
-			EI_CaseType case_type
+		= case (readPtr info_ptr expr_heap) of
+			(EI_CaseType case_type, expr_heap)
 				# (case_type, subst) = arraySubst case_type subst
-				-> (writePtr info_ptr (EI_CaseType case_type) expr_heap, subst)
-			EI_LetType let_type
+				-> (expr_heap <:= (info_ptr, EI_CaseType case_type), subst)
+			(EI_LetType let_type, expr_heap)
 				# (let_type, subst) = arraySubst let_type subst
-				-> (writePtr info_ptr (EI_LetType let_type) expr_heap, subst)
+				-> (expr_heap <:= (info_ptr, EI_LetType let_type), subst)
 
 	expand_function_types :: ![Int] !*{!Type} *{! FunctionType} -> (!*{!Type}, *{! FunctionType})
 	expand_function_types [fun : funs] subst ts_fun_env
-		#! fun_type = ts_fun_env.[fun]
+		# (fun_type, ts_fun_env) = ts_fun_env![fun]
 		= case fun_type of
 			UncheckedType tst
 				# (exp_tst, subst) = arraySubst tst subst
@@ -1665,6 +1669,7 @@ where
 
 // MW0 was	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
 	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} !*ErrorAdmin -> (!*{#FunDef}, !*{!FunctionType}, !.ErrorAdmin)
+// MW0 was	update_function_types group_index comps fun_env fun_defs
 	update_function_types group_index comps fun_env fun_defs error_admin
 		| group_index == size comps
 // MW0 was			= (fun_defs, fun_env)
@@ -1682,9 +1687,9 @@ where
 // MW0 was		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs
 		update_function_types_in_component [ fun_index : funs ] fun_env fun_defs error_admin
 			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
-			#! fd = fun_defs.[fun_index]
+			# (fd, fun_defs) = fun_defs![fun_index]
 // MW0..
-			# is_start_rule  = fd.fun_symb.id_name=="Start" && fd.fun_info.fi_def_level==1 && mod_type==MK_Main
+			# is_start_rule  = fd.fun_symb.id_name=="Start" && fd.fun_info.fi_def_level==1
 			  error_admin = case is_start_rule  of
 			  					False	-> error_admin
 			  					_		-> check_type_of_start_rule fd checked_fun_type error_admin
@@ -1711,15 +1716,16 @@ where
 		= mapSt (type_function ti) group (cons_variables, fun_defs, ts) // ((cons_variables, fun_defs, ts) ---> "[(") ---> ")]"
 
 	type_function ti fun_index (cons_variables, fun_defs, ts=:{ts_fun_env, ts_var_heap, ts_expr_heap, ts_error})
-		#! fd = fun_defs.[fun_index]
-		   type = ts_fun_env.[fun_index]
-		# {fun_symb,fun_arity,fun_body=TransformedBody {tb_args,tb_rhs},fun_pos, fun_info, fun_type} = fd
+		# (fd, fun_defs) = fun_defs![fun_index]
+		  (type, ts_fun_env) = ts_fun_env![fun_index]
+		  {fun_symb,fun_arity,fun_body=TransformedBody {tb_args,tb_rhs},fun_pos, fun_info, fun_type} = fd
 		  temp_fun_type = type_of type
 		  ts_var_heap = makeBase tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_symb fun_pos
 		  ts_error = setErrorAdmin fe_location ts_error
 		  reqs = { req_overloaded_calls = [], req_type_coercions = [], req_attr_coercions = [], req_case_and_let_exprs = [], req_cons_variables = cons_variables }
-		  ( rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs, { ts & ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error })
+		  ( rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs,
+		  		{ ts & ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error, ts_fun_env = ts_fun_env })
 		  req_type_coercions = [{tc_demanded = temp_fun_type.tst_result,tc_offered = rhs_type, tc_position = {cp_expression = tb_rhs }, tc_coercible = True} :
 		  		rhs_reqs.req_type_coercions ]
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap
@@ -1782,7 +1788,7 @@ where
 		= foldSt create_erroneous_function_type group ts
 		
 	create_erroneous_function_type fun ts
-		#! env_type = ts.ts_fun_env.[fun]
+		# (env_type, ts) = ts!ts_fun_env.[fun]
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
 				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tmp_fun_type.tst_lifted ts.ts_type_heaps

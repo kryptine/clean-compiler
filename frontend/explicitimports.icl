@@ -407,7 +407,10 @@ element_appears	imported_st element_ident dcl_index
 element_appears imported_st element_ident dcl_index
 				[h=:(struct_id, SI_DotDot, st, optInfo):t] atomic_imports unimp_index
 				index modules cs
-	| (case st of {ST_stomm_stomm_stomm _ -> True; _ -> False}) && (False->>"element_appears weird case")
+	| (case st of
+			ST_stomm_stomm_stomm _
+				-> True
+			_ 	-> False) && (False->>"element_appears weird case")
 		= undef
 	#	(appears, defined, opt_element_idents, modules, cs)
 			= element_appears_in_struct imported_st element_ident dcl_index struct_id index modules cs
@@ -783,8 +786,8 @@ instance consequences Expression
 instance consequences FunctionBody
   where	consequences (CheckedBody body) = consequences body
 		consequences (TransformedBody body) = consequences body
-		// other alternatives should not occur
-				
+		consequences (RhsMacroBody body) = consequences body
+		
 instance consequences FunType
   where
 	consequences {ft_type}	= consequences ft_type	

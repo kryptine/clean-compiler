@@ -1,7 +1,7 @@
 implementation module typesupport
 
 import StdEnv, StdCompare
-import syntax, parse, check, unitype, utilities // , RWSDebug
+import syntax, parse, check, unitype, utilities, checktypes // , RWSDebug
 
 // MW: this switch is used to en(dis)able the fusion algorithm
 SwitchFusion fuse dont_fuse :== dont_fuse
@@ -91,8 +91,8 @@ where
 			
 instance clean_up Type
 where
-	clean_up cui (TempV tv_number) cus=:{cus_var_env}
-		#! type = cus_var_env.[tv_number]
+	clean_up cui (TempV tv_number) cus
+		# (type, cus) = cus!cus_var_env.[tv_number]
 		= cleanUpVariable cui.cui_top_level type tv_number cus
 	clean_up cui (TA tc types) cus
 		# (types, cus) = clean_up cui types cus
@@ -104,12 +104,12 @@ where
 	clean_up cui t=:(TB _) cus
 		=  (t, cus)
 	clean_up cui (TempCV tempvar :@: types) cus
-		#! type = cus.cus_var_env.[tempvar]
+		# (type, cus) = cus!cus_var_env.[tempvar]
 		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
 		  (types, cus) = clean_up cui types cus
 		= (simplifyTypeApplication type types, cus)
-	clean_up cui (TempQV qv_number) cus=:{cus_var_env,cus_error}
-		#! type = cus_var_env.[qv_number]
+	clean_up cui (TempQV qv_number) cus=:{cus_error}
+		# (type, cus) = cus!cus_var_env.[qv_number]
 		| cui.cui_top_level
 			= cleanUpVariable True type qv_number {cus & cus_error = existentialError cus_error}
 			= cleanUpVariable False type qv_number cus
@@ -162,7 +162,7 @@ where
 instance cleanUpClosed Type
 where
 	cleanUpClosed (TempV tv_number) env
-		#! type = env.[tv_number]
+		# (type, env) = env![tv_number]
 		= cleanUpClosedVariable type env
 	cleanUpClosed (TA tc types) env
 		# (cur, types, env) = cleanUpClosed types env
@@ -171,7 +171,7 @@ where
 		# (cur, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
 		= (cur, argtype --> restype, env)
 	cleanUpClosed (TempCV tv_number :@: types) env
-		#! type = env.[tv_number]
+		# (type, env) = env![tv_number]
 		# (cur1, type, env) = cleanUpClosedVariable type env
 		| checkCleanUpResult cur1 cUndefinedVar
 			= (cur1, TempCV tv_number :@: types, env)
@@ -558,19 +558,9 @@ where
 
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
-	# th_attrs = bind_attr form_attr act_attr th_attrs 
-	= substitute type_rhs (fold2St bind_type_and_attr type_args arg_types { type_heaps & th_attrs = th_attrs })
-where
-	bind_type_and_attr {atv_attribute = TA_Var {av_name,av_info_ptr}, atv_variable={tv_info_ptr}} {at_attribute,at_type} {th_vars,th_attrs}
-		= { th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }
-	bind_type_and_attr {atv_variable={tv_info_ptr}} {at_type} type_heaps=:{th_vars}
-		= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type) }
-
-	bind_attr (TA_Var {av_name,av_info_ptr}) attr th_attrs
-		= th_attrs <:= (av_info_ptr, AVI_Attr attr) 
-	bind_attr _ attr th_attrs
-		= th_attrs
-		
+	# type_heaps = bindTypeVarsAndAttributes form_attr act_attr type_args arg_types type_heaps 
+	  (exp_type, type_heaps) = substitute type_rhs type_heaps
+	= (exp_type, clearBindingsOfTypeVarsAndAttributes form_attr type_args type_heaps)
 
 VarIdTable :: {# String}
 VarIdTable =: { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" }
@@ -746,7 +736,7 @@ where
 	fill_environment [] attr_env
 		= attr_env
 	fill_environment [{ac_demanded,ac_offered} : coercions ] attr_env
-		#! offered = attr_env.[ac_demanded]
+		#  (offered, attr_env) = attr_env![ac_demanded]
 		=  fill_environment coercions { attr_env & [ac_demanded] = TA_List ac_offered offered }
 
 	clear_environment :: ![AttrCoercion] !*{! TypeAttribute} -> *{! TypeAttribute}

@@ -202,9 +202,9 @@ unfoldVariable var=:{var_name,var_info_ptr} us
 						app_args = [ Var { var_name=fv_name, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr }
 									\\ {fv_name,fv_info_ptr}<-vars],
 						app_info_ptr = nilPtr }, us)
-		VI_Dictionary app_symb app_args class_types
-			# (new_class_types, us_opt_type_heaps) = substitute_class_types class_types us.us_opt_type_heaps
-			  (new_info_ptr, us_symbol_heap) = newPtr (EI_ClassTypes new_class_types) us.us_symbol_heap
+		VI_Dictionary app_symb app_args class_type
+			# (new_class_type, us_opt_type_heaps) = substitute_class_types class_type us.us_opt_type_heaps
+			  (new_info_ptr, us_symbol_heap) = newPtr (EI_DictionaryType new_class_type) us.us_symbol_heap
 			-> (App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr },
 				{ us & us_opt_type_heaps = us_opt_type_heaps, us_symbol_heap = us_symbol_heap })
 		_
@@ -305,7 +305,7 @@ where
 					_		-> case (app_symb.symb_kind, isNilPtr app_info_ptr) of
 								(SK_Constructor _, False)
 									# (app_info, us_symbol_heap) = readPtr app_info_ptr us.us_symbol_heap
-									  (new_app_info, us_opt_type_heaps) = substitute_EI_ClassTypes app_info us.us_opt_type_heaps
+									  (new_app_info, us_opt_type_heaps) = substitute_EI_DictionaryType app_info us.us_opt_type_heaps
 									  (new_ptr, us_symbol_heap) = newPtr new_app_info us_symbol_heap
 									-> (new_ptr, { us & us_symbol_heap = us_symbol_heap, us_opt_type_heaps = us_opt_type_heaps })
 								_	-> (nilPtr, us)
@@ -321,10 +321,10 @@ where
 		is_function_or_macro _
 			= False
 
-		substitute_EI_ClassTypes (EI_ClassTypes class_types) (Yes type_heaps)
-			# (new_class_types, type_heaps) = substitute class_types type_heaps
-			= (EI_ClassTypes new_class_types, Yes type_heaps)
-		substitute_EI_ClassTypes x opt_type_heaps
+		substitute_EI_DictionaryType (EI_DictionaryType class_type) (Yes type_heaps)
+			# (new_class_type, type_heaps) = substitute class_type type_heaps
+			= (EI_DictionaryType new_class_type, Yes type_heaps)
+		substitute_EI_DictionaryType x opt_type_heaps
 			= (x, opt_type_heaps)
 
 instance unfold (Bind a b) | unfold a
@@ -348,7 +348,8 @@ where
 		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr}, us)
 	where
 		update_active_case_info_and_unfold case_expr=:(Var {var_info_ptr}) case_info_ptr us=:{us_handle_aci_free_vars}
-			#! case_info = sreadPtr case_info_ptr us.us_symbol_heap
+			# (case_info, us_symbol_heap) = readPtr case_info_ptr us.us_symbol_heap
+			  us = { us & us_symbol_heap = us_symbol_heap }
 			= case case_info of
 				EI_Extended (EEI_ActiveCase aci=:{aci_free_vars}) ei
 					#!(new_aci_free_vars, us) = case us_handle_aci_free_vars of
@@ -358,7 +359,8 @@ where
 																		No		-> (No, us)
 																		Yes fvs	# (fvs_subst, us) = mapSt unfoldBoundVar fvs us
 																				-> (Yes fvs_subst, us)
-					  var_info = sreadPtr var_info_ptr us.us_var_heap
+					  (var_info, us_var_heap) = readPtr var_info_ptr us.us_var_heap
+					  us = { us & us_var_heap = us_var_heap }
 					-> case var_info of
 						VI_Body fun_symb {tb_args, tb_rhs} new_aci_params
 							# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
@@ -398,9 +400,8 @@ where
 			= unfold case_expr us
 
 		unfoldBoundVar {var_info_ptr} us
-			#!var_info = sreadPtr var_info_ptr us.us_var_heap
-			# (VI_Expression (Var act_var)) = var_info
-		= (act_var, us)
+			# (VI_Expression (Var act_var), us_var_heap) = readPtr var_info_ptr us.us_var_heap
+			= (act_var, { us & us_var_heap = us_var_heap })
 
 
 instance unfold Let
@@ -480,7 +481,7 @@ where
 		= (collected_calls, fun_defs, symbol_table)
 
 examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
-	#! entry = sreadPtr id_info symbol_table
+	# (entry, symbol_table) = readPtr id_info symbol_table
 	= case entry.ste_kind of
 		STE_Called indexes
 			| isMember fc_index indexes
@@ -549,7 +550,7 @@ partitionateMacros {ir_from,ir_to} mod_index fun_defs modules var_heap symbol_he
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
 							pi_symbol_table = symbol_table,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
-	  (fun_defs, modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_error, pi_next_group, pi_groups, pi_marks, pi_deps})
+	  (fun_defs, modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_error, pi_next_group, pi_groups, pi_deps})
 	  		= iFoldSt (pationate_macro mod_index max_fun_nr) ir_from ir_to (fun_defs, modules, partitioning_info)
 	= (foldSt reset_body_of_rhs_macro pi_deps fun_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 where
@@ -698,7 +699,7 @@ where
 		# ({fun_symb = { id_info }, fun_kind}, fun_defs) = fun_defs![fc_index]
 		| fun_kind == FK_Macro
 			= (collected_calls, fun_defs, symbol_table)
-			#! entry = sreadPtr id_info symbol_table
+			# (entry, symbol_table) = readPtr id_info symbol_table
 			= ([fc : collected_calls], fun_defs,
 					symbol_table <:= (id_info, { ste_kind = STE_Called [fc_index], ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = entry }))
 
@@ -707,7 +708,7 @@ removeFunctionCallsFromSymbolTable calls fun_defs symbol_table
 where
 	remove_function_call_from_symbol_table {fc_index} (fun_defs, symbol_table)
 		# ({fun_symb = { id_info }}, fun_defs) = fun_defs![fc_index]
-		#! entry = sreadPtr id_info symbol_table
+		# (entry, symbol_table) = readPtr id_info symbol_table
 		= (fun_defs, symbol_table <:= (id_info, entry.ste_previous))
 		
 
@@ -1023,7 +1024,7 @@ where
 
 	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_Macro {glob_object,glob_module}}, app_args}) fun_and_macro_defs mod_index modules es
 		# (app_args, fun_and_macro_defs, modules, (calls, state)) = expand app_args fun_and_macro_defs mod_index modules es
-		#! macro = fun_and_macro_defs.[glob_object]
+		# (macro, fun_and_macro_defs) = fun_and_macro_defs![glob_object]
 		| macro.fun_arity == symb_arity
 			# (expr, fun_and_macro_defs, es) = unfoldMacro macro app_args fun_and_macro_defs (calls, state)
 			= (expr, fun_and_macro_defs, modules, es)
@@ -1190,7 +1191,7 @@ where
 		| is_cyclic_s || is_cyclic_l
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars,
 					{ cos & cos_var_heap = cos_var_heap, cos_error = checkError "" "cyclic let definition" cos.cos_error})
-		| otherwise
+//		| otherwise
 			# (let_expr, free_vars, cos) = collectVariables let_expr free_vars { cos & cos_var_heap = cos_var_heap }
 			  all_binds = mapAppend (\sb->(True, sb)) let_strict_binds [(False, lb) \\ lb<-let_lazy_binds]
 			  (collected_binds, free_vars, cos) = collect_variables_in_binds all_binds [] free_vars cos
@@ -1308,7 +1309,7 @@ where
 	collectVariables [] free_vars cos
 		= ([], free_vars, cos)
 
-instance collectVariables !(!a,!b) | collectVariables a & collectVariables b
+instance collectVariables (!a,!b) | collectVariables a & collectVariables b
 where
 	collectVariables (x,y) free_vars cos
 		# (x, free_vars, cos) = collectVariables x free_vars cos
@@ -1386,7 +1387,7 @@ where
 			_
 				-> abort "collectVariables [BoundVar] (transform, 1227)"  <<- (var_info ---> var_name)
 
-instance <<< Ptr a
+instance <<< (Ptr a)
 where
 	(<<<) file p = file <<< ptrToInt p
 

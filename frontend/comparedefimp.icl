@@ -38,7 +38,7 @@ import RWSDebug
 		}
 
 :: TypesCorrespondMonad
-		:==	!*TypesCorrespondState -> (!Bool, !*TypesCorrespondState)
+		:==	!*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
 
 :: ExpressionsCorrespondState =
 		{	ec_correspondences	// ec_correspondences.[i]==j <=> (functions i and j are already compared 
@@ -130,7 +130,6 @@ compareDefImp untransformed dcl_modules icl_module heaps error_admin
 			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
 					= compareMacrosWithConversion conversion_table.[cMacroDefs] dcl_macros untransformed
 								 				 icl_functions hp_var_heap hp_expression_heap tc_state error_admin
-
 			  (icl_functions, tc_state, error_admin)
 			  		= compareFunctionTypesWithConversions conversion_table.[cFunctionDefs]
 			  			dcl_functions icl_functions tc_state error_admin
@@ -155,9 +154,6 @@ compareDefImp untransformed dcl_modules icl_module heaps error_admin
 compareWithConversions conversions dclDefs iclDefs tc_state error_admin 
 	= iFoldSt (compareWithConversion conversions dclDefs) 0 (size conversions) (iclDefs, tc_state, error_admin)
 
-compareWithConversion :: !w:(a x:Int) !.(b c) !Int !(!u:(d c), !*TypesCorrespondState, !*ErrorAdmin)
-						-> (!v:(d c), !.TypesCorrespondState, !.ErrorAdmin)
-						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c & Array .d & Array .a, [u <= v, w <= x];
 compareWithConversion conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
 	# icl_index = conversions.[dclIndex]
 	| icl_index==dclIndex
@@ -172,9 +168,6 @@ compareFunctionTypesWithConversions conversions	dcl_fun_types icl_functions tc_s
 	= iFoldSt (compareTwoFunctionTypes conversions dcl_fun_types) 0 (size conversions)
 				(icl_functions, tc_state, error_admin)
 
-compareTwoFunctionTypes :: !w:(a x:Int) !.(b FunType) !.Int !(!u:(c FunDef),!*TypesCorrespondState,!*ErrorAdmin)
-						-> (!v:(c FunDef),!.TypesCorrespondState,!.ErrorAdmin)
-						| Array .b & Array .c & Array .a, [u <= v, w <= x];
 compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
 	# (fun_def=:{fun_type}, icl_functions) = icl_functions![conversions.[dclIndex]]
 	= case fun_type of
@@ -337,19 +330,25 @@ instance t_corresponds [a] | t_corresponds a where
 	t_corresponds _ _
 		=	return False
 
-instance t_corresponds {# a} | t_corresponds , select_u , size_u a where 
+
+// instance t_corresponds {# a} | t_corresponds a & Array {#} a // 2.0
+
+instance t_corresponds {# a} | ArrayElem , t_corresponds a
+where 
 	t_corresponds dclArray iclArray
 		# size_dclArray = size dclArray
 		| size_dclArray<>size iclArray
 			= return False
-		= loop (size_dclArray-1) dclArray iclArray
+			= loop (size_dclArray-1) dclArray iclArray
 	  where
+//		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds a & Array {#} a // 2.0
 		loop i dclArray iclArray
 			| i<0
 				= return True
-			=	t_corresponds dclArray.[i] iclArray.[i]
+				= t_corresponds dclArray.[i] iclArray.[i]
 			&&& loop (i-1) dclArray iclArray
 		
+
 instance t_corresponds (Optional a) | t_corresponds a where 
 	t_corresponds No No
 		= return True
@@ -437,7 +436,6 @@ instance t_corresponds AType where
 						_	-> (False, tc_state)
 				_	-> (False, tc_state)
 		  where
-
 			simple_corresponds dclDef iclDef
 				=	t_corresponds dclDef.at_attribute iclDef.at_attribute
 				&&&	t_corresponds dclDef.at_type iclDef.at_type
@@ -486,7 +484,7 @@ instance t_corresponds AType where
 					# (actual_arg, type_var_heap) = possibly_dereference actual_arg type_var_heap
 					= bind_type_vars` formal_args actual_args
 							(writePtr atv_variable.tv_info_ptr (TVI_AType actual_arg) type_var_heap)
-//								--->("binding", atv_variable.tv_name,"to",actual_arg)
+							//	--->("binding", atv_variable.tv_name,"to",actual_arg)
 				bind_type_vars` _ _ type_var_heap
 					= type_var_heap
 				
@@ -711,7 +709,7 @@ instance e_corresponds FunDef where
 	  where
 		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
 		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, cb_rhs)
-
+		
 instance e_corresponds TransformedBody where
 	e_corresponds dclDef iclDef
 		=	e_corresponds dclDef.tb_args iclDef.tb_args
@@ -774,6 +772,8 @@ instance e_corresponds Expression where
 	e_corresponds (TypeCodeExpression dcl) (TypeCodeExpression icl)
 		= e_corresponds dcl icl
 	e_corresponds EE EE
+		= do_nothing
+	e_corresponds (NoBind _) (NoBind _)
 		= do_nothing
 	e_corresponds _ _
 		= give_error ""

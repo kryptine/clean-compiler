@@ -40,7 +40,7 @@ instance toString Ident
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
-				| STE_BoundType !AType
+//				| STE_BoundType !AType
 				| STE_Imported !STE_Kind !Index
 				| STE_DclFunction
 				| STE_Module !(Module (CollectedDefinitions ClassInstance IndexRange))
@@ -332,6 +332,7 @@ cIsNonCoercible			:== 2
 	,	tdi_group_nr		:: !Int
 	,	tdi_group_vars		:: ![Int]
 	,	tdi_cons_vars		:: ![Int]
+	,	tdi_tmp_index		:: !Int
 	,	tdi_classification	:: !TypeClassification
 	}
 
@@ -459,7 +460,7 @@ cIsALocalVar	:== False
 				VI_Pattern !AuxiliaryPattern |
 				VI_Default !Int | VI_Indirection !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
-				VI_Dictionary !SymbIdent ![Expression] ![Type] | /* used during fusion */
+				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo
 
 ::	ExtendedVarInfo = EVI_VarType !AType
@@ -511,7 +512,6 @@ cNonRecursiveAppl	:== False
  
 ::	TypeSymbIdent =
 	{	type_name		:: !Ident
-//	,	type_appl_kind	:: !ApplicationKind
 	,	type_arity		:: !Int
 	,	type_index		:: !Global Index
 	,	type_prop		:: !TypeSymbProperties
@@ -548,7 +548,7 @@ cNonRecursiveAppl	:== False
 
 ::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application
-				| PR_Class !App ![BoundVar] ![Type]
+				| PR_Class !App ![BoundVar] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application
 
@@ -607,10 +607,10 @@ cNonRecursiveAppl	:== False
 					| EI_Attribute !Int
 
 
-		/* EI_ClassTypes is used to store the instance types of a class These type are used during fusion to generate proper types for 
+		/* EI_DictionaryType is used to store the instance type of a class. This type are used during fusion to generate proper types for 
 		   the fusion result (i.e. the resulting function after elimination of dictionaries) */
 
-					| EI_ClassTypes ![Type]
+					| EI_DictionaryType !Type
 					| EI_CaseType !CaseType
 					| EI_LetType ![AType]
 					| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
@@ -988,6 +988,7 @@ cIsNotStrict	:== False
 
 				| TypeCodeExpression !TypeCodeExpression
 				| EE 
+				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 
 
 ::	CodeBinding	variable :== Env String variable
@@ -1006,14 +1007,6 @@ cIsNotStrict	:== False
 	,	case_ident		:: !Optional Ident
 	,	case_info_ptr	:: !ExprInfoPtr
 	}
-/*
-::	Let =
-	{	let_strict		:: !Bool
-	,	let_binds		:: !(Env Expression FreeVar)
-	,	let_expr		:: !Expression
-	,	let_info_ptr	:: !ExprInfoPtr
-	}
-*/
 
 ::	Let =
 	{	let_strict_binds	:: !Env Expression FreeVar
@@ -1130,10 +1123,10 @@ cNotALineNumber :== -1
 /* Used for hashing identifiers */
 
 instance == ModuleKind, Ident
-instance <<< Module a | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, Global object | <<< object,
-			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, Bind a b | <<< a & <<< b, ParsedConstructor, TypeDef a | <<< a, TypeVarInfo,
+instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
+			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
-			 Optional a | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance
+			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification
 
 instance == TypeAttribute
 instance == Annotation
@@ -1148,7 +1141,7 @@ EmptySymbolTableEntry :==
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_tmp_index = NoIndex }
 
 MakeTypeVar name	:== { tv_name = name, tv_info_ptr = nilPtr }
 MakeVar name		:== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }

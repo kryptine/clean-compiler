@@ -226,12 +226,12 @@ where
 				_
 					-> ([{ symbol & dcl_kind = ste_kind } : decls ], symbol_table <:= (id_info, ste_previous))
 
-addLocalFunctionDefsToSymbolTable :: Level Index .Index u:(a FunDef) *SymbolTable *ErrorAdmin -> (v:(a FunDef),.SymbolTable,.ErrorAdmin) | Array .a, [u <= v];
+addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !u:{#FunDef} !*SymbolTable !*ErrorAdmin -> (!u:{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addLocalFunctionDefsToSymbolTable level from_index to_index fun_defs symbol_table error
 	| from_index == to_index
 		= (fun_defs, symbol_table, error)	
-		#! fun_def = fun_defs.[from_index]
-		   (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_symb (STE_FunctionOrMacro []) symbol_table error
+		# (fun_def, fun_defs) = fun_defs![from_index]
+		  (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_symb (STE_FunctionOrMacro []) symbol_table error
 		= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index fun_defs symbol_table error
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
@@ -328,10 +328,9 @@ where
 
 retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);
 retrieveImportsFromSymbolTable [{import_module=import_module=:{id_info},import_symbols} : mods ] decls modules symbol_table
-	#! entry = sreadPtr id_info symbol_table
-	# {ste_index} = entry
-	#! {dcl_declared={dcls_import,dcls_local}} = modules.[ste_index]	
-	   (decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable dcls_import dcls_local decls symbol_table
+	# ({ste_index}, symbol_table) = readPtr id_info symbol_table
+	  ({dcl_declared={dcls_import,dcls_local}}, modules) = modules![ste_index]	
+	  (decls, symbol_table) = retrieveAndRemoveImportsOfModuleFromSymbolTable dcls_import dcls_local decls symbol_table
 	= retrieveImportsFromSymbolTable mods decls modules symbol_table
 retrieveImportsFromSymbolTable [] decls modules symbol_table
 	= (decls, modules, symbol_table)
@@ -356,42 +355,24 @@ removeDeclarationsFromSymbolTable decls scope symbol_table
 	= foldSt (remove_declaration scope) decls symbol_table
 where
 	remove_declaration scope {dcl_ident={id_name,id_info}, dcl_index} symbol_table
-		#! entry = sreadPtr id_info symbol_table
-		# {ste_kind,ste_previous} = entry
+		# ({ste_kind,ste_previous}, symbol_table) = readPtr id_info symbol_table
 		= case ste_kind of
-					STE_Field field_id
-						# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
-						| ste_previous.ste_def_level == scope
-							-> symbol_table <:= (id_info, ste_previous.ste_previous)
-							-> symbol_table <:= (id_info, ste_previous)
-// MW..
-					STE_Empty
-						-> symbol_table
-// ..MW
-					_
-						| ste_previous.ste_def_level == scope
-							-> symbol_table <:= (id_info, ste_previous.ste_previous)
-							-> symbol_table <:= (id_info, ste_previous)
+			STE_Field field_id
+				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
+				| ste_previous.ste_def_level == scope
+					-> symbol_table <:= (id_info, ste_previous.ste_previous)
+					-> symbol_table <:= (id_info, ste_previous)
+			STE_Empty
+				-> symbol_table
+			_
+				| ste_previous.ste_def_level == scope
+					-> symbol_table <:= (id_info, ste_previous.ste_previous)
+					-> symbol_table <:= (id_info, ste_previous)
 
 
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeLocalIdentsFromSymbolTable level idents symbol_table
 	= foldSt (removeIdentFromSymbolTable level) idents symbol_table
-
-
-removeLocalsFromSymbolTable :: .Level .[Ident] LocalDefs u:(a b) *(Heap SymbolTableEntry) -> (v:(a b),.Heap SymbolTableEntry) | Array .a & select_u , toIdent b, [u <= v];
-removeLocalsFromSymbolTable level loc_vars (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) defs symbol_table
-	= remove_defs_from_symbol_table level ir_from ir_to defs (removeLocalIdentsFromSymbolTable level loc_vars symbol_table)
-where
-	remove_defs_from_symbol_table level from_index to_index defs symbol_table
-		| from_index == to_index
-			= (defs, symbol_table)	
-			#! def = defs.[from_index]
-			   id_info = (toIdent def).id_info
-			   entry = sreadPtr id_info symbol_table
-			| level == entry.ste_def_level
-				= remove_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
-				= remove_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
 
 
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
@@ -432,7 +413,7 @@ instance toIdent ConsDef
 where
 	toIdent cons = cons.cons_symb
 
-instance toIdent TypeDef a
+instance toIdent (TypeDef a)
 where
 	toIdent td = td.td_name
 
@@ -511,9 +492,6 @@ where
 	(<<<) file
 		(STE_BoundTypeVariable _)
 			= file <<< "STE_BoundTypeVariable"
-	(<<<) file
-		(STE_BoundType _)
-			= file <<< "STE_BoundType"
 	(<<<) file
 		(STE_Imported _ _)
 			= file <<< "STE_Imported"

@@ -46,7 +46,6 @@ where toString {import_module} = toString import_module
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
-				| STE_BoundType !AType
 				| STE_Imported !STE_Kind !Index
 				| STE_DclFunction
 				| STE_Module !(Module (CollectedDefinitions ClassInstance IndexRange))
@@ -436,7 +435,7 @@ cIsALocalVar	:== False
 				VI_Pattern !AuxiliaryPattern |
 				VI_Default !Int | VI_Indirection !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
-				VI_Dictionary !SymbIdent ![Expression] ![Type] | /* used during fusion */
+				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo
 
 ::	ExtendedVarInfo = EVI_VarType !AType
@@ -517,7 +516,7 @@ cNotVarNumber :== -1
 
 ::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application
-				| PR_Class !App ![BoundVar] ![Type]
+				| PR_Class !App ![BoundVar] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application
 
@@ -579,7 +578,7 @@ cNotVarNumber :== -1
 		/* EI_ClassTypes is used to store the instance types of a class These type are used during fusion to generate proper types for 
 		   the fusion result (i.e. the resulting function after elimination of dictionaries) */
 
-					| EI_ClassTypes ![Type]
+					| EI_DictionaryType !Type
 					| EI_CaseType !CaseType
 					| EI_LetType ![AType]
 					| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
@@ -817,6 +816,7 @@ cNotVarNumber :== -1
 	,	tdi_group_nr		:: !Int
 	,	tdi_group_vars		:: ![Int]
 	,	tdi_cons_vars		:: ![Int]
+	,	tdi_tmp_index		:: !Int
 	,	tdi_classification	:: !TypeClassification
 	}
 
@@ -949,6 +949,7 @@ cIsNotStrict	:== False
 
 				| TypeCodeExpression !TypeCodeExpression
 				| EE 
+				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 
 
 ::	CodeBinding	variable :== Env String variable
@@ -1276,7 +1277,7 @@ where
 	(<<<) file {var_name,var_info_ptr,var_expr_ptr}
 		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr <<< ',' <<< ptrToInt var_expr_ptr <<< '>'
 
-instance <<< Bind a b | <<< a & <<< b 
+instance <<< (Bind a b) | <<< a & <<< b 
 where
 	(<<<) file {bind_src,bind_dst} = file <<< bind_dst <<<  " = " <<< bind_src 
 
@@ -1362,6 +1363,7 @@ where
 	(<<<) file WildCard = file <<< '_'
 	(<<<) file (MatchExpr _ cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
+	(<<<) file (NoBind _) = file <<< "** NB **"
 	(<<<) file (DynamicExpr {dyn_expr,dyn_uni_vars,dyn_type_code})     = writeVarPtrs (file <<< "dynamic " <<< dyn_expr <<< " :: ") dyn_uni_vars <<< dyn_type_code 
 //	(<<<) file (TypeCase type_case)      = file <<< type_case
 	(<<<) file (TypeCodeExpression type_code)      = file <<< type_code
@@ -1419,7 +1421,7 @@ where
 	(<<<) file (LocalParsedDefs defs) = file <<< defs
 	(<<<) file (CollectedLocalDefs defs) = file <<< defs
 
-instance <<< NodeDef dst | <<< dst 
+instance <<< (NodeDef dst) | <<< dst 
 where
 	(<<<) file {nd_dst,nd_alts,nd_locals} = file <<< nd_dst <<< nd_alts <<< nd_locals
 
@@ -1575,7 +1577,7 @@ where
 	(<<<) file {ds_ident}
 		= file <<< ds_ident 
 
-instance <<< TypeDef a | <<< a
+instance <<< (TypeDef a) | <<< a
 where
 	(<<<) file {td_name, td_args, td_rhs}
 		= file <<< ":: " <<< td_name <<< ' ' <<< td_args <<< td_rhs
@@ -1648,16 +1650,16 @@ instance <<< ClassInstance
 where
 	(<<<) file {ins_class,ins_type} = file <<< ins_class <<< " :: " <<< ins_type
 
-instance <<< Optional a | <<< a
+instance <<< (Optional a) | <<< a
 where
 	(<<<) file (Yes x) = file <<< x
 	(<<<) file No = file
 	
-instance <<< Module a | <<< a
+instance <<< (Module a) | <<< a
 where
 	(<<<) file {mod_name,mod_type,mod_defs} = file <<< mod_type <<< mod_name <<< mod_defs
 
-instance <<< CollectedDefinitions a b | <<< a & <<< b
+instance <<< (CollectedDefinitions a b) | <<< a & <<< b
 where
 	(<<<) file {def_types,def_constructors,def_selectors,def_macros,def_classes,def_members,def_instances}
 		= file
@@ -1700,7 +1702,7 @@ where
 //	(<<<) file {id_name,id_index} = file <<< id_name <<< '.' <<< id_index
 	(<<<) file {id_name} = file <<< id_name
 
-instance <<< Global a | <<< a
+instance <<< (Global a) | <<< a
 where
 	(<<<) file {glob_object,glob_module} = file <<< glob_object <<< "M:" <<< glob_module
 
@@ -1754,7 +1756,7 @@ EmptySymbolTableEntry :==
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_tmp_index = NoIndex }
 
 MakeTypeVar name :== { tv_name = name, tv_info_ptr = nilPtr }
 MakeVar name :== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }

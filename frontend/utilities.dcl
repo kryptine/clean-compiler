@@ -1,6 +1,5 @@
 definition module utilities
 
-from StdString import String
 from StdEnv import Eq, not, Ord, IncDec
 import StdMisc, general
 
@@ -9,6 +8,8 @@ import _aconcat
 /*
 	For Strings
 */
+
+from StdString import String // 1.3
 
 stringToCharList	:: !String -> [Char]
 charListToString	:: ![Char] -> String

@@ -136,4 +136,23 @@ addPropClassification :: ![PropClassification] !PropClassification !TypeClassifi
 addPropClassification hio_props prop_class tc=:{tc_props}
 	= { tc & tc_props = treeInsert hio_props { ts_cons_var_props = hio_props, ts_type_prop = prop_class } tc_props }
 
+instance * Sign
+where
+	(*) sign1 sign2
+		| sign1.pos_sign
+			| sign1.neg_sign
+				= sign1
+				= sign2
+		| sign1.neg_sign
+			= { pos_sign = sign2.neg_sign, neg_sign = sign2.pos_sign }
+			= sign1
 
+/*			
+		= {	pos_sign = sign1.pos_sign * sign2.pos_sign || sign1.neg_sign * sign2.neg_sign,
+			neg_sign = sign1.pos_sign * sign2.neg_sign || sign1.neg_sign * sign2.pos_sign }
+		
+instance * Bool
+where
+	(*) b1 b2 = b1 && b2 || not b1 && not b2
+
+*/

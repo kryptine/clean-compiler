@@ -1,6 +1,6 @@
 definition module frontend
 
-from scanner import SearchPaths, String
+from scanner import SearchPaths
 from general import Optional, Yes, No
 import checksupport, transform, overloading
 

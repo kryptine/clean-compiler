@@ -340,9 +340,9 @@ where
 		| (ldep == cMAXINT || ldep == my_mark)
 			# (as_deps, as_check_marks, group) = close_group type_module type_index as_deps as_check_marks [] 
 			  (kinds, (type_properties, as_kind_heap, as_td_infos)) = determine_kinds_and_properties_of_group group as_kind_heap as_td_infos
-			  kind_heap = unify_var_binds con_var_binds as_kind_heap
+			  as_kind_heap = unify_var_binds con_var_binds as_kind_heap
 			  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars con_top_var_binds 0 as_kind_heap
-			  (as_kind_heap, as_td_infos) = update_type_group_info group kinds type_properties normalized_top_vars group as_next_group_num kind_var_store as_kind_heap as_td_infos
+			  (as_kind_heap, as_td_infos) = update_type_group_info group kinds type_properties normalized_top_vars group as_next_group_num 0 kind_var_store as_kind_heap as_td_infos
 			= (cMAXINT, ({con_top_var_binds = [], con_var_binds = [] },
 				 { as & as_check_marks = as_check_marks, as_deps = as_deps, as_kind_heap = as_kind_heap,
 						as_td_infos = as_td_infos, as_next_group_num = inc as_next_group_num }))
@@ -363,7 +363,7 @@ where
 			= (kinds, (combineTypeProperties type_properties tdi_properties, kind_heap, as_td_infos))
 				
 		retrieve_kind (KindVar kind_info_ptr) kind_heap
-			#! kind_info = sreadPtr kind_info_ptr kind_heap
+			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			= (determine_kind kind_info, kind_heap)
 		where
 			determine_kind (KI_Indirection kind) 
@@ -379,12 +379,12 @@ where
 
 	unify_var_bind :: !VarBind !*KindHeap -> *KindHeap
 	unify_var_bind {vb_var, vb_vars} kind_heap
-		#! kind_info = sreadPtr vb_var kind_heap
+		# (kind_info, kind_heap) = readPtr vb_var kind_heap
 		# (vb_var, kind_heap) = determine_var_bind vb_var kind_info kind_heap
 		= redirect_vars vb_var vb_vars kind_heap
 	where	
 		redirect_vars kind_info_ptr [var_info_ptr : var_info_ptrs] kind_heap
-			#! kind_info = sreadPtr var_info_ptr kind_heap
+			# (kind_info, kind_heap) = readPtr var_info_ptr kind_heap
 			# (var_info_ptr, kind_heap) = determine_var_bind var_info_ptr kind_info kind_heap
 			| kind_info_ptr == var_info_ptr
 				= redirect_vars kind_info_ptr var_info_ptrs kind_heap
@@ -393,14 +393,14 @@ where
 			= kind_heap
 			
 		determine_var_bind _ (KI_VarBind kind_info_ptr) kind_heap
-			#! kind_info = sreadPtr kind_info_ptr kind_heap
+			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			= determine_var_bind kind_info_ptr  kind_info kind_heap
 		determine_var_bind kind_info_ptr kind_info kind_heap
 			= (kind_info_ptr, kind_heap)
 
 	nomalize_var :: !KindInfoPtr !KindInfo !(!Int,!*KindHeap) -> (!Int,!(!Int,!*KindHeap))
 	nomalize_var orig_kind_info (KI_VarBind kind_info_ptr) (kind_store, kind_heap)
-		#! kind_info = sreadPtr kind_info_ptr kind_heap
+		# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 		= nomalize_var kind_info_ptr kind_info (kind_store, kind_heap)
 	nomalize_var kind_info_ptr (KI_NormVar var_number) (kind_store, kind_heap)
 		= (var_number, (kind_store, kind_heap))
@@ -412,23 +412,23 @@ where
 	where
 		normalize_top_var :: !KindInfoPtr !(!Int,!*KindHeap) -> (!Int,!(!Int,!*KindHeap))
 		normalize_top_var kind_info_ptr (kind_store, kind_heap)
-			#! kind_info = sreadPtr kind_info_ptr kind_heap
+			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			= nomalize_var kind_info_ptr kind_info (kind_store, kind_heap)
 			
-//	update_type_group_info :: ![Index] ![[TypeKind]] !TypeProperties ![Int] ![Int] !Int !*KindHeap !*{# CheckedTypeDef} -> (!*KindHeap,!*{# CheckedTypeDef})
-	update_type_group_info [td:tds] [td_kinds : tds_kinds] type_properties top_vars group group_nr kind_store kind_heap td_infos
-		# (kind_store, kind_heap, td_infos) = update_type_def_info td td_kinds type_properties top_vars group group_nr kind_store kind_heap td_infos
-		= update_type_group_info tds tds_kinds type_properties top_vars group group_nr kind_store kind_heap td_infos
-	update_type_group_info [] [] type_properties top_vars group group_nr kind_store kind_heap td_infos
+//	update_type_group_info :: ![Index] ![[TypeKind]] !TypeProperties ![Int] ![Int] !Index !Int !*KindHeap !*{# CheckedTypeDef} -> (!*KindHeap,!*{# CheckedTypeDef})
+	update_type_group_info [td:tds] [td_kinds : tds_kinds] type_properties top_vars group group_nr loc_type_index kind_store kind_heap td_infos
+		# (kind_store, kind_heap, td_infos) = update_type_def_info td td_kinds type_properties top_vars group group_nr loc_type_index kind_store kind_heap td_infos
+		= update_type_group_info tds tds_kinds type_properties top_vars group group_nr (inc loc_type_index) kind_store kind_heap td_infos
+	update_type_group_info [] [] type_properties top_vars group group_nr loc_type_index kind_store kind_heap td_infos
 		= (kind_heap, td_infos)
 
-//	update_type_def_info :: !Int ![TypeKind] !TypeProperties ![Int] ![Int] !Int !*KindHeap !*{# CheckedTypeDef} -> (!Int,!*KindHeap,!*{# CheckedTypeDef}) 
-	update_type_def_info {glob_module,glob_object} td_kinds type_properties top_vars group group_nr kind_store kind_heap td_infos
+//	update_type_def_info :: !Int ![TypeKind] !TypeProperties ![Int] ![Int] !Int !Index !Int !*KindHeap !*{# CheckedTypeDef} -> (!Int,!*KindHeap,!*{# CheckedTypeDef}) 
+	update_type_def_info {glob_module,glob_object} td_kinds type_properties top_vars group group_nr loc_type_index kind_store kind_heap td_infos
 		# (td_info=:{tdi_kinds}, td_infos) = td_infos![glob_module].[glob_object]
 		# (group_vars, cons_vars, kind_store, kind_heap) = determine_type_def_info tdi_kinds td_kinds top_vars kind_store kind_heap
 		= (kind_store, kind_heap, { td_infos & [glob_module].[glob_object] =
 				{td_info & tdi_properties = type_properties, tdi_kinds = td_kinds, tdi_group = group,
-				 tdi_group_vars = group_vars, tdi_cons_vars = cons_vars, tdi_group_nr = group_nr } })
+				 tdi_group_vars = group_vars, tdi_cons_vars = cons_vars, tdi_group_nr = group_nr, tdi_tmp_index = loc_type_index } })
 //					---> ("update_type_def_info", glob_module, glob_object, group_nr)
 	where
 		determine_type_def_info [ KindVar kind_info_ptr : kind_vars ] [ kind : kinds ] top_vars kind_store kind_heap

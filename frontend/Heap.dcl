@@ -28,4 +28,4 @@ ptrToInt 	:: !(Ptr w) -> Int
 where
 	(ptr, val) = ptr_and_val
 
-instance == Ptr a
+instance == (Ptr a)

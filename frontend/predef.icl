@@ -236,15 +236,15 @@ where
 			| nr_of_vars == 0
 				= (type_vars, pre_def_symbols)
 				# nr_of_vars = dec nr_of_vars
-				#! var_id = pre_def_symbols.[PD_TypeVar_a0 + nr_of_vars]
+				# (var_id, pre_def_symbols) = pre_def_symbols![PD_TypeVar_a0 + nr_of_vars]
 				= make_type_vars nr_of_vars [MakeTypeVar var_id.pds_ident : type_vars] pre_def_symbols
 
 	new_defined_symbol symbol_index arity ds_index pre_def_symbols
-		#! ds_ident = pre_def_symbols.[symbol_index]
+		# (ds_ident, pre_def_symbols) = pre_def_symbols![symbol_index]
 		= ({ ds_ident = ds_ident.pds_ident, ds_arity = 2, ds_index = ds_index }, pre_def_symbols)
 	
 	make_type_def type_cons_index type_vars type_rhs pre_def_symbols
-		#! type_ident = pre_def_symbols.[type_cons_index]
+		# (type_ident, pre_def_symbols) = pre_def_symbols![type_cons_index]
 		= (MakeTypeDef type_ident.pds_ident (map (\tv -> MakeAttributedTypeVar tv) type_vars) type_rhs TA_None [] NoPos, pre_def_symbols)
 	
 	make_TC_class_def pre_def_symbols

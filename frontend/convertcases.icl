@@ -28,7 +28,7 @@ where
 	convertCases bound_vars group_index common_defs t ci
 		= app2St (convertCases bound_vars group_index common_defs, convertCases bound_vars group_index common_defs) t ci
 
-instance convertCases Bind a b | convertCases a
+instance convertCases (Bind a b) | convertCases a
 where
 	convertCases bound_vars group_index common_defs bind=:{bind_src} ci
 		# (bind_src, ci) = convertCases bound_vars group_index common_defs bind_src ci
@@ -456,7 +456,7 @@ where
 		  group_index = gf_fun_def.fun_info.fi_group_index
 		  (Yes ft) = gf_fun_def.fun_type
 		  (ft, imported_types, imported_conses, type_heaps, var_heap) = convertSymbolType common_defs ft imported_types imported_conses type_heaps var_heap
-		#! group = groups.[group_index]
+		# (group, groups) = groups![group_index]
 		= ({ groups & [group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
 				[ { gf_fun_def & fun_type = Yes ft }: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
 
@@ -478,13 +478,13 @@ where
 	convert_groups group_nr groups dcl_functions common_defs fun_defs_and_ci
 		| group_nr == size groups
 			= (groups, fun_defs_and_ci)
-			#! group = groups.[group_nr]
+			# (group, groups) = groups![group_nr]
 			= convert_groups (inc group_nr) groups dcl_functions common_defs
 				(foldSt (convert_function group_nr dcl_functions common_defs) group.group_members fun_defs_and_ci)
 
 
 	convert_function group_index dcl_functions common_defs fun (fun_defs, collected_imports, ci)
-		#! fun_def = fun_defs.[fun]
+		# (fun_def, fun_defs) = fun_defs![fun]
 		# {fun_body,fun_type} = fun_def
 		  (fun_body, (collected_imports, ci)) = eliminate_code_sharing_in_function dcl_functions common_defs fun_body /* (fun_body ---> ("convert_function", fun_def.fun_symb, fun_body)) */ (collected_imports, ci)		  		
 		  (fun_body, ci) = convert_cases_into_function_patterns fun_body fun_type group_index common_defs ci
@@ -621,10 +621,11 @@ where
 		= (imported_types, type_heaps, var_heap)
 	convert_imported_constructors common_defs [ {glob_module, glob_object} : conses ] imported_types type_heaps var_heap 
 		# {com_cons_defs,com_selector_defs} = common_defs.[glob_module]
-		  {cons_type_ptr,cons_type,cons_type_index} = common_defs.[glob_module].com_cons_defs.[glob_object]
+		  {cons_type_ptr,cons_type,cons_type_index,cons_symb} = common_defs.[glob_module].com_cons_defs.[glob_object]
 		  (cons_type, imported_types, conses, type_heaps, var_heap) = convertSymbolType common_defs cons_type imported_types conses type_heaps var_heap
 		  var_heap = var_heap <:= (cons_type_ptr, VI_ExpandedType cons_type)
 		  ({td_rhs}, imported_types) = imported_types![glob_module].[cons_type_index]
+//				---> ("convert_imported_constructors", cons_symb, cons_type)
 		= case td_rhs of
 			RecordType {rt_fields}
 				# (imported_types, conses, type_heaps, var_heap)
@@ -820,10 +821,12 @@ where
 */
 	copy EE cp_info
 		= (EE, cp_info)
+	copy (NoBind ptr) cp_info
+		= (NoBind ptr, cp_info)
 	copy expr cp_info
 		= abort ("copy (Expression) does not match" ---> expr)
 
-instance copy Optional a | copy a
+instance copy (Optional a) | copy a
 where
 	copy (Yes expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
@@ -1048,6 +1051,8 @@ where
 	weightedRefCount dcl_functions common_defs depth (TypeCodeExpression type_code_expr) rc_info
 		= weightedRefCount dcl_functions common_defs depth type_code_expr rc_info
 	weightedRefCount dcl_functions common_defs depth EE rc_info
+		= rc_info
+	weightedRefCount dcl_functions common_defs depth (NoBind ptr) rc_info
 		= rc_info
 	weightedRefCount dcl_functions common_defs depth expr rc_info
 		= abort ("weightedRefCount [Expression] (convertcases, 864))" ---> expr)
@@ -1294,13 +1299,13 @@ where
 		    		  di_expr_heap = writePtr inner_let_info_ptr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) di_expr_heap
 					-> (Let { inner_let & let_strict_binds = let_strict_binds++inner_let.let_strict_binds}, 
 						{dl_info & di_expr_heap = di_expr_heap})
-				 _	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
+				_	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
 						{dl_info & di_expr_heap = dl_info.di_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
 	where
 		set_let_expression_info depth [(let_strict, {bind_src,bind_dst}):binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { bind_dst & fv_info_ptr = new_info_ptr },
-					  lei_expression = bind_src, lei_type = type, lei_status = LES_Untouched }
+			  			lei_expression = bind_src, lei_type = type, lei_status = LES_Untouched }
 			= set_let_expression_info depth binds ref_counts types (var_heap <:= (bind_dst.fv_info_ptr, VI_LetExpression lei))
 		set_let_expression_info depth [] _ _ var_heap
 			= var_heap
@@ -1338,7 +1343,9 @@ where
 		= (expr, dl_info)
 	distributeLets depth EE dl_info
 		= (EE, dl_info)
-
+	distributeLets depth (NoBind ptr) dl_info
+		= (NoBind ptr, dl_info)
+	
 my_zip [] [] = []
 my_zip [x:xs][y:ys] = [(x,y) : my_zip xs ys]
 
@@ -1486,7 +1493,7 @@ where
 	(<<<) file EI_Empty			= file <<< "*Empty*"
 	(<<<) file (EI_CaseType _)	= file <<< "CaseType"
 
-instance <<< Ptr a
+instance <<< (Ptr a)
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  
 

@@ -11,7 +11,7 @@ instance == FunKind
 where
 	(==) fk1 fk2 = equal_constructor fk1 fk2
 
-instance == Global a | == a
+instance == (Global a) | == a
 where
 	(==) g1 g2
 		= g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object
@@ -188,7 +188,7 @@ where
 	(=<) id1 id2
 		= id1.id_name =< id2.id_name
 
-instance =< Global a | =< a
+instance =< (Global a) | =< a
 where
 	(=<) g1 g2
 		= (g1.glob_module,g1.glob_object) =< (g2.glob_module,g2.glob_object)

@@ -17,7 +17,6 @@ EmptyTypeClassification :: TypeClassification
 
 TopSignClass	:== { sc_pos_vect = bitnot 0, sc_neg_vect = bitnot 0 }
 ArrowSignClass	:== { sc_pos_vect = 2, sc_neg_vect = 1 }
-PosSignClass	:== { sc_pos_vect = bitnot 0, sc_neg_vect = 0 }
 
 :: Sign =
 	{	pos_sign :: !Bool
@@ -36,7 +35,9 @@ signClassToSign :: !SignClassification !Int -> Sign
 IsPositive sign_class index :== sign_class.sc_pos_vect bitand (1 << index) <> 0
 IsNegative sign_class index :== sign_class.sc_neg_vect bitand (1 << index) <> 0
 */
+
 instance <<< Sign
+instance * Sign
 
 ::	TypeSign key =
 	{	ts_cons_var_signs	:: !key

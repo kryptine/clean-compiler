@@ -22,7 +22,6 @@ frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident (hash_table ---> ("Parsing:", mod_ident)) error search_paths predef_symbols files
-	#! mod_type = mod.mod_type
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 	# (ok, mod, nr_of_global_funs, mod_functions, dcl_mod, predef_mod, modules, hash_table, error, predef_symbols, files)
@@ -35,10 +34,10 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
-	# {icl_functions,icl_instances,icl_specials,icl_common,icl_declared={dcls_import}} = icl_mod
+	# {icl_functions,icl_instances,icl_specials,icl_common,icl_declared} = icl_mod
 //	  (components, icl_functions, error) = showComponents components 0 True icl_functions error
 	  (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error)
-		= typeProgram mod_type (components -*-> "Typing") icl_functions icl_specials icl_common dcls_import dcl_mods heaps predef_symbols error
+		= typeProgram (components -*-> "Typing") icl_functions icl_specials icl_common icl_declared.dcls_import dcl_mods heaps predef_symbols error
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
@@ -56,31 +55,17 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 		 = analyseGroups common_defs array_instances (components -*-> "Transform") fun_defs var_heap expression_heap
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  	= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics var_heap type_heaps expression_heap
-/*
-
-	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups common_defs (components -*-> "Transform") fun_defs heaps.hp_var_heap heaps.hp_expression_heap
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  		= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs var_heap heaps.hp_type_heaps expression_heap
-	  (components, fun_defs, error) = showComponents components 0 True fun_defs error
-
-*/
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule dcl_mods common_defs dcl_types used_conses var_heap type_heaps
-/*
-	  (components, fun_defs, predef_symbols, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components -*-> "convertDynamics") fun_defs predef_symbols
-					dcl_types used_conses var_heap type_heaps expression_heap
-	  (components, fun_defs, out) = showComponents components 0 True fun_defs out
-*/
 	  (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctionsIntoPatterns components imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
 	  (dcl_types, type_heaps, var_heap)
 			= convertImportedTypeSpecifications dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
-//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+
 	= (predef_symbols,hash_table,files,error,io,out,
-		Yes	{	fe_icl = {icl_mod & icl_functions=fun_defs}
+		Yes	{	fe_icl = {icl_mod & icl_functions=fun_defs }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
 			,	fe_varHeap = var_heap
@@ -90,11 +75,14 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 			}
 		)
 	where
+
+		build_optional_icl_dcl_conversions :: !Int !(Optional {# Index}) -> Optional {# Index}
 		build_optional_icl_dcl_conversions size No
 			=	Yes (build_icl_dcl_conversions size {})
 		build_optional_icl_dcl_conversions size (Yes dcl_icl_conversions)
 			=	Yes (build_icl_dcl_conversions size dcl_icl_conversions)
-
+	
+		build_icl_dcl_conversions :: !Int !{# Index} -> {# Index}
 		build_icl_dcl_conversions table_size dcl_icl_conversions
 			# dcl_table_size = size dcl_icl_conversions
 			  icl_dcl_conversions = update_conversion_array 0 dcl_table_size dcl_icl_conversions (createArray table_size NoIndex)
@@ -137,7 +125,7 @@ where
 	show_component [] show_types fun_defs file
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] show_types fun_defs file
-		#! fun_def = fun_defs.[fun]
+		# (fun_def, fun_defs) = fun_defs![fun]
 		| show_types
 			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
 			= show_component funs show_types fun_defs (file <<< fun_def)
@@ -154,7 +142,7 @@ where
 	show_component [] fun_defs _ file
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] fun_defs acc_args file
-		#! fd = fun_defs.[fun]
+		# (fd, fun_defs) = fun_defs![fun]
 		# file = show_accumulating_arguments acc_args.[fun].cc_args (file <<< fd.fun_symb <<< '.' <<< fun <<< " (")
 		= show_component funs fun_defs acc_args (file <<< ") ")
 	
@@ -186,7 +174,7 @@ where
 	show_types [] fun_defs file
 		= (fun_defs, file <<< '\n')
 	show_types [fun:funs] fun_defs file
-		#! fun_def = fun_defs.[fun]
+		# (fun_def, fun_defs) = fun_defs![fun]
 		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
 		  (Yes ftype) = fun_def.fun_type
 		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype) <<< '\n' )

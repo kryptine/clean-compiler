@@ -131,7 +131,7 @@ ptrToInt2 p = code {
 	rtn	
 };
 
-instance == Ptr a
+instance == (Ptr a)
 where
 {	(==) p1 p2 = code {
 	push_r_args_b 1 1 1 1 1

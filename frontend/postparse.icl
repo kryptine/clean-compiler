@@ -22,7 +22,7 @@ SelectPredefinedIdents predefs
 			| i == PD_NrOfPredefSymbols
 				=	(idents, symbols)
 			// otherwise
-				#!	symbol = symbols.[i]
+				# (symbol, symbols) = symbols![i]
 				=	selectIdents (i+1) {idents & [i] = symbol.pds_ident} symbols
 
 predef :: Int PredefinedIdents -> ParsedExpr
@@ -228,7 +228,7 @@ where
 		# (from_expr, fun_defs, ca) = collectFunctions from_expr ca
 		= (SQ_From from_expr, fun_defs, ca) 
 
-instance collectFunctions Bind a b | collectFunctions a & collectFunctions b
+instance collectFunctions (Bind a b) | collectFunctions a & collectFunctions b
 where
 	collectFunctions bind=:{bind_src,bind_dst} ca
 		# ((bind_src,bind_dst), fun_defs, ca) = collectFunctions (bind_src,bind_dst) ca
@@ -294,7 +294,7 @@ where
 		=	(locals, [], ca)
 // ... RWS
 
-instance collectFunctions NodeDef a | collectFunctions a
+instance collectFunctions (NodeDef a) | collectFunctions a
 where
 	collectFunctions node_def=:{nd_dst,nd_alts,nd_locals} ca
 		# ((nd_dst,(nd_alts,nd_locals)), fun_defs, ca) = collectFunctions (nd_dst,(nd_alts,nd_locals)) ca
