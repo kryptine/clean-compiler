@@ -125,7 +125,6 @@ stringToIdent s i p :== (ident,parse_state)
 	where
 		({boxed_ident=ident},parse_state) = stringToBoxedIdent s i p
 
-//stringToIdent :: !String !IdentClass !*ParseState -> (!Ident, !*ParseState)
 stringToBoxedIdent :: !String !IdentClass !*ParseState -> (!BoxedIdent, !*ParseState)
 stringToBoxedIdent ident ident_class pState=:{ps_hash_table}
 	# (ident, ps_hash_table) = putIdentInHashTable ident ident_class ps_hash_table
@@ -135,12 +134,9 @@ internalIdent s p :== (ident,parse_state)
 	where
 		({boxed_ident=ident},parse_state) = internaBoxedlIdent s p
 
-//internalIdent :: !String !*ParseState -> (!Ident, !*ParseState)
 internaBoxedlIdent :: !String !*ParseState -> (!BoxedIdent, !*ParseState)
 internaBoxedlIdent prefix pState
 	# ({fp_line,fp_col},pState=:{ps_hash_table})	= getPosition pState
-// MW4 was: (changed to make it compatible with conventions used in postparse)
-// 	  case_string									= prefix +++ toString fp_line +++ "_" +++ toString fp_col
 	  case_string									= prefix +++ ";" +++ toString fp_line +++ ";" +++ toString fp_col
 	  (case_ident, ps_hash_table)					= putIdentInHashTable case_string IC_Expression ps_hash_table
 	= (case_ident, { pState & ps_hash_table = ps_hash_table } )
@@ -247,14 +243,14 @@ optionalPriority isinfix token pState
 	Modules
 */
 
-::	ParseContext	:== Int
+::	ParseContext			:== Int
 
-cICLContext			:== 1
-cGlobalContext		:== 2
-cDCLContext			:== 0
-cLocalContext		:== 1
+cICLContext					:== 1
+cGlobalContext				:== 2
+cDCLContext					:== 0
+cLocalContext				:== 1
+cClassOrInstanceDefsContext	:== 4
 
-// RWS ...
 /*
 	A cClassOrInstanceDefsContext is a further restriction on a
 	local context, because no local node defs are allowed
@@ -262,32 +258,26 @@ cLocalContext		:== 1
 	Possible solution: accept everything in the parser and
 	discriminate in postparse, depending on the context.
 */
-cClassOrInstanceDefsContext :== 4
-// ... RWS
 
 SetGlobalContext iclmodule
 	| iclmodule
 		= cICLContext bitor cGlobalContext
 		= cDCLContext bitor cGlobalContext
 
-SetLocalContext parseContext 	:== parseContext bitand (bitnot cGlobalContext)
+SetLocalContext					parseContext :== parseContext bitand (bitnot cGlobalContext)
+SetClassOrInstanceDefsContext	parseContext :== SetLocalContext (parseContext bitor cClassOrInstanceDefsContext)
 
-// RWS ...
-SetClassOrInstanceDefsContext parseContext :== SetLocalContext (parseContext bitor cClassOrInstanceDefsContext)
-// ... RWS
+isLocalContext	parseContext	:== parseContext bitand cGlobalContext == 0
+isGlobalContext	parseContext	:== parseContext bitand cGlobalContext <> 0 // not (isLocalContext parseContext)
 
-isLocalContext parseContext	:== parseContext bitand cGlobalContext == 0
-isGlobalContext parseContext	:== not (isLocalContext parseContext)
+isDclContext	parseContext	:== parseContext bitand cICLContext == 0
+isIclContext	parseContext	:== parseContext bitand cICLContext <> 0	// not (isDclContext parseContext)
 
-isDclContext parseContext	:== parseContext bitand cICLContext == 0
-isIclContext parseContext	:== not (isDclContext parseContext)
+isClassOrInstanceDefsContext parseContext			:== parseContext bitand cClassOrInstanceDefsContext <> 0
+isGlobalOrClassOrInstanceDefsContext parseContext	:== parseContext bitand (cGlobalContext bitor cClassOrInstanceDefsContext) <> 0
 
-// RWS ...
-isClassOrInstanceDefsContext parseContext	:== parseContext bitand cClassOrInstanceDefsContext <> 0
-// ... RWS
-
-cWantIclFile :== True	
-cWantDclFile :== False	
+cWantIclFile :== True
+cWantDclFile :== False
 
 wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths !*PredefinedSymbols (ModTimeFunction *Files) !*Files
 	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
@@ -602,7 +592,7 @@ where
 	check_name_and_fixity No hasprio pState
 		= (erroneousIdent, False, parseError "Definition" No "identifier" pState)
 	check_name_and_fixity (Yes (name,is_infix)) hasprio pState
-		| not is_infix	&& hasprio	//	XXXXXXX
+		| not is_infix	&& hasprio
 			= (name, False, parseError "Definition" No "Infix operator should be inside parentheses; no infix" pState)
 			= (name, is_infix, pState)
 
@@ -613,7 +603,7 @@ isEqualToken _					= False
 isRhsStartToken :: !ParseContext !Token -> Bool
 isRhsStartToken parseContext EqualToken			= True
 isRhsStartToken parseContext ColonDefinesToken	= True
-isRhsStartToken parseContext DefinesColonToken	= isGlobalContext parseContext
+isRhsStartToken parseContext DefinesColonToken	= True // RWS test isGlobalContext parseContext
 isRhsStartToken parseContext _					= False
 
 optionalSpecials :: !ParseState -> (!Specials, !ParseState)
@@ -683,12 +673,12 @@ where
 wantCodeRhs :: !ParseState -> (Rhs, !ParseState)
 wantCodeRhs pState
 	# (expr, pState)	= want_code_expr pState
-	  (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
+	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	= (	{ rhs_alts		= UnGuardedExpr
 							{ ewl_nodes		= []
 							, ewl_locals	= LocalParsedDefs []
 							, ewl_expr		= expr
-							, ewl_position	= LinePos file_name line_nr // MW++
+							, ewl_position	= LinePos file_name line_nr
 							}
 		, rhs_locals	= LocalParsedDefs []
 		}
@@ -752,8 +742,6 @@ where
 /*
 	For parsing right-hand sides of functions and case expressions
 */
-
-
 /* Syntax:
 	FunctionAltDefRhs	=	FunctionBody						// Rhs
 							[ LocalFunctionAltDefs ]
@@ -832,7 +820,7 @@ where
 		build_root _ optional_expr alts=:[_:_] _ pState
 			= (GuardedAlts alts optional_expr, pState)
 		build_root token _ _ _ pState
-			# (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
+			# (file_name, line_nr, pState)	= getFileAndLineNr pState
 			=	(UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs [],
 												ewl_position = LinePos file_name line_nr}
 							, parseError "RHS: root expression" (Yes token) "= <ExprWithLocals>" pState
@@ -846,14 +834,14 @@ where
 		= want_OptExprWithLocals True EqualToken nodeDefs sep (replaceToken EqualToken pState)
 	want_OptExprWithLocals withExpected token nodeDefs sep pState
 		| sep token
-		# (file_name, line_nr, pState)	= getFileAndLineNr pState // MW++
+		# (file_name, line_nr, pState)	= getFileAndLineNr pState
 		  (expr, pState)	= wantExpression cIsNotAPattern pState
 		  pState			= wantEndRootExpression pState
 		  (locals,pState)	= optionalLocals WithToken withExpected pState
 		= ( Yes	{ ewl_nodes		= nodeDefs
 				, ewl_expr		= expr
 				, ewl_locals	= locals
-				, ewl_position	= LinePos file_name line_nr // MW++
+				, ewl_position	= LinePos file_name line_nr
 				}
 		  , pState
 		  )
@@ -894,7 +882,7 @@ where
 		| succ
 			# pState			= wantToken FunctionContext "let definition" EqualToken pState
 			  (file_name, line_nr, pState)
-			  					= getFileAndLineNr pState // MW++
+			  					= getFileAndLineNr pState
 			  (rhs_exp, pState) = wantExpression cIsNotAPattern pState
 			  pState			= wantEndRootExpression pState -->> ("#",lhs_exp,"=",rhs_exp)
 	  	  	  (locals , pState) = optionalLocals WithToken localsExpected pState
@@ -905,7 +893,7 @@ where
 				  				  }
 				  , ndwl_locals	= locals
 				  , ndwl_position
-				  				= LinePos file_name line_nr // MW++
+				  				= LinePos file_name line_nr
 				  }
 				, pState
 				)
@@ -1490,7 +1478,6 @@ where
 		  			pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
-//			# (exi_vars, pState) = optionalQuantifiedVariables ExistentialQuantifier pState
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
 // MW 			  (token, pState) = nextToken TypeContext pState
 			  (token, pState) = nextToken GeneralContext pState
@@ -1998,39 +1985,10 @@ determAttr attr1    attr2   type pState
 
 wantDynamicType :: !*ParseState -> *(!DynamicType,!*ParseState)
 wantDynamicType pState 
-//	# (type_vars, pState) = optionalQuantifiedVariables UniversalQuantifier pState
 	# (type_vars, pState) = optionalUniversalQuantifiedVariables pState
 	  (type, pState) = want pState
 	= ({ dt_uni_vars = type_vars, dt_type = type, dt_global_vars = [] }, pState)
 
-/* PK
-::	QuantifierKind = UniversalQuantifier | ExistentialQuantifier
-
-instance == QuantifierKind
-where
-	(==) UniversalQuantifier UniversalQuantifier
-		= True 
-	(==) ExistentialQuantifier ExistentialQuantifier
-		= True 
-	(==) _  _
-		= False 
-
-instance try QuantifierKind
-where
-	try (IdentToken name) pState
-		| name == "A"
-			# (token, pState) = nextToken TypeContext pState
-			| token == DotToken
-				= (Yes UniversalQuantifier, pState)
-				= (No, tokenBack (tokenBack pState))
-		| name == "E"
-			# (token, pState) = nextToken TypeContext pState
-			| token == DotToken
-				= (Yes ExistentialQuantifier, pState)
-				= (No, tokenBack (tokenBack pState))
-	try token pState
-			= (No, tokenBack pState)
-*/
 optionalExistentialQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalExistentialQuantifiedVariables pState
 	# (token, pState) = nextToken TypeContext pState
@@ -2047,18 +2005,17 @@ where
 		# (token, pState)	= nextToken TypeContext pState
 		= case token of
 			DotToken
-	// Sjaak 210801 ...
 				# (typevar, pState)	= wantTypeVar pState
 				-> (True, {atv_attribute = TA_Anonymous, atv_annotation = AN_None, atv_variable = typevar}, pState)
-	// ... Sjaak
 			_
 				# (succ, typevar, pState)	= tryTypeVarT token pState
 				| succ
 					#	atypevar = {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}
 					->	(True,atypevar,pState)
 					->	(False,abort "no ATypeVar",pState)
+<<<<<<< parse.icl
+=======
 */
-// Sjaak 041001 ....
 
 optionalUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalUniversalQuantifiedVariables pState
@@ -2086,40 +2043,6 @@ where
 	try_attribute AsteriskToken	pState = (True,	TA_Unique,		pState)
 	try_attribute token      	pState = (False,	TA_None,	pState)
 
-// ... Sjaak
-
-
-/* PK
-optionalQuantifiedVariables :: !QuantifierKind !*ParseState -> *(![ATypeVar],!*ParseState)
-optionalQuantifiedVariables req_quant pState
-	# (token, pState) = nextToken TypeContext pState
-	  (optional_quantifier, pState) = try token pState
-	= case optional_quantifier of
-		Yes off_quant
-			# (vars, pState) = wantList "quantified variable(s)" try_Attributed_TypeVar pState
-			| req_quant == off_quant
-				-> (vars, pState)
-				-> (vars, parseError "optional quantified variables" No "illegal quantifier" pState)
-		No
-			-> ([], pState)
-where
-	try_Attributed_TypeVar :: !ParseState -> (Bool,ATypeVar,ParseState)
-	try_Attributed_TypeVar pState
-		# (token, pState)	= nextToken TypeContext pState
-		= case token of
-			DotToken
-				# (succ,typevar, pState)	= tryTypeVar pState
-				| succ
-					#	atypevar = {atv_attribute = TA_Anonymous, atv_annotation = AN_None, atv_variable = typevar}
-					->	(True,atypevar,pState)
-					->	(False,abort "no ATypeVar",pState)
-			_
-				# (succ,typevar, pState)	= tryTypeVar (tokenBack pState)
-				| succ
-					#	atypevar = {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}
-					->	(True,atypevar,pState)
-					->	(False,abort "no ATypeVar",pState)
-*/
 tryATypeToType :: !AType !ParseState -> (!Bool, !Type, !ParseState)
 tryATypeToType atype pState
 	| atype.at_annotation <> AN_None
@@ -2137,12 +2060,6 @@ tryATypeToType atype pState
 
 /*
 	Expressions
-*/
-/*
-wantMainExp :: !ParseState -> (ParsedExpr, !ParseState)
-wantMainExp pState
-	# (exp, pState) = wantExpression cIsNotAPattern pState
-	= (exp, wantEndOfFileToken pState)
 */
 cIsAPattern		:== True
 cIsNotAPattern	:== False
@@ -2188,10 +2105,7 @@ wantLhsExpressionT (IdentToken name) pState /* to make a=:C x equivalent to a=:(
 						->	(combineExpressions expr1 exprs, pState)
 					// not succ
 						-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
-/*			# (token, pState)	= nextToken FunctionContext pState
-			  (expr, pState)	= wantLhsExpressionT2 token pState
-			= (PE_Bound { bind_dst = id, bind_src = expr }, pState)
-*/		| token == DoubleColonToken
+		| token == DoubleColonToken
 			# (dyn_type, pState) = wantDynamicType pState
 			= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
 		// token <> DefinesColonToken // token back and call to wantLhsExpressionT2 would do also.
@@ -2215,8 +2129,6 @@ combineExpressions expr exprs
 where
 	make_app_exp exp []
 		= exp
-//	make_app_exp (PE_Bound be=:{ bind_src}) exps
-//		= PE_Bound { be & bind_src = make_app_exp bind_src exps }
 	make_app_exp exp exprs
 		= PE_List [exp : exprs]
 
@@ -2310,7 +2222,6 @@ trySimpleExpression is_pattern pState
 		= trySimpleRhsExpression pState
 
 trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
-
 trySimpleExpressionT (IdentToken name) is_pattern pState
 	| isLowerCaseName name
 	# (id, pState) = stringToIdent name IC_Expression pState
@@ -2351,17 +2262,15 @@ trySimpleExpressionT OpenToken is_pattern pState
 				-> (True, PE_List [exp], pState)
 			_
 				-> (True, exp, pState)
-	//	# (token,pState) = nextToken FunctionContext pState		// for debugging
-	//	  pState = tokenBack pState  -->> ("PE_tuple",args,token)
-   		= (True, PE_Tuple args, pState)
+		= (True, PE_Tuple args, pState)
 where
 	want_expression_list is_pattern pState
 		# (expr, pState) = wantExpression is_pattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
 			# (exprs, pState) = want_expression_list is_pattern pState
-	  		= ([expr : exprs], pState)
-	  		= ([expr], tokenBack pState)
+			= ([expr : exprs], pState)
+			= ([expr], tokenBack pState)
 trySimpleExpressionT CurlyOpenToken is_pattern pState
 	# (rec_or_aray_exp, pState) = wantRecordOrArrayExp is_pattern pState 
 	= (True, rec_or_aray_exp, pState)
@@ -2384,17 +2293,13 @@ trySimpleExpressionT token is_pattern pState
 
 trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
-// MW3 was:	# (lam_ident, pState)	= internalIdent "\\" pState
 	# (lam_ident, pState)	= internalIdent (toString backslash) pState
 	  (lam_args, pState) 	= wantList "arguments" trySimpleLhsExpression pState
 	  pState				= want_lambda_sep pState
 	  (exp, pState)			= wantExpression cIsNotAPattern pState
-// MW9..
 	  (file_name, line_nr, pState)	
 	  						= getFileAndLineNr pState
 	  position				= FunPos file_name line_nr lam_ident.id_name
-// ..MW9
-// MW9 was	= (True, PE_Lambda lam_ident lam_args exp, pState)
 	= (True, PE_Lambda lam_ident lam_args exp position, pState)
 	where
 		want_lambda_sep pState
@@ -2514,12 +2419,8 @@ wantListExp is_pattern pState
 						#	(token, pState)	= nextToken FunctionContext pState
 						->	want_LGraphExpr token acc head_strictness pState
 					ColonToken
-		/* PK			#	(token, pState)		= nextToken FunctionContext pState
-							(exp, pState)		= wantRhsExpressionT token pState
-		... PK */
-						#	(exp, pState)		= wantExpression is_pattern pState
-//							pState				= wantToken FunctionContext "list" SquareCloseToken pState
-						# (token,pState) = nextToken FunctionContext pState
+						# (exp, pState)		= wantExpression is_pattern pState
+						# (token,pState)	= nextToken FunctionContext pState
 						| token==SquareCloseToken
 							-> gen_cons_nodes acc exp pState
 						| token==ExclamationToken && head_strictness<>HeadOverloaded
@@ -2663,7 +2564,7 @@ where
 	want_qualifier :: !ParseState -> (!Qualifier, !ParseState)
 	want_qualifier pState
 		# (qual_position, pState) = getPosition pState
-		  (qual_filename, pState) = accScanState getFilename pState //MW3++
+		  (qual_filename, pState) = accScanState getFilename pState
 		  (lhs_expr, pState) = wantExpression cIsAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == LeftArrowToken
@@ -2686,13 +2587,13 @@ where
 		| token == BarToken
 			# (filter_expr, pState) = wantExpression cIsNotAPattern pState
 			= ( { qual_generators = [generator], qual_filter = Yes filter_expr
-				, qual_position = qual_position, qual_filename = qual_filename } //MW3 added qual_filename field
+				, qual_position = qual_position, qual_filename = qual_filename }
 			  , pState
 			  )
 		| token == AndToken
 			# (qualifier, pState) = want_qualifier pState
 			= ({qualifier & qual_generators = [ generator : qualifier.qual_generators] }, pState)
-		= ( {qual_generators = [generator], qual_filter = No, qual_position = qual_position, qual_filename = qual_filename} //MW3 added qual_filename field
+		= ( {qual_generators = [generator], qual_filter = No, qual_position = qual_position, qual_filename = qual_filename}
 		  ,	tokenBack pState
 		  )
 
@@ -2717,7 +2618,7 @@ where
 		# (succ, pattern, pState) = try_pattern pState
 		| succ
 			# (rhs, pState) = wantRhs caseSeperator True pState
-			= (True, { calt_pattern = pattern, calt_rhs = rhs }, pState) // -->> ("case alt", pattern)
+			= (True, { calt_pattern = pattern, calt_rhs = rhs }, pState)
 		// otherwise // ~ succ
 			= (False, abort "no case alt", pState)
 	
@@ -2727,13 +2628,13 @@ where
 		| caseSeperator token
 			#	pState			= tokenBack pState
 				(rhs, pState)	= wantRhs caseSeperator True pState
-			= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState) // -->> ("default case alt")
+			= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState)
 		| token == OtherwiseToken
 			# (token, pState)	= nextToken FunctionContext pState
 			  pState			= tokenBack pState
 			| caseSeperator token
 				# (rhs, pState) = wantRhs caseSeperator True pState
-				= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState) // -->> ("default case alt")
+				= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState)
 				= (False, abort "no case alt", pState)
 			= (False, abort "no case alt", tokenBack pState)
 
@@ -2769,7 +2670,7 @@ buildNodeDef lhsExpr rhsExpr
 					{ ewl_nodes		= []
 					, ewl_locals	= LocalParsedDefs []
 					, ewl_expr		= rhsExpr
-					, ewl_position	= NoPos // MW++
+					, ewl_position	= NoPos
 					}
 			, rhs_locals
 				= LocalParsedDefs []
@@ -2910,7 +2811,6 @@ where
 			 			where
 							equal_selectors :: [ParsedSelection] [ParsedSelection] -> Bool
 							equal_selectors [PS_Record ident1 _ ,_ : _] [PS_Record ident2 _ ,_: _]
-							// equal_selectors [PS_Record ident1 _ : [_]] [PS_Record ident2 _ : [_]]
 								=	ident1.id_name == ident2.id_name
 							equal_selectors _ _
 								=	False
@@ -2925,15 +2825,6 @@ where
 			is_record_select _
 				=	False
 
-/*			transform_record_update :: (Optional Ident) ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
-			transform_record_update record_type expr groupedUpdates level pState
-				# (assignments, (optionalIdent, record_type,pState))
-					=	mapSt (transform_update level) groupedUpdates (No, record_type,pState)
-				  updateExpr
-				  	=	build_update record_type optionalIdent expr assignments
-				=	(updateExpr, pState)
-				where
-*/
 			transform_record_update :: (Optional Ident) ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
 			transform_record_update record_type expr groupedUpdates level pState
 				=	(updateExpr, pState2)
@@ -2943,7 +2834,6 @@ where
 						= mapSt (transform_update level) groupedUpdates (No, record_type,pState)
 					updateExpr
 						= build_update final_record_type optionalIdent expr assignments
-// MW was				= build_update record_type optionalIdent expr assignments
 					// transform one group of nested updates with the same first field
 					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
 					//  (id is ident to shared expression that's being updated)
@@ -2973,7 +2863,7 @@ where
 								=	{update & nu_selectors = tl nu_selectors}
 					transform_update _ _ (_, record_type,pState)
 						# pState
-							=	parseError "record or array" No "field assignments mixed with array assignments not" /* expected */ pState
+							=	parseError "record or array" No "field assignments mixed with array assignments not" pState
 						=	({bind_dst = errorIdent, bind_src = PE_Empty}, (No,record_type,pState))
 
 					build_update :: !(Optional Ident) !(Optional Ident) !ParsedExpr ![FieldAssignment] -> ParsedExpr
@@ -3170,8 +3060,7 @@ wantEndOfDefinition :: String !ParseState -> ParseState
 wantEndOfDefinition msg pState=:{ps_skipping}
 	| ps_skipping
 		#	(token, pState) = skipToEndOfDefinition {pState & ps_skipping = False}
-		//	(pos,pState) 	= getPosition pState	// for debugging
-		= want_end_of_definition token msg pState	//-->> ("restart parsing at ",token, pos)
+		= want_end_of_definition token msg pState
 	# (token, pState) = nextToken FunctionContext pState
 	= want_end_of_definition token msg pState
 where
@@ -3180,25 +3069,25 @@ where
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		| ss_useLayout
 			= case token of
-				NewDefinitionToken	->	pState 				// -->> "end of definition found due to NewDefinitionToken"
-				EndOfFileToken		->	tokenBack pState 	// -->> "end of definition found due to EndOfFileToken"
-				EndGroupToken 		->	tokenBack pState	// -->> "end of definition found due to EndGroupToken"
-				InToken		 		->	tokenBack pState	// -->> "end of definition found due to InToken"
-				WhereToken			->	tokenBack pState	// -->> "end of definition found due to WhereToken"
-				BarToken			->	tokenBack pState	// -->> "end of definition found due to BarToken"
-				EqualToken			->	tokenBack pState	// -->> "end of definition found due to EqualToken"
-				ArrowToken			->	tokenBack pState	// -->> "end of definition found due to ArrowToken"
-				SeqLetToken _		->	tokenBack pState	// -->> "end of definition found due to SeqLetToken"
+				NewDefinitionToken	->	pState 
+				EndOfFileToken		->	tokenBack pState
+				EndGroupToken 		->	tokenBack pState
+				InToken		 		->	tokenBack pState
+				WhereToken			->	tokenBack pState
+				BarToken			->	tokenBack pState
+				EqualToken			->	tokenBack pState
+				ArrowToken			->	tokenBack pState
+				SeqLetToken _		->	tokenBack pState
 				SemicolonToken		#	(token, pState) = nextToken FunctionContext pState
 									->	case token of
-											NewDefinitionToken	->	pState			// -->> "end of definition found due to SemicolonToken and NewDefinitionToken"
-											_					->	tokenBack pState// -->> "end of definition found due to SemicolonToken"
+											NewDefinitionToken	->	pState
+											_					->	tokenBack pState
 				token				->	wantEndOfDefinition "" (parseError msg (Yes token) "end of definition" pState)
 		// otherwise // ~ ss_useLayout
 			= case token of
 				CurlyCloseToken		->	tokenBack pState
 				SemicolonToken		->	pState
-	 			EndOfFileToken		->	tokenBack pState	// -->> "end of definition found due to EndOfFileToken"
+	 			EndOfFileToken		->	tokenBack pState
 				token				->	wantEndOfDefinition "" (parseError msg (Yes token) "end of definition" pState)
 
 wantEndRootExpression :: !ParseState -> ParseState
@@ -3227,13 +3116,13 @@ wantEndRootExpression pState=:{ps_skipping}
 									->	case token of
 											NewDefinitionToken	->	pState
 											_					->	tokenBack pState
-				CurlyCloseToken		->	tokenBack pState // PK
+				CurlyCloseToken		->	tokenBack pState 
 				token				->	wantEndOfDefinition "root expression" (parseError "root expression" (Yes token) "end of root expression" pState)
 		// otherwise // ~ ss_useLayout
 			= case token of
 				SemicolonToken		->	pState
 				CurlyCloseToken		->	tokenBack pState
-				EqualToken 			->	tokenBack pState	// Do we really want to allow all of these tokens
+				EqualToken 			->	tokenBack pState
 				ArrowToken 			->	tokenBack pState
 				(SeqLetToken _)		->	tokenBack pState
 				WhereToken			->	tokenBack pState
@@ -3259,8 +3148,6 @@ wantEndGroup msg pState
 		| token == SemicolonToken
 			= pState
 			= tokenBack pState
-// PK		= pState
-	// otherwise // token <> CurlyCloseToken
 		= parseError msg (Yes token) "end of group without layout, }," pState
 
 wantEndModule :: !ParseState -> ParseState
@@ -3482,7 +3369,7 @@ wantToken :: !ScanContext !{#Char} !Token !ParseState ->  ParseState
 wantToken scanContext act dem_token pState
 	# (token, pState) = nextToken scanContext pState
 	| dem_token == token
-		= pState // -->> (token,"wanted and consumed")
+		= pState
 		= parseError act (Yes token) (toString dem_token) pState
 
 instance want Priority
