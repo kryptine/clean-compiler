@@ -6,11 +6,6 @@ import StdEnv, general
 
 ::	* ScanState
 
-//::	*Input
-//::	* InputStream
-//::	LongToken
-//::	Buffer x
-
 ::	FilePosition = {fp_line :: !Int, fp_col :: !Int}
 
 instance <<< FilePosition

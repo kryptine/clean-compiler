@@ -48,16 +48,29 @@ Conventions:
 	,	ps_hash_table		:: !*HashTable
 	,	ps_pre_def_symbols	:: !*PredefinedSymbols
 	}
-
+/*
 appScanState :: (ScanState -> ScanState) !ParseState -> ParseState
 appScanState f pState=:{ps_scanState}
 	#	ps_scanState = f ps_scanState
 	=	{	pState & ps_scanState = ps_scanState }
+*/
+appScanState f pState:==appScanState pState
+	where
+	appScanState pState=:{ps_scanState}
+		#	ps_scanState = f ps_scanState
+		=	{	pState & ps_scanState = ps_scanState }
 
+/*
 accScanState :: (ScanState -> (.t,ScanState)) !ParseState -> (.t,ParseState)
 accScanState f pState=:{ps_scanState}
 	#	( x, ps_scanState) = f ps_scanState
 	=	( x, {pState & ps_scanState = ps_scanState })
+*/
+accScanState f pState:== accScanState pState
+	where
+		accScanState pState=:{ps_scanState}
+			#	( x, ps_scanState) = f ps_scanState
+			=	( x, {pState & ps_scanState = ps_scanState })
 
 makeStringTypeSymbol pState=:{ps_pre_def_symbols}
 	#! string_id = ps_pre_def_symbols.[PD_StringType]
@@ -2362,6 +2375,7 @@ where
 					// transform one group of nested updates with the same first field
 					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
 					//  (id is ident to shared expression that's being updated)
+
 					transform_update :: !Int [NestedUpdate] (Optional Ident,Optional Ident,ParseState) -> (FieldAssignment, !(!Optional Ident,!Optional Ident,ParseState))
 					transform_update _ [{nu_selectors=[PS_Record fieldIdent field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
 						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
@@ -2396,7 +2410,7 @@ where
 					build_update record_type (Yes ident) expr assignments
 						=	PE_Let False (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
 									(PE_Record (PE_Ident ident) record_type assignments)
-
+					
 					check_field_and_record_types :: (Optional Ident) (Optional Ident) ParseState -> (!Optional Ident,!ParseState);
 					check_field_and_record_types No record_type pState
 						= (record_type,pState);

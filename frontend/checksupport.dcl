@@ -129,7 +129,7 @@ retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaratio
 addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !u:{#FunDef} !*SymbolTable !*ErrorAdmin -> (!u:{# FunDef}, !*SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
 addDeclaredSymbolsToSymbolTable :: .Bool .Int ![.Declaration] ![.Declaration] !*CheckState -> .CheckState;
-addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
+//addLocalSymbolsToSymbolTable :: ![.Declaration] Int !*CheckState -> .CheckState;
 addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable :: ![.Declaration] !*CheckState -> .CheckState;
 retrieveImportsFromSymbolTable :: ![Import ImportDeclaration] ![Declaration] !*{#DclModule} !*(Heap SymbolTableEntry) -> *(![Declaration],!*{#DclModule},!*Heap SymbolTableEntry);

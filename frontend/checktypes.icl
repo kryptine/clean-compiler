@@ -459,6 +459,8 @@ determineAttributeVariable attr_var=:{av_name=attr_name=:{id_info}} oti=:{oti_he
 
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
 
+// JVG: added type:
+newAttribute :: !.DemandedAttributeKind .{#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute,!.OpenTypeInfo,!.CheckState);
 newAttribute DAK_Ignore var_name _ oti cs
 	= (TA_Multi, oti, cs)
 newAttribute DAK_Unique var_name new_attr  oti cs
@@ -574,7 +576,8 @@ where
 	check_attribute var_name dem_attr _ this_attr oti cs
 		= (TA_Multi, oti, cs)
 
-
+//JVG: added type
+checkOpenAType :: Int Int DemandedAttributeKind AType *(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState) -> *(!AType,!*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState));
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
 	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
@@ -627,6 +630,8 @@ where
 		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr arg_types td_args cot_state
 		= ([arg_type : arg_types], cot_state)
 */
+	// JVG: added type:
+	check_args_of_type_cons :: Int Int [AType] [ATypeVar] !*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState) -> *(!.[AType],!*(!u:OpenTypeSymbols,!*OpenTypeInfo,!*CheckState));
 	check_args_of_type_cons mod_index scope [] _ cot_state
 		= ([], cot_state)
 	check_args_of_type_cons mod_index scope [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state

@@ -4,7 +4,6 @@ import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, RWSDebug
 
-
 temporary_import_solution_XXX yes no :== yes
 // to switch between importing modes.
 // iff this is yes, then explicit imports happen in the old Clean 1.3 fashion.
@@ -253,6 +252,8 @@ instance == ConsequenceKind
 
 NoPosition :== -1
 
+//JVG: added type
+filter_decl :: [.Declaration] ([(Ident,AtomType)],[(Ident,StructureInfo,StructureType,Optional Int)]) Int *{#DclModule} *CheckState -> (!(!.[Declaration],!([(Ident,AtomType)],![(Ident,StructureInfo,StructureType,Optional Int)])),!.{#DclModule},!.CheckState);
 filter_decl [] unimported _ modules cs
 	= (([], unimported), modules, cs)
 filter_decl [decl:decls] unimported index modules cs
@@ -317,7 +318,7 @@ atomAppears dcl_ident dcl_index (atomicImports, structureImports) index modules 
 			= atom_appears dcl_ident dcl_index atomicImports atomicImports 0 index modules cs
 	= ((result, (atomicImports, structureImports)), modules, cs)
 
-
+atom_appears :: Ident .Int [(Ident,.AtomType)] w:[y:(Ident,u1:AtomType)] !Int .Int !u:{#u3:DclModule} !*CheckState -> (!(.Bool,x:[z:(Ident,u2:AtomType)]),!v:{#DclModule},!.CheckState) , [u <= v, u1 <= u2, y <= z, w <= x, u <= u3];
 atom_appears _ _ [] atomic_imports _ _ modules cs
   	= ((False, atomic_imports), modules, cs)
 atom_appears ident dcl_index [h=:(import_ident, atomType):t] atomic_imports unimp_index index modules cs
@@ -357,6 +358,7 @@ instance == StructureType
 	(==) ST_Class		ST_Class		= True
 	(==) _ _							= False
 
+element_appears :: StructureType Ident Int [(Ident,.StructureInfo,u2:StructureType,z:Optional .Int)] u:[w:(Ident,u5:StructureInfo,u3:StructureType,y:Optional Int)] !Int Int !*{#DclModule} !*CheckState -> (!(Bool,v:[x:(Ident,u6:StructureInfo,u4:StructureType,u1:Optional Int)]),!.{#DclModule},!.CheckState), [y z <= u1, u3 <= u4, u5 <= u6, w <= x, u <= v, u2 <= u3];
 element_appears _ _ _ [] atomic_imports _ _ modules cs
 	= ((False, atomic_imports), modules, cs)
 // MW2 remove this later ..
@@ -442,6 +444,8 @@ lookup_type dcl_index index modules cs
 		#	com_type_def	= dcl_module.dcl_common.com_type_defs.[dcl_index]
 		= (com_type_def.td_rhs, modules, cs)
 
+//JVG: added type:
+element_appears_in_stomm_struct :: .StructureType Ident .Int .Int .String *{#DclModule} *CheckState -> (!Bool,!.{#DclModule},!.CheckState)
 // MW remove this later CCC
 element_appears_in_stomm_struct imported_st element_ident dcl_index index type_name_string modules cs
 	| not do_temporary_import_solution_XXX
@@ -449,8 +453,45 @@ element_appears_in_stomm_struct imported_st element_ident dcl_index index type_n
 	#	(dcl_module=:{dcl_name=dcl_name=:{id_info}}, modules)		= modules ! [index]
 		(module_entry, cs_symbol_table)				= readPtr id_info cs.cs_symbol_table
 	#!	cs	= { cs & cs_symbol_table=cs_symbol_table }
-	= continuation imported_st module_entry.ste_kind dcl_module modules cs
+//	= continuation imported_st module_entry.ste_kind dcl_module modules cs
+	= (appears imported_st module_entry.ste_kind dcl_module.dcl_common,modules,cs);
   where
+	appears ST_RecordType (STE_OpenModule _ modul) _
+		//	lookup the constructors/fields for the algebraic type/record
+		#	allTypes	= modul.mod_defs.def_types
+			search		= dropWhile (\{td_name} -> td_name.id_name<>type_name_string) allTypes
+		|	isEmpty search
+			= False
+		#	{td_rhs}	= hd search
+		|	not (isRecordType td_rhs)
+			= False
+		#	element_idents	= getElements td_rhs
+		= isMember element_ident element_idents
+	appears ST_RecordType STE_ClosedModule dcl_common
+		// lookup the type of the constructor and compare
+		#	type_index		= dcl_common.com_selector_defs.[dcl_index].sd_type_index
+			com_type_def	= dcl_common.com_type_defs.[type_index]
+			appears	= com_type_def.td_name.id_name==type_name_string
+		= appears
+	appears ST_Class (STE_OpenModule _ modul) _
+		//	lookup the members for the class
+		#	allClasses	= modul.mod_defs.def_classes
+			search		= dropWhile (\{class_name} -> class_name.id_name<>type_name_string) allClasses
+		|	isEmpty search
+			= False
+		#	{class_members}	= hd search
+			element_idents	= [ ds_ident \\ {ds_ident} <-:class_members ]
+		= isMember element_ident element_idents
+	appears ST_Class STE_ClosedModule dcl_common
+		// lookup the class and compare
+		#	com_member_def	= dcl_common.com_member_defs.[dcl_index]
+			{glob_object}	= com_member_def.me_class
+			com_class_def	= dcl_common.com_class_defs.[glob_object]
+			appears	= com_class_def.class_name.id_name==type_name_string
+		= appears
+	appears _ _ _
+		= False
+/*
 	continuation ST_RecordType (STE_OpenModule _ modul) _ modules cs
 		//	lookup the constructors/fields for the algebraic type/record
 		#	allTypes	= modul.mod_defs.def_types
@@ -486,6 +527,7 @@ element_appears_in_stomm_struct imported_st element_ident dcl_index index type_n
 		= (appears, modules, cs)
 	continuation _ _ _ modules cs
 		= (False, modules, cs)
+*/
 	getElements (RecordType {rt_fields})
 		= [ fs_name \\ {fs_name}<-:rt_fields ]
 	getElements _
@@ -555,19 +597,19 @@ element_appears_in_struct imported_st element_ident dcl_index struct_ident index
 
 check_completeness_of_module :: .Index [(.Declaration,.Int)] .String *(*{!.FunctionConsequence},*{#.DclModule},*{#FunDef},*ExpressionHeap,*CheckState) -> (.{!FunctionConsequence},.{#DclModule},.{#FunDef},.ExpressionHeap,.CheckState);
 check_completeness_of_module mod_index dcls_explicit file_name (f_consequences, modules, icl_functions, expr_heap, cs)
-	#	dcls_imp	= [((dcl_ident, kind), (dcl_index, mod_index), (file_name, line_nr))
-						\\ ({dcl_ident, dcl_index, dcl_kind=STE_Imported kind mod_index}, line_nr) <- dcls_explicit]
-		(conseqs, (f_consequences, modules, icl_functions, expr_heap))
-				= mapSt (consequences_of mod_index) dcls_imp (f_consequences, modules, icl_functions, expr_heap)
+//	#	dcls_imp	= [((dcl_ident, kind), (dcl_index, mod_index), (file_name, line_nr))
+//						\\ ({dcl_ident, dcl_index, dcl_kind=STE_Imported kind mod_index}, line_nr) <- dcls_explicit]
+	#	(conseqs, (f_consequences, modules, icl_functions, expr_heap))
+				= mapSt (consequences_of file_name mod_index) dcls_explicit (f_consequences, modules, icl_functions, expr_heap)
 		conseqs	= flatten conseqs
 	#!	(modules, cs)	= foldr checkConsequenceError (modules, cs) conseqs
 	= (f_consequences, modules, icl_functions, expr_heap, cs)
 
-consequences_of ::	!Index
-					(!IdentWithKind, !(!Index,!Index), !(!String, !Int)) !(!*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap)
+consequences_of :: String !Index
+					!(!.Declaration,Int) !(!*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap)
  				->	(![(!IdentWithKind, !IdentWithCKind, !(!String, !Int))], !(*{!FunctionConsequence}, !*{#DclModule}, !*{#FunDef}, !*ExpressionHeap))
-consequences_of count (expl_imp_ident_kind=:(_,expl_imp_kind), (dcl_index, mod_index), errMsgInfo) 
-				(f_consequences, modules, icl_functions, expr_heap)
+
+consequences_of file_name count ({dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index}, line_nr) (f_consequences, modules, icl_functions, expr_heap)
 	= case expl_imp_kind of
 			STE_FunctionOrMacro _
 				# (consequences, (f_consequences, icl_functions, expr_heap)) = consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
@@ -576,6 +618,9 @@ consequences_of count (expl_imp_ident_kind=:(_,expl_imp_kind), (dcl_index, mod_i
 				# (modul, modules)	= modules![mod_index]
 				-> (add_kind_and_error_info_to_consequences (consequences_of_simple_symbol expl_imp_kind modul dcl_index), (f_consequences, modules, icl_functions, expr_heap))
 	where
+		expl_imp_ident_kind=(dcl_ident,expl_imp_kind)
+		errMsgInfo = (file_name, line_nr)
+
 		add_kind_and_error_info_to_consequences consequences
 			= [(expl_imp_ident_kind, conseq, errMsgInfo) \\ conseq<-removeDup consequences]
 	

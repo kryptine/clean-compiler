@@ -16,7 +16,45 @@ functions names starting with '->' require a ';' after the type. Solutions:
 */
 ::	SearchPaths	:== [String]
 
-::	* ScanState =
+::	*ScanState = ScanState !RScanState
+
+instance getFilename ScanState
+where
+	getFilename (ScanState scan_state)
+		# (file_name,scan_state) = getFilename scan_state
+		= (file_name,ScanState scan_state)
+
+instance tokenBack ScanState
+where
+	tokenBack (ScanState scan_state) = ScanState (tokenBack scan_state)
+
+instance nextToken ScanState
+where
+	nextToken context (ScanState scan_state)
+		# (token,scan_state) = nextToken context scan_state
+		= (token,ScanState scan_state) 
+
+instance currentToken ScanState
+where
+	currentToken (ScanState scan_state)
+		# (token,scan_state) = currentToken scan_state
+		= (token,ScanState scan_state) 
+
+instance insertToken ScanState
+where
+	insertToken token context (ScanState scan_state) = ScanState (insertToken token context scan_state)
+
+instance replaceToken ScanState
+where
+	replaceToken token (ScanState scan_state) = ScanState (replaceToken token scan_state)
+
+instance getPosition ScanState
+where
+	getPosition (ScanState scan_state)
+		# (position,scan_state) = getPosition scan_state
+		= (position,ScanState scan_state) 
+
+::	* RScanState =
 	{	ss_input		::	ScanInput
 	,	ss_offsides		::	! [(Int, Bool) ]	// (column, defines newDefinition)
 	,	ss_useLayout	::	! Bool
@@ -29,7 +67,7 @@ functions names starting with '->' require a ';' after the type. Solutions:
 
 ::	* Input =
 	{	inp_stream		::	! * InputStream
-	,	inp_filename	::	String
+	,	inp_filename	::	!String
 	,	inp_pos			::	! FilePosition
 	,	inp_tabsize		::	! Int
 	}
@@ -180,7 +218,7 @@ where
 		# (filename,input) = getFilename input
 		= (filename,PushedToken tok input)
 
-instance getFilename ScanState
+instance getFilename RScanState
 where
 	getFilename scanState=:{ss_input}
 		# (filename,ss_input) = getFilename ss_input
@@ -188,7 +226,7 @@ where
 
 class getPosition state :: !*state -> (!FilePosition,!*state)  // Position of current Token (or Char)
 
-instance getPosition ScanState
+instance getPosition RScanState
 where
 	getPosition scanState=:{ss_tokenBuffer}
 		| isEmptyBuffer ss_tokenBuffer
@@ -202,7 +240,7 @@ where
 
 class getCharPosition state :: !*state -> (FilePosition,!*state)
 
-instance getCharPosition ScanState
+instance getCharPosition RScanState
 where
 	getCharPosition scanState=:{ss_input=Input input}
 		# (pos,input) = getPosition input
@@ -215,7 +253,7 @@ where getCharPosition input=:{inp_pos} = (inp_pos, input)
 
 class nextToken state :: !Context !*state -> (!Token, !*state)
 
-instance nextToken ScanState
+instance nextToken RScanState
 where
 //	nextToken newContext {ss_input=PushedToken token=:{lt_position,lt_token} rest,ss_tokenBuffer,ss_offsides,ss_useLayout}
 	nextToken newContext scanState=:{ss_input=input=:PushedToken token=:{lt_position,lt_token/*,lt_context*/} rest,ss_tokenBuffer}
@@ -339,7 +377,7 @@ where
 
 class tokenBack state :: !*state -> !*state
 
-instance tokenBack ScanState
+instance tokenBack RScanState
 where
 	tokenBack scanState=:{ss_tokenBuffer, ss_input}
 		| isEmptyBuffer ss_tokenBuffer = abort "tokenBack with empty token buffer"
@@ -351,7 +389,7 @@ where
 
 class currentToken state :: !*state -> (!Token, !*state)
 
-instance currentToken ScanState
+instance currentToken RScanState
 where currentToken scanState=:{ss_tokenBuffer}
 		| isEmptyBuffer ss_tokenBuffer
 			= (ErrorToken "dummy", scanState)
@@ -359,7 +397,7 @@ where currentToken scanState=:{ss_tokenBuffer}
 
 class insertToken state :: !Token !Context !*state -> *state
 
-instance insertToken ScanState
+instance insertToken RScanState
 where
 	insertToken t c scanState
 /*		#	chars = if (isGeneratedToken t)
@@ -385,7 +423,7 @@ isGeneratedToken _					= False
 
 class replaceToken state :: !Token !*state -> *state
 
-instance replaceToken ScanState
+instance replaceToken RScanState
 where
 	replaceToken tok scanState=:{ss_tokenBuffer}
 		# (longToken,buffer) = get ss_tokenBuffer
@@ -1609,7 +1647,7 @@ openScanner file_name searchPaths files
 		(No, files)
 			->	(No, files)
 		(Yes file, files)
-			->  (Yes	{	ss_input 		= Input
+			->  (Yes (ScanState {	ss_input 		= Input
 												{ inp_stream		= InFile file
 									 			, inp_filename		= file_name
 									 			, inp_pos			= {fp_line = 1, fp_col = 0}
@@ -1620,7 +1658,7 @@ openScanner file_name searchPaths files
 						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
 						,	ss_useLayout	=	False
 						,	ss_tokenBuffer	=	Buffer0
-						}
+						})
 				, files
 				)
 
@@ -1636,9 +1674,12 @@ fopenInSearchPaths fileName [path : paths] mode f
 		=	fopenInSearchPaths fileName paths mode f
 
 closeScanner :: !ScanState !*Files -> *Files
-closeScanner scanState=:{ss_input=PushedToken _ input} files
-	= closeScanner {scanState & ss_input = input} files 
-closeScanner {ss_input=Input {inp_stream}} files
+closeScanner (ScanState scan_state) files = closeScanner_ scan_state files
+
+closeScanner_ :: !RScanState !*Files -> *Files
+closeScanner_ scanState=:{ss_input=PushedToken _ input} files
+	= closeScanner_ {scanState & ss_input = input} files 
+closeScanner_ {ss_input=Input {inp_stream}} files
 	= case get_file inp_stream of
 		Yes file	#	(_,files) = fclose file files
 					->	files
@@ -1663,13 +1704,21 @@ isNewLine _      = False
  //--- Offside handling ---//
 //------------------------//
 
+UseLayout_ :: !RScanState -> (!Bool, !RScanState)
+UseLayout_ scanState = scanState!ss_useLayout
+
 UseLayout :: !ScanState -> (!Bool, !ScanState)
-UseLayout scanState = scanState!ss_useLayout
+UseLayout (ScanState scanState)
+	# (ss_useLayout,scanState) = scanState!ss_useLayout
+	= (ss_useLayout,ScanState scanState)
 
 setUseLayout :: !Bool !ScanState -> ScanState
-setUseLayout b ss = { ss & ss_useLayout = b } // -->> ("uselayout set to ",b)
+setUseLayout b (ScanState ss) = ScanState { ss & ss_useLayout = b }
 
-checkOffside :: !FilePosition !Token !ScanState -> (Token,ScanState)
+setUseLayout_ :: !Bool !RScanState -> RScanState
+setUseLayout_ b ss = { ss & ss_useLayout = b } // -->> ("uselayout set to ",b)
+
+checkOffside :: !FilePosition !Token !RScanState -> (Token,RScanState)
 checkOffside pos token scanState=:{ss_offsides,ss_useLayout,ss_input}
 	| ~ ss_useLayout
 		=	(token, scanState)  //-->> (token,pos,"No layout rule applied")
@@ -1822,10 +1871,13 @@ canBeOffside (CodeBlockToken _) = False
 canBeOffside _					= True
 
 dropOffsidePosition :: !ScanState -> ScanState
-dropOffsidePosition scanState=:{ss_offsides} = { scanState & ss_offsides = drop 1 ss_offsides }
+dropOffsidePosition (ScanState s) = ScanState (dropOffsidePosition_ s)
+
+dropOffsidePosition_ :: !RScanState -> RScanState
+dropOffsidePosition_ scanState=:{ss_offsides} = { scanState & ss_offsides = drop 1 ss_offsides }
 
 /*
-addOffsidePosition :: !ScanState -> (Int, ScanState)
+addOffsidePosition :: !RScanState -> (Int, RScanState)
 addOffsidePosition scanState=:{ss_useLayout}
 	| ss_useLayout
 		# (position,scanState=:{ss_offsides})	= getPosition scanState
@@ -1834,7 +1886,7 @@ addOffsidePosition scanState=:{ss_useLayout}
 	| otherwise
 		= (1, scanState)
 
-atOffsidePosition :: !ScanState -> (!Bool, !ScanState)
+atOffsidePosition :: !RScanState -> (!Bool, !RScanState)
 atOffsidePosition scanState=:{ss_offsides=[(col,_):_]}
 	#	(position, scanState)	= getPosition scanState
 	=	(position.fp_col == col, scanState) -->> ("atOffsidePosition",position.fp_col,col)
