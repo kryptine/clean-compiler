@@ -10,11 +10,11 @@ exactZip [] []
 exactZip [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
 
-::	ConversionInfo =
+::	*ConversionInfo =
 	{	cs_new_functions 	:: ![FunctionInfoPtr]
-	,	cs_fun_heap			:: !.FunctionHeap
-	,	cs_var_heap			:: !.VarHeap
-	,	cs_expr_heap		:: !.ExpressionHeap
+	,	cs_fun_heap			:: !*FunctionHeap
+	,	cs_var_heap			:: !*VarHeap
+	,	cs_expr_heap		:: !*ExpressionHeap
 	,	cs_next_fun_nr		:: !Index
 	}
 
@@ -24,7 +24,7 @@ getIdent No fun_nr
 	= { id_name = "_f" +++ toString fun_nr, id_info = nilPtr }
 
 
-class convertCases a :: ![(FreeVar, AType)] !Index !{# CommonDefs } !a  !*ConvertState -> (!a, !*ConvertState)
+class convertCases a :: ![(FreeVar, AType)] !Index !{# CommonDefs } !a  !*ConversionInfo -> (!a, !*ConversionInfo)
 
 instance convertCases [a] | convertCases a
 where
@@ -366,8 +366,8 @@ where
 			# bb_args = mapAppend selectFreeVar left_vars [FP_Basic value optional_var : right_patterns ]
 			= { bb_args = bb_args, bb_rhs = bb_rhs }
 
-convertPatternExpression :: ![(FreeVar,AType)] ![[(FreeVar,AType)]] !Index !{#CommonDefs} !ExprInfoPtr !Expression !*ConvertState
-	-> *(![([[FunctionPattern]], !Expression)], !*ConvertState)
+convertPatternExpression :: ![(FreeVar,AType)] ![[(FreeVar,AType)]] !Index !{#CommonDefs} !ExprInfoPtr !Expression !*ConversionInfo
+	-> *(![([[FunctionPattern]], !Expression)], !*ConversionInfo)
 convertPatternExpression left_vars right_vars group_index common_defs default_ptr
 		case_expr=:(Case {case_expr = Var var=:{var_info_ptr}, case_guards, case_default, case_info_ptr}) cs
 	| list_contains_variable var_info_ptr right_vars
