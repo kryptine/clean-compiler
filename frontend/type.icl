@@ -787,7 +787,7 @@ freshOverloadedListType (OverloadedList _ stdStrictLists_index decons_u_index ni
 cWithFreshContextVars 		:== True
 cWithoutFreshContextVars 	:== False
 
-freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,!*TypeState)
+//freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,!*TypeState)
 freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_env,st_arity} common_defs
 				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_var_heap,ts_cons_variables,ts_exis_variables}
 	# (th_vars, ts_var_store)	= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
@@ -910,7 +910,7 @@ addToExistentialVariables pos new_exis_variables exis_variables
 	= [(pos, new_exis_variables) : exis_variables]
 
 	
-freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
+//freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap
 	# (av_dem_info, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
 	  (av_off_info, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
@@ -1349,7 +1349,8 @@ where
 		requirements_of_guarded_expressions (AlgebraicPatterns alg_type patterns) ti=:{ti_common_defs} match_expr pattern_type opt_pattern_ptr
 						goal_type (reqs, ts)
 			# (cons_types, result_type, new_attr_env, ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
-			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, ts)
+			  ts_var_heap = update_case_variable match_expr cons_types ts.ts_var_heap
+			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, { ts & ts_var_heap = ts_var_heap } )
 			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
 			  (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
 			= (reverse used_cons_types,  ({ reqs & req_type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = position,
@@ -1430,7 +1431,7 @@ where
 	
 		requirements_of_dynamic_pattern dyn_type dyn_context dyn_expr_ptr type_code_symbol 
 										ti goal_type {dp_var={fv_info_ptr},dp_rhs} (reqs, ts=:{ts_expr_heap, ts_var_heap})
-			# ts_var_heap = addToBase fv_info_ptr dyn_type No ts_var_heap
+			# ts_var_heap = addToBase fv_info_ptr dyn_type VITI_Empty ts_var_heap
 			  (dp_rhs_type, opt_expr_ptr, (reqs, ts)) = requirements ti dp_rhs (reqs, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
 			  ts_expr_heap = storeAttribute opt_expr_ptr dp_rhs_type.at_attribute ts.ts_expr_heap
 			  type_coercion = { tc_demanded = goal_type, tc_offered = dp_rhs_type, tc_position = CP_Expression dp_rhs, tc_coercible = True }
@@ -1454,6 +1455,20 @@ where
 			  ts_expr_heap = storeAttribute opt_expr_ptr res_type.at_attribute ts.ts_expr_heap
 			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression expr, tc_coercible = True } : reqs.req_type_coercions] },
 					{ ts & ts_expr_heap = ts_expr_heap })
+		
+		update_case_variable (Var {var_name,var_info_ptr,var_expr_ptr}) [cons_types] var_heap
+			# (var_info, var_heap) = readPtr var_info_ptr var_heap
+//				---> ("update_case_variable 1", var_name, cons_types)
+			= case var_info of
+				VI_Type type type_info
+					-> var_heap <:= (var_info_ptr, VI_Type type (VITI_PatternType cons_types type_info))
+				VI_FAType vars type type_info
+					-> var_heap <:= (var_info_ptr, VI_FAType vars type (VITI_PatternType cons_types type_info))
+			  	_
+					-> abort "update_case_variable" // ---> (var_name <<- var_info))
+		update_case_variable expr cons_types var_heap
+			= var_heap
+//				---> ("update_case_variable 2", expr, cons_types)
 
 instance requirements Let
 where
@@ -1469,7 +1484,7 @@ where
 	
 		make_base [{lb_src, lb_dst={fv_name, fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
 			# (v, ts) = freshAttributedVariable ts
-			  optional_position = if (is_rare_name fv_name) (Yes (CP_Expression lb_src)) No
+			  optional_position = if (is_rare_name fv_name) (VITI_Coercion (CP_Expression lb_src)) VITI_Empty
 			= make_base bs [v:var_types] { ts & ts_var_heap = writePtr fv_info_ptr (VI_Type v optional_position) ts.ts_var_heap }
 		make_base [] var_types ts
 			= (var_types, ts)
@@ -1631,14 +1646,15 @@ where
 
 	requirements ti (RecordUpdate {glob_module,glob_object={ds_index,ds_arity}} expression expressions) (reqs, ts)
 		# cp = CP_Expression expression
-		  (lhs, ts) = standardLhsConstructorType cp ds_index glob_module ds_arity ti ts	
 		  (rhs, ts) = standardRhsConstructorType cp ds_index glob_module ds_arity ti ts	
 		  (expression_type, opt_expr_ptr, reqs_ts) = requirements ti expression (reqs, ts)
-		  (reqs, ts) = requirements_of_fields ti expression expressions rhs.tst_args lhs.tst_args reqs_ts
-		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr lhs.tst_result.at_attribute ts.ts_expr_heap }
-		  coercion = { tc_demanded = lhs.tst_result, tc_offered = expression_type, tc_position = CP_Expression expression, tc_coercible = True }
-		= (rhs.tst_result, No, ({ reqs & req_attr_coercions = rhs.tst_attr_env ++ lhs.tst_attr_env ++ reqs.req_attr_coercions,
-										 req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts))
+		  (lhs_args, reqs_ts) = determine_record_type cp ds_index glob_module ds_arity ti expression expression_type opt_expr_ptr reqs_ts	
+		  (reqs, ts) = requirements_of_fields ti expression expressions rhs.tst_args lhs_args reqs_ts
+//		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr lhs_result.at_attribute ts.ts_expr_heap }
+//		  coercion = { tc_demanded = lhs_result, tc_offered = expression_type, tc_position = CP_Expression expression, tc_coercible = True }
+//		= (rhs.tst_result, No, ({ reqs & req_attr_coercions = rhs.tst_attr_env ++ lhs_attr_env ++ reqs.req_attr_coercions, ts))
+		= (rhs.tst_result, No, ({ reqs & req_attr_coercions = rhs.tst_attr_env ++ reqs.req_attr_coercions }, ts))
+//										 req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts))
 	where 
 		requirements_of_fields ti expression [] _ _ reqs_ts
 			= reqs_ts
@@ -1655,6 +1671,28 @@ where
 			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr dem_field_type.at_attribute ts.ts_expr_heap }
 			  coercion = { tc_demanded = dem_field_type, tc_offered = expr_type, tc_position = CP_Expression bind_src, tc_coercible = True }
 			= ({ reqs & req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts)
+			
+		determine_record_type cp cons_index mod_index arity ti (Var var) expression_type opt_expr_ptr (reqs, ts=:{ts_var_heap})
+			# (type_info, ts_var_heap) = getTypeInfoOfVariable var ts_var_heap
+			  ts = { ts & ts_var_heap = ts_var_heap}
+			= case type_info of
+				VITI_PatternType arg_types _
+				 	-> (arg_types, (reqs, ts))
+//						---> ("determine_record_type (Yes)", result_type, arg_types)
+				_
+					-> new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr (reqs, ts)
+//						---> ("determine_record_type (No) 1")
+		determine_record_type cp cons_index mod_index arity ti _ expression_type opt_expr_ptr reqs_ts
+			= new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr reqs_ts
+//						---> ("determine_record_type (No) 2")
+
+		new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr (reqs, ts)
+			# (lhs, ts) = standardLhsConstructorType cp cons_index mod_index arity ti ts
+			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr lhs.tst_result.at_attribute ts.ts_expr_heap }
+	  		  coercion = { tc_demanded = lhs.tst_result, tc_offered = expression_type, tc_position = cp, tc_coercible = True }
+		 	  req_type_coercions = [ coercion : reqs.req_type_coercions ]
+		 	  req_attr_coercions = lhs.tst_attr_env ++ reqs.req_attr_coercions
+			= (lhs.tst_args, ({ reqs & req_type_coercions = req_type_coercions, req_attr_coercions = req_attr_coercions }, ts))
 
 	requirements ti (TupleSelect tuple_symbol arg_nr expr) (reqs=:{req_attr_coercions}, ts)
 		# (position, ts_var_heap) = getPositionOfExpr expr ts.ts_var_heap
@@ -1814,8 +1852,8 @@ makeBase _ _ [] [] ts_var_heap
 	= ts_var_heap
 makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr} : vars] [type : types] ts_var_heap
 	| is_rare_name fv_name
-		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type (Yes (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
-		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type No ts_var_heap)
+		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type (VITI_Coercion (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
+		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type VITI_Empty ts_var_heap)
 
 addToBase info_ptr atype=:{at_type = TFA atvs type} optional_position ts_var_heap 
 	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type} optional_position)
@@ -2451,7 +2489,7 @@ where
 				_
 					-> (bitvects, subst)
 
-	build_coercion_env :: [.FunctionRequirements] v:{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!w:{!Type},!.Coercions,!u:{#u:{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin), [v <= w];
+//	build_coercion_env :: [.FunctionRequirements] v:{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!w:{!Type},!.Coercions,!u:{#u:{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin), [v <= w];
 	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (subst, coercion_env, type_signs, type_var_heap, error)
 			= foldSt (build_coercion_env_for_alternative ip_ident common_defs cons_var_vects)
@@ -2770,17 +2808,29 @@ where
 is_rare_name {id_name}
 	= id_name.[0]=='_'
 
-getPositionOfExpr expr=:(Var {var_info_ptr}) var_heap
-	= case readPtr var_info_ptr var_heap of
-		(VI_Type _ (Yes position), var_heap)
+
+getPositionOfExpr expr=:(Var var) var_heap
+	# (type_info, var_heap) = getTypeInfoOfVariable var var_heap
+	= case type_info of
+		VITI_Coercion position
 			-> (position, var_heap)
-		(VI_FAType _ _ (Yes position), var_heap)
+		VITI_PatternType _ (VITI_Coercion position)
 			-> (position, var_heap)
-		(_, var_heap)
+		_
 			-> (CP_Expression expr, var_heap)
 getPositionOfExpr expr var_heap
 	= (CP_Expression expr, var_heap)
 
+getTypeInfoOfVariable {var_info_ptr} var_heap
+	# (var_info, var_heap)= readPtr var_info_ptr var_heap
+	= case var_info of
+		VI_Type _ type_info
+			-> (type_info, var_heap)
+		VI_FAType _ _ type_info
+			-> (type_info, var_heap)
+		_
+			-> abort "getTypeInfoOfVariable"
+			
 empty_id =: { id_name = "", id_info = nilPtr }
 
 instance <<< (Ptr a)

@@ -603,7 +603,12 @@ pIsSafe			:== True
 
 from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 
-::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
+::	VI_TypeInfo	= VITI_Empty
+				| VITI_Coercion		CoercionPosition
+				| VITI_PatternType	[AType] VI_TypeInfo
+
+//::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
+::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo | VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |

@@ -132,7 +132,7 @@ where
 		collect_sign_class_of_type_def group_nr signs_of_group_vars ci {gi_module,gi_index} (sign_requirements, type_var_heap, td_infos)
 			# ({tdi_group_vars,tdi_kinds,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
 			  {td_name,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
-//			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args (tdi_group_vars ---> ("bind_type_vars_to_signs",td_name, (glob_module, glob_object), tdi_group_vars)) tdi_kinds signs_of_group_vars ([], type_var_heap)
+//			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args (tdi_group_vars ---> ("bind_type_vars_to_signs",td_name, tdi_group_vars)) tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args tdi_group_vars tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (sign_env, scs) = sign_class_of_type_def gi_module td_rhs group_nr ci 
 		  								{scs_type_var_heap = type_var_heap, scs_type_def_infos = td_infos, scs_rec_appls = [] }

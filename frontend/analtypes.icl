@@ -334,6 +334,7 @@ kindInfoToKind kind_info kind_heap
 ::	TypeProperties	:== BITVECT
 
 combineTypeProperties prop1 prop2 :== (combineHyperstrictness prop1 prop2) bitor (combineCoercionProperties prop1 prop2)
+addHyperstrictness prop1 prop2 :== prop1 bitor (combineHyperstrictness prop1 prop2)
 
 condCombineTypeProperties has_root_attr prop1 prop2
 	| has_root_attr
@@ -381,7 +382,8 @@ analTypes_for_TA type_name glob_module glob_object type_arity types has_root_att
 			# (type_properties, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tdi_kinds (conds, as)
 			= (kind, type_properties, conds_as)
 			# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
-			= (kind, type_properties, conds_as)
+//			= (kind, type_properties, conds_as)
+			= (kind, addHyperstrictness type_properties tdi_properties, conds_as)
 		= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_name type_appl_error as.as_error }))
 where
 	anal_types_of_rec_type_cons modules form_tvs [] _ conds_as
@@ -547,13 +549,14 @@ where
 		| is_abstract_type
 			= as
 			# (type_properties, conds, as) = foldSt (anal_type_def modules) group (cIsHyperStrict, { con_top_var_binds = [], con_var_binds = [] }, as)
-			  as = foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
 			  (kinds_in_group, (as_kind_heap, as_td_infos))	= mapSt determine_kinds group (as.as_kind_heap, as.as_td_infos)
 			  as_kind_heap									= unify_var_binds conds.con_var_binds as_kind_heap
 			  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars conds.con_top_var_binds 0 as_kind_heap
 			  (as_kind_heap, as_td_infos) = update_type_def_infos type_properties normalized_top_vars group
 			  										kinds_in_group  kind_var_store as_kind_heap as_td_infos
-			= { as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos }
+			  as = { as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos }
+			  as = foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
+			= as
 
 	init_type_def_infos modules gi=:{gi_module,gi_index} (is_abstract_type, type_def_infos, as_type_var_heap, kind_heap)
 		# {td_args,td_rhs} = modules.[gi_module].com_type_defs.[gi_index]
@@ -673,31 +676,37 @@ where
 
 	check_dcl_properties modules dcl_types dcl_mod_index properties {gi_module, gi_index} as
 		| gi_module == dcl_mod_index && gi_index < size dcl_types
-			# {td_rhs} = dcl_types.[gi_index]
+			# {td_name, td_rhs, td_args, td_pos} = dcl_types.[gi_index]
 			= case td_rhs of
 				AbstractType spec_properties
-					| equivalent_properties spec_properties properties
-						| spec_properties bitand cIsNonCoercible == 0
-							# (as_type_var_heap, as_td_infos, as_error) = check_possitive_sign gi_module gi_index modules as.as_type_var_heap as.as_td_infos as.as_error
-							= {as & as_type_var_heap = as_type_var_heap, as_td_infos = as_td_infos, as_error = as_error} 
-						# as_error = checkError "abstract type properties conflict with derived properties in implementation module" "" as.as_error
-						= { as & as_error = as_error }
+					# as_error = pushErrorAdmin (newPosition td_name td_pos) as.as_error
+					| check_coercibility  spec_properties properties
+//						---> ("check_coercibility", td_name, spec_properties, properties)
+						|check_hyperstrictness spec_properties properties
+							| spec_properties bitand cIsNonCoercible == 0
+								# (as_type_var_heap, as_td_infos, as_error) = check_possitive_sign gi_module gi_index modules td_args as.as_type_var_heap as.as_td_infos as_error
+								= {as & as_type_var_heap = as_type_var_heap, as_td_infos = as_td_infos, as_error = popErrorAdmin as_error} 
+								= {as & as_error = popErrorAdmin as_error} 
+							#	as_error = checkError "abstract type as defined in the implementation module is not hyperstrict" "" as_error
+							= { as & as_error = popErrorAdmin as_error }
+						#	as_error = checkError "abstract type as defined in the implementation module is not coercible" "" as_error
+						= { as & as_error = popErrorAdmin as_error }
 				_
 					= as
 			= as
 	where						
-		equivalent_properties icl_props dcl_props
-			| icl_props bitand cIsNonCoercible > 0 && dcl_props bitand cIsNonCoercible == 0
-				= False
-			| dcl_props bitand cIsHyperStrict > 0 && icl_props bitand cIsHyperStrict == 0
-				= False
-				= True
+		check_coercibility dcl_props icl_props
+			= dcl_props bitand cIsNonCoercible > 0 || icl_props bitand cIsNonCoercible == 0
+
+		check_hyperstrictness dcl_props icl_props
+			= dcl_props bitand cIsHyperStrict == 0 || icl_props bitand cIsHyperStrict > 0
 		
-		check_possitive_sign mod_index type_index modules type_var_heap type_def_infos error
-			# (signs, type_var_heap, type_def_infos) = signClassification mod_index type_index [] modules type_var_heap type_def_infos
+		check_possitive_sign mod_index type_index modules td_args type_var_heap type_def_infos error
+			# top_signs = [ TopSignClass \\ _ <- td_args ]
+			# (signs, type_var_heap, type_def_infos) = signClassification mod_index type_index top_signs modules type_var_heap type_def_infos
 			| signs.sc_neg_vect == 0
 				= (type_var_heap, type_def_infos, error)
-				# error = checkError "abstract type properties conflict with derived properties in implementation module" "" error
+				# error = checkError "signs of abstract type variables should be positive" "" error
 				= (type_var_heap, type_def_infos, error)
 		
 
