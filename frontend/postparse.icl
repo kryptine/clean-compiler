@@ -686,16 +686,16 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} hash_table err_file searchP
 	  (fun_defs, local_defs, ca) = reorganizeLocalDefinitionsOfFunctions (fun_defs ++ defs.def_macros) {ca & ca_fun_count = fun_count + macro_count}
 	  (def_instances, local_defs_in_insts, {ca_fun_count=tot_fun_count, ca_error = {pea_file,pea_ok}, ca_predefs, ca_hash_table=hash_table})
 	  		= reorganizeLocalDefinitionsOfInstances defs.def_instances ca
-	  (import_ok, parsed_modules, local_defs_in_dcl, tot_fun_count, hash_table, err_file, ca_predefs, files)
+	  (import_dcl_ok, parsed_modules, local_defs_in_dcl, tot_fun_count, hash_table, err_file, ca_predefs, files)
 	  		= scan_dcl_module mod_name mod_type tot_fun_count hash_table pea_file predefs files
-	  (import_ok, parsed_modules, local_defs_in_imports, tot_fun_count, hash_table, err_file, ca_predefs, files)
+	  (import_dcls_ok, parsed_modules, local_defs_in_imports, tot_fun_count, hash_table, err_file, ca_predefs, files)
 	  		= scanModules imports parsed_modules tot_fun_count hash_table err_file searchPaths ca_predefs files
 	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_instances = def_instances,
 	  				def_macros = { ir_from = fun_count, ir_to = fun_count + macro_count } }}
 	  [dcl_mod : modules] = reverse parsed_modules
 	  all_local_defs = fun_defs ++ local_defs ++ local_defs_in_insts ++ local_defs_in_dcl ++ local_defs_in_imports
 	  (pre_def_mod, ca_predefs) = buildPredefinedModule ca_predefs
-	= (pea_ok && import_ok, mod, fun_count, all_local_defs, dcl_mod, pre_def_mod, modules, hash_table, err_file, ca_predefs, files)
+	= (pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_count, all_local_defs, dcl_mod, pre_def_mod, modules, hash_table, err_file, ca_predefs, files)
 where
 	scan_dcl_module :: Ident ModuleKind Int *HashTable *File *PredefinedSymbols *Files -> (Bool, [ScannedModule], [FunDef], Int, *HashTable, *File, *PredefinedSymbols, *Files)
 	scan_dcl_module mod_name MK_Main fun_count hash_table err_file predefs files
@@ -932,12 +932,12 @@ where
 		= ([ fun : fun_defs ], ca)
 	collect_member_instances [PD_TypeSpec fun_pos fun_name prio type specials : defs] ca
 		= case defs of
-			[PD_Function pos name is_infix args rhs fun_kind : defs]
+			[PD_Function pos name is_infix args rhs fun_kind : _]
 				| belongsToTypeSpec fun_name prio name is_infix
-  					# fun_arity = determineArity args type
+ 					# fun_arity = determineArity args type
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (fun_defs, ca) = collect_member_instances defs ca
-					  fun = MakeNewFunction name fun_arity [ { pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio type pos
+					  fun = MakeNewFunction name fun_arity bodies fun_kind prio type pos
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
@@ -979,12 +979,12 @@ reorganizeLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : de
 	= ([ fun : fun_defs ], node_defs, ca)
 reorganizeLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 	= case defs of
-		[PD_Function pos name is_infix args rhs fun_kind : defs]
+		[PD_Function pos name is_infix args rhs fun_kind : _]
 			| belongsToTypeSpec name1 prio name is_infix
 				# fun_arity = determineArity args type
 				# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
 				  (fun_defs, node_defs, ca) = reorganizeLocalDefinitions defs ca
-				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio type pos
+				  fun = MakeNewFunction name fun_arity bodies fun_kind prio type pos
 				-> ([fun : fun_defs], node_defs, ca)
 				-> reorganizeLocalDefinitions defs (postParseError pos "function body expected" ca)
 		[PD_NodeDef pos pattern=:(PE_Ident id)  {rhs_alts,rhs_locals} : defs]
@@ -1003,14 +1003,13 @@ reorganizeLocalDefinitions [] ca
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix
 
+
 determineArity :: [ParsedExpr] (Optional SymbolType) -> Int
 determineArity args (Yes {st_arity})
-	# arity
-		=	length args
-	| arity == st_arity
-		=	arity
+	=	st_arity
 determineArity args No
 	=	length args
+
 
 sameFixity :: Priority Bool -> Bool
 sameFixity (Prio _ _) is_infix
