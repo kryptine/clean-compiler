@@ -11,6 +11,7 @@ import rule
 import graph
 import pfun
 import basic
+from general import Yes,No
 import StdEnv
 
 /*
@@ -134,14 +135,14 @@ transform
  |  == var
  &  == pvar
 
-transform anode sargs (Present spine)
+transform anode sargs (Yes spine)
 = selectfromtip (spinetip spine)
   where selectfromtip (nid,Open rgraph) = tryinstantiate nid rgraph anode sargs
         selectfromtip (nid,Redex rule matching) = tryunfold nid rule matching spine
         selectfromtip (nid,Strict) = tryannotate nid sargs
         selectfromtip spine = dostop
 
-transform anode sargs Absent
+transform anode sargs No
 = dostop
 
 // ==== ATTEMPT TO INSTANTIATE A FREE VARIABLE WITH A PATTERN ====
