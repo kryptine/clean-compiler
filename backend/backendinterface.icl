@@ -69,7 +69,20 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# backEndFiles
 		=	BEFree backEnd backEndFiles
 	=	(backEndFiles == 0 && success, var_heap, attrHeap, errorFile, files)
+
 import typesupport
+
+:: DictionaryToClassInfo =
+	{	dtci_iclModuleIndex :: Int
+	,	dtci_iclModule :: IclModule
+	,	dtci_dclModules :: {#DclModule}
+	}
+
+DictionaryToClassInfo iclModuleIndex iclModule dclModules :== 
+	{	dtci_iclModuleIndex = iclModuleIndex
+	,	dtci_iclModule = iclModule
+	,	dtci_dclModules = dclModules
+	}
 
 optionallyPrintFunctionTypes :: ListTypesOption {#Char} DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *Files !*BackEnd -> (*AttrVarHeap, *Files, *BackEnd)
 optionallyPrintFunctionTypes {lto_listTypesKind, lto_showAttributes} typesPath info components functions attrHeap files backEnd
@@ -97,7 +110,7 @@ printFunctionTypes all attr info components functions attrHeap file backEnd
 
 printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap, *File, *BackEnd) -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionType all attr info (functionIndex, {fun_ident,fun_type=Yes type}) (attrHeap, file, backEnd)
-	| not all && functionIndex >= size info.dtic_dclModules.[info.dtci_iclModuleIndex].dcl_functions
+	| not all && functionIndex >= size info.dtci_dclModules.[info.dtci_iclModuleIndex].dcl_functions
 		=	(attrHeap, file, backEnd)
 
 //	| trace_tn (toString fun_ident) && True ---> type.st_args
@@ -325,18 +338,6 @@ markAttrVarCollected :: AttributeVar *AttrVarHeap -> *AttrVarHeap
 markAttrVarCollected {av_info_ptr} attrVarHeap
 	=	writePtr av_info_ptr AVI_Collected attrVarHeap
 
-:: DictionaryToClassInfo =
-	{	dtci_iclModuleIndex :: Int
-	,	dtci_iclModule :: IclModule
-	,	dtic_dclModules :: {#DclModule}
-	}
-
-DictionaryToClassInfo iclModuleIndex iclModule dclModules :== 
-	{	dtci_iclModuleIndex = iclModuleIndex
-	,	dtci_iclModule = iclModule
-	,	dtic_dclModules = dclModules
-	}
-
 dictionariesToClasses :: DictionaryToClassInfo SymbolType -> SymbolType
 dictionariesToClasses info type=:{st_args, st_args_strictness, st_arity, st_context=[]}
 	# (reversedTypes, reversedContexts)
@@ -388,12 +389,19 @@ where
 		=	{tc_class = TCClass klass, tc_types = [at_type \\ {at_type} <- args], tc_var = nilPtr}
 
 typeToClass :: DictionaryToClassInfo TypeSymbIdent -> Optional (Global DefinedSymbol)
-typeToClass info {type_ident, type_arity, type_index={glob_module, glob_object}}
-	=	case typeIndexToClassIndex info glob_module glob_object of
-			Yes classIndex
-				->	Yes {glob_module=glob_module, glob_object = {ds_ident = type_ident, ds_arity = type_arity, ds_index = glob_object}}
-			No
-				->	No
+typeToClass {dtci_iclModuleIndex, dtci_iclModule, dtci_dclModules} {type_ident, type_arity, type_index={glob_module, glob_object}}
+	#! nDclTypes = size dclModule.dcl_common.com_type_defs
+	| glob_module <> dtci_iclModuleIndex || glob_object < nDclTypes
+		# classIndex = glob_object - (nDclTypes - nDclClasses)
+		| classIndex>=0
+			# class_ident = dclModule.dcl_common.com_class_defs.[classIndex].class_ident
+			= Yes {glob_module=glob_module, glob_object = {ds_ident = class_ident, ds_arity = type_arity, ds_index = glob_object}}			
+			= No
+		# classIndex = glob_object - (nIclTypes-nIclClasses)
+		| classIndex>=nDclClasses
+			# class_ident = dtci_iclModule.icl_common.com_class_defs.[classIndex].class_ident
+			= Yes {glob_module=glob_module, glob_object = {ds_ident = class_ident, ds_arity = type_arity, ds_index = glob_object}}			
+			= No		
 	where
 		/*
 			This how the types are organised (#classes == #dictionaries)
@@ -410,33 +418,14 @@ typeToClass info {type_ident, type_arity, type_index={glob_module, glob_object}}
 			+-----------+------------------+-----------+------------------+
 									   nDclTypes					   nIclTypes
 		*/
-		typeIndexToClassIndex :: DictionaryToClassInfo Int Int -> Optional Int
-		typeIndexToClassIndex {dtci_iclModuleIndex, dtci_iclModule, dtic_dclModules} moduleIndex typeIndex
-			| moduleIndex <> dtci_iclModuleIndex || typeIndex < nDclTypes
-				=	toClassIndex typeIndex nDclTypes nDclClasses 0
-			// otherwise
-				=	toClassIndex (typeIndex-nDclTypes) (nIclTypes-nDclTypes) (nIclClasses-nDclClasses) nDclClasses
-			where
-				dclModule
-					=	dtic_dclModules.[moduleIndex]
-				nDclTypes
-					=	size dclModule.dcl_common.com_type_defs
-				nDclClasses
-					=	size dclModule.dcl_common.com_class_defs
-				nIclTypes
-					=	size dtci_iclModule.icl_common.com_type_defs
-				nIclClasses
-					=	size dtci_iclModule.icl_common.com_class_defs
-
-				toClassIndex :: Int Int Int Int -> Optional Int
-				toClassIndex typeIndex nTypes nClasses offset
-					| classIndex < 0
-						=	No
-					// otherwise
-						=	Yes (classIndex + offset)
-					where
-						classIndex
-							=	typeIndex - (nTypes - nClasses)
+		dclModule
+			=	dtci_dclModules.[glob_module]
+		nDclClasses
+			=	size dclModule.dcl_common.com_class_defs
+		nIclTypes
+			=	size dtci_iclModule.icl_common.com_type_defs
+		nIclClasses
+			=	size dtci_iclModule.icl_common.com_class_defs
 
 copyInts :: !Int !Int -> {#Int}
 copyInts length cArray
