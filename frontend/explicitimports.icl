@@ -815,6 +815,9 @@ instance check_completeness Type where
 	check_completeness (TA {type_name} arguments) cci ccs
 		= check_completeness arguments cci
 		  (check_whether_ident_is_imported type_name STE_Type cci ccs)
+	check_completeness (TAS {type_name} arguments _) cci ccs
+		= check_completeness arguments cci
+		  (check_whether_ident_is_imported type_name STE_Type cci ccs)
 	check_completeness (l --> r) cci ccs
 		= check_completeness l cci
 		  (check_completeness r cci ccs)
