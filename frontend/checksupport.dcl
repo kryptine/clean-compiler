@@ -137,6 +137,7 @@ newPosition :: !Ident !Position -> IdentPos
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
+checkWarningWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 
 class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 

@@ -168,7 +168,7 @@ where
 	popErrorAdmin cs=:{cs_error}
 		= {cs & cs_error = popErrorAdmin cs_error } //...PK
 
-newPosition :: !Ident  !Position -> IdentPos 
+newPosition :: !Ident !Position -> IdentPos 
 newPosition id (FunPos file_name line_nr _)
 	= { ip_ident = id, ip_line = line_nr, ip_file = file_name }
 newPosition id (LinePos file_name line_nr)
@@ -190,10 +190,14 @@ checkWarning id mess error=:{ea_file,ea_loc=[]}
 checkWarning id mess error=:{ea_file,ea_loc}
 	= { error & ea_file = ea_file <<< "Warning " <<< hd ea_loc <<< ": " <<< id  <<< " " <<< mess <<< '\n' }
 
-
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorWithIdentPos ident_pos mess error=:{ea_file}
-	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ":" <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ": " <<< mess <<< '\n', ea_ok = False }
+
+checkWarningWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
+checkWarningWithPosition ident pos mess error=:{ea_file}
+	# ident_pos = newPosition ident pos
+	= { error & ea_file = ea_file <<< "Warning " <<< ident_pos <<< ": " <<< mess <<< '\n' }
 
 class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 
@@ -645,7 +649,6 @@ where
 	| ip_line == cNotALineNumber
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_ident <<< ']'
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_line <<< ',' <<< ip_ident <<< ']'
-	
 
 instance <<< ExplImpInfo
   where
