@@ -154,11 +154,12 @@ compareDefImp untransformed dcl_modules icl_module heaps error_admin
 compareWithConversions conversions dclDefs iclDefs tc_state error_admin 
 	= iFoldSt (compareWithConversion conversions dclDefs) 0 (size conversions) (iclDefs, tc_state, error_admin)
 
+// type definition for 1.3 (should be added for 2.0)
+compareWithConversion :: !w:(a x:Int) !.(b c) !Int !(!u:(d c), !*TypesCorrespondState, !*ErrorAdmin)
+						-> (!v:(d c), !.TypesCorrespondState, !.ErrorAdmin)
+						| Array .b & getIdentPos , select_u , t_corresponds , uselect_u c & Array .d & Array .a, [u <= v, w <= x];
 compareWithConversion conversions dclDefs dclIndex (iclDefs, tc_state, error_admin)
-	# icl_index = conversions.[dclIndex]
-	| icl_index==dclIndex
-		= (iclDefs, tc_state, error_admin)
-	# (iclDef, iclDefs) = iclDefs![icl_index]
+	# (iclDef, iclDefs) = iclDefs![conversions.[dclIndex]]
 	  (corresponds, tc_state) = t_corresponds dclDefs.[dclIndex] iclDef tc_state
 	| corresponds
 		= (iclDefs, tc_state, error_admin)
@@ -168,6 +169,10 @@ compareFunctionTypesWithConversions conversions	dcl_fun_types icl_functions tc_s
 	= iFoldSt (compareTwoFunctionTypes conversions dcl_fun_types) 0 (size conversions)
 				(icl_functions, tc_state, error_admin)
 
+// type definition for 1.3 (should be added for 2.0)
+compareTwoFunctionTypes :: !w:(a x:Int) !.(b FunType) !.Int !(!u:(c FunDef),!*TypesCorrespondState,!*ErrorAdmin)
+						-> (!v:(c FunDef),!.TypesCorrespondState,!.ErrorAdmin)
+						| Array .b & Array .c & Array .a, [u <= v, w <= x];
 compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
 	# (fun_def=:{fun_type}, icl_functions) = icl_functions![conversions.[dclIndex]]
 	= case fun_type of
@@ -178,7 +183,7 @@ compareTwoFunctionTypes conversions	dcl_fun_types dclIndex (icl_functions, tc_st
 			  							tc_state
 			  tc_state = init_type_vars (dcl_symbol_type.st_vars++icl_symbol_type.st_vars) tc_state
 			  (corresponds, tc_state)
-					= t_corresponds dcl_symbol_type icl_symbol_type tc_state
+					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
 			| corresponds
 				-> (icl_functions, tc_state, error_admin)
 			-> generate_error error_message fun_def icl_functions tc_state error_admin
@@ -469,6 +474,8 @@ instance t_corresponds AType where
 						  tc_state = opt_set_visited_bit is_defined_in_main_dcl glob_object False tc_state
 						-> (corresponds, tc_state) 
 					AbstractType _
+						| not is_defined_in_main_dcl
+							-> (False, tc_state)
 						#! icl_type_def = tc_state.tc_icl_type_defs.[tc_state.tc_type_conversions.[glob_object]]
 						# tc_state = { tc_state & tc_type_vars
 				  							= bind_type_vars icl_type_def.td_args dclArgs tc_state.tc_type_vars }
