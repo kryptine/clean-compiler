@@ -211,7 +211,7 @@ matchpattern ::
     (FuncBody sym var)
  -> FuncBody sym var
 
-matchpattern _ _ _ = undef
+matchpattern _ _ _ = error "newfold: matchpattern: not yet implemented"
 
 rule2body rule = buildgraph (arguments rule) (ruleroot rule) (rulegraph rule)
 
