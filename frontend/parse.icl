@@ -79,6 +79,12 @@ makeStringType
 	#! string_ident = predefined_idents.[PD_StringType]
 	=: TA (MakeNewTypeSymbIdent string_ident 0) []
 
+HeadLazy:==0
+HeadStrict:==1
+HeadUnboxed:==2
+HeadOverloaded:==3;
+HeadUnboxedAndTailStrict:==4;
+
 makeListTypeSymbol :: Int Int -> TypeSymbIdent
 makeListTypeSymbol head_strictness arity
 	# pre_def_list_index=if (head_strictness==HeadLazy)
@@ -1648,21 +1654,32 @@ where
 		  pState				= verify_annot_attr annot td_attribute name pState
 		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
 		  (token, pState)		= nextToken GeneralContext pState // should be TypeContext
- 		= case token of
+		= case token of
   			CurlyOpenToken
-				#	(fields, pState)			= wantFields td_name pState
-					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
-				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
-				->	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars fields }, pState)
+  				-> want_record_type_rhs name False exi_vars pState
+/*
+  			ExclamationToken
+			  	# (token, pState) = nextToken TypeContext pState
+  				| token==CurlyOpenToken
+  					-> want_record_type_rhs name True exi_vars pState
+	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
+*/
 /*			ColonToken
 				| isEmpty exi_vars
 				->	(PD_Erroneous, parseError "Algebraic type" No "no colon, :," pState)
 				->	(PD_Erroneous, parseError "Algebraic type" No "in this version of Clean no colon, :, after quantified variables" pState)
-*/			_	#	(condefs, pState)	= want_constructor_list exi_vars token pState
+*/
+			_	#	(condefs, pState)	= want_constructor_list exi_vars token pState
 					td					= { td & td_rhs = ConsList condefs }
 				|	annot == AN_None
 	 		  		->	(PD_Type td, pState)
 	 		  		->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
+		where
+			want_record_type_rhs name is_boxed_record exi_vars pState
+				#	(fields, pState)			= wantFields td_name pState
+					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
+				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
+				=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
 
 	want_type_rhs parseContext td=:{td_attribute} ColonDefinesToken annot pState // type Macro
 		# name				= td.td_name.id_name
@@ -2203,14 +2220,22 @@ where
 
 // Sjaak ...
 convertAAType :: ![AType] !TypeAttribute !ParseState -> (!AType,!ParseState)
+convertAAType [atype] attr pState
+	# type				= atype.at_type
+	# (attr, pState)	= determAttr attr atype.at_attribute type pState
+	= ( {at_attribute = attr, at_type = type}, pState)
 convertAAType [atype:atypes] attr pState
-	#	type			= atype.at_type
-		(attr, pState)	= determAttr attr atype.at_attribute type pState
-	| isEmpty atypes
-		= ( {at_attribute = attr, at_type = type}, pState)
-	// otherwise // type application
-		# (type, pState)	= convert_list_of_types atype.at_type atypes pState
-		= ({at_attribute = attr, at_type = type}, pState)
+	# type				= atype.at_type
+	# (attr, pState)	= determAttr_ attr atype.at_attribute type pState
+		with
+			determAttr_ :: !TypeAttribute !TypeAttribute !Type !ParseState -> (!TypeAttribute, !ParseState)
+			determAttr_ TA_None (TA_Var {av_name}) (TV {tv_name}) pState
+				| av_name.id_name==tv_name.id_name
+					= (TA_Anonymous,pState)
+			determAttr_ attr1 attr2 type pState
+				=  determAttr attr1 attr2 type pState
+	# (type, pState)	= convert_list_of_types atype.at_type atypes pState
+	= ({at_attribute = attr, at_type = type}, pState)
 where
 	convert_list_of_types (TA sym []) types pState
 		= (TA { sym & type_arity = length types } types, pState)
@@ -2756,11 +2781,11 @@ trySimpleExpressionT token is_pattern pState
 trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent (toString backslash) pState
+	  (file_name, line_nr, pState)	
+	  						= getFileAndLineNr pState
 	  (lam_args, pState) 	= wantList "arguments" trySimpleLhsExpression pState
 	  pState				= want_lambda_sep pState
 	  (exp, pState)			= wantExpression cIsNotAPattern pState
-	  (file_name, line_nr, pState)	
-	  						= getFileAndLineNr pState
 	  position				= FunPos file_name line_nr lam_ident.id_name
 	= (True, PE_Lambda lam_ident lam_args exp position, pState)
 	where
@@ -2802,12 +2827,6 @@ trySimpleNonLhsExpressionT DynamicToken pState
 		= (True, PE_Dynamic dyn_expr No, tokenBack pState)
 trySimpleNonLhsExpressionT token pState
 	= (False, PE_Empty, tokenBack pState)
-
-HeadLazy:==0
-HeadStrict:==1
-HeadUnboxed:==2
-HeadOverloaded:==3;
-HeadUnboxedAndTailStrict:==4;
 
 wantListExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantListExp is_pattern pState
@@ -2906,17 +2925,77 @@ wantListExp is_pattern pState
 						->	case token of
 							 SquareCloseToken
 								->	case acc of
-										[e]	-> (PE_Sequ (SQ_From e), pState)
+										[e]
+											# pd_from_index =
+												if (head_strictness==HeadStrict) PD_FromS
+												(if (head_strictness==HeadUnboxed) PD_FromU
+												(if (head_strictness==HeadOverloaded) PD_FromO
+													PD_From))
+											-> (PE_Sequ (SQ_From pd_from_index e), pState)
 										[e2,e1]
-											-> (PE_Sequ (SQ_FromThen e1 e2), pState)
+											# pd_from_then_index =
+												if (head_strictness==HeadStrict) PD_FromThenS
+												(if (head_strictness==HeadUnboxed) PD_FromThenU
+												(if (head_strictness==HeadOverloaded) PD_FromThenO
+													PD_FromThen))
+											-> (PE_Sequ (SQ_FromThen pd_from_then_index e1 e2), pState)
 										_	-> abort "Error 1 in WantListExp"
+							 ExclamationToken
+								| head_strictness<>HeadOverloaded
+									# pState = wantToken FunctionContext "dot dot expression" SquareCloseToken pState
+									->	case acc of
+											[e]
+												# pd_from_index =
+													if (head_strictness==HeadStrict) PD_FromSTS
+													(if (head_strictness==HeadUnboxed) PD_FromUTS
+														PD_FromTS)
+												-> (PE_Sequ (SQ_From pd_from_index e), pState)
+											[e2,e1]
+												# pd_from_then_index =
+													if (head_strictness==HeadStrict) PD_FromThenSTS
+													(if (head_strictness==HeadUnboxed) PD_FromThenUTS
+														PD_FromThenTS)
+												-> (PE_Sequ (SQ_FromThen pd_from_then_index e1 e2), pState)
+											_	-> abort "Error 2 in WantListExp"
 							 _	#	(exp, pState)	= wantRhsExpressionT token pState
-									pState			= wantToken FunctionContext "dot dot expression" SquareCloseToken pState
-								->	case acc of
-										[e]	-> (PE_Sequ (SQ_FromTo e exp), pState)
-										[e2,e1]
-											-> (PE_Sequ (SQ_FromThenTo e1 e2 exp), pState)
-										_	-> abort "Error 2 in WantListExp"
+								# (token, pState) = nextToken FunctionContext pState
+								-> case token of
+									SquareCloseToken
+										->	case acc of
+											[e]
+												# pd_from_to_index =
+													if (head_strictness==HeadStrict) PD_FromToS
+													(if (head_strictness==HeadUnboxed) PD_FromToU
+													(if (head_strictness==HeadOverloaded) PD_FromToO
+														PD_FromTo))
+												-> (PE_Sequ (SQ_FromTo pd_from_to_index e exp), pState)
+											[e2,e1]
+												# pd_from_then_to_index =
+													if (head_strictness==HeadStrict) PD_FromThenToS
+													(if (head_strictness==HeadUnboxed) PD_FromThenToU
+													(if (head_strictness==HeadOverloaded) PD_FromThenToO
+														PD_FromThenTo))
+												-> (PE_Sequ (SQ_FromThenTo pd_from_then_to_index e1 e2 exp), pState)
+											_	-> abort "Error 3 in WantListExp"
+									ExclamationToken
+										| head_strictness<>HeadOverloaded
+											# pState = wantToken FunctionContext "dot dot expression" SquareCloseToken pState
+											->	case acc of
+													[e]
+														# pd_from_to_index =
+															if (head_strictness==HeadStrict) PD_FromToSTS
+															(if (head_strictness==HeadUnboxed) PD_FromToUTS
+																PD_FromToTS)
+														-> (PE_Sequ (SQ_FromTo pd_from_to_index e exp), pState)
+													[e2,e1]
+														# pd_from_then_to_index =
+															if (head_strictness==HeadStrict) PD_FromThenToSTS
+															(if (head_strictness==HeadUnboxed) PD_FromThenToUTS
+																PD_FromThenToTS)
+														-> (PE_Sequ (SQ_FromThenTo pd_from_then_to_index e1 e2 exp), pState)
+													_	-> abort "Error 4 in WantListExp"
+									_
+										-> (PE_Empty, parseError "dot dot expression" (Yes token) "] or !]" pState)
 					DoubleBackSlashToken
 						| is_pattern
 						->	(PE_Empty, parseError "want list expression" No "No \\\\ expression in a pattern" pState)
