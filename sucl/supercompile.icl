@@ -32,6 +32,7 @@ supercompile ::
 
 supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0
   #  logfile = stderr
+  #  logfile = logfile <<< "Running supercompile function - $Id$\n"
      // First of all, derive a representation for symbols in the program
   #  (showsuclsymbol,fun_defs1) = suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fun_defs0
      // Determine defined functions
