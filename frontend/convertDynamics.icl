@@ -56,15 +56,19 @@ where
 			# (fun_body, ci) = convert_dynamics_in_body {cinp_st_args = [], cinp_glob_type_inst = global_type_instances, cinp_group_index = group_nr} fun_body fun_type ci
 			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
 				{ ci & ci_new_variables = [] })
-
-	convert_dynamics_in_body global_type_instances (TransformedBody {tb_args,tb_rhs}) (Yes {st_args}) ci
-		# vars_with_types = bindVarsToTypes tb_args st_args []
+// MV ..
+	convert_dynamics_in_body global_type_instances (TransformedBody {tb_args,tb_rhs}) (Yes {st_context, st_args}) ci
+		# vars_with_types = bindVarsToTypes2 st_context tb_args st_args [] common_defs
+// .. MV
 		  (tb_rhs, ci) = convertDynamics {global_type_instances & cinp_st_args = tb_args} vars_with_types No tb_rhs ci
 		= (TransformedBody {tb_args = tb_args,tb_rhs = tb_rhs}, ci)
 	convert_dynamics_in_body global_type_instances other fun_type ci
 		= abort "unexpected value in 'convert dynamics.convert_dynamics_in_body'"
 
-
+// MV ..
+bindVarsToTypes2 st_context vars types typed_vars common_defs
+	:== bindVarsToTypes vars (addTypesOfDictionaries common_defs st_context types) typed_vars
+// .. MV
 bindVarsToTypes vars types typed_vars
 	= fold2St bind_var_to_type vars types typed_vars
 where

@@ -704,8 +704,8 @@ setExtendedVarInfo var_info_ptr extension var_heap
 	= case old_var_info of
 		VI_Extended _ original_var_info	-> writePtr var_info_ptr (VI_Extended extension original_var_info) var_heap
 		_								-> writePtr var_info_ptr (VI_Extended extension old_var_info) var_heap
-neverMatchingCase = { case_expr = EE, case_guards = NoPattern, case_default = No, case_ident = No,
-						case_info_ptr = nilPtr, case_default_pos = NoPos }
+neverMatchingCase = { case_expr = EE, case_guards = NoPattern, case_default = No, case_ident = No, case_info_ptr = nilPtr, 
+						case_default_pos = NoPos }
 
 instance transform DynamicExpr where
 	transform dyn=:{dyn_expr} ro ti
@@ -1416,7 +1416,10 @@ where
 					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
 					= (symbol_type, fun_defs, fun_heap)
 				# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-				  st_args = mapAppend (add_types_of_dictionary ro.ro_common_defs) ft_type.st_context ft_type.st_args
+// MV ..
+				  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
+// was:				  st_args = mapAppend (add_types_of_dictionary ro.ro_common_defs) ft_type.st_context ft_type.st_args
+// .. MV
 				= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
 					fun_defs, fun_heap)
 			get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
@@ -2025,6 +2028,18 @@ convertSymbolType  common_defs st imported_types collected_imports type_heaps va
 	,	ets_type_heaps			:: !.TypeHeaps
 	,	ets_var_heap			:: !.VarHeap
 	}
+
+// MV ..
+addTypesOfDictionaries :: w:(a x:CommonDefs) .[TypeContext] u:[AType] -> v:[AType] | Array .a, [u <= v, w <= x];
+addTypesOfDictionaries common_defs type_contexts type_args
+	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
+where
+	add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
+		# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
+		  dict_type_symb = 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
+		= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
+				map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
+// .. MV
 	
 class expandSynTypes a :: !{# CommonDefs} !a !*ExpandTypeState -> (!a, !*ExpandTypeState)
 
@@ -2036,8 +2051,11 @@ instance expandSynTypes SymbolType
 where
 	expandSynTypes common_defs st=:{st_args,st_result,st_context} ets
 		# ((st_args,st_result), ets) = expandSynTypes common_defs (st_args,st_result) ets
-		# st_args = mapAppend (add_types_of_dictionary common_defs) st_context st_args
+// MV ..
+		# st_args = addTypesOfDictionaries common_defs st_context st_args
+// was:	# st_args = mapAppend (add_types_of_dictionary common_defs) st_context st_args
 		= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
+// .. MV
 
 add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
 	# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
