@@ -858,8 +858,8 @@ checkTypeContext mod_index tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_
 		  tc = { tc & tc_class = { tc_class & glob_object = { class_name & ds_index = class_index }, glob_module = class_module }, tc_types = tc_types}
 		| class_def.class_arity == ds_arity
 			= (tc, (class_defs, ots, oti, cs))
-			= (tc, (class_defs, ots, oti, {  cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
-		= (tc, (class_defs, ots, oti, { cs & cs_error = checkError id_name "undefined" cs.cs_error }))
+			= (tc, (class_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
+		= ({tc & tc_types = []}, (class_defs, ots, oti, { cs & cs_error = checkError id_name "undefined" cs.cs_error }))
 where	
 	check_context_types tc_class [] cs=:{cs_error}
 		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
