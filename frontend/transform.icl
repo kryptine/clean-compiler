@@ -338,6 +338,8 @@ where
 			SK_Function {glob_module,glob_object}
 				| ui_convert_module_n==glob_module 
 					# (Yes conversion_table) = ui_conversion_table
+//					| glob_object>=size conversion_table.[cFunctionDefs]
+//						-> abort ("unfold(App) "+++toString app.app_symb.symb_name+++" "+++toString glob_object+++" "+++toString (size conversion_table.[cFunctionDefs]))
 					# app={app & app_symb.symb_kind=SK_Function {glob_module=glob_module,glob_object=conversion_table.[cFunctionDefs].[glob_object]}}
 					-> unfold_function_app app ui us
 					-> unfold_function_app app ui us
@@ -849,7 +851,7 @@ where
 	
 	expand_simple_macro mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info, fun_symb, fun_pos,fun_kind}
 			(macro_defs, modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_error})
-		| macros_are_simple fun_info.fi_calls macro_defs
+		| macros_are_simple fun_info.fi_calls macro_defs && has_no_curried_macro body.cb_rhs macro_defs
 		  	# identPos = newPosition fun_symb fun_pos
 			# expand_in_imp_module=case fun_kind of FK_ImpMacro->True; _ -> False
 			  es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
@@ -866,10 +868,11 @@ where
 			# pi = { pi & pi_deps = [macro_index:pi.pi_deps] }
 			= ({ macro_defs & [macro_index] = { macro & fun_body = RhsMacroBody body }}, modules, pi)
 
+	macros_are_simple :: [FunCall] {#FunDef} -> Bool;
 	macros_are_simple [] macro_defs
 		= True
 	macros_are_simple [ {fc_index} : calls ] macro_defs
-		# {fun_kind,fun_body} = macro_defs.[fc_index]
+		# {fun_kind,fun_body, fun_symb} = macro_defs.[fc_index]
 		= is_a_pattern_macro fun_kind fun_body && macros_are_simple calls macro_defs
 	where
 		is_a_pattern_macro FK_DefMacro (TransformedBody {tb_args})
@@ -936,6 +939,88 @@ add_macros_to_current_group new_macro_fun_def_index n_fun_defs_after_expanding_m
 //		# pi_groups=[[new_macro_fun_def_index]:pi_groups]
 //		# pi_next_group=pi_next_group+1
 		= add_macros_to_current_group (new_macro_fun_def_index+1) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group [new_macro_fun_def_index:macros]
+
+has_no_curried_macro cb_rhs fun_defs
+	= has_no_curried_macro_CheckedAlternative cb_rhs
+where
+	has_no_curried_macro_CheckedAlternative [{ca_rhs}:cas]
+		= has_no_curried_macro_Expression ca_rhs && has_no_curried_macro_CheckedAlternative cas
+	has_no_curried_macro_CheckedAlternative []
+		= True
+
+	has_no_curried_macro_Expression (App app=:{app_symb={symb_arity, symb_kind = SK_Macro {glob_object,glob_module}}, app_args})
+		| fun_defs.[glob_object].fun_arity<>symb_arity
+			= False;
+			= has_no_curried_macro_Expressions app_args
+	has_no_curried_macro_Expression (App app=:{app_args})
+		= has_no_curried_macro_Expressions app_args
+	has_no_curried_macro_Expression (expr @ exprs)
+		= has_no_curried_macro_Expression expr && has_no_curried_macro_Expressions exprs
+	has_no_curried_macro_Expression (Let {let_strict_binds, let_lazy_binds, let_expr})
+		= has_no_curried_macro_LetBinds let_strict_binds && has_no_curried_macro_LetBinds let_lazy_binds && has_no_curried_macro_Expression let_expr
+		where
+				has_no_curried_macro_LetBinds [{lb_src}:xs]
+					= has_no_curried_macro_Expression lb_src && has_no_curried_macro_LetBinds xs
+				has_no_curried_macro_LetBinds []
+					= True
+	has_no_curried_macro_Expression (Case {case_expr,case_guards,case_default})
+		=	has_no_curried_macro_Expression case_expr && has_no_curried_macro_CasePatterns case_guards && has_no_curried_macro_OptionalExpression case_default
+		where
+			has_no_curried_macro_CasePatterns (AlgebraicPatterns type patterns)
+				= has_no_curried_macro_AlgebraicPatterns patterns
+			where
+				has_no_curried_macro_AlgebraicPatterns [{ap_expr}:patterns]
+					= has_no_curried_macro_Expression ap_expr && has_no_curried_macro_AlgebraicPatterns patterns
+				has_no_curried_macro_AlgebraicPatterns []
+					= True
+			has_no_curried_macro_CasePatterns (BasicPatterns type patterns)
+				= has_no_curried_macro_BasicPatterns patterns
+			where
+				has_no_curried_macro_BasicPatterns [{bp_expr}:patterns]
+					= has_no_curried_macro_Expression bp_expr && has_no_curried_macro_BasicPatterns patterns
+				has_no_curried_macro_BasicPatterns []
+					= True
+			has_no_curried_macro_CasePatterns (DynamicPatterns patterns)
+				= has_no_curried_macro_DynamicPatterns patterns
+			where
+				has_no_curried_macro_DynamicPatterns [{dp_rhs}:patterns]
+					= has_no_curried_macro_Expression dp_rhs && has_no_curried_macro_DynamicPatterns patterns
+				has_no_curried_macro_DynamicPatterns []
+					= True
+
+			has_no_curried_macro_OptionalExpression (Yes expr)
+				= has_no_curried_macro_Expression expr
+			has_no_curried_macro_OptionalExpression No
+				= True
+	has_no_curried_macro_Expression (Selection is_unique expr selectors)
+		= has_no_curried_macro_Expression expr && has_no_curried_macro_Selections selectors
+	has_no_curried_macro_Expression (Update expr1 selectors expr2)
+		= has_no_curried_macro_Expression expr1 && has_no_curried_macro_Expression expr2 && has_no_curried_macro_Selections selectors
+	has_no_curried_macro_Expression (RecordUpdate cons_symbol expression expressions)
+		= has_no_curried_macro_Expression expression && has_no_curried_macro_Binds expressions
+		where
+			has_no_curried_macro_Binds [{bind_src}:binds]
+				= has_no_curried_macro_Expression bind_src && has_no_curried_macro_Binds binds
+			has_no_curried_macro_Binds []
+				= True
+	has_no_curried_macro_Expression (TupleSelect symbol argn_nr expr)
+		= has_no_curried_macro_Expression expr
+	has_no_curried_macro_Expression (MatchExpr opt_tuple cons_symb expr)
+		= has_no_curried_macro_Expression expr
+	has_no_curried_macro_Expression expr
+		= True
+
+	has_no_curried_macro_Expressions [x:xs]
+		= has_no_curried_macro_Expression x && has_no_curried_macro_Expressions xs
+	has_no_curried_macro_Expressions []
+		= True
+
+	has_no_curried_macro_Selections [ArraySelection array_select expr_ptr index_expr:selections]
+		= has_no_curried_macro_Expression index_expr && has_no_curried_macro_Selections selections
+	has_no_curried_macro_Selections [record_selection:selections]
+		= has_no_curried_macro_Selections selections
+	has_no_curried_macro_Selections []
+		= True
 
 partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
@@ -1305,7 +1390,7 @@ where
 		# (macro, es) = es!es_fun_defs.[glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_fun_defs.[glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == symb_arity			
+		| macro.fun_arity == symb_arity
 			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
@@ -1801,3 +1886,4 @@ instance <<< VarInfo
   where
 	(<<<) file (VI_Expression expr) = file <<< expr
 	(<<<) file vi					= file <<< "VI??"
+
