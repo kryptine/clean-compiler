@@ -1092,7 +1092,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_gene
 	  (macro_range, ca) = addFunctionsRange macro_defs ca
 	  (def_instances, ca) = collectFunctions defs.def_instances True ca
 
-	  {	ca_error = {pea_file = err_file,pea_ok}, ca_predefs = predefs, ca_rev_fun_defs, ca_hash_table } = ca
+	  {	ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table } = ca
 	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_instances = def_instances,
 	  				def_macro_indices = macro_range }}
 	  
