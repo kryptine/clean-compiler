@@ -46,19 +46,23 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  sucl_imports = cts_funtypes dcl_mods main_dcl_module_n
      // Build abstract CLI module
   #  sucl_module = mkcli showsuclsymbol sucl_typerules sucl_stricts sucl_exports sucl_imports sucl_constrs sucl_bodies
-  #  logfile = logfile <<< "Function definitions as input to the optimiser:\n" <<< sucl_module
+  //#  logfile = logfile <<< "Function definitions as input to the optimiser:\n" <<< sucl_module
+  #  sucl_module = (stderr <<< "Function definitions as input to the optimiser:\n" <<< sucl_module) $ sucl_module
      // Generate fresh function symbols
   #  (n_fun_defs,fun_defs3) = usize fun_defs2
   #  fresh_symbols = [SuclUser (SK_Function (mkglobal main_dcl_module_n i)) \\ i<-[n_fun_defs..]]
      // Do the job!
   #  debugfile = debugfile <<< "Start fullsymred." <<< nl
-  #  symredresults = fullsymred fresh_symbols sucl_module
-  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults before macro expansion" <<< nl) symredresults
+  #  symredresults = fullsymred showsuclsymbol fresh_symbols sucl_module
+  //#  logfile = sfoldl (<<<) (logfile<<<"All symredresults before macro expansion" <<< nl) symredresults
+  #  debugfile = sfoldl (<<<) (debugfile<<<"All symredresults before macro expansion" <<< nl) symredresults
   #  debugfile = debugfile <<< "Expand macros." <<< nl
   #  symredresults = expand_macros toString toString suclheap (flip isMember (exports sucl_module)) symredresults
-  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults after macro expansion" <<< nl) symredresults
+  //#  logfile = sfoldl (<<<) (logfile<<<"All symredresults after macro expansion" <<< nl) symredresults
+  #  debugfile = sfoldl (<<<) (debugfile<<<"All symredresults after macro expansion" <<< nl) symredresults
   #  n_symredresults = length symredresults
-  #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
+  //#  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
+  #  debugfile = debugfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
      // Create and fill new fundef array
   #  (pds,predefs2) = predefs1![PD_StringType]
   #  (expression_heap`,var_heap`,fun_defs4) = stc_funcdefs pds dcl_mods main_dcl_module_n icl_common n_fun_defs expression_heap var_heap symredresults fun_defs3

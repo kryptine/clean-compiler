@@ -95,7 +95,46 @@ where toString {ds_ident, ds_arity, ds_index}
 		"}"
 
 instance toString Expression
-where toString _ = "<Expression>"
+where toString (Var bv) = "(Var "+++toString bv+++")"
+      toString (App app) = "(App "+++toString app+++")"
+      toString (func @ args) = "("+++toString func+++" @ "+++listToString args+++")"
+      toString (Let letinfo) = "(Let "+++toString letinfo+++")"
+      toString (Case caseinfo) = "(Case "+++toString caseinfo+++")"
+      toString (Selection ogds expr sels) = "(Selection "+++toString ogds+++" "+++toString expr+++" "+++listToString sels+++")"
+      toString (Update expr1 sels expr2) = "(Update "+++toString expr1+++" "+++listToString sels+++" "+++toString expr2+++")"
+      toString (RecordUpdate gds expr binds) = "(RecordUpdate "+++toString gds+++" "+++toString expr+++" "+++listToString binds+++")"
+      toString (TupleSelect ds i expr) = "(TupleSelect "+++toString ds+++" "+++toString i+++" "+++toString expr+++")"
+      toString (BasicExpr bv bt) = "(BasicExpr "+++toString bv+++" "+++toString bt+++")"
+      toString WildCard = "WildCard"
+      toString (Conditional cond) = "(Conditional "+++toString cond+++")"
+      toString (AnyCodeExpr boundbinding freebinding str) = "(AnyCodeExpr "+++listToString boundbinding+++" "+++listToString freebinding+++" "+++listToString str+++")"
+      toString (ABCCodeExpr str bool) = "(ABCCodeExpr "+++listToString str+++" "+++toString bool+++")"
+      toString (MatchExpr ogds gds expr) = "(MatchExpr "+++toString ogds+++" "+++toString gds+++" "+++toString expr+++")"
+      toString (FreeVar fv) = "(FreeVar "+++toString fv+++")"
+      toString (Constant si i p b) = "(Constant "+++toString si+++" "+++toString i+++" "+++toString p+++" "+++toString b+++")"
+      toString (ClassVariable vip) = "(ClassVariable "+++toString vip+++")"
+      toString (DynamicExpr de) = "(DynamicExpr "+++toString de+++")"
+      toString (TypeCodeExpression tce) = "(TypeCodeExpression "+++toString tce+++")"
+      toString EE = "EE"
+      toString (NoBind eip) = "(NoBind "+++toString eip+++")"
+	  toString _ = "<Unexpected expression form>"
+
+instance toString Case
+where toString _ = "<Case>"
+instance toString Let
+where toString _ = "<Let>"
+instance toString BasicValue
+where toString _ = "<BasicValue>"
+instance toString Conditional
+where toString _ = "<Conditional>"
+instance toString DynamicExpr
+where toString _ = "<DynamicExpr>"
+instance toString TypeCodeExpression
+where toString _ = "<TypeCodeExpression>"
+instance toString Selection
+where toString _ = "<Selection>"
+instance toString (Bind a b)
+where toString _ = "<Bind>"
 
 instance toString FieldSymbol
 where toString {fs_name, fs_var, fs_index}
@@ -104,11 +143,9 @@ where toString {fs_name, fs_var, fs_index}
 		", fs_index = "+++toString fs_index+++
 		"}"
 
-/*
 instance toString FreeVar
 where toString {fv_def_level,fv_name,fv_info_ptr,fv_count}
       = "{fv_def_level=" +++ toString fv_def_level +++ ",fv_name=" +++ toString fv_name +++ ",fv_info_ptr=" +++ toString fv_info_ptr +++ ",fv_count=" +++ toString fv_count +++ "}"
-*/
 
 instance <<< GenericDef
 where (<<<) file {gen_name, gen_member_name, gen_type, gen_pos, gen_kinds_ptr, gen_cons_ptr, gen_classes, gen_isomap}
@@ -290,6 +327,10 @@ where
     toString (TVI_Normalized _)           = "TVI_Normalized"
     toString _                            = "TVI_???"
 */
+
+instance toString (Optional a) | toString a
+where toString No = "No"
+      toString (Yes x) = "(Yes "+++toString x+++")"
 
 //arrayToString :: .{a} -> String | toString a
 //arrayToString :: .(a b) -> {#Char} | Array .a & select_u , size_u , toString b;

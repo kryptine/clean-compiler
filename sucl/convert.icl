@@ -30,18 +30,22 @@ suclsymbol_to_string ::
  ,  [u<=v]
 
 suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fundefs0
-= tm (\sk -> suclsymbol_to_funinfo (funinfo_to_string sk o get_funinfo) sk, fundefs1)
+= tm (\sym -> suclsymbol_to_funinfo (funinfo_to_string sym o get_funinfo) sym, fundefs1)
   where getcommon modindex = if (modindex==main_dcl_module_n) icl_common dcl_mods.[modindex].dcl_common
         (oldinfos,fundefs1) = get_infos fundefs0
         get_funinfo = get_formal_name_and_arity {env_dcls=dcl_mods,env_main=main_dcl_module_n,env_getcommon=getcommon,env_infos=oldinfos}
 
-funinfo_to_string sk (id,arity)
-= toString sk+++" ("+++id.id_name+++"/"+++toString arity+++")"
+funinfo_to_string sym (id,arity)
+//= toString sym+++" ("+++id.id_name+++"/"+++toString arity+++")"
+= id.id_name
 
 suclsymbol_to_funinfo symbkind_to_string sym
 = case sym
   of SuclUser sk            -> symbkind_to_string sk
+     _                      -> toString sym
+     /*
      SuclCase eip           -> "_lifted_expression_"+++toString (ptrToInt eip)+++"/?"
+     SuclTupleSelect n i    -> "_tupleselect_"+++toString n+++"_"+++toString i+++"/1"
      SuclFieldSelect gds i  -> "_fieldselect_"+++toString gds.glob_object.ds_ident.id_name+++"_"+++toString i+++"/1"
      SuclArraySelect gds    -> "_arrayselect_"+++toString gds.glob_object.ds_ident.id_name+++"/2"
      SuclDictSelect bv      -> "_distselect_"+++toString bv.var_name.id_name+++"/2"
@@ -51,6 +55,7 @@ suclsymbol_to_funinfo symbkind_to_string sym
      SuclReal r             -> toString r+++"/0"
      SuclBool b             -> toString b+++"/0"
      SuclString s           -> "\""+++toString s+++"\""+++"/0"
+     */
 
 // Cocl to Sucl for functions
 cts_function ::
@@ -451,7 +456,7 @@ convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) 
         [root:heap1] = heap0
         (heap0,(nodes7,fundefs5,globals6,rest,_)) = lrinfo
 
-convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
+convert_expression main_dcl_module_n _ bindings (Case caseinfo) lrinfo
 = (heap4,(nodes9,fundefs9,globals9,[root:rest],False))
   where // Plan: (0.5) convert selector
         //       (1) convert branches
@@ -468,7 +473,7 @@ convert_expression main_dcl_module_n No bindings (Case caseinfo) lrinfo
                   = mkrule ([patroot:innerglobals1++defaultroots]) reproot (compilegraph nodes)
                  mkdefaultalt defaultroot
                   = mkrule (selectorroots++innerglobals1++defaultroots) defaultroot emptygraph // (compilegraph defaultnodes)
-        introduced_function_symbol = SuclCase caseinfo.case_info_ptr
+        introduced_function_symbol = SuclCase caseinfo
         // (1.5) convert default if necessary
         // Note: the default expression is added to the surrounding expression, and passed as argument to the lifted function for this case
         (heap4,(nodes85,fundefs6,globals7,defaultroots,_))
@@ -524,6 +529,8 @@ convert_expression main_dcl_module_n topinfo bindings (DynamicExpr _)        lri
 convert_expression main_dcl_module_n topinfo bindings (TypeCodeExpression _) lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "TypeCodeExpression" lrinfo
 convert_expression main_dcl_module_n topinfo bindings (EE)                   lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "EE" lrinfo
 convert_expression main_dcl_module_n topinfo bindings (NoBind _)             lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "NoBind" lrinfo
+
+convert_expression main_dcl_module_n topinfo bindings expr                   lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings (toString expr) lrinfo
 
 convert_expression_stub main_dcl_module_n topinfo bindings constrname lrinfo
 = (heap1,(nodes1,fundefs0,globals0,[root:rest],False))

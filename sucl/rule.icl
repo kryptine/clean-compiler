@@ -163,6 +163,13 @@ instance <<< (Rgraph sym var) | toString sym & toString var & == var
 where (<<<) file (RgraphAlias root graph)
       = file <<< hd (printgraph graph [root])
 
+printrgraph :: (Rgraph sym var) -> String | toString sym & toString var & == var
+printrgraph rgraph = printrgraphBy toString toString rgraph
+
+printrgraphBy :: (sym->String) (var->String) (Rgraph sym var) -> String | == var
+printrgraphBy showsym showvar (RgraphAlias root graph)
+= hd (printgraphBy showsym showvar graph [root])
+
 /*
 Rules
 

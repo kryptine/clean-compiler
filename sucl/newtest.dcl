@@ -14,6 +14,7 @@ from StdFile import <<<
 from StdString import toString
 from StdOverloaded import ==
 from StdClass import Eq
+from cleanversion import String
 
 :: Symredresult sym var tsym tvar
    = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
@@ -30,6 +31,7 @@ instance toString (Symredresult sym var tsym tvar) | toString sym & toString var
 instance <<< (Symredresult sym var tsym tvar) | toString sym & <<<,==,toString var
 
 fullsymred ::
+    (SuclSymbol->String) // Get the (readable) string representation of a symbol
     [SuclSymbol]    // Fresh function symbols
     Cli             // Module to optimise
  -> [Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable]

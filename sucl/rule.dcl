@@ -76,6 +76,10 @@ showrgraph ::
  -> String
  |  == var
 
+// Make a nice readable representation of a rooted graph
+printrgraph :: (Rgraph sym var) -> String | toString sym & toString var & == var
+printrgraphBy :: (sym->String) (var->String) (Rgraph sym var) -> String | == var
+
 instance <<< (Rgraph sym var) | toString sym & toString var & == var
 instance <<< (Rule sym var) | toString sym & toString,== var
 

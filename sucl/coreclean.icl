@@ -36,7 +36,7 @@ sucltypeheap =: map SuclANONYMOUS [0..]
 
 :: SuclSymbol
  = SuclUser SymbKind
- | SuclCase ExprInfoPtr
+ | SuclCase Case
  | SuclTupleSelect Int Int	// tuple's size and element's index in that order
  | SuclFieldSelect (Global DefinedSymbol) Int
  | SuclArraySelect (Global DefinedSymbol)
@@ -108,7 +108,7 @@ where (<<<) file tvar = file <<< toString tvar
 
 instance == SuclSymbol
 where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
-      (==) (SuclCase  eptr1)  (SuclCase  eptr2)  = eptr1 == eptr2
+      (==) (SuclCase  case1)  (SuclCase  case2)  = case1.case_info_ptr == case2.case_info_ptr
       (==) (SuclApply int1 )  (SuclApply int2 )  = int1  == int2
       (==) (SuclInt   int1 )  (SuclInt   int2 )  = int1  == int2
       (==) (SuclReal  real1)  (SuclReal  real2)  = real1 == real2
@@ -118,7 +118,7 @@ where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
 
 instance toString SuclSymbol
 where toString (SuclUser  sk  ) = toString sk
-      toString (SuclCase  eptr) = "_lift"+++toString eptr
+      toString (SuclCase caseinfo) = foldoptional ("_case_"+++toString caseinfo.case_info_ptr) toString caseinfo.case_ident
       toString (SuclTupleSelect n i) = "_tupleselect_"+++toString n+++"_"+++toString i
       toString (SuclFieldSelect gds i) = "_fieldselect_"+++toString gds+++"_"+++toString i
       toString (SuclArraySelect gds) = "_arrayselect_"+++toString gds

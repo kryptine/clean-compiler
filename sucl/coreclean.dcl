@@ -4,7 +4,7 @@ definition module coreclean
 
 from strat import Strategy
 from rule import Rule
-from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr,SymbKind,BoundVar,DefinedSymbol
+from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr,SymbKind,BoundVar,DefinedSymbol,Case
 from StdOverloaded import ==,toString
 from StdFile import <<<
 
@@ -12,8 +12,8 @@ from StdFile import <<<
 from strat import Substrategy
 from spine import Spine,Subspine
 from graph import Graph,Node
-from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo,ConsVariable
-from general import BITVECT
+from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo,ConsVariable,CasePatterns,Expression,Position
+from general import BITVECT,Optional
 from Heap import Ptr,PtrN,HeapN
 from cleanversion import String
 
@@ -40,7 +40,7 @@ sucltypeheap :: [SuclTypeVariable]
 
 :: SuclSymbol
  = SuclUser SymbKind
- | SuclCase ExprInfoPtr
+ | SuclCase Case
  | SuclTupleSelect Int Int	// tuple's size and element's index in that order
  | SuclFieldSelect (Global DefinedSymbol) Int
  | SuclArraySelect (Global DefinedSymbol)

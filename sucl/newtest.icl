@@ -16,6 +16,8 @@ import basic
 import general
 import StdEnv
 
+trv func = tracevalue (func+++" (newtest.icl)")
+
 /*
 
 newtest.lit - Testing the new trace implementation
@@ -309,15 +311,16 @@ printarea showsym showvar indent area file
 */
 
 fullsymred ::
+    (SuclSymbol->String) // Get the (readable) string representation of a symbol
     [SuclSymbol]    // Fresh function symbols
     Cli             // Module to optimise
  -> [Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable]
 
-fullsymred freshsymbols cli
+fullsymred showsym freshsymbols cli
  = results
    where results = depthfirst generate process (initareas cli)
          generate result = map canonise` (getareas result)
-         process area = symredarea foldarea` cli area
+         process area = trv ("fullsymred.process area=:("+++printrgraphBy showsym toString area+++")") "symredarea foldarea` cli area" (symredarea foldarea` cli area)
 
          foldarea` = foldarea (labelarea` o canonise`)
          labelarea` = labelarea isSuclUserSym (map getinit results) freshsymbols
