@@ -37,11 +37,11 @@ where
 		check_type_attribute TA_Anonymous type_attr root_attr error
 			| try_to_combine_attributes type_attr root_attr
 				= (root_attr, error)
-				= (TA_Multi, checkError "" "conflicting attribution of type definition" error)
+				= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
 		check_type_attribute TA_Unique type_attr root_attr error
 			| try_to_combine_attributes TA_Unique type_attr || try_to_combine_attributes TA_Unique root_attr
 				= (TA_Unique, error)
-				= (TA_Multi, checkError "" "conflicting attribution of type definition" error)
+				= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
 		check_type_attribute (TA_Var var) _ _ error
 			= (TA_Multi, checkError var "attribute variable not allowed" error)
 		check_type_attribute (TA_RootVar var) _ _ error
@@ -109,8 +109,8 @@ where
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types, cti_lhs_attribute, ts_ti_cs)
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types,
 								determine_type_attribute td_attribute, ts_ti_cs)
-				= (TE /* JVG was: type */, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name " used with wrong arity" cs.cs_error }))
-			= (TE /* JVG was: type */, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name " undefined" cs.cs_error}))
+				= (TE /* JVG was: type */, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "used with wrong arity" cs.cs_error }))
+			= (TE /* JVG was: type */, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "undefined" cs.cs_error}))
 	where
 		determine_type_attribute TA_Unique		= TA_Unique
 		determine_type_attribute _				= TA_Multi
@@ -139,7 +139,7 @@ addToAttributeEnviron (TA_Var attr_var) (TA_Var root_var) attr_env error
 addToAttributeEnviron (TA_RootVar attr_var) root_attr attr_env error
 	= (attr_env, error)
 addToAttributeEnviron _ _ attr_env error
-	= (attr_env, checkError "" "inconsistent attribution of type definition" error)
+	= (attr_env, checkError "inconsistent attribution of type definition" "" error)
 
 bindTypesOfConstructors :: !CurrentTypeInfo !Index ![TypeVar] ![AttributeVar] !AType ![DefinedSymbol] !(!*TypeSymbols,!*TypeInfo,!*CheckState)
 	-> (!*TypeSymbols, !*TypeInfo, !*CheckState)
@@ -718,7 +718,7 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
   where
 	check_fully_polymorphity it_types it_context cs_error
 		| all is_type_var it_types && not (isEmpty it_context)
-			= checkError "" "context restriction not allowed for fully polymorph instance" cs_error
+			= checkError "context restriction not allowed for fully polymorph instance" "" cs_error
 		= cs_error
 	  where
 		is_type_var (TV _) = True
@@ -862,7 +862,7 @@ checkTypeContext mod_index tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_
 		= (tc, (class_defs, ots, oti, { cs & cs_error = checkError id_name "undefined" cs.cs_error }))
 where	
 	check_context_types tc_class [] cs=:{cs_error}
-		= { cs & cs_error = checkError tc_class " type context should contain one or more type variables" cs_error}
+		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
 	check_context_types tc_class [TV _ : types] cs
 		= cs
 	check_context_types tc_class [type : types] cs
@@ -881,14 +881,14 @@ where
 	where
 		check_class_variable {tv_name} cs=:{cs_symbol_table,cs_error}
 			= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope tv_name cs_symbol_table,
-					 cs_error			= checkError tv_name " not defined or defined as class variable" cs_error}
+					 cs_error			= checkError tv_name "wrongly used or not used at all" cs_error}
 	
 	check_class_attributes class_attributes cs
 		= foldSt check_class_attribute class_attributes cs
 	where
 		check_class_attribute {av_name} cs=:{cs_symbol_table,cs_error}
 			= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope av_name cs_symbol_table,
-					 cs_error			= checkError av_name " undefined" cs_error}
+					 cs_error			= checkError av_name "undefined" cs_error}
 
 
 checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType) !u:{# CheckedTypeDef} !u:{# DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
@@ -959,7 +959,7 @@ where
 				| entry.ste_kind == STE_Empty
 					= { cs & cs_symbol_table = cs_symbol_table }
 					= { cs & cs_symbol_table = cs_symbol_table <:= (id_info, entry.ste_previous),
-							 cs_error = checkError tv_name.id_name " global type variable not used in type of the function" cs_error }
+							 cs_error = checkError tv_name.id_name "global type variable not used in type of the function" cs_error }
 
 checkDynamics mod_index scope dyn_type_ptrs type_defs modules type_heaps expr_heap cs
 	= foldSt (check_dynamic mod_index scope) dyn_type_ptrs (type_defs, modules, type_heaps, expr_heap, cs)
@@ -974,7 +974,7 @@ where
 						| isEmpty loc_type_vars
 							-> (type_defs, modules, type_heaps, expr_heap <:= (dyn_info_ptr, EI_Dynamic (Yes dyn_type)), cs)
 				  			# cs_symbol_table = removeVariablesFromSymbolTable scope loc_type_vars cs.cs_symbol_table
-							  cs_error = checkError loc_type_vars " type variable(s) not defined" cs.cs_error
+							  cs_error = checkError loc_type_vars "type variable(s) not defined" cs.cs_error
 							-> (type_defs, modules, type_heaps, expr_heap <:= (dyn_info_ptr, EI_Dynamic (Yes dyn_type)),
 									{ cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 					No
@@ -1004,7 +1004,7 @@ where
 			# cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
 			= ({ dt & dt_uni_vars = dt_uni_vars, dt_global_vars = oti_global_vars, dt_type = dt_type },
 					oti_all_vars, ots_type_defs, ots_modules, { oti_heaps & th_vars = th_vars },
-					{ cs & cs_symbol_table = cs_symbol_table, cs_error = checkError (hd oti_all_attrs).av_name " type attribute variable not allowed" cs.cs_error})
+					{ cs & cs_symbol_table = cs_symbol_table, cs_error = checkError (hd oti_all_attrs).av_name "type attribute variable not allowed" cs.cs_error})
 		
 	add_type_variable_to_symbol_table :: !Level !ATypeVar !*(!*TypeVarHeap,!*CheckState) -> (!ATypeVar,!(!*TypeVarHeap, !*CheckState))
 	add_type_variable_to_symbol_table scope atv=:{atv_variable=atv_variable=:{tv_name}, atv_attribute} (type_var_heap, cs=:{cs_symbol_table,cs_error})
@@ -1016,7 +1016,7 @@ where
 				(var_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr, ste_def_level = scope, ste_previous = var_entry })
 			= ({atv & atv_attribute = TA_Multi, atv_variable = { atv_variable & tv_info_ptr = new_var_ptr }}, (type_var_heap,
 					{ cs & cs_symbol_table = cs_symbol_table, cs_error = check_attribute atv_attribute cs_error}))
-			= (atv, (type_var_heap, { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error }))
+			= (atv, (type_var_heap, { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error }))
 
 	check_attribute TA_Unique error
 		= error
@@ -1025,7 +1025,7 @@ where
 	check_attribute TA_None error
 		= error
 	check_attribute attr error
-		= checkError attr " attribute not allowed in type of dynamic" error
+		= checkError attr "attribute not allowed in type of dynamic" error
 	
 	
 checkSpecialTypeVars :: !Specials !*CheckState -> (!Specials, !*CheckState)
@@ -1038,7 +1038,7 @@ where
 		| ste_kind <> STE_Empty && ste_def_level == cGlobalScope
 			# (STE_TypeVariable tv_info_ptr) = ste_kind
 			= ({ bind & bind_dst = { type_var & tv_info_ptr = tv_info_ptr}}, { cs & cs_symbol_table = cs_symbol_table })
-			= (bind, { cs & cs_symbol_table= cs_symbol_table, cs_error = checkError id_name " type variable not defined" cs_error })
+			= (bind, { cs & cs_symbol_table= cs_symbol_table, cs_error = checkError id_name "type variable not defined" cs_error })
 checkSpecialTypeVars SP_None cs
 	= (SP_None, cs)
 /*	
@@ -1115,7 +1115,7 @@ where
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
 					(attr_vars, heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
 			= (atv, (attr_vars, { heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
+					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
 
 	check_attribute :: !TypeAttribute !String ![AttributeVar] !*AttrVarHeap !*ErrorAdmin
 		-> (!TypeAttribute, ![AttributeVar], !*AttrVarHeap, !*ErrorAdmin)
@@ -1154,7 +1154,7 @@ where
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
 					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */ }))
 			= (atv, ({ heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name " type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
+					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error /* TD ... */, cs_x = {cs.cs_x & x_type_var_position = inc x_type_var_position}		/* ... TD */}))
 
 	check_attribute :: !TypeAttribute !TypeAttribute !String !*ErrorAdmin
 		-> (!TypeAttribute, !*ErrorAdmin)

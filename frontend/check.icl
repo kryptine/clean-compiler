@@ -374,7 +374,7 @@ where
 				= check_member_instances module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_name ins_pos ins_type
 						instance_types member_defs type_defs modules var_heap type_heaps
 							{ cs & cs_error = checkError class_member.ds_ident "used with wrong arity" cs.cs_error}
-				# ({me_type,me_class_vars}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
+				# ({me_type,me_class_vars,me_pos}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
 				  (instance_type, _, type_heaps, Yes cs_error) = determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes cs.cs_error)
 				  (type_defs, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n True ins_pos class_name instance_type type_defs modules cs_error
 				  (st_context, var_heap) = initializeContextVariables instance_type.st_context var_heap
@@ -432,7 +432,7 @@ instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_en
 	  				_ -> case opt_error of
 	  						No -> No
 	  						Yes error_admin
-	  							-> Yes (checkError "" "instance type incompatible with class type" 
+	  							-> Yes (checkError "instance type incompatible with class type" "" 
 	  										error_admin)
 	  								// e.g.:class c a :: (a Int); instance c Real
 	= (inst_vars, inst_attr_vars, inst_types, inst_contexts ++ new_ss_context, inst_attr_env, special_subst_list, { type_heaps & th_vars = th_vars }, opt_error)
@@ -489,7 +489,7 @@ determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,i
 			  ss_context = it_context, ss_vars = it_vars, ss_attrs = it_attr_vars} 
 	  (st, specials, type_heaps, opt_error)
 	  		= determine_type_of_member_instance mem_st env specials type_heaps opt_error
-	= (st, specials, type_heaps, opt_error)	 
+	= (st, specials, type_heaps, opt_error)
 where
 	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps opt_error
 		# (mem_st, substs, type_heaps, opt_error) 
@@ -603,7 +603,7 @@ checkTopLevelKinds x_main_dcl_module_n is_icl_module ins_pos class_ident st=:{st
 	  				# cs_error
 	  						= pushErrorAdmin (newPosition class_ident ins_pos) cs_error
 	  				  cs_error
-	  				  		= checkError "" "instance types have wrong kind" cs_error
+	  				  		= checkError "instance types have wrong kind" "" cs_error
 	  				-> popErrorAdmin cs_error
 	= (type_defs, modules, cs_error)
   where
@@ -983,13 +983,13 @@ where
 					= add_macro_declaration id_info entry decl def_index (decl_index - first_macro_index) decl_index
 								(conversion_table, icl_defs, cs_symbol_table)
 				= ([ decl : moved_dcl_defs ], conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-				# cs_error = checkError "definition module" "undefined in implementation module" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+				# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
 				= (moved_dcl_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 		| ste_def_level == cGlobalScope && ste_kind == decl_kind
 			# def_index = toInt decl_kind
 			  decl_index = if (def_index == cMacroDefs) (decl_index - first_macro_index) decl_index
 			= (moved_dcl_defs, { conversion_table & [def_index].[decl_index] = ste_index },  icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-			# cs_error = checkError "definition module" "conflicting definition in implementation module"
+			# cs_error = checkError "conflicting definition in implementation module" ""
 					(setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
 			= (moved_dcl_defs, conversion_table,  icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
@@ -1030,7 +1030,7 @@ where
 			  (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
 			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ], cs)
 		add_type_def td=:{td_name, td_pos, td_rhs = AbstractType _} new_type_defs cs
-			# cs_error = checkError "definition module" "abstract type not defined in implementation module"
+			# cs_error = checkError "abstract type not defined in implementation module" ""
 					(setErrorAdmin (newPosition td_name td_pos) cs.cs_error)
 			= (new_type_defs, { cs & cs_error = cs_error })
 		add_type_def td new_type_defs cs
@@ -1045,7 +1045,7 @@ where
 				  ({ste_kind,ste_index}, cs_symbol_table) = readPtr field.fs_name.id_info cs.cs_symbol_table
 				| is_field ste_kind
 					= ({ new_fields & [field_nr] = { field & fs_index = ste_index }}, { cs & cs_symbol_table = cs_symbol_table })
-					# cs_error = checkError "definition module" "conflicting definition in implementation module"
+					# cs_error = checkError "conflicting definition in implementation module" ""
 									(setErrorAdmin (newPosition field.fs_name pos) cs.cs_error)
 					= (new_fields, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
@@ -1086,7 +1086,7 @@ where
 		# ({ste_kind,ste_index}, cs_symbol_table) = readPtr ds_ident.id_info cs.cs_symbol_table
 		| ste_kind == req_kind
 			= ({ ds & ds_index = ste_index }, { cs & cs_symbol_table = cs_symbol_table })
-			# cs_error = checkError "definition module" "conflicting definition in implementation module"
+			# cs_error = checkError "conflicting definition in implementation module" ""
 							(setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
 			= ({ ds & ds_index = ste_index }, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
@@ -1289,8 +1289,8 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 			  				  cs_error
 			  						= pushErrorAdmin ident_pos cs_error
 			  				  cs_error
-			  				  		=  checkError "" 
-				  							"cyclic module dependencies not allowed in conjunction with Clean 1.3 import syntax"
+			  				  		=  checkError  
+				  							"cyclic module dependencies not allowed in conjunction with Clean 1.3 import syntax" ""
 										cs_error
 							-> popErrorAdmin cs_error
 						_
@@ -1730,7 +1730,14 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 
 	  (icl_functions, e_info, heaps, {cs_symbol_table, cs_predef_symbols, cs_error,cs_x })
 	  	= checkInstanceBodies icl_instance_range icl_functions e_info heaps cs
-
+	 
+	  (icl_functions, hp_type_heaps, cs_error)
+	  		= // foldSt checkSpecifiedInstanceType instance_types 
+	  				(icl_functions, heaps.hp_type_heaps, cs_error)
+	  
+	  heaps
+	  		= { heaps & hp_type_heaps = hp_type_heaps }
+	  
 	  cs_symbol_table = removeDeclarationsFromSymbolTable local_defs cGlobalScope cs_symbol_table
 
 	  cs_symbol_table
@@ -1946,6 +1953,29 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 			# (com_type_defs`, com_type_defs)
 				= memcpy com_type_defs
 			= (com_type_defs`, { icl_common & com_type_defs = com_type_defs })
+
+		checkSpecifiedInstanceType (index_of_member_fun, derived_symbol_type)
+					(icl_functions, type_heaps, cs_error)
+			# ({fun_type, fun_pos, fun_symb}, icl_functions)
+					= icl_functions![index_of_member_fun]
+			  (cs_error, type_heaps)
+			  		= case fun_type of
+			  			No
+			  				-> (cs_error, type_heaps)
+			  			Yes specified_symbol_type
+							# (symbol_types_correspond, type_heaps)
+							  		= symbolTypesCorrespond specified_symbol_type derived_symbol_type
+							  				type_heaps
+							| symbol_types_correspond
+								-> (cs_error, type_heaps)
+							# cs_error
+									= pushErrorAdmin (newPosition fun_symb fun_pos)
+											cs_error
+							  cs_error
+							  		= checkError "the specified member type is incorrect" "" cs_error
+							-> ( popErrorAdmin cs_error, type_heaps)
+			= (icl_functions, type_heaps, cs_error)
+
 
 check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules}}
 //AA..

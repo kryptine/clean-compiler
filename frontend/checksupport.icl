@@ -162,15 +162,15 @@ newPosition id NoPos
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b // PK
 checkError id mess error=:{ea_file,ea_loc=[]}
-	= { error & ea_file = ea_file <<< "Error " <<< "\"" <<< id <<< "\" " <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< " " <<< id <<< " " <<< mess <<< '\n', ea_ok = False }
 checkError id mess error=:{ea_file,ea_loc}
-	= { error & ea_file = ea_file <<< "Error " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< hd ea_loc <<< ": " <<< id  <<< " " <<< mess <<< '\n', ea_ok = False }
 
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b // PK
 checkWarning id mess error=:{ea_file,ea_loc=[]}
-	= { error & ea_file = ea_file <<< "Warning " <<< "\"" <<< id <<< "\" " <<< mess <<< '\n' }
+	= { error & ea_file = ea_file <<< "Warning " <<< " " <<< id <<< " " <<< mess <<< '\n' }
 checkWarning id mess error=:{ea_file,ea_loc}
-	= { error & ea_file = ea_file <<< "Warning " <<< hd ea_loc <<< ":\"" <<< id  <<< "\" " <<< mess <<< '\n' }
+	= { error & ea_file = ea_file <<< "Warning " <<< hd ea_loc <<< ": " <<< id  <<< " " <<< mess <<< '\n' }
 
 
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
@@ -326,7 +326,7 @@ addDefToSymbolTable level def_index def_ident=:{id_info} def_kind symbol_table e
 	| entry.ste_kind == STE_Empty || entry.ste_def_level <> level
 		# entry = {ste_index = def_index, ste_kind = def_kind, ste_def_level = level, ste_previous = entry }
 		= (symbol_table <:= (id_info,entry), error)
-		= (symbol_table, checkError def_ident " already defined" error)
+		= (symbol_table, checkError def_ident "already defined" error)
 
 addDeclarationsOfDclModToSymbolTable :: .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
 addDeclarationsOfDclModToSymbolTable ste_index locals imported cs
@@ -437,7 +437,7 @@ where
 					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = decl_index } cs
 				_
 					-> cs
-			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident decl_pos) " multiply defined" cs.cs_error}
+			= { cs & cs_error = checkErrorWithIdentPos (newPosition ident decl_pos) "multiply defined" cs.cs_error}
 
 removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
 removeImportedSymbolsFromSymbolTable (Declaration {decl_ident=decl_ident=:{id_info}, decl_index}) symbol_table
