@@ -1,8 +1,9 @@
 implementation module checkKindCorrectness
 
 import StdEnv
-import syntax, containers, checksupport, utilities, RWSDebug
+import syntax, containers, checksupport, utilities
 
+// import RWSDebug
 
 checkKindCorrectness :: !NumberSet !Index IndexRange !{#CommonDefs} !{#DclModule} !u:{# FunDef} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
 					-> (!u:{# FunDef}, !*TypeVarHeap, !*TypeDefInfos, !*ErrorAdmin)

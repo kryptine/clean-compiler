@@ -8,8 +8,8 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 //import pp;
 
 APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES yes no :== no
-import RWSDebug;
 import type_io; 
+//import RWSDebug;
 
 ::	*ConversionInfo =
 	{	ci_predef_symb		:: !*PredefinedSymbols
