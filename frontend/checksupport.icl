@@ -335,7 +335,6 @@ where
 	remove_field field_mod field_index []
 		= []
 
-
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntry) -> *Heap SymbolTableEntry;
 removeDeclarationsFromSymbolTable decls scope symbol_table
 	= foldSt (remove_declaration scope) decls symbol_table
@@ -344,15 +343,19 @@ where
 		#! entry = sreadPtr id_info symbol_table
 		# {ste_kind,ste_previous} = entry
 		= case ste_kind of
-			STE_Field field_id
-				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
-				| ste_previous.ste_def_level == scope
-					-> symbol_table <:= (id_info, ste_previous.ste_previous)
-					-> symbol_table <:= (id_info, ste_previous)
-			_
-				| ste_previous.ste_def_level == scope
-					-> symbol_table <:= (id_info, ste_previous.ste_previous)
-					-> symbol_table <:= (id_info, ste_previous)
+					STE_Field field_id
+						# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
+						| ste_previous.ste_def_level == scope
+							-> symbol_table <:= (id_info, ste_previous.ste_previous)
+							-> symbol_table <:= (id_info, ste_previous)
+// MW..
+					STE_Empty
+						-> symbol_table
+// ..MW
+					_
+						| ste_previous.ste_def_level == scope
+							-> symbol_table <:= (id_info, ste_previous.ste_previous)
+							-> symbol_table <:= (id_info, ste_previous)
 
 
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;

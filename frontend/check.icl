@@ -730,22 +730,26 @@ where
 		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError id_name " constructor expected" error)
 
 
-checkIdentPattern :: !Level !Index !Bool !Ident !(Optional (Bind Ident VarInfoPtr)) ![Ident] !*PatternState !*ExpressionInfo !*CheckState
+checkIdentPattern :: !Bool !Ident !(Optional (Bind Ident VarInfoPtr)) !PatternInput ![Ident] !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, ![Ident], !*PatternState, !*ExpressionInfo, !*CheckState)
-checkIdentPattern def_level mod_index is_expr_list id=:{id_name,id_info} opt_var var_env ps e_info cs=:{cs_symbol_table}
+checkIdentPattern is_expr_list id=:{id_name,id_info} opt_var {pi_def_level, pi_mod_index} var_env ps e_info cs=:{cs_symbol_table}
 	#! entry = sreadPtr id_info cs_symbol_table
 	| isLowerCaseName id_name
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
-		  cs = checkPatternVariable def_level entry id new_info_ptr cs
+		  cs = checkPatternVariable pi_def_level entry id new_info_ptr cs
 		= (AP_Variable id new_info_ptr opt_var, [ id : var_env ], { ps & ps_var_heap = ps_var_heap}, e_info, cs)
-		# (pattern, ps, e_info, cs) = checkPatternConstructor mod_index is_expr_list entry id opt_var ps e_info cs
+		# (pattern, ps, e_info, cs) = checkPatternConstructor pi_mod_index is_expr_list entry id opt_var ps e_info cs
 		= (pattern, var_env, ps, e_info, cs)
 
 ::	PatternState =
 	{	ps_var_heap :: !.VarHeap
 	,	ps_fun_defs :: !.{# FunDef}
 	}
-
+::	PatternInput =
+	{	pi_def_level		:: !Int
+	,	pi_mod_index		:: !Index
+	,	pi_is_node_pattern	:: !Bool
+	}
 
 buildPattern mod_index (APK_Constructor type_index) cons_symb args opt_var ps e_info cs
 	= (AP_Algebraic cons_symb type_index args opt_var, ps, e_info, cs)
@@ -754,87 +758,86 @@ buildPattern mod_index APK_Macro {glob_object} args opt_var ps e_info=:{ef_modul
 			= unfoldPatternMacro mod_index glob_object.ds_index args opt_var ps ef_modules ef_cons_defs cs_error
 	= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
 
-checkPattern :: !Level !Index !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) ![Ident] !*PatternState !*ExpressionInfo !*CheckState
+checkPattern :: !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) !PatternInput  ![Ident] !*PatternState !*ExpressionInfo !*CheckState
 									-> (!AuxiliaryPattern, ![Ident], !*PatternState, !*ExpressionInfo, !*CheckState)
-checkPattern def_level mod_index (PE_List [exp]) opt_var var_env ps e_info cs=:{cs_symbol_table}
+checkPattern (PE_List [exp]) opt_var p_input var_env ps e_info cs=:{cs_symbol_table}
 	= case exp of
 		PE_Ident ident
-			-> checkIdentPattern def_level mod_index cIsNotInExpressionList ident opt_var var_env ps e_info cs
+			-> checkIdentPattern cIsNotInExpressionList ident opt_var p_input var_env ps e_info cs
 		_
-			-> checkPattern def_level mod_index exp opt_var var_env ps e_info cs
+			-> checkPattern exp opt_var p_input var_env ps e_info cs
 
-checkPattern def_level mod_index (PE_List [exp1, exp2 : exps]) opt_var var_env ps e_info cs
-	# (exp_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index exp1 var_env ps e_info cs
-	= check_patterns def_level mod_index [exp_pat] exp2 exps opt_var var_env ps e_info cs
+checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input var_env ps e_info cs
+	# (exp_pat, var_env, ps, e_info, cs) = check_pattern exp1 p_input var_env ps e_info cs
+	= check_patterns [exp_pat] exp2 exps opt_var p_input var_env ps e_info cs
 	where
-		check_patterns def_level mod_index left middle [] opt_var var_env ps e_info cs
-			# (mid_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
-			  (pat, ps, e_info, cs) = combine_patterns opt_var [mid_pat : left] [] 0 ps e_info cs
+		check_patterns left middle [] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
+			# (mid_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
+			  (pat, ps, e_info, cs) = combine_patterns pi_mod_index opt_var [mid_pat : left] [] 0 ps e_info cs // MW: pi_mod_index added (klopt dat ?)
 			= (pat, var_env, ps, e_info, cs)
-		check_patterns def_level mod_index left middle [right:rest] opt_var var_env ps e_info cs
-			# (mid_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index middle var_env ps e_info cs
+		check_patterns left middle [right:rest] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
+			# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
 			= case mid_pat of
 				AP_Constant kind constant=:{glob_object={ds_arity,ds_ident}} prio
 					| ds_arity == 0
-						# (pattern, ps, e_info, cs) = buildPattern mod_index kind constant [] No ps e_info cs
-						-> check_patterns def_level mod_index [pattern: left] right rest opt_var var_env ps e_info cs
+						# (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind constant [] No ps e_info cs
+						-> check_patterns [pattern: left] right rest opt_var p_input var_env ps e_info cs
 					| is_infix_constructor prio
-						# (left_arg, ps, e_info, cs) = combine_patterns No left [] 0 ps e_info cs
-						-> check_infix_pattern def_level mod_index [] left_arg kind constant prio right rest
-									opt_var var_env ps e_info cs
+						# (left_arg, ps, e_info, cs) = combine_patterns pi_mod_index No left [] 0 ps e_info cs // MW: pi_mod_index added (klopt dat ?)
+						-> check_infix_pattern [] left_arg kind constant prio right rest opt_var p_input var_env ps e_info cs
 						-> (AP_Empty ds_ident, var_env, ps, e_info,
 								{ cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
-					-> check_patterns def_level mod_index [mid_pat : left] right rest opt_var var_env ps e_info cs
+					-> check_patterns [mid_pat : left] right rest opt_var p_input var_env ps e_info cs
 
-
-		check_pattern def_level mod_index (PE_Ident id) var_env ps e_info cs
-			= checkIdentPattern def_level mod_index cIsInExpressionList id No var_env ps e_info cs
-		check_pattern def_level mod_index expr var_env ps e_info cs
-			= checkPattern def_level mod_index expr No var_env ps e_info cs
+		check_pattern (PE_Ident id) p_input var_env ps e_info cs
+			= checkIdentPattern cIsInExpressionList id No p_input var_env ps e_info cs
+		check_pattern expr p_input var_env ps e_info cs
+			= checkPattern expr No p_input var_env ps e_info cs
 		
-	 	check_infix_pattern def_level mod_index left_args left kind cons prio middle [] opt_var var_env ps e_info cs
-			# (mid_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
-			  (pattern, ps, e_info, cs) = buildPattern mod_index kind cons [left,mid_pat] opt_var ps e_info cs
-			  (pattern, ps, e_info, cs) = build_final_pattern mod_index left_args pattern ps e_info cs
+	 	check_infix_pattern left_args left kind cons prio middle [] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
+			# (mid_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
+			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,mid_pat] opt_var ps e_info cs
+			  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
 			= (pattern, var_env, ps, e_info, cs)
-	 	check_infix_pattern def_level mod_index left_args left kind cons prio middle [right] opt_var var_env ps e_info cs
-			# (mid_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index middle var_env ps e_info cs
-			  (right_pat, var_env, ps, e_info, cs) =  checkPattern def_level mod_index middle No var_env ps e_info cs
-			  (right_arg, ps, e_info, cs) = combine_patterns No [right_pat, mid_pat] [] 0 ps e_info cs
-			  (pattern, ps, e_info, cs) = buildPattern mod_index kind cons [left,right_arg] opt_var ps e_info cs
-			  (pattern, ps, e_info, cs) = build_final_pattern mod_index left_args pattern ps e_info cs
+	 	check_infix_pattern left_args left kind cons prio middle [right] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
+			# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
+// MW was     (right_pat, var_env, ps, e_info, cs) =  checkPattern middle No p_input var_env ps e_info cs
+			  (right_pat, var_env, ps, e_info, cs) =  checkPattern right No p_input var_env ps e_info cs
+			  (right_arg, ps, e_info, cs) = combine_patterns pi_mod_index No [right_pat, mid_pat] [] 0 ps e_info cs // MW added pi_mod_index argument (klopt dat ?)
+			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,right_arg] opt_var ps e_info cs
+			  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
 			= (pattern, var_env, ps, e_info, cs)
-	 	check_infix_pattern def_level mod_index left_args left kind1 cons1 prio1 middle [inf_cons, arg : rest] opt_var var_env ps e_info cs
-			# (inf_cons_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index inf_cons var_env ps e_info cs
+	 	check_infix_pattern left_args left kind1 cons1 prio1 middle [inf_cons, arg : rest] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
+			# (inf_cons_pat, var_env, ps, e_info, cs) = check_pattern inf_cons p_input var_env ps e_info cs
 			= case inf_cons_pat of
 				AP_Constant kind2 cons2=:{glob_object={ds_ident,ds_arity}} prio2
 					| ds_arity == 0
-						# (mid_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index middle var_env ps e_info cs
-						  (pattern2, ps, e_info, cs) = buildPattern mod_index kind2 cons2 [] No ps e_info cs
-						  (pattern1, ps, e_info, cs) = buildPattern mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
-						  (pattern1, ps, e_info, cs) = build_final_pattern mod_index left_args pattern1 ps e_info cs
-						-> check_patterns def_level mod_index [pattern2,pattern1] arg rest opt_var var_env ps e_info cs
+						# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
+						  (pattern2, ps, e_info, cs) = buildPattern pi_mod_index kind2 cons2 [] No ps e_info cs
+						  (pattern1, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
+						  (pattern1, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern1 ps e_info cs
+						-> check_patterns [pattern2,pattern1] arg rest opt_var p_input var_env ps e_info cs
 					| is_infix_constructor prio2
 						# optional_prio = determinePriority prio1 prio2
 						-> case optional_prio of
 							Yes priority
 								| priority
-									# (mid_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index middle var_env ps e_info cs
-								      (pattern, ps, e_info, cs) = buildPattern mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
-								      (left_args, pattern, ps, e_info, cs) = build_left_pattern mod_index left_args prio2 pattern ps e_info cs
-									-> check_infix_pattern def_level mod_index left_args pattern kind2 cons2 prio2 arg rest opt_var var_env ps e_info cs 
-									# (mid_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
-									-> check_infix_pattern def_level mod_index [(kind1, cons1, prio1, left) : left_args]
-									  				mid_pat kind2 cons2 prio2 arg rest No var_env ps e_info cs
+									# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
+								      (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
+								      (left_args, pattern, ps, e_info, cs) = build_left_pattern pi_mod_index left_args prio2 pattern ps e_info cs
+									-> check_infix_pattern left_args pattern kind2 cons2 prio2 arg rest opt_var p_input var_env ps e_info cs 
+									# (mid_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
+									-> check_infix_pattern [(kind1, cons1, prio1, left) : left_args] mid_pat kind2 cons2 prio2 arg
+											rest No p_input var_env ps e_info cs
 							No
 								-> (AP_Empty ds_ident, var_env, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
 						-> (AP_Empty ds_ident, var_env, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
-					# (right_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
-					  (pattern, ps, e_info, cs) = buildPattern mod_index kind1 cons1 [left,right_pat] No ps e_info cs
-					  (pattern, ps, e_info, cs) = build_final_pattern  mod_index left_args pattern ps e_info cs
-					-> check_patterns def_level mod_index [inf_cons_pat, pattern] arg rest opt_var var_env ps e_info cs
+					# (right_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
+					  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,right_pat] No ps e_info cs
+					  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
+					-> check_patterns [inf_cons_pat, pattern] arg rest opt_var p_input var_env ps e_info cs
 
 		is_infix_constructor (Prio _ _) = True
 		is_infix_constructor _ = False
@@ -851,14 +854,14 @@ checkPattern def_level mod_index (PE_List [exp1, exp2 : exps]) opt_var var_env p
 						-> (la, result_pattern,  ps, e_info, cs)
 				No
 					-> (la, result_pattern,  ps, e_info,{ cs & cs_error = checkError cons.glob_object.ds_ident "conflicting priorities" cs.cs_error })
-		
+
 		build_final_pattern mod_index [] result_pattern ps e_info cs
 			= (result_pattern,  ps, e_info, cs)		
 		build_final_pattern mod_index [(kind, cons, priol, left) : left_appls] result_pattern ps e_info cs
 			# (result_pattern, ps, e_info, cs) = buildPattern mod_index kind cons [left,result_pattern] No ps e_info cs
 			= build_final_pattern mod_index left_appls result_pattern ps e_info cs
 
-		combine_patterns opt_var [first_expr] args nr_of_args ps e_info cs
+		combine_patterns mod_index opt_var [first_expr] args nr_of_args ps e_info cs
 			= case first_expr of
 				AP_Constant kind constant=:{glob_object={ds_ident,ds_arity}} _
 					| ds_arity == nr_of_args
@@ -869,8 +872,8 @@ checkPattern def_level mod_index (PE_List [exp1, exp2 : exps]) opt_var var_env p
 					| nr_of_args == 0
 						-> (first_expr, ps, e_info, cs)
 						-> (first_expr, ps, e_info, { cs & cs_error = checkError "<pattern>" "(curried) application not allowed " cs.cs_error })
-		combine_patterns opt_var [rev_arg : rev_args] args arity ps e_info cs
-			= combine_patterns opt_var rev_args [rev_arg : args] (inc arity) ps e_info cs
+		combine_patterns mod_index opt_var [rev_arg : rev_args] args arity ps e_info cs
+			= combine_patterns mod_index opt_var rev_args [rev_arg : args] (inc arity) ps e_info cs
 /*
 		combine_optional_variables (Yes var1) (Yes var2) error
 			= (Yes var1, checkError var2.bind_dst "pattern already bound" error)
@@ -880,45 +883,46 @@ checkPattern def_level mod_index (PE_List [exp1, exp2 : exps]) opt_var var_env p
 			= (opt_var, error)
 */
 
-checkPattern def_level mod_index (PE_DynamicPattern pattern type) opt_var var_env ps e_info cs
-	# (dyn_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index pattern No var_env ps e_info cs
+checkPattern (PE_DynamicPattern pattern type) opt_var p_input var_env ps e_info cs
+	# (dyn_pat, var_env, ps, e_info, cs) = checkPattern pattern No p_input var_env ps e_info cs
 	= (AP_Dynamic dyn_pat type opt_var, var_env, ps, e_info, cs)
-checkPattern def_level mod_index (PE_Basic basic_value) opt_var var_env ps e_info cs
+
+checkPattern (PE_Basic basic_value) opt_var p_input var_env ps e_info cs
 	= (AP_Basic basic_value opt_var, var_env, ps, e_info, cs)
 
-checkPattern def_level mod_index (PE_Tuple tuple_args) opt_var var_env ps e_info cs
-	# (patterns, arity, var_env, ps, e_info, cs) = check_tuple_patterns def_level mod_index tuple_args var_env ps e_info cs
+checkPattern (PE_Tuple tuple_args) opt_var p_input var_env ps e_info cs
+	# (patterns, arity, var_env, ps, e_info, cs) = check_tuple_patterns tuple_args p_input var_env ps e_info cs
 	  (tuple_symbol, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex arity) PD_PredefinedModule STE_Constructor arity cs
 	#! {cons_type_index} = e_info.ef_modules.[tuple_symbol.glob_module].dcl_common.com_cons_defs.[tuple_symbol.glob_object.ds_index]
 	= (AP_Algebraic tuple_symbol cons_type_index patterns opt_var, var_env, ps, e_info, cs)
 where
-	check_tuple_patterns def_level mod_index [] var_env ps e_info cs
+	check_tuple_patterns [] p_input var_env ps e_info cs
 		= ([], 0, var_env, ps, e_info, cs)
-	check_tuple_patterns def_level mod_index [expr : exprs] var_env ps e_info cs
-		# (pattern, var_env, ps, e_info, cs) = checkPattern def_level mod_index expr No var_env ps e_info cs
-		  (patterns, length, var_env, ps, e_info, cs) = check_tuple_patterns def_level mod_index exprs var_env ps e_info cs
+	check_tuple_patterns [expr : exprs] p_input var_env ps e_info cs
+		# (pattern, var_env, ps, e_info, cs) = checkPattern expr No p_input var_env ps e_info cs
+		  (patterns, length, var_env, ps, e_info, cs) = check_tuple_patterns exprs p_input var_env ps e_info cs
 		= ([pattern : patterns], inc length, var_env, ps, e_info, cs)
-checkPattern def_level mod_index (PE_Record record opt_type fields) opt_var var_env ps e_info cs
-	# (opt_record_and_fields, e_info, cs) = checkFields mod_index fields opt_type e_info cs
+checkPattern (PE_Record record opt_type fields) opt_var p_input=:{pi_mod_index, pi_is_node_pattern} var_env ps e_info cs
+	# (opt_record_and_fields, e_info, cs) = checkFields pi_mod_index fields opt_type e_info cs
 	= case opt_record_and_fields of
 		Yes (record_symbol, type_index, new_fields)
-			# (patterns, (var_env, ps, e_info, cs)) = mapSt (check_field_pattern def_level mod_index) new_fields (var_env, ps, e_info, cs)
-			  (patterns, ps_var_heap) = bind_opt_record_variable opt_var patterns new_fields ps.ps_var_heap
+			# (patterns, (var_env, ps, e_info, cs)) = mapSt (check_field_pattern p_input) new_fields (var_env, ps, e_info, cs)
+			  (patterns, ps_var_heap) = bind_opt_record_variable opt_var pi_is_node_pattern patterns new_fields ps.ps_var_heap
 			-> (AP_Algebraic record_symbol type_index patterns opt_var, var_env, { ps & ps_var_heap = ps_var_heap }, e_info, cs)
 		No
 			-> (AP_Empty (hd fields).bind_dst, var_env, ps, e_info, cs)
 where
 
-	check_field_pattern def_level mod_index {bind_src = PE_Empty, bind_dst = {glob_object={fs_var}}} (var_env, ps, e_info, cs)
+	check_field_pattern p_input=:{pi_def_level} {bind_src = PE_Empty, bind_dst = {glob_object={fs_var}}} (var_env, ps, e_info, cs)
 		#! entry = sreadPtr fs_var.id_info cs.cs_symbol_table
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
-		  cs = checkPatternVariable def_level entry fs_var new_info_ptr cs
+		  cs = checkPatternVariable pi_def_level entry fs_var new_info_ptr cs
 		= (AP_Variable fs_var new_info_ptr No, ([ fs_var : var_env ], { ps & ps_var_heap = ps_var_heap }, e_info, cs))
-	check_field_pattern def_level mod_index {bind_src = PE_WildCard, bind_dst={glob_object={fs_var}}} (var_env, ps, e_info, cs)
+	check_field_pattern p_input {bind_src = PE_WildCard, bind_dst={glob_object={fs_var}}} (var_env, ps, e_info, cs)
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
 		= (AP_WildCard (Yes { bind_src = fs_var, bind_dst = new_info_ptr}), (var_env, { ps & ps_var_heap = ps_var_heap }, e_info, cs))
-	check_field_pattern def_level mod_index {bind_src,bind_dst} (var_env, ps, e_info, cs)
-		# (pattern, var_env, ps, e_info, cs) = checkPattern def_level mod_index bind_src No var_env ps e_info cs
+	check_field_pattern p_input {bind_src,bind_dst} (var_env, ps, e_info, cs)
+		# (pattern, var_env, ps, e_info, cs) = checkPattern bind_src No p_input var_env ps e_info cs
 		= (pattern, (var_env, ps, e_info, cs))
 
 
@@ -941,51 +945,36 @@ where
 		  (aps, var_heap) = add_bound_variables aps fields var_heap
 		= ([ap : aps], var_heap)
 
-	bind_opt_record_variable (Yes {bind_dst}) patterns fields var_heap
+	bind_opt_record_variable (Yes {bind_dst}) False patterns fields var_heap
 		# (patterns, var_heap) = add_bound_variables patterns fields var_heap
 		= (patterns, var_heap <:= (bind_dst, VI_Record patterns))
-	bind_opt_record_variable No patterns _ var_heap
+	bind_opt_record_variable no is_node_pattern patterns _ var_heap
 		= (patterns, var_heap)
 
-checkPattern def_level mod_index (PE_Bound bind) opt_var var_env ps e_info cs
-	= checkBoundPattern def_level mod_index bind opt_var var_env ps e_info cs
+checkPattern (PE_Bound bind) opt_var p_input var_env ps e_info cs
+	= checkBoundPattern bind opt_var p_input var_env ps e_info cs
 
-checkPattern def_level mod_index (PE_Ident id) opt_var var_env ps e_info cs
-	= checkIdentPattern def_level mod_index cIsNotInExpressionList id opt_var var_env ps e_info cs
-checkPattern def_level mod_index PE_WildCard opt_var var_env ps e_info cs
+checkPattern (PE_Ident id) opt_var p_input var_env ps e_info cs
+	= checkIdentPattern cIsNotInExpressionList id opt_var p_input var_env ps e_info cs
+checkPattern PE_WildCard opt_var p_input var_env ps e_info cs
 	= (AP_WildCard No, var_env, ps, e_info, cs)
-checkPattern def_level mod_index expr opt_var var_env ps e_info cs
+checkPattern expr opt_var p_input var_env ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
-checkBoundPattern def_level mod_index {bind_src,bind_dst} opt_var var_env ps e_info cs=:{cs_symbol_table}
+checkBoundPattern {bind_src,bind_dst} opt_var p_input var_env ps e_info cs=:{cs_symbol_table}
 	| isLowerCaseName bind_dst.id_name
 		#! entry = sreadPtr bind_dst.id_info cs_symbol_table
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
-		  cs = checkPatternVariable def_level entry bind_dst new_info_ptr cs
+		  cs = checkPatternVariable p_input.pi_def_level entry bind_dst new_info_ptr cs
 		  ps = { ps & ps_var_heap = ps_var_heap }
 		  var_env = [ bind_dst : var_env ]
 		= case opt_var of
 			Yes bind
-				-> checkPattern def_level mod_index bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) var_env ps
+				-> checkPattern bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) p_input var_env ps
 					 	e_info { cs & cs_error = checkError bind.bind_src "pattern already bound" cs.cs_error }
 			No
-				-> checkPattern def_level mod_index bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) var_env ps e_info cs
-	= checkPattern def_level mod_index bind_src opt_var var_env ps e_info { cs & cs_error = checkError bind_dst "variable expected" cs.cs_error }
-
-instance <<< AuxiliaryPattern
-where
-	(<<<) file (AP_Algebraic symbol index patterns var)
-		= file <<< symbol <<< ' ' <<< patterns
-	(<<<) file (AP_Variable ident var_ptr var)
-		= file <<< ident
-	(<<<) file (AP_Basic val var)
-		= file <<< val
-	(<<<) file (AP_Constant kind symbol prio)
-		= file <<< symbol
-	(<<<) file (AP_WildCard _)
-		= file <<< '_'
-	(<<<) file (AP_Empty ident)
-		= file <<< "<?" <<< ident <<< "?>"
+				-> checkPattern bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) p_input var_env ps e_info cs
+	= checkPattern bind_src opt_var p_input var_env ps e_info { cs & cs_error = checkError bind_dst "variable expected" cs.cs_error }
 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
 newFreeVariable new_var vars=:[free_var=:{fv_def_level,fv_info_ptr}: free_vars]
@@ -1242,7 +1231,8 @@ where
 	check_guarded_expression free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals}} patterns pattern_variables defaul e_input=:{ei_expr_level,ei_mod_index}
 				e_state=:{es_fun_defs,es_var_heap} e_info cs
 		# (pattern, var_env, {ps_fun_defs,ps_var_heap}, e_info, cs)
-				= checkPattern ei_expr_level ei_mod_index calt_pattern No [] {ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
+				= checkPattern calt_pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } []
+					{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs}
 		  (expr, free_vars, e_state=:{es_dynamics,es_expression_heap,es_var_heap}, e_info, cs) = checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
 		  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
@@ -1619,17 +1609,17 @@ buildLetExpression binds is_strict expr expr_heap
 
 checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info cs
 	# (loc_defs, var_env, {ps_fun_defs,ps_var_heap}, e_info, cs)
-			= check_patterns def_level mod_index loc_nodes [] {ps_fun_defs = es_fun_defs, ps_var_heap = es_var_heap} e_info cs
+			= check_patterns loc_nodes {pi_def_level = def_level, pi_mod_index = mod_index, pi_is_node_pattern = True } []
+					{ps_fun_defs = es_fun_defs, ps_var_heap = es_var_heap} e_info cs
 	  (es_fun_defs, cs_symbol_table, cs_error) = addLocalFunctionDefsToSymbolTable def_level ir_from ir_to ps_fun_defs cs.cs_symbol_table cs.cs_error
 	= (loc_defs, var_env, { e_state & es_fun_defs = es_fun_defs, es_var_heap = ps_var_heap }, e_info, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
 where
-	check_patterns def_level mod_index [ (_,node_def) : node_defs ] var_env var_store e_info cs
-		# (pattern, var_env, var_store, e_info, cs) = checkPattern def_level mod_index node_def.nd_dst No var_env var_store e_info cs
-		  (patterns, var_env, var_store, e_info, cs) = check_patterns def_level mod_index node_defs var_env var_store e_info cs
+	check_patterns [ (_,node_def) : node_defs ] p_input var_env var_store e_info cs
+		# (pattern, var_env, var_store, e_info, cs) = checkPattern node_def.nd_dst No p_input var_env var_store e_info cs
+		  (patterns, var_env, var_store, e_info, cs) = check_patterns node_defs p_input var_env var_store e_info cs
 		= ([{ node_def & nd_dst = pattern } : patterns], var_env, var_store, e_info, cs)
-	check_patterns def_level mod_index [] var_env var_store e_info cs
+	check_patterns [] p_input var_env var_store e_info cs
 		= ([], var_env, var_store, e_info, cs)
-
 
 checkRhssAndTransformLocalDefs free_vars [] rhs_expr e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
@@ -1839,8 +1829,9 @@ where
 				= checkLocalFunctions ei_mod_index ei_expr_level ndwl_locals e_state.es_fun_defs e_info
 	  				{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expression_heap, hp_type_heaps = e_state.es_type_heaps } cs
 	  	  (es_fun_defs, cs_symbol_table) = removeLocalsFromSymbolTable ei_expr_level loc_env ndwl_locals es_fun_defs cs.cs_symbol_table
-		  (pattern, let_vars, {ps_fun_defs,ps_var_heap}, e_info, cs) = checkPattern ei_expr_level ei_mod_index bind_dst No []
-		  			{ps_var_heap = hp_var_heap, ps_fun_defs = es_fun_defs } e_info { cs & cs_symbol_table = cs_symbol_table }
+		  (pattern, let_vars, {ps_fun_defs,ps_var_heap}, e_info, cs)
+				= checkPattern bind_dst No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = True } [] 
+					{ps_var_heap = hp_var_heap, ps_fun_defs = es_fun_defs } e_info { cs & cs_symbol_table = cs_symbol_table }
 		= (src_expr, pattern, let_vars, free_vars,
 			{ e_state & es_var_heap = ps_var_heap, es_expression_heap = hp_expression_heap, es_type_heaps = hp_type_heaps, es_fun_defs = ps_fun_defs },
 				e_info, cs)
@@ -1926,8 +1917,9 @@ typeOfBasicValue (BVS _) cs
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}} : bodies]) e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
 	# (aux_patterns, var_env, {ps_var_heap, ps_fun_defs}, e_info, cs)
-			= check_patterns ei_expr_level ei_mod_index pb_args [] {ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs 
-	  (rhs_expr, free_vars, e_state=:{es_dynamics=dynamics_in_rhs}, e_info, cs)
+			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} []
+							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs 
+	# (rhs_expr, free_vars, e_state=:{es_dynamics=dynamics_in_rhs}, e_info, cs)
 	  		= checkRhs [] rhs_alts rhs_locals e_input { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs } e_info cs
 	  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
 	  (cb_args, es_var_heap) = mapSt determine_function_arg aux_patterns e_state.es_var_heap
@@ -1940,11 +1932,11 @@ checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}} : bodies
 		{ e_state & es_var_heap = es_var_heap, es_expression_heap = es_expression_heap, es_dynamics = dynamics_in_patterns ++ es_dynamics }, e_info, cs)
 
 where
-	check_patterns def_level mod_index [pattern : patterns] var_env var_store e_info cs
-		# (aux_pat, var_env, var_store, e_info, cs) = checkPattern def_level mod_index pattern No var_env var_store e_info cs
-		  (aux_pats, var_env, var_store, e_info, cs) = check_patterns def_level mod_index patterns var_env var_store e_info cs
+	check_patterns [pattern : patterns] p_input var_env var_store e_info cs
+		# (aux_pat, var_env, var_store, e_info, cs) = checkPattern pattern No p_input var_env var_store e_info cs
+		  (aux_pats, var_env, var_store, e_info, cs) = check_patterns patterns p_input var_env var_store e_info cs
 		= ([aux_pat : aux_pats], var_env, var_store, e_info, cs)
-	check_patterns def_level mod_index [] var_env var_store e_info cs
+	check_patterns [] p_input var_env var_store e_info cs
 		= ([], var_env, var_store, e_info, cs)
 
 	determine_function_arg (AP_Variable name var_info (Yes {bind_src, bind_dst})) var_store
@@ -1967,7 +1959,8 @@ where
 	check_function_bodies free_vars fun_args [{pb_args,pb_rhs={rhs_alts,rhs_locals}} : bodies] e_input=:{ei_expr_level,ei_mod_index}
 			e_state=:{es_var_heap,es_fun_defs} e_info cs
 		# (aux_patterns, var_env, {ps_var_heap, ps_fun_defs}, e_info, cs)
-				= check_patterns ei_expr_level ei_mod_index pb_args [] {ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
+				= check_patterns pb_args { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } []
+					{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs}
 		  (rhs_expr, free_vars, e_state=:{es_dynamics=dynamics_in_rhs}, e_info, cs) = checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
 	 	  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
@@ -2969,6 +2962,21 @@ file_and_status {ea_file,ea_ok}
 instance <<< FunCall
 where
 	(<<<) file {fc_index} = file <<< fc_index
+
+instance <<< AuxiliaryPattern
+where
+	(<<<) file (AP_Algebraic symbol index patterns var)
+		= file <<< symbol <<< ' ' <<< patterns
+	(<<<) file (AP_Variable ident var_ptr var)
+		= file <<< ident
+	(<<<) file (AP_Basic val var)
+		= file <<< val
+	(<<<) file (AP_Constant kind symbol prio)
+		= file <<< symbol
+	(<<<) file (AP_WildCard _)
+		= file <<< '_'
+	(<<<) file (AP_Empty ident)
+		= file <<< "<?" <<< ident <<< "?>"
 
 instance <<< Priority
 where

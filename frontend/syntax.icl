@@ -1109,7 +1109,6 @@ instance needs_brackets a
 where
 	needs_brackets _ = False
 
-	
 instance <<< BasicType
 where
 	(<<<) file BT_Int			= file <<< "Int"
@@ -1332,7 +1331,7 @@ where
 	(<<<) file (App {app_symb, app_args})
 		= file <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
-	(<<<) file (Let {let_info_ptr, let_binds, let_expr}) = write_binds (file <<< "let " <<< ptrToInt let_info_ptr <<< '\n') let_binds <<< "in\n" <<< let_expr
+	(<<<) file (Let {let_info_ptr, let_binds, let_expr}) = write_binds (file <<< "let" <<< '\n') let_binds <<< "in\n" <<< let_expr
 	where
 		write_binds file []
 			= file

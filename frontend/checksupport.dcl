@@ -116,7 +116,6 @@ instance toInt STE_Kind
 instance <<< STE_Kind
 instance <<< IdentPos
 
-// MW..
 retrieveAndRemoveImportsFromSymbolTable :: ![(.a,.Declarations)] [Declaration] *(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 retrieveAndRemoveImportsOfModuleFromSymbolTable :: ![.Declaration] ![.Declaration] ![.Declaration] !*(Heap SymbolTableEntry) -> ([Declaration],.Heap SymbolTableEntry);
 addLocalFunctionDefsToSymbolTable :: Level Index .Index u:(a FunDef) *SymbolTable *ErrorAdmin -> (v:(a FunDef),.SymbolTable,.ErrorAdmin) | Array .a, [u <= v];
@@ -133,4 +132,3 @@ removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*(Heap SymbolTableEntr
 removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
 removeLocalsFromSymbolTable :: .Level .[Ident] LocalDefs u:(a b) *(Heap SymbolTableEntry) -> (v:(a b),.Heap SymbolTableEntry) | Array .a & select_u , toIdent b, [u <= v];
 removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
-// ..MW
