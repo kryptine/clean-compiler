@@ -1196,8 +1196,18 @@ where
 		= (file  <<< 'v' <<< tv_number, No)
 	writeType file opt_beautifulizer (form, TA {type_name,type_index,type_arity} types)
 		| is_predefined type_index
-			| is_list type_name
+			| type_name.id_name=="_List"
 				= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+			| type_name.id_name=="_!List"
+				= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+			| type_name.id_name=="_#List"
+				= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+			| type_name.id_name=="_List!"
+				= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+			| type_name.id_name=="_!List!"
+				= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+			| type_name.id_name=="_#List!"
+				= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_lazy_array type_name
 				= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_strict_array type_name
@@ -1225,7 +1235,6 @@ where
 	where
 			is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
 
-			is_list {id_name}				= id_name == "_List"
 			is_tuple {id_name} tup_arity	= id_name == "_Tuple" +++ toString tup_arity
 			is_lazy_array {id_name} 		= id_name == "_Array"
 			is_strict_array {id_name} 		= id_name == "_!Array"
