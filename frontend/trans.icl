@@ -266,7 +266,7 @@ instance consumerRequirements Expression where
 		= consumerRequirements case_expr common_defs ai
 	consumerRequirements (BasicExpr _) _ ai
 		= (cPassive, False, ai)
-	consumerRequirements (MatchExpr _ _ expr) common_defs ai
+	consumerRequirements (MatchExpr _ expr) common_defs ai
 		= consumerRequirements expr common_defs ai
 	consumerRequirements (Selection _ expr selectors) common_defs ai
 		# (cc, _, ai) = consumerRequirements expr common_defs ai
@@ -778,9 +778,9 @@ where
 	transform (TupleSelect a1 arg_nr expr) ro ti
 		# (expr,ti) = transform expr ro ti
 		= (TupleSelect a1 arg_nr expr,ti)
-	transform (MatchExpr a1 a2 expr) ro ti
+	transform (MatchExpr a1 expr) ro ti
 		# (expr,ti) = transform expr ro ti
-		= (MatchExpr a1 a2 expr,ti)
+		= (MatchExpr a1 expr,ti)
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)	
@@ -2976,7 +2976,7 @@ where
 			= free_variables_of_fields fields var fvi
 	freeVariables (TupleSelect _ arg_nr expr) fvi
 		= freeVariables expr fvi
-	freeVariables (MatchExpr _ _ expr) fvi
+	freeVariables (MatchExpr _ expr) fvi
 		= freeVariables expr fvi
 	freeVariables EE fvi
 		= fvi
@@ -3278,7 +3278,7 @@ instance producerRequirements Expression where
 		= (False,prs)
 	producerRequirements (ABCCodeExpr _ _) prs
 		= (False,prs)
-	producerRequirements (MatchExpr _ _ _) prs
+	producerRequirements (MatchExpr _ _) prs
 		// what's this?
 		= (False,prs)
 	producerRequirements (DynamicExpr _) prs

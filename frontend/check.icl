@@ -2959,7 +2959,9 @@ where
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbolAndCheckIndex PD_StringType mod_index PD_StringTypeIndex STE_Type
-				<=< adjust_predef_symbols PD_ListType PD_UnboxedArrayType mod_index STE_Type
+				<=< adjust_predef_symbols PD_ListType PD_OverloadedListType mod_index STE_Type
+				<=< adjust_predef_symbols_and_check_indices PD_Arity2TupleType PD_Arity32TupleType PD_Arity2TupleTypeIndex mod_index STE_Type
+				<=< adjust_predef_symbols PD_LazyArrayType PD_UnboxedArrayType mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsSymbol PD_Arity32TupleSymbol mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_TypeCodeClass mod_index STE_Class
 				<=< adjustPredefSymbol PD_TypeCodeMember mod_index STE_Member
@@ -2989,7 +2991,6 @@ where
 				<=< adjustPredefSymbol PD_DynamicValue		mod_index (STE_Field unused)
 				<=< adjustPredefSymbol PD_TypeID				mod_index STE_Type
 				<=< adjustPredefSymbol PD_ModuleID			mod_index STE_Constructor)
-// AA..			
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
 		# type_iso_ident = predefined_idents.[PD_TypeISO]	
 		| pre_mod.pds_def == mod_index
@@ -3036,6 +3037,13 @@ where
 				= cs
 					<=< adjustPredefSymbol next_symb mod_index symb_kind
 					<=< adjust_predef_symbols (inc next_symb) last_symb mod_index symb_kind
+
+		adjust_predef_symbols_and_check_indices next_symb last_symb type_index mod_index symb_kind cs
+			| next_symb > last_symb
+				= cs
+				= cs
+					<=< adjustPredefSymbolAndCheckIndex next_symb mod_index type_index symb_kind
+					<=< adjust_predef_symbols_and_check_indices (inc next_symb) last_symb (inc type_index) mod_index symb_kind
 
 	count_members :: !Index !{# ClassInstance} !{# ClassDef} !{# DclModule} -> Int
 	count_members mod_index com_instance_defs com_class_defs modules

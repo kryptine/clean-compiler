@@ -4038,9 +4038,9 @@ mapExprSt f (Conditional cond=:{if_cond, if_then, if_else}) st
 		No  -> (No, st)	
 	= f (Conditional {cond & if_cond = if_cond, if_then = if_then, if_else = if_else}) st
 		
-mapExprSt f (MatchExpr x y expr) st
+mapExprSt f (MatchExpr y expr) st
 	# (expr, st) = mapExprSt f expr st
-	= f (MatchExpr x y expr) st
+	= f (MatchExpr y expr) st
 
 mapExprSt f (DynamicExpr dyn=:{dyn_expr}) st
 	# (dyn_expr, st) = mapExprSt f dyn_expr st
@@ -4145,7 +4145,7 @@ where
 	collect_expr_calls (TupleSelect ds i expr) rest = collect_expr_calls expr rest
 	//collect_expr_calls (Lambda fvs expr) rest = collect_expr_calls expr rest
 	collect_expr_calls (Conditional cond) rest = collect_expr_calls cond.if_cond (collect_expr_calls cond.if_then (foldOptional id collect_expr_calls cond.if_else rest))
-	collect_expr_calls (MatchExpr ogds gds expr) rest = collect_expr_calls expr rest
+	collect_expr_calls (MatchExpr gds expr) rest = collect_expr_calls expr rest
 	collect_expr_calls (DynamicExpr dyn) rest = collect_expr_calls dyn.dyn_expr (collect_tce_calls dyn.dyn_type_code rest)
 	//collect_expr_calls (TypeCase tc) rest = collect_expr_calls tc.type_case_dynamic (foldr collect_dp_calls (foldOptional id collect_expr_calls rest) tc.type_case_patterns)
 	collect_expr_calls (TypeCodeExpression tce) rest = collect_tce_calls tce rest

@@ -660,7 +660,7 @@ instance check_completeness Expression where
 		= ccs
 	check_completeness (ABCCodeExpr _ _) _ ccs
 		= ccs
-	check_completeness (MatchExpr _ constructor expression) cci ccs
+	check_completeness (MatchExpr constructor expression) cci ccs
 		= check_completeness expression cci
 		  (check_whether_ident_is_imported constructor.glob_object.ds_ident STE_Constructor cci ccs)
 	check_completeness (FreeVar _) _ ccs

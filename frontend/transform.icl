@@ -80,9 +80,9 @@ where
 	lift (TupleSelect symbol argn_nr expr) ls
 		# (expr, ls) = lift expr ls
 		= (TupleSelect symbol argn_nr expr, ls)
-	lift (MatchExpr opt_tuple cons_symb expr) ls
+	lift (MatchExpr cons_symb expr) ls
 		# (expr, ls) = lift expr ls
-		= (MatchExpr opt_tuple cons_symb expr, ls)
+		= (MatchExpr cons_symb expr, ls)
 	lift (DynamicExpr expr) ls
 		# (expr, ls) = lift expr ls
 		= (DynamicExpr expr, ls)
@@ -426,9 +426,9 @@ where
 	unfold (TupleSelect symbol argn_nr expr) ui us
 		# (expr, us) = unfold expr ui us
 		= (TupleSelect symbol argn_nr expr, us)
-	unfold (MatchExpr opt_tuple cons_symb expr) ui us
+	unfold (MatchExpr cons_symb expr) ui us
 		# (expr, us) = unfold expr ui us
-		= (MatchExpr opt_tuple cons_symb expr, us)
+		= (MatchExpr cons_symb expr, us)
 	unfold (DynamicExpr expr) ui us
 		# (expr, us) = unfold expr ui us
 		= (DynamicExpr expr, us)
@@ -1257,7 +1257,7 @@ where
 				= True
 	has_no_curried_macro_Expression (TupleSelect symbol argn_nr expr)
 		= has_no_curried_macro_Expression expr
-	has_no_curried_macro_Expression (MatchExpr opt_tuple cons_symb expr)
+	has_no_curried_macro_Expression (MatchExpr cons_symb expr)
 		= has_no_curried_macro_Expression expr
 	has_no_curried_macro_Expression expr
 		= True
@@ -1648,9 +1648,9 @@ where
 	expand (TupleSelect symbol argn_nr expr) ei
 		# (expr, ei) = expand expr ei
 		= (TupleSelect symbol argn_nr expr, ei)
-	expand (MatchExpr opt_tuple cons_symb expr) ei
+	expand (MatchExpr cons_symb expr) ei
 		# (expr, ei) = expand expr ei
-		= (MatchExpr opt_tuple cons_symb expr, ei)
+		= (MatchExpr cons_symb expr, ei)
 	expand expr ei
 		= (expr, ei)
 
@@ -1950,9 +1950,9 @@ where
 	collectVariables (TupleSelect symbol argn_nr expr) free_vars cos
 		# (expr, free_vars, cos) = collectVariables expr free_vars cos
 		= (TupleSelect symbol argn_nr expr, free_vars, cos)
-	collectVariables (MatchExpr opt_tuple cons_symb expr) free_vars cos
+	collectVariables (MatchExpr cons_symb expr) free_vars cos
 		# (expr, free_vars, cos) = collectVariables expr free_vars cos
-		= (MatchExpr opt_tuple cons_symb expr, free_vars, cos)
+		= (MatchExpr cons_symb expr, free_vars, cos)
 	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr /* MV ... */ , dyn_info_ptr /* ... MV */}) free_vars cos
 		#! (dyn_expr, free_vars, cos /* MV ... */ =:{cos_symbol_heap} /* ... MV */) = collectVariables dyn_expr free_vars cos
 // MV ...

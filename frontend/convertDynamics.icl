@@ -412,9 +412,9 @@ where
 		= (AnyCodeExpr codeBinding1 codeBinding2 strings, ci)
 	convertDynamics _ _ _ (ABCCodeExpr strings bool) ci
 		= (ABCCodeExpr strings bool, ci)
-	convertDynamics cinp bound_vars default_expr (MatchExpr opt_symb symb expression) ci
+	convertDynamics cinp bound_vars default_expr (MatchExpr symb expression) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
-		= (MatchExpr opt_symb symb expression, ci)
+		= (MatchExpr symb expression, ci)
 /* Sjaak ... */
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_type_code}) ci=:{ci_symb_ident}
 		#  (dyn_expr,      ci) 			= convertDynamics cinp bound_vars default_expr dyn_expr ci

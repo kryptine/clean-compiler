@@ -1027,8 +1027,7 @@ checkExpression free_vars (PE_Selection selector_kind expr selectors) e_input e_
 		ParsedNormalSelector
 			-> (Selection NormalSelector expr selectors, free_vars, e_state, e_info, cs)
 		ParsedUniqueSelector unique_element
-			# (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
-			-> (Selection (UniqueSelector tuple_type) expr selectors, free_vars, e_state, e_info, cs)
+			-> (Selection UniqueSelector expr selectors, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_info cs	
 	# (expr1, free_vars, e_state, e_info, cs) = checkExpression free_vars expr1 e_input e_state e_info cs
 	  (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithUpdate free_vars selectors e_input e_state e_info cs
@@ -1805,13 +1804,12 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 			_
 				| ds_arity == 1
 		  			# (binds, var_store, expr_heap, e_info, cs)
-						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr No cons_symbol src_expr)
+						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr cons_symbol src_expr)
 								position var_store expr_heap e_info cs
 					-> (opt_var_bind ++ binds, var_store, expr_heap, e_info, cs)
-					# (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex ds_arity) PD_PredefinedModule STE_Type ds_arity cs
-					  (tuple_cons, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex ds_arity) PD_PredefinedModule STE_Constructor ds_arity cs
+					# (tuple_cons, cs) = getPredefinedGlobalSymbol (GetTupleConsIndex ds_arity) PD_PredefinedModule STE_Constructor ds_arity cs
 					  (match_var, match_bind, var_store, expr_heap)
-						=  bind_match_expr (MatchExpr (Yes tuple_type) cons_symbol src_expr) opt_var_bind position var_store expr_heap
+						=  bind_match_expr (MatchExpr cons_symbol src_expr) opt_var_bind position var_store expr_heap
 					-> transform_sub_patterns mod_index def_level args tuple_cons.glob_object 0 match_var match_bind
 							position var_store expr_heap e_info cs
 where
@@ -2195,8 +2193,7 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  			1	# (unq_select_symb, cs) = getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
 		  				-> (unq_select_symb, NormalSelector, cs)
 		  			_	# (select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
-						  (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
-		  				-> (select_symb, UniqueSelector tuple_type, cs)
+		  				-> (select_symb, UniqueSelector, cs)
 		  e_state
 		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 		  (index_exprs, (free_vars, e_state, e_info, cs))

@@ -211,7 +211,7 @@ where
 		= weightedRefCountOfCase rci case_expr case_info { rs & rcs_expr_heap = rcs_expr_heap }
 	weightedRefCount rci expr=:(BasicExpr _) rs
 		= rs
-	weightedRefCount rci (MatchExpr _ constructor expr) rs
+	weightedRefCount rci (MatchExpr constructor expr) rs
 		= weightedRefCount rci expr rs
 	weightedRefCount rci (Selection opt_tuple expr selections) rs
 		= weightedRefCount rci (expr, selections) rs
@@ -456,9 +456,9 @@ where
 		= (fun_expr @ exprs, ds)
 	distributeLets depth expr=:(BasicExpr _) ds
 		= (expr, ds)
-	distributeLets depth (MatchExpr opt_tuple constructor expr) ds
+	distributeLets depth (MatchExpr constructor expr) ds
 		# (expr, ds) = distributeLets depth expr ds
-		= (MatchExpr opt_tuple constructor expr, ds)
+		= (MatchExpr constructor expr, ds)
 	distributeLets depth (Selection opt_tuple expr selectors) ds
 		# (expr, ds) = distributeLets depth expr ds
 		# (selectors, ds) = distributeLets depth selectors ds
@@ -1036,9 +1036,9 @@ where
 	convertCases ci (Let lad) cs
 		# (lad, cs) = convertCases ci lad cs
 		= (Let lad, cs)
-	convertCases ci (MatchExpr opt_tuple constructor expr) cs
+	convertCases ci (MatchExpr constructor expr) cs
 		# (expr, cs) = convertCases ci expr cs
-		= (MatchExpr opt_tuple constructor expr, cs)
+		= (MatchExpr constructor expr, cs)
 	convertCases ci (Selection is_unique expr selectors) cs
 		# (expr, cs) = convertCases ci expr cs
 		  (selectors, cs) = convertCases ci selectors cs
@@ -1236,9 +1236,9 @@ where
 		= (Conditional cond, cp_info)
 	copy expr=:(BasicExpr _) cp_info
 		= (expr, cp_info)
-	copy (MatchExpr opt_tuple constructor expr) cp_info
+	copy (MatchExpr constructor expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
-		= (MatchExpr opt_tuple constructor expr, cp_info)
+		= (MatchExpr constructor expr, cp_info)
 	copy (Selection is_unique expr selectors) cp_info
 		# (expr, cp_info) = copy expr cp_info
 		  (selectors, cp_info) = copy selectors cp_info

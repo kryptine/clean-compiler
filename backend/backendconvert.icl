@@ -1865,14 +1865,8 @@ where
 				=	[]
 	convertExpr (TupleSelect {ds_arity} n expr)
 		=	beTupleSelectNode ds_arity n (convertExpr expr)
-	convertExpr (MatchExpr optionalTuple {glob_module, glob_object={ds_index}} expr)
-		=	beMatchNode (arity optionalTuple) (beConstructorSymbol glob_module ds_index) (convertExpr expr)
-		where
-			arity :: (Optional (Global DefinedSymbol)) -> Int
-			arity No
-				=	1
-			arity (Yes {glob_object={ds_arity}})
-				=	ds_arity
+	convertExpr (MatchExpr {glob_module, glob_object={ds_index,ds_arity}} expr)
+		=	beMatchNode ds_arity (beConstructorSymbol glob_module ds_index) (convertExpr expr)
 	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else})
 		=	beIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
 

@@ -115,7 +115,7 @@ instance == FunctionOrMacroIndex
 	,	def_macro_indices	:: !IndexRange
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
-	,	def_generics		:: ![GenericDef] // AA
+	,	def_generics		:: ![GenericDef]
 	,	def_funtypes		:: ![FunType]
 	,	def_instances		:: ![instance_kind]
 	}
@@ -167,7 +167,7 @@ cIsNotAFunction :== False
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
 	|	PD_Class ClassDef [ParsedDefinition]
-	|	PD_Generic GenericDef // AA
+	|	PD_Generic GenericDef
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
@@ -1104,7 +1104,6 @@ cIsNotStrict	:== False
 		=	NormalSelector
 		|	NormalSelectorUniqueElementResult
 		|	UniqueSelector			// !
-				(Global DefinedSymbol)	// 	tuple type
 
 /*
 ::	SelectorKind	= SEK_Normal | SEK_First | SEK_Next | SEK_Last
@@ -1128,7 +1127,7 @@ cIsNotStrict	:== False
 				| AnyCodeExpr !(CodeBinding BoundVar) !(CodeBinding FreeVar) ![String]
 				| ABCCodeExpr ![String] !Bool
 
-				| MatchExpr !(Optional (Global DefinedSymbol)) !(Global DefinedSymbol) !Expression
+				| MatchExpr !(Global DefinedSymbol) !Expression
 				| FreeVar FreeVar 
 				| Constant !SymbIdent !Int !Priority !Bool	/* auxiliary clause used during checking */
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
@@ -1359,10 +1358,7 @@ ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
  		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
  					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, 
- 		/*AA*/
- 		ins_is_generic = False, 
- 		ins_generate = pi.pi_generate,
- 		ins_partial = False, 
+ 		ins_is_generic = False, ins_generate = pi.pi_generate, ins_partial = False, 
  		ins_generic = {glob_module = NoIndex, glob_object = NoIndex}}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 

@@ -250,7 +250,7 @@ where
 
 	refMark free_vars sel _ (TupleSelect _ arg_nr expr) var_heap
 		= refMark free_vars arg_nr No expr var_heap
-	refMark free_vars sel _ (MatchExpr _ _ expr) var_heap
+	refMark free_vars sel _ (MatchExpr _ expr) var_heap
 		= refMark free_vars sel No expr var_heap
 	refMark free_vars sel _ EE var_heap
 		= var_heap

@@ -1470,16 +1470,15 @@ where
 	requirements ti (Selection selector_kind expr selectors) reqs_ts
 		# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
 		= case selector_kind of
-			UniqueSelector {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
+			UniqueSelector
 				# (var, ts) = freshAttributedVariable ts
 			  	  (_, result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False False var expr (reqs, ts)
-				  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
 				  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
 				  req_type_coercions
 						= [ { tc_demanded = non_unique_type_var, tc_offered = result_type, tc_position = CP_Expression expr, tc_coercible = False },
 							{ tc_demanded = var, tc_offered = expr_type, tc_position = CP_Expression expr, tc_coercible = True } :
 	 								reqs.req_type_coercions]
-				  result_type = { at_type = TA tuple_type [non_unique_type_var,var], at_attribute = TA_Unique, at_annotation = AN_None }
+				  result_type = { at_type = TA tuple2TypeSymbIdent [non_unique_type_var,var], at_attribute = TA_Unique, at_annotation = AN_None }
 				-> (result_type, No, ({ reqs & req_type_coercions = req_type_coercions }, 
 						{ts & ts_var_store = inc ts.ts_var_store, ts_expr_heap = storeAttribute opt_expr_ptr TA_Multi ts.ts_expr_heap}))
 			NormalSelectorUniqueElementResult
@@ -1548,20 +1547,18 @@ where
 		attributedBasicType {box=type} ts=:{ts_attr_store}
 			= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = type}, {ts & ts_attr_store = inc ts_attr_store})
 
-	requirements ti (MatchExpr opt_tuple_type {glob_object={ds_arity, ds_index},glob_module} expr) (reqs, ts)
+	requirements ti (MatchExpr {glob_object={ds_arity, ds_index},glob_module} expr) (reqs, ts)
 		# cp = CP_Expression expr
 		  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ds_arity ti ts	
 		  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
 		  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
 		  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
 		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap }
-		= case opt_tuple_type of
-			Yes {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
-				# tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity
-				-> ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique, at_annotation = AN_None }, No, (reqs, ts))
-			No
-				-> ( hd tst_args, No, (reqs, ts))
-		
+		| ds_arity<>1
+			# tuple_type = MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex+(ds_arity-2), glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType+(ds_arity-2)] ds_arity
+			= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique, at_annotation = AN_None }, No, (reqs, ts))
+			= ( hd tst_args, No, (reqs, ts))
+
 	requirements _ (AnyCodeExpr _ _ _) (reqs, ts)
 		# (fresh_v, ts) = freshAttributedVariable ts
 		= (fresh_v, No, (reqs, ts))
@@ -1579,6 +1576,8 @@ basicCharType =: {box=TB BT_Char}
 basicBoolType =: {box=TB BT_Bool}
 basicRealType =: {box=TB BT_Real}
 basicStringType =: {box=TA (MakeTypeSymbIdent { glob_object = PD_StringTypeIndex, glob_module = cPredefinedModuleIndex } predefined_idents.[PD_StringType] 0) []}
+
+tuple2TypeSymbIdent =: MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex, glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType] 2
 
 requirementsOfSelectors ti opt_expr expr [selector] tc_coercible change_uselect sel_expr_type sel_expr reqs_ts 
 	= requirementsOfSelector ti opt_expr expr selector tc_coercible change_uselect sel_expr_type sel_expr reqs_ts

@@ -1408,9 +1408,9 @@ where
 		| isEmpty uni_vars
 			= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = type_code }, ui)
 			= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = TCE_UniType uni_vars type_code }, ui)
-	updateExpression group_index (MatchExpr opt_tuple cons_symbol expr) ui
+	updateExpression group_index (MatchExpr cons_symbol expr) ui
 		# (expr, ui) = updateExpression group_index expr ui
-		= (MatchExpr opt_tuple cons_symbol expr, ui)
+		= (MatchExpr cons_symbol expr, ui)
 	updateExpression group_index (TupleSelect symbol argn_nr expr) ui
 		# (expr, ui) = updateExpression group_index expr ui
 		= (TupleSelect symbol argn_nr expr, ui)

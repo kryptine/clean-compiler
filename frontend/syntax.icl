@@ -1095,7 +1095,6 @@ cIsNotStrict	:== False
 		=	NormalSelector
 		|	NormalSelectorUniqueElementResult
 		|	UniqueSelector			// !
-				(Global DefinedSymbol)	// 	tuple type
 
 ::	Expression	= Var !BoundVar 
 				| App !App
@@ -1113,7 +1112,7 @@ cIsNotStrict	:== False
 				| AnyCodeExpr !(CodeBinding BoundVar) !(CodeBinding FreeVar) ![String]
 				| ABCCodeExpr ![String] !Bool
 
-				| MatchExpr !(Optional (Global DefinedSymbol)) !(Global DefinedSymbol) !Expression
+				| MatchExpr !(Global DefinedSymbol) !Expression
 				| FreeVar FreeVar 
 				| Constant !SymbIdent !Int !Priority !Bool	/* auxiliary clause used during checking */
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
@@ -1592,7 +1591,7 @@ where
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
 //	(<<<) file (Lambda vars expr) = file <<< '\\' <<< vars <<< " -> " <<< expr
 	(<<<) file WildCard = file <<< '_'
-	(<<<) file (MatchExpr _ cons expr) = file <<< cons <<< " =: " <<< expr
+	(<<<) file (MatchExpr cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
 	(<<<) file (NoBind _) = file <<< "** NB **"
 	(<<<) file (DynamicExpr {dyn_expr,dyn_type_code})     = file <<< "dynamic " <<< dyn_expr <<< " :: " <<< dyn_type_code 
@@ -1660,7 +1659,7 @@ instance <<< SelectorKind
 where
  	(<<<) file NormalSelector = file <<< "."
  	(<<<) file NormalSelectorUniqueElementResult = file <<< "!*"
- 	(<<<) file (UniqueSelector _) = file <<< "!"
+ 	(<<<) file UniqueSelector = file <<< "!"
 
 instance <<< Selection
 where
@@ -2056,7 +2055,7 @@ where
 			= file <<< "argument " <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
 		show_expression file (BasicExpr bv)
 			= file <<< bv
-		show_expression file (MatchExpr _ _ expr)
+		show_expression file (MatchExpr _ expr)
 			= file <<< "match expression"
 		show_expression file _
 			= file

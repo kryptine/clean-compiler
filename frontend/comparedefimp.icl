@@ -946,10 +946,9 @@ instance e_corresponds Expression where
 	e_corresponds (ABCCodeExpr dcl_lines dcl_do_inline) (ABCCodeExpr icl_lines icl_do_inline)
 		=	equal2 dcl_lines icl_lines
 		o`	equal2 dcl_do_inline icl_do_inline
-	e_corresponds (MatchExpr dcl_opt_tuple_type dcl_cons_symbol dcl_src_expr)
-				 (MatchExpr icl_opt_tuple_type icl_cons_symbol icl_src_expr)
-		= 	e_corresponds dcl_opt_tuple_type icl_opt_tuple_type
-		o`	e_corresponds dcl_cons_symbol icl_cons_symbol
+	e_corresponds (MatchExpr dcl_cons_symbol dcl_src_expr)
+				 (MatchExpr icl_cons_symbol icl_src_expr)
+		=	e_corresponds dcl_cons_symbol icl_cons_symbol
 		o`	e_corresponds dcl_src_expr icl_src_expr
 	e_corresponds (FreeVar dcl) (FreeVar icl)
 		= e_corresponds dcl icl

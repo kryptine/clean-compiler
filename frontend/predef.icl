@@ -2,16 +2,18 @@ implementation module predef
 
 import syntax, hashtable, type_io_common
 
-cPredefinedModuleIndex :== 1
-
-PD_StringTypeIndex :== 0
-
 ::	PredefinedSymbols	:== {# PredefinedSymbol}
 
 ::	PredefinedSymbol = {
 		pds_module	:: !Index,
 		pds_def		:: !Index
 	}
+
+cPredefinedModuleIndex :== 1
+
+PD_StringTypeIndex :== 0
+PD_Arity2TupleTypeIndex :== 8
+PD_Arity32TupleTypeIndex :== 38
 
 /* identifiers not present the hashtable */
 
