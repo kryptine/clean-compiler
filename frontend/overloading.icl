@@ -242,36 +242,62 @@ where
 	adjust_type_attributes defs act_types form_types coercion_env type_heaps
 		= fold2St (adjust_type_attribute defs) act_types form_types (True, coercion_env, type_heaps)
 
+	adjust_type_attribute _ _ (TV _) state
+		= state
 	adjust_type_attribute defs (TA type_cons1 cons_args1) (TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
 		| type_cons1 == type_cons2
-			# (ok, coercion_env) = fold2St (adjust_attribute type_cons1.type_name) cons_args1 cons_args2 (ok, coercion_env)
-			= (ok, coercion_env, type_heaps)
+			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
 			# (_, type1, type_heaps) = tryToExpandTypeSyn defs type_cons1 cons_args1 type_heaps
 			  (_, type2, type_heaps) = tryToExpandTypeSyn defs type_cons2 cons_args2 type_heaps
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-	adjust_type_attribute _ _ _  state
+	adjust_type_attribute defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) state
+		= adjust_attributes_and_subtypes defs [arg_type1, res_type1] [arg_type2, res_type2] state
+	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
+		= adjust_attributes_and_subtypes defs types1 types2 state
+	adjust_type_attribute _ (TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
+		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type_cons1 cons_args1 type_heaps
+		| expanded
+			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
+			= (ok, coercion_env, type_heaps)
+	adjust_type_attribute _ type1 (TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
+		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type_cons2 cons_args2 type_heaps
+		| expanded
+			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
+			= (ok, coercion_env, type_heaps)
+	adjust_type_attribute _ _ _ state
 		= state
 	
-	adjust_attribute _ {at_attribute} {at_attribute = TA_Var _} state
-		= state
-	adjust_attribute type_cons {at_attribute} {at_attribute = TA_Unique} (ok, coercion_env)
-		= case at_attribute of
-			TA_Unique
-				-> (ok, coercion_env)
-			TA_TempVar av_number
-				# (succ, coercion_env) = tryToMakeUnique av_number coercion_env
-				-> (ok && succ, coercion_env)
-			_
-				-> (False, coercion_env)
-	adjust_attribute type_cons {at_attribute} attr (ok, coercion_env)
-		= case at_attribute of
-			TA_Multi
-				-> (ok, coercion_env)
-			TA_TempVar av_number
-				# (succ, coercion_env) = tryToMakeNonUnique av_number coercion_env
-				-> (ok && succ, coercion_env)
-			_
-				-> (False, coercion_env)
+
+	adjust_attributes_and_subtypes defs types1 types2 state
+		= fold2St (adjust_attribute_and_subtypes defs) types1 types2 state
+		
+	adjust_attribute_and_subtypes defs atype1 atype2 (ok, coercion_env, type_heaps)
+		# (ok, coercion_env) = adjust_attribute atype1.at_attribute atype2.at_attribute (ok, coercion_env)
+		= adjust_type_attribute defs atype1.at_type atype2.at_type (ok, coercion_env, type_heaps)
+	where
+		adjust_attribute attr1 (TA_Var _) state
+			= state
+		adjust_attribute attr1 TA_Unique (ok, coercion_env)
+			= case attr1 of
+				TA_Unique
+					-> (ok, coercion_env)
+				TA_TempVar av_number
+					# (succ, coercion_env) = tryToMakeUnique av_number coercion_env
+					-> (ok && succ, coercion_env)
+				_
+					-> (False, coercion_env)
+	
+		adjust_attribute attr1 attr (ok, coercion_env)
+			= case attr1 of
+				TA_Multi
+					-> (ok, coercion_env)
+				TA_TempVar av_number
+					# (succ, coercion_env) = tryToMakeNonUnique av_number coercion_env
+					-> (ok && succ, coercion_env)
+				_
+					-> (False, coercion_env)
+	
+
 	
 	context_is_reducible {tc_class,tc_types = [type : types]} predef_symbols
 //		= type_is_reducible type && is_reducible types

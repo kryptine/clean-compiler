@@ -63,7 +63,6 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 			  (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
 
 			  format = { form_properties = cMarkAttribute, form_attr_position = Yes (reverse positions, copy_crc_coercions) }			
-// MW3 was:			  ea_file = error.ea_file <<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) <<< '\n'
 			  
 			  ea_file = 
 			  	case position of
@@ -78,23 +77,6 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 				
 		No
 			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
-
-/*
-			# (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
-			  format = { form_properties = cMarkAttribute, form_attr_position = Yes ([], copy_crc_coercions) }			
-			| file_to_true (stderr <:: (format, exp_off_type) <:: (format, exp_dem_type) <<< '\n')
-					---> ("determineAttributeCoercions", exp_off_type, exp_dem_type)
-				-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
-				-> undef
-
-file_to_true :: !File -> Bool
-file_to_true file = code {
-  .inline file_to_true
-          pop_b 2
-          pushB TRUE
-  .end
-  }	
-*/
 
 
 NotChecked :== -1	
@@ -247,85 +229,6 @@ liftTempTypeVariable modules cons_vars tv_number subst ls
 
 class lift a :: !{# CommonDefs } !{# BOOLVECT } !a !*{! Type} !*LiftState -> (!a, !*{! Type}, !*LiftState)
 
-/*
-instance lift Type
-where
-	lift modules cons_vars (TempV tv_number) subst ls
-		= liftTempTypeVariable modules cons_vars tv_number subst ls
-	lift modules cons_vars (arg_type --> res_type) subst ls
-		# (arg_type, subst, ls) = lift modules cons_vars arg_type subst ls
-		  (res_type, subst, ls) = lift modules cons_vars res_type subst ls
-		= (arg_type --> res_type, subst, ls)
-//	lift modules cons_vars (TA cons_id=:{type_name,type_index={glob_object,glob_module},type_arity} cons_args) subst ls
-	lift modules cons_vars (TA cons_id=:{type_name,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
-		# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
-		  (cons_args, sign_classes, prop_classes, subst, ls) = lift_list modules cons_vars cons_args tdi_kinds subst ls
-		  (type_prop, ls_type_var_heap, ls_td_infos) = typeProperties glob_object glob_module sign_classes prop_classes modules ls.ls_type_var_heap ls.ls_td_infos
-		| equal_type_prop type_prop type_prop0
-			= (TA  cons_id cons_args, subst, { ls & ls_td_infos = ls_td_infos, ls_type_var_heap = ls_type_var_heap})
-			= (TA  { cons_id & type_prop = type_prop } cons_args, subst, { ls & ls_td_infos = ls_td_infos, ls_type_var_heap = ls_type_var_heap})
-		where
-			lift_list :: !{#CommonDefs} !{# BOOLVECT } ![AType] ![TypeKind] !*{!Type} !*LiftState
-				-> (![AType], ![SignClassification], ![PropClassification], !*{!Type}, !*LiftState)
-			lift_list modules cons_vars [] _ subst ls
-				= ([], [], [], subst, ls)
-			lift_list modules cons_vars [t:ts] [tk : tks] subst ls
-				# (t, subst, ls) = lift modules cons_vars t subst ls
-				  (ts, sign_classes, prop_classes, subst, ls) = lift_list modules cons_vars ts tks subst ls
-				| IsArrowKind tk
-					= case t.at_type of 
-						TA {type_arity,type_prop} _
-							-> ([t:ts], [adjustSignClass type_prop.tsp_sign type_arity : sign_classes],
-										[adjustPropClass type_prop.tsp_propagation type_arity : prop_classes], subst, ls)
-						TempV tmp_var_id
-							| isPositive tmp_var_id cons_vars
-								-> ([t:ts], [PostiveSignClass : sign_classes], [PropClass : prop_classes], subst, ls)
-								-> ([t:ts], [TopSignClass : sign_classes], [NoPropClass : prop_classes], subst, ls)
-						_
-							-> ([t:ts], [TopSignClass : sign_classes], [PropClass : prop_classes], subst, ls)
-					= ([t:ts], sign_classes, prop_classes, subst, ls)
-
-	lift modules cons_vars (TempCV temp_var :@: types) subst ls
-		# (type, subst, ls) = liftTempTypeVariable modules cons_vars temp_var subst ls
-		  (types, subst, ls) = lift_list modules cons_vars types subst ls
-		= case type of
-			TA type_cons cons_args
-				# nr_of_new_args = length types
-				-> (TA { type_cons & type_arity = type_cons.type_arity + nr_of_new_args } (cons_args ++ types), subst, ls)
-			TempV tv_number
-				-> (TempCV tv_number :@: types, subst, ls)
-			cons_var :@: cv_types
-				-> (cons_var :@: (cv_types ++ types), subst, ls)
-		where
-			lift_list :: !{#CommonDefs} !{# BOOLVECT } ![a] !*{!Type} !*LiftState -> (![a], !*{!Type}, !*LiftState) | lift a
-			lift_list modules cons_vars [] subst ls
-				= ([], subst, ls)
-			lift_list modules cons_vars [t:ts] subst ls
-				# (t, subst, ls) = lift modules cons_vars t subst ls
-				  (ts, subst, ls) = lift_list modules cons_vars ts subst ls
-				= ([t:ts], subst, ls)
-	lift modules cons_vars type subst ls
-		= (type, subst, ls)
-	
-instance lift AType
-where
-	lift modules cons_vars attr_type=:{at_attribute,at_type} subst ls
-		# (at_type, subst, ls) = lift modules cons_vars at_type subst ls
-		| type_is_non_coercible at_type
-			= ({attr_type & at_type = at_type },subst, ls)
-			= ({attr_type & at_attribute = TA_TempVar ls.ls_next_attr, at_type = at_type}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
-	where
-		type_is_non_coercible (TempV _)
-			= True
-		type_is_non_coercible (TempQV _)
-			= True
-		type_is_non_coercible (_ --> _)
-			= True
-		type_is_non_coercible (_ :@: _)
-			= True
-		type_is_non_coercible _
-			= False
-*/
 instance lift Type
 where
 	lift modules cons_vars t=:(TempV tv_number) subst ls
@@ -556,31 +459,13 @@ where
 		type_is_non_coercible _
 			= False
 
-
-
 ::	ExpansionState = 
 	{	es_type_heaps	:: !.TypeHeaps
 	,	es_td_infos		:: !.TypeDefInfos
 	}
 
 class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!a, !*(!u:{! Type}, !*ExpansionState))
-/*
-instance expandType AType
-where
-	expandType modules cons_vars attr_type=:{at_type, at_attribute} (subst, es=:{es_type_heaps})
-		# (at_attribute, th_attrs) = expand_attribute at_attribute es_type_heaps.th_attrs
-		  (at_type, subst_and_es) = expandType modules cons_vars at_type (subst, {es & es_type_heaps = { es_type_heaps & th_attrs = th_attrs }})
-		= ({ attr_type & at_type = at_type, at_attribute = at_attribute }, subst_and_es)
-	where
-		expand_attribute (TA_Var {av_name,av_info_ptr}) attr_var_heap
-			= case (readPtr av_info_ptr attr_var_heap) of
-				(AVI_Attr attr, attr_var_heap)
-					-> (attr, attr_var_heap)
-				(info, attr_var_heap)
-					-> abort ("expand_attribute (unitype.icl)" ---> (av_name <<- info ))
-		expand_attribute attr attr_var_heap
-			= (attr, attr_var_heap)
-*/
+
 instance expandType AType
 where
 	expandType modules cons_vars attr_type=:{at_type, at_attribute} (subst, es=:{es_type_heaps})
@@ -640,69 +525,6 @@ IsArrowKind _ = False
 equal_type_prop {tsp_sign=sign0,tsp_propagation=prop0,tsp_coercible=coerc0} {tsp_sign=sign1,tsp_propagation=prop1,tsp_coercible=coerc1}
 	= prop0==prop1 && coerc0==coerc1 && sign0.sc_pos_vect==sign1.sc_pos_vect && sign0.sc_neg_vect==sign1.sc_neg_vect
 
-/*
-instance expandType Type
-where
-	expandType modules cons_vars (TempV tv_number) es
-		= expandTempTypeVariable tv_number es
-	expandType modules cons_vars (TV {tv_info_ptr}) (subst, es=:{es_type_heaps})
-		# (TVI_Type type, th_vars) = readPtr tv_info_ptr es_type_heaps.th_vars
-		= (type, (subst, {es & es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
-	expandType modules cons_vars (arg_type --> res_type) es
-		# (arg_type, es) = expandType modules cons_vars arg_type es
-		  (res_type, es) = expandType modules cons_vars res_type es
-		= (arg_type --> res_type, es)
-//	expandType modules cons_vars (TA cons_id=:{type_name, type_index={glob_object,glob_module}} cons_args) (subst, es)
-	expandType modules cons_vars (TA cons_id=:{type_name, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args) (subst, es)
-		# ({tdi_kinds}, es) = es!es_td_infos.[glob_module].[glob_object]
-		  (cons_args, hio_signs, hio_props, (subst,es=:{es_td_infos,es_type_heaps})) = expand_type_list modules cons_vars cons_args tdi_kinds (subst, es)
-		  (type_prop, th_vars, es_td_infos)
-		  			= typeProperties glob_object glob_module hio_signs hio_props modules es_type_heaps.th_vars es_td_infos
-		| equal_type_prop type_prop type_prop0
-			= (TA cons_id cons_args,
-				(subst, { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
-			= (TA { cons_id & type_prop = type_prop } cons_args,
-					(subst, { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
-//					 ---> ("expandType", type_name, type_prop.tsp_propagation)
-	where
-		expand_type_list ::  !{#CommonDefs} !{# BOOLVECT } ![AType] ![TypeKind] !(!u:{!Type}, !*ExpansionState)
-			-> (![AType], ![SignClassification], ![PropClassification], !(!u:{!Type}, !*ExpansionState))
-		expand_type_list modules cons_vars [] _ es
-			= ([], [], [], es)
-		expand_type_list modules cons_vars [t:ts] [tk : tks] es
-			# (t, es) = expandType modules cons_vars t es
-			  (ts, sign_classes, prop_classes, es) = expand_type_list modules cons_vars ts tks es
-			| IsArrowKind tk
-				= case t.at_type of 
-					TA {type_arity,type_prop} _
-						-> ([t:ts], [adjustSignClass type_prop.tsp_sign type_arity : sign_classes],
-									[adjustPropClass type_prop.tsp_propagation type_arity : prop_classes], es)
-					TempV tmp_var_id
-						| isPositive tmp_var_id cons_vars
-							-> ([t:ts], [PostiveSignClass : sign_classes], [PropClass : prop_classes], es)
-							-> ([t:ts], [TopSignClass : sign_classes], [NoPropClass : prop_classes], es)
-					_
-						-> ([t:ts], [TopSignClass : sign_classes], [PropClass : prop_classes], es)
-				= ([t:ts], sign_classes, prop_classes, es)
-					
-	expandType modules cons_vars (TempCV temp_var :@: types) es
-		# (type, es) = expandTempTypeVariable temp_var es
-		  (types, es) = expandType modules cons_vars types es
-		= case type of
-			TA type_cons=:{type_arity} cons_args
-				# nr_of_new_args = length types
-				-> (TA { type_cons & type_arity = type_arity + nr_of_new_args } (cons_args ++ types), es)
-			TempV tv_number
-				-> (TempCV tv_number :@: types, es)
-			cons_var :@: cv_types
-				-> (cons_var :@: (cv_types ++ types), es)
-	expandType modules cons_vars type es
-		= (type, es)
-
-instance expandType [a] | expandType a
-where
-	expandType modules cons_vars l es = mapSt (expandType modules cons_vars) l es
-*/
 
 instance expandType Type
 where
@@ -733,14 +555,12 @@ where
 					(subst, { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
 				= (TA { cons_id & type_prop = type_prop } cons_args,
 						(subst, { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
-	//					 ---> ("expandType", type_name, type_prop.tsp_propagation)
 			# (type_prop, th_vars, es_td_infos) = typeProperties glob_object glob_module hio_signs hio_props modules es_type_heaps.th_vars es_td_infos
 			| equal_type_prop type_prop type_prop0
 				= (t0,
 					(subst, { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
 				= (TA { cons_id & type_prop = type_prop } cons_args,
 						(subst, { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
-	//					 ---> ("expandType", type_name, type_prop.tsp_propagation)
 	where
 		expand_type_list ::  !{#CommonDefs} !{# BOOLVECT } ![AType] ![TypeKind] !(!u:{!Type}, !*ExpansionState)
 			-> (!Bool,![AType], ![SignClassification], ![PropClassification], !(!u:{!Type}, !*ExpansionState))
@@ -1102,15 +922,13 @@ Success (Yes _)	=  False
 instance coerce AType
 where
 	coerce sign defs cons_vars tpos at1=:{at_attribute=attr1, at_type = type1} at2=:{at_attribute=attr2}  cs=:{crc_coercions}
-		// JVG: added !
 		#!attr_sign = adjust_sign sign type1 cons_vars
-//		# attr_sign = adjust_sign sign type1 cons_vars
 		  (succ, crc_coercions) = coerceAttributes attr1 attr2 attr_sign crc_coercions
 		| succ
 			# (succ, cs) = coerceTypes sign defs cons_vars tpos at1 at2 { cs & crc_coercions = crc_coercions }
 			| Success succ
-				# (succ1, crc_coercions) = add_propagation_inequalities attr1 type1 cs.crc_coercions
-				  (succ2, crc_coercions) = add_propagation_inequalities attr2 at2.at_type crc_coercions
+				# (succ1, crc_coercions) = add_propagation_inequalities cons_vars attr1 type1 cs.crc_coercions
+				  (succ2, crc_coercions) = add_propagation_inequalities cons_vars attr2 at2.at_type crc_coercions
 				= (if (succ1 && succ2) No (Yes tpos), { cs & crc_coercions = crc_coercions })
 				= (succ, cs)
 			= (Yes tpos, { cs & crc_coercions = crc_coercions })
@@ -1136,8 +954,7 @@ where
 		adjust_sign sign _ cons_vars
 			= sign
 
-		add_propagation_inequalities :: TypeAttribute !Type *Coercions -> (!.Bool,.Coercions);
-		add_propagation_inequalities attr (TA {type_name,type_prop={tsp_propagation}} cons_args) coercions
+		add_propagation_inequalities cons_vars attr (TA {type_name,type_prop={tsp_propagation}} cons_args) coercions
 			= add_inequalities tsp_propagation attr cons_args coercions
 		where
 			add_inequalities prop_class attr [] coercions
@@ -1149,9 +966,20 @@ where
 				| succ
 					= add_inequalities (prop_class >> 1) attr args coercions
 					= (False, coercions)
-//							---> ("add_propagation_inequalities", attr, at_attribute)
-		add_propagation_inequalities attr type coercions
-			= (True, coercions)
+		add_propagation_inequalities cons_vars attr (TempCV tmp_var_id :@: types) coercions
+			| isPositive tmp_var_id cons_vars
+				= add_inequalities attr types coercions
+				= (True, coercions)
+		where
+			add_inequalities attr [] coercions
+				= (True, coercions)
+			add_inequalities attr [{at_attribute} : args] coercions
+				# (succ, coercions) = coerceAttributes attr at_attribute PositiveSign coercions
+				| succ
+					= add_inequalities attr args coercions
+					= (False, coercions)
+		add_propagation_inequalities cons_vars attr type coercions
+				= (True, coercions)
 
 tryToExpandTypeSyn :: !{#CommonDefs} !{#BOOLVECT} !TypeSymbIdent ![AType] !TypeAttribute !*TypeHeaps !*TypeDefInfos
 	-> (!Bool, !Type, !*TypeHeaps, !*TypeDefInfos)
