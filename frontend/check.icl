@@ -658,7 +658,7 @@ where
 					= (AP_Algebraic cons_symbol cons_def.cons_type_index patterns opt_var, ums)	
 					= (AP_Empty cons_def.cons_symb, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
 							ums_error = checkError cons_def.cons_symb " missing argument(s)" ums_error })
-			
+/* SSS .... */			
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			| mod_index == cons_mod
 				# (cons_def, cons_defs) = cons_defs![cons_index]
@@ -666,6 +666,12 @@ where
 				#! {dcl_common,dcl_conversions} = modules.[cons_mod]
 				#! cons_def = dcl_common.com_cons_defs.[cons_index]
 				= (cons_def, convertIndex cons_index (toInt STE_Constructor) dcl_conversions, cons_defs, modules)
+/* .... SSS */			
+
+		get_cons_def mod_index cons_mod cons_index cons_defs modules
+			#! {dcl_common,dcl_conversions} = modules.[cons_mod]
+			#! cons_def = dcl_common.com_cons_defs.[cons_index]
+			= (cons_def, convertIndex cons_index (toInt STE_Constructor) dcl_conversions, cons_defs, modules)
 
 	unfold_pattern_macro mod_index macro_ident opt_var (BasicExpr bv bt) ums
 		= (AP_Basic bv opt_var, ums)
@@ -1049,6 +1055,7 @@ where
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
 			  e_state = { e_state & es_calls = [{ fc_index = ste_index, fc_level = ste_def_level} : es_calls ]}
 			= (if (fun_kind == FK_Macro) (SK_Macro index) (SK_Function index), fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
+//						---> ("determine_info_of_symbol", ei_fun_index, fun_symb, ptrToInt symb_info, ste_index)
 	where
 		is_called_before caller_index []
 			= False
@@ -2078,9 +2085,10 @@ where
 
 	remove_calls_from_symbol_table fun_index fun_level [{fc_index, fc_level} : fun_calls] fun_defs symbol_table
 		| fc_level <= fun_level
-			#! {fun_symb={id_info}} = fun_defs.[fc_index]
+			#! {fun_symb=fun_symb=:{id_info}} = fun_defs.[fc_index]
 			#! entry = sreadPtr id_info symbol_table
-			# (c,cs) = get_calls entry.ste_kind
+//						---> ("remove_calls_from_symbol_table", fun_symb, ptrToInt id_info, fc_index)
+			# (c,cs) = get_calls entry.ste_kind 
 			| fun_index == c
 				= remove_calls_from_symbol_table fun_index fun_level fun_calls fun_defs (symbol_table <:= (id_info,{ entry & ste_kind = STE_FunctionOrMacro cs}))
 				= abort " Error in remove_calls_from_symbol_table"
@@ -2089,6 +2097,7 @@ where
 		= (fun_defs, symbol_table)
 
 	get_calls (STE_FunctionOrMacro [x:xs]) = (x,xs)
+	get_calls ste_kind = abort "get_calls (check.icl)" <<- ste_kind
 
 			
 checkFunctions :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState)
@@ -2207,10 +2216,8 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 
 	  cs = addGlobalDefinitionsToSymbolTable icl_decl_symbols cs
 
-	  (moved_dcl_defs, icl_sizes, icl_decl_symbols, cs)
-			= foldSt add_undefined_dcl_def dcls_local ([], icl_sizes, icl_decl_symbols, cs)
-	  (conversion_table, cs)
-			= foldSt (add_to_conversion_table dcl_macros.ir_from) dcls_local ({ createArray size NoIndex \\ size <-: dcl_sizes }, cs)
+	  (moved_dcl_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
+			= foldSt (add_to_conversion_table dcl_macros.ir_from) dcls_local ([], { createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
 	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], cs)
 
@@ -2230,37 +2237,50 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		)
 
 where
-	add_to_conversion_table first_macro_index decl=:{dcl_ident,dcl_kind,dcl_index,dcl_pos} (conversion_table, cs)
-		# ({ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr dcl_ident.id_info cs.cs_symbol_table
+	add_to_conversion_table first_macro_index decl=:{dcl_ident=dcl_ident=:{id_info},dcl_kind,dcl_index,dcl_pos}
+			(moved_dcl_defs, conversion_table, icl_sizes, icl_defs, cs)
+		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+		| ste_kind == STE_Empty
+			# def_index = toInt dcl_kind
+			| can_be_only_in_dcl def_index
+				# (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
+					= add_dcl_declaration id_info entry decl def_index dcl_index (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
+				= ([ decl : moved_dcl_defs ], conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+			| def_index == cMacroDefs
+				# (conversion_table, icl_defs, cs_symbol_table)
+					= add_macro_declaration id_info entry decl def_index (dcl_index - first_macro_index) dcl_index
+								(conversion_table, icl_defs, cs_symbol_table)
+				= ([ decl : moved_dcl_defs ], conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+				# cs_error = checkError "definition module" "undefined in implementation module" (setErrorAdmin (newPosition dcl_ident dcl_pos) cs.cs_error)
+				= (moved_dcl_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 		| ste_def_level == cGlobalScope && ste_kind == dcl_kind
 			# def_index = toInt dcl_kind
 			  dcl_index = if (def_index == cMacroDefs) (dcl_index - first_macro_index) dcl_index
-			= ({ conversion_table & [def_index].[dcl_index] = ste_index }, { cs & cs_symbol_table = cs_symbol_table })
+			= (moved_dcl_defs, { conversion_table & [def_index].[dcl_index] = ste_index },  icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
 			# cs_error = checkError "definition module" "conflicting definition in implementation module"
 					(setErrorAdmin (newPosition dcl_ident dcl_pos) cs.cs_error)
-			= (conversion_table, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
+			= (moved_dcl_defs, conversion_table,  icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
-	add_undefined_dcl_def dcl=:{dcl_ident={id_info}} (moved_dcl_defs, icl_sizes, icl_defs, cs)
-		# (entry, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
-		| entry.ste_kind == STE_Empty
-			= check_and_add_dcl_def id_info entry dcl (moved_dcl_defs, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-			= (moved_dcl_defs, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-	where
-		check_and_add_dcl_def info_ptr entry dcl=:{dcl_kind = STE_Type} (moved_dcl_defs, icl_sizes, icl_defs, cs)
-			# (icl_sizes, icl_defs, cs_symbol_table) = add_dcl_declaration info_ptr entry dcl cTypeDefs (icl_sizes, icl_defs, cs.cs_symbol_table)
-			= ([ dcl : moved_dcl_defs ], icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-		check_and_add_dcl_def info_ptr entry dcl=:{dcl_kind = STE_Constructor} (moved_dcl_defs, icl_sizes, icl_defs, cs)
-			# (icl_sizes, icl_defs, cs_symbol_table) = add_dcl_declaration info_ptr entry dcl cConstructorDefs  (icl_sizes, icl_defs, cs.cs_symbol_table)
-			= ([ dcl : moved_dcl_defs ], icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-		check_and_add_dcl_def info_ptr entry {dcl_ident, dcl_pos} (moved_dcl_defs, icl_sizes, icl_defs, cs)
-			# cs_error = checkError "definition module" "undefined in implementation module" (setErrorAdmin (newPosition dcl_ident dcl_pos) cs.cs_error)
-			= (moved_dcl_defs, icl_sizes, icl_defs, { cs & cs_error = cs_error })
+/* To be done : cClassDefs and cMemberDefs */
 
-		add_dcl_declaration info_ptr entry dcl def_index (icl_sizes, icl_defs, symbol_table)
-			# (dcl_index, icl_sizes) = icl_sizes![def_index]
-			= ({ icl_sizes & [def_index] = inc dcl_index },
-			   [ { dcl & dcl_index = dcl_index } : icl_defs ],
-			   NewEntry symbol_table info_ptr dcl.dcl_kind dcl_index cGlobalScope entry)
+	can_be_only_in_dcl def_kind
+		=	def_kind == cTypeDefs	|| def_kind == cConstructorDefs || def_kind == cSelectorDefs
+//		||	def_kind == cClassDefs	|| def_kind == cMemberDefs
+
+
+	add_dcl_declaration info_ptr entry dcl def_index dcl_index (conversion_table, icl_sizes, icl_defs, symbol_table)
+		# (icl_index, icl_sizes) = icl_sizes![def_index]
+		=	(	{ conversion_table & [def_index].[dcl_index] = icl_index }
+			,	{ icl_sizes & [def_index] = inc icl_index }
+			,	[ { dcl & dcl_index = icl_index } : icl_defs ]
+			,	NewEntry symbol_table info_ptr dcl.dcl_kind icl_index cGlobalScope entry
+			)
+
+	add_macro_declaration info_ptr entry dcl def_index dcl_index icl_index (conversion_table, icl_defs, symbol_table)
+		=	(	{ conversion_table & [def_index].[dcl_index] = icl_index }
+			,	[ { dcl & dcl_index = icl_index } : icl_defs ]
+			,	NewEntry symbol_table info_ptr dcl.dcl_kind icl_index cGlobalScope entry
+			)
 	
 	add_dcl_definition {com_type_defs} dcl=:{dcl_kind = STE_Type, dcl_index}
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
@@ -2309,7 +2329,12 @@ where
 	add_dcl_definition {com_cons_defs} dcl=:{dcl_kind = STE_Constructor, dcl_index} 
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 		= (new_type_defs, new_class_defs, [ com_cons_defs.[dcl_index] : new_cons_defs ], new_selector_defs, new_member_defs, cs)
-		
+	add_dcl_definition {com_selector_defs} dcl=:{dcl_kind = STE_Field _, dcl_index} 
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
+		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[dcl_index] : new_selector_defs ], new_member_defs, cs)
+	add_dcl_definition _ _ 
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 
 	rev_append front []
 		= front

@@ -173,7 +173,7 @@ cIsNotAFunction :== False
 	These can only occur in definition modules. After parsing the SP_ParsedSubstitutions alternative
 	is used to indicate the specific instantiation. The SP_Substitutions alternative is used to deduce
 	the type of the specialized version. Finally the SP_ContextTypes alternative is set and used during 
-	the typing to check whether the this instance has been used. The auxiliary SP_Index alternative is used
+	the typing to check whether this instance has been used. The auxiliary SP_FunIndex alternative is used
 	to store the index of the function that has been specialized.
 */
 
