@@ -31,7 +31,6 @@
 #include "sa.h"
 #include "transform.h"
 #include "instructions.h"
-#include "typechecker.h"
 #include "optimisations.h"
 #include "buildtree.h"
 
