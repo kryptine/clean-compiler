@@ -572,6 +572,56 @@ where
 	fresh_existential_variable {atv_variable={tv_info_ptr}} (var_heap, var_store)
 		= (var_heap <:= (tv_info_ptr, TVI_Type (TempQV var_store)), inc var_store)
 
+fresh_type_variables :: [ATypeVar] *(*Heap TypeVarInfo,Int) -> *(!*Heap TypeVarInfo,!Int);
+fresh_type_variables type_variables state
+	= foldSt (\{atv_variable={tv_info_ptr}} (var_heap, var_store) -> (var_heap <:= (tv_info_ptr, TVI_Type (TempV var_store)), inc var_store))
+				type_variables state
+
+fresh_attributes :: [AttributeVar] *(*Heap AttrVarInfo,Int) -> *(!*Heap AttrVarInfo,!Int);
+fresh_attributes attributes state
+	= foldSt (\{av_info_ptr} (attr_heap, attr_store) -> (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store))
+		attributes state
+
+fresh_environment :: [AttrInequality] [AttrCoercion] *(Heap AttrVarInfo) -> *(![AttrCoercion],!*Heap AttrVarInfo);
+fresh_environment inequalities attr_env attr_heap
+	= foldSt fresh_inequality inequalities (attr_env, attr_heap)
+	where
+		fresh_inequality {ai_demanded,ai_offered} (attr_env, attr_heap)
+			# (AVI_Attr dem_temp_attr, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
+			  (AVI_Attr off_temp_attr, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
+			= case dem_temp_attr of
+				TA_TempVar dem_attr_var
+					-> case off_temp_attr of
+						TA_TempVar off_attr_var
+							| is_new_ineqality  dem_attr_var off_attr_var attr_env
+								-> ([{ac_demanded = dem_attr_var, ac_offered = off_attr_var} : attr_env ], attr_heap)
+								-> (attr_env, attr_heap)
+						_
+							-> (attr_env, attr_heap)
+				_
+					-> (attr_env, attr_heap)
+			
+		is_new_ineqality dem_attr_var off_attr_var [{ac_demanded, ac_offered} : attr_env]
+			= (dem_attr_var <> ac_demanded || off_attr_var <> ac_offered) && is_new_ineqality dem_attr_var off_attr_var  attr_env
+		is_new_ineqality dem_attr_var off_attr_var []
+			= True
+
+fresh_symbol_types [{ap_symbol={glob_object}}] cons_defs var_store type_heaps
+	# {cons_type = {st_args,st_attr_env,st_result}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
+	  (th_vars, var_store)		= freshExistentialVariables  cons_exi_vars (type_heaps.th_vars, var_store)
+  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
+  	  (result_type, type_heaps)	= freshCopy st_result { type_heaps & th_attrs = th_attrs, th_vars = th_vars }
+  	  (fresh_args, type_heaps)	= freshCopy st_args type_heaps
+	= ([fresh_args], result_type, var_store, attr_env, type_heaps)
+fresh_symbol_types [{ap_symbol={glob_object}} : patterns] cons_defs var_store type_heaps
+	# (cons_types, result_type, var_store, attr_env, type_heaps)
+			= fresh_symbol_types patterns cons_defs var_store type_heaps
+	  {cons_type = {st_args,st_attr_env}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
+	  (th_vars, var_store)		= freshExistentialVariables cons_exi_vars (type_heaps.th_vars, var_store)
+	  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
+  	  (fresh_args, type_heaps) 	= freshCopy st_args { type_heaps & th_attrs = th_attrs, th_vars = th_vars }
+	= ([fresh_args : cons_types], result_type, var_store, attr_env, type_heaps)
+
 freshUniversalVariables type_variables state
 	= foldSt fresh_universal_variable type_variables state 
 where
@@ -588,78 +638,50 @@ freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_s
 	  		= fresh_symbol_types patterns common_defs.[glob_module].com_cons_defs ts_var_store type_heaps
 	= (cons_types, alg_type, attr_env, { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = type_heaps })
 //		---> ("freshAlgebraicType", alg_type, cons_types)
-where
-	fresh_symbol_types [{ap_symbol={glob_object}}] cons_defs var_store type_heaps
-		# {cons_type = {st_args,st_attr_env,st_result}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
-		  (th_vars, var_store)		= freshExistentialVariables  cons_exi_vars (type_heaps.th_vars, var_store)
-	  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env ([], type_heaps.th_attrs)
-	  	  (result_type, type_heaps)			= freshCopy st_result { type_heaps & th_attrs = th_attrs, th_vars = th_vars }
-	  	  (fresh_args, type_heaps)			= freshArgumentsOfSymbolType st_args type_heaps
-		= ([fresh_args], result_type, var_store, attr_env, type_heaps)
-	fresh_symbol_types [{ap_symbol={glob_object}} : patterns] cons_defs var_store type_heaps
-		# (cons_types, result_type, var_store, attr_env, type_heaps)
-				= fresh_symbol_types patterns cons_defs var_store type_heaps
-		  {cons_type = {st_args,st_attr_env}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
-		  (th_vars, var_store)				= freshExistentialVariables cons_exi_vars (type_heaps.th_vars, var_store)
-		  (attr_env, th_attrs) 				= fresh_environment st_attr_env (attr_env, type_heaps.th_attrs)
-	  	  (fresh_args, type_heaps) 			= freshArgumentsOfSymbolType st_args  { type_heaps & th_attrs = th_attrs, th_vars = th_vars }
-		= ([fresh_args : cons_types], result_type, var_store, attr_env, type_heaps)
 
-	
-	fresh_type_variables type_variables state
-		= foldSt (\{atv_variable={tv_info_ptr}} (var_heap, var_store) -> (var_heap <:= (tv_info_ptr, TVI_Type (TempV var_store)), inc var_store))
-						type_variables state 
-	fresh_attributes attributes state
-		= foldSt (\{av_info_ptr} (attr_heap, attr_store) -> (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store))
-						attributes state
-	fresh_environment inequalities (attr_env, attr_heap)
-		= foldSt fresh_inequality inequalities (attr_env, attr_heap)
-
-	fresh_inequality {ai_demanded,ai_offered} (attr_env, attr_heap)
-		# (AVI_Attr dem_temp_attr, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
-		  (AVI_Attr off_temp_attr, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
-		= case dem_temp_attr of
-			TA_TempVar dem_attr_var
-				-> case off_temp_attr of
-					TA_TempVar off_attr_var
-						| is_new_ineqality  dem_attr_var off_attr_var attr_env
-							-> ([{ac_demanded = dem_attr_var, ac_offered = off_attr_var} : attr_env ], attr_heap)
-							-> (attr_env, attr_heap)
-					_
-						-> (attr_env, attr_heap)
-			_
-				-> (attr_env, attr_heap)
-		
-	is_new_ineqality dem_attr_var off_attr_var [{ac_demanded, ac_offered} : attr_env]
-		= (dem_attr_var <> ac_demanded || off_attr_var <> ac_offered) && is_new_ineqality dem_attr_var off_attr_var  attr_env
-	is_new_ineqality dem_attr_var off_attr_var []
-		= True
-
-cWithFreshContextVars 		:== True		
-cWithoutFreshContextVars 	:== False		
-
-freshArgumentsOfSymbolType :: ![AType] !*TypeHeaps -> (![AType], !*TypeHeaps)
-freshArgumentsOfSymbolType atypes type_heaps = mapSt fresh_arg_type atypes type_heaps
-where
-	fresh_arg_type at=:{at_attribute, at_type = TFA vars type} type_heaps
-		# (fresh_attribute, th_attrs)			= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
-		# type_heaps							= foldSt bind_var_and_attr vars { type_heaps & th_attrs = th_attrs }
-		  (fresh_type, type_heaps)				= freshCopy type type_heaps
-		  type_heaps							= clearBindings vars type_heaps
-		= ({ at &  at_attribute = fresh_attribute, at_type = TFA vars fresh_type }, type_heaps)
+fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
+	| ap_symbol.glob_module==cPredefinedModuleIndex
+		| ap_symbol.glob_object.ds_index==pd_cons_symbol-FirstConstructorPredefinedSymbolIndex
+			# (argument_types,result_type,tst_context,tst_attr_env,ts) = make_cons_type_from_decons_type stdStrictLists_index decons_u_index common_defs ts
+			= case patterns of
+				[]
+					-> ([argument_types],result_type,tst_context,tst_attr_env,ts)
+				[pattern=:{ap_symbol}]
+					| ap_symbol.glob_module==cPredefinedModuleIndex && ap_symbol.glob_object.ds_index==pd_nil_symbol-FirstConstructorPredefinedSymbolIndex
+						-> ([argument_types,[]],result_type,tst_context,tst_attr_env,ts)
+		| ap_symbol.glob_object.ds_index==pd_nil_symbol-FirstConstructorPredefinedSymbolIndex
+			= case patterns of
+				[]
+					# {ft_type,ft_symb,ft_type_ptr,ft_specials} = functions.[stdStrictLists_index].[nil_u_index]
+					# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos ft_symb 0/*symb_arity*/ ft_type ft_type_ptr common_defs ts
+					  {tst_args,tst_result,tst_context,tst_attr_env}=fun_type_copy
+					-> ([tst_args],tst_result,tst_context,tst_attr_env,ts)
+				[pattern=:{ap_symbol}]
+					| ap_symbol.glob_module==cPredefinedModuleIndex && ap_symbol.glob_object.ds_index==pd_cons_symbol-FirstConstructorPredefinedSymbolIndex
+						# (argument_types,result_type,tst_context,tst_attr_env,ts) = make_cons_type_from_decons_type stdStrictLists_index decons_u_index common_defs ts
+						-> ([[],argument_types],result_type,tst_context,tst_attr_env,ts)
+			= abort "fresh_overloaded_list_type"
 	where
-		bind_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
-			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv)), th_attrs = bind_attr atv_attribute th_attrs }
-		where
-			bind_attr var=:(TA_Var {av_info_ptr}) attr_heap
-				= attr_heap <:= (av_info_ptr, AVI_Attr var)
-			bind_attr attr attr_heap
-				= attr_heap
-	fresh_arg_type at type_heaps
-		= freshCopy at type_heaps
+		make_cons_type_from_decons_type stdStrictLists_index decons_u_index common_defs ts
+			# {me_symb,me_type,me_type_ptr} = common_defs.[stdStrictLists_index].com_member_defs.[decons_u_index]
+			  (fun_type_copy,ts) = determineSymbolTypeOfFunction pos me_symb 1/*symb_arity*/ me_type me_type_ptr common_defs ts
+			  {tst_args,tst_arity,tst_lifted,tst_result,tst_context,tst_attr_env}=fun_type_copy						  
+			# result_type = case tst_args of [t] -> t
+			# argument_types = case tst_result.at_type of (TA _ args=:[arg1,arg2]) ->args
+			= (argument_types,result_type,tst_context,tst_attr_env,ts)
 
+freshOverloadedListType :: !OverloadedListType !CoercionPosition ![AlgebraicPattern] !{#CommonDefs} !{#{#FunType }} !*TypeState -> (![[AType]],!AType,![TypeContext],![AttrCoercion],!*TypeState)
+freshOverloadedListType (UnboxedList _ stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+	= fresh_overloaded_list_type patterns PD_UnboxedConsSymbol PD_UnboxedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
+freshOverloadedListType (UnboxedTailStrictList _ stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+	= fresh_overloaded_list_type patterns PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
+freshOverloadedListType (OverloadedList _ stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+	= fresh_overloaded_list_type patterns PD_OverloadedConsSymbol PD_OverloadedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
 
-freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType, !*TypeState)
+cWithFreshContextVars 		:== True
+cWithoutFreshContextVars 	:== False
+
+freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,!*TypeState)
 freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_env,st_arity} common_defs
 				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_td_infos,ts_var_heap,ts_cons_variables,ts_exis_variables}
 	# (th_vars, ts_var_store)	= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
@@ -741,6 +763,25 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 			add_exis_variables pos new_exis_variables exis_variables
 				= [(pos, new_exis_variables) : exis_variables]
 
+freshArgumentsOfSymbolType :: ![AType] !*TypeHeaps -> (![AType], !*TypeHeaps)
+freshArgumentsOfSymbolType atypes type_heaps = mapSt fresh_arg_type atypes type_heaps
+where
+	fresh_arg_type at=:{at_attribute, at_type = TFA vars type} type_heaps
+		# (fresh_attribute, th_attrs)			= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
+		# type_heaps							= foldSt bind_var_and_attr vars { type_heaps & th_attrs = th_attrs }
+		  (fresh_type, type_heaps)				= freshCopy type type_heaps
+		  type_heaps							= clearBindings vars type_heaps
+		= ({ at &  at_attribute = fresh_attribute, at_type = TFA vars fresh_type }, type_heaps)
+	where
+		bind_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv)), th_attrs = bind_attr atv_attribute th_attrs }
+		where
+			bind_attr var=:(TA_Var {av_info_ptr}) attr_heap
+				= attr_heap <:= (av_info_ptr, AVI_Attr var)
+			bind_attr attr attr_heap
+				= attr_heap
+	fresh_arg_type at type_heaps
+		= freshCopy at type_heaps
 	
 freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap
@@ -947,6 +988,7 @@ where
 	combine_attributes _ cum_attr attr_env attr_store
 		= (cum_attr, attr_env, attr_store)
 
+determineSymbolTypeOfFunction :: CoercionPosition Ident Int SymbolType (Ptr VarInfo) {#CommonDefs} *TypeState -> *(!TempSymbolType,!*TypeState);
 determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr_vars,st_attr_env} type_ptr common_defs ts=:{ts_var_heap}
 	# (type_info, ts_var_heap) = readPtr type_ptr ts_var_heap
 	  ts = { ts & ts_var_heap = ts_var_heap }
@@ -999,6 +1041,7 @@ storeAttribute (Yes expt_ptr) type_attribute symbol_heap
 storeAttribute No type_attribute symbol_heap
 	= symbol_heap
 
+getSymbolType :: CoercionPosition TypeInput SymbIdent *TypeState -> *(!TempSymbolType,![Special],!*TypeState);
 getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name} ts
 	| glob_module == ti_main_dcl_module_n
 		| glob_object>=size ts.ts_fun_env
@@ -1117,13 +1160,13 @@ where
 	requirements ti {case_expr,case_guards,case_default,case_info_ptr, case_default_pos} reqs_ts
 		# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti case_expr reqs_ts
 		  (fresh_v, ts) = freshAttributedVariable ts
-		  (cons_types, reqs_ts) = requirements_of_guarded_expressions ti case_guards case_expr expr_type opt_expr_ptr fresh_v (reqs, ts)
+		  (cons_types, reqs_ts) = requirements_of_guarded_expressions case_guards ti case_expr expr_type opt_expr_ptr fresh_v (reqs, ts)
 		  (reqs, ts) = requirements_of_default ti case_default case_default_pos fresh_v reqs_ts
 		  ts_expr_heap =  ts.ts_expr_heap <:= (case_info_ptr, EI_CaseType { ct_pattern_type = expr_type, ct_result_type = fresh_v, ct_cons_types = cons_types })
 		= (fresh_v, No, ({ reqs & req_case_and_let_exprs = [case_info_ptr : reqs.req_case_and_let_exprs]},
 				{ ts & ts_expr_heap = ts_expr_heap }))
 	where
-		requirements_of_guarded_expressions ti=:{ti_common_defs} (AlgebraicPatterns alg_type patterns) match_expr pattern_type opt_pattern_ptr
+		requirements_of_guarded_expressions (AlgebraicPatterns alg_type patterns) ti=:{ti_common_defs} match_expr pattern_type opt_pattern_ptr
 						goal_type (reqs, ts)
 			# (cons_types, result_type, new_attr_env, ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
 			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, ts)
@@ -1133,13 +1176,26 @@ where
 					tc_coercible = True} : reqs.req_type_coercions],
 						req_attr_coercions = new_attr_env ++ reqs.req_attr_coercions }, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap }))
 	
-		requirements_of_guarded_expressions ti (BasicPatterns bas_type patterns) match_expr pattern_type opt_pattern_ptr goal_type (reqs, ts)
+		requirements_of_guarded_expressions (BasicPatterns bas_type patterns) ti match_expr pattern_type opt_pattern_ptr goal_type (reqs, ts)
 			# (attr_bas_type, ts) = attributedBasicType bas_type ts
 			  (reqs, ts) = requirements_of_basic_patterns ti patterns goal_type (reqs, ts)
 			  ts_expr_heap = storeAttribute opt_pattern_ptr attr_bas_type.at_attribute ts.ts_expr_heap
 			= ([], ({ reqs & req_type_coercions = [{tc_demanded = attr_bas_type,tc_offered = pattern_type, tc_position = CP_Expression match_expr, tc_coercible = True} :
 						reqs.req_type_coercions]}, { ts & ts_expr_heap = ts_expr_heap }))
-		requirements_of_guarded_expressions ti (DynamicPatterns dynamic_patterns) match_expr pattern_type opt_pattern_ptr goal_type reqs_ts
+
+		requirements_of_guarded_expressions (OverloadedListPatterns alg_type decons_expr=:(App {app_symb,app_info_ptr}) patterns) ti=:{ti_common_defs,ti_functions} match_expr pattern_type opt_pattern_ptr goal_type (reqs, ts)
+			# (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
+			# ts = {ts & ts_var_heap = ts_var_heap}
+			# (cons_types, result_type, context, new_attr_env, ts) = freshOverloadedListType alg_type position patterns ti_common_defs ti_functions ts
+			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, ts)
+			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
+			  type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = position,tc_coercible = True} : reqs.req_type_coercions]
+			  ts_expr_heap = writePtr app_info_ptr (EI_Overloaded {oc_symbol = app_symb, oc_context = context, oc_specials = []/*specials*/ }) ts_expr_heap			  
+			= (reverse used_cons_types,({ reqs & req_type_coercions = type_coercions,req_attr_coercions = new_attr_env ++ reqs.req_attr_coercions,
+												 req_overloaded_calls = [app_info_ptr : reqs.req_overloaded_calls ] },
+										{ ts & ts_expr_heap = ts_expr_heap }))
+
+		requirements_of_guarded_expressions (DynamicPatterns dynamic_patterns) ti match_expr pattern_type opt_pattern_ptr goal_type reqs_ts
 			# dyn_type = { at_type = TB BT_Dynamic, at_attribute = TA_Multi, at_annotation = AN_None }
 			  (used_dyn_types, (reqs, ts)) = requirements_of_dynamic_patterns ti goal_type dynamic_patterns [] reqs_ts
 			  ts_expr_heap = storeAttribute opt_pattern_ptr TA_Multi ts.ts_expr_heap
@@ -1203,8 +1259,7 @@ where
 				= (reqs, { ts &  ts_expr_heap = ts_expr_heap })
 				# reqs = { reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions], req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls ]}
 				= (reqs, { ts & ts_expr_heap = ts_expr_heap <:=
-						(dyn_expr_ptr,  EI_Overloaded {  oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = [] }) })
-	
+						(dyn_expr_ptr,  EI_Overloaded {  oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = [] }) })	
 	
 		requirements_of_default ti (Yes expr) case_default_pos goal_type reqs_ts
 	  		= possibly_accumulate_reqs_in_new_group
@@ -1845,7 +1900,7 @@ ste_kind_to_string s
 */
 
 typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule} 
-	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
+	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
 typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out dcl_modules
 
 	#! fun_env_size = size fun_defs
@@ -1857,23 +1912,27 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  type_def_sizes =  [ size com_type_defs \\ {com_type_defs} <-: ti_common_defs ]
       class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
       class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
-
 	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
-	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
+	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
 	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
 	  (type_error, fun_defs, predef_symbols, special_instances, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_out})
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
 							{ ts & ts_fun_env = ts_fun_env })
-	  {si_array_instances, si_next_array_member_index, si_next_TC_member_index, si_TC_instances}= special_instances
-	  (fun_defs, predef_symbols, ts_type_heaps) = convert_array_instances si_array_instances ti_common_defs fun_defs predef_symbols ts_type_heaps
-	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
-	= (not type_error, fun_defs, { ir_from = fun_env_size, ir_to = si_next_array_member_index }, type_code_instances, ti_common_defs, ti_functions,
+	  (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,type_code_instances,predef_symbols,ts_type_heaps)
+	  		= create_special_instances special_instances fun_env_size ti_common_defs fun_defs predef_symbols ts_type_heaps
+	  array_and_list_instances = {
+		  	ali_array_first_instance_indices=array_first_instance_indices,
+			ali_list_first_instance_indices=list_first_instance_indices,
+			ali_tail_strict_list_first_instance_indices=tail_strict_list_first_instance_indices,
+			ali_instances_range={ ir_from = fun_env_size, ir_to = special_instances.si_next_array_member_index }
+		}
+	= (not type_error, fun_defs, array_and_list_instances, type_code_instances, ti_common_defs, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps },
 			predef_symbols, ts_error.ea_file, ts_out)
 //				---> ("typeProgram", array_inst_types)
@@ -2284,50 +2343,115 @@ where
 		 
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
-			
-	convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps
-		| isEmpty si_array_instances
-			= (fun_defs, predef_symbols, type_heaps)
-			# ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
-			  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
-			  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
-			  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
-			  array_members = common_defs.[pds_module].com_member_defs
-			  (offset_table, _, predef_symbols) = arrayFunOffsetToPD_IndexTable array_members predef_symbols
-			  (instances, type_heaps) = foldSt (convert_array_instance class_members array_members unboxed_array_type offset_table) si_array_instances
-			  														([], type_heaps)
-			= (arrayPlusList fun_defs instances, predef_symbols, type_heaps)
-	where
-		convert_array_instance class_members array_members unboxed_array_type offset_table {ai_record} funs_and_heaps
-			= create_instance_types class_members array_members unboxed_array_type offset_table (TA ai_record []) (size class_members) funs_and_heaps
-		where
 
-			create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_and_heaps
-				| member_index == 0
-					= funs_and_heaps
-					# member_index = dec member_index
-					  funs_and_heaps = create_instance_type  members array_members unboxed_array_type offset_table record_type member_index funs_and_heaps
-					= create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_and_heaps
+	create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index,si_next_TC_member_index,si_TC_instances} fun_env_size common_defs fun_defs predef_symbols type_heaps
+		# fun_defs = add_extra_elements_to_fun_def_array (si_next_array_member_index-fun_env_size) fun_defs
+		  	with
+		  		add_extra_elements_to_fun_def_array n_new_elements fun_defs
+		  			| n_new_elements==0
+		  				= fun_defs
+			  			# dummy_fun_def = { fun_symb = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_index= -1,fun_kind=FK_DefOrImpUnknown,fun_lifted=0,
+				  							fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
+			  			= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
+		  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps) = convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps		  
+		  (list_first_instance_indices,fun_defs, predef_symbols, type_heaps) = convert_list_instances si_list_instances PD_UListClass common_defs fun_defs predef_symbols type_heaps
+		  (tail_strict_list_first_instance_indices,fun_defs, predef_symbols, type_heaps) = convert_list_instances si_tail_strict_list_instances PD_UTSListClass common_defs fun_defs predef_symbols type_heaps
+		  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
+		  array_first_instance_indices = first_instance_indices si_array_instances
+		= (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,type_code_instances,predef_symbols,type_heaps)
+	where
+		convert_array_instances array_instances common_defs fun_defs predef_symbols type_heaps
+			| isEmpty array_instances
+				= ([],fun_defs, predef_symbols, type_heaps)
+				# ({pds_ident,pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
+				  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
+				  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
+				  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
+				  array_members = common_defs.[pds_module].com_member_defs
+				  (offset_table, _, predef_symbols) = arrayFunOffsetToPD_IndexTable array_members predef_symbols
+				  (fun_defs, type_heaps) = foldSt (convert_array_instance class_members array_members unboxed_array_type offset_table) array_instances (fun_defs, type_heaps)
+		  		  array_first_instance_indices = first_instance_indices array_instances
+				= (array_first_instance_indices,fun_defs, predef_symbols, type_heaps)
+		where
+			convert_array_instance class_members array_members unboxed_array_type offset_table {ai_record,ai_members} funs_and_heaps
+				= create_instance_types class_members array_members unboxed_array_type offset_table (TA ai_record []) (size class_members) funs_and_heaps
+			where
+				first_instance_index=ai_members.[0].ds_index
+				
+				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type {#Int} Type !Int !*(*{#FunDef},*TypeHeaps) -> (!*{#FunDef},!*TypeHeaps);
+				create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_and_heaps
+					| member_index == 0
+						= funs_and_heaps
+						# member_index = dec member_index
+						  funs_and_heaps = create_instance_type members array_members unboxed_array_type offset_table record_type member_index funs_and_heaps
+						= create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_and_heaps
+		
+				create_instance_type members array_members unboxed_array_type offset_table record_type member_index (fun_defs, type_heaps)
+					# {me_type,me_symb,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
+					  (instance_type, _, type_heaps, _, _) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
+															it_types = [unboxed_array_type, record_type]} SP_None type_heaps No No
+					  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
+					  fun_index = first_instance_index+member_index
+					  fun = 
+						{	fun_symb		= me_symb
+						,	fun_arity		= me_type.st_arity
+						,	fun_priority	= NoPrio
+						,	fun_body		= NoBody
+						,	fun_type		= Yes instance_type
+						,	fun_pos			= me_pos
+//						,	fun_index	= member_index
+						,	fun_index		= fun_index
+						,	fun_kind		= FK_DefOrImpUnknown
+						,	fun_lifted		= 0
+						,	fun_info		= EmptyFunInfo
+						}
+					= ({fun_defs & [fun_index]=fun},type_heaps)
+
+		convert_list_instances list_instances predef_list_class_index common_defs fun_defs predef_symbols type_heaps
+			| isEmpty list_instances
+				= ([],fun_defs, predef_symbols, type_heaps)
+				# ({pds_module,pds_def},predef_symbols) = predef_symbols![predef_list_class_index]
+				  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
+				  list_members = common_defs.[pds_module].com_member_defs
+				  (fun_defs, type_heaps) = foldSt (convert_list_instance class_members list_members) list_instances (fun_defs, type_heaps)
+		  		  list_first_instance_indices = first_instance_indices list_instances
+				= (list_first_instance_indices,fun_defs, predef_symbols, type_heaps)
+		where
+			convert_list_instance class_members list_members {ai_record,ai_members} funs_and_heaps
+				= create_instance_types class_members list_members (TA ai_record []) (size class_members) funs_and_heaps
+			where
+				first_instance_index=ai_members.[0].ds_index
+				
+				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type !Int !*(*{#FunDef},*TypeHeaps) -> (!*{#FunDef},!*TypeHeaps);
+				create_instance_types members list_members record_type member_index funs_and_heaps
+					| member_index == 0
+						= funs_and_heaps
+						# member_index = dec member_index
+						  funs_and_heaps = create_instance_type members list_members record_type member_index funs_and_heaps
+						= create_instance_types members list_members record_type member_index funs_and_heaps
+
+				create_instance_type members list_members record_type member_index (fun_defs, type_heaps)
+					# {me_type,me_symb,me_class_vars,me_pos} = list_members.[members.[member_index].ds_index]
+					  (instance_type, _, type_heaps, _, _) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
+															it_types = [record_type]} SP_None type_heaps No No
+					  fun_index = first_instance_index+member_index
+					  fun = 
+						{	fun_symb		= me_symb
+						,	fun_arity		= me_type.st_arity
+						,	fun_priority	= NoPrio
+						,	fun_body		= NoBody
+						,	fun_type		= Yes instance_type
+						,	fun_pos			= me_pos
+//						,	fun_index	= member_index
+						,	fun_index		= fun_index
+						,	fun_kind		= FK_DefOrImpUnknown
+						,	fun_lifted		= 0
+						,	fun_info		= EmptyFunInfo
+						}
+					= ({fun_defs & [fun_index]=fun},type_heaps)
 	
-			create_instance_type members array_members unboxed_array_type offset_table record_type member_index (array_defs, type_heaps)
-				# {me_type,me_symb,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
-				  (instance_type, _, type_heaps, _, _) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
-														it_types = [unboxed_array_type, record_type]} SP_None type_heaps No No
-				  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
-				  fun = 
-					{	fun_symb		= me_symb
-					,	fun_arity		= me_type.st_arity
-					,	fun_priority	= NoPrio
-					,	fun_body		= NoBody
-					,	fun_type		= Yes instance_type
-					,	fun_pos			= me_pos
-					,	fun_index	= member_index
-					,	fun_kind		= FK_DefOrImpUnknown
-					,	fun_lifted		= 0
-					,	fun_info		= EmptyFunInfo
-					}
-	
-				= ([fun : array_defs], type_heaps)
+		first_instance_indices instances
+			= [ai_members.[0].ds_index \\ {ai_members}<-instances]
 	
 	create_erroneous_function_types group ts
 		= foldSt create_erroneous_function_type group ts
