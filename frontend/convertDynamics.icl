@@ -67,13 +67,12 @@ F a b = b
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] _ _ !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps predefined_symbols
-
 	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
 		= { WriteTypeInfoState |
 			wtis_type_heaps				= type_heaps
 		,	wtis_n_type_vars			= 0
-		,	wtis_predefined_module_def	= pre_mod.pds_def
+		,	wtis_predefined_module_def	= pre_mod.pds_module
 		};
 	# (j,tcl_file)
 		= fposition tcl_file
