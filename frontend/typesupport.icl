@@ -1,7 +1,7 @@
 implementation module typesupport
 
 import StdEnv, StdCompare
-import syntax, parse, check, unitype, utilities, checktypes //, RWSDebug
+import syntax, parse, check, unitype, utilities, checktypes, RWSDebug
 
 ::	Store	:== Int
 
@@ -840,8 +840,9 @@ where
 		# (offered_of_demanded, attr_env) = attr_env![demanded_var_number]
 		  attr_env = { attr_env & [demanded_var_number] = TA_Locked offered_of_demanded }
 		# (succ, locked_attributes, attr_env) = contains_coercion offered_var_number offered_of_demanded [demanded_var_number] attr_env
+		  attr_env = foldSt unlock_attribute locked_attributes attr_env
 		| succ
-			= equivalent_environments coercions (foldSt unlock_attribute locked_attributes attr_env) attr_heap
+			= equivalent_environments coercions attr_env attr_heap
 			= (False, attr_env, attr_heap)
 
 //	contains_coercion :: !Int !TypeAttribute ![Int] !u:{! TypeAttribute} -> (!Bool, ![Int], !u:{!TypeAttribute})
@@ -1275,7 +1276,7 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 			
 beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 beautifulizeAttributes symbol_type th_attrs
-	# (nr_of_attr_vars, all_attr_vars, th_attrs)
+	# (nr_of_attr_vars, rev_all_attr_vars, th_attrs)
 	  		= assignNumbersToAttrVars symbol_type th_attrs
 	  (attr_env_coercions, th_attrs)
 	  		= addAttrEnvInequalities symbol_type.st_attr_env (emptyCoercions nr_of_attr_vars) th_attrs
@@ -1291,7 +1292,7 @@ beautifulizeAttributes symbol_type th_attrs
 	  attr_env_coercions
 	  		= foldSt remove_inequality implicit_int_inequalities attr_env_coercions
 	  st_attr_env
-	  		= coercionsToAttrEnv {el \\ el<-all_attr_vars } attr_env_coercions
+	  		= coercionsToAttrEnv {el \\ el<-reverse rev_all_attr_vars } attr_env_coercions
 	  (symbol_type, th_attrs)
 	  		= anonymizeAttrVars { symbol_type & st_attr_env = st_attr_env } implicit_inequalities th_attrs
 	= (symbol_type, th_attrs)
@@ -1732,11 +1733,7 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= foldSt fold_atype_st args st
 		= on_type type st
-	fold_type_st type=:(TB _) st
-		= on_type type st
-	fold_type_st type=:(GTV _) st
-		= on_type type st
-	fold_type_st type=:(TV _) st
+	fold_type_st type st
 		= on_type type st
 
 	fold_atype_st atype=:{at_type} st

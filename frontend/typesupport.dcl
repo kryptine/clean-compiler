@@ -150,13 +150,9 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= foldSt fold_atype_st args st
 		= on_type type st
-	fold_type_st type=:(TB _) st
+	fold_type_st type st
 		= on_type type st
-	fold_type_st type=:(GTV _) st
-		= on_type type st
-	fold_type_st type=:(TV _) st
-		= on_type type st
-
+	
 	fold_atype_st atype=:{at_type} st
 		#! st
 				= fold_type_st at_type st
