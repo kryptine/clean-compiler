@@ -197,8 +197,6 @@ where
 		# (dyn_expr, ls) = lift dyn_expr ls
 		= ({ dyn & dyn_expr = dyn_expr}, ls)
 
-import RWSDebug
-
 liftFunctions :: [FunctionOrMacroIndex] Int Int *{#FunDef} *{#*{#FunDef}} *(Heap VarInfo) *(Heap ExprInfo) -> .LiftState;
 liftFunctions group group_index main_dcl_module_n fun_defs macro_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs,macro_defs)
