@@ -145,8 +145,6 @@ where
 			= (cc, subst)
 	where	
 		skip_indirections cons_var subst
-			| cons_var>=size subst || cons_var<0
-				= abort ("error"->>("cons_var",cons_var))
 			#! redir = subst.[cons_var]
 			| IsAVariable redir
 				= skip_indirections redir subst
@@ -837,6 +835,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			overwrite_result_type case_info_ptr new_result_type ti_symbol_heap
 				#! (EI_CaseType case_type, ti_symbol_heap)	= readExprInfo case_info_ptr ti_symbol_heap
 				= writeExprInfo case_info_ptr (EI_CaseType { case_type & ct_result_type = new_result_type}) ti_symbol_heap
+
 		lift_patterns default_exists (AlgebraicPatterns type case_guards) outer_case ro ti
 			# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
 			# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
@@ -853,9 +852,13 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 		lift_patterns_2 default_exists [guard_expr : guard_exprs] outer_case ro ti
 			# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No,
 					 us_cleanup_info=ti.ti_cleanup_info, us_subst_vars = False, us_handle_aci_free_vars = LeaveThem }
-			  (outer_guards, us) = unfold outer_case.case_guards us
-			  ti = { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = us.us_symbol_heap, ti_cleanup_info=us.us_cleanup_info }
-			  (guard_expr, ti) = transformCase { outer_case & case_expr = guard_expr, case_guards=outer_guards } ro ti
+			  (outer_guards, us=:{us_cleanup_info}) = unfold outer_case.case_guards us
+			  (expr_info, ti_symbol_heap) = readPtr outer_case.case_info_ptr us.us_symbol_heap
+			  (new_info_ptr, ti_symbol_heap) = newPtr expr_info ti_symbol_heap
+			  new_cleanup_info = case expr_info of {(EI_Extended _ _) -> [new_info_ptr:us_cleanup_info]; _ -> us_cleanup_info}
+			  ti = { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
+			  new_case = { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
+			  (guard_expr, ti) = transformCase new_case ro ti
 			  (guard_exprs, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 			= ([guard_expr : guard_exprs], ti)
 		lift_patterns_2 _ [] _ _ ti
@@ -871,6 +874,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 								[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] case_default ro ti
 			| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
 				# zipped = zip2 ap_vars app_args
+				  linearity = map (const True) linearity // XXX
 				  linear_args = filterWith linearity zipped
 				  not_linearity = map not linearity
 				  non_linear_args = filterWith not_linearity zipped
