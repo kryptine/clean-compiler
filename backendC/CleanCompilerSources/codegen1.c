@@ -962,7 +962,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		
 		ConvertSymbolToLabel (&CurrentAltLabel,field_def);
 		
-		if (field_def->sdef_exported)
+		if (field_def->sdef_exported || ExportLocalLabels)
 			GenExportFieldSelector (field_def);
 				
 		GenFieldSelectorDescriptor (field_def,IsSimpleState (offfieldstate));
@@ -993,6 +993,12 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		node_directive_arity = IsSimpleState (offfieldstate) ? (offfieldstate.state_kind!=OnB ? -4 : -3) : field_def->sdef_arity;
 
 		ConvertSymbolToDandNLabel (&d_lab,&n_lab,field_def);
+		
+		if (ExportLocalLabels){
+			d_lab.lab_mod=CurrentModule;
+			n_lab.lab_mod=CurrentModule;
+			ealab.lab_mod=CurrentModule;
+		}
 
 		GenFieldNodeEntryDirective (node_directive_arity,&d_lab,ea_label_p,record_name);
 
@@ -1179,7 +1185,7 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
 			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
 			
-			unboxed_record_cons_lab.lab_mod=NULL;
+			unboxed_record_cons_lab.lab_mod=ExportLocalLabels ? CurrentModule : NULL;
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
 			unboxed_record_cons_lab.lab_issymbol=False;
 			unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_ident->ident_name;

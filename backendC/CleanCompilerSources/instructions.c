@@ -3182,22 +3182,22 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 				CurrentModule,record_name,name,
 				arity,record_name,name);
 	} else if ((sdef->sdef_mark & SDEF_USED_LAZILY_MASK) || has_gc_apply_entry){
-		char *record_name;
-		
-		record_name = sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
-		
-		if (DoDebug)
+		if (ExportLocalLabels)
+			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s ",CurrentModule,record_name,name);		
+		else if (DoDebug)
 			FPrintF (OutFile, D_PREFIX "%s.%s ",record_name,name);				
 		else
 			FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
-		
+
 		if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
-			if (DoDebug)
+			if (ExportLocalLabels)
+				FPrintF (OutFile, "e_%s_" N_PREFIX "%s.%s ",CurrentModule,record_name,name);
+			else if (DoDebug)
 				FPrintF (OutFile, N_PREFIX "%s.%s ",record_name,name);
 			else
 				FPrintF (OutFile, N_PREFIX "%u ",sdef->sdef_number);
 		} else
-			FPrintF (OutFile, "%s ", hnf_lab.lab_name);
+			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
 		
 		if (has_gc_apply_entry){
 			if (DoDebug)
@@ -3205,9 +3205,9 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 			else
 				FPrintF (OutFile, "%s%u ",l_pref,sdef->sdef_number);
 		} else
-			FPrintF (OutFile, "%s ", hnf_lab.lab_name);
+			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
 
-		FPrintF (OutFile, "%d 0 \"%s.%s\"", arity,record_name,name);
+		FPrintF (OutFile, "%d 0 \"%s.%s\"",arity,record_name,name);
 	} else if (DoDebug){
 		FPrintF (OutFile, D_PREFIX "%s %s %s %d 0 \"%s.%s\"", name, hnf_lab.lab_name,
 			hnf_lab.lab_name,arity,record_name,name);
