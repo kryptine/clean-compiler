@@ -1381,8 +1381,6 @@ BESwitchNode (BENodeIdP nodeId, BEArgP cases)
 	switchNode->node_arity		= 1;
 	switchNode->node_arguments	= cases;
 	switchNode->node_annotation	= NoAnnot;
-
-//	--nodeId->nid_refcount;
 	
 	return (switchNode);
 } /* BESwitchNode */
@@ -1439,8 +1437,7 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 	pushNode->node_arguments	= arguments;
 	pushNode->node_record_symbol= symbol;
 	pushNode->node_node_ids		= nodeIds;
-
-	pushNode->node_number		= 0;	/* ??? if !=0 then unique */
+	pushNode->node_number		= 0;
 
 	return (pushNode);
 } /* BEPushNode */
