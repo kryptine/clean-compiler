@@ -5651,8 +5651,11 @@ void StrictnessAnalysis (ImpMod imod)
 
 int StrictnessAnalysisConvertRules (ImpRuleS *rules)
 {
-	initialising = True;
+	if (initialising)
+		return 0;
 
+	initialising=True;
+	
 	if (setjmp (SAEnv)==0){
 		ImpRuleS *rule;
 
@@ -5668,6 +5671,8 @@ int StrictnessAnalysisConvertRules (ImpRuleS *rules)
 		return 1;
 	} else {
 		FreeUnFreezedBlocks();
+		if (StrictWarning)
+			GiveStrictWarning (NULL,"not enough memory for strictness analysis of all functions");
 		return 0;
 	}
 }
