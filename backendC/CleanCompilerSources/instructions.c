@@ -22,6 +22,8 @@
 #include "statesgen.h"
 #include "version.h"
 
+#define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
+
 #define BINARY_ABC 0
 #undef MEMORY_PROFILING_WITH_N_STRING
 
@@ -3519,6 +3521,55 @@ void GenSystemImports (void)
 		}
 #endif
 		GenImpLab ("_driver");
+	}
+}
+
+static void print_foreign_export_type (TypeNode type)
+{
+	if (!type->type_node_is_var){
+		Symbol symbol_p;
+
+		symbol_p=type->type_node_symbol;
+
+		if (symbol_p->symb_kind==int_type){
+			FPrintF (OutFile,"I");
+			return;
+		} else if (symbol_p->symb_kind==tuple_type){
+			TypeArgs type_arg_p;
+			
+			for_l (type_arg_p,type->type_node_arguments,type_arg_next)
+				print_foreign_export_type (type_arg_p->type_arg_node);
+			
+			return;
+		}
+	}
+	
+	error_in_function ("print_foreign_export_type");
+}
+
+void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
+{
+	struct foreign_export_list *foreign_export_p;
+
+	for_l (foreign_export_p,foreign_export_list,fe_next){
+		SymbDef function_sdef;
+		TypeAlt *rule_type_p;
+		TypeArgs type_arg_p;
+
+		function_sdef=foreign_export_p->fe_symbol_p->symb_def;
+
+		FPrintF (OutFile,"\n\tcentry %s e_%s_s%s \"",function_sdef->sdef_ident->ident_name,CurrentModule,function_sdef->sdef_ident->ident_name);
+		
+		rule_type_p=function_sdef->sdef_rule->rule_type;
+		
+		for_l (type_arg_p,rule_type_p->type_alt_lhs->type_node_arguments,type_arg_next)
+			print_foreign_export_type (type_arg_p->type_arg_node);
+		
+		FPrintF (OutFile,":");
+		
+		print_foreign_export_type (rule_type_p->type_alt_rhs);
+				
+		FPrintF (OutFile,"\"");
 	}
 }
 

@@ -815,6 +815,11 @@ struct string_list {
 };
 #endif
 
+struct foreign_export_list {
+	SymbolP						fe_symbol_p;
+	struct foreign_export_list *fe_next;
+};
+
 #if CLEAN2
 typedef char * ModuleFileTime;
 #else
@@ -838,6 +843,7 @@ typedef struct {
 	struct string_list *	im_imported_objs;
 	struct string_list *	im_imported_libs;
 #endif
+	struct foreign_export_list *	im_foreign_exports;
 #if WRITE_DCL_MODIFICATION_TIME
 	ModuleFileTime		im_modification_time;
 #endif

@@ -183,6 +183,7 @@ void GenDepend (char *modname);
 #endif
 void GenEndInfo (void);
 void GenSystemImports (void);
+void GenerateForeignExports (struct foreign_export_list *foreign_export_p);
 void GenStart (SymbDef startsymb);
 void InitFileInfo (ImpMod imod);
 

@@ -413,6 +413,7 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	iclModule->im_imported_objs	= NULL;
 	iclModule->im_imported_libs	= NULL;
 # endif
+	iclModule->im_foreign_exports=NULL;
 
 	CurrentModule	= cName;
 
@@ -3056,6 +3057,20 @@ BEDefineImportedObjsAndLibs (BEStringListP objs, BEStringListP libs)
 	gBEState.be_icl.beicl_module->im_imported_objs	= objs;
 	gBEState.be_icl.beicl_module->im_imported_libs	= libs;
 } /* BEDefineRules */
+
+void BEInsertForeignExport (BESymbolP symbol_p)
+{
+	ImpMod icl_mod_p;
+	struct foreign_export_list *foreign_export_list_p;
+		
+	foreign_export_list_p=ConvertAllocType (struct foreign_export_list);
+	
+	icl_mod_p=gBEState.be_icl.beicl_module;
+
+	foreign_export_list_p->fe_symbol_p=symbol_p;
+	foreign_export_list_p->fe_next=icl_mod_p->im_foreign_exports;
+	icl_mod_p->im_foreign_exports=foreign_export_list_p;
+}
 
 BEStringListP
 BEString (CleanString cleanString)

@@ -532,6 +532,9 @@ Clean (BEExportFunction :: Int BackEnd -> BackEnd)
 void BEDefineImportedObjsAndLibs (BEStringListP objs, BEStringListP libs);
 Clean (BEDefineImportedObjsAndLibs :: BEStringListP BEStringListP BackEnd -> BackEnd)
 
+void BEInsertForeignExport (BESymbolP symbol_p);
+Clean (BEInsertForeignExport :: BESymbolP BackEnd -> BackEnd)
+
 void BESetMainDclModuleN (int main_dcl_module_n_parameter);
 Clean (BESetMainDclModuleN :: Int BackEnd -> BackEnd)
 

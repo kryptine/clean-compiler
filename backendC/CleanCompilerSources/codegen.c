@@ -1242,6 +1242,8 @@ void CodeGeneration (ImpMod imod, char *fname)
 
 			GenerateCodeForConstructorsAndRecords (imod->im_symbols);
 
+			GenerateForeignExports (imod->im_foreign_exports);
+
 			if (imod->im_start)
 				GenStart (imod->im_start);
 			ExitOnInterrupt ();
