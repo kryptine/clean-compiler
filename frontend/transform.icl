@@ -1517,7 +1517,6 @@ where
 			_
 				-> (fun_defs, symbol_table)
 
-// import RWSDebug 
 
 expandMacrosInBody :: [.FunCall] CheckedBody ![ExprInfoPtr] PredefSymbolsForTransform *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],![ExprInfoPtr],.ExpandState);
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_symbol_heap,es_fun_defs,es_macro_defs}
@@ -1529,33 +1528,13 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_tran
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
 	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap})
+	  (new_rhs, new_args, local_vars, fi_dynamics, {cos_error, cos_var_heap, cos_symbol_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
 	  					cos_predef_symbols_for_transform = predef_symbols_for_transform }
-	# (fi_dynamics, cos_symbol_heap)
-			= foldSt collect_used_dynmic fi_dynamics ([], cos_symbol_heap)
 	= (new_args, new_rhs, local_vars, all_calls, fi_dynamics,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap, es_fun_defs=fun_defs, es_symbol_table = symbol_table })
 //		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
-where
-	collect_used_dynmic dyn_expr_ptr (used_dynamics, symbol_heap)
-		# (expr_info, symbol_heap) = readPtr dyn_expr_ptr symbol_heap
-		= case expr_info of
-			EI_UnmarkedDynamic _ _
-				-> (used_dynamics, symbol_heap)
-			EI_Dynamic opt_dyn_type ptrs
-				# (new_ptrs,symbol_heap)
-					= foldSt collect_used_dynmic ptrs ([], symbol_heap)
-				# symbol_heap
-					= writePtr dyn_expr_ptr (EI_Dynamic opt_dyn_type new_ptrs) symbol_heap
-				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
-			EI_DynamicTypeWithVars type_vars dyn_type ptrs
-				# (new_ptrs,symbol_heap)
-					= foldSt collect_used_dynmic ptrs ([], symbol_heap)
-				# symbol_heap
-					= writePtr dyn_expr_ptr (EI_DynamicTypeWithVars type_vars dyn_type new_ptrs) symbol_heap
-				-> ([dyn_expr_ptr : used_dynamics], symbol_heap)
 
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
@@ -1793,12 +1772,12 @@ where
 	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
 	}
 
-determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
+determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], ![DynamicPtr], !*CollectState)
 determineVariablesAndRefCounts free_vars expr cos=:{cos_var_heap}
-	# (expr, local_vars, cos) = collectVariables expr [] { cos & cos_var_heap = clearCount free_vars cIsAGlobalVar cos_var_heap }
+	# (expr, local_vars, dynamics, cos) = collectVariables expr [] [] { cos & cos_var_heap = clearCount free_vars cIsAGlobalVar cos_var_heap }
 	  (free_vars, cos_var_heap) = retrieveRefCounts free_vars cos.cos_var_heap
 	  (local_vars, cos_var_heap) = retrieveRefCounts local_vars cos_var_heap
-	= (expr, free_vars, local_vars, { cos & cos_var_heap = cos_var_heap })
+	= (expr, free_vars, local_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
 
 retrieveRefCounts free_vars var_heap
 	= mapSt retrieveRefCount free_vars var_heap
@@ -1835,27 +1814,28 @@ where
 	In 'collectVariables' all local variables are collected. Moreover the reference counts
 	of the local as well as of the global variables are determined. Aliases and unreachable 
 	bindings introduced in a 'let' are removed.
+	Dynamic administration is rebuilt.
 */	
 
-class collectVariables a :: !a ![FreeVar] !*CollectState -> (!a, ![FreeVar],!*CollectState)
+class collectVariables a :: !a ![FreeVar] ![DynamicPtr] !*CollectState -> !(!a, ![FreeVar],[DynamicPtr],!*CollectState)
 
 cContainsACycle		:== True
 cContainsNoCycle	:== False
 
 instance collectVariables Expression
 where
-	collectVariables (Var var) free_vars cos
-		# (var, free_vars, cos) = collectVariables var free_vars cos
-		= (Var var, free_vars, cos)
+	collectVariables (Var var) free_vars dynamics cos
+		# (var, free_vars, dynamics, cos) = collectVariables var free_vars dynamics cos
+		= (Var var, free_vars, dynamics, cos)
 	/* optimize && and || */
-	collectVariables (App app=:{app_symb={symb_kind=SK_Function {glob_object,glob_module}},app_args}) free_vars cos=:{cos_predef_symbols_for_transform={predef_and,predef_or}}
-		# ([e1,e2:_], free_vars, cos) = collectVariables app_args free_vars cos
+	collectVariables (App app=:{app_symb={symb_kind=SK_Function {glob_object,glob_module}},app_args}) free_vars dynamics cos=:{cos_predef_symbols_for_transform={predef_and,predef_or}}
+		# ([e1,e2:_], free_vars, dynamics, cos) = collectVariables app_args free_vars dynamics cos
 		| glob_object==predef_and.pds_def && glob_module==predef_and.pds_module && two_args app_args
 			# (kase,cos) = if_expression e1 e2 (BasicExpr (BVB False)) cos
-			= (kase, free_vars, cos)
+			= (kase, free_vars, dynamics, cos)
 		| glob_object==predef_or.pds_def && glob_module==predef_or.pds_module && two_args app_args
 			# (kase,cos) = if_expression e1 (BasicExpr (BVB True)) e2 cos
-			= (kase, free_vars, cos)
+			= (kase, free_vars, dynamics, cos)
 		where
 			if_expression :: Expression Expression Expression *CollectState -> (!Expression,!.CollectState);
 			if_expression e1 e2 e3 cos
@@ -1869,13 +1849,13 @@ where
 				= True;
 			two_args app_args
 				= False;
-	collectVariables (App app=:{app_args}) free_vars cos
-		# (app_args, free_vars, cos) = collectVariables app_args free_vars cos
-		= (App { app & app_args = app_args}, free_vars, cos)
-	collectVariables (expr @ exprs) free_vars cos
-		# ((expr, exprs), free_vars, cos) = collectVariables (expr, exprs) free_vars cos
-		= (expr @ exprs, free_vars, cos)
-	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) free_vars cos=:{cos_var_heap}
+	collectVariables (App app=:{app_args}) free_vars dynamics cos
+		# (app_args, free_vars, dynamics, cos) = collectVariables app_args free_vars dynamics cos
+		= (App { app & app_args = app_args}, free_vars, dynamics, cos)
+	collectVariables (expr @ exprs) free_vars dynamics cos
+		# ((expr, exprs), free_vars, dynamics, cos) = collectVariables (expr, exprs) free_vars dynamics cos
+		= (expr @ exprs, free_vars, dynamics, cos)
+	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) free_vars dynamics cos=:{cos_var_heap}
 		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
 		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
 		  (is_cyclic_s, let_strict_binds, cos) 
@@ -1884,16 +1864,16 @@ where
 		  (is_cyclic_l, let_lazy_binds, cos) 
 		  		= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
 		| is_cyclic_s || is_cyclic_l
-			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars,
+			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars, dynamics,
 					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
 //		| otherwise
-			# (let_expr, free_vars, cos) = collectVariables let_expr free_vars cos
+			# (let_expr, free_vars, dynamics, cos) = collectVariables let_expr free_vars dynamics cos
 			  all_binds = mapAppend (\sb->(True, sb)) let_strict_binds [(False, lb) \\ lb<-let_lazy_binds]
-			  (collected_binds, free_vars, cos) = collect_variables_in_binds all_binds [] free_vars cos
+			  (collected_binds, free_vars, dynamics, cos) = collect_variables_in_binds all_binds [] free_vars dynamics cos
 			  (let_strict_binds, let_lazy_binds) = split collected_binds
 			| isEmpty let_strict_binds && isEmpty let_lazy_binds
-				= (let_expr, free_vars, cos)
-				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, cos)
+				= (let_expr, free_vars, dynamics, cos)
+				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, dynamics, cos)
 		where
 
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
@@ -1957,22 +1937,22 @@ where
 		    by examining the reference count.
 		*/
 
-			collect_variables_in_binds binds collected_binds free_vars cos
-				# (continue, binds, collected_binds, free_vars, cos) = examine_reachable_binds False binds collected_binds free_vars cos
+			collect_variables_in_binds binds collected_binds free_vars dynamics cos
+				# (continue, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds False binds collected_binds free_vars dynamics cos
 				| continue
-					= collect_variables_in_binds binds collected_binds free_vars cos
-					= (collected_binds, free_vars, cos)
+					= collect_variables_in_binds binds collected_binds free_vars dynamics cos
+					= (collected_binds, free_vars, dynamics, cos)
 		
-			examine_reachable_binds bind_found [bind=:(is_strict, {lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars cos
-				# (bind_found, binds, collected_binds, free_vars, cos) = examine_reachable_binds bind_found binds collected_binds free_vars cos
+			examine_reachable_binds bind_found [bind=:(is_strict, {lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
+				# (bind_found, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds bind_found binds collected_binds free_vars dynamics cos
 				# (VI_Count count is_global, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
 				# cos = { cos & cos_var_heap = cos_var_heap }
 				| count > 0
-					# (lb_src, free_vars, cos) = collectVariables lb_src free_vars cos
-					= (True, binds, [ (is_strict, { snd bind & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, cos)
-					= (bind_found, [bind : binds], collected_binds, free_vars, cos)
-			examine_reachable_binds bind_found [] collected_binds free_vars cos
-				= (bind_found, [], collected_binds, free_vars, cos)
+					# (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
+					= (True, binds, [ (is_strict, { snd bind & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+					= (bind_found, [bind : binds], collected_binds, free_vars, dynamics, cos)
+			examine_reachable_binds bind_found [] collected_binds free_vars dynamics cos
+				= (bind_found, [], collected_binds, free_vars, dynamics, cos)
 
 			split :: ![(Bool, x)] -> (![x], ![x])
 			split []
@@ -1983,129 +1963,139 @@ where
 					= ([x:l], r)
 				= (l, [x:r])
 
-	collectVariables (Case case_expr) free_vars cos
-		# (case_expr, free_vars, cos) = collectVariables case_expr free_vars cos
-		= (Case case_expr, free_vars, cos)
-	collectVariables (Selection is_unique expr selectors) free_vars cos
-		# ((expr, selectors), free_vars, cos) = collectVariables (expr, selectors) free_vars cos
-		= (Selection is_unique expr selectors, free_vars, cos)
-	collectVariables (Update expr1 selectors expr2) free_vars cos
-		# (((expr1, expr2), selectors), free_vars, cos) = collectVariables ((expr1, expr2), selectors) free_vars cos
-		= (Update expr1 selectors expr2, free_vars, cos)
-	collectVariables (RecordUpdate cons_symbol expression expressions) free_vars cos
-		# ((expression, expressions), free_vars, cos) = collectVariables (expression, expressions) free_vars cos
-		= (RecordUpdate cons_symbol expression expressions, free_vars, cos)
-	collectVariables (TupleSelect symbol argn_nr expr) free_vars cos
-		# (expr, free_vars, cos) = collectVariables expr free_vars cos
-		= (TupleSelect symbol argn_nr expr, free_vars, cos)
-	collectVariables (MatchExpr cons_symb expr) free_vars cos
-		# (expr, free_vars, cos) = collectVariables expr free_vars cos
-		= (MatchExpr cons_symb expr, free_vars, cos)
-	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr, dyn_info_ptr}) free_vars cos
-		# (dyn_expr, free_vars, cos=:{cos_symbol_heap}) = collectVariables dyn_expr free_vars cos
-		  cos_symbol_heap = mark_used_dynamic dyn_info_ptr (readPtr dyn_info_ptr cos_symbol_heap)
-		= (DynamicExpr {dynamic_expr & dyn_expr = dyn_expr}, free_vars, { cos & cos_symbol_heap = cos_symbol_heap });
-	where
-		mark_used_dynamic dyn_info_ptr (EI_UnmarkedDynamic opt_type loc_dynamics, symbol_heap) 
-			= symbol_heap <:= (dyn_info_ptr, EI_Dynamic opt_type loc_dynamics)
-		mark_used_dynamic dyn_info_ptr (_, symbol_heap) 
-			= symbol_heap
-			
-	collectVariables expr free_vars cos
-		= (expr, free_vars, cos)
+	collectVariables (Case case_expr) free_vars dynamics cos
+		# (case_expr, free_vars, dynamics, cos) = collectVariables case_expr free_vars dynamics cos
+		= (Case case_expr, free_vars, dynamics, cos)
+	collectVariables (Selection is_unique expr selectors) free_vars dynamics cos
+		# ((expr, selectors), free_vars, dynamics, cos) = collectVariables (expr, selectors) free_vars dynamics cos
+		= (Selection is_unique expr selectors, free_vars, dynamics, cos)
+	collectVariables (Update expr1 selectors expr2) free_vars dynamics cos
+		# (((expr1, expr2), selectors), free_vars, dynamics, cos) = collectVariables ((expr1, expr2), selectors) free_vars dynamics cos
+		= (Update expr1 selectors expr2, free_vars, dynamics, cos)
+	collectVariables (RecordUpdate cons_symbol expression expressions) free_vars dynamics cos
+		# ((expression, expressions), free_vars, dynamics, cos) = collectVariables (expression, expressions) free_vars dynamics cos
+		= (RecordUpdate cons_symbol expression expressions, free_vars, dynamics, cos)
+	collectVariables (TupleSelect symbol argn_nr expr) free_vars dynamics cos
+		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
+		= (TupleSelect symbol argn_nr expr, free_vars, dynamics, cos)
+	collectVariables (MatchExpr cons_symb expr) free_vars dynamics cos
+		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
+		= (MatchExpr cons_symb expr, free_vars, dynamics, cos)
+	collectVariables (DynamicExpr dynamic_expr) free_vars dynamics cos
+		# (dynamic_expr, free_vars, dynamics, cos) = collectVariables dynamic_expr free_vars dynamics cos
+		= (DynamicExpr dynamic_expr, free_vars, dynamics, cos);
+	collectVariables expr free_vars dynamics cos
+		= (expr, free_vars, dynamics, cos)
 
 instance collectVariables Selection
 where
-	collectVariables (ArraySelection array_select expr_ptr index_expr) free_vars cos
-		# (index_expr, free_vars, cos) = collectVariables index_expr free_vars cos
-		= (ArraySelection array_select expr_ptr index_expr, free_vars, cos)
-	collectVariables record_selection free_vars cos
-		= (record_selection, free_vars, cos)
+	collectVariables (ArraySelection array_select expr_ptr index_expr) free_vars dynamics cos
+		# (index_expr, free_vars, dynamics, cos) = collectVariables index_expr free_vars dynamics cos
+		= (ArraySelection array_select expr_ptr index_expr, free_vars, dynamics, cos)
+	collectVariables record_selection free_vars dynamics cos
+		= (record_selection, free_vars, dynamics, cos)
 
 instance collectVariables [a] | collectVariables a
 where
-	collectVariables [x:xs] free_vars cos
-		# (x, free_vars, cos) = collectVariables x free_vars cos
-		# (xs, free_vars, cos) = collectVariables xs free_vars cos
-		= ([x:xs], free_vars, cos)
-	collectVariables [] free_vars cos
-		= ([], free_vars, cos)
+	collectVariables [x:xs] free_vars dynamics cos
+		# (x, free_vars, dynamics, cos) = collectVariables x free_vars dynamics cos
+		# (xs, free_vars, dynamics, cos) = collectVariables xs free_vars dynamics cos
+		= ([x:xs], free_vars, dynamics, cos)
+	collectVariables [] free_vars dynamics cos
+		= ([], free_vars, dynamics, cos)
 
 instance collectVariables (!a,!b) | collectVariables a & collectVariables b
 where
-	collectVariables (x,y) free_vars cos
-		# (x, free_vars, cos) = collectVariables x free_vars cos
-		# (y, free_vars, cos) = collectVariables y free_vars cos
-		= ((x,y), free_vars, cos)
+	collectVariables (x,y) free_vars dynamics cos
+		# (x, free_vars, dynamics, cos) = collectVariables x free_vars dynamics cos
+		# (y, free_vars, dynamics, cos) = collectVariables y free_vars dynamics cos
+		= ((x,y), free_vars, dynamics, cos)
 
 instance collectVariables (Optional a) | collectVariables a
 where
-	collectVariables (Yes x) free_vars cos
-		# (x, free_vars, cos) = collectVariables x free_vars cos
-		= (Yes x, free_vars, cos)
-	collectVariables no free_vars cos
-		= (no, free_vars, cos)
+	collectVariables (Yes x) free_vars dynamics cos
+		# (x, free_vars, dynamics, cos) = collectVariables x free_vars dynamics cos
+		= (Yes x, free_vars, dynamics, cos)
+	collectVariables no free_vars dynamics cos
+		= (no, free_vars, dynamics, cos)
 
 instance collectVariables (Bind a b) | collectVariables a where
-	collectVariables bind=:{bind_src} free_vars cos
-		# (bind_src, free_vars, cos) = collectVariables bind_src free_vars cos
-		= ({bind & bind_src = bind_src}, free_vars, cos)
+	collectVariables bind=:{bind_src} free_vars dynamics cos
+		# (bind_src, free_vars, dynamics, cos) = collectVariables bind_src free_vars dynamics cos
+		= ({bind & bind_src = bind_src}, free_vars, dynamics, cos)
 
 instance collectVariables Case
 where
-	collectVariables kees=:{ case_expr, case_guards, case_default } free_vars cos
-		# (case_expr, free_vars, cos) = collectVariables case_expr free_vars cos
-		# (case_guards, free_vars, cos) = collectVariables case_guards free_vars cos
-		# (case_default, free_vars, cos) = collectVariables case_default free_vars cos
-		=  ({ kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, free_vars, cos)
+	collectVariables kees=:{ case_expr, case_guards, case_default } free_vars dynamics cos
+		# (case_expr, free_vars, dynamics, cos) = collectVariables case_expr free_vars dynamics cos
+		# (case_guards, free_vars, dynamics, cos) = collectVariables case_guards free_vars dynamics cos
+		# (case_default, free_vars, dynamics, cos) = collectVariables case_default free_vars dynamics cos
+		=  ({ kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, free_vars, dynamics, cos)
 
 instance collectVariables CasePatterns
 where
-	collectVariables (AlgebraicPatterns type patterns) free_vars cos
-		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
-		= (AlgebraicPatterns type patterns, free_vars, cos)
-	collectVariables (BasicPatterns type patterns) free_vars cos
-		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
-		= (BasicPatterns type patterns, free_vars, cos)
-	collectVariables (OverloadedListPatterns type decons_expr patterns) free_vars cos
-		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
-		= (OverloadedListPatterns type decons_expr patterns, free_vars, cos)
-	collectVariables (DynamicPatterns patterns) free_vars cos
-		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
-		= (DynamicPatterns patterns, free_vars, cos)
+	collectVariables (AlgebraicPatterns type patterns) free_vars dynamics cos
+		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
+		= (AlgebraicPatterns type patterns, free_vars, dynamics, cos)
+	collectVariables (BasicPatterns type patterns) free_vars dynamics cos
+		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
+		= (BasicPatterns type patterns, free_vars, dynamics, cos)
+	collectVariables (OverloadedListPatterns type decons_expr patterns) free_vars dynamics cos
+		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
+		= (OverloadedListPatterns type decons_expr patterns, free_vars, dynamics, cos)
+	collectVariables (DynamicPatterns patterns) free_vars dynamics cos
+		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
+		= (DynamicPatterns patterns, free_vars, dynamics, cos)
 
 instance collectVariables AlgebraicPattern
 where
-	collectVariables pattern=:{ap_vars,ap_expr} free_vars cos
-		# (ap_expr, free_vars, cos) = collectVariables ap_expr free_vars { cos & cos_var_heap = clearCount ap_vars cIsALocalVar cos.cos_var_heap}
+	collectVariables pattern=:{ap_vars,ap_expr} free_vars dynamics cos
+		# (ap_expr, free_vars, dynamics, cos) = collectVariables ap_expr free_vars dynamics { cos & cos_var_heap = clearCount ap_vars cIsALocalVar cos.cos_var_heap}
 		  (ap_vars, cos_var_heap) = retrieveRefCounts ap_vars cos.cos_var_heap
-		= ({ pattern & ap_expr = ap_expr, ap_vars = ap_vars }, free_vars, { cos & cos_var_heap = cos_var_heap })
+		= ({ pattern & ap_expr = ap_expr, ap_vars = ap_vars }, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
 	
 instance collectVariables BasicPattern
 where
-	collectVariables pattern=:{bp_expr} free_vars cos
-		# (bp_expr, free_vars, cos) = collectVariables bp_expr free_vars cos
-		= ({ pattern & bp_expr = bp_expr }, free_vars, cos)
+	collectVariables pattern=:{bp_expr} free_vars dynamics cos
+		# (bp_expr, free_vars, dynamics, cos) = collectVariables bp_expr free_vars dynamics cos
+		= ({ pattern & bp_expr = bp_expr }, free_vars, dynamics, cos)
 
 instance collectVariables DynamicPattern
 where
-	collectVariables pattern=:{dp_var,dp_rhs} free_vars cos
-		# (dp_rhs, free_vars, cos) = collectVariables dp_rhs free_vars { cos & cos_var_heap = clearCount dp_var cIsALocalVar cos.cos_var_heap}
+	collectVariables pattern=:{dp_var,dp_rhs,dp_type} free_vars dynamics cos=:{cos_var_heap,cos_symbol_heap}
+		# cos_var_heap = clearCount dp_var cIsALocalVar cos_var_heap
+		  (EI_DynamicTypeWithVars vars type _, cos_symbol_heap) = readPtr dp_type cos_symbol_heap
+		  cos = { cos & cos_var_heap = cos_var_heap, cos_symbol_heap = cos_symbol_heap }
+		  (dp_rhs, free_vars, local_dynamics, cos) = collectVariables dp_rhs free_vars [] cos
+		  cos_symbol_heap = cos.cos_symbol_heap <:= (dp_type, EI_DynamicTypeWithVars vars type local_dynamics)
 		  (dp_var, cos_var_heap) = retrieveRefCount dp_var cos.cos_var_heap
-		= ({ pattern & dp_rhs = dp_rhs, dp_var = dp_var }, free_vars, { cos & cos_var_heap = cos_var_heap })
+		  cos = { cos & cos_var_heap = cos_var_heap, cos_symbol_heap = cos_symbol_heap }
+		= ({ pattern & dp_rhs = dp_rhs, dp_var = dp_var }, free_vars, [dp_type:dynamics], cos)
+
+instance collectVariables DynamicExpr
+where
+	collectVariables dynamic_expr=:{dyn_expr, dyn_info_ptr} free_vars dynamics cos
+		# (dyn_expr, free_vars, local_dynamics, cos=:{cos_symbol_heap}) = collectVariables dyn_expr free_vars [] cos
+		  cos_symbol_heap = mark_used_dynamic dyn_info_ptr local_dynamics (readPtr dyn_info_ptr cos_symbol_heap)
+		= ({dynamic_expr & dyn_expr = dyn_expr}, free_vars, [dyn_info_ptr:dynamics], { cos & cos_symbol_heap = cos_symbol_heap });
+	where
+		mark_used_dynamic dyn_info_ptr local_dynamics (EI_UnmarkedDynamic opt_type _, symbol_heap) 
+			= symbol_heap <:= (dyn_info_ptr, EI_Dynamic opt_type local_dynamics)
+		mark_used_dynamic dyn_info_ptr local_dynamics (EI_Dynamic opt_type _, symbol_heap) 
+			= symbol_heap <:= (dyn_info_ptr, EI_Dynamic opt_type local_dynamics)
 
 instance collectVariables BoundVar
 where
-	collectVariables var=:{var_name,var_info_ptr,var_expr_ptr} free_vars cos=:{cos_var_heap}
+	collectVariables var=:{var_name,var_info_ptr,var_expr_ptr} free_vars dynamics cos=:{cos_var_heap}
 		#! var_info = sreadPtr var_info_ptr cos_var_heap
 		= case var_info of
 			VI_Alias alias
-				#  (original, free_vars, cos) = collectVariables alias free_vars cos
-				-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, cos)
+				#  (original, free_vars, dynamics, cos) = collectVariables alias free_vars dynamics cos
+				-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
 			VI_Count count is_global
 				| count > 0 || is_global
-					-> (var, free_vars, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
-					-> (var, [{fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ],
+					-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
+					-> (var, [{fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics,
 								{ cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
 			_
 				-> abort "collectVariables [BoundVar] (transform, 1227)" // <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
