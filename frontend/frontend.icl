@@ -1,6 +1,6 @@
 implementation module frontend
 
-import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics
+import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics, convertimportedtypes
 //import RWSDebug
 import analtypes
 import generics
