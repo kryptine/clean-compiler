@@ -345,22 +345,27 @@ getconversion whichtable dcl=:{dcl_conversions=No}
      Reuse function symbols where applicable.
 */
 
-/*
 stc_funcdef ::
-    {#DclModule}
-    (FuncDef SuclSymbol SuclVariable)
- -> FunctionBody
+    {#DclModule}                        // DCL for looking up constructor types
+    *ExpressionHeap                     // Fresh expression space
+    *(Heap VarInfo)                     // Fresh variable space
+    (FuncDef SuclSymbol SuclVariable)   // Function definition to convert
+ -> ( *ExpressionHeap                   // Remaining expression space
+    , *(Heap VarInfo)                   // Remaining variable space
+    , FunctionBody                      // Converted function body
+    )
 
-stc_funcdef dcl_mods (args,body)
-= TransformedBody tb
+stc_funcdef dcl_mods exprheap0 varheap0 (args,body)
+= (exprheap1,varheap2,TransformedBody tb)
   where tb
-        = { tb_args = map convert_symbol args
-          , tb_rhs  = convert_funcbody dcl_mods body
+        = { tb_args = map freevarenv args
+          , tb_rhs  = expr
           }
-
-convert_symbol :: SuclSymbol ->Expression
-
-*/
+        (exprheap1,varheap2,expr)
+        = convert_funcbody dcl_mods 1 args freevarenv exprheap0 varheap1 body
+        (freevarenv,varheap1,patnodes)
+        = allocate_freevars 0 noexpr varheap0 args
+        noexpr = mstub "std_funcdef" "open variable in rhs but not lhs"
 
 /*
 
@@ -388,7 +393,7 @@ convert_funcbody ::
     {#DclModule}                        // Dcl modules for looking up constructor types
     Level                               // (Lexical?) level for new variables
     [SuclVariable]                      // Nodes from case variables in the environment
-    (SuclVariable -> Expression)        // Mapping from free nodes to expressions
+    (SuclVariable -> FreeVar)           // Mapping from free nodes to expressions
     *ExpressionHeap                     // Fresh expression space
     *(Heap VarInfo)                     // Fresh variable space
     !(FuncBody SuclSymbol SuclVariable) // Function body to convert
@@ -442,13 +447,13 @@ convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPat
         match_failure_reference = Var default_boundvar
 
 convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (BuildGraph srgraph)
-= convert_graph patnodes freevarenv level srgraph varheap0 exprheap0
+= convert_graph patnodes (FreeVar o freevarenv) level srgraph varheap0 exprheap0
 
 convert_matchpatterns ::
     {#DclModule}                    // DCL modules
     (  Int                          // Level to assign to free variables
        [SuclVariable]               // List of pattern nodes
-       (SuclVariable->Expression)   // Assigning FreeVars to variables from the environment
+       (SuclVariable->FreeVar)      // Assigning FreeVars to variables from the environment
        *ExpressionHeap              // Initial expression heap for case branch
     ->*(  *(Heap VarInfo)           // Initial variable heap for case branch
        -> ( *ExpressionHeap         // Modified expression heap from case branch
@@ -459,7 +464,7 @@ convert_matchpatterns ::
        )
     )
     [SuclVariable]                  // List of pattern nodes
-    (SuclVariable->Expression)      // Assigning FreeVars to variables from the environment
+    (SuclVariable->FreeVar)         // Assigning FreeVars to variables from the environment
     *ExpressionHeap                 // Initial expression heap
     *(Heap VarInfo)                 // Initial variable heap
     Expression                      // Default expression
@@ -489,7 +494,7 @@ convert_matchpattern ::
     {#DclModule}                    // DCL modules
     (  Level                        // Level to assign to free variables
        [SuclVariable]               // List of pattern nodes
-       (SuclVariable->Expression)   // Assigning FreeVars to variables from the environment
+       (SuclVariable->FreeVar)      // Assigning FreeVars to variables from the environment
        *ExpressionHeap              // Initial expression heap for case branch
     ->*(  *(Heap VarInfo)           // Initial variable heap for case branch
        -> ( *ExpressionHeap         // Modified expression heap from case branch
@@ -500,7 +505,7 @@ convert_matchpattern ::
        )
     )
     [SuclVariable]                  // List of pattern nodes
-    (SuclVariable->Expression)      // Assigning FreeVars to variables from the environment
+    (SuclVariable->FreeVar)         // Assigning FreeVars to variables from the environment
     *ExpressionHeap                 // Initial expression heap
     *(Heap VarInfo)                 // Initial variable heap
     Expression                      // Default expression
@@ -522,7 +527,7 @@ convert_matchpattern dcl_mods build_casebranch patnodes0 freevarenv0 exprheap0 v
         (cip,exprheap1) = newPtr EI_Empty exprheap0
         case_expression = Case ci
         ci
-        = { case_expr = freevarenv0 pnode
+        = { case_expr = FreeVar (freevarenv0 pnode)
           , case_guards = cps
           , case_default = Yes default_expression
           , case_ident = No
@@ -536,10 +541,10 @@ convert_matchpattern dcl_mods build_casebranch patnodes0 freevarenv0 exprheap0 v
 
 allocate_freevars ::
     Level
-    (SuclVariable->Expression)
+    (SuclVariable->FreeVar)
     *(Heap VarInfo)
     .[SuclVariable]
- -> ( (SuclVariable->Expression)
+ -> ( (SuclVariable->FreeVar)
     , .Heap VarInfo
     , .[FreeVar]
     )
@@ -561,7 +566,7 @@ allocate_freevars level freevarenv0 varheap0 [pnode:pnodes]
         (varinfoptr,varheap1) = newPtr VI_Empty varheap0
         (freevarenv1,varheap2,freevars)
          = allocate_freevars level freevarenv0 varheap1 pnodes
-        freevarenv2 = adjust pnode (FreeVar freevar) freevarenv1
+        freevarenv2 = adjust pnode freevar freevarenv1
 
 convert_constructor :: {#DclModule} SuclSymbol [FreeVar] Expression -> CasePatterns
 convert_constructor dcl_mods (SuclInt  i) [] expr = mkbps BT_Int  (BVI (toString i)) expr

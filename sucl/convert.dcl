@@ -2,16 +2,19 @@ definition module convert
 
 // $Id$
 
-from syntax import FunDef,FunType
-from checksupport import DclModule
+from newfold import FuncDef
 from rule import Rule
 from coreclean import SuclTypeSymbol,SuclTypeVariable,SuclSymbol,SuclSymbolKind,SuclVariable
+from checksupport import DclModule
+from syntax import FunDef,FunType,ExpressionHeap
 
 // Transitively required stuff
-from syntax import Ident,Priority,FunctionBody,Optional,SymbolType,Position,DefOrImpFunKind,FunInfo,SymbolPtr,TypeVar,AType,AType,TypeContext,AttributeVar,AttrInequality,FunCall,Index,Level,FreeVar,FreeVar,ExprInfoPtr,BITVECT,Ptr,Specials,SymbolTableEntry,TypeVarInfoPtr,TypeAttribute,Annotation,Type,Context,Global,DefinedSymbol,Type,VarInfoPtr,AttrVarInfoPtr,Expression,VarInfoPtr,Ptr,ExprInfo,PtrN,HeapN,PtrN,STE_Kind,TypeVarInfo,VarInfo,AttrVarInfo,CheckedTypeDef,ClassDef,ClassInstance,ConsDef,Declaration,GenericDef,IndexRange,MemberDef,SelectorDef,ATypeVar,DeclarationRecord,GenericClassInfos,GenericType,InstanceType,TypeDef,TypeKind,TypeRhs,GenericClassInfo
+from newfold import FuncBody
 from StdString import String
 from checksupport import CommonDefs,ConversionTable,Declarations
+from syntax import Ident,Priority,FunctionBody,Optional,SymbolType,Position,DefOrImpFunKind,FunInfo,SymbolPtr,TypeVar,AType,AType,TypeContext,AttributeVar,AttrInequality,FunCall,Index,Level,FreeVar,FreeVar,ExprInfoPtr,BITVECT,Ptr,Specials,SymbolTableEntry,TypeVarInfoPtr,TypeAttribute,Annotation,Type,Context,Global,DefinedSymbol,Type,VarInfoPtr,AttrVarInfoPtr,Expression,VarInfoPtr,Ptr,ExprInfo,PtrN,HeapN,PtrN,STE_Kind,TypeVarInfo,VarInfo,AttrVarInfo,CheckedTypeDef,ClassDef,ClassInstance,ConsDef,Declaration,GenericDef,IndexRange,MemberDef,SelectorDef,ATypeVar,DeclarationRecord,GenericClassInfos,GenericType,InstanceType,TypeDef,TypeKind,TypeRhs,GenericClassInfo
 from containers import NumberSet
+from Heap import Heap
 
 
 // Cocl to Sucl for functions
@@ -30,3 +33,14 @@ cts_exports ::
     {#DclModule}    // List of imported DCL modules
     Int             // Index of current module
  -> [SuclSymbol]
+
+//Sucl to Cocl for function bodies
+stc_funcdef ::
+    {#DclModule}                        // DCL for looking up constructor types
+    *ExpressionHeap                     // Fresh expression space
+    *(Heap VarInfo)                     // Fresh variable space
+    (FuncDef SuclSymbol SuclVariable)   // Function definition to convert
+ -> ( *ExpressionHeap                   // Remaining expression space
+    , *(Heap VarInfo)                   // Remaining variable space
+    , FunctionBody                      // Converted function body
+    )
