@@ -1,7 +1,5 @@
 definition module pretty
 
-// $Id$
-
 from StdFile import <<<
 from StdString import String
 

@@ -1,14 +1,8 @@
 implementation module spine
 
-// $Id$
-
-import history
 import rule
-import dnc
-import graph
 import pfun
 import basic
-from general import No,Yes
 import StdEnv
 
 /*
@@ -92,22 +86,6 @@ that the node was in root normal form.
 :: Answer sym var pvar
    :== Optional (Spine sym var pvar)
 
-printanswer ::
-    (sym->String)
-    (var->String)
-    (pvar->String)
-    String
- -> (Answer sym var pvar)
-    *File
- -> .File
- |  == var
- &  == pvar
-
-printanswer showsym showvar showpvar indent
-= foldoptional (printrnf indent) (printspine showsym showvar showpvar indent)
-
-printrnf indent file = file <<< indent <<< "RNF" <<< nl
-
 /*
 
 Spine  describes the spine returned by a strategy.  It contains the node
@@ -134,30 +112,6 @@ at which the strategy was applied, and the result for that node.
 
 :: Spine sym var pvar
    :== (var,Subspine sym var pvar)
-
-printspine ::
-    (sym->String)
-    (var->String)
-    (pvar->String)
-    String
- -> (Spine sym var pvar)
-    *File
- -> .File
- |  == var
- &  == pvar
-
-printspine showsym showvar showpvar indent
-= foldspine pair cycle delta force missingcase open partial unsafe redex strict
-  where pair node (line,printrest) file = printrest (file <<< indent <<< showvar node <<< ": " <<< line <<< nl)
-        cycle = ("Cycle",id)
-        delta = ("Delta",id)
-        force argno printrest = ("Force argument "+++toString argno,printrest)
-        missingcase = ("MissingCase",id)
-        open rgraph = ("Open "+++hd (printgraphBy showsym showpvar (rgraphgraph rgraph) [rgraphroot rgraph]),id)
-        partial rule matching pvar printrest = ("Partial <fn> "+++showruleanch showsym showpvar (repeat False) rule [pvar]+++" <"+++showpvar pvar+++"> "+++showpfun showpvar showvar matching,printrest)
-        unsafe rgraph = ("Unsafe "+++hd (printgraphBy showsym showvar (rgraphgraph rgraph) [rgraphroot rgraph]),id)
-        redex rule matching = ("Redex <fn> "+++showruleanch showsym showpvar (repeat False) rule []+++" "+++showpfun showpvar showvar matching,id)
-        strict = ("Strict",id)
 
 /*
 
@@ -191,7 +145,7 @@ in a graph.
     =   pr
         where pr Cycle = "Cycle"
               pr Delta = "Delta"
-              pr (Force argno spine) = "(Force <argno> "++printspine printa printb printc spine++")"
+              pr (Force spine) = "(Force "++printspine printa printb printc spine++")"
               pr MissingCase = "MissingCase"
               pr (Open rgraph) = "(Open "++printrgraph printa printc rgraph++")"
               pr (Partial rule matching spine) = "(Partial "++printrule printa printc rule++' ':printpfun printc printb matching++' ':printspine printa printb printc spine++")"
@@ -202,15 +156,15 @@ in a graph.
 */
 
 :: Subspine sym var pvar
-   = Cycle                                                              // The spine contains a cycle
-   | Delta                                                              // An imported (delta) rule was found
-   | Force Int (Spine sym var pvar)                                     // Global strictness annotation forced evaluation of a subgraph at specified argument position
-   | MissingCase                                                        // All alternatives failed for a function symbol
-   | Open (Rgraph sym pvar)                                             // Need root normal form of open node for matching
-   | Partial (Rule sym pvar) (Pfun pvar var) pvar (Spine sym var pvar)  // A rule was strictly partially matched
-   | Unsafe (HistoryPattern sym var)                                    // Terminated due to immininent recursion
-   | Redex (Rule sym pvar) (Pfun pvar var)                              // Total match
-   | Strict                                                             // Need root normal form due to strictness
+   = Cycle                                                        // The spine contains a cycle
+   | Delta                                                        // An imported (delta) rule was found
+   | Force (Spine sym var pvar)                                   // Global strictness annotation forced evaluation of a subgraph
+   | MissingCase                                                  // All alternatives failed for a function symbol
+   | Open (Rgraph sym pvar)                                       // Need root normal form of open node for matching
+   | Partial (Rule sym pvar) (Pfun pvar var) (Spine sym var pvar) // A rule was strictly partially matched
+   | Unsafe (Rgraph sym var)                                      // Terminated due to immininent recursion
+   | Redex (Rule sym pvar) (Pfun pvar var)                        // Total match
+   | Strict                                                       // Need root normal form due to strictness
 
 /*
 
@@ -244,18 +198,18 @@ in a graph.
 */
 
 foldspine
- :: !(var .subresult -> .result)                                    // Fold the spine itself
-    .subresult                                                      // Fold a Cycle subspine
-    .subresult                                                      // Fold a Delta subspine
-    (Int .result -> .subresult)                                     // Fold a Force subspine
-    .subresult                                                      // Fold a MissingCase subspine
-    ((Rgraph sym pvar) -> .subresult)                               // Fold an Open subspine
-    ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)    // Fold a Partial subspine
-    ((HistoryPattern sym var) -> .subresult)                        // Fold an Unsafe subspine
-    ((Rule sym pvar) (Pfun pvar var) -> .subresult)                 // Fold a Redex subspine
-    .subresult                                                      // Fold a Strict subspine
-    .(Spine sym var pvar)                                           // The spine to fold
- -> .result                                                         // The final result
+ :: !(var .subresult -> .result)
+    .subresult
+    .subresult
+    (.result -> .subresult)
+    .subresult
+    ((Rgraph sym pvar) -> .subresult)
+    ((Rule sym pvar) (Pfun pvar var) .result -> .subresult)
+    ((Rgraph sym var) -> .subresult)
+    ((Rule sym pvar) (Pfun pvar var) -> .subresult)
+    .subresult
+    .(Spine sym var pvar)
+ -> .result
 
 foldspine pair cycle delta force missingcase open partial unsafe redex strict spine
 = fold spine
@@ -264,118 +218,27 @@ foldspine pair cycle delta force missingcase open partial unsafe redex strict sp
           where (node,subspine) = spine
         foldsub Cycle = cycle
         foldsub Delta = delta
-        foldsub (Force argno spine) = force argno (fold spine)
+        foldsub (Force spine) = force (fold spine)
         foldsub MissingCase = missingcase
         foldsub (Open rgraph) = open rgraph
-        foldsub (Partial rule matching rnode spine) = partial rule matching rnode (fold spine)
-        foldsub (Unsafe histpat) = unsafe histpat
+        foldsub (Partial rule matching spine) = partial rule matching (fold spine)
+        foldsub (Unsafe rgraph) = unsafe rgraph
         foldsub (Redex rule matching) = redex rule matching
         foldsub Strict = strict
 
 spinetip :: !(Spine sym var pvar) -> Spine sym var pvar
-spinetip (_,Force argno spine) = spinetip spine
-spinetip (_,Partial _ _ pnode spine) = spinetip spine
+spinetip (_,Force spine) = spinetip spine
+spinetip (_,Partial _ _ spine) = spinetip spine
 spinetip spine = spine
 
 spinenodes :: .(Spine sym var pvar) -> [var]
 spinenodes spine
-= nodes
-  where partial _ _ _ = id
+= foldspine cons [] [] id [] (const []) partial (const []) redex [] spine
+  where partial _ _ = id
         redex _ _ = []
-        nodes = foldspine cons [] [] (const id) [] (const []) partial (const []) redex [] spine
 
 ifopen :: result result !.(Answer sym var pvar) -> result
 ifopen open other spine
 = foldoptional other (checkopen o spinetip) spine
   where checkopen (onode,Open pattern) = open
         checkopen tip = other
-
-
-/*********************************************
-* Extending the history according to a spine *
-*********************************************/
-
-// A function that associates specific patterns with extensible nodes
-// To be used for extending history patterns
-:: LinkExtender sym var
-   :== (Link var)               // The extensible link to look for
-    -> HistoryPattern sym var   // The associated pattern
-
-extendhistory
- :: (Graph sym var)
-    (var -> var)
-    (Spine sym var pvar)
-    (History sym var)
- -> History sym var
- |  == var
- &  == pvar
-
-extendhistory sgraph redirection spine history
-= snd (foldspine (extendpair sgraph redirection) d d (const id) d (const d) (extendpartial sgraph) (const d) (extendredex sgraph history) d spine)
-  where d = (emptygraph,history)
-
-
-extendpair
- :: (Graph sym var)
-    (var->var)
-    var
-    (Graph sym var,History sym var)
- -> (Graph sym var,History sym var)
- |  == var
-
-extendpair sgraph redirect snode (hgraph,history)
-= (hgraph`,remap (redirect snode) [mkrgraph snode hgraph`:foldmap id [] history snode] (forget snode history))
-  where hgraph` = if sdef (updategraph snode scont hgraph) hgraph
-        (sdef,scont) = dnc (const "in extendpair") sgraph snode
-
-extendpartial
- :: (Graph sym var)
-    (Rule sym pvar)
-    (Pfun pvar var)
-    pvar
-    (Graph sym var,History sym var)
- -> (Graph sym var,History sym var)
- |  == var
- &  == pvar
-
-extendpartial sgraph rule matching rnode (hgraph,history)
-= (extgraph` sgraph rule matching hgraph,history)
-
-extendredex
- :: (Graph sym var)
-    (History sym var)
-    (Rule sym pvar)
-    (Pfun pvar var)
- -> (Graph sym var,History sym var)
- |  == var
- &  == pvar
-
-extendredex sgraph history rule matching
-= (extgraph` sgraph rule matching emptygraph,history)
-
-extgraph` :: (Graph sym var) (Rule sym pvar) -> (Pfun pvar var) (Graph sym var) -> Graph sym var | == var & == pvar
-extgraph` sgraph rule
-= extgraph sgraph rgraph (varlist rgraph (arguments rule))
-  where rgraph = rulegraph rule
-
-(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
-(writeanswer) file No = file <<< "<root-normal-form>" <<< nl
-(writeanswer) file (Yes spine) = file writespine spine <<< nl
-
-(writespine) infixl :: *File (Spine sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
-(writespine) file (var,subspine) = file <<< "(" <<< var <<< "," <<< subspine <<< ")"
-
-instance <<< (Subspine sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
-where
-/*
-      (<<<) file _ = file <<< "<subspine>"
-*/
-      (<<<) file Cycle = file <<< "Cycle"
-      (<<<) file Delta = file <<< "Delta"
-      (<<<) file (Force argno spine) = file <<< "Force " <<< argno <<< " " writespine spine
-      (<<<) file MissingCase = file <<< "MissingCase"
-      (<<<) file (Open pattern) = file <<< "Open <rgraph>"
-      (<<<) file (Partial rule matching focus spine) = file <<< "Partial {rule=<Rule sym pvar>, matching=<Pfun pvar var>, focus=<pvar>, spine=" writespine spine <<< "}"
-      (<<<) file (Unsafe pattern) = file <<< "Unsafe " writergraph pattern
-      (<<<) file (Redex rule matching) = file <<< "Redex {rule=<Rule sym pvar>, matching=<Pfun pvar var>}"
-      (<<<) file Strict = file <<< "Strict"

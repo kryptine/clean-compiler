@@ -1,7 +1,5 @@
 definition module basic
 
-// $Id$
-
 /*
 
 Basic definitions
@@ -14,8 +12,6 @@ Basic types and functions.
 
 */
 
-from general import Optional
-from StdFile import <<<
 import StdOverloaded
 import StdString
 
@@ -28,10 +24,7 @@ Implementation
 
 // The optional type of type t is a type like t
 // where the actual t value may be present or absent.
-//:: Optional t = Absent | Present t
-//Now using Optional from cocl's general module
-
-instance == (Optional a) | == a
+:: Optional t = Absent | Present t
 
 
 // Adjust a function for a single argument
@@ -56,9 +49,6 @@ disjoint :: .[elem] !.[elem] -> Bool | == elem
 // `Eqlen xs ys' determines whether `xs' and `ys' are equally long.
 eqlen :: ![.elem1] ![.elem2] -> .Bool
 
-// Extend a function using the elements of a mapping
-extendfn :: [(src,dst)] (src->dst) src -> dst | == src
-
 // `Foldlm' is a combination of foldl and map.
 foldlm :: ((.collect,.elem) -> (.collect,.elem`)) !(.collect,![.elem]) -> (.collect,[.elem`])
 
@@ -73,9 +63,6 @@ foldmap :: (x:res -> w:res`) w:res` -> u:(![(arg,x:res)] -> v:(arg -> w:res`)) |
 // Foldoptional is the standard fold for the optional type.
 foldoptional :: .res .(.t -> .res) !(Optional .t) -> .res
 
-// Force evaluation of first argument to root normal form before returning second
-force :: !.a .b -> .b
-
 // Forget drops a mapped value from a map given by a list.
 forget :: val -> .(![.(val,res)] -> .[(val,res)]) | == val
 
@@ -85,9 +72,6 @@ indent :: .String -> .([.String] -> .[String])
 
 // `Identifiers' is the list of all identifiers
 identifiers :: [String]
-
-// `Inccounter m f' increments counting function f by one at point m.
-inccounter :: a (a->b) a -> b | == a & +,one b
 
 // `Intersect xs ys' is the intersection of list `ys' with list `xs'.
 intersect :: ![elem] [elem] -> .[elem] | == elem
@@ -100,12 +84,6 @@ join :: a ![.[a]] -> .[a]
    is designed for maximum sharing.
 */
 kleene :: !.[symbol] -> .[[symbol]]
-
-// Lazy variant of the predefined abort function
-error :: .String -> .a
-
-// Determine the string representation of a list
-listToString :: [a] -> String | toString a
 
 // Lookup finds a value mapped in a list mapping.
 lookup :: u:([(arg,w:res)] -> v:(arg -> w:res)) | == arg, [v u <= w]
@@ -131,17 +109,11 @@ mappair :: .(.a -> .b) .(.c -> .d) !(.a,.c) -> (.b,.d)
 // Map a function onto the second element of a 2-tuple.
 mapsnd :: v:(.a -> .b) -> u:((.c,.a) -> (.c,.b)), [u <= v]
 
-// Map a function on the second element of a triple.
-mapsnd3 :: v:(.a -> .b) -> u:((.c,.a,.d) -> (.c,.b,.d)), [u <= v]
-
 // Map a function onto the tail of a list.
 maptl :: .(x:[.a] -> u:[.a]) !w:[.a] -> v:[.a], [u <= v, w <= x]
 
 // Map three functions onto a triple.
 maptriple :: x:(.a -> .b) w:(.c -> .d) v:(.e -> .f) -> u:((.a,.c,.e) -> (.b,.d,.f)), [u <= v, u <= w, u <= x]
-
-// String representation of line terminator
-nl :: String
 
 // Pairwith pairs a value with its result under a given function
 pairwith :: .(arg -> .res) arg -> (arg,.res)
@@ -169,17 +141,11 @@ relimg :: ![(a,.b)] a -> [.b] | == a
 // `Remap x y mapping' alters the mapping by associating y with x, removing the old values.
 remap :: a b [.(a,b)] -> .[(a,b)] | == a
 
-// A variant of foldl that is strict in its accumulator
-sfoldl :: (.a -> .(.b -> .a)) !.a [.b] -> .a
-
 // `Shorter xs' determines whether a list is shorter than list `xs'.
 shorter :: ![.a] [.b] -> .Bool
 
 // `Showbool b' is the string representation of boolean `b'.
 showbool :: .(!.Bool -> a) | fromBool a
-
-// Determine a string representation of a list
-showlist :: (.elem -> .String) ![.elem] -> String
 
 // `Showoptional showa opt' is the string representation of optional value `opt',
 // where `showa' determines the string representation of the inner value.
@@ -198,26 +164,5 @@ showtriple :: !.(.a -> .String) !.(.b -> .String) !.(.c -> .String) !(.a,.b,.c) 
 // `Split sep' splits a list into a list of sublists which are separated by `sep'.
 split :: a -> .(.[a] -> [.[a]]) | == a
 
-// `Stub modulename functionname message' aborts with a explanatory message
-stub :: .String .String .String -> .a
-
 // `Superset xs ys' determines whether ys is a superset (actually, super-multi-set or super-list) of xs.
 superset :: .[a] -> .(.[a] -> Bool) | == a
-
-// zipwith zips up two lists with a joining function
-zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
-
-// Strict version of --->, which evaluates its lhs first
-(<---) infix :: !.a !b -> .a | <<< b
-
-// Sequential evaluation of left and right arguments
-($) infixr :: !.a .b -> .b
-
-// List subtraction (lazier than removeMembers)
-(--) infixl :: !.[elem] .[elem] -> .[elem] | == elem
-
-// Write a list of things, each one terminated by a newline
-(writeList) infixl :: !*File [a] -> .File | <<< a
-
-// Prettyprint a list to a file with indent
-printlist :: (elem->String) String [elem] *File -> .File

@@ -1,7 +1,5 @@
 implementation module pretty
 
-// $Id$
-
 import StdEnv
 
 :: Layout

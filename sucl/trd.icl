@@ -1,11 +1,8 @@
 implementation module trd
 
-// $Id$
-
 import rule
 import graph
 import basic
-from general import --->
 import StdEnv
 
 /*
@@ -81,8 +78,8 @@ argument type of n.
 
 ruletype
  :: .[tvar]
-    ((Node sym var) -> Rule tsym trvar)
-    (Rule sym var)
+    ((Node sym var) -> .Rule tsym trvar)
+    .(Rule sym var)
  -> .Rule tsym tvar
  |  == var
  &  == tsym
@@ -113,17 +110,17 @@ been assigned to the node and its arguments.
 */
 
 buildtype
- :: .((Node sym var) -> Rule tsym trvar)                                       // Assignement of type rules to symbols
+ :: .((Node sym var) -> .Rule tsym trvar)                                       // Assignement of type rules to symbols
     .(Graph sym var)                                                            // Graph to which to apply typing
     var                                                                         // ???
-    .([tvar] -> .(u:(Graph tsym tvar) -> .(v:[w:(var,tvar)] -> .result)))       // Continuation
+    .([tvar] -> .(z:(Graph tsym tvar) -> .(x:[y:(var,tvar)] -> .result)))       // Continuation
     .[tvar]                                                                     // Type heap
-    u:(Graph tsym tvar)                                                         // Type graph build so far
-    x:[y:(var,tvar)]                                                            // Assignment of type variables to variables
+    w:(Graph tsym tvar)                                                         // Type graph build so far
+    u:[v:(var,tvar)]                                                            // Assignment of type variables to variables
  -> .result                                                                     // Final result
  |  == var
  &  == trvar
- ,  [x<=v,v y<=w,x<=y]
+ ,  [u<=x,v<=y,w<=z]
 
 buildtype typerule graph node bcont theap tgraph assignment
 | def
@@ -134,7 +131,7 @@ buildtype typerule graph node bcont theap tgraph assignment
         trule = typerule cont
         trargs = arguments trule; trroot = ruleroot trule; trgraph = rulegraph trule
         trnodes = varlist trgraph [trroot:trargs]
-        (tnodes,theap`) = (claim--->"basic.claim begins from trd.buildtype") trnodes theap
+        (tnodes,theap`) = claim trnodes theap
         matching = zip2 trnodes tnodes
         tgraph` = foldr addnode tgraph matching
         addnode (trnode,tnode)
@@ -148,13 +145,13 @@ buildtype typerule graph node bcont theap tgraph assignment
 
 sharepair
  :: (.var,.var)                                    // Variables to share
-    w:((.var->var2) -> v:((Graph sym var2) -> .result))       // Continuation
+    w:((.var->var2) -> v:(x:(Graph sym var2) -> .result))       // Continuation
     (.var->var2)                                   // Redirection
-    (Graph sym var2)                              // Graph before redirection
+    u:(Graph sym var2)                              // Graph before redirection
  -> .result                  // Final result
  |  == sym
  &  == var2
- ,  [v<=w]
+ ,  [u<=x,v<=w]
 
 sharepair lrnode spcont redirection graph
 = share (mappair redirection redirection lrnode) spcont redirection graph

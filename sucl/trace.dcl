@@ -1,17 +1,8 @@
 definition module trace
 
-// $Id$
-
+from history import History
 from spine import Answer
-from history import History,HistoryAssociation,HistoryPattern
 from rule import Rule
-from StdFile import <<<
-from StdOverloaded import ==
-from StdString import toString
-from cleanversion import String
-
-// Transitive necessities
-
 from spine import Spine,Subspine // for Answer
 from rule import Rgraph          // for History
 from basic import Optional       // for Answer
@@ -164,19 +155,15 @@ Implementation
    = Reduce var (Trace sym var pvar)
    | Annotate (Trace sym var pvar)
    | Stop
-   | Instantiate (Rgraph sym var)
+   | Instantiate (Trace sym var pvar)
                  (Trace sym var pvar)
-                 (Trace sym var pvar)
-
-/* Disable the new abstraction node for now...
-
    | Abstract [Abstraction sym var pvar]
 
 :: Abstraction sym var pvar
    = NewAbstraction (Trace sym var pvar)
    | KnownAbstraction (Rule sym var)
 
-   Alternatives for the Abstract constructor:
+/* Alternatives for the Abstract constructor:
 
      Abstract [Trace sym var pvar]
      together with: Backpointer (Trace sym var pvar)
@@ -250,22 +237,8 @@ Implementation
 >             (args',root':anchors') = claim args reprs
 >             reprs = printgraph printa printb graph (args++root:anchors)
 >             annot strict repr = cond strict ('!':) id (repr++" ")
-*/
-
-printtrace ::
-    sym                     // LHS function symbol
-    (sym->String)           // Symbol representation
-    (var->String)           // Variable representation for transformed program
-    (pvar->String)          // Variable representation for consulted program
-    String                  // Indent
-    (Trace sym var pvar)    // Trace
-    *File                   // File before writing
- -> .File                   // File after writing
- |  == var
- &  == pvar
 
 
-/*
 Tips traverses a finite trace and produces the  list  of  rewrite  rules
 that  are  found  at the leaves of the tree.  This list of rewrite rules
 precisely constitutes the result of symbolic reduction of  the  original
@@ -275,7 +248,7 @@ been applied; this has to be done afterwards.
 >   tips :: trace * ** *** -> [rule * **]
 
 >   tips
->   =   oldtrace reduce annotate stop instantiate
+>   =   foldtrace reduce annotate stop instantiate
 >       where reduce stricts rule answer history reductroot = id
 >             annotate stricts rule answer history = id
 >             stop stricts rule answer history = [rule]
@@ -299,7 +272,7 @@ foldtrace
  :: ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) var .result -> .result)
     ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) .result -> .result)
     ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) -> .result)
-    ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) (Rgraph sym var) .result .result -> .result)
+    ([Bool] (Rule sym var) (Answer sym var pvar) (History sym var) .result .result -> .result)
     !.(Trace sym var pvar)
  -> .result
 
@@ -308,11 +281,9 @@ foldtransformation
     (var .result -> .subresult)
     (.result -> .subresult)
     .subresult
-    ((Rgraph sym var) .result .result -> .subresult)
+    (.result .result -> .subresult)
     ([.absresult] -> .subresult)
     ((Rule sym var) -> .absresult)
     (.result -> .absresult)
     !.(Transformation sym var pvar)
  -> .subresult
-
-instance <<< (Trace sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar

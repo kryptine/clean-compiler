@@ -1,15 +1,3 @@
-implementation module canon
-
-// $Id$
-
-import rule
-import graph
-import basic
-import general
-import StdEnv
-
-/*
-
 canon.lit - Area canonicalization
 =================================
 
@@ -55,29 +43,13 @@ steps:
 (3) Relabeling the nodes in a standard way.
 
 >   canonise :: (*->rule **** *****) -> [***] -> rgraph * ** -> rgraph * ***
->   canonise typerule heap = relabel heap.etaexpand typerule.splitrg.relabel localheap
-
-*/
-
-canonise :: (sym -> Int) [var2] (Rgraph sym var1) -> Rgraph sym var2 | == var1
-canonise arity heap rg
- = (relabel heap o etaexpand arity o splitrg o relabel localheap) rg
-
-/*
+>   canonise typerule heap = relabel heap.uncurry typerule.split.relabel localheap
 
 >   split :: rgraph * num -> rgraph * num
 >   split rgraph
 >   =   foldsingleton single rgraph rgraph
 >       where single root sym args = mkrgraph root (updategraph root (sym,fst (claim args (localheap--[root]))) emptygraph)
 
-*/
-
-splitrg :: (Rgraph sym Int) -> Rgraph sym Int
-splitrg rgraph
- = foldsingleton single rgraph rgraph
-   where single root sym args = mkrgraph root (updategraph root (sym,fst (claim args (localheap--[root]))) emptygraph)
-
-/*
 >   uncurry :: (*->rule **** *****) -> rgraph * num -> rgraph * num
 >   uncurry typerule rgraph
 >   =   f (nc root)
@@ -87,38 +59,17 @@ splitrg rgraph
 >             f cont = rgraph
 >             nc = nodecontents graph
 >             root = rgraphroot rgraph; graph = rgraphgraph rgraph
-*/
 
-etaexpand :: (sym->Int) (Rgraph sym Int) -> Rgraph sym Int
-etaexpand arity rgraph
- = f (nc root)
-   where f (True,(sym,args))
-          = mkrgraph root (updategraph root (sym,take (arity sym) (args++(localheap--(varlist graph [root])))) graph)
-         f cont = rgraph
-         nc = varcontents graph
-         root = rgraphroot rgraph; graph = rgraphgraph rgraph
+>   localheap = [0..]
 
-localheap :: [Int]
-localheap =: [0..]
-
-/*
 ------------------------------------------------------------------------
 
 >   foldarea :: (rgraph * **->*) -> rgraph * ** -> (*,[**])
 >   foldarea label rgraph
 >   =   (label rgraph,foldsingleton single nosingle rgraph)
 >       where single root sym args = args
->             nosingle = snd (varset (rgraphgraph rgraph) [rgraphroot rgraph])
-*/
+>             nosingle = snd (nodeset (rgraphgraph rgraph) [rgraphroot rgraph])
 
-foldarea :: ((Rgraph sym var) -> sym) (Rgraph sym var) -> Node sym var | == var
-foldarea label rgraph
- = (labelrgraph,foldsingleton single nosingle rgraph)
-   where single root sym = id
-         nosingle = snd (graphvars (rgraphgraph rgraph) [rgraphroot rgraph])
-         labelrgraph = label rgraph
-
-/*
 ------------------------------------------------------------------------
 
 >   labelarea :: [rgraph * **] -> [*] -> rgraph * ** -> *
@@ -134,31 +85,9 @@ foldarea label rgraph
 >             getlabel (True,(asym,aargs)) labels = (asym,labels), if ~or (map (fst.nc) aargs)
 >             getlabel acont (label:labels) = (label,labels)
 >             getlabel = error "maketable: out of labels"
->             nc = varcontents agraph
+>             nc = nodecontents agraph
 >             aroot = rgraphroot area; agraph = rgraphgraph area
-*/
 
-labelarea :: (sym->Bool) [Rgraph sym var] [sym] (Rgraph sym var) -> sym | == sym & == var
-labelarea reusable areas labels rg
- = foldmap id nolabel (maketable reusable areas labels) rg
-   where nolabel = abort "canon: labelarea: no label assigned to area"
-
-maketable :: (sym->Bool) [Rgraph sym var] [sym] -> [(Rgraph sym var,sym)] | == var
-maketable _ [] _ = []
-maketable reusable [area:areas] labels
- = [(area,label):maketable reusable areas labels`]
-   where (label,labels`) = getlabel (nc aroot) labels
-         getlabel (True,(asym,aargs)) labels
-          | reusable asym && not (or (map (fst o nc) aargs))
-            = (asym,labels)
-         getlabel acont [label:labels]
-          = (label,labels)
-         getlabel _ _
-          = abort "canon: maketable: out of labels"
-         nc = varcontents agraph
-         aroot = rgraphroot area; agraph = rgraphgraph area
-
-/*
 ------------------------------------------------------------------------
 
 >   relabel :: [***] -> rgraph * ** -> rgraph * ***
@@ -176,25 +105,7 @@ maketable reusable [area:areas] labels
 >             =   id, otherwise
 >                 where (def,(sym,args)) = nc node
 >             nc = nodecontents graph
-*/
 
-relabel :: [var2] (Rgraph sym var1) -> Rgraph sym var2 | == var1
-relabel heap rgraph
- = mkrgraph (move root) graph`
-   where root = rgraphroot rgraph; graph = rgraphgraph rgraph
-         nodes = varlist graph [root]
-         table = zip2 nodes heap
-         move = foldmap id nonew table
-         nonew = abort "relabel: no new node assigned to node"
-         graph` = foldr addnode emptygraph table
-         addnode (node,node`)
-          | def
-            = updategraph node` (sym,map move args)
-          = id
-            where (def,(sym,args)) = nc node
-         nc = varcontents graph
-
-/*
 >   foldsingleton
 >   ::  (**->*->[**]->***) ->
 >       *** ->
@@ -207,21 +118,3 @@ relabel heap rgraph
 >             f cont = nosingle
 >             nc = nodecontents graph
 >             root = rgraphroot rgraph; graph = rgraphgraph rgraph
-*/
-
-foldsingleton ::
-    (var sym [var] -> pvar)
-    pvar
-    (Rgraph sym var)
- -> pvar
- |  == var
-
-foldsingleton single nosingle rgraph
- = case nc root
-   of (True,(sym,args))
-       | not (or (map (fst o nc) args))
-         -> single root sym args
-      _
-       -> nosingle
-   where nc = varcontents graph
-         root = rgraphroot rgraph; graph = rgraphgraph rgraph

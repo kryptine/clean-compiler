@@ -1,10 +1,7 @@
 implementation module graph
 
-// $Id$
-
 import pfun
 import basic
-import general
 import StdEnv
 
 /*
@@ -22,7 +19,7 @@ functions to manipulate them.
 
 // A mapping from variables to nodes (unrooted)
 :: Graph sym var
-    = GraphAlias !(Pfun var (Node sym var))
+   :== Pfun var (Node sym var)
 
 // A node, bearing the contents of a variable
 :: Node sym var
@@ -60,26 +57,26 @@ functions to manipulate them.
 */
 
 // The empty set of bindings
-emptygraph :: .Graph sym var
-emptygraph = GraphAlias emptypfun
+emptygraph :: Graph .sym .var
+emptygraph = emptypfun
 
-updategraph :: var .(Node sym var) !.(Graph sym var) -> .Graph sym var
-updategraph var node graph = mapgraph (extend var node) graph
+updategraph :: .var (Node .sym .var) (Graph .sym .var) -> Graph .sym .var
+updategraph var node graph = extend var node graph
 
-prunegraph :: var !.(Graph sym var) -> .Graph sym var
-prunegraph var graph = mapgraph (restrict var) graph
+prunegraph :: .var (Graph .sym .var) -> Graph .sym .var
+prunegraph var graph = restrict var graph
 
-restrictgraph :: .[var] .(Graph sym var) -> .Graph sym var | == var
-restrictgraph vars graph = mapgraph (domres vars) graph
+restrictgraph :: !.[var] .(Graph sym var) -> Graph sym var | == var
+restrictgraph vars graph = domres vars graph
 
-redirectgraph :: (var->var) !.(Graph sym var) -> .Graph sym var
+redirectgraph :: (.var->.var) !(Graph .sym .var) -> Graph .sym .var | == var
 redirectgraph redirection graph
-= mapgraph (postcomp (mapsnd (map redirection))) graph
+= postcomp (mapsnd (map redirection)) graph
 
-overwritegraph :: !.(Graph sym var) !.(Graph sym var) -> .Graph sym var
-overwritegraph (GraphAlias newpf) oldgraph = mapgraph (overwrite newpf) oldgraph
+overwritegraph :: !(Graph .sym .var) (Graph .sym .var) -> Graph .sym .var
+overwritegraph newgraph oldgraph = overwrite newgraph oldgraph
 
-movegraph :: (var1->var2) !.[var1] .(Graph sym var1) -> .Graph sym var2 | == var1
+movegraph :: (var1->.var2) !.[var1] .(Graph sym var1) -> Graph sym .var2 | == var1
 movegraph movevar varspace oldgraph
 = foldr addvar emptygraph varspace
   where addvar var
@@ -88,9 +85,17 @@ movegraph movevar varspace oldgraph
         = id
           where (def,(sym,args)) = varcontents oldgraph var
 
-varcontents :: !.(Graph sym var) var -> (.Bool,Node sym var) | == var
-varcontents (GraphAlias pfun) v
-= (total (False,(nosym,noargs)) o postcomp found) pfun v
+/*
+>   nodecontents
+>       = total (False,(nosym,noargs)).postcomp s
+>         where s x = (True,x)
+>               nosym = error "nodecontents: getting symbol of open node"
+>               noargs = error "nodecontents: getting arguments of open node"
+*/
+
+varcontents :: !(Graph .sym var) var -> (.Bool,Node .sym var) | == var
+varcontents g v
+= (total (False,(nosym,noargs)) o postcomp found) g v
   where found x = (True,x)
         nosym = abort "varcontents: getting symbol of free variable"
         noargs = abort "varcontents: getting arguments of free variable"
@@ -104,13 +109,13 @@ graphvars graph roots
 graphvars` :: .[var] .(Graph sym var) .[var] -> (.[var],.[var]) | == var
 graphvars` prune graph roots
 = snd (foldlr ns (prune,([],[])) roots)
-  where ns var seenboundfree
-        | isMember var seen = seenboundfree
+  where ns var (seen,boundfree=:(bound,free))
+        | isMember var seen = (seen,boundfree)
         | not def           = ([var:seen],(bound,[var:free]))
                             = (seen`,([var:bound`],free`))
           where (seen`,(bound`,free`)) = foldlr ns ([var:seen],boundfree) args
                 (def,(_,args)) = varcontents graph var
-                (seen,boundfree=:(bound,free)) = seenboundfree
+
 varlist :: .(Graph sym var) !.[var] -> .[var] | == var
 varlist graph roots
 = depthfirst arguments id roots
@@ -158,33 +163,7 @@ prefix graph without vars
 >                               = (seen1,'(':showfunc func++concat (map (' ':) repr1)++")"), otherwise
 >                           (seen1,repr1) = foldlr pg (node:seen,[]) args
 >                           (def,(func,args)) = nodecontents graph node
-*/
 
-printgraph :: .(Graph sym var) .[var] -> .[String] | toString sym & toString var & == var
-printgraph graph nodes = printgraphBy toString toString graph nodes
-
-printgraphBy :: (sym->String) (var->String) .(Graph sym var) .[var] -> .[String] | == var
-printgraphBy showsym showvar graph nodes
-= prntgrph showsym showvar (refcount graph nodes) graph nodes
-
-prntgrph showsym showvar count graph nodes
-= snd (foldlr pg ([],[]) nodes)
-  where pg node (seen,reprs)
-        = (seen2,[repr3:reprs])
-          where repr3
-                = if (not (isMember node seen) && def && count node>1)
-                     (showvar node+++":"+++repr2)
-                     repr2
-                (seen2,repr2)
-                = if (isMember node seen || not def)
-                     (seen,showvar node)
-                     (if (args==[])
-                         (seen1,showsym func)
-                         (seen1,"("+++showsym func+++foldr (+++) ")" (map ((+++)" ") repr1)))
-                (seen1,repr1) = foldlr pg ([node:seen],[]) args
-                (def,(func,args)) = varcontents graph node
-
-/*
 >   refcount graph
 >       = foldr rfcnt (const 0)
 >         where rfcnt node count
@@ -205,17 +184,16 @@ refcount graph roots
           where count` = inccounter var count
                 (def,(_,args)) = varcontents graph var
 
+inccounter m f n = if (n==m) (f n+1) (f n)
+
 /*
 
 Compilegraph compiles a graph from parts.
 Uses in Miranda:
  * reading a parsed program from a file.
-*/
 
-compilegraph :: ![(var,Node sym var)] -> Graph sym var
-compilegraph nds = foldr (uncurry updategraph) emptygraph nds
-
-/*
+>   compilegraph :: [(**,(*,[**]))] -> graph * **
+>   compilegraph = foldr (uncurry updategraph) emptygraph
 
 `Instance g1 g2' determines whether g2 is an instance of g1.
 Uses in Miranda:
@@ -238,7 +216,7 @@ isinstance
  &  == pvar
 
 isinstance (pgraph,pvar) (sgraph,svar)
-= isEmpty (thd3 (findmatching (pgraph,sgraph) (pvar,svar) ([],[],[]))) <--- "graph.isinstance ends"
+= isEmpty (thd3 (findmatching (pgraph,sgraph) (pvar,svar) ([],[],[])))
 
 /*
 
@@ -254,50 +232,31 @@ Uses in Miranda:
  * extract.lit.m: used to find instances of patterns in the termination history, while folding trace tips.
  * transform.lit.m: Uses a different `instantiate' from rewr.lit.m.
 
+>   instantiate :: (graph * ***,graph * **) -> (***,**) -> ([(***,**)],[(***,**)],[(***,**)]) -> ([(***,**)],[(***,**)],[(***,**)])
+
+>   instantiate (pgraph,sgraph) (pnode,snode) (seen,mapping,errs)
+>   =   (seen,mapping,errs), if member seen psnode
+>   =   (psnode:seen,mapping,psnode:errs), if member (map fst seen) pnode
+>   =   (psnode:seen,psnode:mapping,errs), if ~pdef
+>   =   (psnode:seen,mapping,psnode:errs), if ~sdef
+>   =   (psnode:seen,mapping,psnode:errs), if ~(psym=ssym&eqlen pargs sargs)
+>   =   (seen',psnode:mapping',errs'), otherwise
+>       where (pdef,(psym,pargs)) = nodecontents pgraph pnode
+>             (sdef,(ssym,sargs)) = nodecontents sgraph snode
+>             (seen',mapping',errs') = instantiateargs (pgraph,sgraph) (zip2 pargs sargs) (psnode:seen,mapping,errs)
+>             psnode = (pnode,snode)
+
 `Instantiateargs' is the logical extension of `instantiate' to lists of node pairs.
 
+>   instantiateargs :: (graph * ***,graph * **) -> [(***,**)] -> ([(***,**)],[(***,**)],[(***,**)]) -> ([(***,**)],[(***,**)],[(***,**)])
+
+>   instantiateargs psgraph [] = id
+>   instantiateargs psgraph (psnode:psnodes) (seen,mapping,errs)
+>   =   (seen'',mapping'',errs'')
+>       where (seen',mapping'',errs'') = instantiate psgraph psnode (seen,mapping',errs')
+>             (seen'',mapping',errs') = instantiateargs psgraph psnodes (seen',mapping,errs)
+
 */
-
-instantiate ::
-    (Graph sym pvar,Graph sym var)
-    (pvar,var)
-    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
- -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
- |  == sym
- &  == var
- &  == pvar
-
-instantiate (pgraph,sgraph) (pnode,snode) (seen,mapping,errs)
-| isMember psnode seen
-  = (seen,mapping,errs)
-| isMember pnode (map fst seen)
-  = ([psnode:seen],mapping,[psnode:errs])
-| not pdef
-  = ([psnode:seen],[psnode:mapping],errs)
-| not sdef
-  = ([psnode:seen],mapping,[psnode:errs])
-| not (psym==ssym && eqlen pargs sargs)
-  = ([psnode:seen],mapping,[psnode:errs])
-= (seen`,[psnode:mapping`],errs`)
-  where (pdef,(psym,pargs)) = varcontents pgraph pnode
-        (sdef,(ssym,sargs)) = varcontents sgraph snode
-        (seen`,mapping`,errs`) = instantiateargs (pgraph,sgraph) (zip2 pargs sargs) ([psnode:seen],mapping,errs)
-        psnode = (pnode,snode)
-
-instantiateargs ::
-    (Graph sym pvar,Graph sym var)
-    [(pvar,var)]
-    ([(pvar,var)],[(pvar,var)],[(pvar,var)])
- -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
- |  == sym
- &  == var
- &  == pvar
-
-instantiateargs psgraph [] sme = sme
-instantiateargs psgraph [psnode:psnodes] (seen,mapping,errs)
-= (seen``,mapping``,errs``)
-  where (seen`,mapping``,errs``) = instantiate psgraph psnode (seen,mapping`,errs`)
-        (seen``,mapping`,errs`) = instantiateargs psgraph psnodes (seen`,mapping,errs)
 
 :: Matchstate var pvar
    :== ( [(pvar,var)]  // Pattern-subject var combo's already visited
@@ -403,25 +362,18 @@ Uses in Miranda:
 
 `Extgraph' is excluded in most import statements,
 but there doesn't seem to be any other definition of it.
+
+>   extgraph :: graph * ** -> graph * *** -> [***] -> pfun *** ** -> graph * ** -> graph * **
+>   extgraph sgraph pattern pnodes matching graph
+>   =   foldr addnode graph pnodes
+>       where addnode pnode
+>             =   total id (postcomp addnode' matching) pnode, if fst (nodecontents pattern pnode)
+>             =   id, otherwise
+>             addnode' snode
+>             =   updategraph snode scont, if sdef
+>             =   id, otherwise
+>||           =   error "extgraph: closed node mapped to open node", otherwise
+>                 ||  Could have used id, but let's report error when there is one...
+>                 where (sdef,scont) = nodecontents sgraph snode
+
 */
-
-extgraph :: (Graph sym var) (Graph sym pvar) [pvar] (Pfun pvar var) (Graph sym var) -> Graph sym var | == var & == pvar
-extgraph sgraph pattern pnodes matching graph
-= foldr addnode graph pnodes
-  where addnode pnode
-        = if (fst (varcontents pattern pnode)) (total id (postcomp addnode` matching) pnode) id
-        addnode` snode
-        = if sdef (updategraph snode scont) id
-          where (sdef,scont) = varcontents sgraph snode
-
-mapgraph ::
-    !(  (Pfun var1 (sym1,[var1]))
-     -> Pfun var2 (sym2,[var2])
-     )
-    !.(Graph sym1 var1)
- -> .Graph sym2 var2
-mapgraph f (GraphAlias pfun) = GraphAlias (f pfun)
-
-instance == (Graph sym var) | == sym & == var
-where (==) (GraphAlias pf1) (GraphAlias pf2)
-      = pf1 == pf2

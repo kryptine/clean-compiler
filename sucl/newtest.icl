@@ -1,23 +1,3 @@
-implementation module newtest
-
-// $Id$
-
-import cli
-import coreclean
-import newfold
-import complete
-import trd
-import loop
-import trace
-import rule
-import graph
-import canon
-import basic
-import general
-import StdEnv
-
-/*
-
 newtest.lit - Testing the new trace implementation
 ==================================================
 
@@ -146,57 +126,7 @@ these tuples.
 >           [rule * **],      ||  Resulting rewrite rules
 >           [rgraph * **]     ||  New areas for further symbolic reduction (not necessarily canonical)
 >       )
-*/
 
-:: Symredresult sym var tsym tvar
-   = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
-     , srr_assigned_symbol :: sym               // The assigned symbol
-     , srr_strictness      :: [Bool]            // Strictness annotations
-     , srr_arity           :: Int               // Arity
-     , srr_typerule        :: Rule tsym tvar    // Type rule
-     , srr_trace           :: Trace sym var var // Truncated and folded trace
-     , srr_function_def    :: FuncDef sym var   // Resulting rewrite rules
-     , srr_areas           :: [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
-     }
-
-instance toString (Symredresult sym var tsym tvar) | toString sym & toString var & Eq var
-where toString srr
-      = "Task: "+++toString srr.srr_task_expression+++
-        "\nSymbol: "+++toString srr.srr_assigned_symbol+++
-        "\nStrictness: "+++listToString srr.srr_strictness+++
-        "\nArity: "+++toString srr.srr_arity+++
-        "\nTyperule: "+++"<typerule>"+++
-        "\nTrace: "+++"<trace>"+++
-        "\nFunction definition: "+++"<funcdef>"+++
-        "\nAreas: "+++listToString srr.srr_areas+++"\n"
-
-instance <<< (Symredresult sym var tsym tvar) | toString sym & <<<,==,toString var
-where (<<<) file0 srr
-      = file7
-        where file1
-              = file0 <<< "==[BEGIN]==" <<< nl
-                      <<< "Task expression: " <<< srr.srr_task_expression <<< nl
-                      <<< "Assigned symbol: " <<< toString (srr.srr_assigned_symbol) <<< nl
-                      <<< "Strictness: " <<< srr.srr_strictness <<< nl
-                      //<<< "Type rule: ..." <<< nl
-              file2 = printtrace srr.srr_assigned_symbol toString toString toString "" srr.srr_trace file1
-              file3 = file2 <<< "Function definition:" <<< nl
-              file4 = printfuncdef toString toString srr.srr_function_def file3
-              file5 = file4 <<< "Areas:" <<< nl
-              file6 = printareas toString toString "    " srr.srr_areas file5
-              file7 = file6 <<< "==[END]==" <<< nl
-
-printareas :: (sym->String) (var->String) String [Rgraph sym var] *File -> .File | == var
-printareas showsym showvar indent areas file
-= foldl (flip (printarea showsym showvar indent)) file areas
-
-printarea showsym showvar indent area file
-= file <<< indent <<< hd (printgraphBy showsym showvar (rgraphgraph area) [rgraphroot area]) <<< nl
-
-(writeareas) infixl :: *File [Rgraph sym var] -> .File | toString sym & toString,== var
-(writeareas) file xs = sfoldl (<<<) file xs
-
-/*
 >   listopt :: [char] -> [[char]] -> [char]
 
 >   listopt main = listnew main.loadclis
@@ -306,27 +236,7 @@ printarea showsym showvar indent area file
 >             foldarea' = foldarea (labelarea'.canonise')
 >             labelarea' = labelarea (map getinit results) (newsymbols main)
 >             canonise' = canonise (typerule cli) heap
-*/
 
-fullsymred ::
-    [SuclSymbol]    // Fresh function symbols
-    Cli             // Module to optimise
- -> [Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable]
-
-fullsymred freshsymbols cli
- = results
-   where results = depthfirst generate process (initareas cli)
-         generate result = map canonise` (getareas result)
-         process area = symredarea foldarea` cli area
-
-         foldarea` = foldarea (labelarea` o canonise`)
-         labelarea` = labelarea isSuclUserSym (map getinit results) freshsymbols
-         canonise` = canonise (arity cli) suclheap
-
-isSuclUserSym (SuclUser _) = True
-isSuclUserSym _ = False
-
-/*
 `Initareas cli' is the list  of  initial  rooted  graphs  that  must  be
 symbolically  reduced.  An initial rooted graph is formed by applying an
 exported symbol to its full complement of open  arguments  according  to
@@ -346,25 +256,7 @@ its type rule.
 
 >   getareas :: symredresult * ** **** ***** -> [rgraph * **]
 >   getareas (area,symbol,stricts,trule,trace,rules,areas) = areas
-*/
 
-initareas :: Cli -> [Rgraph SuclSymbol SuclVariable]
-initareas cli
-= map (initialise suclheap) (exports cli)
-  where initialise [root:nodes] symbol
-        = mkrgraph root (updategraph root (symbol,args) emptygraph)
-          where args = map2 const nodes targs
-                targs = arguments (typerule cli symbol)
-
-getinit :: (Symredresult sym var tsym tvar) -> Rgraph sym var
-getinit srr
-= srr.srr_task_expression
-
-getareas :: (Symredresult sym var tsym tvar) -> [Rgraph sym var]
-getareas srr
-= srr.srr_areas
-
-/*
 `Symredarea' is the function that does symbolic reduction  of  a  single
 area.
 
@@ -385,46 +277,13 @@ area.
 >             complete' = (~).converse matchable' (mkrgraph () emptygraph)
 >             matchable' = matchable (complete cli)
 >             strategy' = clistrategy cli
-*/
 
-:: Unit = Unit
-
-symredarea ::
-    ((Rgraph SuclSymbol SuclVariable)->(SuclSymbol,[SuclVariable]))
-    Cli
-    (Rgraph SuclSymbol SuclVariable)
- -> Symredresult SuclSymbol SuclVariable SuclTypeSymbol SuclTypeVariable
-
-symredarea foldarea cli area
-= { srr_task_expression = area
-  , srr_assigned_symbol = symbol
-  , srr_strictness      = stricts
-  , srr_arity           = length aargs
-  , srr_typerule        = trule
-  , srr_trace           = trace
-  , srr_function_def    = rules
-  , srr_areas           = areas
-  }
-  where agraph = rgraphgraph area; aroot = rgraphroot area
-        (symbol,aargs) = foldarea area
-        arule = mkrule aargs aroot agraph
-        trule = ruletype sucltypeheap (ctyperule SuclFN sucltypeheap (typerule cli)) arule
-        trace = loop strategy` matchable` (suclheap--varlist agraph [aroot],arule)
-        (stricts,rules,areas) = fullfold (trc symbol) foldarea symbol trace
-        matchable` = matchable (complete cli)
-        strategy` = clistrategy cli
-
-/*
 >   trc :: symbol -> trace symbol node node -> rgraph symbol node -> bool -> bool
 
 >   trc symbol trace area recursive
 >   =   error (lay ("Trace is recursive in area":printrgraph showsymbol shownode area:printtrace symbol showsymbol shownode shownode trace)), if esymbol symbol & recursive
 >   =   recursive, otherwise
-*/
 
-trc symbol trace area recursive = recursive
-
-/*
 >   esymbol (User m "E") = True
 >   esymbol symbol = False
 
@@ -510,20 +369,7 @@ trc symbol trace area recursive = recursive
 
 >   matchable complete patterns rgraph
 >   =   ~coveredby complete (rgraphgraph rgraph) [(rgraphgraph pattern,[rgraphroot pattern])|pattern<-patterns] [rgraphroot rgraph]
-*/
 
-matchable ::
-    ([sym]->Bool)
-    [Rgraph sym pvar]
-    (Rgraph sym var)
- -> Bool
- |  == sym
- &  == var
- &  == pvar
-matchable complete patterns rgraph
-= not (coveredby complete (rgraphgraph rgraph) [(rgraphgraph pattern,[rgraphroot pattern]) \\ pattern<-patterns] [rgraphroot rgraph])
-
-/*
 ------------------------------------------------------------------------
 
 `Ctyperule' cli (sym,args)' is the typerule of an occurrence  of  symbol
@@ -544,25 +390,5 @@ sym with the given arguments, curried if there are too few.
 >             (troot',tgraph',theap') = foldr build (troot,tgraph,typeheap--nodelist tgraph (troot:targs)) targs''
 >             build targ (troot,tgraph,tnode:tnodes)
 >             =   (tnode,updategraph tnode (fn,[targ,troot]) tgraph,tnodes)
-*/
 
-ctyperule ::
-    (Int -> tsym)           // The arrow type symbol for functions of given arity
-    [tvar]                  // Fresh type variables
-    (sym->Rule tsym tvar)   // Type rule of a symbol
-    (sym,[var])             // Node to abstract
- -> Rule tsym tvar
- |  == tvar
-
-ctyperule fn typeheap typerule (sym,args)
-= mkrule targs` troot` tgraph`
-  where targs = arguments trule; troot = ruleroot trule; tgraph = rulegraph trule
-        trule = typerule sym
-        (targs`,targs``) = claim args targs
-        (troot`,tgraph`,_) = foldr build (troot,tgraph,typeheap--varlist tgraph [troot:targs]) targs``
-        build targ (troot,tgraph,[tnode:tnodes])
-        = (tnode,updategraph tnode (fn 1,[targ,troot]) tgraph,tnodes)
-
-/*
 >   newsymbols main = map (User main.("New_"++)) identifiers
-*/

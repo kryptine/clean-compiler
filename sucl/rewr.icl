@@ -1,7 +1,5 @@
 implementation module rewr
 
-// $Id$
-
 import rule
 import graph
 import pfun
@@ -100,7 +98,7 @@ xunfold redexroot rule (heap,root,subject,matching)
         = build (rulegraph rule) (ruleroot rule) (heap,[],subject,matching)
         redirection = adjust redexroot rhs` id
 
-rewrinstantiate
+instantiate
  :: .(Graph sym pvar)       // Pattern to instantiate with
     pvar                    // Root of the pattern
     var                     // Open node to instantiate
@@ -109,7 +107,7 @@ rewrinstantiate
  |  == var
  &  == pvar
 
-rewrinstantiate pattern proot node (heap,graph)
+instantiate pattern proot node (heap,graph)
 | not closed
 = (heap,graph)
 = (heap``,graph``)

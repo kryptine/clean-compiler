@@ -1,16 +1,11 @@
 definition module strat
 
-// $Id$
-
-from spine import Answer
 from history import History
+from spine import Answer
 from rule import Rule
 from graph import Graph,Node
 from StdOverloaded import ==
-from StdClass import Eq
-from cleanversion import String
 
-from history import HistoryAssociation,HistoryPattern,Link // for History
 from spine import Spine    // for Answer
 from spine import Subspine // for Spine
 from rule import Rgraph    // for History
@@ -47,11 +42,11 @@ makernfstrategy
     (Strategy sym var pvar (Answer sym var pvar)) // Strategy for a defined node
     .[var]                                        // List of nodes known in RNF (closed pattern nodes of subject rule+strict args)
     var                                           // Root of replacement
-    (Graph sym var)                              // Subject graph
+    .(Graph sym var)                              // Subject graph
  -> Answer sym var pvar
- |  Eq sym
- &  Eq var
- &  Eq pvar
+ |  == sym
+ &  == var
+ &  == pvar
 
 
 /* ------------------------------------------------------------------------
@@ -59,38 +54,26 @@ STRATEGY TRANSFORMERS
 The funcions below tranform (simpler) strategies into more complicated ones
 ------------------------------------------------------------------------ */
 
-// A strategy transformer that checks for partial applications
-checkarity
- :: !(sym -> Int)                         // Arity of function symbol
-    (Strategy sym var pvar .result)      // Default strategy
-    (Substrategy sym var pvar .result)   // Substrategy
-    (Graph sym var)                      // Subject graph
-    ((Subspine sym var pvar) -> .result) // Spine continuation
-    .result                               // RNF continuation
-    !.(Node sym var)                      // Subject node
- -> .result
-
 // A strategy transformer that checks for constructor applications
 checkconstr
- :: (sym->String)
-    (sym->.Bool)
-    (Strategy sym var pvar .result)
-    (Substrategy sym var pvar .result)
-    (Graph sym var)
-    ((Subspine sym var pvar) -> .result)
+ :: (sym->.Bool)
+    (Strategy sym .var .pvar .result)
+    (Substrategy sym .var .pvar .result)
+    (Graph sym .var)
+    ((Subspine sym .var .pvar) -> .result)
     .result
-    .(Node sym var)
+    (Node sym .var)
  -> .result
 
 // A strategy transformer that checks for primitive symbol applications
 checkimport
  :: !(sym->.Bool)
-    (Strategy sym var pvar .result)
-    (Substrategy sym var pvar .result)
-    (Graph sym var)
-    ((Subspine sym var pvar) -> .result)
+    (Strategy sym .var .pvar .result)
+    (Substrategy sym .var .pvar .result)
+    (Graph sym .var)
+    ((Subspine sym .var .pvar) -> .result)
     .result
-    .(Node sym var)
+    (Node sym .var)
  -> .result
 
 // A strategy transformer that checks (hard coded) laws
@@ -109,7 +92,7 @@ checklaws
 // This is the real thing that characterises the functional strategy
 checkrules
  :: ((Graph sym pvar) pvar var -> .Bool)
-    (sym -> .[Rule sym pvar])
+    (sym -> [.Rule sym pvar])
     (Strategy sym var pvar result)
     (Substrategy sym var pvar result)
     (Graph sym var)
@@ -121,16 +104,16 @@ checkrules
  &  == var
  &  == pvar
 
-// A strategy transformer that checks a function application
-// for strict arguments
-checkstricts
- :: !(sym -> [.Bool])                     // Strict arguments of function
-    (Strategy sym var pvar .result)      // Default strategy
-    (Substrategy sym var pvar .result)   // Substrategy
-    (Graph sym var)                      // Subject graph
-    ((Subspine sym var pvar) -> .result) // Spine continuation
-    .result                               // RNF continuation
-    !.(Node sym var)                      // Subject node
+// A strategy transformer that checks a type rule
+// for curried applications and strict arguments
+checktype
+ :: !(sym -> (Rule .tsym tvar,[.Bool]))
+    (Strategy sym var .pvar .result)
+    (Substrategy sym var .pvar .result)
+    .(Graph sym var)
+    ((Subspine sym var .pvar) -> .result)
+    .result
+    !.(Node sym var)
  -> .result
 
 /* ------------------------------------------------------------------------
@@ -141,15 +124,15 @@ such as done by a strategy transformer.
 
 // Force evaluation of stricts arguments of a node in the graph
 forcenodes
- :: (Substrategy sym var pvar .result)
-    ((Subspine sym var pvar) -> .result)
+ :: (Substrategy .sym .var .pvar .result)
+    ((Subspine .sym .var .pvar) -> .result)
     .result
-    !.[var]
+    ![.var]
  -> .result
 
 // Try to apply a transformation rule (that doesn't need evaluated arguments)
 rulelaw
- :: (Rule sym pvar)
+ :: .(Rule sym pvar)
  -> Law sym var pvar result
  |  == sym
  &  == var
@@ -157,10 +140,10 @@ rulelaw
 
 // Try to apply a law
 trylaw
- :: (Graph sym var)
+ :: .(Graph sym var)
     (.(Subspine sym var pvar) -> result)
     .[var]
-    (Rule sym pvar)
+    .(Rule sym pvar)
     result
  -> result
  |  == sym
@@ -172,11 +155,11 @@ trylaw
 tryrules
  :: ((Graph sym pvar) pvar var -> .Bool)
     (Substrategy sym var pvar result)
-    (Graph sym var)
+    .(Graph sym var)
     ((Subspine sym var pvar) -> result)
     .[var]
  -> result
-    .[Rule sym pvar]
+    [.Rule sym pvar]
  -> result
  |  == sym
  &  == var

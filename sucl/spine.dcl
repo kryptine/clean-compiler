@@ -1,16 +1,8 @@
 definition module spine
 
-// $Id$
-
-from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
-from graph import Graph
 from pfun import Pfun
-from general import Optional
-from StdOverloaded import ==
-from StdFile import <<<
-from StdString import toString
-from cleanversion import String
+from basic import Optional
 
 /*
 
@@ -93,18 +85,6 @@ that the node was in root normal form.
 :: Answer sym var pvar
    :== Optional (Spine sym var pvar)
 
-// Write a strategy answer to a file
-printanswer ::
-    (sym->String)
-    (var->String)
-    (pvar->String)
-    String
- -> (Answer sym var pvar)
-    *File
- -> .File
- |  == var
- &  == pvar
-
 /*
 
 Spine  describes the spine returned by a strategy.  It contains the node
@@ -175,30 +155,30 @@ in a graph.
 */
 
 :: Subspine sym var pvar
-   = Cycle                                                              // The spine contains a cycle
-   | Delta                                                              // An imported (delta) rule was found
-   | Force Int (Spine sym var pvar)                                     // Global strictness annotation forced evaluation of a subgraph at specified argument position
-   | MissingCase                                                        // All alternatives failed for a function symbol
-   | Open (Rgraph sym pvar)                                             // Need root normal form of open node for matching
-   | Partial (Rule sym pvar) (Pfun pvar var) pvar (Spine sym var pvar)  // A rule was strictly partially matched
-   | Unsafe (HistoryPattern sym var)                                    // Terminated due to immininent recursion
-   | Redex (Rule sym pvar) (Pfun pvar var)                              // Total match
-   | Strict                                                             // Need root normal form due to strictness
+   = Cycle                                                        // The spine contains a cycle
+   | Delta                                                        // An imported (delta) rule was found
+   | Force (Spine sym var pvar)                                   // Global strictness annotation forced evaluation of a subgraph
+   | MissingCase                                                  // All alternatives failed for a function symbol
+   | Open (Rgraph sym pvar)                                       // Need root normal form of open node for matching
+   | Partial (Rule sym pvar) (Pfun pvar var) (Spine sym var pvar) // A rule was strictly partially matched
+   | Unsafe (Rgraph sym var)                                      // Terminated due to immininent recursion
+   | Redex (Rule sym pvar) (Pfun pvar var)                        // Total match
+   | Strict                                                       // Need root normal form due to strictness
 
 // Fold up a spine using a function for each constructor
 foldspine
- :: !(var .subresult -> .result)                                    // Fold the spine itself
-    .subresult                                                      // Fold a Cycle subspine
-    .subresult                                                      // Fold a Delta subspine
-    (Int .result -> .subresult)                                     // Fold a Force subspine
-    .subresult                                                      // Fold a MissingCase subspine
-    ((Rgraph sym pvar) -> .subresult)                               // Fold an Open subspine
-    ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)    // Fold a Partial subspine
-    ((HistoryPattern sym var) -> .subresult)                        // Fold an Unsafe subspine
-    ((Rule sym pvar) (Pfun pvar var) -> .subresult)                 // Fold a Redex subspine
-    .subresult                                                      // Fold a Strict subspine
-    .(Spine sym var pvar)                                           // The spine to fold
- -> .result                                                         // The final result
+ :: !(var .subresult -> .result)
+    .subresult
+    .subresult
+    (.result -> .subresult)
+    .subresult
+    ((Rgraph sym pvar) -> .subresult)
+    ((Rule sym pvar) (Pfun pvar var) .result -> .subresult)
+    ((Rgraph sym var) -> .subresult)
+    ((Rule sym pvar) (Pfun pvar var) -> .subresult)
+    .subresult
+    .(Spine sym var pvar)
+ -> .result
 
 // Get the tip of a spine,
 // i.e. the last part when all Partial's and Force's are stripped.
@@ -211,19 +191,3 @@ spinenodes :: .(Spine sym var pvar) -> [var]
 
 // Make a decision (continuation based) on whether a spine ends in Open
 ifopen :: result result !.(Answer sym var pvar) -> result
-
-// Extend the history according to a spine
-extendhistory
- :: (Graph sym var)
-    (var -> var)
-    (Spine sym var pvar)
-    (History sym var)
- -> History sym var
- |  == var
- &  == pvar
-
-(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
-
-(writespine) infixl :: *File (Spine sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
-
-instance <<< (Subspine sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar

@@ -1,17 +1,5 @@
 implementation module law
 
-// $Id$
-
-import coreclean
-import strat
-import spine
-import rule
-import dnc
-import graph
-import basic
-from general import --->
-import StdEnv
-
 /*
 
 >   %export
@@ -111,12 +99,7 @@ import StdEnv
 ------------------------------------------------------------------------
 
 >   cleanlaws :: [(symbol,law symbol ** node ****)]
-*/
 
-cleanlaws :: [(SuclSymbol,Law SuclSymbol var SuclVariable result)]
-cleanlaws =: []
-
-/*
 >   cleanlaws
 >   =   [(User "deltaI" "*",law) | law <- mullaws] ++
 >       [(User "deltaI" "+",law) | law <- addlaws] ++
@@ -149,24 +132,7 @@ Also, using trylaw is easier
 
 >   corestrategy matchable substrat subject found rnf (ssym,snodes)
 >   =   rnf
-*/
 
-// The strategy for built in clean symbols
-corestrategy :: ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable result | == var
-corestrategy matchable =(\ substrat subject found rnf snode
- -> let (ssym,sargs) = snode
-    in case ssym
-       of SuclUser sptr
-           -> found MissingCase
-          SuclCase eptr
-           -> found MissingCase
-          SuclApply argc
-           -> trylaw subject found sargs (applyrule nc) (found Delta)
-              where nc = dnc (const "in corestrategy") subject (hd sargs)
-          _
-           -> rnf)
-
-/*
 >   applyrule :: (bool,(*,[**])) -> rule * node
 >   applyrule (sdef,scont)
 >   =   aprule (anode,(sym,aargs)) [enode] aroot
@@ -175,17 +141,7 @@ corestrategy matchable =(\ substrat subject found rnf snode
 >             =   scont, if sdef
 >             =   (nosym,[]), otherwise
 >             nosym = error "applyrule: no function symbol available"
-*/
 
-applyrule :: (Bool,Node sym var) -> Rule sym SuclVariable
-applyrule (sdef,scont)
- = aprule (anode,(sym,aargs)) [enode] aroot
-   where (aargs,[anode,aroot,enode:_]) = (claim--->"basic.claim begins from law.applyrule") sargs suclheap
-         (sym,sargs)
-          = if sdef scont (nosym,[])
-         nosym = abort "applyrule: no function symbol available"
-
-/*
 >   aprule :: (***,(*,[***])) -> [***] -> *** -> rule * ***
 >   aprule (anode,(sym,aargs)) anodes aroot
 >   =   mkrule (anode:anodes) aroot agraph
@@ -193,17 +149,7 @@ applyrule (sdef,scont)
 >             =   (   updategraph aroot (sym,aargs++anodes)
 >                 .   updategraph anode (sym,aargs)
 >                 ) emptygraph
-*/
 
-aprule :: (pvar,Node sym pvar) [pvar] pvar -> Rule sym pvar
-aprule (anode,(sym,aargs)) anodes aroot
- = mkrule [anode:anodes] aroot agraph
-   where agraph
-          = ( updategraph aroot (sym,aargs++anodes)
-            o updategraph anode (sym,aargs)
-            ) emptygraph
-
-/*
 >   apmatching :: [**] -> [***] -> pfun *** **
 >   apmatching snodes anodes
 >   =   foldr (uncurry extend) emptypfun nodepairs

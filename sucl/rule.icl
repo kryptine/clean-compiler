@@ -1,16 +1,13 @@
 implementation module rule
 
-// $Id$
-
 import graph
 import basic
-import StdEnv
 
 :: Rule sym var
-    = RuleAlias [var] var (Graph sym var)
+   :== ([var],var,Graph sym var)
 
 :: Rgraph sym var
-    = RgraphAlias var (Graph sym var)
+   :== (var,Graph sym var)
 
 /*
 
@@ -111,59 +108,42 @@ Rooted graphs
 >   mkrgraph root graph = (root,graph)
 */
 
-emptyrgraph :: var -> .Rgraph sym var
-emptyrgraph root = RgraphAlias root emptygraph
+emptyrgraph :: .var -> Rgraph .sym .var
+emptyrgraph root = (root,emptygraph)
 
-updatergraph :: var .(Node sym var) !.(Rgraph sym var) -> .Rgraph sym var
-updatergraph var node rgraph = maprgraph (mapsnd (updategraph var node)) rgraph
+updatergraph :: .var (Node .sym .var) !(Rgraph .sym .var) -> Rgraph .sym .var
+updatergraph var node rgraph = mapsnd (updategraph var node) rgraph
 
-prunergraph  :: var !.(Rgraph sym var) -> .Rgraph sym var
-prunergraph var rgraph = maprgraph (mapsnd (prunegraph var)) rgraph
+prunergraph :: .var !(Rgraph .sym .var) -> Rgraph .sym .var
+prunergraph var rgraph = mapsnd (prunegraph var) rgraph
 
-rgraphroot   :: !.(Rgraph sym var) -> var
-rgraphroot (RgraphAlias root _) = root
+rgraphroot :: !(Rgraph .sym .var) -> .var
+rgraphroot (root,_) = root
 
-rgraphgraph  :: !.(Rgraph sym var) -> Graph sym var
-rgraphgraph (RgraphAlias _ graph) = graph
+rgraphgraph :: !(Rgraph .sym .var) -> Graph .sym .var
+rgraphgraph (_,graph) = graph
 
-mkrgraph :: var (Graph sym var) -> .Rgraph sym var
-mkrgraph root graph = RgraphAlias root graph
-
-maprgraph :: (.(var1,Graph sym1 var1) -> .(var2,Graph sym2 var2)) !.(Rgraph sym1 var1) -> .Rgraph sym2 var2
-maprgraph f (RgraphAlias root1 graph1) = RgraphAlias root2 graph2
-   where (root2,graph2) = f (root1,graph1)
-
-instance toString (Rgraph sym var) | toString sym & toString var & Eq var
-where toString rgraph = showrgraph toString toString rgraph
-
-showrgraph ::
-    (sym->String)
-    (var->String)
-    (Rgraph sym var)
- -> String
- |  == var
-
-showrgraph showsym showvar (RgraphAlias root graph)
-= "("+++snd (showsubgraph root ([],"emptyrgraph) "))+++showvar root
-  where showsubgraph node (seen,repr)
-        | not def || isMember node seen
-          = (seen,repr)
-        = (seen``,repr``)
-          where (def,(f,args)) = varcontents graph node
-                (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
-                seen` = [node:seen]
-                repr`` = "updatergraph "+++showvar node+++" ("+++showsym f+++","+++showlist showvar args+++") o "+++repr`
+mkrgraph :: .var (Graph .sym .var) -> Rgraph .sym .var
+mkrgraph root graph = (root,graph)
 
 /*
+>   showrgraph showfunc shownode (root,graph)
+>       = '(':snd (showsubgraph root ([],"emptyrgraph) "))++shownode root
+>         where showsubgraph node (seen,repr)
+>                   = (seen,repr), if ~def \/ member seen node
+>                   = (seen'',repr''), otherwise
+>                     where (def,(f,args)) = nodecontents graph node
+>                           (seen'',repr') = foldlr showsubgraph (seen',repr) args
+>                           seen' = node:seen
+>                           repr''
+>                               = "updatergraph "++shownode node++" ("++
+>                                 showfunc f++',':showlist shownode args++")."++
+>                                 repr'
+
 >   printrgraph showfunc shownode (root,graph)
 >       = hd (printgraph showfunc shownode graph [root])
-*/
 
-instance <<< (Rgraph sym var) | toString sym & toString var & == var
-where (<<<) file (RgraphAlias root graph)
-      = file <<< hd (printgraph graph [root])
 
-/*
 Rules
 
 >   mkrule lroots rroot graph = (lroots,rroot,graph)
@@ -172,19 +152,33 @@ Rules
 >   rulegraph (lroots,rroot,graph) = graph
 */
 
-mkrule :: .[var] var (Graph sym var) -> .Rule sym var
-mkrule args root graph = RuleAlias args root graph
+mkrule :: [.var] .var (Graph .sym .var) -> Rule .sym .var
+mkrule args root graph = (args,root,graph)
 
-arguments :: !.(Rule sym var) -> [var]
-arguments (RuleAlias args _ _) = args
+arguments :: !(Rule .sym .var) -> [.var]
+arguments (args,_,_) = args
 
-ruleroot :: !.(Rule sym var) -> var
-ruleroot (RuleAlias _ root _) = root
+ruleroot :: !(Rule .sym .var) -> .var
+ruleroot (_,root,_) = root
 
-rulegraph :: !.(Rule sym var) -> Graph sym var
-rulegraph (RuleAlias _ _ graph) = graph
+rulegraph :: !(Rule .sym .var) -> Graph .sym .var
+rulegraph (_,_,graph) = graph
 
 /*
+>   showrule showfunc shownode (lroots,rroot,graph)
+>       = "((mkrule "++showlist shownode lroots++' ':shownode rroot++repr'++") emptygraph)"
+>         where (seen,repr') = showsubgraph rroot ([],repr)
+>               (seen',repr) = foldlr showsubgraph (seen,"") lroots
+>               showsubgraph node (seen,repr)
+>                   = (seen,repr), if ~def \/ member seen node
+>                   = (seen'',repr''), otherwise
+>                     where (def,(f,args)) = nodecontents graph node
+>                           (seen'',repr') = foldlr showsubgraph (seen',repr) args
+>                           seen' = node:seen
+>                           repr''
+>                               = ".updategraph "++shownode node++" ("++
+>                                 showfunc f++',':showlist shownode args++')':repr'
+
 >   printrule showfunc shownode (lroots,rroot,graph)
 >       = (concat.map (++" ").init) reprs++"-> "++last reprs
 >         where reprs = printgraph showfunc shownode graph (lroots++[rroot])
@@ -193,73 +187,3 @@ rulegraph (RuleAlias _ _ graph) = graph
 >   compilerule args root = mkrule args root.compilegraph
 
 */
-
-instance == (Rgraph sym var) | == sym & == var
-where (==) (RgraphAlias root1 graph1) (RgraphAlias root2 graph2)
-       = root1==root2 && graph1==graph2
-
-instance toString (Rule sym var) | toString sym & toString var & == var
-where toString rule = showrule toString toString rule
-
-showrule ::
-    (sym->String)
-    (var->String)
-    (Rule sym var)
- -> String
- |  == var
-
-showrule showsym showvar (RuleAlias lroots rroot graph)
-= "((mkrule "+++showlist showvar lroots+++" "+++showvar rroot+++repr`+++") emptygraph)"
-  where (seen,repr`) = foldlr showsubgraph ([],repr) lroots
-        (seen`,repr) = showsubgraph rroot (seen,"")
-        showsubgraph node (seen,repr)
-        | not def || isMember node seen
-          = (seen,repr)
-        = (seen``,repr``)
-          where (def,(f,args)) = varcontents graph node
-                (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
-                seen` = [node:seen]
-                repr`` = " o updategraph "+++showvar node+++" ("+++showsym f+++","+++showlist showvar args+++")"+++repr`
-
-ruleToString :: (sym->.String) .(Rule sym var) -> String | Eq,toString var
-ruleToString symToString (RuleAlias lroots rroot graph)
-/*
-= if def ("<rule with root "+++symToString sym+++">") "<rule with no root>"
-  where (def,(sym,args)) = varcontents graph rroot
-*/
-= "((mkrule "+++showlist toString lroots+++" "+++toString rroot+++repr`+++") emptygraph)"
-  where (seen,repr`) = foldlr showsubgraph ([],repr) lroots
-        (seen`,repr) = showsubgraph rroot (seen,"")
-        showsubgraph node (seen,repr)
-        | not def || isMember node seen
-          = (seen,repr)
-        = (seen``,repr``)
-          where (def,(f,args)) = varcontents graph node
-                (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
-                seen` = [node:seen]
-                repr`` = " o updategraph "+++toString node+++" ("+++symToString f+++","+++showlist toString args+++")"+++repr`
-
-instance <<< (Rule sym var) | toString sym & toString,== var
-where (<<<) file rule = file <<< toString rule
-
-(writergraph) infixl :: *File .(Rgraph sym var) -> .File | toString sym & ==,toString var
-(writergraph) file rgraph = file <<< rgraph
-
-(writerule) infixl :: *File .(Rule sym var) -> .File | toString sym & ==,toString var
-(writerule) file rule = file <<< rule
-
-showruleanch ::
-    (sym->String)
-    (var->String)
-    [Bool]
-    (Rule sym var)
-    [var]
- -> String
- |  == var
-
-showruleanch showsym showvar stricts rule anchors
-= foldr (+++) "" (map2 annot stricts argreprs)+++"-> "+++rootrepr
-  where graph = rulegraph rule; args = arguments rule; root = ruleroot rule
-        (argreprs,[rootrepr:anchorreprs]) = claim args reprs
-        reprs = printgraphBy showsym showvar graph (args++[root:anchors])
-        annot strict repr = (if strict ((+++) "!") id) (repr+++" ")

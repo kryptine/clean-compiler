@@ -1,15 +1,12 @@
 implementation module strat
 
-// $Id$
-
-import spine
 import history
-import rule
+import spine
 import dnc
+import rule
 import graph
 import pfun
 import basic
-from general import No,Yes,--->
 import StdEnv
 
 /*
@@ -98,21 +95,21 @@ Types
 
 //------------------------------------------------------------------------
 
-makernfstrategy ::
-    .(History sym var)                            // History of previous rooted graphs attached to nodes
+makernfstrategy
+ :: .(History sym var)                            // History of previous rooted graphs attached to nodes
     (Strategy sym var pvar (Answer sym var pvar)) // Strategy for a defined node
     .[var]                                        // List of nodes known in RNF (closed pattern nodes of subject rule+strict args)
     var                                           // Root of replacement
-    (Graph sym var)                              // Subject graph
+    .(Graph sym var)                              // Subject graph
  -> Answer sym var pvar
- |  Eq sym
- &  Eq var
- &  Eq pvar
+ |  == sym
+ &  == var
+ &  == pvar
 
 makernfstrategy hist strat rnfnodes node graph
 = substrat [] spinecont rnfanswer node
-  where spinecont spine = Yes spine
-        rnfanswer = No
+  where spinecont spine = Present spine
+        rnfanswer = Absent
 
         substrat spinenodes spinecont rnfanswer node
         | isMember node spinenodes
@@ -124,8 +121,11 @@ makernfstrategy hist strat rnfnodes node graph
         = strat` (substrat spinenodes`) graph subspinecont rnfanswer cnt
           where (def,cnt) = dnc (const "in makernfstrategy") graph node
                 spinenodes` = [node:spinenodes]
+
                 subspinecont subspine = spinecont (node,subspine)
-                strat` = (checkhistory--->"strat.checkhistory begins from strat.makernfstrategy.substrat.strat`") (graph,node) spinenodes` hist strat
+
+                strat` = checkinstance (graph,node) histpatts strat
+                histpatts = foldr (foldmap (++) id hist) [] spinenodes`
 
 /*
 
@@ -137,11 +137,11 @@ NORMAL REWRITE RULE STRATEGY
 tryrules
  :: ((Graph sym pvar) pvar var -> .Bool)
     (Substrategy sym var pvar result)
-    (Graph sym var)
+    .(Graph sym var)
     ((Subspine sym var pvar) -> result)
     .[var]
  -> result
-    .[Rule sym pvar]
+    [.Rule sym pvar]
  -> result
  |  == sym
  &  == var
@@ -153,10 +153,10 @@ tryrules matchable substrat subject found sargs
 matchrule
  :: ((Graph sym pvar) pvar var -> .Bool)
     (Substrategy sym var pvar result)
-    (Graph sym var)
+    .(Graph sym var)
     ((Subspine sym var pvar) -> result)
     .[var]
-    (Rule sym pvar)
+    .(Rule sym pvar)
     result
  -> result
  |  == sym
@@ -171,16 +171,16 @@ matchrule matchable substrat subject found sargs rule fail
         pattern = rulegraph rule
         pairs = zip2 pargs sargs
         matchable` = matchable pattern
-        foundsub matching rnode spine = found (Partial rule matching rnode spine)
+        foundsub matching spine = found (Partial rule matching spine)
         foundmatch matching = found (Redex rule matching)
 
 matchnodes
  :: (pvar var -> .Bool)
-    (Graph sym var)
+    .(Graph sym var)
     (Substrategy sym var pvar result)
-    ((Pfun pvar var) pvar (Spine sym var pvar) -> result)
+    ((Pfun pvar var) (Spine sym var pvar) -> result)
     result
-    (Graph sym pvar)
+    .(Graph sym pvar)
  -> ((Pfun pvar var) -> result)
     [.(pvar,var)]
     (Pfun pvar var)
@@ -197,8 +197,8 @@ matchnodes matchable subject substrat found fail pattern
         | not pdef
         = match (extend pnode snode matching)
         | not sdef
-        = found matching pnode openspine
-        = substrat (found matching pnode) rnfanswer snode
+        = found matching openspine
+        = substrat (found matching) rnfanswer snode
           where openspine = (snode,Open (mkrgraph pnode pattern))
                 rnfanswer
                 | psym==ssym && eqlen pargs sargs
@@ -259,7 +259,7 @@ Does not try to reduce arguments before matching.
 */
 
 rulelaw
- :: (Rule sym pvar)
+ :: .(Rule sym pvar)
  -> Law sym var pvar result
  |  == sym
  &  == var
@@ -271,10 +271,10 @@ where law substrat subject found rnf snids fail
       = trylaw subject found snids rule fail
 
 trylaw
- :: (Graph sym var)
+ :: .(Graph sym var)
     (.(Subspine sym var pvar) -> result)
     .[var]
-    (Rule sym pvar)
+    .(Rule sym pvar)
     result
  -> result
  |  == sym
@@ -290,8 +290,8 @@ trylaw graph found sargs rule fail
         pairs = zip2 pargs sargs
 
 lawmatch
- :: (Graph sym pvar)
-    (Graph sym var)
+ :: .(Graph sym pvar)
+    .(Graph sym var)
     result
  -> ((Pfun pvar var) -> result)
     [.(pvar,var)]
@@ -321,17 +321,16 @@ FORCING EVALUATION OF (STRICT) ARGUMENTS
 */
 
 forcenodes
- :: (Substrategy sym var pvar .result)
-    ((Subspine sym var pvar) -> .result)
+ :: (Substrategy .sym .var .pvar .result)
+    ((Subspine .sym .var .pvar) -> .result)
     .result
-    !.[var]
+    ![.var]
  -> .result
 
 forcenodes substrat found rnf nodes
-= foldr forcenode rnf (zip2 [0..] nodes)
-  where forcenode (argno,nid) rnfrest
-        = substrat foundforce rnfrest nid
-          where foundforce spine = found (Force argno spine)
+= foldr forcenode rnf nodes
+  where forcenode nid rnfrest = substrat foundforce rnfrest nid
+        foundforce spine = found (Force spine)
 
 /*
 
@@ -342,68 +341,45 @@ Check for an instance in the termination history.
 
 */
 
-checkhistory
- :: (Graph sym var,var)
-    [var]
-    (History sym var)
-    (Strategy sym var pvar result)
- -> Strategy sym var pvar result
- |  Eq sym
- &  Eq var
+checkinstance
+ :: (.Graph sym var,var)
+    [.Rgraph sym var]
+    (Strategy sym var .pvar result)
+ -> Strategy sym var .pvar result
+ |  == sym
+ &  == var
+ &  == pvar
 
-checkhistory (sgraph,snode) spinenodes history defaultstrategy
-= (if (isEmpty histpats) defaultstrategy unsafestrategy) <--- "strat.checkhistory ends"
-  where histpats
-        = (matchhistory--->"history.matchhistory begins from strat.checkhistory.histpats") history spinenodes sgraph snode
-        unsafestrategy _ _ found _ _
-        = found (Unsafe (hd histpats))
+checkinstance (graph,node) history defaultstrategy
+= foldr check defaultstrategy history
+  where check hrgraph defaultstrategy substrat subject found rnf (ssym,sargs)
+        | isinstance (hgraph,hroot) (graph,node)
+        = found (Unsafe hrgraph)
+        = defaultstrategy substrat subject found rnf (ssym,sargs)
+          where hgraph = rgraphgraph hrgraph; hroot = rgraphroot hrgraph
 
 
-// Check for curried applications
+// Check a type rule for curried applications and strict arguments
 
-checkarity
- :: !(sym -> Int)                         // Arity of function symbol
-    (Strategy sym var pvar .result)      // Default strategy
-    (Substrategy sym var pvar .result)   // Substrategy
-    (Graph sym var)                      // Subject graph
-    ((Subspine sym var pvar) -> .result) // Spine continuation
-    .result                               // RNF continuation
-    !.(Node sym var)                      // Subject node
+checktype
+ :: !(sym -> (Rule .tsym tvar,[.Bool]))
+    (Strategy sym var .pvar .result)
+    (Substrategy sym var .pvar .result)
+    .(Graph sym var)
+    ((Subspine sym var .pvar) -> .result)
+    .result
+    !.(Node sym var)
  -> .result
 
-checkarity funarity defaultstrategy substrat subject found rnf (ssym,sargs)
-| shortern arity sargs
+checktype typeinfo defaultstrategy substrat subject found rnf (ssym,sargs)
+| shorter targs sargs
 = rnf
-| eqlenn arity sargs
-= defaultstrategy substrat subject found rnf (ssym,sargs)
-= abort ("checktype: symbol occurrence with actual arity "+++toString (length sargs)+++" greater than its type arity "+++toString arity)
-  where arity = funarity ssym
-
-shortern n _      | n<=0 = False
-shortern _ []            = True
-shortern n [x:xs]        = shortern (n-1) xs
-
-eqlenn n _      | n<0 = False
-eqlenn 0 []           = True
-eqlenn n [x:xs]       = eqlenn (n-1) xs
-
-
-// Check for strict arguments
-
-checkstricts
- :: !(sym -> [.Bool])                     // Strict arguments of function
-    (Strategy sym var pvar .result)      // Default strategy
-    (Substrategy sym var pvar .result)   // Substrategy
-    (Graph sym var)                      // Subject graph
-    ((Subspine sym var pvar) -> .result) // Spine continuation
-    .result                               // RNF continuation
-    !.(Node sym var)                      // Subject node
- -> .result
-
-checkstricts funstricts defaultstrategy substrat subject found rnf (ssym,sargs)
+| eqlen targs sargs
 = forcenodes substrat found rnf` strictnodes
+= abort "checktype: symbol occurrence with arity greater than its type"
   where rnf` = defaultstrategy substrat subject found rnf (ssym,sargs)
-        tstricts = funstricts ssym
+        (trule,tstricts) = typeinfo ssym
+        targs = arguments trule
         strictnodes = [sarg\\(True,sarg)<-zip2 tstricts sargs]
 
 
@@ -432,7 +408,7 @@ checklaws laws defaultstrategy substrat subject found rnf (ssym,sargs)
 
 checkrules
  :: ((Graph sym pvar) pvar var -> .Bool)
-    (sym -> .[Rule sym pvar])
+    (sym -> [.Rule sym pvar])
     (Strategy sym var pvar result)
     (Substrategy sym var pvar result)
     (Graph sym var)
@@ -453,12 +429,12 @@ checkrules matchable ruledefs defstrat substrat subject found rnf (ssym,sargs)
 
 checkimport
  :: !(sym->.Bool)
-    (Strategy sym var pvar .result)
-    (Substrategy sym var pvar .result)
-    (Graph sym var)
-    ((Subspine sym var pvar) -> .result)
+    (Strategy sym .var .pvar .result)
+    (Substrategy sym .var .pvar .result)
+    (Graph sym .var)
+    ((Subspine sym .var .pvar) -> .result)
     .result
-    .(Node sym var)
+    (Node sym .var)
  -> .result
 
 checkimport local defstrat substrat subject found rnf (ssym,sargs)
@@ -470,17 +446,16 @@ checkimport local defstrat substrat subject found rnf (ssym,sargs)
 // Check for constructors
 
 checkconstr
- :: (sym->String)
-    (sym->.Bool)
-    (Strategy sym var pvar .result)
-    (Substrategy sym var pvar .result)
-    (Graph sym var)
-    ((Subspine sym var pvar) -> .result)
+ :: (sym->.Bool)
+    (Strategy sym .var .pvar .result)
+    (Substrategy sym .var .pvar .result)
+    (Graph sym .var)
+    ((Subspine sym .var .pvar) -> .result)
     .result
-    .(Node sym var)
+    (Node sym .var)
  -> .result
 
-checkconstr showsym isconstr defstrat substrat subject found rnf (ssym,sargs)
-| isconstr ssym ---> ("strat.checkconstr begins for "+++showsym ssym)
-= rnf <--- ("strat.checkconstr ends (RNF)")
-= defstrat substrat subject found rnf (ssym,sargs) <--- ("strat.checkconstr ends (default strategy)")
+checkconstr isconstr defstrat substrat subject found rnf (ssym,sargs)
+| isconstr ssym
+= rnf
+= defstrat substrat subject found rnf (ssym,sargs)
