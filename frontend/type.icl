@@ -67,7 +67,7 @@ where
 instance arraySubst Type
 where
 	arraySubst tv=:(TempV tv_number) subst
-		#! type = subst.[tv_number]
+		# (type, subst) = subst![tv_number]
 		= case type of
 			TE	-> (False,tv, subst)
 			_
@@ -84,7 +84,7 @@ where
 			= (True, TA cons_id cons_args, subst) 
 			= (False,type, subst) 
 	arraySubst tcv=:(TempCV tv_number :@: types) subst
-		#! type = subst.[tv_number]
+		# (type, subst) = subst![tv_number]
 		= case type of
 			TE
 				# (changed,types, subst) = arraySubst types subst
