@@ -667,7 +667,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 //	| False -!-> ("generate_case_function",ro_fun.symb_name)		= undef
 	# fun_arity								= length ro_fun_args
 	# ti = arity_warning "generate_case_function" ro_fun.symb_name fun_index fun_arity ti
-	  (Yes {st_vars,st_args,st_attr_vars})	= outer_fun_def.fun_type
+	  (Yes {st_vars,st_args,st_attr_env})	= outer_fun_def.fun_type
 	  types_from_outer_fun					= [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
 	  nr_of_lifted_vars						= fun_arity-(length types_from_outer_fun)
 	  (lifted_types, ti_var_heap)			= mapSt get_type_of_local_var (take nr_of_lifted_vars ro_fun_args) ti.ti_var_heap
@@ -676,19 +676,13 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 
 	  arg_types								= lifted_types++types_from_outer_fun
 
-	# {ti_type_heaps}						= ti
-	  {th_vars}								= ti_type_heaps
-	  (type_variables, th_vars)				= getTypeVars [ct_result_type:arg_types] th_vars
-	  (fresh_type_vars, th_vars)			= mapSt bind_to_fresh_type_variable type_variables th_vars
-	  ti_type_heaps							= { ti_type_heaps & th_vars = th_vars }
-
-	  (_, fresh_arg_types, ti_type_heaps)	= substitute arg_types ti_type_heaps
-	  (_, fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
+	# ti = {ti & ti_var_heap = ti_var_heap, ti_symbol_heap = ti_symbol_heap}
+	# (fun_type,ti)							= determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti
 
 	  // unfold...
-	  us =		{ us_var_heap				= ti_var_heap
-	  			, us_symbol_heap			= ti_symbol_heap
-	  			, us_opt_type_heaps			= Yes ti_type_heaps
+	  us =		{ us_var_heap				= ti.ti_var_heap
+	  			, us_symbol_heap			= ti.ti_symbol_heap
+	  			, us_opt_type_heaps			= Yes ti.ti_type_heaps
 	  			, us_cleanup_info			= ti.ti_cleanup_info
 	  			, us_local_macro_functions	= No 
 	  			}
@@ -700,16 +694,6 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  {us_var_heap=ti_var_heap, us_symbol_heap=ti_symbol_heap, us_cleanup_info=ti_cleanup_info, us_opt_type_heaps = Yes ti_type_heaps}
 	  		= us
 	  // generated function...
-	  fun_type =
-	  			{ st_vars					= fresh_type_vars
-	  			, st_args					= fresh_arg_types
-	  			, st_arity					= fun_arity
-	  			, st_args_strictness		= NotStrict
-	  			, st_result					= fresh_result_type
-	  			, st_context				= []
-	  			, st_attr_vars				= []
-	  			, st_attr_env				= []
-	  			}
 	  fun_def =	{ fun_symb					= ro_fun.symb_name
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
@@ -761,6 +745,26 @@ where
 		= (a_type, var_heap)
 	free_var_to_bound_var {fv_name, fv_info_ptr}
 		= Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+	determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti
+		# {ti_type_heaps}						= ti
+		  {th_vars}								= ti_type_heaps
+		  (type_variables, th_vars)				= getTypeVars [ct_result_type:arg_types] th_vars
+		  (fresh_type_vars, th_vars)			= mapSt bind_to_fresh_type_variable type_variables th_vars
+		  ti_type_heaps							= { ti_type_heaps & th_vars = th_vars }
+		  (_, fresh_arg_types, ti_type_heaps)	= substitute arg_types ti_type_heaps
+		  (_, fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
+		  fun_type =
+		  			{ st_vars					= fresh_type_vars
+		  			, st_args					= fresh_arg_types
+		  			, st_arity					= fun_arity
+		  			, st_args_strictness		= NotStrict
+		  			, st_result					= fresh_result_type
+		  			, st_context				= []
+		  			, st_attr_vars				= []
+		  			, st_attr_env				= []
+		  			}
+		  ti									= { ti & ti_type_heaps = ti_type_heaps }
+		= (fun_type,ti)
 
 removeNeverMatchingSubcases :: Expression !.ReadOnlyTI -> Expression
 removeNeverMatchingSubcases keesExpr=:(Case kees) ro
@@ -2219,7 +2223,8 @@ where
 		match_types type type` perm common_defs type_heaps
 			| not (match_strictness` (dec type.st_arity) type.st_args_strictness type`.st_args_strictness perm)
 				= (False,type_heaps)
-			# (ok,args,res)	= make_args (type`.st_arity) type.st_args type.st_result
+			= (True,type_heaps)
+/*			# (ok,args,res)	= make_args (type`.st_arity) type.st_args type.st_result
 			| not ok = (False,type_heaps)
 			# args` = permute_args args perm
 			# ms = {tvar_map=[], ms_type_heaps = type_heaps,ms_common_defs=common_defs}
@@ -2230,6 +2235,7 @@ where
 			| type.st_context <> [] || type`.st_context <> []
 				= (False,ms.ms_type_heaps)
 			= (True,ms.ms_type_heaps)
+
 		where
 			make_args n as r
 				# l = length as
@@ -2239,7 +2245,7 @@ where
 			move_args 0 as r accu	= (True,as++(reverse accu),r)
 			move_args n as {at_type = a-->r} accu = move_args (dec n) as r [a:accu]
 			move_args _ as r accu = (False,as,r)
-
+*/
 		match_strictness` i s1 s2 p
 			| i < 0 = True
 			= arg_is_strict (p!!i) s1 == arg_is_strict i s2 && match_strictness (dec i) s1 s2
