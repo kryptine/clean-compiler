@@ -172,6 +172,8 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_Erroneous
 
+::	StrictnessList = NotStrict | Strict !Int | StrictList !Int StrictnessList
+
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
 
 cNameNotLocationDependent :== False
@@ -180,6 +182,7 @@ cNameLocationDependent :== True
 ::	ParsedSelector =
 	{	ps_field_name		:: !Ident
 	,	ps_selector_name	:: !Ident
+	,	ps_field_annotation	:: !Annotation
 	,	ps_field_type		:: !AType
 	,	ps_field_var		:: !Ident
 	,	ps_field_pos		:: !Position
@@ -190,6 +193,7 @@ cNameLocationDependent :== True
 	,	pc_cons_arity	:: !Int
 	,	pc_exi_vars		:: ![ATypeVar]
 	,	pc_arg_types	:: ![AType]
+	,	pc_args_strictness	:: !StrictnessList
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
 	}
@@ -796,6 +800,7 @@ cNotVarNumber :== -1
 ::	SymbolType =
 	{	st_vars			:: ![TypeVar]
 	,	st_args			:: ![AType]
+	,	st_args_strictness :: !StrictnessList
 	,	st_arity		:: !Int
 	,	st_result		:: !AType
 	,	st_context		:: ![TypeContext]
@@ -811,7 +816,6 @@ cNotVarNumber :== -1
 
 ::	AType =
 	{	at_attribute	:: !TypeAttribute
-	,	at_annotation	:: !Annotation
 	,	at_type			:: !Type
 	}
 	
@@ -819,6 +823,7 @@ cNotVarNumber :== -1
 ::	TempVarId		:== Int
 
 ::	Type	=	TA !TypeSymbIdent ![AType]
+			|	TAS !TypeSymbIdent ![AType] !StrictnessList
 			|	(-->) infixr 9 !AType !AType
 			| 	TArrow							/* (->) */
 			| 	TArrow1	!AType					/* ((->) a) */
@@ -908,7 +913,6 @@ cNotVarNumber :== -1
 
 ::	ATypeVar =
 	{	atv_attribute		:: !TypeAttribute
-	,	atv_annotation		:: !Annotation
 	,	atv_variable		:: !TypeVar
 	}
 
@@ -1283,6 +1287,8 @@ instance needs_brackets Type
 where
 	needs_brackets (TA {type_arity} _)
 		= type_arity > 0
+	needs_brackets (TAS {type_arity} _ _)
+		= type_arity > 0
 	needs_brackets (_ --> _)
 		= True
 	needs_brackets (_ :@: _)
@@ -1341,8 +1347,8 @@ where
 
 instance <<< AType
 where
-	(<<<) file {at_annotation,at_attribute,at_type}
-		= file <<< at_annotation <<< at_attribute <<< at_type
+	(<<<) file {at_attribute,at_type}
+		= file <<< at_attribute <<< at_type
 
 instance <<< TypeAttribute
 where
@@ -1383,8 +1389,8 @@ where
 
 instance <<< ATypeVar
 where
-	(<<<) file {atv_annotation,atv_attribute,atv_variable}
-		= file <<< atv_annotation <<< atv_attribute <<< atv_variable
+	(<<<) file {atv_attribute,atv_variable}
+		= file <<< atv_attribute <<< atv_variable
 
 instance <<< ConsVariable
 where
@@ -1395,6 +1401,15 @@ where
 	(<<<) file (TempQCV tv)
 		= file <<<  "E." <<< tv <<< ' ' 
 
+instance <<< StrictnessList
+where
+	(<<<) file (NotStrict)
+		= file <<< 0
+	(<<<) file (Strict s)
+		= file <<< s
+	(<<<) file (StrictList s l)
+		= file <<< s <<< ' ' <<< l
+
 instance <<< Type
 where
 	(<<<) file (TV varid)
@@ -1403,6 +1418,8 @@ where
 		= file  <<< 'v' <<< tv_number <<< ' ' 
 	(<<<) file (TA consid types)
 		= file  <<< consid <<< " " <<< types
+	(<<<) file (TAS consid types strictness)
+		= file  <<< consid <<< ' ' <<< strictness <<< ' ' <<< types
 	(<<<) file (arg_type --> res_type)
 		= file <<< arg_type <<< " -> " <<< res_type
 //AA..		
@@ -1437,8 +1454,8 @@ instance <<< SymbolType
 where
 	(<<<) file st=:{st_vars,st_attr_vars}
 		| st.st_arity == 0
-			= write_inequalities st.st_attr_env (write_contexts st.st_context (file <<< '[' <<< st_vars <<< ',' <<< st_attr_vars <<< ']' <<< st.st_result))
-			= write_inequalities st.st_attr_env (write_contexts st.st_context (file <<< '[' <<< st_vars <<< ',' <<< st_attr_vars <<< ']' <<< st.st_args <<< " -> " <<< st.st_result))
+			= write_inequalities st.st_attr_env (write_contexts st.st_context (file <<< '[' <<< st_vars <<< ',' <<< st_attr_vars <<< ']' <<< st.st_args_strictness <<< ' ' <<< st.st_result))
+			= write_inequalities st.st_attr_env (write_contexts st.st_context (file <<< '[' <<< st_vars <<< ',' <<< st_attr_vars <<< ']' <<< st.st_args_strictness <<< ' ' <<< st.st_args <<< " -> " <<< st.st_result))
 
 write_contexts [] file
 	= file
@@ -2184,8 +2201,8 @@ EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group
 MakeTypeVar name :== { tv_name = name, tv_info_ptr = nilPtr }
 MakeVar name :== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
 
-MakeAttributedType type :== { at_attribute = TA_None, at_annotation = AN_None, at_type = type }
-MakeAttributedTypeVar type_var :== { atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = type_var }
+MakeAttributedType type :== { at_attribute = TA_None, at_type = type }
+MakeAttributedTypeVar type_var :== { atv_attribute = TA_None, atv_variable = type_var }
 
 EmptyFunInfo :== { fi_calls = [], fi_group_index = NoIndex, fi_def_level = NotALevel,
 				   fi_free_vars = [], fi_local_vars = [], fi_dynamics = [], fi_properties=0 }
@@ -2212,12 +2229,12 @@ MakeTypeSymbIdentMacro type_index name arity
 ParsedSelectorToSelectorDef sd_type_index ps :==
 	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,
 		sd_exi_vars = [], sd_type_ptr = nilPtr, sd_field = ps.ps_field_name,
-		sd_type	= { st_vars = [], st_args = [], st_result = ps.ps_field_type, st_arity = 0, st_context = [],
+		sd_type	= { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_result = ps.ps_field_type, st_arity = 0, st_context = [],
 				    st_attr_env = [], st_attr_vars = [] }}
 
 ParsedConstructorToConsDef pc :==
 	{	cons_symb = pc.pc_cons_name, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_index = NoIndex, cons_type_index = NoIndex,
-		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_result = MakeAttributedType TE, 
+		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_args_strictness=pc.pc_args_strictness, st_result = MakeAttributedType TE, 
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr, cons_arg_vars = [] }
 

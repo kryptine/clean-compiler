@@ -178,6 +178,134 @@ bitvectOr op1 op2
 			= (has_changed, op1, op2)
 		= (True, op1, { op2 & [i] = or })
 
+add_strictness :: !Int !StrictnessList -> StrictnessList
+add_strictness index NotStrict
+	| index<32
+		= Strict (1<<index);
+		= StrictList 0 (add_strictness (index-32) NotStrict)
+add_strictness index (Strict s)
+	| index<32
+		= Strict (s bitor (1<<index));
+		= StrictList s (add_strictness (index-32) NotStrict)
+add_strictness index (StrictList s l)
+	| index<32
+		= StrictList (s bitor (1<<index)) l;
+		= StrictList s (add_strictness (index-32) l)
+
+first_n_strict :: !Int -> StrictnessList
+first_n_strict 0
+	= NotStrict
+first_n_strict n
+	| n<32
+		= Strict (bitnot ((-1)<<n))
+		= StrictList (-1) (first_n_strict (n-32))
+
+insert_n_strictness_values_at_beginning :: !Int !StrictnessList -> StrictnessList
+insert_n_strictness_values_at_beginning 0 s
+	= s
+insert_n_strictness_values_at_beginning n NotStrict
+	| n<32
+		= Strict (bitnot ((-1)<<n))
+		= StrictList (-1) (first_n_strict (n-32))
+insert_n_strictness_values_at_beginning n (Strict s)
+	| n<32
+		# s2=((s>>1) bitand 0x7fffffff)>>(31-n)
+		# s=(bitnot ((-1)<<n)) bitor (s<<n)
+		| s2==0
+			= Strict s
+			= StrictList s (Strict s2)
+		= StrictList (-1) (first_n_strict (n-32))
+insert_n_strictness_values_at_beginning n (StrictList s l)
+	| n<32
+		# s2=((s>>1) bitand 0x7fffffff)>>(31-n)
+		# s=(bitnot ((-1)<<n)) bitor (s<<n)
+		= StrictList s (shift_or l n s2)
+		= StrictList (-1) (insert_n_strictness_values_at_beginning (n-32) l)
+
+insert_n_lazy_values_at_beginning :: !Int !StrictnessList -> StrictnessList
+insert_n_lazy_values_at_beginning 0 s
+	= s
+insert_n_lazy_values_at_beginning n NotStrict
+	= NotStrict
+insert_n_lazy_values_at_beginning n (Strict s)
+	| n<32
+		# s2=((s>>1) bitand 0x7fffffff)>>(31-n)
+		# s=s<<n
+		| s2==0
+			= Strict s
+			= StrictList s (Strict s2)
+		= StrictList (-1) (first_n_strict (n-32))
+insert_n_lazy_values_at_beginning n (StrictList s l)
+	| n<32
+		# s2=((s>>1) bitand 0x7fffffff)>>(31-n)
+		# s=s<<n
+		= StrictList s (shift_or l n s2)
+		= StrictList (-1) (insert_n_lazy_values_at_beginning (n-32) l)
+
+shift_or NotStrict n s2
+	| s2==0	
+		= NotStrict
+		= Strict s2
+shift_or (Strict s) n s2
+	# new_s=(s<<n) bitor s2
+	# new_s2=((s>>1) bitand 0x7fffffff)>>(31-n)
+	| new_s2==0
+		= Strict new_s
+		= StrictList new_s (Strict new_s2)
+shift_or (StrictList s l) n s2
+	# new_s=(s<<n) bitor s2
+	# new_s2=((s>>1) bitand 0x7fffffff)>>(31-n)
+	= StrictList new_s (shift_or l n new_s2)
+
+arg_strictness_annotation :: !Int !StrictnessList -> Annotation;
+arg_strictness_annotation _ NotStrict
+	= AN_None
+arg_strictness_annotation i (Strict s)
+	| i<32 && (s>>i) bitand 1>0
+		= AN_Strict
+		= AN_None
+arg_strictness_annotation i (StrictList s l)
+	| i<32
+		| (s>>i) bitand 1>0
+			= AN_Strict
+			= AN_None
+		= arg_strictness_annotation (i-32) l
+
+arg_is_strict :: !Int !StrictnessList -> Bool;
+arg_is_strict _ NotStrict
+	= False
+arg_is_strict i (Strict s)
+	= i<32 && (s>>i) bitand 1>0
+arg_is_strict i (StrictList s l)
+	| i<32
+		= (s>>i) bitand 1>0
+		= arg_is_strict (i-32) l
+
+is_not_strict :: !StrictnessList -> Bool
+is_not_strict NotStrict = True
+is_not_strict (Strict s) = s==0
+is_not_strict (StrictList s l) = s==0 && is_not_strict l
+
+add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
+add_next_strict strictness_index strictness strictness_list
+	| strictness_index<32
+		= (strictness_index+1,strictness bitor (1<<strictness_index),strictness_list)
+		= (0,0x80000000,append_strictness strictness strictness_list)
+
+add_next_not_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
+add_next_not_strict strictness_index strictness strictness_list
+	| strictness_index<32
+		= (strictness_index+1,strictness,strictness_list)
+		= (0,0,append_strictness strictness strictness_list)
+
+append_strictness :: !Int !StrictnessList -> StrictnessList
+append_strictness strictness NotStrict
+	= Strict strictness
+append_strictness strictness (Strict s)
+	= StrictList s (Strict strictness)
+append_strictness strictness (StrictList s l)
+	= StrictList s (append_strictness strictness l)
+
 screw :== 80
 
 :: IntKey :== Int

@@ -516,8 +516,8 @@ make_type_def type_cons_index type_vars type_rhs pre_def_symbols
 	# type_cons_ident = predefined_idents.[type_cons_index]
 	= (MakeTypeDef type_cons_ident (map (\tv -> MakeAttributedTypeVar tv) type_vars) type_rhs TA_None [] NoPos, pre_def_symbols)
 
-make_list_definition :: Int Int Int Ident TypeVar AType *{#PredefinedSymbol} -> (!TypeDef TypeRhs,!ConsDef,!ConsDef,!.{#PredefinedSymbol})
-make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index nil_pre_def_symbol_index pre_mod_id type_var type_var_with_attr pre_def_symbols
+make_list_definition :: Int Int Int Ident TypeVar AType StrictnessList *{#PredefinedSymbol} -> (!TypeDef TypeRhs,!ConsDef,!ConsDef,!.{#PredefinedSymbol})
+make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index nil_pre_def_symbol_index pre_mod_id type_var type_var_with_attr cons_strictness pre_def_symbols
 	# cons_ident = predefined_idents.[cons_pre_def_symbol_index]
 	  nil_ident = predefined_idents.[nil_pre_def_symbol_index]
 	  list_ident = predefined_idents.[list_type_pre_def_symbol_index] 
@@ -527,8 +527,8 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_symb,nil_symb]) pre_def_symbols	
 	  list_type = MakeAttributedType (TA (MakeNewTypeSymbIdent list_ident 1) [type_var_with_attr])
 	  cons_def = {	pc_cons_name = cons_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type],
-	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
-	  nil_def = {	pc_cons_name = nil_ident, pc_cons_arity = 0, pc_arg_types = [],
+				 	pc_args_strictness=cons_strictness,	pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
+	  nil_def = {	pc_cons_name = nil_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict,
 	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
@@ -547,19 +547,19 @@ buildPredefinedModule pre_def_symbols
 	  (string_def, pre_def_symbols)	= make_type_def PD_StringType [] (SynType unb_arr_of_char_type) pre_def_symbols
 	
 	  (list_def,cons_def,nil_def,pre_def_symbols)
-		= make_list_definition PD_ListType PD_ConsSymbol PD_NilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_ListType PD_ConsSymbol PD_NilSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
 	  (strict_list_def,strict_cons_def,strict_nil_def,pre_def_symbols)
-		= make_list_definition PD_StrictListType PD_StrictConsSymbol PD_StrictNilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_StrictListType PD_StrictConsSymbol PD_StrictNilSymbol pre_mod_ident type_var type_var_with_attr (Strict 1) pre_def_symbols
 	  (unboxed_list_def,unboxed_cons_def,unboxed_nil_def,pre_def_symbols)
-		= make_list_definition PD_UnboxedListType PD_UnboxedConsSymbol PD_UnboxedNilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_UnboxedListType PD_UnboxedConsSymbol PD_UnboxedNilSymbol pre_mod_ident type_var type_var_with_attr (Strict 1) pre_def_symbols
 	  (tail_strict_list_def,tail_strict_cons_def,tail_strict_nil_def,pre_def_symbols)
-		= make_list_definition PD_TailStrictListType PD_TailStrictConsSymbol PD_TailStrictNilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_TailStrictListType PD_TailStrictConsSymbol PD_TailStrictNilSymbol pre_mod_ident type_var type_var_with_attr (Strict 2) pre_def_symbols
 	  (strict_tail_strict_list_def,strict_tail_strict_cons_def,strict_tail_strict_nil_def,pre_def_symbols)
-		= make_list_definition PD_StrictTailStrictListType PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_StrictTailStrictListType PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol pre_mod_ident type_var type_var_with_attr (Strict 3) pre_def_symbols
 	  (unboxed_tail_strict_list_def,unboxed_tail_strict_cons_def,unboxed_tail_strict_nil_def,pre_def_symbols)
-		= make_list_definition PD_UnboxedTailStrictListType PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_UnboxedTailStrictListType PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol pre_mod_ident type_var type_var_with_attr (Strict 3) pre_def_symbols
 	  (overloaded_list_def,overloaded_cons_def,overloaded_nil_def,pre_def_symbols)
-		= make_list_definition PD_OverloadedListType PD_OverloadedConsSymbol PD_OverloadedNilSymbol pre_mod_ident type_var type_var_with_attr pre_def_symbols
+		= make_list_definition PD_OverloadedListType PD_OverloadedConsSymbol PD_OverloadedNilSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
 
 	  (array_def, pre_def_symbols)		= make_type_def PD_LazyArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 	  (strict_def, pre_def_symbols)		= make_type_def PD_StrictArrayType [type_var] (AbstractType cIsHyperStrict) pre_def_symbols
@@ -585,7 +585,9 @@ where
 			  
 			  (tuple_type_def, pre_def_symbols)	= make_type_def (GetTupleTypeIndex tup_arity) type_vars (AlgType [tuple_cons_symb]) pre_def_symbols
 			  tuple_cons_def	= { pc_cons_name = tuple_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
-			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars], pc_cons_prio =  NoPrio, pc_exi_vars = []}
+			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars],
+			  						pc_args_strictness = NotStrict,
+			  						pc_cons_prio =  NoPrio, pc_exi_vars = []}
 			= add_tuple_defs pre_mod_id (dec tup_arity) [tuple_type_def : type_defs] [ParsedConstructorToConsDef tuple_cons_def : cons_defs] pre_def_symbols
 			= (type_defs, cons_defs, pre_def_symbols)
 	where
@@ -603,8 +605,8 @@ where
 		
 		  class_var = MakeTypeVar type_var_ident
 
-		  me_type = { st_vars = [], st_args = [], st_arity = 0,
-					  st_result = { at_attribute = TA_None, at_annotation = AN_None, at_type = TV class_var },
+		  me_type = { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_arity = 0,
+					  st_result = { at_attribute = TA_None, at_type = TV class_var },
 					  st_context = [ {tc_class = {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name, ds_arity = 1, ds_index = NoIndex }},
 					   				tc_types = [ TV class_var ], tc_var = nilPtr}],
 					  st_attr_vars = [], st_attr_env = [] }
@@ -621,8 +623,8 @@ where
 
 // MW..
 	make_identity_fun_type alias_dummy_id type_var
-		# a = { at_attribute = TA_Anonymous, at_annotation = AN_Strict, at_type = TV type_var }
-		  id_symbol_type = { st_vars = [], st_args = [a], st_arity = 1, st_result = a, st_context = [], 
+		# a = { at_attribute = TA_Anonymous, at_type = TV type_var }
+		  id_symbol_type = { st_vars = [], st_args = [a], st_args_strictness = Strict 1, st_arity = 1, st_result = a, st_context = [], 
 							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
 		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
 			ft_specials = SP_None, ft_type_ptr = nilPtr }

@@ -187,6 +187,12 @@ instance compare Type
 where
 	compare (TA dclIdent dclArgs) (TA iclIdent iclArgs) comp_st
 		= compare (dclIdent.type_index, dclArgs) (iclIdent.type_index, iclArgs) comp_st
+	compare (TA dclIdent dclArgs) (TAS iclIdent iclArgs iclStrictness) comp_st
+		= compare (dclIdent.type_index, (dclArgs,NotStrict)) (iclIdent.type_index, (iclArgs,iclStrictness)) comp_st
+	compare (TAS dclIdent dclArgs dclStrictness) (TA iclIdent iclArgs) comp_st
+		= compare (dclIdent.type_index, (dclArgs,dclStrictness)) (iclIdent.type_index, (iclArgs,NotStrict)) comp_st
+	compare (TAS dclIdent dclArgs dclStrictness) (TAS iclIdent iclArgs iclStrictness) comp_st
+		= compare (dclIdent.type_index, (dclArgs,dclStrictness)) (iclIdent.type_index, (iclArgs,iclStrictness)) comp_st
 	compare (dclFun --> dclArg) (iclFun --> iclArg) comp_st
 		= compare (dclFun, dclArg) (iclFun, iclArg) comp_st
 	compare (CV dclVar :@: dclArgs) (CV iclVar :@: iclArgs) comp_st
@@ -203,7 +209,7 @@ where
 instance compare AType
 where
 	compare at1 at2 comp_st
-		= compare (at1.at_attribute, (at1.at_annotation,  at1.at_type)) (at2.at_attribute, (at2.at_annotation, at2.at_type)) comp_st
+		= compare (at1.at_attribute, at1.at_type) (at2.at_attribute, at2.at_type) comp_st
 
 instance compare TypeAttribute
 where
@@ -223,6 +229,20 @@ instance compare Annotation
 where
 	compare an1 an2 comp_st
 		= (equal_constructor an1 an2, comp_st)
+
+instance compare StrictnessList
+where
+	compare strictness1 strictness2 comp_st
+		= (equal_strictness_lists strictness1 strictness2,comp_st)
+
+equal_strictness_lists NotStrict NotStrict
+	= True
+equal_strictness_lists NotStrict (Strict s)
+	= s==0
+equal_strictness_lists (Strict s) NotStrict
+	= s==0
+equal_strictness_lists (Strict s1) (Strict s2)
+	= s1==s2
 	
 instance compare AttributeVar
 where
@@ -267,8 +287,8 @@ where
 		  comp_attr_var_heap = initialyseAttributeVars dcl_st.st_attr_vars comp_attr_var_heap
 		  comp_attr_var_heap = initialyseAttributeVars icl_st.st_attr_vars comp_attr_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
-		= compare	(dcl_st.st_args, (dcl_st.st_result, (dcl_st.st_context, dcl_st.st_attr_env)))
-					(icl_st.st_args, (icl_st.st_result, (icl_st.st_context, icl_st.st_attr_env))) comp_st
+		= compare	(dcl_st.st_args, (dcl_st.st_args_strictness, (dcl_st.st_result, (dcl_st.st_context, dcl_st.st_attr_env))))
+					(icl_st.st_args, (icl_st.st_args_strictness, (icl_st.st_result, (icl_st.st_context, icl_st.st_attr_env)))) comp_st
 //						---> ("compare SymbolType", dcl_st, icl_st)
 
 instance compare InstanceType
@@ -689,7 +709,6 @@ instance t_corresponds DefinedSymbol where
 instance t_corresponds ATypeVar where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.atv_attribute iclDef.atv_attribute
-		&&&	t_corresponds dclDef.atv_annotation iclDef.atv_annotation
 		&&&	t_corresponds dclDef.atv_variable iclDef.atv_variable
 
 instance t_corresponds Annotation where
@@ -698,11 +717,17 @@ instance t_corresponds Annotation where
 	  where
 		t_corresponds` dcl_annotation icl_annotation tc_state=:{tc_ignore_strictness}
 			= (tc_ignore_strictness || dcl_annotation==icl_annotation, tc_state)
+
+instance t_corresponds StrictnessList where
+	t_corresponds dcl_strictness icl_strictness 
+		= t_corresponds` dcl_strictness icl_strictness
+	  where
+		t_corresponds` dcl_strictness icl_strictness tc_state=:{tc_ignore_strictness}
+			= (tc_ignore_strictness || equal_strictness_lists dcl_strictness icl_strictness, tc_state)
 			
 instance t_corresponds AType where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.at_attribute iclDef.at_attribute
-		&&&	t_corresponds dclDef.at_annotation iclDef.at_annotation
 		&&&	t_corresponds dclDef.at_type iclDef.at_type
 
 instance t_corresponds TypeAttribute where
@@ -739,6 +764,21 @@ instance t_corresponds Type where
 	t_corresponds (TA dclIdent dclArgs) icl_type=:(TA iclIdent iclArgs)
 		=	equal dclIdent.type_name iclIdent.type_name
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
+		&&& t_corresponds dclArgs iclArgs
+	t_corresponds (TA dclIdent dclArgs) icl_type=:(TAS iclIdent iclArgs iclStrictness)
+		=	equal dclIdent.type_name iclIdent.type_name
+		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
+		&&& return (equal_strictness_lists NotStrict iclStrictness)
+		&&& t_corresponds dclArgs iclArgs
+	t_corresponds (TAS dclIdent dclArgs dclStrictness) icl_type=:(TA iclIdent iclArgs)
+		=	equal dclIdent.type_name iclIdent.type_name
+		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
+		&&& return (equal_strictness_lists dclStrictness NotStrict)
+		&&& t_corresponds dclArgs iclArgs
+	t_corresponds (TAS dclIdent dclArgs dclStrictness) icl_type=:(TAS iclIdent iclArgs iclStrictness)
+		=	equal dclIdent.type_name iclIdent.type_name
+		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
+		&&& return (equal_strictness_lists dclStrictness iclStrictness)
 		&&& t_corresponds dclArgs iclArgs
 	t_corresponds (dclFun --> dclArg) (iclFun --> iclArg)
 		=	t_corresponds dclFun iclFun
@@ -818,6 +858,7 @@ init_atype_vars atype_vars
 instance t_corresponds SymbolType where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.st_args iclDef.st_args
+		&&&	t_corresponds dclDef.st_args_strictness iclDef.st_args_strictness
 		&&&	t_corresponds dclDef.st_result iclDef.st_result
 		&&&	t_corresponds dclDef.st_context iclDef.st_context
 		&&&	t_corresponds dclDef.st_attr_env iclDef.st_attr_env

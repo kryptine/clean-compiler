@@ -1,11 +1,11 @@
 definition module containers
 
 /*2.0
-from syntax import ::Optional
+from syntax import ::Optional,::StrictnessList,::Annotation
 from StdOverloaded import class toString
 0.2*/
 //1.3
-from syntax import Optional
+from syntax import Optional,StrictnessList,Annotation
 from StdOverloaded import toString
 //3.1
 
@@ -26,6 +26,17 @@ bitvectSet :: !Int !*LargeBitvect -> .LargeBitvect
 bitvectReset :: !Int !*LargeBitvect -> .LargeBitvect
 bitvectSetFirstN :: !Int !*LargeBitvect -> .LargeBitvect 
 bitvectResetAll :: !*LargeBitvect -> .LargeBitvect 
+
+add_strictness :: !Int !StrictnessList -> StrictnessList
+first_n_strict :: !Int -> StrictnessList
+insert_n_strictness_values_at_beginning :: !Int !StrictnessList -> StrictnessList
+insert_n_lazy_values_at_beginning :: !Int !StrictnessList -> StrictnessList
+arg_strictness_annotation :: !Int !StrictnessList -> Annotation;
+is_not_strict :: !StrictnessList -> Bool
+arg_is_strict :: !Int !StrictnessList -> Bool;
+add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
+add_next_not_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
+append_strictness :: !Int !StrictnessList -> StrictnessList
 
 :: IntKey :== Int
 

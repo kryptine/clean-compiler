@@ -1,7 +1,7 @@
 implementation module postparse
 
 import StdEnv
-import syntax, parse, utilities, StdCompare
+import syntax, parse, utilities, containers, StdCompare
 //import RWSDebug
 
 :: *CollectAdmin =
@@ -1180,6 +1180,22 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
+strictness_from_fields :: ![ParsedSelector] -> StrictnessList
+strictness_from_fields fields
+	= add_strictness_for_arguments fields 0 0 NotStrict
+where 
+	add_strictness_for_arguments :: ![ParsedSelector] !Int !Int !StrictnessList -> StrictnessList
+	add_strictness_for_arguments [] strictness_index strictness strictness_list
+		| strictness==0
+			= strictness_list
+			= append_strictness strictness strictness_list
+	add_strictness_for_arguments [{ps_field_annotation=AN_Strict}:fields] strictness_index strictness strictness_list
+		# (strictness_index,strictness,strictness_list) = add_next_strict strictness_index strictness strictness_list
+		= add_strictness_for_arguments fields strictness_index strictness strictness_list
+	add_strictness_for_arguments [{ps_field_annotation=AN_None}:fields] strictness_index strictness strictness_list
+		# (strictness_index,strictness,strictness_list) = add_next_not_strict strictness_index strictness strictness_list
+		= add_strictness_for_arguments fields strictness_index strictness strictness_list
+
 reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject], !*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count type_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
@@ -1239,8 +1255,9 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorL
 	# (sel_syms, new_count) = determine_symbols_of_selectors sel_defs sel_count
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs (inc cons_count) new_count mem_count (type_count+1) ca
 	  cons_arity = new_count - sel_count
+	  pc_arg_types = [ ps_field_type \\ {ps_field_type} <- sel_defs ]
 	  cons_def = {	pc_cons_name = rec_cons_id, pc_cons_prio = NoPrio, pc_cons_arity = cons_arity, pc_cons_pos = td_pos,
-	  				pc_arg_types = [ ps_field_type \\ {ps_field_type} <- sel_defs ], pc_exi_vars = exivars }
+	  				pc_arg_types = pc_arg_types, pc_args_strictness=strictness_from_fields sel_defs,pc_exi_vars = exivars }
 	  type_def = { type_def & td_rhs = RecordType {rt_constructor = { ds_ident = rec_cons_id, ds_arity = cons_arity, ds_index = cons_count },
 	  							rt_fields =  { sel \\ sel <- sel_syms }}}
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors],

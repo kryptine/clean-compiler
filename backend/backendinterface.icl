@@ -99,6 +99,9 @@ printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap
 printFunctionType all attr info (functionIndex, {fun_symb,fun_type=Yes type}) (attrHeap, file, backEnd)
 	| not all && functionIndex >= size info.dtic_dclModules.[info.dtci_iclModuleIndex].dcl_functions
 		=	(attrHeap, file, backEnd)
+
+//	| trace_tn (toString fun_symb) && True ---> type.st_args
+
 	# (strictnessAdded, type, backEnd)
 		=	addStrictnessFromBackEnd functionIndex fun_symb.id_name backEnd type
 	| not strictnessAdded && not all
@@ -127,6 +130,9 @@ addStrictnessFromBackEnd functionIndex functionName backEnd type
 		=	{si_robust_encoding = False, si_positions = strictPositions, si_size = bitSize, si_name = functionName}
 	  offset
 	  	=	0
+
+//	| trace_tn (toString bitSize+++" "+++toString strictPositions.[0])
+
 	# (robust, offset)
 		=	nextBit strictnessInfo offset
 	  strictnessInfo
@@ -134,10 +140,18 @@ addStrictnessFromBackEnd functionIndex functionName backEnd type
 	# (anyStrictnessAdded, offset)
 		=	nextBit strictnessInfo offset
 	# (type, offset)
-		=	addStrictness strictnessInfo type offset
+		=	addStrictnessToSymbolType strictnessInfo type offset
 	# type
 		=	checkFinalOffset strictnessInfo offset type
 	= (anyStrictnessAdded, type, backEnd)
+
+addStrictnessToSymbolType strictPositions=:{si_size} args offset
+	| offset >= si_size // short cut
+		=	(args, offset)
+addStrictnessToSymbolType strictPositions type=:{st_args,st_args_strictness} offset
+	# (st_args, offset,args_strictness)
+		=	addStrictness strictPositions st_args offset st_args_strictness 0
+	=	({type & st_args = st_args,st_args_strictness=args_strictness}, offset)
 
 :: StrictnessInfo =
 	{	si_size :: !Int
@@ -146,7 +160,7 @@ addStrictnessFromBackEnd functionIndex functionName backEnd type
 	,	si_robust_encoding :: !Bool
 	}
 
-class addStrictness a :: !StrictnessInfo !a Int -> (!a, !Int)
+class addStrictness a :: !StrictnessInfo !a Int StrictnessList Int -> (!a, !Int,!StrictnessList)
 
 nextBit :: StrictnessInfo Int -> (Bool, Int)
 nextBit {si_size, si_positions, si_robust_encoding} offset
@@ -187,58 +201,64 @@ checkFinalOffset info=:{si_size, si_robust_encoding} offset value
 	// otherwise
 		=	value
 
-instance addStrictness SymbolType where
-	addStrictness strictPositions=:{si_size} args offset
-		| offset >= si_size // short cut
-			=	(args, offset)
-	addStrictness strictPositions type=:{st_args} offset
-		# (st_args, offset)
-			=	addStrictness strictPositions st_args offset
-		=	({type & st_args = st_args}, offset)
-
 instance addStrictness [a] | addStrictness a where
-	addStrictness strictPositions l offset
-		=	mapSt (addStrictness strictPositions) l offset
+	addStrictness strictPositions [] offset args_strictness args_strictness_index
+		= ([],offset,args_strictness)
+	addStrictness strictPositions [type:types] offset args_strictness args_strictness_index
+		# (type,offset,args_strictness)=addStrictness strictPositions type offset args_strictness args_strictness_index
+		# (types,offset,args_strictness)=addStrictness strictPositions types offset args_strictness (args_strictness_index+1)
+		= ([type:types],offset,args_strictness)
 
 instance addStrictness AType where
-	addStrictness strictPositions arg=:{at_annotation, at_type} offset
-		# (at_annotation, offset)
-			=	addStrictness strictPositions at_annotation offset
+	addStrictness strictPositions arg=:{at_type} offset args_strictness args_strictness_index
+		# (is_strict,offset,args_strictness)
+			=	addStrictnessAnnotation strictPositions offset args_strictness args_strictness_index
 		# (at_type, offset)
-			=	addStrictnessToType strictPositions (at_annotation == AN_Strict) at_type offset
-		=	({arg & at_annotation = at_annotation, at_type = at_type}, offset)
+			=	addStrictnessToType strictPositions is_strict at_type offset
+		=	({arg & at_type=at_type}, offset,args_strictness)
 
-instance addStrictness Annotation where
-	addStrictness info annotation offset
-		# offset
-			=	checkStrictness info wasStrict offset
-		# (strictAdded, offset)
-			=	nextBit info offset
-		| strictAdded
-			| wasStrict
+addStrictnessAnnotation info offset args_strictness args_strictness_index
+	# wasStrict = arg_is_strict args_strictness_index args_strictness
+	# offset
+		=	checkStrictness info wasStrict offset
+	# (strictAdded, offset)
+		=	nextBit info offset
+	| strictAdded
+		| wasStrict
 				=	abort "backendinterface, addStrictness: already strict"
-			// otherwise
-				=	(AN_Strict, offset)
 		// otherwise
-			=	(annotation, offset)
-		where
-			wasStrict
-				=	annotation == AN_Strict
+			# args_strictness = add_strictness args_strictness_index args_strictness
+			=	(True, offset,args_strictness)
+	// otherwise
+		=	(wasStrict, offset,args_strictness)
 
 addStrictnessToType :: StrictnessInfo Bool Type Int -> (Type, Int)
-addStrictnessToType strictPositions isStrict type=:(TA ident=:{type_name,type_arity} args) offset
+addStrictnessToType strictPositions isStrict type=:(TA ident=:{type_index={glob_object,glob_module}} args) offset
 	# offset
 		=	checkType strictPositions isTuple offset
 	| isTuple && isStrict
-		# (args, offset)
-			=	addStrictness strictPositions args offset
-		=	(TA ident args, offset)
+		# (args, offset,args_strictness)
+			=	addStrictness strictPositions args offset NotStrict 0
+		| is_not_strict args_strictness
+			=	(TA ident args, offset)
+			=	(TAS ident args args_strictness, offset)
 	// otherwise
 		=	(type, offset)
 	where
-		// FIXME: don't match on name but use predef info
 		isTuple
-			= type_name.id_name == "_Tuple" +++ toString type_arity
+			= glob_module==cPredefinedModuleIndex && (glob_object>=PD_Arity2TupleTypeIndex && glob_object<=PD_Arity32TupleTypeIndex)
+addStrictnessToType strictPositions isStrict type=:(TAS ident=:{type_index={glob_object,glob_module}} args strictness) offset
+	# offset
+		=	checkType strictPositions isTuple offset
+	| isTuple && isStrict
+		# (args, offset,strictness)
+			=	addStrictness strictPositions args offset strictness 0
+		=	(TAS ident args strictness, offset)
+	// otherwise
+		=	(type, offset)
+	where
+		isTuple
+			= glob_module==cPredefinedModuleIndex && (glob_object>=PD_Arity2TupleTypeIndex && glob_object<=PD_Arity32TupleTypeIndex)
 addStrictnessToType strictPositions _ type offset
 	# offset
 		=	checkType strictPositions False offset
@@ -273,6 +293,8 @@ instance collectAttrVars TypeAttribute where
 
 instance collectAttrVars Type where
 	collectAttrVars (TA _ types) collect
+		=	collectAttrVars types collect
+	collectAttrVars (TAS _ types _) collect
 		=	collectAttrVars types collect
 	collectAttrVars (type1 --> type2) collect
 		=	collectAttrVars type1 (collectAttrVars type2 collect)
@@ -316,28 +338,54 @@ DictionaryToClassInfo iclModuleIndex iclModule dclModules :==
 	}
 
 dictionariesToClasses :: DictionaryToClassInfo SymbolType -> SymbolType
-dictionariesToClasses info type=:{st_args, st_arity, st_context=[]}
+dictionariesToClasses info type=:{st_args, st_args_strictness, st_arity, st_context=[]}
 	# (reversedTypes, reversedContexts)
 		=	dictionaryArgsToClasses info st_args ([], [])
+	# n_contexts = length reversedContexts
+	# new_st_args_strictness = remove_first_n_strictness_values n_contexts st_args_strictness
+		with
+			remove_first_n_strictness_values 0 s
+				= s
+			remove_first_n_strictness_values _ NotStrict
+				= NotStrict
+			remove_first_n_strictness_values n (Strict s)
+				| n<32
+					 = Strict (((s>>1) bitand 0x7fffffff)>>(n-1))
+					 = NotStrict
+			remove_first_n_strictness_values n (StrictList s l)
+				| n<32
+					# s2=case l of
+							Strict s -> s
+							StrictList s _ -> s
+							NotStrict -> 0
+					# s=(((s>>1) bitand 0x7fffffff)>>(n-1)) bitor (s2<<(32-n))
+					= StrictList s (remove_first_n_strictness_values n l)
+					= remove_first_n_strictness_values (n-32) l
 	=	{type & st_args = reverse reversedTypes, st_context = reverse reversedContexts,
-				st_arity = st_arity - length reversedContexts}
+				st_arity = st_arity - n_contexts, st_args_strictness=new_st_args_strictness}
 
 dictionaryArgsToClasses :: DictionaryToClassInfo [AType] ([AType], [TypeContext]) -> ([AType], [TypeContext])
 dictionaryArgsToClasses info args result
 	=	foldSt (dictionaryArgToClass info) args result
-
-dictionaryArgToClass :: DictionaryToClassInfo AType ([AType], [TypeContext]) -> ([AType], [TypeContext])
-dictionaryArgToClass info type=:{at_type=TA typeSymbol args} (reversedTypes, reversedContexts)
-	=	case typeToClass info typeSymbol of
-			Yes klass
-				->	(reversedTypes, [context : reversedContexts])
-				with
-					context	
-						=	{tc_class = klass, tc_types = [at_type \\ {at_type} <- args], tc_var = nilPtr}
-			No
-				->	([type : reversedTypes], reversedContexts)
-dictionaryArgToClass _ type (reversedTypes, reversedContexts)
-	=	([type : reversedTypes], reversedContexts)
+where
+	dictionaryArgToClass :: DictionaryToClassInfo AType ([AType], [TypeContext]) -> ([AType], [TypeContext])
+	dictionaryArgToClass info type=:{at_type=TA typeSymbol args} (reversedTypes, reversedContexts)
+		=	case typeToClass info typeSymbol of
+				Yes klass
+					->	(reversedTypes, [dictionary_to_context klass args : reversedContexts])
+				No
+					->	([type : reversedTypes], reversedContexts)
+	dictionaryArgToClass info type=:{at_type=TAS typeSymbol args _} (reversedTypes, reversedContexts)
+		=	case typeToClass info typeSymbol of
+				Yes klass
+					->	(reversedTypes, [dictionary_to_context klass args : reversedContexts])
+				No
+					->	([type : reversedTypes], reversedContexts)
+	dictionaryArgToClass _ type (reversedTypes, reversedContexts)
+		=	([type : reversedTypes], reversedContexts)
+	
+	dictionary_to_context klass args
+		=	{tc_class = klass, tc_types = [at_type \\ {at_type} <- args], tc_var = nilPtr}
 
 typeToClass :: DictionaryToClassInfo TypeSymbIdent -> Optional (Global DefinedSymbol)
 typeToClass info {type_name, type_arity, type_index={glob_module, glob_object}}

@@ -259,12 +259,22 @@ where
 
 	adjust_type_attribute _ _ (TV _) state
 		= state
-	adjust_type_attribute defs (TA type_cons1 cons_args1) (TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
+	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
 		| type_cons1 == type_cons2
 			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
-			# (_, type1, type_heaps) = tryToExpandTypeSyn defs type_cons1 cons_args1 type_heaps
-			  (_, type2, type_heaps) = tryToExpandTypeSyn defs type_cons2 cons_args2 type_heaps
-			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
+			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
+	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
+		| type_cons1 == type_cons2
+			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
+			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
+	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
+		| type_cons1 == type_cons2
+			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
+			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
+	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
+		| type_cons1 == type_cons2
+			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
+			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
 	adjust_type_attribute defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) state
 		= adjust_attributes_and_subtypes defs [arg_type1, res_type1] [arg_type2, res_type2] state
 // AA..
@@ -273,19 +283,33 @@ where
 // ..AA
 	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
 		= adjust_attributes_and_subtypes defs types1 types2 state
-	adjust_type_attribute _ (TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
-		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type_cons1 cons_args1 type_heaps
+	adjust_type_attribute _ type1=:(TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
+		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute _ type1 (TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
-		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type_cons2 cons_args2 type_heaps
+	adjust_type_attribute _ type1=:(TAS type_cons1 cons_args1 _) type2 (ok, coercion_env, type_heaps)
+		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
+		| expanded
+			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
+			= (ok, coercion_env, type_heaps)
+	adjust_type_attribute _ type1 type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
+		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
+		| expanded
+			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
+			= (ok, coercion_env, type_heaps)
+	adjust_type_attribute _ type1 type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
+		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 			= (ok, coercion_env, type_heaps)
 	adjust_type_attribute _ _ _ state
 		= state
 	
+	expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
+		# (_, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
+		  (_, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
+		= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 
 	adjust_attributes_and_subtypes defs types1 types2 state
 		= fold2St (adjust_attribute_and_subtypes defs) types1 types2 state
@@ -506,6 +530,14 @@ where
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
 			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
+		reduce_tc_context type_code_class (TAS cons_id=:{type_index={glob_module}} cons_args _) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+			# defining_module_name
+				= dcl_modules.[glob_module].dcl_name.id_name
+			# (inst_index, (si_next_TC_member_index, si_TC_instances))
+			  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (si_next_TC_member_index, si_TC_instances)
+			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
+			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
+			= (CA_GlobalTypeCode { tci_index = inst_index, tci_contexts = rc_red_contexts }, instances)
 		reduce_tc_context type_code_class (TB basic_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance (GTT_Basic basic_type) (si_next_TC_member_index, si_TC_instances)
@@ -554,14 +586,14 @@ addGlobalTCInstance type_of_TC (next_member_index, instances=:[inst : insts])
 addGlobalTCInstance type_of_TC (next_member_index, [])
 	= (next_member_index, (inc next_member_index, [{ gtci_index = next_member_index, gtci_type = type_of_TC }]))
 
-tryToExpandTypeSyn defs cons_id=:{type_name,type_index={glob_object,glob_module}} type_args type_heaps
+tryToExpandTypeSyn defs type cons_id=:{type_name,type_index={glob_object,glob_module}} type_args type_heaps
 	# {td_name,td_rhs,td_args,td_attribute} = defs.[glob_module].com_type_defs.[glob_object]
 	= case td_rhs of
 		SynType {at_type}
 			# (_, expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args type_args at_type type_heaps
 			-> (True, expanded_type, type_heaps) 
 		_
-			-> (False, TA cons_id type_args, type_heaps)
+			-> (False, type, type_heaps)
 
 class match type ::  !{# CommonDefs} !type !type !*TypeHeaps -> (!Bool, !*TypeHeaps)
 
@@ -569,35 +601,55 @@ instance match AType
 where
 	match defs atype1 atype2 type_heaps = match defs atype1.at_type atype2.at_type type_heaps
 
+expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
+	# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+	# (succ2, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+	| succ1 || succ2
+		= match defs type1 type2 type_heaps
+/*
+	| succ2
+	
+		= case type2 of
+			TA cons_id2 cons_args2
+				| cons_id1 == cons_id2
+					-> match defs cons_args1 cons_args2 type_heaps
+					-> (False, type_heaps)
+			_
+					-> (False, type_heaps)
+	
+*/
+		= (False, type_heaps)
+
 instance match Type
 where 
 	match defs (TV {tv_info_ptr}) type type_heaps=:{th_vars}
 		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type type)})
-	match defs (TA cons_id1 cons_args1) (TA cons_id2 cons_args2) type_heaps
+	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps
 		| cons_id1 == cons_id2
 			= match defs cons_args1 cons_args2 type_heaps
-			# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs cons_id1 cons_args1 type_heaps
-			# (succ2, type2, type_heaps) = tryToExpandTypeSyn defs cons_id2 cons_args2 type_heaps
-			| succ1 || succ2
-				= match defs type1 type2 type_heaps
-/*
-			| succ2
-			
-				= case type2 of
-					TA cons_id2 cons_args2
-						| cons_id1 == cons_id2
-							-> match defs cons_args1 cons_args2 type_heaps
-							-> (False, type_heaps)
-					_
-							-> (False, type_heaps)
-
-*/
-				= (False, type_heaps)
+			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
+	match defs type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) type_heaps
+		| cons_id1 == cons_id2
+			= match defs cons_args1 cons_args2 type_heaps
+			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
+	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) type_heaps
+		| cons_id1 == cons_id2
+			= match defs cons_args1 cons_args2 type_heaps
+			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
+	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) type_heaps
+		| cons_id1 == cons_id2
+			= match defs cons_args1 cons_args2 type_heaps
+			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
 	match defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) type_heaps
 		= match defs (arg_type1,res_type1) (arg_type2,res_type2) type_heaps
 	match defs (type1 :@: types1) (type2 :@: types2) type_heaps
 		= match defs (type1,types1) (type2,types2) type_heaps
 	match defs (CV tv :@: types) (TA type_cons cons_args) type_heaps
+		# diff = type_cons.type_arity - length types
+		| diff >= 0
+			= match defs (TV tv, types) (TA { type_cons & type_arity = diff } (take diff cons_args), drop diff cons_args) type_heaps
+			= (False, type_heaps)
+	match defs (CV tv :@: types) (TAS type_cons cons_args _) type_heaps
 		# diff = type_cons.type_arity - length types
 		| diff >= 0
 			= match defs (TV tv, types) (TA { type_cons & type_arity = diff } (take diff cons_args), drop diff cons_args) type_heaps
@@ -612,13 +664,24 @@ where
 		= (tb1 == tb2, type_heaps)
 /*	match defs type (TB (BT_String array_type)) type_heaps
 		= match defs type array_type type_heaps
-*/	match defs (TA cons_id cons_args) type2 type_heaps
-		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs cons_id cons_args type_heaps
+*/
+	match defs type1=:(TA cons_id cons_args) type2 type_heaps
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
 		| succ
 			= match defs type1 type2 type_heaps
 			= (False, type_heaps)
-	match defs type1 (TA cons_id cons_args) type_heaps
-		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs cons_id cons_args type_heaps
+	match defs type1=:(TAS cons_id cons_args _) type2 type_heaps
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
+		| succ
+			= match defs type1 type2 type_heaps
+			= (False, type_heaps)
+	match defs type1 type2=:(TA cons_id cons_args) type_heaps
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
+		| succ
+			= match defs type1 type2 type_heaps
+			= (False, type_heaps)
+	match defs type1 type2=:(TAS cons_id cons_args _) type_heaps
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
 		| succ
 			= match defs type1 type2 type_heaps
 			= (False, type_heaps)
@@ -845,7 +908,7 @@ expressionToTypeCodeExpression expr									= abort "expressionToTypeCodeExpress
 generateClassSelection address last_selectors
 	= mapAppend (\(off_set,selector) -> RecordSelection selector off_set) address last_selectors
 
-AttributedType type :== { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }
+AttributedType type :== { at_attribute = TA_Multi, at_type = type }
 
 instance toString ClassApplication
 where 
@@ -982,14 +1045,13 @@ where
 					-> (Yes [ (tc_index, selector) : address ], type_heaps)
 				No
 					-> find_super_instance context tcs (inc tc_index) address  dict_mod dict_index defs type_heaps
-		
 
 getClassVariable :: !Ident !VarInfoPtr !*VarHeap !*ErrorAdmin -> (!Ident, !VarInfoPtr, !*VarHeap, !*ErrorAdmin)
 getClassVariable symb var_info_ptr var_heap error
 	= case (readPtr var_info_ptr var_heap) of
 		(VI_ClassVar var_name new_info_ptr count, var_heap)
 			-> (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)), error)
-		(_, var_heap)
+		(_,var_heap)
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), overloadingError symb error)
 
@@ -1103,7 +1165,6 @@ where
 					VI_Empty
 						# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 						-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
-//							---> ("determine_class_argument (VI_ForwardClassVar)", ptrToInt tc_var, ptrToInt var_info_ptr)
 					_
 						-> abort ("determine_class_argument 1 (overloading.icl)")//  <<- var_info)
 
@@ -1111,7 +1172,6 @@ where
 				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 				  var_heap	= var_heap
 				-> ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
-//							---> ("determine_class_argument (VI_Empty)", ptrToInt tc_var)
 			_
 				-> abort ("determine_class_argument 2 (overloading.icl)") // <<- var_info)
 
@@ -1240,6 +1300,13 @@ class toTypeCodeExpression type :: !Ident type !(!*TypeCodeInfo,!*VarHeap,!*Erro
 instance toTypeCodeExpression Type
 where
 	toTypeCodeExpression symb_name (TA cons_id=:{type_index={glob_module}} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules},var_heap,error)
+		# defining_module_name
+			= tci_dcl_modules.[glob_module].dcl_name.id_name
+		# (inst_index, (tci_next_index, tci_instances))
+		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name) (tci_next_index, tci_instances)
+		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
+		= (TCE_Constructor inst_index type_code_args, tci)
+	toTypeCodeExpression symb_name (TAS cons_id=:{type_index={glob_module}} type_args _) (tci=:{tci_next_index,tci_instances,tci_dcl_modules},var_heap,error)
 		# defining_module_name
 			= tci_dcl_modules.[glob_module].dcl_name.id_name
 		# (inst_index, (tci_next_index, tci_instances))
@@ -1688,7 +1755,7 @@ let_ptr nr_of_binds ui=:{ui_symbol_heap}
 	= (expr_info_ptr, {ui &  ui_symbol_heap = ui_symbol_heap})
 where 
 	empty_attributed_type :: AType
-	empty_attributed_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
+	empty_attributed_type = { at_attribute = TA_Multi, at_type = TE }
 
 class equalTypes a :: !a !a !*TypeVarHeap -> (!Bool, !*TypeVarHeap)
 
@@ -1718,6 +1785,18 @@ where
 		= equalTypes x y type_var_heap		
 // .. AA
 	equalTypes (TA tc1 types1) (TA tc2 types2) type_var_heap
+		| tc1 == tc2
+			= equalTypes types1 types2 type_var_heap
+			= (False, type_var_heap)
+	equalTypes (TA tc1 types1) (TAS tc2 types2 _) type_var_heap
+		| tc1 == tc2
+			= equalTypes types1 types2 type_var_heap
+			= (False, type_var_heap)
+	equalTypes (TAS tc1 types1 _) (TA tc2 types2) type_var_heap
+		| tc1 == tc2
+			= equalTypes types1 types2 type_var_heap
+			= (False, type_var_heap)
+	equalTypes (TAS tc1 types1 _) (TAS tc2 types2 _) type_var_heap
 		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap
 			= (False, type_var_heap)

@@ -790,12 +790,14 @@ declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
 
 			functionName :: {#Char} Int Int -> {#Char}
 			functionName name functionIndex nrOfDclFunctions 
+//				| trace_tn (name+++(if (functionIndex < nrOfDclFunctions) "" (";" +++ toString functionIndex)))
+
 				| functionIndex < nrOfDclFunctions
 					=	name
 				// otherwise
 					=	name +++ ";" +++ toString functionIndex
 
-import StdDebug
+//import StdDebug
 
 /*
 declareCurrentDclModuleTypes :: {#CheckedTypeDef} {#Int} -> BackEnder
@@ -824,10 +826,13 @@ defineType moduleIndex constructors _ typeIndex {td_name, td_args, td_rhs=AlgTyp
 		=	convertConstructors typeIndex td_name.id_name moduleIndex constructors constructorSymbols be
 	=	appBackEnd (BEAlgebraicType flatType constructors) be
 defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordType {rt_constructor, rt_fields}} be
+//	| trace_tn constructorDef.cons_symb
+
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_args be
 	# (fields, be)
-		=	convertSelectors moduleIndex selectors rt_fields be
+//		=	convertSelectors moduleIndex selectors rt_fields be
+		=	convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness be
 	# (constructorType,be) = constructorTypeFunction be
 	# (constructorTypeNode, be)
 		=	beNormalTypeNode
@@ -875,15 +880,32 @@ convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index}
 						_
 							->	(constructorDef.cons_type,be)) // ->> (typeName, typeIndex, constructorDef.cons_symb.id_name, ds_index, constructorDef.cons_type)
 
-convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} -> BEMonad BEFieldListP
-convertSelectors moduleIndex selectors symbols
-	=	foldrA (beFields o convertSelector moduleIndex selectors) beNoFields symbols
 
-convertSelector :: ModuleIndex {#SelectorDef} FieldSymbol -> BEMonad BEFieldListP
-convertSelector moduleIndex selectorDefs {fs_index}
+foldrAi function result array
+	:== foldrA 0
+	where
+		arraySize
+			=	size array
+		foldrA index
+			| index == arraySize
+				=	result
+			// otherwise
+				=	function index array.[index] (foldrA (index+1))
+
+//convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} -> BEMonad BEFieldListP
+convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} StrictnessList -> BEMonad BEFieldListP
+convertSelectors moduleIndex selectors symbols strictness
+//	=	foldrA (beFields o convertSelector moduleIndex selectors) beNoFields symbols
+	=	foldrAi (\i -> (beFields o convertSelector moduleIndex selectors (arg_is_strict i strictness))) beNoFields symbols
+
+//convertSelector :: ModuleIndex {#SelectorDef} FieldSymbol -> BEMonad BEFieldListP
+convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFieldListP
+//convertSelector moduleIndex selectorDefs {fs_index}
+convertSelector moduleIndex selectorDefs is_strict {fs_index}
 	= \be0 -> let (selectorType,be) = selectorTypeFunction be0 in
 		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_symb.id_name)
-		o`	beField fs_index moduleIndex (convertAnnotTypeNode (selectorType.st_result))) be
+//		o`	beField fs_index moduleIndex (convertAnnotTypeNode (selectorType.st_result))) be
+		o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) (selectorType.st_result))) be
 	where
 		selectorDef
 			=	selectorDefs.[fs_index]
@@ -1238,6 +1260,7 @@ convertRules rules main_dcl_module_n aliasDummyId be
 
 convertRule :: Ident (Int,FunDef) Int -> BEMonad BEImpRuleP
 convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) main_dcl_module_n
+//	| trace_tn fun_symb.id_name
 	=	beRule index (cafness fun_kind)
 			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_symb.id_name, index, type)))
 			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
@@ -1324,8 +1347,9 @@ convertAttributeKind attributeVar
 	=	beAttributeKind (convertAttributeVar attributeVar)
 
 convertSymbolTypeArgs :: SymbolType -> BEMonad BETypeArgP
-convertSymbolTypeArgs {st_args}
-	=	convertTypeArgs st_args
+convertSymbolTypeArgs {st_args,st_args_strictness}
+//	=	convertTypeArgs st_args
+	= convertAnnotatedTypeArgs st_args st_args_strictness
 
 convertBasicTypeKind :: BasicType -> BESymbKind
 convertBasicTypeKind BT_Int
@@ -1392,7 +1416,7 @@ convertAttribution attr
 	=	abort "backendconvert, convertAttribution: unknown TypeAttribute" // <<- attr
 
 convertAnnotTypeNode :: AType -> BEMonad BETypeNodeP
-convertAnnotTypeNode {at_type, at_annotation, at_attribute}
+convertAnnotTypeNode {at_type, at_attribute}
 /*
 	=	convertTypeNode at_type
 	:-	beAnnotateTypeNode (convertAnnotation at_annotation)
@@ -1404,6 +1428,15 @@ convertAnnotTypeNode {at_type, at_annotation, at_attribute}
 	:-	beAnnotateTypeNode c_annot
 	:-	beAttributeTypeNode c_attrib
 //	) s
+	where
+		c_annot = convertAnnotation AN_None // at_annotation
+		c_attrib = convertAttribution at_attribute
+
+convertAnnotAndTypeNode :: Annotation AType -> BEMonad BETypeNodeP
+convertAnnotAndTypeNode at_annotation {at_type, at_attribute}
+	= convertTypeNode at_type
+	:-	beAnnotateTypeNode c_annot
+	:-	beAttributeTypeNode c_attrib
 	where
 		c_annot = convertAnnotation at_annotation
 		c_attrib = convertAttribution at_attribute
@@ -1417,6 +1450,9 @@ convertTypeNode (TB basicType)
 	=	beNormalTypeNode (beBasicSymbol (convertBasicTypeKind basicType)) beNoTypeArgs	
 convertTypeNode (TA typeSymbolIdent typeArgs)
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
+convertTypeNode (TAS typeSymbolIdent typeArgs strictness)
+//	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
+	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedTypeArgs typeArgs strictness)
 convertTypeNode (TV {tv_name})
 	=	beVarTypeNode tv_name.id_name
 convertTypeNode (TempQV n)
@@ -1426,7 +1462,7 @@ convertTypeNode (TempV n)
 convertTypeNode (a --> b) 
 	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a, b])
 convertTypeNode (a :@: b)
-	=	beNormalTypeNode (beBasicSymbol BEApplySymb) (convertTypeArgs [{at_attribute=TA_Multi, at_annotation=AN_None, at_type = consVariableToType a} : b])
+	=	beNormalTypeNode (beBasicSymbol BEApplySymb) (convertTypeArgs [{at_attribute=TA_Multi, at_type = consVariableToType a} : b])
 convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
 convertTypeNode (TFA vars type)
@@ -1445,6 +1481,16 @@ consVariableToType (TempQCV varId)
 convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args
 	=	sfoldr (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
+
+convertAnnotatedTypeArgs :: [AType] StrictnessList -> BEMonad BETypeArgP
+convertAnnotatedTypeArgs args strictness
+	= foldr args 0
+	where
+		foldr [] i
+			= beNoTypeArgs
+		foldr [a:x] i
+//			| trace_tn (toString i+++" "+++toString (arg_strictness_annotation i strictness))
+			= (beTypeArgs o (convertAnnotAndTypeNode (arg_strictness_annotation i strictness))) a (foldr x (i+1))
 
 convertTransformedBody :: Int Int Ident TransformedBody Int -> BEMonad BERuleAltP
 convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n

@@ -1978,12 +1978,12 @@ buildCurriedType :: ![AType] !AType !TypeAttribute ![AttrInequality] ![Attribute
 buildCurriedType [] type cum_attr attr_env attr_vars attr_var_name attr_store th_attrs 
 	= (type, attr_env, attr_vars, attr_store, th_attrs)
 buildCurriedType [at=:{at_attribute}] type cum_attr attr_env attr_vars attr_var_name attr_store th_attrs
-	# atype = {at_annotation = AN_None, at_attribute = cum_attr , at_type = at --> type }
+	# atype = {at_attribute = cum_attr , at_type = at --> type }
 	= (atype, attr_env, attr_vars, attr_store, th_attrs)
 buildCurriedType [at=:{at_attribute}:ats] type cum_attr attr_env attr_vars attr_var_name attr_store th_attrs
 	# (next_cum_attr, new_attr_env, attr_vars, attr_store, th_attrs) = combine_attributes at_attribute cum_attr attr_env attr_vars attr_store th_attrs
 	  (res_type, attr_env, attr_vars, attr_store, th_attrs) = buildCurriedType ats type next_cum_attr attr_env attr_vars attr_var_name attr_store th_attrs
-	# atype = {at_annotation = AN_None, at_attribute = cum_attr , at_type = at --> res_type }  
+	# atype = {at_attribute = cum_attr , at_type = at --> res_type }  
 	= (atype, attr_env, attr_vars, attr_store, th_attrs)
 where
 	combine_attributes TA_Unique cum_attr attr_env attr_vars attr_store th_attrs
@@ -2096,7 +2096,7 @@ where
 				(TA_Var av) -> [av:avs]
 				_			-> avs
 			#! th = {th & th_vars = th_vars}
-			= (	{atv_attribute=attr, atv_variable=tv, atv_annotation=AN_None},
+			= (	{atv_attribute=attr, atv_variable=tv},
 				(avs, th))
 
 			 
@@ -2401,7 +2401,7 @@ where
 					#! (TVI_Attribute attr, th_vars) = readPtr tv_info_ptr th_vars
 					#! avs = (collect_attr_var attr) ++ avs
 					#! th = {th & th_vars = th_vars}
-					= (	{atv_attribute=attr, atv_variable=tv, atv_annotation=AN_None},
+					= (	{atv_attribute=attr, atv_variable=tv},
 						(avs, th))
 				collect_attr_var (TA_Var av)	= [av]
 				collect_attr_var _ 				= []
@@ -2510,7 +2510,7 @@ where
 					= (attr, ([fresh_av:avs], th_attrs))
 		#! (st, th) = substituteInSymbolType gt_type {th & th_vars = th_vars, th_attrs = th_attrs}
 
-		#! atvs = [{atv_attribute=attr, atv_variable=tv, atv_annotation=AN_None} \\
+		#! atvs = [{atv_attribute=attr, atv_variable=tv} \\
 			attr 	<- attrs &
 			tv 		<- tvs]
 		
@@ -2967,6 +2967,7 @@ buildIsomapType module_index type_def_index
 	# generic_type = 
 		{ gt_type = 
 			{ st_vars = []
+			, st_args_strictness=NotStrict
 			, st_args = []
 			, st_arity = 0
 			, st_result = buildATypeISO t1 t2 gs_predefs
@@ -3430,7 +3431,6 @@ getGenericMember {glob_module, glob_object} kind modules
 makeAType :: !Type !TypeAttribute -> !AType
 makeAType type attr = 
 	{	at_attribute = attr
-	, 	at_annotation = AN_None
 	, 	at_type = type
 	}
 

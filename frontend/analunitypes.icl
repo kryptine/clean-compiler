@@ -236,12 +236,8 @@ where
 UseTopSign		:== True
 DontUSeTopSign	:== False
 
-signClassOfType :: !Type !Sign !Bool !Int !{#CommonDefs} !*SignClassState -> (!SignClassification,!SignClassification,!*SignClassState)
-signClassOfType (TV tv) sign use_top_sign group_nr ci scs
-	# (sign_class, type_class, scs) = signClassOfTypeVariable tv ci scs
-	= (sign *+ sign_class, type_class, scs)
-
-signClassOfType (TA {type_index = {glob_module, glob_object}} types) sign use_top_sign group_nr ci scs
+signClassOfType_for_TA :: Int Int [AType] !Sign !Bool !Int !{#CommonDefs} !*SignClassState -> (!SignClassification,!SignClassification,!*SignClassState)
+signClassOfType_for_TA glob_module glob_object types sign use_top_sign group_nr ci scs
 	# (td_info=:{tdi_group_nr,tdi_index_in_group,tdi_kinds}, scs) = scs!scs_type_def_infos.[glob_module].[glob_object]
 	| tdi_group_nr == group_nr
 		= sign_class_of_type_list_of_rec_type types sign use_top_sign tdi_index_in_group ci [] scs 
@@ -281,6 +277,17 @@ where
 	
 	adjust_sign_class {sc_pos_vect,sc_neg_vect} arity
 		= { sc_pos_vect = sc_pos_vect >> arity, sc_neg_vect = sc_neg_vect >> arity }
+
+signClassOfType :: !Type !Sign !Bool !Int !{#CommonDefs} !*SignClassState -> (!SignClassification,!SignClassification,!*SignClassState)
+signClassOfType (TV tv) sign use_top_sign group_nr ci scs
+	# (sign_class, type_class, scs) = signClassOfTypeVariable tv ci scs
+	= (sign *+ sign_class, type_class, scs)
+
+signClassOfType (TA {type_index = {glob_module, glob_object}} types) sign use_top_sign group_nr ci scs
+	= signClassOfType_for_TA glob_module glob_object types sign use_top_sign group_nr ci scs
+
+signClassOfType (TAS {type_index = {glob_module, glob_object}} types _) sign use_top_sign group_nr ci scs
+	= signClassOfType_for_TA glob_module glob_object types sign use_top_sign group_nr ci scs
 
 signClassOfType (CV tv :@: types) sign use_top_sign group_nr ci scs
 	# (sign_class, type_class, scs) = signClassOfTypeVariable tv ci scs
@@ -487,11 +494,8 @@ propClassOfTypeVariable {tv_info_ptr} ci pcs=:{pcs_type_var_heap}
 		_
 			-> (NoPropClass, PropClass, pcs)
 
-propClassOfType :: !Type !Int !{#CommonDefs} !*PropClassState -> (!PropClassification, !PropClassification, !*PropClassState)
-propClassOfType (TV tv) _ ci pcs
-	= propClassOfTypeVariable tv ci pcs
-
-propClassOfType (TA {type_name,type_index = {glob_module, glob_object}} types) group_nr ci pcs
+propClassOfType_for_TA :: Int Int [AType] !Int !{#CommonDefs} !*PropClassState -> (!PropClassification, !PropClassification, !*PropClassState)
+propClassOfType_for_TA glob_module glob_object types group_nr ci pcs
 	# (td_info=:{tdi_group_nr,tdi_index_in_group,tdi_kinds}, pcs) = pcs!pcs_type_def_infos.[glob_module].[glob_object]
 	| tdi_group_nr == group_nr
 		= prop_class_of_type_list_of_rec_type types tdi_index_in_group ci [] pcs 
@@ -530,6 +534,16 @@ where
 			= determine_cummulative_prop ts tks prop_class hio_prop_classes (inc type_index) group_nr ci cumm_class pcs
 	determine_cummulative_prop [] _ prop_class hio_prop_classes type_index group_nr ci cumm_class pcs
 		= (cumm_class, pcs)
+
+propClassOfType :: !Type !Int !{#CommonDefs} !*PropClassState -> (!PropClassification, !PropClassification, !*PropClassState)
+propClassOfType (TV tv) _ ci pcs
+	= propClassOfTypeVariable tv ci pcs
+
+propClassOfType (TA {type_index = {glob_module, glob_object}} types) group_nr ci pcs
+	= propClassOfType_for_TA glob_module glob_object types group_nr ci pcs
+
+propClassOfType (TAS {type_index = {glob_module, glob_object}} types _) group_nr ci pcs
+	= propClassOfType_for_TA glob_module glob_object types group_nr ci pcs
 
 propClassOfType (CV tv :@: types) group_nr ci pcs
 	# (prop_class, type_class, pcs) = propClassOfTypeVariable tv ci pcs

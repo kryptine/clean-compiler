@@ -578,13 +578,19 @@ where
 		= state
 		
 	must_not_be_essentially_unique x_main_dcl_module_n {tv_name, tv_info_ptr} th_vars modules type_defs error
-		# (TVI_Type type, th_vars)
-				= readPtr tv_info_ptr th_vars
+		# (TVI_Type type, th_vars) = readPtr tv_info_ptr th_vars
 		= case type of
 			TA {type_name, type_index} _
+				-> must_not_be_essentially_unique_for_TA type_name type_index th_vars
+			TAS {type_name, type_index} _ _
+				-> must_not_be_essentially_unique_for_TA type_name type_index th_vars
+			_
+				-> (False, th_vars, modules, type_defs, error)
+		where
+			must_not_be_essentially_unique_for_TA type_name type_index th_vars
 				# (type_def, type_defs, modules)
 						= getTypeDef x_main_dcl_module_n type_index type_defs modules
-				-> case type_def.td_attribute of
+				= case type_def.td_attribute of
 					TA_Unique
 						-> (True, th_vars, modules, type_defs,
 							checkError type_name 
@@ -595,9 +601,7 @@ where
 						   )
 					_
 						-> (False, th_vars, modules, type_defs, error)
-			_
-				-> (False, th_vars, modules, type_defs, error)
-
+		
 getTypeDef :: !Index !(Global Index) !v:{#CheckedTypeDef} !w:{#DclModule}
 		-> (!CheckedTypeDef, !v:{#CheckedTypeDef}, !w:{#DclModule})
 getTypeDef x_main_dcl_module_n {glob_module,glob_object} type_defs modules
@@ -640,8 +644,9 @@ where
 				# empty_st = 
 					{	st_vars = []
 					,	st_args = []
+					,	st_args_strictness=NotStrict
 					,	st_arity = -1
-					,	st_result = {at_type=TE, at_attribute=TA_None, at_annotation=AN_None}
+					,	st_result = {at_type=TE, at_attribute=TA_None}
 					,	st_context = []
 					,	st_attr_vars = []
 					,	st_attr_env = []
@@ -1277,7 +1282,7 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 				# dummy_ident = {id_name="",id_info=nilPtr}
 				# com_type_defs=reorder_and_enlarge_array com_type_defs n_dictionary_types icl_to_dcl_index_table.[cTypeDefs]
 									{td_name=dummy_ident,td_index= -1,td_arity=0,td_args=[],td_attrs=[],td_context=[],td_rhs=UnknownType,td_attribute=TA_None,td_pos=NoPos,td_used_types=[]}
-				# dummy_symbol_type={st_vars=[],st_args=[],st_arity=0,st_result={at_attribute=TA_None,at_annotation=AN_None,at_type=TE},st_context=[],st_attr_vars=[],st_attr_env=[]}
+				# dummy_symbol_type={st_vars=[],st_args=[],st_args_strictness=NotStrict,st_arity=0,st_result={at_attribute=TA_None,at_type=TE},st_context=[],st_attr_vars=[],st_attr_env=[]}
 				# com_selector_defs=reorder_and_enlarge_array com_selector_defs n_dictionary_selectors icl_to_dcl_index_table.[cSelectorDefs]
 					 				{sd_symb=dummy_ident,sd_field=dummy_ident,sd_type=dummy_symbol_type,sd_exi_vars=[],sd_field_nr=0,sd_type_index=0,sd_type_ptr=nilPtr,sd_pos=NoPos}
 				# com_cons_defs=reorder_and_enlarge_array com_cons_defs n_dictionary_constructors icl_to_dcl_index_table.[cConstructorDefs]
@@ -2413,24 +2418,34 @@ where
 elemTypeIsStrict [TA {type_index={glob_object,glob_module}} _ : _] predef_symbols
 	= glob_module == predef_symbols.[PD_PredefinedModule].pds_def &&
 		(glob_object == predef_symbols.[PD_StrictArrayType].pds_def || glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def)
+elemTypeIsStrict [TAS {type_index={glob_object,glob_module}} _ _ : _] predef_symbols
+	= glob_module == predef_symbols.[PD_PredefinedModule].pds_def &&
+		(glob_object == predef_symbols.[PD_StrictArrayType].pds_def || glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def)
 
 makeElemTypeOfArrayFunctionStrict :: !SymbolType !Index !{# Index} -> SymbolType
-makeElemTypeOfArrayFunctionStrict st=:{st_args,st_result} me_offset offset_table
+makeElemTypeOfArrayFunctionStrict st=:{st_args,st_args_strictness,st_result} me_offset offset_table
 	# array_fun_kind = offset_table.[me_offset]
 	| array_fun_kind == PD_UnqArraySelectFun
-		# (TA tuple [elem : res_array]) = st_result.at_type
-		= { st & st_result = { st_result &  at_type = TA tuple [{ elem & at_annotation = AN_Strict } : res_array]}}
+		= case st_result.at_type of
+			TA tuple elems
+				-> { st & st_result = { st_result & at_type = TAS tuple elems (Strict 1)}}
+			TAS tuple elems strictness
+				-> { st & st_result = { st_result & at_type = TAS tuple elems (add_strictness 0 strictness)}}
 	| array_fun_kind == PD_ArrayUpdateFun
 		# [array, index, elem: _] = st_args
-		= { st & st_args = [array, index, { elem & at_annotation = AN_Strict }] }
+		= { st & st_args_strictness=add_strictness 2 st_args_strictness,st_args = [array, index, elem ] }
 	| array_fun_kind == PD_CreateArrayFun
 		# [array, elem: _] = st_args
-		= { st & st_args = [array, { elem & at_annotation = AN_Strict }] }
+		= { st & st_args_strictness=add_strictness 1 st_args_strictness,st_args = [array, elem ] }
 	| array_fun_kind == PD_ArrayReplaceFun
 		# [arg_array, index, elem: _] = st_args
-		  (TA tuple [elem : res_array]) = st_result.at_type
-		= { st & st_args = [arg_array, index, { elem & at_annotation = AN_Strict }],
-					st_result = { st_result &  at_type = TA tuple [{ elem & at_annotation = AN_Strict } : res_array]}}
+		= case st_result.at_type of
+			 TA tuple elems
+				-> { st & st_args_strictness=add_strictness 2 st_args_strictness,st_args = [arg_array, index, elem],
+					st_result = { st_result &  at_type = TAS tuple elems (Strict 1)}}
+			 TAS tuple elems strictness
+				-> { st & st_args_strictness=add_strictness 2 st_args_strictness,st_args = [arg_array, index, elem],
+					st_result = { st_result &  at_type = TAS tuple elems (add_strictness 0 strictness)}}
 		= st
 
 initialDclModule ({mod_name, mod_modification_time, mod_defs=mod_defs=:{def_funtypes,def_macro_indices}, mod_type}, sizes, all_defs) module_n

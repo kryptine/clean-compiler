@@ -412,7 +412,7 @@ where
 					//
 					# (Yes old_case_default) = this_case_default
 //					# (let_info_ptr,  ci) = let_ptr ci
-					# (default_var, ci) = newVariable "s" (VI_BoundVar {at_attribute=TA_None,at_annotation=AN_None,at_type=TE}) ci
+					# (default_var, ci) = newVariable "s" (VI_BoundVar {at_attribute=TA_None,at_type=TE}) ci
 					# default_fv = varToFreeVar default_var 1
 					# ci
 						= { ci & ci_new_variables = [default_fv : ci.ci_new_variables]}
@@ -1298,7 +1298,7 @@ let_ptr2 let_types ci=:{ci_expr_heap}
 
 /* Sjaak ... */
 toAType :: Type -> AType
-toAType type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }
+toAType type = { at_attribute = TA_Multi, at_type = type }
 
 empty_attributed_type :: AType
 empty_attributed_type = toAType TE

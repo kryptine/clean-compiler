@@ -749,6 +749,9 @@ where
 	has_observing_type (TA {type_index = {glob_object,glob_module}} type_args) type_def_infos subst
 		# {tdi_properties} = type_def_infos.[glob_module].[glob_object]
 		= foldSt (\ {at_type} ok -> ok && has_observing_type at_type type_def_infos subst) type_args (tdi_properties bitand cIsHyperStrict <> 0)
+	has_observing_type (TAS {type_index = {glob_object,glob_module}} type_args _) type_def_infos subst
+		# {tdi_properties} = type_def_infos.[glob_module].[glob_object]
+		= foldSt (\ {at_type} ok -> ok && has_observing_type at_type type_def_infos subst) type_args (tdi_properties bitand cIsHyperStrict <> 0)
 	has_observing_type type type_def_infos subst
 		= False
 					

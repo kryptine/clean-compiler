@@ -170,20 +170,11 @@ sel_type_var_heap wtis=:{wtis_type_heaps}
  
 instance WriteTypeInfo ATypeVar
 where 
-	write_type_info {atv_annotation,atv_variable} tcl_file wtis
- 		# (tcl_file,wtis) 
- 			= write_type_info atv_annotation tcl_file wtis
+	write_type_info {atv_variable} tcl_file wtis
  		# (tcl_file,wtis)
  			= write_type_info atv_variable tcl_file wtis
  		= (tcl_file,wtis)
- 		
-instance WriteTypeInfo Annotation
-where 
-	write_type_info AN_Strict tcl_file wtis	
-		= (fwritec '!' tcl_file,wtis)
-	write_type_info AN_None tcl_file wtis
-		= (fwritec ' ' tcl_file,wtis)
-		
+
 instance WriteTypeInfo TypeVar
 where
 	write_type_info {tv_info_ptr} tcl_file wtis
@@ -266,22 +257,33 @@ where
 // NEW ->
 instance WriteTypeInfo SymbolType
 where
-	write_type_info {st_vars,st_args,st_arity,st_result} tcl_file wtis
+	write_type_info {st_vars,st_args,st_args_strictness,st_arity,st_result} tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info st_vars tcl_file wtis
 		# (tcl_file,wtis)
-			= write_type_info st_args tcl_file wtis
+			= write_annotated_type_info st_args st_args_strictness tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info st_arity tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info st_result tcl_file wtis
 		= (tcl_file,wtis)
+
+write_annotated_type_info l strictness tcl_file wtis
+	# tcl_file
+		= fwritei (length l) tcl_file
+	= write_annotated_type_info_loop l 0 tcl_file wtis
+	where
+		write_annotated_type_info_loop [] arg_index tcl_file wtis
+			= (tcl_file,wtis)
+		write_annotated_type_info_loop [x:xs] arg_index tcl_file wtis
+			# tcl_file = fwritec (if (arg_is_strict arg_index strictness) '!' ' ') tcl_file
+			# (tcl_file,wtis)
+				= write_type_info x tcl_file wtis
+			= write_annotated_type_info_loop xs (arg_index+1) tcl_file wtis
 		
 instance WriteTypeInfo AType
 where
-	write_type_info {at_annotation,at_type} tcl_file wtis
-		# (tcl_file,wtis)
-			= write_type_info at_annotation tcl_file wtis
+	write_type_info {at_type} tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info at_type tcl_file wtis
 		= (tcl_file,wtis)
@@ -295,6 +297,15 @@ where
 			= write_type_info type_symb_ident tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info atypes tcl_file wtis
+		= (tcl_file,wtis)
+
+	write_type_info (TAS type_symb_ident atypes strictness) tcl_file wtis
+		# tcl_file
+			= fwritec TypeTACode tcl_file
+		# (tcl_file,wtis)
+			= write_type_info type_symb_ident tcl_file wtis
+		# (tcl_file,wtis)
+			= write_annotated_type_info atypes strictness tcl_file wtis
 		= (tcl_file,wtis)
 
 	write_type_info (atype1 --> atype2) tcl_file wtis
@@ -471,7 +482,7 @@ openTclFile compile_for_dynamics icl_mod_pathname files
 	| opened
 		=(Yes tcl_file, files)
 	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
-	
+
 closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
 closeTclFile (Yes tcl_file) files
 	= fclose tcl_file files
@@ -502,5 +513,4 @@ splitBy char string
 			=	size string
 
 // ... copy from compile.icl
-
 // ... MV

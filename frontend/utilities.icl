@@ -433,23 +433,3 @@ replaceTwoDimArrElt ix1 ix2 el arr
 	  (el2, inner_array)
 	  		= replace inner_array ix2 el
 	= (el2, { arr & [ix1] = inner_array })
-/* crashes!
-replaceTwoDimArrElt ix1 ix2 el arr = code
-	{						| A:arr el								B:ix2 ix1
-		push_b 0			| A:arr el								B:ix2 ix1 ix1
-		update_b 2 1		| A:arr el								B:ix2 ix2 ix1
-		update_b 0 2		| A:arr el								B:ix1 ix2 ix1
-		push_a 1			| A:arr el arr							B:ix1 ix2 ix1
-		select _ 1 0		| A:arr el arr.[ix1]					B:ix1 ix2
-		push_array 0
-		updatepop_a 0 1
-		replace _ 1 0		| A:arr arr.[ix1]* new_el				B:ix1
-		push_a 2	 		| A:arr arr.[ix1]* new_el arr			B:ix1
-		update_a 1 3		| A:new_el arr.[ix1]* new_el arr		B:ix1
-		update_a 2 1		| A:new_el arr.[ix1]* arr.[ix1]* arr	B:ix1
-		update _ 1 0		| A:new_el arr.[ix1]* arr*
-		update_a 2 1		| A:new_el new_el arr*
-		update_a 0 2		| A:arr* new_el arr*
-		pop_a 1				| A:arr* new_el
-	}
-*/

@@ -81,7 +81,12 @@ where
 	arraySubst type=:(TA cons_id cons_args) subst
 		# (changed, cons_args, subst) = arraySubst cons_args subst
 		| changed
-			= (True, TA cons_id cons_args, subst) 
+			= (True, TA cons_id cons_args, subst)
+			= (False,type, subst) 
+	arraySubst type=:(TAS cons_id cons_args strictness) subst
+		# (changed, cons_args, subst) = arraySubst cons_args subst
+		| changed
+			= (True, TAS cons_id cons_args strictness, subst)
 			= (False,type, subst) 
 	arraySubst tcv=:(TempCV tv_number :@: types) subst
 		# (type, subst) = subst![tv_number]
@@ -182,6 +187,8 @@ where
 		= containsTypeVariable var_id arg_type subst
 //..AA
 	containsTypeVariable var_id (TA cons_id cons_args) subst
+		= containsTypeVariable var_id cons_args subst
+	containsTypeVariable var_id (TAS cons_id cons_args _) subst
 		= containsTypeVariable var_id cons_args subst
 	containsTypeVariable var_id (type :@: types) subst
 		= containsTypeVariable var_id type subst || containsTypeVariable var_id types subst
@@ -308,23 +315,28 @@ unifyTypes t1=:(TB tb1) attr1 t2=:(TB tb2) attr2 modules subst heaps
 	| tb1 == tb2
 		= (True, subst, heaps)
 		= (False, subst, heaps)
+unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2 modules subst heaps
+	| cons_id1 == cons_id2
+		= unify cons_args1 cons_args2 modules subst heaps
+		= expandAndUnifyTypes t1 attr1 t2 attr2 modules subst heaps
+unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TAS cons_id2 cons_args2 _) attr2 modules subst heaps
+	| cons_id1 == cons_id2
+		= unify cons_args1 cons_args2 modules subst heaps
+		= expandAndUnifyTypes t1 attr1 t2 attr2 modules subst heaps
+unifyTypes t1=:(TAS cons_id1 cons_args1 _) attr1 t2=:(TA cons_id2 cons_args2) attr2 modules subst heaps
+	| cons_id1 == cons_id2
+		= unify cons_args1 cons_args2 modules subst heaps
+		= expandAndUnifyTypes t1 attr1 t2 attr2 modules subst heaps
+unifyTypes t1=:(TAS cons_id1 cons_args1 _) attr1 t2=:(TAS cons_id2 cons_args2 _) attr2 modules subst heaps
+	| cons_id1 == cons_id2
+		= unify cons_args1 cons_args2 modules subst heaps
+		= expandAndUnifyTypes t1 attr1 t2 attr2 modules subst heaps
 unifyTypes (arg_type1 --> res_type1) attr1 (arg_type2 --> res_type2) attr2 modules subst heaps
 	= unify (arg_type1,res_type1) (arg_type2,res_type2) modules subst heaps
-//AA..	
 unifyTypes TArrow attr1 TArrow attr2 modules subst heaps
 	= (True, subst, heaps)	
 unifyTypes (TArrow1 t1) attr1 (TArrow1 t2) attr2 modules subst heaps
 	= unify t1 t2 modules subst heaps	
-//..AA
-unifyTypes t1=:(TA cons_id1 cons_args1) attr1 t2=:(TA cons_id2 cons_args2) attr2 modules subst heaps
-	| cons_id1 == cons_id2
-		= unify cons_args1 cons_args2 modules subst heaps
-		# (succ1, t1, heaps) = tryToExpand t1 attr1 modules.ti_common_defs heaps
-		  (succ2, t2, heaps) = tryToExpand t2 attr2 modules.ti_common_defs heaps
-		| succ1 || succ2
-			= unifyTypes t1 attr1 t2 attr2 modules subst heaps
-			= (False, subst, heaps)
-//				---> "unifyTypes1"
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
 	# (_, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
 	= unifyTypeApplications cons_var attr1 types type2 attr2 modules subst heaps
@@ -344,8 +356,23 @@ unifyTypes type1 attr1 type2 attr2 modules subst heaps
 		= unifyTypes type1 attr1 type2 attr2 modules subst heaps
 		= (False, subst, heaps)
 
+expandAndUnifyTypes t1 attr1 t2 attr2 modules subst heaps
+	# (succ1, t1, heaps) = tryToExpand t1 attr1 modules.ti_common_defs heaps
+	  (succ2, t2, heaps) = tryToExpand t2 attr2 modules.ti_common_defs heaps
+	| succ1 || succ2
+		= unifyTypes t1 attr1 t2 attr2 modules subst heaps
+		= (False, subst, heaps)
+
 tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
 tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr ti_common_defs type_heaps
+	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
+	= case type_def.td_rhs of
+		SynType {at_type}
+			# (_, expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps)
+		_
+			-> (False, type, type_heaps)
+tryToExpand type=:(TAS {type_index={glob_object,glob_module}} type_args _) type_attr ti_common_defs type_heaps
 	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
 	= case type_def.td_rhs of
 		SynType {at_type}
@@ -369,6 +396,8 @@ toCV is_exist temp_var_id
 simplifyTypeApplication :: !Type ![AType] -> (!Bool, !Type)
 simplifyTypeApplication (TA type_cons=:{type_arity} cons_args) type_args
 	= (True, TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args))
+simplifyTypeApplication (TAS type_cons=:{type_arity} cons_args strictness) type_args
+	= (True, TAS { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args) strictness)
 simplifyTypeApplication (cons_var :@: types) type_args
 	= (True, cons_var :@: (types ++ type_args))
 simplifyTypeApplication (TempV tv_number) type_args
@@ -416,6 +445,15 @@ unifyCVwithType is_exist tv_number type_args type=:(TA type_cons cons_args) modu
 		# (succ, subst, heaps) = unify type_args (drop diff cons_args) modules subst heaps
 		| succ
 			= unifyTypes (toTV is_exist tv_number) TA_Multi (TA { type_cons & type_arity = diff } (take diff cons_args)) TA_Multi modules subst heaps
+		    = (False, subst, heaps)
+		= (False, subst, heaps)
+
+unifyCVwithType is_exist tv_number type_args type=:(TAS type_cons cons_args strictness) modules subst heaps
+	# diff = type_cons.type_arity - length type_args
+	| diff >= 0 
+		# (succ, subst, heaps) = unify type_args (drop diff cons_args) modules subst heaps
+		| succ
+			= unifyTypes (toTV is_exist tv_number) TA_Multi (TAS { type_cons & type_arity = diff } (take diff cons_args) strictness) TA_Multi modules subst heaps
 		    = (False, subst, heaps)
 		= (False, subst, heaps)
 
@@ -558,6 +596,9 @@ where
 	freshCopy (TA cons_id=:{type_index={glob_object,glob_module}} cons_args)  type_heaps
 		# (cons_args, type_heaps) = freshCopy cons_args type_heaps
 		= (TA cons_id cons_args, type_heaps)
+	freshCopy (TAS cons_id=:{type_index={glob_object,glob_module}} cons_args strictness)  type_heaps
+		# (cons_args, type_heaps) = freshCopy cons_args type_heaps
+		= (TAS cons_id cons_args strictness, type_heaps)
 	freshCopy (arg_type --> res_type) type_heaps
 		# (arg_type, type_heaps) = freshCopy arg_type type_heaps
 		  (res_type, type_heaps) = freshCopy res_type type_heaps
@@ -891,12 +932,12 @@ where
 
 freshAttributedVariable :: !u:TypeState -> (!AType, !u:TypeState)
 freshAttributedVariable ts=:{ts_var_store,ts_attr_store}
-	= ({ at_attribute = TA_TempVar ts_attr_store, at_annotation = AN_None, at_type = TempV ts_var_store },
+	= ({ at_attribute = TA_TempVar ts_attr_store, at_type = TempV ts_var_store },
 	     {ts & ts_var_store = inc ts_var_store, ts_attr_store = inc ts_attr_store})
 
 freshNonUniqueVariable :: !u:TypeState -> (!AType, !u:TypeState)
 freshNonUniqueVariable ts=:{ts_var_store}
-	= ({ at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts_var_store },
+	= ({ at_attribute = TA_Multi, at_type = TempV ts_var_store },
 	     {ts & ts_var_store = inc ts_var_store})
 
 freshAttribute :: !u:TypeState -> (!TypeAttribute, !u:TypeState)
@@ -918,6 +959,63 @@ attribute_error type_attr (Yes err)
 	# err = errorHeading "Type error" err
 	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
 
+add_propagation_attributes_to_atypes modules [] ps
+	= ([], [], ps) 
+add_propagation_attributes_to_atypes modules [atype : atypes] ps
+	# (atype, prop_class, ps) = addPropagationAttributesToAType modules atype ps
+	  (atypes, prop_classes, ps) = add_propagation_attributes_to_atypes modules atypes ps
+	= ([atype : atypes], [prop_class : prop_classes], ps)
+
+determine_attribute_of_cons modules TA_Unique cons_args prop_class attr_var_heap attr_vars attr_env ps_error
+	= (TA_Unique, prop_class >> length cons_args, attr_var_heap, attr_vars, attr_env, ps_error)
+determine_attribute_of_cons modules cons_attr cons_args prop_class attr_var_heap attr_vars attr_env ps_error
+	# (cumm_attr, prop_attrs, prop_class) = determine_cummulative_attribute cons_args TA_Multi [] prop_class
+	  (comb_attr, attr_var_heap, attr_vars, attr_env, ps_error)
+	  		= combine_attributes cons_attr cumm_attr prop_attrs attr_var_heap attr_vars attr_env ps_error
+	= (comb_attr, prop_class, attr_var_heap, attr_vars, attr_env, ps_error)
+where
+	determine_cummulative_attribute [] cumm_attr attr_vars prop_class
+		= (cumm_attr, attr_vars, prop_class)
+	determine_cummulative_attribute [{at_attribute} : types ] cumm_attr attr_vars prop_class
+		| prop_class bitand 1 == 0
+			= determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
+			= case at_attribute of
+				TA_Unique
+					-> (TA_Unique, [], prop_class >> length types)
+				TA_Multi
+					-> determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
+				TA_Var attr_var
+					-> determine_cummulative_attribute types at_attribute [attr_var : attr_vars] (prop_class >> 1)
+				TA_MultiOfPropagatingConsVar
+					-> determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
+
+	combine_attributes (TA_Var attr_var) cumm_attr prop_vars attr_var_heap attr_vars attr_env ps_error
+		= case cumm_attr of
+			TA_Unique
+				-> (TA_Unique, attr_var_heap, attr_vars, attr_env, attribute_error attr_var ps_error)
+			
+			TA_Multi
+				-> (TA_Var attr_var, attr_var_heap, attr_vars, attr_env, ps_error)
+			TA_Var _
+				-> (TA_Var attr_var, attr_var_heap, attr_vars, foldSt (new_inequality attr_var) prop_vars attr_env, ps_error)
+	where
+		new_inequality off_attr_var dem_attr_var [] 
+			= [{ ai_demanded = dem_attr_var, ai_offered = off_attr_var }]
+		new_inequality off_attr_var dem_attr_var ins=:[ inequal : iequals ]
+			 | dem_attr_var.av_info_ptr == inequal.ai_demanded.av_info_ptr && off_attr_var.av_info_ptr == inequal.ai_offered.av_info_ptr
+			 	= ins
+			 	= [ inequal : new_inequality off_attr_var dem_attr_var iequals ]
+
+	combine_attributes _ (TA_Var var) prop_vars attr_var_heap attr_vars attr_env ps_error
+		# (new_attr_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+		  new_attr_var = { var & av_info_ptr = new_attr_ptr }
+		= (TA_Var new_attr_var, attr_var_heap, [new_attr_var : attr_vars],
+				mapAppend (\ai_demanded -> { ai_demanded = ai_demanded, ai_offered = new_attr_var }) prop_vars attr_env, ps_error)
+	combine_attributes cons_attr TA_Unique _ attr_var_heap attr_vars attr_env ps_error
+		= (TA_Unique, attr_var_heap, attr_vars, attr_env, ps_error)
+	combine_attributes cons_attr _ _ attr_var_heap attr_vars attr_env ps_error
+		= (cons_attr, attr_var_heap, attr_vars, attr_env, ps_error)
+
 addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);
 addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module},type_name} cons_args, at_attribute} ps
 	# (cons_args, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
@@ -928,64 +1026,15 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
 			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
 				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
-	where
-		add_propagation_attributes_to_atypes modules [] ps
-			= ([], [], ps) 
-		add_propagation_attributes_to_atypes modules [atype : atypes] ps
-			# (atype, prop_class, ps) = addPropagationAttributesToAType modules atype ps
-			  (atypes, prop_classes, ps) = add_propagation_attributes_to_atypes modules atypes ps
-			= ([atype : atypes], [prop_class : prop_classes], ps)
-	
-		determine_attribute_of_cons modules TA_Unique cons_args prop_class attr_var_heap attr_vars attr_env ps_error
-			= (TA_Unique, prop_class >> length cons_args, attr_var_heap, attr_vars, attr_env, ps_error)
-		determine_attribute_of_cons modules cons_attr cons_args prop_class attr_var_heap attr_vars attr_env ps_error
-			# (cumm_attr, prop_attrs, prop_class) = determine_cummulative_attribute cons_args TA_Multi [] prop_class
-			  (comb_attr, attr_var_heap, attr_vars, attr_env, ps_error)
-			  		= combine_attributes cons_attr cumm_attr prop_attrs attr_var_heap attr_vars attr_env ps_error
-			= (comb_attr, prop_class, attr_var_heap, attr_vars, attr_env, ps_error)
-			  
-		determine_cummulative_attribute [] cumm_attr attr_vars prop_class
-			= (cumm_attr, attr_vars, prop_class)
-		determine_cummulative_attribute [{at_attribute} : types ] cumm_attr attr_vars prop_class
-			| prop_class bitand 1 == 0
-				= determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
-				= case at_attribute of
-					TA_Unique
-						-> (TA_Unique, [], prop_class >> length types)
-					TA_Multi
-						-> determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
-					TA_Var attr_var
-						-> determine_cummulative_attribute types at_attribute [attr_var : attr_vars] (prop_class >> 1)
-					TA_MultiOfPropagatingConsVar
-						-> determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
-
-		combine_attributes (TA_Var attr_var) cumm_attr prop_vars attr_var_heap attr_vars attr_env ps_error
-			= case cumm_attr of
-				TA_Unique
-					-> (TA_Unique, attr_var_heap, attr_vars, attr_env, attribute_error attr_var ps_error)
-				
-				TA_Multi
-					-> (TA_Var attr_var, attr_var_heap, attr_vars, attr_env, ps_error)
-				TA_Var _
-					-> (TA_Var attr_var, attr_var_heap, attr_vars, foldSt (new_inequality attr_var) prop_vars attr_env, ps_error)
-		where
-			new_inequality off_attr_var dem_attr_var [] 
-				= [{ ai_demanded = dem_attr_var, ai_offered = off_attr_var }]
-			new_inequality off_attr_var dem_attr_var ins=:[ inequal : iequals ]
-				 | dem_attr_var.av_info_ptr == inequal.ai_demanded.av_info_ptr && off_attr_var.av_info_ptr == inequal.ai_offered.av_info_ptr
-				 	= ins
-				 	= [ inequal : new_inequality off_attr_var dem_attr_var iequals ]
-	
-		combine_attributes _ (TA_Var var) prop_vars attr_var_heap attr_vars attr_env ps_error
-			# (new_attr_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-			  new_attr_var = { var & av_info_ptr = new_attr_ptr }
-			= (TA_Var new_attr_var, attr_var_heap, [new_attr_var : attr_vars],
-					mapAppend (\ai_demanded -> { ai_demanded = ai_demanded, ai_offered = new_attr_var }) prop_vars attr_env, ps_error)
-		combine_attributes cons_attr TA_Unique _ attr_var_heap attr_vars attr_env ps_error
-			= (TA_Unique, attr_var_heap, attr_vars, attr_env, ps_error)
-		combine_attributes cons_attr _ _ attr_var_heap attr_vars attr_env ps_error
-			= (cons_attr, attr_var_heap, attr_vars, attr_env, ps_error)
-
+addPropagationAttributesToAType modules type=:{at_type = TAS cons_id=:{type_index={glob_object,glob_module},type_name} cons_args strictness, at_attribute} ps
+	# (cons_args, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
+			= add_propagation_attributes_to_atypes modules cons_args ps
+	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
+	  (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
+	  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+	= ({ type & at_type = TAS cons_id cons_args strictness, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
+			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
+				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
 addPropagationAttributesToAType modules type=:{at_type} ps
 	# (at_type, ps) = addPropagationAttributesToType modules at_type ps
 	= ({ type & at_type = at_type }, NoPropClass, ps)
@@ -1049,7 +1098,7 @@ buildCurriedType [] type cum_attr attr_env attr_store
 buildCurriedType [at=:{at_attribute}:ats] type cum_attr attr_env attr_store
 	# (next_cum_attr, attr_env, attr_store) = combine_attributes at_attribute cum_attr attr_env attr_store
 	  (res_type, attr_env, attr_store) = buildCurriedType ats type next_cum_attr attr_env attr_store
-	= ({at_annotation = AN_None, at_attribute = cum_attr , at_type = at --> res_type }, attr_env, attr_store)
+	= ({at_attribute = cum_attr , at_type = at --> res_type }, attr_env, attr_store)
 where
 	combine_attributes TA_Unique cum_attr attr_env attr_store
 		= (TA_Unique, attr_env, attr_store)
@@ -1286,7 +1335,7 @@ where
 										{ ts & ts_expr_heap = ts_expr_heap }))
 
 		requirements_of_guarded_expressions (DynamicPatterns dynamic_patterns) ti match_expr pattern_type opt_pattern_ptr goal_type reqs_ts
-			# dyn_type = { at_type = TB BT_Dynamic, at_attribute = TA_Multi, at_annotation = AN_None }
+			# dyn_type = { at_type = TB BT_Dynamic, at_attribute = TA_Multi }
 			  (used_dyn_types, (reqs, ts)) = requirements_of_dynamic_patterns ti goal_type dynamic_patterns [] reqs_ts
 			  ts_expr_heap = storeAttribute opt_pattern_ptr TA_Multi ts.ts_expr_heap
 			= (reverse used_dyn_types, ({ reqs & req_type_coercions = [{tc_demanded = dyn_type, tc_offered = pattern_type, tc_position = CP_Expression match_expr, tc_coercible = True} :
@@ -1455,10 +1504,10 @@ where
 		  ts_expr_heap = storeAttribute opt_expr_ptr dyn_expr_type.at_attribute ts.ts_expr_heap
 		  type_coercion = { tc_demanded = dyn_type, tc_offered = dyn_expr_type, tc_position = CP_Expression dyn_expr, tc_coercible = True }
 		| isEmpty dyn_context
-			= ({ at_type = TB BT_Dynamic, at_attribute = TA_Multi, at_annotation = AN_None }, No, 
+			= ({ at_type = TB BT_Dynamic, at_attribute = TA_Multi }, No, 
 					({reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions]}, 
 						{ ts &  ts_expr_heap = ts_expr_heap }))
-			= ({ at_type = TB BT_Dynamic, at_attribute = TA_Multi, at_annotation = AN_None }, No,
+			= ({ at_type = TB BT_Dynamic, at_attribute = TA_Multi }, No,
 					({ reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions], req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls ]},
 						{ ts & ts_expr_heap = ts_expr_heap <:= (dyn_expr_ptr, EI_Overloaded {
 								oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = []}) }))
@@ -1489,7 +1538,7 @@ where
 		apply_type [(opt_expr_ptr,type) : types] res_type type_coercions function ts
 			# (type, type_coercions, ts) = determine_demanded_type type opt_expr_ptr type_coercions function ts
 			  (u, ts) = freshAttribute ts
-			= apply_type types { at_annotation = AN_None, at_attribute = u, at_type = type --> res_type } type_coercions function ts
+			= apply_type types { at_attribute = u, at_type = type --> res_type } type_coercions function ts
 		
 		determine_demanded_type :: !AType !(Optional ExprInfoPtr) ![TypeCoercion] !Expression !*TypeState
 			-> (!AType, ![TypeCoercion], !*TypeState)
@@ -1516,12 +1565,12 @@ where
 			UniqueSelector
 				# (var, ts) = freshAttributedVariable ts
 			  	  (_, result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False False var expr (reqs, ts)
-				  non_unique_type_var = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TempV ts.ts_var_store }
+				  non_unique_type_var = { at_attribute = TA_Multi, at_type = TempV ts.ts_var_store }
 				  req_type_coercions
 						= [ { tc_demanded = non_unique_type_var, tc_offered = result_type, tc_position = CP_Expression expr, tc_coercible = False },
 							{ tc_demanded = var, tc_offered = expr_type, tc_position = CP_Expression expr, tc_coercible = True } :
 	 								reqs.req_type_coercions]
-				  result_type = { at_type = TA tuple2TypeSymbIdent [non_unique_type_var,var], at_attribute = TA_Unique, at_annotation = AN_None }
+				  result_type = { at_type = TA tuple2TypeSymbIdent [non_unique_type_var,var], at_attribute = TA_Unique }
 				-> (result_type, No, ({ reqs & req_type_coercions = req_type_coercions }, 
 						{ts & ts_var_store = inc ts.ts_var_store, ts_expr_heap = storeAttribute opt_expr_ptr TA_Multi ts.ts_expr_heap}))
 			NormalSelectorUniqueElementResult
@@ -1588,7 +1637,7 @@ where
 		typeOfBasicValue (BVS _) = basicStringType
 
 		attributedBasicType {box=type} ts=:{ts_attr_store}
-			= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = type}, {ts & ts_attr_store = inc ts_attr_store})
+			= ({ at_attribute = TA_TempVar ts_attr_store, at_type = type}, {ts & ts_attr_store = inc ts_attr_store})
 
 	requirements ti (MatchExpr {glob_object={ds_arity, ds_index},glob_module} expr) reqs_ts=:(reqs, ts)
 		| glob_module==cPredefinedModuleIndex
@@ -1605,7 +1654,7 @@ where
 			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap }
 			| ds_arity<>1
 				# tuple_type = MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex+(ds_arity-2), glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType+(ds_arity-2)] ds_arity
-				= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique, at_annotation = AN_None }, No, (reqs, ts))
+				= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique }, No, (reqs, ts))
 				= ( hd tst_args, No, (reqs, ts))
 
 	requirements _ (AnyCodeExpr _ _ _) (reqs, ts)
@@ -1691,6 +1740,12 @@ where
 		# args = [{arg_array & at_type = aa :@: [{ae & at_attribute = attribute}]}, arg_int]
 		# result = {result & at_type = TA tuple_symb [{result_element & at_attribute = attribute}, {result_array & at_type=ra :@: [{re & at_attribute = attribute}]}]}
 		= (args, result, ts)
+	change_uselect_attributes args=:[arg_array=:{at_type=aa :@: [ae]}, arg_int]
+					result=:{at_type=TAS tuple_symb [result_element, result_array=:{at_type=ra :@: [re]}] strictness} ts
+		# (attribute, ts) =	freshAttribute ts
+		# args = [{arg_array & at_type = aa :@: [{ae & at_attribute = attribute}]}, arg_int]
+		# result = {result & at_type = TAS tuple_symb [{result_element & at_attribute = attribute}, {result_array & at_type=ra :@: [{re & at_attribute = attribute}]}] strictness}
+		= (args, result, ts)
 	change_uselect_attributes _ _ ts
 		= abort "type.icl, change_uselect_attributes: wrong type for uselect"
 
@@ -1727,9 +1782,9 @@ addToBase info_ptr type optional_position ts_var_heap
 	= ts_var_heap  <:= (info_ptr, VI_Type type optional_position)
 	
 attributedBasicType (BT_String string_type) ts=:{ts_attr_store}
-	= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = string_type}, {ts & ts_attr_store = inc ts_attr_store})
+	= ({ at_attribute = TA_TempVar ts_attr_store, at_type = string_type}, {ts & ts_attr_store = inc ts_attr_store})
 attributedBasicType bas_type ts=:{ts_attr_store}
-	= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = TB bas_type}, {ts & ts_attr_store = inc ts_attr_store})
+	= ({ at_attribute = TA_TempVar ts_attr_store, at_type = TB bas_type}, {ts & ts_attr_store = inc ts_attr_store})
 
 unify_coercions [{tc_demanded,tc_offered,tc_position}:coercions] modules subst heaps err
 	# (succ, subst, heaps) = unify tc_demanded tc_offered modules subst heaps
@@ -1789,7 +1844,7 @@ where
 	create_general_symboltype :: !Bool !Bool !Int !Int !*TypeState -> (!TempSymbolType, !*TypeState)
 	create_general_symboltype is_start_rule is_caf nr_of_args nr_of_lifted_args ts
 		| is_start_rule && nr_of_args > 0
-			# (tst_args, ts) = fresh_attributed_type_variables (nr_of_args - 1) [{at_attribute = TA_Unique, at_annotation = AN_Strict, at_type = TB BT_World }] ts
+			# (tst_args, ts) = fresh_attributed_type_variables (nr_of_args - 1) [{at_attribute = TA_Unique, /*at_annotation = AN_Strict,*/ at_type = TB BT_World }] ts
 			  (tst_result, ts) = (if is_caf freshNonUniqueVariable freshAttributedVariable) ts
 			= ({ tst_args = tst_args, tst_arity = 1, tst_result = tst_result, tst_context = [], tst_attr_env = [], tst_lifted = 0 }, ts)
 			# (tst_args, ts) = fresh_attributed_type_variables nr_of_args [] ts
@@ -1827,7 +1882,7 @@ where
 						expr_heap <:= (dyn_ptr, EI_TempDynamicType opt_dyn_type loc_dynamics tdt_type contexts expr_ptr type_code_symbol), predef_symbols)
 			EI_Dynamic No loc_dynamics 
 				# fresh_var = TempV var_store
-				  tdt_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = fresh_var }
+				  tdt_type = { at_attribute = TA_Multi, at_type = fresh_var }
 
 				# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeClass]
 				# pds_ident = predefined_idents.[PD_TypeCodeClass]
@@ -1998,10 +2053,10 @@ where
 				= take arity_diff args2 ++ args1
 				= args1
 
-addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
-	= { st & st_args = take nr_of_lifted_arguments new_args ++ st_args, st_vars = st_vars ++ drop (length st_vars) new_vars,
-			st_attr_vars = (take (length new_attrs - length st_attr_vars) new_attrs) ++ st_attr_vars, st_arity = st_arity + nr_of_lifted_arguments,
-				st_context = take (length new_context - length st_context) new_context ++ st_context }
+addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
+	= { st & st_args = take nr_of_lifted_arguments new_args ++ st_args, st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
+			 st_vars = st_vars ++ drop (length st_vars) new_vars, st_attr_vars = (take (length new_attrs - length st_attr_vars) new_attrs) ++ st_attr_vars,
+			 st_arity = st_arity + nr_of_lifted_arguments,st_context = take (length new_context - length st_context) new_context ++ st_context }
 
 ::	FunctionRequirements =
 	{	fe_requirements	:: !Requirements
@@ -2123,21 +2178,9 @@ where
 			= state
 
 		check_type_of_constructor_variable ins_pos common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
-			# {td_arity,td_name} = common_defs.[glob_module].com_type_defs.[glob_object]
-			  ({tdi_properties,tdi_cons_vars}, td_infos) = td_infos![glob_module].[glob_object]
-			| tdi_properties bitand cIsNonCoercible == 0
-				# ({sc_neg_vect}, type_var_heap, td_infos)
-					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
-				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)							
-				= (checkErrorWithIdentPos (newPosition empty_id ins_pos)
-					 " instance type should be coercible" error, type_var_heap, td_infos)
-		where
-			check_sign type neg_signs arg_nr error
-				| arg_nr == 0
-					= error
-					| neg_signs bitand 1 == 0
-						= check_sign type (neg_signs >> 1) (dec arg_nr) error
-						= checkError type " all arguments of an instance type should have a non-negative sign" error
+			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
+		check_type_of_constructor_variable ins_pos common_defs type=:(TAS {type_index={glob_module,glob_object},type_arity} types _) (error, type_var_heap, td_infos)
+			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
 		check_type_of_constructor_variable ins_pos common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
 			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
 				type_var_heap, td_infos)
@@ -2157,6 +2200,23 @@ where
 				type_var_heap, td_infos)
 		check_type_of_constructor_variable ins_pos common_defs type state
 			= state
+
+		check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
+			# {td_arity,td_name} = common_defs.[glob_module].com_type_defs.[glob_object]
+			  ({tdi_properties,tdi_cons_vars}, td_infos) = td_infos![glob_module].[glob_object]
+			| tdi_properties bitand cIsNonCoercible == 0
+				# ({sc_neg_vect}, type_var_heap, td_infos)
+					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
+				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)							
+				= (checkErrorWithIdentPos (newPosition empty_id ins_pos)
+					 " instance type should be coercible" error, type_var_heap, td_infos)
+		where
+			check_sign type neg_signs arg_nr error
+				| arg_nr == 0
+					= error
+					| neg_signs bitand 1 == 0
+						= check_sign type (neg_signs >> 1) (dec arg_nr) error
+						= checkError type " all arguments of an instance type should have a non-negative sign" error
 			
 	insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
 	insert ins_types new_ins_index new_ins_module modules error IT_Empty
@@ -2284,6 +2344,15 @@ where
 	  where
 		add_unicity_of_essentially_unique_type common_defs 
 								{at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} coercions
+			# {td_attribute} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
+			= case td_attribute of
+				TA_Unique
+					// the type is essentially unique
+					-> snd (tryToMakeUnique av_number coercions)
+				_
+					-> coercions
+		add_unicity_of_essentially_unique_type common_defs 
+								{at_attribute=TA_TempVar av_number, at_type=TAS {type_index} _ _} coercions
 			# {td_attribute} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
 			= case td_attribute of
 				TA_Unique

@@ -150,6 +150,10 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= foldSt fold_atype_st args st
 		= on_type type st
+	fold_type_st type=:(TAS type_symb_ident args _) st
+		#! st
+				= foldSt fold_atype_st args st
+		= on_type type st
 	fold_type_st type=:(l --> r) st
 		#! st
 				= fold_atype_st r (fold_atype_st l st)

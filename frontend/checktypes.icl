@@ -107,6 +107,9 @@ retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 		_
 			-> ((NotFound, mod_index), symbol_table, used_types)
 
+determine_type_attribute TA_Unique		= TA_Unique
+determine_type_attribute _				= TA_Multi
+
 instance bindTypes Type
 where
 	bindTypes cti (TV tv) ts_ti_cs
@@ -128,10 +131,22 @@ where
 								determine_type_attribute td_attribute, ts_ti_cs)
 				= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "used with wrong arity" cs.cs_error }))
 			= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "undefined" cs.cs_error}))
-	where
-		determine_type_attribute TA_Unique		= TA_Unique
-		determine_type_attribute _				= TA_Multi
-	
+	bindTypes cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} type=:(TAS type_cons=:{type_name=type_name=:{id_info}} types strictness)
+					(ts=:{ts_type_defs,ts_modules}, ti, cs=:{cs_symbol_table})
+		# ((type_index, type_module), cs_symbol_table, ti_used_types) = retrieveTypeDefinition id_info cti_module_index cs_symbol_table ti.ti_used_types
+		  ti = { ti & ti_used_types = ti_used_types }
+		# cs = { cs & cs_symbol_table = cs_symbol_table }
+		| type_index <> NotFound
+			# ({td_arity,td_attribute,td_rhs},type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts_type_defs ts_modules
+			  ts = { ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules }
+			| checkArityOfType type_cons.type_arity td_arity td_rhs
+				# (types, _, ts_ti_cs) = bindTypes cti types (ts, ti, cs)
+				| type_module == cti_module_index && cti_type_index == type_index
+					= (TAS { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types strictness, cti_lhs_attribute, ts_ti_cs)
+					= (TAS { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types strictness,
+								determine_type_attribute td_attribute, ts_ti_cs)
+				= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "used with wrong arity" cs.cs_error }))
+			= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "undefined" cs.cs_error}))	
 	bindTypes cti (arg_type --> res_type) ts_ti_cs
 		# (arg_type, _, ts_ti_cs) = bindTypes cti arg_type ts_ti_cs
 		  (res_type, _, ts_ti_cs) = bindTypes cti res_type ts_ti_cs
@@ -206,16 +221,16 @@ where
 		-> (!TypeRhs, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
 	//
 	check_rhs_of_TypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:AlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} ts_ti_cs
-		# type_lhs = { at_annotation = AN_None, at_attribute = cti_lhs_attribute,
+		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_name td_arity)
-									[{at_annotation = AN_None, at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
 		  ts_ti_cs = bind_types_of_constructors cti 0 [ atv_variable \\ {atv_variable} <- td_args] attr_vars type_lhs conses ts_ti_cs
 		= (td_rhs, ts_ti_cs)
 	check_rhs_of_TypeDef {td_name,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_constructor=rec_cons=:{ds_index}, rt_fields}}
 			attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} ts_ti_cs
-		# type_lhs = {	at_annotation = AN_None, at_attribute = cti_lhs_attribute,
+		# type_lhs = {	at_attribute = cti_lhs_attribute,
 						at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_name td_arity)
-				[{at_annotation = AN_None, at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+				[{ at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
 		  (ts, ti, cs) = bind_types_of_constructors cti 0  [ atv_variable \\ {atv_variable} <- td_args]
 		  						attr_vars type_lhs [rec_cons] ts_ti_cs
 		# (rec_cons_def, ts) = ts!ts_cons_defs.[ds_index]
@@ -298,7 +313,7 @@ where
 				| stv_count == 0
 					= (local_vars, symbol_table)
 					
-					= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr}, atv_attribute = stv_attribute, atv_annotation = AN_None } : local_vars],
+					= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr}, atv_attribute = stv_attribute } : local_vars],
 							symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
 
 	retrieve_used_types symb_ptrs symbol_table
@@ -491,6 +506,22 @@ where
 	check_attribute var_name dem_attr _ this_attr oti cs
 		= (TA_Multi, oti, cs)
 
+check_args_of_type_cons :: !Index !Int !DemandedAttributeKind ![AType] ![ATypeVar] !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+	-> (![AType], !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
+check_args_of_type_cons mod_index scope dem_attr_kind [] _ cot_state
+	= ([], cot_state)
+check_args_of_type_cons mod_index scope dem_attr_kind [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
+	# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute dem_attr_kind /* DAK_None */ atv_attribute) arg_type cot_state
+	  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr_kind arg_types td_args cot_state
+	= ([arg_type : arg_types], cot_state)
+
+new_demanded_attribute DAK_Ignore _
+	= DAK_Ignore
+new_demanded_attribute _ TA_Unique
+	= DAK_Unique
+new_demanded_attribute dem_attr_kind _
+	= dem_attr_kind
+
 checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
@@ -536,23 +567,21 @@ checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type
 			= ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs)) 
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
-where
-	check_args_of_type_cons :: !Index !Int !DemandedAttributeKind ![AType] ![ATypeVar] !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
-		-> (![AType], !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-	check_args_of_type_cons mod_index scope dem_attr_kind [] _ cot_state
-		= ([], cot_state)
-	check_args_of_type_cons mod_index scope dem_attr_kind [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
-		# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute dem_attr_kind /* DAK_None */ atv_attribute) arg_type cot_state
-		  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr_kind arg_types td_args cot_state
-		= ([arg_type : arg_types], cot_state)
-
-	new_demanded_attribute DAK_Ignore _
-		= DAK_Ignore
-	new_demanded_attribute _ TA_Unique
-		= DAK_Unique
-	new_demanded_attribute dem_attr_kind _
-		= dem_attr_kind
-
+checkOpenAType mod_index scope dem_attr type=:{ at_type=TAS type_cons=:{type_name=type_name=:{id_name,id_info}} types strictness, at_attribute}
+		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
+	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+	  cs = { cs & cs_symbol_table = cs_symbol_table }
+	  (type_index, type_module) = retrieveGlobalDefinition entry STE_Type mod_index
+	| type_index <> NotFound
+		# ({td_arity,td_args,td_attribute,td_rhs},type_index,ots_type_defs,ots_modules) = getTypeDef type_index type_module mod_index ots_type_defs ots_modules
+		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
+		| checkArityOfType type_cons.type_arity td_arity td_rhs
+			# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
+			  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr types td_args (ots, oti, cs)
+			  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr td_attribute) id_name at_attribute oti cs
+			= ({ type & at_type = TAS type_cons types strictness, at_attribute = new_attr} , (ots, oti, cs)) 
+			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
+		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
 checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_type, at_attribute} cot_state
 	# (arg_type, cot_state) = checkOpenAType mod_index scope DAK_None arg_type cot_state
 	  (result_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None result_type cot_state
@@ -605,7 +634,7 @@ checkOpenTypes mod_index scope dem_attr types cot_state
 	= mapSt (checkOpenType mod_index scope dem_attr) types cot_state
 
 checkOpenType mod_index scope dem_attr type cot_state
-	# ({at_type}, cot_state) = checkOpenAType mod_index scope dem_attr { at_type = type, at_attribute = TA_Multi, at_annotation = AN_None } cot_state
+	# ({at_type}, cot_state) = checkOpenAType mod_index scope dem_attr { at_type = type, at_attribute = TA_Multi } cot_state
 	= (at_type, cot_state)
 	
 checkOpenATypes mod_index scope types cot_state
@@ -648,6 +677,12 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 		= cs_error
 	  where
 		compare_context_and_instance_type (TA {type_index=ti1} _) (TA {type_index=ti2} _) are_equal_accu
+			= ti1==ti2 && are_equal_accu
+		compare_context_and_instance_type (TA {type_index=ti1} _) (TAS {type_index=ti2} _ _) are_equal_accu
+			= ti1==ti2 && are_equal_accu
+		compare_context_and_instance_type (TAS {type_index=ti1} _ _) (TA {type_index=ti2} _) are_equal_accu
+			= ti1==ti2 && are_equal_accu
+		compare_context_and_instance_type (TAS {type_index=ti1} _ _) (TAS {type_index=ti2} _ _) are_equal_accu
 			= ti1==ti2 && are_equal_accu
 		compare_context_and_instance_type (_ --> _) (_ --> _) are_equal_accu
 			= are_equal_accu
@@ -1198,7 +1233,7 @@ removeVariablesFromSymbolTable scope vars symbol_table
 	,	index_selector	:: !Index
 	}
 
-makeAttributedType attr annot type :== { at_attribute = attr, at_annotation = annot, at_type = type }
+makeAttributedType attr type :== { at_attribute = attr, at_type = type }
 
 createClassDictionaries ::		  !Bool !Index !Index !Index !Index !*{#CheckedTypeDef} !*{# SelectorDef} !*{# ConsDef} !*{#ClassDef} !*{#DclModule} !*TypeVarHeap !*VarHeap !*SymbolTable
 	-> (![CheckedTypeDef],![SelectorDef],![ConsDef],!DictionaryInfo,!*{#CheckedTypeDef},!*{# SelectorDef},!*{# ConsDef},!*{#ClassDef},!*{#DclModule},!*TypeVarHeap,!*VarHeap,!*SymbolTable)
@@ -1311,13 +1346,13 @@ where
 
 		  type_symb = MakeTypeSymbIdent { glob_object = index_type, glob_module = mod_index } rec_type_id class_arity
 				
-		  rec_type		= makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
-		  field_type	= makeAttributedType TA_Multi AN_None TE
+		  rec_type		= makeAttributedType TA_Multi (TA type_symb [makeAttributedType TA_Multi TE \\ i <- [1..class_arity]])
+		  field_type	= makeAttributedType TA_Multi TE
 		  (rev_fields, var_heap, symbol_table)
 	  			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] var_heap symbol_table
 		  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, symbol_table)
 	  			= build_context_fields mod_index nr_of_members class_context rec_type index_type (index_selector + nr_of_members) rev_fields
-	  					[ { field_type & at_annotation = AN_Strict } \\ i <- [1..nr_of_members] ] class_defs modules var_heap symbol_table
+	  					[ field_type \\ i <- [1..nr_of_members] ] class_defs modules var_heap symbol_table
 
 		  (cons_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 		  rec_cons_id = { class_name & id_info = cons_id_info}
@@ -1341,7 +1376,7 @@ where
 		
 		  cons_def = 	
 			{	cons_symb		= rec_cons_id
-			,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_result = rec_type,
+			,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = first_n_strict nr_of_fields, st_result = rec_type,
 								    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
 			,	cons_priority	= NoPrio
 			,	cons_index		= 0
@@ -1362,7 +1397,7 @@ where
 	
 	new_attributed_type_variable tv type_var_heap
 		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
-		= ({atv_attribute = TA_Multi, atv_annotation = AN_None , atv_variable = { tv & tv_info_ptr = new_tv_ptr }}, type_var_heap)
+		= ({atv_attribute = TA_Multi, atv_variable = { tv & tv_info_ptr = new_tv_ptr }}, type_var_heap)
 		
 	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields var_heap symbol_table
 		| field_nr < nr_of_fields
@@ -1376,7 +1411,7 @@ where
 			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
 		# ({class_name, class_arity, class_dictionary = {ds_ident, ds_index}}, _, class_defs, modules) = getClassDef ds_index glob_module mod_index class_defs modules
 		  type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
-		  field_type = makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
+		  field_type = makeAttributedType TA_Multi (TA type_symb [makeAttributedType TA_Multi TE \\ i <- [1..class_arity]])
 /* RWS FIXME ...
 	This is a patch for the case that the class has a context field which class
 	has not yet been seen. For example (note the order of definitions):
@@ -1387,7 +1422,7 @@ where
 		2) bind context fields
 	This should then also work across (dcl) module boundaries.
 */
-		  field_type = if (ds_index == NoIndex) (makeAttributedType TA_Multi AN_Strict TE) field_type
+		  field_type = if (ds_index == NoIndex) (makeAttributedType TA_Multi TE) field_type
 // ... RWS
 		  (field, var_heap, symbol_table) = build_field field_nr class_name.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
@@ -1402,7 +1437,7 @@ where
   		  sel_def =
   		  	{	sd_symb			= field_id
   		  	,	sd_field		= field_id
-  		  	,	sd_type			= { st_vars	= [], st_args = [ rec_type ], st_result = field_type, st_arity = 1,
+  		  	,	sd_type			= { st_vars	= [], st_args = [ rec_type ], st_args_strictness=Strict 1, st_result = field_type, st_arity = 1,
   		  	                        st_context = [], st_attr_vars = [], st_attr_env = [] }
 			,	sd_exi_vars		= []
 			,	sd_field_nr		= field_nr

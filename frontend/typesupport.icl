@@ -26,6 +26,8 @@ import syntax, parse, check, unitype, utilities, checktypes, compilerSwitches
 simplifyTypeApplication :: !Type ![AType] -> (!Bool, !Type)
 simplifyTypeApplication (TA type_cons=:{type_arity} cons_args) type_args
 	= (True, TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args))
+simplifyTypeApplication (TAS type_cons=:{type_arity} cons_args strictness) type_args
+	= (True, TAS { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args) strictness)
 simplifyTypeApplication (CV tv :@: type_args1) type_args2
 	= (True, CV tv :@: (type_args1 ++ type_args2))
 simplifyTypeApplication TArrow [type1, type2] 
@@ -73,7 +75,7 @@ where
 			# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
 			# (type, cus)			= cus!cus_var_env.[qv_number]
 			  (var, cus)			= cleanUpVariable True type qv_number cus
-			= ({atype & at_attribute = at_attribute, at_type = var, at_annotation = AN_None},
+			= ({atype & at_attribute = at_attribute, at_type = var},
 					{cus & cus_exis_vars = add_new_variable type qv_number at_attribute cus.cus_exis_vars})
 	where			
 		add_new_variable TE ev_number ev_attr cus_exis_vars
@@ -83,7 +85,7 @@ where
 	clean_up cui atype=:{at_attribute,at_type} cus
 		# (at_attribute, cus) = cleanUpTypeAttribute False cui at_attribute cus 
 		  (at_type, cus) = clean_up cui at_type cus
-		= ({atype & at_attribute = at_attribute, at_type = at_type, at_annotation = AN_None}, cus)
+		= ({atype & at_attribute = at_attribute, at_type = at_type}, cus)
 
 
 attrIsUndefined TA_None = True
@@ -141,6 +143,9 @@ where
 	clean_up cui (TA tc types) cus
 		# (types, cus) = clean_up cui types cus
 		= (TA tc types, cus)
+	clean_up cui (TAS tc types strictness) cus
+		# (types, cus) = clean_up cui types cus
+		= (TAS tc types strictness, cus)
 	clean_up cui (argtype --> restype) cus
 		# (argtype, cus) = clean_up cui argtype cus
 		  (restype, cus) = clean_up cui restype cus
@@ -237,6 +242,9 @@ where
 	cleanUpClosed (TA tc types) env
 		# (cur, types, env) = cleanUpClosed types env
 		= (cur, TA tc types, env)
+	cleanUpClosed (TAS tc types strictness) env
+		# (cur, types, env) = cleanUpClosed types env
+		= (cur, TAS tc types strictness, env)
 	cleanUpClosed (argtype --> restype) env
 		# (cur, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
 		= (cur, argtype --> restype, env)
@@ -308,7 +316,7 @@ cleanSymbolType :: !Int !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 cleanSymbolType arity type_heaps
 	# (st_result, clean_state) = newAttributedVariable 0 ([], [], type_heaps)
 	  (st_args, (st_vars, st_attr_vars, type_heaps)) = newAttributedVariables arity [] clean_state
-	= ({ st_arity = arity, st_vars = st_vars , st_args = st_args, st_result = st_result, st_context = [],
+	= ({ st_arity = arity, st_vars = st_vars , st_args = st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = [],
 			st_attr_env = [], st_attr_vars = st_attr_vars }, type_heaps)
 
 newAttributedVariables var_number attributed_variables clean_state=:(_,_,_) /* Temporary hack */
@@ -322,7 +330,7 @@ newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th
 	  new_var = { tv_name = NewVarId var_number, tv_info_ptr = tv_info_ptr }
 	  (av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
 	  new_attr_var = { av_name = NewAttrVarId var_number, av_info_ptr = av_info_ptr }
-	= ({ at_annotation = AN_None, at_attribute = TA_Var new_attr_var, at_type = TV new_var},
+	= ({ at_attribute = TA_Var new_attr_var, at_type = TV new_var},
 		([ new_var : variables ], [ new_attr_var : attributes ], { type_heaps & th_vars = th_vars, th_attrs = th_attrs }))
 
 cSpecifiedType	:== True
@@ -351,7 +359,7 @@ cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,ts
 				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
 							 cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
 							 cus_error = cus_error }
-	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_result = st_result, st_context = st_context,
+	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
 	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
@@ -393,7 +401,7 @@ where
 					_
 						-> (exi_vars, all_vars, { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
 				# (TV var, cus) = cus!cus_var_env.[var_number]
-				= ([{atv_attribute = var_attr, atv_variable = var, atv_annotation = AN_None } : exi_vars ],
+				= ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ],
 						[var_number : all_vars], { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }})
 
 	clean_up_result_type cui at cus
@@ -597,6 +605,12 @@ instance bindInstances Type
 				-> type_var_heap <:= (tv_info_ptr, TVI_Type type)
 	bindInstances (TA _ arg_types1) (TA _ arg_types2) type_var_heap
 		= bindInstances arg_types1 arg_types2 type_var_heap
+	bindInstances (TA _ arg_types1) (TAS _ arg_types2 _) type_var_heap
+		= bindInstances arg_types1 arg_types2 type_var_heap
+	bindInstances (TAS _ arg_types1 _) (TA _ arg_types2) type_var_heap
+		= bindInstances arg_types1 arg_types2 type_var_heap
+	bindInstances (TAS _ arg_types1 _) (TAS _ arg_types2 _) type_var_heap
+		= bindInstances arg_types1 arg_types2 type_var_heap
 	bindInstances (l1 --> r1) (l2 --> r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances l1 l2 type_var_heap)
 //AA..
@@ -719,6 +733,9 @@ where
 	substitute (TA cons_id cons_args) heaps
 		# (ok, cons_args, heaps) = substitute cons_args heaps
 		= (ok, TA cons_id cons_args,  heaps)
+	substitute (TAS cons_id cons_args strictness) heaps
+		# (ok, cons_args, heaps) = substitute cons_args heaps
+		= (ok, TAS cons_id cons_args strictness,  heaps)
 	substitute (CV type_var :@: types) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
 		  heaps = { heaps & th_vars = th_vars }
@@ -802,6 +819,11 @@ where
 		| rem 
 			= (True, TA cons_id cons_args)
 			= (False, t)
+	removeAnnotations t=:(TAS cons_id cons_args _)
+		# (rem, cons_args) = removeAnnotations cons_args
+		| rem 
+			= (True, TA cons_id cons_args)
+			= (False, t)
 	removeAnnotations t=:(cv :@: types)
 		# (rem, types) = removeAnnotations types
 		| rem 
@@ -813,21 +835,21 @@ where
 
 instance removeAnnotations AType
 where
-	removeAnnotations atype=:{at_annotation,at_type}
+	removeAnnotations atype=:{at_type}
 		# (rem, at_type) = removeAnnotations at_type
 		| rem
-			= (True, { atype & at_annotation = AN_None, at_type = at_type })
-		| at_annotation == AN_None
+			= (True, { atype & at_type = at_type })
 			= (False, atype)
-			= (True, { atype & at_annotation = AN_None })
 
 instance removeAnnotations SymbolType
 where
-	removeAnnotations st=:{st_args,st_result}
+	removeAnnotations st=:{st_args,st_result,st_args_strictness}
 		# (rem, (st_args,st_result)) = removeAnnotations (st_args,st_result)
 		| rem
-			= (True, { st & st_args = st_args, st_result = st_result })
+			= (True, { st & st_args = st_args, st_args_strictness=NotStrict, st_result = st_result })
+		| is_not_strict st_args_strictness
 			= (False, st)
+			= (True, { st & st_args_strictness=NotStrict })
 
 /*
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
@@ -903,6 +925,18 @@ where
 	equiv TArrow TArrow heaps
 		= (True, heaps)
 	equiv (TA tc1 types1) (TA tc2 types2) heaps
+		| tc1 == tc2
+			= equiv types1 types2 heaps
+			= (False, heaps)
+	equiv (TA tc1 types1) (TAS tc2 types2 _) heaps
+		| tc1 == tc2
+			= equiv types1 types2 heaps
+			= (False, heaps)
+	equiv (TAS tc1 types1 _) (TA tc2 types2) heaps
+		| tc1 == tc2
+			= equiv types1 types2 heaps
+			= (False, heaps)
+	equiv (TAS tc1 types1 _) (TAS tc2 types2 _) heaps
 		| tc1 == tc2
 			= equiv types1 types2 heaps
 			= (False, heaps)
@@ -1105,9 +1139,19 @@ where
 	writeType file (Yes beautifulizer) (_, av)
 		= writeBeautifulAttrVar file beautifulizer (TA_Var av)
 
+:: SAType = {s_annotation::!Annotation,s_type::!AType}
+
+add_strictness_annotations :: [AType] Int StrictnessList -> [SAType]
+add_strictness_annotations [arg:args] strictness_index strictness
+	# annotation=arg_strictness_annotation strictness_index strictness
+	# args=add_strictness_annotations args (strictness_index+1) strictness
+	= [{s_annotation=annotation,s_type=arg}:args]
+add_strictness_annotations [] strictness_index strictness
+	= []
+
 instance writeType SymbolType
 where
-	writeType file opt_beautifulizer (form, {st_args, st_arity, st_result, st_context, st_attr_env})
+	writeType file opt_beautifulizer (form, {st_args, st_args_strictness,st_arity, st_result, st_context, st_attr_env})
 		# file_opt_beautifulizer
 				= case st_arity of
 					0
@@ -1118,8 +1162,14 @@ where
 								bracket_arrow_type _ form
 									=	form
 					_
-						# (file, opt_beautifulizer)
-								= writeType file opt_beautifulizer (form, st_args)
+ 						# (file, opt_beautifulizer)
+//								= writeType file opt_beautifulizer (form, st_args)
+								= write_arguments file opt_beautifulizer form st_args
+							with
+								write_arguments file opt_beautifulizer form st_args
+									| checkProperty form cAnnotated
+										= writeType file opt_beautifulizer (form, add_strictness_annotations st_args 0 st_args_strictness)
+										= writeType file opt_beautifulizer (form, st_args)								
 						-> writeType (file <<< " -> ") opt_beautifulizer (form, st_result)
 		  (file, opt_beautifulizer)
 				= show_context form st_context file_opt_beautifulizer
@@ -1162,11 +1212,14 @@ where
 	writeType file opt_beautifulizer (form, {tc_class={glob_object={ds_ident}}, tc_types})
 		= writeType (file <<< ds_ident <<< ' ') opt_beautifulizer (form, tc_types)
 
+instance writeType SAType
+where
+	writeType file opt_beautifulizer (form, {s_annotation, s_type})
+		= writeType (file <<< s_annotation) opt_beautifulizer (form,s_type)
+
 instance writeType AType
 where
-	writeType file opt_beautifulizer (form, {at_attribute, at_annotation, at_type})
-		| checkProperty form cAnnotated
-			= show_attributed_type (file <<< at_annotation) opt_beautifulizer form at_attribute at_type
+	writeType file opt_beautifulizer (form, {at_attribute, at_type})
 			= show_attributed_type file opt_beautifulizer form at_attribute at_type
 	where
 		show_attributed_type file opt_beautifulizer form TA_Multi type
@@ -1226,53 +1279,12 @@ where
 		= (file <<< varid, No)
 	writeType file No (form, TempV tv_number)
 		= (file  <<< 'v' <<< tv_number, No)
-	writeType file opt_beautifulizer (form, TA {type_name,type_index,type_arity} types)
-		| is_predefined type_index
-			| type_name.id_name=="_List"
-				= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| type_name.id_name=="_!List"
-				= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| type_name.id_name=="_#List"
-				= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| type_name.id_name=="_List!"
-				= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| type_name.id_name=="_!List!"
-				= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| type_name.id_name=="_#List!"
-				= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| is_lazy_array type_name
-				= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| is_strict_array type_name
-				= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| is_unboxed_array type_name
-				= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| is_tuple type_name type_arity
-				= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-			| is_string_type type_name
-				= (file <<< "String", opt_beautifulizer)
-			| type_arity == 0
-				= (file <<< type_name, opt_beautifulizer)
-			| checkProperty form cBrackets
-				# (file, opt_beautifulizer)
-						= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
-				= (file <<< ')', opt_beautifulizer)
-				= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
-		| type_arity == 0
-			= (file <<< type_name, opt_beautifulizer)
-		| checkProperty form cBrackets
-			# (file, opt_beautifulizer)
-					= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
-			= (file <<< ')', opt_beautifulizer)
-			= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
-	where
-			is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
-
-			is_tuple {id_name} tup_arity	= id_name == "_Tuple" +++ toString tup_arity
-			is_lazy_array {id_name} 		= id_name == "_Array"
-			is_strict_array {id_name} 		= id_name == "_!Array"
-			is_unboxed_array {id_name} 		= id_name == "_#Array"
-			is_string_type {id_name}		= id_name == "_String"
-
+	writeType file opt_beautifulizer (form, TA type_symb types)
+		= writeTypeTA file opt_beautifulizer form type_symb types
+	writeType file opt_beautifulizer (form, TAS type_symb types strictness)
+		| checkProperty form cAnnotated
+			= writeTypeTA file opt_beautifulizer form type_symb (add_strictness_annotations types 0 strictness)
+			= writeTypeTA file opt_beautifulizer form type_symb types
 	writeType file opt_beautifulizer (form, arg_type --> res_type)
 		| checkProperty form cBrackets
 			= writeWithinBrackets "(" ")" file opt_beautifulizer
@@ -1320,10 +1332,58 @@ where
 	writeType file _ (form, type)
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
+writeTypeTA :: !*File !(Optional TypeVarBeautifulizer) !Format !TypeSymbIdent !a -> (!*File, !Optional TypeVarBeautifulizer) | writeType a
+writeTypeTA	file opt_beautifulizer form {type_name,type_index,type_arity} types
+	| is_predefined type_index
+		| type_name.id_name=="_List"
+			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| type_name.id_name=="_!List"
+			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| type_name.id_name=="_#List"
+			= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| type_name.id_name=="_List!"
+			= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| type_name.id_name=="_!List!"
+			= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| type_name.id_name=="_#List!"
+			= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| is_lazy_array type_name
+			= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| is_strict_array type_name
+			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| is_unboxed_array type_name
+			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| is_tuple type_name type_arity
+			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| is_string_type type_name
+			= (file <<< "String", opt_beautifulizer)
+		| type_arity == 0
+			= (file <<< type_name, opt_beautifulizer)
+		| checkProperty form cBrackets
+			# (file, opt_beautifulizer)
+					= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
+			= (file <<< ')', opt_beautifulizer)
+			= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
+	| type_arity == 0
+		= (file <<< type_name, opt_beautifulizer)
+	| checkProperty form cBrackets
+		# (file, opt_beautifulizer)
+				= writeType (file <<< '(' <<< type_name <<< ' ') opt_beautifulizer (form, types)
+		= (file <<< ')', opt_beautifulizer)
+		= writeType (file <<< type_name <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
+where
+		is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
+
+		is_tuple {id_name} tup_arity	= id_name == "_Tuple" +++ toString tup_arity
+		is_lazy_array {id_name} 		= id_name == "_Array"
+		is_strict_array {id_name} 		= id_name == "_!Array"
+		is_unboxed_array {id_name} 		= id_name == "_#Array"
+		is_string_type {id_name}		= id_name == "_String"
+
 instance writeType ATypeVar
 where
-	writeType file beautifulizer (form, {atv_attribute,atv_annotation,atv_variable})
-		= writeType file beautifulizer (form, { at_attribute = atv_attribute, at_annotation = atv_annotation, at_type = TV atv_variable })
+	writeType file beautifulizer (form, {atv_attribute,atv_variable})
+		= writeType file beautifulizer (form, { at_attribute = atv_attribute, at_type = TV atv_variable })
 
 writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
 	# (file, opt_beautifulizer) 
@@ -1472,7 +1532,14 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 	= uniqueBagToList (Pair ineqs1 ineqs2)
   where
 	get_ineqs_of_atype :: !AType -> !.Bag AttrInequality
-	get_ineqs_of_atype a_type=:{at_attribute=TA_Var outer_av, at_type=at_type=:TA type_symb_ident type_args}
+	get_ineqs_of_atype {at_attribute=TA_Var outer_av, at_type=at_type=:TA type_symb_ident type_args}
+		= get_ineqs_of_TA_with_TA_Var outer_av at_type type_symb_ident type_args
+	get_ineqs_of_atype {at_attribute=TA_Var outer_av, at_type=at_type=:TAS type_symb_ident type_args _}
+		= get_ineqs_of_TA_with_TA_Var outer_av at_type type_symb_ident type_args
+	get_ineqs_of_atype {at_type}
+		= get_ineqs_of_type at_type
+
+	get_ineqs_of_TA_with_TA_Var outer_av at_type type_symb_ident type_args
 		# ({tsp_propagation}) = type_symb_ident.type_prop
 		  implicit_ineqs_1 = get_superflous_ineqs outer_av type_args tsp_propagation
 		| isEmptyBag implicit_ineqs_1
@@ -1492,10 +1559,10 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 				TA_Var inner_av
 					-> Pair (Single {ai_demanded=inner_av, ai_offered=outer_av}) other_ineqs
 				_	-> other_ineqs
-	get_ineqs_of_atype {at_type}
-		= get_ineqs_of_type at_type
 
 	get_ineqs_of_type (TA ts args)
+		= get_ineqs_of_atype_list args
+	get_ineqs_of_type (TAS ts args _)
 		= get_ineqs_of_atype_list args
 	get_ineqs_of_type (l --> r)
 		= Pair (get_ineqs_of_atype l) (get_ineqs_of_atype r)
@@ -1684,6 +1751,9 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	anonymize_type (TA tsi args) th_attrs
 		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
 		= (TA tsi args, th_attrs)
+	anonymize_type (TAS tsi args strictness) th_attrs
+		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
+		= (TAS tsi args strictness, th_attrs)
 	anonymize_type (l --> r) th_attrs
 		# (l, th_attrs) = anonymize_atype l th_attrs
 		  (r, th_attrs) = anonymize_atype r th_attrs
@@ -1730,6 +1800,8 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 			= count_attr_vars_of_type at_type th_attrs
 	
 		count_attr_vars_of_type (TA _ args) th_attrs
+			= foldSt count_attr_vars_of_atype args th_attrs
+		count_attr_vars_of_type (TAS _ args _) th_attrs
 			= foldSt count_attr_vars_of_atype args th_attrs
 		count_attr_vars_of_type (l --> r) th_attrs
 			= count_attr_vars_of_atype l (count_attr_vars_of_atype r th_attrs)
@@ -1895,6 +1967,8 @@ instance performOnTypeVars Type
   where
 	performOnTypeVars f (TA _ args) st
 		= performOnTypeVars f args st
+	performOnTypeVars f (TAS _ args _) st
+		= performOnTypeVars f args st
 	performOnTypeVars f (at1 --> at2) st
 		= performOnTypeVars f at2 (performOnTypeVars f at1 st)
 //AA..
@@ -1942,6 +2016,8 @@ class performOnAttrVars a :: !(AttributeVar .st -> .st) !a !.st -> .st
 instance performOnAttrVars Type
   where
 	performOnAttrVars f (TA _ args) st
+		= performOnAttrVars f args st
+	performOnAttrVars f (TAS _ args _) st
 		= performOnAttrVars f args st
 	performOnAttrVars f (at1 --> at2) st
 		= performOnAttrVars f at2 (performOnAttrVars f at1 st)
@@ -1993,6 +2069,10 @@ accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r,
 foldATypeSt on_atype on_type type st :== fold_atype_st type st
   where
 	fold_type_st type=:(TA type_symb_ident args) st
+		#! st
+				= foldSt fold_atype_st args st
+		= on_type type st
+	fold_type_st type=:(TAS type_symb_ident args _) st
 		#! st
 				= foldSt fold_atype_st args st
 		= on_type type st

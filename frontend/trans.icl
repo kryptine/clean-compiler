@@ -999,8 +999,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
 				# zipped = zip2 ap_vars app_args
 				  {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
-				  laziness = [type.at_annotation == AN_None \\ type <- cons_type.st_args]
-				  unfoldables = [ (lazy && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & lazy <- laziness]
+				  unfoldables = [ ((not (arg_is_strict i cons_type.st_args_strictness)) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
 				  unfoldable_args = filterWith unfoldables zipped
 				  not_unfoldable = map not unfoldables
 				  non_unfoldable_args = filterWith not_unfoldable zipped
@@ -1160,7 +1159,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		  (copied_expr, {us_var_heap=ti_var_heap, us_symbol_heap=ti_symbol_heap, us_cleanup_info=ti_cleanup_info,
 								us_opt_type_heaps = Yes ti_type_heaps})
 				= unfold new_expr ui us
-		  fun_type = { st_vars = fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity, st_result = fresh_result_type,
+		  fun_type = { st_vars = fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity, st_args_strictness=NotStrict, st_result = fresh_result_type,
 						st_context = [], st_attr_vars = [], st_attr_env = [] }
 		  fun_def =	{	fun_symb = ro_fun.symb_name
 					,	fun_arity = fun_arity
@@ -1433,8 +1432,30 @@ readableCoercions {coer_demanded}
 		# (vars, _) = flattenCoercionTree ct
 		= map TA_TempVar vars
 
+:: ATypesWithStrictness = {ats_types::![AType],ats_strictness::!StrictnessList};
+
+compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStrict 0 new_arg_types_array
+  	where
+  		compute_args_strictness strictness_index strictness strictness_list array_index new_arg_types_array
+  			| array_index==size new_arg_types_array
+  				| strictness==0
+  					= strictness_list
+  					= append_strictness strictness strictness_list
+  				# {ats_types,ats_strictness} = new_arg_types_array.[array_index]
+  				# (strictness_index,strictness) = add_strictness_for_arguments ats_types 0 strictness_index strictness strictness_list
+  					with
+  						add_strictness_for_arguments [] ats_strictness_index strictness_index strictness strictness_list
+  							= (strictness_index,strictness)
+  						add_strictness_for_arguments [_:ats_types] ats_strictness_index strictness_index strictness strictness_list
+  							| arg_is_strict ats_strictness_index ats_strictness
+  								# (strictness_index,strictness,strictness_list) = add_next_strict strictness_index strictness strictness_list
+  								= add_strictness_for_arguments ats_types (ats_strictness_index+1) strictness_index strictness strictness_list
+  								# (strictness_index,strictness,strictness_list) = add_next_not_strict strictness_index strictness strictness_list
+  								= add_strictness_for_arguments ats_types (ats_strictness_index+1) strictness_index strictness strictness_list
+  				= compute_args_strictness strictness_index strictness strictness_list (array_index+1) new_arg_types_array
+	
 generateFunction :: !FunDef !ConsClasses !{! Producer} !FunctionInfoPtr !ReadOnlyTI !*TransformInfo -> (!Index, !Int, !*TransformInfo)
-generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
+generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}}
 				 {cc_args,cc_linear_bits} prods fun_def_ptr ro
 				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
 				 		ti_type_heaps,ti_cons_args,ti_cleanup_info, ti_type_def_infos}
@@ -1449,7 +1470,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 //		= undef
 */
 	#!(fi_group_index, ti_cons_args, ti_fun_defs, ti_fun_heap)
-			= max_group_index 0 prods fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
+			= max_group_index 0 prods ro.ro_main_dcl_module_n fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
 	# (Yes consumer_symbol_type) 
 			= fd.fun_type
 	  (function_producer_types, ti_fun_defs, ti_fun_heap)
@@ -1460,7 +1481,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  ([Yes sound_consumer_symbol_type:opt_sound_function_producer_types], (ti_type_heaps, ti_type_def_infos))
 	  		= mapSt (add_propagation_attributes ro.ro_common_defs) [Yes consumer_symbol_type: fresh_function_producer_types]
 	  				(ti_type_heaps, ti_type_def_infos)
-	  ({st_attr_vars,st_args,st_result,st_attr_env})
+	  ({st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env})
 	  		= sound_consumer_symbol_type
 	  (class_types, ti_fun_defs, ti_fun_heap)
 	  		= iFoldSt (accum_class_type prods ro) 0 (size prods) 
@@ -1492,10 +1513,13 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	    uniqueness_requirements, subst, let_bindings, ti_type_heaps=:{th_vars},
 	    ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap, ti_cons_args)
 			= determine_args cc_linear_bits cc_args 0 prods opt_sound_function_producer_types tb_args
-							(st_args_array st_args) next_attr_nr (tb_rhs, ro) 
+							(st_args_array st_args st_args_strictness) next_attr_nr (tb_rhs, ro) 
 							[] subst ([],[],[],[]) ti_type_heaps ti_symbol_heap ti_fun_defs 
 							ti_fun_heap ti_var_heap ti_cons_args
-	  new_arg_types = flatten [ el \\ el<-:new_arg_types_array ]
+	  new_arg_types = flatten [ ats_types \\ {ats_types}<-:new_arg_types_array ]
+	  
+	  new_args_strictness = compute_args_strictness new_arg_types_array
+	  	  	  
 	  (cons_vars, th_vars)
 			= foldSt set_cons_var_bit propagating_cons_vars
 					(createArray (inc (BITINDEX nr_of_all_type_vars)) 0, th_vars)
@@ -1544,7 +1568,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  		= { el \\ el <- fresh_type_vars }
 	  (attr_partition, demanded) 
 	  		= partitionateAttributes coercions.coer_offered coercions.coer_demanded
-	  		// to eliminate circles in the attribute inequalities graph that was built during "determine_args"
+	  		// to eliminate circles in the attribute inequalities graph that was built during "det ermine_arg s"
 	  (fresh_attr_vars, ti_type_heaps)
 	  		= accAttrVarHeap (create_fresh_attr_vars demanded (size demanded)) { ti_type_heaps & th_vars = th_vars }
 	  		// the attribute variables stored in the "demanded" graph are represented as integers: 
@@ -1565,8 +1589,8 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
  	  		= getTypeVars (fresh_arg_types, fresh_result_type) ti_type_heaps.th_vars
 	  fun_arity
 	  		= length new_fun_args
-	  new_fun_type
-	  		= Yes { st_vars = all_fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity,
+	# new_fun_type
+	  		= Yes { st_vars = all_fresh_type_vars, st_args = fresh_arg_types, st_args_strictness=new_args_strictness, st_arity = fun_arity,
 					st_result = fresh_result_type, st_context = [], st_attr_vars = all_attr_vars,
 					st_attr_env = coercionsToAttrEnv fresh_attr_vars final_coercions }
 /* DvA... STRICT_LET
@@ -1672,9 +1696,10 @@ where
 	is_dictionary _ es_td_infos
 		= False
 
-	st_args_array :: ![AType] -> .{![AType]}
-	st_args_array st_args
-		= { [el] \\ el <- st_args }
+	st_args_array :: ![AType] !StrictnessList -> .{#ATypesWithStrictness}
+	st_args_array st_args args_strictness
+		# strict1=Strict 1
+		= { {ats_types=[el],ats_strictness=if (arg_is_strict i args_strictness) strict1 NotStrict} \\ i<-[0..] & el <- st_args }
 		
 	determine_args _ [] prod_index producers prod_atypes forms arg_types next_attr_nr _ 
 				uniqueness_requirements subst let_bindings type_heaps symbol_heap fun_defs fun_heap var_heap ti_cons_args
@@ -1721,7 +1746,7 @@ where
 		determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr,fv_name} prod_index (_,(_, ro))
 					  (vars, arg_types, next_attr_nr, new_linear_bits, new_cons_args, 
 						uniqueness_requirements, subst, let_bindings, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap, ti_cons_args)
-			# (arg_type, arg_types)
+			# ({ats_types=[arg_type:_]}, arg_types)
 					= arg_types![prod_index]
 			  (_, int_class_type, type_heaps)
 			  		= substitute class_type type_heaps
@@ -1733,14 +1758,14 @@ where
 					  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
 					  }
 			# (succ, subst, type_heaps)
-			  		= unify class_atype (hd arg_type) type_input subst type_heaps
+			  		= unify class_atype arg_type type_input subst type_heaps
 			| not succ
-				= abort ("sanity check nr 93 in module trans failed\n"--->(class_atype,"\n", (hd arg_type)))
+				= abort ("sanity check nr 93 in module trans failed\n"--->(class_atype,"\n", arg_type))
 			= ( mapAppend (\({var_info_ptr,var_name}, _)
 							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
 						  free_vars_and_types vars
-			  , { arg_types & [prod_index] = [ { empty_atype & at_type = at_type }
-			  									\\ (_, at_type) <- free_vars_and_types] }
+			  , { arg_types & [prod_index] = {ats_types= [ { empty_atype & at_type = at_type } \\ (_, at_type) <- free_vars_and_types],
+			  								  ats_strictness = first_n_strict (length free_vars_and_types) } }
 			  , next_attr_nr
 			  , mapAppend (\_ -> True) free_vars_and_types new_linear_bits
 			  , mapAppend (\_ -> cActive) free_vars_and_types new_cons_args
@@ -1754,7 +1779,7 @@ where
 			  , writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) var_heap
 			  , ti_cons_args
 			  )
-		determine_arg producer (Yes {st_args, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
+		determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
 						{fv_info_ptr,fv_name} prod_index 
 						((linear_bit, _),(consumer_body_rhs, ro))
 						(vars, arg_types, next_attr_nr, new_linear_bits, new_cons_args, 
@@ -1768,7 +1793,7 @@ where
 					= size fun_defs
 			# ({cc_args, cc_linear_bits}, fun_heap, ti_cons_args)
 					= calc_cons_args curried symbol symbol_arity ti_cons_args linear_bit size_fun_defs fun_heap
-			  (arg_type, arg_types)
+			  ({ats_types=[arg_type:_],ats_strictness}, arg_types)
 			  		= arg_types![prod_index]
 			  (next_attr_nr, th_attrs)
 			  		= foldSt bind_to_temp_attr_var st_attr_vars (next_attr_nr, th_attrs)
@@ -1785,13 +1810,13 @@ where
 					  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
 					  }
 			  (succ, subst, type_heaps)
-			  		= unify application_type (hd arg_type) type_input subst type_heaps
+			  		= unify application_type arg_type type_input subst type_heaps
 			| not succ
-				= abort ("sanity check nr 94 in module trans failed"--->(application_type, (hd arg_type)))
+				= abort ("sanity check nr 94 in module trans failed"--->(application_type, arg_type))
 			# (attr_inequalities, type_heaps)
 					= accAttrVarHeap (mapSt substitute_attr_inequality st_attr_env) type_heaps
 			  new_uniqueness_requirement
-			  		= { ur_offered = application_type, ur_demanded = hd arg_type,
+			  		= { ur_offered = application_type, ur_demanded = arg_type,
 			  			ur_attr_ineqs = attr_inequalities }
 			  (opt_body, var_names, fun_defs, fun_heap)
 			  		= case producer of
@@ -1819,7 +1844,7 @@ where
 							-> (VI_Body symbol tb (take nr_of_applied_args form_vars), var_heap)
 /* DvA... STRICT_LET
 			  (expr_to_unfold, var_heap, let_bindings)
-					= case (hd arg_type).at_annotation of
+					= case arg_type.at_annotation of
 						AN_Strict
 							# (new_info_ptr_l, var_heap) = newPtr VI_Empty var_heap
 			  				# free_var_l = { fv_name = { id_name = "free_l", id_info = nilPtr }, fv_info_ptr = new_info_ptr_l, fv_count = 0, fv_def_level = NotALevel }
@@ -1830,12 +1855,12 @@ where
 							# var_heap = writeVarInfo new_info_ptr_l expr_to_unfold var_heap
 
 							# let_bindings = case let_bindings of
-											(s,l,st,lt) -> ([bind:s],l,[hd arg_type:st],lt)
+											(s,l,st,lt) -> ([bind:s],l,[arg_type:st],lt)
 							-> (VI_Empty, var_heap, let_bindings)
 						_	-> (expr_to_unfold,var_heap,let_bindings)
 ...DvA */
 			= (	form_vars
-			  , { arg_types & [prod_index] = take nr_of_applied_args st_args }
+			  , { arg_types & [prod_index] = {ats_types=take nr_of_applied_args st_args,ats_strictness=st_args_strictness} }
 			  , next_attr_nr
 			  , cc_linear_bits++new_linear_bits
 			  , cc_args++new_cons_args
@@ -1909,7 +1934,7 @@ where
 				= abort "sanity check nr 234 failed in module trans"
 			# (applied_args, unapplied_args) = splitAt (nr_of_applied_args-nr_context_args) st_args
 			  attr_approx = if (any has_unique_attribute applied_args) TA_Unique TA_Multi
-			= foldr (\atype1 atype2->{at_attribute=attr_approx, at_annotation=AN_None, at_type=atype1-->atype2})
+			= foldr (\atype1 atype2->{at_attribute=attr_approx, at_type=atype1-->atype2})
 					st_result unapplied_args
 		  where
 			has_unique_attribute {at_attribute=TA_Unique} = True
@@ -2049,9 +2074,11 @@ where
 				= (symbol_type, fun_defs, fun_heap)
 				= (symbol_type, fun_defs, fun_heap)
 			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-			  (_, ft_type) = removeAnnotations ft_type
-			  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
-			= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] }, fun_defs, fun_heap)
+			  (_, ft_type=:{st_args,st_args_strictness}) = removeAnnotations ft_type
+			  new_st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context st_args
+			  new_st_arity = length new_st_args
+			  new_st_args_strictness = insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
+			= ({ft_type & st_args = new_st_args, st_args_strictness = new_st_args_strictness, st_arity = new_st_arity, st_context = [] }, fun_defs, fun_heap)
 // ... Sjaak
 	get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
 		# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
@@ -2095,13 +2122,28 @@ where
 		  		= cs
 		= (btype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
 
-	max_group_index prod_index producers current_max fun_defs fun_heap cons_args
-		| prod_index == size producers
-			= (current_max, cons_args, fun_defs, fun_heap)
-			# (current_max, cons_args, fun_defs, fun_heap)
-				= max_group_index_of_producer producers.[prod_index] current_max fun_defs fun_heap cons_args
-			= max_group_index (inc prod_index) producers current_max fun_defs fun_heap cons_args
+	create_fresh_attr_vars :: !{!CoercionTree} !Int !*AttrVarHeap -> (!{!TypeAttribute}, !.AttrVarHeap)
+	create_fresh_attr_vars demanded nr_of_attr_vars th_attrs
+		# fresh_array = createArray nr_of_attr_vars TA_None
+		= iFoldSt (allocate_fresh_attr_var demanded) 0 nr_of_attr_vars (fresh_array, th_attrs)
+	  where
+		allocate_fresh_attr_var demanded i (attr_var_array, th_attrs)
+			= case demanded.[i] of
+				CT_Unique
+					-> ({ attr_var_array & [i] = TA_Unique}, th_attrs)
+				CT_NonUnique
+					-> ({ attr_var_array & [i] = TA_Multi}, th_attrs)
+				_
+					# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
+					-> ({ attr_var_array & [i] = TA_Var { av_name = NewAttrVarId i, av_info_ptr = new_info_ptr }}, th_attrs)
 
+max_group_index prod_index producers ro_main_dcl_module_n current_max fun_defs fun_heap cons_args
+	| prod_index == size producers
+		= (current_max, cons_args, fun_defs, fun_heap)
+		# (current_max, cons_args, fun_defs, fun_heap)
+			= max_group_index_of_producer producers.[prod_index] current_max fun_defs fun_heap cons_args
+		= max_group_index (inc prod_index) producers ro_main_dcl_module_n current_max fun_defs fun_heap cons_args
+where
 	max_group_index_of_producer PR_Empty current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
@@ -2128,8 +2170,6 @@ where
 		= (current_max, cons_args, fun_defs, fun_heap)	// DvA: not a clue what we're trying here...
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
-
-	ro_main_dcl_module_n = ro.ro_main_dcl_module_n
 	
 	max_group_index_of_member
 				(App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
@@ -2169,21 +2209,6 @@ where
 			# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
 			= (max generated_function.gf_fun_def.fun_info.fi_group_index current_max, fun_defs, fun_heap)
 
-	create_fresh_attr_vars :: !{!CoercionTree} !Int !*AttrVarHeap -> (!{!TypeAttribute}, !.AttrVarHeap)
-	create_fresh_attr_vars demanded nr_of_attr_vars th_attrs
-		# fresh_array = createArray nr_of_attr_vars TA_None
-		= iFoldSt (allocate_fresh_attr_var demanded) 0 nr_of_attr_vars (fresh_array, th_attrs)
-	  where
-		allocate_fresh_attr_var demanded i (attr_var_array, th_attrs)
-			= case demanded.[i] of
-				CT_Unique
-					-> ({ attr_var_array & [i] = TA_Unique}, th_attrs)
-				CT_NonUnique
-					-> ({ attr_var_array & [i] = TA_Multi}, th_attrs)
-				_
-					# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
-					-> ({ attr_var_array & [i] = TA_Var { av_name = NewAttrVarId i, av_info_ptr = new_info_ptr }}, th_attrs)
-
 class replaceIntegers a :: !a !({!TypeVar}, !{!TypeAttribute}, !AttributePartition) !*{#Bool} -> (!a, !.{#Bool})
 	// get rid of all those TempV and TA_Var things
 
@@ -2216,6 +2241,9 @@ instance replaceIntegers Type where
 	replaceIntegers (TA type_symb_ident args) input used
 		# (args, used) = replaceIntegers args input used
 		= (TA type_symb_ident args, used)
+	replaceIntegers (TAS type_symb_ident args strictness) input used
+		# (args, used) = replaceIntegers args input used
+		= (TAS type_symb_ident args strictness, used)
 	replaceIntegers (a --> b) input used
 		# (a, used) = replaceIntegers a input used
 		  (b, used) = replaceIntegers b input used
@@ -2739,20 +2767,22 @@ where
 				= common_defs.[glob_module].com_class_defs.[ds_index]
 		  dict_type_symb
 		  		= 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
-		= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
+		= { at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb (
 //				map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
 				fst (mapSt 	(\type class_cons_vars
 								-> let at_attribute = if (lowest_bit class_cons_vars) TA_MultiOfPropagatingConsVar TA_Multi
-							   		in ( { at_attribute = at_attribute, at_annotation = AN_None, at_type = type },
+							   		in ( { at_attribute = at_attribute, at_type = type },
 						   				class_cons_vars>>1)
 						   	)
 						  	tc_types
 						  	class_cons_vars))}
 
-expandSynTypesInSymbolType rem_annots common_defs st=:{st_args,st_result,st_context} ets
+expandSynTypesInSymbolType rem_annots common_defs st=:{st_args,st_args_strictness,st_result,st_context} ets
 	# (_,(st_args,st_result), ets) = expandSynTypes rem_annots common_defs (st_args,st_result) ets
-	  st_args = addTypesOfDictionaries common_defs st_context st_args
-	= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
+	  new_st_args = addTypesOfDictionaries common_defs st_context st_args
+	  new_st_arity = length new_st_args
+	  new_st_args_strictness = insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
+	= ({st & st_args = new_st_args, st_args_strictness = new_st_args_strictness, st_result = st_result, st_arity = new_st_arity, st_context = [] }, ets)
 	
 class expandSynTypes a :: !Bool !{# CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
 
@@ -2771,6 +2801,8 @@ where
 			= (True,cons_var :@: types, ets)
 			= (False,type, ets)
 	expandSynTypes rem_annots common_defs type=:(TA type_symb types) ets
+		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
+	expandSynTypes rem_annots common_defs type=:(TAS type_symb types _) ets
 		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
 // Sjaak 240801 ...
 	expandSynTypes rem_annots common_defs tfa_type=:(TFA vars type) ets
@@ -2800,23 +2832,12 @@ where
 		# (changed_type2,type2,ets) = expandSynTypes rem_annots common_defs type2 ets
 		= (changed_type1 || changed_type2,(type1,type2),ets)
 
-expand_syn_types_in_TA rem_annots common_defs ta_type=:(TA type_symb=:{type_index={glob_object,glob_module},type_name} types) attribute ets=:{ets_type_defs}
-	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
-	  ets = { ets & ets_type_defs = ets_type_defs }
-	= case td_rhs of
-		SynType rhs_type
-			# ets_type_heaps = bind_attr td_attribute attribute ets.ets_type_heaps
-			  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
-			  (_, type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
-			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
-			-> (True,type,ets)
-		_
-			# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
-			# ta_type = if changed (TA type_symb types) ta_type
-			| glob_module == ets.ets_main_dcl_module_n
-				-> (changed,ta_type, ets)
-				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
-where
+bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets_type_heaps
+	# ets_type_heaps = bind_attr td_attribute attribute ets_type_heaps
+	  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
+	  (_, type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
+	= (type, ets_type_heaps)
+	where
 		bind_var_and_attr {	atv_attribute = TA_Var {av_info_ptr},  atv_variable = {tv_info_ptr} } {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}
 			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }
 		bind_var_and_attr { atv_variable  = {tv_info_ptr}} {at_type} type_heaps=:{th_vars}
@@ -2827,33 +2848,62 @@ where
 		bind_attr _ attribute type_heaps
 			= type_heaps
 
-		collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}
-			# (ets_collected_conses, ets_var_heap)
-					= collect_imported_constructor mod_index common_defs.[mod_index].com_cons_defs rt_constructor (ets_collected_conses, ets_var_heap)
-			= { ets & ets_collected_conses = ets_collected_conses, ets_var_heap = ets_var_heap }
-		collect_imported_constructors common_defs mod_index (AlgType constructors) ets=:{ets_collected_conses,ets_var_heap}
-			# (ets_collected_conses, ets_var_heap) 
-					= foldSt (collect_imported_constructor mod_index common_defs.[mod_index].com_cons_defs) constructors (ets_collected_conses, ets_var_heap)
-			= { ets & ets_collected_conses = ets_collected_conses, ets_var_heap = ets_var_heap }
-		collect_imported_constructors common_defs mod_index _ ets
-			= ets
-
-		collect_imported_constructor mod_index cons_defs {ds_index} (collected_conses, var_heap)
-			# {cons_type_ptr} = cons_defs.[ds_index]
-			  (type_info, var_heap) = readVarInfo cons_type_ptr var_heap
-			| has_been_collected type_info
-				= (collected_conses, var_heap)
-				= ([{ glob_module = mod_index, glob_object = ds_index } : collected_conses ], writeVarInfo cons_type_ptr VI_Used var_heap)
-
-		has_been_collected VI_Used				= True
-		has_been_collected (VI_ExpandedType _)	= True
-		has_been_collected _					= False
-
 		substitute_rhs rem_annots rhs_type type_heaps
 			| rem_annots
 				# (_, rhs_type) = removeAnnotations rhs_type
 			  	= substitute rhs_type type_heaps
 			  	= substitute rhs_type type_heaps
+
+collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}
+	# (ets_collected_conses, ets_var_heap)
+			= collect_imported_constructor mod_index common_defs.[mod_index].com_cons_defs rt_constructor (ets_collected_conses, ets_var_heap)
+	= { ets & ets_collected_conses = ets_collected_conses, ets_var_heap = ets_var_heap }
+collect_imported_constructors common_defs mod_index (AlgType constructors) ets=:{ets_collected_conses,ets_var_heap}
+	# (ets_collected_conses, ets_var_heap) 
+			= foldSt (collect_imported_constructor mod_index common_defs.[mod_index].com_cons_defs) constructors (ets_collected_conses, ets_var_heap)
+	= { ets & ets_collected_conses = ets_collected_conses, ets_var_heap = ets_var_heap }
+collect_imported_constructors common_defs mod_index _ ets
+	= ets
+
+collect_imported_constructor mod_index cons_defs {ds_index} (collected_conses, var_heap)
+	# {cons_type_ptr} = cons_defs.[ds_index]
+	  (type_info, var_heap) = readVarInfo cons_type_ptr var_heap
+	| has_been_collected type_info
+		= (collected_conses, var_heap)
+		= ([{ glob_module = mod_index, glob_object = ds_index } : collected_conses ], writeVarInfo cons_type_ptr VI_Used var_heap)
+where
+	has_been_collected VI_Used				= True
+	has_been_collected (VI_ExpandedType _)	= True
+	has_been_collected _					= False
+
+expand_syn_types_in_TA rem_annots common_defs ta_type=:(TA type_symb=:{type_index={glob_object,glob_module},type_name} types) attribute ets=:{ets_type_defs}
+	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
+	  ets = { ets & ets_type_defs = ets_type_defs }
+	= case td_rhs of
+		SynType rhs_type
+			# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets.ets_type_heaps
+			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
+			-> (True,type,ets)
+		_
+			# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+			# ta_type = if changed (TA type_symb types) ta_type
+			| glob_module == ets.ets_main_dcl_module_n
+				-> (changed,ta_type, ets)
+				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
+expand_syn_types_in_TA rem_annots common_defs ta_type=:(TAS type_symb=:{type_index={glob_object,glob_module},type_name} types strictness) attribute ets=:{ets_type_defs}
+	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
+	  ets = { ets & ets_type_defs = ets_type_defs }
+	= case td_rhs of
+		SynType rhs_type
+			# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets.ets_type_heaps
+			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
+			-> (True,type,ets)
+		_
+			# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+			# ta_type = if changed (TAS type_symb types strictness) ta_type
+			| glob_module == ets.ets_main_dcl_module_n
+				-> (changed,ta_type, ets)
+				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
 
 instance expandSynTypes AType
 where
@@ -2861,6 +2911,11 @@ where
 		= expand_syn_types_in_a_type rem_annots common_defs atype ets
 	where
 		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TA type_symb types,at_attribute} ets
+			# (changed,at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
+			| changed
+				= (True,{ atype & at_type = at_type }, ets)
+				= (False,atype,ets)
+		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TAS type_symb types _,at_attribute} ets
 			# (changed,at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
 			| changed
 				= (True,{ atype & at_type = at_type }, ets)
@@ -3112,7 +3167,7 @@ lowest_bit int :== int bitand 1 <> 0
 isYes (Yes _) = True
 isYes _ = False
 
-empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
+empty_atype = { at_attribute = TA_Multi, at_type = TE }
 
 mapExprSt map_expr map_free_var postprocess_free_var expr st :== map_expr_st expr st
   where

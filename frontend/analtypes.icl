@@ -106,7 +106,14 @@ where
 				_
 					-> (type_defs, main_dcl_type_defs, type_heaps, error)
 
-		try_to_expand_synonym_type pos type=:{at_type = TA {type_name,type_index={glob_object,glob_module}} types} attribute (type_defs, type_heaps, error)
+		try_to_expand_synonym_type pos type=:{at_type = TA {type_index={glob_object,glob_module}} types} attribute (type_defs, type_heaps, error)
+			= try_to_expand_synonym_type_for_TA glob_object glob_module types pos type attribute type_defs type_heaps error
+		try_to_expand_synonym_type pos type=:{at_type = TAS {type_index={glob_object,glob_module}} types _} attribute (type_defs, type_heaps, error)
+			= try_to_expand_synonym_type_for_TA glob_object glob_module types pos type attribute type_defs type_heaps error
+		try_to_expand_synonym_type pos type attribute (type_defs, type_heaps, error)
+			= (No, type_defs, type_heaps, error)
+
+		try_to_expand_synonym_type_for_TA glob_object glob_module types pos type attribute type_defs type_heaps error
 			# (used_td=:{td_rhs}, type_defs) = type_defs![glob_module, glob_object]
 			= case td_rhs of
 				SynType {at_type}
@@ -117,8 +124,6 @@ where
 						-> (No, type_defs, type_heaps, error)
 				_
 					-> (No, type_defs, type_heaps, error)
-		try_to_expand_synonym_type pos type attribute (type_defs, type_heaps, error)
-			= (No, type_defs, type_heaps, error)
 
 		try_to_expand_synonym_type_in_main_dcl main_dcl_module_index {gi_module,gi_index} (type_defs, main_dcl_type_defs, type_heaps, error)
 			| main_dcl_module_index == main_dcl_module_index && gi_index < size main_dcl_type_defs
@@ -365,52 +370,58 @@ where
 			= (kind_info, cIsHyperStrict, ({ conds & con_var_binds = [{vb_var = kind_info_ptr, vb_vars = form_tvs } : con_var_binds] },
 						 { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap }))
 
+analTypes_for_TA :: Ident Int Int Int [AType] !Bool !{#CommonDefs} ![KindInfoPtr] !Conditions !*AnalyseState
+	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
+analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
+	# form_type_arity = modules.[glob_module].com_type_defs.[glob_object].td_arity
+	  ({tdi_kinds, tdi_properties}, as) = as!as_td_infos.[glob_module].[glob_object]
+	| type_arity <= form_type_arity
+		# kind = kindArrowToKindInfo (drop type_arity tdi_kinds)
+		| tdi_properties bitand cIsAnalysed == 0
+			# (type_properties, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tdi_kinds (conds, as)
+			= (kind, type_properties, conds_as)
+			# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
+			= (kind, type_properties, conds_as)
+		= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_name type_appl_error as.as_error }))
+where
+	anal_types_of_rec_type_cons modules form_tvs [] _ conds_as
+		= (cIsHyperStrict, conds_as)
+	anal_types_of_rec_type_cons modules form_tvs [type : types] [(KindVar kind_info_ptr) : tvs] conds_as
+		# (type_kind, type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules [ kind_info_ptr : form_tvs ] type conds_as
+		  (kind, as_kind_heap) = readPtr kind_info_ptr as_kind_heap
+		  {uki_kind_heap, uki_error} = unifyKinds type_kind kind {uki_kind_heap = as_kind_heap, uki_error = as_error}
+		| is_type_var type
+			# (other_type_props, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tvs
+					(conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error })
+			= (combineTypeProperties type_props other_type_props, conds_as)
+			# (other_type_props, conds_as) =  anal_types_of_rec_type_cons modules form_tvs types tvs
+					({ conds & con_top_var_binds = [kind_info_ptr : conds.con_top_var_binds]}, { as & as_kind_heap = uki_kind_heap, as_error = uki_error })
+			= (combineTypeProperties type_props other_type_props, conds_as)
+	where
+		is_type_var {at_type = TV _}
+			= True
+		is_type_var _
+			= False
+		
+	anal_types_of_type_cons modules form_tvs [] _ conds_as
+		= (cIsHyperStrict, conds_as)
+	anal_types_of_type_cons modules form_tvs [type : types] [tk : tks] conds_as
+		# (type_kind, type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs type conds_as
+		  {uki_kind_heap, uki_error} = unifyKinds type_kind (kindToKindInfo tk) {uki_kind_heap = as_kind_heap, uki_error = as_error}
+		  as = { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
+		  (other_type_props, conds_as) =  anal_types_of_type_cons modules form_tvs types tks (conds, as)
+		= (combineTypeProperties type_props other_type_props, conds_as)
+	anal_types_of_type_cons modules form_tvs types tks conds_as
+		= abort ("anal_types_of_type_cons (analtypes.icl)" ---> (types, tks))
+
 instance analTypes Type
 where
 	analTypes has_root_attr modules form_tvs (TV tv) conds_as
 		= analTypes has_root_attr modules form_tvs tv conds_as
 	analTypes has_root_attr modules form_tvs type=:(TA {type_name,type_index={glob_module,glob_object},type_arity} types) (conds, as)
-		# form_type_arity = modules.[glob_module].com_type_defs.[glob_object].td_arity
-		  ({tdi_kinds, tdi_properties}, as) = as!as_td_infos.[glob_module].[glob_object]
-		| type_arity <= form_type_arity
-			# kind = kindArrowToKindInfo (drop type_arity tdi_kinds)
-			| tdi_properties bitand cIsAnalysed == 0
-				# (type_properties, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tdi_kinds (conds, as)
-				= (kind, type_properties, conds_as)
-				# (type_properties, conds_as) = anal_types_of_type_cons modules form_tvs types tdi_kinds (conds, as)
-				= (kind, type_properties, conds_as)
-			= (KI_Const, tdi_properties, (conds, { as & as_error = checkError type_name type_appl_error as.as_error }))
-	where
-		anal_types_of_rec_type_cons modules form_tvs [] _ conds_as
-			= (cIsHyperStrict, conds_as)
-		anal_types_of_rec_type_cons modules form_tvs [type : types] [(KindVar kind_info_ptr) : tvs] conds_as
-			# (type_kind, type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules [ kind_info_ptr : form_tvs ] type conds_as
-			  (kind, as_kind_heap) = readPtr kind_info_ptr as_kind_heap
-			  {uki_kind_heap, uki_error} = unifyKinds type_kind kind {uki_kind_heap = as_kind_heap, uki_error = as_error}
-			| is_type_var type
-				# (other_type_props, conds_as) = anal_types_of_rec_type_cons modules form_tvs types tvs
-						(conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error })
-				= (combineTypeProperties type_props other_type_props, conds_as)
-				# (other_type_props, conds_as) =  anal_types_of_rec_type_cons modules form_tvs types tvs
-						({ conds & con_top_var_binds = [kind_info_ptr : conds.con_top_var_binds]}, { as & as_kind_heap = uki_kind_heap, as_error = uki_error })
-				= (combineTypeProperties type_props other_type_props, conds_as)
-		where
-			is_type_var {at_type = TV _}
-				= True
-			is_type_var _
-				= False
-			
-		anal_types_of_type_cons modules form_tvs [] _ conds_as
-			= (cIsHyperStrict, conds_as)
-		anal_types_of_type_cons modules form_tvs [type : types] [tk : tks] conds_as
-			# (type_kind, type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs type conds_as
-			  {uki_kind_heap, uki_error} = unifyKinds type_kind (kindToKindInfo tk) {uki_kind_heap = as_kind_heap, uki_error = as_error}
-			  as = { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
-			  (other_type_props, conds_as) =  anal_types_of_type_cons modules form_tvs types tks (conds, as)
-			= (combineTypeProperties type_props other_type_props, conds_as)
-		anal_types_of_type_cons modules form_tvs types tks conds_as
-			= abort ("anal_types_of_type_cons (analtypes.icl)" ---> (types, tks))
-		
+		= analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
+	analTypes has_root_attr modules form_tvs type=:(TAS {type_name,type_index={glob_module,glob_object},type_arity} types _) (conds, as)
+		= analTypes_for_TA type_name glob_module glob_object type_arity types has_root_attr modules form_tvs conds as
 	analTypes has_root_attr modules form_tvs (arg_type --> res_type) conds_as
 		# (arg_kind, arg_type_props, conds_as) = analTypes has_root_attr modules form_tvs arg_type conds_as
 		  (res_kind, res_type_props, (conds, as=:{as_kind_heap,as_error})) = analTypes has_root_attr modules form_tvs res_type conds_as
@@ -475,7 +486,7 @@ cDummyBool :== False
 analTypesOfConstructor modules cons_defs [{ds_index}:conses] (conds, as=:{as_type_var_heap,as_kind_heap})
 	# {cons_exi_vars,cons_type} = cons_defs.[ds_index ]
 	  (coercible, as_type_var_heap, as_kind_heap) = new_local_kind_variables cons_exi_vars (as_type_var_heap, as_kind_heap)
-	  (cons_properties, conds_as) = anal_types_of_cons modules cons_type.st_args
+	  (cons_properties, conds_as) = anal_types_of_cons modules cons_type.st_args cons_type.st_args_strictness 0
 			(conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap })
 	  (other_properties, conds_as) = analTypesOfConstructor modules cons_defs conses conds_as
 	  properties = combineTypeProperties cons_properties other_properties
@@ -494,22 +505,16 @@ where
 		is_not_a_variable (TA_RootVar var)	= False
 		is_not_a_variable attr				= True
 			
-	anal_types_of_cons modules [] conds_as
+	anal_types_of_cons modules [] args_strictness strictness_index conds_as
 		= (cIsHyperStrict, conds_as)
-	anal_types_of_cons modules [type : types] conds_as
-		# (other_type_props, conds_as) = anal_types_of_cons modules types conds_as
+	anal_types_of_cons modules [type : types] args_strictness strictness_index conds_as
+		# (other_type_props, conds_as) = anal_types_of_cons modules types args_strictness (strictness_index+1) conds_as
 		  (type_kind, cv_props, (conds, as=:{as_kind_heap, as_error})) = analTypes cDummyBool modules [] type conds_as
 		  {uki_kind_heap, uki_error} = unifyKinds type_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
-		  cons_props = if	(type_is_strict type.at_annotation)
+		  cons_props = if (arg_is_strict strictness_index args_strictness)
 							(combineTypeProperties cv_props other_type_props)
 							(combineCoercionProperties cv_props other_type_props)
 		= (cons_props, (conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
-
-	where 
-		type_is_strict AN_Strict
-			= True
-		type_is_strict annot
-			= False
 
 analTypesOfConstructor _ _ [] conds_as
 	= (cIsHyperStrict, conds_as)
@@ -957,25 +962,31 @@ instance isUnique AType
 instance isUnique Type
   where
 	isUnique common_defs (TA {type_index={glob_module, glob_object}} type_args) (td_infos, th_vars)
-		# type_def
-				= common_defs.[glob_module].com_type_defs.[glob_object]
-		| isUniqueAttr type_def.td_attribute
-			= (True, (td_infos, th_vars))
-		# (prop_classification, th_vars, td_infos)
-				= propClassification glob_object glob_module (repeatn type_def.td_arity 0)
-						common_defs th_vars td_infos
-		  (uniqueness_of_args, (td_infos, th_vars))
-		  		= mapSt (isUnique common_defs) type_args (td_infos, th_vars)
-		= (unique_if_arg_is_unique_and_propagating uniqueness_of_args prop_classification, (td_infos, th_vars))
-	  where
-		unique_if_arg_is_unique_and_propagating [] _
-			= False
-		unique_if_arg_is_unique_and_propagating [is_unique_argument:rest] prop_classification
-			| isOdd prop_classification /*MW:cool!*/ && is_unique_argument
-				= True
-			= unique_if_arg_is_unique_and_propagating rest (prop_classification>>1)
+		= isUnique_for_TA glob_module glob_object type_args common_defs td_infos th_vars
+	isUnique common_defs (TAS {type_index={glob_module, glob_object}} type_args _) (td_infos, th_vars)
+		= isUnique_for_TA glob_module glob_object type_args common_defs td_infos th_vars
 	isUnique common_defs _ state
 		= (False, state)
+
+isUnique_for_TA :: Int Int [AType] !{# CommonDefs} !*TypeDefInfos !*TypeVarHeap -> (!Bool, !(!*TypeDefInfos, !*TypeVarHeap))
+isUnique_for_TA glob_module glob_object type_args common_defs td_infos th_vars
+	# type_def
+			= common_defs.[glob_module].com_type_defs.[glob_object]
+	| isUniqueAttr type_def.td_attribute
+		= (True, (td_infos, th_vars))
+	# (prop_classification, th_vars, td_infos)
+			= propClassification glob_object glob_module (repeatn type_def.td_arity 0)
+					common_defs th_vars td_infos
+	  (uniqueness_of_args, (td_infos, th_vars))
+	  		= mapSt (isUnique common_defs) type_args (td_infos, th_vars)
+	= (unique_if_arg_is_unique_and_propagating uniqueness_of_args prop_classification, (td_infos, th_vars))
+  where
+	unique_if_arg_is_unique_and_propagating [] _
+		= False
+	unique_if_arg_is_unique_and_propagating [is_unique_argument:rest] prop_classification
+		| isOdd prop_classification && is_unique_argument
+			= True
+		= unique_if_arg_is_unique_and_propagating rest (prop_classification>>1)
 
 isUniqueAttr TA_Unique = True
 isUniqueAttr _ = False
