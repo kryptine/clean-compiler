@@ -75,7 +75,7 @@ instance == FrontEndPhase where
 frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface upToPhase mod_ident search_paths predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
-		= wantModule cWantIclFile mod_ident (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
+		= wantModule cWantIclFile mod_ident NoPos (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files
 	| not ok
 		= (predef_symbols, hash_table, files, error, io, out, No)
 	# (ok, mod, global_fun_range, mod_functions, dcl_mod, predef_mod, modules, hash_table, error, predef_symbols, files)

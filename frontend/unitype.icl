@@ -6,9 +6,11 @@ import syntax, analunitypes, type, utilities, checktypes, RWSDebug
 
 import cheat
 
+/* MW3 moved to syntax:
 ::	CoercionPosition =
 	{	cp_expression	:: !Expression
 	}
+*/
 
 AttrUni			:== 0
 AttrMulti		:== 1
@@ -61,7 +63,10 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 			  (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
 
 			  format = { form_properties = cMarkAttribute, form_attr_position = Yes (reverse positions, copy_crc_coercions) }			
-			  ea_file = error.ea_file <<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) <<< '\n'
+// MW3 was:			  ea_file = error.ea_file <<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) <<< '\n'
+			  ea_file = error.ea_file <<< optionalFrontPosition position 
+			  					<<< " attribute at indicated position could not be coerced " <:: (format, exp_off_type) 
+			  					<<< position <<< '\n'
 
 			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, { error & ea_file = ea_file })
 				
@@ -76,6 +81,7 @@ determineAttributeCoercions off_type dem_type coercible position subst coercions
 				-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
 				-> undef
 */
+
 
 NotChecked :== -1	
 DummyAttrNumber :== -1
@@ -720,10 +726,15 @@ where
 	(<<<) file CT_NonUnique = file <<< "CT_NonUnique"
 	(<<<) file CT_Empty = file <<< "##"
 
+/* MW3 was:
 instance <<< CoercionPosition
 where
 	(<<<) file {cp_expression} = show_expression file cp_expression
-
+*/
+instance <<< CoercionPosition
+where
+	(<<<) file (CP_FunArg fun_ident arg_nr) = file
+	(<<<) file (CP_Expression expression) = show_expression (file <<< " near ") expression
 	where
 		show_expression file (Var {var_name})
 			= file <<< var_name

@@ -65,3 +65,5 @@ class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a
 
 instance <<< TempSymbolType
+
+optionalFrontPosition :: !CoercionPosition -> String // MW3++

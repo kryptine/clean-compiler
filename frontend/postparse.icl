@@ -404,10 +404,12 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
 	,	tq_success :: ParsedExpr
 	,	tq_end :: ParsedExpr
 	,	tq_fun_id :: Ident
+	,	tq_fun_pos :: !Position // MW3++
 	}
 
 transformQualifier :: Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
-transformQualifier {qual_generators, qual_filter, qual_position} ca
+//MW3 was:transformQualifier {qual_generators, qual_filter, qual_position} ca
+transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators, ca)
 		=	mapSt transformGenerator qual_generators ca
 	# (qual_fun_id, ca)
@@ -420,11 +422,13 @@ transformQualifier {qual_generators, qual_filter, qual_position} ca
 		,	tq_success = PE_Empty
 		,	tq_end = PE_Empty
 		,	tq_fun_id = qual_fun_id
+		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
 		}, ca)
 
 // =array&callArray are misnomers (can also be records)
 transformUpdateQualifier :: ParsedExpr ParsedExpr Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
-transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position} ca
+//MW3 was:transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position} ca
+transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators, ca)
 		=	mapSt transformGenerator qual_generators ca
 	# (qual_fun_id, ca)
@@ -437,6 +441,7 @@ transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_pos
 		,	tq_success = PE_Empty
 		,	tq_end = PE_Empty
 		,	tq_fun_id = qual_fun_id
+		,	tq_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
 		}, ca)
 
 transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
@@ -468,7 +473,8 @@ transformComprehension gen_kind expr qualifiers ca
 		  (create_array, ca)
 		  	=	get_predef_id PD__CreateArrayFun ca
 		  (length, ca)
-		  	=	computeLength qualifiers qual_position ca
+//MW3 was:		  	=	computeLength qualifiers qual_position ca
+		  	=	computeLength qualifiers qual_position hd_qualifier.qual_filename ca
 		  new_array
 		  	=	PE_List [PE_Ident create_array, length]
 		  update
@@ -477,8 +483,10 @@ transformComprehension gen_kind expr qualifiers ca
 		  	=	[{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] } : tl_qualifiers]
 		=	transformUpdateComprehension new_array update (PE_Ident c_a) qualifiers ca
 
-computeLength :: [Qualifier] LineAndColumn *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-computeLength qualifiers qual_position ca
+//MW3 was:computeLength :: [Qualifier] LineAndColumn *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+//MW3 was:computeLength qualifiers qual_position ca
+computeLength :: [Qualifier] LineAndColumn FileName *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+computeLength qualifiers qual_position qual_filename ca
 	# (fun_ident, ca)
 		=	prefixAndPositionToIdent "c_l" qual_position ca
 	  (tail_ident, ca)
@@ -491,10 +499,19 @@ computeLength qualifiers qual_position ca
 	  	=	makeConsExpression PE_WildCard (PE_Ident tail_ident) ca
 	  (inc, ca)
 		=	get_predef_id PD_IncFun ca
+	  new_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
+/* MW3 was
 	  parsedFunction1
 		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] (exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
 	  parsedFunction2
 		=	MakeNewParsedDef fun_ident [PE_WildCard, PE_Ident i_ident] (exprToRhs (PE_Ident i_ident))
+*/
+	  parsedFunction1
+		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] 
+						(exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
+						new_fun_pos
+	  parsedFunction2
+		=	MakeNewParsedDef fun_ident [PE_WildCard, PE_Ident i_ident] (exprToRhs (PE_Ident i_ident)) new_fun_pos
 	= (PE_Let cIsStrict (LocalParsedDefs [parsedFunction1, parsedFunction2])
 				(PE_List [PE_Ident fun_ident, list, PE_Basic (BVI "0")]), ca)
 
@@ -524,13 +541,19 @@ transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca
 makeComprehensions :: [TransformedQualifier] ParsedExpr (Optional ParsedExpr) *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 makeComprehensions [] success _ ca
 	=	(success, ca)
-makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id} : qualifiers] success threading ca
+// MW3 was:makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id} : qualifiers] success threading ca
+makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
 	# (success, ca)
 		=	makeComprehensions qualifiers success threading ca
-  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id ca
+// MW3 was:  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id ca
+  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id tq_fun_pos ca
 	where
-		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr (Optional ParsedExpr) ParsedExpr Ident *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident ca
+// MW3 was:		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr (Optional ParsedExpr) ParsedExpr Ident *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+// MW3 was:		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident ca
+		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr
+									(Optional ParsedExpr) ParsedExpr Ident Position *CollectAdmin 
+								 -> (ParsedExpr, *CollectAdmin)
+		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident fun_pos ca
 			# continue
 				=	PE_List (thread (PE_Ident fun_ident) threading [generator.tg_rhs_continuation \\ generator <- generators])
 				with
@@ -543,7 +566,8 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 			  rhs
 			  	=	build_rhs generators success optional_filter failure end
 			  parsed_def
-			  	=	MakeNewParsedDef fun_ident lhsArgs rhs 
+// MW3 was:			  	=	MakeNewParsedDef fun_ident lhsArgs rhs 
+			  	=	MakeNewParsedDef fun_ident lhsArgs rhs fun_pos
 			= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) call_comprehension, ca)
 
 		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
@@ -627,12 +651,14 @@ transformArrayDenot exprs pi
 scanModules :: [ParsedImport] [ScannedModule] SearchPaths *Files *CollectAdmin -> (Bool, [ScannedModule], *Files, *CollectAdmin)
 scanModules [] parsed_modules searchPaths files ca
 	= (True, parsed_modules, files, ca)
-scanModules [{import_module,import_symbols} : mods] parsed_modules searchPaths files ca
+// MW3 was:scanModules [{import_module,import_symbols} : mods] parsed_modules searchPaths files ca
+scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules searchPaths files ca
 	# (found, mod) = try_to_find import_module parsed_modules
 	| found
 		= scanModules mods parsed_modules searchPaths files ca
 		# (succ, parsed_modules, files, ca)
-				= parseAndScanDclModule import_module parsed_modules searchPaths files ca
+// MW3 was:				= parseAndScanDclModule import_module parsed_modules searchPaths files ca
+				= parseAndScanDclModule import_module import_file_position parsed_modules searchPaths files ca
 		  (mods_succ, parsed_modules, files, ca)
 		  		= scanModules mods parsed_modules searchPaths files ca
 		= (succ && mods_succ, parsed_modules, files, ca)
@@ -649,15 +675,18 @@ MakeEmptyModule name :==  { mod_name = name, mod_type = MK_None, mod_imports = [
 	mod_defs = {	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macros = { ir_from = 0, ir_to = 0 },
 					def_members = [], def_funtypes = [], def_instances = [] } }
 
-parseAndScanDclModule :: !Ident ![ScannedModule] !SearchPaths !*Files !*CollectAdmin
+//MW3 was:parseAndScanDclModule :: !Ident ![ScannedModule] !SearchPaths !*Files !*CollectAdmin
+parseAndScanDclModule :: !Ident !Position ![ScannedModule] !SearchPaths !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule], !*Files, !*CollectAdmin)
-parseAndScanDclModule dcl_module parsed_modules searchPaths files ca
+parseAndScanDclModule dcl_module import_file_position parsed_modules searchPaths files ca
 	# {ca_error, ca_fun_count, ca_rev_fun_defs, ca_predefs, ca_u_predefs, ca_hash_table}
 		= ca
 	  hash_table = ca_hash_table
 	  pea_file = ca_error.pea_file
 	  predefs = ca_u_predefs
-	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module hash_table pea_file searchPaths predefs files
+// MW3 was:	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module hash_table pea_file searchPaths predefs files
+	# (parse_ok, mod, hash_table, err_file, predefs, files)
+			= wantModule cWantDclFile dcl_module import_file_position hash_table pea_file searchPaths predefs files
 	# ca = {ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}, ca_u_predefs=predefs, ca_fun_count=ca_fun_count, ca_rev_fun_defs=ca_rev_fun_defs, ca_predefs=ca_predefs}
 	| parse_ok
 		= scan_dcl_module mod parsed_modules searchPaths files ca
@@ -722,7 +751,7 @@ where
 	scan_dcl_module mod_name MK_None searchPaths files ca
 		= (True, [MakeEmptyModule mod_name], files, ca)
 	scan_dcl_module mod_name kind searchPaths files ca
-		= parseAndScanDclModule mod_name [] searchPaths files ca
+		= parseAndScanDclModule mod_name NoPos [] searchPaths files ca
 
 instance collectFunctions (ParsedInstance a) | collectFunctions a where
 	collectFunctions inst=:{pi_members} ca
@@ -743,9 +772,14 @@ MakeNewFunction name arity body kind prio opt_type pos
 	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_index = NoIndex, fun_info = EmptyFunInfo }
 
+/* MW3 was
 // +++ position
 MakeNewParsedDef ident args rhs 
 	:==	PD_Function NoPos ident False args rhs (FK_Function cNameLocationDependent)
+*/
+// +++ position <------------ AHAAAAAAAAAAA !!!!!!!!!!!!!
+MakeNewParsedDef ident args rhs pos
+	:==	PD_Function pos ident False args rhs (FK_Function cNameLocationDependent)
 
 collectFunctionBodies :: !Ident !Int !Priority !FunKind ![ParsedDefinition] !*CollectAdmin
 	-> (![ParsedBody], !FunKind, ![ParsedDefinition], !*CollectAdmin)

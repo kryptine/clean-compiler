@@ -244,14 +244,17 @@ isIclContext context	:== not (isDclContext context)
 cWantIclFile :== True	
 cWantDclFile :== False	
 
-wantModule :: !Bool !Ident !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+// MW3 was:wantModule :: !Bool !Ident !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
+wantModule :: !Bool !Ident !Position !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
 	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
-wantModule iclmodule file_id=:{id_name} hash_table error searchPaths pre_def_symbols files
+wantModule iclmodule file_id=:{id_name} import_file_position hash_table error searchPaths pre_def_symbols files
 	# file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
 	= case openScanner file_name searchPaths files of
 		(Yes scanState, files) -> initModule file_name scanState hash_table error pre_def_symbols files
 		(No       , files) -> let mod = { mod_name = file_id, mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
-							  (False, mod, hash_table, error <<< "Could not open: " <<< file_name <<< "\n", pre_def_symbols, files)
+// MW3 was:							  (False, mod, hash_table, error <<< "Could not open: " <<< file_name <<< "\n", pre_def_symbols, files)
+							  (False, mod, hash_table, error <<< import_file_position <<< ":could not open " <<< file_name <<< "\n",
+								pre_def_symbols, files)
 where
 	initModule :: String ScanState !*HashTable !*File !*PredefinedSymbols *Files
 				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
@@ -779,7 +782,7 @@ wantImports pState
 	# (names, pState) = wantIdents FunctionContext IC_Module pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  pState = wantEndOfDefinition "imports" pState
-	= (map (\name -> { import_module = name, import_symbols = [], import_file_position = (file_name, line_nr)}) names, pState)
+	= (map (\name -> { import_module = name, import_symbols = [], import_file_position = LinePos file_name line_nr}) names, pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
@@ -789,7 +792,7 @@ wantFromImports pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  (import_symbols, pState) = wantSequence CommaToken GeneralContext pState
 	  pState = wantEndOfDefinition "from imports" pState
-	= ( { import_module = mod_ident, import_symbols = import_symbols, import_file_position = (file_name, line_nr) }, pState)
+	= ( { import_module = mod_ident, import_symbols = import_symbols, import_file_position = LinePos file_name line_nr }, pState)
 
 instance want ImportedObject where
 	want pState
@@ -1952,7 +1955,8 @@ trySimpleExpressionT token is_pattern pState
 
 trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
-	# (lam_ident, pState)	= internalIdent "\\" pState
+// MW3 was:	# (lam_ident, pState)	= internalIdent "\\" pState
+	# (lam_ident, pState)	= internalIdent (toString backslash) pState
 	  (lam_args, pState) 	= wantList "arguments" trySimpleLhsExpression pState
 	  pState				= want_lambda_sep pState
 	  (exp, pState)			= wantExpression cIsNotAPattern pState
@@ -2101,17 +2105,22 @@ where
 	want_qualifier :: !ParseState -> (!Qualifier, !ParseState)
 	want_qualifier pState
 		# (qual_position, pState) = getPosition pState
+		  (qual_filename, pState) = accScanState getFilename pState //MW3++
 		  (lhs_expr, pState) = wantExpression cIsAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == LeftArrowToken
-			= want_generators cIsListGenerator (toLineAndColumn qual_position) lhs_expr pState
+//MW3 was:			= want_generators cIsListGenerator (toLineAndColumn qual_position) lhs_expr pState
+			= want_generators cIsListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 		| token == LeftArrowColonToken
-			= want_generators cIsArrayGenerator (toLineAndColumn qual_position) lhs_expr pState
-			= ({qual_generators = [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}},
+//MW3 was:			= want_generators cIsArrayGenerator (toLineAndColumn qual_position) lhs_expr pState
+			= want_generators cIsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+			= ({qual_generators = [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)
 
-	want_generators :: !GeneratorKind !LineAndColumn !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
-	want_generators gen_kind qual_position pattern_exp pState
+//MW3 was:	want_generators :: !GeneratorKind !LineAndColumn !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
+//MW3 was:	want_generators gen_kind qual_position pattern_exp pState
+	want_generators :: !GeneratorKind !LineAndColumn !FileName !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
+	want_generators gen_kind qual_position qual_filename pattern_exp pState
 		# (gen_position, pState)			= getPosition pState
 		# (gen_expr, pState) = wantExpression cIsNotAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
@@ -2120,11 +2129,16 @@ where
 			}
 		| token == BarToken
 			# (filter_expr, pState) = wantExpression cIsNotAPattern pState
-			= ({qual_generators = [generator], qual_filter = Yes filter_expr, qual_position = qual_position }, pState)
+			= ( { qual_generators = [generator], qual_filter = Yes filter_expr
+				, qual_position = qual_position, qual_filename = qual_filename } //MW3 added qual_filename field
+			  , pState
+			  )
 		| token == AndToken
 			# (qualifier, pState) = want_qualifier pState
 			= ({qualifier & qual_generators = [ generator : qualifier.qual_generators] }, pState)
-		= ({qual_generators = [generator], qual_filter = No, qual_position = qual_position}, tokenBack pState)
+		= ( {qual_generators = [generator], qual_filter = No, qual_position = qual_position, qual_filename = qual_filename} //MW3 added qual_filename field
+		  ,	tokenBack pState
+		  )
 
 /**
 	Case Expressions

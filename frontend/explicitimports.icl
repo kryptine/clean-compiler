@@ -30,6 +30,7 @@ do_temporary_import_solution_XXX :== temporary_import_solution_XXX True False
 
 ::	OptimizeInfo	:==	Optional Index
 
+// XXX change !(!FileName,!LineNr) into Position
 possibly_filter_decls :: ![ImportDeclaration] ![(!Index,!Declarations)] !(!FileName,!LineNr) !*{#DclModule} !*CheckState 
 						-> (![(!Index,!Declarations)],!.{#DclModule},!.CheckState)
 possibly_filter_decls [] decls_of_imported_module	_ modules cs // implicit import can't go wrong

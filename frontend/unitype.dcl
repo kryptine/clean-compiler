@@ -3,9 +3,11 @@ definition module unitype
 import StdEnv
 import syntax, analunitypes
 
+/* MW3 moved to syntax:
 ::	CoercionPosition =
 	{	cp_expression	:: !Expression
 	}
+*/
 
 AttrUni			:== 0
 AttrMulti		:== 1

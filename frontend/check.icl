@@ -1072,7 +1072,7 @@ where
 	check_id_expression :: !SymbolTableEntry !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 		-> (!Expression, ![FreeVar], !*ExpressionState, !u:ExpressionInfo, !*CheckState)
 	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error}
-		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id " undefined" cs_error })
+		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })
 	check_id_expression {ste_kind = STE_Variable info_ptr,ste_def_level} is_expr_list free_vars id e_input=:{ei_fun_level} e_state=:{es_expr_heap} e_info cs
 		| ste_def_level < ei_fun_level
 			# free_var = { fv_def_level = ste_def_level, fv_name = id, fv_info_ptr = info_ptr, fv_count = 0 }
@@ -2277,9 +2277,8 @@ checkFunction :: !Index !Index !Level !*{#FunDef} !*ExpressionInfo !*Heaps !*Che
 checkFunction mod_index fun_index def_level fun_defs
 			e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps} cs=:{cs_error}
 	# (fun_def,fun_defs) = fun_defs![fun_index]
-	# {fun_symb,fun_pos,fun_body,fun_type} = fun_def
-	  position = newPosition fun_symb fun_pos
-	  cs = { cs & cs_error = pushErrorAdmin position cs_error }
+	# {fun_symb,fun_pos,fun_body,fun_type,fun_kind} = fun_def
+	  cs = { cs & cs_error = push_error_admin_beautifully fun_symb fun_pos fun_kind cs_error }
 	  (fun_type, ef_type_defs, ef_class_defs, ef_modules, hp_var_heap, hp_type_heaps, cs)
 			= check_function_type fun_type mod_index ef_type_defs ef_class_defs ef_modules hp_var_heap hp_type_heaps cs
 	  e_info  = { e_info & ef_type_defs = ef_type_defs, ef_class_defs = ef_class_defs, ef_modules = ef_modules }
@@ -2325,7 +2324,13 @@ where
 	get_calls (STE_FunctionOrMacro [x:xs]) = (x,xs)
 	get_calls ste_kind = abort "get_calls (check.icl)" // <<- ste_kind
 
-			
+	push_error_admin_beautifully {id_name} fun_pos (FK_Function fun_name_is_location_dependent) cs_error
+		| fun_name_is_location_dependent && size id_name>0
+			# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
+			= pushErrorAdmin (newPosition { id_name=beautiful_name, id_info=nilPtr } fun_pos) cs_error
+	push_error_admin_beautifully fun_symb fun_pos _ cs_error
+		= pushErrorAdmin (newPosition fun_symb fun_pos) cs_error
+
 checkFunctions :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState)
 checkFunctions mod_index level from_index to_index fun_defs e_info heaps cs
 	| from_index == to_index
@@ -2437,6 +2442,7 @@ where
 		# ({fun_symb, fun_pos}, fun_defs) = fun_defs![dcl_index]
 		= ([{ dcl_ident = fun_symb, dcl_pos = fun_pos, dcl_kind = STE_FunctionOrMacro [], dcl_index = dcl_index } : defs], fun_defs)
 
+combineDclAndIclModule :: !ModuleKind !*{#DclModule} ![Declaration] !(CollectedDefinitions b c) !*{#Int} !*CheckState -> (!*{#DclModule},![Declaration],!CollectedDefinitions b c,!*{#Int},!*CheckState);
 combineDclAndIclModule MK_Main modules icl_decl_symbols icl_definitions icl_sizes cs
 	= (modules, icl_decl_symbols, icl_definitions, icl_sizes, cs)
 combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
@@ -2446,9 +2452,9 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 
 	  (moved_dcl_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 			= foldSt (add_to_conversion_table dcl_macros.ir_from) dcls_local ([], { createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
+
 	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, cs)
 			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], cs)
-
 	  cs_symbol_table = removeDeclarationsFromSymbolTable icl_decl_symbols cGlobalScope cs.cs_symbol_table
 
 	=	( { modules & [cIclModIndex] = { dcl_mod & dcl_conversions = Yes conversion_table }}
@@ -2463,7 +2469,6 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		, icl_sizes
 		, { cs & cs_symbol_table = cs_symbol_table }
 		)
-
 where
 	add_to_conversion_table first_macro_index decl=:{dcl_ident=dcl_ident=:{id_info},dcl_kind,dcl_index,dcl_pos}
 			(moved_dcl_defs, conversion_table, icl_sizes, icl_defs, cs)
@@ -3122,11 +3127,11 @@ checkDclModule is_on_cycle {mod_name,mod_imports,mod_defs} mod_index modules icl
 	  			 dcl_class_specials = { ir_from = first_special_class_index, ir_to = last_special_class_index }}
 	= ({ modules & [ mod_index ] = dcl_mod }, icl_functions, heaps, { cs & cs_symbol_table = cs_symbol_table })
 where
-	collect_imported_symbols [{import_module={id_info},import_symbols,import_file_position} : mods ] all_decls modules cs=:{cs_symbol_table}
+	collect_imported_symbols [{import_module={id_info},import_symbols,import_file_position=LinePos filename line_nr} : mods ] all_decls modules cs=:{cs_symbol_table}
 		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 		# (decls_of_imported_module, modules, cs) = collect_declarations_of_module id_info entry [] modules { cs & cs_symbol_table = cs_symbol_table}
 		  (imported_decls, modules, cs)	= possibly_filter_decls 
-		  										import_symbols decls_of_imported_module import_file_position modules cs
+		  										import_symbols decls_of_imported_module (filename, line_nr) modules cs
 		= collect_imported_symbols mods (imported_decls++all_decls) modules cs
 	collect_imported_symbols [] all_decls modules cs
 		= (all_decls, modules, cs)
@@ -3244,10 +3249,10 @@ NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	
 addImportsToSymbolTable :: ![ParsedImport] ![(!Declaration, !LineNr)] !*{# DclModule} !*CheckState 
 						-> (![(!Declaration, !LineNr)], !*{# DclModule}, !*CheckState)
-addImportsToSymbolTable [{import_module={id_info},import_symbols, import_file_position} : mods ]  explicit_akku modules cs=:{cs_symbol_table}
+addImportsToSymbolTable [{import_module={id_info},import_symbols, import_file_position=LinePos filename line_nr} : mods ] explicit_akku modules cs=:{cs_symbol_table}
 	# ({ste_index}, cs_symbol_table)						= readPtr id_info cs_symbol_table
 	# ({dcl_declared=decls_of_imported_module}, modules)	= modules![ste_index]
-	  (imported_decls, modules, cs)	= possibly_filter_decls import_symbols [(ste_index, decls_of_imported_module)] import_file_position
+	  (imported_decls, modules, cs)	= possibly_filter_decls import_symbols [(ste_index, decls_of_imported_module)] (filename, line_nr)
 	  		modules { cs & cs_symbol_table = cs_symbol_table }
 	| isEmpty imported_decls
 		= addImportsToSymbolTable mods explicit_akku modules cs

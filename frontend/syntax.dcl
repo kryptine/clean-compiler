@@ -258,7 +258,7 @@ cNameLocationDependent :== True
 ::	Import from_symbol =
 	{	import_module		:: !Ident
 	,	import_symbols		:: ![from_symbol]
-	,	import_file_position:: !(!FileName, !Int)	// for error messages
+	,	import_file_position:: !Position	// for error messages
 	}
 
 instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
@@ -443,7 +443,7 @@ cIsALocalVar	:== False
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro
 
-::	VarInfo  =	VI_Empty | VI_Type !AType | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
+::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
@@ -943,6 +943,7 @@ cIsArrayGenerator	:== False
 	{	qual_generators	:: ![Generator]
 	,	qual_filter		:: !Optional ParsedExpr
 	,	qual_position	:: !LineAndColumn
+	,	qual_filename	:: !FileName
 	}
 
 ::	Sequence	= SQ_FromThen ParsedExpr ParsedExpr
@@ -1112,6 +1113,10 @@ cIsNotStrict	:== False
 					| PreDefPos Ident
 					| NoPos
 
+::	CoercionPosition
+	=	CP_Expression !Expression
+	|	CP_FunArg !Ident !Int // Function symbol, argument position (>=1)
+
 ::	IdentPos =
 	{	ip_ident	:: !Ident
 	,	ip_line		:: !Int
@@ -1202,3 +1207,4 @@ MakeDefinedSymbol ident index arity :== { ds_ident = ident, ds_arity = arity, ds
 MakeNewFunctionType name arity prio type pos specials var_ptr
 	:== { ft_symb = name, ft_arity = arity, ft_priority = prio, ft_type = type, ft_pos = pos, ft_specials = specials, ft_type_ptr = var_ptr  }
 
+backslash :== '\\'

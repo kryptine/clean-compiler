@@ -493,7 +493,8 @@ where
 			= foldSt initial_occurrence vars (subst, type_def_infos, var_heap, expr_heap)
 		where
 			initial_occurrence {fv_name,fv_info_ptr} (subst, type_def_infos, var_heap, expr_heap) 
-				# (VI_Type {at_type,at_attribute}, var_heap) = readPtr fv_info_ptr var_heap
+// MW3 was:				# (VI_Type {at_type,at_attribute}, var_heap) = readPtr fv_info_ptr var_heap
+				# (VI_Type {at_type,at_attribute} _, var_heap) = readPtr fv_info_ptr var_heap
 				= case at_type of
 					TempV tv_number
 						#! is_oberving = has_observing_type type_def_infos subst.[tv_number]
@@ -532,7 +533,8 @@ where
 						| succ
 //								 ---> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr)
 							-> (coercion_env, expr_heap, error)
-							-> (coercion_env, expr_heap, uniquenessError { cp_expression = FreeVar free_var} " demanded attribute cannot be offered by shared object" error)
+// MW3 was:							-> (coercion_env, expr_heap, uniquenessError { cp_expression = FreeVar free_var} " demanded attribute cannot be offered by shared object" error)
+							-> (coercion_env, expr_heap, uniquenessError (CP_Expression (FreeVar free_var)) " demanded attribute cannot be offered by shared object" error)
 					_
 						-> abort ("make_shared_occurrence_non_unique" ---> ((free_var, var_expr_ptr) <<- expr_info))
 		make_selection_non_unique fv {su_multiply} cee

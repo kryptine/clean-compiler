@@ -1006,3 +1006,10 @@ where
 			= file <<< tst_result <<< " | " <<< tst_context <<< " [" <<< tst_attr_env <<< ']'
 			= file <<< tst_args <<< " -> " <<< tst_result <<< " | " <<< tst_context <<< " [" <<< tst_attr_env <<< ']'
 
+// MW3..
+optionalFrontPosition :: !CoercionPosition -> String
+optionalFrontPosition (CP_Expression _)
+	= ""
+optionalFrontPosition (CP_FunArg {id_name} arg_nr)
+	= "\"argument "+++toString arg_nr+++" of "+++id_name+++"\""
+// ..MW3
