@@ -1197,13 +1197,13 @@ where
 						# (type_var_heap, var_heap, error)
 								= bind_type_vars_to_type_codes symb_name dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_var_heap, var_heap)
-						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression symb_name (add_universal_vars_to_type dt_uni_vars dt_type)
+						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  				({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 					EI_Empty
 						# (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_code_info.tci_type_var_heap, var_heap)
-						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression symb_name (add_universal_vars_to_type dt_uni_vars dt_type)
+						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  			({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
@@ -1226,12 +1226,12 @@ where
 								= bind_type_vars_to_type_codes symb_name dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_var_heap
-						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression symb_name (add_universal_vars_to_type dt_uni_vars dt_type) ({ type_code_info & tci_type_var_heap = type_var_heap },var_heap, error)
+						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) ({ type_code_info & tci_type_var_heap = type_var_heap },var_heap, error)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr), type_pattern_vars, var_heap, error)
 					EI_Empty
 						# (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_code_info.tci_type_var_heap
-						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression symb_name (add_universal_vars_to_type dt_uni_vars dt_type) ({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
+						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) ({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr), type_pattern_vars, var_heap, error)
 	where
 		bind_type_vars_to_type_codes symb_name type_vars type_codes type_var_heap var_heap error
@@ -1328,10 +1328,10 @@ fatal :: {#Char} {#Char} -> .a
 fatal function_name message
 	=	abort ("overloading, " +++ function_name +++ ": " +++ message)
 
-class toTypeCodeExpression type :: !Ident type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
+class toTypeCodeExpression type :: type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
 
 instance toTypeCodeExpression Type where
-	toTypeCodeExpression symb_name type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules,tci_common_defs},var_heap,error)
+	toTypeCodeExpression type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules,tci_common_defs},var_heap,error)
 // RWS ...
 		# type_heaps
 			=	{th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
@@ -1340,42 +1340,42 @@ instance toTypeCodeExpression Type where
 		# tci
 			=	{tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
 		| expanded
-			=	toTypeCodeExpression symb_name type (tci,var_heap,error)
+			=	toTypeCodeExpression type (tci,var_heap,error)
 // ... RWS
 		# type_constructor
 			=	toTypeCodeConstructor type_index tci_common_defs
 		# (inst_index, (tci_next_index, tci_instances))
 		  	=	addGlobalTCInstance type_constructor (tci_next_index, tci_instances)
 		  (type_code_args, tci)
-		  	=	mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
+		  	=	mapSt (toTypeCodeExpression) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
 		= (TCE_Constructor inst_index type_constructor type_code_args, tci)
-	toTypeCodeExpression symb_name (TAS cons_id type_args _) state
-		=	toTypeCodeExpression symb_name (TA cons_id type_args) state
-	toTypeCodeExpression symb_name (TB basic_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
+	toTypeCodeExpression (TAS cons_id type_args _) state
+		=	toTypeCodeExpression (TA cons_id type_args) state
+	toTypeCodeExpression (TB basic_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
 		# (inst_index, (tci_next_index, tci_instances))
 		  		= addGlobalTCInstance (GTT_Basic basic_type) (tci_next_index, tci_instances)
 		= (TCE_Constructor inst_index (GTT_Basic basic_type) [], ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error))
-	toTypeCodeExpression symb_name (arg_type --> result_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
+	toTypeCodeExpression (arg_type --> result_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
 		# (inst_index, (tci_next_index, tci_instances))
 				= addGlobalTCInstance GTT_Function (tci_next_index, tci_instances)
-		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) [arg_type, result_type] ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
+		  (type_code_args, tci) = mapSt (toTypeCodeExpression) [arg_type, result_type] ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
 		= (TCE_Constructor inst_index GTT_Function type_code_args, tci)
-	toTypeCodeExpression symb_name (TV var) st
-		= toTypeCodeExpression symb_name var st
-	toTypeCodeExpression symb_name (TFA vars type) (tci=:{tci_type_var_heap}, var_heap, error)
+	toTypeCodeExpression (TV var) st
+		= toTypeCodeExpression var st
+	toTypeCodeExpression (TFA vars type) (tci=:{tci_type_var_heap}, var_heap, error)
 		# (new_vars, (tci_type_var_heap, var_heap)) = newTypeVariables vars (tci_type_var_heap, var_heap)
-		  (type_code, tci) = toTypeCodeExpression symb_name type ({tci & tci_type_var_heap = tci_type_var_heap}, var_heap, error)
+		  (type_code, tci) = toTypeCodeExpression type ({tci & tci_type_var_heap = tci_type_var_heap}, var_heap, error)
 		= (TCE_UniType new_vars type_code, tci)
-	toTypeCodeExpression symb_name (CV var :@: args) st
+	toTypeCodeExpression (CV var :@: args) st
 		# (type_code_var, st)
-			=	toTypeCodeExpression symb_name var st
+			=	toTypeCodeExpression var st
 		  (type_code_args, st)
-		  	=	mapSt (toTypeCodeExpression symb_name) args st
+		  	=	mapSt (toTypeCodeExpression) args st
 		= (foldl TCE_App type_code_var type_code_args, st)
 
 
 instance toTypeCodeExpression TypeVar where
-	toTypeCodeExpression symb_name {tv_name,tv_info_ptr} (tci=:{tci_type_var_heap}, var_heap, error)
+	toTypeCodeExpression {tv_name,tv_info_ptr} (tci=:{tci_type_var_heap}, var_heap, error)
 		# (type_info, tci_type_var_heap) = readPtr tv_info_ptr tci_type_var_heap
 		  tci = { tci & tci_type_var_heap = tci_type_var_heap }
 		= case type_info of
@@ -1386,7 +1386,7 @@ instance toTypeCodeExpression TypeVar where
 
 instance toTypeCodeExpression AType
 where
-	toTypeCodeExpression symb_ident {at_type} tci_and_var_heap_and_error = toTypeCodeExpression symb_ident at_type tci_and_var_heap_and_error
+	toTypeCodeExpression {at_type} tci_and_var_heap_and_error = toTypeCodeExpression at_type tci_and_var_heap_and_error
 
 ::	UpdateInfo =
 	{	ui_instance_calls	:: ![FunCall]
