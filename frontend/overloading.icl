@@ -1093,8 +1093,9 @@ where
 		| isEmpty fi_dynamics
 			= update_dynamics funs type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
 // MV ...			
-			# (_,module_id_app,predef_symbols)
-				= get_module_id_app predef_symbols
+//			# (_,module_id_app,predef_symbols)
+//				= get_module_id_app predef_symbols
+			# module_id_app = undef
 // ... MV
 		  	# (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 		  			= convertDynamicTypes fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
@@ -1107,6 +1108,7 @@ where
 		  	  	= updateExpression fi_group_index tb.tb_rhs
 					{ ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_fun_defs = fun_defs, ui_local_vars = fi_local_vars,
 					  ui_fun_env = fun_env, ui_var_heap = var_heap, ui_error = error,
+					  ui_has_type_codes = False,
 // MV ...
 					  ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n,x_internal_type_id = module_id_app,x_module_id = No}}
 // ... MV
@@ -1149,8 +1151,9 @@ where
 	remove_overloaded_function type_pattern_vars fun_index (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 		| ok
 	// MV ...			
-			# (_,module_id_app,predef_symbols)
-				= get_module_id_app predef_symbols
+//			# (_,module_id_app,predef_symbols)
+//				= get_module_id_app predef_symbols
+			# module_id_app = undef
 	// ... MV			
 			# (fun_def, fun_defs) = fun_defs![fun_index]  
 			  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
@@ -1165,18 +1168,27 @@ where
 			  		= updateExpression fun_info.fi_group_index tb_rhs {  ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
 			  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
 	// MV ...
+							ui_has_type_codes = False,
 						    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n,x_internal_type_id = module_id_app,x_module_id = No}}
 						    
-			#  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}})
+			#  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}})
 				= build_type_identification tb_rhs ui
 			#
 	// ... MV
 			  (tb_args, var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap) 
+			  fun_info = mark_type_codes ui_has_type_codes fun_info
 			  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
 			  						fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars } }
 			#! ok = ui_error.ea_ok
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+			where
+				// this is a ugly way to mark this function for conversion in convertDynamics
+				// FIXME: find a better way to mark the function
+				mark_type_codes True info=:{fi_dynamics=[]}
+					=	{info & fi_dynamics = [nilPtr]}
+				mark_type_codes _ info
+					=	info
 
 	determine_class_argument {tc_class, tc_var} (variables, var_heap)
 		# (var_info, var_heap) = readPtr tc_var var_heap
@@ -1375,6 +1387,7 @@ where
 	,	ui_fun_defs			:: !.{# FunDef}
 	,	ui_fun_env			:: !.{! FunctionType}
 	,	ui_error			:: !.ErrorAdmin
+	,	ui_has_type_codes	:: !Bool
 	,	ui_x 				:: !.UpdateInfoX
 	}
 
@@ -1533,9 +1546,7 @@ where
 		# (dyn_expr, ui) = updateExpression group_index dyn_expr ui
 		  (EI_TypeOfDynamic uni_vars type_code, ui_symbol_heap) = readPtr dyn_info_ptr ui.ui_symbol_heap
 		  ui = { ui & ui_symbol_heap = ui_symbol_heap }
-		| isEmpty uni_vars
-			= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = type_code }, ui)
-			= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = TCE_UniType uni_vars type_code }, ui)
+		= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = type_code }, ui)
 	updateExpression group_index (MatchExpr cons_symbol expr) ui
 		# (expr, ui) = updateExpression group_index expr ui
 		= (MatchExpr cons_symbol expr, ui)
@@ -1645,137 +1656,8 @@ where
 	adjustClassExpression symb_name (Selection opt_type expr selectors) ui
 		# (expr, ui) = adjustClassExpression symb_name expr ui
 		= (Selection opt_type expr selectors, ui)
-	adjustClassExpression symb_name (TypeCodeExpression type_code_expression) ui
-		= convertTypecode type_code_expression ui
-	where
-		convertTypecode TCE_Empty ui
-			= (EE, ui)
-		convertTypecode (TCE_Var var_info_ptr) ui
-			= (Var {var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, ui)
-		convertTypecode (TCE_TypeTerm var_info_ptr) ui=:{ui_var_heap,ui_error}
-			# (var_info_ptr, (ui_var_heap,ui_error)) = getTCDictionary symb_name var_info_ptr (ui_var_heap, ui_error)
-			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error})
-// MV ...
-		convertTypecode (TCE_Constructor index typecode_exprs) ui=:{ui_x={x_internal_type_id,x_type_code_info={tci_type_constructors_in_patterns} }}
-			# ui
-				= { ui & ui_x.x_type_code_info.tci_type_constructors_in_patterns = [index:tci_type_constructors_in_patterns] }
-			# (typecons_symb,ui) 		= getSymbol PD_TypeConsSymbol SK_Constructor ui
-			  (constructor,ui)			= get_constructor index ui
-			  (typecode_exprs,  ui)		= convertTypecodes typecode_exprs ui
-			# (ui_internal_type_id,ui)
-				= get_module_id ui
-			= (App {app_symb				= typecons_symb,
-					app_args 				= USE_DummyModuleName [constructor , ui_internal_type_id, typecode_exprs] [constructor , typecode_exprs] ,
-					app_info_ptr			= nilPtr}, ui)
-		where
-			get_module_id ui=:{ui_x={x_module_id=Yes {lb_dst}}}
-				= (Var (freeVarToVar lb_dst),ui)
-		
-			get_module_id ui
-				# (dst=:{var_info_ptr},ui)
-					= newVariable "module_id" VI_Empty ui
-				# dst_fv
-					= varToFreeVar dst 1
-
-				# let_bind
-					= { lb_src = x_internal_type_id
-					,	lb_dst = dst_fv
-					,	lb_position = NoPos
-					}
-				# ui
-					= { ui & 
-						ui_local_vars		= [ dst_fv : ui.ui_local_vars ]
-					,	ui_x 				= { ui.ui_x & x_module_id		= Yes let_bind}
-					}
-				= (Var dst,ui)
-						
-			freeVarToVar ::  FreeVar -> BoundVar
-			freeVarToVar {fv_name, fv_info_ptr}
-				= { var_name = fv_name,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-				
-			newVariable :: String !VarInfo !*UpdateInfo -> *(!BoundVar,!*UpdateInfo)
-			newVariable var_name var_info ui=:{ui_var_heap}
-				# (var_info_ptr, ui_var_heap) = newPtr var_info ui_var_heap
-				= ( { var_name = {id_name = var_name, id_info = nilPtr},  var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},
-				    { ui & ui_var_heap = ui_var_heap })	
-// ... MV					
-		convertTypecode (TCE_Selector selections var_info_ptr) ui
-			= (Selection NormalSelector (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ui)
-		convertTypecode (TCE_UniType uni_vars type_code) ui
-			# (let_binds, ui)		= createUniversalVariables uni_vars ui
-			  (let_expr, ui)		= convertTypecode type_code ui
-			  (let_info_ptr,ui) = let_ptr (length let_binds) ui
-			= ( Let {	let_strict_binds	= []
-					,	let_lazy_binds		= let_binds
-					,	let_expr			= let_expr
-					,	let_info_ptr		= let_info_ptr
-					,	let_expr_position	= NoPos
-					}, ui)
-		convertTypecodes [] ui
-			# (nil_symb, ui) = getSymbol PD_NilSymbol SK_Constructor ui
-			= (App {	app_symb		= nil_symb,
-						app_args 		= [],
-						app_info_ptr	= nilPtr}, ui)
-		convertTypecodes [typecode_expr : typecode_exprs] ui
-			# (cons_symb, ui) 	= getSymbol PD_ConsSymbol SK_Constructor ui
-			  (expr, ui) 		= convertTypecode typecode_expr ui
-			  (exprs, ui)		= convertTypecodes typecode_exprs ui
-			= (App {	app_symb		= cons_symb,
-						app_args 		= [expr , exprs],
-						app_info_ptr	= nilPtr}, ui)
-						
-		createUniversalVariables var_info_ptrs ui
-			= createVariables2 True var_info_ptrs ui
-
-		createVariables2 generate_universal_placeholders var_info_ptrs ui
-			= mapSt create_variable var_info_ptrs ui
-		where
-			create_variable var_info_ptr ui
-				# (placeholder_symb, ui) 
-					= getSymbol PD_UPV_Placeholder SK_Constructor ui
-				  cyclic_var = {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
-				  cyclic_fv = varToFreeVar cyclic_var 1	
-				= ({ lb_src = App {	app_symb = placeholder_symb,
-									app_args = [Var cyclic_var, Var cyclic_var],
-									app_info_ptr = nilPtr },
-					 lb_dst = varToFreeVar cyclic_var 1,
-					 lb_position = NoPos
-				   },
-				   { ui & ui_local_vars = [cyclic_fv : ui.ui_local_vars]})	
-
-		getSymbol :: !Int !((Global Int) -> SymbKind) !*UpdateInfo -> (SymbIdent,*UpdateInfo)
-		getSymbol index symb_kind ui=:{ui_x}
-			# ({pds_module, pds_def}, ui_x) = ui_x!x_predef_symbols.[index]
-			# pds_ident = predefined_idents.[index]
-			  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def} }
-			= (symbol, { ui & ui_x = ui_x})
-
-		get_constructor :: !Int !*UpdateInfo -> (!Expression,!*UpdateInfo)
-		get_constructor index ui=:{ui_x = {x_type_code_info={tci_instances}}}
-			/*
-			** MV
-			** Inefficiency. The correct gtci_type referred to by index has to be selected from the list of
-			** instances (tci_instances). A rather inefficient linear search is used to look up the type. It
-			** is a temporary solution.
-			*/
-			# tci_instance 
-				= filter (\{gtci_index} -> gtci_index == index) tci_instances // {createArray ? GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- tci_instances}
-			| isEmpty tci_instance
-				= abort "get_constructor (overloading.icl): internal error"
-			# tci_instance
-				= (hd tci_instance).gtci_type // tci_instances.[index]
-			# cons_expr
-				= BasicExpr (BVS ("\"" +++ toString tci_instance +++ "\""))
-			= (cons_expr,ui)
-
-		a_ij_var_name	= { id_name = "a_ij", id_info = nilPtr }
-		v_tc_name		= { id_name = "overloadingvTC", id_info = nilPtr }
-
-		
-		varToFreeVar :: BoundVar Int -> FreeVar
-		varToFreeVar {var_name, var_info_ptr} count
-			= {fv_def_level = NotALevel, fv_name = var_name, fv_info_ptr = var_info_ptr, fv_count = count}
-			
+	adjustClassExpression symb_name tce=:(TypeCodeExpression _) ui
+		= (tce, {ui & ui_has_type_codes = True})
 	adjustClassExpression symb_name (Let this_let=:{let_strict_binds, let_lazy_binds, let_expr }) ui
 		# (let_strict_binds, ui) = adjust_let_binds symb_name let_strict_binds ui
 		  (let_lazy_binds, ui) = adjust_let_binds symb_name let_lazy_binds ui

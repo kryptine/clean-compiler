@@ -7,7 +7,7 @@ switch_import_syntax one_point_three two_point_zero :== two_point_zero
 
 SwitchPreprocessor preprocessor no_preprocessor :== preprocessor
 
-SwitchGenerics on off :== off
+SwitchGenerics on off :== on
 SwitchGenericInfo on off :== on
 
 // MV...
@@ -16,5 +16,5 @@ SwitchGenericInfo on off :== on
 
 USE_DummyModuleName yes no :== yes
 
-switch_dynamics on off :== off;		// to turn dynamics on or off
+switch_dynamics on off :== on;		// to turn dynamics on or off
 // ...MV

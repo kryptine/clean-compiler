@@ -2453,7 +2453,8 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 
 	  (x_main_dcl_module,cs) = cs!cs_x.x_main_dcl_module_n
 	  cs = cs
-		<=< adjustPredefSymbol PD_ModuleConsSymbol x_main_dcl_module STE_Constructor
+	  		<=< adjustPredefSymbol PD_ModuleConsSymbol x_main_dcl_module STE_Constructor
+
 
 	  (dcl_modules, icl_functions,macro_defs,hp_expression_heap, cs)
 			= checkExplicitImportCompleteness imports.si_explicit dcl_modules icl_functions macro_defs heaps.hp_expression_heap cs
@@ -3387,19 +3388,19 @@ where
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdDynamic]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjustPredefSymbol PD_TypeObjectType		mod_index STE_Type
-				<=< adjustPredefSymbol PD_TypeConsSymbol		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_PV_Placeholder 		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_UPV_Placeholder		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_UV_Placeholder		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_unify					mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_coerce				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_undo_indirections		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_DynamicTemp			mod_index STE_Type
-				<=< adjustPredefSymbol PD_DynamicType			mod_index (STE_Field unused)
-				<=< adjustPredefSymbol PD_DynamicValue			mod_index (STE_Field unused)
-				<=< adjustPredefSymbol PD_TypeID				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ModuleID				mod_index STE_Constructor)
+				<=< adjustPredefSymbol PD_Dyn_DynamicTemp			mod_index STE_Type
+				<=< adjustPredefSymbol PD_Dyn_Type					mod_index STE_Type
+				<=< adjustPredefSymbol PD_Dyn_TypeScheme 			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_TypeApp				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_TypeVar				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_TypePatternVar		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_ModuleID				mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_Unifier				mod_index STE_Type
+				<=< adjustPredefSymbol PD_Dyn_unify					mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_Dyn_initial_unifier		mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_Dyn_normalise				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_Dyn_bind_global_type_pattern_var	mod_index STE_DclFunction)
+
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
 		# type_bimap = predefined_idents.[PD_TypeBimap]	
 		| pre_mod.pds_def == mod_index

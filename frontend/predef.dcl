@@ -69,9 +69,10 @@ PD_TypeVar_a31				:== 119
 /* Dynamics */
 
 PD_TypeCodeMember			:== 120
-PD_DynamicTemp				:== 121
-PD_DynamicValue				:== 122
-PD_DynamicType				:== 123
+PD_TypeCodeClass			:== 121
+PD_Dyn_bind_global_type_pattern_var
+							:== 122
+PD_Dyn_ModuleID				:== 123
 
 /* identifiers present in the hashtable */
 
@@ -138,19 +139,18 @@ PD_UTSListClass :== 163
 
 PD_StdDynamic				:== 164
 
-PD_TypeCodeClass			:== 165
-PD_TypeObjectType			:== 166
-PD_TypeConsSymbol			:== 167
-PD_unify					:== 168
-PD_coerce					:== 169
-PD_PV_Placeholder			:== 170		// Pattern variable (occurs only in pattern)
-PD_UPV_Placeholder			:== 171		// Universal Pattern Variable (occurs only in pattern; universally quantified variable)
-PD_UV_Placeholder			:== 172		// Universal Variable (occurs only in dynamic; universally quantified variable)					
-PD_undo_indirections		:== 173
-
-PD_TypeID					:== 174
-PD_ModuleID					:== 175
-PD_ModuleConsSymbol			:== 176
+PD_Dyn_DynamicTemp			:== 165
+PD_Dyn_Type					:== 166
+PD_Dyn_TypeScheme			:== 167
+PD_Dyn_TypeApp				:== 168
+PD_Dyn_TypeVar				:== 169
+PD_Dyn_TypePatternVar		:== 170
+PD_Dyn_TypeCons				:== 171
+PD_Dyn_tc_name				:== 172
+PD_Dyn_Unifier				:== 173
+PD_Dyn_unify				:== 174
+PD_Dyn_initial_unifier		:== 175
+PD_Dyn_normalise			:== 176
 
 /* Generics */
 PD_StdGeneric				:== 177
@@ -202,7 +202,9 @@ PD_bimapId					:== 216
 
 PD_TypeGenericDict 			:== 217
 
-PD_NrOfPredefSymbols		:== 218
+PD_ModuleConsSymbol			:== 218
+
+PD_NrOfPredefSymbols		:== 219
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
@@ -218,10 +220,6 @@ buildPredefinedModule :: !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSym
 // MV ...
 // changes requires recompile of {static,dynamic}-linker plus all dynamics ever made
 UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"	
-
-DynamicRepresentation_String			:== "DynamicTemp"		
-
-T_ypeObjectTypeRepresentation_String	:== "T_ypeObjectType"
 
 // List-type
 PD_ListType_String				:== "_List"

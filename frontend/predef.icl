@@ -69,9 +69,10 @@ PD_TypeVar_a31				:== 119
 /* Dynamics */
 
 PD_TypeCodeMember			:== 120
-PD_DynamicTemp				:== 121
-PD_DynamicValue				:== 122
-PD_DynamicType				:== 123
+PD_TypeCodeClass			:== 121
+PD_Dyn_bind_global_type_pattern_var
+							:== 122
+PD_Dyn_ModuleID				:== 123
 
 /* identifiers present in the hashtable */
 
@@ -138,19 +139,18 @@ PD_UTSListClass :== 163
 
 PD_StdDynamic				:== 164
 
-PD_TypeCodeClass			:== 165
-PD_TypeObjectType			:== 166
-PD_TypeConsSymbol			:== 167
-PD_unify					:== 168
-PD_coerce					:== 169
-PD_PV_Placeholder			:== 170		// Pattern variable (occurs only in pattern)
-PD_UPV_Placeholder			:== 171		// Universal Pattern Variable (occurs only in pattern; universally quantified variable)
-PD_UV_Placeholder			:== 172		// Universal Variable (occurs only in dynamic; universally quantified variable)					
-PD_undo_indirections		:== 173
-
-PD_TypeID					:== 174
-PD_ModuleID					:== 175
-PD_ModuleConsSymbol			:== 176
+PD_Dyn_DynamicTemp			:== 165
+PD_Dyn_Type					:== 166
+PD_Dyn_TypeScheme			:== 167
+PD_Dyn_TypeApp				:== 168
+PD_Dyn_TypeVar				:== 169
+PD_Dyn_TypePatternVar		:== 170
+PD_Dyn_TypeCons				:== 171
+PD_Dyn_tc_name				:== 172
+PD_Dyn_Unifier				:== 173
+PD_Dyn_unify				:== 174
+PD_Dyn_initial_unifier		:== 175
+PD_Dyn_normalise			:== 176
 
 /* Generics */
 PD_StdGeneric				:== 177
@@ -202,7 +202,9 @@ PD_bimapId					:== 216
 
 PD_TypeGenericDict 			:== 217
 
-PD_NrOfPredefSymbols		:== 218
+PD_ModuleConsSymbol			:== 218
+
+PD_NrOfPredefSymbols		:== 219
 
 
 (<<=) infixl
@@ -299,21 +301,29 @@ predefined_idents
 					[PD_FromThenTo] = i "_from_then_to",
 					
 					[PD_TypeCodeClass] = i "TC",
-					[PD_TypeObjectType] = i T_ypeObjectTypeRepresentation_String,
-					[PD_TypeConsSymbol] = i "T_ypeConsSymbol",
-					[PD_PV_Placeholder] = i "PV_Placeholder",
-					[PD_UPV_Placeholder] = i "UPV_Placeholder",
-					[PD_UV_Placeholder] = i "UV_Placeholder",
-					[PD_unify] = i "_unify",
-					[PD_coerce] = i "_coerce",
 					[PD_StdDynamic] = i UnderscoreSystemDynamicModule_String,
-					[PD_undo_indirections] = i "_undo_indirections",
-				
-					[PD_DynamicTemp] = i DynamicRepresentation_String,
-					[PD_ModuleConsSymbol] = i "__Module",
-					[PD_TypeID] = i "T_ypeID",
-					[PD_ModuleID] = i "ModuleID",
-				
+					[PD_Dyn_DynamicTemp] = i DynamicRepresentation_String,
+
+					[PD_Dyn_Type] = i "_Type",
+					[PD_Dyn_TypeScheme] = i "_TypeScheme",
+					// FIXME: change constructor name T_ypeConsSymbol to T_ypeApp (also in dynamic linker)
+					[PD_Dyn_TypeApp] = i "T_ypeConsSymbol",
+					[PD_Dyn_TypeVar] = i "_TypeVar",
+					[PD_Dyn_TypePatternVar] = i "_TypePatternVar",
+					[PD_Dyn_TypeCons] = i "_TypeCons",
+					[PD_Dyn_tc_name] = i "_tc_name",
+					[PD_Dyn_Unifier] = i "_Unifier",
+					[PD_Dyn_unify] = i "_unify",
+					[PD_Dyn_initial_unifier] = i "_initial_unifier",
+					[PD_Dyn_bind_global_type_pattern_var] = i "_bind_global_type_pattern_var",
+					// FIXME: change constructor name ModuleID to _ModuleID (also in dynamic linker?)
+					[PD_Dyn_ModuleID] = i "ModuleID",
+
+					[PD_Dyn_normalise] = i "_normalise",
+					[PD_Dyn_tc_name] = i "_tc_name",
+					[PD_Dyn_tc_name] = i "_tc_name",
+					[PD_Dyn_tc_name] = i "_tc_name",
+
 					[PD_StdGeneric] = i "StdGeneric",
 					[PD_TypeBimap] = i "Bimap",
 					[PD_ConsBimap] = i "_Bimap",
@@ -358,15 +368,15 @@ predefined_idents
 					[PD_bimapId] = i "bimapId",
 				
 					[PD_TypeGenericDict] = i "GenericDict",
+
+					[PD_ModuleConsSymbol] = i "__Module",
+
 									
 					[PD_StdMisc] = i "StdMisc",
 					[PD_abort] = i "abort",
 					[PD_undef] = i "undef",
 					
-					[PD_Start] = i "Start",
-								
-					[PD_DynamicType] = i "type",
-					[PD_DynamicValue] = i "value"
+					[PD_Start] = i "Start"
 		}
 	=: idents
 	where
@@ -480,23 +490,26 @@ where
 					<<- (local_predefined_idents, IC_Expression, PD_FromTo)
 					<<- (local_predefined_idents, IC_Expression, PD_FromThenTo)
 					
-					<<- (local_predefined_idents,					 IC_Class, PD_TypeCodeClass)
-					<<- (local_predefined_idents,		IC_Type, PD_TypeObjectType)
-					<<- (local_predefined_idents,		IC_Expression, PD_TypeConsSymbol)
-					<<- (local_predefined_idents,		IC_Expression, PD_PV_Placeholder)
-					<<- (local_predefined_idents,		IC_Expression, PD_UPV_Placeholder)
-					<<- (local_predefined_idents,		IC_Expression, PD_UV_Placeholder)
-					<<- (local_predefined_idents,				IC_Expression, PD_unify)
-					<<-	(local_predefined_idents,				IC_Expression, PD_coerce) /* MV */
-					<<- (local_predefined_idents,		IC_Module, PD_StdDynamic)
-					<<- (local_predefined_idents,	IC_Expression, PD_undo_indirections)
+					<<- (local_predefined_idents,	IC_Class, PD_TypeCodeClass)
+					<<- (local_predefined_idents,	IC_Module, PD_StdDynamic)
 
-					<<- (local_predefined_idents,			IC_Type, PD_DynamicTemp)
-					<<- (local_predefined_idents,			IC_Expression, PD_ModuleConsSymbol)
-					<<- (local_predefined_idents,				IC_Type, PD_TypeID)
-					<<- (local_predefined_idents,			IC_Expression, PD_ModuleID)
 
-					<<- (local_predefined_idents,			IC_Module, 		PD_StdGeneric)
+					<<- (local_predefined_idents,	IC_Expression, PD_ModuleConsSymbol)
+					<<- (local_predefined_idents,	IC_Type, PD_Dyn_DynamicTemp)
+					<<- (local_predefined_idents,	IC_Type, PD_Dyn_Type)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeScheme)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeApp)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeVar)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypePatternVar)
+					<<- (local_predefined_idents,	IC_Type, PD_Dyn_TypeCons)
+					<<- (local_predefined_idents,	IC_Type, PD_Dyn_Unifier)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_unify)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_initial_unifier)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_normalise)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_bind_global_type_pattern_var)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_ModuleID)
+
+					<<- (local_predefined_idents,				IC_Module, 		PD_StdGeneric)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeBimap)
 					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsBimap)	
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeUNIT)
@@ -548,10 +561,9 @@ where
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_from)
 					
-		# dynamic_temp_ident = local_predefined_idents.[PD_DynamicTemp]
+		# dyn_type_cons_ident = local_predefined_idents.[PD_Dyn_TypeCons]
 		# hash_table = hash_table 
-					<<- (local_predefined_idents, IC_Field dynamic_temp_ident, PD_DynamicType)
-					<<- (local_predefined_idents, IC_Field dynamic_temp_ident, PD_DynamicValue)
+					<<- (local_predefined_idents, IC_Field dyn_type_cons_ident, PD_Dyn_tc_name)
 
 		= hash_table
 
@@ -687,9 +699,7 @@ where
 // changes requires recompile of {static,dynamic}-linker plus all dynamics ever made
 UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"	
 
-DynamicRepresentation_String			:== "DynamicTemp"		
-
-T_ypeObjectTypeRepresentation_String	:== "T_ypeObjectType"
+DynamicRepresentation_String			:== "_DynamicTemp"		
 
 // List-type
 PD_ListType_String				:== "_List"

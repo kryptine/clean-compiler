@@ -576,6 +576,8 @@ pIsSafe			:== True
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro !Bool // is_dcl_macro
 
+:: TypeCodeVariableInfo = TCI_TypeTerm | TCI_TypeVar !Expression
+
 ::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
@@ -594,7 +596,8 @@ pIsSafe			:== True
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
-				VI_Default !Int | VI_Indirection !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_TypeCodeVariable !TypeCodeVariableInfo |
+				VI_DynamicValueAlias !BoundVar |
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |

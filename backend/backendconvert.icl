@@ -916,7 +916,7 @@ convertSelector moduleIndex selectorDefs is_strict {fs_index}
 
 declareDynamicTemp :: PredefinedSymbols -> BackEnder
 declareDynamicTemp predefs
-	=	appBackEnd (BEDeclareDynamicTypeSymbol predefs.[PD_StdDynamic].pds_def predefs.[PD_DynamicTemp].pds_def)
+	=	appBackEnd (BEDeclareDynamicTypeSymbol predefs.[PD_StdDynamic].pds_def predefs.[PD_Dyn_DynamicTemp].pds_def)
 
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
@@ -1693,7 +1693,8 @@ convertRootExpr aliasDummyId (Case kees=:{case_expr, case_guards}) main_dcl_modu
 			 			Yes ident
 			 				->	DefaultCaseFail ident
 			 			_
-			 				->	abort "backendconvert:defaultCase, case without id"
+							->	DefaultCaseFail {id_name="kees_be", id_info=nilPtr}
+//			 				->	abort "backendconvert:defaultCase, case without id"
 			// otherwise
 			 	=	DefaultCaseNone
 convertRootExpr _ (FailExpr fail_ident) _
@@ -1826,6 +1827,8 @@ where
 				=	beFunctionSymbol glob_object glob_module
 			convertSymbol {symb_kind=SK_LocalMacroFunction glob_object}
 				=	beFunctionSymbol glob_object main_dcl_module_n
+			convertSymbol {symb_kind=SK_GeneratedCaseFunction _ index}
+				=	beFunctionSymbol index main_dcl_module_n
 			convertSymbol {symb_kind=SK_GeneratedFunction _ index}
 				=	beFunctionSymbol index main_dcl_module_n
 			convertSymbol {symb_kind=SK_GeneratedCaseFunction _ index}
