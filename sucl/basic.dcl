@@ -213,5 +213,8 @@ zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 // Sequential evaluation of left and right arguments
 ($) infixr :: !.a .b -> .b
 
+// List subtraction (lazier than removeMembers)
+(--) infixl :: !.[elem] .[elem] -> .[elem] | == elem
+
 // Write a list of things, each one terminated by a newline
 (writeList) infixl :: !*File [a] -> .File | <<< a

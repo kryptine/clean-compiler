@@ -7,6 +7,8 @@ from graph import Graph
 from general import Optional
 from StdOverloaded import ==
 from StdString import toString
+from StdClass import Eq
+from cleanversion import String
 
 // A history relates node-ids in the subject graph to patterns
 :: History sym var
@@ -34,8 +36,16 @@ matchhistory
     (Graph sym var)             // Current subject graph
     var                         // Current application point of strategy
  -> [HistoryPattern sym var]    // Matching history patterns
- |  == sym
- &  == var
+ |  Eq sym
+ &  Eq var
+
+// Convert a history to its string representation
+historyToString ::
+    (History sym var)
+ -> String
+ |  toString sym
+ &  toString var
+ &  Eq var
 
 (writeHistory) infixl :: *File (History sym var) -> .File | toString sym & toString,== var
 (writeHistoryAssociation) infixl :: *File (HistoryAssociation sym var) -> .File | toString sym & toString,== var

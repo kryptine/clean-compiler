@@ -9,6 +9,7 @@ from pfun import Pfun
 from general import Optional
 from StdOverloaded import ==
 from StdFile import <<<
+from StdString import toString
 
 /*
 
@@ -208,8 +209,8 @@ extendhistory
  |  == var
  &  == pvar
 
-(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | <<< var
+(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
 
-(writespine) infixl :: *File (Spine sym var pvar) -> .File | <<< var
+(writespine) infixl :: *File (Spine sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
 
-instance <<< Subspine sym var pvar
+instance <<< (Subspine sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar

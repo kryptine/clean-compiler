@@ -39,7 +39,8 @@ domres :: !.[dom] .(Pfun dom ran) -> Pfun dom ran | == dom
 apply :: !(Pfun dom .ran) dom -> (.Bool,.ran) | == dom
 
 // Partial functions are printable
-instance toString Pfun dom ran | toString dom & toString ran
+instance toString (Pfun dom ran) | toString dom & toString ran & == dom
+(writepfun) infixl :: *File .(Pfun dom ran) -> .File | ==,toString dom & toString ran
 
 /* `Idpfun dom pfun' checks whether partial function `pfun' is the identity
    on the nodes in `dom' for which it is defined.

@@ -299,4 +299,4 @@ foldtransformation
     !.(Transformation sym var pvar)
  -> .subresult
 
-instance <<< Trace sym var pvar | toString sym & <<<,==,toString var
+instance <<< (Trace sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar

@@ -60,7 +60,7 @@ functions to manipulate them.
 */
 
 // The empty set of bindings
-emptygraph :: Graph .sym .var
+emptygraph :: .Graph sym var
 emptygraph = GraphAlias emptypfun
 
 updategraph :: var .(Node sym var) !.(Graph sym var) -> .Graph sym var
@@ -97,18 +97,18 @@ varcontents (GraphAlias pfun) v
 
 graphvars :: .(Graph sym var) !.[var] -> (.[var],.[var]) | == var
 graphvars graph roots
-= (graphvars` [] graph roots<---"graph.graphvars ends")--->"graph.graphvars begins"
+= graphvars` [] graph roots
 
 // Finds bound and free variables in a graph
 // Excludes the variables only reachable through "prune"
 graphvars` :: .[var] .(Graph sym var) .[var] -> (.[var],.[var]) | == var
 graphvars` prune graph roots
-= (snd (foldlr (ns--->"graph.graphvars`.ns begins from graph.graphvars`") (prune,([],[])) roots)<---"graph.graphvars` ends")--->"graph.graphvars` begins"
+= snd (foldlr ns (prune,([],[])) roots)
   where ns var seenboundfree
-        | isMember var seen = seenboundfree<---"graph.graphvars`.ns ends (already seen)"
-        | not def           = ([var:seen],(bound,[var:free]))<---"graph.graphvars`.ns ends (open variable)"
-                            = (seen`,([var:bound`],free`))<---"graph.graphvars`.ns ends (closed variable)"
-          where (seen`,(bound`,free`)) = foldlr (ns--->"graph.graphvars`.ns begins from graph.graphvars`.ns") ([var:seen],boundfree) args
+        | isMember var seen = seenboundfree
+        | not def           = ([var:seen],(bound,[var:free]))
+                            = (seen`,([var:bound`],free`))
+          where (seen`,(bound`,free`)) = foldlr ns ([var:seen],boundfree) args
                 (def,(_,args)) = varcontents graph var
                 (seen,boundfree=:(bound,free)) = seenboundfree
 varlist :: .(Graph sym var) !.[var] -> .[var] | == var
@@ -235,7 +235,7 @@ isinstance
  &  == pvar
 
 isinstance (pgraph,pvar) (sgraph,svar)
-= isEmpty (thd3 (findmatching (pgraph,sgraph) (pvar,svar) ([],[],[])))
+= isEmpty (thd3 (findmatching (pgraph,sgraph) (pvar,svar) ([],[],[]))) <--- "graph.isinstance ends"
 
 /*
 
@@ -413,12 +413,12 @@ extgraph sgraph pattern pnodes matching graph
 
 mapgraph ::
     !(  (Pfun var1 (sym1,[var1]))
-     -> Pfun .var2 (.sym2,[.var2])
+     -> Pfun var2 (sym2,[var2])
      )
     !.(Graph sym1 var1)
- -> Graph .sym2 .var2
+ -> .Graph sym2 var2
 mapgraph f (GraphAlias pfun) = GraphAlias (f pfun)
 
 instance == (Graph sym var) | == sym & == var
 where (==) (GraphAlias pf1) (GraphAlias pf2)
-      = ((pf1 == pf2) <--- "graph.==(Graph) ends") ---> "graph.==(Graph) begins"
+      = pf1 == pf2

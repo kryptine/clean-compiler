@@ -299,7 +299,7 @@ stub modulename functionname message
 = abort (modulename+++": "+++functionname+++": "+++message)
 
 superset :: .[a] -> .(.[a] -> Bool) | == a
-superset set = isEmpty o (removeMembers set)
+superset set = isEmpty o ((--) set)
 
 zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
@@ -310,6 +310,14 @@ zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
 
 ($) infixr :: !.a .b -> .b
 ($) x y = y
+
+// List subtraction (lazier than removeMembers)
+(--) infixl :: !.[elem] .[elem] -> .[elem] | == elem
+(--) []     ys = []
+(--) [x:xs] ys = f maybeeqs
+                 where (noteqs,maybeeqs) = span ((<>)x) ys
+                       f []     = [x:xs--noteqs]    // x wasn't in ys
+                       f [y:ys] = xs--(noteqs++ys)  // x==y
 
 (writeList) infixl :: !*File [a] -> .File | <<< a
 (writeList) file [] = file

@@ -5,6 +5,8 @@ definition module rule
 from graph import Graph,Node
 from StdOverloaded import ==,toString
 from StdFile import <<<
+from cleanversion import String
+from StdClass import Eq
 
 // --- Exported types
 
@@ -14,23 +16,24 @@ from StdFile import <<<
 // --- Functions on rules
 
 // Build a rule from its constituents
-mkrule :: [.var] .var (Graph .sym .var) -> Rule .sym .var
+mkrule    :: .[var] var (Graph sym var) -> .Rule sym var
 
 // The arguments of a rule, i.e. the roots of its lhs
 arguments :: !.(Rule sym var) -> [var]
 
 // The root of a rule, i.e. of its rhs
-ruleroot :: !.(Rule sym var) -> var
+ruleroot  :: !.(Rule sym var) -> var
 
 // The graph part of a rule, i.e. its bindings
 rulegraph :: !.(Rule sym var) -> Graph sym var
 
-instance toString Rule sym var | toString sym & toString var & == var
+instance toString (Rule sym var) | toString sym & toString var & == var
+ruleToString :: (sym->.String) .(Rule sym var) -> String | Eq,toString var
 
 // --- Functions on rooted graphs
 
 // The empty rooted graph with a given root
-emptyrgraph  :: .var -> Rgraph .sym .var
+emptyrgraph  :: var -> .Rgraph sym var
 
 // Update the contents of a variable in a rooted graph
 updatergraph :: var .(Node sym var) !.(Rgraph sym var) -> .Rgraph sym var
@@ -45,9 +48,12 @@ rgraphroot   :: !.(Rgraph sym var) -> var
 rgraphgraph  :: !.(Rgraph sym var) -> Graph sym var
 
 // Build a rooted graph from a root and a graph
-mkrgraph     :: .var (Graph .sym .var) -> Rgraph .sym .var
+mkrgraph     :: var (Graph sym var) -> .Rgraph sym var
 
 instance == (Rgraph sym var) | == sym & == var
-instance toString (Rgraph sym var) | toString sym & toString var & == var
-instance <<< Rgraph sym var | toString sym & toString var & == var
-instance <<< Rule sym var | toString sym & toString,== var
+instance toString (Rgraph sym var) | toString sym & toString var & Eq var
+instance <<< (Rgraph sym var) | toString sym & toString var & == var
+instance <<< (Rule sym var) | toString sym & toString,== var
+
+(writergraph) infixl :: *File .(Rgraph sym var) -> .File | toString sym & ==,toString var
+(writerule) infixl :: *File .(Rule sym var) -> .File | toString sym & ==,toString var

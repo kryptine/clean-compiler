@@ -70,13 +70,15 @@ apply pfun arg
   where s x = (True,x)
         baddomain = abort "apply: partial function applied outside domain"
 
-instance toString Pfun dom ran | toString dom & toString ran
+instance toString Pfun dom ran | toString dom & toString ran & == dom
 where toString pfun
       = toString ['{':drop 1 (flatten (map ((cons ',') o printlink) (pfunlist pfun)))++['}']]
         where printlink (arg,res) = fromString (toString arg)++['|->']++fromString (toString res)
 
-pfunlist :: (Pfun dom res) -> [(dom,res)]
-pfunlist _ = error "pfunlist not implemented"
+pfunlist :: (Pfun dom res) -> [(dom,res)] | == dom
+pfunlist EmptyPfun = []
+pfunlist (Extend x y pf) = [(x,y):pfunlist (Restrict x pf)]
+pfunlist (Restrict x pf) = [xxyy \\ xxyy=:(xx,yy) <- pfunlist pf | xx<>x]
 
 idpfun :: !.[dom] .(Pfun dom dom) -> Bool | == dom
 idpfun domain pfun
@@ -90,3 +92,6 @@ where (==) EmptyPfun EmptyPfun = True
       (==) (Restrict x1 pf1) (Restrict x2 pf2)
             = x1==x2 && pf1==pf2
       (==) _ _ = False
+
+(writepfun) infixl :: *File .(Pfun dom ran) -> .File | ==,toString dom & toString ran
+(writepfun) file pfun = file <<< toString pfun

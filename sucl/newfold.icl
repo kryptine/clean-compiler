@@ -110,9 +110,11 @@ fullfold ::
  |  == sym
  &  == var
  &  == pvar
- &  toString var
- &  <<< var
  &  toString sym
+ &  toString var
+ &  toString pvar
+ &  <<< var
+ &  <<< pvar
 
 fullfold trc foldarea fnsymbol trace
 | recursive ---> "newfold.fullfold begins"
@@ -140,9 +142,11 @@ recurse ::
  |  == sym
  &  == var
  &  == pvar
- &  toString var
- &  <<< var
  &  toString sym
+ &  toString var
+ &  toString pvar
+ &  <<< var
+ &  <<< pvar
 
 recurse foldarea fnsymbol
 = ((f--->"newfold.recurse.f begins from newfold.recurse") ([],[]) <--- "newfold.recurse ends") ---> "newfold.recurse begins"
@@ -195,22 +199,22 @@ foldtips foldarea foldcont
   where ft hist trace
         = case transf
           of Stop
-              -> foldoptional exres (pair True o addstrict stricts o mapfst rule2body) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule) <--- "newfold.foldtips.ft ends (Stop)"
+              -> (foldoptional exres (pair True o addstrict stricts o mapfst rule2body) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule) <--- "newfold.foldtips.ft ends (Stop)") ---> "newfold.foldtips.ft case = Stop"
                  where deltanodes = foldoptional [] getdeltanodes answer
                        rnfnodes = foldoptional [ruleroot rule] (const []) answer
              Instantiate yestrace notrace
               -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Instantiate.match") hist yestrace) ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Instantiate.fail") hist notrace)
-                 where ft` (False,yessra) (False,nosra) = exres <--- "newfold.foldtips.ft ends (Instantiate/no)"
+                 where ft` (False,yessra) (False,nosra) = (exres <--- "newfold.foldtips.ft ends (Instantiate/no)") ---> "newfold.foldtips.ft case Instantiate/no"
                        ft` (yesfound,(yesstricts,yesbody,yesareas)) (nofound,(nostricts,nobody,noareas))
-                       = (True,(stricts,matchpattern answer yesbody nobody,yesareas++noareas)) <--- "newfold.foldtips.ft ends (Instantiate/yes)"
+                       = ((True,(stricts,matchpattern answer yesbody nobody,yesareas++noareas)) <--- "newfold.foldtips.ft ends (Instantiate/yes)") ---> "newfold.foldtips.ft case Instantiate/yes"
              Reduce reductroot trace
               -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Reduce") (fst hist,fst hist) trace)
-                 where ft` (False,sra) = exres <--- "newfold.foldtips.ft ends (Reduce/no)"
-                       ft` (found,sra) = (True,sra) <--- "newfold.foldtips.ft ends (Reduce/yes)"
+                 where ft` (False,sra) = (exres <--- "newfold.foldtips.ft ends (Reduce/no)") ---> "newfold.foldtips.ft case Reduce/no"
+                       ft` (found,sra) = ((True,sra) <--- "newfold.foldtips.ft ends (Reduce/yes)") ---> "newfold.foldtips.ft case Reduce/no"
              Annotate trace
               -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Annotate") hist trace)
-                 where ft` (False,sra) = exres <--- "newfold.foldtips.ft ends (Annotate/no)"
-                       ft` (found,sra) = (True,sra) <--- "newfold.foldtips.ft ends (Annotate/yes)"
+                 where ft` (False,sra) = (exres <--- "newfold.foldtips.ft ends (Annotate/no)") ---> "newfold.foldtips.ft case Annotate/no"
+                       ft` (found,sra) = ((True,sra) <--- "newfold.foldtips.ft ends (Annotate/yes)") ---> "newfold.foldtips.ft case Annotate/no"
           where (Trace stricts rule answer _ transf) = trace
                 exres = (False,newextract noetrc foldarea trace)
 
@@ -301,7 +305,7 @@ buildgraph ::
  -> FuncBody sym var | == var
 buildgraph args root graph
 = (BuildGraph (mkrgraph root (compilegraph (map (pairwith (snd o varcontents graph)) newnodes))) <--- "newfold.buildgraph ends") ---> "newfold.buildgraph begins"
-  where newnodes = removeMembers closedreplnodes patnodes
+  where newnodes = closedreplnodes--patnodes
         closedreplnodes = fst (graphvars graph [root])
         patnodes = varlist graph args
 
@@ -363,7 +367,7 @@ findpattern pattern thespinenodes residuroot transf
 findpattern pattern thespinenodes residuroot (Reduce reductroot trace)
 = fp (redirect residuroot) trace
   where fp residuroot (Trace stricts rule answer history transf)
-         | or [isinstance pattern (graph,node) \\ node<-varlist graph [residuroot]]
+         | or [(isinstance--->"graph.isinstance begins from newfold.findpattern.fp") pattern (graph,node) \\ node<-varlist graph [residuroot]]
            = True
              where graph = rulegraph rule
         fp residuroot trace = findpattern` pattern residuroot trace

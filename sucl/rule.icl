@@ -111,7 +111,7 @@ Rooted graphs
 >   mkrgraph root graph = (root,graph)
 */
 
-emptyrgraph :: .var -> Rgraph .sym .var
+emptyrgraph :: var -> .Rgraph sym var
 emptyrgraph root = RgraphAlias root emptygraph
 
 updatergraph :: var .(Node sym var) !.(Rgraph sym var) -> .Rgraph sym var
@@ -126,10 +126,10 @@ rgraphroot (RgraphAlias root _) = root
 rgraphgraph  :: !.(Rgraph sym var) -> Graph sym var
 rgraphgraph (RgraphAlias _ graph) = graph
 
-mkrgraph :: .var (Graph .sym .var) -> Rgraph .sym .var
+mkrgraph :: var (Graph sym var) -> .Rgraph sym var
 mkrgraph root graph = RgraphAlias root graph
 
-maprgraph :: (.(var1,Graph sym1 var1) -> (.var2,Graph .sym2 .var2)) !.(Rgraph sym1 var1) -> Rgraph .sym2 .var2
+maprgraph :: (.(var1,Graph sym1 var1) -> .(var2,Graph sym2 var2)) !.(Rgraph sym1 var1) -> .Rgraph sym2 var2
 maprgraph f (RgraphAlias root1 graph1) = RgraphAlias root2 graph2
    where (root2,graph2) = f (root1,graph1)
 
@@ -148,7 +148,7 @@ maprgraph f (RgraphAlias root1 graph1) = RgraphAlias root2 graph2
 >                                 repr'
 */
 
-instance toString Rgraph sym var | toString sym & toString var & == var
+instance toString (Rgraph sym var) | toString sym & toString var & Eq var
 where toString (RgraphAlias root graph)
       = "("+++snd (showsubgraph root ([],"emptyrgraph) "))+++toString root
         where showsubgraph node (seen,repr)
@@ -165,7 +165,7 @@ where toString (RgraphAlias root graph)
 >       = hd (printgraph showfunc shownode graph [root])
 */
 
-instance <<< Rgraph sym var | toString sym & toString var & == var
+instance <<< (Rgraph sym var) | toString sym & toString var & == var
 where (<<<) file (RgraphAlias root graph)
       = file <<< hd (printgraph graph [root])
 
@@ -178,7 +178,7 @@ Rules
 >   rulegraph (lroots,rroot,graph) = graph
 */
 
-mkrule :: [.var] .var (Graph .sym .var) -> Rule .sym .var
+mkrule :: .[var] var (Graph sym var) -> .Rule sym var
 mkrule args root graph = RuleAlias args root graph
 
 arguments :: !.(Rule sym var) -> [var]
@@ -219,10 +219,11 @@ where (==) (RgraphAlias root1 graph1) (RgraphAlias root2 graph2)
        = root1==root2 && graph1==graph2
 
 instance toString (Rule sym var) | toString sym & toString var & == var
-where toString (RuleAlias lroots rroot graph)
+where //toString rule = "<rule>"
+      toString (RuleAlias lroots rroot graph)
       = "((mkrule "+++listToString lroots+++" "+++toString rroot+++repr`+++") emptygraph)"
-        where (seen,repr`) = showsubgraph rroot ([],repr)
-              (seen`,repr) = foldlr showsubgraph (seen,"") lroots
+        where (seen,repr`) = foldlr showsubgraph ([],repr) lroots
+              (seen`,repr) = showsubgraph rroot (seen,"")
               showsubgraph node (seen,repr)
               | not def || isMember node seen
                 = (seen,repr)
@@ -232,5 +233,29 @@ where toString (RuleAlias lroots rroot graph)
                       seen` = [node:seen]
                       repr`` = " o updategraph "+++toString node+++" ("+++toString f+++","+++listToString args+++")"+++repr`
 
-instance <<< Rule sym var | toString sym & toString,== var
+ruleToString :: (sym->.String) .(Rule sym var) -> String | Eq,toString var
+ruleToString symToString (RuleAlias lroots rroot graph)
+/*
+= if def ("<rule with root "+++symToString sym+++">") "<rule with no root>"
+  where (def,(sym,args)) = varcontents graph rroot
+*/
+= "((mkrule "+++showlist toString lroots+++" "+++toString rroot+++repr`+++") emptygraph)"
+  where (seen,repr`) = foldlr showsubgraph ([],repr) lroots
+        (seen`,repr) = showsubgraph rroot (seen,"")
+        showsubgraph node (seen,repr)
+        | not def || isMember node seen
+          = (seen,repr)
+        = (seen``,repr``)
+          where (def,(f,args)) = varcontents graph node
+                (seen``,repr`) = foldlr showsubgraph (seen`,repr) args
+                seen` = [node:seen]
+                repr`` = " o updategraph "+++toString node+++" ("+++symToString f+++","+++showlist toString args+++")"+++repr`
+
+instance <<< (Rule sym var) | toString sym & toString,== var
 where (<<<) file rule = file <<< toString rule
+
+(writergraph) infixl :: *File .(Rgraph sym var) -> .File | toString sym & ==,toString var
+(writergraph) file rgraph = file <<< rgraph
+
+(writerule) infixl :: *File .(Rule sym var) -> .File | toString sym & ==,toString var
+(writerule) file rule = file <<< rule
