@@ -196,7 +196,10 @@ where
 		| properties bitand cIsNonCoercible == 0
 			= (PostiveSignClass, scs)
 			= (TopSignClass, scs)
-
+	sign_class_of_type_def _ (AbstractSynType properties _) _ _ scs
+		| properties bitand cIsNonCoercible == 0
+			= (PostiveSignClass, scs)
+			= (TopSignClass, scs)
 	sign_class_of_type_conses module_index [{ds_index}:conses] group_nr ci cumm_sign_class scs
 		#! cons_def = ci.[module_index].com_cons_defs.[ds_index]
 		#  (cumm_sign_class, scs) = sign_class_of_type_of_list cons_def.cons_type.st_args group_nr ci cumm_sign_class scs
@@ -460,6 +463,8 @@ where
 	prop_class_of_type_def module_index (RecordType {rt_constructor}) group_nr ci pcs
 		= prop_class_of_type_conses module_index [rt_constructor] group_nr ci NoPropClass pcs
 	prop_class_of_type_def _ (AbstractType properties) _ _ pcs
+		= (PropClass, pcs)
+	prop_class_of_type_def _ (AbstractSynType properties _) _ _ pcs
 		= (PropClass, pcs)
 
 	prop_class_of_type_conses module_index [{ds_index}:conses] group_nr ci cumm_prop_class pcs

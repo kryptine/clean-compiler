@@ -533,10 +533,6 @@ where
 		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 		= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))
 
-
-is_abs (AbstractType _) = True
-is_abs _ = False
-
 analyseTypeDefs :: !{#CommonDefs} !TypeGroups !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin -> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
 analyseTypeDefs modules groups type_def_infos type_var_heap error
 	# as = { as_kind_heap = newHeap, as_type_var_heap = type_var_heap, as_td_infos = type_def_infos, as_error = error }
@@ -560,6 +556,12 @@ where
 		# {td_args,td_rhs} = modules.[gi_module].com_type_defs.[gi_index]
 		= case td_rhs of
 			AbstractType properties
+				# (tdi, type_def_infos) = type_def_infos![gi_module,gi_index]
+				  new_tdi = { tdi &	tdi_kinds = [ KindConst \\ _ <- td_args ],
+				  					tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]],
+				  					tdi_properties = properties bitor cIsAnalysed  }
+				-> (True, { type_def_infos & [gi_module].[gi_index] = new_tdi}, as_type_var_heap, kind_heap)
+			AbstractSynType properties _
 				# (tdi, type_def_infos) = type_def_infos![gi_module,gi_index]
 				  new_tdi = { tdi &	tdi_kinds = [ KindConst \\ _ <- td_args ],
 				  					tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]],
