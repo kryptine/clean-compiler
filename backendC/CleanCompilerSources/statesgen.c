@@ -1510,13 +1510,13 @@ static Bool AdjustState (StateS *old_state_p, StateS newstate)
 		return False;
 }
 
-static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs *t_or_e_defs, StateS demstate,int local_scope)
+static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs t_or_e_defs, StateS demstate,int local_scope)
 {
 	Node node;
 	
 	node=t_or_e_args->arg_node;
 	
-	if (node->node_kind==NodeIdNode && *t_or_e_defs==NULL){
+	if (node->node_kind==NodeIdNode && t_or_e_defs==NULL){
 		NodeId node_id;
 		
 		node_id=node->node_node_id;
@@ -2221,35 +2221,76 @@ static void DetermineStatesOfNonIfRootNode (Node root,NodeId root_id,StateS dems
 }
 
 static int scope;
+static void DetermineStatesRootNode (Node node, NodeId nid, StateS demstate,int local_scope);
 
-static void DetermineStatesOfGuardRootNode (Node node, NodeId nid, StateS demstate,int local_scope)
-{	
-	if (node->node_kind!=IfNode)
-		DetermineStatesOfNonIfRootNode (node, nid, demstate, local_scope);
-	else {
-		Args condpart;
-		int new_local_scope;
+static void DetermineStatesIfRootNode (Node node, StateS demstate,int local_scope)
+{
+	Args condpart;
+	int new_local_scope;
 
-		new_local_scope=scope+2;
-		scope+=3;
+	new_local_scope=scope+2;
+	scope+=3;
 
-		condpart = node->node_arguments;
-				
-		AdjustState (&condpart->arg_state, BasicSymbolStates [bool_type]);
+	condpart = node->node_arguments;
+			
+	AdjustState (&condpart->arg_state, BasicSymbolStates [bool_type]);
 
-		if (condpart->arg_node->node_kind!=NodeIdNode)
-			DetermineStatesOfGuardRootNode (condpart->arg_node, NULL,condpart->arg_state, local_scope);
-		else 
-			/* the parallel state of the condition is not needed */
-			AdjustStateOfSharedNode (condpart->arg_node->node_node_id,condpart->arg_state,local_scope);
-		
-		AdjustState (&node->node_state, demstate);
+	if (condpart->arg_node->node_kind!=NodeIdNode)
+		DetermineStatesRootNode (condpart->arg_node, NULL,condpart->arg_state, local_scope);
+	else 
+		/* the parallel state of the condition is not needed */
+		AdjustStateOfSharedNode (condpart->arg_node->node_node_id,condpart->arg_state,local_scope);
+	
+	AdjustState (&node->node_state, demstate);
 
-		++scope;
-		DetermineStateOfThenOrElse (condpart->arg_next,&node->node_then_node_defs,demstate,new_local_scope);
+	++scope;
+	DetermineStateOfThenOrElse (condpart->arg_next,node->node_then_node_defs,demstate,new_local_scope);
 
-		++scope;
-		DetermineStateOfThenOrElse (condpart->arg_next->arg_next,&node->node_else_node_defs,demstate,new_local_scope);
+	++scope;
+	DetermineStateOfThenOrElse (condpart->arg_next->arg_next,node->node_else_node_defs,demstate,new_local_scope);
+}
+
+static void DetermineStatesSwitchRootNode (Node root_node, StateS demstate, int local_scope)
+{
+	ArgP arg_p;
+
+	AdjustState (&root_node->node_state, demstate);
+
+	for_l (arg_p,root_node->node_arguments,arg_next){
+		NodeP node;
+
+		node=arg_p->arg_node;
+		if (node->node_kind==CaseNode){
+			NodeP case_alt_node_p;
+
+			case_alt_node_p=node->node_arguments->arg_node;
+/*	Codewarrior bug			if (case_alt_node_p->node_kind==PushNode){  */
+			if (node->node_arguments->arg_node->node_kind==PushNode){
+				DetermineStatesOfRootNodeAndDefs (case_alt_node_p->node_arguments->arg_next->arg_node,
+													node->node_node_defs, demstate, local_scope);
+			}
+			else
+				DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node, node->node_node_defs, demstate, local_scope);
+		} else if (node->node_kind==DefaultNode){
+			DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node, node->node_node_defs, demstate, local_scope);
+		} else
+			error_in_function ("DetermineStatesSwitchRootNode");
+	}
+}
+
+static void DetermineStatesRootNode (Node node, NodeId nid, StateS demstate,int local_scope)
+{
+	switch (node->node_kind)
+	{
+		case IfNode:
+			DetermineStatesIfRootNode (node, demstate, local_scope);
+			break;
+		case SwitchNode:
+			DetermineStatesSwitchRootNode (node, demstate, local_scope);
+			break;
+		default:
+			DetermineStatesOfNonIfRootNode (node, nid, demstate, local_scope);
+			break;
 	}
 }
 
@@ -2615,9 +2656,9 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 			if (node_id->nid_node==NULL || node_id->nid_ref_count_copy<0)
 				return;
 			
-			DetermineStatesOfGuardRootNode (node_id->nid_node,node_id,demstate,local_scope);
+			DetermineStatesRootNode (node_id->nid_node,node_id,demstate,local_scope);
 		} else
-			DetermineStatesOfGuardRootNode (root_node,NULL,demstate,local_scope);
+			DetermineStatesRootNode (root_node,NULL,demstate,local_scope);
 
 		if (node_defs)
 			DetermineStatesOfNodeDefs (node_defs,local_scope);
@@ -2625,10 +2666,10 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 }
 #endif
 
-void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs *rootdef,StateS demstate,int local_scope)
+void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs rootdef,StateS demstate,int local_scope)
 {
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-	DetermineStatesOfNodeAndDefs (root_node,*rootdef,demstate,local_scope);
+	DetermineStatesOfNodeAndDefs (root_node,rootdef,demstate,local_scope);
 #else
 	ShouldDecrRefCount = True;
 
@@ -2639,12 +2680,12 @@ void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs *rootdef,StateS d
 		if (node_id->nid_node==NULL || node_id->nid_ref_count_copy<0)
 			return;
 		
-		DetermineStatesOfGuardRootNode (node_id->nid_node,node_id,demstate,local_scope);
+		DetermineStatesRootNode (node_id->nid_node,node_id,demstate,local_scope);
 	} else
-		DetermineStatesOfGuardRootNode (root_node,NULL,demstate,local_scope);
+		DetermineStatesRootNode (root_node,NULL,demstate,local_scope);
 
-	if (*rootdef)
-		DetermineStatesOfNodeDefs (*rootdef,local_scope);
+	if (rootdef)
+		DetermineStatesOfNodeDefs (rootdef,local_scope);
 #endif
 }
 
@@ -2755,7 +2796,7 @@ void GenerateStatesForRule (ImpRuleS *rule)
 			scope=1;
 
 			if (alt->alt_kind==Contractum){
-				DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+				DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
 
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
 				set_states_of_array_selects_in_pattern (alt);
@@ -2958,6 +2999,43 @@ static NodeP add_argument_to_if_node (NodeP rhs_root_p,NodeIdP new_node_id_p)
 	return rhs_root_p;
 }
 
+static NodeP add_argument_to_switch_node (NodeP rhs_root_p,NodeIdP new_node_id_p)
+{
+	ArgP arg_p;
+
+	for_l (arg_p,rhs_root_p->node_arguments,arg_next){
+		NodeP node_p;
+
+		node_p=arg_p->arg_node;
+		if (node_p->node_kind==CaseNode){
+			
+			node_p=node_p->node_arguments->arg_node;
+			if (node_p->node_kind==PushNode)
+				node_p=node_p->node_arguments->arg_next->arg_node;
+		} else if (node_p->node_kind==DefaultNode){
+			node_p	= node_p->node_arguments->arg_node;
+		} else
+			error_in_function ("add_argument_to_switch_node");
+
+		add_argument_to_node (node_p, new_node_id_p);
+
+		--new_node_id_p->nid_refcount;
+	}
+
+	++new_node_id_p->nid_refcount;
+
+	return rhs_root_p;
+}
+
+static NodeP add_argument_to_guard_node (NodeP rhs_root_p,NodeIdP new_node_id_p)
+{
+	add_argument_to_node (rhs_root_p->node_arguments->arg_node, new_node_id_p);
+	--new_node_id_p->nid_refcount;
+	add_argument_to_node (rhs_root_p->node_arguments->arg_next->arg_node, new_node_id_p);
+
+	return rhs_root_p;
+}
+
 static NodeP add_argument_to_node (NodeP rhs_root_p,NodeIdP new_node_id_p)
 {
 	ArgP new_arg1,new_arg2;
@@ -2984,7 +3062,11 @@ static NodeP add_argument_to_node (NodeP rhs_root_p,NodeIdP new_node_id_p)
 		}
 	} else if (rhs_root_p->node_kind==IfNode)
 		return add_argument_to_if_node (rhs_root_p,new_node_id_p);
-		
+	else if (rhs_root_p->node_kind==SwitchNode)
+		return add_argument_to_switch_node (rhs_root_p,new_node_id_p);
+	else if (rhs_root_p->node_kind==GuardNode)
+		return add_argument_to_guard_node (rhs_root_p,new_node_id_p);
+
 	new_arg2=NewArgument (NewNodeIdNode (new_node_id_p));
 
 	new_arg1=NewArgument (rhs_root_p);
@@ -3360,6 +3442,7 @@ static NodeDefs *CollectSharedNodeIdsInNode (Node* node_p,NodeId parent_node_id,
 				arg->arg_state=LazyState;
 				last = CollectSharedNodeIdsInNode (&arg->arg_node,parent_node_id,last);
 			}
+		/* RWS SwitchNode */
 		} else {
 			NodeDefs *shared;
 			Args cond_arg,then_arg,else_arg;
@@ -3422,6 +3505,68 @@ static NodeDefs *CollectSharedNodeIdsInNode (Node* node_p,NodeId parent_node_id,
 
 	return last;
 }
+
+/* RWS ... */
+/* parent_node_id always NULL? */
+static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node_id,NodeDefs *last)
+{
+	NodeP	root_node;
+
+	root_node=*node_p;
+
+	switch (root_node->node_kind)
+	{
+		case SwitchNode:
+		{
+			ArgP arg_p;
+		
+			for_l (arg_p,root_node->node_arguments,arg_next){
+				NodeP node;
+
+				node=arg_p->arg_node;
+				if (node->node_kind==CaseNode){
+					NodeP case_alt_node_p;
+					NodeDefs *case_last;
+
+					case_alt_node_p=node->node_arguments->arg_node;
+					case_last=&node->node_node_defs;
+/*	Codewarrior bug			if (case_alt_node_p->node_kind==PushNode){ */
+					if (node->node_arguments->arg_node->node_kind==PushNode){
+						case_last=CollectSharedNodeIdsInRootNode (&case_alt_node_p->node_arguments->arg_next->arg_node, parent_node_id, case_last);
+					}
+					else
+						case_last=CollectSharedNodeIdsInRootNode (&node->node_arguments->arg_node, parent_node_id, case_last);
+					*case_last=NULL;
+				} else if (node->node_kind==DefaultNode){
+					NodeDefs *default_last;
+
+					default_last=&node->node_node_defs;
+					default_last=CollectSharedNodeIdsInRootNode (&node->node_arguments->arg_node, parent_node_id, default_last);
+					*default_last=NULL;
+				} else
+					error_in_function ("CollectSharedNodeIdsInRootNode");
+			}
+			break;
+		}
+		case GuardNode:
+		{
+			NodeDefs *guard_last;
+
+			CollectSharedNodeIdsInRootNode (&root_node->node_arguments->arg_node, parent_node_id, last);
+			guard_last=&root_node->node_node_defs;
+			guard_last=CollectSharedNodeIdsInRootNode (&root_node->node_arguments->arg_next->arg_node, parent_node_id, guard_last);
+			*guard_last=NULL;
+			break;
+		}
+		default:
+			last=CollectSharedNodeIdsInNode (node_p,parent_node_id,last);
+			break;
+
+	}
+
+	return last;
+}
+/* ... RWS */
 
 static void CollectSharedAndAnnotatedNodesInRhs (NodeS **root_p,NodeDefS **defs_p,StrictNodeIdP strict_node_ids)
 {
@@ -3529,7 +3674,11 @@ static void CollectSharedAndAnnotatedNodesInRhs (NodeS **root_p,NodeDefS **defs_
 
 	last=defs_p;
 	
+/* RWS ...
 	last = CollectSharedNodeIdsInNode (root_p,NULL,last);
+*/
+	last = CollectSharedNodeIdsInRootNode (root_p,NULL,last);
+/* ... RWS */
 	*last = NULL;
 
 	AddStrictLhsNodeIdsToNodeDefs (strict_node_ids,defs_p);
@@ -3587,6 +3736,7 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 				node_id->nid_node->node_annotation=StrictAnnot;
 	}
 	
+	/* RWS SwitchNode */
 	if (node->node_kind==IfNode){
 		ArgS *arg;
 	
@@ -3652,6 +3802,7 @@ static void reset_states_and_ref_count_copies_of_node (Node node)
 				arg->arg_state=LazyState;
 				reset_states_and_ref_count_copies_of_node (arg->arg_node);
 			}
+		/* RWS SwitchNode */
 		} else {
 			Args cond_arg,then_arg,else_arg;
 	

@@ -30,27 +30,58 @@ static void set_node_id_scope_numbers (NodeDefP node_defs,int local_scope)
 
 static void set_root_scope_numbers (NodeP node_p,int local_scope)
 {
-	if (node_p->node_kind==IfNode){
-		int new_local_scope;
-		ArgP arg_p;
-
-		node_p->node_if_scope=local_scope;
-
-		new_local_scope=scope+2;
-		scope+=3;
-
-		arg_p=node_p->node_arguments;
-		set_root_scope_numbers (arg_p->arg_node,local_scope);
+/* RWS added switch nodes */
+	switch (node_p->node_kind)
+	{
+		case IfNode:
+			{
+				int new_local_scope;
+				ArgP arg_p;
 		
-		++scope;
-		arg_p=arg_p->arg_next;
-		set_root_scope_numbers (arg_p->arg_node,new_local_scope);
-		set_node_id_scope_numbers (node_p->node_then_node_defs,new_local_scope);	
+				node_p->node_if_scope=local_scope;
 		
-		++scope;
-		arg_p=arg_p->arg_next;
-		set_root_scope_numbers (arg_p->arg_node,new_local_scope);
-		set_node_id_scope_numbers (node_p->node_else_node_defs,new_local_scope);
+				new_local_scope=scope+2;
+				scope+=3;
+		
+				arg_p=node_p->node_arguments;
+				set_root_scope_numbers (arg_p->arg_node,local_scope);
+				
+				++scope;
+				arg_p=arg_p->arg_next;
+				set_root_scope_numbers (arg_p->arg_node,new_local_scope);
+				set_node_id_scope_numbers (node_p->node_then_node_defs,new_local_scope);	
+				
+				++scope;
+				arg_p=arg_p->arg_next;
+				set_root_scope_numbers (arg_p->arg_node,new_local_scope);
+				set_node_id_scope_numbers (node_p->node_else_node_defs,new_local_scope);
+			}
+			break;
+		case SwitchNode:
+			{
+				ArgP arg_p;
+				
+				for_l (arg_p,node_p->node_arguments,arg_next){
+					NodeP node;
+		
+					node=arg_p->arg_node;
+					if (node->node_kind==CaseNode){
+						NodeP case_alt_node_p;
+						
+						case_alt_node_p=node->node_arguments->arg_node;
+		/*	Cedewarrior bug			if (case_alt_node_p->node_kind==PushNode){ */
+						if (node->node_arguments->arg_node->node_kind==PushNode){
+							set_root_scope_numbers (case_alt_node_p->node_arguments->arg_next->arg_node, local_scope);
+						}
+						else
+							set_root_scope_numbers (node->node_arguments->arg_node, local_scope);
+					} else if (node->node_kind==DefaultNode){
+						set_root_scope_numbers (node->node_arguments->arg_node, local_scope);
+					} else
+						ErrorInCompiler ("set_scope_numbers.c", "set_root_scope_numbers", "");
+				}
+			}
+			break;
 	}
 }
 

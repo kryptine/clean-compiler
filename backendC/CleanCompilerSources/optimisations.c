@@ -3392,7 +3392,7 @@ static ImpRuleS **OptimiseRule (ImpRuleS *rule)
 			new_rules=new_rule->rule_next;
 			
 			alt=new_rule->rule_alts;
-			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
 			ReorderNodeDefinitionsAndDetermineUsedEntries (&alt->alt_rhs_defs,alt->alt_rhs_root);
 			
 			new_rule->rule_next=rule->rule_next;
