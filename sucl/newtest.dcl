@@ -11,14 +11,14 @@ from rule import Rgraph,Rule
 from general import Optional
 
 :: Symredresult sym var tsym tvar
-   :== ( Rgraph sym var    // The initial area in canonical form
-       , sym               // The assigned symbol
-       , [Bool]            // Strictness annotations
-       , Rule tsym tvar    // Type rule
-       , Trace sym var var // Truncated and folded trace
-       , [Rule sym var]    // Resulting rewrite rules
-       , [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
-       )
+   = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
+     , srr_assigned_symbol :: sym               // The assigned symbol
+     , srr_strictness      :: [Bool]            // Strictness annotations
+     , srr_typerule        :: Rule tsym tvar    // Type rule
+     , srr_trace           :: Trace sym var var // Truncated and folded trace
+     , srr_rules           :: [Rule sym var]    // Resulting rewrite rules
+     , srr_areas           :: [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
+     }
 
 fullsymred ::
     [SuclSymbol]    // Fresh function symbols
