@@ -2768,7 +2768,7 @@ where
 						,	fun_pos			= me_pos
 						,	fun_kind		= FK_Unknown
 						,	fun_lifted		= 0
-						,	fun_info		= EmptyFunInfo
+						,	fun_info		= {EmptyFunInfo & fi_properties=FI_IsUnboxedListOfRecordsConsOrNil}
 						}
 					= ({fun_defs & [fun_index]=fun}, type_heaps, error)
 	

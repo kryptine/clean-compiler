@@ -609,10 +609,6 @@ dummy_predef_symbols =
 	, predef_or				= dummy_predef_symbol
 	}
 
-///// FI_IsNonRecursive
-
-FI_IsNonRecursive	:== 4
-
 set_rec_prop non_recursive fi_properties
 	= case non_recursive of
 		True	-> fi_properties bitor FI_IsNonRecursive

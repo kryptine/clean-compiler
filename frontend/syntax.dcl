@@ -500,10 +500,10 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 
 ::	FunCall = FunCall !Index !Level | MacroCall !ModuleIndex !Index Level | DclFunCall !ModuleIndex !DclFunctionIndex;
 
-/* Sjaak 19-3-2001 ... */
-
 FI_IsMacroFun	:== 1			// whether the function is a local function of a macro
 FI_HasTypeSpec	:== 2			// whether the function has u user defined type
+FI_IsNonRecursive :== 4			// used in trans.icl and partition.icl
+FI_IsUnboxedListOfRecordsConsOrNil :== 8
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -514,7 +514,6 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 	,	fi_dynamics			:: ![ExprInfoPtr]
 	,	fi_properties		:: !BITVECT
 	}
-/* ... Sjaak 19-3-2001 */
 
 ::	ParsedBody =
 	{	pb_args		:: ![ParsedExpr]
