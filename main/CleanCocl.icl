@@ -2,10 +2,7 @@ module CleanCocl;
 
 import StdEnv;
 
-from compilerSwitches import SwitchFusion;
 import cache_variable;
-
-f = SwitchFusion fusion_is_on 0;
 
 import CoclSystemDependent,Clean2AppleEventHandler;
 //1.3
