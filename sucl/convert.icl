@@ -1404,9 +1404,9 @@ convert_graph_symbol stringtype suclinfo (SuclUser symbkind) argexprs exprheap0 
         symbident
         = { symb_name = ident
           , symb_kind = symbkind
-          , symb_arity = arity
+          , symb_arity = length argexprs
           }
-        (ident,arity) = suclinfo symbkind
+        (ident,_) = suclinfo symbkind
         (appinfoptr,exprheap1) = newPtr EI_Empty exprheap0
 convert_graph_symbol _ _ _ _ exprheap eips = (mstub "convert_graph_symbol" "unexpected application form in graph node",exprheap,eips)
 
