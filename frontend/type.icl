@@ -867,6 +867,12 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
 	  (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
 	  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+// MW32..
+	  ({tdi_kinds}, prop_td_infos)
+	  		= prop_td_infos![glob_module,glob_object]
+	  (_, prop_error)
+	  		= unsafeFold2St (check_kind type_name modules) tdi_kinds cons_args (1, prop_error)
+// ..MW32
 	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
 			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
 				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
@@ -926,6 +932,41 @@ addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index
 			= (TA_Unique, attr_var_heap, attr_vars, attr_env, ps_error)
 		combine_attributes cons_attr _ _ attr_var_heap attr_vars attr_env ps_error
 			= (cons_attr, attr_var_heap, attr_vars, attr_env, ps_error)
+
+// MW32..
+		check_kind type_name modules type_kind {at_type} (arg_nr, prop_error)
+			# ok
+					= kind_is_ok modules (my_kind_to_int type_kind) at_type
+			| ok
+				= (arg_nr+1, prop_error)
+			# prop_error = errorHeading type_error prop_error
+			= (arg_nr+1, { prop_error & ea_file = prop_error.ea_file <<< " argument " <<< arg_nr <<< " of type " <<< type_name 
+													<<< " expected kind " <<< type_kind <<< "\n" })
+		  where
+			kind_is_ok modules demanded_kind (TA {type_index={glob_object,glob_module}} args)
+				# {td_arity}
+						= modules.[glob_module].com_type_defs.[glob_object]
+				= demanded_kind == td_arity-length args
+			kind_is_ok modules 0 (_ --> _)
+				= True
+			kind_is_ok modules _ (_ :@: _)
+				= True
+			kind_is_ok modules 0 (TB _)
+				= True
+			kind_is_ok modules _ (GTV _)
+				= True
+			kind_is_ok modules _ (TV _)
+				= True
+			kind_is_ok modules _ (TQV _)
+				= True
+			kind_is_ok modules _ _
+				= False
+		
+			my_kind_to_int KindConst
+				= 0
+			my_kind_to_int (KindArrow int_kind)
+				= int_kind
+// ..MW32
 
 addPropagationAttributesToAType modules type=:{at_type} ps
 	# (at_type, ps) = addPropagationAttributesToType modules at_type ps
@@ -1650,10 +1691,16 @@ CreateInitialSymbolTypes start_index common_defs [fun : funs] (fun_defs, pre_def
 	# (fd, fun_defs) = fun_defs![fun]
 	  (pre_def_symbols, req_cons_variables, ts) = initial_symbol_type (start_index == fun) common_defs fd (pre_def_symbols, req_cons_variables, ts)
 	= CreateInitialSymbolTypes start_index common_defs funs (fun_defs, pre_def_symbols, req_cons_variables, ts)
-where 
-	initial_symbol_type is_start_rule common_defs {fun_type = Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env}, fun_lifted, fun_info = {fi_dynamics} }
+where
+	initial_symbol_type is_start_rule common_defs 
+				{fun_symb, fun_type = Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env},fun_lifted,
+				 fun_info = {fi_dynamics}, fun_pos }
 				(pre_def_symbols, req_cons_variables, ts=:{ts_type_heaps,ts_expr_heap,ts_td_infos,ts_error})
-		# (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
+// MW32..
+		# fe_location = newPosition fun_symb fun_pos
+		  ts_error = setErrorAdmin fe_location ts_error
+// ..MW32
+		  (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
 				{ prop_type_heaps = ts_type_heaps, prop_td_infos = ts_td_infos,
 				  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = ts_error}
 		  (st_result, _, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error,prop_attr_env}) = addPropagationAttributesToAType common_defs st_result ps
@@ -2047,7 +2094,12 @@ where
 	type_component list_inferred_types comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (fun_defs, predef_symbols, [], ts)
-		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
+// MW32..
+		| not ts.ts_error.ea_ok
+			= (True, fun_defs, predef_symbols, special_instances, create_erroneous_function_types comp
+					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_error = { ts.ts_error & ea_ok = True } })
+// ..MW32
+		# (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts
 		#! nr_of_type_variables = ts.ts_var_store 
 		# (subst, ts_type_heaps, ts_error)
 		  		= unify_requirements_of_functions fun_reqs ti (createArray nr_of_type_variables TE) ts.ts_type_heaps ts.ts_error
