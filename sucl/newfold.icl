@@ -68,7 +68,7 @@ Deprecated type
 >       (bool,([bool],[rule * **],[rgraph * **]))
 */
 
-:: FunBody sym var
+:: FuncDef sym var
    :== [Rule sym var]
 
 /*
@@ -94,7 +94,7 @@ fullfold ::
     ((Rgraph sym var)->(sym,[var]))
     sym
     (Trace sym var pvar)
- -> ([Bool],FunBody sym var,[Rgraph sym var])
+ -> ([Bool],FuncDef sym var,[Rgraph sym var])
  |  == sym
  &  == var
  &  == pvar
@@ -119,7 +119,7 @@ recurse ::
     ((Rgraph sym var)->(sym,[var]))
     sym
  -> (Trace sym var pvar)
- -> (Bool,([Bool],FunBody sym var,[Rgraph sym var]))
+ -> (Bool,([Bool],FuncDef sym var,[Rgraph sym var]))
  |  == sym
  &  == var
  &  == pvar
@@ -159,7 +159,7 @@ foldtips ::
     (sym,[var])
  -> ([(var,Graph sym var)],[(var,Graph sym var)])
     (Trace sym var pvar)
- -> (Bool,([Bool],FunBody sym var,[Rgraph sym var]))
+ -> (Bool,([Bool],FuncDef sym var,[Rgraph sym var]))
  |  == sym
  &  == var
  &  == pvar
@@ -228,7 +228,7 @@ newextract ::
     (Etracer sym var pvar)
     ((Rgraph sym var)->(sym,[var]))
     (Trace sym var pvar)
- -> ([Bool],FunBody sym var,[Rgraph sym var])
+ -> ([Bool],FuncDef sym var,[Rgraph sym var])
  |  == sym
  &  == var
  &  == pvar

@@ -4,7 +4,7 @@ definition module newtest
 
 from cli import Cli
 from coreclean import SuclTypeSymbol,SuclTypeVariable,SuclSymbol,SuclVariable
-from newfold import FunBody
+from newfold import FuncDef
 from trace import Trace,Transformation
 from spine import Answer,Spine,Subspine
 from history import History,HistoryAssociation,HistoryPattern
@@ -17,7 +17,7 @@ from general import Optional
      , srr_strictness      :: [Bool]            // Strictness annotations
      , srr_typerule        :: Rule tsym tvar    // Type rule
      , srr_trace           :: Trace sym var var // Truncated and folded trace
-     , srr_function_body   :: FunBody sym var   // Resulting rewrite rules
+     , srr_function_def    :: FuncDef sym var   // Resulting rewrite rules
      , srr_areas           :: [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
      }
 
