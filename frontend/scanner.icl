@@ -786,9 +786,13 @@ ScanBSChar n chars input
 		'n'		->	(['n','\\':chars], n + 2, input)
 		'r'		->	(['r','\\':chars], n + 2, input)
 		'f'		->	(['f','\\':chars], n + 2, input)
-		'b'		->	(['b','\\':chars], n + 2, input)
+// RWS ...		'b'		->	(['b','\\':chars], n + 2, input)
+		'b'		->	to_chars '\b' n input
+// ... RWS
 		't'		->	(['t','\\':chars], n + 2, input)
-		'v'		->	(['v','\\':chars], n + 2, input)
+// RWS ...		'v'		->	(['v','\\':chars], n + 2, input)
+		'v'		->	to_chars '\v' n input
+// ... RWS
 		'\\'	->	(['\\','\\':chars], n + 2, input)
 		'"'		->	(['"' ,'\\':chars], n + 2, input)
 		'\''	->	(['\'','\\':chars], n + 2, input)
@@ -806,7 +810,9 @@ where
 	ScanNumChar base valid n acc input
 		# (eof, c, input)		= ReadChar input
 		| eof					= (acc, input)
-		| valid c				= ScanNumChar base valid (n-1) (base*acc+digitToInt c) input
+// RWS ...		| valid c				= ScanNumChar base valid (n-1) (base*acc+digitToInt c) input
+		| valid c				= ScanNumChar base valid (n-1) (base*acc+hexDigitToInt c) input
+// ... RWS
 								= (acc, charBack input)	
 	Hex = 16
 	Oct = 8
@@ -817,12 +823,26 @@ where
 		'\n'	->	(['n','\\':chars], n + 2, input)
 		'\r'	->	(['r','\\':chars], n + 2, input)
 		'\f'	->	(['f','\\':chars], n + 2, input)
-		'\b'	->	(['b','\\':chars], n + 2, input)
+// RWS \b not accepted in abc		'\b'	->	(['b','\\':chars], n + 2, input)
 		'\t'	->	(['t','\\':chars], n + 2, input)
-		'\v'	->	(['v','\\':chars], n + 2, input)
+// RWS \v not accepted in abc		'\v'	->	(['v','\\':chars], n + 2, input)
 		'\\'	->	(['\\','\\':chars], n + 2, input)
 		'"'		->	(['"' ,'\\':chars], n + 2, input)
 		'\''	->	(['\'','\\':chars], n + 2, input)
+
+// RWS ...
+		// escape non-printable characters
+		c		| not (IsPrint c)
+					-> (more_chars, n+4, input)
+					with
+						more_chars =
+							[	toChar (48 +  (toInt c       bitand 7))
+							,	toChar (48 + ((toInt c >> 3) bitand 7))
+							,	toChar (48 + ((toInt c >> 6) bitand 7))
+							,	'\\'
+							:	chars
+							]
+// ... RWS
 	 	c		->	([c:chars], n + 1, input)
 
 ScanEndOfChar :: !Int ![Char] !Input -> (!Token, !Input)
@@ -894,6 +914,13 @@ IsWhiteSpace c :== isSpace c
 IsDigit c :== isDigit c
 
 IsOct c :== '0' <= c && c <= '7'
+
+// RWS ...
+//IsDigit	:: Char	-> Bool
+// this assumes all 8 bit characters (>127) are not printable
+IsPrint c
+	:== c >= ' ' && c <= '~'
+// ... RWS
 
 //IsHex c :== isDigit c || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f') 
 /*
