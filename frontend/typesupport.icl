@@ -138,7 +138,10 @@ where
 		
 cleanUpTypeAttribute _ cui av=:(TA_Var _) cus
 	= (av, cus)			
-			
+
+cleanUpTypeAttribute _ cui type_attribute cus
+	= abort ("cleanUpTypeAttribute "+++toString type_attribute)
+
 instance clean_up Type
 where
 	clean_up cui (TempV tv_number) cus
@@ -1136,12 +1139,12 @@ checkProperty	form property	:== not (form.form_properties bitand property == 0)
 setProperty		form property	:== {form & form_properties = form.form_properties bitor property}
 clearProperty	form property	:== {form & form_properties = form.form_properties bitand (bitnot property)}
 
-(<::) infixl :: !*File (!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
+(<::) infixl :: !*File !(!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
 (<::) file (format, a, opt_beautifulizer)
 	# (file, _) = writeType file opt_beautifulizer (format, a)
 	= file
 	
-class writeType a :: !*File !(Optional TypeVarBeautifulizer) (!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
+class writeType a :: !*File !(Optional TypeVarBeautifulizer) !(!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
 
 instance writeType AttributeVar
 where

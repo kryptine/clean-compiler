@@ -12,9 +12,9 @@ from unitype import Coercions, CoercionTree, AttributePartition, CT_Empty
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
 // MW4 was:class (<::) infixl a :: !*File (!Format, !a) -> *File
-(<::) infixl :: !*File (!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
+(<::) infixl :: !*File !(!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
 
-class writeType a :: !*File !(Optional TypeVarBeautifulizer) (!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
+class writeType a :: !*File !(Optional TypeVarBeautifulizer) !(!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
 
 :: Format =
 	{	form_properties 	:: !BITVECT
