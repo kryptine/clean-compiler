@@ -1605,7 +1605,7 @@ where
 		convertTypecode (TCE_Selector selections var_info_ptr) ui
 			= (Selection NormalSelector (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ui)
 		convertTypecode (TCE_UniType uni_vars type_code) ui
-			# (let_binds, ui)		= createVariables uni_vars ui
+			# (let_binds, ui)		= createUniversalVariables uni_vars ui
 			  (let_expr, ui)		= convertTypecode type_code ui
 			  (let_info_ptr,ui) = let_ptr (length let_binds) ui
 			= ( Let {	let_strict_binds	= []
@@ -1626,12 +1626,16 @@ where
 			= (App {	app_symb		= cons_symb,
 						app_args 		= [expr , exprs],
 						app_info_ptr	= nilPtr}, ui)
+						
+		createUniversalVariables var_info_ptrs ui
+			= createVariables2 True var_info_ptrs ui
 
-		createVariables var_info_ptrs ui
+		createVariables2 generate_universal_placeholders var_info_ptrs ui
 			= mapSt create_variable var_info_ptrs ui
 		where
 			create_variable var_info_ptr ui
-				# (placeholder_symb, ui) = getSymbol PD_variablePlaceholder SK_Constructor ui
+				# (placeholder_symb, ui) 
+					= getSymbol PD_UvariablePlaceholder SK_Constructor ui
 				  cyclic_var = {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 				  cyclic_fv = varToFreeVar cyclic_var 1	
 				= ({ lb_src = App {	app_symb = placeholder_symb,

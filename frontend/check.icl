@@ -2987,6 +2987,7 @@ where
 				<=< adjustPredefSymbol PD_TypeObjectType		mod_index STE_Type
 				<=< adjustPredefSymbol PD_TypeConsSymbol		mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_variablePlaceholder mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_UvariablePlaceholder mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_unify				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_coerce				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_undo_indirections	mod_index STE_DclFunction
