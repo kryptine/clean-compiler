@@ -750,6 +750,9 @@ where
 											case_default	= default_expr,
 											case_ident		= No,
 											case_info_ptr	= case_info_ptr,
+// RWS ...
+											case_explicit	= False,
+// ... RWS
 											case_default_pos= NoPos } // MW4++
 				,	let_info_ptr = let_info_ptr	
 				,	let_expr_position = NoPos // MW0++
@@ -880,6 +883,9 @@ where
 												case_default	= default_expr,
 												case_ident		= No,
 												case_info_ptr	= case_info_ptr,
+// RWS ...
+												case_explicit	= False,
+// ... RWS
 												case_default_pos= NoPos }, // MW4++
 // MW0		  					let_info_ptr = let_info_ptr	}
 		  					let_info_ptr = let_info_ptr,

@@ -3118,6 +3118,9 @@ buildCaseExpr case_arg case_alts heaps=:{hp_expression_heap}
 		case_default = No,
 		case_ident = No,
 		case_info_ptr = expr_info_ptr,
+// RWS ...
+		case_explicit = False,
+// ... RWS
 		case_default_pos = NoPos 
 		}
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap}	

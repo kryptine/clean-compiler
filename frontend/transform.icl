@@ -1536,7 +1536,10 @@ where
 			if_expression e1 e2 e3 cos
 				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
 				# kase = Case {	case_expr=e1, case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr=e2,bp_position=NoPos}],
-								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos }
+								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos,
+// RWS ...
+								case_explicit = False }
+// ... RWS
 				= (kase,{cos & cos_symbol_heap=symbol_heap});
 			
 			two_args [_,_]

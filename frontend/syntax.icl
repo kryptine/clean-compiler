@@ -1077,6 +1077,9 @@ cIsNotStrict	:== False
 	,	case_default	:: !Optional Expression
 	,	case_ident		:: !Optional Ident
 	,	case_info_ptr	:: !ExprInfoPtr
+// RWS ...
+	,	case_explicit	:: !Bool
+// ... RWS
 	,	case_default_pos:: !Position
 	}
 
