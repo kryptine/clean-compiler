@@ -840,9 +840,9 @@ where
 		= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
 
 checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
-	!*TypeVarHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*GenericHeap, !*ErrorAdmin)
+	!*TypeVarHeap !*ExpressionHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ExpressionHeap, !*GenericHeap, !*ErrorAdmin)
 checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs icl_fun_defs dcl_modules
-			type_def_infos class_infos type_var_heap gen_heap error
+			type_def_infos class_infos type_var_heap expression_heap gen_heap error
 	# as =
 	  	{	as_td_infos			= type_def_infos
 		,	as_type_var_heap	= type_var_heap
@@ -850,31 +850,31 @@ checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_
 		,	as_error			= error
 		}
 
-	# (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
+	# (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
 		= iFoldSt (check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs)
-						0 (size common_defs) (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
-	= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, gen_heap, as.as_error)
+						0 (size common_defs) (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
+	= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, expression_heap, gen_heap, as.as_error)
 where
 	check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs module_index
-					(icl_fun_defs, dcl_modules, class_infos, gen_heap, as) 
+					(icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as) 
 		| inNumberSet module_index used_module_numbers
 			| module_index == main_module_index
 				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
 				# (class_infos, gen_heap, as) = check_kinds_of_generics common_defs 0 common_defs.[module_index].com_generic_defs class_infos gen_heap as
 				# as = check_kinds_of_gencases 0 common_defs.[module_index].com_gencase_defs as
-				# (icl_fun_defs, class_infos, as) = foldSt (check_kinds_of_icl_fuctions common_defs) icl_fun_def_ranges (icl_fun_defs, class_infos, as)
+				# (icl_fun_defs, class_infos, expression_heap, as) = foldSt (check_kinds_of_icl_fuctions common_defs) icl_fun_def_ranges (icl_fun_defs, class_infos, expression_heap, as)
 					with
-						check_kinds_of_icl_fuctions common_defs {ir_from,ir_to} (icl_fun_defs, class_infos, as)
-							= iFoldSt (check_kinds_of_icl_fuction common_defs) ir_from ir_to (icl_fun_defs, class_infos, as)
-				= (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
+						check_kinds_of_icl_fuctions common_defs {ir_from,ir_to} (icl_fun_defs, class_infos, expression_heap, as)
+							= iFoldSt (check_kinds_of_icl_fuction common_defs) ir_from ir_to (icl_fun_defs, class_infos, expression_heap, as)
+				= (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
 			| module_index >= first_uncached_module
 				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
 				# (class_infos, gen_heap, as) = check_kinds_of_generics common_defs 0 common_defs.[module_index].com_generic_defs class_infos gen_heap as
 				# as = check_kinds_of_gencases 0 common_defs.[module_index].com_gencase_defs as
 				# (dcl_modules, class_infos, as) = check_kinds_of_dcl_fuctions common_defs module_index dcl_modules class_infos as
-				= (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
-				= (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
-			= (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)				
+				= (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
+				= (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
+			= (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)				
 
 	check_kinds_of_class_instances common_defs instance_index instance_defs class_infos as
 		| instance_index == size instance_defs
@@ -948,15 +948,16 @@ where
 		check_kinds_of_gencase gencase as 
 			= as
 
-	check_kinds_of_icl_fuction common_defs fun_index (icl_fun_defs, class_infos, as)
-		# ({fun_type,fun_symb,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
+	check_kinds_of_icl_fuction common_defs fun_index (icl_fun_defs, class_infos, expression_heap, as)
+		# ({fun_type,fun_symb,fun_info,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
+		  (expression_heap, as) = check_kinds_of_dynamics common_defs fun_info.fi_dynamics expression_heap as
 		= case fun_type of
 			Yes symbol_type
 				# as_error = pushErrorAdmin (newPosition fun_symb fun_pos) as.as_error
 				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos { as & as_error = as_error }
-				-> (icl_fun_defs, class_infos, { as & as_error = popErrorAdmin as.as_error })
+				-> (icl_fun_defs, class_infos, expression_heap, { as & as_error = popErrorAdmin as.as_error })
 			No
-				-> (icl_fun_defs, class_infos, as)
+				-> (icl_fun_defs, class_infos, expression_heap, as)
 
 	check_kinds_of_dcl_fuctions common_defs module_index dcl_modules class_infos as
 		# ({dcl_functions,dcl_instances}, dcl_modules) = dcl_modules![module_index]
@@ -976,6 +977,41 @@ where
 		# (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars st_vars as_type_var_heap as_kind_heap
 		  as = determine_kinds_type_list common_defs [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 		= determine_kinds_of_type_contexts common_defs st_context class_infos as
+
+	check_kinds_of_dynamics :: {#CommonDefs} [DynamicPtr] *ExpressionHeap *AnalyseState -> (*ExpressionHeap, *AnalyseState)
+	check_kinds_of_dynamics common_defs dynamic_ptrs expr_heap as
+		= foldSt (check_kinds_of_dynamic common_defs) dynamic_ptrs (expr_heap, as)
+	where
+		check_kinds_of_dynamic :: {#CommonDefs} DynamicPtr (*ExpressionHeap, *AnalyseState) -> (*ExpressionHeap, *AnalyseState)
+		check_kinds_of_dynamic common_defs dynamic_ptr (expr_heap, as)
+			# (dynamic_info, expr_heap) = readPtr dynamic_ptr expr_heap
+			  (expr_heap, as) = check_kinds_of_dynamic_info common_defs dynamic_info (expr_heap, as)
+			= (expr_heap, as)
+
+		check_kinds_of_dynamic_info :: {#CommonDefs} ExprInfo (*ExpressionHeap, *AnalyseState) -> (*ExpressionHeap, *AnalyseState)
+		check_kinds_of_dynamic_info	common_defs (EI_Dynamic opt_type locals) (expr_heap, as)
+			# as = check_kinds_of_opt_dynamic_type common_defs opt_type as
+			  (expr_heap, as) = check_kinds_of_dynamics common_defs locals expr_heap as
+			= (expr_heap, as)
+		check_kinds_of_dynamic_info	common_defs (EI_DynamicTypeWithVars	vars type locals) (expr_heap, as=:{as_type_var_heap,as_kind_heap})
+			# (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars vars as_type_var_heap as_kind_heap
+			  as = check_kinds_of_dynamic_type common_defs type { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+			  (expr_heap, as) = check_kinds_of_dynamics common_defs locals expr_heap as
+			= (expr_heap, as)
+
+		check_kinds_of_opt_dynamic_type :: {#CommonDefs} (Optional DynamicType) *AnalyseState -> *AnalyseState
+		check_kinds_of_opt_dynamic_type	common_defs (Yes type) as
+			= check_kinds_of_dynamic_type common_defs type as
+		check_kinds_of_opt_dynamic_type	common_defs No as
+			= as
+
+		check_kinds_of_dynamic_type :: {#CommonDefs} DynamicType *AnalyseState -> *AnalyseState
+		check_kinds_of_dynamic_type	common_defs {dt_type, dt_uni_vars, dt_global_vars} as=:{as_type_var_heap,as_kind_heap}
+			# (as_type_var_heap, as_kind_heap)
+				= bindFreshKindVariablesToTypeVars [atv_variable \\ {atv_variable} <- dt_uni_vars]
+						as_type_var_heap as_kind_heap
+			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars dt_global_vars as_type_var_heap as_kind_heap
+			= determine_kinds_type_list common_defs [dt_type] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 
 instance <<< DynamicType
 where

@@ -125,13 +125,13 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 */
 	  (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
-	# (fun_defs, dcl_mods, td_infos, th_vars, gen_heap, error_admin)
+	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)
 			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers icl_global_functions
-				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars gen_heap error_admin
+				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars heaps.hp_expression_heap heaps.hp_generic_heap error_admin
 
       type_heaps = { type_heaps & th_vars = th_vars }
 
-	# heaps = { heaps & hp_type_heaps = type_heaps, hp_generic_heap = gen_heap }
+	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap }
 	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
 		with 
 			dcl_common_defs :: .{#DclModule} -> .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading
