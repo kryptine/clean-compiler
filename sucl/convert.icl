@@ -1063,6 +1063,7 @@ collect_calls _ _ = mstub "collect_calls" "unexpected FunctionBody form"
 addfuncall main_dcl_module_n {symb_kind=SK_Function {glob_module=modindex,glob_object=funindex}} rest
 | modindex == main_dcl_module_n
   = [{fc_level=NotALevel,fc_index=funindex}:rest]
+addfuncall _ _ rest
 = rest
 
 //collect_expr_calls :: Expression [SymbIdent] -> [SymbIdent]
