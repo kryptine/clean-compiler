@@ -4,7 +4,7 @@ import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers, portToNewSyntax, compilerSwitches
-import RWSDebug
+// import RWSDebug
 
 cUndef :== (-1)
 cDummyArray :== {}
@@ -790,6 +790,106 @@ ident_for_errors_from_fun_symb_and_fun_kind {id_name} (FK_Function fun_name_is_l
 ident_for_errors_from_fun_symb_and_fun_kind fun_symb _
 	= fun_symb
 
+// check that there are no strict lets, mark top-level cases as explicit
+class checkMacro a :: !Bool !a !*ErrorAdmin -> (!a, !*ErrorAdmin)
+
+instance checkMacro [a] | checkMacro a where
+	checkMacro topLevel l ea
+		=	mapSt (checkMacro topLevel) l ea
+
+instance checkMacro FunctionBody where
+	checkMacro topLevel (CheckedBody body) ea
+		# (body, ea)
+			=	checkMacro topLevel body ea
+		= (CheckedBody body, ea)
+
+instance checkMacro CheckedBody where
+	checkMacro topLevel body=:{cb_rhs} ea
+		# (cb_rhs, ea)
+			=	checkMacro topLevel cb_rhs ea
+		= ({body & cb_rhs = cb_rhs}, ea)
+
+instance checkMacro CheckedAlternative where
+	checkMacro topLevel alt=:{ca_rhs} ea
+		# (ca_rhs, ea)
+			=	checkMacro topLevel ca_rhs ea
+		= ({alt & ca_rhs = ca_rhs}, ea)
+
+instance checkMacro Expression where
+	checkMacro topLevel (Let lad) ea
+		# (lad, ea)
+			=	checkMacro topLevel lad ea
+		=	(Let lad, ea)
+	checkMacro topLevel (Case kees) ea
+		# (kees, ea)
+			=	checkMacro topLevel kees ea
+		=	(Case kees, ea)
+	checkMacro _ expr ea
+		=	(expr, ea)
+
+instance checkMacro Let where
+	checkMacro topLevel lad=:{let_strict_binds, let_expr} ea
+		# ea
+			=	check_strict_binds let_strict_binds ea
+		# (let_expr, ea)
+			=	checkMacro topLevel let_expr ea
+		= ({lad & let_expr = let_expr}, ea)
+		where
+			check_strict_binds [] ea
+				=	ea
+			check_strict_binds _ ea
+				=	checkError "#! not allowed in macros" "" ea
+
+instance checkMacro Case where
+	checkMacro topLevel kees=:{case_guards, case_explicit} ea
+		# (case_guards, ea)
+			=	checkMacro False case_guards ea
+		= ({kees & case_guards = case_guards,case_explicit = topLevel || case_explicit}, ea)
+
+instance checkMacro CasePatterns where
+	checkMacro topLevel (AlgebraicPatterns type patterns) ea
+		# (patterns, ea)
+			=	checkMacro topLevel patterns ea	
+		=	(AlgebraicPatterns type patterns, ea)
+	checkMacro topLevel (BasicPatterns type patterns) ea
+		# (patterns, ea)
+			=	checkMacro topLevel patterns ea	
+		=	(BasicPatterns type patterns, ea)
+	checkMacro topLevel (DynamicPatterns patterns) ea
+		# (patterns, ea)
+			=	checkMacro topLevel patterns ea	
+		=	(DynamicPatterns patterns, ea)
+	checkMacro topLevel (OverloadedListPatterns type decons patterns) ea
+		# (patterns, ea)
+			=	checkMacro topLevel patterns ea	
+		=	(OverloadedListPatterns type decons patterns, ea)
+	checkMacro _ NoPattern ea
+		=	(NoPattern, ea)
+
+instance checkMacro AlgebraicPattern where
+	checkMacro topLevel pattern=:{ap_expr} ea
+		# (ap_expr, ea)
+			=	checkMacro topLevel ap_expr ea	
+		=	({pattern & ap_expr = ap_expr}, ea)
+
+instance checkMacro BasicPattern where
+	checkMacro topLevel pattern=:{bp_expr} ea
+		# (bp_expr, ea)
+			=	checkMacro topLevel bp_expr ea	
+		=	({pattern & bp_expr = bp_expr}, ea)
+
+instance checkMacro DynamicPattern where
+	checkMacro topLevel pattern=:{dp_rhs} ea
+		# (dp_rhs, ea)
+			=	checkMacro topLevel dp_rhs ea	
+		=	({pattern & dp_rhs = dp_rhs}, ea)
+
+checkFunctionBodyIfMacro :: !FunKind !FunctionBody !*ErrorAdmin -> (!FunctionBody, !*ErrorAdmin)
+checkFunctionBodyIfMacro FK_Macro def ea
+	=	checkMacro True def ea
+checkFunctionBodyIfMacro _ def ea
+	=	(def, ea)
+
 checkFunction :: !FunDef !Index !FunctionOrMacroIndex !Level !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 													  -> (!FunDef,!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState);
 checkFunction fun_def=:{fun_symb,fun_pos,fun_body,fun_type,fun_kind} mod_index fun_index def_level local_functions_index_offset
@@ -808,7 +908,8 @@ checkFunction fun_def=:{fun_symb,fun_pos,fun_body,fun_type,fun_kind} mod_index f
 	# {es_fun_defs,es_calls,es_var_heap,es_expr_heap,es_type_heaps,es_dynamics} = e_state
 	  (ef_type_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
 	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_modules es_type_heaps es_expr_heap cs
-	  cs = { cs & cs_error = popErrorAdmin cs.cs_error }
+	  (fun_body, cs_error) = checkFunctionBodyIfMacro fun_kind fun_body cs.cs_error
+	  cs = { cs & cs_error = popErrorAdmin cs_error }
 	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
 	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics,
 	  								  fi_properties = fi_properties }
