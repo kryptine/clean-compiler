@@ -2631,8 +2631,8 @@ where
 		  array_first_instance_indices = first_instance_indices si_array_instances
 		= (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,type_code_instances,predef_symbols,type_heaps,error)
 	where
-		mark_used_type_constructors_in_applications_of_type_dependent_functions {gtci_index, gtci_type=GTT_Constructor type_symb_ident module_name False}
-			= GTT_Constructor type_symb_ident module_name True
+		mark_used_type_constructors_in_applications_of_type_dependent_functions {gtci_index, gtci_type=GTT_Constructor cons False}
+			= GTT_Constructor cons True
 		mark_used_type_constructors_in_applications_of_type_dependent_functions {gtci_type}
 			= gtci_type
 	

@@ -1278,7 +1278,6 @@ cIsNotStrict	:== False
 	{	dyn_expr		:: !Expression
 	,	dyn_opt_type	:: !Optional DynamicType
 	,	dyn_info_ptr	:: !ExprInfoPtr
-//	,	dyn_uni_vars	:: ![VarInfoPtr]			/* filled after type checking */
 	,	dyn_type_code	:: !TypeCodeExpression		/* filled after type checking */
 	}	
 
@@ -1302,10 +1301,11 @@ instance == OverloadedListType
 						| TCE_Var 			!VarInfoPtr
 						| TCE_TypeTerm		!VarInfoPtr
 						| TCE_Constructor	!Index			![TypeCodeExpression]
+						| TCE_App			!TypeCodeExpression !TypeCodeExpression
 						| TCE_Selector		![Selection]	!VarInfoPtr
 						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
 
-::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent !String !Bool | GTT_Function
+::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !SymbIdent !Bool | GTT_PredefTypeConstructor !(Global Index) | GTT_Function
 	
 
 ::	FunctionPattern	= FP_Basic !BasicValue !(Optional FreeVar)

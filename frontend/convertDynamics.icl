@@ -13,11 +13,8 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 import type_io;
 //import pp;
 
-/*2.0
-from type_io_common import class toString (..),instance toString GlobalTCType;
-0.2*/
 
-:: TypeCodeVariableInfo = TCI_TypeTerm | TCI_TypeVar !Expression
+:: TypeCodeVariableInfo = TCI_TypeVar !Expression | TCI_TypePatternVar !Expression
 :: DynamicValueAliasInfo :== BoundVar
 
 ::	*ConversionState =
@@ -27,9 +24,8 @@ from type_io_common import class toString (..),instance toString GlobalTCType;
 	,	ci_new_variables 	:: ![FreeVar]
 
 	,	ci_type_pattern_var_count	:: !Int	
+	,	ci_type_var_count :: !Int
 	//	data needed to generate coercions
-	,	ci_module_id_symbol						:: Expression
-	,	ci_module_id_var						:: Optional LetBind
 	,	ci_type_constructor_used_in_dynamic_patterns	:: !*{#Bool}
 	}
 
@@ -49,6 +45,9 @@ from type_io_common import class toString (..),instance toString GlobalTCType;
 F :: !a .b -> .b
 F a b = b
 
+fatal :: {#Char} {#Char} -> .a
+fatal function_name message
+	=	abort ("convertDynamics, " +++ function_name +++ ": " +++ message)
 
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] _ _ !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
@@ -71,7 +70,7 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 
 	// dynamic pattern matches
 	#! type_constructors_in_dynamic_patterns
-		= collect_type_constructors_in_dynamic_patterns 0 (size global_type_instances) []
+		=	collect_type_constructors_in_dynamic_patterns 0 (size global_type_instances) []
 	#! (tcl_file,write_type_info_state)
 		= write_type_info type_constructors_in_dynamic_patterns tcl_file write_type_info_state
 
@@ -91,60 +90,37 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 				
 	= (True,tcl_file,type_heaps,predefined_symbols) 
 where
+
 	collect_type_constructors_in_dynamic_patterns :: !Int !Int [TypeSymbIdent] -> [TypeSymbIdent]
 	collect_type_constructors_in_dynamic_patterns i limit type_constructors_in_dynamic_patterns
-		| i == limit
-			= type_constructors_in_dynamic_patterns
-			
-			| isGTT_Constructor global_type_instances.[i]
-				# (GTT_Constructor type_name=:{type_name={id_name}} module_name used_in_application_of_type_dependent_function)
-					= global_type_instances.[i]
-				| used_in_application_of_type_dependent_function || ci_type_constructor_used_in_dynamic_patterns.[i]
-					= collect_type_constructors_in_dynamic_patterns (inc i) limit [type_name:type_constructors_in_dynamic_patterns]
-					= collect_type_constructors_in_dynamic_patterns (inc i) limit type_constructors_in_dynamic_patterns
-				= collect_type_constructors_in_dynamic_patterns (inc i) limit type_constructors_in_dynamic_patterns
-	where
-		isGTT_Constructor (GTT_Constructor _ _ _)	= True
-		isGTT_Constructor _							= False
-		
+		=	[]
+
 	f write_type_info_state=:{wtis_type_heaps}
 		= (wtis_type_heaps,{write_type_info_state & wtis_type_heaps = abort "convertDynamics.icl"});
+
+
 
 /*2.0
 f (Yes tcl_file)
 	= tcl_file;
 0.2*/
+
 			
 convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
 convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	#! (dynamic_representation,predefined_symbols)
 		=	create_dynamic_and_selector_idents common_defs predefined_symbols
-/*
-	# (module_symb,module_id,predefined_symbols)
-		= get_module_id_app predefined_symbols
-	# ({pds_module=pds_type_id_module, pds_def=pds_type_id_def} , predefined_symbols) = predefined_symbols![PD_TypeID]
-	# type_id
-		=	{	type_name	= common_defs.[pds_type_id_module].com_type_defs.[pds_type_id_def].td_name
-			,	type_arity	= 0
-			,	type_index	= { glob_object = pds_type_id_def, glob_module = pds_type_id_module}
-			,	type_prop	= { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }
-			}
-*/
-	# type_id = undef
-	# (module_symb,module_id,predefined_symbols)
-		= get_module_id_app predefined_symbols
 
 	#! nr_of_funs = size fun_defs
 	#! s_global_type_instances = size global_type_instances
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_type_constructor_used_in_dynamic_patterns}))
-			= convert_groups 0 groups global_type_instances type_id module_id dynamic_representation (fun_defs, {	
+			= convert_groups 0 groups global_type_instances dynamic_representation (fun_defs, {	
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
 							ci_new_variables = [],
+							ci_type_var_count = -1,
 							ci_type_pattern_var_count = 0,
-							ci_module_id_symbol = App module_symb,
-							ci_module_id_var  = No,
 							ci_type_constructor_used_in_dynamic_patterns	= createArray s_global_type_instances False
 							})
 			
@@ -163,13 +139,13 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 
 	= (groups, fun_defs, ci_predef_symb, imported_types, [], ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
 where
-	convert_groups group_nr groups global_type_instances type_id module_id dynamic_representation fun_defs_and_ci
+	convert_groups group_nr groups global_type_instances dynamic_representation fun_defs_and_ci
 		| group_nr == size groups
 			= (groups, fun_defs_and_ci)
 			# (group, groups) = groups![group_nr]
-			= convert_groups (inc group_nr) groups global_type_instances type_id module_id dynamic_representation (foldSt (convert_function group_nr global_type_instances type_id module_id dynamic_representation) group.group_members fun_defs_and_ci)
+			= convert_groups (inc group_nr) groups global_type_instances dynamic_representation (foldSt (convert_function group_nr global_type_instances dynamic_representation) group.group_members fun_defs_and_ci)
 
-	convert_function group_nr global_type_instances type_id module_id dynamic_representation fun (fun_defs, ci)
+	convert_function group_nr global_type_instances dynamic_representation fun (fun_defs, ci)
 		# (fun_def, fun_defs) = fun_defs![fun]
 		  {fun_body, fun_type, fun_info} = fun_def
 		| isEmpty fun_info.fi_dynamics
@@ -179,8 +155,6 @@ where
 			// of its use. In some very specific cases, the let generated here is superfluous.
 			# (TransformedBody fun_body=:{tb_rhs})
 				= fun_body
-			# (tb_rhs, ci)
-				= share_module_identification tb_rhs module_id ci
 			# fun_body
 				= {fun_body & tb_rhs = tb_rhs}
 			# fun_body
@@ -189,7 +163,7 @@ where
 			# (unify_subst_var, ci)
 			  	=	newVariable "unify_subst" VI_Empty ci
 			# ci
-				= {ci & ci_type_pattern_var_count = 0}
+				= {ci & ci_type_pattern_var_count = 0, ci_type_var_count = -1}
 
 			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
 					cinp_glob_type_inst = global_type_instances,
@@ -197,34 +171,6 @@ where
 
 			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
 				{ ci & ci_new_variables = [] })
-		where
-			share_module_identification rhs module_id ci
-				# (dst=:{var_info_ptr},ci)
-					= newVariable "module_id" VI_Empty ci
-				# dst_fv
-					= varToFreeVar dst 1
-				# let_bind
-					= { lb_src = module_id
-					,	lb_dst = dst_fv
-					,	lb_position = NoPos
-					}
-
-				# ci
-					= { ci & 
-						ci_new_variables	= [ dst_fv : ci.ci_new_variables ]
-					,	ci_module_id_var		= Yes let_bind
-					}
-
-				# (let_info_ptr,  ci)	= let_ptr2 [toAType TE] ci
-				# rhs
-					= Let {	let_strict_binds	= [],
-							let_lazy_binds		= [let_bind],
-							let_expr			= rhs,
-							let_info_ptr		= let_info_ptr,
-							let_expr_position	= NoPos
-					}
-				=	(rhs, ci)
-
 
 class convertDynamics a :: !ConversionInput !a !*ConversionState -> (!a, !*ConversionState)
 
@@ -250,8 +196,8 @@ instance convertDynamics TransformedBody where
 	convertDynamics cinp body=:{tb_args,tb_rhs} ci=:{ci_var_heap}
 		// this actually marks all arguments as type terms (also the regular arguments
 		// and dictionaries)
-		# ci_var_heap
-			=	foldSt mark_var tb_args ci_var_heap
+//		# ci_var_heap
+//			=	foldSt mark_var tb_args ci_var_heap
 		# (tb_rhs, ci)
 			=	convertDynamics cinp tb_rhs {ci & ci_var_heap = ci_var_heap}
 		# (global_tpvs, subst, ci)
@@ -260,9 +206,9 @@ instance convertDynamics TransformedBody where
 			=	share_init_subst subst global_tpvs tb_rhs ci
 		=	({body & tb_rhs = tb_rhs}, ci)
 		where
-			mark_var :: FreeVar *VarHeap -> *VarHeap
-			mark_var {fv_info_ptr} var_heap
-				=	writePtr fv_info_ptr (VI_TypeCodeVariable TCI_TypeTerm) var_heap
+//			mark_var :: FreeVar *VarHeap -> *VarHeap
+//			mark_var {fv_info_ptr} var_heap
+//				=	writePtr fv_info_ptr (VI_TypeCodeVariable TCI_TypeTerm) var_heap
 
 			collect_global_type_pattern_var :: FreeVar ([LetBind], BoundVar, *ConversionState) -> ([LetBind], BoundVar, *ConversionState)
 			collect_global_type_pattern_var {fv_info_ptr} (l, subst, ci)
@@ -271,7 +217,7 @@ instance convertDynamics TransformedBody where
 				# ci
 					=	{ci & ci_var_heap = ci_var_heap}
 				=	case var_info of
-						VI_TypeCodeVariable (TCI_TypeVar tpv)
+						VI_TypeCodeVariable (TCI_TypePatternVar tpv)
 							# (bind_global_tpv_symb, ci) 
 								=	getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
 							# type_code
@@ -293,13 +239,16 @@ instance convertDynamics TransformedBody where
 
 			share_init_subst :: BoundVar [LetBind] Expression *ConversionState
 					-> (Expression, *ConversionState)
-			share_init_subst subst global_tpv_binds rhs ci=:{ci_type_pattern_var_count}
+			share_init_subst subst global_tpv_binds rhs ci=:{ci_type_pattern_var_count, ci_type_var_count}
 				#  (initial_unifier_symb, ci) 
-					=	getSymbol PD_Dyn_initial_unifier SK_Function 1 ci
+					=	getSymbol PD_Dyn_initial_unification_environment SK_Function 2 ci
 
 				# let_bind_initial_subst
 					= { lb_src = App {	app_symb		= initial_unifier_symb,
-										app_args 		= [BasicExpr (BVInt ci_type_pattern_var_count)],
+										app_args 		=
+												[	BasicExpr (BVInt ci_type_pattern_var_count)
+												,	BasicExpr (BVInt (~ci_type_var_count-1))
+												],
 										app_info_ptr	= nilPtr }
 					,	lb_dst =  varToFreeVar subst 1
 					,	lb_position = NoPos
@@ -335,13 +284,9 @@ instance convertDynamics (Bind a b) | convertDynamics a where
 
 instance convertDynamics Expression where
 	convertDynamics cinp (TypeCodeExpression tce) ci
-		# (type_code, ci)
+		# (dyn_type_code, ci)
 			=	convertExprTypeCode cinp tce ci
-		# (normalise_symb, ci) 
-			=	getSymbol PD_Dyn_normalise SK_Function 2 ci
-		# normalise_call
-			=	App { app_symb = normalise_symb,  app_args = [ Var cinp.cinp_subst_var, type_code],  app_info_ptr = nilPtr }
-		=	(normalise_call, ci)
+		=	(dyn_type_code, ci)
 	convertDynamics cinp (Var var) ci
 		# (info, ci_var_heap)
 			=	readPtr var.var_info_ptr ci.ci_var_heap
@@ -469,17 +414,9 @@ convertDynamic cinp=:{cinp_dynamic_representation={dr_type_ident}}
 		=	convertDynamics cinp dyn_expr ci
 	# (dyn_type_code, ci)
 		=	convertExprTypeCode cinp dyn_type_code ci
-
-	#  (normalise_symb, ci) 
-		=	getSymbol PD_Dyn_normalise SK_Function 2 ci
-
-	# normalise_call
-		=	App { app_symb = normalise_symb,  app_args = [ Var cinp.cinp_subst_var, dyn_type_code],  app_info_ptr = nilPtr }
-
 	=	(App {	app_symb		= dr_type_ident,
-				app_args 		= [dyn_expr, normalise_call],
+				app_args 		= [dyn_expr, dyn_type_code],
 				app_info_ptr	= nilPtr }, ci)
-
 convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dynamic_type}}
 			kees=:{case_guards=DynamicPatterns alts, case_info_ptr, case_default} ci
 	# (value_var, ci)
@@ -619,127 +556,173 @@ convertExprTypeCode
 	::	!ConversionInput !TypeCodeExpression !*ConversionState
 	->	(!Expression, !*ConversionState)
 convertExprTypeCode cinp tce ci
-	# (expr, binds, ci)
-		=	convertTypeCode cinp tce [] ci
+	# (type_code, (has_var, binds, ci))
+		=	convertTypeCode False cinp tce (False, [], ci)
 	// sanity check ...
 	| not (isEmpty binds)
 		=	abort "unexpected binds in expression type code"
 	// ... sanity check	
-	=	(expr, ci)
+	# (normalise_symb, ci) 
+		=	getSymbol PD_Dyn_normalise SK_Function 2 ci
+	# type_code
+		=	App { app_symb = normalise_symb,
+				app_args = [ BasicExpr (BVB has_var), Var cinp.cinp_subst_var, type_code],  app_info_ptr = nilPtr }
+	=	(type_code, ci)
 
 convertPatternTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 										-> (!Expression, ![LetBind], !*ConversionState)
 convertPatternTypeCode cinp tce ci
-	=	convertTypeCode cinp tce [] ci
+	# (type_code, (has_var, binds, ci))
+		=	convertTypeCode True cinp tce (False, [], ci)
+	=	(type_code, binds, ci)
 
-convertTypeCode :: !ConversionInput !TypeCodeExpression ![LetBind] !*ConversionState
-										-> (!Expression, ![LetBind], !*ConversionState)
-convertTypeCode _ (TCE_Var var_info_ptr) binds ci=:{ci_var_heap}
+convertTypeCode :: !Bool !ConversionInput !TypeCodeExpression (!Bool, ![LetBind], !*ConversionState)
+										-> (!Expression, (!Bool, ![LetBind], !*ConversionState))
+convertTypeCode pattern _ (TCE_Var var_info_ptr) (has_var, binds, ci=:{ci_var_heap})
 	# (var_info, ci_var_heap)
 		=	readPtr var_info_ptr ci_var_heap
 	  ci
 	  	=	{ci & ci_var_heap = ci_var_heap}
 	=	case var_info of
-			// sanity check ...
-			VI_TypeCodeVariable TCI_TypeTerm
-				->	abort "unexpected type term"
-			// ... sanity check
-			VI_TypeCodeVariable (TCI_TypeVar expr)
-				->	(expr, binds, ci) 
+			VI_TypeCodeVariable (TCI_TypeVar tv)
+				->	(tv, (has_var, binds, ci))
+			VI_TypeCodeVariable (TCI_TypePatternVar tpv)
+				->	(tpv, (True, binds, ci))
 			_
 				# (expr, ci)
 					=	createTypePatternVariable ci
 				# ci
 					=	{ci & ci_var_heap
-						=	writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypeVar expr)) ci.ci_var_heap}
-				->	(expr, binds, ci)
-convertTypeCode _ (TCE_TypeTerm var_info_ptr) binds ci=:{ci_var_heap}
-	// sanity check ...
+						=	writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
+				->	(expr, (True, binds, ci))
+convertTypeCode pattern _ (TCE_TypeTerm var_info_ptr) (has_var, binds, ci=:{ci_var_heap})
 	# (var_info, ci_var_heap)
 		=	readPtr var_info_ptr ci_var_heap
 	  ci
 	  	=	{ci & ci_var_heap = ci_var_heap}
-//	# ci
 	=	case var_info of
-				VI_TypeCodeVariable TCI_TypeTerm
-					# (expr, ci)
-						=	createTypePatternVariable ci
-					# ci
-						=	{ci & ci_var_heap
-							=	writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypeVar expr)) ci.ci_var_heap}
-					->	(expr, binds, ci)
-				VI_TypeCodeVariable (TCI_TypeVar expr)
-					->	(expr, binds, ci)
-				info
-					->	abort "type term expected instead of unknown"
-/*
-	// ... sanity check
-	# var
-		// FIXME, share vars & proper name
-		=	{var_name = a_ij_var_name, var_info_ptr = var_info_ptr,
-															var_expr_ptr = nilPtr}
-	=	(Var var, binds, ci)
-*/
-convertTypeCode cinp (TCE_Constructor index typecode_exprs) binds ci
+			VI_TypeCodeVariable (TCI_TypeVar tv)
+				->	(tv, (has_var, binds, ci))
+			VI_TypeCodeVariable (TCI_TypePatternVar tpv)
+				->	(tpv, (True, binds, ci))
+			_
+				# (expr, ci)
+					=	createTypePatternVariable ci
+				# ci
+					=	{ci & ci_var_heap
+						=	writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
+				->	(expr, (True, binds, ci))
+
+convertTypeCode pattern cinp (TCE_App t arg) (has_var, binds, ci)
 	# (typeapp_symb, ci)
 		=	getSymbol PD_Dyn_TypeApp SK_Constructor 2 ci
-	# (constructor, ci)
-		=	get_constructor cinp.cinp_glob_type_inst index ci
-	  (module_id, ci)
-		=	get_module_id ci
-	  (typecode_exprs, binds, ci)
-	  	=	convertTypeCodes cinp typecode_exprs binds ci
+	# (typecode_t, st)
+	  	=	convertTypeCode pattern cinp t (has_var, binds, ci)
+	# (typecode_arg, st)
+	  	=	convertTypeCode pattern cinp arg st
 	= (App {app_symb		= typeapp_symb,
-			app_args 		= [constructor, module_id, typecode_exprs],
-			app_info_ptr	= nilPtr}, binds, ci)
+			app_args 		= [typecode_t, typecode_arg],
+			app_info_ptr	= nilPtr}, st)
+convertTypeCode pattern cinp (TCE_Constructor index []) (has_var, binds, ci)
+	# (typecons_symb, ci)
+		=	getSymbol PD_Dyn_TypeCons SK_Constructor 1 ci
+	# (constructor, ci)
+		=	typeConstructor cinp.cinp_glob_type_inst.[index] ci
+	= (App {app_symb		= typecons_symb,
+			app_args 		= [constructor],
+			app_info_ptr	= nilPtr}, (has_var, binds, ci))
 where
-	get_module_id ci=:{ci_module_id_var=Yes {lb_dst}}
-		=	(Var (freeVarToVar lb_dst),ci)
-		
-	get_constructor :: !{!GlobalTCType} Index !*ConversionState -> (Expression,!*ConversionState)
-	get_constructor glob_type_inst index ci=:{ci_type_constructor_used_in_dynamic_patterns}
-		# cons_string
-			=	BasicExpr (BVS ("\"" +++ toString  glob_type_inst.[index] +++ "\""))
-		=	(cons_string, ci)
-
-	convertTypeCodes _ [] binds ci
-		# (nil_symb, ci) = getSymbol PD_NilSymbol SK_Constructor 0 ci
-		= (App {	app_symb		= nil_symb,
-					app_args 		= [],
-					app_info_ptr	= nilPtr},binds, ci)
-	
-	convertTypeCodes cinp [typecode_expr : typecode_exprs] binds ci
+	constructorExp :: Index ((Global Index) -> SymbKind) Int !*ConversionState
+		-> (Expression, !*ConversionState)
+	constructorExp index symb_kind arity ci
 		# (cons_symb, ci)
-			=	getSymbol PD_ConsSymbol SK_Constructor 2 ci
-		# (expr, binds, ci)
-			=	convertTypeCode cinp typecode_expr  binds ci
-		# (exprs, binds, ci)
-			=	convertTypeCodes cinp typecode_exprs binds ci
-		= (App {	app_symb		= cons_symb,
-					app_args 		= [expr , exprs],
-					app_info_ptr	= nilPtr}, binds, ci)
-convertTypeCode cinp (TCE_UniType uni_vars type_code) binds ci
-		# (type_scheme_sym, ci)
-			=	getSymbol PD_Dyn_TypeScheme SK_Constructor 2 ci
+			=	getSymbol index symb_kind arity ci
+		=	(App {app_symb = cons_symb, app_args = [], app_info_ptr = nilPtr}, ci)
+		
+	typeConstructor (GTT_PredefTypeConstructor {glob_object=type_index}) ci
+		| PD_Arity2TupleTypeIndex <= type_index && type_index <= PD_Arity32TupleTypeIndex
+			# arity
+				=	type_index - PD_Arity2TupleTypeIndex + 2
+			# (tuple_symb, ci)
+				=	getSymbol PD_Dyn_TypeCodeConstructor_Tuple SK_Function 1 ci 
+			=	(App {app_symb = tuple_symb, app_args = [BasicExpr (BVInt arity)], app_info_ptr = nilPtr}, ci)
+		// otherwise
+			# predef_type_index
+				=	type_index + FirstTypePredefinedSymbolIndex
+			=	constructorExp (predefinedTypeConstructor predef_type_index) SK_Function 0 ci
+	typeConstructor (GTT_Constructor cons_symb _) ci
+		=	(App {app_symb = cons_symb, app_args = [], app_info_ptr = nilPtr}, ci)
+	typeConstructor (GTT_Basic basic_type) ci
+		=	constructorExp (basicTypeConstructor basic_type) SK_Function 0 ci
+	typeConstructor GTT_Function ci
+		=	constructorExp PD_Dyn_TypeCodeConstructor_Arrow SK_Function 0 ci
+
+	basicTypeConstructor BT_Int
+		=	PD_Dyn_TypeCodeConstructorInt
+	basicTypeConstructor BT_Char	
+		=	PD_Dyn_TypeCodeConstructorChar
+	basicTypeConstructor BT_Real	
+		=	PD_Dyn_TypeCodeConstructorReal
+	basicTypeConstructor BT_Bool	
+		=	PD_Dyn_TypeCodeConstructorBool
+	basicTypeConstructor BT_Dynamic	
+		=	PD_Dyn_TypeCodeConstructorDynamic
+	basicTypeConstructor BT_File	
+		=	PD_Dyn_TypeCodeConstructorFile
+	basicTypeConstructor BT_World	
+		=	PD_Dyn_TypeCodeConstructorWorld
+	
+	predefinedTypeConstructor predef_type_index
+		| predef_type_index == PD_ListType
+			=	PD_Dyn_TypeCodeConstructor_List
+		| predef_type_index == PD_StrictListType
+			=	PD_Dyn_TypeCodeConstructor_StrictList
+		| predef_type_index == PD_UnboxedListType
+			=	PD_Dyn_TypeCodeConstructor_UnboxedList
+		| predef_type_index == PD_TailStrictListType
+			=	PD_Dyn_TypeCodeConstructor_TailStrictList
+		| predef_type_index == PD_StrictTailStrictListType
+			=	PD_Dyn_TypeCodeConstructor_StrictTailStrictList
+		| predef_type_index == PD_UnboxedTailStrictListType
+			=	PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList
+		| predef_type_index == PD_LazyArrayType
+			=	PD_Dyn_TypeCodeConstructor_LazyArray
+		| predef_type_index == PD_StrictArrayType
+			=	PD_Dyn_TypeCodeConstructor_StrictArray
+		| predef_type_index == PD_UnboxedArrayType
+			=	PD_Dyn_TypeCodeConstructor_UnboxedArray
+		// otherwise
+			=	fatal "predefinedType" "TC code from predef"
+convertTypeCode pattern cinp (TCE_Constructor index args) st
+	# curried_type
+		=	foldl TCE_App (TCE_Constructor index []) args
+	=	convertTypeCode pattern cinp curried_type st
+convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, ci)
 		# (tv_symb, ci)
 			=	getSymbol PD_Dyn_TypeVar SK_Constructor 1 ci
-		// assign unique numbers for all type variables in the module (for testing)
-		# init_count = ci.ci_type_pattern_var_count
+		# init_count
+			=	if pattern ci.ci_type_var_count 0
 		# (count, ci_var_heap)
-			=	foldSt (mark_uni_var (build_tv tv_symb)) uni_vars (init_count, ci.ci_var_heap)
+			=	foldSt (mark_uni_var pattern (build_tv tv_symb)) uni_vars (init_count, ci.ci_var_heap)
 		# ci
-			=	{ci & ci_type_pattern_var_count = count, ci_var_heap = ci_var_heap}
-//		  (type_code_expr, binds, ci)
-	  	=	convertTypeCode cinp type_code binds ci
-/*		=	(App {	app_symb = type_scheme_sym,
-					app_args = [BasicExpr (BVInt (count - init_count)), type_code_expr],
-					app_info_ptr = nilPtr }, binds, ci)
-*/		where
-			mark_uni_var :: (Int -> Expression) VarInfoPtr (Int, *VarHeap) -> (Int, *VarHeap)
-			mark_uni_var build_var_code var_info_ptr (count, var_heap)
+			=	{ci & ci_type_var_count = if pattern count ci.ci_type_var_count, ci_var_heap = ci_var_heap}
+		# (type_code, (has_var, binds, ci))
+	  		=	convertTypeCode pattern cinp type_code (has_var, binds, ci)
+	  	| count > 0
+			# (type_scheme_sym, ci)
+				=	getSymbol PD_Dyn_TypeScheme SK_Constructor 2 ci
+			=	(App {	app_symb = type_scheme_sym,
+							app_args = [BasicExpr (BVInt count), type_code],
+							app_info_ptr = nilPtr }, (has_var, binds, ci))
+		// otherwise
+			=	(type_code, (has_var, binds, ci))
+
+		where
+			mark_uni_var :: Bool (Int -> Expression) VarInfoPtr (Int, *VarHeap) -> (Int, *VarHeap)
+			mark_uni_var pattern build_var_code var_info_ptr (count, var_heap)
 				# var_info
 					=	VI_TypeCodeVariable (TCI_TypeVar (build_var_code count))
-				=	(count+1, writePtr var_info_ptr var_info var_heap)
+				=	(count + (if pattern -1 1), writePtr var_info_ptr var_info var_heap)
 
 			build_tv :: SymbIdent Int -> Expression
 			build_tv tv_symb number
@@ -747,10 +730,10 @@ convertTypeCode cinp (TCE_UniType uni_vars type_code) binds ci
 							app_args = [BasicExpr (BVInt number)],
 							app_info_ptr = nilPtr }
 
-convertTypeCode cinp (TCE_Selector selections var_info_ptr) binds ci
-	# (var, binds, ci)		
-		=	convertTypeCode cinp (TCE_Var var_info_ptr) binds ci
-	=	(Selection NormalSelector var selections, binds, ci)
+convertTypeCode pattern cinp (TCE_Selector selections var_info_ptr) st
+	# (var, st)		
+		=	convertTypeCode pattern cinp (TCE_Var var_info_ptr) st
+	=	(Selection NormalSelector var selections, st)
 
 createTypePatternVariable :: !*ConversionState -> (!Expression, !*ConversionState)
 createTypePatternVariable ci
@@ -807,7 +790,7 @@ bool_case_ptr result_type ci=:{ci_expr_heap}
 
 dummy_case_ptr :: !AType !*ConversionState -> (ExprInfoPtr, !*ConversionState)
 dummy_case_ptr result_type ci=:{ci_expr_heap}
-	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = toAType (TB BT_Bool),
+	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = toAType TE,
 															ct_result_type = result_type, //empty_attributed_type,
 															ct_cons_types = [[empty_attributed_type, empty_attributed_type]]}) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
@@ -861,23 +844,4 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 			,	dr_dynamic_symbol	= dynamic_defined_symbol
 			}, predefined_symbols)
 
-get_module_id_app :: !*PredefinedSymbols -> (App,Expression,!*PredefinedSymbols)
-get_module_id_app predef_symbols
-	// get module id symbol
-	# ({pds_module, pds_def}, predef_symbols)	= predef_symbols![PD_ModuleConsSymbol]
-	# pds_ident = predefined_idents.[PD_ModuleConsSymbol]
-	# module_symb = 
-		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
-		,	app_args 		= []
-		,	app_info_ptr	= nilPtr
-		}
-
-	# ({pds_module, pds_def}, predef_symbols)	= predef_symbols![PD_Dyn_ModuleID]
-	# pds_ident = predefined_idents.[PD_Dyn_ModuleID]
-	# module_id_symb = 
-		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
-		,	app_args 		= [App module_symb]
-		,	app_info_ptr	= nilPtr
-		}
-
-	= (module_symb,App module_id_symb,predef_symbols)
+	

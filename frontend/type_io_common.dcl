@@ -77,7 +77,7 @@ LowLevelInterfaceModule			:== "StdDynamicLowLevelInterface"
 
 FunctionTypeConstructorAsString	:== " -> "
  
-instance toString GlobalTCType
+// instance toString GlobalTCType
 
 create_type_string type_name module_name
 	:== if (type_name == FunctionTypeConstructorAsString)

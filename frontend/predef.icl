@@ -100,25 +100,36 @@ predefined_idents
 					[PD_StdDynamic] = i UnderscoreSystemDynamicModule_String,
 					[PD_Dyn_DynamicTemp] = i DynamicRepresentation_String,
 
-					[PD_Dyn_Type] = i "_Type",
-					[PD_Dyn_TypeScheme] = i "_TypeScheme",
-					// FIXME: change constructor name T_ypeConsSymbol to T_ypeApp (also in dynamic linker)
-					[PD_Dyn_TypeApp] = i "T_ypeConsSymbol",
-					[PD_Dyn_TypeVar] = i "_TypeVar",
+					[PD_Dyn_Type] = i "TypeCode",
+					[PD_Dyn_TypeScheme] = i "TypeScheme",
+					[PD_Dyn_TypeApp] = i "TypeApp",
+					[PD_Dyn_TypeVar] = i "TypeVar",
+					[PD_Dyn_TypeCons] = i "TypeCons",
 					[PD_Dyn_TypePatternVar] = i "_TypePatternVar",
-					[PD_Dyn_TypeCons] = i "_TypeCons",
-					[PD_Dyn_tc_name] = i "_tc_name",
-					[PD_Dyn_Unifier] = i "_Unifier",
-					[PD_Dyn_unify] = i "_unify",
-					[PD_Dyn_initial_unifier] = i "_initial_unifier",
+					[PD_Dyn_UnificationEnvironment] = i "_UnificationEnvironment",
+					[PD_Dyn_initial_unification_environment] = i "_initial_unification_environment",
 					[PD_Dyn_bind_global_type_pattern_var] = i "_bind_global_type_pattern_var",
-					// FIXME: change constructor name ModuleID to _ModuleID (also in dynamic linker?)
-					[PD_Dyn_ModuleID] = i "ModuleID",
-
+					[PD_Dyn_unify] = i "_unify",
 					[PD_Dyn_normalise] = i "_normalise",
-					[PD_Dyn_tc_name] = i "_tc_name",
-					[PD_Dyn_tc_name] = i "_tc_name",
-					[PD_Dyn_tc_name] = i "_tc_name",
+
+					[PD_Dyn_TypeCodeConstructorInt] = i "TypeCodeConstructorInt",
+					[PD_Dyn_TypeCodeConstructorChar] = i "TypeCodeConstructorChar",
+					[PD_Dyn_TypeCodeConstructorReal] = i "TypeCodeConstructorReal",
+					[PD_Dyn_TypeCodeConstructorBool] = i "TypeCodeConstructorBool",
+					[PD_Dyn_TypeCodeConstructorDynamic] = i "TypeCodeConstructorDynamic",
+					[PD_Dyn_TypeCodeConstructorFile] = i "TypeCodeConstructorFile",
+					[PD_Dyn_TypeCodeConstructorWorld] = i "TypeCodeConstructorWorld",
+					[PD_Dyn_TypeCodeConstructor_Arrow] = i "TypeCodeConstructor_Arrow",
+					[PD_Dyn_TypeCodeConstructor_List] = i "TypeCodeConstructor_List",
+					[PD_Dyn_TypeCodeConstructor_StrictList] = i "TypeCodeConstructor_StrictList",
+					[PD_Dyn_TypeCodeConstructor_UnboxedList] = i "TypeCodeConstructor_UnboxedList",
+					[PD_Dyn_TypeCodeConstructor_TailStrictList] = i "TypeCodeConstructor_TailStrictList",
+					[PD_Dyn_TypeCodeConstructor_StrictTailStrictList] = i "TypeCodeConstructor_StrictTailStrictList",
+					[PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList] = i "TypeCodeConstructor_UnboxedTailStrictList",
+					[PD_Dyn_TypeCodeConstructor_Tuple] = i "TypeCodeConstructor_Tuple",
+					[PD_Dyn_TypeCodeConstructor_LazyArray] = i "TypeCodeConstructor_LazyArray",
+					[PD_Dyn_TypeCodeConstructor_StrictArray] = i "TypeCodeConstructor_StrictArray",
+					[PD_Dyn_TypeCodeConstructor_UnboxedArray] = i "TypeCodeConstructor_UnboxedArray",
 
 					[PD_StdGeneric] = i "StdGeneric",
 					[PD_TypeBimap] = i "Bimap",
@@ -167,9 +178,6 @@ predefined_idents
 				
 					[PD_TypeGenericDict] = i "GenericDict",
 
-					[PD_ModuleConsSymbol] = i "__Module",
-
-									
 					[PD_StdMisc] = i "StdMisc",
 					[PD_abort] = i "abort",
 					[PD_undef] = i "undef",
@@ -291,21 +299,37 @@ where
 					<<- (local_predefined_idents,	IC_Class, PD_TypeCodeClass)
 					<<- (local_predefined_idents,	IC_Module, PD_StdDynamic)
 
-
-					<<- (local_predefined_idents,	IC_Expression, PD_ModuleConsSymbol)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_DynamicTemp)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_Type)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeScheme)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeApp)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeVar)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypePatternVar)
-					<<- (local_predefined_idents,	IC_Type, PD_Dyn_TypeCons)
-					<<- (local_predefined_idents,	IC_Type, PD_Dyn_Unifier)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCons)
+					<<- (local_predefined_idents,	IC_Type, PD_Dyn_UnificationEnvironment)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_unify)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_initial_unifier)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_initial_unification_environment)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_normalise)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_bind_global_type_pattern_var)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_ModuleID)
+
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorInt)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorChar)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorReal)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorBool)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorDynamic)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorFile)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorWorld)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_Arrow)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_List)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictList)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedList)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_TailStrictList)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictTailStrictList)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_Tuple)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_LazyArray)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictArray)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedArray)
 
 					<<- (local_predefined_idents,				IC_Module, 		PD_StdGeneric)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeBimap)
@@ -360,11 +384,6 @@ where
 		# hash_table = hash_table 
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_from)
-					
-		# dyn_type_cons_ident = local_predefined_idents.[PD_Dyn_TypeCons]
-		# hash_table = hash_table 
-					<<- (local_predefined_idents, IC_Field dyn_type_cons_ident, PD_Dyn_tc_name)
-
 		= hash_table
 
 MakeTupleConsSymbIndex arity 	:== arity - 2 + (PD_Arity2TupleSymbol-FirstConstructorPredefinedSymbolIndex)
@@ -496,6 +515,6 @@ where
 		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
 			ft_specials = SP_None, ft_type_ptr = nilPtr }
 
-DynamicRepresentation_String			:== "_DynamicTemp"		
+DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		
 
 

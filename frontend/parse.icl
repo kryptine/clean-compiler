@@ -306,9 +306,6 @@ where
 		  	  (mod_ident, pState)	= stringToIdent mod_name IC_Module pState
 		  	  pState				= check_layout_rule pState
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
-// MV ...
-			# (defs, pState)		= add_module_id mod_name defs pState;
-// ... MV			  				
 			  {ps_scanState,ps_hash_table,ps_error}
 			  						= pState
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
@@ -325,37 +322,6 @@ where
 		  mod = { mod_name = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
 		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
 			closeScanner scanState files)
-	where
-// MV...
-		add_module_id mod_name defs pState
-			| not iclmodule
-				= (defs,pState);
-	
-			// It is essential that the type name denoted by ident is an unique type name within the application. Otherwise
-			// the static linker will choose one implementation (because the type names are equal) and map the other to the
-			// chosen implementation.
-			// The zero arity of the _Module constructor makes the code generator, pre-allocate _Module in .data section of
-			// the final executable. The module name needed by the dynamic run-time system can then be determined by looking
-			// at the descriptor. If however all implementations were mapped to a single one, the dynamic rts could not use
-			// the module name anymore because they are all the same.
-			# (ident,   pState)	= stringToIdent ("_" +++ mod_name +++ "_Module") IC_Type pState
-			# td				= MakeTypeDef ident [] (ConsList []) TA_None [] NoPos
-				
-			# (pc_cons_name, pState) = stringToIdent "__Module" IC_Expression pState
-			# cons
-				= { 
-					pc_cons_name		= pc_cons_name
-				,	pc_arg_types		= []
-				,	pc_args_strictness	= NotStrict
-				,	pc_cons_arity		= 0
-				,	pc_cons_prio		= NoPrio
-				,	pc_exi_vars			= []
-				,	pc_cons_pos			= NoPos
-				}
-			# td
-				= { td & td_rhs = ConsList [cons] }
-			= ([PD_Type td:defs],pState) 
-// ...MV
 
 	try_module_header :: !Bool !ScanState -> (!Bool,!ModuleKind,!String,!ScanState)
 	try_module_header is_icl_mod scanState

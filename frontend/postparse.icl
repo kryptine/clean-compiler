@@ -1058,7 +1058,7 @@ where
 	scan_dcl_module :: ParsedModule [ScannedModule] !SearchPaths (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
 	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
 		# (_, defs, imports, imported_objects, ca)
-			= reorganiseDefinitions False pdefs 0 0 0 0 ca
+			= reorganiseDefinitionsAndAddTypes False pdefs 0 0 0 0 ca
 	  	  (def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=0,ca_rev_fun_defs=[]}
 		  (range, ca) = addFunctionsRange def_macros ca
 		  (rev_fun_defs,ca) = ca!ca_rev_fun_defs
@@ -1079,7 +1079,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_gene
 			,	ca_rev_fun_defs	= []
 			,	ca_hash_table	= hash_table
 			}
-	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitions True pdefs 0 0 0 0 ca
+	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes True pdefs 0 0 0 0 ca
 
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
@@ -1146,7 +1146,7 @@ where
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
-			# (_, defs, imports, imported_objects, ca) = reorganiseDefinitions False pdefs 0 0 0 0 ca
+			# (_, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes False pdefs 0 0 0 0 ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_name:cached_modules]
 			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics modtimefunction files ca
@@ -1451,6 +1451,54 @@ reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [],def_macro_indices={ir_from=0,ir_to=0},def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [], 
 			def_generics = [], def_generic_cases = []}, [], [], ca)
+
+reorganiseDefinitionsAndAddTypes icl_module defs cons_count sel_count mem_count type_count ca
+	# (rev_defs, ca)
+		=	addTypeConstructors defs [] ca
+	=	reorganiseDefinitions icl_module (reverse rev_defs) cons_count sel_count mem_count type_count ca
+	where
+		addTypeConstructors [] rev_defs ca
+			=	(rev_defs, ca)
+		addTypeConstructors [PD_Type type_def : defs] rev_defs ca
+			# (type_def, tc_def, ca)
+				=	addTypeConstructor type_def ca
+			= addTypeConstructors defs [PD_Type tc_def, PD_Type type_def : rev_defs] ca
+		addTypeConstructors [def : defs] rev_defs ca
+			=	addTypeConstructors defs [def : rev_defs] ca
+
+addTypeConstructor def=:{td_name, td_attribute, td_attrs, td_args, td_arity, td_pos} ca=:{ca_hash_table}
+	# tc_name = "TC;" +++ td_name.id_name
+	# ({boxed_ident=tc_cons_ident}, ca_hash_table) = putIdentInHashTable tc_name IC_Expression ca_hash_table
+	# ({boxed_ident=tc_type_ident}, ca_hash_table) = putIdentInHashTable tc_name IC_Type ca_hash_table
+	=	(def, type_tc_def tc_type_ident tc_cons_ident td_name td_attribute td_attrs td_args
+												td_arity td_pos, { ca & ca_hash_table = ca_hash_table })
+	where
+		type_tc_def type_ident cons_ident type_name attr attrs args arity position
+			= 	{	td_name	= type_ident
+				,	td_index = NoIndex
+				,	td_arity = arity
+				,	td_args	= args
+				,	td_attrs = attrs
+				,	td_context = []
+				,	td_rhs = ConsList [type_tc_cons cons_ident type_name args arity position]
+				,	td_attribute = attr
+				,	td_pos = position
+				,	td_used_types = []
+				}
+		type_tc_cons cons_ident type_name args arity position
+			=	{	pc_cons_name = cons_ident
+				,	pc_cons_arity = 1
+				,	pc_exi_vars	= []
+				,	pc_arg_types = [type type_name args arity]
+				,	pc_args_strictness	= NotStrict
+				,	pc_cons_prio = NoPrio
+				,	pc_cons_pos	= position
+				}
+		type type_name args arity
+			=	{	at_attribute = TA_None
+				,	at_type = TA (MakeNewTypeSymbIdent type_name arity)
+						[{at_attribute = TA_None, at_type = TV arg.atv_variable} \\ arg <- args]
+				}
 
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix
