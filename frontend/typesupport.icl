@@ -467,6 +467,7 @@ where
 			TA_None
 				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions attr_env attr_vars inequalities error
 	
+	build_inequalities :: {#Int} Bool AttributeVar !CoercionTree {!CoercionTree} *{!TypeAttribute} [AttrInequality] -> (!Bool,!*{!TypeAttribute},![AttrInequality])
 	build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var (CT_Node dem_attr left right)
 				coercions attr_env inequalities
 		# (ok1, attr_env, inequalities)
