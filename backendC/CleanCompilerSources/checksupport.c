@@ -115,45 +115,111 @@ static char *PrintArgumentsOfType (char *type_repr, File file, ModuleInfo module
 			PrintChar ('(', file, max_length_p);
 	}
 	return ++type_repr;
+}
 
-} /* PrintArgumentsOfType */
-
-static void PrintName (char *name, char *name_end, unsigned line_nr, File file)
+static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passed_end)
 {
-	if (*name == '_')
-	{	char *name_tail;
+	char c,*s2;
+	
+	s2=s2_begin;
+	do {
+		c=*s1++;
+		if (c=='\0')
+			return s2==s2_passed_end;
+		if (s2>=s2_passed_end)
+			return 0;
+	} while (*s2++ == c);
+
+	return 0;
+}
+
+
+#ifdef CLEAN2
+static char *print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
+{
+	char *passed_digits;
+
+	FPutS (name,file);
+	
+	passed_digits=NULL;
+	if (name_end[0]==';' && isdigit (name_end[1])){
+		char *s;
+		
+		s=name_end+2;
+		while (isdigit (*s))
+			++s;
+		if (*s==';')
+			passed_digits=s;
+	}
+	
+	if (line_nr>0){
+		FPrintF (file,"[line: %u]", line_nr);
+		if (passed_digits)
+			name_end=passed_digits;
+	} else
+		if (passed_digits){
+			char *d_p;
+
+			FPutS ("[line:",file);
+			for (d_p=name_end+1; d_p<passed_digits; ++d_p)
+				FPutC (*d_p,file);
+			FPutC (']',file);
+
+			name_end=passed_digits;
+		}
+	FPutS (name_end,file);
+
+	return name_end+strlen (name_end);
+}
+#endif
+
+static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
+{
+#ifdef CLEAN2
+	if (*name=='\\' && name+1==name_end)
+		return print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
+#endif
+
+	if (*name == '_'){
+		char *name_tail;
+
+#ifdef CLEAN2
+		if (string_and_string_begin_equal ("c",name+1,name_end))
+			return print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
+		else if (string_and_string_begin_equal ("if",name+1,name_end))
+			return print_compiler_generated_function_name ("<if>",name_end,line_nr,file);
+#endif
 	
 		for (name_tail = name + 1; name_tail != name_end; name_tail++)
 			if (isdigit (*name_tail))
 				break;
 
-		if (strncmp (name, kCasePrefix, name_tail - name) == 0)
+		if (string_and_string_begin_equal (kCasePrefix,name,name_tail))
 			FPutS ("<case expression>", file);
-		else if (strncmp (name, kLambdaPrefix, name_tail - name) == 0)
+		else if (string_and_string_begin_equal (kLambdaPrefix,name,name_tail))
 			FPutS ("<lambda expression>", file);
-		else if (strncmp (name, kListGeneratorPrefix, name_tail - name) == 0)
+		else if (string_and_string_begin_equal (kListGeneratorPrefix,name,name_tail))
 			FPutS ("<list comprehension>", file);
-		else if (strncmp (name, kArrayGeneratorPrefix, name_tail - name) == 0)
+		else if (string_and_string_begin_equal (kArrayGeneratorPrefix,name,name_tail))
 			FPutS ("<array comprehension>", file);
-		else
-		{	FPutS (name, file);
-			return;	
+		else {
+			FPutS (name, file);
+			return name_end;
 		}
 		FPrintF (file, " [line: %u]", line_nr);
-	}
-	else
-	{	for (; name != name_end; name++)
-		{	if (*name != '.')
-			{
+		return name_end;
+	} else {
+		for (; name != name_end; name++){
+			if (*name != '.'){
 /*				if (*name == ':')
 					FPutC (' ', file);
 				else
 */					FPutC (*name, file);
 			}
 		}
+		return name_end;
 	}
-
-} /* PrintName */
+}
 
 static char *PrintTypesOfSymbol (char *type_repr, File file, ModuleInfo module_info, int * const max_length_p)
 {
@@ -318,7 +384,7 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 			}
 	}	
 	
-	PrintName (name, next_char, line_nr, file);
+	next_char = PrintName (name, next_char, line_nr, file);
 
 	if ((*next_char) == cTypeDelimiter && next_char[1] != '\0')
 	{	next_char++;
@@ -329,13 +395,12 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 			for (end_name = next_char + 1; *end_name != cTypeDelimiter && *end_name != '\0'; end_name++)
 				 ;
 			
-			if (line_nr > 0)
-			{	FPrintF (file, " [line: %u]", line_nr);
+			if (line_nr > 0){
+				FPrintF (file, " [line: %u]", line_nr);
 				if (*end_name == '\0')
 					return;
-			}
-			else
-			{	FPutC (cTypeDelimiter, file);
+			} else {
+				FPutC (cTypeDelimiter, file);
 			
 				PrintName (next_char, end_name, line_nr, file);
 				
@@ -346,7 +411,7 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 			next_char = end_name + 1;
 		}
 
-#ifdef _ANALYSE_INSTANCE_TYPES_		
+# ifdef _ANALYSE_INSTANCE_TYPES_		
 		FPutS (" (", file);
 
 		next_char = PrintTypesOfSymbol (next_char, file, sid -> ident_mod_info, & print_length);
@@ -357,15 +422,12 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 		}
 
 		FPutC (')', file);
-#else
+# else
 		FPutS (next_char, file);
-#endif /* _ANALYSE_INSTANCE_TYPES_ */
+# endif
 	}
-
 #else
-
 	FPutS (name, file);
-
 #endif	
 }
 
