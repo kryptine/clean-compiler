@@ -43,6 +43,7 @@ Global
 		Path:	{Project}:main:Mac
 		Path:	{Project}:main
 		Path:	{Project}:backend
+		Path:	{Project}:backend:Mac
 MainModule
 	Name:	CleanCocl
 	Dir:	{Project}
