@@ -227,9 +227,10 @@ where
 		  cs = pushErrorAdmin (newPosition ins_ident ins_pos) { cs & cs_symbol_table = cs_symbol_table }
 		| class_index <> NotFound
 			| class_def.class_arity == ds_arity
-				# (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs) = checkInstanceType module_index ins_type ins_specials
-						is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
-				  ins_class = { glob_object = { class_name & ds_index = class_index }, glob_module = class_mod_index}
+				# ins_class = { glob_object = { class_name & ds_index = class_index }, glob_module = class_mod_index}
+				  (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs)
+				  		= checkInstanceType module_index ins_class ins_type ins_specials
+								is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
 				  is = { is & is_type_defs = is_type_defs, is_class_defs = is_class_defs, is_modules = is_modules }
 				= ({ins & ins_class = ins_class, ins_type = ins_type, ins_specials = ins_specials}, is, type_heaps, popErrorAdmin cs)
 				= ( ins

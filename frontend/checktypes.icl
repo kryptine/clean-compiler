@@ -686,20 +686,55 @@ checkOpenATypes mod_index scope types cot_state
 //	# dak_None=DAK_None
 //	= mapSt (checkOpenAType mod_index scope dak_None) types cot_state
 
-checkInstanceType :: !Index !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
+checkInstanceType :: !Index !(Global DefinedSymbol) !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!InstanceType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
-checkInstanceType mod_index it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
-	# ots = { ots_type_defs = type_defs, ots_modules = modules }
+checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
+	# cs_error
+			= check_fully_polymorphity it_types it_context cs.cs_error
+	  ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
-	  (it_types, (ots, {oti_heaps,oti_all_vars,oti_all_attrs}, cs)) = checkOpenTypes mod_index cGlobalScope DAK_None it_types (ots, oti, cs)
+	  (it_types, (ots, {oti_heaps,oti_all_vars,oti_all_attrs}, cs)) = checkOpenTypes mod_index cGlobalScope DAK_None it_types (ots, oti, { cs & cs_error = cs_error })
 	  (it_context, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts it_context mod_index ots.ots_type_defs class_defs ots.ots_modules oti_heaps cs
-	  (specials, cs) = checkSpecialTypeVars specials cs 
+	  cs_error
+	  		= foldSt (compare_context_and_instance_types ins_class it_types) it_context cs.cs_error
+	  (specials, cs) = checkSpecialTypeVars specials { cs & cs_error = cs_error }
 	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope oti_all_vars cs.cs_symbol_table
 	  cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
 	  (specials, type_defs, modules, heaps, cs) = checkSpecialTypes mod_index specials type_defs modules heaps { cs & cs_symbol_table = cs_symbol_table }
 	= ({it & it_vars = oti_all_vars, it_types = it_types, it_attr_vars = oti_all_attrs, it_context = it_context },
 	    	specials, type_defs, class_defs, modules, heaps, cs)
-	
+  where
+	check_fully_polymorphity it_types it_context cs_error
+		| all is_type_var it_types && not (isEmpty it_context)
+			= checkError "" "context restriction not allowed for fully polymorph instance" cs_error
+		= cs_error
+	  where
+		is_type_var (TV _) = True
+		is_type_var _ = False
+
+	compare_context_and_instance_types ins_class it_types {tc_class, tc_types} cs_error
+		| ins_class<>tc_class
+			= cs_error
+		# are_equal
+				= fold2St compare_context_and_instance_type it_types tc_types True
+		| are_equal
+			= checkError ins_class.glob_object.ds_ident "context restriction equals instance type" cs_error
+		= cs_error
+	  where
+		compare_context_and_instance_type (TA {type_index=ti1} _) (TA {type_index=ti2} _) are_equal_accu
+			= ti1==ti2 && are_equal_accu
+		compare_context_and_instance_type (_ --> _) (_ --> _) are_equal_accu
+			= are_equal_accu
+		compare_context_and_instance_type (CV tv1 :@: _) (CV tv2 :@: _) are_equal_accu
+			= tv1==tv2 && are_equal_accu
+		compare_context_and_instance_type (TB bt1) (TB bt2) are_equal_accu
+			= bt1==bt2 && are_equal_accu
+		compare_context_and_instance_type (TV tv1) (TV tv2) are_equal_accu
+			= tv1==tv2 && are_equal_accu
+		compare_context_and_instance_type _ _ are_equal_accu
+			= False
+
+
 checkSymbolType :: !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!SymbolType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 checkSymbolType  mod_index st=:{st_args,st_result,st_context,st_attr_env} specials type_defs class_defs modules heaps cs
