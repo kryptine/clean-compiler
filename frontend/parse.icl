@@ -81,8 +81,24 @@ makeStringTypeSymbol pState=:{ps_pre_def_symbols}
 	#! string_id = ps_pre_def_symbols.[PD_StringType]
 	= (MakeNewTypeSymbIdent string_id.pds_ident 0, pState)
 
-makeListTypeSymbol arity pState=:{ps_pre_def_symbols}
-	#! list_id = ps_pre_def_symbols.[PD_ListType]
+makeListTypeSymbol :: Int Int !*ParseState -> *(!TypeSymbIdent,!*ParseState)
+makeListTypeSymbol head_strictness arity pState=:{ps_pre_def_symbols}
+	# pre_def_list_index=if (head_strictness==HeadLazy)
+							PD_ListType
+						(if (head_strictness==HeadStrict)
+							PD_StrictListType
+							PD_UnboxedListType)
+	#! list_id = ps_pre_def_symbols.[pre_def_list_index]
+	= (MakeNewTypeSymbIdent list_id.pds_ident arity, pState)
+
+makeTailStrictListTypeSymbol :: Int Int !*ParseState -> *(!TypeSymbIdent,!*ParseState)
+makeTailStrictListTypeSymbol head_strictness arity pState=:{ps_pre_def_symbols}
+	# pre_def_list_index=if (head_strictness==HeadLazy)
+							PD_TailStrictListType
+						(if (head_strictness==HeadStrict)
+							PD_StrictTailStrictListType
+							PD_UnboxedTailStrictListType)
+	#! list_id = ps_pre_def_symbols.[pre_def_list_index]
 	= (MakeNewTypeSymbIdent list_id.pds_ident arity, pState)
 
 makeLazyArraySymbol arity pState=:{ps_pre_def_symbols}
@@ -100,14 +116,6 @@ makeUnboxedArraySymbol arity pState=:{ps_pre_def_symbols}
 makeTupleTypeSymbol form_arity act_arity  pState=:{ps_pre_def_symbols}
 	#! tuple_id = ps_pre_def_symbols.[GetTupleTypeIndex form_arity]
 	= (MakeNewTypeSymbIdent tuple_id.pds_ident act_arity, pState)
-
-makeNilExpression pState=:{ps_pre_def_symbols}
-	#! nil_id = ps_pre_def_symbols.[PD_NilSymbol]
-	= (PE_List [PE_Ident nil_id.pds_ident], pState)
-
-makeConsExpression a1 a2 pState=:{ps_pre_def_symbols}
-	#! cons_id = ps_pre_def_symbols.[PD_ConsSymbol]
-	= (PE_List [PE_Ident cons_id.pds_ident, a1, a2], pState)
 	
 class try a	 :: !Token !*ParseState -> (!Optional a, !*ParseState)
 class want a :: !*ParseState -> (!a, !*ParseState)
@@ -1099,8 +1107,8 @@ wantClassDefinition context pos pState
 // ... RWS 
   		  	  class_def = { class_name = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex },
-	    					class_arg_kinds = []}
+	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex},
+							class_arg_kinds = [] }
 	    	  pState = wantEndGroup "class" pState
 			= (PD_Class class_def members, pState)
 		| isEmpty contexts
@@ -1539,8 +1547,11 @@ optionalAnnotAndAttr pState
    	# (token, pState) = nextToken TypeContext pState
    	| token == ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
-// Sjaak		  (_   , attr, pState)  = optional_attribute token pState
-		  (_   , attr, pState)  = tryAttribute token pState
+// JVG added for strict lists:
+		| token==SquareCloseToken
+			= (False,AN_None,TA_None,tokenBack (tokenBack pState))
+// Sjaak  (_   , attr, pState)  = optional_attribute token pState
+		# (_   , attr, pState)  = tryAttribute token pState
 		= (True, AN_Strict, attr, pState)
 	| otherwise // token <> ExclamationToken
 		# (succ, attr, pState)  = tryAttribute token pState
@@ -1823,6 +1834,19 @@ trySimpleType annot attr pState
 	# (token, pState)		= nextToken TypeContext pState
 	= trySimpleTypeT token annot attr pState
 
+is_tail_strict_list_or_nil pState
+	# (square_close_position, pState) = getPosition pState
+	# pState=tokenBack pState
+	# (exclamation_position, pState) = getPosition pState
+	# pState=tokenBack pState
+	# (square_open_position, pState) = getPosition pState
+	# (exclamation_token,pState) = nextToken TypeContext pState
+	# (square_close_token,pState) = nextToken TypeContext pState
+	| exclamation_position.fp_col+1==square_close_position.fp_col && exclamation_position.fp_line==square_close_position.fp_line
+		&& (square_open_position.fp_col+1<>exclamation_position.fp_col || square_open_position.fp_line<>exclamation_position.fp_line)
+		= (True,pState)
+		= (False,pState)
+
 trySimpleTypeT :: !Token !Annotation !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
 trySimpleTypeT (IdentToken id) annot attr pState
 	| isLowerCaseName id
@@ -1834,14 +1858,48 @@ trySimpleTypeT (IdentToken id) annot attr pState
 	= (True, {at_annotation = annot, at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT SquareOpenToken annot attr pState
 	# (token, pState) = nextToken TypeContext pState
+	# (head_strictness,token,pState) = wantHeadStrictness token pState
+		with
+			wantHeadStrictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
+			wantHeadStrictness ExclamationToken pState
+				# (token,pState) = nextToken TypeContext pState
+				= (HeadStrict,token,pState)
+			wantHeadStrictness HashToken pState
+				# (token,pState) = nextToken TypeContext pState
+				= (HeadUnboxed,token,pState)
+			wantHeadStrictness token pState
+				= (HeadLazy,token,pState)
 	| token == SquareCloseToken
-		# (list_symbol, pState) = makeListTypeSymbol 0 pState
+		| head_strictness==HeadStrict
+			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
+			| tail_strict
+				# (list_symbol, pState) = makeTailStrictListTypeSymbol HeadLazy 0 pState
+		  		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)					
+				# (list_symbol, pState) = makeListTypeSymbol head_strictness 0 pState
+		  		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)
+		# (list_symbol, pState) = makeListTypeSymbol head_strictness 0 pState
   		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)
+
+	| token==ExclamationToken
+		# (token,pState) = nextToken TypeContext pState
+		| token==SquareCloseToken
+			# (list_symbol, pState) = makeTailStrictListTypeSymbol head_strictness 0 pState
+  			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol []}, pState)
+			= (False, {at_annotation = annot, at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
+
 	# (type, pState)	= wantAType (tokenBack pState)
 	  (token, pState)	= nextToken TypeContext pState
 	| token == SquareCloseToken
-		# (list_symbol, pState) = makeListTypeSymbol 1 pState
+		# (list_symbol, pState) = makeListTypeSymbol head_strictness 1 pState
 		= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol [type]}, pState)
+
+	| token==ExclamationToken
+		# (token,pState) = nextToken TypeContext pState
+		| token==SquareCloseToken
+			# (list_symbol, pState) = makeTailStrictListTypeSymbol head_strictness 1 pState
+			= (True, {at_annotation = annot, at_attribute = attr, at_type = TA list_symbol [type]}, pState)
+			= (False, {at_annotation = annot, at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
+
 	// otherwise // token <> SquareCloseToken
 		= (False, {at_annotation = annot, at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 trySimpleTypeT OpenToken annot attr pState
@@ -2206,7 +2264,11 @@ where
 			= (PE_Selection cNonUniqueSelection exp selectors, pState)
 		| token == ExclamationToken
 			# (token, pState) = nextToken FunctionContext pState
-			  (selectors, pState) = wantSelectors token pState
+// JVG added for strict lists:
+			| token==SquareCloseToken
+				= (exp, tokenBack (tokenBack pState))
+//			
+			#  (selectors, pState) = wantSelectors token pState
 			= (PE_Selection cUniqueSelection exp selectors, pState)
 		| otherwise
 			= (exp, tokenBack pState)
@@ -2254,6 +2316,7 @@ trySimpleExpression is_pattern pState
 		= trySimpleRhsExpression pState
 
 trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
+
 trySimpleExpressionT (IdentToken name) is_pattern pState
 	| isLowerCaseName name
 	# (id, pState) = stringToIdent name IC_Expression pState
@@ -2379,91 +2442,218 @@ trySimpleNonLhsExpressionT DynamicToken pState
 trySimpleNonLhsExpressionT token pState
 	= (False, PE_Empty, tokenBack pState)
 
+HeadLazy:==0
+HeadStrict:==1
+HeadUnboxed:==2
+HeadOverloaded:==3;
+HeadUnboxedAndTailStrict:==4;
+
 wantListExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantListExp is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
-	= case token of
-		SquareCloseToken
-			-> makeNilExpression pState
-		_	-> want_LGraphExpr token [] pState
-where
-	want_list acc pState
+	# (head_strictness,token,pState) = wantHeadStrictness token pState
+		with
+			wantHeadStrictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
+			wantHeadStrictness ExclamationToken pState
+				# (token,pState) = nextToken FunctionContext pState
+				= (HeadStrict,token,pState)
+			wantHeadStrictness (SeqLetToken strict) pState
+				# (token,pState) = nextToken FunctionContext pState
+				| strict
+					= (HeadUnboxedAndTailStrict,token,pState);
+					= (HeadUnboxed,token,pState)
+			wantHeadStrictness BarToken pState
+				# (token,pState) = nextToken FunctionContext pState
+				= (HeadOverloaded,token,pState)
+			wantHeadStrictness token pState
+				= (HeadLazy,token,pState)
+	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
 		# (token, pState) = nextToken FunctionContext pState
-		= case token of
-			SquareCloseToken
-				#	(nil_expr, pState) = makeNilExpression pState
-				->	gen_cons_nodes acc nil_expr pState
-			CommaToken
-				#	(token, pState)	= nextToken FunctionContext pState
-				->	want_LGraphExpr token acc pState
-			ColonToken
-/* PK				#	(token, pState)		= nextToken FunctionContext pState
-					(exp, pState)		= wantRhsExpressionT token pState ... PK */
-				#	(exp, pState)		= wantExpression is_pattern pState
-					pState				= wantToken FunctionContext "list" SquareCloseToken pState
-				->	gen_cons_nodes acc exp pState
-			DotDotToken
-				| is_pattern
-				->	(PE_Empty, parseError "want list expression" No "No dot dot expression in a pattern" pState)
-				| length acc > 2 || isEmpty acc
-				#	(nil_expr, pState)	= makeNilExpression pState
-					pState				= parseError "list expression" No "one or two expressions before .." pState
-				->	gen_cons_nodes acc nil_expr pState
-				#	(token, pState)		= nextToken FunctionContext pState
-				->	case token of
-					 SquareCloseToken
-						->	case acc of
-								[e]	-> (PE_Sequ (SQ_From e), pState)
-								[e2,e1]
-									-> (PE_Sequ (SQ_FromThen e1 e2), pState)
-								_	-> abort "Error 1 in WantListExp"
-					 _	#	(exp, pState)	= wantRhsExpressionT token pState
-							pState			= wantToken FunctionContext "dot dot expression" SquareCloseToken pState
-						->	case acc of
-								[e]	-> (PE_Sequ (SQ_FromTo e exp), pState)
-								[e2,e1]
-									-> (PE_Sequ (SQ_FromThenTo e1 e2 exp), pState)
-								_	-> abort "Error 2 in WantListExp"
-			DoubleBackSlashToken
-				| is_pattern
-				->	(PE_Empty, parseError "want list expression" No "No \\\\ expression in a pattern" pState)
-				| length acc == 1
-				->	wantComprehension IsListGenerator (acc!!0)  pState
-				// otherwise // length acc <> 1
-				#	(nil_expr, pState)	= makeNilExpression pState
-					pState				= parseError "list comprehension" No "one expressions before \\\\" pState
-				->	gen_cons_nodes acc nil_expr pState
-			_	#	(nil_expr, pState)	= makeNilExpression pState
-					pState	= parseError "list" (Yes token) "list element separator" pState
-				->	gen_cons_nodes acc nil_expr pState
+		| token==SquareCloseToken
+			= makeTailStrictNilExpression head_strictness is_pattern pState
+			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+	| token==SquareCloseToken
+		| head_strictness==HeadUnboxedAndTailStrict
+			= makeTailStrictNilExpression HeadUnboxed is_pattern pState
+		| head_strictness==HeadStrict
+			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
+			| tail_strict
+				= makeTailStrictNilExpression HeadLazy is_pattern pState
+				= makeNilExpression head_strictness is_pattern pState
+			= makeNilExpression head_strictness is_pattern pState
+	| head_strictness==HeadUnboxedAndTailStrict
+		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+	| head_strictness==HeadLazy && (case token of (IdentToken "!!") -> True; _ -> False)
+		# (next_token,pState) = nextToken FunctionContext pState
+		| next_token==SquareCloseToken
+			= makeTailStrictNilExpression HeadStrict is_pattern pState
+			= want_LGraphExpr token [] head_strictness (tokenBack pState)
+		= want_LGraphExpr token [] head_strictness pState
+	where
+		want_LGraphExpr token acc head_strictness pState
+			= case token of
+				CharListToken chars
+					->	want_list (add_chars (fromString chars) acc) pState
+					with
+						add_chars [] 			acc	= acc
+						add_chars ['\\',c:r]	acc	= add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
+						add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])): acc]
+				_	#	(exp, pState) = (if is_pattern (wantLhsExpressionT token) (wantRhsExpressionT token)) pState
+					->	want_list [exp: acc] pState
+		where
+			want_list acc pState
+				# (token, pState) = nextToken FunctionContext pState
+				= case token of
+					SquareCloseToken
+						#	(nil_expr, pState) = makeNilExpression head_strictness is_pattern pState
+						->	gen_cons_nodes acc nil_expr pState
+					ExclamationToken
+						| head_strictness<>HeadOverloaded
+							# (token, pState) = nextToken FunctionContext pState
+							| token==SquareCloseToken
+								# (nil_expr,pState) = makeTailStrictNilExpression head_strictness is_pattern pState
+								->	gen_tail_strict_cons_nodes acc nil_expr pState
+								-> (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+					CommaToken
+						#	(token, pState)	= nextToken FunctionContext pState
+						->	want_LGraphExpr token acc head_strictness pState
+					ColonToken
+		/* PK			#	(token, pState)		= nextToken FunctionContext pState
+							(exp, pState)		= wantRhsExpressionT token pState
+		... PK */
+						#	(exp, pState)		= wantExpression is_pattern pState
+//							pState				= wantToken FunctionContext "list" SquareCloseToken pState
+						# (token,pState) = nextToken FunctionContext pState
+						| token==SquareCloseToken
+							-> gen_cons_nodes acc exp pState
+						| token==ExclamationToken && head_strictness<>HeadOverloaded
+							# pState = wantToken FunctionContext "list" SquareCloseToken pState
+							-> gen_tail_strict_cons_nodes acc exp pState
+							# pState = parseError "list" (Yes token) (toString SquareCloseToken) pState
+							-> gen_cons_nodes acc exp pState
+					DotDotToken
+						| is_pattern
+						->	(PE_Empty, parseError "want list expression" No "No dot dot expression in a pattern" pState)
+						| length acc > 2 || isEmpty acc
+						#	(nil_expr, pState)	= makeNilExpression head_strictness is_pattern pState
+							pState				= parseError "list expression" No "one or two expressions before .." pState
+						->	gen_cons_nodes acc nil_expr pState
+						#	(token, pState)		= nextToken FunctionContext pState
+						->	case token of
+							 SquareCloseToken
+								->	case acc of
+										[e]	-> (PE_Sequ (SQ_From e), pState)
+										[e2,e1]
+											-> (PE_Sequ (SQ_FromThen e1 e2), pState)
+										_	-> abort "Error 1 in WantListExp"
+							 _	#	(exp, pState)	= wantRhsExpressionT token pState
+									pState			= wantToken FunctionContext "dot dot expression" SquareCloseToken pState
+								->	case acc of
+										[e]	-> (PE_Sequ (SQ_FromTo e exp), pState)
+										[e2,e1]
+											-> (PE_Sequ (SQ_FromThenTo e1 e2 exp), pState)
+										_	-> abort "Error 2 in WantListExp"
+					DoubleBackSlashToken
+						| is_pattern
+						->	(PE_Empty, parseError "want list expression" No "No \\\\ expression in a pattern" pState)
+						| length acc == 1
+						->	wantListComprehension head_strictness (acc!!0)  pState
+						// otherwise // length acc <> 1
+						#	(nil_expr, pState)	= makeNilExpression head_strictness is_pattern pState
+							pState				= parseError "list comprehension" No "one expressions before \\\\" pState
+						->	gen_cons_nodes acc nil_expr pState
+					_	#	(nil_expr, pState)	= makeNilExpression head_strictness is_pattern pState
+							pState	= parseError "list" (Yes token) "list element separator" pState
+						->	gen_cons_nodes acc nil_expr pState
+			
+			gen_cons_nodes [] exp pState
+				= (exp, pState)
+			gen_cons_nodes [e:r] exp pState
+				# (exp, pState) = makeConsExpression head_strictness is_pattern e exp pState
+				= gen_cons_nodes r exp pState
 
-	want_LGraphExpr token acc pState
-		= case token of
-			CharListToken chars
-				->	want_list (add_chars (fromString chars) acc) pState
-				with
-					add_chars [] 			acc	= acc
-					add_chars ['\\',c:r]	acc	= add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
-					add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])): acc]
-			_	#	(exp, pState) = (if is_pattern (wantLhsExpressionT token) (wantRhsExpressionT token)) pState
-				->	want_list [exp: acc] pState
-	
-	gen_cons_nodes [] exp pState
-		= (exp, pState)
-	gen_cons_nodes [e:r] exp pState
-		# (exp, pState) = makeConsExpression e exp pState
-		= gen_cons_nodes r exp pState
+			gen_tail_strict_cons_nodes [] exp pState
+				= (exp, pState)
+			gen_tail_strict_cons_nodes [e:r] exp pState
+				# (exp, pState) = makeTailStrictConsExpression head_strictness is_pattern e exp pState
+				= gen_tail_strict_cons_nodes r exp pState
 
-/**
+makeNilExpression :: Int Bool *ParseState -> *(!ParsedExpr,!*ParseState)
+makeNilExpression head_strictness is_pattern pState=:{ps_pre_def_symbols}
+	# pre_def_nil_index= if (head_strictness==HeadLazy)
+							PD_NilSymbol
+						(if (head_strictness==HeadStrict)
+							PD_StrictNilSymbol
+						(if (head_strictness==HeadOverloaded)
+							(if is_pattern PD_OverloadedNilSymbol PD_nil)
+							(if is_pattern PD_UnboxedNilSymbol PD_nil_u)))
+	#! nil_id = ps_pre_def_symbols.[pre_def_nil_index]
+	= (PE_Ident nil_id.pds_ident, pState)
+
+makeTailStrictNilExpression :: Int Bool *ParseState -> *(!ParsedExpr,!*ParseState)
+makeTailStrictNilExpression head_strictness is_pattern pState=:{ps_pre_def_symbols}
+	# pre_def_nil_index= if (head_strictness==HeadLazy)
+							PD_TailStrictNilSymbol
+						(if (head_strictness==HeadStrict)
+							PD_StrictTailStrictNilSymbol
+							(if is_pattern PD_UnboxedTailStrictNilSymbol PD_nil_uts))
+	#! nil_id = ps_pre_def_symbols.[pre_def_nil_index]
+	= (PE_Ident nil_id.pds_ident, pState)
+
+makeConsExpression :: Int Bool ParsedExpr ParsedExpr *ParseState -> *(!ParsedExpr,!*ParseState)
+makeConsExpression head_strictness is_pattern a1 a2 pState=:{ps_pre_def_symbols}
+	# pre_def_cons_index=if (head_strictness==HeadLazy)
+							PD_ConsSymbol
+						(if (head_strictness==HeadStrict)
+							PD_StrictConsSymbol
+						(if (head_strictness==HeadOverloaded)
+							(if is_pattern PD_OverloadedConsSymbol PD_cons)
+							(if is_pattern PD_UnboxedConsSymbol PD_cons_u)))
+	#! cons_id = ps_pre_def_symbols.[pre_def_cons_index]
+	= (PE_List [PE_Ident cons_id.pds_ident, a1, a2], pState)
+
+cons_and_nil_symbol_index HeadLazy = (PD_ConsSymbol,PD_NilSymbol)
+cons_and_nil_symbol_index HeadStrict = (PD_StrictConsSymbol,PD_StrictNilSymbol)
+cons_and_nil_symbol_index HeadUnboxed = (PD_cons_u,PD_nil_u)
+cons_and_nil_symbol_index HeadOverloaded = (PD_cons,PD_nil)
+
+makeTailStrictConsExpression :: Int Bool ParsedExpr ParsedExpr *ParseState -> *(!ParsedExpr,!*ParseState)
+makeTailStrictConsExpression head_strictness is_pattern a1 a2 pState=:{ps_pre_def_symbols}
+	# pre_def_cons_index=if (head_strictness==HeadLazy)
+							PD_TailStrictConsSymbol
+						(if (head_strictness==HeadStrict)
+							PD_StrictTailStrictConsSymbol
+							(if is_pattern PD_UnboxedTailStrictConsSymbol PD_cons_uts))
+	#! cons_id = ps_pre_def_symbols.[pre_def_cons_index]
+	= (PE_List [PE_Ident cons_id.pds_ident, a1, a2], pState)
+
+tail_strict_cons_and_nil_symbol_index HeadLazy = (PD_TailStrictConsSymbol,PD_TailStrictNilSymbol)
+tail_strict_cons_and_nil_symbol_index HeadStrict = (PD_StrictTailStrictConsSymbol,PD_StrictTailStrictNilSymbol)
+tail_strict_cons_and_nil_symbol_index HeadUnboxed = (PD_cons_uts,PD_nil_uts)
+
+/*
 	(List and Array) Comprehensions
-**/
+*/
 
-wantComprehension :: !GeneratorKind !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
-wantComprehension gen_kind exp pState
+wantArrayComprehension :: !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
+wantArrayComprehension exp pState
 	# (qualifiers, pState) = wantQualifiers pState
-	| gen_kind == IsListGenerator
-		= (PE_Compr IsListGenerator exp qualifiers, wantToken FunctionContext "list comprehension" SquareCloseToken pState)
-		= (PE_Compr IsArrayGenerator exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
+	= (PE_ArrayCompr exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
+
+wantListComprehension :: !Int !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
+wantListComprehension head_strictness exp pState
+	# (qualifiers, pState) = wantQualifiers pState
+	# (token, pState) = nextToken FunctionContext pState
+	| token==SquareCloseToken
+		# (cons_index,nil_index) = cons_and_nil_symbol_index head_strictness
+		= (PE_ListCompr cons_index nil_index exp qualifiers, pState)
+	| token==ExclamationToken && head_strictness<>HeadOverloaded
+		# pState = wantToken FunctionContext "list comprehension" SquareCloseToken pState
+		# (tail_strict_cons_index,tail_strict_nil_index) = tail_strict_cons_and_nil_symbol_index head_strictness
+		= (PE_ListCompr tail_strict_cons_index tail_strict_nil_index exp qualifiers, pState)
+		# pState = parseError "list" (Yes token) (toString SquareCloseToken) pState
+		# (cons_index,nil_index) = cons_and_nil_symbol_index head_strictness
+		= (PE_ListCompr cons_index nil_index exp qualifiers, pState)
 
 wantQualifiers :: !ParseState -> (![Qualifier], !ParseState)
 wantQualifiers pState
@@ -2630,7 +2820,7 @@ wantRecordOrArrayExp is_pattern pState
 					# (token, pState) = nextToken FunctionContext pState
 					-> want_record_or_array_update token expr pState
 				| token == DoubleBackSlashToken
-					-> wantComprehension IsArrayGenerator expr pState
+					-> wantArrayComprehension expr pState
 				# (elems, pState) = want_array_elems token pState
 				-> (PE_ArrayDenot [expr : elems], pState)
 where
