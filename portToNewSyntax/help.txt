@@ -1,0 +1,142 @@
+        coclPort - a tool to port Clean 1.3 programs to Clean 2.0
+	----------------------------------------------------------------------------
+
+Folder contents
+---------------
+	
+	coclPort.exe - a tool to port Clean 1.3 programs to Clean 2.0
+	StdEnvPort - a necessary standard environment
+	help.txt - this file
+
+
+Why to use coclPort
+-------------------
+
+	Clean 2.0 is not downward compatible to Clean 1.3.x: Due to changes in the
+	syntax there are Clean 1.3.x programs that cannot be compiled with the new
+	Clean 2.0 compiler. Fortunately these changes in syntax are rather small.
+	The most important syntax modification is concerned with explicit
+	import statements. These are statements like "from m import x". With the
+	new syntax it's possible to write e.g.
+
+		from m import T, :: T (C1), :: T2 (..), class ==, instance == Int
+
+	Such a statement causes the following symbols to be imported: the function T,
+	the algebraic type T with it's constructor C1, the algebraic type T2 with all
+	it's constructors, the class == and it's instance Int. See the Clean 2.0
+	language report for further information.
+
+	Purpose of coclPort is to help you to port Clean 1.3.x programs to
+	this new syntax.
+
+What coclPort does
+------------------
+
+	coclPort is indeed a Clean 2.0 compiler that is modified such that it can
+	handle Clean 1.3 import syntax. Therefore it cannot handle 2.0 import syntax.
+	To port a 1.3 module
+	just compile it with the coclPort compiler. Then for this "original" module
+	a copy of that module is written out in which the explicit import
+	statements have been adapted to Clean 2.0 syntax. This copy will be written
+	into a folder named "PortedModules" which will be a subfolder of the folder
+	that contains the original module.
+
+	Due to some other slight changes
+	in the language it is possible that your Clean 1.3.x modules will not be accepted
+	by coclPort. For instance the "String" type has become a
+	basic type (so you can't import it explicitly).
+	In that case you have to modify the contents of the original module
+	and try again.
+	
+	coclPort has some insufficiencies. See section "Insufficiencies".
+
+The preprocessor
+----------------
+
+	We think that for a while it should be made possible to let every source code
+	file be compiled with both the 1.3 and the 2.0 compiler. How can this be
+	achieved when the 2.0 compiler is not fully downward compatible? With a
+	preprocessor of course. The simple preprocessor that we have built into
+	coclPort and into the 2.0 compiler as well allows to distinguish parts
+	of code that are either ignored by
+	the 1.3 compiler or by the 2.0 compiler. To illustrate this we show what
+	coclPort will produce for a file that contains the following statement:
+
+	    from module_name import ==
+
+	The produced output might look like this:
+
+	    //1.3
+	    from module_name import ==
+	    //3.1
+	    /*2.0
+	    from module_name import class ==, instance == Int, instance == Real
+	    0.2*/
+
+	For the 2.0 compiler this would be the same as
+
+	    from module_name import class ==, instance == Int, instance == Real
+
+	because the preprocessor will take care that everything between "//1.3" and
+	"//3.1" will be ignored and that everything between "/*2.0" and "0.2*/"
+	will _not_ be treated as a comment.
+	For the 1.3 this would be the same as 
+
+	    from module_name import ==
+
+	You can use this feature to keep your files both compilable with 1.3 and
+	with 2.0. If you don't want your sources cluttered with old 1.3 stuff then
+	you can use the "rmPreprop" application to extract the pure 1.3 or 2.0
+	contents.
+	Note that the "//1.3", "//3.1", "/*2.0" and "0.2*/" brackets have to be
+	the first characters of the line (no preceeding whitespace characters are
+	allowed). Otherwise they will be ignored. Furtheron such sections shouldn't
+	be nested or overlapping.
+
+How to use this program
+-----------------------
+
+	You have to tell the CleanIDE that for compiling a module it should
+	launch "coclPort.exe" instead "cocl.exe" (BTW "cocl" means "Concurrent
+	Clean"). In the CleanIDE select an environment that uses the Clean 2.0
+	compiler. Now select "Environment/Edit Current" and select the "tools"
+	button. The field at "compiler:" determines where the CleanIDE finds the
+	Clean commpiler (cocl.exe). You can use this field to ensure that this entry indeed
+	refers to the Clean 2.0 compiler and not e.g. to a Clean 1.3 compiler:
+	If it is the Clean 2.0 compiler then there must be a file named "backend.dll"
+	in the folder that is shown there. Put the file "coclPort.exe" into the same
+	folder and change the entry in the field at "compiler:" from "cocl.exe"
+	into "coclPort.exe". Now the CleanIDE will use coclPort as the compiler.
+
+	But coclPort needs another standard environment than cocl. You have to replace
+	the path to StdEnv to a path to StdEnvPort. You can set paths with the
+	"Environment/Edit Current" or "Project/Project Options" dialog.
+
+	Now simply try to compile your project.
+
+Insufficiencies
+---------------
+
+	Certain restrictions are imposed on the source code that should be ported:
+	  - For every explicit import statement the "from" token should be the first
+	    non white space character in that line. After some white space characters
+	    the line should then contain the module name (and not e.g. a comment first).
+	    This excludes the following import statements
+	      /* comment */ from module_name import f
+	      from /* comment */ module_name import f
+	      from
+		module_name import f
+	    An explicit import statement that is outcommented with "//" will work fine,
+	    since it will be ignored anyway:
+	      // from module_name import f
+	  - coclPort has problems when a line within a comment begins
+	    with the "from" token this can be mistaken as an explicit import statement
+	    by this program. As a consequence in the "ported" version there might appear
+	    an explicit import statement within that comment that should appear somewhere
+	    else. Example:
+	      import aphrotisaica /* And I knew I loved her
+	         from that moment on until forever */
+	However we think that when something goes wrong with this program it should
+	be easy to adjust the ported modules manually after it has been tried to
+	compile them.
+	
