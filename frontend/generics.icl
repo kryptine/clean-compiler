@@ -956,16 +956,6 @@ where
 			ds_index  = to_fun_index,
 			ds_arity  = 1	
 			}
-		# gtd_info = GTDI_Generic { 
-			gt_type 		= generic_rep_type,
-			gt_type_args	= [atv_variable \\ {atv_variable} <- type_def.td_args], 
-			gt_iso 			= iso_def_sym,
-			gt_isomap_group	= NoIndex,
-			gt_isomap		= EmptyDefinedSymbol,		
-			gt_isomap_from	= EmptyDefinedSymbol,		
-			gt_isomap_to	= EmptyDefinedSymbol		
-			}
-
 		# (from_fun_def, gs) = buildIsoFrom from_def_sym from_group_index module_index type_def gs	
 		# (to_fun_def, gs) = buildIsoTo to_def_sym to_group_index module_index type_def cons_infos gs	
 
@@ -1362,9 +1352,9 @@ where
 			#! instance_defs = {instance_defs & [instance_index] = instance_def} 
 			# (dcl_fun_index, gs) = get_dcl_member_index instance_index gs
 				with
-			 		get_dcl_member_index icl_instance_index gs=:{gs_dcl_modules, gs_main_dcl_module_n}			 		
-			 			# ({dcl_conversions, dcl_common}, gs_dcl_modules) = gs_dcl_modules![gs_main_dcl_module_n] 
-						# gs = {gs & gs_dcl_modules = gs_dcl_modules}
+			 		get_dcl_member_index icl_instance_index gs=:{gs_main_dcl_module_n}			 		
+//			 			# ({dcl_common}, gs_dcl_modules) = gs_dcl_modules![gs_main_dcl_module_n] 
+//						# gs = {gs & gs_dcl_modules = gs_dcl_modules}
 //						# dcl_index = case dcl_conversions of
 						# dcl_index = NoIndex
 /*
@@ -1717,7 +1707,7 @@ where
 			#! gs_fun_defs = {gs_fun_defs & [fun_index] = fun_def}
 			
 			// update corresponding DCL function type, which is empty at the moment
-			#! ({dcl_conversions}, gs_dcl_modules) = gs_dcl_modules ! [gs_main_dcl_module_n]  
+//			#! (gs_dcl_modules) = gs_dcl_modules ! [gs_main_dcl_module_n]  
 			#! (dcl_fun_index, gs_opt_dcl_icl_conversions) 
 				= find_dcl_fun_index fun_index gs_opt_dcl_icl_conversions// XXX
 				with
