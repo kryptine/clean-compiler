@@ -88,114 +88,126 @@ containsContext new_tc [tc : tcs]
 FoundObject object :== object.glob_module <> NotFound
 ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
-reduceContexts :: ![TypeContext] !Int !{# CommonDefs} !ClassInstanceInfo ![TypeContext] !*SpecialInstances ![LocalTypePatternVariable]
-	!(!*VarHeap, !*TypeHeaps) !*Coercions !*PredefinedSymbols !*ErrorAdmin !{# DclModule}
-		-> *(![ClassApplication],  ![TypeContext], !*SpecialInstances, ![LocalTypePatternVariable],
-				!(!*VarHeap, !*TypeHeaps), !*Coercions, !*PredefinedSymbols, !*ErrorAdmin)
-reduceContexts [] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error dcl_modules
-	= ([], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-reduceContexts [tc : tcs] main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error dcl_modules
-	# (appl, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-			= try_to_reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-	  (appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-	  		= reduceContexts tcs main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error dcl_modules
-	= ([appl : appls], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
+:: ReduceState =
+	{	rs_new_contexts :: ![TypeContext]
+	,	rs_special_instances :: !.SpecialInstances
+	,	rs_type_pattern_vars :: ![LocalTypePatternVariable]
+	,	rs_var_heap :: !.VarHeap
+	,	rs_type_heaps :: !.TypeHeaps
+	,	rs_coercions :: !.Coercions
+	,	rs_predef_symbols :: !.PredefinedSymbols
+	,	rs_error :: !.ErrorAdmin
+	}
 
+:: ReduceInfo =
+	{	ri_defs :: !{# CommonDefs}
+	,	ri_instance_info :: !ClassInstanceInfo
+	,	ri_main_dcl_module_n :: !Int
+	}
+
+:: ReduceTCState =
+	{	rtcs_new_contexts :: ![TypeContext]
+	,	rtcs_type_pattern_vars :: ![LocalTypePatternVariable]
+	,	rtcs_var_heap :: !.VarHeap
+	,	rtcs_type_heaps :: !.TypeHeaps
+	,	rtcs_error :: !.ErrorAdmin
+	}
+
+reduceContexts :: !ReduceInfo ![TypeContext] !*ReduceState -> (![ClassApplication], !*ReduceState)
+reduceContexts info tcs rs_state
+	=	mapSt (try_to_reduce_context info) tcs rs_state
 where		
-	try_to_reduce_context :: !TypeContext !{# CommonDefs} !ClassInstanceInfo ![TypeContext] !*SpecialInstances ![LocalTypePatternVariable]
-		!(!*VarHeap, !*TypeHeaps) !*Coercions !*PredefinedSymbols !*ErrorAdmin
-			-> *(!ClassApplication, ![TypeContext], !*SpecialInstances, ![LocalTypePatternVariable], !(!*VarHeap, !*TypeHeaps), !*Coercions, !*PredefinedSymbols, !*ErrorAdmin)
-	try_to_reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-		| context_is_reducible tc predef_symbols
-			= reduce_any_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+	try_to_reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ClassApplication, !*ReduceState)
+	try_to_reduce_context info tc rs_state=:{rs_predef_symbols, rs_new_contexts}
+		| context_is_reducible tc rs_predef_symbols
+			= reduce_any_context info tc rs_state
 //				---> ("try_to_reduce_context (Yes)", tc)
-		| containsContext tc new_contexts
+		| containsContext tc rs_new_contexts
 //				---> ("try_to_reduce_context (No)", tc)
-			= (CA_Context tc, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-			# (var_heap, type_heaps) = heaps
-			  (tc_var, var_heap) = newPtr VI_Empty var_heap
-			= (CA_Context tc, [{ tc & tc_var = tc_var } : new_contexts], special_instances,
-					type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
+			= (CA_Context tc, rs_state)
+			# {rs_var_heap, rs_new_contexts} = rs_state
+			# (tc_var, rs_var_heap) = newPtr VI_Empty rs_var_heap
+			# rs_new_contexts = [{ tc & tc_var = tc_var } : rs_new_contexts]
+			= (CA_Context tc, {rs_state & rs_var_heap=rs_var_heap, rs_new_contexts=rs_new_contexts})
 
-	reduce_any_context tc=:{tc_class=class_symb=:(TCGeneric {gtc_class})} defs instance_info new_contexts
-			special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
-		= reduce_any_context {tc & tc_class = TCClass gtc_class} defs instance_info new_contexts
-			special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
-	reduce_any_context tc=:{tc_class=class_symb=:(TCClass {glob_object={ds_index},glob_module}),tc_types} defs instance_info new_contexts
-				special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
-		| is_predefined_symbol glob_module ds_index PD_TypeCodeClass predef_symbols
-			# (red_context, (new_contexts, type_pattern_vars, var_heap, type_heaps,error))
-						= reduce_TC_context class_symb (hd tc_types) new_contexts type_pattern_vars var_heap type_heaps error
-			= (red_context, new_contexts, special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
-			# (class_appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-					= reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars
-							(var_heap, type_heaps) coercion_env predef_symbols error
-			= (CA_Instance class_appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
+	reduce_any_context info tc=:{tc_class=class_symb=:(TCGeneric {gtc_class})} rs_state
+		= reduce_any_context info {tc & tc_class = TCClass gtc_class} rs_state
+	reduce_any_context info=:{ri_defs} tc=:{tc_class=class_symb=:(TCClass {glob_object={ds_index},glob_module}),tc_types} rs_state=:{rs_predef_symbols}
+		| is_predefined_symbol glob_module ds_index PD_TypeCodeClass rs_predef_symbols
+			# {rs_new_contexts, rs_type_pattern_vars,rs_var_heap, rs_type_heaps, rs_error} = rs_state
+			# rtcs_state = {rtcs_new_contexts=rs_new_contexts, rtcs_type_pattern_vars=rs_type_pattern_vars,
+									rtcs_var_heap=rs_var_heap, rtcs_type_heaps=rs_type_heaps, rtcs_error=rs_error}
+			# (red_context, {rtcs_new_contexts, rtcs_type_pattern_vars,rtcs_var_heap, rtcs_type_heaps, rtcs_error})
+						= reduce_TC_context ri_defs class_symb (hd tc_types) rtcs_state
+			# rs_state = {rs_state & rs_new_contexts=rtcs_new_contexts, rs_type_pattern_vars=rtcs_type_pattern_vars,
+									rs_var_heap=rtcs_var_heap, rs_type_heaps=rtcs_type_heaps, rs_error=rtcs_error}
+			= (red_context, rs_state)
+			# (class_appls, rs_state)
+					= reduce_context info tc rs_state
+			= (CA_Instance class_appls, rs_state)
 
-	reduce_context tc=:{tc_class=TCGeneric {gtc_class}} defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-		= reduce_context {tc & tc_class = TCClass gtc_class} defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-	reduce_context {tc_class=TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types} defs
-						instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-		# {class_members,class_context,class_args,class_ident} = defs.[glob_module].com_class_defs.[ds_index]
+	reduce_context info tc=:{tc_class=TCGeneric {gtc_class}} rs_state
+		= reduce_context info {tc & tc_class = TCClass gtc_class} rs_state
+	reduce_context info=:{ri_defs,ri_instance_info,ri_main_dcl_module_n} {tc_class=TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types}
+			rs_state
+		# {class_members,class_context,class_args,class_ident} = ri_defs.[glob_module].com_class_defs.[ds_index]
 		| size class_members > 0
-			# class_instances = instance_info.[glob_module].[ds_index]
-			# ({glob_module,glob_object}, contexts, uni_ok, (var_heap, type_heaps), coercion_env) = find_instance tc_types class_instances defs heaps coercion_env
+			# class_instances = ri_instance_info.[glob_module].[ds_index]
+			# {rs_coercions, rs_var_heap, rs_type_heaps} = rs_state
+			# ({glob_module,glob_object}, contexts, uni_ok, (rs_var_heap, rs_type_heaps), rs_coercions) = find_instance tc_types class_instances ri_defs (rs_var_heap, rs_type_heaps) rs_coercions
+			# rs_state = {rs_state & rs_coercions=rs_coercions, rs_var_heap=rs_var_heap, rs_type_heaps=rs_type_heaps}
 			| (glob_module <> NotFound) && uni_ok
-				# {ins_members, ins_class} = defs.[glob_module].com_instance_defs.[glob_object]
-				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_ArrayClass predef_symbols &&
-				  is_unboxed_array tc_types predef_symbols
-					# (rcs_class_context, special_instances, (predef_symbols, type_heaps), error)
-						= check_unboxed_array_type glob_module ins_class ins_members tc_types class_members defs special_instances (predef_symbols, type_heaps) error
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
-									special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
+				# {ins_members, ins_class} = ri_defs.[glob_module].com_instance_defs.[glob_object]
+				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_ArrayClass rs_state.rs_predef_symbols &&
+				  is_unboxed_array tc_types rs_state.rs_predef_symbols
+					# {rs_predef_symbols, rs_error,rs_special_instances, rs_type_heaps}
+						=	rs_state
+					# (rcs_class_context, rs_special_instances, (rs_predef_symbols, rs_type_heaps), rs_error)
+						= check_unboxed_array_type ri_main_dcl_module_n glob_module ins_class ins_members tc_types class_members ri_defs rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
+					# rs_state = {rs_state & rs_predef_symbols=rs_predef_symbols,
+									rs_special_instances=rs_special_instances,rs_type_heaps=rs_type_heaps, rs_error=rs_error}
+					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
+				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_UListClass rs_state.rs_predef_symbols
+					# {rs_predef_symbols, rs_error,rs_special_instances, rs_type_heaps}
+						=	rs_state
+					# (rcs_class_context, rs_special_instances, (rs_predef_symbols, rs_type_heaps), rs_error)
+						= check_unboxed_list_type ri_main_dcl_module_n glob_module ins_class ins_members tc_types class_members ri_defs rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
+					# rs_state = {rs_state & rs_predef_symbols=rs_predef_symbols,
+									rs_special_instances=rs_special_instances,rs_type_heaps=rs_type_heaps, rs_error=rs_error}
+					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
+				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_UTSListClass rs_state.rs_predef_symbols
+					# {rs_predef_symbols, rs_error,rs_special_instances, rs_type_heaps}
+						=	rs_state
+					# (rcs_class_context, rs_special_instances, (rs_predef_symbols, rs_type_heaps), rs_error)
+						= check_unboxed_tail_strict_list_type ri_main_dcl_module_n glob_module ins_class ins_members tc_types class_members ri_defs rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
+					# rs_state = {rs_state & rs_predef_symbols=rs_predef_symbols,
+									rs_special_instances=rs_special_instances,rs_type_heaps=rs_type_heaps, rs_error=rs_error}
+					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
 
-				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_UListClass predef_symbols
-					# (rcs_class_context, special_instances, (predef_symbols, type_heaps), error)
-						= check_unboxed_list_type glob_module ins_class ins_members tc_types class_members defs special_instances (predef_symbols, type_heaps) error
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
-									special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
-				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_UTSListClass predef_symbols
-					# (rcs_class_context, special_instances, (predef_symbols, type_heaps), error)
-						= check_unboxed_tail_strict_list_type glob_module ins_class ins_members tc_types class_members defs special_instances (predef_symbols, type_heaps) error
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
-									special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
-
-					# (appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-							= reduceContexts contexts main_dcl_module_n defs instance_info new_contexts special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error dcl_modules
-					  (constraints, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-					  		= reduce_contexts_in_constraints tc_types class_args class_context defs instance_info new_contexts special_instances type_pattern_vars
-					  				heaps coercion_env predef_symbols error
+					# (appls, rs_state)
+							= reduceContexts info contexts rs_state
+					  (constraints, rs_state)
+					  		= reduce_contexts_in_constraints info tc_types class_args class_context rs_state
 					= ({ rcs_class_context = { rc_class = ins_class, rc_inst_module = glob_module, rc_inst_members = ins_members,
-								rc_types = tc_types, rc_red_contexts = appls }, rcs_constraints_contexts = constraints }, new_contexts,
-							special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
+								rc_types = tc_types, rc_red_contexts = appls }, rcs_constraints_contexts = constraints }, rs_state)
 				# rcs_class_context = { rc_class = class_symb, rc_inst_module = NoIndex, rc_inst_members = {}, rc_types = tc_types, rc_red_contexts = [] }
 				| glob_module <> NotFound
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
-							special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, uniqueError class_ident tc_types error)
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, new_contexts,
-							special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, instanceError class_ident tc_types error)
-			# (constraints, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-				= reduce_contexts_in_constraints tc_types class_args class_context defs instance_info new_contexts special_instances type_pattern_vars
-								heaps coercion_env predef_symbols error
+					# rs_state = {rs_state & rs_error = uniqueError class_ident tc_types rs_state.rs_error}
+					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
+					# rs_state = {rs_state & rs_error = instanceError class_ident tc_types rs_state.rs_error}
+					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
+			# (constraints, rs_state)
+				= reduce_contexts_in_constraints info tc_types class_args class_context rs_state
 			= ({ rcs_class_context = { rc_class = class_symb, rc_inst_module = NoIndex, rc_inst_members = {}, rc_types = tc_types, rc_red_contexts = [] },
-				rcs_constraints_contexts = constraints },  new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
+				rcs_constraints_contexts = constraints }, rs_state)
 
-	reduce_contexts_in_constraints types class_args [] defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-		= ([], new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-	reduce_contexts_in_constraints types class_args class_context defs instance_info new_contexts special_instances type_pattern_vars
-			(var_heap, type_heaps=:{th_vars}) coercion_env predef_symbols error
+	reduce_contexts_in_constraints info types class_args [] rs_state
+		= ([], rs_state)
+	reduce_contexts_in_constraints info types class_args class_context rs_state=:{rs_var_heap, rs_type_heaps=rs_type_heaps=:{th_vars}}
 		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
-		  (instantiated_context, heaps) = fresh_contexts class_context (var_heap, { type_heaps & th_vars = th_vars })
-		# (cappls, (new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error))
-		  		= mapSt (reduce_context_in_constraint defs instance_info) instantiated_context
-		  				(new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-		= (cappls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-
-	where
-		reduce_context_in_constraint defs instance_info tc (new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-		  	# (cappls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
-				= reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
-			= (cappls, (new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error))
+		  (instantiated_context, (rs_var_heap, rs_type_heaps)) = fresh_contexts class_context (rs_var_heap, { rs_type_heaps & th_vars = th_vars })
+		# rs_state = {rs_state & rs_var_heap=rs_var_heap, rs_type_heaps=rs_type_heaps}
+		= mapSt (reduce_context info) instantiated_context rs_state
 
 	find_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs heaps coercion_env
 		# (left_index, types, uni_ok, (var_heap, type_heaps), coercion_env) = find_instance co_types left defs heaps coercion_env
@@ -246,22 +258,22 @@ where
 // ..AA
 	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
 		= adjust_attributes_and_subtypes defs types1 types2 state
-	adjust_type_attribute _ type1=:(TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
+	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
 		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute _ type1=:(TAS type_cons1 cons_args1 _) type2 (ok, coercion_env, type_heaps)
+	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2 (ok, coercion_env, type_heaps)
 		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute _ type1 type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
+	adjust_type_attribute defs type1 type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
 		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute _ type1 type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
+	adjust_type_attribute defs type1 type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
 		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
@@ -369,7 +381,7 @@ where
 	is_unboxed_array _ predef_symbols
 		= False
 
-	check_unboxed_array_type ins_module ins_class ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols_type_heaps error
+	check_unboxed_array_type main_dcl_module_n ins_module ins_class ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols_type_heaps error
 		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
 		| unboxable
 			= case opt_record of
@@ -394,7 +406,7 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_array_instances = [ inst : si_array_instances ] })
 
-	check_unboxed_list_type ins_module ins_class ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
+	check_unboxed_list_type main_dcl_module_n ins_module ins_class ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
 		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
 		| unboxable
 			= case opt_record of
@@ -419,7 +431,7 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_list_instances = [ inst : si_list_instances ] })
 
-	check_unboxed_tail_strict_list_type ins_module ins_class ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
+	check_unboxed_tail_strict_list_type main_dcl_module_n ins_module ins_class ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
 		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
 		| unboxable
 			= case opt_record of
@@ -482,7 +494,7 @@ where
 		= {	ai_members = { { class_member & ds_index = next_inst_index } \\ class_member <-: members & next_inst_index <- [next_member_index .. ]},
 			ai_record = record }
 				
-	disallow_abstract_types_in_dynamics type_index=:{glob_module,glob_object} error
+	disallow_abstract_types_in_dynamics defs type_index=:{glob_module,glob_object} error
 		| cPredefinedModuleIndex == glob_module
 			= error
 			
@@ -493,43 +505,43 @@ where
 				AbstractSynType _ _		-> abstractTypeInDynamicError td_ident error
 				_						-> error
 
-	reduce_TC_context type_code_class tc_type new_contexts type_pattern_vars var_heap type_heaps error
-		= reduce_tc_context type_code_class tc_type (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
+	reduce_TC_context defs type_code_class tc_type rtcs_state
+		= reduce_tc_context defs type_code_class tc_type rtcs_state
 	where							
-		reduce_tc_context type_code_class type=:(TA cons_id=:{type_index} cons_args) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			# error
-				= disallow_abstract_types_in_dynamics type_index error
+		reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
+			# rtcs_error
+				= disallow_abstract_types_in_dynamics defs type_index rtcs_error
 				
-			# (expanded, type, type_heaps)
-				=	tryToExpandTypeSyn defs type cons_id cons_args type_heaps
+			# (expanded, type, rtcs_type_heaps)
+				=	tryToExpandTypeSyn defs type cons_id cons_args rtcs_type_heaps
+			# rtcs_state = {rtcs_state & rtcs_error=rtcs_error, rtcs_type_heaps=rtcs_type_heaps}
 			| expanded
-				=	reduce_tc_context type_code_class type (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
+				=	reduce_tc_context defs type_code_class type rtcs_state
 				
 			# type_constructor = toTypeCodeConstructor type_index defs
-			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
-			  		 (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
-		reduce_tc_context type_code_class (TAS cons_id cons_args _) state
-			=	reduce_tc_context type_code_class (TA cons_id cons_args) state
-		reduce_tc_context type_code_class (TB basic_type) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			= (CA_GlobalTypeCode { tci_constructor = GTT_Basic basic_type, tci_contexts = [] },
-					(new_contexts, type_pattern_vars, var_heap, type_heaps, error))
-		reduce_tc_context type_code_class (arg_type --> result_type) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			#  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class [arg_type, result_type]
-			  		 (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			= (CA_GlobalTypeCode { tci_constructor = GTT_Function, tci_contexts = rc_red_contexts }, instances)
-		reduce_tc_context type_code_class (TempQV var_number) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			# (inst_var, (type_pattern_vars, var_heap)) = addLocalTCInstance var_number (type_pattern_vars, var_heap)
-			= (CA_LocalTypeCode inst_var, (new_contexts, type_pattern_vars, var_heap, type_heaps, error))
-		reduce_tc_context type_code_class (TempV var_number) (new_contexts, type_pattern_vars, var_heap, type_heaps, error)
-			# (tc_var, var_heap) = newPtr VI_Empty var_heap
+			  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class cons_args rtcs_state
+			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, rtcs_state)
+		reduce_tc_context defs type_code_class (TAS cons_id cons_args _) rtcs_state
+			=	reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
+		reduce_tc_context defs type_code_class (TB basic_type) rtcs_state
+			= (CA_GlobalTypeCode { tci_constructor = GTT_Basic basic_type, tci_contexts = [] }, rtcs_state)
+		reduce_tc_context defs type_code_class (arg_type --> result_type) rtcs_state
+			#  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class [arg_type, result_type] rtcs_state
+			= (CA_GlobalTypeCode { tci_constructor = GTT_Function, tci_contexts = rc_red_contexts }, rtcs_state)
+		reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_type_pattern_vars, rtcs_var_heap}
+			# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap)) = addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
+			# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
+			= (CA_LocalTypeCode inst_var, rtcs_state)
+		reduce_tc_context defs type_code_class (TempV var_number) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
 			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
-			| containsContext tc new_contexts
-				= (CA_Context tc, (new_contexts, type_pattern_vars, var_heap, type_heaps, error))
-				= (CA_Context tc, ([tc : new_contexts], type_pattern_vars, var_heap, type_heaps, error))
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
 
-		reduce_TC_contexts type_code_class cons_args instances
-			= mapSt (\{at_type} -> reduce_tc_context type_code_class at_type) cons_args instances
+		reduce_TC_contexts defs type_code_class cons_args rtcs_state
+			= mapSt (\{at_type} -> reduce_tc_context defs type_code_class at_type) cons_args rtcs_state
 		
 addLocalTCInstance var_number (instances=:[inst : insts], ltp_var_heap)
 	# cmp = var_number =< inst.ltpv_var
@@ -751,10 +763,19 @@ where
 									{ ds_ident =  oc_symbol.symb_ident, ds_arity = 0, ds_index = glob_fun.glob_object }} [])
 			= (reduced_calls, new_contexts, coercion_env, type_pattern_vars, { os & os_type_heaps = os_type_heaps, os_symbol_heap = os_symbol_heap })
 		| otherwise
-			# (class_applications, new_contexts, os_special_instances, type_pattern_vars,
-								(os_var_heap, os_type_heaps), coercion_env, os_predef_symbols, os_error)
-					= reduceContexts oc_context main_dcl_module_n defs instance_info new_contexts os_special_instances type_pattern_vars
-							(os_var_heap, os_type_heaps) coercion_env os_predef_symbols os_error dcl_modules
+			# rs_state 	= {rs_new_contexts=new_contexts, rs_special_instances = os_special_instances,
+							rs_type_pattern_vars=type_pattern_vars,rs_var_heap=os_var_heap, 
+							rs_type_heaps=os_type_heaps, rs_coercions=coercion_env,
+							rs_predef_symbols=os_predef_symbols, rs_error=os_error}
+			# info
+				=	{ri_main_dcl_module_n=main_dcl_module_n, ri_defs=defs, ri_instance_info=instance_info}
+			# (class_applications, rs_state)
+					= reduceContexts info oc_context rs_state
+			# {rs_new_contexts=new_contexts, rs_special_instances = os_special_instances,
+							rs_type_pattern_vars=type_pattern_vars,rs_var_heap=os_var_heap, 
+							rs_type_heaps=os_type_heaps, rs_coercions=coercion_env,
+							rs_predef_symbols=os_predef_symbols, rs_error=os_error}
+				= rs_state
 			= ([ (oc_symbol, fun_index, over_info_ptr, class_applications) : reduced_calls ], new_contexts, coercion_env, type_pattern_vars, 
 					{ os & os_type_heaps = os_type_heaps, os_symbol_heap = os_symbol_heap, os_var_heap = os_var_heap,
 						   os_special_instances = os_special_instances, os_error = os_error, os_predef_symbols = os_predef_symbols })
