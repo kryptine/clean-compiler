@@ -1212,6 +1212,11 @@ where
 					= fun_index
 					= NoIndex
 				= NoIndex
+		get_recursive_fun_index group_index (SK_LocalMacroFunction glob_object) main_dcl_module_n fun_defs
+			# {fun_info,fun_index} = fun_defs.[glob_object]
+			| fun_info.fi_group_index == group_index
+				= fun_index
+				= NoIndex
 		get_recursive_fun_index group_index _ main_dcl_module_n fun_defs
 			= NoIndex
 
@@ -1600,3 +1605,4 @@ where
 instance <<< TypeCodeInstance
 where
 	(<<<) file {tci_index, tci_contexts} = file <<< tci_index <<< ' ' <<< tci_contexts
+
