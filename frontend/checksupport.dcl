@@ -100,11 +100,13 @@ cConversionTableSize	:== 10
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
-	,	icl_foreign_exports		:: ![FunDefIndex]
+	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet
 	,	icl_copied_from_dcl 	:: !CopiedDefinitions
 	,	icl_modification_time	:: !{#Char}
 	}
+
+:: ForeignExport = {fe_fd_index :: !FunDefIndex, fe_stdcall :: !Bool}
 
 ::	DclModule =
 	{	dcl_name			:: !Ident

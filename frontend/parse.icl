@@ -676,11 +676,28 @@ where
 				# (token, pState) = nextToken FunctionContext pState
 				-> case token of
 					IdentToken function_name
-						# pState = wantEndOfDefinition "foreign export" pState
-						# (ident,pState) = stringToIdent function_name IC_Expression pState
-						-> (True,PD_ForeignExport ident file_name line_nr,pState)
+						| function_name=="ccall"
+							# (token2, pState) = nextToken FunctionContext pState
+							-> case token2 of
+								IdentToken function_name
+									-> accept_foreign_export function_name line_nr False pState
+								_
+									-> accept_foreign_export function_name line_nr False (tokenBack pState)
+						| function_name=="stdcall"
+							# (token2, pState) = nextToken FunctionContext pState
+							-> case token2 of 
+								IdentToken function_name
+									-> accept_foreign_export function_name line_nr True pState
+								_
+									-> accept_foreign_export function_name line_nr False (tokenBack pState)
+							-> accept_foreign_export function_name line_nr False pState
 					_
 						-> foreign_export_error "function name" pState
+				where
+					accept_foreign_export function_name line_nr stdcall pState
+						# pState = wantEndOfDefinition "foreign export" pState
+						# (ident,pState) = stringToIdent function_name IC_Expression pState
+						= (True,PD_ForeignExport ident file_name line_nr stdcall,pState)
 			_
 				-> foreign_export_error "export" pState
 		where

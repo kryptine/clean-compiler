@@ -2039,11 +2039,11 @@ getVariableSequenceNumber varInfoPtr be
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
 
-convertForeignExports :: [Int] Int BackEnd -> BackEnd
-convertForeignExports [functionIndex:icl_foreign_exports] main_dcl_module_n backEnd
+convertForeignExports :: [ForeignExport] Int BackEnd -> BackEnd
+convertForeignExports [{fe_fd_index,fe_stdcall}:icl_foreign_exports] main_dcl_module_n backEnd
 	# backEnd = convertForeignExports icl_foreign_exports main_dcl_module_n backEnd
-	# (function_symbol_p,backEnd) = BEFunctionSymbol functionIndex main_dcl_module_n backEnd
-	= BEInsertForeignExport function_symbol_p backEnd
+	# (function_symbol_p,backEnd) = BEFunctionSymbol fe_fd_index main_dcl_module_n backEnd
+	= BEInsertForeignExport function_symbol_p (if fe_stdcall 1 0) backEnd
 convertForeignExports [] main_dcl_module_n backEnd
 	= backEnd
 

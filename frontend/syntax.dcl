@@ -96,8 +96,15 @@ instance == FunctionOrMacroIndex
 	,	mod_type		:: !ModuleKind
 	, 	mod_imports		:: ![ParsedImport]
 	,	mod_imported_objects :: ![ImportedObject]
-	,	mod_foreign_exports :: ![IdentPos]
+	,	mod_foreign_exports :: ![ParsedForeignExport]
 	,	mod_defs		:: !defs
+	}
+
+::	ParsedForeignExport =
+	{	pfe_ident	:: !Ident
+	,	pfe_line	:: !Int
+	,	pfe_file	:: !FileName
+	,	pfe_stdcall	:: !Bool
 	}
 
 ::	ParsedModule	:== Module  [ParsedDefinition]
@@ -175,7 +182,7 @@ cIsNotAFunction :== False
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
-	|	PD_ForeignExport !Ident !{#Char} !Int
+	|	PD_ForeignExport !Ident !{#Char} !Int !Bool /* if stdcall */
 	|	PD_Generic GenericDef // AA
 	| 	PD_GenericCase GenericCaseDef // AA	
 	|	PD_Derive [GenericCaseDef] // AA
@@ -1327,7 +1334,7 @@ instance == OverloadedListType
 	=	CP_Expression !Expression
 	|	CP_FunArg !Ident !Int // Function symbol, argument position (>=1)
 	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
-	
+
 ::	IdentPos =
 	{	ip_ident	:: !Ident
 	,	ip_line		:: !Int

@@ -3072,7 +3072,7 @@ BEDefineImportedObjsAndLibs (BEStringListP objs, BEStringListP libs)
 	gBEState.be_icl.beicl_module->im_imported_libs	= libs;
 } /* BEDefineRules */
 
-void BEInsertForeignExport (BESymbolP symbol_p)
+void BEInsertForeignExport (BESymbolP symbol_p,int stdcall)
 {
 	ImpMod icl_mod_p;
 	struct foreign_export_list *foreign_export_list_p;
@@ -3082,6 +3082,7 @@ void BEInsertForeignExport (BESymbolP symbol_p)
 	icl_mod_p=gBEState.be_icl.beicl_module;
 
 	foreign_export_list_p->fe_symbol_p=symbol_p;
+	foreign_export_list_p->fe_stdcall=stdcall;
 	foreign_export_list_p->fe_next=icl_mod_p->im_foreign_exports;
 	icl_mod_p->im_foreign_exports=foreign_export_list_p;
 }

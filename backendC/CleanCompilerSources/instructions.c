@@ -3574,6 +3574,9 @@ void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 
 		FPrintF (OutFile,"\n\tcentry %s e_%s_s%s \"",function_sdef->sdef_ident->ident_name,CurrentModule,function_sdef->sdef_ident->ident_name);
 		
+		if (foreign_export_list->fe_stdcall)
+			FPutC ('P',OutFile);
+		
 		rule_type_p=function_sdef->sdef_rule->rule_type;
 		
 		for_l (type_arg_p,rule_type_p->type_alt_lhs->type_node_arguments,type_arg_next)

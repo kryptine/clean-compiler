@@ -1241,7 +1241,7 @@ where
 		# (strictness_index,strictness,strictness_list) = add_next_not_strict strictness_index strictness strictness_list
 		= add_strictness_for_arguments fields strictness_index strictness strictness_list
 
-reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject],![IdentPos],!*CollectAdmin)
+reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count type_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
@@ -1457,9 +1457,9 @@ reorganiseDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_c
 reorganiseDefinitions icl_module [PD_ImportedObjects new_imported_objects : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	= (fun_defs, c_defs, imports, new_imported_objects ++ imported_objects,foreign_exports, ca)
-reorganiseDefinitions icl_module [PD_ForeignExport new_foreign_export file_name line_n : defs] cons_count sel_count mem_count type_count ca
+reorganiseDefinitions icl_module [PD_ForeignExport new_foreign_export file_name line_n stdcall : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
-	= (fun_defs, c_defs, imports, imported_objects,[{ip_ident=new_foreign_export,ip_file=file_name,ip_line=line_n}:foreign_exports], ca)
+	= (fun_defs, c_defs, imports, imported_objects,[{pfe_ident=new_foreign_export,pfe_file=file_name,pfe_line=line_n,pfe_stdcall=stdcall}:foreign_exports], ca)
 reorganiseDefinitions icl_module [def:defs] _ _ _ _ ca
 	= abort ("reorganiseDefinitions does not match" ---> def)
 reorganiseDefinitions icl_module [] _ _ _ _ ca

@@ -817,6 +817,7 @@ struct string_list {
 
 struct foreign_export_list {
 	SymbolP						fe_symbol_p;
+	int							fe_stdcall;
 	struct foreign_export_list *fe_next;
 };
 

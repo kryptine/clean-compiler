@@ -758,11 +758,11 @@ BEDefineImportedObjsAndLibs a0 a1 a2 = code {
 }
 // void BEDefineImportedObjsAndLibs (BEStringListP objs,BEStringListP libs);
 
-BEInsertForeignExport :: !BESymbolP !BackEnd -> BackEnd;
-BEInsertForeignExport a0 a1 = code {
-	ccall BEInsertForeignExport "I:V:I"
+BEInsertForeignExport :: !BESymbolP !Int !BackEnd -> BackEnd;
+BEInsertForeignExport a0 a1 a2 = code {
+	ccall BEInsertForeignExport "II:V:I"
 }
-// void BEInsertForeignExport (BESymbolP symbol_p);
+// void BEInsertForeignExport (BESymbolP symbol_p,int stdcall);
 
 BESetMainDclModuleN :: !Int !BackEnd -> BackEnd;
 BESetMainDclModuleN a0 a1 = code {

@@ -2522,7 +2522,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  		fill_macro_def_array i [dcl_macro_defs:macro_defs] a
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
-check_module2 :: Bool Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [IdentPos] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int !Int 
+check_module2 :: Bool Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int !Int 
 				(Optional (Module a)) [Declaration] *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
@@ -2855,8 +2855,8 @@ check_module2 support_dynamics mod_ident mod_modification_time mod_imported_obje
 						-> ( popErrorAdmin cs_error, type_heaps)
 			= (icl_functions, type_heaps, cs_error)
 
-checkForeignExports :: [IdentPos] [IndexRange] *{#FunDef} *CheckState -> (![Int],!*{#FunDef},!*CheckState)
-checkForeignExports [ident_pos=:{ip_ident={id_name,id_info}}:foreign_exports] icl_global_functions_ranges fun_defs cs
+checkForeignExports :: [ParsedForeignExport] [IndexRange] *{#FunDef} *CheckState -> (![ForeignExport],!*{#FunDef},!*CheckState)
+checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,pfe_stdcall}:foreign_exports] icl_global_functions_ranges fun_defs cs
 	# ({ste_kind,ste_index},cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 	# cs = { cs & cs_symbol_table = cs_symbol_table }
 	# (foreign_export_fundef_index,fun_defs,cs) = check_foreign_export ste_kind icl_global_functions_ranges fun_defs cs
@@ -2872,20 +2872,22 @@ checkForeignExports [ident_pos=:{ip_ident={id_name,id_info}}:foreign_exports] ic
 									-> ([],{cs & cs_error = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in type of foreign exported function (context not allowed)" cs.cs_error})
 								| not (first_n_are_strict st_arity st_args_strictness)
 									-> ([],{cs & cs_error = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in type of foreign exported function (strictness annotation missing)" cs.cs_error})
-									-> ([ste_index],cs)
+									-> ([{fe_fd_index=ste_index,fe_stdcall=pfe_stdcall}],cs)
 					= (foreign_export_fundef_index,fun_defs,cs)
 			check_foreign_export (STE_FunctionOrMacro _) [_,{ir_from, ir_to}:_] fun_defs cs
 				| ste_index>=ir_from && ste_index<ir_to
+					# ident_pos = { ip_ident=pfe_ident,ip_line=pfe_line,ip_file=pfe_file }
 					= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been exported" cs.cs_error})
 			check_foreign_export _ _ fun_defs cs
+				# ident_pos = { ip_ident=pfe_ident,ip_line=pfe_line,ip_file=pfe_file }
 				= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been declared" cs.cs_error})
 	# (foreign_export_fundef_indexes,fun_defs,cs) = checkForeignExports foreign_exports icl_global_functions_ranges fun_defs cs
 	= (foreign_export_fundef_index++foreign_export_fundef_indexes,fun_defs,cs)
 checkForeignExports [] icl_global_functions_ranges fun_defs cs
 	= ([],fun_defs,cs)
 
-checkForeignExportedFunctionTypes :: !*ErrorAdmin ![Int] !*{#FunDef} -> (!*ErrorAdmin,!*{#FunDef})
-checkForeignExportedFunctionTypes error_admin [fun_def_index:icl_foreign_exports] fun_defs
+checkForeignExportedFunctionTypes :: !*ErrorAdmin ![ForeignExport] !*{#FunDef} -> (!*ErrorAdmin,!*{#FunDef})
+checkForeignExportedFunctionTypes error_admin [{fe_fd_index}:icl_foreign_exports] fun_defs
 	# error_admin = if (check_foreign_export_type st_result.at_type)
 						error_admin
 						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin)
@@ -2894,7 +2896,7 @@ checkForeignExportedFunctionTypes error_admin [fun_def_index:icl_foreign_exports
 						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in argument type for foreign exported function" error_admin)
 	= checkForeignExportedFunctionTypes error_admin icl_foreign_exports fun_defs2
 	where
-		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fun_def_index]
+		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fe_fd_index]
 
 		check_foreign_export_types [{at_type}:argument_types]
 			= check_foreign_export_type at_type && check_foreign_export_types argument_types 
