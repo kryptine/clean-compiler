@@ -61,6 +61,7 @@ instance == SuclTypeSymbol
 instance == SuclTypeVariable
 instance == SuclSymbol
 instance == SuclVariable
+instance == SymbKind
 
 instance toString SuclTypeSymbol
 instance <<< SuclTypeSymbol
@@ -72,6 +73,8 @@ instance toString SuclSymbolKind
 instance <<< SuclSymbolKind
 instance toString SuclVariable
 instance <<< SuclVariable
+instance toString SymbKind
+instance <<< SymbKind
 
 instance toString (Ptr a)
 instance <<< (Ptr a)
