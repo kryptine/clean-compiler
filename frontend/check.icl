@@ -4,6 +4,7 @@ import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers, portToNewSyntax, compilerSwitches
+import RWSDebug
 
 cUndef :== (-1)
 cDummyArray :== {}
@@ -2700,7 +2701,9 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 	# dcl_mod = {dcl_mod & dcl_dictionary_info=dictionary_info}
 	  heaps	= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap}
 	| not cs.cs_error.ea_ok
-		= ((0, 0, []), (expl_imp_info, modules, icl_functions, macro_defs, heaps, cs))
+	 	# cs_symbol_table = removeDeclarationsFromSymbolTable dcl_defined cModuleScope cs.cs_symbol_table
+	 	# cs_symbol_table = foldlArraySt removeImportedSymbolsFromSymbolTable dcls_import cs_symbol_table
+		= ((0, 0, []), (expl_imp_info, modules, icl_functions, macro_defs, heaps, {cs & cs_symbol_table = cs_symbol_table}))
 
 	#!nr_of_members = count_members mod_index dcl_common.com_instance_defs dcl_common.com_class_defs modules
 	# nr_of_dcl_functions_and_instances = nr_of_dcl_functions+nr_of_members
@@ -2734,6 +2737,7 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 					-> checkExplicitImportCompleteness decls_explicit modules icl_functions macro_defs hp_expression_heap cs
 				True
 					-> (modules, icl_functions, macro_defs, hp_expression_heap, cs)
+
 	  heaps = { heaps & hp_expression_heap = hp_expression_heap }
 
 	  dcl_common = { dcl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
