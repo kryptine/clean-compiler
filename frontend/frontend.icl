@@ -131,8 +131,12 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
       				fun_defs ti_common_defs dcl_mods type_heaps.th_vars td_infos error_admin
       type_heaps = { type_heaps & th_vars = th_vars }
 	# heaps = { heaps & hp_type_heaps = type_heaps }
-	# ti_common_defs = {dcl_common \\ {dcl_common} <-: dcl_mods }
-	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
+	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
+		with 
+			dcl_common_defs :: .{#DclModule} -> .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading
+			dcl_common_defs dcl_mods
+				=	{dcl_common \\ {dcl_common} <-: dcl_mods }
+
 
 	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin) = 
 		SwitchGenerics
@@ -141,10 +145,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 					heaps hash_table predef_symbols dcl_mods optional_dcl_icl_conversions error_admin)
 			(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin)	
 
-	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
-		with 
-			copied_ti_common_defs :: !.{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
-			copied_ti_common_defs = {x \\ x <-: ti_common_defs}
+	# (icl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n saved_main_dcl_common		
 	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }
 		
 	# error = error_admin.ea_file
