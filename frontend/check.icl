@@ -34,6 +34,7 @@ checkGenerics
 			, 	KindArrow [KindConst, KindConst]
 			]
 		# (kinds_ptr, th_vars) = newPtr (TVI_Kinds kinds) th_vars
+		# (cons_ptr, th_vars) = newPtr (TVI_Empty) th_vars
 
 		# cs = {cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }
 		# type_heaps = {type_heaps & th_vars = th_vars}
@@ -50,6 +51,7 @@ checkGenerics
 			{	generic_def &
 				gen_type = { gen_type & gt_vars = gt_vars, gt_type = gt_type }
 			,	gen_kinds_ptr = kinds_ptr
+			, 	gen_cons_ptr = cons_ptr
 			}
 
 		# generic_defs = {generic_defs & [gen_index] = generic_def}				

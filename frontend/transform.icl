@@ -331,7 +331,6 @@ where
 	unfold fv=:{fv_info_ptr,fv_name} ui us=:{us_var_heap}
 		# (new_info_ptr, us_var_heap) = newPtr VI_Empty us_var_heap
 		= ({ fv & fv_info_ptr = new_info_ptr }, { us & us_var_heap = writePtr fv_info_ptr (VI_Variable fv_name new_info_ptr) us_var_heap })
-
 instance unfold App
 where
 	unfold app=:{app_symb={symb_kind}, app_args, app_info_ptr} ui=:{ui_convert_module_n,ui_conversion_table} us

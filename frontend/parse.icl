@@ -1231,6 +1231,7 @@ wantGenericDefinition context pos pState
 		,	gen_kinds_ptr = nilPtr
 		,	gen_classes = []
 		,	gen_isomap = MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0
+		,	gen_cons_ptr = nilPtr
 		}
 	= (PD_Generic gen_def, pState)	
 	where

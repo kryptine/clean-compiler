@@ -14,6 +14,19 @@ partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# Dcl
 
 ::	CopiedLocalFunctions
 
+// AA..
+
+::	CollectState =
+	{	cos_var_heap	:: !.VarHeap
+	,	cos_symbol_heap :: !.ExpressionHeap
+	,	cos_error		:: !.ErrorAdmin
+	,	cos_alias_dummy	:: !PredefinedSymbol
+	}
+
+determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
+
+// ..AA
+
 ::	UnfoldState =
 	{	us_var_heap				:: !.VarHeap
 	,	us_symbol_heap			:: !.ExpressionHeap
@@ -31,5 +44,4 @@ partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# Dcl
 :: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem
 
 class unfold a :: !a !UnfoldInfo !*UnfoldState -> (!a, !*UnfoldState)
-
 instance unfold Expression, CasePatterns
