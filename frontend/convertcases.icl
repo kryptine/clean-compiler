@@ -704,9 +704,10 @@ newFunction :: !(Optional Ident) !FunctionBody ![FreeVar] ![AType] !AType !Int !
 newFunction opt_id fun_bodies local_vars arg_types result_type group_index state
 	=	newFunctionWithType opt_id fun_bodies local_vars fun_type group_index state
 	where
-	  fun_type =
+	  (_,fun_type) = removeAnnotations
 		{	st_vars			= []
 		,	st_args			= arg_types
+		,	st_args_strictness=NotStrict
 		,	st_arity		= length arg_types // -*-> ("newFunction", fun_id.id_name)
 		,	st_result		= result_type
 		,	st_context		= []
@@ -1133,9 +1134,11 @@ where
 
 		# body
 			=	TransformedBody {tb_args=[case_var : [var \\ (var, _) <- free_vars]], tb_rhs=caseExpr}
-	  	  type
-			=	{	st_vars			= []
+	  	  (_,type)
+			=	removeAnnotations
+				{	st_vars			= []
 				,	st_args			= [ct_pattern_type : [ type \\ (_, type) <- free_vars]]
+				,	st_args_strictness=NotStrict
 				,	st_arity		= 1 + length free_vars
 				,	st_result		= ct_result_type
 				,	st_context		= []
