@@ -99,31 +99,31 @@ Implementation
 emptygraph :: Graph .sym .var
 
 // Assign a node to a variable in a graph.
-updategraph :: .var (Node .sym .var) (Graph .sym .var) -> Graph .sym .var
+updategraph :: var .(Node sym var) !.(Graph sym var) -> .Graph sym var
 
 // Unassign a variable in a graph, making it free.
-prunegraph :: .var (Graph .sym .var) -> Graph .sym .var
+prunegraph :: var !.(Graph sym var) -> .Graph sym var
 
 // Restrict a graph to a given domain, i.e.
 // make all variables free except those in the domain.
-restrictgraph :: !.[var] .(Graph sym var) -> Graph sym var | == var
+restrictgraph :: .[var] .(Graph sym var) -> .Graph sym var | == var
 
 // Redirect references (node arguments) in a graph
 // according to a redirection function
-redirectgraph :: (.var->.var) !(Graph .sym .var) -> Graph .sym .var | == var
+redirectgraph :: (var->var) !.(Graph sym var) -> .Graph sym var
 
 // Overwrite the variables in the second graph by their contents in the first.
 // Keeps the contents of the second graph if free in the first.
-overwritegraph :: !(Graph .sym .var) (Graph .sym .var) -> Graph .sym .var
+overwritegraph :: !.(Graph sym var) !.(Graph sym var) -> .Graph sym var
 
 // Movegraph moves a graph to a different variable domain
 // Requires a list of bound variables in the graph
-movegraph :: (var1->.var2) !.[var1] .(Graph sym var1) -> Graph sym .var2 | == var1
+movegraph :: (var1->var2) !.[var1] .(Graph sym var1) -> .Graph sym var2 | == var1
 
 // Varcontents obtains the contents of a variable in a graph
 // Returns a boolean determining if it's bound, and
 // its contents if the boolean is True.
-varcontents :: !(Graph .sym var) var -> (.Bool,Node .sym var) | == var
+varcontents :: !.(Graph sym var) var -> (.Bool,Node sym var) | == var
 
 // Graphvars determines the top-level-bound and free variables in a graph,
 // reachable from a given list of variables.
@@ -213,3 +213,5 @@ compilegraph :: ![(var,Node sym var)] -> Graph sym var
 >                 where (sdef,scont) = nodecontents sgraph snode
 
 */
+
+instance == (Graph sym var) | == sym & == var
