@@ -51,14 +51,14 @@ where
 (--->) val message
 	| file_to_true (stderr <<< message <<< '\n')
 		= val
-		= abort "Internal error in --->"
+		= halt
 
 (-?->) infix :: .a !(!Bool, !b) -> .a | <<< b
 (-?->) val (cond, message)  
 	| cond
 		| file_to_true (stderr <<< message <<< '\n')
 			= val
-      		= abort "Internal error in --->"
+			= halt
 		= val
 
 file_to_true :: !File -> Bool
@@ -68,6 +68,11 @@ file_to_true file = code {
           pushB TRUE
   .end
   }
+
+halt :: .a
+halt = code {
+	halt
+ }
 
 instance + {#Char}
 where
