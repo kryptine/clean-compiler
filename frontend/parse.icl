@@ -276,7 +276,7 @@ isGlobalContext	parseContext	:== parseContext bitand cGlobalContext <> 0 // not 
 isDclContext	parseContext	:== parseContext bitand cICLContext == 0
 isIclContext	parseContext	:== parseContext bitand cICLContext <> 0	// not (isDclContext parseContext)
 
-isClassOrInstanceDefsContext parseContext			:== parseContext bitand cClassOrInstanceDefsContext <> 0
+isNotClassOrInstanceDefsContext parseContext		:== parseContext bitand cClassOrInstanceDefsContext == 0
 isGlobalOrClassOrInstanceDefsContext parseContext	:== parseContext bitand (cGlobalContext bitor cClassOrInstanceDefsContext) <> 0
 
 cWantIclFile :== True
@@ -528,9 +528,11 @@ where
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		  localsExpected	= ~ ss_useLayout
 		  (rhs, _, pState)		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) (tokenBack pState)
-		| isGlobalContext parseContext
- 			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
- 			= (PD_NodeDef pos (combine_args args) rhs, pState)
+		| isLocalContext parseContext
+			| isNotClassOrInstanceDefsContext parseContext
+ 				= (PD_NodeDef pos (combine_args args) rhs, pState)
+	 			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<class or instance definition>" pState)
+			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
 	where		
 		want_node_def_token s EqualToken		= s
 		want_node_def_token s DefinesColonToken = s // PK replaceToken EqualToken s
@@ -541,7 +543,7 @@ where
 	want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
 		# code_allowed  = definingToken == EqualToken
 		| isIclContext parseContext && isLocalContext parseContext && (definingToken == EqualToken || definingToken == DefinesColonToken) &&
-		/* PK isLowerCaseName name.id_name && */ not (isClassOrInstanceDefsContext parseContext)
+		/* PK isLowerCaseName name.id_name && */ isNotClassOrInstanceDefsContext parseContext
 		  	# (token, pState) = nextToken FunctionContext pState
 			| code_allowed && token == CodeToken
 				# (rhs, pState) = wantCodeRhs pState
@@ -576,6 +578,7 @@ where
 			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
 			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
+
 	check_name_and_fixity No hasprio pState
 		= (erroneousIdent, False, parseError "Definition" No "identifier" pState)
 	check_name_and_fixity (Yes (name,is_infix)) hasprio pState
