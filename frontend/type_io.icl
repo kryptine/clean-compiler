@@ -1,7 +1,7 @@
 implementation module type_io
 
-
-import DebugUtilities;
+//import DebugUtilities;
+F a b :== b
 
 import StdEnv, compare_constructor // ,RWSDebug
 
