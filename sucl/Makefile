@@ -25,7 +25,7 @@ tags: *.dcl *.icl ../compiler/*.dcl ../compiler/*.icl
 $(SYS)/%.abc: %.icl
 	$(COCL) $(COCLFLAGS) $*
 
-$(SYS)/supercompile.abc: supercompile.icl supercompile.dcl convert.dcl
+$(SYS)/supercompile.abc: supercompile.icl supercompile.dcl convert.dcl newtest.dcl cli.dcl coreclean.dcl basic.dcl
 $(SYS)/convert.abc: convert.icl convert.dcl coreclean.dcl rule.dcl graph.dcl basic.dcl
 $(SYS)/newtest.abc: newtest.icl newtest.dcl newfold.dcl cli.dcl canon.dcl coreclean.dcl loop.dcl trace.dcl spine.dcl history.dcl complete.dcl trd.dcl rule.dcl graph.dcl basic.dcl
 $(SYS)/newfold.abc: newfold.icl newfold.dcl extract.dcl trace.dcl spine.dcl history.dcl rule.dcl dnc.dcl graph.dcl basic.dcl
