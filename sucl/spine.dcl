@@ -157,15 +157,15 @@ in a graph.
 */
 
 :: Subspine sym var pvar
-   = Cycle                                                        // The spine contains a cycle
-   | Delta                                                        // An imported (delta) rule was found
-   | Force (Spine sym var pvar)                                   // Global strictness annotation forced evaluation of a subgraph
-   | MissingCase                                                  // All alternatives failed for a function symbol
-   | Open (Rgraph sym pvar)                                       // Need root normal form of open node for matching
-   | Partial (Rule sym pvar) (Pfun pvar var) (Spine sym var pvar) // A rule was strictly partially matched
-   | Unsafe (Rgraph sym var)                                      // Terminated due to immininent recursion
-   | Redex (Rule sym pvar) (Pfun pvar var)                        // Total match
-   | Strict                                                       // Need root normal form due to strictness
+   = Cycle                                                              // The spine contains a cycle
+   | Delta                                                              // An imported (delta) rule was found
+   | Force (Spine sym var pvar)                                         // Global strictness annotation forced evaluation of a subgraph
+   | MissingCase                                                        // All alternatives failed for a function symbol
+   | Open (Rgraph sym pvar)                                             // Need root normal form of open node for matching
+   | Partial (Rule sym pvar) (Pfun pvar var) pvar (Spine sym var pvar)  // A rule was strictly partially matched
+   | Unsafe (Rgraph sym var)                                            // Terminated due to immininent recursion
+   | Redex (Rule sym pvar) (Pfun pvar var)                              // Total match
+   | Strict                                                             // Need root normal form due to strictness
 
 // Fold up a spine using a function for each constructor
 foldspine
@@ -175,7 +175,7 @@ foldspine
     (.result -> .subresult)
     .subresult
     ((Rgraph sym pvar) -> .subresult)
-    ((Rule sym pvar) (Pfun pvar var) .result -> .subresult)
+    ((Rule sym pvar) (Pfun pvar var) pvar .result -> .subresult)
     ((Rgraph sym var) -> .subresult)
     ((Rule sym pvar) (Pfun pvar var) -> .subresult)
     .subresult
