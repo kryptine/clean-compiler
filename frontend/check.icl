@@ -1114,6 +1114,9 @@ where
 			# symbol_table = remove_call entry.ste_kind fun_index entry id_info symbol_table
 			= remove_calls_from_symbol_table fun_index fun_level fun_calls fun_defs macro_defs symbol_table
 			= remove_calls_from_symbol_table fun_index fun_level fun_calls fun_defs macro_defs symbol_table
+	remove_calls_from_symbol_table fun_index fun_level [DclFunCall _ _ : fun_calls] fun_defs macro_defs symbol_table
+		= remove_calls_from_symbol_table fun_index fun_level fun_calls fun_defs macro_defs symbol_table
+
 	remove_calls_from_symbol_table fun_index fun_level [] fun_defs macro_defs symbol_table
 		= (fun_defs,macro_defs,symbol_table)
 
@@ -1145,7 +1148,7 @@ checkFunctions mod_index level fun_index to_index local_functions_index_offset f
 		# (fun_def,fun_defs, e_info, heaps, cs) = checkFunction fun_def mod_index (FunctionOrIclMacroIndex fun_index) level local_functions_index_offset fun_defs e_info heaps cs
 		# fun_defs = { fun_defs & [fun_index] = fun_def }
 		= checkFunctions mod_index level (inc fun_index) to_index local_functions_index_offset fun_defs e_info heaps cs
-			
+
 checkDclMacros :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 										  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState)
 checkDclMacros mod_index level fun_index to_index fun_defs e_info heaps cs
@@ -1574,7 +1577,7 @@ where
 		= def_kind == cTypeDefs || def_kind == cSelectorDefs || def_kind == cClassDefs || def_kind == cGenericDefs 
 
  	is_abstract_type com_type_defs decl_index
- 		= case com_type_defs.[decl_index].td_rhs of (AbstractType _) -> True ; _ -> False
+ 		= case com_type_defs.[decl_index].td_rhs of (AbstractType _) -> True ; (AbstractSynType _ _) -> True ; _ -> False
  
 	add_dcl_declaration info_ptr entry (Declaration dcl) def_index decl_index (conversion_table, icl_sizes, icl_defs, symbol_table)
 		# (icl_index, icl_sizes) = icl_sizes![def_index]
@@ -1614,6 +1617,10 @@ where
 			# (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
 			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td=:{td_name, td_pos, td_rhs = AbstractType _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
+			# cs_error = checkError "abstract type not defined in implementation module" ""
+					(setErrorAdmin (newPosition td_name td_pos) cs.cs_error)
+			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
+		add_type_def td=:{td_name, td_pos, td_rhs = AbstractSynType _ _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 			# cs_error = checkError "abstract type not defined in implementation module" ""
 					(setErrorAdmin (newPosition td_name td_pos) cs.cs_error)
 			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
