@@ -3,22 +3,16 @@ implementation module checkKindCorrectness
 import StdEnv
 import syntax, containers, checksupport, utilities
 
-// import RWSDebug
+//import RWSDebug
 
-checkKindCorrectness :: !Index IndexRange !u:{# FunDef} !{#CommonDefs} !*{#DclModule} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
-					-> (!u:{# FunDef}, !*{#DclModule}, !*TypeVarHeap, !*TypeDefInfos, !*ErrorAdmin)
-checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs 
-			dcl_mods th_vars td_infos error_admin
-	#! n_fun_defs
-			= size fun_defs
-	   size_dcl_mods
-	   		= size dcl_mods
-	# (bv_cashed_modules, dcl_mods)
-			= iFoldSt mark_cashed_module
-					0 size_dcl_mods (bitvectCreate size_dcl_mods, dcl_mods)
-	  (dcl_mods, th_vars, td_infos, error_admin)
+checkKindCorrectness :: !Index IndexRange !{#CommonDefs} !Int !u:{# FunDef} !*{#DclModule} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
+																						-> (!u:{# FunDef}, !*{#DclModule}, !*TypeVarHeap, !*TypeDefInfos, !*ErrorAdmin)
+checkKindCorrectness main_dcl_module_n icl_instances common_defs n_cached_dcl_modules fun_defs dcl_mods th_vars td_infos error_admin
+	#! n_fun_defs = size fun_defs
+	   size_dcl_mods = size dcl_mods
+	# (dcl_mods, th_vars, td_infos, error_admin)
 			= iFoldSt (\mod_index state
-						-> if (bitvectSelect mod_index bv_cashed_modules)
+						-> if (mod_index<n_cached_dcl_modules)
 								state
 								(check_classes mod_index state))
 					0 size_dcl_mods (dcl_mods, th_vars, td_infos, error_admin)
@@ -28,11 +22,10 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 	  		= foldrArraySt (check_class icl_common_defs.com_member_defs)
 	  				icl_common_defs.com_class_defs
 					([], th_vars, td_infos, error_admin)
-	  bv_uninitialized_mods
-	  		= {el\\el<-:bv_cashed_modules}
+	  bv_uninitialized_mods = bitvectSetFirstN n_cached_dcl_modules (bitvectCreate size_dcl_mods)
 	  (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 			= iFoldSt (\mod_index state
-						-> if (bitvectSelect mod_index bv_cashed_modules)
+						-> if (mod_index<n_cached_dcl_modules)
 								state
 								(check_instances_and_class_and_member_contexts
 										common_defs common_defs.[mod_index] state))
@@ -45,18 +38,13 @@ checkKindCorrectness main_dcl_module_n icl_instances fun_defs common_defs
 			= iFoldSt (check_icl_function common_defs) icl_instances.ir_to n_fun_defs state
 	  (dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 			= iFoldSt (\mod_index state
-						-> if (bitvectSelect mod_index bv_cashed_modules || mod_index==main_dcl_module_n)
+						-> if (mod_index<n_cached_dcl_modules || mod_index==main_dcl_module_n)
 			    		      state
 						   	  (check_dcl_functions common_defs mod_index state))
 			  0 size_dcl_mods
 			  (dcl_mods, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	= (fun_defs, dcl_mods, th_vars, td_infos, error_admin)
   where
-	mark_cashed_module mod_index (bitvect, dcl_mods)
-		| dcl_mods.[mod_index].dcl_is_cashed
-			= (bitvectSet mod_index bitvect, dcl_mods)
-		= (bitvect, dcl_mods)
-
 	check_classes mod_index (dcl_mods, th_vars, td_infos, error_admin)
 		# (dcl_mod, dcl_mods)
 				= dcl_mods![mod_index]

@@ -1,6 +1,6 @@
 definition module checkKindCorrectness
 
-import syntax, checksupport, containers
+import syntax, checksupport
 
-checkKindCorrectness :: !Index IndexRange !u:{# FunDef} !{#CommonDefs} !*{#DclModule} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
-					-> (!u:{# FunDef}, !*{#DclModule}, !*TypeVarHeap, !*TypeDefInfos, !*ErrorAdmin)
+checkKindCorrectness :: !Index IndexRange !{#CommonDefs} !Int !u:{# FunDef} !*{#DclModule} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
+																						-> (!u:{# FunDef}, !*{#DclModule}, !*TypeVarHeap, !*TypeDefInfos, !*ErrorAdmin)

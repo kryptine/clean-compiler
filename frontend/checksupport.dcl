@@ -109,7 +109,6 @@ cConversionTableSize	:== 9 // AA
 	,	dcl_module_kind		:: !ModuleKind
 // ... RWS
 	,	dcl_imported_module_numbers :: !NumberSet
-	,	dcl_is_cashed		:: !Bool
 	}
 
 class Erroradmin state

@@ -127,6 +127,10 @@ BITNUMBER index :== index bitand 31
 
 :: LargeBitvect :== {#Int}
 
+bitvectCreate :: !Int -> .LargeBitvect 
+bitvectCreate 0 = {}
+bitvectCreate n_elements = createArray ((BITINDEX (n_elements-1)+1)) 0
+
 bitvectSelect :: !Int !LargeBitvect -> Bool
 bitvectSelect index a
 	= a.[BITINDEX index] bitand (1 << BITNUMBER index) <> 0
@@ -143,9 +147,17 @@ bitvectReset index a
 	   a_bit_index = a.[bit_index]
 	= { a & [bit_index] = a_bit_index bitand (bitnot (1 << BITNUMBER index))}
 
-bitvectCreate :: !Int -> .LargeBitvect 
-bitvectCreate 0 = {}
-bitvectCreate n_elements = createArray ((BITINDEX (n_elements-1)+1)) 0
+bitvectSetFirstN :: !Int !*LargeBitvect -> .LargeBitvect 
+bitvectSetFirstN n_bits a
+		= set_bits 0 n_bits a
+	where
+		set_bits index n_bits a
+			| n_bits<=0
+				= a
+			| n_bits<32
+				# (a_index,a) = a![index]
+			 	= {a & [index]=a_index bitor (bitnot ((-1)<<n_bits))}
+			 	= set_bits (index+1) (n_bits-32) {a & [index]= -1}
 
 bitvectResetAll :: !*LargeBitvect -> .LargeBitvect 
 bitvectResetAll arr

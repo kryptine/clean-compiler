@@ -14,10 +14,11 @@ bitvectToNumberSet :: !LargeBitvect -> .NumberSet
 
 :: LargeBitvect :== {#Int}
 
+bitvectCreate :: !Int -> .LargeBitvect 
 bitvectSelect :: !Int !LargeBitvect -> Bool
 bitvectSet :: !Int !*LargeBitvect -> .LargeBitvect 
 bitvectReset :: !Int !*LargeBitvect -> .LargeBitvect
-bitvectCreate :: !Int -> .LargeBitvect 
+bitvectSetFirstN :: !Int !*LargeBitvect -> .LargeBitvect 
 bitvectResetAll :: !*LargeBitvect -> .LargeBitvect 
 
 :: IntKey :== Int

@@ -1606,7 +1606,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 	  init_new_dcl_modules = gimme_a_strict_array_type { initialDclModule scanned_module module_n \\ scanned_module <- scanned_modules & module_n<-[size dcl_modules..]}
 			
 	  init_dcl_modules = {	if (i<size dcl_modules) 
-	  							{ dcl_modules.[i] & dcl_is_cashed = True }
+	  							dcl_modules.[i]
 		  						init_new_dcl_modules.[i-size dcl_modules] 
 	  						\\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
 	= (mod_name,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,local_defs,icl_functions,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
@@ -2226,7 +2226,6 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 		,	dcl_module_kind	= mod_type
 // ... RWS
 		,	dcl_imported_module_numbers = EndNumbers
-		,	dcl_is_cashed	= False
 		}
 
 addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_component_set imports_ikh dcl_modules cs
