@@ -28,6 +28,140 @@ like instantiation, reduction or strict annotation.
 
 ------------------------------------------------------------
 
+The function that produces a trace is given an initial task expression.
+
+The function first determines a transformation (Reduce,Annotate,Instantiate) to
+apply, using the strategy.
+
+This may fail when the termination history indicates a required abstraction
+higher up.  In that case, return at once with failure, and the current graph
+(with shared parts excluded) as the most specific generaliser.
+
+After application of the transformation, a trace is produced for the resulting
+graph(s).
+
+However, the production of the subtraces may fail initially because of a
+necessary abstraction higher-up which wasn't there (introduced recursion).
+
+Therefore, producing a trace can return one of two results: either a successful
+trace, or failure, with an indication of which abstraction was actually
+necessary.
+
+The needed generalisation is computed by taking the most specific generaliser
+for each pattern in the termination history.
+
+In the general case, generation of the subtraces fails for both the history
+pattern of the current transformation, and some patterns higher up (which were
+also passed to the trace generation function.  There are now two courses of
+action:
+
+[1] Apply abstraction instead of the current transformation.  Use the returned
+    most specific generaliser and the original graph to determine how to
+    abstract.  Then, generate subtraces.  There should be no more abstractions
+    necessary for the current node, because they should be handled in the
+    graphs resulting from the abstraction.[*]
+
+[2] Immediately return the failure, assuming (rule of thumb) that when the
+    upper generalisation was necessary, the lower one won't make it go away.
+    This is probably an optimisation of the optimisation process, but it can be
+    important, as some backtracking code (exponential!) may not have to be
+    executed.
+
+[*] This may not be entirely true in the case of sharing.  Because shared parts
+    must be pruned, the termination pattern may get smaller in the abstraction
+    operation.
+
+Questions:
+
+[?] Which would yield better results and/or perform better: [1] or [2] above?
+
+[?] Must the abstracted areas be associated with termination patterns that
+    caused their introduction?  Or somehow with the trace node where they were
+    introduced?  The termination patterns don't have to be the same over
+    different branches of the trace!  Do they play a role at all in selecting
+    the abstracted part?  Actually, they don't.  We just need their roots so we
+    can find the corresponding subgraphs and determine the MSG's.
+
+It would appear we can traverse the trace when everything is done and collected
+all the introduced functions from it.
+
+------------------------------------------------------------
+
+*/
+
+:: FallibleTrace sym var pvar
+   = GoodTrace (Trace sym var pvar)
+   | NeedAbstraction [Rgraph sym var]
+
+:: Strat sym var pvar
+   :== (History sym var)
+       (Rgraph sym var)
+    -> Answer sym var pvar
+
+maketrace
+ :: (Strat sym var pvar)        // The strategy
+    (History sym var)           // Patterns to stop partial evaluation
+    (Rgraph sym var)            // Subject graph
+ -> FallibleTrace sym var pvar  // The result
+
+maketrace strategy history subject
+ = ( case answer
+     of No                          // Root normal form, abstract and continue with arguments
+         -> handlernf
+        Yes spine                   // Do something, even if it is to fail
+         -> ( case subspine
+              of Cycle              // Cycle in spine.  Generate x:_Strict x x with _Strict :: !a b -> b.  Probably becomes a #!
+                  -> handlecycle
+                 Delta              // Primitive function.  Abstract its application and continue with remainder.
+                  -> handledelta
+                 Force n (spine)    // Shouldn't happen
+                  -> abort "loop: maketrace: spinetip returned Force???"
+                 MissingCase        // Missing case.  Generate _MissingCase, possibly parametrised with user function?
+                  -> handlemissingcase
+                 Open pattern       // Need instantiation.  Generate two branches, extend history (for both) and continue.
+                  -> handleopen pattern
+                 Partial rule match rulenode spine
+                  -> abort "loop: maketrace: spinetop returned Partial???"
+                 Unsafe histpat     // Require pattern from history.
+                  -> handleunsafe histpat // If we have a more general version with a name attached, use that.  
+                                    // Otherwise, fail with the corresponding subgraph
+                 Redex rule match   // Found a redex.  Unfold, extend history and continue.
+                  -> handleredex rule match
+                 Strict             // Need to put a strictness annotation on an open node-id.
+                  -> handlestrict   // Abstract _Strict <mumble> <mumble> and continue with rest.
+            ) spine
+            where (redexroot,subspine) = spinetip spine
+   ) strategy history subject
+   where answer = strategy history subject
+
+handlernf :: (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handlernf _ _ _ = undef
+
+handlecycle :: (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handlecycle _ _ _ _ = undef
+
+handledelta :: (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handledelta _ _ _ _ = undef
+
+handlemissingcase :: (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handlemissingcase _ _ _ _ = undef
+
+handleopen :: (Rgraph sym pvar) (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handleopen _ _ _ _ _ = undef
+
+handleunsafe :: (HistoryPattern sym var) (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handleunsafe _ _ _ _ _ = undef
+
+handleredex :: (Rule sym pvar) (Pfun pvar var) (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handleredex _ _ _ _ _ _ = undef
+
+handlestrict :: (Spine sym var pvar) (Strat sym var pvar) (History sym var) (Rgraph sym var) -> FallibleTrace sym var pvar
+handlestrict _ _ _ _ = undef
+
+/*
+
+------------------------------------------------------------
+
 Types
 -----
 
