@@ -188,8 +188,6 @@ where
 		# (dp_rhs, ls) = lift dp_rhs ls
 		= ({ pattern & dp_rhs = dp_rhs }, ls)
 
-import RWSDebug
-
 liftFunctions :: [FunctionOrMacroIndex] Int Int *{#FunDef} *{#*{#FunDef}} *(Heap VarInfo) *(Heap ExprInfo) -> .LiftState;
 liftFunctions group group_index main_dcl_module_n fun_defs macro_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs,macro_defs)
