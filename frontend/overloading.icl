@@ -864,7 +864,7 @@ where
 		# (class_context, context_address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		| isEmpty context_address
 			= (ClassVariable class_context.tc_var, ({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
-			= (Selection No (ClassVariable class_context.tc_var) (generateClassSelection context_address []), ({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
+			= (Selection NormalSelector (ClassVariable class_context.tc_var) (generateClassSelection context_address []), ({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
 	convert_class_appl_to_expression defs contexts (CA_LocalTypeCode new_var_ptr) heaps_and_ptrs
 		= (TypeCodeExpression (TCE_Var new_var_ptr), heaps_and_ptrs)
 	convert_class_appl_to_expression defs contexts (CA_GlobalTypeCode {tci_index,tci_contexts}) heaps_and_ptrs
@@ -1302,7 +1302,7 @@ where
 				EI_Selection selectors record_var context_args
 					# (all_args, ui=:{ui_var_heap, ui_error}) = adjustClassExpressions symb_name context_args app_args ui
 					  (var_name, var_info_ptr, ui_var_heap, ui_error) = getClassVariable symb_name record_var ui_var_heap ui_error
-					  select_expr = Selection No (Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selectors
+					  select_expr = Selection NormalSelector (Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selectors
 					| isEmpty all_args
 						-> (select_expr, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 						-> (select_expr @ all_args, examine_calls context_args
@@ -1595,7 +1595,7 @@ where
 				    { ui & ui_var_heap = ui_var_heap })	
 // ... MV					
 		convertTypecode (TCE_Selector selections var_info_ptr) ui
-			= (Selection No (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ui)
+			= (Selection NormalSelector (Var { var_name = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }) selections, ui)
 		convertTypecode (TCE_UniType uni_vars type_code) ui
 			# (let_binds, ui)		= createVariables uni_vars ui
 			  (let_expr, ui)		= convertTypecode type_code ui

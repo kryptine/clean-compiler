@@ -1092,12 +1092,18 @@ cNonUniqueSelection	:== False
 cIsStrict		:== True
 cIsNotStrict	:== False
 
+::	SelectorKind
+		=	NormalSelector			// .
+		|	UniqueSelector			// !
+				(Global DefinedSymbol)	// 	tuple type
+				!Bool					// 	is result element unique?
+
 ::	Expression	= Var !BoundVar 
 				| App !App
 				| (@) infixl 9  !Expression ![Expression]
 				| Let !Let
 				| Case !Case
-				| Selection !(Optional (Global DefinedSymbol)) !Expression ![Selection]
+				| Selection !SelectorKind !Expression ![Selection]
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
@@ -1583,10 +1589,7 @@ where
 		else_part file No = file <<< '\n'
 		else_part file (Yes else) = file <<< "\nELSE\n" <<< else <<< '\n'
 */
- 	(<<<) file (Selection opt_tuple expr selectors) = file <<< expr <<< selector_kind opt_tuple <<< selectors
-	where
-		selector_kind No		= '.'
-		selector_kind (Yes _)	= '!'
+ 	(<<<) file (Selection selector_kind expr selectors) = file <<< expr <<< selector_kind <<< selectors
 	(<<<) file (Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (RecordUpdate cons_symbol expression expressions) = file <<< '{' <<< cons_symbol <<< ' ' <<< expression <<< " & " <<< expressions <<< '}'
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
@@ -1655,6 +1658,12 @@ instance <<< (Ptr a)
 where
 	(<<<) file ptr
 		= file <<< ptrToInt ptr
+
+instance <<< SelectorKind
+where
+ 	(<<<) file NormalSelector = file <<< "!"
+ 	(<<<) file (UniqueSelector _ False) = file <<< "!"
+ 	(<<<) file (UniqueSelector _ True) = file <<< "!*"
 
 instance <<< Selection
 where

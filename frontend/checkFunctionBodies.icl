@@ -1012,17 +1012,17 @@ checkExpression free_vars (PE_Selection is_unique expr [PS_Array index_expr]) e_
 	| is_unique
 		# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
 		  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
-		= (Selection No expr [selector], free_vars, e_state, e_info, cs)
+		= (Selection NormalSelector expr [selector], free_vars, e_state, e_info, cs)
 		# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
 		  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
-		= (Selection No expr [selector], free_vars, e_state, e_info, cs)
+		= (Selection NormalSelector expr [selector], free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Selection is_unique expr selectors) e_input e_state e_info cs	
 	# (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithSelection free_vars selectors e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	| is_unique
 		# (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
-		= (Selection (Yes tuple_type) expr selectors, free_vars, e_state, e_info, cs)
-		= (Selection No expr selectors, free_vars, e_state, e_info, cs)
+		= (Selection (UniqueSelector tuple_type False) expr selectors, free_vars, e_state, e_info, cs)
+		= (Selection NormalSelector expr selectors, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_info cs	
 	# (expr1, free_vars, e_state, e_info, cs) = checkExpression free_vars expr1 e_input e_state e_info cs
 	  (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithUpdate free_vars selectors e_input e_state e_info cs
@@ -1836,7 +1836,7 @@ where
 		  selector = { glob_module = field_module, glob_object = MakeDefinedSymbol fs_name fs_index 1}
 		  (this_record_expr, expr_heap) = adjust_match_expression record_expr expr_heap
 		  (binds, var_store, expr_heap, e_info, cs)
-				= transfromPatternIntoBind mod_index def_level pattern (Selection No this_record_expr [ RecordSelection selector field_index ])
+				= transfromPatternIntoBind mod_index def_level pattern (Selection NormalSelector this_record_expr [ RecordSelection selector field_index ])
 						position var_store expr_heap e_info cs
 		= transform_sub_patterns_of_record mod_index def_level patterns fields field_module (inc field_index) record_expr
 				(binds ++ all_binds) position var_store expr_heap e_info cs
@@ -2181,13 +2181,13 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  		= mapSt newPtr (repeatn dimension EI_Empty) es_expr_heap
 		  (tuple_cons, cs)
 		  		= getPredefinedGlobalSymbol (GetTupleConsIndex 2) PD_PredefinedModule STE_Constructor 2 cs
-		  (glob_select_symb, opt_tuple_type, cs)
+		  (glob_select_symb, selector_kind, cs)
 		  		= case dimension of
 		  			1	# (unq_select_symb, cs) = getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
-		  				-> (unq_select_symb, No, cs)
+		  				-> (unq_select_symb, NormalSelector, cs)
 		  			_	# (select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
 						  (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
-		  				-> (select_symb, Yes tuple_type, cs)
+		  				-> (select_symb, UniqueSelector tuple_type False, cs)
 		  e_state
 		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 		  (index_exprs, (free_vars, e_state, e_info, cs))
@@ -2195,7 +2195,7 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  selections
 		  		= [ ArraySelection glob_select_symb new_expr_ptr index_expr \\ new_expr_ptr<-new_expr_ptrs & index_expr<-index_exprs ]
 		= (	new_array_var
-		  ,	[ {lb_dst = var_for_uselect_result, lb_src = Selection opt_tuple_type (Var bound_array_var) selections, lb_position = NoPos }
+		  ,	[ {lb_dst = var_for_uselect_result, lb_src = Selection selector_kind (Var bound_array_var) selections, lb_position = NoPos }
 		    , {lb_dst = new_array_var, lb_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result), lb_position = NoPos }
 		    , {lb_dst = array_element_var, lb_src = TupleSelect tuple_cons.glob_object 0 (Var bound_var_for_uselect_result), lb_position = NoPos }
 		  	: binds

@@ -1791,10 +1791,10 @@ where
 		=	beNormalNode (beBasicSymbol BEApplySymb) (convertArgs [f, a])
 	convertExpr (f @ [a:as])
 		=	convertExpr (f @ [a] @ as)
-	convertExpr (Selection isUnique expression selections)
-		=	convertSelections (convertExpr expression) (addKinds isUnique selections)
+	convertExpr (Selection selectorKind expression selections)
+		=	convertSelections (convertExpr expression) (addKinds selectorKind selections)
 		where
-			addKinds No selections
+			addKinds NormalSelector selections
 				=	[(BESelector, selection) \\ selection <- selections]
 			addKinds _ [selection]
 				=	[(BESelector_U, selection)]
@@ -1826,7 +1826,7 @@ where
 	convertExpr (Update expr1 [singleSelection] expr2)
 		=	case singleSelection of
 				RecordSelection _ _
-					->	beUpdateNode (convertArgs [expr1, Selection No expr2 [singleSelection]])
+					->	beUpdateNode (convertArgs [expr1, Selection NormalSelector expr2 [singleSelection]])
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
 	// RWS not used?, eleminate beSpecialArrayFunctionSymbol?
 					->	beNormalNode
@@ -1834,11 +1834,11 @@ where
 							(convertArgs [expr1, index, expr2])
 	//
 				DictionarySelection dictionaryVar dictionarySelections _ index
-					->	convertExpr (Selection No (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
+					->	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
 	convertExpr (Update expr1 selections expr2)
 		=	case lastSelection of
 				RecordSelection _ _
-					->	beUpdateNode (beArgs selection (convertArgs [Selection No expr2 [lastSelection]]))
+					->	beUpdateNode (beArgs selection (convertArgs [Selection NormalSelector expr2 [lastSelection]]))
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
 					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2]))
 				DictionarySelection dictionaryVar dictionarySelections _ index
@@ -1846,7 +1846,7 @@ where
 								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
 						with
 							dictionary
-								=	convertExpr (Selection No (Var dictionaryVar) dictionarySelections)
+								=	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections)
 		where
 			lastSelection
 				=	last selections
@@ -1902,7 +1902,7 @@ where
 								(beArgs dictionary (beArgs expression (convertArgs [index])))
 			where
 				dictionary
-					=	convertExpr (Selection No (Var dictionaryVar) dictionarySelections)
+					=	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections)
 
 caseVar :: Expression -> BoundVar
 caseVar (Var var)

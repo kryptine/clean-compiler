@@ -175,7 +175,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							,	glob_module		= pds_module2 
 							}
 						#! ci_sel_type_field
-							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection type_defined_symbol sd_field_nr])
+							= (\dynamic_expr -> Selection NormalSelector dynamic_expr [RecordSelection type_defined_symbol sd_field_nr])
 							
 						// value field
 						# ({pds_module=pds_module3, pds_def=pds_def3} , predefined_symbols) = predefined_symbols![PD_DynamicValue]
@@ -192,7 +192,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							,	glob_module		= pds_module3
 							}
 						#! ci_sel_value_field
-							= (\dynamic_expr -> Selection No dynamic_expr [RecordSelection value_defined_symbol sd_field_nr3])
+							= (\dynamic_expr -> Selection NormalSelector dynamic_expr [RecordSelection value_defined_symbol sd_field_nr3])
 						-> (dynamic_temp_symb_ident, ci_sel_value_field, ci_sel_type_field,predefined_symbols)
 						
 	# (module_symb,module_id_app,predefined_symbols)
@@ -600,7 +600,7 @@ where
 convertTypecode cinp (TCE_Selector selections var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
 	#! (var,binds,placeholders_and_tc_args,ci)		
 		= convertTypecode cinp (TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
-	= (Selection No var selections,binds,placeholders_and_tc_args,ci)
+	= (Selection NormalSelector var selections,binds,placeholders_and_tc_args,ci)
 
 //convertTypecodes :: !ConversionInput [TypeCodeExpression] !*ConversionInfo  -> (Expression,!*ConversionInfo)
 convertTypecodes _ [] replace_tc_args binds placeholders_and_tc_args ci

@@ -1099,6 +1099,12 @@ cNonUniqueSelection	:== False
 cIsStrict		:== True
 cIsNotStrict	:== False
 
+::	SelectorKind
+		=	NormalSelector			// .
+		|	UniqueSelector			// !
+				(Global DefinedSymbol)	// 	tuple type
+				!Bool					// 	is result element unique?
+
 /*
 ::	SelectorKind	= SEK_Normal | SEK_First | SEK_Next | SEK_Last
 
@@ -1110,8 +1116,7 @@ cIsNotStrict	:== False
 				| (@) infixl 9  !Expression ![Expression]
 				| Let !Let
 				| Case !Case
-				| Selection !(Optional (Global DefinedSymbol)) !Expression ![Selection]
-							// Yes: a "!" selection
+				| Selection !SelectorKind !Expression ![Selection]
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
@@ -1293,7 +1298,7 @@ instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
-			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
+			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar
 
 instance <<< FunctionBody

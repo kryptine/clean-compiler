@@ -3883,7 +3883,7 @@ buildIsoToSelectionExpr record_expr predefs
 	# selector = { 
 		glob_module = pds_module, 
 		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
-	= Selection No record_expr [RecordSelection selector 0]
+	= Selection NormalSelector record_expr [RecordSelection selector 0]
 
 buildIsoFromSelectionExpr :: !Expression !PredefinedSymbols -> Expression
 buildIsoFromSelectionExpr record_expr predefs 
@@ -3891,7 +3891,7 @@ buildIsoFromSelectionExpr record_expr predefs
 	# selector = { 
 		glob_module = pds_module, 
 		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
-	= Selection No record_expr [RecordSelection selector 1]
+	= Selection NormalSelector record_expr [RecordSelection selector 1]
 
 buildVarExpr :: !String !*Heaps	-> (!Expression, !FreeVar, !*Heaps)
 buildVarExpr name heaps=:{hp_var_heap, hp_expression_heap} 

@@ -1467,10 +1467,10 @@ where
 	requirements ti (DynamicExpr dienamic) reqs_ts
 		= requirements ti dienamic reqs_ts
 
-	requirements ti (Selection result_type_symb expr selectors) reqs_ts
+	requirements ti (Selection selector_kind expr selectors) reqs_ts
 		# (expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
-		= case result_type_symb of
-			Yes {glob_object={ds_ident,ds_index,ds_arity}, glob_module}
+		= case selector_kind of
+			UniqueSelector {glob_object={ds_ident,ds_index,ds_arity}, glob_module} _
 				# (var, ts) = freshAttributedVariable ts
 			  	  (_, result_type, (reqs, ts)) =  requirementsOfSelectors ti No expr selectors False var expr (reqs, ts)
 				  tuple_type = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity

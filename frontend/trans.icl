@@ -2369,7 +2369,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extr
 //			&& trace_tn ("select_member "+++toString select_symb.glob_object.ds_ident.id_name)
 				= (app_args !! me_offset,ti)
 		select_member exp select_symb me_offset ti
-			= (Selection No exp [RecordSelection select_symb me_offset],ti)
+			= (Selection NormalSelector exp [RecordSelection select_symb me_offset],ti)
 
 // XXX linear_bits field has to be added for generated functions
 transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
@@ -2386,23 +2386,23 @@ transformApplication app [] ro ti
 transformApplication app extra_args ro ti
 	= (App app @ extra_args, ti)
 
-transformSelection :: (Optional .(Global DefinedSymbol)) [Selection] Expression *TransformInfo -> (!Expression,!*TransformInfo)
-transformSelection No s=:[RecordSelection _ field_index : selectors] 
+transformSelection :: SelectorKind [Selection] Expression *TransformInfo -> (!Expression,!*TransformInfo)
+transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors] 
 					app=:(App {app_symb={symb_kind= SK_Constructor _ }, app_args, app_info_ptr})
 					ti=:{ti_symbol_heap}
 	| isNilPtr app_info_ptr
-		= (Selection No app s, ti)
+		= (Selection NormalSelector app s, ti)
 	# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti_symbol_heap
 	  ti = { ti & ti_symbol_heap = ti_symbol_heap }
 	= case app_info of
 		EI_DictionaryType _
-			-> transformSelection No selectors (app_args !! field_index) ti
+			-> transformSelection NormalSelector selectors (app_args !! field_index) ti
 		_
-			-> (Selection No app s, ti)
-transformSelection No [] expr ti
+			-> (Selection NormalSelector app s, ti)
+transformSelection NormalSelector [] expr ti
 	= (expr, ti)
-transformSelection opt_type selectors expr ti
-	= (Selection opt_type expr selectors, ti)
+transformSelection selector_kind selectors expr ti
+	= (Selection selector_kind expr selectors, ti)
 
 // XXX store linear_bits and cc_args together ?
 
