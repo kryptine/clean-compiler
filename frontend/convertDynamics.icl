@@ -351,6 +351,10 @@ where
 			(BasicPatterns type basic_patterns)
 				#  (basic_patterns, ci) = convertDynamics  cinp bound_vars nested_case_default basic_patterns ci
 				-> (Case {keesje &  case_expr = case_expr, case_guards = BasicPatterns type basic_patterns, case_default = this_case_default}, ci)
+			(OverloadedListPatterns type decons_expr algebraic_patterns)
+				#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
+													(zip2 algebraic_patterns ct_cons_types) ci
+				-> (Case {keesje &  case_expr = case_expr, case_guards = OverloadedListPatterns type decons_expr algebraic_patterns, case_default = this_case_default}, ci)
 			(DynamicPatterns dynamic_patterns)
 				#  keesje = {keesje &  case_expr = case_expr, case_default = this_case_default}
 				-> convertDynamicPatterns cinp bound_vars keesje ci

@@ -756,6 +756,8 @@ instance e_corresponds CasePatterns where
 	e_corresponds (BasicPatterns dcl_basic_type dcl_patterns) (BasicPatterns icl_basic_type icl_patterns)
 		=	equal2 dcl_basic_type icl_basic_type
 		o`	e_corresponds dcl_patterns icl_patterns
+	e_corresponds (OverloadedListPatterns dcl_alg_type _ dcl_patterns) (OverloadedListPatterns icl_alg_type _ icl_patterns)
+		=	e_corresponds dcl_patterns icl_patterns
 	e_corresponds (DynamicPatterns dcl_patterns) (DynamicPatterns icl_patterns)
 		=	e_corresponds dcl_patterns icl_patterns
 	e_corresponds NoPattern NoPattern
