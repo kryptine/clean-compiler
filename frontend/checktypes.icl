@@ -476,7 +476,7 @@ newAttribute DAK_Unique var_name new_attr  oti cs
 		TA_None
 			-> (TA_Unique, oti, cs)
 		_
-			-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed (1)" cs.cs_error })
+			-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })
 newAttribute DAK_None var_name (TA_Var attr_var) oti cs=:{cs_symbol_table}
 	# (attr_var, oti, cs_symbol_table) = determineAttributeVariable attr_var oti cs_symbol_table
 	= (TA_Var attr_var, oti, { cs & cs_symbol_table = cs_symbol_table })
@@ -546,7 +546,7 @@ where
 			| old_var.av_info_ptr == new_var.av_info_ptr
 				= (TA_Var old_var, oti, { cs &  cs_symbol_table = cs_symbol_table })
 				= (TA_Var old_var, oti, { cs &  cs_symbol_table = cs_symbol_table,
-						cs_error = checkError new_var.av_name "inconsistently attributed (4)" cs_error })
+						cs_error = checkError new_var.av_name "inconsistently attributed" cs_error })
 		check_var_attribute var_attr=:(TA_Var old_var) TA_Anonymous oti cs
 			= (var_attr, oti, cs)
 		check_var_attribute TA_Unique new_attr oti cs
@@ -554,7 +554,7 @@ where
 				TA_Unique
 					-> (TA_Unique, oti, cs)
 				_
-					-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed (5)" cs.cs_error })
+					-> (TA_Unique, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })
 		check_var_attribute TA_Multi new_attr oti cs
 			= case new_attr of
 				TA_Multi
@@ -562,9 +562,9 @@ where
 				TA_None
 					-> (TA_Multi, oti, cs)
 				_
-					-> (TA_Multi, oti, { cs & cs_error = checkError var_name "inconsistently attributed (6)" cs.cs_error })
+					-> (TA_Multi, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })
 		check_var_attribute var_attr new_attr oti cs
-			= (var_attr, oti, { cs & cs_error = checkError var_name "inconsistently attributed (7)" cs.cs_error })// ---> (var_attr, new_attr)
+			= (var_attr, oti, { cs & cs_error = checkError var_name "inconsistently attributed" cs.cs_error })// ---> (var_attr, new_attr)
 		
 		
 		determine_attribute var_name DAK_Unique new_attr error
@@ -576,7 +576,7 @@ where
 				 TA_Unique
 				 	-> (TA_Unique, error)
 				 _
-				 	-> (TA_Unique, checkError var_name "inconsistently attributed (3)" error)
+				 	-> (TA_Unique, checkError var_name "inconsistently attributed" error)
 		determine_attribute var_name dem_attr TA_None error
 			= (TA_Multi, error)
 		determine_attribute var_name dem_attr new_attr error
