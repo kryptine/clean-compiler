@@ -7,6 +7,10 @@ import CoclSystemDependent
 import portToNewSyntax
 //import RWSDebug
 
+// MV ...
+generate_tcl_file :== False;
+// ... MV
+
 ::	CoclOptions =
 	{
 		moduleName:: {#Char}
@@ -174,12 +178,14 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
-	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,Yes tcl_file,heaps)
-		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out (Yes tcl_file) heaps 
+	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
+		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 
+// MV ...
 	# (closed, files)
-		=	fclose tcl_file files
+		= closeTclFile tcl_file files
+// ... MV
 	| not closed
 		=	abort ("couldn't close tcl file \"" +++ options.pathName +++ "tcl\"\n")
 
@@ -239,9 +245,12 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
 
-
-openTclFile :: !String !*Files -> (!.File, !*Files)
+// MV ...
+openTclFile :: !String !*Files -> (Optional !.File, !*Files)
 openTclFile icl_mod_pathname files
+	| not generate_tcl_file 
+		= (No,files);
+		
 	# csf_path
 		= directoryName icl_mod_pathname +++ "Clean System Files"
 	# tcl_path
@@ -249,7 +258,7 @@ openTclFile icl_mod_pathname files
 	# (opened, tcl_file, files)
 		= fopen tcl_path FWriteData files
 	| opened
-		= (tcl_file, files)
+		= (Yes tcl_file, files)
 	// try again after creating Clean System Files folder
 	# (ok, files)
 		= ensureCleanSystemFilesExists csf_path files
@@ -258,6 +267,12 @@ openTclFile icl_mod_pathname files
 	# (opened, tcl_file, files)
 		= fopen tcl_path FWriteData files
 	| opened
-		=(tcl_file, files)
+		=(Yes tcl_file, files)
 	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
+	
+closeTclFile (Yes tcl_file) files
+	= fclose tcl_file files
+closeTclFile _ files
+	= (True,files);
+// ... MV
 
