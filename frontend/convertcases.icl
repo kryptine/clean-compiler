@@ -74,8 +74,6 @@ where
 			_
 				-> abort "convertCases [Let] (convertcases 53)" // <<- let_info 
 
-// MW0 addLetVars [{bind_dst} : binds] [bind_type : bind_types] bound_vars
-// MW0	= addLetVars binds bind_types [ (bind_dst, bind_type) : bound_vars ]
 addLetVars [{lb_dst} : binds] [bind_type : bind_types] bound_vars
 	= addLetVars binds bind_types [ (lb_dst, bind_type) : bound_vars ]
 addLetVars [] _ bound_vars
@@ -659,8 +657,6 @@ where
 		# (let_expr, cp_info) = copy let_expr cp_info
 		= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cp_info)
 	where
-// MW0		bind_let_var {bind_dst} (local_vars, var_heap)
-// MW0			= ([bind_dst : local_vars], var_heap <:= (bind_dst.fv_info_ptr, VI_LocalVar))
 		bind_let_var {lb_dst} (local_vars, var_heap)
 			= ([lb_dst : local_vars], var_heap <:= (lb_dst.fv_info_ptr, VI_LocalVar))
 	copy (Case case_expr) cp_info
