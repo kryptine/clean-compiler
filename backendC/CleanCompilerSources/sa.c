@@ -1869,6 +1869,9 @@ static void UpdateExp (Exp src, Exp dst)
 		dst->e_deps = Null;
 		return;
 	case Ind:
+#ifdef _DB_
+		FPrintF (outfile, "Update with indirection %u %u\n", src->e_add,dst->e_add);
+#endif
 		dst->e_sym = src->e_sym;
 		arity = 1;
 		break;
@@ -2992,7 +2995,7 @@ static StrictPositionsP StrictPositionsCopy (void)
 	sizeBits = strict_positions_last_one;
 #endif
 
-	Assume (size < kMaxStrictPositions, "too many strict positions", "StrictPositionsToInts");
+	Assume (sizeBits < kMaxStrictPositions, "too many strict positions", "StrictPositionsToInts");
 
 	if (sizeBits == 0)
 	{
@@ -4842,11 +4845,13 @@ static void ReduceArguments (Exp e)
 	arity = e->e_fun->fun_arity;
 	
 	for (i = 0; i < arity; i++){
-#ifdef _DB_
+#if 0 && defined (_DB_)
 		printf ("Reduce argument %d\n",i);
 #endif
+
 		(void) ReduceInContext (& e->e_args[i], (Path) Null, NewSimpleContext (HnfStrict, True));
-#ifdef _DB_
+
+#if 0 && defined (_DB_)
 		printf ("End reduce argument %d\n",i);
 #endif
 	}
@@ -4908,13 +4913,16 @@ static void Reduce (ExpP ep, Path p, Context context)
 	start_fuel+=saved_fuel1;
 #endif
 
-	if (e->e_fun->fun_kind == Function && StrictDoEager){
+	if (e->e_fun->fun_kind==Function && StrictDoEager){
 #ifdef DIVIDE_FUEL
 		if (start_fuel>saved_fuel2){
 			start_fuel-=saved_fuel2;
 #endif
 		e = *ep;
-		ReduceArguments (e);
+		/* JVG added 23-1-2003: */
+		if (e->e_kind==Value && e->e_fun->fun_kind==Function)
+		/* */
+			ReduceArguments (e);
 #ifdef DIVIDE_FUEL
 			start_fuel+=saved_fuel2;
 		}
@@ -4995,7 +5003,12 @@ static Bool CheckEndOfReductions (ExpP ep, Path p, Context context, Bool *result
 	/* check if current exp is already under reduction */
 	if (e->e_red){
 		*ep = MakeIndirection (e);
+
+		/* JVG changed 23-1-2003: */
+		e->e_hasind = True; 
+		/*
 		(*ep)->e_hasind = True;
+		*/
 #ifdef _DB_RED_
 		if (DBPrinting){
 			FPrintF (outfile, "Result is indirection: ");
@@ -5535,7 +5548,8 @@ int init_strictness_analysis (ImpMod imod)
 	/* Initialise all */
 #ifdef _DB_
 	cur_add         = 1;
-	outfile         = StdOut;
+/*	outfile         = StdOut; */
+	outfile = fopen ("SADump","w");
 /*	StrictDoLists   = True; */
 	DBPrinting      = False;
 #endif
@@ -5576,8 +5590,7 @@ int init_strictness_analysis (ImpMod imod)
 			GiveStrictWarning (NULL,"not enough memory for strictness analysis");
 
 #ifdef _DB_
-/*		FClose (outfile);
-*/
+		FClose (outfile);
 #endif
 		return False;
 	}
@@ -5612,9 +5625,7 @@ void do_strictness_analysis (void)
 #endif
 
 #ifdef _DB_
-/*
 	FClose (outfile);
-*/
 #endif
 
 #if 0
