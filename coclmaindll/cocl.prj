@@ -42,6 +42,7 @@ Global
 		Path:	{Project}\backendCModules
 		Path:	{Project}\main
 		Path:	{Project}\main\Windows
+		Path:	{Project}\backend\Windows
 MainModule
 	Name:	cocl
 	Dir:	{Project}\main
