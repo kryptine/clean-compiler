@@ -373,7 +373,6 @@ where
 		# (list_of_specials, (next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error))
 				= mapSt (checkSpecial mod_index fun_type fun_index) substs (next_inst_index, all_instances, heaps, predef_symbols,error)
 		= (SP_ContextTypes list_of_specials, next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error)
-
 	check_specials mod_index fun_type fun_index SP_None next_inst_index all_instances heaps predef_symbols error
 		= (SP_None, next_inst_index, all_instances, heaps, predef_symbols,error)
 
@@ -863,9 +862,7 @@ where
 			substitute_instance_type it=:{it_vars,it_attr_vars,it_types,it_context} environment type_heaps cs_error
 				# (it_vars, it_attr_vars, it_atypes, it_context, _, _, type_heaps, cs_error)	
 					= instantiateTypes it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] environment [] type_heaps cs_error
-				= ({it & it_vars = it_vars, it_types = [ at_type \\ {at_type} <- it_atypes ], it_attr_vars = it_attr_vars, it_context = it_context }, type_heaps, cs_error)
-
-			
+				= ({it & it_vars = it_vars, it_types = [ at_type \\ {at_type} <- it_atypes ], it_attr_vars = it_attr_vars, it_context = it_context }, type_heaps, cs_error)			
 		check_specials mod_index inst=:{ins_type} type_offset [] list_of_specials next_inst_index all_instances type_heaps predef_symbols error
 			= (list_of_specials,  next_inst_index, all_instances, type_heaps, predef_symbols, error)
 	check_instance_specials mod_index fun_type fun_index SP_None next_inst_index all_instances type_heaps predef_symbols error
@@ -3201,7 +3198,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			  								, ir_to = nr_of_dcl_funs_insts_specs_and_gencases},
 			  				dcl_common = 
 			  					{ dcl_common 
-			  					& com_instance_defs = com_instance_defs	
+			  					& com_instance_defs = array_plus_list com_instance_defs new_class_instances
 			  					, com_class_defs = com_class_defs
 			  					, com_member_defs = com_member_defs
 			  					, com_gencase_defs = com_gencase_defs
