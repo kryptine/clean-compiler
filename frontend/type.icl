@@ -787,7 +787,7 @@ freshOverloadedListType (OverloadedList _ stdStrictLists_index decons_u_index ni
 cWithFreshContextVars 		:== True
 cWithoutFreshContextVars 	:== False
 
-//freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,!*TypeState)
+freshSymbolType :: !(Optional CoercionPosition) !Bool !SymbolType {#u:CommonDefs} !*TypeState -> (!TempSymbolType,!*TypeState)
 freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_attr_vars,st_attr_env,st_arity} common_defs
 				ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_var_heap,ts_cons_variables,ts_exis_variables}
 	# (th_vars, ts_var_store)	= fresh_type_variables st_vars (ts_type_heaps.th_vars, ts_var_store)
@@ -910,7 +910,7 @@ addToExistentialVariables pos new_exis_variables exis_variables
 	= [(pos, new_exis_variables) : exis_variables]
 
 	
-//freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
+freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap
 	# (av_dem_info, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
 	  (av_off_info, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
@@ -2489,7 +2489,7 @@ where
 				_
 					-> (bitvects, subst)
 
-//	build_coercion_env :: [.FunctionRequirements] v:{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!w:{!Type},!.Coercions,!u:{#u:{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin), [v <= w];
+	build_coercion_env :: [FunctionRequirements] *{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!.{!Type},!.Coercions,!.{#.{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin);
 	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (subst, coercion_env, type_signs, type_var_heap, error)
 			= foldSt (build_coercion_env_for_alternative ip_ident common_defs cons_var_vects)
