@@ -556,17 +556,16 @@ possibly_generate_case_function :: !Case !ActiveCaseInfo !ReadOnlyTI !*Transform
 possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 //	| False -!-> ("possibly_generate_case_function",ro.ro_fun_root.symb_name.id_name,ro.ro_fun_case.symb_name.id_name,ro.ro_root_case_mode)
 //		= undef
+	| not aci.aci_safe
+		= skip_over kees ro ti
 	// determine free variables
-	# (free_vars, ti)
-		 = case aci_free_vars of
-			Yes free_vars
-				-> (free_vars, ti)
-			No	# fvi	= { fvi_var_heap = ti.ti_var_heap, fvi_expr_heap = ti.ti_symbol_heap, fvi_variables = [],
-						  fvi_expr_ptrs = ti.ti_cleanup_info }
-				  {fvi_var_heap, fvi_expr_heap, fvi_variables, fvi_expr_ptrs}
-				  		= freeVariables (Case kees) fvi
-				  ti	= { ti & ti_var_heap = fvi_var_heap, ti_symbol_heap = fvi_expr_heap, ti_cleanup_info = fvi_expr_ptrs }
-				-> (fvi_variables, ti)
+	# ti_var_heap = clearVariables (Case kees) ti.ti_var_heap
+	  fvi	= { fvi_var_heap = ti_var_heap, fvi_expr_heap = ti.ti_symbol_heap, fvi_variables = [],
+			  fvi_expr_ptrs = ti.ti_cleanup_info }
+	  {fvi_var_heap, fvi_expr_heap, fvi_variables, fvi_expr_ptrs}
+	  		= freeVariables (Case kees) fvi
+	  ti	= { ti & ti_var_heap = fvi_var_heap, ti_symbol_heap = fvi_expr_heap, ti_cleanup_info = fvi_expr_ptrs }
+	  free_vars	= fvi_variables
 	// search function definition and consumer arguments
 	  (outer_fun_def, outer_cons_args, ti_cons_args, ti_fun_defs, ti_fun_heap)
 	  		= get_fun_def_and_cons_args ro.ro_fun_root.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
@@ -3297,6 +3296,114 @@ where
 
 //@	freeVariables
 
+class clearVariables expr :: !expr !*VarHeap -> *VarHeap
+
+instance clearVariables [a] | clearVariables a
+where
+	clearVariables list fvi
+		= foldSt clearVariables list fvi
+
+instance clearVariables LetBind
+where
+	clearVariables {lb_src} fvi
+		= clearVariables lb_src fvi
+
+instance clearVariables (Bind a b) | clearVariables a
+where
+	clearVariables {bind_src} fvi
+		= clearVariables bind_src fvi
+
+instance clearVariables (Optional a) | clearVariables a
+where
+	clearVariables (Yes x) fvi
+		= clearVariables x fvi
+	clearVariables No fvi
+		= fvi
+
+//XXX
+instance clearVariables BoundVar
+where
+	clearVariables bound_var=:{var_info_ptr} var_heap
+		# (var_info, var_heap) = readVarInfo var_info_ptr var_heap
+		= case var_info of
+			(VI_UsedVar _)	-> writeVarInfo var_info_ptr VI_Empty var_heap
+			VI_LocalVar		-> writeVarInfo var_info_ptr VI_Empty var_heap
+			VI_Empty		-> var_heap
+			VI_Count _ _			-> abort "VI_Count"
+			VI_Expression _			-> writeVarInfo var_info_ptr VI_Empty var_heap	//abort "VI_Expression"
+			VI_Body _ _ _			-> abort "VI_Body"
+			VI_Dictionary _ _ _		-> writeVarInfo var_info_ptr VI_Empty var_heap	//abort "VI_Dictionary"
+			VI_Occurrence _			-> abort "VI_Occurrence"
+			VI_Variable _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap	//abort "VI_Variable"
+			VI_AccVar _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap	//abort "VI_AccVar"
+			VI_Used					-> abort "VI_Used"
+			VI_ExpandedType _		-> abort "VI_ExpandedType"
+			v				-> abort "unexpected VI type in clearVariables\n"
+
+instance clearVariables Expression
+where
+	clearVariables (Var var) fvi
+		= clearVariables var fvi
+	clearVariables (App {app_args}) fvi
+		= clearVariables app_args fvi
+	clearVariables (fun @ args) fvi
+		= clearVariables args (clearVariables fun fvi)
+	clearVariables (Let {let_strict_binds,let_lazy_binds,let_expr}) fvi
+		# fvi = clearVariables let_strict_binds fvi
+		  fvi = clearVariables let_lazy_binds fvi
+		  fvi = clearVariables let_expr fvi
+		= fvi
+	clearVariables (Case {case_expr,case_guards,case_default}) fvi
+		# fvi = clearVariables case_expr fvi
+		  fvi = clearVariables case_guards fvi
+		  fvi = clearVariables case_default fvi
+		= fvi
+
+	clearVariables (Selection _ expr selectors) fvi
+		= clearVariables expr (clearVariables selectors fvi)
+	clearVariables (Update expr1 selectors expr2) fvi
+		= clearVariables expr2 (clearVariables selectors (clearVariables expr1 fvi))
+	clearVariables (RecordUpdate cons_symbol expression expressions) fvi
+		= clearVariables expression (clearVariables expressions fvi)
+	clearVariables (TupleSelect _ arg_nr expr) fvi
+		= clearVariables expr fvi
+	clearVariables (MatchExpr _ expr) fvi
+		= clearVariables expr fvi
+	clearVariables EE fvi
+		= fvi
+	clearVariables _ fvi
+		= fvi
+
+instance clearVariables CasePatterns
+where
+	clearVariables (AlgebraicPatterns _ alg_patterns) fvi
+		= foldSt clearVariables alg_patterns fvi
+	clearVariables (BasicPatterns _ basic_patterns) fvi
+		= foldSt clearVariables basic_patterns fvi
+	clearVariables (OverloadedListPatterns _ _ alg_patterns) fvi
+		= foldSt clearVariables alg_patterns fvi
+
+instance clearVariables BasicPattern
+where
+	clearVariables {bp_expr} fvi
+		= clearVariables bp_expr fvi
+
+instance clearVariables AlgebraicPattern
+where
+	clearVariables {ap_vars, ap_expr} fvi
+		= clearVariables ap_expr fvi
+		
+instance clearVariables Selection
+where
+	clearVariables (RecordSelection _ _) fvi
+		= fvi
+	clearVariables (ArraySelection _ _ expr) fvi
+		= clearVariables expr fvi
+	clearVariables (DictionarySelection dict_var selections _ expr) fvi
+		= clearVariables dict_var (clearVariables selections (clearVariables expr fvi))
+	
+////////////////
+
 ::	FreeVarInfo =
 	{	fvi_var_heap	:: !.VarHeap
 	,	fvi_expr_heap	:: !.ExpressionHeap
@@ -3393,26 +3500,11 @@ where
 				= { fvi & fvi_var_heap = fvi_var_heap, fvi_variables = fvi_variables }
 		
 	freeVariables (Selection _ expr selectors) fvi
-		= freeVariables expr fvi
+		= freeVariables selectors (freeVariables expr fvi)
 	freeVariables (Update expr1 selectors expr2) fvi
 		= freeVariables expr2 (freeVariables selectors (freeVariables expr1 fvi))
 	freeVariables (RecordUpdate cons_symbol expression expressions) fvi
-		= free_variables_of_record_expression expression expressions fvi
-	where
-		free_variables_of_record_expression (Var var) fields fvi
-			= free_variables_of_fields fields var fvi
-		free_variables_of_record_expression expression fields fvi
-			# fvi = freeVariables expression fvi
-			= freeVariables fields fvi
-	
-		free_variables_of_fields [] var fvi
-			= fvi
-		free_variables_of_fields [{bind_src = EE} : fields] var fvi
-			# fvi = freeVariables var fvi
-			= free_variables_of_fields fields var fvi
-		free_variables_of_fields [{bind_src} : fields] var fvi
-			# fvi = freeVariables bind_src fvi
-			= free_variables_of_fields fields var fvi
+		= freeVariables expressions (freeVariables expression fvi)
 	freeVariables (TupleSelect _ arg_nr expr) fvi
 		= freeVariables expr fvi
 	freeVariables (MatchExpr _ expr) fvi
