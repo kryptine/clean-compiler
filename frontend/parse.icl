@@ -1675,7 +1675,6 @@ where
 optionalQuantifiedVariables :: !QuantifierKind !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalQuantifiedVariables req_quant pState
 	# (token, pState) = nextToken TypeContext pState
-// PK	# (token, pState) = nextToken GeneralContext pState // was wrong "correction" of MW
 	  (optional_quantifier, pState) = try token pState
 	= case optional_quantifier of
 		Yes off_quant

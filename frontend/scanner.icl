@@ -434,7 +434,6 @@ skip_whites_in_line i fp_col fp_line line tabsize stream inp_filename
 
 TryScanComment :: !Char !Input -> (!Optional String, !Char, !Input)
 TryScanComment c1=:'/' input
-//	#! pos = input.inp_pos // MW++
 	# (eof,c2, input)		= ReadNormalChar input
 	| eof					= (No, c1, input)
 	= case c2 of
@@ -442,13 +441,6 @@ TryScanComment c1=:'/' input
 		'*' -> case ScanComment input of
 				(No,input)	-> SkipWhites input
 				(er,input)	-> (er, c1, input)
-/*
-// MW..
-		NewLineChar
-			# input = charBack input
-			-> (No, c1, { input & inp_pos = pos })
-// ..MW
-*/
 		_   -> (No, c1, charBack input)
 			
 TryScanComment c input
@@ -1150,7 +1142,8 @@ ReadNormalChar {inp_stream = OldLine i line stream,inp_pos,inp_tabsize,inp_filen
 				)
 		= ReadNormalChar {inp_filename=inp_filename,inp_tabsize=inp_tabsize,inp_pos=inp_pos,inp_stream = stream}
 ReadNormalChar {inp_stream = InFile file, inp_pos, inp_tabsize, inp_filename}
-	#!	(s, file) = freadline file
+// MW8 was:	#!	(s, file) = freadline file
+	#!	(s, file) = (SwitchPreprocessor freadPreprocessedLine freadline) file
 	| size s==0
 		#	c	= NewLineChar
 //			pos	= NextPos c inp_pos inp_tabsize
@@ -1194,7 +1187,8 @@ ReadChar {inp_stream = OldLine i line stream,inp_pos,inp_tabsize,inp_filename}
 								inp_stream = stream}
 //ReadChar input=:{inp_stream = InFile file, inp_pos, inp_tabsize}
 ReadChar {inp_stream = InFile file, inp_pos, inp_tabsize, inp_filename}
-	#!	(s, file) = freadline file
+// MW8 was:	#!	(s, file) = freadline file
+	#!	(s, file) = (SwitchPreprocessor freadPreprocessedLine freadline) file
 	| size s==0
 		#	c	= NewLineChar
 			pos	= NextPos c inp_pos inp_tabsize
@@ -1360,7 +1354,8 @@ ReadLine input=:{inp_stream = OldLine i line oldfile, inp_pos}
 ReadLine input=:{inp_stream = InFile infile,inp_pos}
 	# (eof, file) 	= fend infile
 	| eof			= ("", {input & inp_stream = InFile file})
-	# (l, file )	= freadline file
+//MW8 was	# (l, file )	= freadline file
+	# (l, file )	= (SwitchPreprocessor freadPreprocessedLine freadline) file
 	= (l,  {input & inp_stream = InFile file, inp_pos = NextPos CRChar inp_pos 0})
 /*
 	ReadLine input=:{inp_stream = OldChar c p oldfile}
@@ -1885,3 +1880,45 @@ where
 
 (-->>) val _ :== val
 //(-->>) val message :== val ---> ("Scanner",message)
+
+
+// MW8..
+  //--------------------//
+ //--- Preprocessor ---//
+//--------------------//
+
+
+SwitchPreprocessor preprocessor no_preprocessor :== preprocessor
+
+freadPreprocessedLine :: !*File -> (!.{#Char},!*File)
+freadPreprocessedLine file
+	#! (line, file) = freadline file
+	| begins_with "/*2.0" line 
+		= (replace_beginning_with "/***/" line, file)
+	| begins_with "0.2*/" line 
+		= (replace_beginning_with "/***/" line, file) 
+	| begins_with "//1.3" line 
+		= (replace_beginning_with "/*1.3" line, file) 
+	| begins_with "//3.1" line 
+		= (replace_beginning_with "3.1*/" line, file)
+	= (line, file)
+  where
+	begins_with :: !String !String -> Bool
+	begins_with pattern line
+		# size_pattern = size pattern
+		| size line<size_pattern
+			= False
+		= loop pattern line (size_pattern-1)
+	loop :: !String !String !Int -> Bool
+	loop pattern line i
+		| i<0 
+			= True
+		| line.[i]<>pattern.[i]
+			= False
+		= loop pattern line (i-1)
+	replace_beginning_with :: !String !*String -> .String
+	replace_beginning_with replacement string
+		# result = { string & [i] = replacement.[i] \\ i<-[0..size replacement-1] }
+		| True--->("replaced", result)
+			= result
+// ..MW8
