@@ -26,7 +26,7 @@
 # include	"scanner.h"
 # include	"sizes.h"
 
-# if (defined (__MWERKS__) || defined (__MRC__) || (defined (GNU_C) && defined (_MAC_)) && !defined _WINDOWS_ /* && !defined (MAKE_MPW_TOOL) */
+# if (defined (__MWERKS__) || defined (__MRC__) || (defined (GNU_C) && defined (_MAC_))) && !defined _WINDOWS_ /* && !defined (MAKE_MPW_TOOL) */
 # define CACHE_DCL_FILES
 # define CACHE_INLINE_FILES
 # else
