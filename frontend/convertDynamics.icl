@@ -24,8 +24,6 @@ import type_io;
 
 	,	ci_type_pattern_var_count	:: !Int	
 	,	ci_type_var_count :: !Int
-	//	data needed to generate coercions
-	,	ci_type_constructor_used_in_dynamic_patterns	:: !*{#Bool}
 	}
 
 :: DynamicRepresentation =
@@ -35,8 +33,7 @@ import type_io;
 	}
 
 ::	ConversionInput =
-	{	cinp_glob_type_inst	:: !{! GlobalTCType} 
-	,	cinp_dynamic_representation	:: DynamicRepresentation
+	{	cinp_dynamic_representation	:: DynamicRepresentation
 	,	cinp_st_args		:: ![FreeVar]
 	,	cinp_subst_var		:: !BoundVar
 	}
@@ -48,7 +45,7 @@ fatal :: {#Char} {#Char} -> .a
 fatal function_name message
 	=	abort ("convertDynamics, " +++ function_name +++ ": " +++ message)
 
-write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} icl_common_defs tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps 
+write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} icl_common_defs tcl_file directly_imported_dcl_modules type_heaps 
 			   predefined_symbols imported_types var_heap common_defs icl_mod
 	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
@@ -73,10 +70,12 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		= write_type_info directly_imported_dcl_modules tcl_file write_type_info_state
 
 	// dynamic pattern matches
-	#! type_constructors_in_dynamic_patterns
-		=	collect_type_constructors_in_dynamic_patterns 0 (size global_type_instances) []
 	#! (tcl_file,write_type_info_state)
-		= write_type_info type_constructors_in_dynamic_patterns tcl_file write_type_info_state
+		= write_type_info no_type_symb_ident tcl_file write_type_info_state
+		with
+			no_type_symb_ident :: [TypeSymbIdent]
+			no_type_symb_ident
+				=	[]
 
 	#! (tcl_file,write_type_info_state)
 		= write_type_info (help_20_compiler { dcl_name.id_name\\ {dcl_name} <-: dcl_mods }) tcl_file write_type_info_state
@@ -95,11 +94,6 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 				
 	= (True,tcl_file,type_heaps,predefined_symbols,imported_types,var_heap) 
 where
-
-	collect_type_constructors_in_dynamic_patterns :: !Int !Int [TypeSymbIdent] -> [TypeSymbIdent]
-	collect_type_constructors_in_dynamic_patterns i limit type_constructors_in_dynamic_patterns
-		=	[]
-
 	f write_type_info_state=:{wtis_type_heaps,wtis_type_defs,wtis_var_heap}
 		= (wtis_type_heaps,wtis_type_defs,wtis_var_heap)
 
@@ -108,22 +102,20 @@ f (Yes tcl_file)
 	= tcl_file;
 0.2*/
 			
-convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
+convertDynamicPatternsIntoUnifyAppls :: {!GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
-convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
+convertDynamicPatternsIntoUnifyAppls _ common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	#! (dynamic_representation,predefined_symbols)
 		=	create_dynamic_and_selector_idents common_defs predefined_symbols
 
 	#! nr_of_funs = size fun_defs
-	#! s_global_type_instances = size global_type_instances
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
-	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap, ci_type_constructor_used_in_dynamic_patterns}))
-			= convert_groups 0 groups global_type_instances dynamic_representation (fun_defs, {	
+	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap}))
+			= convert_groups 0 groups dynamic_representation (fun_defs, {	
 							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
 							ci_new_variables = [],
 							ci_type_var_count = 0,
-							ci_type_pattern_var_count = 0,
-							ci_type_constructor_used_in_dynamic_patterns	= createArray s_global_type_instances False
+							ci_type_pattern_var_count = 0
 							})
 			
 	// store type info			
@@ -134,7 +126,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 			_ 
 				# tcl_file = f tcl_file;
 				# (ok,tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
-					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps ci_predef_symb 
+					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules type_heaps ci_predef_symb 
 									 imported_types ci_var_heap common_defs icl_mod
 				| not ok
 					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
@@ -142,13 +134,13 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 
 	= (groups, fun_defs, ci_predef_symb, imported_types, [], ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
 where
-	convert_groups group_nr groups global_type_instances dynamic_representation fun_defs_and_ci
+	convert_groups group_nr groups dynamic_representation fun_defs_and_ci
 		| group_nr == size groups
 			= (groups, fun_defs_and_ci)
 			# (group, groups) = groups![group_nr]
-			= convert_groups (inc group_nr) groups global_type_instances dynamic_representation (foldSt (convert_function group_nr global_type_instances dynamic_representation) group.group_members fun_defs_and_ci)
+			= convert_groups (inc group_nr) groups dynamic_representation (foldSt (convert_function group_nr dynamic_representation) group.group_members fun_defs_and_ci)
 
-	convert_function group_nr global_type_instances dynamic_representation fun (fun_defs, ci)
+	convert_function group_nr dynamic_representation fun (fun_defs, ci)
 		# (fun_def, fun_defs) = fun_defs![fun]
 		  {fun_body, fun_type, fun_info} = fun_def
 		| isEmpty fun_info.fi_dynamics
@@ -169,7 +161,6 @@ where
 				= {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
 
 			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
-					cinp_glob_type_inst = global_type_instances,
 					cinp_subst_var = unify_subst_var} fun_body ci
 
 			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
@@ -633,7 +624,7 @@ convertTypeCode pattern cinp (TCE_Constructor index cons []) (has_var, binds, ci
 	# (typecons_symb, ci)
 		=	getSymbol PD_Dyn_TypeCons SK_Constructor 1 ci
 	# (constructor, ci)
-		=	typeConstructor cons /* cinp.cinp_glob_type_inst.[index]*/ ci
+		=	typeConstructor cons ci
 	= (App {app_symb		= typecons_symb,
 			app_args 		= [constructor],
 			app_info_ptr	= nilPtr}, (has_var, binds, ci))
