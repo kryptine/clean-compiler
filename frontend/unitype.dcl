@@ -3,11 +3,17 @@ definition module unitype
 import StdEnv
 import syntax, analunitypes
 
-/* MW3 moved to syntax:
-::	CoercionPosition =
-	{	cp_expression	:: !Expression
+::	CoercionState =
+	{	crc_type_heaps	:: !.TypeHeaps
+	,	crc_coercions	:: !.Coercions
+	,	crc_td_infos	:: !.TypeDefInfos
 	}
-*/
+
+class coerce a ::  !Sign !{# CommonDefs} !{# BOOLVECT} !TypePosition !a !a !*CoercionState -> (!Optional TypePosition, !*CoercionState)
+
+instance coerce AType
+
+::	TypePosition :== [Int]
 
 AttrUni			:== 0
 AttrMulti		:== 1
@@ -30,10 +36,11 @@ isUniqueAttribute		:: !Int !Coercions -> Bool
 
 BITINDEX temp_var_id :== temp_var_id >> 5
 BITNUMBER temp_var_id :== temp_var_id bitand 31
+set_bit :: !Int !*{# BOOLVECT} -> .{# BOOLVECT}
 
-determineAttributeCoercions :: !AType !AType !Bool !CoercionPosition !u:{! Type} !*Coercions !{# CommonDefs } 
-	!{# BOOLVECT } !*TypeDefInfos !*TypeHeaps !*ErrorAdmin
-		-> (!u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps, !*ErrorAdmin) 
+determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{# CommonDefs } 
+	!{# BOOLVECT } !*TypeDefInfos !*TypeHeaps
+		-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
 
 ::	AttributePartition	:== {# Int}
 
@@ -49,3 +56,11 @@ uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
 
 liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeVarHeap !*TypeDefInfos -> (*{! Type}, !Int, !*TypeVarHeap, !*TypeDefInfos)
 
+::	ExpansionState = 
+	{	es_type_heaps	:: !.TypeHeaps
+	,	es_td_infos		:: !.TypeDefInfos
+	}
+
+class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!a, !*(!u:{! Type}, !*ExpansionState))
+
+instance expandType AType

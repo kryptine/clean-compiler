@@ -118,7 +118,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	| upToPhase == FrontEndPhaseCheck
 		=	frontSyntaxTree cached_functions_and_macros n_functions_and_macros_in_dcl_modules main_dcl_module_n predef_symbols hash_table files error io out icl_mod dcl_mods fun_defs components array_instances optional_dcl_icl_conversions global_fun_range heaps
 
-	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error,out)
+	# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
 		= typeProgram (components -*-> "Typing") main_dcl_module_n icl_functions icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers heaps predef_symbols error out
 
 	| not ok
@@ -145,7 +145,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 		 = analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
 
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  	= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics var_heap type_heaps expression_heap
+	  	= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
 
 	| upToPhase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}

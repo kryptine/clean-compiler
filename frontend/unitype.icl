@@ -6,12 +6,6 @@ import syntax, analunitypes, type, utilities, checktypes, RWSDebug
 
 import cheat
 
-/* MW3 moved to syntax:
-::	CoercionPosition =
-	{	cp_expression	:: !Expression
-	}
-*/
-
 AttrUni			:== 0
 AttrMulti		:== 1
 /*
@@ -49,36 +43,21 @@ isPositive :: !TempVarId !{# BOOLVECT } -> Bool
 isPositive var_id cons_vars
 	= cons_vars.[BITINDEX var_id] bitand (1 << BITNUMBER var_id) <> 0
 
-determineAttributeCoercions :: !AType !AType !Bool !CoercionPosition !u:{! Type} !*Coercions !{# CommonDefs } 
-	!{# BOOLVECT } !*TypeDefInfos !*TypeHeaps !*ErrorAdmin
-		-> (!u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps, !*ErrorAdmin) 
-determineAttributeCoercions off_type dem_type coercible position subst coercions defs cons_vars td_infos type_heaps error
+determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{# CommonDefs } 
+	!{# BOOLVECT } !*TypeDefInfos !*TypeHeaps
+		-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
+determineAttributeCoercions off_type dem_type coercible subst coercions defs cons_vars td_infos type_heaps
 	# (exp_off_type, es) = expandType defs cons_vars off_type (subst, { es_type_heaps = type_heaps, es_td_infos = td_infos})
 	  (exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
 	  (result, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce (if coercible PositiveSign TopSign) defs cons_vars [] exp_off_type exp_dem_type 
 	  		 { crc_type_heaps = es_type_heaps, crc_coercions = coercions, crc_td_infos = es_td_infos}
-	= case result of
-		Yes positions
-			# (error=:{ea_file}) = errorHeading "Uniqueness error" error
-			  (crc_coercions, copy_crc_coercions) = uniqueCopy crc_coercions
-
-			  format = { form_properties = cMarkAttribute, form_attr_position = Yes (reverse positions, copy_crc_coercions) }			
-			  
-			  ea_file = 
-			  	case position of
-			  		CP_FunArg _ _
-			  			-> ea_file <<< "\"" <<< position <<< "\" "
-			  		_
-			  			-> ea_file
-			  ea_file = ea_file	<<< "attribute at indicated position could not be coerced "
-			  					 <:: (format, exp_off_type, Yes initialTypeVarBeautifulizer) <<< '\n'
-
-			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, { error & ea_file = ea_file })
-				
-		No
-			-> (subst, crc_coercions, crc_td_infos, crc_type_heaps, error)
-//					---> ("determineAttributeCoercions",position, (off_type, dem_type,exp_off_type,exp_dem_type))
-
+	  error_info
+	  	= case result of
+	  		No
+	  			-> No
+	  		Yes pos
+	  			-> Yes (pos, exp_off_type)
+	= (error_info, subst, crc_coercions, crc_td_infos, crc_type_heaps)
 
 NotChecked :== -1	
 DummyAttrNumber :== -1
@@ -841,7 +820,7 @@ where
 			# (succ, ct_greater) = insert new_attr ct_greater
 			= (succ, CT_Node this_attr ct_less ct_greater)
 			= (False, CT_Node this_attr ct_less ct_greater)
-	
+
 isNonUnique :: !CoercionTree -> Bool
 isNonUnique CT_NonUnique	= True
 isNonUnique _ 				= False
@@ -1050,3 +1029,9 @@ where
 	(<<<) file CT_Unique = file <<< "CT_Unique"
 	(<<<) file CT_NonUnique = file <<< "CT_NonUnique"
 	(<<<) file CT_Empty = file <<< "##"
+
+set_bit :: !Int !*{# BOOLVECT} -> .{# BOOLVECT}
+set_bit var_number bitvects
+	# bit_index = BITINDEX var_number
+	  (prev_vect, bitvects) = bitvects![bit_index]
+	= { bitvects & [bit_index] = prev_vect bitor (1 << BITNUMBER var_number) }

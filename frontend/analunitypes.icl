@@ -305,6 +305,11 @@ signClassOfType type _ _ _ _ scs
 propClassification :: !Index !Index ![PropClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!PropClassification, !*TypeVarHeap, !*TypeDefInfos)
 propClassification type_index module_index hio_props defs type_var_heap td_infos
+// MW3..
+	| type_index>=size td_infos.[module_index]
+		// must be a dictionary => doesn't propagate
+		= (0, type_var_heap, td_infos)
+// ..MW3
 	# {td_args, td_name} = defs.[module_index].com_type_defs.[type_index]
 	  (td_info, td_infos) = td_infos![module_index].[type_index]
 	= determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
@@ -540,6 +545,3 @@ where
 propClassOfType _ _ _ pcs
 	= (NoPropClass, NoPropClass, pcs)
 
-instance == SignClassification
-where
-	== sc1 sc2 = sc1.sc_pos_vect == sc2.sc_pos_vect && sc1.sc_neg_vect == sc2.sc_neg_vect

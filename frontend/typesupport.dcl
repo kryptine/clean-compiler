@@ -44,6 +44,8 @@ expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribut
 
 equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
 
+NewAttrVarId :: !Int -> Ident
+
 beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 
 ::	AttrCoercion =
@@ -68,15 +70,18 @@ updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*Ex
 
 class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 
-instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a
+instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a,
+			(a,b) | substitute a & substitute b
 
 instance <<< TempSymbolType
 
 removeInequality :: !Int !Int !*Coercions -> .Coercions
 flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
+	// retrieve all numbers from a coercion tree
 assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
+	// returns the number and a list of all attribute variables
 getImplicitAttrInequalities :: !SymbolType -> [AttrInequality]
-	// retrieve those inequalities  that are implied by propagation
+	// retrieve those inequalities that are implied by propagation
 emptyCoercions :: !Int -> .Coercions
 	// Int: nr of attribute variables
 addAttrEnvInequalities :: ![AttrInequality] !*Coercions !u:AttrVarHeap
@@ -85,6 +90,7 @@ addAttrEnvInequalities :: ![AttrInequality] !*Coercions !u:AttrVarHeap
 	// nr corresponds to the attribute variable
 optBeautifulizeIdent :: !String -> Optional (!String, !LineNr)
 	// convert something like "c;8;2" to Yes ("comprehension", 8)
+removeUnusedAttrVars :: !{!CoercionTree} ![Int] -> Coercions
 	
 //accCoercionTree :: !.(u:CoercionTree -> (.a,u:CoercionTree)) !Int !*{!u:CoercionTree} -> (!.a,!{!u:CoercionTree})
 accCoercionTree f i coercion_trees
@@ -102,4 +108,27 @@ appCoercionTree f i coercion_trees
 	acc_coercion_tree i coercion_trees
 		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
 		= snd (replace coercion_trees i (f coercion_tree))
+	
+class performOnTypeVars a :: !(TypeAttribute TypeVar .st -> .st) !a !.st -> .st
+// run through a type and do something on each type variable
+
+instance performOnTypeVars Type, AType, ConsVariable, [a] | performOnTypeVars a,
+		(a, b) | performOnTypeVars a & performOnTypeVars b
+
+getTypeVars :: !a !*TypeVarHeap -> (!.[TypeVar],!.TypeVarHeap) | performOnTypeVars a
+
+class performOnAttrVars a :: !(AttributeVar .st -> .st) !a !.st -> .st
+// run through a type and do something on each attribute variable
+
+getAttrVars :: !a !*AttrVarHeap -> (!.[AttributeVar],!.AttrVarHeap) | performOnAttrVars a
+
+instance performOnAttrVars Type, AType, [a] | performOnAttrVars a,
+		(a, b) | performOnAttrVars a & performOnAttrVars b
+
+initializeToTVI_Empty :: a !TypeVar !*TypeVarHeap -> .TypeVarHeap
+initializeToAVI_Empty :: !AttributeVar !*AttrVarHeap -> .AttrVarHeap
+
+appTypeVarHeap f type_heaps :== let th_vars = f type_heaps.th_vars in { type_heaps & th_vars = th_vars }
+accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, { type_heaps & th_vars = th_vars })
+accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r, { type_heaps & th_attrs = th_attrs })
 	

@@ -2,7 +2,7 @@ implementation module trans
 
 import StdEnv
 
-import syntax, transform, checksupport, StdCompare, check, utilities //,RWSDebug
+import syntax, transform, checksupport, StdCompare, check, utilities, unitype, typesupport, type
 
 ::	PartitioningInfo = 
 	{	pi_marks :: 		!.{# Int}
@@ -347,7 +347,7 @@ instance consumerRequirements Case where
 			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
 			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
 			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
-			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (quicksort (<) all_constructors)
+			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
 			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, not (multimatch_loop has_default sorted_pattern_constructors))
 		  where
 			is_sorted [x]
@@ -363,7 +363,7 @@ instance consumerRequirements Case where
 			= (False, False)
 
 		sort constr_indices unsafe_bits
-			= quicksort smaller (zip3 constr_indices [0..] unsafe_bits)
+			= sortBy smaller (zip3 constr_indices [0..] unsafe_bits)
 		  where
 			smaller (i1,si1,_) (i2,si2,_)
 				| i1<i2		= True
@@ -480,7 +480,6 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 	unify_ref_counts 1 x = if (x==0) 1 2
 	unify_ref_counts 2 _ = 2
 
-
 analyseGroups	:: !{# CommonDefs} !IndexRange !Int !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
 analyseGroups common_defs {ir_from, ir_to} main_dcl_module_n groups fun_defs var_heap expr_heap
@@ -550,7 +549,7 @@ where
 
 	analyse_functions common_defs [fun : funs] cfvog_accu ai fun_defs
 		#  (fun_def, fun_defs) = fun_defs![fun]
-		#  (TransformedBody {tb_args, tb_rhs}) = fun_def.fun_body
+ 		   (TransformedBody {tb_args, tb_rhs}) = fun_def.fun_body
 		   nr_of_args = length tb_args
 		   ai = { ai & ai_cur_ref_counts = createArray (nr_of_args + length fun_def.fun_info.fi_local_vars) 0,
 						ai_next_var_of_fun = nr_of_args }
@@ -601,6 +600,7 @@ mapAndLength f []
 	,	ti_var_heap				:: !.VarHeap
 	,	ti_symbol_heap			:: !.ExpressionHeap
 	,	ti_type_heaps			:: !.TypeHeaps
+	,	ti_type_def_infos		:: !.TypeDefInfos
 	,	ti_next_fun_nr			:: !Index
 	,	ti_cleanup_info			:: !CleanupInfo
 	,	ti_recursion_introduced	:: !Optional Index
@@ -974,14 +974,6 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		# (FI_Function {gf_fun_def, gf_cons_args}, fun_heap) = readPtr fun_info_ptr fun_heap
 		= (gf_fun_def, gf_cons_args, fun_defs, fun_heap)
 
-/*
-	get_fun_def_and_cons_args (SK_Function {glob_object}) cons_args fun_defs fun_heap
-		# (fun_def, fun_defs) = fun_defs![glob_object]
-		= (fun_def, cons_args.[glob_object], fun_defs, fun_heap)
-	get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr _) cons_args fun_defs fun_heap
-		# (FI_Function {gf_fun_def, gf_cons_args}, fun_heap) = readPtr fun_info_ptr fun_heap
-		= (gf_fun_def, gf_cons_args, fun_defs, fun_heap)
-*/
 	generate_case_function old_ti_recursion_introduced fun_index case_info_ptr new_expr outer_fun_def outer_cons_args used_mask
 						{ro_fun=ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}, ro_fun_args} ti
 //		| False->>"generate_case_function"
@@ -994,9 +986,9 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		  (EI_CaseType {ct_result_type}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  (form_vars, ti_var_heap) = mapSt bind_to_fresh_var ro_fun_args ti_var_heap
 		  arg_types = lifted_types++types_from_outer_fun
-		  type_variables = getTypeVars [ct_result_type:arg_types]
 		  {th_vars,th_attrs} = ti.ti_type_heaps
-		  (fresh_type_vars, th_vars) = mapSt bind_to_fresh_type_var type_variables th_vars
+		  (type_variables, th_vars) = getTypeVars [ct_result_type:arg_types] th_vars
+		  (fresh_type_vars, th_vars) = mapSt bind_to_fresh_type_variable type_variables th_vars
 		  (fresh_arg_types, ti_type_heaps) = substitute arg_types { th_vars = th_vars, th_attrs = th_attrs }
 		  (fresh_result_type, ti_type_heaps) = substitute ct_result_type ti_type_heaps
 		  us = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = Yes ti_type_heaps, 
@@ -1044,10 +1036,6 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 			  form_var = { fv_name = fv_name, fv_info_ptr = new_info_ptr, fv_count = undeff, fv_def_level = NotALevel }
 			  act_var = { var_name = fv_name, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr }
 			= (form_var, writeVarInfo fv_info_ptr (VI_Expression (Var act_var)) var_heap)
-		bind_to_fresh_type_var tv type_var_heap
-			# (new_info_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
-			  new_type_var = { tv_name = tv.tv_name, tv_info_ptr = new_info_ptr }
-			= (new_type_var, writePtr tv.tv_info_ptr (TVI_Type (TV new_type_var)) type_var_heap)
 		get_type_of_local_var {fv_info_ptr} var_heap
 			# (VI_Extended (EVI_VarType a_type) _, var_heap) = readPtr fv_info_ptr var_heap
 			= (a_type, var_heap)
@@ -1062,7 +1050,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees)
 	  filtered_default = get_filtered_default case_default
 	= case case_guards of
 		AlgebraicPatterns i alg_patterns
-			| not (any (is_never_matching_case o get_alg_rhs) alg_patterns)
+			| not (any (is_never_matching_case o get_alg_rhs) alg_patterns) && not (is_never_matching_default case_default)
 				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
@@ -1071,7 +1059,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees)
 				-> fromYes case_default
 			-> Case {kees & case_guards = AlgebraicPatterns i filtered_case_guards, case_default = filtered_default }
 		BasicPatterns bt basic_patterns
-			| not (any (is_never_matching_case o get_basic_rhs) basic_patterns)
+			| not (any (is_never_matching_case o get_basic_rhs) basic_patterns) && not (is_never_matching_default case_default)
 				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_basic_rhs) basic_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
@@ -1096,6 +1084,10 @@ removeNeverMatchingSubcases keesExpr=:(Case kees)
 		= False
 	get_alg_rhs {ap_expr} = ap_expr
 	get_basic_rhs {bp_expr} = bp_expr
+	is_never_matching_default No
+		= False
+	is_never_matching_default (Yes expr)
+		= is_never_matching_case expr
 removeNeverMatchingSubcases expr
 	= expr
 
@@ -1220,78 +1212,282 @@ searchInstance prods1 (II_Node prods2 fun_info_ptr left right)
 	= searchInstance prods1 left
 */
 
+coercionsToAttrEnv :: !{!TypeAttribute} !Coercions -> [AttrInequality]
+coercionsToAttrEnv attr_vars {coer_demanded, coer_offered}
+	= flatten [ [ {ai_offered = toAttrVar attr_vars.[offered],
+					ai_demanded = toAttrVar attr_vars.[demanded] }
+				\\ offered <- fst (flattenCoercionTree offered_tree) ]
+			  \\ offered_tree<-:coer_offered & demanded<-[0..] ]
+  where
+	toAttrVar (TA_Var av) = av
+
+:: UniquenessRequirement =
+	{	ur_offered		:: !AType
+	,	ur_demanded		:: !AType
+	,	ur_attr_ineqs	:: ![AttrCoercion]
+	}
+
+// XXX unused!
+instance == AttributeVar
+where
+	(==) av1 av2 = av1.av_info_ptr==av2.av_info_ptr
+
+
+readableCoercions {coer_demanded}
+	= [ (i, readable coer_demanded.[i]) \\ i<-[0..size coer_demanded - 1] ]
+  where
+	readable CT_Unique
+	 	= [TA_Unique]
+	readable CT_NonUnique
+	 	= [TA_Multi]
+	readable ct
+		# (vars, _) = flattenCoercionTree ct
+		= map TA_TempVar vars
+
 generateFunction :: !FunDef !ConsClasses !{! Producer} !FunctionInfoPtr !ReadOnlyTI !*TransformInfo -> (!Index, !Int, !*TransformInfo)
 generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
 				 {cc_args,cc_linear_bits} prods fun_def_ptr ro
-				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,ti_type_heaps,ti_cons_args,ti_cleanup_info}
+				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
+				 		ti_type_heaps,ti_cons_args,ti_cleanup_info, ti_type_def_infos}
 /*
 	| False->>("generating new function",fd.fun_symb.id_name,fd.fun_index,"->",ti_next_fun_nr)
+		= undef
+	| False--->("with type",fd.fun_type)
 		= undef
 	| False--->("producers:",II_Node prods nilPtr II_Empty II_Empty,("cc_args",cc_args,("cc_linear_bits",cc_linear_bits)))
 		= undef
 */
-	#!fi_group_index = max_group_index 0 prods fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
-	# (Yes fun_type=:{st_vars,st_attr_vars,st_args,st_result}) = fd.fun_type
-	  th_vars = foldSt (\tv type_var_heap -> type_var_heap <:= (tv.tv_info_ptr, TVI_Type (TV tv))) st_vars ti_type_heaps.th_vars 
-	  th_attrs = foldSt (\av attr_var_heap -> attr_var_heap <:= (av.av_info_ptr, AVI_Attr TA_Multi)) st_attr_vars ti_type_heaps.th_attrs 
-	  ti_type_heaps = { ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars }
-	  
-	  (new_fun_args, new_arg_types_array, new_result_type, new_type_vars, new_linear_bits, new_cons_args, ti_type_heaps, ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
-			= determine_args cc_linear_bits cc_args 0 prods tb_args (st_args_array st_args) st_result st_vars (ti_cons_args, tb_rhs, ro) ti_type_heaps
-							 ti_symbol_heap ti_fun_defs ti_fun_heap ti_var_heap
+	#!fi_group_index
+			= max_group_index 0 prods fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
+	# (Yes consumer_symbol_type) 
+			= fd.fun_type
+	  (function_producer_types, ti_fun_defs, ti_fun_heap)
+	  		= iFoldSt (accum_function_producer_type prods ro) 0 (size prods) 
+	  				([], ti_fun_defs, ti_fun_heap)
+	  (fresh_function_producer_types, ti_type_heaps)
+	  		= mapSt copy_opt_symbol_type function_producer_types ti_type_heaps
+	  ([Yes sound_consumer_symbol_type:opt_sound_function_producer_types], (ti_type_heaps, ti_type_def_infos))
+	  		= mapSt (add_propagation_attributes ro.ro_common_defs) [Yes consumer_symbol_type: fresh_function_producer_types]
+	  				(ti_type_heaps, ti_type_def_infos)
+	  ({st_vars,st_attr_vars,st_args,st_result,st_attr_env})
+	  		= sound_consumer_symbol_type
+/* HACK..
+	  (st_attr_vars, th_attrs)
+	  		= getAttrVars (st_args, st_result) ti_type_heaps.th_attrs
+	  ti_type_heaps = { ti_type_heaps & th_attrs = th_attrs }
+// ..HACK
+*/
+	  (class_types, ti_fun_defs, ti_fun_heap)
+	  		= iFoldSt (accum_class_type prods ro) 0 (size prods) 
+	  				([], ti_fun_defs, ti_fun_heap)
+	  (type_vars_in_class_types, th_vars)
+	  		= mapSt getTypeVars class_types ti_type_heaps.th_vars
+	  sound_function_producer_types
+	  		= [x \\ Yes x <- opt_sound_function_producer_types]
+	  all_involved_types
+	  		= class_types ++ (flatten (map (\{st_args, st_result}-> [st_result:st_args]) 
+					  					[sound_consumer_symbol_type:sound_function_producer_types]))
+	  (propagating_cons_vars, th_vars)
+	  		= collectPropagatingConsVars all_involved_types th_vars
+	  all_type_vars
+	  		=   flatten [st_vars \\ {st_vars} <- [sound_consumer_symbol_type:sound_function_producer_types]]
+	  		  ++flatten type_vars_in_class_types
+	  (nr_of_all_type_vars, th_vars)
+	  		=  foldSt bind_to_temp_type_var all_type_vars (0, th_vars)
+	  subst
+	  		= createArray nr_of_all_type_vars TE
+	  (next_attr_nr, th_attrs)
+	  		= foldSt bind_to_temp_attr_var st_attr_vars (FirstAttrVar, ti_type_heaps.th_attrs)
+	  ti_type_heaps
+	  		= { ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars }
+	  ((st_args,st_result), ti_type_heaps)
+	  		= substitute (st_args,st_result) ti_type_heaps
+	  (new_fun_args, new_arg_types_array, next_attr_nr,
+	    new_linear_bits, new_cons_args, uniqueness_requirements, subst, ti_type_heaps=:{th_vars, th_attrs},
+	    ti_symbol_heap, ti_fun_defs, ti_fun_heap, ti_var_heap)
+			= determine_args cc_linear_bits cc_args 0 prods opt_sound_function_producer_types tb_args
+							(st_args_array st_args)
+							next_attr_nr (ti_cons_args, tb_rhs, ro) [] subst ti_type_heaps
+							ti_symbol_heap ti_fun_defs ti_fun_heap ti_var_heap
 	  new_arg_types = flatten [ el \\ el<-:new_arg_types_array ]
-	  (fresh_type_vars, ti_type_heaps) = accTypeVarHeap (mapSt bind_to_fresh_type_variable new_type_vars) ti_type_heaps
-	  (fresh_arg_types, ti_type_heaps) = substitute new_arg_types ti_type_heaps
-	  (fresh_result_type, ti_type_heaps) = substitute new_result_type ti_type_heaps
-	  fun_arity = length new_fun_args
-	  new_fun_type = Yes { st_vars = fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity,
-							st_result = fresh_result_type, st_context = [], st_attr_vars = [], st_attr_env = [] }
-
-	  new_fd_expanding = { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, fun_index=ti_next_fun_nr,
-								fun_info.fi_group_index = fi_group_index}
-	  new_gen_fd = { gf_fun_def = new_fd_expanding,	gf_instance_info = II_Empty, gf_fun_index = ti_next_fun_nr,
-					 gf_cons_args = {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits} }
-	  ti_fun_heap = writePtr fun_def_ptr (FI_Function new_gen_fd) ti_fun_heap
-	  us = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = Yes ti_type_heaps,
-			 us_cleanup_info=ti_cleanup_info }
-	  ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1,ui_conversion_table=No }
-	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes type_heaps, us_cleanup_info}) = unfold tb_rhs ui us
-	  ro =	{ ro &	ro_root_case_mode = case tb_rhs of 
-	  					Case _
-	  						-> RootCase
-	  					_	-> NotRootCase,
-					ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr, symb_arity = fun_arity},
-					ro_fun_args = new_fun_args
-			}
-	  ti_trace=False
+	  (cons_vars, th_vars)
+			= foldSt set_cons_var_bit propagating_cons_vars
+					(createArray (inc (BITINDEX nr_of_all_type_vars)) 0, th_vars)
+//	| False--->("subst before", [el\\el<-:subst], "cons_vars", [el\\el<-:cons_vars])
+//		= undef
+	# (subst, next_attr_nr, th_vars, ti_type_def_infos)
+	  		= liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr th_vars ti_type_def_infos
+//	| False--->("subst after lifting", [el\\el<-:subst])
+//		= undef
+	# coer_demanded
+	  		= {{ CT_Empty \\ i <- [0 .. next_attr_nr - 1] } & [AttrUni] = CT_Unique }
+	  coer_offered
+	  		= {{ CT_Empty \\ i <- [0 .. next_attr_nr - 1] } & [AttrMulti] = CT_NonUnique }
+//	  			--->(("next_attr_nr", next_attr_nr)
+//	  			--->("nr_of_all_type_vars", nr_of_all_type_vars))
+	  (consumer_attr_inequalities, th_attrs)
+			= mapSt substitute_attr_inequality st_attr_env th_attrs
+	  coercions 
+	  		= foldSt new_inequality consumer_attr_inequalities
+	  				{ coer_offered = coer_offered, coer_demanded = coer_demanded }
+	  coercions 
+	  		= foldSt (\{ur_attr_ineqs} coercions
+	  					-> foldSt new_inequality ur_attr_ineqs coercions)
+		  			uniqueness_requirements coercions
+	  (subst, coercions, ti_type_def_infos, ti_type_heaps)
+	  		= foldSt (coerce_types ro.ro_common_defs cons_vars) uniqueness_requirements
+	  				(subst, coercions, ti_type_def_infos, { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs })
+//	| False--->("cons_vars", [el\\el<-:cons_vars])
+//		= undef
+//	  expansion_state
+//	  		= { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
+//	# ([st_result:new_arg_types], (coercions, subst, { es_type_heaps = ti_type_heaps=:{th_vars}, es_td_infos = ti_type_def_infos }))
+//	  		= mapSt (expand_type ro.ro_common_defs cons_vars) [st_result:new_arg_types] (subst, expansion_state)
+	# ([st_result:new_arg_types], (coercions, subst, ti_type_heaps=:{th_vars}, ti_type_def_infos))
+	  		= mapSt (expand_type ro.ro_common_defs cons_vars) [st_result:new_arg_types]
+	  				(coercions, subst, ti_type_heaps, ti_type_def_infos)
+	  with
+		expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
+			| is_dictionary atype ti_type_def_infos
+				# (atype, subst) = arraySubst atype subst
+				= (atype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
+			# es
+		  			= { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
+			  (btype, (subst, es))
+			  		= expandType ro_common_defs cons_vars atype (subst, es)
+	 		  { es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos }
+					= es
+			  cs
+					= { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
+			# (_, cs)
+			  		= coerce PositiveSign ro_common_defs cons_vars [] btype btype cs
+			  { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
+			  		= cs
+			= (btype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
+/*
+	| False--->("unified type", new_arg_types, "->", st_result)
+		= undef
+	| False--->("coercions", readableCoercions coercions)
+		= undef
+*/
+	# (fresh_type_vars, th_vars) 
+			= iFoldSt allocate_fresh_type_var 0 nr_of_all_type_vars ([], th_vars)
+	  fresh_type_vars_array
+	  		= { el \\ el <- fresh_type_vars }
+	  (attr_partition, demanded) 
+	  		= partitionateAttributes coercions.coer_offered coercions.coer_demanded
+	  		// to eliminate circles in the attribute inequalities graph that was built during "determine_args"
+	  (fresh_attr_vars, ti_type_heaps)
+	  		= accAttrVarHeap (create_fresh_attr_vars demanded (size demanded)) { ti_type_heaps & th_vars = th_vars }
+	  		// the attribute variables stored in the "demanded" graph are represented as integers: 
+	  		// prepare to replace them by pointers
+	  ((fresh_arg_types, fresh_result_type), used_attr_vars) 
+	  		= replaceIntegers (new_arg_types, st_result) (fresh_type_vars_array, fresh_attr_vars, attr_partition)
+	  				 (createArray (size demanded) False)
+			// replace the integer-attribute-variables with pointer-attribute-variables or TA_Unique or TA_Multi
+	  final_coercions 
+	  		= removeUnusedAttrVars demanded [i \\ i<-[0..(size used_attr_vars)-1] | not used_attr_vars.[i]]
+			// the attribute inequalities graph may have contained unused attribute variables.
+ 	  (all_attr_vars2, th_attrs)
+ 	  		= getAttrVars (fresh_arg_types, fresh_result_type) ti_type_heaps.th_attrs
+	  all_attr_vars
+	  		= [ attr_var \\ TA_Var attr_var
+	  							<- [fresh_attr_vars.[i] \\ i<-[0..(size used_attr_vars)-1] | used_attr_vars.[i]]]
+// sanity.. remove! (XXX)
+	| any (\attr_var -> not (isMember attr_var all_attr_vars2)) all_attr_vars ||
+	  any (\attr_var -> not (isMember attr_var all_attr_vars)) all_attr_vars2
+		= abort "sanity chek 046 in m trans failed"
+// ..sanity
+ 	# (all_fresh_type_vars, th_vars)
+ 	  		= getTypeVars (fresh_arg_types, fresh_result_type) ti_type_heaps.th_vars
+	  fun_arity
+	  		= length new_fun_args
+	  new_fun_type
+	  		= Yes { st_vars = all_fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity,
+					st_result = fresh_result_type, st_context = [], st_attr_vars = all_attr_vars,
+					st_attr_env = coercionsToAttrEnv fresh_attr_vars final_coercions }
+	  new_fd_expanding 
+	  		= { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, fun_index = ti_next_fun_nr,
+					fun_info.fi_group_index = fi_group_index}
+	  new_gen_fd
+	  		= { gf_fun_def = new_fd_expanding,	gf_instance_info = II_Empty, gf_fun_index = ti_next_fun_nr,
+				 gf_cons_args = {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits} }
+	  ti_fun_heap
+	  		= writePtr fun_def_ptr (FI_Function new_gen_fd) ti_fun_heap
+	  (subst, _)
+	  		= iFoldSt (replace_integers_in_substitution (fresh_type_vars_array, fresh_attr_vars, attr_partition))
+	  				0 nr_of_all_type_vars (subst, createArray (size demanded) False)
+	  (_, th_vars)
+	  		= foldSt (\{tv_info_ptr} (i, th_vars) 
+	  					-> case subst.[i] of
+	  						TE
+	  							-> (i+1, writePtr tv_info_ptr (TVI_Type (TV fresh_type_vars_array.[i])) th_vars)
+	  						_
+	  							-> (i+1, writePtr tv_info_ptr (TVI_Type subst.[i]) th_vars))
+	  				all_type_vars (0, th_vars)
+	  us 	
+	  		= { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap,
+	  			us_opt_type_heaps = Yes { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs },
+				 us_cleanup_info=ti_cleanup_info }
+ 	  ui	
+ 	  		= {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1,ui_conversion_table=No }
+	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
+	  		= unfold tb_rhs ui us
+	  ro 	=	{ ro &	ro_root_case_mode = case tb_rhs of 
+	  						Case _
+	  							-> RootCase
+	  						_	-> NotRootCase,
+						ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr, symb_arity = fun_arity},
+						ro_fun_args = new_fun_args
+				}
+	  ti_trace
+	  		=False
 	| ti_trace && (False--->("transforming new function:",tb_rhs))
 		= undef
-	# (new_fun_rhs, ti) = transform tb_rhs ro { ti & ti_var_heap = us_var_heap, ti_fun_heap = ti_fun_heap, ti_symbol_heap = us_symbol_heap,
-	  			ti_next_fun_nr = inc ti_next_fun_nr, ti_new_functions = [fun_def_ptr : ti_new_functions],
-				ti_type_heaps = type_heaps, ti_fun_defs=ti_fun_defs,ti_cleanup_info = us_cleanup_info, ti_trace=ti_trace }
-	  new_fd = { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
-//	| (False--->("generated function", new_fd, '\n', new_fd.fun_type))
+	# ti
+			= { ti & ti_var_heap = us_var_heap, ti_fun_heap = ti_fun_heap, ti_symbol_heap = us_symbol_heap,
+	  			ti_next_fun_nr = inc ti_next_fun_nr, ti_type_def_infos = ti_type_def_infos,
+	  			ti_new_functions = [fun_def_ptr : ti_new_functions], ti_fun_defs = ti_fun_defs,
+	  			ti_type_heaps = ti_type_heaps, ti_cleanup_info = us_cleanup_info, ti_trace=ti_trace }
+	  (new_fun_rhs, ti)
+			= transform tb_rhs ro ti
+	  new_fd
+	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
+//	| (False--->("generated function", new_fd.fun_symb, '\n', new_fd.fun_type, new_cons_args))
 //		= undef
 	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
 where
+	is_dictionary {at_type=TA {type_index} _} es_td_infos
+		= type_index.glob_object>=size es_td_infos.[type_index.glob_module]
+	is_dictionary _ es_td_infos
+		= False
+
 	st_args_array :: ![AType] -> .{![AType]}
 	st_args_array st_args
 		= { [el] \\ el <- st_args }
 		
-	determine_args _ [] prod_index producers forms arg_types result_type type_vars _ type_heaps symbol_heap fun_defs fun_heap var_heap
+	determine_args _ [] prod_index producers prod_atypes forms arg_types next_attr_nr _ 
+				uniqueness_requirements subst type_heaps symbol_heap fun_defs fun_heap var_heap
 		# (vars, var_heap) = new_variables forms var_heap
-		= (vars, arg_types, result_type, type_vars, [], [], type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
-	determine_args [linear_bit : linear_bits] [cons_arg : cons_args ] prod_index producers [form : forms] arg_types result_type
-					type_vars input type_heaps symbol_heap fun_defs fun_heap var_heap
+		= (vars, arg_types, next_attr_nr, [], [], uniqueness_requirements, 
+			subst, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
+	determine_args [linear_bit : linear_bits] [cons_arg : cons_args ] prod_index producers [prod_atype:prod_atypes]
+					[form : forms] arg_types next_attr_nr
+					input uniqueness_requirements subst type_heaps symbol_heap fun_defs fun_heap var_heap
 		| cons_arg == cActive
-			# new_args = determine_args linear_bits cons_args (inc prod_index) prods forms arg_types result_type type_vars input type_heaps 
+			# new_args = determine_args linear_bits cons_args (inc prod_index) prods prod_atypes forms arg_types
+									next_attr_nr input uniqueness_requirements subst type_heaps 
 									symbol_heap fun_defs fun_heap var_heap
-			= determine_arg producers.[prod_index] form prod_index ((linear_bit,cons_arg), input) new_args
-			# (vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap) 
-					= determine_args linear_bits cons_args (inc prod_index) prods forms arg_types result_type type_vars input type_heaps symbol_heap fun_defs fun_heap var_heap
+			= determine_arg producers.[prod_index] prod_atype form prod_index ((linear_bit,cons_arg), input) new_args
+			# (vars, arg_types, next_attr_nr, new_linear_bits, new_cons_args, uniqueness_requirements, subst,
+				type_heaps, symbol_heap, fun_defs, fun_heap, var_heap) 
+					= determine_args linear_bits cons_args (inc prod_index) prods prod_atypes forms
+									arg_types next_attr_nr
+									input uniqueness_requirements subst type_heaps symbol_heap fun_defs fun_heap var_heap
 			  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			= ([{ form & fv_info_ptr = new_info_ptr } : vars], arg_types, result_type, type_vars, [linear_bit : new_linear_bits], [cons_arg : new_cons_args], type_heaps, symbol_heap, fun_defs,
-					fun_heap, writeVarInfo form.fv_info_ptr (VI_Variable form.fv_name new_info_ptr) var_heap)
+			= ([{ form & fv_info_ptr = new_info_ptr } : vars], arg_types, next_attr_nr, 
+				[linear_bit : new_linear_bits], [cons_arg : new_cons_args], uniqueness_requirements, subst, type_heaps, symbol_heap, fun_defs,
+				fun_heap, writeVarInfo form.fv_info_ptr (VI_Variable form.fv_name new_info_ptr) var_heap)
 	where
 		build_var_args [] form_vars act_vars var_heap
 			= (form_vars, act_vars, var_heap)
@@ -1301,54 +1497,96 @@ where
 			  act_var = { var_name = new_name, var_info_ptr = info_ptr, var_expr_ptr = nilPtr }
 			= build_var_args new_names [form_var : form_vars] [Var act_var : act_vars] var_heap
 
-		determine_arg PR_Empty form=:{fv_name,fv_info_ptr} _ ((linear_bit,cons_arg), _)
-						(vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
+		determine_arg PR_Empty _ form=:{fv_name,fv_info_ptr} _ ((linear_bit,cons_arg), _)
+						(vars, arg_types, next_attr_nr, new_linear_bits,
+							new_cons_args, uniqueness_requirements, subst, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			= (	[{ form & fv_info_ptr = new_info_ptr } : vars], arg_types, result_type, type_vars,
-				[linear_bit : new_linear_bits], [cons_arg /* was cActive*/ : new_cons_args], type_heaps, symbol_heap, fun_defs, fun_heap,
+			= (	[{ form & fv_info_ptr = new_info_ptr } : vars], arg_types, next_attr_nr,
+				[linear_bit : new_linear_bits], [cons_arg /* was cActive*/ : new_cons_args], uniqueness_requirements, subst, type_heaps, symbol_heap, fun_defs, fun_heap,
 				writeVarInfo fv_info_ptr (VI_Variable fv_name new_info_ptr) var_heap)
 
-		determine_arg (PR_Class class_app free_vars class_type) {fv_info_ptr,fv_name} prod_index (_,(_, _, ro))
-					  (vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
-			# (arg_type, arg_types) = arg_types![prod_index]
-			  empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
-			  (unbounded_type_vars, type_heaps)
-			  		= createBindingsForUnifiedTypes { empty_atype & at_type = class_type } (hd arg_type)
-			  										((getTypeVars class_type)++type_vars) ro.ro_common_defs type_heaps
-			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = repeatn (length free_vars) empty_atype} type_heaps
-			  (result_type, type_heaps) = substitute result_type type_heaps
+		determine_arg (PR_Class class_app free_vars class_type) _ {fv_info_ptr,fv_name} prod_index (_,(_, _, ro))
+					  (vars, arg_types, next_attr_nr, new_linear_bits, new_cons_args, 
+						uniqueness_requirements, subst, type_heaps, symbol_heap, fun_defs, fun_heap, var_heap)
+			# (arg_type, arg_types)
+					= arg_types![prod_index]
+			  (int_class_type, type_heaps)
+			  		= substitute class_type type_heaps
+			  type_input
+			  		= { ti_common_defs = ro.ro_common_defs
+			  		  , ti_functions = ro.ro_imported_funs
+					  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
+					  }
+			  (succ, subst, type_heaps)
+			  		= case isEmptyType int_class_type || isEmptyType (hd arg_type).at_type of
+			  			True
+			  				-> (True, subst, type_heaps)
+			  			_
+			  				-> unify { empty_atype & at_type = int_class_type } (hd arg_type) type_input subst type_heaps
+			  with
+				isEmptyType TE = True
+				isEmptyType _ = False
+			| not succ
+				= abort ("sanity check nr 93 in module trans failed"--->({ empty_atype & at_type = int_class_type }, (hd arg_type)))
+// XXX sanity check: remove later..
+			# (attr_vars, type_heaps) = accAttrVarHeap (getAttrVars (class_type, hd arg_type)) type_heaps
+			| not (isEmpty attr_vars)
+				= abort "sanity check nr 78 in module trans failed"
+// ..sanity check
 			= ( mapAppend (\{var_info_ptr,var_name} 
 							-> { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
 						  free_vars vars
-			  , arg_types
-			  , result_type
-			  , unbounded_type_vars
+			  , { arg_types & [prod_index] = repeatn (length free_vars) empty_atype}
+			  , next_attr_nr
 			  , mapAppend (\_ -> True) free_vars new_linear_bits
 			  , mapAppend (\_ -> cActive) free_vars new_cons_args
+			  , uniqueness_requirements
+			  , subst
 			  , type_heaps
 			  , symbol_heap
 			  , fun_defs
 			  , fun_heap
 			  , writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) var_heap
 			  )
-		determine_arg producer {fv_info_ptr,fv_name} prod_index ((linear_bit, _),(ti_cons_args, consumer_body_rhs, ro))
-						(vars, arg_types, result_type, type_vars, new_linear_bits, new_cons_args, type_heaps=:{th_vars, th_attrs}, symbol_heap, fun_defs, fun_heap, var_heap)
-			# symbol = get_producer_symbol producer
-			  (symbol_type, fun_defs, fun_heap)
-					= get_producer_type symbol ro fun_defs fun_heap
-			  curried = is_curried producer
-			#! size_fun_defs = size fun_defs
-			# ({cc_args, cc_linear_bits}, fun_heap) = calc_cons_args curried symbol ti_cons_args linear_bit size_fun_defs fun_heap
-			  nr_of_applied_args = symbol.symb_arity
-			  application_type = build_application_type symbol_type nr_of_applied_args
-			  (arg_type, arg_types) = arg_types![prod_index]
-			  th_attrs = foldSt (\av attr_var_heap -> attr_var_heap <:= (av.av_info_ptr, AVI_Attr TA_Multi)) symbol_type.st_attr_vars th_attrs 
-			  (unbounded_type_vars, type_heaps) 
-			  		= createBindingsForUnifiedTypes application_type (hd arg_type) (symbol_type.st_vars++type_vars) 
-			  								ro.ro_common_defs { th_vars = th_vars, th_attrs = th_attrs }
-			  (arg_types, type_heaps) = substituteArr { arg_types & [prod_index] = take nr_of_applied_args symbol_type.st_args }
-					  								type_heaps
-			  (result_type, type_heaps) = substitute result_type type_heaps
+		determine_arg producer (Yes {st_args, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
+						{fv_info_ptr,fv_name} prod_index 
+						((linear_bit, _),(ti_cons_args, consumer_body_rhs, ro))
+						(vars, arg_types, next_attr_nr, new_linear_bits, new_cons_args, 
+							uniqueness_requirements, subst, type_heaps=:{th_vars, th_attrs}, symbol_heap,
+							fun_defs, fun_heap, var_heap)
+			# symbol
+					= get_producer_symbol producer
+			  curried
+			  		= is_curried producer
+			#! size_fun_defs
+					= size fun_defs
+			# ({cc_args, cc_linear_bits}, fun_heap)
+					= calc_cons_args curried symbol ti_cons_args linear_bit size_fun_defs fun_heap
+			  (arg_type, arg_types)
+			  		= arg_types![prod_index]
+			  (next_attr_nr, th_attrs)
+			  		= foldSt bind_to_temp_attr_var st_attr_vars (next_attr_nr, th_attrs)
+			  		// prepare for substitute calls
+			  ((st_args, st_result), type_heaps)
+			  		= substitute (st_args, st_result) { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
+			  nr_of_applied_args
+			  		= symbol.symb_arity
+			  application_type
+			  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args
+			  type_input
+			  		= { ti_common_defs = ro.ro_common_defs
+			  		  , ti_functions = ro.ro_imported_funs
+					  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
+					  }
+			  (succ, subst, type_heaps)
+			  		= unify application_type (hd arg_type) type_input subst type_heaps
+			| not succ
+				= abort "sanity check nr 94 in module trans failed"
+			# (attr_inequalities, type_heaps)
+					= accAttrVarHeap (mapSt substitute_attr_inequality st_attr_env) type_heaps
+			  new_uniqueness_requirement
+			  		= { ur_offered = application_type, ur_demanded = hd arg_type,
+			  			ur_attr_ineqs = attr_inequalities }
 			  (opt_body, var_names, fun_defs, fun_heap)
 			  		= case producer of
 			  			(PR_Curried {symb_arity, symb_kind=SK_Function {glob_module}})
@@ -1370,13 +1608,14 @@ where
 							# (TransformedBody tb) = opt_body
 							-> (VI_Body symbol tb (take nr_of_applied_args form_vars), var_heap)
 			| nr_of_applied_args<>length cc_linear_bits || nr_of_applied_args<>length cc_args
-				= abort "Martin REALLY missed something XXX"
+				= abort ("Martin REALLY missed something XXX")
 			= (	form_vars
-			  , arg_types
-			  , result_type
-			  , unbounded_type_vars
+			  , { arg_types & [prod_index] = take nr_of_applied_args st_args }
+			  , next_attr_nr
 			  , cc_linear_bits++new_linear_bits
 			  , cc_args++new_cons_args
+			  , [new_uniqueness_requirement:uniqueness_requirements]
+			  , subst
 			  , type_heaps
 			  , symbol_heap
 			  , fun_defs
@@ -1385,28 +1624,20 @@ where
 			  ) 
 		  where
 			
-			get_producer_symbol (PR_Curried symbol)
-				= symbol
-			get_producer_symbol (PR_Function symbol _)
-				= symbol
-			get_producer_symbol (PR_GeneratedFunction symbol _)
-				= symbol
-			
-			get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
-				| glob_module == ro.ro_main_dcl_module_n
-					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
-					= (symbol_type, fun_defs, fun_heap)
-				# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-				  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
-				= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
-					fun_defs, fun_heap)
-			get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
-				# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
-				= (symbol_type, fun_defs, fun_heap)
-			get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
-				# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
-				= (symbol_type, fun_defs, fun_heap)
-
+// XXX...
+			traceAttrEnv st_attr_env th_attrs
+				# th_attrs = th_attrs--->("producer attr inequalities")
+				  th_attrs = foldSt traceOne st_attr_env th_attrs
+				= forget th_attrs
+			  where
+				forget :: !x -> Bool
+				forget th_attrs = False
+				traceOne {ai_offered, ai_demanded} th_attrs
+					# (AVI_Attr (TA_TempVar o), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
+					  (AVI_Attr (TA_TempVar d), th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
+					  th_attrs = th_attrs--->("u"+++toString o+++" <= u"+++toString d)
+					= th_attrs 
+// ...XXX
 			calc_cons_args curried {symb_kind, symb_arity} ti_cons_args linear_bit size_fun_defs fun_heap
 				# (opt_cons_classes, fun_heap)
 						= case symb_kind of
@@ -1427,15 +1658,16 @@ where
 								-> (Yes gf_cons_args, fun_heap)
 				= case opt_cons_classes of
 					Yes cons_classes
-						| curried
-							-> ({ cc_size = symb_arity, cc_args = take symb_arity cons_classes.cc_args, 
-					  				cc_linear_bits = repeatn symb_arity linear_bit}, fun_heap)
-						-> (cons_classes, fun_heap)
+						-> ({ cc_size = symb_arity, cc_args = take symb_arity cons_classes.cc_args, 
+				  				cc_linear_bits = if curried (repeatn symb_arity linear_bit) 
+				  									(take symb_arity cons_classes.cc_linear_bits)}
+				  			, fun_heap)
 					No
 						-> ({cc_size = symb_arity, cc_args = repeatn symb_arity cPassive,
 								cc_linear_bits = repeatn symb_arity linear_bit}, fun_heap)
 
-			get_fun_def (SK_Function {glob_module, glob_object}) main_dcl_module_n fun_defs fun_heap
+
+ 			get_fun_def (SK_Function {glob_module, glob_object}) main_dcl_module_n fun_defs fun_heap
 				| glob_module<>main_dcl_module_n
 					= abort "sanity check 2 failed in module trans"
 				# (fun_def, fun_defs) = fun_defs![glob_object]
@@ -1450,26 +1682,158 @@ where
 			is_curried (PR_Curried _) = True
 			is_curried _ = False
 			
-		substituteArr :: !*{![AType]} !*TypeHeaps -> (!.{![AType]}, !.TypeHeaps)
-		// apply substitute on every array element
-		substituteArr arg_types type_heaps
-			#! size = size arg_types
-			= iFoldSt substitute_element 0 size (arg_types, type_heaps)
-		  where
-		  	substitute_element i (arg_types, type_heaps)
-		  		# (arg_type, arg_types) = arg_types![i]
-		  		  (arg_type, type_heaps) = substitute arg_type type_heaps
-				= ({ arg_types & [i] = arg_type }, type_heaps)
-
-		build_application_type :: !SymbolType !Int -> AType
-		build_application_type symbol_type=:{st_arity, st_context, st_result, st_args} nr_of_applied_args
-			# nr_context_args = length st_context
+		build_application_type st_arity nr_context_args st_result st_args nr_of_applied_args
 			| st_arity+nr_context_args==nr_of_applied_args
 				= st_result
 			| nr_of_applied_args<nr_context_args
 				= abort "sanity check nr 234 failed in module trans"
-			= foldr (\atype1 atype2->{at_attribute=TA_None, at_annotation=AN_None, at_type=atype1-->atype2})
-					st_result (drop (nr_of_applied_args-nr_context_args) st_args)
+			# (applied_args, unapplied_args) = splitAt (nr_of_applied_args-nr_context_args) st_args
+			  attr_approx = if (any has_unique_attribute applied_args) TA_Unique TA_Multi
+			= foldr (\atype1 atype2->{at_attribute=attr_approx, at_annotation=AN_None, at_type=atype1-->atype2})
+					st_result unapplied_args
+		  where
+			has_unique_attribute {at_attribute=TA_Unique} = True
+			has_unique_attribute _ = False
+
+	substitute_attr_inequality {ai_offered, ai_demanded} th_attrs
+		#! ac_offered = pointer_to_int ai_offered th_attrs
+		   ac_demanded = pointer_to_int ai_demanded th_attrs
+		= ({ ac_offered = ac_offered, ac_demanded = ac_demanded }, th_attrs)
+	  where
+		pointer_to_int {av_info_ptr} th_attrs
+			# (AVI_Attr (TA_TempVar i)) = sreadPtr av_info_ptr th_attrs
+			= i
+
+	new_inequality {ac_offered, ac_demanded} coercions
+		= newInequality ac_offered ac_demanded coercions
+
+	bind_to_temp_type_var {tv_info_ptr} (next_type_var_nr, th_vars)
+		= (next_type_var_nr+1, writePtr tv_info_ptr (TVI_Type (TempV next_type_var_nr)) th_vars)
+	
+	bind_to_temp_attr_var {av_info_ptr} (next_attr_var_nr, th_attrs)
+		= (next_attr_var_nr+1, writePtr av_info_ptr (AVI_Attr (TA_TempVar next_attr_var_nr)) th_attrs)
+
+	set_cons_var_bit {tv_info_ptr} (cons_vars, th_vars)
+		# (TVI_Type (TempV i), th_vars) = readPtr tv_info_ptr th_vars 
+		= (set_bit i cons_vars, th_vars)
+
+	copy_opt_symbol_type No ti_type_heaps
+		= (No, ti_type_heaps)
+	copy_opt_symbol_type (Yes symbol_type=:{st_vars, st_attr_vars, st_args, st_result, st_attr_env})
+				ti_type_heaps=:{th_vars, th_attrs}
+		# (fresh_st_vars, th_vars)
+				= mapSt bind_to_fresh_type_variable st_vars th_vars
+		  (fresh_st_attr_vars, th_attrs)
+				= mapSt bind_to_fresh_attr_variable st_attr_vars th_attrs
+		  ([fresh_st_result:fresh_st_args], ti_type_heaps)
+		  		= substitute [st_result:st_args] { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
+		  (fresh_st_attr_env, ti_type_heaps)
+		  		= substitute st_attr_env ti_type_heaps
+		= (Yes { symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
+				st_result = fresh_st_result, st_attr_env = fresh_st_attr_env}, ti_type_heaps)
+
+	add_propagation_attributes ro_common_defs No state
+		= (No, state)
+	add_propagation_attributes ro_common_defs (Yes st=:{st_args, st_result, st_attr_env, st_attr_vars})
+				(ti_type_heaps, ti_type_def_infos)
+		# ([sound_st_result:sound_st_args], ps)
+			  	= add_propagation_attributes_to_atypes ro_common_defs [st_result:st_args]
+					{ prop_type_heaps = ti_type_heaps, prop_td_infos = ti_type_def_infos,
+					  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = No }
+		  ({prop_type_heaps = ti_type_heaps, prop_td_infos = ti_type_def_infos, prop_attr_vars, prop_attr_env})
+		  		= ps
+		  sound_symbol_type
+		  		= { st & st_args = sound_st_args, st_result = sound_st_result, st_attr_env = prop_attr_env,
+		  			st_attr_vars = prop_attr_vars } 
+		= (Yes sound_symbol_type, (ti_type_heaps, ti_type_def_infos))
+
+	add_propagation_attributes_to_atypes :: {#CommonDefs} ![AType] !*PropState -> (![AType],!*PropState)
+	add_propagation_attributes_to_atypes modules types ps
+		= mapSt (add_propagation_attributes_to_atype modules) types ps
+
+	add_propagation_attributes_to_atype modules type ps
+		| is_dictionary type ps.prop_td_infos
+			= (type, ps)
+		# (type, prop_class, ps) = addPropagationAttributesToAType modules type ps
+		= (type, ps)
+	
+	empty_atype = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
+
+	accum_class_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
+		= case prods.[i] of
+			PR_Class _ _ class_type
+				-> ([{empty_atype & at_type = class_type}  : type_accu ], ti_fun_defs, ti_fun_heap)
+			_
+				-> (type_accu, ti_fun_defs, ti_fun_heap)
+
+
+	accum_function_producer_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
+		= case prods.[size prods-i-1] of
+			PR_Empty
+				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
+			PR_Class _ _ class_type
+				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
+			producer
+				# symbol = get_producer_symbol producer
+				  (symbol_type, ti_fun_defs, ti_fun_heap)
+						= get_producer_type symbol ro ti_fun_defs ti_fun_heap
+				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
+
+	coerce_types common_defs cons_vars {ur_offered, ur_demanded} (subst, coercions, ti_type_def_infos, ti_type_heaps)
+//		| False--->("determineAttributeCoercions", ur_offered, ur_demanded)
+//			= undef
+		# (opt_error_info, subst, coercions, ti_type_def_infos, ti_type_heaps)
+				= determineAttributeCoercions ur_offered ur_demanded True /*XXX True?*/
+						subst coercions common_defs cons_vars ti_type_def_infos ti_type_heaps
+		= case opt_error_info of
+			Yes _
+				-> abort "sanity check nr 5623 failed in module trans"
+			No
+				-> (subst, coercions, ti_type_def_infos, ti_type_heaps)
+
+	collectPropagatingConsVars type th_vars
+		# th_vars
+				= performOnTypeVars initializeToTVI_Empty type th_vars
+		= performOnTypeVars collect_unencountered_cons_var type ([], th_vars)
+	  where
+		collect_unencountered_cons_var TA_MultiOfPropagatingConsVar tv=:{tv_info_ptr} (cons_var_accu, th_vars)
+			# (tvi, th_vars) = readPtr tv_info_ptr th_vars
+			= case tvi of
+				TVI_Empty
+					-> ([tv:cons_var_accu], writePtr tv_info_ptr TVI_Used th_vars)
+				TVI_Used
+					-> (cons_var_accu, th_vars)
+		collect_unencountered_cons_var _ _ state
+			= state
+
+	get_producer_symbol (PR_Curried symbol)
+		= symbol
+	get_producer_symbol (PR_Function symbol _)
+		= symbol
+	get_producer_symbol (PR_GeneratedFunction symbol _)
+		= symbol
+
+	replace_integers_in_substitution replace_input i (subst, used)
+		# (subst_i, subst)
+				= subst![i]
+		  (subst_i, used)
+		  		= replaceIntegers subst_i replace_input used
+		= ({ subst & [i] = subst_i }, used)
+
+	get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
+		| glob_module == ro.ro_main_dcl_module_n
+			# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
+			= (symbol_type, fun_defs, fun_heap)
+		# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+		  st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context ft_type.st_args
+		= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
+			fun_defs, fun_heap)
+	get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
+		# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
+		= (symbol_type, fun_defs, fun_heap)
+	get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
+		# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
+		= (symbol_type, fun_defs, fun_heap)
 
 	new_variables [] var_heap
 		= ([], var_heap)
@@ -1503,24 +1867,6 @@ where
 		= max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
-/* was
-	max_group_index_of_producer PR_Empty current_max fun_defs fun_heap cons_args
-		= current_max
-	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
-		= max_group_index_of_members app_args current_max fun_defs fun_heap cons_args
-	max_group_index_of_producer (PR_Curried _) current_max fun_defs fun_heap cons_args
-		= current_max
-	max_group_index_of_producer (PR_Function _ fun_index) current_max fun_defs fun_heap cons_args
-		# (fun_def, fun_defs) = fun_defs![fun_index]
-		= max fun_def.fun_info.fi_group_index current_max
-	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _)
-								current_max fun_defs fun_heap cons_args
-		| fun_index < size fun_defs
-			# {fun_info} = fun_defs.[fun_index] 
-			= max fun_info.fi_group_index current_max
-			# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
-			= max generated_function.gf_fun_def.fun_info.fi_group_index current_max
-*/
 	ro_main_dcl_module_n = ro.ro_main_dcl_module_n
 
 	max_group_index_of_member fun_defs fun_heap cons_args current_max (App {app_symb = {symb_name, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
@@ -1555,6 +1901,72 @@ where
 			# (FI_Function generated_function) = sreadPtr fun_ptr fun_heap
 			= max generated_function.gf_fun_def.fun_info.fi_group_index current_max
 
+	create_fresh_attr_vars :: !{!CoercionTree} !Int !*AttrVarHeap -> (!{!TypeAttribute}, !.AttrVarHeap)
+	create_fresh_attr_vars demanded nr_of_attr_vars th_attrs
+		# fresh_array = createArray nr_of_attr_vars TA_None
+		= iFoldSt (allocate_fresh_attr_var demanded) 0 nr_of_attr_vars (fresh_array, th_attrs)
+	  where
+		allocate_fresh_attr_var demanded i (attr_var_array, th_attrs)
+			= case demanded.[i] of
+				CT_Unique
+					-> ({ attr_var_array & [i] = TA_Unique}, th_attrs)
+				CT_NonUnique
+					-> ({ attr_var_array & [i] = TA_Multi}, th_attrs)
+				_
+					# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
+					-> ({ attr_var_array & [i] = TA_Var { av_name = NewAttrVarId i, av_info_ptr = new_info_ptr }}, th_attrs)
+
+class replaceIntegers a :: !a !({!TypeVar}, !{!TypeAttribute}, !AttributePartition) !*{#Bool} -> (!a, !.{#Bool})
+	// get rid of all those TempV and TA_Var things
+
+instance replaceIntegers (a, b) | replaceIntegers a & replaceIntegers b where
+	replaceIntegers (a, b) input used
+		# (a, used) = replaceIntegers a input used
+		  (b, used) = replaceIntegers b input used
+		= ((a, b), used)
+
+instance replaceIntegers [a] | replaceIntegers a where
+	replaceIntegers [] input used
+		= ([], used)
+	replaceIntegers [h:t] input used
+		# (h, used) = replaceIntegers h input used
+		  (t, used) = replaceIntegers t input used
+		= ([h:t], used)
+
+instance replaceIntegers TypeAttribute where
+	replaceIntegers (TA_TempVar i) (_, attributes, attr_partition) used
+		# index = attr_partition.[i]
+		  attribute = attributes.[index]
+		= (attribute, { used & [index] = isAttrVar attribute })
+	  where
+		isAttrVar (TA_Var _) = True
+		isAttrVar _ = False
+	replaceIntegers ta _ used
+		= (ta, used)
+
+instance replaceIntegers Type where
+	replaceIntegers (TA type_symb_ident args) input used
+		# (args, used) = replaceIntegers args input used
+		= (TA type_symb_ident args, used)
+	replaceIntegers (a --> b) input used
+		# (a, used) = replaceIntegers a input used
+		  (b, used) = replaceIntegers b input used
+		= (a --> b, used)
+	replaceIntegers (consvar :@: args) input=:(fresh_type_vars, _, _) used
+		# (TempCV i) = consvar
+		  (args, used) = replaceIntegers args input used
+		= (CV fresh_type_vars.[i] :@: args, used)
+	replaceIntegers (TempV i) (fresh_type_vars, _, _) used
+		= (TV fresh_type_vars.[i], used)
+	replaceIntegers type input used
+		= (type, used)
+
+instance replaceIntegers AType where
+	replaceIntegers atype=:{at_attribute, at_type} input used
+		# (at_attribute, used) = replaceIntegers at_attribute input used
+		  (at_type, used) = replaceIntegers at_type input used
+		= ({atype & at_attribute = at_attribute, at_type = at_type}, used)
+		
 (-!->) infix :: !.a !b -> .a | <<< b
 (-!->) a b = a ---> b
 
@@ -1563,180 +1975,16 @@ bind_to_fresh_type_variable {tv_name, tv_info_ptr} th_vars
 	  tv = { tv_name=tv_name, tv_info_ptr=new_tv_info_ptr }
 	= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
 
-appTypeVarHeap f type_heaps :== let th_vars = f type_heaps.th_vars in { type_heaps & th_vars = th_vars }
-accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, { type_heaps & th_vars = th_vars })
+bind_to_fresh_attr_variable {av_name, av_info_ptr} th_attrs
+	# (new_av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
+	  av = { av_name=av_name, av_info_ptr=new_av_info_ptr }
+	= (av, writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs)
 
-createBindingsForUnifiedTypes :: !AType !AType ![TypeVar] !{#CommonDefs} !*TypeHeaps -> (![TypeVar], !.TypeHeaps)
-createBindingsForUnifiedTypes type_1 type_2 all_type_vars common_defs type_heaps=:{th_vars}
-/* unify the two type arguments and generate new bindings. The resulting list of type variables should only
-   contain variables that occur in the second type argument (the "demanded" type).
-*/
-//	| False --->("createBindingsForUnifiedTypes", type_1, type_2, all_type_vars)
-//		= undef
-	# th_vars = foldSt (\tv th_vars -> th_vars <:= (tv.tv_info_ptr, TVI_Empty)) all_type_vars th_vars
-	  (type_heaps=:{th_vars}) = bind_and_unify_atypes type_1 type_2 common_defs { type_heaps & th_vars = th_vars }
-//	  th_vars = th_vars -!-> ""
-//	  th_vars = foldSt trace_type_var all_type_vars th_vars
-	  th_vars = foldSt (\ a b -> snd (bind_to_root a b)) all_type_vars th_vars
-//	  th_vars = th_vars -!-> ""
-//	  th_vars = foldSt trace_type_var all_type_vars th_vars
-	  (unbound_type_vars, th_vars) = foldSt get_unbound_var all_type_vars ([], th_vars)
-//	  th_vars = th_vars -!-> ""
-//	  th_vars = foldSt trace_type_var all_type_vars th_vars
-	= (unbound_type_vars, { type_heaps & th_vars = th_vars })
-  where
-	bind_and_unify_types (TV tv_1) (TV tv_2) common_defs type_heaps=:{th_vars}
-		# (root_1, th_vars) = get_root tv_1 th_vars
-		  (root_2, th_vars) = get_root tv_2 th_vars
-		  maybe_root_tv_1 = only_tv root_1
-		  maybe_root_tv_2 = only_tv root_2
-		  type_heaps = { type_heaps & th_vars = th_vars }
-		= case (maybe_root_tv_1, maybe_root_tv_2) of
-						(Yes root_tv_1, No)
-							-> appTypeVarHeap (bind_root_variable_to_type root_tv_1 root_2) type_heaps
-						(No, Yes root_tv_2)
-							-> appTypeVarHeap (bind_root_variable_to_type root_tv_2 root_1) type_heaps
-						(Yes root_tv_1, Yes root_tv_2)
-							| root_tv_1.tv_info_ptr==root_tv_2.tv_info_ptr
-								-> type_heaps
-							-> appTypeVarHeap (bind_roots_together root_tv_1 root_2) type_heaps
-						(No, No)
-							-> bind_and_unify_types root_1 root_2 common_defs type_heaps
-	bind_and_unify_types (TV tv_1) type common_defs type_heaps=:{th_vars}
-		| not (is_non_variable_type type)
-			= abort ("compiler error in trans.icl: assertion failed (1) XXX"--->type)
-		# th_vars = bind_variable_to_type tv_1 type th_vars
-		= { type_heaps & th_vars = th_vars }
-	bind_and_unify_types type (TV tv_1) common_defs type_heaps=:{th_vars}
-		| not (is_non_variable_type type)
-			= abort ("compiler error in trans.icl: assertion failed (2) XXX"--->type)
-		# th_vars = bind_variable_to_type tv_1 type th_vars
-		= { type_heaps & th_vars = th_vars }
-	bind_and_unify_types (TA _ arg_types1) (TA _ arg_types2) common_defs type_heaps
-		= bind_and_unify_atype_lists arg_types1 arg_types2 common_defs type_heaps
-	bind_and_unify_types (l1 --> r1) (l2 --> r2) common_defs type_heaps
-		= bind_and_unify_atypes r1 r2 common_defs (bind_and_unify_atypes l1 l2 common_defs type_heaps)
-	bind_and_unify_types (TB _) (TB _) common_defs type_heaps
-		= type_heaps
-	bind_and_unify_types ((CV l1) :@: r1) ((CV l2) :@: r2) common_defs type_heaps
-		= bind_and_unify_atype_lists r1 r2 common_defs (bind_and_unify_types (TV l1) (TV l2) common_defs type_heaps)
-	bind_and_unify_types (TA type_symb r1) ((CV l2) :@: r2) common_defs type_heaps
-		= bind_and_unify_atype_lists r1 r2 common_defs (bind_and_unify_types (TA type_symb []) (TV l2) common_defs type_heaps)
-	bind_and_unify_types ((CV l1) :@: r1) (TA type_symb r2) common_defs type_heaps
-		= bind_and_unify_atype_lists r1 r2 common_defs (bind_and_unify_types (TV l1) (TA type_symb []) common_defs type_heaps)
-	bind_and_unify_types TE y common_defs type_heaps
-		= type_heaps
-	bind_and_unify_types x TE common_defs type_heaps
-		= type_heaps
-	bind_and_unify_types x y _ _
-		= abort ("bind_and_unify_types"--->(x,y))
+allocate_fresh_type_var i (accu, th_vars)
+	# (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
+	  tv = { tv_name = { id_name = "a"+++toString i, id_info = nilPtr }, tv_info_ptr=new_tv_info_ptr }
+	= ([tv:accu], th_vars)
 
-	bind_and_unify_atype_lists [] [] common_defs type_heaps
-		= type_heaps
-	bind_and_unify_atype_lists [x:xs] [y:ys] common_defs type_heaps
-		= bind_and_unify_atype_lists xs ys common_defs (bind_and_unify_atypes x y common_defs type_heaps)
-	
-	bind_and_unify_atypes {at_type=TA type_symb_1 type_args_1} {at_type=TA type_symb_2 type_args_2} common_defs type_heaps
-		| type_symb_1==type_symb_2
-			= bind_and_unify_atype_lists type_args_1 type_args_2 common_defs type_heaps
-		// otherwise further with next alternative ("functional GOTO")
-	bind_and_unify_atypes atype_1 atype_2 common_defs type_heaps
-		# (mb_expanded_1, type_heaps) = try_to_expand atype_1 common_defs type_heaps
-		  (mb_expanded_2, type_heaps) = try_to_expand atype_2 common_defs type_heaps
-		= bind_and_unify_types mb_expanded_1 mb_expanded_2 common_defs type_heaps
-	  where
-		try_to_expand {at_type=actual_type=:TA {type_index={glob_object,glob_module}} actual_args, at_attribute=actual_type_attr}
-						common_defs type_heaps
-			#! type_def = common_defs.[glob_module].com_type_defs.[glob_object]
-			= case type_def.td_rhs of
-				SynType {at_type=rhs_type}
-					-> expandTypeApplication type_def.td_args type_def.td_attribute rhs_type actual_args actual_type_attr type_heaps
-				_
-					-> (actual_type, type_heaps)
-		try_to_expand {at_type} _ type_heaps
-			= (at_type, type_heaps)
-
-	bind_to_root :: !TypeVar !*TypeVarHeap -> (!TypeVarInfo,!.TypeVarHeap);
-	bind_to_root this_tv th_vars
-		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
-		= case tv_info of
-			TVI_Empty
-				-> (tv_info, th_vars)
-			(TVI_Type type)
-				| is_non_variable_type type
-					 -> (tv_info, th_vars)
-				-> case type of
-					(TV next_tv)
-						# (root_tvi, th_vars) = bind_to_root next_tv th_vars
-						-> case root_tvi of
-							TVI_Empty
-								// this_tv is already bound to the root which is a type variable itself
-								-> (tv_info, th_vars)
-							_
-								// the root type is root_tvi
-							 	-> (root_tvi, th_vars <:= (this_tv.tv_info_ptr, root_tvi))
-
-	get_unbound_var tv=:{tv_info_ptr} (unbound_type_vars_accu, th_vars)
-		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
-		= case tv_info of
-			TVI_Empty
-				-> ([tv:unbound_type_vars_accu], th_vars)
-			(TVI_Type type)
-				-> (unbound_type_vars_accu, th_vars)
-
-	only_tv :: Type -> Optional TypeVar
-	only_tv (TV tv) = Yes tv
-	only_tv _ = No
-	
-	is_non_variable_type (TA _ _)	= True
-	is_non_variable_type (_ --> _)	= True
-	is_non_variable_type (_ :@: _)	= True
-	is_non_variable_type (TB _)		= True
-	is_non_variable_type _			= False
-	
-	bind_variable_to_type tv type th_vars
-		# (root, th_vars) = get_root tv th_vars
-		= case (only_tv root) of
-			(Yes tv)	-> bind_root_variable_to_type tv type th_vars
-			No 			-> th_vars
-	
-	bind_root_variable_to_type {tv_info_ptr} type th_vars
-		= th_vars <:= (tv_info_ptr, TVI_Type type)
-	
-	bind_roots_together :: TypeVar Type *(Heap TypeVarInfo) -> .Heap TypeVarInfo;
-	bind_roots_together root_tv_1 root_type_2 th_vars
-		= th_vars <:= (root_tv_1.tv_info_ptr, TVI_Type root_type_2)
-	
-	get_root :: TypeVar *(Heap TypeVarInfo) -> (Type,.Heap TypeVarInfo);
-	get_root this_tv th_vars
-		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
-		= case tv_info of
-			TVI_Empty
-				-> (TV this_tv, th_vars)
-			(TVI_Type type)
-				| is_non_variable_type type
-					 -> (type, th_vars)
-				-> case type of
-					(TV next_tv) -> get_root next_tv th_vars
-	// XXX for tracing
-	trace_type_var tv th_vars
-		= trace_type_vars tv (th_vars -!-> "TYPE VARIABLE")
-	
-	trace_type_vars this_tv th_vars
-		# th_vars = th_vars -!-> this_tv
-		# (tv_info, th_vars) = readPtr this_tv.tv_info_ptr th_vars
-		= case tv_info of
-			TVI_Empty
-				-> th_vars
-			(TVI_Type type)
-				| is_non_variable_type type
-					-> (th_vars -!-> ("TVI_Type", type))
-				-> case type of
-					(TV next_tv) -> trace_type_vars next_tv th_vars
-//			(TVI_FreshTypeVar root_type_var)
-//				-> th_vars -!-> ("TVI_FreshTypeVar",root_type_var)
-
-	
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_symb, app_args, extra_args) = complete_application app_symb fun_def.fun_arity app_args extra_args
 	| cc_size > 0
@@ -1862,9 +2110,9 @@ where
 		= (producers, [arg : new_args], ti)
 
 // XXX check for linear_bit also in case of a constructor ?
-determineProducer _ _ {app_symb = {symb_arity}, app_args} _ new_args prod_index producers _ ti
+determineProducer _ _ app=:{app_symb = {symb_arity}, app_args} _ new_args prod_index producers _ ti
 	| symb_arity<>length app_args
-		= abort "XXX Martin missed something"
+		= abort "sanity check 98765 failed in module trans"
 determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) new_args prod_index producers _ ti
 	# (app_args, (new_vars, ti_var_heap)) = renewVariables app_args ([], ti.ti_var_heap)
 	  (new_args, ti_var_heap) = mapAppendSt retrieve_old_var new_vars new_args ti_var_heap
@@ -1975,26 +2223,26 @@ where
 ::	ImportedConstructors	:== [Global Index]
 
 transformGroups :: !CleanupInfo !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
-		!*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
+		!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-
-transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_defs imported_funs imported_types collected_imports var_heap type_heaps symbol_heap
-	#! (nr_of_funs, fun_defs) = usize fun_defs
+transformGroups cleanup_info main_dcl_module_n groups fun_defs cons_args common_defs imported_funs imported_types
+		collected_imports type_def_infos var_heap type_heaps symbol_heap
+	#! nr_of_funs = size fun_defs
 	# (groups, imported_types, collected_imports, ti)
 		= transform_groups 0 groups common_defs imported_funs imported_types collected_imports
 			{ti_fun_defs = fun_defs, ti_instances = createArray nr_of_funs II_Empty,
 				ti_cons_args = cons_args, ti_new_functions = [], ti_fun_heap = newHeap, ti_var_heap = var_heap,
-				ti_symbol_heap = symbol_heap, ti_type_heaps = type_heaps, ti_next_fun_nr = nr_of_funs, ti_cleanup_info = cleanup_info,
-				ti_recursion_introduced = No, ti_trace = False }
+				ti_symbol_heap = symbol_heap, ti_type_heaps = type_heaps, ti_type_def_infos = type_def_infos,
+				ti_next_fun_nr = nr_of_funs, ti_cleanup_info = cleanup_info,
+				ti_recursion_introduced = No, ti_trace = False}
 	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_next_fun_nr,ti_type_heaps,ti_cleanup_info} = ti
 	  (groups, new_fun_defs, imported_types, collected_imports, ti_type_heaps, ti_var_heap) 
 	  		= foldSt (add_new_function_to_group common_defs ti_fun_heap) ti_new_functions
 	  				(groups, [], imported_types, collected_imports, ti_type_heaps, ti_var_heap)
-	  ti_symbol_heap = foldSt cleanup ti_cleanup_info ti_symbol_heap
+	  ti_symbol_heap = foldSt cleanup_attributes ti_cleanup_info ti_symbol_heap
 	= ( groups, { fundef \\ fundef <- [ fundef \\ fundef <-: ti_fun_defs ] ++ new_fun_defs }, imported_types, collected_imports,
 			ti_var_heap, ti_type_heaps, ti_symbol_heap)
-
-where
+  where
 	transform_groups group_nr groups common_defs imported_funs imported_types collected_imports ti
 		| group_nr < size groups
 			# (group, groups) = groups![group_nr]
@@ -2046,7 +2294,7 @@ where
 		  		= convertSymbolType common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
 		= ({ fun_defs & [fun_index] = { fun_def & fun_type = Yes fun_type }}, imported_types, collected_imports, type_heaps, var_heap)
 
-	cleanup expr_info_ptr symbol_heap
+	cleanup_attributes expr_info_ptr symbol_heap
 		# (expr_info, symbol_heap) = readPtr expr_info_ptr symbol_heap
 		= case expr_info of
 			EI_Extended _ expr_info -> writePtr expr_info_ptr expr_info symbol_heap
@@ -2080,10 +2328,19 @@ addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
 where
 	add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
-		# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
-		  dict_type_symb = 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
+		# {class_arity, class_dictionary={ds_ident,ds_index}, class_cons_vars}
+				= common_defs.[glob_module].com_class_defs.[ds_index]
+		  dict_type_symb
+		  		= 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
 		= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
-				map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
+//				map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
+				fst (mapSt 	(\type class_cons_vars
+								-> let at_attribute = if (lowest_bit class_cons_vars) TA_MultiOfPropagatingConsVar TA_Multi
+							   		in ( { at_attribute = at_attribute, at_annotation = AN_None, at_type = type },
+						   				class_cons_vars>>1)
+						   	)
+						  	tc_types
+						  	class_cons_vars))}
 	
 class expandSynTypes a :: !{# CommonDefs} !a !*ExpandTypeState -> (!a, !*ExpandTypeState)
 
@@ -2095,14 +2352,8 @@ instance expandSynTypes SymbolType
 where
 	expandSynTypes common_defs st=:{st_args,st_result,st_context} ets
 		# ((st_args,st_result), ets) = expandSynTypes common_defs (st_args,st_result) ets
-		# st_args = addTypesOfDictionaries common_defs st_context st_args
+		  st_args = addTypesOfDictionaries common_defs st_context st_args
 		= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
-
-add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
-	# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
-	  dict_type_symb = 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
-	= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
-			map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
 
 instance expandSynTypes Type
 where
@@ -2369,94 +2620,7 @@ app_EEI_ActiveCase transformer expr_info_ptr expr_heap
 			-> writePtr expr_info_ptr (EI_Extended (EEI_ActiveCase (transformer aci)) original_expr_info) expr_heap
 		_	-> expr_heap
 
-getTypeVars types
-	# (type_variables,_) = get_type_vars types ([],[])
-	= removeDuplicates smaller_type_vars type_variables
-
-removeDuplicates smaller l
-	// XXX speed this up by using heap
-	# sorted = quicksort smaller l
-	  partitions = partitionate sorted
-	= flatten [removeDup uneq partition \\ partition<-partitions]
-  where
-	partitionate []
-		= []
-	partitionate [h:t]
-		= partitions_with t [h]
-	partitions_with [] accu
-		= [accu]
-	partitions_with [h2:t] accu=:[h:_]
-		| h.tv_name.id_name==h2.tv_name.id_name
-			= partitions_with t [h2:accu]
-		= [accu:partitions_with t [h2]]
-	removeDup uneq [x:xs] = [x:removeDup uneq (filter (uneq x) xs)]
-	removeDup uneq _      = []
-	uneq {tv_info_ptr=p1} {tv_info_ptr=p2}
-		= p1<>p2
-		
-quicksort _ []
-	= []
-quicksort smaller [h:t]
-	# left = [ el \\ el<-t | smaller el h ]
-	  right = [ el \\ el<-t | not (smaller el h) ]
-	= (quicksort smaller left)++[h]++(quicksort smaller right)
-
-smaller_type_vars {tv_name={id_name=n1}} {tv_name={id_name=n2}}
-	= n1<n2
-
 undeff :== -1
-
-class get_type_vars a :: a !(![TypeVar], ![AttributeVar]) -> (![TypeVar], ![AttributeVar])
-
-instance get_type_vars Type
-  where
-	get_type_vars (TA _ args) accu
-		= get_type_vars args accu
-	get_type_vars (at1 --> at2) accu
-		= get_type_vars at2 (get_type_vars at1 accu)
-	get_type_vars (cv :@: at) accu
-		= get_type_vars cv (get_type_vars at accu)
-	get_type_vars (GTV t_var) (t_vars,a_vars)
-		= ([t_var:t_vars], a_vars)
-	get_type_vars (TV t_var) (t_vars,a_vars)
-		= ([t_var:t_vars], a_vars)
-	get_type_vars (TQV t_var) (t_vars,a_vars)
-		= ([t_var:t_vars], a_vars)
-	get_type_vars _ accu
-		= accu
-
-instance get_type_vars AType
-  where
-	get_type_vars {at_attribute, at_type} accu
-		= get_type_vars at_attribute (get_type_vars at_type accu)
-
-instance get_type_vars ConsVariable
-  where
-	get_type_vars (CV t_var) (t_vars,a_vars)
-		= ([t_var:t_vars], a_vars)
-
-instance get_type_vars TypeAttribute
-  where
-	get_type_vars (TA_Var a_var) (t_vars,a_vars)
-		= (t_vars, [a_var:a_vars])
-	get_type_vars (TA_RootVar a_var) (t_vars,a_vars)
-		= (t_vars, [a_var:a_vars])
-	get_type_vars (TA_List _ ta) accu
-		= get_type_vars ta accu
-	get_type_vars _ accu
-		= accu
-
-instance get_type_vars [a] | get_type_vars a
-  where
-	get_type_vars [] accu
-		= accu
-	get_type_vars [h:t] accu
-		= get_type_vars t (get_type_vars h accu)
-
-instance get_type_vars (a, b) | get_type_vars a & get_type_vars b
-  where
-	get_type_vars (a, b) accu
-		= get_type_vars a (get_type_vars b accu)
 
 
 /*
@@ -2474,9 +2638,20 @@ where
 	(<<<) file (PR_GeneratedFunction symbol index)
 		= file <<< "(G)" <<< symbol.symb_name <<< index
 	(<<<) file PR_Empty = file <<< 'E'
-	(<<<) file (PR_Class _ _ _) = file <<< "(Class)"
-	(<<<) file (PR_Curried {symb_name}) = file <<< "(Curried)" <<< symb_name
+	(<<<) file (PR_Class _ _ type) = file <<< "(Class(" <<< type <<< "))"
+	(<<<) file (PR_Curried {symb_name, symb_kind}) = file <<< "(Curried)" <<< symb_name <<< symb_kind
 	(<<<) file _ = file
+
+instance <<< SymbKind
+where
+	(<<<) file (SK_Function gi) = file <<< "(SK_Function)" <<< gi
+	(<<<) file (SK_LocalMacroFunction gi) = file <<< gi
+	(<<<) file (SK_OverloadedFunction gi) = file <<< "(SK_OverloadedFunction)" <<< gi
+	(<<<) file (SK_Constructor gi) = file <<< gi
+	(<<<) file (SK_Macro gi) = file <<< gi
+	(<<<) file (SK_GeneratedFunction _ gi) = file <<< "(SK_GeneratedFunction)" <<< gi
+	(<<<) file _ = file
+
 
 instance <<< FunCall
 where
@@ -2501,3 +2676,8 @@ instance <<< (Ptr a)
 where
 	(<<<) file p = file <<< ptrToInt p
 
+
+lowest_bit int :== int bitand 1 <> 0
+
+isYes (Yes _) = True
+isYes _ = False

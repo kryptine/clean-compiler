@@ -493,20 +493,12 @@ where
 instance substitute TypeAttribute
 where
 	substitute (TA_Var {av_name, av_info_ptr}) heaps=:{th_attrs}
-/* 
-	This alternative's code can be replaced with the original again, when the fusion algorithm becomes able to
-    infer correct type attributes
-*/
 		#! av_info = sreadPtr av_info_ptr th_attrs
 		= case av_info of
 			AVI_Attr attr
 				-> (attr, heaps)
 			_
 				-> (TA_Multi, heaps)
-/* Sjaak ...				-> SwitchFusion
-						(TA_Multi, heaps)
-						(abort "compiler bug nr 7689 in module typesupport")
-... Sjaak */
 	substitute TA_None heaps
 		= (TA_Multi, heaps)
 	substitute attr heaps
@@ -540,7 +532,7 @@ substituteTypeVariable tv=:{tv_name,tv_info_ptr} heaps=:{th_vars}
 	  heaps = { heaps & th_vars = th_vars }
 	= case tv_info of
 		TVI_Type type
-			-> (type, heaps)
+				-> (type, heaps)
 		_
 			-> (TV tv, heaps)
 
@@ -548,16 +540,28 @@ instance substitute Type
 where
 	substitute (TV tv) heaps
 		= substituteTypeVariable tv heaps
-	substitute (arg_type --> res_type)  heaps
+	substitute (arg_type --> res_type) heaps
 		# ((arg_type, res_type), heaps) = substitute (arg_type, res_type) heaps
 		= (arg_type --> res_type, heaps)
-	substitute (TA cons_id cons_args)  heaps
+	substitute (TA cons_id cons_args) heaps
 		# (cons_args, heaps) = substitute cons_args heaps
 		= (TA cons_id cons_args,  heaps)
-	substitute (CV type_var :@: types)  heaps
+/* MW3 was
+	substitute (CV type_var :@: types) heaps
 		# (type, heaps) = substituteTypeVariable type_var heaps
 		  (types, heaps) = substitute types heaps
 		= (simplifyTypeApplication type types, heaps)
+*/
+	substitute (CV type_var :@: types) heaps=:{th_vars}
+		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
+		  heaps = { heaps & th_vars = th_vars }
+		  (types, heaps) = substitute types heaps
+		= case tv_info of
+			TVI_Type tv=:(TempV i)
+				-> (TempCV i :@: types, heaps)
+			_
+				# (type, heaps) = substituteTypeVariable type_var heaps
+				-> (simplifyTypeApplication type types, heaps)
 	substitute type heaps
 		= (type, heaps)
 
@@ -605,6 +609,7 @@ NewVarId var_store
 AttrVarIdTable :: {# String}
 AttrVarIdTable =: { "u", "v", "w", "x", "y", "z" }
 
+NewAttrVarId :: !Int -> Ident
 NewAttrVarId attr_var_store
 	| attr_var_store < size AttrVarIdTable
  		= newIdent AttrVarIdTable.[attr_var_store]
@@ -1295,41 +1300,34 @@ beautifulizeAttributes symbol_type th_attrs
 assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
 assignNumbersToAttrVars {st_attr_vars, st_args, st_result, st_attr_env} th_attrs
 	# th_attrs
-			= foldSt initialise_to_AVI_Empty st_attr_vars th_attrs
-	  (next_number, numbered_vars_accu, th_attrs)
-	  		= foldSt assign_numbers_attr_ineq st_attr_env
-				(assign_numbers_atype st_result
-					(foldSt assign_numbers_atype st_args (0, [], th_attrs)))
-	= (next_number, reverse numbered_vars_accu, th_attrs)
+			= foldSt initializeToAVI_Empty st_attr_vars th_attrs
+	  (nr_of_attr_vars, attr_vars, th_attrs)
+	  		= performOnAttrVars assign_number_to_unencountered_attr_var (st_args, st_result)
+	  				(0, [], th_attrs)
+	| fst (foldSt hasnt_got_a_number st_attr_env (False, th_attrs))
+		= abort "sanity check nr 834 in module typesupport failed"
+ 	= (nr_of_attr_vars, attr_vars, th_attrs)
   where
-	assign_numbers_atype atype=:{at_attribute=TA_Var av=:{av_info_ptr}, at_type}
-						(next_number, numbered_vars_accu, th_attrs)
+	assign_number_to_unencountered_attr_var av=:{av_info_ptr} (next_number, attr_vars_accu, th_attrs)
 		# (avi, th_attrs) = readPtr av_info_ptr th_attrs
-		= assign_numbers_type at_type
-			(assign_number avi av (next_number, numbered_vars_accu, th_attrs))
-	assign_numbers_atype atype=:{at_type} assign_state
-		= assign_numbers_type at_type assign_state
-
-	assign_numbers_type (TA _ args) assign_state
-		= foldSt assign_numbers_atype args assign_state
-	assign_numbers_type (l --> r) assign_state
-		= assign_numbers_atype l (assign_numbers_atype r assign_state)
-	assign_numbers_type (_ :@: args) assign_state
-		= foldSt assign_numbers_atype args assign_state
-	assign_numbers_type _ assign_state
-		= assign_state
-
-	assign_numbers_attr_ineq {ai_offered, ai_demanded} (next_number, numbered_vars_accu, th_attrs)
-		# (avi_offered, th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
-		  (avi_demanded, th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
-		= assign_number avi_offered ai_offered
-			(assign_number avi_demanded ai_demanded (next_number, numbered_vars_accu, th_attrs))
+		= case avi of
+			AVI_Empty
+				-> (next_number+1, [av:attr_vars_accu],
+					writePtr av_info_ptr (AVI_Attr (TA_TempVar next_number)) th_attrs)
+			_
+				-> (next_number, attr_vars_accu, th_attrs)
 	
-	assign_number AVI_Empty av=:{av_info_ptr} (next_number, numbered_vars_accu, th_attrs)
-		= (next_number+1, [av:numbered_vars_accu],
-			writePtr av_info_ptr (AVI_Attr (TA_TempVar next_number)) th_attrs)
-	assign_number _ _ assign_state
-		= assign_state
+	hasnt_got_a_number {ai_offered, ai_demanded} (or_of_all, th_attrs)
+		# hnn1 = has_no_number ai_offered th_attrs
+		  hnn2 = has_no_number ai_demanded th_attrs
+		= (hnn1 || hnn2 || or_of_all, th_attrs)
+		
+	has_no_number {av_info_ptr} th_attrs
+		= case sreadPtr av_info_ptr th_attrs of
+			AVI_Empty
+				-> True
+			_
+				-> False
 
 //accCoercionTree :: !.(u:CoercionTree -> (.a,u:CoercionTree)) !Int !*{!u:CoercionTree} -> (!.a,!{!u:CoercionTree})
 accCoercionTree f i coercion_trees
@@ -1351,12 +1349,12 @@ flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
 flattenCoercionTree tree
 	= flatten_ct ([], tree)
   where
-	flatten_ct (accu, CT_Empty)
-		= (accu, CT_Empty)
 	flatten_ct (accu, CT_Node i left right)
 		# (accu, right) = flatten_ct (accu, right)
 		  (accu, left) = flatten_ct ([i:accu], left)
 		= (accu, CT_Node i left right)
+	flatten_ct (accu, _)
+		= (accu, CT_Empty)
 
 anonymizeAttrVars :: !SymbolType ![AttrInequality] !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_inequalities th_attrs
@@ -1446,32 +1444,28 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 			_
 				-> th_attrs
 				
-initialise_to_AVI_Empty {av_info_ptr} th_attrs
-	= writePtr av_info_ptr AVI_Empty th_attrs
-
 removeInequality :: !Int !Int !*Coercions -> .Coercions
 removeInequality offered demanded attr_env_coercions=:{coer_offered, coer_demanded}
 	# coer_offered = appCoercionTree (removeNode offered) demanded coer_offered
 	  coer_demanded = appCoercionTree (removeNode demanded) offered coer_demanded
 	= { attr_env_coercions & coer_demanded = coer_demanded, coer_offered = coer_offered }
-  where
-	removeNode :: !Int !*CoercionTree -> !.CoercionTree
-	removeNode i1 (CT_Node i2 left right)
-		| i1<i2
-			= CT_Node i2 (removeNode i1 left) right
-		| i1>i2
-			= CT_Node i2 left (removeNode i1 right)
-		= rightInsert left right
-	removeNode i1 CT_Empty
-		= CT_Empty
 
+removeNode :: !Int !*CoercionTree -> !.CoercionTree
+removeNode i1 (CT_Node i2 left right)
+	| i1<i2
+		= CT_Node i2 (removeNode i1 left) right
+	| i1>i2
+		= CT_Node i2 left (removeNode i1 right)
+	= rightInsert left right
+  where
 	rightInsert :: !*CoercionTree !*CoercionTree -> !.CoercionTree
 	rightInsert CT_Empty right
 		= right
 	rightInsert (CT_Node i left right2) right1
 		= CT_Node i left (rightInsert right2 right1)
+removeNode i1 CT_Empty
+	= CT_Empty
 
-			
 emptyCoercions :: !Int -> .Coercions
 emptyCoercions nr_of_attr_vars
 		= { coer_demanded = create_a_unique_array nr_of_attr_vars,
@@ -1523,3 +1517,152 @@ searchlArrElt p s i
 			= i
 		= searchl s (i+1)
 // ..MW4
+
+removeUnusedAttrVars :: !{!CoercionTree} ![Int] -> Coercions
+removeUnusedAttrVars demanded unused_attr_vars
+	# nr_of_attr_vars
+			= size demanded
+	  coercions
+			= emptyCoercions nr_of_attr_vars
+	  coercions
+	  		= iFoldSt (add_inequalities demanded) 0 nr_of_attr_vars coercions
+	= foldSt redirect_inequalities_that_contain_unused_attr_var unused_attr_vars coercions
+	  
+  where
+	add_inequalities :: !{!CoercionTree} !Int !*Coercions -> *Coercions
+	add_inequalities demanded i coercions	
+		= foldSt (\demanded coercions -> newInequality i demanded coercions)
+				(fst (flattenCoercionTree demanded.[i])) coercions
+	redirect_inequalities_that_contain_unused_attr_var :: !Int !*Coercions -> *Coercions
+	redirect_inequalities_that_contain_unused_attr_var unused_attr_var 
+				coercions=:{coer_offered, coer_demanded}
+		# (offered_attr_vars, coer_offered)
+				= accCoercionTree flattenCoercionTree unused_attr_var coer_offered
+		  (demanded_attr_vars, coer_demanded)
+				= accCoercionTree flattenCoercionTree unused_attr_var coer_demanded
+		  coer_offered = { coer_offered & [unused_attr_var] = CT_Empty }
+		  coer_offered = foldSt (appCoercionTree (removeNode unused_attr_var)) demanded_attr_vars coer_offered
+		  coer_demanded = { coer_demanded & [unused_attr_var] = CT_Empty }
+		  coer_demanded = foldSt (appCoercionTree (removeNode unused_attr_var)) offered_attr_vars coer_demanded
+		= foldSt (\(offered, demanded) coercions -> newInequality offered demanded coercions)
+				[(offered, demanded) \\ offered<-offered_attr_vars, demanded<-demanded_attr_vars]
+				{ coercions & coer_offered = coer_offered, coer_demanded = coer_demanded }
+	
+getTypeVars :: !a !*TypeVarHeap -> (!.[TypeVar],!.TypeVarHeap) | performOnTypeVars a
+getTypeVars type th_vars
+	# th_vars
+			= performOnTypeVars initializeToTVI_Empty type th_vars
+	= performOnTypeVars accum_unencountered_type_var type ([], th_vars)
+  where
+	accum_unencountered_type_var _ tv=:{tv_info_ptr} (type_var_accu, th_vars)
+		# (tvi, th_vars) = readPtr tv_info_ptr th_vars
+		= case tvi of
+			TVI_Empty
+				-> ([tv:type_var_accu], writePtr tv_info_ptr TVI_Used th_vars)
+			TVI_Used
+				-> (type_var_accu, th_vars)
+
+getAttrVars :: !a !*AttrVarHeap -> (!.[AttributeVar],!.AttrVarHeap) | performOnAttrVars a
+getAttrVars type th_attrs
+	# th_attrs
+			= performOnAttrVars initializeToAVI_Empty type th_attrs
+	= performOnAttrVars accum_unencountered_attr_var type ([], th_attrs)
+  where
+	accum_unencountered_attr_var av=:{av_info_ptr} (attr_var_accu, th_attrs)
+		# (avi, th_attrs) = readPtr av_info_ptr th_attrs
+		= case avi of
+			AVI_Empty
+				-> ([av:attr_var_accu], writePtr av_info_ptr AVI_Used th_attrs)
+			AVI_Used
+				-> (attr_var_accu, th_attrs)
+
+class performOnTypeVars a :: !(TypeAttribute TypeVar .st -> .st) !a !.st -> .st
+// run through a type and do something on each type variable
+
+instance performOnTypeVars Type
+  where
+	performOnTypeVars f (TA _ args) st
+		= performOnTypeVars f args st
+	performOnTypeVars f (at1 --> at2) st
+		= performOnTypeVars f at2 (performOnTypeVars f at1 st)
+	performOnTypeVars f (cv :@: at) st
+		= performOnTypeVars f cv (performOnTypeVars f at st)
+	performOnTypeVars f _ st
+		= st
+
+instance performOnTypeVars AType
+  where
+	performOnTypeVars f {at_attribute, at_type=TV type_var} st
+		= f at_attribute type_var st
+	performOnTypeVars f {at_attribute, at_type=GTV type_var} st
+		= f at_attribute type_var st
+	performOnTypeVars f {at_attribute, at_type=TQV type_var} st
+		= f at_attribute type_var st
+	performOnTypeVars f {at_attribute, at_type} st
+		= performOnTypeVars f at_type st
+
+instance performOnTypeVars ConsVariable
+  where
+	performOnTypeVars f (CV type_var) st
+		= f TA_Multi type_var st
+
+instance performOnTypeVars [a] | performOnTypeVars a
+  where
+	performOnTypeVars f [] st
+		= st
+	performOnTypeVars f [h:t] st
+		= performOnTypeVars f t (performOnTypeVars f h st)
+
+instance performOnTypeVars (a, b) | performOnTypeVars a & performOnTypeVars b
+  where
+	performOnTypeVars f (a, b) st
+		= performOnTypeVars f b (performOnTypeVars f a st)
+
+class performOnAttrVars a :: !(AttributeVar .st -> .st) !a !.st -> .st
+// run through a type and do something on each attribute variable
+
+instance performOnAttrVars Type
+  where
+	performOnAttrVars f (TA _ args) st
+		= performOnAttrVars f args st
+	performOnAttrVars f (at1 --> at2) st
+		= performOnAttrVars f at2 (performOnAttrVars f at1 st)
+	performOnAttrVars f (_ :@: at) st
+		= performOnAttrVars f at st
+	performOnAttrVars f _ st
+		= st
+
+instance performOnAttrVars AType
+  where
+	performOnAttrVars f {at_attribute=TA_Var attr_var, at_type} st
+		= performOnAttrVars f at_type (f attr_var st)
+	performOnAttrVars f {at_attribute=TA_RootVar attr_var, at_type} st
+		= performOnAttrVars f at_type (f attr_var st)
+	performOnAttrVars f {at_type} st
+		= performOnAttrVars f at_type st
+
+instance performOnAttrVars [a] | performOnAttrVars a
+  where
+	performOnAttrVars f [] st
+		= st
+	performOnAttrVars f [h:t] st
+		= performOnAttrVars f t (performOnAttrVars f h st)
+
+instance performOnAttrVars (a, b) | performOnAttrVars a & performOnAttrVars b
+  where
+	performOnAttrVars f (a, b) st
+		= performOnAttrVars f b (performOnAttrVars f a st)
+
+
+initializeToTVI_Empty :: a !TypeVar !*TypeVarHeap -> .TypeVarHeap
+initializeToTVI_Empty _ {tv_info_ptr} th_vars
+	= writePtr tv_info_ptr TVI_Empty th_vars
+
+initializeToAVI_Empty :: !AttributeVar !*AttrVarHeap -> .AttrVarHeap
+initializeToAVI_Empty {av_info_ptr} th_attrs
+	= writePtr av_info_ptr AVI_Empty th_attrs
+
+appTypeVarHeap f type_heaps :== let th_vars = f type_heaps.th_vars in { type_heaps & th_vars = th_vars }
+accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, { type_heaps & th_vars = th_vars })
+accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r, { type_heaps & th_attrs = th_attrs })
+	
