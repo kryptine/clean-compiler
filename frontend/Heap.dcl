@@ -1,6 +1,6 @@
 definition module Heap
 
-import StdEnv
+import StdClass
 
 :: Heap v = {heap::!.HeapN v}
 :: HeapN v
@@ -33,4 +33,3 @@ where
 	(ptr, val) = ptr_and_val
 
 instance == (Ptr a)
-
