@@ -4,6 +4,7 @@
 implementation module coclmain
 
 import StdEnv
+import StdDebug
 import ArgEnv
 import set_return_code
 
@@ -12,12 +13,14 @@ import compile
 coclMain :: ![{#Char}] !*World -> *World
 // currentVersion latestDefVersion latestImpVersion testArgs world
 coclMain  testArgs world
+	# world
+		=	set_return_code 0 world
 	# (commandArgs, world)
 		=	getCommandArgs (tl [arg \\ arg <-: getCommandLine]) testArgs world 
 	# (symbol_table,world)
 		= init_identifiers newHeap world
 	# (success, world)
-		=	accFiles (compiler commandArgs symbol_table) world
+		=	accFiles (compiler symbol_table) world
 	=	set_return_code (if success 0(-1)) world
 	where
 		getCommandArgs :: [{#Char}] [{#Char}] *World -> ([{#Char}], *World)
@@ -75,19 +78,40 @@ coclMain  testArgs world
 
 CoclArgsFile :== "coclargs.txt"
 
+/*
 import thread_message;
 
 import code from "thread_message.obj";
+*/
 
-compiler :: ![{#Char}] *SymbolTable *Files -> *(!Bool,!*Files);
-compiler commandArgs symbol_table files
+// compiler driver
+
+/* Windows
+compiler symbol_table files
 	# dcl_cache = empty_cache symbol_table
 	| length commandArgs==2 && commandArgs!!0=="-ide"
 		# wm_number=get_message_number;
 		# thread_id=hex_to_int (commandArgs!!1);
-		= (True,compile_files dcl_cache thread_id wm_number files)
-		# (r,cache,files)=compile commandArgs dcl_cache files
+		= (True,compile_files compile dcl_cache thread_id wm_number files)
+		# (r,dcl_cache,files)=compile commandArgs dcl_cache files
 		= (r,files)
+	where
+		commandArgs
+			=	tl [arg \\ arg <-: getCommandLine]
+*/
+// Unix
+compiler symbol_table files
+	# dcl_cache = empty_cache symbol_table
+	| length commandArgs==3 && commandArgs!!0=="--pipe"
+		# commands_name= (commandArgs!!1);
+		# results_name= (commandArgs!!2);
+		= (True,compile_loop compile dcl_cache commands_name results_name files)
+		# (r,dcl_cache,files)=compile commandArgs dcl_cache files
+		= (r,files)
+	where
+		commandArgs
+			=	tl [arg \\ arg <-: getCommandLine]
+// ... Unix
 
 hex_to_int :: {#Char} -> Int
 hex_to_int s
@@ -150,24 +174,35 @@ string_to_args string
 				= i;
 				= skip_to_double_quote (i+1);
 
-compile_files cache thread_id wm_number files
-	# (r,a,s) =get_integers_from_message wm_number;
-	| r==0
+// Unix
+import ipc
+import code from "ipc.o"
+
+compile_loop compile cache commands results files
+	# r=open_pipes commands results;
+	| r<>0
+		= abort ("compile_loop\n");
+	=	compile_files compile cache files
+	
+
+compile_files compile cache files
+	# n = get_command_length;
+	| n==(-1)
 		= abort "compile_files 1";
-	# string=createArray a '\0';
-	# r=get_string_from_file_map_and_delete_map s string;
-	| r==0
+	# string=createArray n '\0';
+	# r=get_command string;
+	| r<>0
 		= abort ("compile_files 2 ");
 	# args=string_to_args (string % (0,size string-2))
 	= case args of
 		["cocl":cocl_args]
 			# (ok,cache,files)=compile cocl_args cache files
 			# result=if ok 0(-1);
-			# r=send_integers_to_thread thread_id wm_number 0 result;
-			| r==0
+			# r=send_result result
+			| r<>0
 				-> abort "compile_files 3";
-				-> compile_files cache thread_id wm_number files
-		["exit"]
-			-> files;
+				-> compile_files compile cache files
+		["quit"]
+			-> trace_n "quiting" files;
 		_
 				-> abort "compile_files 4"

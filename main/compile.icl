@@ -16,6 +16,7 @@ from type_io import openTclFile, closeTclFile, baseName, directoryName, splitBy
 ::	CoclOptions =
 	{	moduleName:: {#Char}
 	,	pathName ::{#Char}
+	,	outputPathName ::{#Char}
 	,	errorPath:: {#Char}
 	,	errorMode::	Int
 	,	outPath:: {#Char}
@@ -28,12 +29,16 @@ from type_io import openTclFile, closeTclFile, baseName, directoryName, splitBy
 	,	compile_with_generics   :: !Bool
 	}
 
+StdErrPathName :== "_stderr_"
+StdOutPathName :== "_stderr_"
+
 InitialCoclOptions =
 	{	moduleName=	""
 	,	pathName=	""
-	,	errorPath=	"errors"
+	,	outputPathName=	""
+	,	errorPath=	StdErrPathName
 	,	errorMode=	FWriteText
-	,	outPath=	"out"
+	,	outPath=	StdErrPathName
 	,	outMode=	FWriteText
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
@@ -68,6 +73,8 @@ compile args cache files
 parseCommandLine :: [{#Char}] CoclOptions -> ([{#Char}],[{#Char}],CoclOptions)
 parseCommandLine [] options
 	=	([],[],options)
+parseCommandLine [arg1=:"-o", outputPathName : args] options=:{searchPaths}
+        =       parseCommandLine args {options & outputPathName = outputPathName}
 parseCommandLine [arg1=:"-P", searchPathsString : args] options=:{searchPaths}
 // RWS, voor Maarten +++	=	parseCommandLine args {options & searchPaths = {searchPaths & sp_paths = splitPaths searchPathsString}}
 	# (args,modules,options) =	parseCommandLine args {options & searchPaths.sp_paths = splitPaths searchPathsString}
@@ -158,14 +165,25 @@ compile_modules [module_:modules] n_compiles cocl_options args_without_modules c
 compile_modules [] n_compiles cocl_options args_without_modules cache files
 	= (True,cache,files);
 
+openPath :: {#Char} Int *Files -> (Bool, *File, *Files)
+openPath path mode files
+	| path == StdErrPathName
+		=	(True, stderr, files)
+	| path == StdOutPathName
+		# (io, files)
+			=	stdio files
+		=	(True, io, files)
+	// otherwise
+		=	fopen path mode files
+
 compileModule :: CoclOptions [{#Char}] *DclCache *Files -> (!Bool,!*DclCache,!*Files)
 compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files
 	# (opened, error, files)
-		=	fopen options.errorPath options.errorMode files
+		=	openPath options.errorPath options.errorMode files
 	| not opened
 		=	abort ("couldn't open error file \"" +++ options.errorPath +++ "\"\n")
 	# (opened, out, files)
-		=	fopen options.outPath options.outMode files
+		=	openPath options.outPath options.outMode files
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (tcl_file, files)
@@ -210,8 +228,9 @@ compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbo
 				  							 <<< options.moduleName <<< '\n')
 				  			error
 				# (success, var_heap, attrHeap, error, files)
-					= backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
+				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
 				-> (success,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
+				// -> (True,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
 				with
 					appendRedirection arg
 						= case arg of
@@ -224,6 +243,12 @@ compileModule options backendArgs {dcl_modules,functions_and_macros,predef_symbo
 			No
 				-> (False,{},0,var_heap,attrHeap,error, files)
 		with
+/*
+			outputPath
+				=	if (options.outputPathName == "")
+						(directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ baseName options.pathName)
+						options.outputPathName
+*/
 			outputPath
 	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
 				=	baseName options.pathName

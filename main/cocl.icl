@@ -8,10 +8,14 @@ import StdEnv
 import coclmain
 
 import frontend
+import StdDebug
 
 // Start :: *World -> *World
 Start world
-	=	(testArgs, coclMain testArgs world)
+	# world = trace_n "hello from cocl!\n" world
+	# world
+		=	coclMain testArgs world
+	= trace_n "bye from cocl!\n" world
 	where
 		testArgs
 			=	[
