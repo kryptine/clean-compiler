@@ -87,6 +87,8 @@ cConversionTableSize	:== 10
 	,	copied_generic_defs :: {#Bool}
 	}
 	
+::	FunDefIndex:==Int
+
 ::	IclModule  =
 	{	icl_name				:: !Ident
 	,	icl_functions			:: !.{# FunDef }
@@ -97,11 +99,10 @@ cConversionTableSize	:== 10
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
+	,	icl_foreign_exports		:: ![FunDefIndex]
 	,	icl_used_module_numbers :: !NumberSet
 	,	icl_copied_from_dcl 	:: !CopiedDefinitions
-// RWS ...
 	,	icl_modification_time	:: !{#Char}
-// ... RWS
 	}
 
 ::	DclModule =

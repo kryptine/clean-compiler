@@ -382,7 +382,7 @@ backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
 backEndConvertModulesH predefs {fe_icl = 
-	fe_icl =: {icl_name, icl_functions, icl_common,icl_global_functions,icl_imported_objects,icl_used_module_numbers, icl_modification_time},
+	fe_icl =: {icl_name, icl_functions, icl_common,icl_global_functions,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers, icl_modification_time},
 	fe_components, fe_dcls, fe_arrayInstances}
 	main_dcl_module_n backEnd
 	// sanity check ...
@@ -463,6 +463,7 @@ backEndConvertModulesH predefs {fe_icl =
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | not imported.io_is_library])
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | imported.io_is_library])
 				(backEnd -*-> "beDefineImportedObjsAndLibs")
+	#! backEnd = appBackEnd (convertForeignExports icl_foreign_exports main_dcl_module_n) backEnd
 	#! backEnd
 		=	markExports fe_dcls.[main_dcl_module_n] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs (backEnd -*-> "markExports")
 			with
@@ -2053,6 +2054,14 @@ getVariableSequenceNumber varInfoPtr be
 			-> (sequenceNumber,be)
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
+
+convertForeignExports :: [Int] Int BackEnd -> BackEnd
+convertForeignExports [functionIndex:icl_foreign_exports] main_dcl_module_n backEnd
+	# backEnd = convertForeignExports icl_foreign_exports main_dcl_module_n backEnd
+	# (function_symbol_p,backEnd) = BEFunctionSymbol functionIndex main_dcl_module_n backEnd
+	= BEInsertForeignExport function_symbol_p backEnd
+convertForeignExports [] main_dcl_module_n backEnd
+	= backEnd
 
 foldStateWithIndex function n
 	:== foldStateWithIndexTwice 0

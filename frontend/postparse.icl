@@ -1050,7 +1050,7 @@ where
 			= try_to_find mod_id pmods
 
 MakeEmptyModule name mod_type
-	:== { mod_ident = name, mod_modification_time = "", mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs =
+	:== { mod_ident = name, mod_modification_time = "", mod_type = mod_type, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs =
 				{	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macro_indices={ir_from=0,ir_to=0},
 					def_macros=[],def_members = [], def_funtypes = [], def_instances = [], 
 					def_generics = [], def_generic_cases = []} }
@@ -1067,7 +1067,7 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 where
 	scan_dcl_module :: ParsedModule [ScannedModule] !SearchPaths (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
 	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
-		# (_, defs, imports, imported_objects, ca)
+		# (_, defs, imports, imported_objects,foreign_exports,ca)
 			= reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
 	  	  (def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=0,ca_rev_fun_defs=[]}
 		  (range, ca) = addFunctionsRange def_macros ca
@@ -1089,7 +1089,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 			,	ca_rev_fun_defs	= []
 			,	ca_hash_table	= hash_table
 			}
-	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes support_dynamics True pdefs ca
+	  (fun_defs, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes support_dynamics True pdefs ca
 
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
@@ -1122,7 +1122,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  (def_generic_cases, ca) = collectFunctions defs.def_generic_cases True ca  
 
 	  {	ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table } = ca
-	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, 
+	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_foreign_exports = foreign_exports,
 	  				mod_defs = { defs & def_instances = def_instances,
 	  								def_generic_cases = def_generic_cases,
 	  								def_macro_indices = macro_range }}
@@ -1156,7 +1156,7 @@ where
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
-			# (_, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
+			# (_, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_ident:cached_modules]
 			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
@@ -1241,16 +1241,16 @@ where
 		# (strictness_index,strictness,strictness_list) = add_next_not_strict strictness_index strictness strictness_list
 		= add_strictness_for_arguments fields strictness_index strictness strictness_list
 
-reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject], !*CollectAdmin)
+reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject],![IdentPos],!*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count type_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies] fun_kind prio No pos
 	| fun_kind == FK_Macro
-		= (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros ]}, imports, imported_objects, ca)
-		= ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
+		= (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros ]}, imports, imported_objects,foreign_exports, ca)
+		= ([ fun : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials : defs] cons_count sel_count mem_count type_count ca
 	= case defs of
 		[PD_Function pos name is_infix args rhs fun_kind : defs]
@@ -1261,35 +1261,35 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
 			//	| belongsToTypeSpec fun_name prio name is_infix
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-	  			  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	  			  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 				  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No fun_pos
 				| fun_kind == FK_Macro
-					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects, ca)
-					-> ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
+					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects,foreign_exports, ca)
+					-> ([ fun : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
 			//	-> reorganiseDefinitions icl_module defs cons_count sel_count mem_count (postParseError fun_pos "function body expected (1)" ca)
 		_
 			-> reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count (postParseError fun_pos "function alternative expected (2)" ca)
 reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_arity}) specials : defs] cons_count sel_count mem_count type_count ca
 	# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
-	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	| isEmpty bodies
 		# fun_type = MakeNewFunctionType name st_arity prio fun_type pos specials nilPtr
 		  c_defs = { c_defs & def_funtypes = [ fun_type : c_defs.def_funtypes ]}
 		| icl_module
-			= (fun_defs, c_defs, imports, imported_objects, postParseError pos "function body expected" ca)
-			= (fun_defs, c_defs, imports, imported_objects, ca)
+			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, postParseError pos "function body expected" ca)
+			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 		# fun = MakeNewImpOrDefFunction name fun_type.st_arity bodies fun_kind prio (Yes fun_type) pos
 		| icl_module
 			| case fun_kind of FK_Macro -> True; _ -> False
-				= ([fun : fun_defs], c_defs, imports, imported_objects, postParseError pos "macro with function type not allowed" ca)		  
-				= ([fun : fun_defs], c_defs, imports, imported_objects, ca)		  
-			= ([fun : fun_defs], c_defs, imports, imported_objects, postParseError pos "function body not allowed in definition module" ca)
+				= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseError pos "macro with function type not allowed" ca)		  
+				= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, ca)		  
+			= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseError pos "function body not allowed in definition module" ca)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs} : defs] cons_count sel_count mem_count type_count ca
 	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
-	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = AlgType 	cons_symbs }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors }
-	= (fun_defs, c_defs, imports, imported_objects, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 where
 	determine_symbols_of_conses :: [ParsedConstructor] Index -> ([DefinedSymbol], Index)
 	determine_symbols_of_conses [{pc_cons_ident,pc_cons_arity} : conses] next_cons_index
@@ -1300,7 +1300,7 @@ where
 		= ([], next_cons_index)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_ident, td_rhs = SelectorList rec_cons_id exivars is_boxed_record sel_defs, td_pos } : defs] cons_count sel_count mem_count type_count ca
 	# (sel_syms, new_count) = determine_symbols_of_selectors sel_defs sel_count
-	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs (inc cons_count) new_count mem_count (type_count+1) ca
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs (inc cons_count) new_count mem_count (type_count+1) ca
 	  cons_arity = new_count - sel_count
 	  pc_arg_types = [ ps_field_type \\ {ps_field_type} <- sel_defs ]
 	  cons_def = {	pc_cons_ident = rec_cons_id, pc_cons_prio = NoPrio, pc_cons_arity = cons_arity, pc_cons_pos = td_pos,
@@ -1309,7 +1309,7 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_ident, td_rhs = Selector
 	  							rt_fields =  { sel \\ sel <- sel_syms }, rt_is_boxed_record = is_boxed_record}}
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors],
 	  				def_selectors = mapAppend (ParsedSelectorToSelectorDef type_count) sel_defs c_defs.def_selectors }
-	= (fun_defs, c_defs, imports, imported_objects, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 where
 	determine_symbols_of_selectors :: [ParsedSelector] Index -> ([FieldSymbol], Index)
 	determine_symbols_of_selectors [{ps_field_ident,ps_field_var} : sels] next_selector_index
@@ -1319,30 +1319,30 @@ where
 	determine_symbols_of_selectors [] next_selector_index
 		= ([], next_selector_index)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = TypeSpec type} : defs] cons_count sel_count mem_count type_count ca
-	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = SynType type }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
-	= (fun_defs, c_defs, imports, imported_objects, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = EmptyRhs properties} : defs] cons_count sel_count mem_count type_count ca
-	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = AbstractType properties }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
-	= (fun_defs, c_defs, imports, imported_objects, ca)
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = AbstractTypeSpec properties type} : defs] cons_count sel_count mem_count type_count ca
-	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = AbstractSynType properties type }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
-	= (fun_defs, c_defs, imports, imported_objects, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] cons_count sel_count mem_count type_count ca
 	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
 					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}
 	  (mem_defs, mem_macros, ca) = check_symbols_of_class_members members type_context ca
 	  (mem_symbs, mem_defs, class_size) = reorganise_member_defs mem_defs mem_count
-	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs  cons_count sel_count (mem_count + class_size) type_count ca
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs  cons_count sel_count (mem_count + class_size) type_count ca
 	  class_def = { class_def & class_members = { member \\ member <- mem_symbs }}
 	  c_defs = { c_defs & def_classes = [class_def : c_defs.def_classes], def_macros = mem_macros ++ c_defs.def_macros,
 	  			 def_members = mem_defs ++ c_defs.def_members }
-	= (fun_defs, c_defs, imports, imported_objects, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 where
 	check_symbols_of_class_members :: ![ParsedDefinition] !TypeContext !*CollectAdmin -> (![MemberDef], ![FunDef], !*CollectAdmin)
 	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context ca
@@ -1393,11 +1393,11 @@ where
 		= ([], [], last_mem_offset)
 
 reorganiseDefinitions icl_module [PD_Instance class_instance=:{pi_members,pi_pos} : defs] cons_count sel_count mem_count type_count ca
-	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	  (mem_defs, ca) = collect_member_instances pi_members ca
 	| icl_module || isEmpty mem_defs
-		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = mem_defs} : c_defs.def_instances] }, imports, imported_objects, ca)
-		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = []} : c_defs.def_instances] }, imports, imported_objects,
+		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = mem_defs} : c_defs.def_instances] }, imports, imported_objects,foreign_exports, ca)
+		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = []} : c_defs.def_instances] }, imports, imported_objects,foreign_exports,
 			postParseError pi_pos "instance specifications of members not allowed" ca)
 where	  
 	collect_member_instances :: [ParsedDefinition] *CollectAdmin -> ([FunDef], *CollectAdmin)
@@ -1425,12 +1425,12 @@ reorganiseDefinitions icl_module [PD_Instances class_instances : defs] cons_coun
 	= reorganiseDefinitions icl_module ([PD_Instance class_instance \\ class_instance <- class_instances] ++ defs) cons_count sel_count mem_count type_count ca
 // AA ..
 reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count mem_count type_count ca
-	# 	(fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	# 	(fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
-	= (fun_defs, c_defs, imports, imported_objects, ca)
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count mem_count type_count ca
 	#! (bodies, defs, ca) = collectGenericBodies gc defs ca  
-	#! (fun_defs, c_defs, imports, imported_objects, ca) 
+	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 		= reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	# (GCB_ParsedBody args rhs) = gc.gc_body
 	# body = 
@@ -1443,26 +1443,29 @@ reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count
 	#! fun = MakeNewImpOrDefFunction fun_name gc.gc_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
 	#! inst = { gc & gc_body = GCB_FunDef fun } 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
-	= (fun_defs, c_defs, imports, imported_objects, ca)
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca
-	#! (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	#! c_defs = { c_defs & def_generic_cases = derive_defs ++ c_defs.def_generic_cases}
-	= (fun_defs, c_defs, imports, imported_objects, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 // .. AA
 	
 reorganiseDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_count mem_count type_count ca
-	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
-	= (fun_defs, c_defs, new_imports ++ imports, imported_objects, ca)
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	= (fun_defs, c_defs, new_imports ++ imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_ImportedObjects new_imported_objects : defs] cons_count sel_count mem_count type_count ca
-	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
-	= (fun_defs, c_defs, imports, new_imported_objects ++ imported_objects, ca)
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	= (fun_defs, c_defs, imports, new_imported_objects ++ imported_objects,foreign_exports, ca)
+reorganiseDefinitions icl_module [PD_ForeignExport new_foreign_export file_name line_n : defs] cons_count sel_count mem_count type_count ca
+	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	= (fun_defs, c_defs, imports, imported_objects,[{ip_ident=new_foreign_export,ip_file=file_name,ip_line=line_n}:foreign_exports], ca)
 reorganiseDefinitions icl_module [def:defs] _ _ _ _ ca
 	= abort ("reorganiseDefinitions does not match" ---> def)
 reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [],def_macro_indices={ir_from=0,ir_to=0},def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [], 
-			def_generics = [], def_generic_cases = []}, [], [], ca)
+			def_generics = [], def_generic_cases = []}, [], [], [], ca)
 
 reorganiseDefinitionsAndAddTypes support_dynamics icl_module defs ca
 	| support_dynamics

@@ -292,7 +292,7 @@ wantModule iclmodule file_id=:{id_name} import_file_position support_generics ha
 			# hash_table=set_hte_mark 0 hash_table
 			->(ok,mod,hash_table,file,files)
 		(No, files)
-			-> let mod = { mod_ident = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [], mod_defs = [] } in
+			-> let mod = { mod_ident = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs = [] } in
 			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
 where
 	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
@@ -317,7 +317,7 @@ where
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
 						[PD_Import imports \\ PD_Import imports <- defs]
 						defs
-			  mod					= { mod_ident = mod_ident, mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
+			  mod	= { mod_ident = mod_ident, mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_foreign_exports=[],mod_defs = defs }
 			= ( ps_error.pea_ok
 			  , mod, ps_hash_table
 			  , ps_error.pea_file
@@ -325,7 +325,7 @@ where
 			  )
 		// otherwise // ~ succ
 		# ({fp_line}, scanState) = getPosition scanState
-		  mod = { mod_ident = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = [] }
+		  mod = { mod_ident = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs = [] }
 		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
 			closeScanner scanState files)
 
@@ -414,147 +414,59 @@ where
 			= (False,abort "no def(3)",parseError "definition" No "type definitions only at the global level" (tokenBack pState))
 			# (def, pState) = wantTypeDef parseContext pos pState
 			= (True, def, pState)
-	try_definition _ ImportToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
-		# (token, pState) = nextToken FunctionContext pState
-		| token == CodeToken && isIclContext parseContext
-		# (importedObjects, pState) = wantCodeImports pState
-		= (True, PD_ImportedObjects importedObjects, pState)
-		# pState = tokenBack pState
-		# (imports, pState) = wantImports pState
-   		= (True, PD_Import imports, pState)
-	try_definition _ FromToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
-			# (imp, pState) = wantFromImports pState
-	   		= (True, PD_Import [imp], pState) -->> imp
-/*	try_definition _ ExportToken pos pState
-		# (exports, pState) = wantExportDef pState
-   		= (True, PD_Export exports, pState)
-	try_definition _ ExportAllToken pos pState
-   		= (True, PD_Export ExportAll, pState)
-*/	try_definition parseContext ClassToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
-	   		# (classdef, pState) = wantClassDefinition parseContext pos pState
-	   		= (True, classdef, pState)
-	// AA..
-	try_definition parseContext GenericToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
-	   		# (gendef, pState) = wantGenericDefinition parseContext pos pState
-	   		= (True, gendef, pState)
-	
-	try_definition parseContext DeriveToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)   		
-	   		# (gendef, pState) = wantDeriveDefinition parseContext pos pState
-	   		= (True, gendef, pState)
-	// ..AA 
-	 		
-	try_definition parseContext InstanceToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
-	   		# (instdef, pState) = wantInstanceDeclaration parseContext pos pState
-	   		= (True, instdef, pState)
-
-// AA : new syntax for generics ...
 	try_definition parseContext (IdentToken name) pos pState
 		# (token, pState) = nextToken FunctionContext pState
 		= case token of
-			GenericOpenToken // generic function
-				//# (type, pState) = wantType pState
-				# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
-				# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
-				# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
-				# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState
-				# (type_OBJECT_ident, pState)= stringToIdent "OBJECT" IC_Type pState
-				# (generic_ident, pState) = stringToIdent name IC_Generic pState					
-
-				# (type_cons, pState) = get_type_cons type pState
-					with
-						get_type_cons (TA type_symb []) pState
-								= (TypeConsSymb type_symb, pState)							
-						get_type_cons (TA type_symb _) pState
-							# pState = parseError "generic type, no constructor arguments allowed" No " |}" pState
-							= (abort "no TypeCons", pState)
-						get_type_cons (TB tb) pState 
-							= (TypeConsBasic tb, pState)
-						get_type_cons TArrow pState
-							= (TypeConsArrow, pState)				 
-						get_type_cons (TV tv) pState
-							= (TypeConsVar tv, pState)				 
-						get_type_cons _ pState 
-							# pState = parseError "generic type" No " |}" pState
-							= (abort "no TypeCons", pState)
-
-				# (token, pState) = nextToken GenericContext pState
-				# (geninfo_arg, pState) = case token of
-					GenericOfToken
-						# (ok, geninfo_arg, pState) = trySimpleLhsExpression pState
-						# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-						| ok 
-							-> case type_cons of
-								(TypeConsSymb {type_ident})
-									| type_ident == type_CONS_ident
-										# (cons_CONS_ident, pState) = stringToIdent "GenericConsInfo" IC_Expression pState 
-										-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
-									| type_ident == type_FIELD_ident 
-										# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
-										-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)
-									| type_ident == type_OBJECT_ident 
-										# (cons_OBJECT_ident, pState) = stringToIdent "GenericTypeDefInfo" IC_Expression pState 
-										-> (PE_List [PE_Ident cons_OBJECT_ident, geninfo_arg], pState)
-								_
-									| otherwise
-										-> (geninfo_arg, pState)
-						| otherwise
-							# pState = parseError "generic case" No "simple lhs expression" pState
-							-> (PE_Empty, pState)
-						 
-					GenericCloseToken
-						# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
-						-> (PE_Ident geninfo_ident, pState)
-					_ 	
-						# pState = parseError "generic type" (Yes token) "of or |}" pState
-						# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
-						-> (PE_Ident geninfo_ident, pState)
-																						
-				//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-				# (args, pState) = parseList trySimpleLhsExpression pState
-
-				//# (geninfo_ident, pState) = stringToIdent "geninfo" IC_Expression pState
-				# args = SwitchGenericInfo [geninfo_arg :  args] args
-
-				// must be EqualToken or HashToken or ???
-				//# pState = wantToken FunctionContext "generic definition" EqualToken pState
-				//# pState = tokenBack pState
-
-			  	# (ss_useLayout, pState) = accScanState UseLayout pState
-			    # localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
-			    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
-
-				# generic_case = 
-					{ gc_ident = ident
-					, gc_gident = generic_ident
-					, gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
-					, gc_arity = length args
-					, gc_pos = pos
-					, gc_type = type
-					, gc_type_cons = type_cons
-					, gc_body = GCB_ParsedBody args rhs
-					, gc_kind = KindError	
-					}					
-				-> (True, PD_GenericCase generic_case, pState)
+			GenericOpenToken
+				// generic function
+				-> wantGenericFunctionDefinition name pos pState
 			_   // normal function
 				# pState = tokenBack pState
 				# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
 			      (token, pState) = nextToken FunctionContext pState
 			      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
 				-> (True, def, pState)
-// ... AA
-	   		
+	try_definition _ ImportToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
+		# (token, pState) = nextToken FunctionContext pState
+		| token == CodeToken && isIclContext parseContext
+			# (importedObjects, pState) = wantCodeImports pState
+			= (True, PD_ImportedObjects importedObjects, pState)
+			# pState = tokenBack pState
+			# (imports, pState) = wantImports pState
+	   		= (True, PD_Import imports, pState)
+	try_definition _ FromToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
+			# (imp, pState) = wantFromImports pState
+	   		= (True, PD_Import [imp], pState) -->> imp
+	try_definition parseContext ClassToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
+	   		# (classdef, pState) = wantClassDefinition parseContext pos pState
+	   		= (True, classdef, pState)
+	try_definition parseContext GenericToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
+	   		# (gendef, pState) = wantGenericDefinition parseContext pos pState
+	   		= (True, gendef, pState)
+	try_definition parseContext DeriveToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)   		
+	   		# (gendef, pState) = wantDeriveDefinition parseContext pos pState
+	   		= (True, gendef, pState)
+	try_definition parseContext InstanceToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
+	   		# (instdef, pState) = wantInstanceDeclaration parseContext pos pState
+	   		= (True, instdef, pState)
+	try_definition parseContext ForeignToken pos pState
+		| not (isGlobalContext parseContext)
+			= (False,abort "no def",parseErrorSimple "definition" "foreign export definitions are only allowed at the global level" pState)
+		| isDclContext parseContext
+			= (False,abort "no def",parseErrorSimple "definition" "foreign export definitions are only allowed in implementation modules" pState)
+			= wantForeignExportDefinition pState
 	try_definition parseContext token pos pState
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState
@@ -670,6 +582,111 @@ where
 		| not is_infix	&& hasprio
 			= (name, False, parseError "Definition" No "Infix operator should be inside parentheses; no infix" pState)
 			= (name, is_infix, pState)
+
+	wantGenericFunctionDefinition name pos pState
+		//# (type, pState) = wantType pState
+		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
+		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
+		# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
+		# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState
+		# (type_OBJECT_ident, pState)= stringToIdent "OBJECT" IC_Type pState
+		# (generic_ident, pState) = stringToIdent name IC_Generic pState					
+	
+		# (type_cons, pState) = get_type_cons type pState
+			with
+				get_type_cons (TA type_symb []) pState
+						= (TypeConsSymb type_symb, pState)							
+				get_type_cons (TA type_symb _) pState
+					# pState = parseError "generic type, no constructor arguments allowed" No " |}" pState
+					= (abort "no TypeCons", pState)
+				get_type_cons (TB tb) pState 
+					= (TypeConsBasic tb, pState)
+				get_type_cons TArrow pState
+					= (TypeConsArrow, pState)				 
+				get_type_cons (TV tv) pState
+					= (TypeConsVar tv, pState)				 
+				get_type_cons _ pState 
+					# pState = parseError "generic type" No " |}" pState
+					= (abort "no TypeCons", pState)
+	
+		# (token, pState) = nextToken GenericContext pState
+		# (geninfo_arg, pState) = case token of
+			GenericOfToken
+				# (ok, geninfo_arg, pState) = trySimpleLhsExpression pState
+				# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
+				| ok 
+					-> case type_cons of
+						(TypeConsSymb {type_ident})
+							| type_ident == type_CONS_ident
+								# (cons_CONS_ident, pState) = stringToIdent "GenericConsInfo" IC_Expression pState 
+								-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
+							| type_ident == type_FIELD_ident 
+								# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
+								-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)
+							| type_ident == type_OBJECT_ident 
+								# (cons_OBJECT_ident, pState) = stringToIdent "GenericTypeDefInfo" IC_Expression pState 
+								-> (PE_List [PE_Ident cons_OBJECT_ident, geninfo_arg], pState)
+						_
+							| otherwise
+								-> (geninfo_arg, pState)
+				| otherwise
+					# pState = parseError "generic case" No "simple lhs expression" pState
+					-> (PE_Empty, pState)
+				 
+			GenericCloseToken
+				# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
+				-> (PE_Ident geninfo_ident, pState)
+			_ 	
+				# pState = parseError "generic type" (Yes token) "of or |}" pState
+				# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
+				-> (PE_Ident geninfo_ident, pState)
+																				
+		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
+		# (args, pState) = parseList trySimpleLhsExpression pState
+	
+		//# (geninfo_ident, pState) = stringToIdent "geninfo" IC_Expression pState
+		# args = SwitchGenericInfo [geninfo_arg :  args] args
+	
+		// must be EqualToken or HashToken or ???
+		//# pState = wantToken FunctionContext "generic definition" EqualToken pState
+		//# pState = tokenBack pState
+	
+	  	# (ss_useLayout, pState) = accScanState UseLayout pState
+	    # localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
+	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
+	
+		# generic_case = 
+			{ gc_ident = ident
+			, gc_gident = generic_ident
+			, gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
+			, gc_arity = length args
+			, gc_pos = pos
+			, gc_type = type
+			, gc_type_cons = type_cons
+			, gc_body = GCB_ParsedBody args rhs
+			, gc_kind = KindError	
+			}					
+		= (True, PD_GenericCase generic_case, pState)
+
+	wantForeignExportDefinition pState
+		# (token, pState) = nextToken GeneralContext pState
+		# (file_name,line_nr,pState) = getFileAndLineNr pState
+		= case token of
+			IdentToken "export"
+				# (token, pState) = nextToken FunctionContext pState
+				-> case token of
+					IdentToken function_name
+						# pState = wantEndOfDefinition "foreign export" pState
+						# (ident,pState) = stringToIdent function_name IC_Expression pState
+						-> (True,PD_ForeignExport ident file_name line_nr,pState)
+					_
+						-> foreign_export_error "function name" pState
+			_
+				-> foreign_export_error "export" pState
+		where
+			foreign_export_error s pState
+				= (True,PD_Erroneous,tokenBack (parseError "foreign export" No s pState))
+
 /*
 isEqualToken :: !Token -> Bool
 isEqualToken EqualToken			= True
@@ -1189,15 +1206,6 @@ want_2_0_import_declaration token pState
 				= (True, token, pState)
 				= (False, token, pState)
 
-/*						
-wantExportDef :: !ParseState -> (!Export, !ParseState)
-wantExportDef pState
-	# (name, pState) = want pState
-	  (ident, pState) = stringToIdent name IC_Class pState
-	  (types, pState) = wantList "instance types" trySimpleType pState
-	  pState = wantEndOfDefinition "exports" pState
-	= ({ export_class = ident, export_types = types}, pState)
-*/
 /*
 	Classes and instances
 */

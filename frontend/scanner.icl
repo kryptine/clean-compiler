@@ -1,6 +1,6 @@
 implementation module scanner
 
-import	StdEnv, compare_constructor, StdCompare, general, compilerSwitches
+import	StdEnv, compare_constructor, general, compilerSwitches
 
 from utilities import revCharListToString, isSpecialChar
 
@@ -154,6 +154,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ImportToken				//		import
 	|	FromToken				//		from
 	|	SpecialToken			//		special
+	|	ForeignToken			//		foreign
 
 	|	IntTypeToken			//		Int
 	|	CharTypeToken			//		Char
@@ -163,8 +164,6 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	FileTypeToken			//		File
 	|	WorldTypeToken			//		World
 	|	VoidTypeToken			//		Void
-	|	LeftAssocToken			//		left
-	|	RightAssocToken			//		right
 	|	ClassToken				//		class
 	|	InstanceToken			//		instance
 	|	OtherwiseToken			//		otherwise
@@ -834,6 +833,7 @@ CheckEveryContext s input
 						Yes err -> (ErrorToken err						, input)  //-->> ("Error token generated: "+err)
 						No		-> (PriorityToken (Prio NoAssoc n)		, input)
 	"import" -> (ImportToken,input)
+	"foreign" -> (ForeignToken,input)
    	s			->	(IdentToken s		, input)
 
 CheckTypeContext :: !String !Input -> (!Token, !Input)
@@ -1387,6 +1387,7 @@ where
 	toString ImportToken				= "import"
 	toString FromToken					= "from"
 	toString SpecialToken				= "special"
+	toString ForeignToken				= "foreign"
 
 	toString IntTypeToken				= "Int"
 	toString CharTypeToken				= "Char"
@@ -1396,8 +1397,6 @@ where
 	toString FileTypeToken				= "File"
 	toString WorldTypeToken				= "World"
 	toString VoidTypeToken				= "Void"
-	toString LeftAssocToken				= "left"
-	toString RightAssocToken			= "right"
 	toString ClassToken					= "class"
 	toString InstanceToken				= "instance"
 	toString OtherwiseToken				= "otherwise"

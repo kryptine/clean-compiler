@@ -2242,7 +2242,7 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 checkModule :: !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
 	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 
-checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache 
+checkModule {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache 
 	optional_dcl_mod scanned_modules dcl_modules cached_dcl_macros predef_symbols symbol_table err_file heaps
 	# nr_of_cached_modules = size dcl_modules
 	# (optional_pre_def_mod,predef_symbols)
@@ -2250,13 +2250,13 @@ checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_m
 			0	# (predef_mod,predef_symbols) = buildPredefinedModule predef_symbols
 				-> (Yes predef_mod,predef_symbols)
 			_	-> (No,predef_symbols)
-	# (mod_ident,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,first_gen_inst_index, local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
-		= check_module1 m icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
+	# (icl_global_function_range,nr_of_functions,first_inst_index,first_gen_inst_index, local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
+		= check_module1 mod_defs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# icl_instance_range = {ir_from = first_inst_index, ir_to = first_gen_inst_index/*AA nr_of_functions*/}
 	# icl_generic_range = {ir_from = first_gen_inst_index, ir_to = nr_of_functions} //AA	
-	= check_module2 mod_ident m.mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions nr_of_cached_modules optional_pre_def_mod local_defs icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+	= check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions nr_of_cached_modules optional_pre_def_mod local_defs icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 
-check_module1 {mod_type,mod_ident,mod_imports,mod_imported_objects,mod_defs = cdefs} icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
+check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
 
 	  first_inst_index = length fun_defs
@@ -2296,7 +2296,7 @@ check_module1 {mod_type,mod_ident,mod_imports,mod_imported_objects,mod_defs = cd
 	  							dcl_modules.[i]
 		  						init_new_dcl_modules.[i-size dcl_modules] 
 	  						\\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
-	= (mod_ident,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,first_gen_inst_index,local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
+	= (icl_global_function_range,nr_of_functions,first_inst_index,first_gen_inst_index,local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 
 	where
 		add_dcl_module_predef_module_and_modules_to_symbol_table (Yes dcl_mod) optional_predef_mod modules mod_index cs
@@ -2425,11 +2425,11 @@ check_module1 {mod_type,mod_ident,mod_imports,mod_imported_objects,mod_defs = cd
 	  		fill_macro_def_array i [dcl_macro_defs:macro_defs] a
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
-check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int !Int 
+check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [IdentPos] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int !Int 
 				(Optional (Module a)) [Declaration] *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
-check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions nr_of_cached_modules optional_pre_def_mod local_defs icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions nr_of_cached_modules optional_pre_def_mod local_defs icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 		
 	  (copied_dcl_defs, dcl_conversions, dcl_modules, local_defs, cdefs, icl_sizes, cs)
@@ -2493,9 +2493,6 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
 
-	  icl_imported
-	  		= { el \\ el<-dcls_import_list }
-
 	  icl_imported = { el \\ el<-dcls_import_list }
 	  
 	  (_,icl_common, dcl_modules, heaps=:{hp_var_heap, hp_type_heaps}, cs)
@@ -2503,6 +2500,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 				
 	  (instance_types, icl_common, dcl_modules, hp_var_heap, hp_type_heaps, cs)
 	  		= checkInstances main_dcl_module_n icl_common dcl_modules hp_var_heap hp_type_heaps cs
+	  		  	
 	  heaps = { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }
 
 	  e_info = { ef_type_defs = icl_common.com_type_defs, ef_selector_defs = icl_common.com_selector_defs, ef_class_defs = icl_common.com_class_defs, 
@@ -2519,6 +2517,8 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 	  (icl_functions, e_info, heaps, cs)
 	  	= checkInstanceBodies icl_instances_ranges local_functions_index_offset icl_functions e_info heaps cs
+
+	  (foreign_exports,icl_functions,cs) = checkForeignExports mod_foreign_exports icl_global_functions_ranges icl_functions cs
 
 	  cs = check_needed_modules_are_imported mod_ident ".icl" cs
 	  {cs_symbol_table, cs_predef_symbols, cs_error,cs_x } = cs
@@ -2551,11 +2551,11 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
 										 com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs,
 										 com_generic_defs = e_info.ef_generic_defs, com_instance_defs = class_instances }	  			  
-		  icl_mod		= { 	icl_name = mod_ident, icl_functions = icl_functions, icl_common = icl_common,
-		  						icl_global_functions = icl_global_functions_ranges, icl_instances = icl_instances_ranges, icl_specials = icl_specials,
-								icl_gencases = icl_generic_ranges,
-								icl_imported_objects = mod_imported_objects, icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-	  			  				icl_import = icl_imported,  icl_modification_time = mod_modification_time}
+		  icl_mod		= { 	icl_name = mod_ident, icl_functions = icl_functions, icl_common = icl_common, icl_global_functions = icl_global_functions_ranges,
+		  						icl_instances = icl_instances_ranges, icl_specials = icl_specials, icl_gencases = icl_generic_ranges,
+								icl_import = icl_imported, icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
+								icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
+	  			  				icl_modification_time = mod_modification_time}
 
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 		  (main_dcl_module, dcl_modules) = dcl_modules![main_dcl_module_n]
@@ -2576,10 +2576,10 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 			  	 			  com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs, com_generic_defs = e_info.ef_generic_defs }	  			  
 		  icl_mod		= { icl_name = mod_ident, icl_functions = icl_functions, icl_common = icl_common,
 		  					icl_global_functions = icl_global_functions_ranges, icl_instances = icl_instances_ranges,
-		  					icl_specials = {ir_from = nr_of_functions, ir_to = nr_of_functions},
-							icl_gencases = icl_generic_ranges,
-							icl_imported_objects = mod_imported_objects, icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-	    		  			icl_import = icl_imported ,icl_modification_time = mod_modification_time}
+		  					icl_specials = {ir_from = nr_of_functions, ir_to = nr_of_functions}, icl_gencases = icl_generic_ranges,
+							icl_import = icl_imported, icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
+							icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
+	    		  			icl_modification_time = mod_modification_time}
 		= (False, icl_mod, dcl_modules, {}, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
 	where
 		check_start_rule mod_kind mod_ident icl_global_functions_ranges cs=:{cs_symbol_table,cs_x}
@@ -2729,6 +2729,67 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 						  cs_error = checkError "the specified member type is incorrect ("(luxurious_explanation+++" not ok)") cs_error
 						-> ( popErrorAdmin cs_error, type_heaps)
 			= (icl_functions, type_heaps, cs_error)
+
+checkForeignExports :: [IdentPos] [IndexRange] *{#FunDef} *CheckState -> (![Int],!*{#FunDef},!*CheckState)
+checkForeignExports [ident_pos=:{ip_ident={id_name,id_info}}:foreign_exports] icl_global_functions_ranges fun_defs cs
+	# ({ste_kind,ste_index},cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+	# cs = { cs & cs_symbol_table = cs_symbol_table }
+	# (foreign_export_fundef_index,fun_defs,cs) = check_foreign_export ste_kind icl_global_functions_ranges fun_defs cs
+		with
+			check_foreign_export (STE_FunctionOrMacro _) [{ir_from, ir_to}:_] fun_defs cs
+				| ste_index>=ir_from && ste_index<ir_to
+					# ({fun_type,fun_ident,fun_pos},fun_defs) = fun_defs![ste_index]
+					# (foreign_export_fundef_index,cs) = case fun_type of
+							No
+								-> ([],cs)
+							Yes {st_args,st_args_strictness,st_arity,st_result,st_context}
+								| not (isEmpty st_context)
+									-> ([],{cs & cs_error = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in type of foreign exported function (context not allowed)" cs.cs_error})
+								| not (first_n_are_strict st_arity st_args_strictness)
+									-> ([],{cs & cs_error = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in type of foreign exported function (strictness annotation missing)" cs.cs_error})
+									-> ([ste_index],cs)
+					= (foreign_export_fundef_index,fun_defs,cs)
+			check_foreign_export (STE_FunctionOrMacro _) [_,{ir_from, ir_to}:_] fun_defs cs
+				| ste_index>=ir_from && ste_index<ir_to
+					= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been exported" cs.cs_error})
+			check_foreign_export _ _ fun_defs cs
+				= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been declared" cs.cs_error})
+	# (foreign_export_fundef_indexes,fun_defs,cs) = checkForeignExports foreign_exports icl_global_functions_ranges fun_defs cs
+	= (foreign_export_fundef_index++foreign_export_fundef_indexes,fun_defs,cs)
+checkForeignExports [] icl_global_functions_ranges fun_defs cs
+	= ([],fun_defs,cs)
+
+checkForeignExportedFunctionTypes :: !*ErrorAdmin ![Int] !*{#FunDef} -> (!*ErrorAdmin,!*{#FunDef})
+checkForeignExportedFunctionTypes error_admin [fun_def_index:icl_foreign_exports] fun_defs
+	# error_admin = if (check_foreign_export_result_type st_result.at_type)
+						error_admin
+						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin)
+	# error_admin = if (check_foreign_export_types st_args)
+						error_admin
+						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in argument type for foreign exported function" error_admin)
+	= checkForeignExportedFunctionTypes error_admin icl_foreign_exports fun_defs2
+	where
+		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fun_def_index]
+
+		check_foreign_export_result_type (TB BT_Int)
+			= True
+		check_foreign_export_result_type _
+			= False
+
+		check_foreign_export_types [{at_type}:argument_types]
+			= check_foreign_export_type at_type && check_foreign_export_types argument_types 
+		check_foreign_export_types []
+			= True
+
+		check_foreign_export_type (TB BT_Int)
+			= True
+		check_foreign_export_type (TAS {type_arity,type_index={glob_object,glob_module}} arguments strictness)
+			= glob_module==cPredefinedModuleIndex && glob_object==PD_Arity2TupleTypeIndex+(type_arity-2)
+				&& first_n_are_strict type_arity strictness && check_foreign_export_types arguments
+		check_foreign_export_type _
+			= False
+checkForeignExportedFunctionTypes error_admin [] fun_defs
+	= (error_admin,fun_defs)
 
 check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_modules}}
 	# cs = case x_needed_modules bitand cNeedStdGeneric of

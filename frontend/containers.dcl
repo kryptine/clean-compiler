@@ -41,6 +41,7 @@ equal_strictness_lists :: !StrictnessList !StrictnessList -> Bool
 add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 add_next_not_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 append_strictness :: !Int !StrictnessList -> StrictnessList
+first_n_are_strict :: !Int !StrictnessList -> Bool
 
 :: IntKey :== Int
 

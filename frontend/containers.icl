@@ -326,6 +326,24 @@ append_strictness strictness (Strict s)
 append_strictness strictness (StrictList s l)
 	= StrictList s (append_strictness strictness l)
 
+first_n_are_strict :: !Int !StrictnessList -> Bool
+first_n_are_strict 0 _
+	= True
+first_n_are_strict n NotStrict
+	= False
+first_n_are_strict n (Strict s)
+	| n>32
+		= False
+	| n==32
+		= s==0xffffffff
+		# m=(1<<n)-1
+		= s bitand m==m
+first_n_are_strict n (StrictList s l)
+	| n>=32
+		= s==0xffffffff && first_n_are_strict (n-32) l
+		# m=(1<<n)-1
+		= s bitand m==m
+
 screw :== 80
 
 :: IntKey :== Int

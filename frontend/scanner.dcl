@@ -68,6 +68,7 @@ instance <<< FilePosition
 	|	ImportToken				//		import
 	|	FromToken				//		from
 	|	SpecialToken			//		special
+	|	ForeignToken			//		foreign
 
 	|	IntTypeToken			//		Int
 	|	CharTypeToken			//		Char
@@ -77,8 +78,6 @@ instance <<< FilePosition
 	|	FileTypeToken			//		File
 	|	WorldTypeToken			//		World
 	|	VoidTypeToken			//		Void
-	|	LeftAssocToken			//		left
-	|	RightAssocToken			//		right
 	|	ClassToken				//		class
 	|	InstanceToken			//		instance
 	|	OtherwiseToken			//		otherwise

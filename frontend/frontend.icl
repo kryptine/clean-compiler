@@ -62,7 +62,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			select_and_remove_icl_functions_from_record :: !*IclModule -> (!.{#FunDef},!.IclModule)
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
-	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_import,icl_name,icl_imported_objects,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
+	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_name,icl_import,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
 	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
@@ -200,6 +200,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 					= (pds_def, predef_symbols)
 					= (NoIndex, predef_symbols)
 
+	# (error_admin,fun_defs) = checkForeignExportedFunctionTypes error_admin icl_foreign_exports fun_defs	
+	
 	# [icl_exported_global_functions,icl_not_exported_global_functions:_] = icl_global_functions
 	# exported_global_functions = case start_rule_index of
 				NoIndex	-> [icl_exported_global_functions]
@@ -267,9 +269,9 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# 	fe ={	fe_icl =
 //							 {icl_mod & icl_functions=fun_defs }
 							 {icl_functions=fun_defs,icl_global_functions=icl_global_functions,icl_instances=icl_instances,icl_specials=icl_specials,
-							 icl_common=icl_common,icl_import=icl_import,
-							 icl_gencases = icl_gencases ++ generic_ranges,
-							 icl_name=icl_name,icl_imported_objects=icl_imported_objects,icl_used_module_numbers=icl_used_module_numbers,
+							 icl_common=icl_common, icl_gencases = icl_gencases ++ generic_ranges,
+							 icl_import=icl_import, icl_imported_objects=icl_imported_objects, icl_foreign_exports=icl_foreign_exports,
+							 icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
 							 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time}
 
 			,	fe_dcls = dcl_mods

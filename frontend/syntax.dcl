@@ -96,6 +96,7 @@ instance == FunctionOrMacroIndex
 	,	mod_type		:: !ModuleKind
 	, 	mod_imports		:: ![ParsedImport]
 	,	mod_imported_objects :: ![ImportedObject]
+	,	mod_foreign_exports :: ![IdentPos]
 	,	mod_defs		:: !defs
 	}
 
@@ -174,6 +175,7 @@ cIsNotAFunction :== False
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
+	|	PD_ForeignExport !Ident !{#Char} !Int
 	|	PD_Generic GenericDef // AA
 	| 	PD_GenericCase GenericCaseDef // AA	
 	|	PD_Derive [GenericCaseDef] // AA
