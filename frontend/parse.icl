@@ -551,16 +551,16 @@ where
 
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
-	want_rhs_of_def parseContext (Yes (name, False), []) token pos pState
-		# code_allowed  = token == EqualToken
-		| isIclContext parseContext && isLocalContext parseContext && (token == EqualToken || token == DefinesColonToken) &&
+	want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
+		# code_allowed  = definingToken == EqualToken
+		| isIclContext parseContext && isLocalContext parseContext && (definingToken == EqualToken || definingToken == DefinesColonToken) &&
 		/* PK isLowerCaseName name.id_name && */ not (isClassOrInstanceDefsContext parseContext)
 		  	# (token, pState) = nextToken FunctionContext pState
 			| code_allowed && token == CodeToken
 				# (rhs, pState) = wantCodeRhs pState
 				= (PD_Function pos name False [] rhs (FK_Function cNameNotLocationDependent), pState)
 			# pState = tokenBack pState
-			# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact token) (tokenBack pState)
+			# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact definingToken) (tokenBack pState)
 			| token == EqualToken
 				= (PD_Function pos name False [] rhs FK_NodeDefOrFunction, pState)
 			// otherwise // token == DefinesColonToken
