@@ -155,9 +155,9 @@ where
 		# {class_members,class_context,class_args,class_ident} = ri_defs.[glob_module].com_class_defs.[ds_index]
 		| size class_members > 0
 			# class_instances = ri_instance_info.[glob_module].[ds_index]
-			# {rs_coercions, rs_var_heap, rs_type_heaps} = rs_state
-			# ({glob_module,glob_object}, contexts, uni_ok, (rs_var_heap, rs_type_heaps), rs_coercions) = find_instance tc_types class_instances ri_defs (rs_var_heap, rs_type_heaps) rs_coercions
-			# rs_state = {rs_state & rs_coercions=rs_coercions, rs_var_heap=rs_var_heap, rs_type_heaps=rs_type_heaps}
+			# {rs_coercions, rs_type_heaps} = rs_state
+			# ({glob_module,glob_object}, contexts, uni_ok, rs_type_heaps, rs_coercions) = find_instance tc_types class_instances ri_defs rs_type_heaps rs_coercions
+			# rs_state = {rs_state & rs_coercions=rs_coercions, rs_type_heaps=rs_type_heaps}
 			| (glob_module <> NotFound) && uni_ok
 				# {ins_members, ins_class} = ri_defs.[glob_module].com_instance_defs.[glob_object]
 				| is_predefined_symbol ins_class.glob_module ins_class.glob_object.ds_index PD_ArrayClass rs_state.rs_predef_symbols &&
@@ -206,27 +206,27 @@ where
 	reduce_contexts_in_constraints :: !ReduceInfo ![Type] ![TypeVar] ![TypeContext] *ReduceState -> *([ReducedContexts],*ReduceState)
 	reduce_contexts_in_constraints info types class_args [] rs_state
 		= ([], rs_state)
-	reduce_contexts_in_constraints info types class_args class_context rs_state=:{rs_var_heap, rs_type_heaps=rs_type_heaps=:{th_vars}}
+	reduce_contexts_in_constraints info types class_args class_context rs_state=:{rs_type_heaps=rs_type_heaps=:{th_vars}}
 		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
-		  (instantiated_context, (rs_var_heap, rs_type_heaps)) = fresh_contexts class_context (rs_var_heap, { rs_type_heaps & th_vars = th_vars })
-		# rs_state = {rs_state & rs_var_heap=rs_var_heap, rs_type_heaps=rs_type_heaps}
+		  (instantiated_context, rs_type_heaps) = fresh_contexts class_context { rs_type_heaps & th_vars = th_vars }
+		# rs_state = {rs_state & rs_type_heaps=rs_type_heaps}
 		= mapSt (reduce_context info) instantiated_context rs_state
 
-	find_instance :: [Type] !InstanceTree {#CommonDefs} (.a,*TypeHeaps) *Coercions -> *(Global Int,[TypeContext],Bool,(.a,*TypeHeaps),*Coercions)
-	find_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs heaps coercion_env
-		# (left_index, types, uni_ok, (var_heap, type_heaps), coercion_env) = find_instance co_types left defs heaps coercion_env
+	find_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
+	find_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps coercion_env
+		# (left_index, types, uni_ok, type_heaps, coercion_env) = find_instance co_types left defs type_heaps coercion_env
 		| FoundObject left_index
-			= (left_index, types, uni_ok, (var_heap, type_heaps), coercion_env)
+			= (left_index, types, uni_ok, type_heaps, coercion_env)
 			# {ins_type={it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
 			  (matched, type_heaps) = match defs it_types co_types type_heaps
 			| matched
-				# (subst_context, (var_heap, type_heaps)) = fresh_contexts it_context (var_heap, type_heaps)
+				# (subst_context, type_heaps) = fresh_contexts it_context type_heaps
 				  (uni_ok, coercion_env, type_heaps) = adjust_type_attributes defs co_types it_types coercion_env type_heaps
 				  (spec_inst, type_heaps) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps
 				| FoundObject spec_inst
-					= (spec_inst, [], uni_ok, (var_heap, type_heaps), coercion_env)
-					= (this_inst_index, subst_context, uni_ok, (var_heap, type_heaps), coercion_env)
-				= find_instance co_types right defs (var_heap, type_heaps) coercion_env
+					= (spec_inst, [], uni_ok, type_heaps, coercion_env)
+					= (this_inst_index, subst_context, uni_ok, type_heaps, coercion_env)
+				= find_instance co_types right defs type_heaps coercion_env
 	find_instance co_types IT_Empty defs heaps coercion_env
 		= (ObjectNotFound, [], True, heaps, coercion_env)
 
@@ -382,16 +382,16 @@ where
 		is_reducible [ type : types] tc_class predef_symbols
 			= type_is_reducible type tc_class predef_symbols && is_reducible types tc_class predef_symbols
 
-	fresh_contexts :: ![TypeContext] !*(.a,*TypeHeaps) -> ([TypeContext],(.a,*TypeHeaps))
-	fresh_contexts contexts heaps
-		= mapSt fresh_context contexts heaps
+	fresh_contexts :: ![TypeContext] !*TypeHeaps -> ([TypeContext],*TypeHeaps)
+	fresh_contexts contexts type_heaps
+		= mapSt fresh_context contexts type_heaps
 	where
-		fresh_context :: !TypeContext !*(.a,*TypeHeaps) -> (TypeContext,(.a,*TypeHeaps))
-		fresh_context tc=:{tc_types} (var_heap, type_heaps)
+		fresh_context :: !TypeContext !*TypeHeaps -> (TypeContext,*TypeHeaps)
+		fresh_context tc=:{tc_types} type_heaps
 			# (tc_types, type_heaps) = substitute tc_types type_heaps
 //			  (tc_var, var_heap) = newPtr VI_Empty var_heap
 //			= ({ tc & tc_types = tc_types, tc_var = tc_var }, (var_heap, type_heaps))
-			= ({ tc & tc_types = tc_types }, (var_heap, type_heaps))
+			= ({ tc & tc_types = tc_types }, type_heaps)
 
 	is_unboxed_array:: [Type] PredefinedSymbols -> Bool
 	is_unboxed_array [TA {type_index={glob_module,glob_object},type_arity} _ : _] predef_symbols
