@@ -384,7 +384,8 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
 		  transformed_generator
 		  	=	{	tg_expr = PE_Tuple [PE_Basic (BVI "0"), PE_List [PE_Ident usize, gen_expr]]
 		  		,	tg_lhs_arg = PE_Tuple [i, PE_Tuple [n, array]]
-		  		,	tg_case_end_expr = PE_List [PE_Ident smaller, i, n]
+// MW50		  		,	tg_case_end_expr = PE_List [PE_Ident smaller, i, n]
+		  		,	tg_case_end_expr = PE_List [PE_List [PE_Ident smaller], i, n]
 		  		,	tg_case_end_pattern = PE_Basic (BVB True)
 				,	tg_element = PE_List [PE_Ident uselect, array, i]
 				,	tg_case1 = gen_var_case1

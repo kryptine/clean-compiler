@@ -1187,6 +1187,11 @@ where
  	check_expressions free_vars [] e_input e_state e_info cs
 		= ([], free_vars, e_state, e_info, cs)
 
+	first_argument_of_infix_operator_missing
+		= "first argument of infix operator missing"
+
+	build_expression [Constant symb _ (Prio _ _) _ , _: _] e_state cs_error
+		= (EE, e_state, checkError symb.symb_name first_argument_of_infix_operator_missing cs_error)
 	build_expression [Constant symb arity _ is_fun] e_state cs_error
 		= buildApplication symb arity 0 is_fun [] e_state cs_error
 	build_expression [expr] e_state cs_error
@@ -1196,13 +1201,19 @@ where
 		  (left_expr, e_state, cs_error) = combine_expressions left [] 0 e_state cs_error
 		= case opt_opr of
 			Yes (symb, prio, is_fun, right)
-				-> build_operator_expression [] left_expr (symb, prio, is_fun) right e_state cs_error
+				-> case right of
+					[Constant symb _ (Prio _ _) _:_]
+						-> (EE, e_state, checkError symb.symb_name first_argument_of_infix_operator_missing cs_error)
+					_
+						-> build_operator_expression [] left_expr (symb, prio, is_fun) right e_state cs_error
 			No
 				-> (left_expr, e_state, cs_error)
 	where
 		split_at_operator left [Constant symb arity NoPrio is_fun : exprs] e_state cs_error
 			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
 			= split_at_operator [appl_exp : left] exprs e_state cs_error
+		split_at_operator left [Constant symb arity (Prio _ _) is_fun] e_state cs_error
+			= (No, left, e_state, checkError symb.symb_name "second argument of infix operator missing" cs_error)
 		split_at_operator left [Constant symb arity prio is_fun] e_state cs_error
 			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
 			= (No, [appl_exp : left], e_state, cs_error)
