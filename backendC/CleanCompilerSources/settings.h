@@ -31,8 +31,6 @@ extern Bool OptimizeLazyTupleRecursion;
 extern Bool OptimizeTailCallModuloCons;
 extern Bool WriteModificationTimes;
 
-#define NR_BLOCKS 100
-#define BLOCK_SIZE (unsigned long) (16 * KBYTE)
 #define	StrictDoRelated	False
 
 extern unsigned StrictDepth;

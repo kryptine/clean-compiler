@@ -44,8 +44,6 @@ Bool StrictDoEager			= True;
 Bool StrictDoVerbose		= False;
 Bool StrictDoAnnots			= True;
 
-unsigned long StrictMemUse	= NR_BLOCKS * BLOCK_SIZE;
-
 Bool FunctionMayFailIsError	= False;
 Bool NotUsedIsError			= False;
 Bool FunctionNotUsedIsError	= False;

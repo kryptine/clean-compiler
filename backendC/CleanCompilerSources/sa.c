@@ -55,6 +55,13 @@
 
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
+#define NR_BLOCKS 200
+#define NR_BLOCKS_FOR_ANALYSIS 100
+
+#define BLOCK_SIZE (unsigned long) (16 * KBYTE)
+
+unsigned long StrictMemUse	= NR_BLOCKS * BLOCK_SIZE;
+
 #ifdef CHECK_STACK_OVERFLOW	
 char *min_stack;
 int stack_source = 0;
@@ -243,8 +250,8 @@ static char		*ffree       = Null;		/* the freezed free position		*/
 static void NewBlock (void)
 {
 	if (usedblocks < n_allocated_blocks)
-		usedblocks ++;
-	else if (n_allocated_blocks < NR_BLOCKS && (BLOCK_SIZE * (n_allocated_blocks+1)) < StrictMemUse){	
+		++usedblocks;
+	else if (n_allocated_blocks<NR_BLOCKS && (fblocks==0 || n_allocated_blocks<fblocks+NR_BLOCKS_FOR_ANALYSIS) && BLOCK_SIZE*(n_allocated_blocks+1)<StrictMemUse){
 		if (! (free_pos = (char *) Alloc (BLOCK_SIZE, SizeOf (char))))
 			return;
 		
@@ -253,7 +260,7 @@ static void NewBlock (void)
 		n_allocated_blocks++;
 		usedblocks++;
 	} else {
-		free_pos = (char *) Null;
+		free_pos = NULL;
 		return;
 	}
 
@@ -356,7 +363,7 @@ static void FreeBlocks (void)
 		}
 	}
 	
-	n_allocated_blocks     = usedblocks = fblocks = 0;
+	n_allocated_blocks = usedblocks = fblocks = 0;
 	free_pos   = ffree   = Null;
 }
 
