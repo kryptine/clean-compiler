@@ -35,5 +35,7 @@ supercompile
 supercompile common_defs array_instances dcl_mods main_dcl_module_n components fun_defs var_heap expression_heap imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
 = (components,fun_defs,dcl_types,used_conses,var_heap,type_heaps,expression_heap)
   where used_conses = abort "supercompile: not implemented"
+		// Determine defined functions
         _ = cts_function fun_defs
-        _ = cts_exports dcl_mods[main_dcl_module_n].dcl_functions
+		// Determine exported functions
+        _ = cts_exports fun_defs dcl_mods main_dcl_module_n
