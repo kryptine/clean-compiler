@@ -128,36 +128,35 @@ BELiteralSymbol a0 a1 a2 = code {
 };
 // BESymbolP BELiteralSymbol (BESymbKind kind,CleanString value);
 
-
 BEPredefineListConstructorSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
 BEPredefineListConstructorSymbol a0 a1 a2 a3 a4 a5 = code {
 	ccall BEPredefineListConstructorSymbol "IIIII:V:I"
 };
-// void BEPredefineListConstructorSymbol(int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictnes,int tail_stricness);
+// void BEPredefineListConstructorSymbol (int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness);
 
 BEPredefineListTypeSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
 BEPredefineListTypeSymbol a0 a1 a2 a3 a4 a5 = code {
 	ccall BEPredefineListTypeSymbol "IIIII:V:I"
 };
-// void BEPredefineListTypeSymbol(int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictnes,int tail_stricness);
+// void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness);
 
 BEAdjustStrictListConsInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustStrictListConsInstance a0 a1 a2 = code {
 	ccall BEAdjustStrictListConsInstance "II:V:I"
 };
-// void BEAdjustStrictListConsInstance(int functionIndex,int moduleIndex);
+// void BEAdjustStrictListConsInstance (int functionIndex,int moduleIndex);
 
 BEAdjustUnboxedListDeconsInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustUnboxedListDeconsInstance a0 a1 a2 = code {
 	ccall BEAdjustUnboxedListDeconsInstance "II:V:I"
 };
-// void BEAdjustUnboxedListDeconsInstance(int functionIndex,int moduleIndex);
+// void BEAdjustUnboxedListDeconsInstance (int functionIndex,int moduleIndex);
 
 BEAdjustOverloadedNilFunction :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustOverloadedNilFunction a0 a1 a2 = code {
 	ccall BEAdjustOverloadedNilFunction "II:V:I"
 };
-// void BEAdjustOverloadedNilFunction(int functionIndex,int moduleIndex);
+// void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex);
 
 BEOverloadedConsSymbol :: !Int !Int !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 BEOverloadedConsSymbol a0 a1 a2 a3 a4 = code {
@@ -170,7 +169,6 @@ BEOverloadedPushNode a0 a1 a2 a3 a4 a5 = code {
 	ccall BEOverloadedPushNode "IIIII:I:I"
 };
 // BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENodeIdListP nodeIds,BENodeP decons_node);
-
 
 BEPredefineConstructorSymbol :: !Int !Int !Int !BESymbKind !BackEnd -> BackEnd;
 BEPredefineConstructorSymbol a0 a1 a2 a3 a4 = code {
@@ -196,11 +194,17 @@ BEVarTypeNode a0 a1 = code {
 };
 // BETypeNodeP BEVarTypeNode (CleanString name);
 
-BETypeVars :: !BETypeVarP !BETypeVarListP !BackEnd -> (!BETypeVarListP,!BackEnd);
+BETypeVarListElem :: !BETypeVarP !BEAttribution !BackEnd -> (!BETypeVarListP,!BackEnd);
+BETypeVarListElem a0 a1 a2 = code {
+	ccall BETypeVarListElem "II:I:I"
+};
+// BETypeVarListP BETypeVarListElem (BETypeVarP typeVar,BEAttribution attribute);
+
+BETypeVars :: !BETypeVarListP !BETypeVarListP !BackEnd -> (!BETypeVarListP,!BackEnd);
 BETypeVars a0 a1 a2 = code {
 	ccall BETypeVars "II:I:I"
 };
-// BETypeVarListP BETypeVars (BETypeVarP typeVar,BETypeVarListP typeVarList);
+// BETypeVarListP BETypeVars (BETypeVarListP typeVarListElem,BETypeVarListP typeVarList);
 
 BENoTypeVars :: !BackEnd -> (!BETypeVarListP,!BackEnd);
 BENoTypeVars a0 = code {
@@ -219,6 +223,12 @@ BEAnnotateTypeNode a0 a1 a2 = code {
 	ccall BEAnnotateTypeNode "II:I:I"
 };
 // BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation,BETypeNodeP typeNode);
+
+BEAddForAllTypeVariables :: !BETypeVarListP !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
+BEAddForAllTypeVariables a0 a1 a2 = code {
+	ccall BEAddForAllTypeVariables "II:I:I"
+};
+// BETypeNodeP BEAddForAllTypeVariables (BETypeVarListP vars,BETypeNodeP type);
 
 BEAttributeTypeNode :: !BEAttribution !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
 BEAttributeTypeNode a0 a1 a2 = code {

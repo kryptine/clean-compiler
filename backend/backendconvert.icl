@@ -1,6 +1,7 @@
 implementation module backendconvert
 
 import code from library "backend_library"
+import compilerSwitches
 
 import StdEnv
 
@@ -8,7 +9,7 @@ import frontend
 import backend
 import backendsupport, backendpreprocess
 
-//import RWSDebug
+import RWSDebug
 
 // trace macro
 (-*->) infixl
@@ -229,6 +230,8 @@ beUpdateNode
 	:==	beFunction1 BEUpdateNode
 beNormalTypeNode
 	:==	beFunction2 BENormalTypeNode
+beAddForAllTypeVariables
+	:==	beFunction2 BEAddForAllTypeVariables
 beVarTypeNode name
 	:==	beFunction0 (BEVarTypeNode name)
 beRuleAlt lineNumber
@@ -313,6 +316,8 @@ beTypeVars
 	:==	beFunction2 BETypeVars
 beTypeVar name
 	:==	beFunction0 (BETypeVar name)
+beTypeVarListElem
+	:==	beFunction2 BETypeVarListElem
 beExportType dclTypeIndex iclTypeIndex
 	:==	beApFunction0 (BEExportType dclTypeIndex iclTypeIndex)
 beExportConstructor dclConstructorIndex iclConstructorIndex
@@ -895,9 +900,9 @@ convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
 convertTypeVars typeVars
 	=	sfoldr (beTypeVars o convertTypeVar) beNoTypeVars typeVars
 
-convertTypeVar :: ATypeVar -> BEMonad BETypeVarP
+convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
 convertTypeVar typeVar
-	=	beTypeVar typeVar.atv_variable.tv_name.id_name
+	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_name.id_name) (convertAttribution typeVar.atv_attribute)
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef *BackEndState -> *BackEndState
 defineType moduleIndex constructors _ typeIndex {td_name, td_args, td_rhs=AlgType constructorSymbols} be
@@ -1434,7 +1439,7 @@ convertAttribution TA_Anonymous
 convertAttribution (TA_Var attrVar)
 	=	convertAttributeVar attrVar
 convertAttribution (TA_RootVar attrVar)
-	=	convertAttributeVar attrVar
+	=	PA_BUG (return BENoUniAttr) (convertAttributeVar attrVar)
 convertAttribution TA_MultiOfPropagatingConsVar
 	=	return BENoUniAttr
 // FIXME
@@ -1482,8 +1487,10 @@ convertTypeNode (a :@: b)
 	=	beNormalTypeNode (beBasicSymbol BEApplySymb) (convertTypeArgs [{at_attribute=TA_Multi, at_annotation=AN_None, at_type = consVariableToType a} : b])
 convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
+convertTypeNode (TFA vars type)
+	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
 convertTypeNode typeNode
-	=	abort "convertTypeNode" //  <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
+	=	abort "convertTypeNode"  <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 
 consVariableToType :: ConsVariable -> Type
 consVariableToType (CV typeVar)

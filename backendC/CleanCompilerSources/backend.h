@@ -244,8 +244,11 @@ Clean (BEBasicSymbol :: Int BackEnd -> (BESymbolP, BackEnd))
 BETypeNodeP BEVarTypeNode (CleanString name);
 Clean (BEVarTypeNode :: String BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeVarListP BETypeVars (BETypeVarP typeVar, BETypeVarListP typeVarList);
-Clean (BETypeVars :: BETypeVarP BETypeVarListP BackEnd -> (BETypeVarListP, BackEnd))
+BETypeVarListP BETypeVarListElem (BETypeVarP typeVar, BEAttribution attribute);
+Clean (BETypeVarListElem :: BETypeVarP BEAttribution BackEnd -> (BETypeVarListP, BackEnd))
+
+BETypeVarListP BETypeVars (BETypeVarListP typeVarListElem, BETypeVarListP typeVarList);
+Clean (BETypeVars :: BETypeVarListP BETypeVarListP BackEnd -> (BETypeVarListP, BackEnd))
 
 BETypeVarListP BENoTypeVars (void);
 Clean (BENoTypeVars :: BackEnd -> (BETypeVarListP, BackEnd))
@@ -255,6 +258,9 @@ Clean (BENormalTypeNode :: BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd
 
 BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode);
 Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
+
+BETypeNodeP BEAddForAllTypeVariables (BETypeVarListP vars, BETypeNodeP type);
+Clean (BEAddForAllTypeVariables :: BETypeVarListP BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
 
 BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
 Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))

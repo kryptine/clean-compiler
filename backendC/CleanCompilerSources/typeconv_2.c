@@ -429,6 +429,28 @@ static void PrintArguments (TypeArgs args, char separator, Bool brackets, Bool s
 	
 } /* PrintArguments */
 
+#ifdef CLEAN2
+static void PrintTypeVarList (TypeVarList type_vars)
+{
+	for (; type_vars != NULL; type_vars = type_vars -> tvl_next)
+	{
+		/* RWS:
+			Printing the attributes currently works because the attributes for
+			universally quantified type variables can only be none, '*' or '.'.
+			For attribute variables something should probably done with the
+			CurrentARC_Info administration, but I don't understand how this works. 
+		*/
+		if (type_vars -> tvl_attribute != NoUniAttr)
+			PrintAttribute (type_vars -> tvl_attribute, cDoPrintColon);
+
+		FPutS (type_vars -> tvl_elem -> tv_ident -> ident_name, StdListTypes);
+
+		if (type_vars -> tvl_next != NULL)
+			FPutC (' ', StdListTypes);		
+	}
+}
+#endif
+
 static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool print_annot)
 {
 
@@ -449,6 +471,14 @@ static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool p
 			(node -> type_node_symbol -> symb_kind == fun_type || node -> type_node_symbol -> symb_kind == apply_symb))
 			brackets = True;
 	}
+#ifdef CLEAN2
+	if (node -> type_for_all_vars != NULL)
+	{	FPutS ("(A.", StdListTypes);
+		PrintTypeVarList (node -> type_for_all_vars);
+		FPutC (':', StdListTypes);
+		brackets = False;
+	}
+#endif
 	switch (node -> type_node_symbol -> symb_kind)
 	{
 	case tuple_type:
@@ -546,6 +576,10 @@ static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool p
 		break;
 	}
 
+#ifdef CLEAN2
+	if (node -> type_for_all_vars != NULL)
+		FPutC (')', StdListTypes);
+#endif
 } /* PrintNode */
 
 static void PrintAttributeEquations (UniVarEquations attr_equas)
