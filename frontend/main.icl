@@ -3,8 +3,6 @@ module main
 import scanner, parse, postparse, check, type, trans, convertcases, utilities, convertDynamics
 
 import StdEnv
-// XXX
-import RWSDebug
 
 Start world
 	# (std_io, world) = stdio world
@@ -19,15 +17,6 @@ Start world
 	= fclose ms_out world
 
 CommandLoop proj ms=:{ms_io}
-	# answer = "c Menu0"
-	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
-	| command == []
-		= CommandLoop proj { ms & ms_io = ms_io}
-		# (ready, proj, ms) = DoCommand command argument proj { ms & ms_io = ms_io}
-		= ms
-
-/*
-CommandLoop proj ms=:{ms_io}
 	# (answer, ms_io)		= freadline (ms_io <<< "> ")
 	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
 	| command == []
@@ -36,7 +25,6 @@ CommandLoop proj ms=:{ms_io}
 		| ready
 			= ms
 			= CommandLoop proj ms
-*/
 
 ::	MainStateDefs funs funtypes types conses classes instances members selectors =
 	{	msd_funs		:: !funs
@@ -179,9 +167,9 @@ loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_o
 //	  (components, fun_defs, ms_out) = showComponents components 0 True fun_defs ms_out
 	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups (components ---> "Transform") fun_defs heaps.hp_var_heap heaps.hp_expression_heap
-	# (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs var_heap heaps.hp_type_heaps expression_heap
-//	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
+///	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 	  (components, fun_defs, predef_symbols, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
