@@ -54,6 +54,11 @@ total def (Restrict x p) arg
 | arg==x = def
          = total def p arg
 
+// Apply partial function with a default value
+foldpfun :: (.ran1 -> .ran2) .ran2 !(Pfun dom .ran1) dom -> .ran2 | == dom
+foldpfun found notfound pfun arg
+ = total notfound (postcomp found pfun) arg
+
 domres :: !.[dom] .(Pfun dom ran) -> Pfun dom ran | == dom
 domres domain oldpfun
 = foldr adddom emptypfun domain
