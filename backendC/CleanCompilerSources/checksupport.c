@@ -382,7 +382,7 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 	
 	next_char = PrintName (name, next_char, line_nr, file);
 
-	if ((*next_char) == cTypeDelimiter && next_char[1] != '\0')
+	if ((*next_char) == cTypeDelimiter)
 	{	next_char++;
 	
 		if (isdigit (* next_char))
@@ -405,7 +405,8 @@ void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 			}
 			
 			next_char = end_name + 1;
-		}
+		} else
+			FPutC (cTypeDelimiter, file);
 
 		FPutS (next_char, file);
 	}
