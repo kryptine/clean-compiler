@@ -19,3 +19,5 @@ SystemDependentDevices :: [a]
 SystemDependentInitialIO :: [a]
 
 ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
+
+set_compiler_id :: Int -> Int

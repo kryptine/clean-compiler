@@ -2,7 +2,7 @@
 implementation module CoclSystemDependent
 
 import StdEnv
-import code from "cDirectory.obj",  library "directory_library" // Windows
+//import code from "cDirectory.obj",  library "directory_library" // Windows
 
 PathSeparator
 	:==	';'
@@ -20,9 +20,12 @@ SystemDependentInitialIO
 ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
 // returned bool: now there is such a subfolder
 ensureCleanSystemFilesExists path env
-	# path_c_string = path +++ "\0"
+	= (False,env)
+
+/*	# path_c_string = path +++ "\0"
 	  (err_code, env) = createDirectoryC path_c_string env
 	= (err_code==M_NoDirError || err_code==M_AlreadyExists, env)
+*/
 
 createDirectoryC :: !String !*env -> (!Int, !*env)
 createDirectoryC _ _
@@ -40,3 +43,5 @@ M_NotEnoughSpace	:== -4
 M_AlreadyExists		:== -5
 M_NoPermission		:== -6
 
+set_compiler_id :: Int -> Int
+set_compiler_id compiler_id = compiler_id
