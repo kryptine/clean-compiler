@@ -29,13 +29,13 @@ suclsymbol_to_string ::
  ,  [u<=v]
 
 suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fundefs0
-= (suclsymbol_to_funinfo (funinfo_to_string o get_funinfo), fundefs1)
+= (\sk -> suclsymbol_to_funinfo (funinfo_to_string sk o get_funinfo) sk, fundefs1)
   where getcommon modindex = if (modindex==main_dcl_module_n) icl_common dcl_mods.[modindex].dcl_common
         (oldinfos,fundefs1) = get_infos fundefs0
         get_funinfo = get_formal_name_and_arity {env_dcls=dcl_mods,env_main=main_dcl_module_n,env_getcommon=getcommon,env_infos=oldinfos}
 
-funinfo_to_string (id,arity)
-= id.id_name+++"/"+++toString arity
+funinfo_to_string sk (id,arity)
+= toString sk+++" ("+++id.id_name+++"/"+++toString arity+++")"
 
 suclsymbol_to_funinfo symbkind_to_string sym
 = case sym
@@ -107,18 +107,32 @@ convert_fundef ::
     )
 
 convert_fundef showsuclsymbol main_dcl_module_n funindex fundef (typerulemap,strictsmap,fundefs0,kindmap)
- = ( [(funsym,typerule):typerulemap]
-   , [(funsym,stricts):strictsmap]
-   , fundefs1
-   , [(funsym,kind):kindmap]
-   )
-   where {fun_arity,fun_body,fun_type,fun_kind} = fundef
-         funsym = SuclUser (SK_Function {glob_module=main_dcl_module_n,glob_object=funindex})
-         (typerule,stricts) = foldoptional (notyperule,repeatn fun_arity False) convert_symboltype fun_type
-         //notyperule = abort ("convert: convert_fundef: "+++fundef.fun_symb.id_name+++"/"+++toString fun_arity+++": fun_type is absent")
-         notyperule = mkrule (take fun_arity (tl sucltypeheap)) (hd sucltypeheap) emptygraph
-         fundefs1 = convert_functionbody showsuclsymbol main_dcl_module_n funsym fun_body fundefs0
-         kind = convert_kind fun_kind
+//| fun_type_good && fun_body_good
+  = ( [(funsym,typerule):typerulemap]
+    , [(funsym,stricts):strictsmap]
+    , fundefs1
+    , [(funsym,kind):kindmap]
+    ) ---> msg
+//= mstub "convert_fundef" msg
+  where {fun_arity,fun_body,fun_type,fun_kind} = fundef
+        funsym = SuclUser (SK_Function {glob_module=main_dcl_module_n,glob_object=funindex})
+        (typerule,stricts) = foldoptional (notyperule,repeatn fun_arity False) convert_symboltype fun_type
+        //notyperule = abort ("convert: convert_fundef: "+++fundef.fun_symb.id_name+++"/"+++toString fun_arity+++": fun_type is absent")
+        notyperule = mkrule (take fun_arity (tl sucltypeheap)) (hd sucltypeheap) emptygraph
+        fundefs1 = convert_functionbody showsuclsymbol main_dcl_module_n funsym fun_body fundefs0
+        kind = convert_kind fun_kind
+
+        // Sanity checks
+        msg = showsuclsymbol funsym+++": fun_arity = "+++toString fun_arity+++", fun_type = "+++fun_type_msg+++", fun_body = "+++fun_body_msg
+        (fun_type_good,fun_type_msg)
+        = case fun_type
+          of Yes {st_arity,st_args,st_context} -> (st_arity==fun_arity && length st_args==fun_arity, "Yes {st_arity = "+++toString st_arity+++", #st_args = "+++toString (length st_args)+++", #st_context = "+++toString (length st_context)+++"}")
+             No                                -> (True,"No")
+        (fun_body_good,fun_body_msg)
+        = case fun_body
+          of TransformedBody {tb_args} -> (length tb_args==fun_arity, "TransformedBody {#tb_args = "+++toString (length tb_args)+++"}")
+             CheckedBody {cb_args}     -> (length cb_args==fun_arity, "CheckedBody {#cb_args = "+++toString (length cb_args)+++"}")
+             _                         -> (False,fbcn fun_body)
 
 /******************************************************************************
 *  TYPE CONVERSION                                                            *
@@ -249,7 +263,10 @@ cts_funtypes dcl_mods main_dcl_module_n
           = []
         = maparrayindex (mkarity dcli) dcl.dcl_functions
         mkarity dcli fti ft
-        = (SuclUser (SK_Function {glob_module=dcli,glob_object=fti}),ft.ft_arity)
+        = (SuclUser (SK_Function {glob_module=dcli,glob_object=fti}),ft.ft_type.st_arity+length ft.ft_type.st_context) ---> fun_type_sanity_check ft
+            // NOTE: ft.ft_arity does not account for dictionaries that handle class restrictions
+            //       therefore, we must derive the arity from the symbol type
+            //       However, for FunDefs, the arity is adjusted when dictionaries are introduced
 
 // Map a function over an array, producing a list of equal length
 // The function also gets the element index
@@ -261,6 +278,10 @@ maparrayindex f xs
           = []
         = [f j xs.[j]:map (j+1)]
         sizexs = size xs
+
+fun_type_sanity_check :: FunType -> String
+fun_type_sanity_check ft
+= ft.ft_symb.id_name+++": ft_arity = "+++toString ft.ft_arity+++", ft_type = {st_arity = "+++toString ft.ft_type.st_arity+++", #st_args = "+++toString (length ft.ft_type.st_args)+++", #st_context = "+++toString (length ft.ft_type.st_context)+++"}"
 
 
 /******************************************************************************
@@ -496,9 +517,15 @@ convert_expression main_dcl_module_n topinfo bindings (Selection _ fromexpr sele
         (heap2,(nodes1,fundefs1,globals1,fromroots,_)) = convert_expression main_dcl_module_n topinfo bindings fromexpr (heap1,(nodes0,fundefs0,globals0,rest,False))
         (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
 
+convert_expression main_dcl_module_n topinfo bindings (TupleSelect {ds_arity=tuplesize} elemindex tupleexpr) lrinfo
+= (heap2,(nodes2,fundefs1,globals1,[selectionnode:rest],False))
+  where [selectionnode:heap1] = heap0
+        nodes2 = [(selectionnode,(SuclTupleSelect tuplesize elemindex,tuplenode)):nodes1]
+        (heap2,(nodes1,fundefs1,globals1,tuplenode,_)) = convert_expression main_dcl_module_n topinfo bindings tupleexpr (heap1,(nodes0,fundefs0,globals0,[],False))
+        (heap0,(nodes0,fundefs0,globals0,rest,_)) = lrinfo
+
 convert_expression main_dcl_module_n topinfo bindings (Update _ _ _)         lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "Update" lrinfo <--- "convert.convert_expression ends (for other expression)"
 convert_expression main_dcl_module_n topinfo bindings (RecordUpdate _ _ _)   lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "RecordUpdate" lrinfo <--- "convert.convert_expression ends (for other expression)"
-convert_expression main_dcl_module_n topinfo bindings (TupleSelect _ _ _)    lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "TupleSelect" lrinfo <--- "convert.convert_expression ends (for other expression)"
 convert_expression main_dcl_module_n topinfo bindings (WildCard)             lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "WildCard" lrinfo <--- "convert.convert_expression ends (for other expression)"
 convert_expression main_dcl_module_n topinfo bindings (AnyCodeExpr _ _ _)    lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "AnyCodeExpr" lrinfo <--- "convert.convert_expression ends (for other expression)"
 convert_expression main_dcl_module_n topinfo bindings (ABCCodeExpr _ _)      lrinfo = convert_expression_stub main_dcl_module_n topinfo bindings "ABCCodeExpr" lrinfo <--- "convert.convert_expression ends (for other expression)"
@@ -1502,7 +1529,9 @@ get_formal_name_and_arity_from_fundef env funindex
 
 get_formal_name_and_arity_from_funtype env modindex funindex
 # funtype = env.env_dcls.[modindex].dcl_functions.[funindex]
-= (funtype.ft_symb,funtype.ft_arity)
+# symtype = funtype.ft_type
+= (funtype.ft_symb,symtype.st_arity+length symtype.st_context)
+    // NOTE: ft_arity does not account for the context because DCL functions are not transformed
 
 instance toString (a,b) | toString a & toString b
 where toString (x,y) = "("+++toString x+++","+++toString y+++")"
