@@ -1234,7 +1234,10 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				
 				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
 #if BOXED_RECORDS
-				if (arg->arg_state.state_type==SimpleState){
+				if (node->node_arity<SELECTOR_L ?
+					arg->arg_state.state_type==SimpleState :
+					arg->arg_state.state_type==TupleState && arg->arg_state.state_tuple_arguments[0].state_type==SimpleState
+				){
 					if (node->node_arity<SELECTOR_L)
 						PushField (*record_state_p,fieldnr,0,asp_p,bsp_p,&asize,&bsize);
 					else
