@@ -1021,7 +1021,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 					,	fun_type = Yes fun_type
 					,	fun_pos = NoPos
 					,	fun_index = fun_index
-					,	fun_kind = FK_Function
+					,	fun_kind = FK_Function cFunctionGenerated
 					,	fun_lifted = undeff
 					,	fun_info = 	{	fi_calls = []
 									,	fi_group_index = outer_fun_def.fun_info.fi_group_index

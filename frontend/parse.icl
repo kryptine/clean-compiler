@@ -470,17 +470,17 @@ where
 		  localsExpected = isNotEmpty args || isGlobalContext context
 		  (rhs, pState) = wantRhs isRhsStartToken localsExpected pState
 		= case fun_kind of
-			FK_Function  | isDclContext context
+			FK_Function _  | isDclContext context
 				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
 			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
   			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
 	where
-		token_to_fun_kind s BarToken			= (FK_Function, False,  s)
-		token_to_fun_kind s (SeqLetToken _)		= (FK_Function, False,  s)
-		token_to_fun_kind s EqualToken			= (FK_Function, True,  s)
+		token_to_fun_kind s BarToken			= (FK_Function cFunctionNotGenerated, False,  s)
+		token_to_fun_kind s (SeqLetToken _)		= (FK_Function cFunctionNotGenerated, False,  s)
+		token_to_fun_kind s EqualToken			= (FK_Function cFunctionNotGenerated, True,  s)
 		token_to_fun_kind s ColonDefinesToken	= (FK_Macro, False, s)
-		token_to_fun_kind s DoubleArrowToken	= (FK_Function, True, s)
+		token_to_fun_kind s DoubleArrowToken	= (FK_Function cFunctionNotGenerated, True, s)
 		token_to_fun_kind s DefinesColonToken	= (FK_Caf, False, s)
 		token_to_fun_kind s token 				= (FK_Unknown, False, parseError "RHS" (Yes token) "defines token (=, => or =:) or argument" s)
 

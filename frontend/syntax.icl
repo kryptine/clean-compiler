@@ -137,7 +137,9 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_Erroneous
 
-::	FunKind	= FK_Function | FK_Macro | FK_Caf | FK_Unknown
+::	FunKind	= FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
+cFunctionNotGenerated :== False
+cFunctionGenerated :== True
 
 ::	ParsedSelector =
 	{	ps_field_name		:: !Ident

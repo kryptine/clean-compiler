@@ -280,7 +280,7 @@ newFunction opt_id fun_bodies local_vars arg_types result_type group_index (ci_n
 			,	fun_type		= Yes fun_type
 			,	fun_pos			= NoPos
 			,	fun_index		= NoIndex
-			,	fun_kind		= FK_Function
+			,	fun_kind		= FK_Function cFunctionGenerated
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}
@@ -834,6 +834,7 @@ where
 	copy (DictionarySelection record selectors expr_ptr index_expr) cp_info
 		# (index_expr, cp_info) = copy index_expr cp_info
 		  (selectors, cp_info) = copy selectors cp_info
+		  (record, cp_info) = copy record cp_info
 		= (DictionarySelection record selectors expr_ptr index_expr, cp_info)
 	copy (ArraySelection selector expr_ptr index_expr) cp_info
 		# (index_expr, cp_info) = copy index_expr cp_info

@@ -313,7 +313,7 @@ transformLambda lam_ident args result
 	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs },
 	  			  rhs_locals = NoCollectedLocalDefs }
 	  lam_body = [{pb_args = args, pb_rhs = lam_rhs }]
-	  fun_def = MakeNewFunction lam_ident (length args) lam_body FK_Function NoPrio No NoPos
+	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cFunctionGenerated) NoPrio No NoPos
 	= fun_def
 
 makeNilExpression :: *CollectAdmin -> (ParsedExpr,*CollectAdmin)
@@ -740,7 +740,7 @@ MakeNewFunction name arity body kind prio opt_type pos
 
 // +++ position
 MakeNewParsedDef ident args rhs 
-	:==	PD_Function NoPos ident False args rhs FK_Function
+	:==	PD_Function NoPos ident False args rhs (FK_Function cFunctionGenerated)
 
 collectFunctionBodies :: !Ident !Int !Priority !FunKind ![ParsedDefinition] !*CollectAdmin
 	-> (![ParsedBody], !FunKind, ![ParsedDefinition], !*CollectAdmin)
