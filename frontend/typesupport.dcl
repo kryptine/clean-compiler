@@ -107,7 +107,7 @@ accCoercionTree f i coercion_trees
 	acc_coercion_tree i coercion_trees
 		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
 		  (x, coercion_tree) = f coercion_tree
-		= (x, snd (replace coercion_trees i coercion_tree))
+		= (x, {coercion_trees & [i]=coercion_tree})
 	
 //accCoercionTree :: !.(u:CoercionTree -> u:CoercionTree) !Int !*{!u:CoercionTree} -> {!u:CoercionTree}
 appCoercionTree f i coercion_trees
@@ -115,7 +115,7 @@ appCoercionTree f i coercion_trees
   where
 	acc_coercion_tree i coercion_trees
 		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
-		= snd (replace coercion_trees i (f coercion_tree))
+		= {coercion_trees & [i] = f coercion_tree}
 	
 class performOnTypeVars a :: !(TypeAttribute TypeVar .st -> .st) !a !.st -> .st
 // run through a type and do something on each type variable

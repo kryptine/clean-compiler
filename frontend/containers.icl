@@ -135,6 +135,14 @@ bitvectSelect :: !Int !LargeBitvect -> Bool
 bitvectSelect index a
 	= a.[BITINDEX index] bitand (1 << BITNUMBER index) <> 0
 
+bitvectTestAndSet :: !Int !*LargeBitvect -> (!Bool,!.LargeBitvect)
+bitvectTestAndSet index a
+	#  bit_index = BITINDEX index
+	#! a_bit_index = a.[bit_index]
+	#  mask = 1 << BITNUMBER index
+	#  new_a_bit_index = a_bit_index bitor mask
+	= (new_a_bit_index==a_bit_index,{ a & [bit_index] = new_a_bit_index})
+
 bitvectSet :: !Int !*LargeBitvect -> .LargeBitvect 
 bitvectSet index a
 	#! bit_index = BITINDEX index
@@ -161,8 +169,7 @@ bitvectSetFirstN n_bits a
 
 bitvectResetAll :: !*LargeBitvect -> .LargeBitvect 
 bitvectResetAll arr
-	#! size
-			= size arr
+	#! size = size arr
 	= { arr & [i] = 0 \\ i<-[0..size-1] } // list should be optimized away
 
 bitvectOr :: !u:LargeBitvect !*LargeBitvect -> (!Bool, !u:LargeBitvect, !*LargeBitvect)

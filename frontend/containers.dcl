@@ -25,6 +25,7 @@ numberSetToList :: !NumberSet -> [Int]
 
 bitvectCreate :: !Int -> .LargeBitvect 
 bitvectSelect :: !Int !LargeBitvect -> Bool
+bitvectTestAndSet :: !Int !*LargeBitvect -> (!Bool,!.LargeBitvect)
 bitvectSet :: !Int !*LargeBitvect -> .LargeBitvect 
 bitvectReset :: !Int !*LargeBitvect -> .LargeBitvect
 bitvectSetFirstN :: !Int !*LargeBitvect -> .LargeBitvect 

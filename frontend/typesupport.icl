@@ -361,7 +361,7 @@ cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,ts
 	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
-	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions cus.cus_attr_env [] [] cus_error
+	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) cus.cus_attr_env [] [] cus_error
 	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error}) = update_expression_types { cui & cui_top_level = False } case_and_let_exprs
 				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
 							 cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
@@ -451,50 +451,55 @@ where
 				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
 		| otherwise
 			= (collected_contexts, env, error)
-				
-	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
-		-> (!*AttributeEnv, ![AttributeVar], ![AttrInequality], !*ErrorAdmin)
-	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions attr_env attr_vars inequalities error
+
+	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
+																							-> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
+	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions already_build_inequalities attr_env attr_vars inequalities error
 		| attr_group_index == max_attr_nr
 			= (attr_env, attr_vars, inequalities, error)
 		# (attr, attr_env) = attr_env![attr_group_index]
 		= case attr of
 			TA_Var attr_var
-				# (ok, attr_env, inequalities)
+				# already_build_inequalities = bitvectResetAll already_build_inequalities
+				# (ok, attr_env, inequalities,already_build_inequalities)
 						= build_inequalities appears_in_lifted_part (bitvectSelect attr_group_index appears_in_lifted_part)
-								attr_var coercions.[attr_group_index] coercions attr_env inequalities
-				  error
-				  		= case ok of
+								attr_var coercions.[attr_group_index] coercions attr_env inequalities already_build_inequalities
+				  error = case ok of
 				  			True
 				  				-> error
 				  			_
 				  				-> checkError "attribute variable of lifted argument appears in derived attribute inequality"
-										"" error
-				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions attr_env [attr_var : attr_vars] inequalities error
+				  					"" error
+				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities attr_env [attr_var : attr_vars] inequalities error
 			TA_None
-				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions attr_env attr_vars inequalities error
-	
-	build_inequalities :: {#Int} Bool AttributeVar !CoercionTree {!CoercionTree} *{!TypeAttribute} [AttrInequality] -> (!Bool,!*{!TypeAttribute},![AttrInequality])
-	build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var (CT_Node dem_attr left right)
-				coercions attr_env inequalities
-		# (ok1, attr_env, inequalities)
-				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var left coercions attr_env inequalities
-		  (ok2, attr_env, inequalities)
-		  		= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var right coercions attr_env inequalities
+				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities attr_env attr_vars inequalities error
+
+	build_inequalities :: {#Int} Bool AttributeVar !CoercionTree {!CoercionTree} !*{!TypeAttribute}  [AttrInequality] !*LargeBitvect
+																	   -> (!Bool,!*{!TypeAttribute},![AttrInequality],!*LargeBitvect)
+	build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var (CT_Node dem_attr left right) 
+				coercions attr_env inequalities already_build_inequalities
+		# (ok1, attr_env, inequalities,already_build_inequalities)
+				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var left coercions attr_env inequalities already_build_inequalities
+		  (ok2, attr_env, inequalities,already_build_inequalities)
+		  		= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var right coercions attr_env inequalities already_build_inequalities
 		# (attr, attr_env) = attr_env![dem_attr]
 		= case attr of
 			TA_Var attr_var
 				| is_new_inequality attr_var off_var inequalities
 					# ok3 = off_appears_in_lifted_part == bitvectSelect dem_attr appears_in_lifted_part
-					-> (ok1 && ok2 && ok3, attr_env, [{ ai_demanded = attr_var, ai_offered = off_var } : inequalities]) 
-					-> (ok1 && ok2, attr_env, inequalities)
+					-> (ok1 && ok2 && ok3, attr_env, [{ ai_demanded = attr_var, ai_offered = off_var } : inequalities],already_build_inequalities) 
+					-> (ok1 && ok2, attr_env, inequalities,already_build_inequalities)
 			TA_None
-				# (ok3, attr_env, inequalities)
+				# (already_build_inequality,already_build_inequalities) = bitvectTestAndSet dem_attr already_build_inequalities
+				| already_build_inequality
+					-> (ok1 && ok2, attr_env, inequalities,already_build_inequalities)
+				# (ok3, attr_env, inequalities,already_build_inequalities)
 						= build_inequalities appears_in_lifted_part off_appears_in_lifted_part 
-								off_var coercions.[dem_attr] coercions attr_env inequalities
-				-> (ok1 && ok2 && ok3, attr_env, inequalities)
-	build_inequalities _ _ off_var tree coercions attr_env inequalities
-		= (True, attr_env, inequalities)
+								off_var coercions.[dem_attr] coercions attr_env inequalities already_build_inequalities
+				#! ok3=ok3
+				-> (ok1 && ok2 && ok3, attr_env, inequalities,already_build_inequalities)
+	build_inequalities _ _ off_var tree coercions attr_env inequalities already_build_inequalities
+		= (True, attr_env, inequalities,already_build_inequalities)
 
 	is_new_inequality dem_var off_var []
 		= True
@@ -652,13 +657,13 @@ substituteType form_root_attribute act_root_attribute form_type_args act_type_ar
 
 bindTypeVarsAndAttributes :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !*TypeHeaps -> *TypeHeaps
 bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
-	# th_attrs = bind_attribute form_root_attribute act_root_attribute type_heaps.th_attrs
+	# th_attrs = bind_attribute form_root_attribute act_root_attribute type_heaps.th_attrs	
 	= fold2St bind_type_and_attr form_type_args act_type_args { type_heaps & th_attrs = th_attrs }
 where
 	bind_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} {at_type,at_attribute} type_heaps=:{th_vars,th_attrs}
 		= { type_heaps &	th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type),
 							th_attrs = bind_attribute atv_attribute at_attribute th_attrs }
-		
+
 	bind_attribute (TA_Var {av_info_ptr}) attr th_attrs
 		= th_attrs <:= (av_info_ptr, AVI_Attr attr)
 	bind_attribute _ _ th_attrs
@@ -688,6 +693,13 @@ where
 instance substitute TypeAttribute
 where
 	substitute (TA_Var {av_ident, av_info_ptr}) heaps=:{th_attrs}
+		#! av_info = sreadPtr av_info_ptr th_attrs
+		= case av_info of
+			AVI_Attr attr
+				-> (attr, heaps)
+			_
+				-> (TA_Multi, heaps)
+	substitute (TA_RootVar {av_info_ptr}) heaps=:{th_attrs}
 		#! av_info = sreadPtr av_info_ptr th_attrs
 		= case av_info of
 			AVI_Attr attr
@@ -1717,14 +1729,14 @@ accCoercionTree f i coercion_trees
 	acc_coercion_tree i coercion_trees
 		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
 		  (x, coercion_tree) = f coercion_tree
-		= (x, snd (replace coercion_trees i coercion_tree))
+		= (x, {coercion_trees & [i]=coercion_tree})
 	
 appCoercionTree f i coercion_trees
 	:== acc_coercion_tree i coercion_trees
   where
 	acc_coercion_tree i coercion_trees
 		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
-		= snd (replace coercion_trees i (f coercion_tree))
+		= {coercion_trees & [i] = f coercion_tree}
 	
 flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
 flattenCoercionTree tree
