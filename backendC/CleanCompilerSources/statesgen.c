@@ -1228,7 +1228,7 @@ void ExamineTypesAndLhsOfSymbols (Symbol symbs)
 #endif
 }
 
-extern PolyList UserDefinedArrayFunctions;
+PolyList UserDefinedArrayFunctions;
 
 void ImportSymbols (Symbol symbols)
 {
