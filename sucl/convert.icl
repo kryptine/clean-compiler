@@ -233,11 +233,7 @@ convert_expression bounds (Case caseinfo) ((heap0,seen0),(nodes6,fundefs5,global
                    = mkrule (innerglobals++defaultroots++selectorroots) defaultroot emptygraph
          // (1.5) convert default if necessary
          ((heap4,seen3),(nodes7,fundefs6,globals7,defaultroots))
-          = case caseinfo.case_default
-            of Yes expr
-                -> convert_expression bounds expr ((heap3,seen2),(nodes6,fundefs5,globals6,[]))
-               No
-                -> ((heap3,seen2),(nodes6,fundefs5,globals6,[]))
+          = foldoptional id (convert_expression bounds) caseinfo.case_default ((heap3,seen2),(nodes6,fundefs5,globals6,[]))
          // (1) convert branches
          ((heap3,seen2),(innerglobals,fundefs7,alternatives))
           = case caseinfo.case_guards
@@ -246,7 +242,7 @@ convert_expression bounds (Case caseinfo) ((heap0,seen0),(nodes6,fundefs5,global
                BasicPatterns _ branches
                 -> foldlr convert_basic_branch ((heap2,seen1),([],fundefs6,[])) branches
                _
-                -> ((heap2,seen1),([],fundefs6,abort "convert: convert_expression: cannot handle case guard constructor"))
+                -> ((heap2,seen1),([],fundefs6,abort "convert: convert_expression: unhandled CasePatterns constructor"))
          globals8 = removeDup (innerglobals++globals7)
          // (0.5) Convert selector
          ((heap2,seen1),(nodes8,fundefs8,globals9,selectorroots))
