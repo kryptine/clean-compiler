@@ -1960,9 +1960,16 @@ static Bool insert_unique_fill_node (NodeP node,FreeUniqueNodeIdsP *f_node_ids,i
 # else
 				DetermineSizeOfState (node_id_p->nid_state,&e_a_size2,&e_b_size2);
 # endif
-				if (e_a_size1!=e_a_size2 || e_b_size1!=e_b_size2 ||
-					((e_a_size1 | e_a_size2)!=0 && a_size1!=a_size2) ||
-					((e_b_size1 | e_b_size2)!=0 && b_size1+node_a_size!=b_size2+total_a_size2))
+				if (e_a_size1!=e_a_size2 ||
+					e_b_size1!=e_b_size2 ||
+					(e_a_size1!=0 && (a_size1!=a_size2 ||
+						((a_size1==1 || (a_size1==0 && e_a_size1>1)) &&
+							((node_size==2) != (total_a_size2+total_b_size2==2)))
+						)) ||
+					(e_b_size1!=0 && (b_size1+node_a_size!=b_size2+total_a_size2 ||
+						((b_size1+node_a_size==1 || (b_size1+node_a_size==0 && e_b_size1>1)) &&
+							((node_size==2) != (total_a_size2+total_b_size2==2)))
+						)))
 				{
 					argument_overwrite_bits|=1<<n;			
 				} else {
