@@ -482,8 +482,14 @@ instance declareVars BackendBody where
 class declare a :: ModuleIndex !VarHeap a  -> Backender
 class declareWithIndex a :: Index ModuleIndex !VarHeap a -> Backender
 
+//1.3
 instance declare {#a} | declareWithIndex a & ArrayElem a where
 	declare :: ModuleIndex  VarHeap {#a} -> Backender | declareWithIndex a & ArrayElem a 
+//3.1
+/*2.0
+instance declare {#a} | declareWithIndex a & Array {#} a where
+	declare :: ModuleIndex  VarHeap {#a} -> Backender | declareWithIndex a & Array {#} a 
+0.2*/
 	declare moduleIndex varHeap array
 		=	foldStateWithIndexA (\i -> declareWithIndex i moduleIndex varHeap) array
 

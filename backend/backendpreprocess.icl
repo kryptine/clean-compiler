@@ -17,7 +17,12 @@ class preprocess a :: a -> Preprocessor
 :: PreprocessState
 	:==	VarHeap
 
+//1.3
 instance preprocess {#a} | preprocess a & ArrayElem a where
+//3.1
+/*2.0
+instance preprocess {#a} | preprocess a & Array {#} a where
+0.2*/
 	preprocess array
 		=	foldStateA preprocess array
 

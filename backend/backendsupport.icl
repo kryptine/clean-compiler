@@ -1,6 +1,6 @@
 implementation module backendsupport
 
-from StdArray import size, size_u
+import StdArray
 from StdFunc import `bind`
 from StdInt import +, ==
 

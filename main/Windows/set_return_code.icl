@@ -2,7 +2,7 @@ implementation module set_return_code;
 
 import code from "set_return_code.obj";
 
-from StdString import String;
+import StdString;
 
 :: *UniqueWorld :== World;
 
