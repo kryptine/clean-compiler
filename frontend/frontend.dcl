@@ -7,7 +7,7 @@ import checksupport, transform, overloading
 :: FrontEndSyntaxTree
 	=	{	fe_icl :: !IclModule
 		,	fe_dcls :: !{#DclModule}
-		,	fe_components :: {!Group}
+		,	fe_components :: !{!Group}
 		,	fe_varHeap :: !.VarHeap
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}

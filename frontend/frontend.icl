@@ -6,7 +6,7 @@ import RWSDebug
 :: FrontEndSyntaxTree
 	=	{	fe_icl :: !IclModule
 		,	fe_dcls :: !{#DclModule}
-		,	fe_components :: {!Group}
+		,	fe_components :: !{!Group}
 		,	fe_varHeap :: !.VarHeap
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
@@ -16,7 +16,7 @@ import RWSDebug
 // trace macro
 (-*->) infixl
 (-*->) value trace
-	:==	value ---> trace
+	:==	value // ---> trace
 
 frontEndInterface :: !Ident !SearchPaths !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface mod_ident search_paths predef_symbols hash_table files error io out
@@ -42,9 +42,8 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 		= (predef_symbols, hash_table, files, error, io, out, No)
 
 	# (components, fun_defs) 		= partitionateFunctions (fun_defs -*-> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
-	  (components, fun_defs, io)	= showTypes components 0 fun_defs io
+//	  (components, fun_defs, io)	= showTypes components 0 fun_defs io
 //	  (components, fun_defs, out)	= showComponents components 0 True fun_defs out
-
 
 	  (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components -*-> "convertDynamics") fun_defs predef_symbols
