@@ -14,6 +14,7 @@ AttrVarHeap	../compiler/syntax.dcl	/::\tAttrVarHeap\>/
 AttrVarInfo	../compiler/syntax.dcl	/::\tAttrVarInfo\>/
 AttrVarInfoPtr	../compiler/syntax.dcl	/::\tAttrVarInfoPtr\>/
 AttributeVar	../compiler/syntax.dcl	/::\tAttributeVar\>/
+AuxiliaryPattern	../compiler/syntax.dcl	/:: \tAuxiliaryPattern\>/
 BackendBody	../compiler/syntax.dcl	/::\tBackendBody\>/
 BasicPattern	../compiler/syntax.dcl	/::\tBasicPattern\>/
 BasicType	../compiler/syntax.dcl	/::\tBasicType\>/
@@ -101,6 +102,7 @@ LetExpressionInfo	../compiler/syntax.dcl	/::\tLetExpressionInfo\>/
 LetExpressionStatus	../compiler/syntax.dcl	/::\tLetExpressionStatus\>/
 LetOccurrences	../compiler/syntax.dcl	/::\tLetOccurrences\>/
 LetVarInfo	../compiler/syntax.dcl	/::\tLetVarInfo\>/
+Level	../compiler/syntax.dcl	/::  Level\>/
 LocalDefs	../compiler/syntax.dcl	/::\tLocalDefs\>/
 MemberDef	../compiler/syntax.dcl	/::\tMemberDef\>/
 Module	../compiler/syntax.dcl	/::\tModule\>/
@@ -131,6 +133,7 @@ RefCountsInCase	../compiler/syntax.dcl	/::\tRefCountsInCase\>/
 ReferenceCount	../compiler/syntax.dcl	/::\tReferenceCount\>/
 Rhs	../compiler/syntax.dcl	/::\tRhs\>/
 RhsDefsOfType	../compiler/syntax.dcl	/::\tRhsDefsOfType\>/
+STE_Kind	../compiler/syntax.dcl	/::\tSTE_Kind\>/
 ScannedModule	../compiler/syntax.dcl	/::\tScannedModule\>/
 Selection	../compiler/syntax.dcl	/::\tSelection\>/
 SelectiveUse	../compiler/syntax.dcl	/::\tSelectiveUse\>/
