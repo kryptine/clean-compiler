@@ -1785,7 +1785,7 @@ where
 	Dynamic administration is rebuilt.
 */	
 
-class collectVariables a :: !a ![FreeVar] ![DynamicPtr] !*CollectState -> !(!a, ![FreeVar],[DynamicPtr],!*CollectState)
+class collectVariables a :: !a ![FreeVar] ![DynamicPtr] !*CollectState -> (!a, ![FreeVar],[DynamicPtr],!*CollectState)
 
 cContainsACycle		:== True
 cContainsNoCycle	:== False
