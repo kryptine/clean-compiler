@@ -814,7 +814,7 @@ where
 		'\t'	->	(['t','\\':chars], n + 2, input)
 		'\v'	->	(['v','\\':chars], n + 2, input)
 		'\\'	->	(['\\','\\':chars], n + 2, input)
-//		'"'		->	(['"' ,'\\':chars], n + 2, input)
+		'"'		->	(['"' ,'\\':chars], n + 2, input)
 		'\''	->	(['\'','\\':chars], n + 2, input)
 	 	c		->	([c:chars], n + 1, input)
 
