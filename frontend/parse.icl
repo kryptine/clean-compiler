@@ -31,7 +31,6 @@ is_record_update updates
 
 // ... RWS
 
-// Sjaak 
 /*
 
 Parser for Clean 2.0
@@ -1697,7 +1696,7 @@ wantRhsExpressionT  token pState
 	| succ
 		# (exprs, pState) = parseList trySimpleRhsExpression pState
 		= (combineExpressions expr exprs, pState)
-		= (PE_Empty,  parseError "RHS expression" (Yes token) "<expression>" pState)
+		= (PE_Empty,  parseError "RHS expression" (Yes token) "<expression> **" pState)
 
 wantLhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
 wantLhsExpressionT  token pState
@@ -1765,7 +1764,7 @@ where
 wantSelectors :: Token *ParseState -> *(![ParsedSelection], !*ParseState)
 wantSelectors token pState
 			# (selector, pState) = want_selector token pState
-			  (token, pState) = nextToken  FunctionContext pState
+			  (token, pState) = nextToken FunctionContext pState
 			| token == DotToken
 				# (token, pState) = nextToken FunctionContext pState
 				  (selectors, pState) = wantSelectors token pState
@@ -2085,6 +2084,7 @@ where
 	{	nu_selectors :: ![ParsedSelection]
 	,	nu_update_expr :: !ParsedExpr
 	}
+
 errorIdent :: Ident
 errorIdent
 	=	{id_name = "<<error>>", id_info = nilPtr}
@@ -2515,6 +2515,7 @@ wantEndGroup msg pState
 	| ss_useLayout
 		= case token of
 			EndGroupToken	->	pState
+			InToken			->	tokenBack pState
 			_				->	parseError msg (Yes token) "end of group with layout" pState
 	// ~ ss_useLayout
 	| token == CurlyCloseToken
@@ -2569,6 +2570,7 @@ wantEndLocals pState
 	| ss_useLayout
 		= case token of
 			EndGroupToken	->	pState
+			InToken			->	tokenBack pState	// For let expressions with cases
 			_				->	parseError "local definitions" (Yes token) "end of locals with layout" pState
 	// ~ ss_useLayout
 	| token == CurlyCloseToken
@@ -2593,6 +2595,7 @@ wantEndCase pState
 			SemicolonToken		->	tokenBack (appScanState dropOffsidePosition pState)
 			CommaToken			->	tokenBack (appScanState dropOffsidePosition pState)
 			ColonToken			->	tokenBack (appScanState dropOffsidePosition pState)
+			InToken				->	tokenBack (appScanState dropOffsidePosition pState)
 			_					->	parseError "case expression" (Yes token) "end of case with layout" pState
 	// ~ ss_useLayout
 	| token == CurlyCloseToken

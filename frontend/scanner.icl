@@ -1375,7 +1375,8 @@ checkOffside pos token scanState=:{ss_offsides,ss_useLayout,ss_input}
 			  	= (newToken, scanState) // -->> ("new offsides",new_offsides)
 			  	= gen_end_groups (dec n) scanState
 	| token == InToken
-		# scanState			= tokenBack { scanState & ss_offsides = tl ss_offsides }
+		= (token, { scanState & ss_offsides = tl ss_offsides })
+/*		# scanState			= tokenBack { scanState & ss_offsides = tl ss_offsides }
 		  newToken			= EndGroupToken
 		= ( newToken
 		  , { scanState
@@ -1389,7 +1390,7 @@ checkOffside pos token scanState=:{ss_offsides,ss_useLayout,ss_input}
 					scanState.ss_tokenBuffer
 			}
 		  ) -->> (token,"EndGroupToken generated: in",pos,ss_offsides)
-	// otherwise
+*/	// otherwise
 		= newOffside token scanState
 where
 	newOffside token scanState=:{ss_offsides}
