@@ -3547,6 +3547,14 @@ static void print_foreign_export_type (TypeNode type)
 	error_in_function ("print_foreign_export_type");
 }
 
+static void print_foreign_export_result_type (TypeNode type)
+{
+	if (!type->type_node_is_var && type->type_node_symbol->symb_kind==tuple_type)
+		FPrintF (OutFile,"V");
+
+	print_foreign_export_type (type);
+}
+
 void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 {
 	struct foreign_export_list *foreign_export_p;
@@ -3567,7 +3575,7 @@ void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 		
 		FPrintF (OutFile,":");
 		
-		print_foreign_export_type (rule_type_p->type_alt_rhs);
+		print_foreign_export_result_type (rule_type_p->type_alt_rhs);
 				
 		FPrintF (OutFile,"\"");
 	}
