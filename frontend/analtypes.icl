@@ -852,6 +852,7 @@ where
 			| module_index == main_module_index
 				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
 				# (class_infos, gen_heap, as) = check_kinds_of_generics common_defs 0 common_defs.[module_index].com_generic_defs class_infos gen_heap as
+				# as = check_kinds_of_gencases 0 common_defs.[module_index].com_gencase_defs as
 				# (icl_fun_defs, class_infos, as) = foldSt (check_kinds_of_icl_fuctions common_defs) icl_fun_def_ranges (icl_fun_defs, class_infos, as)
 					with
 						check_kinds_of_icl_fuctions common_defs {ir_from,ir_to} (icl_fun_defs, class_infos, as)
@@ -860,6 +861,7 @@ where
 			| module_index >= first_uncached_module
 				# (class_infos, as) = check_kinds_of_class_instances common_defs 0 common_defs.[module_index].com_instance_defs class_infos as
 				# (class_infos, gen_heap, as) = check_kinds_of_generics common_defs 0 common_defs.[module_index].com_generic_defs class_infos gen_heap as
+				# as = check_kinds_of_gencases 0 common_defs.[module_index].com_gencase_defs as
 				# (dcl_modules, class_infos, as) = check_kinds_of_dcl_fuctions common_defs module_index dcl_modules class_infos as
 				= (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
 				= (icl_fun_defs, dcl_modules, class_infos, gen_heap, as)
@@ -872,11 +874,8 @@ where
 			= check_kinds_of_class_instances common_defs (inc instance_index) instance_defs class_infos as
 	where	
 		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
-		check_kinds_of_class_instance common_defs {ins_generated, ins_class,ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
+		check_kinds_of_class_instance common_defs {ins_class,ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
 					as=:{as_type_var_heap,as_kind_heap,as_error}
-			| ins_generated
-				// generic instances are cheched in the generic phase
-				= (class_infos, as)		
 			# as_error = pushErrorAdmin (newPosition ins_ident ins_pos) as_error
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
 			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }
@@ -910,13 +909,35 @@ where
 
 		check_kinds_of_generic_vars :: ![TypeKind] !*AnalyseState -> !*AnalyseState
 		check_kinds_of_generic_vars [gen_kind:gen_kinds] as
-			| all (\k -> k == gen_kind) gen_kinds
+			//| all (\k -> k == gen_kind) gen_kinds
+			  | all ((==) KindConst) [gen_kind:gen_kinds]  // forcing all kind variables be of kind star
 				 = as 
 				 # as_error = checkError 
 				 	"conflicting kinds: "
 				 	"generic variables must have the same kind" 
 				 	as.as_error
 				 = {as & as_error = as_error}  
+
+	check_kinds_of_gencases :: !Index !{#GenericCaseDef} !*AnalyseState -> !*AnalyseState
+	check_kinds_of_gencases index gencases as
+		| index == size gencases
+			= as
+			# as = check_kinds_of_gencase gencases.[index] as	
+			= check_kinds_of_gencases (inc index) gencases as 
+	where
+		check_kinds_of_gencase gencase=:{gc_type_cons=TypeConsSymb {type_index}} as=:{as_error, as_td_infos}
+			# ({tdi_kinds}, as_td_infos) = as_td_infos ! [type_index.glob_module, type_index.glob_object] 
+			# kind = if (isEmpty tdi_kinds) KindConst (KindArrow tdi_kinds)
+			# as_error = case rank_of_kind kind > 2 of 
+				True -> checkError kind "only kinds up to rank-2 supported by generics" as_error
+				False -> as_error
+			= {as & as_error = as_error, as_td_infos = as_td_infos}
+		where
+			rank_of_kind KindConst = 0
+			rank_of_kind (KindArrow kinds) = 1 + foldr max 0 (map rank_of_kind kinds)	
+			
+		check_kinds_of_gencase gencase as 
+			= as
 
 	check_kinds_of_icl_fuction common_defs fun_index (icl_fun_defs, class_infos, as)
 		# ({fun_type,fun_symb,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]

@@ -819,7 +819,6 @@ where
 			com_cons_defs = arrayPlusList cons_defs new_cons_defs}
 
 		#! heaps = {heaps & hp_var_heap = hp_var_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}} 
-		#! modules = { modules & [module_index] = common_defs } 		
 		= (common_defs, dcl_modules, heaps, symbol_table)		
 
 
@@ -1289,14 +1288,6 @@ where
 	build_instance_and_member module_index class_index gencase symbol_type ins_type fun_info ins_info heaps
 		#! (memfun_ds, fun_info, heaps) 
 			= build_instance_member module_index gencase symbol_type fun_info heaps
-/*
-		#! ins_type = 
-			{	it_vars	= []
-			,	it_types = [gencase.gc_type]
-			,	it_attr_vars = []
-			,	it_context = []
-			}
-*/			
 		#! ins_info = build_class_instance class_index gencase memfun_ds ins_type ins_info
 		= (fun_info, ins_info, heaps)
 	
@@ -1366,7 +1357,6 @@ where
 			,	ins_members	= {member_fun_ds}
 			,	ins_specials = SP_None
 			,	ins_pos		= gc_pos
-			,	ins_generated = True 
 			}
 		
 		= (inc ins_index, [ins:instances])
@@ -1812,23 +1802,23 @@ instance foldType TypeContext where
 // mapping of a AType, depth first 
 //----------------------------------------------------------------------------------------
 class mapTypeSt type :: 
-	(Type  .st -> (Type, .st)) 			// called on each type before recursion
-	(AType  .st -> (AType, .st)) 		// called on each attributed type before recursion
-	(Type  .st -> (Type, .st)) 			// called on each type after recursion
-	(AType  .st -> (AType, .st)) 		// called on each attributed type after recursion	
-	type .st -> (type, .st)
+	(Type  -> u:(.st -> u:(Type, .st))) 			// called on each type before recursion
+	(AType -> u:(.st -> u:(AType, .st))) 		// called on each attributed type before recursion
+	(Type  -> u:(.st -> u:(Type, .st))) 			// called on each type after recursion
+	(AType -> u:(.st -> u:(AType, .st))) 		// called on each attributed type after recursion	
+	type .st -> u:(type, .st)
 
 mapTypeBeforeSt :: 
-	(Type  .st -> (Type, .st)) 			// called on each type before recursion
-	(AType  .st -> (AType, .st)) 		// called on each attributed type before recursion
-	type .st -> (type, .st) | mapTypeSt type
+	(Type  -> u:(.st -> u:(Type, .st))) 			// called on each type before recursion
+	(AType  -> u:(.st -> u:(AType, .st))) 		// called on each attributed type before recursion
+	type .st -> u:(type, .st) | mapTypeSt type
 mapTypeBeforeSt on_type_before on_atype_before type st
 	= mapTypeSt on_type_before on_atype_before idSt idSt type st
 	
 mapTypeAfterSt :: 
-	(Type  .st -> (Type, .st)) 			// called on each type after recursion
-	(AType  .st -> (AType, .st)) 		// called on each attributed type after recursion
-	type .st -> (type, .st) | mapTypeSt type
+	(Type  -> u:(.st -> u:(Type, .st))) 			// called on each type after recursion
+	(AType  -> u:(.st -> u:(AType, .st))) 		// called on each attributed type after recursion
+	type .st -> u:(type, .st) | mapTypeSt type
 mapTypeAfterSt on_type_after on_atype_after type st
 	= mapTypeSt idSt idSt on_type_after on_atype_after type st
 

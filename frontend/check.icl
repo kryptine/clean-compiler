@@ -490,12 +490,8 @@ where
 	check_class_instance :: ClassDef !Index !Index !Index !ClassInstance !u:InstanceSymbols !*TypeHeaps !*CheckState 
 		-> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
 	check_class_instance class_def module_index class_index class_mod_index
-			ins=:{ins_members,ins_class={glob_object = class_name =: {ds_ident = {id_name,id_info},ds_arity}},ins_type,ins_specials,ins_pos,ins_ident,ins_generated}
+			ins=:{ins_members,ins_class={glob_object = class_name =: {ds_ident = {id_name,id_info},ds_arity}},ins_type,ins_specials,ins_pos,ins_ident}
 			is=:{is_class_defs,is_modules} type_heaps cs=:{cs_symbol_table}	
-		| ins_generated
-			= ( ins, is, type_heaps
-			  , { cs & cs_error = checkError id_name "cannot generate class instance" cs.cs_error }
-			  )
 		| class_def.class_arity == ds_arity
 			# ins_class = { glob_object = { class_name & ds_index = class_index }, glob_module = class_mod_index}
 			  (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs)
@@ -530,9 +526,7 @@ where
 		// otherwise
 			= (instance_types, instance_defs, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 
-	check_class_instance {ins_pos,ins_class,ins_members,ins_type, ins_generated} mod_index instance_types class_defs member_defs generic_defs type_defs modules var_heap type_heaps cs
-			| ins_generated
-				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
+	check_class_instance {ins_pos,ins_class,ins_members,ins_type} mod_index instance_types class_defs member_defs generic_defs type_defs modules var_heap type_heaps cs
 			# ({class_members,class_name}, class_defs, modules) = getClassDef ins_class mod_index class_defs modules
 			  class_size = size class_members
 			| class_size == size ins_members
@@ -810,34 +804,20 @@ where
 	determine_types_of_instances x_main_dcl_module_n inst_index next_class_inst_index next_mem_inst_index mod_index all_class_specials
 			class_defs member_defs modules instance_defs type_heaps var_heap predef_symbols error
 		| inst_index < size instance_defs
-			# (instance_def, instance_defs) = instance_defs![inst_index]
-			# {ins_class,ins_pos,ins_type,ins_specials, ins_generated} = instance_def
-			| ins_generated	
-				
-				// REMOVE ins_generated functionality
-				# empty_st = 
-					{	st_vars = []
-					,	st_args = []
-					,	st_arity = -1
-					,	st_result = {at_type=TE, at_attribute=TA_None, at_annotation=AN_None}
-					,	st_context = []
-					,	st_attr_vars = []
-					,	st_attr_env = []
-					}	
-				= undef				
-				# ({class_name, class_members}, class_defs, modules) = getClassDef ins_class mod_index class_defs modules
-				  class_size = size class_members
-				  (ins_members, memb_inst_defs1, member_defs, modules, type_heaps, var_heap, error)
-				  		= determine_instance_symbols_and_types x_main_dcl_module_n next_mem_inst_index 0 mod_index ins_class.glob_module class_size class_members
-				  				ins_type ins_specials class_name ins_pos member_defs modules type_heaps var_heap error
-				  instance_def = { instance_def & ins_members = { member \\ member <- ins_members }}
-				  (ins_specials, next_class_inst_index, all_class_specials, type_heaps, predef_symbols,error)
-						= check_instance_specials mod_index instance_def inst_index ins_specials next_class_inst_index all_class_specials type_heaps predef_symbols error
-				  (memb_inst_defs2, next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
-				  		= determine_types_of_instances x_main_dcl_module_n (inc inst_index) next_class_inst_index (next_mem_inst_index + class_size) mod_index all_class_specials
-				  				class_defs member_defs modules { instance_defs & [inst_index] = { instance_def & ins_specials = ins_specials }} type_heaps var_heap predef_symbols error
-	
-				= (memb_inst_defs1 ++ memb_inst_defs2, next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
+			# (instance_def=:{ins_class,ins_pos,ins_type,ins_specials}, instance_defs) = instance_defs![inst_index]
+			# ({class_name, class_members}, class_defs, modules) = getClassDef ins_class mod_index class_defs modules
+			  class_size = size class_members
+			  (ins_members, memb_inst_defs1, member_defs, modules, type_heaps, var_heap, error)
+			  		= determine_instance_symbols_and_types x_main_dcl_module_n next_mem_inst_index 0 mod_index ins_class.glob_module class_size class_members
+			  				ins_type ins_specials class_name ins_pos member_defs modules type_heaps var_heap error
+			  instance_def = { instance_def & ins_members = { member \\ member <- ins_members }}
+			  (ins_specials, next_class_inst_index, all_class_specials, type_heaps, predef_symbols,error)
+					= check_instance_specials mod_index instance_def inst_index ins_specials next_class_inst_index all_class_specials type_heaps predef_symbols error
+			  (memb_inst_defs2, next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
+			  		= determine_types_of_instances x_main_dcl_module_n (inc inst_index) next_class_inst_index (next_mem_inst_index + class_size) mod_index all_class_specials
+			  				class_defs member_defs modules { instance_defs & [inst_index] = { instance_def & ins_specials = ins_specials }} type_heaps var_heap predef_symbols error
+
+			= (memb_inst_defs1 ++ memb_inst_defs2, next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
 			= ([], next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
 
 	determine_instance_symbols_and_types :: !Index !Index !Index !Index !Index !Int !{#DefinedSymbol} !InstanceType !Specials Ident !Position
@@ -3459,12 +3439,10 @@ where
 				= foldlArraySt (count_members_of_instance mod_index) com_instance_defs (0, com_class_defs, modules)
 		= sum
 
-	count_members_of_instance mod_index {ins_class,ins_generated} (sum, com_class_defs, modules)
-		| ins_generated
-			= (1 + sum, com_class_defs, modules)
-			# ({class_members}, com_class_defs, modules)
-				= getClassDef ins_class mod_index com_class_defs modules
-	 		= (size class_members + sum, com_class_defs, modules)
+	count_members_of_instance mod_index {ins_class} (sum, com_class_defs, modules)
+		# ({class_members}, com_class_defs, modules)
+			= getClassDef ins_class mod_index com_class_defs modules
+ 		= (size class_members + sum, com_class_defs, modules)
 
 adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_error}
 	# pre_id = predefined_idents.[predef_index]

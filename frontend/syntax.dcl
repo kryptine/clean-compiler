@@ -361,7 +361,6 @@ cNameLocationDependent :== True
 	,	ins_members		:: !{# DefinedSymbol}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
-	,	ins_generated	:: !Bool				//AA 
 	}
 
 /*
@@ -876,6 +875,9 @@ cNonRecursiveAppl	:== False
 	,	tc_types	:: ![Type]
 	,	tc_var		:: !VarInfoPtr
 	}
+
+:: TCClass 	= TCClass 		!(Global DefinedSymbol)
+			| TCGeneric 	!(Global DefinedSymbol) !TypeKind
 
 ::	AType =
 	{	at_attribute	:: !TypeAttribute
@@ -1415,7 +1417,7 @@ ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
  		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
  					 it_context = pi.pi_context }, 
- 		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, ins_generated = False}
+ 		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
 	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,
