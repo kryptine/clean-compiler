@@ -50,7 +50,7 @@ import genericsupport, compilerSwitches, type_io_common
 	,	si_tail_strict_list_instances		:: ![ArrayInstance]
 	,	si_next_TC_member_index				:: !Index
 	,	si_TC_instances						:: ![GlobalTCInstance]
-	,	si_type_constructors_in_patterns	:: ![!Index]
+	,	si_type_constructors_in_patterns	:: ![Index]
 	}
 
 ::	LocalTypePatternVariable =
@@ -1297,7 +1297,7 @@ getTCDictionary symb_name var_info_ptr (var_heap, error)
 	,	tci_instances						:: ![GlobalTCInstance]
 	,	tci_type_var_heap					:: !.TypeVarHeap
 	,	tci_dcl_modules						:: !{# DclModule}
-	,	tci_type_constructors_in_patterns	:: ![!Index]
+	,	tci_type_constructors_in_patterns	:: ![Index]
 	}
 		
 class toTypeCodeExpression type :: !Ident type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
