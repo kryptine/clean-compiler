@@ -275,7 +275,7 @@ int do_command (char *command)
 static char script_string[16001];
 
 #ifdef CLEAN2
-int compiler_id;
+int compiler_id=-1;
 #else
 extern int compiler_id;
 #endif
