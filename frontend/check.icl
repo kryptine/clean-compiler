@@ -773,7 +773,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input var_env ps e_info cs
 	where
 		check_patterns left middle [] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
 			# (mid_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
-			  (pat, ps, e_info, cs) = combine_patterns pi_mod_index opt_var [mid_pat : left] [] 0 ps e_info cs // MW: pi_mod_index added (klopt dat ?)
+			  (pat, ps, e_info, cs) = combine_patterns pi_mod_index opt_var [mid_pat : left] [] 0 ps e_info cs
 			= (pat, var_env, ps, e_info, cs)
 		check_patterns left middle [right:rest] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
 			# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
@@ -783,8 +783,10 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input var_env ps e_info cs
 						# (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind constant [] No ps e_info cs
 						-> check_patterns [pattern: left] right rest opt_var p_input var_env ps e_info cs
 					| is_infix_constructor prio
-						# (left_arg, ps, e_info, cs) = combine_patterns pi_mod_index No left [] 0 ps e_info cs // MW: pi_mod_index added (klopt dat ?)
-						-> check_infix_pattern [] left_arg kind constant prio right rest opt_var p_input var_env ps e_info cs
+						# (left_arg, ps, e_info, cs) = combine_patterns pi_mod_index No left [] 0 ps e_info cs
+						  (right_pat, var_env, ps, e_info, cs) = check_pattern right p_input var_env ps e_info cs
+						-> check_infix_pattern [] left_arg kind constant prio [right_pat] rest
+									opt_var p_input var_env ps e_info cs
 						-> (AP_Empty ds_ident, var_env, ps, e_info,
 								{ cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
@@ -796,15 +798,13 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input var_env ps e_info cs
 			= checkPattern expr No p_input var_env ps e_info cs
 		
 	 	check_infix_pattern left_args left kind cons prio middle [] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
-			# (mid_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
-			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,mid_pat] opt_var ps e_info cs
+			# (middle_pat, ps, e_info, cs) = combine_patterns pi_mod_index No middle [] 0 ps e_info cs
+			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,middle_pat] opt_var ps e_info cs
 			  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
 			= (pattern, var_env, ps, e_info, cs)
-	 	check_infix_pattern left_args left kind cons prio middle [right] opt_var p_input=:{pi_mod_index} var_env ps e_info cs
-			# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
-// MW was     (right_pat, var_env, ps, e_info, cs) =  checkPattern middle No p_input var_env ps e_info cs
-			  (right_pat, var_env, ps, e_info, cs) =  checkPattern right No p_input var_env ps e_info cs
-			  (right_arg, ps, e_info, cs) = combine_patterns pi_mod_index No [right_pat, mid_pat] [] 0 ps e_info cs // MW added pi_mod_index argument (klopt dat ?)
+	 	check_infix_pattern left_args left kind cons prio middle [right] opt_var  p_input=:{pi_mod_index} var_env ps e_info cs
+			# (right_pat, var_env, ps, e_info, cs) = checkPattern right No p_input var_env ps e_info cs
+			  (right_arg, ps, e_info, cs) = combine_patterns pi_mod_index No [right_pat : middle] [] 0 ps e_info cs
 			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,right_arg] opt_var ps e_info cs
 			  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
 			= (pattern, var_env, ps, e_info, cs)
@@ -813,31 +813,29 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input var_env ps e_info cs
 			= case inf_cons_pat of
 				AP_Constant kind2 cons2=:{glob_object={ds_ident,ds_arity}} prio2
 					| ds_arity == 0
-						# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
+						# (middle_pat, ps, e_info, cs) = combine_patterns pi_mod_index No middle [] 0 ps e_info cs
 						  (pattern2, ps, e_info, cs) = buildPattern pi_mod_index kind2 cons2 [] No ps e_info cs
-						  (pattern1, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
+						  (pattern1, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,middle_pat] No ps e_info cs
 						  (pattern1, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern1 ps e_info cs
 						-> check_patterns [pattern2,pattern1] arg rest opt_var p_input var_env ps e_info cs
 					| is_infix_constructor prio2
 						# optional_prio = determinePriority prio1 prio2
 						-> case optional_prio of
 							Yes priority
+								# (arg_pat, var_env, ps, e_info, cs) = check_pattern arg p_input var_env ps e_info cs
 								| priority
-									# (mid_pat, var_env, ps, e_info, cs) = check_pattern middle p_input var_env ps e_info cs
-								      (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
+									# (middle_pat, ps, e_info, cs) = combine_patterns pi_mod_index No middle [] 0 ps e_info cs
+								      (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,middle_pat] No ps e_info cs
 								      (left_args, pattern, ps, e_info, cs) = build_left_pattern pi_mod_index left_args prio2 pattern ps e_info cs
-									-> check_infix_pattern left_args pattern kind2 cons2 prio2 arg rest opt_var p_input var_env ps e_info cs 
-									# (mid_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
-									-> check_infix_pattern [(kind1, cons1, prio1, left) : left_args] mid_pat kind2 cons2 prio2 arg
-											rest No p_input var_env ps e_info cs
+									-> check_infix_pattern left_args pattern kind2 cons2 prio2 [arg_pat] rest opt_var p_input var_env ps e_info cs 
+									# (middle_pat, ps, e_info, cs) = combine_patterns pi_mod_index No middle [] 0 ps e_info cs
+									-> check_infix_pattern [(kind1, cons1, prio1, left) : left_args]
+									  				middle_pat kind2 cons2 prio2 [arg_pat] rest No p_input var_env ps e_info cs
 							No
 								-> (AP_Empty ds_ident, var_env, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
 						-> (AP_Empty ds_ident, var_env, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
-					# (right_pat, var_env, ps, e_info, cs) = checkPattern middle No p_input var_env ps e_info cs
-					  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind1 cons1 [left,right_pat] No ps e_info cs
-					  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
-					-> check_patterns [inf_cons_pat, pattern] arg rest opt_var p_input var_env ps e_info cs
+					-> check_infix_pattern left_args left kind1 cons1 prio1 [inf_cons_pat : middle] [arg : rest] opt_var p_input var_env ps e_info cs 
 
 		is_infix_constructor (Prio _ _) = True
 		is_infix_constructor _ = False
