@@ -7,10 +7,3 @@ SwitchPreprocessor preprocessor no_preprocessor :== preprocessor
 
 SwitchGenerics on off :== on
 SwitchGenericInfo on off :== on
-
-// MV...
-// - change T_ypeObjectType in StdDynamic (remove DummyModuleName-argument of T_ypeConsSymbol)
-// - the (ModuleID _)-constructor is *not* yet shared
-
-switch_dynamics on off :== on;		// to turn dynamics on or off
-// ...MV

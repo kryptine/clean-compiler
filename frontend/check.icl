@@ -2742,7 +2742,7 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 			_ -> check_it PD_StdGeneric mod_ident "" extension cs
 	# cs = case x_needed_modules bitand cNeedStdDynamic of
 			0 -> cs
-			_ -> switch_dynamics (check_it PD_StdDynamic mod_ident "" extension cs) (switched_off_Clean_feature PD_StdDynamic mod_ident " (dynamics are disabled)" extension cs)
+			_ -> check_it PD_StdDynamic mod_ident "" extension cs
 	# cs = case x_needed_modules bitand cNeedStdArray of
 			0 -> cs
 			_ -> check_it PD_StdArray mod_ident " (needed for array denotations)" extension cs
