@@ -167,14 +167,30 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	fopen options.outPath options.outMode files
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
+// MV ...
+	# tcl_path
+		= ((directoryName options.pathName) +++ "Clean System Files\\" +++ (baseName options.pathName) +++ ".tcl")
+	# (opened,tcl_file, files)
+		=	fopen tcl_path FWriteData files
+	| not opened
+		=	abort ("couldn't open file \"" +++ tcl_path +++ "\n")
+// ... MV
 	# (io, files)
 		=	stdio files
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
 	# list_inferred_types = if (isMember "-lt" commandLineArgs) (Yes (not (isMember "-lattr" commandLineArgs))) No
-	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,heaps)
-		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out heaps
+	# (optionalSyntaxTree,cached_functions_and_macros,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
+		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
+
+// MV ...
+	# (closed, files)
+		=	fclose tcl_file files
+	| not closed
+		=	abort ("couldn't open tcl file \"" +++ options.pathName +++ "tcl\"\n")
+// ... MV
+
 	# (closed, files)
 		=	fclose io files
 	| not closed
