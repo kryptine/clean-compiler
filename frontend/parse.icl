@@ -1138,9 +1138,11 @@ where
 		# name					= td_name.id_name
 		  pState				= verify_annot_attr annot td_attribute name pState
 		  (exi_vars, pState)	= optionalQuantifiedVariables ExistentialQuantifier pState
- 		  (token, pState)		= nextToken TypeContext pState
+// MW  		  (token, pState)		= nextToken TypeContext pState
+ 		  (token, pState)		= nextToken GeneralContext pState
  		  (token, pState)		= case token of	// Make the ':' optional for now to handle 1.3 files
- 		  							ColonToken	-> nextToken TypeContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
+// MW  		  							ColonToken	-> nextToken TypeContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
+ 		  							ColonToken	-> nextToken GeneralContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
  		  							_			-> (token, pState)
  		= case token of
   			CurlyOpenToken
@@ -1203,7 +1205,8 @@ where
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
 			# (exi_vars, pState) = optionalQuantifiedVariables ExistentialQuantifier pState
-			  (token, pState) = nextToken TypeContext pState
+// MW 			  (token, pState) = nextToken TypeContext pState
+			  (token, pState) = nextToken GeneralContext pState
 			  (cons_list, pState) = want_constructor_list exi_vars token pState
 			= ([cons : cons_list], pState)
 		// otherwise
@@ -1628,7 +1631,8 @@ where
 
 optionalQuantifiedVariables :: !QuantifierKind !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalQuantifiedVariables req_quant pState
-	# (token, pState) = nextToken TypeContext pState
+// MW 	# (token, pState) = nextToken TypeContext pState
+	# (token, pState) = nextToken GeneralContext pState
 	  (optional_quantifier, pState) = try token pState
 	= case optional_quantifier of
 		Yes off_quant
