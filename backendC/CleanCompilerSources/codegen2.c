@@ -5277,6 +5277,10 @@ static int FillNodeDefs (NodeDefs nds,int node_id_number,int *asp_p,int *bsp_p,N
 						
 						decrement_reference_count_of_node_id (node_id,&code_gen_node_ids_p->free_node_ids);
 					}
+
+					/* added 22-10-2001 */
+					result_state_p=tuple_state_p;
+					/* */
 					
 					arg=node->node_arguments;				
 					if (arg->arg_node->node_kind==NodeIdNode){
