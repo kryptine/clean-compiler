@@ -25,7 +25,7 @@ instance makeTypeFun FunDef where
 				,	fun_body = GeneratedBody
 				,	fun_type = Yes symbol_type
 				,	fun_pos = position
-				,	fun_kind = FK_Caf
+				,	fun_kind = FK_Function False
 				,	fun_lifted = 0
 				,	fun_info = EmptyFunInfo
 				}
