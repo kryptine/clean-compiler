@@ -54,7 +54,7 @@ import RWSDebug
 		,	ec_tc_state
 				::	!.TypesCorrespondState
 		,	ec_untransformed
-				::	!(!Int, !{ FunDef })
+				::	!{! FunctionBody }
 		}
 		
 :: ExpressionsCorrespondMonad
@@ -84,7 +84,7 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !(!Int, !{FunDef}) !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
+compareDefImp :: !{!FunctionBody} !*{# DclModule} !*IclModule !*Heaps !*ErrorAdmin 
 				-> (!.{# DclModule}, !.IclModule,!.Heaps,!.ErrorAdmin)
 compareDefImp untransformed dcl_modules icl_module heaps error_admin
 	# (main_dcl_module, dcl_modules) = dcl_modules![cIclModIndex]
@@ -231,17 +231,16 @@ compareTwoMacroFuns dclIndex iclIndex
 	  			_	-> True
 	| not need_to_be_compared
 		= ec_state
-	# adjusted_icl_function
+	# adjusted_icl_body
 	  		= case (dcl_function.fun_body, icl_function.fun_body) of
 	  			(CheckedBody _, TransformedBody _)
 					// the macro definition in the icl module is has been transformed but not the dcl
 					// module's definition: use the untransformed icl original for comparision
-	  				# (offset, untransformed_icl_functions) = ec_untransformed
-	  				-> untransformed_icl_functions.[iclIndex-offset]
-	  			_	-> icl_function
+	  				-> ec_untransformed.[iclIndex]
+	  			_	-> icl_function.fun_body
 	  ident_pos = getIdentPos dcl_function
 	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
-	  ec_state = e_corresponds dcl_function adjusted_icl_function { ec_state & ec_error_admin = ec_error_admin }
+	  ec_state = e_corresponds dcl_function.fun_body adjusted_icl_body { ec_state & ec_error_admin = ec_error_admin }
 	= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
 
 instance getIdentPos (TypeDef a) where
@@ -706,12 +705,12 @@ instance e_corresponds DefinedSymbol where
 	e_corresponds dclDef iclDef
 		= equal2 dclDef.ds_ident iclDef.ds_ident
 
-instance e_corresponds FunDef where
+instance e_corresponds FunctionBody where
 	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
-//		| False--->("compare", dclDef, iclDef)
+//		| False--->("compare", from_body dclDef, from_body iclDef)
 //			= undef
-		=	e_corresponds (from_body dclDef.fun_body) (from_body iclDef.fun_body)
+		=	e_corresponds (from_body dclDef) (from_body iclDef)
 	  where
 		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
 		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, cb_rhs)

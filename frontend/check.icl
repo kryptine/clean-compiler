@@ -2660,7 +2660,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 		  (dcl_modules, class_instances, icl_functions, cs_predef_symbols)
 		  		= adjust_instance_types_of_array_functions_in_std_array_icl dcl_modules class_instances icl_functions cs_predef_symbols
 
-		  (untransformed_macro_funs_defs, icl_functions) = memcpy cdefs.def_macros icl_functions
+		  (untransformed_fun_bodies, icl_functions) = copy_bodies icl_functions
 		  (groups, icl_functions, dcl_modules, var_heap, expr_heap, cs_symbol_table, cs_error)
 		  		= partitionateAndLiftFunctions [icl_global_function_range, icl_instances] cIclModIndex icl_functions
 		  			dcl_modules var_heap expr_heap cs_symbol_table cs_error
@@ -2673,7 +2673,7 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 
 		  (dcl_modules, icl_mod, heaps, cs_error)
-		  		= compareDefImp (cdefs.def_macros.ir_from, untransformed_macro_funs_defs) dcl_modules icl_mod heaps cs_error
+		  		= compareDefImp untransformed_fun_bodies dcl_modules icl_mod heaps cs_error
 
 		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file)
 		# icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
@@ -2882,10 +2882,11 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 				  (Yes symbol_type) = inst_def.fun_type
 				= { instance_defs & [ds_index] = { inst_def & fun_type = Yes (makeElemTypeOfArrayFunctionStrict symbol_type ins_offset offset_table) } }
 
-		memcpy :: !IndexRange !*{# FunDef} -> (!.{FunDef}, !*{# FunDef})
-		memcpy {ir_from, ir_to} fun_defs
-			# new = createArray (ir_to-ir_from) (abort "check.icl: don't make that array strict !")
-			= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i-ir_from] = src_i }, src)) ir_from ir_to (new, fun_defs)
+		copy_bodies :: !*{# FunDef} -> (!.{!FunctionBody}, !*{# FunDef})
+		copy_bodies fun_defs
+			#! size = size fun_defs
+			# new = createArray size NoBody
+			= iFoldSt (\i (dst, src=:{[i]=src_i})->({ dst & [i] = src_i.fun_body }, src)) 0 size (new, fun_defs)
 
 check_needed_modules_are_imported mod_name extension cs=:{cs_needed_modules}
 	# cs = case cs_needed_modules bitand cNeedStdDynamics of
