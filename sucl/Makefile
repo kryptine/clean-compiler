@@ -23,7 +23,7 @@ $(SYS)/%.abc: %.icl
 	$(COCL) $(COCLFLAGS) $*
 
 $(SYS)/supercompile.abc: supercompile.icl supercompile.dcl
-$(SYS)/convert.abc: convert.icl convert.dcl rule.dcl
+$(SYS)/convert.abc: convert.icl convert.dcl coreclean.dcl rule.dcl
 $(SYS)/coreclean.abc: coreclean.icl coreclean.dcl
 $(SYS)/law.abc: law.icl law.dcl
 $(SYS)/loop.abc: loop.icl loop.dcl trace.dcl strat.dcl history.dcl rule.dcl graph.dcl basic.dcl
