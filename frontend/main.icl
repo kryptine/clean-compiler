@@ -182,8 +182,12 @@ loadModule mod_ident {dcl_modules,cached_macros,predef_symbols,hash_table,heaps}
 	# (tcl_file,ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths})
 		= write_tcl_file (WrapopenTclFile ms) (No,ms);
 // ... MV
-	# (optional_syntax_tree,cached_cached_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
+	# (optional_syntax_tree,cached_cached_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,tcl_file,heaps)
 		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules cached_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out tcl_file heaps
+// MV ...
+	# (_,ms_files)
+		= closeTclFile tcl_file ms_files 
+// ... MV
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
 		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls}
