@@ -386,18 +386,20 @@ where
 						-> remove_declared_symbols_in_array (symbol_index+1) symbols symbol_table
 			= symbol_table
 
-addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !u:{#FunDef} !*SymbolTable !*ErrorAdmin -> (!u:{# FunDef}, !*SymbolTable, !*ErrorAdmin)
-addLocalFunctionDefsToSymbolTable level from_index to_index fun_defs symbol_table error
+addLocalFunctionDefsToSymbolTable :: !Level !Index !Index !Bool !*{#FunDef} !*SymbolTable !*ErrorAdmin -> (!*{# FunDef}, !*SymbolTable, !*ErrorAdmin)
+addLocalFunctionDefsToSymbolTable level from_index to_index is_macro_fun fun_defs symbol_table error
 	| from_index == to_index
 		= (fun_defs, symbol_table, error)	
 		# (fun_def, fun_defs) = fun_defs![from_index]
-		  (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_symb (STE_FunctionOrMacro []) symbol_table error
-		= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index fun_defs symbol_table error
+		# (symbol_table, error) = addDefToSymbolTable level from_index fun_def.fun_symb (STE_FunctionOrMacro []) symbol_table error
+		| is_macro_fun
+			# fun_defs = {fun_defs & [from_index].fun_info.fi_is_macro_fun=is_macro_fun}
+			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
+			= addLocalFunctionDefsToSymbolTable level (inc from_index) to_index is_macro_fun fun_defs symbol_table error
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
-	
-		
+
 addDefToSymbolTable :: !Level !Index !Ident !STE_Kind !*SymbolTable !*ErrorAdmin -> (!* SymbolTable, !*ErrorAdmin)
 addDefToSymbolTable level def_index def_ident=:{id_info} def_kind symbol_table error
 	#! entry = sreadPtr id_info symbol_table

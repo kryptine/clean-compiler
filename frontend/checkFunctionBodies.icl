@@ -911,13 +911,13 @@ where
 	determine_info_of_symbol :: !SymbolTableEntry !SymbolPtr !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 		-> (!SymbKind, !Int, !Priority, !Bool, !*ExpressionState, !u:ExpressionInfo,!*CheckState)
 	determine_info_of_symbol entry=:{ste_kind=STE_FunctionOrMacro calls,ste_index,ste_def_level} symb_info
-				e_input=:{ei_fun_index, ei_mod_index} e_state=:{es_fun_defs,es_calls} e_info=:{ef_is_macro_fun} cs=:{cs_symbol_table,cs_x}
-		# ({fun_symb,fun_arity,fun_kind,fun_priority}, es_fun_defs) = es_fun_defs![ste_index]
+				e_input=:{ei_fun_index, ei_mod_index} e_state=:{es_fun_defs,es_calls} e_info cs=:{cs_symbol_table,cs_x}
+		# ({fun_symb,fun_arity,fun_kind,fun_priority,fun_info}, es_fun_defs) = es_fun_defs![ste_index]
 		# index = { glob_object = ste_index, glob_module = cs_x.x_main_dcl_module_n }
 		| is_called_before ei_fun_index calls
 			| case fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
 				= (SK_Macro index, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
-				# symbol_kind = if ef_is_macro_fun (SK_LocalMacroFunction ste_index) (SK_Function index)
+				# symbol_kind = if fun_info.fi_is_macro_fun (SK_LocalMacroFunction ste_index) (SK_Function index)
 				= (symbol_kind, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
 			  e_state = { e_state & es_fun_defs = es_fun_defs, es_calls = [{ fc_index = ste_index, fc_level = ste_def_level} : es_calls ]}
@@ -927,7 +927,7 @@ where
 				FK_ImpMacro
 					-> SK_Macro index;
 				_
-					| ef_is_macro_fun
+					| fun_info.fi_is_macro_fun
 						-> SK_LocalMacroFunction ste_index
 						-> SK_Function index
 			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
@@ -1710,11 +1710,11 @@ checkRhssAndTransformLocalDefs free_vars loc_defs rhs_expr e_input e_state e_inf
 	= (rhs_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
 checkLhssOfLocalDefs :: .Int .Int LocalDefs *ExpressionState *ExpressionInfo *CheckState -> (!.[NodeDef AuxiliaryPattern],!(![Ident],![ArrayPattern]),!.ExpressionState,!.ExpressionInfo,!.CheckState);
-checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info cs
+checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_from,ir_to},loc_nodes}) e_state=:{es_var_heap,es_fun_defs} e_info=:{ef_is_macro_fun} cs
 	# (loc_defs, accus, {ps_fun_defs,ps_var_heap}, e_info, cs)
 			= check_patterns loc_nodes {pi_def_level = def_level, pi_mod_index = mod_index, pi_is_node_pattern = True } ([], [])
 					{ps_fun_defs = es_fun_defs, ps_var_heap = es_var_heap} e_info cs
-	  (es_fun_defs, cs_symbol_table, cs_error) = addLocalFunctionDefsToSymbolTable def_level ir_from ir_to ps_fun_defs cs.cs_symbol_table cs.cs_error
+	  (es_fun_defs, cs_symbol_table, cs_error) = addLocalFunctionDefsToSymbolTable def_level ir_from ir_to ef_is_macro_fun ps_fun_defs cs.cs_symbol_table cs.cs_error
 	= (loc_defs, accus, { e_state & es_fun_defs = es_fun_defs, es_var_heap = ps_var_heap }, e_info, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
 where
 	check_patterns [ (_,node_def) : node_defs ] p_input accus var_store e_info cs
@@ -1723,8 +1723,6 @@ where
 		= ([{ node_def & nd_dst = pattern } : patterns], accus, var_store, e_info, cs)
 	check_patterns [] p_input accus var_store e_info cs
 		= ([], accus, var_store, e_info, cs)
-
-
 
 addArraySelections [] rhs_expr free_vars e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
