@@ -2,7 +2,7 @@ definition module checktypes
 
 import checksupport, typesupport
 
-checkTypeDefs :: /* TD */ !Bool !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
+checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
 
 checkFunctionType :: !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState

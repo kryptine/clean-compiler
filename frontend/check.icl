@@ -870,7 +870,7 @@ checkCommonDefinitions :: !Bool !Index !*CommonDefs !*{# DclModule} !*TypeHeaps 
 checkCommonDefinitions is_dcl module_index common modules type_heaps var_heap cs
 	#! is_main_dcl_mod = is_dcl && module_index == cs.cs_x.x_main_dcl_module_n
 	# (com_type_defs, com_cons_defs, com_selector_defs, modules, var_heap, type_heaps, cs)
-			= checkTypeDefs is_dcl is_main_dcl_mod common.com_type_defs module_index
+			= checkTypeDefs is_main_dcl_mod common.com_type_defs module_index
 							common.com_cons_defs common.com_selector_defs modules var_heap type_heaps cs
 	  (com_class_defs, com_member_defs, com_type_defs, modules, type_heaps, cs)
 	  		= checkTypeClasses 0 module_index common.com_class_defs common.com_member_defs com_type_defs modules type_heaps cs
@@ -1583,7 +1583,7 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 	  (icl_functions, (sizes, local_defs)) = collectMacros cdefs.def_macros icl_functions sizes_and_local_defs
 
 	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache (size dcl_modules)
-	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n, x_is_dcl_module = False, x_type_var_position = 0}}
+	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n}}
 
 	  (scanned_modules, icl_functions, cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules (size dcl_modules) icl_functions cs
 
