@@ -655,19 +655,27 @@ where
 
 newFunction :: !(Optional Ident) !FunctionBody ![FreeVar] ![AType] !AType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
 	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
-newFunction opt_id fun_bodies local_vars arg_types result_type group_index (cs_next_fun_nr, cs_new_functions, cs_fun_heap)
-	# (fun_def_ptr, cs_fun_heap) = newPtr FI_Empty cs_fun_heap
-	  fun_id = getIdent opt_id cs_next_fun_nr
-	  arity = length arg_types
+newFunction opt_id fun_bodies local_vars arg_types result_type group_index state
+	=	newFunctionWithType opt_id fun_bodies local_vars fun_type group_index state
+	where
 	  fun_type =
-	  	{	st_vars			= []
+		{	st_vars			= []
 		,	st_args			= arg_types
-		,	st_arity		= arity
+		,	st_arity		= length arg_types // -*-> ("newFunction", fun_id.id_name)
 		,	st_result		= result_type
 		,	st_context		= []
 		,	st_attr_vars	= []
 		,	st_attr_env		= []
 		}
+
+newFunctionWithType :: !(Optional Ident) !FunctionBody ![FreeVar] !SymbolType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
+	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
+newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_fun_nr, cs_new_functions, cs_fun_heap)
+	# (fun_def_ptr, cs_fun_heap) = newPtr FI_Empty cs_fun_heap
+	  fun_id = getIdent opt_id cs_next_fun_nr
+
+	  arity
+	  	=	fun_type.st_arity
 
 	  fun_def = 
 			{	fun_symb		= fun_id
