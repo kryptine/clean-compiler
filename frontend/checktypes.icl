@@ -226,7 +226,7 @@ decodeTopConsVar cv		:== ~(inc cv)
 
 checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:{cs_error}
 	#! type_def = ts_type_defs.[type_index]
-	# {td_name,td_pos,td_args,td_attribute,td_properties} = type_def
+	# {td_name,td_pos,td_args,td_attribute} = type_def
 	  position = newPosition td_name td_pos
 	  cs_error = pushErrorAdmin position cs_error
 	  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_name.id_name ti_type_heaps.th_attrs

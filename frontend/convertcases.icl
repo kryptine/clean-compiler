@@ -527,10 +527,12 @@ where
 convertDclModule :: !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
 convertDclModule dcl_mods common_defs imported_types imported_conses var_heap type_heaps
-	# {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_defs},dcl_conversions} = dcl_mods.[cIclModIndex]
+	# {dcl_functions,dcl_common=dcl_common=:{com_type_defs,com_cons_defs,com_selector_defs},dcl_conversions} = dcl_mods.[cIclModIndex]
 	= case dcl_conversions of
 		Yes conversion_table
 			# (icl_type_defs, imported_types) = imported_types![cIclModIndex]
+			  common_defs = { common \\ common <-: common_defs }
+			  common_defs = { common_defs & [cIclModIndex] = dcl_common }
 			  types_and_heaps = convert_dcl_functions dcl_functions common_defs ( { imported_types & [cIclModIndex] = com_type_defs }, imported_conses, var_heap, type_heaps)
 			  types_and_heaps = convertConstructorTypes com_cons_defs common_defs types_and_heaps
 			  (imported_types, imported_conses, var_heap, type_heaps) = convertSelectorTypes com_selector_defs common_defs types_and_heaps
@@ -545,7 +547,7 @@ where
 		# {ft_type, ft_type_ptr} = dcl_functions.[dcl_index]
 		  (ft_type, imported_types, imported_conses, type_heaps, var_heap) = convertSymbolType common_defs ft_type imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, var_heap <:= (ft_type_ptr, VI_ExpandedType ft_type), type_heaps)
-	
+
 convertConstructorTypes cons_defs common_defs types_and_heaps
 	= iFoldSt (convert_constructor_type common_defs cons_defs) 0 (size cons_defs) types_and_heaps
 where

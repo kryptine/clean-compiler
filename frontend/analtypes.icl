@@ -308,9 +308,9 @@ analTypeDef modules type_module type_index as=:{as_error,as_heaps,as_kind_heap,a
 	  (is_abs_type, abs_type_properties) = is_abstract_type td_rhs
 	| is_abs_type
 		# (tdi, as_td_infos) = as_td_infos![type_module].[type_index]
-		= (cMAXINT, ({con_top_var_binds = [], con_var_binds = [] }, 
-				{ as & as_td_infos = { as_td_infos & [type_module].[type_index] = { tdi & tdi_kinds = [ KindConst \\ _ <- td_args ], tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]],
-																						  tdi_properties = abs_type_properties }}}))
+		  tdi = {	tdi & tdi_kinds = [ KindConst \\ _ <- td_args ], tdi_group = [{glob_module = type_module, glob_object = type_index}], 
+		  			tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]], tdi_properties = abs_type_properties }
+		= (cMAXINT, ({con_top_var_binds = [], con_var_binds = [] }, { as & as_td_infos = { as_td_infos & [type_module].[type_index] = tdi}}))
 		# position = newPosition td_name td_pos
 		  as_error = pushErrorAdmin position as_error
 		  (tdi_kinds, (th_vars, as_kind_heap)) = newKindVariables td_args (as_heaps.th_vars, as_kind_heap)

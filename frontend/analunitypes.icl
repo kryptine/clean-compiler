@@ -24,20 +24,21 @@ set_sign_in_sign_class {pos_sign,neg_sign} index {sc_pos_vect,sc_neg_vect}
 typeProperties :: !Index  !Index ![SignClassification] ![PropClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!TypeSymbProperties, !*TypeVarHeap, !*TypeDefInfos)
 typeProperties type_index module_index hio_signs hio_props defs type_var_heap td_infos
-	# {td_args} = defs.[module_index].com_type_defs.[type_index]
+	# {td_args, td_name} = defs.[module_index].com_type_defs.[type_index]
 	  (td_info, td_infos) = td_infos![module_index].[type_index]
 	  (tsp_sign, type_var_heap, td_infos) = determineSignClassOfTypeDef type_index module_index td_args td_info hio_signs defs type_var_heap td_infos
 	  (tsp_propagation, type_var_heap, td_infos) = determinePropClassOfTypeDef type_index module_index td_args td_info hio_props defs type_var_heap td_infos
 	  tsp_coercible = (td_info.tdi_properties bitand cIsNonCoercible) == 0
 	= ({tsp_sign = tsp_sign, tsp_propagation = tsp_propagation, tsp_coercible = tsp_coercible }, type_var_heap, td_infos)
-
+//		---> ("typeProperties", td_name, tsp_sign, tsp_propagation)
+		
 signClassification :: !Index !Index ![SignClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!SignClassification, !*TypeVarHeap, !*TypeDefInfos)
 signClassification type_index module_index hio_signs defs type_var_heap td_infos
-	# {td_args} = defs.[module_index].com_type_defs.[type_index]
+	# {td_name,td_args} = defs.[module_index].com_type_defs.[type_index]
 	  (td_info, td_infos) = td_infos![module_index].[type_index]
 	= determineSignClassOfTypeDef type_index module_index td_args td_info hio_signs defs type_var_heap td_infos
-
+//		---> ("signClassification", td_name)
 removeTopClasses [cv : cvs] [tc : tcs] 
 	| isATopConsVar cv
 		= removeTopClasses cvs tcs
@@ -54,12 +55,15 @@ determineSignClassOfTypeDef type_index module_index td_args {tdi_classification,
 	= case result of
 		Yes {ts_type_sign}
 			-> (ts_type_sign, type_var_heap, td_infos)
+//					---> ("determineSignClassOfTypeDef1", ts_type_sign)
+
 		No
 			# type_var_heap = bind_type_vars_to_signs td_args tdi_group_vars tdi_cons_vars hio_signs type_var_heap
 			  (sign_class, type_var_heap, td_infos)
 			  		= newSignClassOfTypeDefGroup tdi_group_nr { glob_module = module_index, glob_object = type_index}
 						tdi_group hio_signs ci type_var_heap td_infos
 			-> (sign_class, foldSt restore_binds_of_type_var td_args type_var_heap, td_infos)
+//					---> ("determineSignClassOfTypeDef2", sign_class)
 
 where
 	bind_type_vars_to_signs [{atv_variable={tv_info_ptr}}: tvs] [gv : gvs] cons_vars hio_signs type_var_heap
@@ -237,7 +241,7 @@ determinePropClassOfTypeDef type_index module_index td_args {tdi_classification,
 			hio_props ci type_var_heap td_infos
 	# hio_props = removeTopClasses tdi_cons_vars hio_props
 	  result = retrievePropClassification hio_props tdi_classification
-					// ---> (td_args, tdi_kinds, tdi_group_vars)
+//					---> (td_args, tdi_kinds, tdi_group_vars)
 	= case result of
 		Yes {ts_type_prop}
 			-> (ts_type_prop, type_var_heap, td_infos)
