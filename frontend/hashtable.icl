@@ -26,7 +26,7 @@ import predef, syntax, StdCompare, compare_constructor
 
 :: BoxedIdent = {boxed_ident::!Ident}
 
-newHashTable :: *SymbolTable -> *HashTable
+newHashTable :: !*SymbolTable -> *HashTable
 newHashTable symbol_heap = { hte_symbol_heap = symbol_heap, hte_entries = {  HTE_Empty \\ i <- [0 .. dec cHashTableSize] },hte_mark=0}
 
 set_hte_mark :: !Int !*HashTable -> *HashTable
