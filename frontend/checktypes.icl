@@ -1194,164 +1194,6 @@ removeVariablesFromSymbolTable scope vars symbol_table
 
 makeAttributedType attr annot type :== { at_attribute = attr, at_annotation = annot, at_type = type }
 
-/*
-createClassDictionaries :: !Index !*{#ClassDef} !*{#MemberDef} !u:{#.DclModule} !Index !Index !Index !*TypeVarHeap !*VarHeap !*SymbolTable
-	-> (!*{#ClassDef}, !*{#MemberDef}, !u:{#DclModule}, ![CheckedTypeDef], ![SelectorDef], ![ConsDef], !*TypeVarHeap, !*VarHeap, !*SymbolTable)
-createClassDictionaries mod_index class_defs member_defs modules first_type_index first_selector_index first_cons_index type_var_heap var_heap symbol_table
-	# (class_defs, member_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
-			= create_class_dictionaries mod_index 0  class_defs member_defs modules []
-				{ index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index } type_var_heap var_heap symbol_table
-	  (type_defs, sel_defs, cons_defs, symbol_table) = foldSt collect_type_def rev_dictionary_list  ([], [], [], symbol_table)
-	= (class_defs, member_defs, modules, type_defs, sel_defs, cons_defs, type_var_heap, var_heap, symbol_table)
-where
-	create_class_dictionaries = undef
-	collect_type_def = undef
-	collect_type_def type_ptr (type_defs, sel_defs, cons_defs, symbol_table)
-		# ({ ste_kind = STE_DictType type_def }, symbol_table) = readPtr type_ptr symbol_table
-		  (RecordType {rt_constructor, rt_fields}) = type_def.td_rhs
-		  ({ ste_kind = STE_DictCons cons_def }, symbol_table) = readPtr rt_constructor.ds_ident.id_info symbol_table
-	 	  (sel_defs, symbol_table) = collect_fields 0 rt_fields (sel_defs, symbol_table)
-	 	= ( [type_def : type_defs ] , sel_defs, [cons_def : cons_defs], symbol_table)
-	 where
-		collect_fields field_nr fields (sel_defs, symbol_table)
-			| field_nr < size fields
-				# (sel_defs, symbol_table) = collect_fields (inc field_nr) fields (sel_defs, symbol_table)
-				  ({ ste_kind = STE_DictField sel_def }, symbol_table) = readPtr fields.[field_nr].fs_name.id_info symbol_table
-				= ( [ sel_def : sel_defs ], symbol_table)
-				= ( sel_defs, symbol_table)
-
-	create_class_dictionaries mod_index class_index class_defs member_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-		| class_index < size class_defs
-			# (class_defs, member_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs) =
-					create_class_dictionary mod_index class_index class_defs member_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-			= create_class_dictionaries mod_index (inc class_index) class_defs member_defs modules rev_dictionary_list indexes type_var_heap var_heap cs
-			= (class_defs, member_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, cs)
-
-	create_class_dictionary ::
-		!Index            // Module number of class
-		!Index            // Number of class within module
-		!*{#ClassDef}     // Class definitions containing the one to convert
-		!*{#MemberDef}    // Member definitions containing the class' members
-		!w:{#DclModule}   // Imported DCL modules
-		!v:[SymbolPtr]    // Accumulator for created dictionary types
-		!u:Indexes        // Indices for next dictionary type, constructor, and field selectors to create
-		!*TypeVarHeap     // Type and attribute variables for generating fresh types
-		!*VarHeap         // Value variables for genering expressions (constructor defs)
-		!*SymbolTable     // Storage for created dictionary type, constructor, and field selectors
-	 ->	( !*{#ClassDef}   // Consulted class definitions (with dictionary reference updated)
-		, !*{#MemberDef}  // Consulted member definitions
-		, !w:{#DclModule} // Consulted imported DCL modules
-		, !v:[SymbolPtr]  // Extended list of dictionary types
-		, !u:Indexes      // Updated indices, ready for the next dictionary (+1,+1,+#field)
-		, !*TypeVarHeap   // Used heaps
-		, !*VarHeap       // Used heap
-		, !*SymbolTable   // Symbol table updated with dictionary type, constructor, and field selectors
-		)
-	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } member_defs modules rev_dictionary_list
-			indexes type_var_heap var_heap symbol_table
-		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name}},class_pos} = class_def
-		# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
-		  nr_of_members = size class_members
-		  nr_of_fields = nr_of_members + length class_context
-		  rec_type_id = { class_name &  id_info = type_id_info}
-		  class_dictionary = { ds & ds_ident = rec_type_id }
-
-		  { index_type, index_cons, index_selector } = indexes
-
-		  type_symb = MakeTypeSymbIdent { glob_object = index_type, glob_module = mod_index } rec_type_id class_arity
-
-		  rec_type		= makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
-		  field_type	= makeAttributedType TA_Multi AN_None TE
-
-		  (rev_fields, var_heap, symbol_table)
-	  			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] var_heap symbol_table
-		  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, symbol_table)
-	  			= build_context_fields mod_index nr_of_members class_context rec_type index_type (index_selector + nr_of_members) rev_fields
-	  					[ { field_type & at_annotation = AN_Strict } \\ i <- [1..nr_of_members] ] class_defs modules var_heap symbol_table
-		  (cons_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
-		  rec_cons_id = { class_name & id_info = cons_id_info}
-		  cons_symbol = { ds_ident = rec_cons_id, ds_arity = nr_of_fields, ds_index = index_cons }
-		  (cons_type_ptr, var_heap) = newPtr VI_Empty var_heap
-
-		  (td_args, type_var_heap) = mapSt new_attributed_type_variable class_args type_var_heap
-
-
-  		  type_def =
-		 	{	td_name			= rec_type_id
-			,	td_index		= index_type
-			,	td_arity		= length td_args
-			,	td_args			= td_args
-			,	td_attrs		= []
-			,	td_context		= []
-			,	td_rhs			= RecordType {rt_constructor = cons_symbol, rt_fields = { field \\ field <- reverse rev_fields }}
-			,	td_attribute	= TA_None
-			,	td_pos			= class_pos
-			,	td_used_types	= []
-			}
-
-		  cons_def =
-			{	cons_symb		= rec_cons_id
-			,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_result = rec_type,
-								    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
-			,	cons_priority	= NoPrio
-			,	cons_index		= index_cons
-			,	cons_type_index	= index_type
-			,	cons_exi_vars	= []
-			,	cons_arg_vars	= []
-			,	cons_type_ptr	= cons_type_ptr
-			,	cons_pos		= class_pos
-			}
-
-		= ({ class_defs & [class_index] = { class_def & class_dictionary = { class_dictionary & ds_index = index_type }}}, member_defs, modules,
-				 [ type_id_info : rev_dictionary_list ], { index_type = inc index_type, index_cons = inc index_cons, index_selector = index_selector },
-					type_var_heap, var_heap,
-						symbol_table <:= (type_id_info, { ste_kind = STE_DictType type_def, ste_index = index_type,
-												ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })
-										<:= (cons_id_info, { ste_kind = STE_DictCons cons_def, ste_index = index_cons,
-												ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }))
-	new_attributed_type_variable tv type_var_heap
-		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
-		= ({atv_attribute = TA_Multi, atv_annotation = AN_None , atv_variable = { tv & tv_info_ptr = new_tv_ptr }}, type_var_heap)
-
-	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields var_heap symbol_table
-		| field_nr < nr_of_fields
-			# (field, var_heap, symbol_table) = build_field field_nr class_members.[field_nr].ds_ident.id_name rec_type_index
-											rec_type field_type next_selector_index var_heap symbol_table
-			= build_fields (inc field_nr) nr_of_fields class_members rec_type field_type rec_type_index (inc next_selector_index)
-				[ field : rev_fields ] var_heap symbol_table
-			= (rev_fields, var_heap, symbol_table)
-
-	build_context_fields mod_index field_nr [{tc_class = {glob_module, glob_object={ds_index}}}:tcs] rec_type rec_type_index
-			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
-		# ({class_name, class_arity, class_dictionary = {ds_ident, ds_index}}, _, class_defs, modules) = getClassDef ds_index glob_module mod_index class_defs modules
-		  type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
-		  field_type = makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
-		  (field, var_heap, symbol_table) = build_field field_nr class_name.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
-		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
-				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
-	build_context_fields mod_index field_nr [] rec_type rec_type_index next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
-		= (next_selector_index, rev_fields, rev_field_types , class_defs, modules, var_heap, symbol_table)
-
-	build_field field_nr field_name rec_type_index rec_type field_type selector_index var_heap symbol_table
-		# (id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
-		  (sd_type_ptr, var_heap) = newPtr VI_Empty var_heap
-  		  field_id = { id_name = field_name, id_info = id_info }
-  		  sel_def =
-  		  	{	sd_symb			= field_id
-  		  	,	sd_field		= field_id
-  		  	,	sd_type			= { st_vars	= [], st_args = [ rec_type ], st_result = field_type, st_arity = 1,
-  		  	                        st_context = [], st_attr_vars = [], st_attr_env = [] }
-			,	sd_exi_vars		= []
-			,	sd_field_nr		= field_nr
-			,	sd_type_index	= rec_type_index
-			,	sd_type_ptr		= sd_type_ptr
-			,	sd_pos			= NoPos
-			}
-		  field = { fs_name = field_id, fs_var = field_id, fs_index = selector_index }
-		= (field, var_heap, symbol_table <:= (id_info, { ste_kind = STE_DictField sel_def, ste_index = selector_index,
-				ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }))
-*/
-
 class toVariable var :: !STE_Kind !Ident -> var
 
 instance toVariable TypeVar
@@ -1406,7 +1248,7 @@ createClassDictionaries2 ::
 createClassDictionaries2 modindex classdefs0 memberdefs0 dcls0 typedefs0 seldefs0 consdefs0 tvheap0 avheap0 vheap0 symboltable0
 = (classdefs1, memberdefs1, dcls1, typedefs1, seldefs1, consdefs1, tvheap1, avheap1, vheap1, symboltable1)
   where (classdefs1, memberdefs1, typedefs1, consdefs1, seldefs1, symboltable1, vheap1, {th_vars=tvheap1, th_attrs=avheap1}, dcls1)
-        = undef convert_classdefs get_classdef modindex (classdefs0, memberdefs0, typedefs0, consdefs0, seldefs0, symboltable0, vheap0, {th_vars=tvheap0, th_attrs=avheap0}, dcls0)
+        = convert_classdefs get_classdef modindex (classdefs0, memberdefs0, typedefs0, consdefs0, seldefs0, symboltable0, vheap0, {th_vars=tvheap0, th_attrs=avheap0}, dcls0)
 		get_classdef {glob_module,glob_object} (dcls_a, classdefs_a)
 		= (classdef, (dcls_b, classdefs_b))
 		  where (classdef, _, classdefs_b, dcls_b) = getClassDef glob_object glob_module modindex classdefs_a dcls_a
@@ -1522,9 +1364,14 @@ build_dicttypedef get_classdef0 modindex classindex classdef memberdefs0 typedef
 | not ok
   = abort "build_dicttypedef (checktypes.icl): substitute failed?"
 = (dict_defsymb, memberdefs1, typedefs1, consdefs1, seldefs1, indexes1, symboltable3, varheap2, typeheaps3, env1)
-  where dict_defsymb = {ds_ident = dict_ident, ds_arity = dict_arity, ds_index = dictindex}
-        dict_ident = {id_name = classdef.class_name.id_name, id_info = dict_symbolptr}
-		(dict_symbolptr, symboltable1) = newSymbolPtr (STE_DictType dict_typedef) dictindex symboltable0
+  where dict_defsymb = { ds_ident = dict_ident
+                       , ds_arity = dict_arity
+					   , ds_index = dictindex
+					   }
+        dict_ident = { id_name = classdef.class_name.id_name
+		             , id_info = dict_symbolptr
+					 }
+		(dict_symbolptr, symboltable3) = newSymbolPtr (STE_DictType dict_typedef) dictindex symboltable2
 		typedefs1 = {typedefs0 & [dictindex] = dict_typedef}
 		dict_typedef
  		= { td_name       = dict_ident
@@ -1536,13 +1383,15 @@ build_dicttypedef get_classdef0 modindex classindex classdef memberdefs0 typedef
 		  , td_rhs        = RecordType {rt_constructor = constr_defsym, rt_fields = fields}
 		  , td_attribute  = TA_None
 		  , td_pos        = classdef.class_pos
-		  , td_used_types = []                  // FIXME: What's this supposed to be?
+		  , td_used_types = [] // FIXME: What's this supposed to be?
 	      }
 		dict_arity = length dict_typeargs
-		(constr_defsym, consdefs1, symboltable2, varheap1, typeheaps1) = build_constructor classdef dictindex dicttype dict_type_vars constr_index fieldinfos consdefs0 symboltable1 varheap0 typeheaps0
-		(fields, fieldinfos, seldefs1, varheap2, typeheaps2, symboltable3, (memberdefs1, env1)) = build_selectors get_classdef1 get_memberdef dict_type_vars dicttype classdef selindex (seldefs0, varheap1, typeheaps1, symboltable2, (memberdefs0, env0))
-		dict_typeargs = map build_atypevar class_typeargs
 		(ok, class_typeargs, typeheaps3) = substitute dict_type_vars typeheaps2
+		(constr_defsym, consdefs1, symboltable2, varheap2, typeheaps2)
+		= build_constructor classdef dictindex dicttype dict_type_vars constr_index fieldinfos consdefs0 symboltable1 varheap1 typeheaps1
+		(fields, fieldinfos, seldefs1, varheap1, typeheaps1, symboltable1, (memberdefs1, env1))
+		= build_selectors get_classdef1 get_memberdef dict_type_vars dicttype classdef selindex (seldefs0, varheap0, typeheaps0, symboltable0, (memberdefs0, env0))
+		dict_typeargs = map build_atypevar class_typeargs
 		dicttype = build_dicttype modindex classdef
 		nfield = nmember+ncontext
 		nmember = size classdef.class_members
@@ -1641,8 +1490,11 @@ build_selectors ::
  -> (.{#FieldSymbol}, .[FieldInfo], .{#SelectorDef}, .VarHeap, .TypeHeaps, .SymbolTable, .env)
 build_selectors get_classdef get_memberdef dict_type_vars dicttype classdef selindex (seldefs0, varheap0, typeheaps0, symboltable0, env0)
 = (fields2, fieldinfos2, seldefs2, verheap2, typeheaps2, symboltable2, env2)
-  where (fields2, fieldinfos2, seldefs2, verheap2, typeheaps2, symboltable2, env2) = foldrarray (build_member_selector dict_type_vars dicttype classdef get_memberdef selindex 0) ftvhthst1 class_members
-        ftvhthst1 = foldrwithindex (build_context_selector get_contexttype classdef dicttype (selindex+nmember) nmember) (fields0, [], seldefs0, varheap0, typeheaps0, symboltable0, env0) class_context
+  where (fields2, fieldinfos2, seldefs2, verheap2, typeheaps2, symboltable2, env2)
+		= foldrarray (build_member_selector dict_type_vars dicttype classdef get_memberdef selindex 0) ftvhthst1 class_members
+        ftvhthst1 = foldrwithindex (build_context_selector get_contexttype classdef dicttype (selindex+nmember) nmember)
+								   (fields0, [], seldefs0, varheap0, typeheaps0, symboltable0, env0)
+								   class_context
 		{class_members,class_context} = classdef
 		get_contexttype typecontext env0
 		= (atype, env1)
@@ -1673,10 +1525,10 @@ build_dicttype modindex classdef
 = makeAttributedType TA_Multi AN_Strict (TA dictsymbident (map (makeAttributedType TA_Multi AN_None o TV) classdef.class_args))
 
 build_member_selector ::
-	!.[TypeVar]                            // Polymorphic type variables of dictionary type (arguments of class)
+	.[TypeVar]                             // Polymorphic type variables of dictionary type (arguments of class)
 	AType                                  // Application of dictionary type
 	.ClassDef                              // Class being converted to dictionary
-	!(Index .envin -> (MemberDef,.envout)) // Getting the definition of the class member
+	(Index .envin -> (MemberDef,.envout))  // Getting the definition of the class member
 	.Index                                 // Offset where first member selector is stored in selectordef array
 	.Index                                 // Offset where first member field is stored in record
 	.Int                                   // Index of member in class
@@ -1685,7 +1537,7 @@ build_member_selector ::
 	, [u1:FieldInfo]                       // Types of remaining fields (accumulator)
 	, *{#SelectorDef}                      // Storage for defined selector
 	, *VarHeap                             // Heap for allocating fresh (value) variables
-	, !*TypeHeaps                          // Heaps for creating fresh type and attribute variables
+	, *TypeHeaps                           // Heaps for creating fresh type and attribute variables
 	, *SymbolTable                         // Destination for generated member selector symbol
 	, .envin
 	)
@@ -1699,17 +1551,19 @@ build_member_selector ::
 	)
  ,  [u1<=v1]
 
-build_member_selector dict_type_vars dict_type classdef get_memberdef selectoroffset fieldoffset memberindex membersymbol (fields, fieldinfos, seldefs, varheap, typeheaps, symbol_table, env)
+build_member_selector dict_type_vars dict_type classdef get_memberdef selectoroffset fieldoffset memberindex membersymbol state
+	// Unpack state.  Has to be done lazily, so here.  I hate strict tuple matching.
+    # (fields, fieldinfos, seldefs, varheap, typeheaps, symbol_table, env) = state
 	// Determine where the selector and field goes
 	# selectorindex = selectoroffset+memberindex
 	  fieldindex = fieldoffset+memberindex
 	// Fetch the member's definition
 	# (memberdef,env) = get_memberdef membersymbol.ds_index env
 	// Create fresh instance of member's type
-	# (ok, fieldinfo, selectortype, typeheaps) = build_member_selector_type dict_type_vars dict_type memberdef.me_type typeheaps
-	| not ok
-	  = abort "build_member_selector (checktypes.icl): build_member_selector_type failed?"
-	# (fields, seldefs, varheap, typeheaps, symbol_table) = build_selector selectorindex selectortype fieldindex membersymbol.ds_ident.id_name classdef.class_dictionary.ds_index memberdef.me_pos (fields, seldefs, varheap, typeheaps, symbol_table)
+	# (fieldinfo, selectortype, typeheaps)
+	  = build_member_selector_type dict_type_vars dict_type memberdef.me_type typeheaps
+	# (fields, seldefs, varheap, symbol_table)
+	  = build_selector selectorindex selectortype fieldindex membersymbol.ds_ident.id_name classdef.class_dictionary.ds_index memberdef.me_pos (fields, seldefs, varheap, symbol_table)
 	= (fields, [fieldinfo:fieldinfos], seldefs, varheap, typeheaps, symbol_table, env)
 
 /* Build the type of a dictory member field selector
@@ -1717,12 +1571,11 @@ build_member_selector dict_type_vars dict_type classdef get_memberdef selectorof
  *           Then copy the whole thing in one go
  */
 build_member_selector_type ::
-	!.[TypeVar]  // Polymorphic type variables of dictionary (arguments of class)
+	.[TypeVar]   // Polymorphic type variables of dictionary (arguments of class)
 	AType        // Application of dictionary type
-	!SymbolType  // Type of member
-    !*TypeHeaps  // Heaps for allocating fresh type and attribute variables
- -> ( !Bool      // Success indicator (?)
-	, .FieldInfo // fieldinfo
+	SymbolType   // Type of member
+    *TypeHeaps   // Heaps for allocating fresh type and attribute variables
+ -> ( .FieldInfo // fieldinfo
     , SymbolType // Resulting dictionary field selector type
 	, .TypeHeaps // Used heaps
 	)
@@ -1737,20 +1590,21 @@ build_member_selector_type dict_type_vars dict_type st=:{st_vars,st_args,st_resu
 		   , st_result = curried_member_type
 		   }
     # (ok, symboltype, heaps) = copy_symboltype [] st heaps
-	= (ok, fieldinfo, symboltype, heaps)
+	# symboltype = if ok symboltype (abort "build_member_selector_type (checktypes.icl): copy_symboltype failed?")
+	= (fieldinfo, symboltype, heaps)
 
 // FIXME: find out what to do with uniqueness
 buildarrowtype :: AType AType -> AType
 buildarrowtype argtype restype = makeAttributedType TA_Multi AN_None (argtype-->restype)
 
 build_context_selector ::
-	!( TypeContext    // Context to find dictionary for
+	( TypeContext     // Context to find dictionary for
 	  .envin          // Unique environment for lookup
 	-> ( AType        // Resulting dictionary type
 	   , .envout      // Used environment
 	   )
 	)                 // Get the dictionary type for a class' context
-	!ClassDef         // Class for which dictionary is being created
+	ClassDef          // Class for which dictionary is being created
 	AType             // Dictionary type corresponding to class
 	.Index            // Offset where first selector of this dictionary is stored in selectordef array
 	.Int              // Offset where first context is stored in dictionary
@@ -1760,7 +1614,7 @@ build_context_selector ::
 	, [u1:FieldInfo]  // Types of remaining fields (accumulator)
     , *{#SelectorDef} // Storage for defined selector symbol
 	, *VarHeap        // Heap for allocating fresh (value) variables
-	, !*TypeHeaps     // Heaps for allocating fresh type and attribute variables
+	, *TypeHeaps      // Heaps for allocating fresh type and attribute variables
 	, *SymbolTable    // Destination for generated context selector symbol
 	, .envin          // Other unique environment parts
 	)
@@ -1774,7 +1628,9 @@ build_context_selector ::
 	)
  ,  [u1<=v1]
 
-build_context_selector get_contexttype classdef dicttype selectoroffset fieldoffset contextindex typecontext (fields, fieldinfos, seldefs, varheap, typeheaps,symbol_table,env)
+build_context_selector get_contexttype classdef dicttype selectoroffset fieldoffset contextindex typecontext state
+	// Lazily unpack state
+    # (fields, fieldinfos, seldefs, varheap, typeheaps,symbol_table,env) = state
 	// Determine where the selector goes
 	# selectorindex = selectoroffset+contextindex  // FIXME: Use precomputed offset for context?
 	// Find context dictionary of used context
@@ -1784,11 +1640,9 @@ build_context_selector get_contexttype classdef dicttype selectoroffset fieldoff
 	       noattrvars = abort "build_context_selector (checktypes.icl): dictionary context field selector's attribute variables not implemented"
 	       noattrenv = abort "build_context_selector (checktypes.icl): dictionary context field selector's attribute inequalities not implemented"
 	// Create fresh instance of context's type
-	# (ok, selectortype, typeheaps) = build_context_selector_type classdef dicttype contexttype typeheaps
-	| not ok
-	  = abort "build_context_selector (checktypes.icl): build_context_selector_type failed?"
+	# (selectortype, typeheaps) = build_context_selector_type classdef dicttype contexttype typeheaps
 	// Build the selector
-	# (fields, seldefs, varheap, typeheaps, symbol_table) = build_selector selectorindex selectortype (fieldoffset+contextindex) typecontext.tc_class.glob_object.ds_ident.id_name classdef.class_dictionary.ds_index classdef.class_pos (fields, seldefs, varheap, typeheaps, symbol_table)
+	# (fields, seldefs, varheap, symbol_table) = build_selector selectorindex selectortype (fieldoffset+contextindex) typecontext.tc_class.glob_object.ds_ident.id_name classdef.class_dictionary.ds_index classdef.class_pos (fields, seldefs, varheap, symbol_table)
 	= (fields, [fieldinfo:fieldinfos], seldefs, varheap, typeheaps, symbol_table, env)
 
 /* Build the type of a dictory context field selector
@@ -1796,12 +1650,11 @@ build_context_selector get_contexttype classdef dicttype selectoroffset fieldoff
  *           Then copy the whole thing in one go
  */
 build_context_selector_type ::
-	!ClassDef    // Class being converted to dictionary
+	ClassDef     // Class being converted to dictionary
 	AType        // Dictionary type of class being converted
-	!AType       // Context's dictionary type
-    !*TypeHeaps  // Heaps for allocating fresh type and attribute variables
- -> ( !Bool      // Success indicator (?)
-    , SymbolType // Resulting dictionary field selector type
+	AType        // Context's dictionary type
+    *TypeHeaps   // Heaps for allocating fresh type and attribute variables
+ -> ( SymbolType // Resulting dictionary field selector type
 	, .TypeHeaps // Used heaps
 	)
 
@@ -1814,7 +1667,9 @@ build_context_selector_type {class_args} dict_type contexttype heaps
 	       , st_attr_vars = []
 	       , st_attr_env = []
 	       }
-= copy_symboltype [] st heaps
+	# (ok, symboltype, heaps) = copy_symboltype [] st heaps
+	# symboltype = if ok symboltype (abort "build_context_selector_type (checktypes.icl): copy_symboltype failed?")
+	= (symboltype, heaps)
 
 buildcontexttype ctxt_index=:{glob_module} ctxt_def=:{class_arity,class_dictionary={ds_ident,ds_index}} args
 = makeAttributedType TA_Multi AN_Strict (TA classdictident (map (makeAttributedType TA_Multi AN_None) args))
@@ -1830,17 +1685,15 @@ build_selector ::
 	( *{#FieldSymbol} // Storage for defined field
 	, *{#SelectorDef} // Storage for defined selector
 	, *VarHeap        // Heap for allocation of fresh (value) variables
-	, *TypeHeaps      // Type heaps for allocating type and attribute variables (attrvars unused)
 	, *SymbolTable    // Symbol table to add selector symbol to
 	)
  -> ( .{#FieldSymbol} // Updated storage
 	, .{#SelectorDef} // Updated storage
 	, .VarHeap        // Used variable heap
-	, .TypeHeaps      // Used heaps
 	, .SymbolTable    // Extended symbol table
 	)
-build_selector selectorindex selector_type fieldindex field_name dict_type_index selector_position (fields0, seldefs0, varheap0, typeheaps, symbol_table0)
-= (fields1, seldefs1, varheap1, typeheaps, symbol_table1)
+build_selector selectorindex selector_type fieldindex field_name dict_type_index selector_position (fields0, seldefs0, varheap0, symbol_table0)
+= (fields1, seldefs1, varheap1, symbol_table1)
   where
 		// Allocate type variable for selector
 		(selector_var, varheap1) = newPtr VI_Empty varheap0
@@ -1858,17 +1711,20 @@ build_selector selectorindex selector_type fieldindex field_name dict_type_index
 		// Allocate and store selector symbol
 		(selectorsymbolptr, symbol_table1) = newSymbolPtr (STE_DictField selectordef) selectorindex symbol_table0
 		// Create identifier for selector symbol
-		selector_ident = { id_name = field_name, id_info = selectorsymbolptr }
-		field = { fs_name  = selector_ident
-		        , fs_var   = selector_ident
-				, fs_index = selectorindex
-				}
+		selector_ident = {id_name = field_name, id_info = selectorsymbolptr}
+		field = {fs_name = selector_ident, fs_var = selector_ident, fs_index = selectorindex}
 		fields1 = {fields0 & [fieldindex] = field}
 		seldefs1 = {seldefs0 & [selectorindex] = selectordef}
 
+// Allocating a new symbol pointer
+// This has to be done in two steps, because STE_DictField/STE_DictCons/STE_DictType strictly require their own pointer
+//  ... solution: first write a dummy value into the heap, use that for the pointer, then overwrite the pointer
+//  ... sometimes you have just too much strictness :-(
 newSymbolPtr :: STE_Kind Index *SymbolTable -> (SymbolPtr, .SymbolTable)
 newSymbolPtr kind index symboltable
-= newPtr {EmptySymbolTableEntry & ste_kind = kind, ste_index = index} symboltable
+# (symbolptr, symboltable) = newPtr EmptySymbolTableEntry symboltable
+# symboltable = writePtr symbolptr {EmptySymbolTableEntry & ste_kind = kind, ste_index = index} symboltable
+= (symbolptr, symboltable)
 
 /* Copy a symbol type, creating fresh type variables and attribute variables,
  * There is an exception for type variables that were already bound in the environment
@@ -1876,9 +1732,9 @@ newSymbolPtr kind index symboltable
  */
 copy_symboltype ::
     .[TypeVar]   // Type variables bound in context
-    !SymbolType  // Symbol type to make fresh copy of
-    !*TypeHeaps  // Type heaps for doing the substitution
- -> ( !Bool      // Result indicating success (?)
+    SymbolType   // Symbol type to make fresh copy of
+    *TypeHeaps   // Type heaps for doing the substitution
+ -> ( Bool       // Result indicating success (?)
     , SymbolType // Fresh symbol type
 	, .TypeHeaps // Used type heaps
 	)
@@ -1985,8 +1841,10 @@ they DCL or ICL.  Thus:
 
 unzip4
  :== foldr distrib4 ([], [], [], [])
-	 where distrib4 (x1, x2, x3, x4) (xs1, xs2, xs3, xs4)
+	 where distrib4 x1234 xs1234
 		   = ([x1:xs1], [x2:xs2], [x3:xs3], [x4:xs4])
+	         where (x1, x2, x3, x4) = x1234
+			       (xs1, xs2, xs3, xs4) = xs1234
 
 // Resize an array by truncating it or appending elements
 resizeArray :: e Int u:{#e} -> (.{#e}, v:{#e}) | createArray_u,uselect_u,update_u,usize_u e, [u<=v]
