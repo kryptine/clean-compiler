@@ -61,7 +61,7 @@ where
 		  										[x : xs]
 		  											-> (x, xs)
 		  										_
-		  											-> abort ("restoreOccurrences" ---> (fv_name, fv_info_ptr, wher))
+		  											-> abort ("restoreOccurrences" /* ---> (fv_name, fv_info_ptr, wher) */)
 		  var_heap = var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = prev_ref_count, occ_previous = occ_previous })
 		= case occ_ref_count ===> ("restore_occurrence", fv_name, fv_info_ptr, (occ_ref_count, prev_ref_count, occ_previous)) of
 			RC_Unused
