@@ -638,11 +638,11 @@ cNotVarNumber :== -1
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
 ::	Producer	= PR_Empty
-				| PR_Function !SymbIdent !Index
+				| PR_Function !SymbIdent !Int !Index
 				| PR_Class !App ![(BoundVar, Type)] !Type
-				| PR_Constructor !SymbIdent ![Expression]
-				| PR_GeneratedFunction !SymbIdent !Index
-				| PR_Curried !SymbIdent
+				| PR_Constructor !SymbIdent !Int ![Expression]
+				| PR_GeneratedFunction !SymbIdent !Int !Index
+				| PR_Curried !SymbIdent !Int
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
@@ -765,7 +765,6 @@ cNotVarNumber :== -1
 ::	SymbIdent =
 	{	symb_name		:: !Ident
 	,	symb_kind		:: !SymbKind
-	,	symb_arity		:: !Int
 	}
 
 ::	ConsDef =
@@ -929,9 +928,7 @@ cNotVarNumber :== -1
 				| BT_File | BT_World
 				| BT_String !Type /* the internal string type synonym only used to type string denotations */
 
-
-::	BasicValue	= BVI !String | BVC !String | BVB !Bool | BVR !String | BVS !String
-
+::	BasicValue	= BVI !String | BVInt !Int |BVC !String | BVB !Bool | BVR !String | BVS !String
 
 ::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
 
@@ -1109,8 +1106,7 @@ cIsNotStrict	:== False
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
-//				| Lambda .[FreeVar] !Expression
-				| BasicExpr !BasicValue !BasicType
+				| BasicExpr !BasicValue
 				| WildCard
 				| Conditional !Conditional
 
@@ -1300,16 +1296,14 @@ where
 
 instance needs_brackets Expression
 where
-	needs_brackets (App app)
-		= app.app_symb.symb_arity > 0
+	needs_brackets (App {app_args})
+		= not (isEmpty app_args)
 	needs_brackets (_ @ _)
 		= True
 	needs_brackets (Let _)
 		= True
 	needs_brackets (Case _)
 		= True
-//	needs_brackets (Lambda _ _)
-//		= True
 	needs_brackets (Selection _ _ _)
 		= True
 	needs_brackets _
@@ -1547,6 +1541,7 @@ where
 instance <<< BasicValue
 where
 	(<<<) file (BVI int)	= file <<< int
+	(<<<) file (BVInt int)	= file <<< int
 	(<<<) file (BVC char)	= file <<< char
 	(<<<) file (BVB bool)	= file <<< bool
 	(<<<) file (BVR real)	= file <<< real
@@ -1578,7 +1573,7 @@ where
 	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr})
 		//= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t->" <<< def_expr
 		= file <<< "case " <<< case_expr <<< " of" <<< case_guards <<< "\n\t->" <<< def_expr
-	(<<<) file (BasicExpr basic_value basic_type) = file <<< basic_value
+	(<<<) file (BasicExpr basic_value) = file <<< basic_value
 	(<<<) file (Conditional {if_cond,if_then,if_else}) =
 			else_part (file <<< "IF " <<< if_cond <<< "\nTHEN\n" <<< if_then) if_else
 	where
@@ -2058,7 +2053,7 @@ where
 			= file <<< "update"
 		show_expression file (TupleSelect {ds_arity} elem_nr expr)
 			= file <<< "argument " <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
-		show_expression file (BasicExpr bv _)
+		show_expression file (BasicExpr bv)
 			= file <<< bv
 		show_expression file (MatchExpr _ _ expr)
 			= file <<< "match expression"
@@ -2212,9 +2207,6 @@ MakeTypeSymbIdent type_index name arity
 MakeTypeSymbIdentMacro type_index name arity
 	:== {	type_name = name, type_arity = arity, type_index = type_index,
 			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
-
-MakeSymbIdent name arity	:== { symb_name = name, symb_kind = SK_Unknown, symb_arity = arity }
-MakeConstant name			:== MakeSymbIdent name 0
 
 ParsedSelectorToSelectorDef sd_type_index ps :==
 	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,

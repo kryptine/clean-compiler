@@ -653,11 +653,11 @@ cNonRecursiveAppl	:== False
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
 ::	Producer	= PR_Empty
-				| PR_Function !SymbIdent !Index
+				| PR_Function !SymbIdent !Int !Index
 				| PR_Class !App ![(BoundVar, Type)] !Type
-				| PR_Constructor !SymbIdent ![Expression]
-				| PR_GeneratedFunction !SymbIdent !Index
-				| PR_Curried !SymbIdent
+				| PR_Constructor !SymbIdent !Int ![Expression]
+				| PR_GeneratedFunction !SymbIdent !Int !Index
+				| PR_Curried !SymbIdent !Int
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
@@ -787,7 +787,6 @@ cNonRecursiveAppl	:== False
 ::	SymbIdent =
 	{	symb_name		:: !Ident
 	,	symb_kind		:: !SymbKind
-	,	symb_arity		:: !Int
 	}
 
 ::	ConsDef =
@@ -949,7 +948,7 @@ cNonRecursiveAppl	:== False
 				| BT_File | BT_World
 				| BT_String !Type /* the internal string type synonym only used to type string denotations */
 
-::	BasicValue	= BVI !String | BVC !String | BVB !Bool | BVR !String | BVS !String
+::	BasicValue	= BVI !String | BVInt !Int |BVC !String | BVB !Bool | BVR !String | BVS !String
 
 ::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
 
@@ -1122,8 +1121,7 @@ cIsNotStrict	:== False
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
-//				| Lambda .[FreeVar] !Expression
-				| BasicExpr !BasicValue !BasicType
+				| BasicExpr !BasicValue
 				| WildCard
 				| Conditional !Conditional
 
@@ -1344,9 +1342,6 @@ MakeNewTypeSymbIdent name arity
 
 MakeTypeSymbIdent type_index name arity
 	:== {	newTypeSymbIdentCAF & type_name = name, type_arity = arity, type_index = type_index }
-
-MakeSymbIdent name arity	:== { symb_name = name, symb_kind = SK_Unknown, symb_arity = arity  }
-MakeConstant name			:== MakeSymbIdent name 0
 
 ParsedSelectorToSelectorDef sd_type_index ps :==
 	{	sd_symb = ps.ps_selector_name, sd_field_nr = NoIndex, sd_pos =  ps.ps_field_pos, sd_type_index = sd_type_index,

@@ -2282,8 +2282,38 @@ where
 trySimpleExpressionT CurlyOpenToken is_pattern pState
 	# (rec_or_aray_exp, pState) = wantRecordOrArrayExp is_pattern pState 
 	= (True, rec_or_aray_exp, pState)
-trySimpleExpressionT (IntToken int) is_pattern pState
-	= (True, PE_Basic (BVI int), pState)
+trySimpleExpressionT (IntToken int_string) is_pattern pState
+	# (ok,int) = string_to_int int_string
+		with
+		string_to_int s
+			| len==0
+				= (False,0)
+			| s.[0] == '-'
+				| len>2 && s.[1]=='0' /* octal */
+					= (False,0)
+					# (ok,int) = (string_to_int2 1 0 s)
+					=	(ok,~int)
+			| s.[0] == '+'
+				| len>2&& s.[1]=='0' /* octal */
+					= (False,0)
+					=	string_to_int2 1 0 s
+			| s.[0]=='0' && len>1 /* octal */
+				= (False,0)
+				=	string_to_int2 0 0 s
+		 where
+			len = size s
+
+			string_to_int2:: !Int !Int !{#Char} -> (!Bool,!Int)
+			string_to_int2 posn val s
+				| len==posn
+					= (True,val)
+				# n =	toInt (s.[posn]) - toInt '0'
+				|	0<=n && n<= 9
+					=	string_to_int2 (posn+1) (n+val*10) s
+					=	(False,0)
+	| ok
+		= (True, PE_Basic (BVInt int), pState)
+		= (True, PE_Basic (BVI int_string), pState)
 trySimpleExpressionT (StringToken string) is_pattern pState
 	= (True, PE_Basic (BVS string), pState)
 trySimpleExpressionT (BoolToken bool) is_pattern pState

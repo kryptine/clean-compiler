@@ -677,7 +677,6 @@ instance t_corresponds (TypeDef TypeRhs) where
 			  tc_state = init_atype_vars iclDef.td_args tc_state
 			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, (dclDef.td_context, dclDef.td_attribute)))
 			 				(iclDef.td_args, (iclDef.td_rhs, (iclDef.td_context, iclDef.td_attribute))) tc_state
-		
 instance t_corresponds TypeContext where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.tc_class iclDef.tc_class
@@ -938,9 +937,8 @@ instance e_corresponds Expression where
 		=	e_corresponds dcl_ds icl_ds
 		o`	equal2 dcl_field_nr icl_field_nr
 		o`	e_corresponds dcl_expr icl_expr
-	e_corresponds (BasicExpr dcl_value dcl_type) (BasicExpr icl_value icl_type)
+	e_corresponds (BasicExpr dcl_value) (BasicExpr icl_value)
 		=	equal2 dcl_value icl_value
-		o`	equal2 dcl_type icl_type
 	e_corresponds (AnyCodeExpr dcl_ins dcl_outs dcl_code_sequence) (AnyCodeExpr icl_ins icl_outs icl_code_sequence)
 		=	e_corresponds dcl_ins icl_ins
 		o`	e_corresponds dcl_outs icl_outs
@@ -1075,7 +1073,7 @@ instance e_corresponds {#Char} where
 instance e_corresponds BoundVar where
 	e_corresponds dcl icl
 		= e_corresponds_VarInfoPtr icl.var_name dcl.var_info_ptr icl.var_info_ptr
-
+		
 instance e_corresponds FieldSymbol where
 	e_corresponds dclField iclField
 		= equal2 dclField.fs_name iclField.fs_name

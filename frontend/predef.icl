@@ -4,6 +4,8 @@ import syntax, hashtable, type_io_common
 
 cPredefinedModuleIndex :== 1
 
+PD_StringTypeIndex :== 0
+
 ::	PredefinedSymbols	:== {# PredefinedSymbol}
 
 ::	PredefinedSymbol = {

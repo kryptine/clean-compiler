@@ -54,7 +54,10 @@ where
 
 instance == BasicValue
 where
-	(==) (BVI int1) (BVI int2)			= int1 == int2
+	(==) (BVI int1) (BVI int2) = int1 == int2
+	(==) (BVI int1) (BVInt int2) = int1 == toString int2
+	(==) (BVInt int1) (BVI int2) = toString int1 == int2
+	(==) (BVInt int1) (BVInt int2) = int1 == int2
 	(==) (BVC char1) (BVC char2)		= char1 == char2
 	(==) (BVB bool1) (BVB bool2)		= bool1 == bool2
 	(==) (BVR real1) (BVR real2)		= real1 == real2

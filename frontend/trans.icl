@@ -264,7 +264,7 @@ instance consumerRequirements Expression where
 				
 	consumerRequirements (Case case_expr) common_defs ai
 		= consumerRequirements case_expr common_defs ai
-	consumerRequirements (BasicExpr _ _) _ ai
+	consumerRequirements (BasicExpr _) _ ai
 		= (cPassive, False, ai)
 	consumerRequirements (MatchExpr _ _ expr) common_defs ai
 		= consumerRequirements expr common_defs ai
@@ -313,14 +313,14 @@ where
 		= ai
 			
 instance consumerRequirements App where
-	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
+	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
 		| glob_module == main_dcl_module_n//ai_main_dcl_module_n
 			| glob_object < size ai_cons_class
 				#! fun_class = ai_cons_class.[glob_object]
 				= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
 				= consumerRequirements app_args common_defs ai
 
-		| glob_module==stdStrictLists_module_n && symb_arity>0 && is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
+		| glob_module==stdStrictLists_module_n && (not (isEmpty app_args)) && is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 //			&& trace_tn ("consumerRequirements "+++symb_name.id_name+++" "+++toString imported_funs.[glob_module].[glob_object].ft_type.st_arity)
 			# [app_arg:app_args]=app_args;
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
@@ -329,7 +329,7 @@ instance consumerRequirements App where
 			= consumerRequirements app_args common_defs ai
 
 			= consumerRequirements app_args common_defs ai
-	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
+	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
 		| glob_object < size ai_cons_class
 			#! fun_class = ai_cons_class.[glob_object]
 			= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
@@ -365,7 +365,7 @@ instance consumerRequirements Case where
 						-> ai
 				_	-> ai
 		# ai = case case_guards of
-					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_arity=1,symb_kind=SK_Function _},app_args=[app_arg]}) patterns
+					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns
 						// decons_expr will be optimized to a decons_u Selector in transform
 						# (cc, _, ai) = consumerRequirements app_arg common_defs ai
 						# ai_class_subst = unifyClassifications cActive cc ai.ai_class_subst
@@ -883,7 +883,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 										  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
 										-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
 							No	-> skip_over this_case ro ti
-			BasicExpr basic_value _
+			BasicExpr basic_value
 				| not is_active
 					-> skip_over this_case ro ti // XXX currently only active cases are matched at runtime (multimatch problem)
 				# basicPatterns = getBasicPatterns case_guards
@@ -1015,7 +1015,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			= match_and_instantiate linearities cons_index app_args guards case_default ro ti
 		  where
 		  	in_normal_form (Var _)			= True
-		  	in_normal_form (BasicExpr _ _)	= True
+		  	in_normal_form (BasicExpr _)	= True
 		  	in_normal_form _				= False
 		  	
 			filterWith [True:t2] [h1:t1]
@@ -1097,7 +1097,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 	  fun_ident
 	  		= { id_name = ro.ro_fun_root.symb_name.id_name+++"_case", id_info = nilPtr }
 	  fun_symb
-	  		= { symb_name = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff, symb_arity = length all_args }
+	  		= { symb_name = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
 	  new_ro
 	  		= { ro & ro_root_case_mode = RootCaseOfZombie , ro_fun_case = fun_symb, ro_fun_args = all_args }
 	  ti
@@ -1351,9 +1351,9 @@ where
 			= Smaller
 			= Greater
 	where
-		compare_constructor_arguments (PR_Function _ index1) (PR_Function _ index2)
+		compare_constructor_arguments (PR_Function _ _ index1) (PR_Function _ _ index2)
 			= index1 =< index2
-		compare_constructor_arguments (PR_GeneratedFunction _ index1) (PR_GeneratedFunction _ index2)
+		compare_constructor_arguments (PR_GeneratedFunction _ _ index1) (PR_GeneratedFunction _ _ index2)
 			= index1 =< index2
 		compare_constructor_arguments 	(PR_Class app1 lifted_vars_with_types1 t1) 
 										(PR_Class app2 lifted_vars_with_types2 t2) 
@@ -1362,11 +1362,11 @@ where
 			| cmp<>Equal
 				= cmp
 			= compare_types lifted_vars_with_types1 lifted_vars_with_types2
-		compare_constructor_arguments (PR_Curried symb_ident1) (PR_Curried symb_ident2)
+		compare_constructor_arguments (PR_Curried symb_ident1 _) (PR_Curried symb_ident2 _)
 			= symb_ident1 =< symb_ident2
 		compare_constructor_arguments PR_Empty PR_Empty
 			= Equal
-		compare_constructor_arguments (PR_Constructor symb_ident1 _) (PR_Constructor symb_ident2 _)
+		compare_constructor_arguments (PR_Constructor symb_ident1 _ _) (PR_Constructor symb_ident2 _ _)
 			= symb_ident1 =< symb_ident2
 			
 		compare_types [(_, type1):types1] [(_, type2):types2]
@@ -1622,7 +1622,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
 	  		= unfold tb_rhs ui us
 //	| False -!-> ("unfolded:", tb_rhs) = undef
-	# ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr, symb_arity = fun_arity}
+	# ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr }
 	# ro 	=	{ ro &	ro_root_case_mode = case tb_rhs of 
 	  						Case _
 	  							-> RootCase
@@ -1760,14 +1760,14 @@ where
 						(vars, arg_types, next_attr_nr, new_linear_bits, new_cons_args, 
 							uniqueness_requirements, subst, let_bindings, type_heaps=:{th_vars, th_attrs}, symbol_heap,
 							fun_defs, fun_heap, var_heap, ti_cons_args)
-			# symbol
+			# (symbol,symbol_arity)
 					= get_producer_symbol producer
 			  curried
 			  		= is_curried producer
 			#! size_fun_defs
 					= size fun_defs
 			# ({cc_args, cc_linear_bits}, fun_heap, ti_cons_args)
-					= calc_cons_args curried symbol ti_cons_args linear_bit size_fun_defs fun_heap
+					= calc_cons_args curried symbol symbol_arity ti_cons_args linear_bit size_fun_defs fun_heap
 			  (arg_type, arg_types)
 			  		= arg_types![prod_index]
 			  (next_attr_nr, th_attrs)
@@ -1776,7 +1776,7 @@ where
 			  (_, (st_args, st_result), type_heaps)
 			  		= substitute (st_args, st_result) { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 			  nr_of_applied_args
-			  		= symbol.symb_arity
+					= symbol_arity
 			  application_type
 			  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args
 			  type_input
@@ -1795,12 +1795,12 @@ where
 			  			ur_attr_ineqs = attr_inequalities }
 			  (opt_body, var_names, fun_defs, fun_heap)
 			  		= case producer of
-			  			(PR_Constructor {symb_arity, symb_kind=SK_Constructor {glob_module}} _)
-		  					-> (NoBody, repeatn symb_arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
-			  			(PR_Curried {symb_arity, symb_kind=SK_Function {glob_module}})
+			  			(PR_Constructor {symb_kind=SK_Constructor {glob_module}} arity _)
+		  					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
+			  			(PR_Curried {symb_kind=SK_Function {glob_module}} arity)
 			  				| glob_module <> ro.ro_main_dcl_module_n
 			  					// we do not have good names for the formal variables of that function: invent some
-			  					-> (NoBody, repeatn symb_arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
+			  					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, fun_defs, fun_heap)
 			  				// GOTO next alternative
 			  			_
 							# ({fun_body=fun_body=:TransformedBody tb}, fun_defs, fun_heap)
@@ -1810,9 +1810,9 @@ where
 			  		= build_var_args (reverse var_names) vars [] var_heap
 			  (expr_to_unfold, var_heap)
 					= case producer of
-						(PR_Constructor symb expr)
+						(PR_Constructor symb _ expr)
 							-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), var_heap)
-						(PR_Curried _)
+						(PR_Curried _ _)
 							-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), var_heap)
 						_ // function or generated function
 							# (TransformedBody tb) = opt_body
@@ -1850,7 +1850,7 @@ where
 			  , ti_cons_args
 			  ) 
 		  where
-			calc_cons_args curried {symb_kind, symb_arity} ti_cons_args linear_bit size_fun_defs fun_heap
+			calc_cons_args curried {symb_kind} symbol_arity ti_cons_args linear_bit size_fun_defs fun_heap
 				# (cons_size, ti_cons_args) = usize ti_cons_args
 				# (opt_cons_classes, fun_heap, ti_cons_args)
 						= case symb_kind of
@@ -1876,14 +1876,14 @@ where
 								-> (No, fun_heap, ti_cons_args)
 				= case opt_cons_classes of
 					Yes cons_classes
-						-> ({ cc_size = symb_arity, cc_args = take symb_arity cons_classes.cc_args, 
-				  				cc_linear_bits = if curried (repeatn symb_arity linear_bit) 
-				  									(take symb_arity cons_classes.cc_linear_bits),
+						-> ({ cc_size = symbol_arity, cc_args = take symbol_arity cons_classes.cc_args, 
+				  				cc_linear_bits = if curried (repeatn symbol_arity linear_bit) 
+				  									(take symbol_arity cons_classes.cc_linear_bits),
 				  				cc_producer = False}
 				  			, fun_heap, ti_cons_args)
 					No
-						-> ({cc_size = symb_arity, cc_args = repeatn symb_arity cPassive,
-								cc_linear_bits = repeatn symb_arity linear_bit,
+						-> ({cc_size = symbol_arity, cc_args = repeatn symbol_arity cPassive,
+								cc_linear_bits = repeatn symbol_arity linear_bit,
 								cc_producer = False}, fun_heap, ti_cons_args)
 
 
@@ -1899,7 +1899,7 @@ where
 				# (FI_Function {gf_fun_def}, fun_heap) = readPtr fun_ptr fun_heap
 				= (gf_fun_def, fun_defs, fun_heap)
 				
-			is_curried (PR_Curried _) = True
+			is_curried (PR_Curried _ _) = True
 			is_curried _ = False
 			
 		build_application_type st_arity nr_context_args st_result st_args nr_of_applied_args
@@ -1991,7 +1991,7 @@ where
 			PR_Class _ _ class_type
 				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
 			producer
-				# symbol = get_producer_symbol producer
+				# (symbol,_) = get_producer_symbol producer
 				  (symbol_type, ti_fun_defs, ti_fun_heap)
 						= get_producer_type symbol ro ti_fun_defs ti_fun_heap
 				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
@@ -2023,14 +2023,14 @@ where
 		collect_unencountered_cons_var _ _ state
 			= state
 
-	get_producer_symbol (PR_Curried symbol)
-		= symbol
-	get_producer_symbol (PR_Function symbol _)
-		= symbol
-	get_producer_symbol (PR_GeneratedFunction symbol _)
-		= symbol
-	get_producer_symbol (PR_Constructor symbol _)
-		= symbol
+	get_producer_symbol (PR_Curried symbol arity)
+		= (symbol,arity)
+	get_producer_symbol (PR_Function symbol arity _)
+		= (symbol,arity)
+	get_producer_symbol (PR_GeneratedFunction symbol arity _)
+		= (symbol,arity)
+	get_producer_symbol (PR_Constructor symbol arity _)
+		= (symbol,arity)
 
 	replace_integers_in_substitution replace_input i (subst, used)
 		# (subst_i, subst)
@@ -2106,25 +2106,25 @@ where
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_producer (PR_Class {app_args} _ _) current_max fun_defs fun_heap cons_args
 		= foldSt (foldrExprSt max_group_index_of_member) app_args (current_max, cons_args, fun_defs, fun_heap)
-	max_group_index_of_producer (PR_Curried {symb_kind=SK_Function {glob_object=fun_index, glob_module}}) current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Curried {symb_kind=SK_Function {glob_object=fun_index, glob_module}} _) current_max fun_defs fun_heap cons_args
 		| glob_module<>ro_main_dcl_module_n
 			= (current_max, cons_args, fun_defs, fun_heap)
 		# (current_max, fun_defs) = max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
 		= (current_max, cons_args, fun_defs, fun_heap)
-	max_group_index_of_producer (PR_Curried {symb_kind=SK_LocalMacroFunction fun_index}) current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Curried {symb_kind=SK_LocalMacroFunction fun_index} _) current_max fun_defs fun_heap cons_args
 		# (current_max, fun_defs) = max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
 		= (current_max, cons_args, fun_defs, fun_heap)
-	max_group_index_of_producer (PR_Curried { symb_kind = SK_GeneratedFunction fun_ptr fun_index}) current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Curried { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _) current_max fun_defs fun_heap cons_args
 		# (current_max, fun_defs, fun_heap) = max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
 		= (current_max, cons_args, fun_defs, fun_heap)
-	max_group_index_of_producer (PR_Function _ fun_index) current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Function _ _ fun_index) current_max fun_defs fun_heap cons_args
 		# (current_max, fun_defs) = max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
 		= (current_max, cons_args, fun_defs, fun_heap)
-	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _)
+	max_group_index_of_producer (PR_GeneratedFunction { symb_kind = SK_GeneratedFunction fun_ptr fun_index} _ _)
 								current_max fun_defs fun_heap cons_args
 		# (current_max, fun_defs, fun_heap) = max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
 		= (current_max, cons_args, fun_defs, fun_heap)
-	max_group_index_of_producer (PR_Constructor symb args) current_max fun_defs fun_heap cons_args
+	max_group_index_of_producer (PR_Constructor symb _ args) current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)	// DvA: not a clue what we're trying here...
 	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
 		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
@@ -2150,7 +2150,7 @@ where
 			= (max fi_group_index current_max, cons_args, fun_defs, fun_heap)
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_member
-				(App {app_symb = {symb_kind = SK_GeneratedFunction fun_ptr _ }})
+				(App {app_symb = {symb_kind = SK_GeneratedFunction fun_ptr _}})
 				(current_max, cons_args, fun_defs, fun_heap)
 		# (FI_Function {gf_fun_def={fun_info = {fi_group_index}}}, fun_heap) = readPtr fun_ptr fun_heap
 		= (max fi_group_index current_max, cons_args, fun_defs, fun_heap)
@@ -2251,7 +2251,7 @@ allocate_fresh_type_var i (accu, th_vars)
 	= ([tv:accu], th_vars)
 
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
-	# (app_symb, app_args, extra_args) = complete_application app_symb fun_def.fun_arity app_args extra_args
+	# (app_args, extra_args) = complete_application fun_def.fun_arity app_args extra_args
 	| False -!-> ("transformFunctionApplication",app_symb,app_args) = undef
 	| cc_size > 0 && not_expanding_consumer
 		| False-!->("determineProducers",(app_symb.symb_name, cc_linear_bits,cc_args,app_args))
@@ -2265,12 +2265,12 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  		| is_new
 	  			# ti = update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
 	  			# (fun_index, fun_arity, ti) = generateFunction fun_def cc producers fun_def_ptr ro ti
-	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index, symb_arity = length new_args}
-				# (app_symb, app_args, extra_args) = complete_application app_symb fun_arity new_args extra_args
+	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index }
+				# (app_args, extra_args) = complete_application fun_arity new_args extra_args
 	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 	  			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-				  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index, symb_arity = length new_args}
-				  (app_symb, app_args, extra_args) = complete_application app_symb gf_fun_def.fun_arity new_args extra_args
+				  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
+				  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
 	  			# ti = {ti & ti_fun_heap = ti_fun_heap }
 	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 			= (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
@@ -2290,11 +2290,11 @@ where
 		# (FI_Function fun_info, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 		= { ti & ti_fun_heap = ti_fun_heap <:= (fun_def_ptr, FI_Function { fun_info & gf_instance_info = instances })}
 
-	complete_application symb form_arity args []
-		= (symb, args, [])
-	complete_application symb=:{symb_arity} form_arity args extra_args
-		# arity_diff = min (form_arity - symb_arity) (length extra_args)
-		= ({ symb & symb_arity = symb_arity + arity_diff }, args ++ take arity_diff extra_args, drop arity_diff extra_args)
+	complete_application form_arity args []
+		= (args, [])
+	complete_application form_arity args extra_args
+		# arity_diff = min (form_arity - length args) (length extra_args)
+		= (args ++ take arity_diff extra_args, drop arity_diff extra_args)
 
 	build_application app []
 		= App app
@@ -2309,7 +2309,7 @@ is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== not (isEmpty imported_funs.[glob_module].[glob_object].ft_type.st_context);
 
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
-transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extra_args
+transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
 	| is_SK_Function_or_SK_LocalMacroFunction symb_kind // otherwise GOTO next alternative	
 		# { glob_module, glob_object }
@@ -2326,9 +2326,9 @@ transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extr
 			// It seems as if we have an array function 
 				| isEmpty extra_args
 					= (App app, ti)
-					= (App { app & app_symb = { symb & symb_arity = symb_arity + length extra_args}, app_args = app_args ++ extra_args}, ti)
+					= (App { app & app_args = app_args ++ extra_args}, ti)
 
-		| glob_module==ro.ro_stdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && symb_arity>0
+		| glob_module==ro.ro_stdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && (not (isEmpty app_args))
 //			&& trace_tn ("transformApplication "+++toString symb.symb_name)
 			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
 			# [{tc_class={glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
@@ -2351,12 +2351,11 @@ transformApplication app=:{app_symb=symb=:{symb_kind,symb_arity}, app_args} extr
 				= (App app, ti)
 				# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
 				  form_arity = ft_arity + length ft_type.st_context
-				  ar_diff = form_arity - symb_arity
+				  ar_diff = form_arity - length app_args
 				  nr_of_extra_args = length extra_args
 				| nr_of_extra_args <= ar_diff
-					= (App {app  &  app_args = app_args ++ extra_args, app_symb = { symb & symb_arity = symb_arity + nr_of_extra_args }}, ti)
-					= (App {app  &  app_args = app_args ++ take ar_diff extra_args, app_symb = { symb & symb_arity = symb_arity + ar_diff }} @
-							drop ar_diff extra_args, ti)
+					= (App {app  &  app_args = app_args ++ extra_args }, ti)
+					= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
 	where
 		find_member_n i member_string a
 			| i<size a
@@ -2424,9 +2423,6 @@ where
 		= (producers, [arg : new_args], ti)
 
 // XXX check for linear_bit also in case of a constructor ?
-determineProducer _ _ app=:{app_symb = {symb_arity}, app_args} _ new_args prod_index producers _ ti
-	| symb_arity<>length app_args
-		= abort "sanity check 98765 failed in module trans"
 determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) new_args prod_index producers _ ti
 	# (app_args, (new_vars_and_types, free_vars, ti_var_heap)) 
 			= renewVariables app_args ti.ti_var_heap
@@ -2440,19 +2436,19 @@ determineProducer _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructo
 	| False -!-> ("ProduceXcc",symb_name)
 		= undef
 	| SwitchConstructorFusion (ro.ro_transform_fusion && linear_bit) False
-		# producers = {producers & [prod_index] = PR_Constructor symb app_args }
+		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
 	= ( producers, [App app : new_args ], ti)
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index, symb_arity}, app_args} _
+determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
-	| symb_arity<>fun_arity
+	| length app_args<>fun_arity
 		| is_applied_to_macro_fun 
-			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc_macro",symb.symb_name)
 		| SwitchCurriedFusion ro.ro_transform_fusion False
-			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc_curried",symb.symb_name)
 		= (producers, [App app : new_args ], ti)
 	# is_good_producer
@@ -2462,10 +2458,10 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ sy
 			(TransformedBody {tb_rhs})
 				-> SwitchGeneratedFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 	| cc_producer && is_good_producer
-		= ({ producers & [prod_index] = (PR_GeneratedFunction symb fun_index)}, app_args ++ new_args, ti)
+		= ({ producers & [prod_index] = (PR_GeneratedFunction symb (length app_args) fun_index)}, app_args ++ new_args, ti)
 				-!-> ("Produce1cc",symb.symb_name)
 	= (producers, [App app : new_args ], ti)
-determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind, symb_arity}, app_args} _
+determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind}, app_args} _
 				  new_args prod_index producers ro ti
 	| is_SK_Function_or_SK_LocalMacroFunction symb_kind
 		# { glob_module, glob_object }
@@ -2473,12 +2469,12 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 				SK_Function global_index -> global_index
 				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
 		# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
-		| symb_arity<>fun_arity
+		| length app_args<>fun_arity
 			| is_applied_to_macro_fun
-				= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+				= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc_macro",symb.symb_name)
 			| SwitchCurriedFusion ro.ro_transform_fusion False
-				= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
+				= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc_curried",symb.symb_name)
 			= (producers, [App app : new_args ], ti)
 		#! max_index = size ti.ti_cons_args
@@ -2491,7 +2487,7 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 		  is_good_producer = SwitchFunctionFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 		  {cc_producer} = ti.ti_cons_args.[glob_object]
 		| is_good_producer && cc_producer
-			= ({ producers & [prod_index] = (PR_Function symb glob_object)}, app_args ++ new_args, ti)
+			= ({ producers & [prod_index] = (PR_Function symb (length app_args) glob_object)}, app_args ++ new_args, ti)
 					-!-> ("Produce2cc",symb.symb_name)
 		= (producers, [App app : new_args ], ti)
 	= (producers, [App app : new_args ], ti)
@@ -2678,8 +2674,8 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 		  (fun_rhs, ti) = transform tb.tb_rhs ro { ti & ti_fun_defs = ti_fun_defs, ti_var_heap = ti_var_heap }
 		= { ti & ti_fun_defs = {ti.ti_fun_defs & [fun] = { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}}}
 	  where
-		fun_def_to_symb_ident fun_index {fun_symb,fun_arity}
-			= { symb_name=fun_symb, symb_kind=SK_Function {glob_object=fun_index, glob_module=main_dcl_module_n } , symb_arity=fun_arity }
+		fun_def_to_symb_ident fun_index {fun_symb}
+			= { symb_name=fun_symb, symb_kind=SK_Function {glob_object=fun_index, glob_module=main_dcl_module_n } }
 
 		get_root_case_mode {tb_rhs=Case _}	= RootCase
 		get_root_case_mode _ 				= NotRootCase
@@ -3071,13 +3067,13 @@ where
 // XXX	
 instance <<< Producer
 where
-	(<<<) file (PR_Function symbol index)
+	(<<<) file (PR_Function symbol _ index)
 		= file <<< "(F)" <<< symbol.symb_name
-	(<<<) file (PR_GeneratedFunction symbol index)
+	(<<<) file (PR_GeneratedFunction symbol _ index)
 		= file <<< "(G)" <<< symbol.symb_name <<< index
 	(<<<) file PR_Empty = file <<< 'E'
 	(<<<) file (PR_Class app vars type) = file <<< "(Class(" <<< App app<<<","<<< type <<< "))"
-	(<<<) file (PR_Curried {symb_name, symb_kind}) = file <<< "(Curried)" <<< symb_name <<< symb_kind
+	(<<<) file (PR_Curried {symb_name, symb_kind} _) = file <<< "(Curried)" <<< symb_name <<< symb_kind
 	(<<<) file _ = file
 
 instance <<< SymbKind
@@ -3276,7 +3272,7 @@ instance producerRequirements Expression where
 							= (safe,prs)
 	producerRequirements (TupleSelect _ _ expr) prs
 		= producerRequirements expr prs
-	producerRequirements (BasicExpr _ _) prs
+	producerRequirements (BasicExpr _) prs
 		= (True,prs)
 	producerRequirements (AnyCodeExpr _ _ _) prs
 		= (False,prs)
@@ -3335,7 +3331,7 @@ instance producerRequirements BasicPattern where
 		= producerRequirements bp_expr prs
 
 // compare with 'get_fun_def_and_cons_args'
-retrieve_consumer_args si=:{symb_kind, symb_arity} prs=:{prs_cons_args, prs_main_dcl_module_n}
+retrieve_consumer_args si=:{symb_kind} prs=:{prs_cons_args, prs_main_dcl_module_n}
 	# (prs_size, prs_cons_args) = usize prs_cons_args
 	  prs = {prs & prs_cons_args = prs_cons_args}
 	= case symb_kind of

@@ -68,7 +68,7 @@ make_unboxed_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
 	# unboxed_list=UnboxedList type_symbol stdStrictLists_index decons_u_index nil_u_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_name=decons_u_ident,symb_arity=0,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	# decons_expr = App {app_symb={symb_name=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_unboxed_tail_strict_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
@@ -85,7 +85,7 @@ make_unboxed_tail_strict_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_u_ident cs
 	# unboxed_list=UnboxedTailStrictList type_symbol stdStrictLists_index decons_uts_index nil_uts_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_name=decons_uts_ident,symb_arity=0,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	# decons_expr = App {app_symb={symb_name=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_overloaded_list_indices_and_decons_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
@@ -102,7 +102,7 @@ make_overloaded_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_index,decons_index,nil_index,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
 	# overloaded_list=OverloadedList type_symbol stdStrictLists_index decons_index nil_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_name=decons_ident,symb_arity=0,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	# decons_expr = App {app_symb={symb_name=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
 make_case_guards cons_symbol type_symbol alg_patterns expr_heap cs
@@ -1036,10 +1036,9 @@ checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_in
 	= (Update expr1 selectors expr2, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Tuple exprs) e_input e_state e_info cs
 	# (exprs, arity, free_vars, e_state, e_info, cs) = check_expression_list free_vars exprs e_input e_state e_info cs
-	  ({glob_object={ds_ident,ds_index, ds_arity},glob_module}, cs)
+	  ({glob_object={ds_ident,ds_index},glob_module}, cs)
 	  		= getPredefinedGlobalSymbol (GetTupleConsIndex arity) PD_PredefinedModule STE_Constructor arity cs
-	= (App { app_symb = { symb_name = ds_ident, symb_arity = ds_arity,
-						  symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }},
+	= (App { app_symb = { symb_name = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }},
 			 app_args = exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
 where
 	check_expression_list free_vars [] e_input e_state e_info cs
@@ -1053,8 +1052,8 @@ checkExpression free_vars rec=:(PE_Record record opt_type fields) e_input=:{ei_e
 	# (opt_record_and_fields, e_info, cs) = checkFields ei_mod_index fields opt_type e_info cs
 	= case opt_record_and_fields of
 		Yes (cons=:{glob_module, glob_object}, _, new_fields)
-			# {ds_ident,ds_index,ds_arity} = glob_object
-			  rec_cons = { symb_name = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }, symb_arity = ds_arity }
+			# {ds_ident,ds_index} = glob_object
+			  rec_cons = { symb_name = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module } }
 			-> case record of
 				PE_Empty
 					# (exprs, free_vars, e_state, e_info, cs) = check_field_exprs free_vars new_fields 0 RK_Constructor e_input e_state e_info cs
@@ -1135,8 +1134,7 @@ checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expr_h
 // ... MV
 
 checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
-	# (basic_type, cs) = typeOfBasicValue basic_value cs
-	= (BasicExpr basic_value basic_type, free_vars, e_state, e_info, cs)
+	= (BasicExpr basic_value, free_vars, e_state, e_info, cs)
 
 checkExpression free_vars (PE_ABC_Code code_sequence do_inline) e_input e_state e_info cs
 	= (ABCCodeExpr code_sequence do_inline, free_vars, e_state, e_info, cs)
@@ -1216,7 +1214,7 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 
 		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs
 			#! symb_kind = SK_Generic { glob_object = gen_index, glob_module = mod_index} kind
-		  	#! symbol = { symb_name = id, symb_kind = symb_kind, symb_arity = 0 }			
+		  	#! symbol = { symb_name = id, symb_kind = symb_kind }			
 			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 			#! app = { app_symb = symbol, app_args = [], app_info_ptr = new_info_ptr }
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
@@ -1286,7 +1284,7 @@ where
 			{ cs & cs_error = checkError id "generic: missing kind argument" cs_error})								
 	check_id_expression entry is_expr_list free_vars id=:{id_info} e_input e_state e_info cs
 		# (symb_kind, arity, priority, is_a_function, e_state, e_info, cs) = determine_info_of_symbol entry id_info e_input e_state e_info cs
-		  symbol = { symb_name = id, symb_kind = symb_kind, symb_arity = 0 }
+		  symbol = { symb_name = id, symb_kind = symb_kind }
   		| is_expr_list
 			= (Constant symbol arity priority is_a_function, free_vars, e_state, e_info, cs)
 			# (app_expr, e_state, cs_error) = buildApplication symbol arity 0 is_a_function [] e_state cs.cs_error
@@ -1591,6 +1589,8 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 			= states
 		// further with next alternative
 	check_index_expr (PE_Basic (BVI _)) states
+			= states
+	check_index_expr (PE_Basic (BVInt _)) states
 			= states
 	check_index_expr _ (var_env, ap_selections, var_heap, cs)
 		= (var_env, ap_selections, var_heap, { cs & cs_error = checkError "variable or integer constant expected as index expression" "" cs.cs_error })
@@ -1907,10 +1907,10 @@ where
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb,app_args}) ums
 		= unfold_application  mod_index macro_ident opt_var extra_args app_symb app_args ums
 	where
-		unfold_application  mod_index macro_ident opt_var extra_args {symb_kind=SK_Constructor {glob_module,glob_object},symb_name,symb_arity} app_args
+		unfold_application  mod_index macro_ident opt_var extra_args {symb_kind=SK_Constructor {glob_module,glob_object},symb_name} app_args
 										ums=:{ums_cons_defs, ums_modules,ums_error}
 				# (cons_def, cons_index, ums_cons_defs, ums_modules) = get_cons_def mod_index glob_module glob_object ums_cons_defs ums_modules
-				| cons_def.cons_type.st_arity == symb_arity+length extra_args
+				| cons_def.cons_type.st_arity == length app_args+length extra_args
 					# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
 					  cons_symbol = { glob_object = MakeDefinedSymbol symb_name cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
 					= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
@@ -1925,7 +1925,7 @@ where
 				  cons_def = dcl_common.com_cons_defs.[cons_index]
 				= (cons_def, cons_index, cons_defs, modules)
 
-	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv bt) ums=:{ums_error}
+	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv) ums=:{ums_error}
 		| not (isEmpty extra_args)
 			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too much arguments for pattern macro" ums_error })
 		= (AP_Basic bv opt_var, ums)
@@ -2233,11 +2233,11 @@ buildApplication symbol form_arity act_arity is_fun args e_state=:{es_expr_heap}
 	| is_fun
 		# (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 		| form_arity < act_arity
-			# app = { app_symb = { symbol & symb_arity = form_arity }, app_args = take form_arity args, app_info_ptr = new_info_ptr }
+			# app = { app_symb = symbol , app_args = take form_arity args, app_info_ptr = new_info_ptr }
 			= (App app @ drop form_arity args, { e_state & es_expr_heap = es_expr_heap }, error)
-			# app = { app_symb = { symbol & symb_arity = act_arity }, app_args = take form_arity args, app_info_ptr = new_info_ptr }
+			# app = { app_symb = symbol , app_args = take form_arity args, app_info_ptr = new_info_ptr }
 			= (App app, { e_state & es_expr_heap = es_expr_heap }, error)
-		# app = App { app_symb = { symbol & symb_arity = act_arity }, app_args = args, app_info_ptr = nilPtr }
+		# app = App { app_symb = symbol , app_args = args, app_info_ptr = nilPtr }
 		| form_arity < act_arity
 			= (app, e_state, checkError symbol.symb_name "used with too many arguments" error)
 			= (app, e_state, error)
@@ -2284,6 +2284,7 @@ where
 
 typeOfBasicValue :: !BasicValue !*CheckState -> (!BasicType, !*CheckState)
 typeOfBasicValue (BVI _) cs = (BT_Int, cs)
+typeOfBasicValue (BVInt _) cs = (BT_Int, cs)
 typeOfBasicValue (BVC _) cs = (BT_Char, cs)
 typeOfBasicValue (BVB _) cs = (BT_Bool, cs)
 typeOfBasicValue (BVR _) cs = (BT_Real, cs)

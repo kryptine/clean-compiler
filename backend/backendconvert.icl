@@ -374,7 +374,7 @@ beDynamicTempTypeSymbol
 
 notYetImplementedExpr :: Expression
 notYetImplementedExpr
-	=	(BasicExpr (BVS "\"error in compiler (something was not implemented by lazy Ronny)\"") BT_Int)
+	=	(BasicExpr (BVS "\"error in compiler (something was not implemented by lazy Ronny)\""))
 
 backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree !Int *VarHeap *AttrVarHeap *BackEnd -> (!*VarHeap, *AttrVarHeap, !*BackEnd)
 /*
@@ -1751,6 +1751,8 @@ convertRhsStrictNodeIds expression
 convertLiteralSymbol :: BasicValue -> BEMonad BESymbolP
 convertLiteralSymbol (BVI intString)
 	=	beLiteralSymbol BEIntDenot intString
+convertLiteralSymbol (BVInt int)
+	=	beLiteralSymbol BEIntDenot (toString int)
 convertLiteralSymbol (BVB bool)
 	=	beBoolSymbol bool
 convertLiteralSymbol (BVC charString)
@@ -1769,7 +1771,7 @@ convertExpr  expr main_dcl_module_n
 	= convertExpr expr
 where
 	convertExpr :: Expression -> BEMonad BENodeP
-	convertExpr  (BasicExpr value _)
+	convertExpr  (BasicExpr value)
 		=	beNormalNode (convertLiteralSymbol value) beNoArgs
 	convertExpr  (App {app_symb, app_args})
 		=	beNormalNode (convertSymbol app_symb) (convertArgs app_args)

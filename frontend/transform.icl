@@ -96,7 +96,7 @@ where
 
 instance lift App
 where
-	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
+	lift app=:{app_symb = app_symbol=:{symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
 		| glob_module == ls.ls_x.LiftStateX.x_main_dcl_module_n
 			# (fun_def,ls) = ls!ls_x.x_fun_defs.[glob_object]
 			= lift_function_app app fun_def.fun_info.fi_free_vars ls
@@ -112,13 +112,13 @@ where
 		# (app_args, ls) = lift app_args ls
 		= ({ app & app_args = app_args }, ls)
 
-lift_function_app app=:{app_symb=app_symbol=:{symb_arity},app_args} [] ls
+lift_function_app app=:{app_symb=app_symbol,app_args} [] ls
 	# (app_args, ls) = lift app_args ls
 	= ({ app & app_args = app_args }, ls)
-lift_function_app app=:{app_symb=app_symbol=:{symb_arity},app_args} fi_free_vars ls
+lift_function_app app=:{app_args} fi_free_vars ls
 	# (app_args, ls) = lift app_args ls
 	# (app_args, ls_var_heap, ls_expr_heap) = add_free_variables_in_app fi_free_vars app_args ls.ls_var_heap ls.ls_expr_heap
-	# app = { app & app_args = app_args, app_symb = { app_symbol & symb_arity = symb_arity + length fi_free_vars }}
+	# app = { app & app_args = app_args }
 	= (app,	{ ls & ls_var_heap = ls_var_heap, ls_expr_heap = ls_expr_heap })
 where
 	add_free_variables_in_app :: ![FreeVar] ![Expression] !*VarHeap !*ExpressionHeap -> (![Expression],!*VarHeap,!*ExpressionHeap)
@@ -1187,15 +1187,15 @@ where
 	has_no_curried_macro_CheckedAlternative []
 		= True
 
-	has_no_curried_macro_Expression (App app=:{app_symb={symb_arity, symb_kind = SK_DclMacro {glob_object,glob_module}}, app_args})
-		| macro_defs.[glob_module,glob_object].fun_arity<>symb_arity
+	has_no_curried_macro_Expression (App {app_symb={symb_kind = SK_DclMacro {glob_object,glob_module}}, app_args})
+		| macro_defs.[glob_module,glob_object].fun_arity<>length app_args
 			= False;
 			= has_no_curried_macro_Expressions app_args
-	has_no_curried_macro_Expression (App app=:{app_symb={symb_arity, symb_kind = SK_IclMacro glob_object}, app_args})
-		| fun_defs.[glob_object].fun_arity<>symb_arity
+	has_no_curried_macro_Expression (App {app_symb={symb_kind = SK_IclMacro glob_object}, app_args})
+		| fun_defs.[glob_object].fun_arity<>length app_args
 			= False;
 			= has_no_curried_macro_Expressions app_args
-	has_no_curried_macro_Expression (App app=:{app_args})
+	has_no_curried_macro_Expression (App {app_args})
 		= has_no_curried_macro_Expressions app_args
 	has_no_curried_macro_Expression (expr @ exprs)
 		= has_no_curried_macro_Expression expr && has_no_curried_macro_Expressions exprs
@@ -1558,12 +1558,12 @@ class expand a :: !a !*ExpandInfo -> (!a, !*ExpandInfo)
 
 instance expand Expression
 where
-	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_DclMacro {glob_object,glob_module}}, app_args}) ei
+	expand (App app=:{app_symb = symb=:{symb_kind = SK_DclMacro {glob_object,glob_module}}, app_args}) ei
 		# (app_args, (calls, es)) = expand app_args ei
 		# (macro, es) = es!es_macro_defs.[glob_module,glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_macro_defs.[glob_module,glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == symb_arity
+		| macro.fun_arity == length app_args
 			= unfoldMacro macro app_args True (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
@@ -1593,12 +1593,12 @@ where
 				= (app, (calls, { es & es_symbol_table = es_symbol_table }))
 				= (app, (calls, { es & es_symbol_table = es_symbol_table }))
 */
-	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_IclMacro glob_object}, app_args}) ei
+	expand (App app=:{app_symb = symb=:{symb_kind = SK_IclMacro glob_object}, app_args}) ei
 		# (app_args, (calls, es)) = expand app_args ei
 		# (macro, es) = es!es_fun_defs.[glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_fun_defs.[glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == symb_arity
+		| macro.fun_arity == length app_args
 			= unfoldMacro macro app_args False (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
@@ -1794,10 +1794,10 @@ where
 	collectVariables (App app=:{app_symb={symb_kind=SK_Function {glob_object,glob_module}},app_args}) free_vars cos=:{cos_predef_symbols_for_transform={predef_and,predef_or}}
 		# ([e1,e2:_], free_vars, cos) = collectVariables app_args free_vars cos
 		| glob_object==predef_and.pds_def && glob_module==predef_and.pds_module && two_args app_args
-			# (kase,cos) = if_expression e1 e2 (BasicExpr (BVB False) BT_Bool) cos
+			# (kase,cos) = if_expression e1 e2 (BasicExpr (BVB False)) cos
 			= (kase, free_vars, cos)
 		| glob_object==predef_or.pds_def && glob_module==predef_or.pds_module && two_args app_args
-			# (kase,cos) = if_expression e1 (BasicExpr (BVB True) BT_Bool) e2 cos
+			# (kase,cos) = if_expression e1 (BasicExpr (BVB True)) e2 cos
 			= (kase, free_vars, cos)
 		where
 			if_expression :: Expression Expression Expression *CollectState -> (!Expression,!.CollectState);
@@ -1805,9 +1805,7 @@ where
 				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
 				# kase = Case {	case_expr=e1, case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr=e2,bp_position=NoPos}],
 								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos,
-// RWS ...
 								case_explicit = False }
-// ... RWS
 				= (kase,{cos & cos_symbol_heap=symbol_heap});
 			
 			two_args [_,_]
@@ -1893,9 +1891,7 @@ where
 					# (new_app_info_ptr, cos_symbol_heap) = newPtr EI_Empty cos_symbol_heap
 					  {pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
 					  pds_ident = predefined_idents.[PD_DummyForStrictAliasFun]
-			  		  app_symb = { symb_name = pds_ident, 
-					  				symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def},
-									symb_arity = 1 }
+			  		  app_symb = { symb_name = pds_ident, symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def} }
 					= (App { app_symb = app_symb, app_args = [bind_src], app_info_ptr = new_app_info_ptr },
 						{ cos & cos_symbol_heap = cos_symbol_heap } )
 								

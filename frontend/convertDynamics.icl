@@ -140,7 +140,7 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 						// get tuple arity 2 constructor
 						# ({pds_module, pds_def}, predefined_symbols)	= predefined_symbols![GetTupleConsIndex arity]
 						# pds_ident = predefined_idents.[GetTupleConsIndex arity]
-						# twoTuple_symb	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+						# twoTuple_symb	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
 						
 						// get tuple, type and value selectors
 						# ({pds_def}, predefined_symbols) = predefined_symbols![GetTupleConsIndex arity]
@@ -159,7 +159,6 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 							= { SymbIdent |
 								symb_name	= rt_constructor.ds_ident
 							,	symb_kind 	= SK_Constructor {glob_module = pds_module1, glob_object = rt_constructor.ds_index} 
-							,	symb_arity	= rt_constructor.ds_arity
 							}
 		
 						// type field
@@ -407,8 +406,8 @@ where
 	convertDynamics cinp bound_vars default_expr (TupleSelect definedSymbol int expression) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
 		= (TupleSelect definedSymbol int expression, ci)
-	convertDynamics _ _ _ (BasicExpr basicValue basicType) ci
-		= (BasicExpr basicValue basicType, ci)
+	convertDynamics _ _ _ be=:(BasicExpr basicValue) ci
+		= (be, ci)
 	convertDynamics _ _ _ (AnyCodeExpr codeBinding1 codeBinding2 strings) ci
 		= (AnyCodeExpr codeBinding1 codeBinding2 strings, ci)
 	convertDynamics _ _ _ (ABCCodeExpr strings bool) ci
@@ -937,7 +936,7 @@ where
 			= ci;
 		# ({pds_module, pds_def}, ci_predef_symb)	= ci_predef_symb![PD_ModuleConsSymbol]
 		# pds_ident = predefined_idents.[PD_ModuleConsSymbol]
-		# module_symb1	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 0 }
+		# module_symb1	= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
 		# ci
 			= { ci & ci_predef_symb = ci_predef_symb };
 
@@ -1181,7 +1180,7 @@ addToBoundVars var type bound_vars
 
 get_constructor :: !{!GlobalTCType} Index -> Expression
 get_constructor glob_type_inst index
-	= BasicExpr (BVS ("\"" +++ toString  glob_type_inst.[index] +++ "\"")) (BT_String TE)
+	= BasicExpr (BVS ("\"" +++ toString  glob_type_inst.[index] +++ "\""))
 
 getResultType :: ExprInfoPtr !*ConversionInfo -> (!AType, !*ConversionInfo)
 getResultType case_info_ptr ci=:{ci_expr_heap}
@@ -1193,7 +1192,7 @@ getSymbol index symb_kind arity ci=:{ci_predef_symb}
 	# ({pds_module, pds_def}, ci_predef_symb) = ci_predef_symb![index]
 	# pds_ident = predefined_idents.[index]
 	  ci = {ci & ci_predef_symb = ci_predef_symb}
-	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+	  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def} }
 	= (symbol, ci)
 
 getTupleSymbol arity ci=:{ci_predef_symb}
@@ -1283,7 +1282,7 @@ get_module_id_app predef_symbols
 	# ({pds_module, pds_def}, predef_symbols)	= predef_symbols![PD_ModuleConsSymbol]
 	# pds_ident = predefined_idents.[PD_ModuleConsSymbol]
 	# module_symb = 
-		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 0 }
+		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
 		,	app_args 		= []
 		,	app_info_ptr	= nilPtr
 		}
@@ -1291,7 +1290,7 @@ get_module_id_app predef_symbols
 	# ({pds_module, pds_def}, predef_symbols)	= predef_symbols![PD_ModuleID]
 	# pds_ident = predefined_idents.[PD_ModuleID]
 	# module_id_symb = 
-		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def}, symb_arity = 1 }
+		{	app_symb 		= { symb_name = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
 		,	app_args 		= [App module_symb]
 		,	app_info_ptr	= nilPtr
 		}

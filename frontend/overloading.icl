@@ -789,29 +789,28 @@ getDictionaryTypeAndConstructor {glob_module, glob_object = {ds_ident,ds_index}}
 	= (class_dictionary, rt_constructor)
 
 convertOverloadedCall :: !{#CommonDefs} ![TypeContext] !SymbIdent !ExprInfoPtr ![ClassApplication] !(!*Heaps, ![ExprInfoPtr]) -> (!*Heaps, ![ExprInfoPtr])
-convertOverloadedCall defs contexts {symb_name,symb_kind = SK_OverloadedFunction {glob_module,glob_object}, symb_arity} expr_ptr [class_appl:class_appls] heaps_and_ptrs
+convertOverloadedCall defs contexts {symb_name,symb_kind = SK_OverloadedFunction {glob_module,glob_object}} expr_ptr [class_appl:class_appls] heaps_and_ptrs
 	# mem_def = defs.[glob_module].com_member_defs.[glob_object]
 	  (class_exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts class_appls heaps_and_ptrs
-	  (inst_expr, (heaps, ptrs)) = adjust_member_application defs contexts  mem_def symb_arity class_appl class_exprs heaps_and_ptrs
+	  (inst_expr, (heaps, ptrs)) = adjust_member_application defs contexts  mem_def class_appl class_exprs heaps_and_ptrs
 	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_ptr, inst_expr)}, ptrs)
 where
-	adjust_member_application defs contexts {me_symb,me_offset,me_class} symb_arity (CA_Instance red_contexts) class_exprs heaps_and_ptrs
+	adjust_member_application defs contexts {me_symb,me_offset,me_class} (CA_Instance red_contexts) class_exprs heaps_and_ptrs
 		# ({glob_module,glob_object}, red_contexts) = find_instance_of_member me_class me_offset red_contexts
 		  (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts heaps_and_ptrs
 		  class_exprs = exprs ++ class_exprs
 		= (EI_Instance { glob_module = glob_module, glob_object = { ds_ident = me_symb, ds_arity = length class_exprs, ds_index = glob_object }} class_exprs,
 			 heaps_and_ptrs)
-	adjust_member_application  defs contexts  {me_symb,me_offset,me_class={glob_module,glob_object}} symb_arity (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
+	adjust_member_application  defs contexts  {me_symb,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		  {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
 		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
 				({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
-
-	adjust_member_application defs contexts  _ _ (CA_GlobalTypeCode {tci_index,tci_contexts}) _ heaps_and_ptrs
+	adjust_member_application defs contexts  _ (CA_GlobalTypeCode {tci_index,tci_contexts}) _ heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
 		= (EI_TypeCode (TCE_Constructor tci_index (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
-	adjust_member_application defs contexts _ _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
+	adjust_member_application defs contexts _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
 	
 	find_instance_of_member me_class me_offset { rcs_class_context = {rc_class, rc_inst_module, rc_inst_members, rc_red_contexts}, rcs_constraints_contexts}
@@ -911,8 +910,8 @@ where
 				  {ds_ident,ds_index} = ins_members.[mem_offset]
 				  mem_expr =  App { app_symb = {
 				  							symb_name = ds_ident,
-				  							symb_kind = SK_Function { glob_object = ds_index, glob_module = mod_index },
-											symb_arity = arity },
+				  							symb_kind = SK_Function { glob_object = ds_index, glob_module = mod_index }
+											},
 									app_args = class_arguments,
 									app_info_ptr = nilPtr }
 				= build_class_members mem_offset ins_members mod_index class_arguments arity [ mem_expr : dictionary_args ]
@@ -920,8 +919,8 @@ where
 		build_dictionary class_symbol instance_types dictionary_args defs expr_heap ptrs
 			# (dict_type, dict_cons) = getDictionaryTypeAndConstructor class_symbol defs
 			  record_symbol = { symb_name = dict_cons.ds_ident,		  
-			  					symb_kind = SK_Constructor {glob_module = class_symbol.glob_module, glob_object = dict_cons.ds_index},
-			  					symb_arity = dict_cons.ds_arity }
+			  					symb_kind = SK_Constructor {glob_module = class_symbol.glob_module, glob_object = dict_cons.ds_index}
+								}
 			  dict_type_symbol = MakeTypeSymbIdent {glob_module = class_symbol.glob_module, glob_object = dict_type.ds_index} dict_type.ds_ident dict_type.ds_arity
 			  class_type = TA dict_type_symbol [ AttributedType type \\ type <- instance_types ]
 			  (app_info_ptr, expr_heap) = newPtr (EI_DictionaryType class_type) expr_heap
@@ -1265,7 +1264,7 @@ class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
 
 instance updateExpression Expression
 where
-	updateExpression group_index (App app=:{app_symb=symb=:{symb_kind,symb_arity,symb_name},app_args,app_info_ptr}) ui
+	updateExpression group_index (App app=:{app_symb=symb=:{symb_kind,symb_name},app_args,app_info_ptr}) ui
 		# (app_args, ui) = updateExpression group_index app_args ui
 		| isNilPtr app_info_ptr
 			= (App { app & app_args = app_args }, ui)
@@ -1279,24 +1278,22 @@ where
 						-> (App { app & app_args = app_args }, ui)
 						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
 						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_name) st_context app_args (ui.ui_var_heap, ui.ui_error)
-						-> (App { app & app_symb = { symb & symb_arity = symb_arity + length st_context}, app_args = app_args },
-									{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
+						-> (App { app & app_args = app_args }, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_Context context_args
 					# (app_args, ui=:{ui_var_heap, ui_error}) = adjustClassExpressions symb_name context_args app_args ui
 					#! main_dcl_module_n = ui.ui_x.UpdateInfoX.x_main_dcl_module_n
 					#! fun_index = get_recursive_fun_index group_index symb_kind main_dcl_module_n ui.ui_fun_defs
 					| fun_index == NoIndex
-						# app = { app & app_symb = { symb & symb_arity = length context_args + symb_arity }, app_args = app_args}
+						# app = { app & app_args = app_args}
 						-> (App app, examine_calls context_args { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
 						  nr_of_context_args = length context_args
 						  nr_of_lifted_contexts = length st_context - nr_of_context_args
 						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_name) (take nr_of_lifted_contexts st_context) app_args (ui_var_heap, ui_error)
-						-> (App { app & app_symb = { symb & symb_arity = nr_of_lifted_contexts + nr_of_context_args + symb_arity }, app_args = app_args },
-								 	examine_calls context_args { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
+						-> (App { app & app_args = app_args }, examine_calls context_args { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_Instance inst_symbol context_args
 					# (context_args, ui=:{ui_var_heap, ui_error}) = adjustClassExpressions symb_name context_args [] ui
-					-> (build_application inst_symbol context_args app_args symb_arity app_info_ptr,
+					-> (build_application inst_symbol context_args app_args app_info_ptr,
 							examine_calls context_args (new_call inst_symbol.glob_module inst_symbol.glob_object.ds_index
 								{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error }))
 				EI_Selection selectors record_var context_args
@@ -1339,10 +1336,9 @@ where
 		get_recursive_fun_index group_index _ main_dcl_module_n fun_defs
 			= NoIndex
 
-		build_application def_symbol=:{glob_object} context_args orig_args nr_of_orig_args app_info_ptr
+		build_application def_symbol=:{glob_object} context_args orig_args app_info_ptr
 			= App {app_symb = { symb_name = glob_object.ds_ident,
-									symb_kind = SK_Function { def_symbol & glob_object = glob_object.ds_index },
-										symb_arity = glob_object.ds_arity + nr_of_orig_args },
+									symb_kind = SK_Function { def_symbol & glob_object = glob_object.ds_index } },
 				   app_args = context_args ++ orig_args, app_info_ptr = app_info_ptr }
 
 		examine_application (SK_Function {glob_module,glob_object}) ui
@@ -1554,7 +1550,7 @@ where
 			= (Var {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error})
 // MV ...
 		convertTypecode (TCE_Constructor index typecode_exprs) ui=:{ui_x={x_internal_type_id}}
-			# (typecons_symb,ui) 		= getSymbol PD_TypeConsSymbol SK_Constructor (USE_DummyModuleName 3 2) ui
+			# (typecons_symb,ui) 		= getSymbol PD_TypeConsSymbol SK_Constructor ui
 			  (constructor,ui)			= get_constructor index ui
 			  (typecode_exprs,  ui)		= convertTypecodes typecode_exprs ui
 			# (ui_internal_type_id,ui)
@@ -1607,12 +1603,12 @@ where
 					,	let_expr_position	= NoPos
 					}, ui)
 		convertTypecodes [] ui
-			# (nil_symb, ui) = getSymbol PD_NilSymbol SK_Constructor 0 ui
+			# (nil_symb, ui) = getSymbol PD_NilSymbol SK_Constructor ui
 			= (App {	app_symb		= nil_symb,
 						app_args 		= [],
 						app_info_ptr	= nilPtr}, ui)
 		convertTypecodes [typecode_expr : typecode_exprs] ui
-			# (cons_symb, ui) 	= getSymbol PD_ConsSymbol SK_Constructor 2 ui
+			# (cons_symb, ui) 	= getSymbol PD_ConsSymbol SK_Constructor ui
 			  (expr, ui) 		= convertTypecode typecode_expr ui
 			  (exprs, ui)		= convertTypecodes typecode_exprs ui
 			= (App {	app_symb		= cons_symb,
@@ -1623,7 +1619,7 @@ where
 			= mapSt create_variable var_info_ptrs ui
 		where
 			create_variable var_info_ptr ui
-				# (placeholder_symb, ui) = getSymbol PD_variablePlaceholder SK_Constructor 3 ui
+				# (placeholder_symb, ui) = getSymbol PD_variablePlaceholder SK_Constructor ui
 				  cyclic_var = {var_name = v_tc_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}	
 				  cyclic_fv = varToFreeVar cyclic_var 1	
 				= ({ lb_src = App {	app_symb = placeholder_symb,
@@ -1634,11 +1630,11 @@ where
 				   },
 				   { ui & ui_local_vars = [cyclic_fv : ui.ui_local_vars]})	
 
-		getSymbol :: !Int !(!(Global !Int) -> !SymbKind) !Int !*UpdateInfo -> (SymbIdent,*UpdateInfo)
-		getSymbol index symb_kind arity ui=:{ui_x}
+		getSymbol :: !Int !(!(Global !Int) -> !SymbKind) !*UpdateInfo -> (SymbIdent,*UpdateInfo)
+		getSymbol index symb_kind ui=:{ui_x}
 			# ({pds_module, pds_def}, ui_x) = ui_x!x_predef_symbols.[index]
 			# pds_ident = predefined_idents.[index]
-			  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def}, symb_arity = arity }
+			  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def} }
 			= (symbol, { ui & ui_x = ui_x})
 
 		get_constructor :: !Int !*UpdateInfo -> !(!Expression,!*UpdateInfo)
@@ -1656,7 +1652,7 @@ where
 			# tci_instance
 				= (hd tci_instance).gtci_type // tci_instances.[index]
 			# cons_expr
-				= BasicExpr (BVS ("\"" +++ toString tci_instance +++ "\"")) (BT_String TE)
+				= BasicExpr (BVS ("\"" +++ toString tci_instance +++ "\""))
 			= (cons_expr,ui)
 
 		a_ij_var_name	= { id_name = "a_ij", id_info = nilPtr }

@@ -3749,8 +3749,8 @@ buildConsApp cons_mod {ds_ident, ds_index, ds_arity} arg_exprs heaps=:{hp_expres
 	# expr = App {
 		app_symb = {
 			symb_name = ds_ident, 
-			symb_kind = SK_Constructor cons_glob, 
-			symb_arity = ds_arity }, 
+			symb_kind = SK_Constructor cons_glob
+			}, 
 		app_args = arg_exprs, 
 		app_info_ptr = expr_info_ptr} 	
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap } 
@@ -3764,8 +3764,8 @@ buildFunApp fun_mod {ds_ident, ds_index, ds_arity} arg_exprs heaps=:{hp_expressi
 	# expr = App {
 		app_symb = {
 			symb_name = ds_ident, 
-			symb_kind = SK_Function fun_glob, 
-			symb_arity = length arg_exprs }, 
+			symb_kind = SK_Function fun_glob
+			}, 
 		app_args = arg_exprs, 
 		app_info_ptr = expr_info_ptr} 	
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap } 
@@ -3779,8 +3779,8 @@ buildGenericApp module_index {ds_ident, ds_index} kind arg_exprs heaps=:{hp_expr
 	# expr = App {
 		app_symb = {
 			symb_name = ds_ident, 
-			symb_kind = SK_Generic glob_index kind, 
-			symb_arity = length arg_exprs }, 
+			symb_kind = SK_Generic glob_index kind
+		}, 
 		app_args = arg_exprs, 
 		app_info_ptr = expr_info_ptr} 	
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap } 
@@ -3847,8 +3847,7 @@ buildPredefConsApp predef_index args predefs heaps=:{hp_expression_heap}
 	# global_index = {glob_module = pds_module, glob_object = pds_def}
 	# symb_ident = {
 		symb_name = pds_ident, 
-		symb_kind = SK_Constructor global_index, 
-		symb_arity = length args 
+		symb_kind = SK_Constructor global_index
 		}
 	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
 	# app = App {app_symb = symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
@@ -3869,9 +3868,8 @@ buildPredefFunApp predef_index args predefs heaps=:{hp_expression_heap}
 	# pds_ident = predefined_idents.[predef_index]
 	# global_index = {glob_module = pds_module, glob_object = pds_def}
 	# symb_ident = {
-		symb_name = pds_ident, 
-		symb_kind = SK_Function global_index, 
-		symb_arity = length args 
+		symb_name = pds_ident,
+		symb_kind = SK_Function global_index
 		}
 	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
 	# app = App {app_symb = symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
@@ -4179,14 +4177,14 @@ makeIdent :: String -> Ident
 makeIdent str = {id_name = str, id_info = nilPtr} 
 
 makeIntExpr :: Int -> Expression
-makeIntExpr value = BasicExpr (BVI (toString value)) BT_Int
+makeIntExpr value = BasicExpr (BVI (toString value))
 
 makeStringExpr :: String !PredefinedSymbols -> Expression
 makeStringExpr str predefs
 	#! {pds_module, pds_def} = predefs.[PD_StringType]
 	#! pds_ident = predefined_idents.[PD_StringType]
 	#! type_symb = MakeTypeSymbIdent { glob_module = pds_module, glob_object = pds_def } pds_ident 0
-	=  BasicExpr (BVS str) (BT_String (TA type_symb []))
+	=  BasicExpr (BVS str)
 
 makeListExpr :: [Expression] !PredefinedSymbols !*Heaps -> (Expression, !*Heaps)
 makeListExpr [] predefs heaps

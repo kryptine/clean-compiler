@@ -684,7 +684,7 @@ fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol d
 			= case patterns of
 				[]
 					# {ft_type,ft_symb,ft_type_ptr,ft_specials} = functions.[stdStrictLists_index].[nil_u_index]
-					# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos ft_symb 0/*symb_arity*/ ft_type ft_type_ptr common_defs ts
+					# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos ft_symb 0 ft_type ft_type_ptr common_defs ts
 					  {tst_args,tst_result,tst_context,tst_attr_env}=fun_type_copy
 					-> ([tst_args],tst_result,tst_context,tst_attr_env,ts)
 				[pattern=:{ap_symbol}]
@@ -695,7 +695,7 @@ fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol d
 	where
 		make_cons_type_from_decons_type stdStrictLists_index decons_u_index common_defs ts
 			# {me_symb,me_type,me_type_ptr} = common_defs.[stdStrictLists_index].com_member_defs.[decons_u_index]
-			  (fun_type_copy,ts) = determineSymbolTypeOfFunction pos me_symb 1/*symb_arity*/ me_type me_type_ptr common_defs ts
+			  (fun_type_copy,ts) = determineSymbolTypeOfFunction pos me_symb 1 me_type me_type_ptr common_defs ts
 			  {tst_args,tst_arity,tst_lifted,tst_result,tst_context,tst_attr_env}=fun_type_copy						  
 			# result_type = case tst_args of [t] -> t
 			# argument_types = case tst_result.at_type of (TA _ args=:[arg1,arg2]) ->args
@@ -1088,24 +1088,24 @@ storeAttribute (Yes expt_ptr) type_attribute symbol_heap
 storeAttribute No type_attribute symbol_heap
 	= symbol_heap
 
-getSymbolType :: CoercionPosition TypeInput SymbIdent *TypeState -> *(!TempSymbolType,![Special],!*TypeState);
-getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name} ts
+getSymbolType :: CoercionPosition TypeInput SymbIdent Int *TypeState -> *(!TempSymbolType,![Special],!*TypeState);
+getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Function {glob_module,glob_object}, symb_name} n_app_args ts
 	| glob_module == ti_main_dcl_module_n
 		| glob_object>=size ts.ts_fun_env
 			= abort symb_name.id_name;
 		# (fun_type, ts) = ts!ts_fun_env.[glob_object]
 		= case fun_type of
 			UncheckedType fun_type
-				# (fun_type_copy, ts) = currySymbolType fun_type symb_arity ts
+				# (fun_type_copy, ts) = currySymbolType fun_type n_app_args ts
 				-> (fun_type_copy, [], ts)
 			SpecifiedType fun_type lifted_arg_types _ 
 				# (fun_type_copy=:{tst_args,tst_arity}, ts) = freshSymbolType (Yes pos) cWithoutFreshContextVars fun_type ti_common_defs ts
 				  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
-				  										  tst_arity = tst_arity + length lifted_arg_types } symb_arity ts
+				  										  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
 				-> (fun_type_copy, [], ts)
 			CheckedType fun_type
 				# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
-				  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
+				  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
 				-> (fun_type_copy, [], ts)
 			_
 				-> abort ("getSymbolType: SK_Function "+++toString symb_name+++" "+++toString glob_object)
@@ -1113,45 +1113,45 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
 		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]
 			= abort (toString glob_module+++" "+++toString glob_object+++" "+++toString ti_main_dcl_module_n+++" "+++symb_name.id_name);
-		# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos symb_name symb_arity ft_type ft_type_ptr ti_common_defs ts
+		# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos symb_name n_app_args ft_type ft_type_ptr ti_common_defs ts
 		= (fun_type_copy, get_specials ft_specials, ts)
 	where
 		get_specials (SP_ContextTypes specials) = specials
 		get_specials SP_None 					= []
-getSymbolType pos ti {symb_kind = SK_Constructor {glob_module,glob_object}, symb_arity} ts
-	# (fresh_cons_type, ts) = standardRhsConstructorType pos glob_object glob_module symb_arity ti ts
+getSymbolType pos ti {symb_kind = SK_Constructor {glob_module,glob_object}} n_app_args ts
+	# (fresh_cons_type, ts) = standardRhsConstructorType pos glob_object glob_module n_app_args ti ts
 	= (fresh_cons_type, [], ts) 
-getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_LocalMacroFunction glob_object, symb_arity, symb_name} ts
+getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_LocalMacroFunction glob_object, symb_name} n_app_args ts
 	| glob_object>=size ts.ts_fun_env
 		= abort symb_name.id_name;
 	# (fun_type, ts) = ts!ts_fun_env.[glob_object]
 	= case fun_type of
 		UncheckedType fun_type
-			# (fun_type_copy, ts) = currySymbolType fun_type symb_arity ts
+			# (fun_type_copy, ts) = currySymbolType fun_type n_app_args ts
 			-> (fun_type_copy, [], ts)
 		SpecifiedType fun_type lifted_arg_types _ 
 			# (fun_type_copy=:{tst_args,tst_arity}, ts) = freshSymbolType (Yes pos) cWithoutFreshContextVars fun_type ti_common_defs ts
 			  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
-			  										  tst_arity = tst_arity + length lifted_arg_types } symb_arity ts
+			  										  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
 			-> (fun_type_copy, [], ts)
 		CheckedType fun_type
 			# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
-			  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
+			  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
 			-> (fun_type_copy, [], ts)
 		_
 			-> abort ("getSymbolType SK_LocalMacroFunction: "+++toString symb_name+++" " +++toString glob_object)
 //			-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
-getSymbolType pos ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}, symb_arity} ts
+getSymbolType pos ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}} n_app_args ts
 	# {me_symb, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
-	  (fun_type_copy, ts) = determineSymbolTypeOfFunction pos me_symb symb_arity me_type me_type_ptr ti_common_defs ts
+	  (fun_type_copy, ts) = determineSymbolTypeOfFunction pos me_symb n_app_args me_type me_type_ptr ti_common_defs ts
 	= (fun_type_copy, [], ts)
 // AA..	
-getSymbolType pos ti=:{ti_common_defs} symbol=:{symb_kind = SK_Generic gen_glob kind} ts
+getSymbolType pos ti=:{ti_common_defs} symbol=:{symb_kind = SK_Generic gen_glob kind} n_app_args ts
 	# (found, member_glob) = getGenericMember gen_glob kind ti_common_defs
 	| not found
 		= abort "getSymbolType: no class for kind"	
- 		= getSymbolType pos ti {symbol & symb_kind = SK_OverloadedFunction member_glob} ts  		
-// ..AA	
+ 		= getSymbolType pos ti {symbol & symb_kind = SK_OverloadedFunction member_glob} n_app_args ts
+// ..AA
 
 class requirements a :: !TypeInput !a !(!u:Requirements, !*TypeState) -> (!AType, !Optional ExprInfoPtr, !(!u:Requirements, !*TypeState))
 
@@ -1184,7 +1184,7 @@ where
 instance requirements App
 where
 	requirements ti app=:{app_symb,app_args,app_info_ptr} (reqs=:{req_attr_coercions}, ts)
-		# (tst=:{tst_attr_env,tst_args,tst_result,tst_context}, specials, ts) = getSymbolType (CP_Expression (App app)) ti app_symb ts
+		# (tst=:{tst_attr_env,tst_args,tst_result,tst_context}, specials, ts) = getSymbolType (CP_Expression (App app)) ti app_symb (length app_args) ts
 	  	  reqs = { reqs & req_attr_coercions = tst_attr_env ++ req_attr_coercions }
 	      (reqs, ts) = requirements_of_args ti app_symb.symb_name 1 app_args tst_args (reqs, ts)
 		| isEmpty tst_context
@@ -1532,11 +1532,21 @@ where
 		  ts_expr_heap = storeAttribute opt_expr_ptr argtype.at_attribute ts.ts_expr_heap
 		= (tst_result, No, ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap }))
 	
-	
-	requirements _ (BasicExpr basic_val basic_type) (reqs, ts)
+	requirements _ (BasicExpr basic_val) (reqs, ts)
+		# basic_type = typeOfBasicValue basic_val
 		# (type, ts) = attributedBasicType basic_type ts
 	 	= (type, No, (reqs, ts))
+	where
+		typeOfBasicValue :: !BasicValue -> Box Type
+		typeOfBasicValue (BVI _) = basicIntType
+		typeOfBasicValue (BVInt _) = basicIntType
+		typeOfBasicValue (BVC _) = basicCharType
+		typeOfBasicValue (BVB _) = basicBoolType
+		typeOfBasicValue (BVR _) = basicRealType
+		typeOfBasicValue (BVS _) = basicStringType
 
+		attributedBasicType {box=type} ts=:{ts_attr_store}
+			= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = type}, {ts & ts_attr_store = inc ts_attr_store})
 
 	requirements ti (MatchExpr opt_tuple_type {glob_object={ds_arity, ds_index},glob_module} expr) (reqs, ts)
 		# cp = CP_Expression expr
@@ -1562,6 +1572,13 @@ where
 	requirements _ expr reqs_ts
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
 
+:: Box a = { box :: !a}
+
+basicIntType =: {box=TB BT_Int}
+basicCharType =: {box=TB BT_Char}
+basicBoolType =: {box=TB BT_Bool}
+basicRealType =: {box=TB BT_Real}
+basicStringType =: {box=TA (MakeTypeSymbIdent { glob_object = PD_StringTypeIndex, glob_module = cPredefinedModuleIndex } predefined_idents.[PD_StringType] 0) []}
 
 requirementsOfSelectors ti opt_expr expr [selector] tc_coercible change_uselect sel_expr_type sel_expr reqs_ts 
 	= requirementsOfSelector ti opt_expr expr selector tc_coercible change_uselect sel_expr_type sel_expr reqs_ts
@@ -1575,7 +1592,7 @@ requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible change_u
 	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
 	= (False, tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
-requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index,ds_arity},glob_module} expr_ptr index_expr) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts) 
+requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index},glob_module} expr_ptr index_expr) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts) 
 	# {me_type} = ti.ti_common_defs.[glob_module].com_member_defs.[ds_index]
 	  ({tst_attr_env,tst_args,tst_result,tst_context}, ts) = freshSymbolType (Yes (CP_Expression expr)) cWithFreshContextVars me_type ti.ti_common_defs ts
 	# (tst_args, tst_result, ts)
@@ -1597,7 +1614,7 @@ requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident
 		= (True, tst_result, (reqs, ts))
 		= (True, tst_result, ({ reqs & req_overloaded_calls = [expr_ptr : reqs.req_overloaded_calls ]}, { ts & ts_expr_heap =
 				ts.ts_expr_heap <:= (expr_ptr, EI_Overloaded { oc_symbol = 
-					{ symb_name = ds_ident, symb_kind = SK_OverloadedFunction {glob_module = glob_module, glob_object = ds_index}, symb_arity = ds_arity },
+					{ symb_name = ds_ident, symb_kind = SK_OverloadedFunction {glob_module = glob_module, glob_object = ds_index}},
 						oc_context = tst_context, oc_specials = [] })}))
 where
 	array_and_index_type [array_type, index_type : rest_type ]
@@ -1770,7 +1787,7 @@ where
  				  (pds, predef_symbols) = predef_symbols![PD_TypeCodeMember]
 		  		  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeMember]
  		  		  pds_ident = predefined_idents.[PD_TypeCodeMember]
-				  tc_member_symb = { symb_name = pds_ident, symb_kind = SK_OverloadedFunction {glob_module = pds_module, glob_object = pds_def }, symb_arity = 0}
+				  tc_member_symb = { symb_name = pds_ident, symb_kind = SK_OverloadedFunction {glob_module = pds_module, glob_object = pds_def }}
 		 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
 				  context = {tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
 		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap //---> ("^EI_Dynamic No=" +++ toString var_store)
@@ -1831,7 +1848,7 @@ where
 		  tc_class_symb = {glob_module = pds_module, glob_object = {ds_ident = pds_ident, ds_arity = 1, ds_index = pds_def }}
 		  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_TypeCodeMember]
   		  pds_ident = predefined_idents.[PD_TypeCodeMember]
-		  tc_member_symb = { symb_name	= pds_ident, symb_kind = SK_TypeCode, symb_arity = 0}
+		  tc_member_symb = { symb_name	= pds_ident, symb_kind = SK_TypeCode}
 		  (contexts, (var_heap, type_var_heap)) = mapSt (build_type_context tc_class_symb) global_vars (var_heap, type_var_heap)
 		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (contexts, expr_ptr, tc_member_symb, (var_heap, expr_heap, type_var_heap, predef_symbols))
@@ -1855,10 +1872,9 @@ specification_error type type1 err
 									<:: (format, type, Yes initialTypeVarBeautifulizer) 
 									<<< '\n' }
 
-
 cleanUpAndCheckFunctionTypes [] _ _ start_index _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 	= (fun_defs, ts)
-cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] dict_types start_index list_inferred_types defs type_contexts coercion_env
+cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements={req_case_and_let_exprs}} : reqs] dict_types start_index list_inferred_types defs type_contexts coercion_env
 				attr_partition type_var_env attr_var_env (fun_defs, ts)
 	# (fd, fun_defs) = fun_defs![fun]
 	  dict_ptrs = get_dict_ptrs fun dict_types
@@ -2319,7 +2335,6 @@ where
 
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
-
 	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
 		# (_, context, subst) = arraySubst context subst
 		  subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs (subst, expr_heap)

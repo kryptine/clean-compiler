@@ -2158,12 +2158,12 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 					= (icl_functions, heaps)
 					= (icl_functions, heaps)
 		 
-			build_function new_fun_index fun_def=:{fun_symb, fun_arity,  fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
+			build_function new_fun_index fun_def=:{fun_symb, fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
 						(var_heap, type_var_heap, expr_heap)
 				# (tb_args, var_heap) = mapSt new_free_var cb_args var_heap
 				  (app_args, expr_heap) = mapSt new_bound_var tb_args expr_heap
 				  (app_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				  tb_rhs = App { app_symb = {	symb_name = fun_symb, symb_arity = fun_arity,
+				  tb_rhs = App { app_symb = {	symb_name = fun_symb,
 												symb_kind = SK_Function { glob_module = main_dcl_module_n, glob_object = fun_index }},
 								 app_args = app_args,
 								 app_info_ptr = app_info_ptr }
@@ -2849,7 +2849,7 @@ where
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_PredefinedModule]
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjustPredefSymbol PD_StringType mod_index STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_StringType mod_index PD_StringTypeIndex STE_Type
 				<=< adjust_predef_symbols PD_ListType PD_UnboxedArrayType mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsSymbol PD_Arity32TupleSymbol mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_TypeCodeClass mod_index STE_Class
@@ -2947,6 +2947,18 @@ adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_erro
 	| pre_index <> NoIndex
 		= { cs & cs_predef_symbols.[predef_index] = { pds_def = pre_index, pds_module = mod_index }}
 		= { cs & cs_error = checkError pre_id " function not defined" cs_error }
+where
+	determine_index_of_symbol {ste_kind, ste_index} symb_kind
+		| ste_kind == symb_kind
+			= ste_index
+			= NoIndex
+
+adjustPredefSymbolAndCheckIndex predef_index mod_index symbol_index symb_kind cs=:{cs_symbol_table,cs_error}
+	# pre_id = predefined_idents.[predef_index]
+	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
+	| pre_index == symbol_index
+		= { cs & cs_predef_symbols.[predef_index] = { pds_def = pre_index, pds_module = mod_index }}
+		= { cs & cs_error = checkError pre_id " function not defined or wrong index in predef" cs_error }
 where
 	determine_index_of_symbol {ste_kind, ste_index} symb_kind
 		| ste_kind == symb_kind

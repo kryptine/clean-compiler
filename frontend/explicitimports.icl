@@ -654,7 +654,7 @@ instance check_completeness Expression where
 		  (check_completeness selections cci ccs)
 	check_completeness (TupleSelect _ _ expression) cci ccs
 		= check_completeness expression cci ccs
-	check_completeness (BasicExpr _ _) _ ccs
+	check_completeness (BasicExpr _) _ ccs
 		= ccs
 	check_completeness (AnyCodeExpr _ _ _) _ ccs
 		= ccs

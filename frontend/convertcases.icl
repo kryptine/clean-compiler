@@ -209,7 +209,7 @@ where
 	weightedRefCount rci (Case case_expr) rs=:{rcs_expr_heap}
 		# (case_info, rcs_expr_heap) = readPtr case_expr.case_info_ptr rcs_expr_heap
 		= weightedRefCountOfCase rci case_expr case_info { rs & rcs_expr_heap = rcs_expr_heap }
-	weightedRefCount rci expr=:(BasicExpr _ _) rs
+	weightedRefCount rci expr=:(BasicExpr _) rs
 		= rs
 	weightedRefCount rci (MatchExpr _ constructor expr) rs
 		= weightedRefCount rci expr rs
@@ -454,7 +454,7 @@ where
 		# (fun_expr, ds) = distributeLets depth fun_expr ds
 		  (exprs, ds) = distributeLets depth exprs ds
 		= (fun_expr @ exprs, ds)
-	distributeLets depth expr=:(BasicExpr _ _) ds
+	distributeLets depth expr=:(BasicExpr _) ds
 		= (expr, ds)
 	distributeLets depth (MatchExpr opt_tuple constructor expr) ds
 		# (expr, ds) = distributeLets depth expr ds
@@ -734,7 +734,7 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}
-	= ({ symb_name = fun_id, symb_kind = SK_GeneratedFunction fun_def_ptr cs_next_fun_nr, symb_arity = arity },
+	= ({ symb_name = fun_id, symb_kind = SK_GeneratedFunction fun_def_ptr cs_next_fun_nr },
 			(inc cs_next_fun_nr, [fun_def_ptr : cs_new_functions],
 				cs_fun_heap <:= (fun_def_ptr,  FI_Function { gf_fun_def = fun_def, gf_instance_info = II_Empty,
 	  				  gf_fun_index = cs_next_fun_nr, gf_cons_args = {cc_size=0, cc_args = [], cc_linear_bits = [], cc_producer = False} })))
@@ -910,7 +910,7 @@ instance convertRootCases Expression where
 			build_conditional false guard then_expr (Yes else_expr)
 				= Conditional { if_cond = guard, if_then = else_expr, if_else = Yes then_expr }
 			build_conditional false guard then_expr No
-				= Conditional { if_cond = Conditional { if_cond = guard, if_then = BasicExpr (BVB False) BT_Bool, if_else = Yes (BasicExpr (BVB True) BT_Bool) },
+				= Conditional { if_cond = Conditional { if_cond = guard, if_then = BasicExpr (BVB False), if_else = Yes (BasicExpr (BVB True)) },
 									if_then = then_expr, if_else = No }
 
 			convert_to_else_part ci sign_of_then_part [ alt=:{bp_value=BVB sign_of_else_part,bp_expr} : alts ] case_default cs
@@ -1234,7 +1234,7 @@ where
 	copy (Conditional cond) cp_info
 		# (cond, cp_info) = copy cond cp_info
 		= (Conditional cond, cp_info)
-	copy expr=:(BasicExpr _ _) cp_info
+	copy expr=:(BasicExpr _) cp_info
 		= (expr, cp_info)
 	copy (MatchExpr opt_tuple constructor expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
