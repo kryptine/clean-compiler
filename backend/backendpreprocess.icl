@@ -88,7 +88,7 @@ instance sequence FunctionBody where
 	sequence (TransformedBody transformedBody)
 		=	sequence transformedBody
 	sequence body
-		=	abort "preprocess (FunctionBody): unknown body" <<- body
+		=	abort "preprocess (FunctionBody): unknown body"// <<- body
 
 // case test ...
 instance sequence TransformedBody where
@@ -140,6 +140,8 @@ instance sequence CasePatterns where
 	sequence (AlgebraicPatterns _ patterns)
 		=	sequence patterns
 	sequence (BasicPatterns _ patterns)
+		=	sequence patterns
+	sequence (OverloadedListPatterns _ decons_expr patterns)
 		=	sequence patterns
 
 instance sequence AlgebraicPattern where
