@@ -561,11 +561,17 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = TArrow1 arg_type, at_at
 	  (new_attr, oti, cs) = newAttribute dem_attr "TArrow1" at_attribute oti cs
 	= ({ type & at_type = TArrow1 arg_type, at_attribute = new_attr }, (ots, oti, cs))
 //..AA
+/*
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, _, (oti, cs)) = checkTypeVar scope DAK_None tv TA_Multi (oti, cs)
 	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
 	  (new_attr, oti, cs) = newAttribute dem_attr ":@:" at_attribute oti cs
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = new_attr }, (ots, oti, cs))
+*/
+checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
+	# (cons_var, var_attr, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
+	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
+	= ({ type & at_type = CV cons_var :@: types, at_attribute = var_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
 	# (vars, (oti, cs)) = mapSt add_universal_var vars  (oti, cs) 
 	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr { atype & at_type = type } (ots, oti, cs)
