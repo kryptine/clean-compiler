@@ -32,7 +32,6 @@ supercompile ::
 
 supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile
   #  debugfile = stderr
-  #  logfile = logfile <<< "Running supercompile function - $Id$\n"
      // First of all, derive a representation for symbols in the program
   #  (showsuclsymbol,fun_defs1) = suclsymbol_to_string dcl_mods main_dcl_module_n icl_common fun_defs0
      // Determine defined functions
@@ -47,18 +46,17 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  sucl_imports = cts_funtypes dcl_mods main_dcl_module_n
      // Build abstract CLI module
   #  sucl_module = mkcli showsuclsymbol sucl_typerules sucl_stricts sucl_exports sucl_imports sucl_constrs sucl_bodies
-  #! debugfile = debugfile <<< "Function definitions as input to the optimiser:\n"
-                           <<< sucl_module
-                           <<< "End of function definitions as input to the optimiser.\n"
+  #  logfile = logfile <<< "Function definitions as input to the optimiser:\n" <<< sucl_module
      // Generate fresh function symbols
   #  (n_fun_defs,fun_defs3) = usize fun_defs2
   #  fresh_symbols = [SuclUser (SK_Function (mkglobal main_dcl_module_n i)) \\ i<-[n_fun_defs..]]
      // Do the job!
   #  debugfile = debugfile <<< "Start fullsymred." <<< nl
   #  symredresults = fullsymred fresh_symbols sucl_module
-  #  debugfile = sfoldl (<<<) (debugfile<<<"All symredresults before macro expansion" <<< nl) symredresults
+  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults before macro expansion" <<< nl) symredresults
+  #  debugfile = debugfile <<< "Expand macros." <<< nl
   #  symredresults = expand_macros toString toString suclheap (flip isMember (exports sucl_module)) symredresults
-  #  debugfile = sfoldl (<<<) (debugfile<<<"All symredresults after macro expansion" <<< nl) symredresults
+  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults after macro expansion" <<< nl) symredresults
   #  n_symredresults = length symredresults
   #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
      // Create and fill new fundef array
