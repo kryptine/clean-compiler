@@ -1230,12 +1230,12 @@ where
 	get_group :: !Index  !Index !*GenericState 
 		-> (!Index, !*GenericState)
 	get_group module_index type_def_index gs=:{gs_gtd_infos}
-		#! gtd_info = gs_gtd_infos . [module_index, type_def_index]
+		#! (gtd_info,gs_gtd_infos) = gs_gtd_infos![module_index, type_def_index]
 		#! gt = case gtd_info of 
 			(GTDI_Generic gt) 	-> gt
 			_ -> abort "no generic representation for a type\n"
 		| gt.gtr_isomap_group <> NoIndex // group index already allocated
-			= (gt.gtr_isomap_group, gs)
+			= (gt.gtr_isomap_group, { gs & gs_gtd_infos = gs_gtd_infos})
 				//---> ("group for type already exists", module_index, type_def_index, gt.gtr_isomap_group) 	
 		# (group_index, gs=:{gs_td_infos, gs_gtd_infos}) 
 			= newGroupIndex {gs & gs_gtd_infos = gs_gtd_infos}
@@ -1245,20 +1245,21 @@ where
 		= (group_index, { gs & gs_gtd_infos = gs_gtd_infos, gs_td_infos = gs_td_infos})
 			//---> ("type group of type ", module_index, type_def_index, type_def_info.tdi_group_nr)
 
-	update_group :: !Index ![Global Index] !*GenericTypeDefInfos -> !*GenericTypeDefInfos
+// Sjaak ...
+	update_group :: !Index ![GlobalIndex] !*GenericTypeDefInfos -> !*GenericTypeDefInfos
 	update_group group_index [] gtd_infos = gtd_infos	
-	update_group group_index [{glob_module, glob_object}:type_def_global_indexes] gtd_infos
-		#! (gtd_info, gtd_infos) = gtd_infos ! [glob_module, glob_object]
+	update_group group_index [{gi_module, gi_index}:type_def_global_indexes] gtd_infos
+		#! (gtd_info, gtd_infos) = gtd_infos ! [gi_module, gi_index]
 		#! gtd_info = case gtd_info of 
 			(GTDI_Generic gt) 
 				| gt.gtr_isomap_group <> NoIndex 
 					-> abort "sanity check: updating already updated group\n"					
 					-> GTDI_Generic {gt & gtr_isomap_group = group_index }
 			_ 	-> gtd_info
-		#! gtd_infos = {gtd_infos & [glob_module, glob_object] = gtd_info}
+		#! gtd_infos = {gtd_infos & [gi_module, gi_index] = gtd_info}
 		= update_group group_index type_def_global_indexes gtd_infos
 
-
+/// ... Sjaak
 buildIsomapsForGenerics :: !*GenericState
 	-> (![FunDef], ![Group], !*GenericState)
 buildIsomapsForGenerics gs

@@ -71,7 +71,7 @@ determineSignClassOfTypeDef type_index module_index td_args {tdi_classification,
 			-> (ts_type_sign, type_var_heap, td_infos)
 		No
 			# signs_of_group_vars = foldSt (determine_signs_of_group_var tdi_cons_vars hio_signs) tdi_group_vars []
-			-> newSignClassOfTypeDefGroup tdi_group_nr { glob_module = module_index, glob_object = type_index}
+			-> newSignClassOfTypeDefGroup tdi_group_nr { gi_module = module_index, gi_index = type_index}
 //					tdi_group (signs_of_group_vars ---> ("determine_signs_of_group_var", (module_index, type_index), signs_of_group_vars, tdi_group_vars)) ci type_var_heap td_infos
 					tdi_group signs_of_group_vars ci type_var_heap td_infos
 
@@ -107,38 +107,38 @@ where
 newGroupSigns :: !Int -> *{# SignRequirements}
 newGroupSigns group_size = createArray group_size { sr_hio_signs = [], sr_classification = BottomSignClass, sr_type_applications = [] }
 
-newSignClassOfTypeDefGroup :: !Int !(Global Int) ![Global Int] ![(Int, SignClassification)] !{#CommonDefs} !*TypeVarHeap !*TypeDefInfos
+newSignClassOfTypeDefGroup :: !Int !GlobalIndex ![GlobalIndex] ![(Int, SignClassification)] !{#CommonDefs} !*TypeVarHeap !*TypeDefInfos
 			-> *(!SignClassification, !*TypeVarHeap, !*TypeDefInfos)
-newSignClassOfTypeDefGroup group_nr {glob_module,glob_object} group signs_of_group_vars ci type_var_heap td_infos
+newSignClassOfTypeDefGroup group_nr {gi_module,gi_index} group signs_of_group_vars ci type_var_heap td_infos
 	# (group_signs, type_var_heap, td_infos) = collect_sign_class_of_type_defs group_nr group signs_of_group_vars ci
 	  					(newGroupSigns (length group)) type_var_heap td_infos
 	  group_signs = determine_fixed_point group_signs
 	  td_infos = update_sign_class_of_group group group_signs td_infos
-	  (tdi=:{tdi_tmp_index},td_infos) = td_infos![glob_module].[glob_object]
-	= (group_signs.[tdi_tmp_index].sr_classification, type_var_heap, td_infos)
+	  (tdi=:{tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
+	= (group_signs.[tdi_index_in_group].sr_classification, type_var_heap, td_infos)
 where
 	update_sign_class_of_group group group_signs td_infos
 		= foldSt (update_sign_class_of_type_def group_signs) group td_infos
 	where
-		update_sign_class_of_type_def group_signs {glob_module,glob_object} td_infos
-			# (tdi=:{tdi_classification,tdi_tmp_index},td_infos) = td_infos![glob_module].[glob_object]
-			  {sr_hio_signs, sr_classification} = group_signs.[tdi_tmp_index]
+		update_sign_class_of_type_def group_signs {gi_module,gi_index} td_infos
+			# (tdi=:{tdi_classification,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
+			  {sr_hio_signs, sr_classification} = group_signs.[tdi_index_in_group]
 			  tdi_classification = addSignClassification sr_hio_signs sr_classification tdi_classification
-			= { td_infos & [glob_module].[glob_object] = { tdi & tdi_classification = tdi_classification }}
+			= { td_infos & [gi_module].[gi_index] = { tdi & tdi_classification = tdi_classification }}
 		
 
 	collect_sign_class_of_type_defs group_nr group signs_of_group_vars ci sign_requirements type_var_heap td_infos
 		= foldSt (collect_sign_class_of_type_def group_nr signs_of_group_vars ci) group (sign_requirements, type_var_heap, td_infos)
 	where			
-		collect_sign_class_of_type_def group_nr signs_of_group_vars ci {glob_module,glob_object} (sign_requirements, type_var_heap, td_infos)
-			# ({tdi_group_vars,tdi_kinds,tdi_tmp_index},td_infos) = td_infos![glob_module].[glob_object]
-			  {td_name,td_args,td_rhs} = ci.[glob_module].com_type_defs.[glob_object]
+		collect_sign_class_of_type_def group_nr signs_of_group_vars ci {gi_module,gi_index} (sign_requirements, type_var_heap, td_infos)
+			# ({tdi_group_vars,tdi_kinds,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
+			  {td_name,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
 //			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args (tdi_group_vars ---> ("bind_type_vars_to_signs",td_name, (glob_module, glob_object), tdi_group_vars)) tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args tdi_group_vars tdi_kinds signs_of_group_vars ([], type_var_heap)
-			  (sign_env, scs) = sign_class_of_type_def glob_module td_rhs group_nr ci 
+			  (sign_env, scs) = sign_class_of_type_def gi_module td_rhs group_nr ci 
 		  								{scs_type_var_heap = type_var_heap, scs_type_def_infos = td_infos, scs_rec_appls = [] }
 			  type_var_heap = foldSt restore_binds_of_type_var td_args scs.scs_type_var_heap
-			= ({sign_requirements & [tdi_tmp_index] = { sr_hio_signs = reverse rev_hio_signs, sr_classification = sign_env,
+			= ({sign_requirements & [tdi_index_in_group] = { sr_hio_signs = reverse rev_hio_signs, sr_classification = sign_env,
 					sr_type_applications = scs.scs_rec_appls }}, type_var_heap, scs.scs_type_def_infos)
 
 	determine_fixed_point sign_requirements
@@ -242,9 +242,9 @@ signClassOfType (TV tv) sign use_top_sign group_nr ci scs
 	= (sign *+ sign_class, type_class, scs)
 
 signClassOfType (TA {type_index = {glob_module, glob_object}} types) sign use_top_sign group_nr ci scs
-	# (td_info=:{tdi_group_nr,tdi_tmp_index,tdi_kinds}, scs) = scs!scs_type_def_infos.[glob_module].[glob_object]
+	# (td_info=:{tdi_group_nr,tdi_index_in_group,tdi_kinds}, scs) = scs!scs_type_def_infos.[glob_module].[glob_object]
 	| tdi_group_nr == group_nr
-		= sign_class_of_type_list_of_rec_type types sign use_top_sign tdi_tmp_index ci [] scs 
+		= sign_class_of_type_list_of_rec_type types sign use_top_sign tdi_index_in_group ci [] scs 
 		# {td_args,td_arity} = ci.[glob_module].com_type_defs.[glob_object]
 		  (sign_classes, hio_signs, scs) = collect_sign_classes_of_type_list types tdi_kinds group_nr ci scs 
 		  (type_class, scs_type_var_heap, scs_type_def_infos)
@@ -326,7 +326,7 @@ determinePropClassOfTypeDef type_index module_index td_args {tdi_classification,
 
 		No
 			# props_of_group_vars = foldSt (determine_props_of_group_var tdi_cons_vars hio_props) tdi_group_vars []
-			-> newPropClassOfTypeDefGroup tdi_group_nr { glob_module = module_index, glob_object = type_index}
+			-> newPropClassOfTypeDefGroup tdi_group_nr { gi_module = module_index, gi_index = type_index}
 					tdi_group props_of_group_vars ci type_var_heap td_infos
 
 where
@@ -367,36 +367,36 @@ where
 newGroupProps :: !Int -> *{# PropRequirements}
 newGroupProps group_size = createArray group_size { pr_hio_signs = [], pr_classification = NoPropClass, pr_type_applications = [] }
 
-newPropClassOfTypeDefGroup :: !Int !(Global Int) ![Global Int] ![(Int, PropClassification)] !{#CommonDefs} !*TypeVarHeap !*TypeDefInfos
+newPropClassOfTypeDefGroup :: !Int !GlobalIndex ![GlobalIndex] ![(Int, PropClassification)] !{#CommonDefs} !*TypeVarHeap !*TypeDefInfos
 			-> *(!PropClassification, !*TypeVarHeap, !*TypeDefInfos)
-newPropClassOfTypeDefGroup group_nr {glob_module,glob_object} group props_of_group_vars ci type_var_heap td_infos
+newPropClassOfTypeDefGroup group_nr {gi_module,gi_index} group props_of_group_vars ci type_var_heap td_infos
 	# (group_props, type_var_heap, td_infos) = collect_prop_class_of_type_defs group_nr group props_of_group_vars ci
 														(newGroupProps (length group)) type_var_heap td_infos
 	  group_props = determine_fixed_point group_props
 	  td_infos = update_prop_class_of_group group group_props td_infos
-	  (tdi=:{tdi_tmp_index},td_infos) = td_infos![glob_module].[glob_object]
-	= (group_props.[tdi_tmp_index].pr_classification, type_var_heap, td_infos)
+	  (tdi=:{tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
+	= (group_props.[tdi_index_in_group].pr_classification, type_var_heap, td_infos)
 where
 	update_prop_class_of_group group group_props td_infos
 		= foldSt (update_prop_class_of_type_def group_props) group td_infos
 	where
-		update_prop_class_of_type_def group_props {glob_module,glob_object} td_infos
-			# (tdi=:{tdi_classification,tdi_tmp_index},td_infos) = td_infos![glob_module].[glob_object]
-			  {pr_hio_signs, pr_classification} = group_props.[tdi_tmp_index]
+		update_prop_class_of_type_def group_props {gi_module,gi_index} td_infos
+			# (tdi=:{tdi_classification,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
+			  {pr_hio_signs, pr_classification} = group_props.[tdi_index_in_group]
 			  tdi_classification = addPropClassification pr_hio_signs pr_classification tdi_classification
-			= { td_infos & [glob_module].[glob_object] = { tdi & tdi_classification = tdi_classification }}
+			= { td_infos & [gi_module].[gi_index] = { tdi & tdi_classification = tdi_classification }}
 		
 	collect_prop_class_of_type_defs group_nr group props_of_group_vars ci prop_requirements type_var_heap td_infos
 		= foldSt (collect_sign_class_of_type_def group_nr props_of_group_vars ci) group (prop_requirements, type_var_heap, td_infos)
 	where			
-		collect_sign_class_of_type_def group_nr props_of_group_vars ci {glob_module,glob_object} (prop_requirements, type_var_heap, td_infos)
-			# ({tdi_group_vars,tdi_kinds,tdi_tmp_index},td_infos) = td_infos![glob_module].[glob_object]
-			  {td_name,td_args,td_rhs} = ci.[glob_module].com_type_defs.[glob_object]
+		collect_sign_class_of_type_def group_nr props_of_group_vars ci {gi_module,gi_index} (prop_requirements, type_var_heap, td_infos)
+			# ({tdi_group_vars,tdi_kinds,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
+			  {td_name,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
 			  (rev_hio_props, type_var_heap) = bind_type_vars_to_props td_args tdi_group_vars tdi_kinds props_of_group_vars ([], type_var_heap)
-			  (prop_env, pcs) = prop_class_of_type_def glob_module td_rhs group_nr ci 
+			  (prop_env, pcs) = prop_class_of_type_def gi_module td_rhs group_nr ci 
 		  								{pcs_type_var_heap = type_var_heap, pcs_type_def_infos = td_infos, pcs_rec_appls = [] }
 			  type_var_heap = foldSt restore_binds_of_type_var td_args pcs.pcs_type_var_heap
-			= ({prop_requirements & [tdi_tmp_index] = { pr_hio_signs = reverse rev_hio_props, pr_classification = prop_env,
+			= ({prop_requirements & [tdi_index_in_group] = { pr_hio_signs = reverse rev_hio_props, pr_classification = prop_env,
 					pr_type_applications = pcs.pcs_rec_appls }}, type_var_heap, pcs.pcs_type_def_infos)
 
 	determine_fixed_point sign_requirements
@@ -490,9 +490,9 @@ propClassOfType (TV tv) _ ci pcs
 	= propClassOfTypeVariable tv ci pcs
 
 propClassOfType (TA {type_name,type_index = {glob_module, glob_object}} types) group_nr ci pcs
-	# (td_info=:{tdi_group_nr,tdi_tmp_index,tdi_kinds}, pcs) = pcs!pcs_type_def_infos.[glob_module].[glob_object]
+	# (td_info=:{tdi_group_nr,tdi_index_in_group,tdi_kinds}, pcs) = pcs!pcs_type_def_infos.[glob_module].[glob_object]
 	| tdi_group_nr == group_nr
-		= prop_class_of_type_list_of_rec_type types tdi_tmp_index ci [] pcs 
+		= prop_class_of_type_list_of_rec_type types tdi_index_in_group ci [] pcs 
 		# {td_args,td_arity} = ci.[glob_module].com_type_defs.[glob_object]
 		  (prop_classes, hio_props, pcs) = collect_prop_classes_of_type_list types tdi_kinds group_nr ci pcs 
 		  (type_class, pcs_type_var_heap, pcs_type_def_infos)
