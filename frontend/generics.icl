@@ -3341,7 +3341,7 @@ where
 	build_gen_expr _ heaps
 		= buildGenericApp generic_module generic_def_sym KindConst [] heaps
 
-buildKindConstInstance1 :: !DefinedSymbol !Int !Index !DefinedSymbol [!TypeKind] !GenericState
+buildKindConstInstance1 :: !DefinedSymbol !Int !Index !DefinedSymbol ![TypeKind] !GenericState
 	-> (!FunDef, !*GenericState)
 buildKindConstInstance1 
 		def_sym group_index 
