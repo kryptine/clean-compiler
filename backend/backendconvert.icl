@@ -517,12 +517,7 @@ declareCurrentDclModule {icl_common} {dcl_name, dcl_modification_time, dcl_funct
 declareDclModule :: ModuleIndex DclModule -> BackEnder
 declareDclModule moduleIndex {dcl_name, dcl_modification_time, dcl_common, dcl_functions, dcl_module_kind}
 	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name dcl_modification_time (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
-/*
-defineCurrentDclModule :: IclModule DclModule {#Int} -> BackEnder
-defineCurrentDclModule {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions
-	=	declareCurrentDclModuleTypes icl_common.com_type_defs typeConversions
-	o`	defineCurrentDclModuleTypes dcl_common.com_cons_defs dcl_common.com_selector_defs dcl_common.com_type_defs typeConversions
-*/
+
 defineDclModule :: ModuleIndex DclModule -> BackEnder
 defineDclModule moduleIndex {dcl_name, dcl_common, dcl_functions,dcl_instances}
 	=	declare moduleIndex dcl_common
@@ -771,15 +766,10 @@ declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_ident, ft_type_ptr
 					(case vi of
 						VI_ExpandedType expandedType
 							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex nrOfDclFunctions)
-//							->	beDeclareRuleType functionIndex moduleIndex (functionName moduleIndex ft_ident.id_name functionIndex nrOfDclFunctions)
 							o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
 						_
 							->	identity) be
 		where
-//			functionName :: Int {#Char} Int Int -> {#Char}
-//			functionName moduleIndex name functionIndex nrOfDclFunctions 
-//				| trace_t (":"+++toString moduleIndex+++" "+++toString functionIndex)
-
 			functionName :: {#Char} Int Int -> {#Char}
 			functionName name functionIndex nrOfDclFunctions 
 //				| trace_tn (name+++(if (functionIndex < nrOfDclFunctions) "" (";" +++ toString functionIndex)))
@@ -789,18 +779,12 @@ declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_ident, ft_type_ptr
 				// otherwise
 					=	name +++ ";" +++ toString functionIndex
 
-//import StdDebug
-
-/*
-declareCurrentDclModuleTypes :: {#CheckedTypeDef} {#Int} -> BackEnder
-*/
 defineTypes :: ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} -> BackEnder
 defineTypes moduleIndex constructors selectors types
 	=	foldStateWithIndexA (defineType moduleIndex constructors selectors) types
 
 convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
 convertTypeLhs moduleIndex typeIndex attribute args
-//	=	beFlatTypeX (beTypeSymbol typeIndex moduleIndex) (convertAttribution attribute) (convertTypeVars args)
 	=	beFlatType (beTypeSymbol typeIndex moduleIndex) (convertTypeVars args)
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
@@ -831,7 +815,6 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 				(convertSymbolTypeArgs constructorType)
 				be
 	=	appBackEnd (BERecordType moduleIndex flatType constructorTypeNode fields) be
-//	=	appBackEnd (BERecordTypeX moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
 	where
 		constructorIndex
 			=	rt_constructor.ds_index
@@ -889,16 +872,12 @@ foldrAi function result array
 //convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} -> BEMonad BEFieldListP
 convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} StrictnessList -> BEMonad BEFieldListP
 convertSelectors moduleIndex selectors symbols strictness
-//	=	foldrA (beFields o convertSelector moduleIndex selectors) beNoFields symbols
 	=	foldrAi (\i -> (beFields o convertSelector moduleIndex selectors (arg_is_strict i strictness))) beNoFields symbols
 
-//convertSelector :: ModuleIndex {#SelectorDef} FieldSymbol -> BEMonad BEFieldListP
 convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFieldListP
-//convertSelector moduleIndex selectorDefs {fs_index}
 convertSelector moduleIndex selectorDefs is_strict {fs_index}
 	= \be0 -> let (selectorType,be) = selectorTypeFunction be0 in
 		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd__ident.id_name)
-//		o`	beField fs_index moduleIndex (convertAnnotTypeNode (selectorType.st_result))) be
 		o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) (selectorType.st_result))) be
 	where
 		selectorDef
@@ -944,8 +923,6 @@ predefineSymbols {dcl_common} predefs
 		types :: [(Int, Int, BESymbKind)]
 		types
 			=	[	
-//					(PD_ListType, 1, BEListType),
-					
 					(PD_LazyArrayType, 1, BEArrayType)
 				,	(PD_StrictArrayType, 1, BEStrictArrayType)
 				,	(PD_UnboxedArrayType, 1, BEUnboxedArrayType)
@@ -987,12 +964,8 @@ predefineSymbols {dcl_common} predefs
 		
 		constructors :: [(Int, Int, BESymbKind)]
 		constructors
-			=	
-//				[(PD_NilSymbol, 0, BENilSymb), (PD_ConsSymbol, 3, BEConsSymb) : 
+			=	[(index, index-PD_Arity2TupleSymbol+2, BETupleSymb) \\ index <- [PD_Arity2TupleSymbol..PD_Arity32TupleSymbol]]
 
-				[(index, index-PD_Arity2TupleSymbol+2, BETupleSymb) \\ index <- [PD_Arity2TupleSymbol..PD_Arity32TupleSymbol]]
-
-//				]
  
 		predefineConstructor (index, arity, symbolKind)
 			// sanity check ...
@@ -1061,16 +1034,12 @@ where
 	adjust_strict_list_instances i instances backEnd
 		| i<size instances
 			# instance_i = instances.[i]
-//			| is_instance_for_basic_type instance_i.ins_type.it_types && trace_tn ("instance: "+++toString instance_i.ins_ident) && trace_tn (types_to_string instance_i.ins_type.it_types)
 			| isEmpty instance_i.ins_type.it_context // && trace_t ("instance: "+++toString instance_i.ins_ident+++" ") && trace_t (types_to_string instance_i.ins_type.it_types+++" ")
 				# backEnd = adjust_strict_list_members 0 instance_i.ins_members backEnd
 				= adjust_strict_list_instances (i+1) instances backEnd
 				= adjust_strict_list_instances (i+1) instances backEnd
 			= backEnd
 	where
-//		is_instance_for_basic_type [TB _] = True
-//		is_instance_for_basic_type _ = False
-		
 		adjust_strict_list_members i members backEnd
 			| i<size members
 				# member=members.[i]
@@ -1119,11 +1088,11 @@ type_to_string _ = "?"
 	,	asai_funs			:: !{#FunType}
 	}
 
-adjustArrayFunctions :: [Int]/*IndexRange*/ PredefinedSymbols Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet -> BackEnder
-adjustArrayFunctions array_first_instance_indices/*arrayInstancesRange*/ predefs main_dcl_module_n functions dcls icl_instances used_module_numbers
+adjustArrayFunctions :: [Int] PredefinedSymbols Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet -> BackEnder
+adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n functions dcls icl_instances used_module_numbers
 	=	adjustStdArray arrayInfo predefs
 				(if (arrayModuleIndex == main_dcl_module_n) icl_instances stdArray.dcl_common.com_instance_defs)
-	o`	adjustIclArrayInstances /*arrayInstancesRange*/array_first_instance_indices arrayMemberMapping (size arrayClass.class_members) /*functions*/
+	o`	adjustIclArrayInstances array_first_instance_indices arrayMemberMapping (size arrayClass.class_members) /*functions*/
 	where
 		arrayModuleIndex
 			=	predefs.[PD_StdArray].pds_def
@@ -1173,7 +1142,6 @@ adjustArrayFunctions array_first_instance_indices/*arrayInstancesRange*/ predefs
 		adjustStdArray :: AdjustStdArrayInfo PredefinedSymbols {#ClassInstance} -> BackEnder
 		adjustStdArray arrayInfo predefs instances
 			| arrayModuleIndex == NoIndex || not (inNumberSet arrayModuleIndex used_module_numbers)
-//				|| arrayModuleIndex <> main_dcl_module_n
 				=	identity
 			// otherwise
 				=	foldStateA (adjustStdArrayInstance arrayClassIndex arrayInfo) instances
@@ -1201,26 +1169,9 @@ adjustArrayFunctions array_first_instance_indices/*arrayInstancesRange*/ predefs
 											_
 												->	identity) be
 
-		adjustIclArrayInstances :: [Int]/*IndexRange*/ {#BEArrayFunKind} Int /*{#FunDef}*/ -> BackEnder
-		adjustIclArrayInstances array_first_instance_indices/*{ir_from, ir_to}*/ mapping n_array_members /*instances*/
-/*
-			=	foldStateWithIndexRangeA (adjustIclArrayInstance mapping) ir_from ir_to instances
-			where
-				adjustIclArrayInstance :: {#BEArrayFunKind} Index FunDef -> BackEnder
-				// for array functions fun_index is not the index in the FunDef array,
-				// but its member index in the Array class
-				adjustIclArrayInstance mapping index {fun_index}
-					=	beAdjustArrayFunction mapping.[fun_index] index main_dcl_module_n
-*/
-/*			= adjustIclArrayInstances r_from 0
-			where
-				adjustIclArrayInstances index member_index
-					| index==ir_to
-						= identity
-						# next_member_index=member_index+1
-						=	beAdjustArrayFunction mapping.[member_index] index main_dcl_module_n
-						o`	adjustIclArrayInstances (index+1) (if (next_member_index<n_array_members) next_member_index 0)
-*/
+		adjustIclArrayInstances :: [Int] {#BEArrayFunKind} Int -> BackEnder
+		adjustIclArrayInstances array_first_instance_indices mapping n_array_members
+
 			= adjustIclArrayInstances array_first_instance_indices
 			where
 				adjustIclArrayInstances [array_first_instance_index:array_first_instance_indices]
@@ -1342,7 +1293,6 @@ convertAttributeKind attributeVar
 
 convertSymbolTypeArgs :: SymbolType -> BEMonad BETypeArgP
 convertSymbolTypeArgs {st_args,st_args_strictness}
-//	=	convertTypeArgs st_args
 	= convertAnnotatedTypeArgs st_args st_args_strictness
 
 convertBasicTypeKind :: BasicType -> BESymbKind
@@ -1360,7 +1310,6 @@ convertBasicTypeKind BT_World
 	=	BEWorldType
 convertBasicTypeKind BT_Dynamic
 	=	undef // <<- "convertBasicTypeKind (BT_Dynamic) shouldn't occur"
-//	=	BEDynamicType
 convertBasicTypeKind (BT_String _)
 	=	undef // <<- "convertBasicTypeKind (BT_String _) shouldn't occur"
 
@@ -1369,7 +1318,6 @@ convertAnnotation AN_None
 	=	BENoAnnot
 convertAnnotation AN_Strict
 	=	BEStrictAnnot
-
 
 nextAttributeNumber :: *BackEndState -> (BEAttribution, *BackEndState)
 nextAttributeNumber state=:{bes_attr_number}
@@ -1411,19 +1359,11 @@ convertAttribution attr
 
 convertAnnotTypeNode :: AType -> BEMonad BETypeNodeP
 convertAnnotTypeNode {at_type, at_attribute}
-/*
 	=	convertTypeNode at_type
-	:-	beAnnotateTypeNode (convertAnnotation at_annotation)
-	:-	beAttributeTypeNode (convertAttribution at_attribute)
-*/
-	=
-//	\s -> (
-	convertTypeNode at_type
 	:-	beAnnotateTypeNode c_annot
 	:-	beAttributeTypeNode c_attrib
-//	) s
 	where
-		c_annot = convertAnnotation AN_None // at_annotation
+		c_annot = convertAnnotation AN_None
 		c_attrib = convertAttribution at_attribute
 
 convertAnnotAndTypeNode :: Annotation AType -> BEMonad BETypeNodeP
@@ -1445,7 +1385,6 @@ convertTypeNode (TB basicType)
 convertTypeNode (TA typeSymbolIdent typeArgs)
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
 convertTypeNode (TAS typeSymbolIdent typeArgs strictness)
-//	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedTypeArgs typeArgs strictness)
 convertTypeNode (TV {tv_ident})
 	=	beVarTypeNode tv_ident.id_name
@@ -1487,7 +1426,6 @@ convertAnnotatedTypeArgs args strictness
 		foldr [] i
 			= beNoTypeArgs
 		foldr [a:x] i
-//			| trace_tn (toString i+++" "+++toString (arg_strictness_annotation i strictness))
 			= (beTypeArgs o (convertAnnotAndTypeNode (arg_strictness_annotation i strictness))) a (foldr x (i+1))
 
 convertTransformedBody :: Int Int Ident TransformedBody Int -> BEMonad BERuleAltP
@@ -1613,11 +1551,6 @@ instance varInfoPtr FreeVar where
 convertCodeParameter :: (Bind String a) -> BEMonad BECodeParameterP | varInfoPtr a
 convertCodeParameter {bind_src, bind_dst}
 		=	beCodeParameter bind_src (convertVar (varInfoPtr bind_dst))
-/*
-convertTransformedLhs :: Int [FreeVar] -> BEMonad BENodeP
-convertTransformedLhs functionIndex freeVars
-	=	beNormalNode (beFunctionSymbol functionIndex cIclModIndex) (convertLhsArgs freeVars)
-*/
 
 convertPatterns :: [FunctionPattern] -> BEMonad BEArgP
 convertPatterns patterns
@@ -1691,7 +1624,6 @@ convertRootExpr aliasDummyId (Case kees=:{case_expr, case_guards}) main_dcl_modu
 			 				->	DefaultCaseFail ident
 			 			_
 							->	DefaultCaseFail {id_name="kees_be", id_info=nilPtr}
-//			 				->	abort "backendconvert:defaultCase, case without id"
 			// otherwise
 			 	=	DefaultCaseNone
 convertRootExpr _ (FailExpr fail_ident) _
@@ -2020,7 +1952,6 @@ caseNode localRefCounts arity symbolM defsM strictsM rhsM be
 		# (kees, be)
 			=	accBackEnd (BECaseNode arity symbol defs stricts rhs) be
 		=	(kees, be)
-//		=	beCaseNode arity symbolM defsM strictsM rhsM be
 
 defaultNode defsM strictsM rhsM be
 	# be
@@ -2173,8 +2104,6 @@ getVariableSequenceNumber varInfoPtr be
 			-> (sequenceNumber,be)
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
-//		vi
-//			-> abort "getVariableSequenceNumber" // <<- vi
 
 foldStateWithIndexTwice function n
 	:== foldStateWithIndexTwice 0
