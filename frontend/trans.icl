@@ -587,7 +587,12 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 							\\ {var_name, var_info_ptr} <- free_vars | not (isMember var_info_ptr outer_info_ptrs)]
 	  all_args
 	  		= lifted_arguments++arguments_from_outer_fun
-	  (fun_info_ptr, ti_fun_heap)
+	| SwitchArityChecks (length all_args > 32) False
+		# ti
+		  		= { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
+		  ti	= { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_fun_root.symb_name.id_name <<< "\n"}
+		= skip_over kees ro ti
+	# (fun_info_ptr, ti_fun_heap)
 	  		= newPtr FI_Empty ti_fun_heap
 	  fun_ident
 	  		= { id_name = ro.ro_fun_root.symb_name.id_name+++"_case", id_info = nilPtr }
@@ -614,6 +619,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 					{ro_fun_case=ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}, ro_fun_args} ti
 //	| False -!-> ("generate_case_function",ro_fun.symb_name)		= undef
 	# fun_arity								= length ro_fun_args
+	# ti = arity_warning "generate_case_function" ro_fun.symb_name fun_index fun_arity ti
 	  (Yes {st_vars,st_args,st_attr_vars})	= outer_fun_def.fun_type
 	  types_from_outer_fun					= [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
 	  nr_of_lifted_vars						= fun_arity-(length types_from_outer_fun)
@@ -1094,7 +1100,14 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  ti_var_heap				= das.das_var_heap
 	  ti_cons_args				= das.das_cons_args
 	  
-	  new_arg_types = flatten [ ats_types \\ {ats_types}<-:new_arg_types_array ]
+	  new_fun_arity
+	  		= length new_fun_args
+	| SwitchArityChecks (new_fun_arity > 32) False
+		# ti = { ti & ti_type_heaps = ti_type_heaps, ti_symbol_heap = ti_symbol_heap, ti_fun_defs = ti_fun_defs
+				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos }
+		  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_fun_root.symb_name.id_name <<< "\n"}
+		= (-1,new_fun_arity,ti)
+	# new_arg_types = flatten [ ats_types \\ {ats_types}<-:new_arg_types_array ]
 	  
 	  new_args_strictness = compute_args_strictness new_arg_types_array
 	  	  	  
@@ -1157,14 +1170,12 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  							<- [fresh_attr_vars.[i] \\ i<-[0..(size used_attr_vars)-1] | used_attr_vars.[i]]]
  	# (all_fresh_type_vars, ti_type_heaps)
  	  		= accTypeVarHeap (getTypeVars (fresh_arg_types, fresh_result_type)) ti_type_heaps
-	  fun_arity
-	  		= length new_fun_args
 	  new_fun_type
 	  		= Yes
 	  			{ st_vars		= all_fresh_type_vars
 	  			, st_args		= fresh_arg_types
 	  			, st_args_strictness=new_args_strictness
-	  			, st_arity		= fun_arity
+	  			, st_arity		= new_fun_arity
 	  			, st_result		= fresh_result_type
 	  			, st_context	= []
 	  			, st_attr_vars	= all_attr_vars
@@ -1189,7 +1200,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  				-> (new_expr,ti_symbol_heap,strict_free_vars)
 ...DvA */
 	  new_fd_expanding 
-	  		= { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, 
+	  		= { fd & fun_body = Expanding new_fun_args, fun_arity = new_fun_arity,fun_type=new_fun_type, 
 	  					fun_info.fi_group_index = fi_group_index
 /* DvA... STRICT_LET
 					,fun_info.fi_free_vars = strict_free_vars++fd.fun_info.fi_free_vars
@@ -1245,6 +1256,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  			ti_new_functions = [fun_def_ptr : ti_new_functions], ti_fun_defs = ti_fun_defs,
 	  			ti_type_heaps = ti_type_heaps, ti_cleanup_info = us_cleanup_info, 
 	  			ti_cons_args = ti_cons_args }
+	# ti = arity_warning "generateFunction" fd.fun_symb.id_name ti_next_fun_nr new_fun_arity ti
 	  (new_fun_rhs, ti)
 			= transform tb_rhs ro ti
 	  new_fd
@@ -1270,7 +1282,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 		, ti_cons_args= prs.prs_cons_args
 		, ti_fun_defs	= prs.prs_fun_defs
 		}
-	= (ti_next_fun_nr, fun_arity, ti)
+	= (ti_next_fun_nr, new_fun_arity, ti)
 where
 	st_args_array :: ![AType] !StrictnessList -> .{#ATypesWithStrictness}
 	st_args_array st_args args_strictness
@@ -2002,7 +2014,9 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  		| is_new
 	  			# ti = update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
 	  			# (fun_index, fun_arity, ti) = generateFunction fun_def cc_args cc_linear_bits producers fun_def_ptr ro ti
-	  			  app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index }
+				| fun_index == (-1)
+					= (build_application { app & app_args = app_args } extra_args, ti)
+	  			# app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index }
 				# (app_args, extra_args) = complete_application fun_arity new_args extra_args
 	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
   			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
@@ -2279,7 +2293,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 				# insts							= resolveContext context ei
 				# (num_special_args,special_gi)	= findInstInSpecials insts specials
 				| foundSpecial special_gi
-					= build_application {app & app_symb.symb_kind = SK_Function gi} (drop num_special_args app_args) extra_args special_gi ti
+					= build_application {app & app_symb.symb_kind = SK_Function special_gi} (drop num_special_args app_args) extra_args special_gi ti
 				= build_application app app_args extra_args gi ti
 			= build_application app app_args extra_args gi ti
 		= build_application app app_args extra_args gi ti
@@ -2312,10 +2326,13 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 					= i
 					= find_member_n (i+1) member_string a
 
-		select_member (App {app_symb={symb_kind=SK_Constructor _},app_args,app_info_ptr}) select_symb me_offset ti
-			| not (isNilPtr app_info_ptr) && (case (sreadPtr app_info_ptr ti.ti_symbol_heap) of (EI_DictionaryType _) -> True; _ -> False)
-//			&& trace_tn ("select_member "+++toString select_symb.glob_object.ds_ident.id_name)
-				= (app_args !! me_offset,ti)
+		select_member exp=:(App {app_symb={symb_kind=SK_Constructor _},app_args,app_info_ptr}) select_symb me_offset ti=:{ti_symbol_heap}
+			| not (isNilPtr app_info_ptr) 
+				# (ei,ti_symbol_heap)	= readPtr app_info_ptr ti_symbol_heap
+				# ti = {ti & ti_symbol_heap = ti_symbol_heap}
+				= case ei of
+					(EI_DictionaryType _)	-> (app_args !! me_offset,ti)
+					_						-> (Selection NormalSelector exp [RecordSelection select_symb me_offset],ti)
 		select_member exp select_symb me_offset ti
 			= (Selection NormalSelector exp [RecordSelection select_symb me_offset],ti)
 
@@ -2326,9 +2343,11 @@ transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction 
 		#! cons_class = ti_cons_args.[fun_index]
 		   (instances, ti_instances) = ti_instances![fun_index]
 		   (fun_def, ti_fun_defs) = ti_fun_defs![fun_index]
-		= transformFunctionApplication fun_def instances cons_class app extra_args ro { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
-		# (FI_Function {gf_fun_def,gf_instance_info,gf_cons_args}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-		= transformFunctionApplication gf_fun_def gf_instance_info gf_cons_args app extra_args ro { ti & ti_fun_heap = ti_fun_heap }
+		   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs }
+		= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
+	# (FI_Function {gf_fun_def,gf_instance_info,gf_cons_args}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
+	  ti = { ti & ti_fun_heap = ti_fun_heap }
+	= transformFunctionApplication gf_fun_def gf_instance_info gf_cons_args app extra_args ro ti
 transformApplication app [] ro ti
 	= (App app, ti)
 transformApplication app=:{app_symb={symb_name,symb_kind = SK_Constructor cons_index},app_args} extra_args
@@ -3841,3 +3860,8 @@ foundSpecial {glob_object= -1,glob_module = -1}	= False
 foundSpecial _ = True	
 
 // ...SPECIAL
+
+arity_warning msg symb_name fun_index fun_arity ti
+	| fun_arity <= 32
+		= ti
+	= {ti & ti_error_file = ti.ti_error_file <<< "Warning: Arity > 32 " <<< msg <<< " " <<< fun_arity <<< " " <<< symb_name <<< "@" <<< fun_index <<< "\n"}
