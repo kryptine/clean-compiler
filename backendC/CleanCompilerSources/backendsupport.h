@@ -12,6 +12,8 @@ typedef struct clean_string {int length; char chars [1]; } *CleanString;
 extern void AssertionFailed (char *conditionString, char *file, int line);
 # define	Assert(condition)	{if (!(condition)) AssertionFailed ("!(" #condition ")", __FILE__, __LINE__);}
 
+extern void fatal_backend_error (char *s);
+
 /*
 	Memory management
 	=================

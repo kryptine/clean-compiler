@@ -1,4 +1,10 @@
 
+#include "compiledefines.h"
+
+#ifdef KARBON
+# define TARGET_API_MAC_CARBON 1
+#endif
+
 #include <stdio.h>
 #include <unix.h>
 #include <SIOUX.h>
@@ -15,6 +21,7 @@
 #include "Gestalt.h"
 #include "AERegistry.h"
 
+#include "types.t"
 #include "system.h"
 #include "path_cache.h"
 #include "compiler.h"
@@ -23,6 +30,7 @@ extern void clear_inline_cache (void);
 
 #undef BACKGROUND
 #define MW_DEBUG 0
+#define NO68K
 
 #ifndef BACKGROUND
 #	undef NO_REDIRECT_STDFILES
@@ -40,22 +48,22 @@ extern void clear_inline_cache (void);
 static Boolean gAppleEventsFlag, gQuitFlag;
 static long gSleepVal;
 
-static pascal OSErr DoAEOpenApplication (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,long refCon)
+static pascal OSErr DoAEOpenApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	return noErr;
 }
  
-static pascal OSErr DoAEOpenDocuments (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent, long refCon)
+static pascal OSErr DoAEOpenDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	return errAEEventNotHandled;
 }
  
-static pascal OSErr DoAEPrintDocuments (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,long refCon)
+static pascal OSErr DoAEPrintDocuments (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	return errAEEventNotHandled;
 }
  
-static pascal OSErr DoAEQuitApplication (AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,long refCon)
+static pascal OSErr DoAEQuitApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	gQuitFlag = true;
 	return noErr;
@@ -68,15 +76,19 @@ extern int CallCompiler (int argc,char **argv);
 #ifdef CODE_GENERATOR
 # ifdef __cplusplus
  extern "C" { int generate_code (int,char **); }
+#  ifndef NO68K
  extern int generate_code68 (int,char **);
+#  endif
 # else
  extern int generate_code (int,char **);
+#  ifndef NO68K
  extern int generate_code68__FiPPc (int,char **);
- #define generate_code68 generate_code68__FiPPc
+#define generate_code68 generate_code68__FiPPc
+#  endif
 # endif
 #endif
 
-#ifdef LINKER
+#if defined (LINKER) && !defined (NO68K)
 # ifdef __cplusplus
  extern "C" { int link_application_argc_argv (int,char **); }
 # else
@@ -104,7 +116,7 @@ int do_command (char *command)
 		++p;
 
 	while (*p!='\0' && argc<256){
-		if (*p=='>' || *p=='„'){
+		if (*p=='>' || *p=='³'){
 			int redirection_char;
 			char *file_name;
 			
@@ -153,7 +165,7 @@ int do_command (char *command)
 				freopen (file_name,"w",stdout);
 				redirect_stdout=1;
 #endif
-			} else if (redirection_char=='„' && redirect_stderr==0){
+			} else if (redirection_char=='³' && redirect_stderr==0){
 #ifndef NO_REDIRECT_STDFILES
 				freopen (file_name,"w",stderr);
 				redirect_stderr=1;
@@ -215,6 +227,10 @@ int do_command (char *command)
 */
 
 	if (argc>0){
+#ifdef CLEAN2
+		if (0)
+			;
+#else
 		if (!strcmp (argv[0],"cocl")){
 			if (argc>=2 && !strcmp ("-clear_cache",argv[1])){
 				result=CallCompiler (argc-2,&argv[2]);
@@ -224,13 +240,16 @@ int do_command (char *command)
 			} else
 				result=CallCompiler (argc-1,&argv[1]);
 		}
+#endif
 #ifdef CODE_GENERATOR
 		else if (!strcmp (argv[0],"cg"))
 			result=generate_code (argc,&argv[0]);
+# ifndef NO68K
 		else if (!strcmp (argv[0],"cg68"))
 			result=generate_code68 (argc,&argv[0]);
+# endif
 #endif
-#ifdef LINKER
+#if defined (LINKER) && !defined (NO68K)
 		else if (!strcmp (argv[0],"linker"))
 			result=link_application_argc_argv (argc,&argv[0]);
 #endif
@@ -255,7 +274,13 @@ int do_command (char *command)
 
 static char script_string[16001];
 
-static pascal OSErr do_script_apple_event (AppleEvent *apple_event,AppleEvent *replyAppleEvent,long refCon)
+#ifdef CLEAN2
+int compiler_id;
+#else
+extern int compiler_id;
+#endif
+
+pascal OSErr do_script_apple_event (const AppleEvent *apple_event,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	DescType returned_type;
 	long actual_size;
@@ -272,7 +297,13 @@ static pascal OSErr do_script_apple_event (AppleEvent *apple_event,AppleEvent *r
 #if !MW_DEBUG
 		error=do_command (script_string);
 #endif
-		
+
+		if (compiler_id>=0){
+			error += (compiler_id+1)<<1;
+
+			compiler_id = -1;
+		}
+
 		return_error_string_length=strlen (return_error_string);
 		if (return_error_string_length!=0){
 			AEPutParamPtr (replyAppleEvent,keyErrorString,typeChar,return_error_string,return_error_string_length);
@@ -337,16 +368,22 @@ int /*clean_compiler_*/ main (void)
 	EventRecord mainEventRec;
 	Boolean eventFlag;
 
+#ifndef KARBON
 	SetApplLimit (GetApplLimit() - 200*1024);
 
 	InitGraf (&qd.thePort);
 	InitFonts();
+#endif
 	FlushEvents (everyEvent,0);
 
 #ifndef BACKGROUND
+# ifndef KARBON
 	InitWindows();
+# endif
 	InitCursor();
+# ifndef KARBON
 	InitMenus();
+# endif
 #endif
 
 	_fcreator='3PRM';
@@ -360,7 +397,7 @@ int /*clean_compiler_*/ main (void)
 	else
 		gAppleEventsFlag = false;
 
-#ifdef STDIO_WINDOW
+#if defined (STDIO_WINDOW)
 	SIOUXSettings.autocloseonquit=1;
 	SIOUXSettings.showstatusline=0;
 	SIOUXSettings.asktosaveonclose=0;

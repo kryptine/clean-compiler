@@ -17,3 +17,7 @@
 #define IMPORT_OBJ_AND_LIB 1
 
 #define WRITE_DCL_MODIFICATION_TIME 1
+
+#define STRICT_LISTS 0
+
+#undef KARBON

@@ -1,11 +1,26 @@
 
-extern void cache_dcl_path (char *file_name,short wd_ref_num,short clean_system_files_wd_ref_num,
-	unsigned long file_time,char *path);
+#ifdef KARBON
+	struct vd_id {
+		FSVolumeRefNum volume_id;
+		long directory_id;
+	};
+#endif
+
+extern void cache_dcl_path (char *file_name,
+#ifdef KARBON
+	struct vd_id vd_id,struct vd_id clean_system_files_vd_id,
+#else
+	short wd_ref_num,short clean_system_files_wd_ref_num,
+#endif
+	FileTime file_time,char *path);
 
 struct search_dcl_path_in_cache_result {
+#ifdef KARBON
+#else
 	short			wd_ref_num;
 	short			clean_system_files_wd_ref_num;
-	unsigned long	file_time;
+#endif
+	FileTime	file_time;
 	char *			path;
 };
 

@@ -1,9 +1,9 @@
 
 #include "compiledefines.h"
-#include "system.h"
-#include <ctype.h>
 #include "comsupport.h"
 #include "settings.h"
+#include "system.h"
+#include <ctype.h>
 #include "compiler.h"
 #include "version.h"
 

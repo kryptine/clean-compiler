@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 
+#include "compiledefines.h"
 #include "types.t"
 #include "syntaxtr.t"
 #include "comsupport.h"

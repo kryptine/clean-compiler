@@ -1,6 +1,7 @@
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
-
 #include "settings.h"
 #include "syntaxtr.t"
 #include "comsupport.h"

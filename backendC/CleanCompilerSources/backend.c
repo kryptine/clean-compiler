@@ -1,8 +1,9 @@
 #define CODE_INLINE_FLAG
 #define DYNAMIC_TYPE 1
 
-# include "system.h"
 # include "compiledefines.h"
+# include "types.t"
+# include "system.h"
 # include "syntaxtr.t"
 # include "codegen_types.h"
 # include "statesgen.h"
@@ -1021,6 +1022,52 @@ BELiteralSymbol (BESymbKind kind, CleanString value)
 
 	return (symbol);
 } /* BELiteralSymbol */
+
+#if STRICT_LISTS
+void BEPredefineListConstructorSymbol(int arity,int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
+{
+	BEModuleP	module;
+	SymbolP symbol_p;
+
+	Assert (moduleIndex == kPredefinedModuleIndex);
+
+	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
+	module	= &gBEState.be_modules [moduleIndex];
+
+	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
+	
+	symbol_p=module->bem_constructors [constructorIndex];
+	
+	Assert (symbol_p->symb_kind == erroneous_symb);
+
+	symbol_p->symb_kind	= symbolKind;
+	symbol_p->symb_arity	= arity;
+	symbol_p->symb_head_strictness=head_strictness;
+	symbol_p->symb_tail_strictness=tail_strictness;
+}
+
+void BEPredefineListTypeSymbol(int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
+{
+	BEModuleP	module;
+	SymbolP symbol_p;
+
+	Assert (moduleIndex == kPredefinedModuleIndex);
+
+	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
+	module	= &gBEState.be_modules [moduleIndex];
+
+	Assert ((unsigned int) typeIndex < module->bem_nTypes);
+
+	symbol_p=module->bem_types [typeIndex];
+
+	Assert (symbol_p->symb_kind == erroneous_symb);
+
+	symbol_p->symb_kind		= symbolKind;
+	symbol_p->symb_arity	= 1;
+	symbol_p->symb_head_strictness=head_strictness;
+	symbol_p->symb_tail_strictness=tail_strictness;
+}
+#endif
 
 void
 BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind)
@@ -2532,6 +2579,26 @@ BEGenerateCode (CleanString outputFile)
 	gBEState.be_icl.beicl_module->im_rules	=	rule;
 
 	outputFileName	= ConvertCleanString (outputFile);
+
+#if 0
+	{
+		File f;
+		
+		f=fopen ("Rules","w");
+		if (f){
+			ImpRuleS *rule;
+
+			for (rule=gBEState.be_icl.beicl_module->im_rules; rule!=NULL; rule=rule->rule_next){
+				PrintImpRule (rule,4,f);
+				
+				if (rule->rule_next!=NULL)
+					FPutC ('\n',f);
+			}
+			fclose (f);
+		}
+	}
+#endif
+
 	CodeGeneration (gBEState.be_icl.beicl_module, outputFileName);
 
 	return (!CompilerError);

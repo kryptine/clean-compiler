@@ -53,6 +53,15 @@ extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arit
 # define	NewNil()			NewNormalNode (NilSymbol, NIL, 0)
 # define	NewFalse()			NewNormalNode (FalseSymbol, NIL, 0)
 # define	NewTrue()			NewNormalNode (TrueSymbol, NIL, 0)
+
+#if STRICT_LISTS
+# define	NewStrictNil() NewNormalNode (StrictNilSymbol, NIL, 0)
+# define	NewUnboxedNil() NewNormalNode (UnboxedNilSymbol, NIL, 0)
+# define	NewTailStrictNil() NewNormalNode (TailStrictNilSymbol, NIL, 0)
+# define	NewStrictTailStrictNil() NewNormalNode (StrictTailStrictNilSymbol, NIL, 0)
+# define	NewUnboxedTailStrictNil() NewNormalNode (UnboxedTailStrictNilSymbol, NIL, 0)
+#endif
+
 extern	NodeP NewIntNode (int value);
 extern	ImpRules NewRule (unsigned line_number, TypeAlts typeAlternative, NodeP rule_root, ScopeP scope);
 
@@ -101,6 +110,14 @@ extern SymbolP	BasicTypeSymbols [],
 				TrueSymbol, FalseSymbol, TupleSymbol, ListSymbol, ConsSymbol, NilSymbol,
 				ApplySymbol, ApplyTypeSymbol, SelectSymbols[],
 				FailSymbol, IfSymbol, AllSymbol, EmptyTypeSymbol;
+#if STRICT_LISTS
+extern SymbolP
+	StrictListSymbol, StrictConsSymbol, StrictNilSymbol,
+	UnboxedListSymbol, UnboxedConsSymbol, UnboxedNilSymbol,
+	TailStrictListSymbol, TailStrictConsSymbol, TailStrictNilSymbol,
+	StrictTailStrictListSymbol, StrictTailStrictConsSymbol, StrictTailStrictNilSymbol,
+	UnboxedTailStrictListSymbol, UnboxedTailStrictConsSymbol, UnboxedTailStrictNilSymbol;
+#endif
 
 extern	SymbolP	TupleTypeSymbols [];
 IdentP UseArrayFunctionId (ArrayFunKind kind);

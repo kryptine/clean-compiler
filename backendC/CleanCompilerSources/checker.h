@@ -7,6 +7,9 @@
 
 extern Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId, IfId, FailId, DeltaBId,
 			 AndId, OrId, StdArrayId, ArrayFunctionIds [], ArrayId, StrictArrayId, UnboxedArrayId, ArrayClassId;
+#if STRICT_LISTS
+extern Ident StrictListId,UnboxedListId,TailStrictListId,StrictTailStrictListId,UnboxedTailStrictListId;
+#endif
 #ifdef CLEAN2
 extern Ident DynamicId;
 #endif

@@ -3,6 +3,8 @@
 	Author:	John van Groningen
 */
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
@@ -1549,7 +1551,11 @@ static void optimise_normal_node (Node node)
 #else
 		if ((BETWEEN (int_denot,real_denot,symbol->symb_kind)
 			 || symbol->symb_kind==string_denot
+# if STRICT_LISTS
+			 || (BETWEEN (tuple_symb,nil_symb,symbol->symb_kind) && !(symbol->symb_kind==cons_symb && (symbol->symb_head_strictness || symbol->symb_tail_strictness)))
+# else
 			 || BETWEEN (tuple_symb,nil_symb,symbol->symb_kind)
+# endif
 			) && node->node_state.state_kind==OnA){
 #endif
 			node->node_state.state_kind=StrictOnA;
@@ -1903,6 +1909,10 @@ static Bool try_insert_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f
 				break;
 			}
 			case cons_symb:
+#if STRICT_LISTS
+				if ((node->node_symbol->symb_head_strictness || node->node_symbol->symb_tail_strictness) && IsLazyStateKind (node->node_state.state_kind))
+					return False;
+#endif
 				return insert_unique_fill_node (node,f_node_ids,2,0);
 			case tuple_symb:
 				return insert_unique_fill_node (node,f_node_ids,node->node_arity,0);
@@ -3394,7 +3404,7 @@ static ImpRuleS **OptimiseRule (ImpRuleS *rule)
 			new_rules=new_rule->rule_next;
 			
 			alt=new_rule->rule_alts;
-			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
 			ReorderNodeDefinitionsAndDetermineUsedEntries (&alt->alt_rhs_defs,alt->alt_rhs_root);
 			
 			new_rule->rule_next=rule->rule_next;

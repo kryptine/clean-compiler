@@ -16,6 +16,9 @@ extern char channel_code [],ext_nf_reducer_code[],nf_reducer_code[],hnf_reducer_
 extern LabDef
 	cycle_lab, reserve_lab, type_error_lab, indirection_lab, ind_lab,
 	hnf_lab, cons_lab, nil_lab, tuple_lab, empty_lab, add_arg_lab, match_error_lab,
+#if STRICT_LISTS
+	conss_lab,consts_lab,conssts_lab,
+#endif
 #ifdef CLEAN2
 	select_with_dictionary_lab, update_with_dictionary_lab,
 #endif

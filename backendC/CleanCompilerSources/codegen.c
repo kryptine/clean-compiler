@@ -4,6 +4,8 @@
 #define SHARE_UPDATE_CODE 0 /* also in codegen1.c */
 #define SELECTORS_FIRST 1 /* also in codegen2.c */
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
@@ -26,7 +28,6 @@
 # if TAIL_CALL_MODULO_TUPLE_CONS_OPTIMIZATION
 #include "tuple_tail_recursion.h"
 # endif
-#include "dbprint.h"
 
 static char *ECodeBlock	= "incorrect number of output parameters";
 

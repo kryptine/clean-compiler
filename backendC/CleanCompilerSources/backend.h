@@ -200,6 +200,14 @@ Clean (BEBoolSymbol :: Bool BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BELiteralSymbol (BESymbKind kind, CleanString value);
 Clean (BELiteralSymbol :: BESymbKind String BackEnd -> (BESymbolP, BackEnd))
 
+/*
+void BEPredefineListConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
+Clean (BEPredefineListConstructorSymbol :: Int Int Int BESymbKind Int Int BackEnd -> BackEnd)
+
+void BEPredefineListTypeSymbol (int typeIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
+Clean (BEPredefineListTypeSymbol :: Int Int BESymbKind Int Int BackEnd -> BackEnd)
+*/
+
 void BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind);
 Clean (BEPredefineConstructorSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
 

@@ -1,16 +1,14 @@
 /*
-
 Version 1.0 26/08/1994
-
 Author: Sjaak Smetsers 
-
 */
 
 #define STATES_GENERATED
 #define STORE_UNIQUE_ATTRIBUTES_IN_TYPE_NODES
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
-
 #include "settings.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
@@ -479,7 +477,17 @@ static void PrintNode (TypeNode node, Bool brackets, Bool strict_context, Bool p
 	}
 	case list_type:
 		FPutC ('[', StdListTypes);
+#if STRICT_LISTS
+		if (node->type_node_symbol->symb_head_strictness==1)
+			FPutC ('!', StdListTypes);			
+		else if (node->type_node_symbol->symb_head_strictness==2)
+			FPutC ('#', StdListTypes);
+#endif
 		PrintArguments (node -> type_node_arguments, ',', cDontPrintBrackets, cNotInAStrictContext, NULL);
+#if STRICT_LISTS
+		if (node->type_node_symbol->symb_tail_strictness)
+			FPutC ('!', StdListTypes);			
+#endif
 		FPutC (']', StdListTypes);
 		break;
 	case array_type:

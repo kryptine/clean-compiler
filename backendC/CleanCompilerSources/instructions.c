@@ -6,6 +6,7 @@
 #pragma segment instructions
 
 #include "compiledefines.h"
+#include "comsupport.h"
 #include "system.h"
 
 #include <ctype.h>
@@ -18,7 +19,6 @@
 #include "codegen_types.h"
 #include "codegen1.h"
 #include "codegen2.h"
-#include "comsupport.h"
 #include "instructions.h"
 #include "statesgen.h"
 #include "version.h"
@@ -3254,15 +3254,23 @@ void GenSystemImports (void)
 		GenImpLab_node_entry (indirection_lab.lab_name,"_eaind");
 		GenImpDesc ("e_system_dif");
 		GenImpLab_node_entry ("e_system_nif","e_system_eaif");
+		GenImpLab ("e_system_sif");
+
 		GenImpDesc ("e_system_dAP");
 		GenImpLab_node_entry ("e_system_nAP","e_system_eaAP");
-
-		GenImpLab ("e_system_sif");
 		GenImpLab ("e_system_sAP");
-		GenImpDesc (cons_lab.lab_name);
+		
 		GenImpDesc (nil_lab.lab_name);
+		GenImpDesc (cons_lab.lab_name);
+#if STRICT_LISTS
+		GenImpDesc (conss_lab.lab_name);
+		GenImpLab_node_entry ("n_Conss","ea_Conss");
+		GenImpDesc (consts_lab.lab_name);
+		GenImpLab_node_entry ("n_Consts","ea_Consts");
+		GenImpDesc (conssts_lab.lab_name);
+		GenImpLab_node_entry ("n_Conssts","ea_Conssts");
+#endif
 		GenImpDesc (tuple_lab.lab_name);
-
 		for (selnum=1; selnum<=NrOfGlobalSelectors; ++selnum){
 			put_directive_b (impdesc);
 			FPrintF (OutFile,D_PREFIX "%s.%d",glob_sel,selnum);
@@ -3284,11 +3292,6 @@ void GenSystemImports (void)
 void GenParameters (Bool input, Parameters params, int asp, int bsp)
 {
 	int is_first_parameter;
-
-/* RWS ... ??? */	
-	if (params==NULL)
-		return;
-/* ... RWS */	
 
 	if (input)
 		put_instruction_ (Iin);

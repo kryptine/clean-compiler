@@ -2,7 +2,7 @@
 #if !defined (_THE__TYPES_)
 #define _THE__TYPES_
 
-#define _WINDOWS_
+#undef _WINDOWS_
 
 #if (defined (__MWERKS__) && !defined (_WINDOWS_)) || defined (__MRC__)
 # define POWER 1
@@ -62,21 +62,25 @@ typedef struct
 				opt_liststricttypes:1;
 } CompilerOptions;
 
-
-#endif
-
 #ifdef _WINDOWS_
-#include <stdarg.h>
-#define FileTime FILETIME
-#ifdef __MWERKS__
+# include <stdarg.h>
+# define FileTime FILETIME
+# ifdef __MWERKS__
 #	include <x86_prefix.h>
-#else
+# else
 #	define _X86_
-#endif
-#include <windef.h>
-#include <winbase.h>
+# endif
+# include <windef.h>
+# include <winbase.h>
 #else
+# ifdef KARBON
+#include <UTCUtils.h>
+typedef UTCDateTime FileTime;
+# else
 typedef unsigned long FileTime;
+# endif
 #endif
 
 #define NoFile			((FileTime) 0)
+
+#endif

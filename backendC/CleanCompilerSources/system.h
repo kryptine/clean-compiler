@@ -6,7 +6,7 @@
 */
 
 #define _SYSTEM_
-#define _WINDOWS_
+#undef _WINDOWS_
 
 #if defined (applec) || (defined (__MWERKS__) && !defined (_WINDOWS_)) || defined (__MRC__)
 #	define _MAC_

@@ -1,18 +1,30 @@
 
+#if 0
+#define KARBON
+#define TARGET_API_MAC_CARBON 1
+#endif
+
 #include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
+#include <Files.h>
 #include "path_cache.h"
 
 struct path_cache_list {
 	char *						pcache_path;
+#ifdef KARBON
+	struct vd_id				pcache_vd_id;
+	struct vd_id				pcache_clean_system_files_vd_id;
+#else
 	short 						pcache_wd_ref_num;
 	short						pcache_clean_system_files_wd_ref_num;
-	FileTime				pcache_dcl_time;
+#endif
+	FileTime					pcache_dcl_time;
 	struct path_cache_list *	pcache_next;
 	struct file_block *			pcache_file_blocks;
 #if defined (__MWERKS__) || defined (__MRC__)
@@ -49,8 +61,13 @@ static int simple_hash (char *name)
 	return sum & 31;
 }
 
-void cache_dcl_path (char *file_name,short wd_ref_num,short clean_system_files_wd_ref_num,
-	unsigned long file_time,char *path)
+void cache_dcl_path (char *file_name,
+#ifdef KARBON
+	struct vd_id vd_id,struct vd_id clean_system_files_vd_id,
+#else
+	short wd_ref_num,short clean_system_files_wd_ref_num,
+#endif
+	FileTime file_time,char *path)
 {
 	int hash_value,file_name_length;
 	struct path_cache_list **pcache_elem_p,*new_pcache_elem;
@@ -71,8 +88,13 @@ void cache_dcl_path (char *file_name,short wd_ref_num,short clean_system_files_w
 	if (new_pcache_elem!=NULL){
 		strcpy (new_pcache_elem->pcache_file_name,file_name);
 		new_pcache_elem->pcache_path=path;
+#ifdef KARBON
+		new_pcache_elem->pcache_vd_id=vd_id;
+		new_pcache_elem->pcache_clean_system_files_vd_id=clean_system_files_vd_id;
+#else
 		new_pcache_elem->pcache_wd_ref_num=wd_ref_num;
 		new_pcache_elem->pcache_clean_system_files_wd_ref_num=clean_system_files_wd_ref_num;
+#endif
 		new_pcache_elem->pcache_dcl_time=file_time;
 		new_pcache_elem->pcache_next=NULL;
 		new_pcache_elem->pcache_file_blocks=NULL;
@@ -95,8 +117,15 @@ int search_dcl_path_in_cache (char *file_name,struct search_dcl_path_in_cache_re
 			struct path_cache_list *pcache_elem;
 			
 			pcache_elem=*pcache_elem_p;
+#ifdef KARBON
+/*
+			r->fs_spec=pcache_elem->pcache_vd_id;
+			r->clean_system_files_fs_spec=pcache_elem->pcache_clean_system_files_fs_spec;
+*/
+#else
 			r->wd_ref_num=pcache_elem->pcache_wd_ref_num;
 			r->clean_system_files_wd_ref_num=pcache_elem->pcache_clean_system_files_wd_ref_num;
+#endif
 			r->file_time=pcache_elem->pcache_dcl_time;
 			r->path=pcache_elem->pcache_path;
 

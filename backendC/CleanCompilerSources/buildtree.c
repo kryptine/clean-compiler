@@ -1,3 +1,5 @@
+
+# include "compiledefines.h"
 # include "types.t"
 # include "syntaxtr.t"
 # include "comsupport.h"
@@ -14,6 +16,15 @@ SymbolP	BasicTypeSymbols [Nr_Of_Basic_Types],
 		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol, FailSymbol, AllSymbol,
 		EmptyTypeSymbol,
 		TupleTypeSymbols [MaxNodeArity];
+
+#if STRICT_LISTS
+SymbolP
+	StrictListSymbol, StrictConsSymbol, StrictNilSymbol,
+	UnboxedListSymbol, UnboxedConsSymbol, UnboxedNilSymbol,
+	TailStrictListSymbol, TailStrictConsSymbol, TailStrictNilSymbol,
+	StrictTailStrictListSymbol, StrictTailStrictConsSymbol, StrictTailStrictNilSymbol,
+	UnboxedTailStrictListSymbol, UnboxedTailStrictConsSymbol, UnboxedTailStrictNilSymbol;
+#endif
 
 char BasicTypeIds [] = BASIC_TYPE_IDS_STRING;
 

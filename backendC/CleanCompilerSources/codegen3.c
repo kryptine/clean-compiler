@@ -10,6 +10,8 @@
 #define for_li(v,i,l,n) for(v=(l),i=0;v!=NULL;v=v->n,++i)
 #define for_ll(v1,v2,l1,l2,n1,n2) for(v1=(l1),v2=(l2);v1!=NULL;v1=v1->n1,v2=v2->n2)
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 #include "syntaxtr.t"
 #include "comsupport.h"

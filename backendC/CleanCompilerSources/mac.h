@@ -66,5 +66,5 @@ extern int open_dcl_file_for_block_reading (char *fname,File *file_p);
 extern int read_next_block_from_dcl_file (char *buffer);
 
 #if WRITE_DCL_MODIFICATION_TIME
-extern int open_dcl_file_for_block_reading_with_file_time (char *file_name,File *file_p,unsigned long *file_time_p);
+extern int open_dcl_file_for_block_reading_with_file_time (char *file_name,File *file_p,FileTime *file_time_p);
 #endif

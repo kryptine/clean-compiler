@@ -1,3 +1,6 @@
+
+# include "compiledefines.h"
+# include "types.t"
 # include "system.h"
 # include "comsupport.h"
 # include "backendsupport.h"
@@ -30,6 +33,36 @@ AssertionFailed (char *conditionString, char *file, int line)
 			Debugger ();
 	}
 #else
+# ifdef _MAC_
+	{
+		FILE *f;
+	
+		f=fopen ("AssertionFailedError","w");
+		if (f!=NULL){
+			FPrintF (f, "Error in backend: File %s, Line %d (%s)\n", file, line, conditionString);
+			fclose (f);
+		}
+	}
+# endif
 	Debugger ();
 #endif
 } /* AssertionFailed */
+
+void
+fatal_backend_error (char *s)
+{
+	FPrintF (StdError, "Error in backend: %s\n", s);
+
+#ifdef _MAC_
+	{
+		FILE *f;
+	
+		f=fopen ("AssertionFailedError","w");
+		if (f!=NULL){
+			FPrintF (f, "Error in backend: %s\n", s);
+			fclose (f);
+		}
+	}
+#endif	
+	Debugger ();
+}

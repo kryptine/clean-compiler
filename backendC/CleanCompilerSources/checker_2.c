@@ -12,6 +12,7 @@
 #define MOVE_CURRIED_APPLICATIONS
 #define MOVE_FUNCTIONS_IN_LAMBDAS
 
+#include "compiledefines.h"
 #include "types.t"
 #include "system.h"
 #include "syntaxtr.t"

@@ -77,22 +77,6 @@ typedef enum {
 	erroneous_symb
 } SymbKind;
 
-#ifdef THINK_C
-#define DSymbKind(v) ( \
-	v==definition?"definition": \
-	v==int_denot?"int_denot": \
-	v==tuple_symb?"tuple_symb": \
-	v==cons_symb?"cons_symb": \
-	v==nil_symb?"nil_symb": \
-	v==select_symb?"select_symb": \
-	v==apply_symb?"apply_symb": \
-	v==if_symb?"if_symb": \
-	v==newsymbol?"newsymbol": \
-	v==emptysymbol?"emptysymbol": \
-	v==field_symbol_list?"field_symbol_list": \
-	"")
-#endif
-
 #if D
 
 STRUCT (state,State){
@@ -183,6 +167,11 @@ STRUCT (symbol,Symbol) {
 	unsigned			symb_infix_priority:4;
 	unsigned			symb_infix_assoc:2;	/* Assoc */
 };
+
+#if STRICT_LISTS
+# define symb_head_strictness symb_infix_priority /* 0=lazy,1=strict,2=unboxed */
+# define symb_tail_strictness symb_infix_assoc /* 0=lazy,1=strict */
+#endif
 
 #define symb_ident symb_val.val_ident
 #define symb_def symb_val.val_def
@@ -604,20 +593,6 @@ typedef enum {
 	OverloadedNode, RecursionNode, UpdateNodeInTC,												/* nodes in typechecker */
 	SwitchNode, CaseNode, DefaultNode, PushNode, GuardNode, TupleSelectorsNode, FillUniqueNode	/* nodes in codegen */
 } NodeKind;
-
-#ifdef THINK_C
-#define DNodeKind(v) ( \
-	v==IfNode?"IfNode": \
-	v==NormalNode?"NormalNode": \
-	v==SelectorNode?"SelectorNode": \
-	v==NodeIdNode?"NodeIdNode": \
-	v==RecordNode?"RecordNode": \
-	v==UpdateNode?"UpdateNode": \
-	v==IdentNode?"IdentNode": \
-	v==ApplyNode?"ApplyNode": \
-	v==PrefixNode?"PrefixNode" \
-	:"")
-#endif
 
 #define SELECTOR_U 2
 #define SELECTOR_F 3

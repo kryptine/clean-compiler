@@ -31,6 +31,8 @@
 #define SHOW_STRICT_EXPORTED_TUPLE_ELEMENTS
 #define MORE_ANNOTS 1
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 #include "settings.h"
 #include "sizes.h"
@@ -112,6 +114,13 @@ static Fun
 	* fail_sym,					/* the fail id							*/
 	* inffunct_sym,				/* the E2 id							*/
 	* botmemfunct_sym;			/* the E3 id							*/
+
+#if STRICT_LISTS
+# ifndef _DB_
+static
+# endif
+Fun *strict_cons_sym,*tail_strict_cons_sym,*strict_tail_strict_cons_sym;
+#endif
 
 static ExpRepr top;
 static ExpRepr bottom;
@@ -2183,6 +2192,15 @@ static Exp ConvertNode (Node node, NodeId nid)
 					e->e_hnf = True;
 					break;
 				case cons_symb:
+#if STRICT_LISTS
+					if (node->node_symbol->symb_head_strictness){
+						e->e_fun = node->node_symbol->symb_tail_strictness ? strict_tail_strict_cons_sym : strict_cons_sym;
+						break;
+					} else if (node->node_symbol->symb_tail_strictness){
+						e->e_fun = tail_strict_cons_sym;
+						break;					
+					}
+#endif
 					e->e_hnf = True;
 					e->e_fun = conssym;
 					break;
@@ -2377,8 +2395,8 @@ static Exp ConvertNode (Node node, NodeId nid)
 				newrecordexp->e_args[i] = NULL;
 
 			/* now fill in the updates of the new record */
-			for (arg = node->node_arguments->arg_next; arg; arg = arg->arg_next)
-			{	field_nr = arg->arg_node->node_symbol->symb_def->sdef_sel_field_number;
+			for_l (arg,node->node_arguments->arg_next,arg_next){
+				field_nr = arg->arg_node->node_symbol->symb_def->sdef_sel_field_number;
 				newrecordexp->e_args[field_nr] = ConvertNode (arg->arg_node->node_arguments->arg_node, Null);
 			}
 			
@@ -2484,6 +2502,15 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 			e->e_hnf = True;
 			break;
 		case cons_symb:
+#if STRICT_LISTS
+			if (symbol_p->symb_head_strictness){
+				e->e_fun = symbol_p->symb_tail_strictness ? strict_tail_strict_cons_sym : strict_cons_sym;
+				break;
+			} else if (symbol_p->symb_tail_strictness){
+				e->e_fun = tail_strict_cons_sym;
+				break;					
+			}
+#endif
 			e->e_hnf = True;
 			e->e_fun = conssym;
 			break;
@@ -3081,6 +3108,39 @@ static void init_predefined_symbols (void)
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
+
+#if STRICT_LISTS
+	strict_cons_sym = f;
+	f->fun_symbol = NULL;
+	f->fun_arity = 2;
+	f->fun_kind = Constructor;
+	f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
+	f->fun_single = False;
+	InitStrictInfo (f->fun_strictargs,HnfStrict);
+	InitStrictResult (&f->fun_strictresult);
+	++f;
+
+	tail_strict_cons_sym = f;
+	f->fun_symbol = NULL;
+	f->fun_arity = 2;
+	f->fun_kind = Constructor;
+	f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
+	f->fun_single = False;
+	InitStrictInfo (&f->fun_strictargs[1],HnfStrict);
+	InitStrictResult (&f->fun_strictresult);
+	++f;
+
+	strict_tail_strict_cons_sym = f;
+	f->fun_symbol = NULL;
+	f->fun_arity = 2;
+	f->fun_kind = Constructor;
+	f->fun_strictargs = InitNewStrictInfos (2,NotStrict);;
+	f->fun_single = False;
+	InitStrictInfo (f->fun_strictargs,HnfStrict);
+	InitStrictInfo (&f->fun_strictargs[1],HnfStrict);
+	InitStrictResult (&f->fun_strictresult);
+	++f;
+#endif
 
 	if_sym = f;
 	f->fun_symbol     = Null;

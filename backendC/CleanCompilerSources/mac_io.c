@@ -1,4 +1,10 @@
 
+#include "compiledefines.h"
+
+#ifdef KARBON
+# define TARGET_API_MAC_CARBON 1
+#endif
+
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
 #if defined (applec) || defined (__MWERKS__) || defined (__MRC__)
@@ -18,6 +24,7 @@
 
 #include "compiledefines.h"
 #ifndef _SYSTEM_
+#	include "types.t"
 #	include "system.h"
 #endif
 
@@ -61,35 +68,96 @@ static unsigned char *copy_c_to_p_string (char *c_string,char *p_string)
 	return (unsigned char*) p_string;
 }
 
-static FileTime FindFileTime (char *fname,int wd_ref_num)
-{
-	int err;
-	FileParam fpb;
-	char p_string [256];
+#ifdef KARBON
+	static int FindFileUTCDateTime0 (char *fname,UTCDateTime *file_time_p)
+	{
+		int err;
+		FSCatalogInfo catalog_info;
+		FSRef fs_ref;
+		FSSpec fs_spec;
 
-	fpb.ioNamePtr=copy_c_to_p_string (fname,p_string);
-	fpb.ioFDirIndex=0;
-	fpb.ioFVersNum=0;
-	fpb.ioVRefNum=wd_ref_num;
+		copy_c_to_p_string (fname,(char*)&fs_spec.name);
+		fs_spec.parID=0;
+		fs_spec.vRefNum=0;
 
-#ifdef mpwc
-	err = PBGetFInfoSync ((ParmBlkPtr)&fpb);
+		err = FSpMakeFSRef (&fs_spec,&fs_ref);
+		if (err)
+			return 0;
+
+		err = FSGetCatalogInfo (&fs_ref,kFSCatInfoContentMod,&catalog_info,NULL,NULL,NULL);
+		if (err)
+			return 0;
+		else {
+			*file_time_p=catalog_info.contentModDate;
+
+			return 1;	
+		}
+	}
+
+	static int FindFileUTCDateTime (char *fname,struct vd_id vd_id,UTCDateTime *file_time_p)
+	{
+		int err;
+		FSCatalogInfo catalog_info;
+		FSRef fs_ref;
+		FSSpec fs_spec;
+
+		copy_c_to_p_string (fname,(char*)&fs_spec.name);
+		fs_spec.parID=vd_id.directory_id;
+		fs_spec.vRefNum=vd_id.volume_id;
+
+		err = FSpMakeFSRef (&fs_spec,&fs_ref);
+		if (err)
+			return 0;
+
+		err = FSGetCatalogInfo (&fs_ref,kFSCatInfoContentMod,&catalog_info,NULL,NULL,NULL);
+		if (err!=0)
+			return 0;
+		else {
+			*file_time_p=catalog_info.contentModDate;
+
+			return 1;	
+		}
+	}
 #else
-	err = PBGetFInfo (&fpb, 0);
+	static FileTime FindFileTime (char *fname,int wd_ref_num)
+	{
+		int err;
+		FileParam fpb;
+		char p_string [256];
+
+		fpb.ioNamePtr=copy_c_to_p_string (fname,p_string);
+		fpb.ioFDirIndex=0;
+		fpb.ioFVersNum=0;
+		fpb.ioVRefNum=wd_ref_num;
+
+#ifdef KARBON
+		err = PBHGetFInfo ((HParmBlkPtr)&fpb,0);
+#else
+# ifdef mpwc
+		err = PBGetFInfoSync ((ParmBlkPtr)&fpb);
+# else
+		err = PBGetFInfo (&fpb, 0);
+# endif
 #endif
 
-	if (err)
-		return NoFile;
-	else
-		return fpb.ioFlMdDat;
-}
+		if (err)
+			return NoFile;
+		else
+			return fpb.ioFlMdDat;
+	}
+#endif
 
 char *PATHLIST;
 
 #ifdef mpwc
 struct path_list {
+# ifdef KARBON
+	struct vd_id		path_vd_id;
+	struct vd_id		path_clean_system_files_vd_id;
+# else
 	short				path_wd_ref_num;
 	short				path_clean_system_files_wd_ref_num;
+# endif
 	struct path_list *	path_next;
 #if defined (__MWERKS__) || defined (__MRC__)
 	char				path_name[];
@@ -102,12 +170,18 @@ static struct path_list *path_list=NULL;
 
 static void add_directory_to_path_list (char *path_name,struct path_list **old_path_list_h)
 {
-	short wd_ref_num,clean_system_files_wd_ref_num;
 	struct path_list *new_path,**last_path_p;
 	int path_name_length;
 	char p_string [256];
+#ifdef KARBON
+	struct vd_id vd_id,clean_system_files_vd_id;
+	FSSpec fs_spec;
+	FSRef fs_ref;
+#else
+	short wd_ref_num,clean_system_files_wd_ref_num;
 	CInfoPBRec fpb;
 	WDPBRec wd_pb;
+#endif
 	int err,root_path;
 
 	root_path=0;
@@ -125,6 +199,24 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 		}
 	}
 
+#ifdef KARBON
+	vd_id.volume_id=0;
+	vd_id.directory_id=0;
+	err = FSMakeFSSpec (0,0,path_name ? copy_c_to_p_string (path_name,p_string) : (unsigned char*)"\001:",&fs_spec);
+	if (err==0){
+		err = FSpMakeFSRef (&fs_spec,&fs_ref);
+		if (err==0){
+			FSCatalogInfo catalog_info;
+			
+			err = FSGetCatalogInfo (&fs_ref,kFSCatInfoVolume|kFSCatInfoNodeID,&catalog_info,NULL,NULL,NULL);
+			
+			if (err==0){
+				vd_id.volume_id=catalog_info.volume;
+				vd_id.directory_id=catalog_info.nodeID;
+			}
+		}
+	}
+#else
 	if (path_name)
 		fpb.hFileInfo.ioNamePtr=copy_c_to_p_string (path_name,p_string);
 	else
@@ -135,6 +227,7 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 	fpb.hFileInfo.ioDirID=0;
 
 	err = PBGetCatInfoSync (&fpb);
+#endif
 
 	if (err!=0){
 #ifdef FOLDER_DOES_NOT_EXIST_ERRORS
@@ -148,6 +241,7 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 		return;
 	}
 
+#ifndef KARBON
 	wd_pb.ioNamePtr=fpb.hFileInfo.ioNamePtr;
 	wd_pb.ioWDProcID='ClCo';
 
@@ -169,6 +263,7 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 	}
 
 	wd_ref_num=wd_pb.ioVRefNum;
+#endif
 
 #ifndef NO_CLEAN_SYSTEM_FILES_FOLDERS
 	if (path_name){
@@ -178,7 +273,38 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 			strcat (path_name,":Clean System Files");
 	} else
 		path_name="Clean System Files";
+
+# ifdef KARBON
+	clean_system_files_vd_id.volume_id=0;
+	clean_system_files_vd_id.directory_id=0;
+	err = FSMakeFSSpec (0,0,copy_c_to_p_string (path_name,p_string),&fs_spec);
+
+	if (err==fnfErr){
+		long dir_id;
+		
+		err=FSpDirCreate (&fs_spec,smSystemScript,&dir_id);
+	}
+
+	if (err==0){
+		err = FSpMakeFSRef (&fs_spec,&fs_ref);
+		if (err==0){
+			FSCatalogInfo catalog_info;
+			
+			err = FSGetCatalogInfo (&fs_ref,kFSCatInfoVolume|kFSCatInfoNodeID,&catalog_info,NULL,NULL,NULL);
+			
+			if (err==0){
+				clean_system_files_vd_id.volume_id=catalog_info.volume;
+				clean_system_files_vd_id.directory_id=catalog_info.nodeID;
+			}
+		}
+	}
 	
+	if (err!=0){
+		fprintf (stderr,"cannot create folder '%s'\n",path_name);
+
+		return;	
+	}
+# else
 	fpb.hFileInfo.ioNamePtr=copy_c_to_p_string (path_name,p_string);
 	fpb.hFileInfo.ioVRefNum =0;
 	fpb.hFileInfo.ioFDirIndex=0;
@@ -213,6 +339,7 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 	}
 
 	clean_system_files_wd_ref_num=wd_pb.ioVRefNum;
+# endif
 
 	path_name_length=strlen (path_name)-strlen (":Clean System Files");
 	if (path_name_length<0)
@@ -236,8 +363,16 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 		struct path_list *old_path_list_p;
 
 		for (; (old_path_list_p=*old_path_list_h)!=NULL; old_path_list_h=&old_path_list_p->path_next){
-			if (old_path_list_p->path_wd_ref_num==wd_ref_num &&
+			if (
+#ifdef KARBON
+				old_path_list_p->path_vd_id.volume_id==vd_id.volume_id &&
+				old_path_list_p->path_vd_id.directory_id==vd_id.directory_id &&
+				old_path_list_p->path_clean_system_files_vd_id.volume_id==clean_system_files_vd_id.volume_id &&
+				old_path_list_p->path_clean_system_files_vd_id.directory_id==clean_system_files_vd_id.directory_id &&
+#else
+				old_path_list_p->path_wd_ref_num==wd_ref_num &&
 				old_path_list_p->path_clean_system_files_wd_ref_num==clean_system_files_wd_ref_num &&
+#endif
 				!strcmp (old_path_list_p->path_name,path_name))
 			{
 				*old_path_list_h=old_path_list_p->path_next;
@@ -250,8 +385,13 @@ static void add_directory_to_path_list (char *path_name,struct path_list **old_p
 	}
 	
 	new_path=(struct path_list*)Alloc (1,sizeof (struct path_list)+1+path_name_length);
+#ifdef KARBON
+	new_path->path_vd_id=vd_id;
+	new_path->path_clean_system_files_vd_id=clean_system_files_vd_id;
+#else
 	new_path->path_wd_ref_num=wd_ref_num;
 	new_path->path_clean_system_files_wd_ref_num=clean_system_files_wd_ref_num;
+#endif
 	strcpy (new_path->path_name,path_name);
 	new_path->path_next=NULL;
 
@@ -387,14 +527,20 @@ extern char *clean_abc_path; /* imported from clm.c */
 #endif
 
 			for_l (path_elem,path_list,path_next){
-				short wd_ref_num;
+#ifdef KARBON
+				UTCDateTime file_time;
+
+				if (FindFileUTCDateTime (path,path_elem->path_vd_id,&file_time)){
+#else
 				unsigned long file_time;
+				short wd_ref_num;
 
 				wd_ref_num=path_elem->path_wd_ref_num;
 	
 				file_time=FindFileTime (path,wd_ref_num);
 
 				if (file_time!=NoFile){
+#endif
 					strcpy (path,path_elem->path_name);
 
 #ifndef NO_CLEAN_SYSTEM_FILES_FOLDERS
@@ -411,8 +557,13 @@ extern char *clean_abc_path; /* imported from clm.c */
 
 #if USE_PATH_CACHE
 					if (kind==dclFile)
-						cache_dcl_path (file_name,path_elem->path_wd_ref_num,
-							path_elem->path_clean_system_files_wd_ref_num,file_time,path_elem->path_name);
+						cache_dcl_path (file_name,
+# ifdef KARBON
+							path_elem->path_vd_id,path_elem->path_clean_system_files_vd_id,
+# else
+							path_elem->path_wd_ref_num,path_elem->path_clean_system_files_wd_ref_num,
+# endif
+							file_time,path_elem->path_name);
 #endif				
 					*file_time_p=file_time;
 							
@@ -424,6 +575,9 @@ extern char *clean_abc_path; /* imported from clm.c */
 		strcpy (path,file_name);	
 		strcat (path,file_extension);
 
+#ifdef KARBON
+		return FindFileUTCDateTime0 (path,file_time_p);
+#else
 		{	
 			unsigned long file_time;
 	
@@ -434,7 +588,8 @@ extern char *clean_abc_path; /* imported from clm.c */
 				*file_time_p=file_time;
 				return True;
 			}
-		}	
+		}
+#endif
 	}
 #endif
 
@@ -503,19 +658,33 @@ extern char *clean_abc_path; /* imported from clm.c */
 #else
 			for_l (path_elem,path_list,path_next){
 #endif
+#ifdef KARBON
+				struct vd_id vd_id;
+				FileTime file_time;
+
+# ifndef NO_CLEAN_SYSTEM_FILES_FOLDERS
+				if (in_clean_system_files_folder)
+					vd_id=path_elem->path_clean_system_files_vd_id;
+				else
+# endif
+					vd_id=path_elem->path_vd_id;
+	
+				if (FindFileUTCDateTime (path,vd_id,&file_time)){
+#else
 				short wd_ref_num;
 				unsigned long file_time;
 
-#ifndef NO_CLEAN_SYSTEM_FILES_FOLDERS
+# ifndef NO_CLEAN_SYSTEM_FILES_FOLDERS
 				if (in_clean_system_files_folder)
 					wd_ref_num=path_elem->path_clean_system_files_wd_ref_num;
 				else
-#endif
+# endif
 					wd_ref_num=path_elem->path_wd_ref_num;
 	
 				file_time=FindFileTime (path,wd_ref_num);
 
 				if (file_time!=NoFile){
+#endif
 					strcpy (path,path_elem->path_name);
 
 #ifndef NO_CLEAN_SYSTEM_FILES_FOLDERS
@@ -537,8 +706,13 @@ extern char *clean_abc_path; /* imported from clm.c */
 
 #if USE_PATH_CACHE
 					if (kind==dclFile && !in_clean_system_files_folder)
-						cache_dcl_path (file_name,path_elem->path_wd_ref_num,
-							path_elem->path_clean_system_files_wd_ref_num,file_time,path_elem->path_name);
+						cache_dcl_path (file_name,
+# ifdef KARBON
+							path_elem->path_vd_id,path_elem->path_clean_system_files_vd_id,
+# else
+							path_elem->path_wd_ref_num,path_elem->path_clean_system_files_wd_ref_num,
+# endif
+							file_time,path_elem->path_name);
 #endif						
 					return True;
 				}
@@ -559,7 +733,14 @@ extern char *clean_abc_path; /* imported from clm.c */
 	
 		strcat (path,file_extension);
 	
-		return FindFileTime (path,0);
+# ifdef KARBON
+		{
+			FileTime file_time;
+			return FindFileUTCDateTime0 (path,&file_time);
+		}
+# else
+		return FindFileTime (path,0)!=NoFile;
+# endif
 	}
 #else
 	static Bool findfilepath (char *wname, FileKind kind, char *path)
@@ -573,7 +754,11 @@ extern char *clean_abc_path; /* imported from clm.c */
 		strcpy (path,wname);
 		strcat (path,file_extension);
 	
+# ifdef KARBON
+		if (FindFileUTCDateTime0 (path) != NoFile)
+# else
 		if (FindFileTime (path,0) != NoFile)
+# endif
 			return True;
 		
 		pathelem = PATHLIST;
@@ -593,7 +778,11 @@ extern char *clean_abc_path; /* imported from clm.c */
 				strcat (path, wname);
 				strcat (path,file_extension);
 				
+#ifdef KARBON
+				if (FindFileUTCDateTime0 (path) != NoFile)
+#else
 				if (FindFileTime (path,0) != NoFile)
+#endif
 					return True;
 							
 				/* if all else fails, exit the loop */
@@ -885,7 +1074,8 @@ long FTell (File f)
 {
 	return ftell ((FILE *) f);
 } /* FTell */
-  
+
+#ifndef KARBON
 FileTime FGetFileTime (char *fname, FileKind kind)
 {
 	char path[MAXPATHLEN];
@@ -896,17 +1086,34 @@ FileTime FGetFileTime (char *fname, FileKind kind)
 /*	FPrintF (StdOut, "timing %s\n", fname); */
 
 	if (res)
+#ifdef KARBON
+		return FindFileUTCDateTime0 (path);
+#else
 		return FindFileTime (path,0);
+#endif
 	else
 		return NoFile;
-} /* FGetFileTime */
+}
+#endif
 
 #ifdef WRITE_DCL_MODIFICATION_TIME
 void FWriteFileTime (FileTime file_time,File f)
 {
 	DateTimeRec date_and_time;
+# ifdef KARBON
+	{
+		LocalDateTime local_date_and_time;
+		LongDateRec long_date_and_time;
+		SInt64 long_file_time;
 	
+		ConvertUTCToLocalDateTime (&file_time,&local_date_and_time);
+		long_file_time=((SInt64)local_date_and_time.highSeconds<<32) | local_date_and_time.lowSeconds;
+		LongSecondsToDate (&long_file_time,&long_date_and_time);
+		date_and_time=long_date_and_time.od.oldDate;
+	}
+# else
 	SecondsToDate (file_time,&date_and_time);
+# endif
 	
 	fprintf (f,"%04d%02d%02d%02d%02d%02d",
 				date_and_time.year,date_and_time.month,date_and_time.day,
@@ -928,7 +1135,7 @@ void DoError (char *fmt, ...)
 	(void) vfprintf (stderr, fmt, args);
 	
 	va_end (args);
-} /* DoError */
+}
 
 void DoFatalError (char *fmt, ...)
 {	va_list args;
@@ -940,8 +1147,7 @@ void DoFatalError (char *fmt, ...)
 	va_end (args);
 
 	exit (0);
-} /* DoFatalError */
-
+}
 
 void CmdError (char *errormsg,...)
 {	va_list args;
@@ -953,17 +1159,17 @@ void CmdError (char *errormsg,...)
 	fputc ('\n', stdout); 
 		
 	va_end (args);
-} /* CmdError */
+}
 
 extern long GetMainModuleVolume (void);
 long GetMainModuleVolume (void)
 {
 	return 0;
-} /* GetMainModuleVolume */
+}
 
 static void Nothing (void)
 {
-} /* Nothing */
+}
 
 static void (*interfunct) (void) = Nothing;
 
@@ -971,7 +1177,7 @@ void (*SetSignal (void (*f) (void))) (void)
 {	void (*oldf) () = interfunct;
 	interfunct = f;
 	return oldf;
-} /* SetSignal */
+}
 
 int CheckInterrupt ()
 {

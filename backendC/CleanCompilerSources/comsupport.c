@@ -14,6 +14,8 @@
 	Version:	1.0
 */
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 #include "sizes.h"
 #include "cmdline.h"
@@ -323,6 +325,17 @@ void FatalCompError (char *mod, char *proc, char *mess)
 		OpenedFile = (File) NIL;
 	}
 #ifdef CLEAN2
+# ifdef _MAC_
+	{
+		FILE *f;
+	
+		f=fopen ("FatalCompError","w");
+		if (f!=NULL){
+			FPrintF (f,"Fatal Error in %s:%s \"%s\"\n", mod, proc, mess);
+			fclose (f);
+		}
+	}
+# endif
 	exit (1);
 #else
 	longjmp (ExitEnv, 1);
@@ -669,6 +682,20 @@ void ErrorInCompiler (char *mod, char *proc, char *msg)
 		FPrintF (StdError,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);
 
 #ifdef CLEAN2
+# ifdef _MAC_
+	{
+		FILE *f;
+	
+		f=fopen ("ErrorInCompiler","w");
+		if (f!=NULL){
+			if (CurrentModule!=NULL)
+				FPrintF (f,"Error in compiler while compiling %s.icl: Module %s, Function %s, \"%s\"\n",CurrentModule,mod,proc,msg);
+			else
+				FPrintF (f,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);
+			fclose (f);
+		}
+	}
+# endif
 	exit (1);
 #endif
 }

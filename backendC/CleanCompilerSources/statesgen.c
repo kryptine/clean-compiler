@@ -11,8 +11,9 @@
 
 #pragma segment statesgen
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
-
 #include "settings.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
@@ -1510,13 +1511,13 @@ static Bool AdjustState (StateS *old_state_p, StateS newstate)
 		return False;
 }
 
-static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs t_or_e_defs, StateS demstate,int local_scope)
+static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs *t_or_e_defs, StateS demstate,int local_scope)
 {
 	Node node;
 	
 	node=t_or_e_args->arg_node;
 	
-	if (node->node_kind==NodeIdNode && t_or_e_defs==NULL){
+	if (node->node_kind==NodeIdNode && *t_or_e_defs==NULL){
 		NodeId node_id;
 		
 		node_id=node->node_node_id;
@@ -1693,11 +1694,16 @@ static Bool ArgsInAStrictContext (StateP arg_state_p,Args argn, int local_scope)
 			
 		selector_node=arg->arg_node;
 		selector_number=selector_node->node_symbol->symb_def->sdef_sel_field_number;
-			
+
+#if 1
+		type_arg_number=selector_number;
+#else
+		/* Codewarrior 6 optimizer bug */
 		while (type_arg_number!=selector_number){
 			++type_arg_number;
 		}
-		
+#endif
+
 		if (!IsLazyState (record_arg_states[type_arg_number])){
 			if (semi_strict
 				? ArgInAStrictContext (selector_node->node_arguments,StrictState,True,local_scope)
@@ -1727,6 +1733,14 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 		rootsymb = node->node_symbol;
 		switch (rootsymb->symb_kind){
 			case cons_symb:
+#if STRICT_LISTS
+				if (node->node_arity==2){
+					if (rootsymb->symb_head_strictness)
+						parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+					if (rootsymb->symb_tail_strictness)
+						parallel = DetermineStrictArgContext (node->node_arguments->arg_next,StrictState,local_scope);
+				}
+#endif
 				if (ShouldDecrRefCount)
 					DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
 			case nil_symb:
@@ -2244,10 +2258,10 @@ static void DetermineStatesIfRootNode (Node node, StateS demstate,int local_scop
 	AdjustState (&node->node_state, demstate);
 
 	++scope;
-	DetermineStateOfThenOrElse (condpart->arg_next,node->node_then_node_defs,demstate,new_local_scope);
+	DetermineStateOfThenOrElse (condpart->arg_next,&node->node_then_node_defs,demstate,new_local_scope);
 
 	++scope;
-	DetermineStateOfThenOrElse (condpart->arg_next->arg_next,node->node_else_node_defs,demstate,new_local_scope);
+	DetermineStateOfThenOrElse (condpart->arg_next->arg_next,&node->node_else_node_defs,demstate,new_local_scope);
 }
 
 static void DetermineStatesSwitchRootNode (Node root_node, StateS demstate, int local_scope)
@@ -2265,14 +2279,12 @@ static void DetermineStatesSwitchRootNode (Node root_node, StateS demstate, int 
 
 			case_alt_node_p=node->node_arguments->arg_node;
 /*	Codewarrior bug			if (case_alt_node_p->node_kind==PushNode){  */
-			if (node->node_arguments->arg_node->node_kind==PushNode){
-				DetermineStatesOfRootNodeAndDefs (case_alt_node_p->node_arguments->arg_next->arg_node,
-													node->node_node_defs, demstate, local_scope);
-			}
+			if (node->node_arguments->arg_node->node_kind==PushNode)
+				DetermineStatesOfRootNodeAndDefs (case_alt_node_p->node_arguments->arg_next->arg_node,&node->node_node_defs,demstate,local_scope);
 			else
-				DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node, node->node_node_defs, demstate, local_scope);
+				DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node,&node->node_node_defs,demstate,local_scope);
 		} else if (node->node_kind==DefaultNode){
-			DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node, node->node_node_defs, demstate, local_scope);
+			DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node,&node->node_node_defs,demstate,local_scope);
 		} else
 			error_in_function ("DetermineStatesSwitchRootNode");
 	}
@@ -2580,11 +2592,21 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 									StateP unique_state_p;
 									
 									unique_state_p=CompAllocType (StateS);
+#  if STRICT_LISTS
+									if (symbol->symb_head_strictness)
+										*unique_state_p=StrictState;
+									else
+#  endif
 									*unique_state_p=LazyState;
 									unique_state_p->state_mark |= STATE_UNIQUE_MASK;
 
 									node_id_p->nid_lhs_state_p_=unique_state_p;
 								} else
+#  if STRICT_LISTS
+									if (symbol->symb_head_strictness)
+										node_id_p->nid_lhs_state_p_=&StrictState;
+									else
+#  endif
 									node_id_p->nid_lhs_state_p_=&LazyState;
 																
 								node_ids=node_ids->nidl_next;
@@ -2596,7 +2618,11 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 									StateP unique_state_p;
 									
 									unique_state_p=CompAllocType (StateS);
-
+#  if STRICT_LISTS
+									if (symbol->symb_tail_strictness)
+										*unique_state_p=StrictState;
+									else
+#  endif
 									*unique_state_p=LazyState;
 									unique_state_p->state_mark |= STATE_UNIQUE_MASK;
 									if ((node_id_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) && (node_id_state_p->state_unq_type_args & 1)){
@@ -2627,6 +2653,19 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 									} else
 										node_id_p->nid_lhs_state_p_=&LazyState;
 								}
+							} else
+# endif
+# if STRICT_LISTS
+							if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness || symbol->symb_tail_strictness) && case_alt_node_p->node_arity==2){
+								NodeIdP node_id_p;
+							
+								node_id_p=node_ids->nidl_node_id;
+								node_id_p->nid_lhs_state_p_= symbol->symb_head_strictness ? &StrictState : &LazyState;
+								node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
+
+								node_id_p=node_ids->nidl_next->nidl_node_id;
+								node_id_p->nid_lhs_state_p_= symbol->symb_tail_strictness ? &StrictState : &LazyState;
+								node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
 							} else
 # endif
 							set_lazy_push_node_id_states (node_ids);
@@ -2666,10 +2705,10 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 }
 #endif
 
-void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs rootdef,StateS demstate,int local_scope)
+void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs *rootdef,StateS demstate,int local_scope)
 {
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-	DetermineStatesOfNodeAndDefs (root_node,rootdef,demstate,local_scope);
+	DetermineStatesOfNodeAndDefs (root_node,*rootdef,demstate,local_scope);
 #else
 	ShouldDecrRefCount = True;
 
@@ -2684,8 +2723,8 @@ void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs rootdef,StateS de
 	} else
 		DetermineStatesRootNode (root_node,NULL,demstate,local_scope);
 
-	if (rootdef)
-		DetermineStatesOfNodeDefs (rootdef,local_scope);
+	if (*rootdef)
+		DetermineStatesOfNodeDefs (*rootdef,local_scope);
 #endif
 }
 
@@ -2796,7 +2835,7 @@ void GenerateStatesForRule (ImpRuleS *rule)
 			scope=1;
 
 			if (alt->alt_kind==Contractum){
-				DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+				DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
 
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
 				set_states_of_array_selects_in_pattern (alt);

@@ -9,8 +9,9 @@
 #define FREE_STRICT_LHS_TUPLE_ELEMENTS 1 /* also in codegen2.c */
 #define BIND_UNBOXED_LHS_TUPLE_AND_RECORD_ARGUMENTS_IN_BIND_ARGUMENTS 1
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
-
 #include "settings.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
@@ -88,6 +89,11 @@ LabDef tuple_lab			= {NULL, "", False, "_Tuple", 0};
 LabDef empty_lab			= {NULL, "", False, "_", 0};
 LabDef add_arg_lab			= {NULL, "", False, "_add_arg", 0};
 LabDef match_error_lab		= {NULL, "", False, "_match_error", 0};
+#if STRICT_LISTS
+LabDef conss_lab			= {NULL, "", False, "_Conss", 0};
+LabDef consts_lab			= {NULL, "", False, "_Consts", 0};
+LabDef conssts_lab			= {NULL, "", False, "_Conssts", 0};
+#endif
 #ifdef CLEAN2
 LabDef select_with_dictionary_lab	= {NULL, "", False, "_select_with_dictionary", 0};
 LabDef update_with_dictionary_lab	= {NULL, "", False, "_update_with_dictionary", 0};

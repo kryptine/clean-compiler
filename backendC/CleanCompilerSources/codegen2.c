@@ -14,6 +14,8 @@
 #define FREE_STRICT_LHS_TUPLE_ELEMENTS 1 /* also in codegen1.c */
 #define SELECTORS_FIRST 1 /* also in codegen.c */
 
+#include "compiledefines.h"
+#include "types.t"
 #include "system.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
