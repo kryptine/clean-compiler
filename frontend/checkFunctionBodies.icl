@@ -426,25 +426,29 @@ where
 	check_sequential_lets :: [FreeVar] [NodeDefWithLocals] u:[[Ident]] !ExpressionInput *ExpressionState *ExpressionInfo *CheckState 
 						-> *(![.([LetBind],![LetBind])],!u:[[Ident]],!Int,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_sequential_lets free_vars [seq_let:seq_lets] let_vars_list e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
-		# ei_expr_level
-				= inc ei_expr_level
-		  e_input
-		  		= { e_input & ei_expr_level = ei_expr_level }
+		# ei_expr_level = inc ei_expr_level
+		  e_input = { e_input & ei_expr_level = ei_expr_level }
 		  (src_expr, pattern_expr, (let_vars, array_patterns), free_vars, e_state, e_info, cs)
 		  		= check_sequential_let free_vars seq_let e_input e_state e_info cs
 	      (binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	      		= check_sequential_lets free_vars seq_lets [let_vars : let_vars_list] e_input e_state e_info cs
-		  (let_binds, es_var_heap, es_expr_heap, e_info, cs)
-				= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr seq_let.ndwl_position
-						e_state.es_var_heap e_state.es_expr_heap e_info cs
-		  e_state
-		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
-		  (strict_array_pattern_binds, lazy_array_pattern_binds, free_vars, e_state, e_info, cs)
-				= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
-		  all_binds
-		  		= [if seq_let.ndwl_strict (s, l) ([],let_binds), (strict_array_pattern_binds, lazy_array_pattern_binds) : binds]
-		    with (l,s) = splitAt ((length let_binds)-1) let_binds
-	    = (all_binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
+	    | seq_let.ndwl_strict
+		    # (lazy_let_binds,strict_let_bind,es_var_heap, es_expr_heap, e_info, cs)
+					= transfromPatternIntoStrictBind ei_mod_index ei_expr_level pattern_expr src_expr seq_let.ndwl_position
+							e_state.es_var_heap e_state.es_expr_heap e_info cs
+			  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
+			  (strict_array_pattern_binds, lazy_array_pattern_binds, free_vars, e_state, e_info, cs)
+					= buildArraySelections e_input array_patterns free_vars e_state e_info cs
+			  all_binds = [ (strict_let_bind,lazy_let_binds), (strict_array_pattern_binds, lazy_array_pattern_binds) : binds]
+		    = (all_binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
+		    # (let_binds, es_var_heap, es_expr_heap, e_info, cs)
+					= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr seq_let.ndwl_position
+							e_state.es_var_heap e_state.es_expr_heap e_info cs
+			  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
+			  (strict_array_pattern_binds, lazy_array_pattern_binds, free_vars, e_state, e_info, cs)
+					= buildArraySelections e_input array_patterns free_vars e_state e_info cs
+			  all_binds = [([],let_binds), (strict_array_pattern_binds, lazy_array_pattern_binds) : binds]
+		    = (all_binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	check_sequential_lets free_vars [] let_vars_list e_input=:{ei_expr_level} e_state e_info cs
 		= ([], let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs)
 
