@@ -12,6 +12,18 @@
 static char *result_string;
 static int n_free_result_string_characters;
 
+static int string_begins_with (char *s1,char *s2)
+{
+	while (*s2!='\0'){
+		if (*s2!=*s1)
+			return 0;
+		++s2;
+		++s1;
+	}
+	
+	return 1;
+}
+
 static pascal OSErr DoAEOpenApplication (const AppleEvent *theAppleEvent,AppleEvent *replyAppleEvent,unsigned long refCon)
 {
 	return noErr;
@@ -173,7 +185,7 @@ static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyA
 
 #if 1
 	/* RWS ... : ugly, special case for Clean IDE / cg combo */
-	if (strncmp (result_string, "cg ", 3) == 0)
+	if (string_begins_with (result_string, "cg "))
 	{
 		exit_code=do_script_apple_event (apple_event, replyAppleEvent, refCon);
 
@@ -182,7 +194,7 @@ static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyA
 	/* ... RWS */
 	else
 #endif
-	if (strncmp (result_string,"cocl ",5)==0){
+	if (string_begins_with (result_string,"cocl ")){
 		int string_length;
 		
 		result_string += actual_size;
@@ -221,7 +233,7 @@ static pascal OSErr DoAEScript (const AppleEvent *apple_event,AppleEvent *replyA
 		}
 		
 		last_exit_code = exit_code;
-	} else if (strncmp (result_string,"repeat_result",13)==0){
+	} else if (string_begins_with (result_string,"repeat_result")){
 		result_string=NULL;
 		n_free_result_string_characters=0;
 
