@@ -11,10 +11,12 @@ import CoclSystemDependent,Clean2AppleEventHandler;
 
 from events import KeyDownEvent,HighLevelEvent,GetNextEvent,WaitNextEvent,Toolbox,RgnHandle;
 
+from predef import init_identifiers;
+
 DeviceMask :== -31361;		// HighLevelEventMask+UpdateMask+ActivMask+KeyboardMask+MouseMask+OsMask+1
 
 Start world
-	| install_apple_event_handlers==0 && store_state empty_cache<>0
+	| install_apple_event_handlers==0 && store_state (empty_cache (init_identifiers newHeap))<>0
 		= event_loop world;
 		= world;
 {}{
