@@ -305,8 +305,7 @@ where
 			# cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info dcl_kind dcl_index cGlobalScope entry }
 			= case dcl_kind of
 				STE_Field selector_id
-					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = dcl_index } (cs
-								 ---> ("add_global_definition", ident, selector_id, (ptrToInt id_info, ptrToInt selector_id.id_info)))
+					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = dcl_index } cs
 				_
 					-> cs
 			= { cs & cs_error = checkError ident "(global definition) already defined" cs.cs_error}
@@ -346,8 +345,7 @@ where
 		# {ste_kind,ste_previous} = entry
 		= case ste_kind of
 			STE_Field field_id
-				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index (symbol_table
-								 ---> ("removeDeclarationsFromSymbolTable", id_name, field_id, (ptrToInt id_info, ptrToInt field_id.id_info)))
+				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex dcl_index symbol_table
 				| ste_previous.ste_def_level == scope
 					-> symbol_table <:= (id_info, ste_previous.ste_previous)
 					-> symbol_table <:= (id_info, ste_previous)
