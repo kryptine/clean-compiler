@@ -126,7 +126,6 @@ typedef union symb_value {
 	int								val_arity;
 	struct symbol_type *			val_type;		/* for cons_symb, nil_symb apply_symbol ? */
 	struct symbol *					val_symb;		/* for field_symbol_list */
-	struct overloaded_instance *	val_instance;
 #if STRICT_LISTS
 	struct state *					val_state_p;		/* element state for unboxed list cons in lhs */
 	struct unboxed_cons *			val_unboxed_cons_p;	/* state and symbol definition for unboxed list cons in rhs */
@@ -255,17 +254,6 @@ struct symb_list {
 
 typedef struct def_repr DefRepr,*DefMod;
 
-typedef struct import_list ImportElem,*ImportList;
-
-struct import_list {
-	Symbol		ilist_module;
-	Bool		ilist_all;
-	unsigned	ilist_line;
-	SymbList	ilist_symbs;
-	DefMod		ilist_def;
-	ImportList	ilist_next;
-};
-
 typedef struct node_def *NodeDefs;
 
 typedef struct {
@@ -283,20 +271,11 @@ STRUCT (node_id,NodeId){
 	int				nid_number;
 	union {
 		struct node_id *				inf2_forward_node_id;
-		struct type_cell *				inf2_type;
 		Index							inf2_index;
 		int								inf2_lazy_selector_ref_count;
 	} nid_inf2;
 	union {
-		struct {
-			union {
-				struct node *			u1_subst_node;
-				struct node_id *		u1_subst_node_id;
-				struct reference_info *	u1_ref_info;
-/*				NodeDefs				u1_nodedef; */
-			}	s_u1;
-			int	s_ref_count_copy;
-		} inf1_s;
+		int	inf1_ref_count_copy;
 		StateS			inf1_state;
 	} nid_inf1;
 	int				nid_scope;
@@ -312,14 +291,9 @@ STRUCT (node_id,NodeId){
 	} nid_u4;
 };
 
-#define nid_subst_node			nid_inf1.inf1_s.s_u1.u1_subst_node		/* macros */
-#define nid_subst_node_id		nid_inf1.inf1_s.s_u1.u1_subst_node_id	/* macros */
-#define nid_reference_info		nid_inf1.inf1_s.s_u1.u1_ref_info		/* refcountanal */
-/* #define nid_node_def			nid_inf1.inf1_s.s_u1.u1_nodedef			** buildtree,sa,statesgen,optimisations */
-#define nid_ref_count_copy		nid_inf1.inf1_s.s_ref_count_copy		/* statesgen */
+#define nid_ref_count_copy		nid_inf1.inf1_ref_count_copy			/* statesgen */
 #define nid_state 				nid_inf1.inf1_state						/* codegen2,instructions */
 
-#define nid_type						nid_inf2.inf2_type				/* comparser,typechecker */
 #define nid_forward_node_id				nid_inf2.inf2_forward_node_id	/* checker,transform */
 #define nid_node_id_ref_count_element	nid_u3.u3_ref_count_element		/* pattern_match */
 #define nid_node_id_ref_count_element_	nid_u3.u3_ref_count_element		/* pattern_match */
@@ -328,7 +302,6 @@ STRUCT (node_id,NodeId){
 
 #define nid_lazy_selector_ref_count		nid_inf2.inf2_lazy_selector_ref_count/* statesgen */
 
-#define nid_type_						nid_inf2.inf2_type				/* comparser,typechecker */
 #define nid_forward_node_id_			nid_inf2.inf2_forward_node_id	/* checker,transform */
 #define nid_a_index_					nid_inf2.inf2_index.index_a		/* codegen2,instructions */
 #define nid_b_index_					nid_inf2.inf2_index.index_b		/* codegen2,instructions */
@@ -345,11 +318,8 @@ STRUCT (node_id,NodeId){
 #define nid_state_				nid_state
 #define nid_state__				nid_state
 #define nid_lhs_tuple_node_id_	nid_lhs_tuple_node_id
-#define nid_subst_node_			nid_subst_node
-#define nid_subst_node_id_		nid_subst_node_id
 #define nid_exp_				nid_exp
 #define nid_lhs_state_p_		nid_lhs_state_p
-#define nid_reference_info_		nid_reference_info
 
 /*	Masks for nid_mark */
 
@@ -363,27 +333,18 @@ STRUCT (node_id,NodeId){
 #define NID_VERIFY_MASK							256		/* macros */
 #define NID_THEN_ELSE_NON_LOCAL_NODE_ID			512		/* pattern_match */
 
-#define NID_TYPE_CHECKED_MASK					1024	/* typechecker */
-#define NID_TYPE_ATTRIBUTED_MASK				2048	/* typechecker */
-#define NID_EXTRA_REFCOUNT_SUBTRACTED_MASK		4096	/* checker */
-
 #define NID_STRICT_LHS_TUPLE_ELEMENT_MASK		8192	/* codegen1,codegen2 */
-#define NID_SHARED_SELECTION_NODE_ID			16384
+#define NID_SHARED_SELECTION_NODE_ID			16384	/* optimisations,codegen2 */
 #define NID_LIFTED_BY_OPTIMISE					32768	/* optimisations */
 
 /* Masks for nid_mark2 */
 
-#define NID_HAS_REF_COUNT_INFO_MASK			(1 << 0)		/* refcountanal */
-#define NID_DETERMINE_REF_COUNT_MASK		(1 << 1)		/* refcountanal */
-#define NID_REF_COUNT_DETERMINED_MASK		(1 << 2)		/* refcountanal */
-#define NID_LHS_ROOT_ID						(1 << 3)		/* refcountanal */
-#define NID_READ_ONLY_ID					(1 << 4)		/* typechecker */
-#define NID_FIELD_NAME_MASK					(1 << 5)		/* typechecker */
+#define NID_SELECTION_NODE_ID				1
+#define NID_RECORD_USED_BY_UPDATE			2
+#define NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES 4
+#define NID_FIELD_NAME_MASK					32			/* typechecker */
 
 #define NID_COMPONENT_DETERMINED_MASK		256				/* optimise_lambda */
-#define NID_LIFTED_CONSTANT_CHECKED_MASK	512				/* checker */
-#define NID_LIFTED_MASK						1024			/* checker */
-#define NID_REFERENCE_NOT_COUNTED_MASK		2048			/* checker */
 #define NID_LHS_PUSHED						4096			/* codegen1 */
 
 #define NID_HAS_LAZY_SELECTOR_COUNTER		8192			/* statesgen */
@@ -416,14 +377,12 @@ STRUCT (if_node_contents,IfNodeContents){
 	ImpRules		if_then_rules;
 	union {
 		StrictNodeIdP					u_strict_node_ids;
-		struct poly_list *				u_observer_list;
 		struct node_id_ref_count_list *	u_node_id_ref_counts;
 	} if_then_u;
 	NodeDefs		if_else_node_defs;
 	ImpRules		if_else_rules;
 	union {
 		StrictNodeIdP					u_strict_node_ids;
-		struct poly_list *				u_observer_list;
 		struct node_id_ref_count_list *	u_node_id_ref_counts;
 	} if_else_u;
 	int				if_local_scope;
@@ -431,16 +390,13 @@ STRUCT (if_node_contents,IfNodeContents){
 
 #define if_then_strict_node_ids	if_then_u.u_strict_node_ids
 #define if_else_strict_node_ids	if_else_u.u_strict_node_ids
-#define if_then_observer_list	if_then_u.u_observer_list
-#define if_else_observer_list	if_else_u.u_observer_list
 #define node_then_node_id_ref_counts node_contents.contents_if->if_then_u.u_node_id_ref_counts
 #define node_else_node_id_ref_counts node_contents.contents_if->if_else_u.u_node_id_ref_counts
 
 typedef enum {
 	IfNode, NormalNode, SelectorNode, NodeIdNode, UpdateNode, MatchNode,						/* normal nodes */
-	RecordNode, IdentNode, ApplyNode, PrefixNode, ScopeNode,									/* nodes in parser and checker */
+	RecordNode, IdentNode, ApplyNode, ScopeNode,												/* nodes in parser and checker */
 	IndirectionNode,																			/* nodes in optimise_lambda */
-	OverloadedNode, RecursionNode, UpdateNodeInTC,												/* nodes in typechecker */
 	SwitchNode, CaseNode, DefaultNode, PushNode, GuardNode, TupleSelectorsNode, FillUniqueNode	/* nodes in codegen */
 } NodeKind;
 
@@ -474,12 +430,7 @@ STRUCT (node,Node){
 	union {
 		StateS						 su_state;
 		struct {
-			union {
-				Symbol						u_record_symbol;			/* comparser,checker */
-				struct symbol_type *		u_type_info;				/* typechecker */
-				struct recursive_call *		u_recursive_call;			/* typechecker */
-				struct overloaded_function *u_overloaded_application;	/* typechecker */
-			} s_u;
+			Symbol							s_record_symbol;			/* comparser,checker */
 			int								s_line;						/* size for PushNode if not STRICT_LISTS) */
 		} su_s;
 		struct {
@@ -519,10 +470,7 @@ STRUCT (node,Node){
 #endif
 
 #define node_state					node_su.su_state
-#define node_record_symbol			node_su.su_s.s_u.u_record_symbol
-#define node_type					node_su.su_s.s_u.u_type_info
-#define node_recursive_call			node_su.su_s.s_u.u_recursive_call
-#define node_overloaded_application	node_su.su_s.s_u.u_overloaded_application
+#define node_record_symbol			node_su.su_s.s_record_symbol
 #define node_line					node_su.su_s.s_line
 #define node_node_defs				node_su.su_u.u_node_defs
 #define node_symbol					node_contents.contents_symbol
@@ -551,9 +499,6 @@ STRUCT (node,Node){
 # define node_decons_node			node_su.su_push.push_pu.pu_decons_node
 # define node_push_size				node_su.su_push.push_pu.pu_size
 #endif
-
-#define node_then_observer_list		node_contents.contents_if->if_then_observer_list
-#define node_else_observer_list		node_contents.contents_if->if_else_observer_list
 
 STRUCT (arg,Arg){
 	Node 				arg_node;
@@ -650,48 +595,28 @@ STRUCT (rule_alt,RuleAlt){
 		CodeBlock			rhs_code;
 	} alt_rhs;
 	NodeDefs				alt_rhs_defs;
-	union {
-		StrictNodeIdP		u_alt_strict_node_ids;
-		struct poly_list *	u_alt_observer_list;
-	} alt_u;
-	struct lifted_node_id *	alt_lifted_node_ids;
-	ImpRules				alt_local_imp_rules;
+	StrictNodeIdP			alt_strict_node_ids;
 	RuleAlts				alt_next;
 	unsigned				alt_line;
-	BITVECT					alt_used_arguments;
 #ifdef OS2
 	unsigned				alt_kind:4;	/* RhsKind */
 #else
 	unsigned				alt_kind:3;	/* RhsKind */
 #endif
-	Bool					alt_write_access:1;
 	Bool					alt_may_fail:1;
 };
 
 #define alt_rhs_root alt_rhs.rhs_root
 #define alt_rhs_code alt_rhs.rhs_code
-#define alt_strict_node_ids alt_u.u_alt_strict_node_ids
-#define alt_observer_list	alt_u.u_alt_observer_list
-
-typedef struct macro Macro,*Macros;
-
-struct macro {
-	RuleAlts 	macro_rule;
-	Node 		macro_root;
-	unsigned	macro_line;
-	Macros		macro_next;
-};
 
 typedef enum {
 	NEWDEFINITION, ABSTYPE, TYPE, TYPESYN, DEFRULE, IMPRULE,
-	CONSTRUCTOR, SYSRULE, MACRORULE,
+	CONSTRUCTOR, SYSRULE, 
 	RECORDTYPE, FIELDSELECTOR,
-	OVERLOADEDRULE,
-	INSTANCE, CLASS, CLASSINSTANCE, CLASSLIST
+	INSTANCE
 } SDefKind;
 
 #define SDefKindSize 5
-#define DERIVEDRULE  16
 
 typedef enum {
 	Indefinite, CurrentlyChecked, TypeChecked,
@@ -718,7 +643,6 @@ STRUCT (imp_rule,ImpRule){
 	StateP						rule_state_p;
 	ImpRules					rule_next;
 	union {
-		struct depend_function *u_depend_functions;
 		ImpRuleP				u_next_changed_function;
 		ImpRuleP				u_next_used_function;
 		ImpRuleP				u_next_function_with_more_arguments;
@@ -749,7 +673,6 @@ STRUCT (imp_rule,ImpRule){
 #define RULE_CALL_VIA_LAZY_SELECTIONS_ONLY	1024
 #define RULE_TAIL_MODULO_CONS_ENTRY_MASK	2048
 
-#define rule_depend_functions					rule_u.u_depend_functions					/* comparser,checker,macros */
 #define rule_next_changed_function				rule_u.u_next_changed_function				/* optimisations */
 #define rule_next_used_function					rule_u.u_next_used_function					/* optimisations */
 #define rule_next_function_with_more_arguments	rule_u.u_next_function_with_more_arguments	/* statesgen */
@@ -763,17 +686,10 @@ STRUCT (symbol_def,SymbDef){
 		SynTypes		u_syn_type;
 		AbsTypes		u_abs_type;
 		ImpRules		u_rule;
-		Macros			u_macro;
-		Overloaded		u_overloaded;
-		Instance		u_instance;
-		ClassDefinition	u_class;
-		ClassInstance 	u_class_instance;
-		SymbolList		u_class_symb_list;
 	} sdef_u;
 	union
 	{	struct symbol_type_info *	sti_rule_type_info;
 		struct symbol_type *		sti_type_cons_info;
-		unsigned long			sti_class_instance_info;
 		StateS					typeinfo_record_state;
 		struct
 		{	FieldList	fieldinfo_sel_field;
@@ -797,9 +713,6 @@ STRUCT (symbol_def,SymbDef){
 #ifdef CLEAN2
 		SymbolP			u3_unboxed_cons_symbol;		/* backend.c */
 #endif
-#ifndef CLEAN2
-		unsigned		u3_instantiation_depth;
-#endif
 	} sdef_u3;
 
 	struct symbol_def *	sdef_dcl_icl;					/* to dcl if sdef_exported, to icl if sdef_main_dcl */
@@ -811,8 +724,6 @@ STRUCT (symbol_def,SymbDef){
 
 	union {
 		struct symbol_def *		sdef_u2_parent;
-		struct member_item *	sdef_u2_class_members;
-/*		struct symbol_def *		sdef_u2_aliases; */
 		struct type_cons_repr *	sdef_u2_type_cons_repr;
 		struct symbol_def *		sdef_u2_next_version;	/* for IMPRULES */
 	} sdef_u2;
@@ -821,41 +732,20 @@ STRUCT (symbol_def,SymbDef){
 	int				sdef_mark;
 
 	Bool			sdef_isused:1;
-	Bool			sdef_is_local_function:1;
-
-	Bool			sdef_is_instantiated:1;
-	
 	Bool			sdef_no_sa:1;
-	Bool			sdef_explicitly_imported:1;
-	Bool			sdef_has_aliases:1;
-
-	Bool			sdef_attributed:1;
 	Bool			sdef_returnsnode:1;
 	Bool			sdef_calledwithrootnode:1;
-
-	Bool			sdef_has_inftype:1;
-	Bool			sdef_typable:1;
-	Bool			sdef_contains_freevars:1;
-	Bool			sdef_noncoercible:1;
 	Bool			sdef_unq_attributed:1;
-	Bool			sdef_is_cyclic:1;
-	Bool			sdef_is_redirection:1;
-	Bool			sdef_is_observing:1;
-	Bool			sdef_is_hyperstrict:1;
-	Bool			sdef_with_uniqueness_variables:1;
-	Bool			sdef_current_type_vars_mark:1;	/* for TYPESYN */
-	Bool			sdef_abstract_type_synonym:1;	/* for TYPESYN */
 	Bool			sdef_strict_constructor:1;		/* for CONSTRUCTOR and RECORDTYPE */
+	Bool			sdef_boxed_record:1;			/* for RECORDTYPE */
 	Bool			sdef_exported:1;
 	Bool			sdef_main_dcl:1;				/* if in .dcl of main .icl */
-	Bool			sdef_first_group_element:1;
 	Bool			sdef_infix:1;
 #ifdef OS2
 	int				sdef_stupid_gcc;
 	SDefKind		sdef_kind:SDefKindSize;
 	unsigned		sdef_infix_priority:4;
 	unsigned		sdef_checkstatus:4;		/* CheckStatus */
-	unsigned		sdef_prop_status:4;		/* CheckStatus */
 	unsigned		sdef_arfun:ArrayFunKindBitSize;			/* ArrayFunKind */
 	unsigned		sdef_infix_assoc:2;		/* Assoc */
 #else
@@ -863,7 +753,6 @@ STRUCT (symbol_def,SymbDef){
 	unsigned		sdef_infix_priority:4;
 	unsigned		sdef_infix_assoc:2;		/* Assoc */
 	unsigned		sdef_checkstatus:3;		/* CheckStatus */
-	unsigned		sdef_prop_status:3;		/* CheckStatus */
 	unsigned		sdef_arfun:ArrayFunKindBitSize;			/* ArrayFunKind */
 #endif
 };
@@ -873,16 +762,7 @@ STRUCT (symbol_def,SymbDef){
 #define sdef_syn_type		sdef_u.u_syn_type
 #define sdef_abs_type		sdef_u.u_abs_type
 #define sdef_rule			sdef_u.u_rule
-#define sdef_macro			sdef_u.u_macro
-#define sdef_rc				sdef_u.u_rc
-#define sdef_overloaded		sdef_u.u_overloaded
-#define sdef_instance		sdef_u.u_instance
-#define sdef_class_instance	sdef_u.u_class_instance
-#define sdef_class_symb_list sdef_u.u_class_symb_list
 
-#define sdef_class			sdef_u.u_class
-
-#define sdef_instantiation_depth	sdef_u3.u3_instantiation_depth
 #define sdef_sa_fun					sdef_u3.u3_sa_fun
 #ifdef CLEAN2
  #define sdef_unboxed_cons_symbol sdef_u3.u3_unboxed_cons_symbol
@@ -905,8 +785,6 @@ STRUCT (symbol_def,SymbDef){
 #define sdef_has_instance_info	sdef_used_as_instance
 
 #define sdef_parent			sdef_u2.sdef_u2_parent
-#define sdef_class_members	sdef_u2.sdef_u2_class_members	
-#define sdef_aliases		sdef_u2.sdef_u2_aliases
 #define sdef_type_cons_repr	sdef_u2.sdef_u2_type_cons_repr
 
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
@@ -915,7 +793,6 @@ STRUCT (symbol_def,SymbDef){
 
 #define sdef_rule_type_info			sdef_typeinfo.sti_rule_type_info
 #define sdef_type_cons_info			sdef_typeinfo.sti_type_cons_info
-#define sdef_class_instance_info	sdef_typeinfo.sti_class_instance_info
 
 #define sdef_rule_cons_type_info  sdef_rc->rc_type_info
 
@@ -945,16 +822,12 @@ typedef FileTime ModuleFileTime;
 typedef struct {
 	Symbol				im_name;
 	Symbol				im_symbols;
-	ImportList			im_imports;
 	Types				im_types;
 	SynTypes			im_syn_types;
 	ImpRules			im_rules;
-	Macros				im_macros;
 	struct symbol_def *	im_start;
 	Bool				im_main;
 	DefMod				im_def_module;
-	ClassDefinition		im_classes;
-	ClassInstance		im_instances;
 
 #ifdef SHORT_CLASS_NAMES
 	struct module_info *	im_module_info;
@@ -971,16 +844,11 @@ typedef struct {
 struct def_repr {
 	Symbol		dm_name;
 	Symbol		dm_symbols;
-	ImportList	dm_imports;
-	ExportList	dm_exports;
 	Types		dm_types;
 	SynTypes	dm_syn_types;
 	AbsTypes	dm_abs_types;
 	RuleTypes	dm_rules;
-	Macros		dm_macros;
 	Bool		dm_system_module;
-	ClassDefinition			dm_classes;
-	ClassInstance			dm_instances;
 
 #ifdef SHORT_CLASS_NAMES
 	struct module_info *	dm_module_info;
