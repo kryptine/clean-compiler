@@ -812,7 +812,7 @@ static void GenerateConstructorDescriptorAndFunction (ConstructorList constructo
 	if (constructor_def->sdef_kind==CONSTRUCTOR && constructor_def->sdef_strict_constructor){
 		GenStrictConstructorDescriptor (constructor_def,constructor->cl_state_p);
 		
-		if (constructor_def->sdef_exported || (constructor_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))){
+		if (constructor_def->sdef_exported || (constructor_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)) || ExportLocalLabels){
 			LabDef constructor_label,ealab,n_lab,d_lab;
 			int maxasize,asize,bsize;
 			int asp,bsp,arity;
@@ -833,7 +833,7 @@ static void GenerateConstructorDescriptorAndFunction (ConstructorList constructo
 
 			MakeSymbolLabel (&ealab,constructor_def->sdef_exported ? CurrentModule : NULL,ea_pref,constructor_def,0);
 			
-			if (constructor_def->sdef_exported || (constructor_def->sdef_mark & SDEF_USED_CURRIED_MASK)){
+			if (constructor_def->sdef_exported || (constructor_def->sdef_mark & SDEF_USED_CURRIED_MASK) || ExportLocalLabels){
 				CurrentAltLabel.lab_pref  = l_pref;
 
 				if (DoTimeProfiling)
@@ -1275,7 +1275,7 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 
 					GenRecordDescriptor (def);
 
-					if (def->sdef_strict_constructor && (def->sdef_exported || (def->sdef_mark & SDEF_USED_LAZILY_MASK)))
+					if (def->sdef_strict_constructor && (def->sdef_exported || (def->sdef_mark & SDEF_USED_LAZILY_MASK) || ExportLocalLabels))
 						GenLazyRecordEntry (def);
 
 					for_l (fields,constructor->cl_fields,fl_next)
