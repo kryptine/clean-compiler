@@ -7,6 +7,7 @@ from spine import Answer,Spine,Subspine
 from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
 from general import Optional
+from StdOverloaded import ==
 
 :: Etracer sym var pvar :==
        (Trace sym var pvar)
@@ -20,3 +21,6 @@ fullfold ::
     sym
     (Trace sym var pvar)
  -> ([Bool],[Rule sym var],[Rgraph sym var])
+ |  == sym
+ &  == var
+ &  == pvar
