@@ -69,7 +69,17 @@ Deprecated type
 */
 
 :: FuncDef sym var
-   :== [Rule sym var]
+   :== ( [var]              // Arguments of function
+       , FuncBody sym var   // Right hand side of function
+       )
+
+:: FuncBody sym var
+   = MatchPattern
+       (Rgraph sym var)     // Pattern to match
+       (FuncBody sym var)   // Right hand side for matching graph (case branch)
+       (FuncBody sym var)   // Right hand side for failed match (case default)
+   | BuildGraph
+       (Rgraph sym var)     // Right hand side to reduce to
 
 /*
 Implementation
@@ -101,9 +111,11 @@ fullfold ::
 
 fullfold trc foldarea fnsymbol trace
 | recursive
-  = recurseresult
-= newextract trc foldarea trace
+  = addlhs recurseresult
+= addlhs (newextract trc foldarea trace)
   where (recursive,recurseresult) = recurse foldarea fnsymbol trace
+        addlhs = mapsnd3 (pair (arguments rule))
+        (Trace _ rule _ _ _) = trace
 
 /*
 `Recurse foldarea fnsymbol trace' is a pair `(recursive,recurseresult)'.
@@ -119,7 +131,7 @@ recurse ::
     ((Rgraph sym var)->(sym,[var]))
     sym
  -> (Trace sym var pvar)
- -> (Bool,([Bool],FuncDef sym var,[Rgraph sym var]))
+ -> (Bool,([Bool],FuncBody sym var,[Rgraph sym var]))
  |  == sym
  &  == var
  &  == pvar
@@ -159,7 +171,7 @@ foldtips ::
     (sym,[var])
  -> ([(var,Graph sym var)],[(var,Graph sym var)])
     (Trace sym var pvar)
- -> (Bool,([Bool],FuncDef sym var,[Rgraph sym var]))
+ -> (Bool,([Bool],FuncBody sym var,[Rgraph sym var]))
  |  == sym
  &  == var
  &  == pvar
@@ -169,34 +181,40 @@ foldtips foldarea foldcont
   where ft hist trace
         = case transf
           of Stop
-              -> foldoptional exres (pair True o addstrict stricts) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule)
+              -> foldoptional exres (pair True o addstrict stricts o mapfst rule2body) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule)
                  where deltanodes = foldoptional [] getdeltanodes answer
                        rnfnodes = foldoptional [ruleroot rule] (const []) answer
              Instantiate yestrace notrace
-              -> ft`` (ft hist yestrace) (ft hist notrace)
-                 where ft`` (False,yessra) (False,nosra) = exres
-                       ft`` (yesfound,(yesstricts,yesrules,yesareas)) (nofound,(nostricts,norules,noareas))
-                       = (True,(stricts,yesrules++norules,yesareas++noareas))
+              -> ft` (ft hist yestrace) (ft hist notrace)
+                 where ft` (False,yessra) (False,nosra) = exres
+                       ft` (yesfound,(yesstricts,yesbody,yesareas)) (nofound,(nostricts,nobody,noareas))
+                       = (True,(stricts,matchpattern answer yesbody nobody,yesareas++noareas))
              Reduce reductroot trace
-              -> ft`` (ft (fst hist,fst hist) trace)
-                 where ft`` (False,sra) = exres
-                       ft`` (found,sra) = (True,sra)
+              -> ft` (ft (fst hist,fst hist) trace)
+                 where ft` (False,sra) = exres
+                       ft` (found,sra) = (True,sra)
              Annotate trace
-              -> ft`` (ft hist trace)
-                 where ft`` (False,sra) = exres
-                       ft`` (found,sra) = (True,sra)
-          where (Trace stricts rule answer history transf) = trace
+              -> ft` (ft hist trace)
+                 where ft` (False,sra) = exres
+                       ft` (found,sra) = (True,sra)
+          where (Trace stricts rule answer _ transf) = trace
                 exres = (False,newextract noetrc foldarea trace)
 
-addstrict stricts (rule,areas) = (stricts,[rule],areas)
+matchpattern ::
+    (Answer sym var pvar)
+    (FuncBody sym var)
+    (FuncBody sym var)
+ -> FuncBody sym var
+
+matchpattern _ _ _ = undef
+
+rule2body rule = buildgraph (arguments rule) (ruleroot rule) (rulegraph rule)
+
+addstrict stricts (body,areas) = (stricts,body,areas)
 
 noetrc trace area = id
 
 pair x y = (x,y)
-
-only :: [.elem] -> .elem
-only [x] = x
-only xs = abort "only: not a singleton list"
 
 /*
 ------------------------------------------------------------------------
@@ -228,25 +246,25 @@ newextract ::
     (Etracer sym var pvar)
     ((Rgraph sym var)->(sym,[var]))
     (Trace sym var pvar)
- -> ([Bool],FuncDef sym var,[Rgraph sym var])
+ -> ([Bool],FuncBody sym var,[Rgraph sym var])
  |  == sym
  &  == var
  &  == pvar
 
 newextract trc newname (Trace stricts rule answer history transf)
 | recursive
-  = (stricts,[recrule],recareas)
+  = (stricts,rule2body recrule,recareas)
 = case transf
   of Reduce reductroot trace
       -> newextract trc newname trace
      Annotate trace
       -> newextract trc newname trace
      Instantiate yestrace notrace
-      -> (stricts,yesrules++norules,yesareas++noareas)
-         where (yesstricts,yesrules,yesareas) = newextract trc newname yestrace
-               (nostricts,norules,noareas) = newextract trc newname notrace
+      -> (stricts,matchpattern answer yesbody nobody,yesareas++noareas)
+         where (_,yesbody,yesareas) = newextract trc newname yestrace
+               (_,nobody,noareas) = newextract trc newname notrace
      Stop
-      -> (stricts,[mkrule rargs rroot stoprgraph],stopareas)
+      -> (stricts,buildgraph rargs rroot stoprgraph,stopareas)
 
   where (recursive,unsafearea)
         = if (isreduce transf)
@@ -260,6 +278,13 @@ newextract trc newname (Trace stricts rule answer history transf)
         rnfnodes = foldoptional (cons rroot) (const id) answer (varlist rgraph rargs)
 
         deltanodes = foldoptional [] getdeltanodes answer
+
+buildgraph ::
+    [var]
+    var
+    (Graph sym var)
+ -> FuncBody sym var
+buildgraph _ _ _ = undef
 
 isreduce (Reduce reductroot trace) = True
 isreduce transf = False
