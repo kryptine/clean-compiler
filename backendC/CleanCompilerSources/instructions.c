@@ -1990,12 +1990,12 @@ static void GenFieldLabel (Label label,char *record_name)
 	def = (SymbDef) label->lab_name;
 		
 	if (label->lab_mod)
-		FPrintF (OutFile,"e_%s_%s%s.%s",
-			label->lab_mod,label->lab_pref,record_name,def->sdef_ident->ident_name);
+		FPrintF (OutFile,"e_%s_%s%s.%s",label->lab_mod,label->lab_pref,record_name,def->sdef_ident->ident_name);
+	else if (ExportLocalLabels)
+		FPrintF (OutFile,"e_%s_%s%s.%s",CurrentModule,label->lab_pref,record_name,def->sdef_ident->ident_name);
 	else if (DoDebug){
 		if (def->sdef_kind==IMPRULE)
-			FPrintF (OutFile, "%s%s.%s.%u",
-				label->lab_pref,record_name,def->sdef_ident->ident_name,def->sdef_number);
+			FPrintF (OutFile, "%s%s.%s.%u",label->lab_pref,record_name,def->sdef_ident->ident_name,def->sdef_number);
 		else
 			FPrintF (OutFile, "%s%s.%s",label->lab_pref,record_name,def->sdef_ident->ident_name);
 	} else if (def->sdef_number==0)
@@ -3171,10 +3171,10 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 	put_directive_ (Ddesc);
 	if (sdef->sdef_exported){
 		if (has_gc_apply_entry)
-			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s e_%s_%s%s.%s %d 0 \"%s.%s\"",
+			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s e_%s_" L_PREFIX "%s.%s %d 0 \"%s.%s\"",
 				CurrentModule,record_name,name,
 				CurrentModule,record_name,name,
-				CurrentModule,l_pref,record_name,name,
+				CurrentModule,record_name,name,
 				arity,record_name,name);	
 		else
 			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s _hnf %d 0 \"%s.%s\"",
@@ -3200,10 +3200,12 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
 		
 		if (has_gc_apply_entry){
-			if (DoDebug)
-				FPrintF (OutFile, "%s%s.%s ",l_pref,record_name,name);
+			if (ExportLocalLabels)
+				FPrintF (OutFile, "e_%s_" L_PREFIX "%s.%s ",CurrentModule,record_name,name);
+			else if (DoDebug)
+				FPrintF (OutFile, L_PREFIX "%s.%s ",record_name,name);
 			else
-				FPrintF (OutFile, "%s%u ",l_pref,sdef->sdef_number);
+				FPrintF (OutFile, L_PREFIX "%u ",sdef->sdef_number);
 		} else
 			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
 

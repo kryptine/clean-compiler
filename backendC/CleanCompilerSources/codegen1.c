@@ -994,12 +994,6 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 
 		ConvertSymbolToDandNLabel (&d_lab,&n_lab,field_def);
 		
-		if (ExportLocalLabels){
-			d_lab.lab_mod=CurrentModule;
-			n_lab.lab_mod=CurrentModule;
-			ealab.lab_mod=CurrentModule;
-		}
-
 		GenFieldNodeEntryDirective (node_directive_arity,&d_lab,ea_label_p,record_name);
 
 		GenOAStackLayout (1);
