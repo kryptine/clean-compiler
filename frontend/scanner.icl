@@ -910,13 +910,14 @@ TestFraction n input chars
 	| IsDigit c				= ScanFraction (n + 2) input [c,'.':chars]
 			 				= (IntToken (revCharListToString n chars), charBack (charBack input))
 
+
 ScanFraction :: !Int !Input ![Char] -> (!Token, !Input)
 ScanFraction n input chars
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (RealToken (revCharListToString n chars), input)
 	| c == 'E'				= case chars of
-								[c:_] | IsDigit c	-> ScanExponentSign (n + 1) input [c:chars]
-								_					-> ScanExponentSign (n + 2) input [c,'0':chars]
+								[c:_] | IsDigit c	-> ScanExponentSign (n + 1) input ['E':chars] /* Sjaak, was [c:chars] */
+								_					-> ScanExponentSign (n + 2) input ['E','0':chars] /* Sjaak, idem */
 	| IsDigit c				= ScanFraction (n + 1) input [c:chars]
 							= case chars of
 								[c:_] | IsDigit c	-> (RealToken (revCharListToString n chars), charBack input)

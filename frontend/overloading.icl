@@ -93,7 +93,6 @@ where
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
-// MW4 was:	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type " <:: (format, types) <<< '\n' }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type "
 									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
 
@@ -102,14 +101,12 @@ uniqueError symbol types err
 	# err = errorHeading "Overloading/Uniqueness error" err
 	  format = { form_properties = cAnnotated, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol
-// MW4 was:			<<< "\" uniqueness specification of instance conflicts with current application " <:: (format, types) <<< '\n'}
 			<<< "\" uniqueness specification of instance conflicts with current application "
 			<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n'}
 
 unboxError type err
 	# err = errorHeading "Overloading error of Array class" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
-// MW4 was:	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type) <<< " instance cannot be unboxed\n"}
 	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type, Yes initialTypeVarBeautifulizer) <<< " instance cannot be unboxed\n"}
 
 overloadingError op_symb err
@@ -151,7 +148,7 @@ where
 			-> *(!ClassApplication, ![TypeContext], !*SpecialInstances, ![LocalTypePatternVariable], !(!*VarHeap, !*TypeHeaps), !*Coercions, !*PredefinedSymbols, !*ErrorAdmin)
 	try_to_reduce_context tc=:{tc_class=class_symb=:{glob_object={ds_index},glob_module},tc_types} defs instance_info new_contexts
 			special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
-		| is_reducible tc_types
+		| context_is_reducible tc predef_symbols
 			| is_predefined_symbol glob_module ds_index PD_TypeCodeClass predef_symbols
 				# (red_context, (new_contexts, special_instances, type_pattern_vars, var_heap))
 							= reduce_TC_context class_symb (hd tc_types) new_contexts special_instances type_pattern_vars var_heap
@@ -272,14 +269,40 @@ where
 			_
 				-> (False, coercion_env)
 	
+	context_is_reducible {tc_class,tc_types = [type : types]} predef_symbols
+//		= type_is_reducible type && is_reducible types
+		= type_is_reducible type && types_are_reducible types type tc_class predef_symbols
+
+	type_is_reducible (TempV _)
+		= False
+	type_is_reducible (_ :@: _)
+		= False
+	type_is_reducible _
+		= True
+
+	types_are_reducible [] _ _ _
+		= True
+	types_are_reducible [type : types] first_type tc_class predef_symbols
+		= case type of
+			TempV _
+				->	is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_ArrayClass predef_symbols &&
+					is_lazy_or_strict_array_type first_type predef_symbols
+			_ :@: _
+				-> False
+			_
+				-> is_reducible types
+
+	where				
+		is_lazy_or_strict_array_type (TA {type_index} _) predef_symbols
+			= is_predefined_symbol type_index.glob_module type_index.glob_object PD_LazyArrayType predef_symbols ||
+			  is_predefined_symbol type_index.glob_module type_index.glob_object PD_StrictArrayType predef_symbols
+		is_lazy_or_strict_array_type _ _
+			= False
+
 	is_reducible []
 		= True
-	is_reducible [TempV _ : types]
-		= False
-	is_reducible [ _ :@: _ : types]
-		= False
-	is_reducible [ _ : types]
-		= is_reducible types
+	is_reducible [ type : types]
+		= type_is_reducible type && is_reducible types
 
 	fresh_contexts contexts heaps
 		= mapSt fresh_context contexts heaps
