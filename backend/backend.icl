@@ -37,6 +37,7 @@ from StdString import String;
 :: BEArrayFunKind :== Int;
 :: BESelectorKind :== Int;
 :: BEUpdateKind :== Int;
+:: BESpecialIdentIndex :== Int;
 
 BEGetVersion :: (!Int,!Int,!Int);
 BEGetVersion  = code {
@@ -67,6 +68,18 @@ BEDeclareModules a0 a1 = code {
 	ccall BEDeclareModules "I:V:I"
 };
 // void BEDeclareModules (int nModules);
+
+BEBindSpecialModule :: !BESpecialIdentIndex !Int !BackEnd -> BackEnd;
+BEBindSpecialModule a0 a1 a2 = code {
+	ccall BEBindSpecialModule "II:V:I"
+};
+// void BEBindSpecialModule (BESpecialIdentIndex index,int moduleIndex);
+
+BEBindSpecialFunction :: !BESpecialIdentIndex !Int !Int !BackEnd -> BackEnd;
+BEBindSpecialFunction a0 a1 a2 a3 = code {
+	ccall BEBindSpecialFunction "III:V:I"
+};
+// void BEBindSpecialFunction (BESpecialIdentIndex index,int functionIndex,int moduleIndex);
 
 BESpecialArrayFunctionSymbol :: !BEArrayFunKind !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 BESpecialArrayFunctionSymbol a0 a1 a2 a3 = code {
@@ -763,9 +776,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 };
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02000214;
+kBEVersionCurrent:==0x02000215;
 kBEVersionOldestDefinition:==0x02000213;
-kBEVersionOldestImplementation:==0x02000214;
+kBEVersionOldestImplementation:==0x02000215;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;
@@ -838,6 +851,13 @@ BESelector_N:==5;
 BEUpdateDummy:==0;
 BEUpdate:==1;
 BEUpdate_U:==2;
+BESpecialIdentStdMisc:==0;
+BESpecialIdentAbort:==1;
+BESpecialIdentUndef:==2;
+BESpecialIdentStdBool:==3;
+BESpecialIdentAnd:==4;
+BESpecialIdentOr:==5;
+BESpecialIdentCount:==6;
 BELhsNodeId:==0;
 BERhsNodeId:==1;
 BEIsNotACaf:==0;

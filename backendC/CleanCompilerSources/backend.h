@@ -1,15 +1,15 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02000214
+# define	kBEVersionCurrent				0x02000215
 
-// change this to the same value as kBEVersionCurrent if the new release is not
-// upward compatible (for example when a function is added)
+// change this to the same value as kBEVersionCurrent if the new release is
+// not upward compatible (for example when a function is added)
 # define	kBEVersionOldestDefinition		0x02000213
 
-// change this to the same value as kBEVersionCurrent if the new release is not
-// downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02000214
+// change this to the same value as kBEVersionCurrent if the new release is
+// not downward compatible (for example when a function is removed)
+# define	kBEVersionOldestImplementation	0x02000215
 
 
 # define	kBEDebug	1
@@ -161,7 +161,15 @@ enum {
 	BEUpdateDummy, BEUpdate, BEUpdate_U
 };
 
+typedef int BESpecialIdentIndex;
+Clean (::BESpecialIdentIndex :== Int)
+enum {
+	/* StdMisc */
+	BESpecialIdentStdMisc, BESpecialIdentAbort, BESpecialIdentUndef,
+	BESpecialIdentStdBool, BESpecialIdentAnd, BESpecialIdentOr,
 
+	BESpecialIdentCount
+};
 /* functions */
 
 void BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation);
@@ -178,6 +186,12 @@ Clean (BEArg :: String BackEnd -> BackEnd)
 
 void BEDeclareModules (int nModules);
 Clean (BEDeclareModules :: Int BackEnd -> BackEnd)
+
+void BEBindSpecialModule (BESpecialIdentIndex index, int moduleIndex);
+Clean (BEBindSpecialModule :: BESpecialIdentIndex Int BackEnd -> BackEnd)
+
+void BEBindSpecialFunction (BESpecialIdentIndex index, int functionIndex, int moduleIndex);
+Clean (BEBindSpecialFunction :: BESpecialIdentIndex Int Int BackEnd -> BackEnd)
 
 BESymbolP BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex);
 Clean (BESpecialArrayFunctionSymbol :: BEArrayFunKind Int Int BackEnd -> (BESymbolP, BackEnd))

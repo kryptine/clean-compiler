@@ -363,6 +363,10 @@ beNoUniVarEquations
 	:== beFunction0 BENoUniVarEquations
 beUniVarEquationsList
 	:== beFunction2 BEUniVarEquationsList
+beBindSpecialModule specialIdentIndex moduleIndex
+	:== beApFunction0 (BEBindSpecialModule specialIdentIndex moduleIndex)
+beBindSpecialFunction specialIdentIndex functionIndex moduleIndex
+	:== beApFunction0 (BEBindSpecialFunction specialIdentIndex functionIndex moduleIndex)
 
 // temporary hack
 beDynamicTempTypeSymbol
@@ -483,6 +487,7 @@ backEndConvertModulesH predefs {fe_icl =
 			with
 				dcl_common
 					=	currentDcl.dcl_common
+	# backEnd = bindSpecialIdents predefs icl_used_module_numbers backEnd
 	#! backEnd = removeExpandedTypesFromDclModules fe_dcls icl_used_module_numbers backEnd
 	=	(backEnd -*-> "backend done")
 	where
@@ -1075,6 +1080,47 @@ predefineSymbols {dcl_common} predefs
 				=	abort "backendconvert, predefineSymbols predef is not a constructor"
 			// ... sanity check
 			=	appBackEnd (BEPredefineConstructorSymbol arity predefs.[index].pds_def cPredefinedModuleIndex symbolKind)
+
+
+bindSpecialIdents :: PredefinedSymbols NumberSet -> BackEnder
+bindSpecialIdents predefs usedModules
+	=	foldState (bindSpecialModule predefs usedModules) specialModules
+	where
+		bindSpecialModule :: PredefinedSymbols NumberSet (Int, BESpecialIdentIndex, [(Int, BESpecialIdentIndex)]) -> BackEnder
+		bindSpecialModule predefs usedModules (predefIndex, specialIdentIndex, specialFunctions)
+			| moduleIndex == NoIndex || not (inNumberSet moduleIndex usedModules)
+				=	identity
+			// otherwise
+				=	beBindSpecialModule specialIdentIndex moduleIndex
+				o`	foldState (bindSpecialFunction predefs) specialFunctions
+				where
+					predef
+						=	predefs.[predefIndex]
+					moduleIndex
+						=	predef.pds_def
+
+		bindSpecialFunction :: PredefinedSymbols (Int, BESpecialIdentIndex) -> BackEnder
+		bindSpecialFunction predefs (predefIndex, specialIdentIndex)
+			| predef.pds_def == NoIndex
+				=	identity
+			// otherwise
+				=	beBindSpecialFunction specialIdentIndex predef.pds_def predef.pds_module
+				where
+					predef
+						=	predefs.[predefIndex]
+
+		specialModules
+			=	[	(PD_StdMisc, BESpecialIdentStdMisc,
+						[	(PD_abort,	BESpecialIdentAbort)
+						,	(PD_undef,	BESpecialIdentUndef)
+						]
+					)
+				,	(PD_StdBool, BESpecialIdentStdBool,
+						[	(PD_AndOp,	BESpecialIdentAnd)
+						,	(PD_OrOp,	BESpecialIdentOr)
+						]
+					)
+				]
 
 adjustStrictListFunctions :: [Int] [Int] {#PredefinedSymbol} {#DclModule} NumberSet Int *BackEndState -> *BackEndState;
 adjustStrictListFunctions list_first_instance_indices tail_strict_list_first_instance_indices predefs dcls used_module_numbers main_dcl_module_n backEnd

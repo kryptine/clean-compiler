@@ -4,6 +4,8 @@ BEInit
 BEFree
 BEArg
 BEDeclareModules
+BEBindSpecialModule
+BEBindSpecialFunction
 BESpecialArrayFunctionSymbol
 BEDictionarySelectFunSymbol
 BEDictionaryUpdateFunSymbol

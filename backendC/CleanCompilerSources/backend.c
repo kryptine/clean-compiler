@@ -170,6 +170,9 @@ static SymbolP	gTupleSelectSymbols [MaxNodeArity];
 
 static int number_of_node_ids=0;
 
+typedef IdentP *IdentH;
+static IdentH gSpecialIdents[BESpecialIdentCount];
+
 static IdentP
 Identifier (char *name)
 {
@@ -535,6 +538,37 @@ GetArrayFunctionType (SymbDefP sdef, TypeNode *elementTypeP, TypeNode *arrayType
 			break;
 	}
 } /* GetArrayFunctionType */
+
+void
+BEBindSpecialModule (BESpecialIdentIndex index, int moduleIndex)
+{
+	BEModuleP	module;
+
+	Assert (index >= 0 && index < BESpecialIdentCount);
+
+	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
+	module	= &gBEState.be_modules [moduleIndex];
+
+	(*gSpecialIdents [index])->ident_name	= module->bem_name;
+} /* BEBindSpecialModule */
+
+void
+BEBindSpecialFunction (BESpecialIdentIndex index, int functionIndex, int moduleIndex)
+{
+	SymbolP		functionSymbol;
+	BEModuleP	module;
+
+	Assert (index >= 0 && index < BESpecialIdentCount);
+
+	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
+	module	= &gBEState.be_modules [moduleIndex];
+
+	Assert ((unsigned int) functionIndex < module->bem_nFunctions);
+	functionSymbol	= &module->bem_functions [functionIndex];
+
+	if (functionSymbol->symb_kind == definition)
+		*gSpecialIdents [index]	= functionSymbol->symb_def->sdef_ident;
+} /* BEBindSpecialFunction */
 
 BESymbolP
 BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
@@ -3522,7 +3556,6 @@ BEInit (int argc)
 	/* +++ remove symbol table from backend */
 	ScanInitIdentStringTable ();
 	InitScanner (); /* for inlining */
-	DeltaBId	= Identifier ("StdBool");
 	ApplyId		= Identifier ("AP");
 	ListId		= Identifier ("List");
 	TupleId		= Identifier ("Tuple");
@@ -3534,6 +3567,23 @@ BEInit (int argc)
 #if DYNAMIC_TYPE
 	DynamicId	= Identifier ("Dynamic");
 #endif
+
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+	StdMiscId	= Identifier ("StdMisc");
+
+	abort_id	= NULL;
+	undef_id	= NULL;
+	gSpecialIdents [BESpecialIdentStdMisc]	= &StdMiscId;
+	gSpecialIdents [BESpecialIdentAbort]	= &abort_id;
+	gSpecialIdents [BESpecialIdentUndef]	= &undef_id;
+#endif
+
+	DeltaBId	= Identifier ("StdBool");
+	AndId	= NULL;
+	OrId	= NULL;
+	gSpecialIdents [BESpecialIdentStdBool]	= &DeltaBId;
+	gSpecialIdents [BESpecialIdentAnd]		= &AndId;
+	gSpecialIdents [BESpecialIdentOr]		= &OrId;
 
 	UserDefinedArrayFunctions	= NULL;
 #if STRICT_LISTS
