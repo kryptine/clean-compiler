@@ -1856,13 +1856,52 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 			st_attr_vars = st_attr_vars ++ take (length new_attrs - length st_attr_vars) new_attrs, st_arity = st_arity + nr_of_lifted_arguments,
 				st_context = take (length new_context - length st_context) new_context ++ st_context }
 
-
 ::	FunctionRequirements =
 	{	fe_requirements	:: !Requirements
 	,	fe_context		:: !Optional [TypeContext]
 	,	fe_index		:: !Index
 	,	fe_location		:: !IdentPos
 	}
+/*
+ste_kind_to_string s
+	= case s of
+		(STE_FunctionOrMacro _)
+			-> "STE_FunctionOrMacro"
+		STE_Type
+			-> "STE_Type"	
+		STE_Constructor
+			-> "STE_Constructor"
+		(STE_Selector _)
+			-> "STE_Selector"
+		STE_Class
+			-> "STE_Class"
+		(STE_Field _)
+			-> "STE_Field"
+		STE_Member
+			-> "STE_Member"
+		(STE_Instance _)
+			-> "STE_Instance"
+		(STE_Variable _) 
+			-> "STE_Variable"
+		(STE_TypeVariable _) 
+			-> "STE_TypeVariable"
+		(STE_TypeAttribute _)
+			-> "STE_TypeAttribute"
+		(STE_BoundTypeVariable _)
+			-> "STE_BoundTypeVariable"
+		(STE_Imported a b)
+			-> "STE_Imported "+++ ste_kind_to_string a
+		STE_DclFunction
+			-> "STE_DclFunction"
+		(STE_Module _)
+			-> "STE_Module"	
+		STE_ClosedModule
+			-> "STE_ClosedModule"
+		STE_Empty 
+			-> "STE_Empty"	
+		_ 
+			-> "STE_???"
+*/
 
 typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule} 
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
@@ -1871,7 +1910,6 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 //typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule}
 //	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !.TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
 //typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out dcl_modules
-
 	#! fun_env_size = size fun_defs
 
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
@@ -1933,8 +1971,8 @@ where
 	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
 		= foldSt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
 
-	collect_imported_instance common_defs {dcl_ident, dcl_kind = STE_Imported (STE_Instance _) mod_index, dcl_index } state
-		= update_instances_of_class common_defs mod_index dcl_index state
+	collect_imported_instance common_defs (Declaration {decl_kind = STE_Imported (STE_Instance _) mod_index, decl_index }) state
+		= update_instances_of_class common_defs mod_index decl_index state
 	collect_imported_instance common_defs _ state
 		= state
 

@@ -85,6 +85,12 @@ compareDefImp :: !{#Int} !{!FunctionBody} !Int !{#CheckedTypeDef} !DclModule !*I
 				-> (!.IclModule,!.Heaps,!.ErrorAdmin)
 compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_type_defs main_dcl_module 
 			icl_module heaps error_admin
+
+
+//	| print_function_body_array untransformed
+//		&& print_function_body_array icl_module.icl_functions
+
+
 	// icl definitions with indices >= size_uncopied_icl_defs.[def_type] don't have to be compared,
 	// because they are copies of definitions that appear exclusively in the dcl module
 	= case main_dcl_module.dcl_conversions of
@@ -106,7 +112,7 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_typ
 			  (_, tc_state, error_admin)
 					= compareWithConversions 
 						size_uncopied_icl_defs.[cTypeDefs] conversion_table.[cTypeDefs]
-						dcl_common.com_type_defs icl_com_type_defs tc_state error_admin
+						dcl_common.com_unexpanded_type_defs icl_com_type_defs tc_state error_admin
 			  (icl_com_cons_defs, tc_state, error_admin)
 					= compareWithConversions 
 						size_uncopied_icl_defs.[cConstructorDefs] conversion_table.[cConstructorDefs]
@@ -867,6 +873,7 @@ continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_index icl_app_sy
 		= ec_state
 	= give_error icl_app_symb.symb_name ec_state
   where
+	names_are_compatible :: Int Int {#FunDef} -> Bool;
 	names_are_compatible dcl_index icl_index icl_functions
 		# dcl_function = icl_functions.[dcl_index]
 		  icl_function = icl_functions.[icl_index]
@@ -930,3 +937,23 @@ do_nothing ec_state
 give_error s ec_state
 	= { ec_state & ec_error_admin = checkError s error_message ec_state.ec_error_admin }
 
+/*
+print_function_body_array function_bodies
+	= print_function_bodies 0
+	where
+		print_function_bodies i
+			| i<size function_bodies
+				= Trace_tn i && Trace_tn function_bodies.[i] && print_function_bodies (i+1)
+				= True;
+
+Trace_tn d
+	= file_to_true (stderr <<< d <<< '\n')
+
+file_to_true :: !File -> Bool;
+file_to_true file = code {
+  .inline file_to_true
+          pop_b 2
+          pushB TRUE
+  .end
+ };
+*/

@@ -1,7 +1,7 @@
 implementation module checktypes
 
 import StdEnv
-import syntax, checksupport, check, typesupport, utilities, RWSDebug
+import syntax, checksupport, check, typesupport, utilities //, RWSDebug
 
 
 ::	TypeSymbols = 
@@ -379,12 +379,14 @@ where
 	look_for_cycles mod_index {at_type} expst
 		= look_for_cycles mod_index at_type expst
 
+import StdDebug
+
 expandSynType ::  !Index !Index !*ExpandState -> *ExpandState
 expandSynType mod_index type_index expst=:{exp_type_defs}
 	# (type_def, exp_type_defs) = exp_type_defs![type_index]
 	  expst = { expst & exp_type_defs = exp_type_defs }
 	= case type_def.td_rhs of
-		SynType type=:{at_type = TA {type_name,type_index={glob_object,glob_module}} types}
+		SynType type=:{at_type = TA {type_name,type_index={glob_object,glob_module}} types}		
 	   		# ({td_args,td_attribute,td_rhs}, _, exp_type_defs, exp_modules) = getTypeDef glob_object glob_module mod_index expst.exp_type_defs expst.exp_modules
 	   		  expst = { expst & exp_type_defs = exp_type_defs, exp_modules = exp_modules }
 			-> case td_rhs of
@@ -429,6 +431,26 @@ expand_syn_types module_index type_index nr_of_types expst
 		# expst = expandSynType module_index type_index expst
 		= expand_syn_types module_index (inc type_index) nr_of_types expst
 		= expand_syn_types module_index (inc type_index) nr_of_types expst
+/*
+Tracea_tn a
+	# s=size a
+	# f=stderr
+	# r=t 0 f
+	  with
+	  	t i f
+	  		| i<s && file_to_true (stderr <<< i <<< '\n' <<< a.[i] <<< '\n')
+	  			= t (i+1) f
+	  			= True
+	 = r
+
+file_to_true :: !File -> Bool;
+file_to_true file = code {
+  .inline file_to_true
+          pop_b 2
+          pushB TRUE
+  .end
+ }
+*/
 
 expandSynonymTypes :: !.Index !*{#CheckedTypeDef} !*{#.DclModule} !*TypeHeaps !*ErrorAdmin
 	-> (!.{#CheckedTypeDef},!.{#DclModule},!.TypeHeaps,!.ErrorAdmin)

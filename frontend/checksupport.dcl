@@ -51,6 +51,9 @@ cConversionTableSize	:== 9 // AA
 
 ::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
+	
+	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
+	
 	,	com_cons_defs		:: !.{# ConsDef}
 	,	com_selector_defs	:: !.{# SelectorDef}
 	,	com_class_defs		:: !.{# ClassDef}

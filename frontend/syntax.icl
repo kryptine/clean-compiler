@@ -62,11 +62,13 @@ where toString {import_module} = toString import_module
 				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
 				| STE_BelongingSymbol !Int
 
-::	Declaration =
-	{	dcl_ident	:: !Ident
-	,	dcl_pos		:: !Position
-	,	dcl_kind	:: !STE_Kind
-	,	dcl_index	:: !Index
+::	Declaration = Declaration !DeclarationRecord
+
+::	DeclarationRecord =
+	{	decl_ident	:: !Ident
+	,	decl_pos	:: !Position
+	,	decl_kind	:: !STE_Kind
+	,	decl_index	:: !Index
 	}
 
 ::	ComponentNrAndIndex =
@@ -1028,7 +1030,7 @@ cIsNotStrict	:== False
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
-				| Lambda .[FreeVar] !Expression
+//				| Lambda .[FreeVar] !Expression
 				| BasicExpr !BasicValue !BasicType
 				| WildCard
 				| Conditional !Conditional
@@ -1212,8 +1214,8 @@ where
 		= True
 	needs_brackets (Case _)
 		= True
-	needs_brackets (Lambda _ _)
-		= True
+//	needs_brackets (Lambda _ _)
+//		= True
 	needs_brackets (Selection _ _ _)
 		= True
 	needs_brackets _
@@ -1373,12 +1375,16 @@ where
 
 instance <<< SymbIdent
 where
-	(<<<) file symb=:{symb_kind = SK_Function symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
-	(<<<) file symb=:{symb_kind = SK_LocalMacroFunction symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
-	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
-	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index } = file <<< symb.symb_name <<<  "[o]@" <<< symb_index
-	(<<<) file symb=:{symb_kind = SK_Constructor symb_index } = file <<< symb.symb_name <<<  '@' <<< symb_index
-	(<<<) file symb = file <<< symb.symb_name
+	(<<<) file symb=:{symb_kind = SK_Function symb_index }
+		= file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_LocalMacroFunction symb_index }
+		= file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index }
+		= file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index }
+		= file <<< symb.symb_name <<<  "[o]@" <<< symb_index
+	(<<<) file symb
+		= file <<< symb.symb_name 
 
 instance <<< TypeSymbIdent
 where
@@ -1479,7 +1485,7 @@ where
 	(<<<) file (Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (RecordUpdate cons_symbol expression expressions) = file <<< '{' <<< cons_symbol <<< ' ' <<< expression <<< " & " <<< expressions <<< '}'
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
-	(<<<) file (Lambda vars expr) = file <<< '\\' <<< vars <<< " -> " <<< expr
+//	(<<<) file (Lambda vars expr) = file <<< '\\' <<< vars <<< " -> " <<< expr
 	(<<<) file WildCard = file <<< '_'
 	(<<<) file (MatchExpr _ cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
@@ -1640,12 +1646,23 @@ where
 	(<<<) file {fun_symb,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< ' ' <<< bodies 
 	(<<<) file {fun_symb,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
 			<<< "C " <<< cb_args <<< " = " <<< cb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '@' <<< fun_index
-			<<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_symb,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
+//			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
+	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}}
+		= file <<< fun_symb <<< '@' <<< fun_index <<< '.'
+			<<< "T "  <<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs 
+//			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
+	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '@' <<< fun_index <<< '.'
 			<<< body <<< '\n'
 	(<<<) file {fun_symb,fun_body=NoBody,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
 			<<< "Array function\n"
+
+instance <<< FunctionBody
+where
+	(<<<) file (ParsedBody bodies) = file <<< bodies 
+	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< " = " <<< cb_rhs 
+	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< " = " <<< tb_rhs 
+	(<<<) file (BackendBody body) = file <<< body <<< '\n'
+	(<<<) file NoBody = file <<< "Array function\n"
 
 instance <<< FunCall
 where
@@ -1916,8 +1933,8 @@ where
 		
 instance <<< Declaration
   where
-	(<<<) file { dcl_ident, dcl_kind } 
-		= file <<< dcl_ident <<< '<' <<< ptrToInt dcl_ident.id_info <<< '>' <<< '(' <<< dcl_kind <<< ')'
+	(<<<) file (Declaration { decl_ident, decl_kind })
+		= file <<< decl_ident <<< '<' <<< ptrToInt decl_ident.id_info <<< '>' <<< '(' <<< decl_kind <<< ')'
 
 instance <<< STE_Kind
 where

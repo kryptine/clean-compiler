@@ -10,7 +10,7 @@ import StdEnv
 	,	fs_error			:: !.ErrorAdmin
 	}
 
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, RWSDebug, cheat
+import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef, cheat//, RWSDebug
 
 cUndef :== (-1)
 implies a b :== not a || b
@@ -24,7 +24,6 @@ implies a b :== not a || b
 	{	si_explicit	:: ![([Declaration], Position)]
 	,	si_implicit	:: ![(Index, Position)]	// module indices
 	}
-
 
 markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
 		-> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
@@ -61,8 +60,6 @@ markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
 		  (eii_ident, eii)
 		  		= get_eei_ident eii
 		= (eii_ident, { expl_imp_info & [component_nr, i] = eii })
-
-	
 				
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
@@ -72,7 +69,6 @@ updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs co
 			(dcl_modules, expl_imp_infos, cs_symbol_table)
 updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-
 
 addExplImpInfo :: !Index Declaration ![Declaration] !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
 			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
@@ -108,12 +104,11 @@ addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_mod
 		  , cs_symbol_table
 		  )
 
-
 optStoreInstanceWithClassSymbol :: Declaration !Ident !*SymbolTable -> .SymbolTable
 optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
 	// this function is only for old syntax
 	| switch_import_syntax False True
-		= cs_symbol_table
+		= cs_symbol_table	
 	# (class_ste, cs_symbol_table)
 			= readPtr class_ident.id_info cs_symbol_table
 	= case class_ste.ste_kind of
@@ -123,8 +118,6 @@ optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
 					cs_symbol_table
 		_
 			-> cs_symbol_table
-
-
 
 foldlBelongingSymbols f bs st
 	:== case bs of
@@ -136,6 +129,18 @@ foldlBelongingSymbols f bs st
 				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
 			BS_Nothing
 				-> st
+/*
+imp_decl_to_string (ID_Function {ii_ident={id_name}}) = "ID_Function "+++toString id_name
+imp_decl_to_string (ID_Class {ii_ident={id_name}} _) = "ID_Class "+++toString id_name
+imp_decl_to_string (ID_Type {ii_ident={id_name}} _) = "ID_Type "+++toString id_name
+imp_decl_to_string (ID_Record {ii_ident={id_name}} _) = "ID_Record "+++toString id_name
+imp_decl_to_string (ID_Instance {ii_ident={id_name}} _ _ ) = "ID_Instance "+++toString id_name
+imp_decl_to_string (ID_OldSyntax idents) = "ID_OldSyntax "+++idents_to_string idents
+	where
+		idents_to_string [] = ""
+		idents_to_string [{id_name}] = toString id_name
+		idents_to_string [{id_name}:l] = toString id_name+++","+++idents_to_string l
+*/
 
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
 				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
@@ -238,30 +243,30 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= abort "sanity check nr 2765 failed in module check"
 		= eii_declaring_modules
 
-	get_nth_belonging_decl position belong_nr decl dcl_modules
-		# (STE_Imported _ def_mod_index) = decl.dcl_kind
+	get_nth_belonging_decl position belong_nr decl=:(Declaration {decl_kind}) dcl_modules
+		# (STE_Imported _ def_mod_index) = decl_kind
 		  (belongin_symbols, dcl_modules)
 				= getBelongingSymbols decl dcl_modules
 		= case belongin_symbols of
 			BS_Constructors constructors
 				# {ds_ident, ds_index} = constructors!!belong_nr
-				-> ({ dcl_ident = ds_ident, dcl_pos = position, 
-						dcl_kind = STE_Imported STE_Constructor def_mod_index,
-						dcl_index = ds_index }, dcl_modules)
+				-> (Declaration { decl_ident = ds_ident, decl_pos = position, 
+						decl_kind = STE_Imported STE_Constructor def_mod_index,
+						decl_index = ds_index }, dcl_modules)
 			BS_Fields rt_fields
 				# {fs_name, fs_index} = rt_fields.[belong_nr]
 				  ({sd_symb}, dcl_modules)
 						= dcl_modules![def_mod_index].dcl_common.com_selector_defs.[fs_index]
-				-> ({ dcl_ident = fs_name, dcl_pos = position, 
-						dcl_kind = STE_Imported (STE_Field sd_symb) def_mod_index,
-						dcl_index = fs_index }, dcl_modules)
+				-> (Declaration { decl_ident = fs_name, decl_pos = position, 
+						decl_kind = STE_Imported (STE_Field sd_symb) def_mod_index,
+						decl_index = fs_index }, dcl_modules)
 			BS_Members class_members
 				# {ds_ident, ds_index} = class_members.[belong_nr]
-				-> ({ dcl_ident = ds_ident, dcl_pos = position,
-						 dcl_kind = STE_Imported STE_Member def_mod_index,
-						dcl_index = ds_index }, dcl_modules)
+				-> (Declaration { decl_ident = ds_ident, decl_pos = position,
+						 decl_kind = STE_Imported STE_Member def_mod_index,
+						decl_index = ds_index }, dcl_modules)
 
-	get_all_belongs decl dcl_modules
+	get_all_belongs decl=:(Declaration {decl_kind,decl_index}) dcl_modules
 		# (belonging_symbols, dcl_modules)
 				= getBelongingSymbols decl dcl_modules
 		= case belonging_symbols of
@@ -270,9 +275,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			BS_Fields rt_fields
 				-> ([fs_name \\ {fs_name}<-:rt_fields], dcl_modules)
 			BS_Members class_members
-				# (STE_Imported _ def_mod_index) = decl.dcl_kind
+				# (STE_Imported _ def_mod_index) = decl_kind
 				  ({class_members}, dcl_modules)
-						= dcl_modules![def_mod_index].dcl_common.com_class_defs.[decl.dcl_index]
+						= dcl_modules![def_mod_index].dcl_common.com_class_defs.[decl_index]
 				-> ([ds_ident \\ {ds_ident}<-:class_members], dcl_modules)
 			BS_Nothing
 				-> ([], dcl_modules)
@@ -392,7 +397,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= (True, getBelongingSymbolsFromID ini_imp_decl)
 		= search_imported_symbol imported_symbol t
 
-
 	belong_ident_found :: !Ident !(Optional [ImportedIdent]) -> Bool
 	belong_ident_found belong_ident No
 		// like from m import ::T
@@ -457,7 +461,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	impDeclToNameSpaceString (ID_Record _ _)	= "type"
 	impDeclToNameSpaceString (ID_Instance _ _ _)= "instance"
 
-
 get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 	
 :: CheckCompletenessState =
@@ -503,11 +506,11 @@ checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions expr_hea
 	= (ccs_dcl_modules, ccs_icl_functions, ccs_expr_heap, cs)
   where
 	checkCompleteness :: !Int !Position !Declaration !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompleteness main_dcl_module_n import_position {dcl_ident, dcl_index, dcl_kind=STE_FunctionOrMacro _} ccs 
-		= checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
-	checkCompleteness main_dcl_module_n import_position {dcl_ident, dcl_index, dcl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index} ccs 
-		= checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
-	checkCompleteness main_dcl_module_n import_position {dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index} ccs 
+	checkCompleteness main_dcl_module_n import_position (Declaration {decl_ident, decl_index, decl_kind=STE_FunctionOrMacro _}) ccs 
+		= checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
+	checkCompleteness main_dcl_module_n import_position (Declaration {decl_ident, decl_index, decl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index}) ccs 
+		= checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
+	checkCompleteness main_dcl_module_n import_position (Declaration {decl_ident, decl_index, decl_kind=STE_Imported expl_imp_kind mod_index}) ccs
 		#! ({dcl_common,dcl_functions}, ccs) = ccs!box_ccs.ccs_dcl_modules.[mod_index]
 		   cci = { box_cci = { cci_import_position = import_position, cci_main_dcl_module_n=main_dcl_module_n }}
 		= continuation expl_imp_kind dcl_common dcl_functions cci ccs
@@ -515,24 +518,24 @@ checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions expr_hea
 		continuation :: !STE_Kind CommonDefs !{# FunType} !CheckCompletenessInputBox !*CheckCompletenessStateBox
 					-> *CheckCompletenessStateBox
 		continuation STE_Type dcl_common dcl_functions cci ccs
-			= check_completeness dcl_common.com_type_defs.[dcl_index] cci ccs
+			= check_completeness dcl_common.com_type_defs.[decl_index] cci ccs
 		continuation STE_Constructor dcl_common dcl_functions cci ccs
-			= check_completeness dcl_common.com_cons_defs.[dcl_index] cci ccs
+			= check_completeness dcl_common.com_cons_defs.[decl_index] cci ccs
 		continuation (STE_Field _) dcl_common dcl_functions cci ccs
-			= check_completeness dcl_common.com_selector_defs.[dcl_index] cci ccs
+			= check_completeness dcl_common.com_selector_defs.[decl_index] cci ccs
 		continuation STE_Class dcl_common dcl_functions cci ccs
-			= check_completeness dcl_common.com_class_defs.[dcl_index] cci ccs
+			= check_completeness dcl_common.com_class_defs.[decl_index] cci ccs
 		continuation STE_Member dcl_common dcl_functions cci ccs
-			= check_completeness dcl_common.com_member_defs.[dcl_index] cci ccs
+			= check_completeness dcl_common.com_member_defs.[decl_index] cci ccs
 		continuation (STE_Instance _) dcl_common dcl_functions cci ccs
-			= check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
+			= check_completeness dcl_common.com_instance_defs.[decl_index] cci ccs
 		continuation STE_DclFunction dcl_common dcl_functions cci ccs
-			= check_completeness dcl_functions.[dcl_index] cci ccs
+			= check_completeness dcl_functions.[decl_index] cci ccs
 	
 	checkCompletenessOfMacro :: !Ident !Index !Int !Position !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompletenessOfMacro dcl_ident dcl_index main_dcl_module_n import_position ccs
-		#! ({fun_body}, ccs) = ccs!box_ccs.ccs_icl_functions.[dcl_index]
-		   ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[dcl_index] = True }
+	checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
+		#! ({fun_body}, ccs) = ccs!box_ccs.ccs_icl_functions.[decl_index]
+		   ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[decl_index] = True }
 		   cci = { box_cci = { cci_import_position = import_position, cci_main_dcl_module_n=main_dcl_module_n }}
 		= check_completeness fun_body cci ccs
 	
@@ -687,7 +690,7 @@ instance check_completeness Expression where
 		  o (check_completeness expr2) cci
 		  ) ccs
 	check_completeness expr _ _
-		= abort "explicitimports:check_completeness (Expression) does not match" <<- expr
+		= abort "explicitimports:check_completeness (Expression) does not match" //<<- expr
 
 instance check_completeness FunctionBody where
 	check_completeness (CheckedBody body) cci ccs

@@ -1,7 +1,7 @@
 implementation module refmark
 
 import StdEnv
-import syntax, Heap, typesupport, check, overloading, unitype, utilities, RWSDebug
+import syntax, Heap, typesupport, check, overloading, unitype, utilities //, RWSDebug
 
 
 NotASelector :== -1
@@ -522,7 +522,7 @@ where
 										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
 											occ_observing = False,  occ_bind = OB_Empty }), expr_heap)
 					_
-						-> abort ("initial_occurrence (remark.icl)" ---> ((fv_name,fv_info_ptr) <<- var_info))
+						-> abort ("initial_occurrence (refmark.icl)" ---> ((fv_name,fv_info_ptr) ))//<<- var_info))
 					
 
 		make_shared_vars_non_unique vars coercion_env var_heap expr_heap error
@@ -553,7 +553,7 @@ where
 							-> (coercion_env, expr_heap, error)
 							-> (coercion_env, expr_heap, uniquenessError (CP_Expression (FreeVar free_var)) " demanded attribute cannot be offered by shared object" error)
 					_
-						-> abort ("make_shared_occurrence_non_unique" ---> ((free_var, var_expr_ptr) <<- expr_info))
+						-> abort ("make_shared_occurrence_non_unique" ---> ((free_var, var_expr_ptr) )) // <<- expr_info))
 		make_selection_non_unique fv {su_multiply} cee
 			= make_shared_occurrences_non_unique fv su_multiply cee
 

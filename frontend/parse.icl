@@ -4,7 +4,8 @@ import StdEnv
 import scanner, syntax, hashtable, utilities, predef
 
 ParseOnly :== False
-import RWSDebug
+
+//import RWSDebug
 
 toLineAndColumn {fp_line, fp_col}
 	=	{lc_line = fp_line, lc_column = fp_col}

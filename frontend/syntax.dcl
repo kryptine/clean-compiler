@@ -66,11 +66,13 @@ instance toString Ident
 					*/
 				| STE_BelongingSymbol !Int
 
-::	Declaration =
-	{	dcl_ident	:: !Ident
-	,	dcl_pos		:: !Position
-	,	dcl_kind	:: !STE_Kind
-	,	dcl_index	:: !Index
+::	Declaration = Declaration !DeclarationRecord
+
+::	DeclarationRecord =
+	{	decl_ident	:: !Ident
+	,	decl_pos	:: !Position
+	,	decl_kind	:: !STE_Kind
+	,	decl_index	:: !Index
 	}
 
 ::	ComponentNrAndIndex =
@@ -1061,7 +1063,7 @@ cIsNotStrict	:== False
 				| Update !Expression ![Selection] Expression
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
-				| Lambda .[FreeVar] !Expression
+//				| Lambda .[FreeVar] !Expression
 				| BasicExpr !BasicValue !BasicType
 				| WildCard
 				| Conditional !Conditional
@@ -1235,6 +1237,8 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar
+
+instance <<< FunctionBody
 
 instance == TypeAttribute
 instance == Annotation

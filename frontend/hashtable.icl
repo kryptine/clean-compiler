@@ -3,7 +3,7 @@ implementation module hashtable
 import predef, syntax, StdCompare, compare_constructor
 
 ::	HashTableEntry
-		= HTE_Ident !Ident !IdentClass !Int !HashTableEntry !HashTableEntry
+		= HTE_Ident !BoxedIdent !IdentClass !Int !HashTableEntry !HashTableEntry
 		| HTE_Empty 
 
 ::	HashTable =
@@ -115,11 +115,15 @@ where
 	insert name ident_class hte_mark0 hte_symbol_heap HTE_Empty
 		# (hte_symbol_ptr, hte_symbol_heap) = newPtr EmptySymbolTableEntry hte_symbol_heap
 		# ident = { id_name = name, id_info = hte_symbol_ptr}
-		= ({boxed_ident=ident}, hte_symbol_heap, HTE_Ident ident ident_class hte_mark0 HTE_Empty HTE_Empty)
-	insert name ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{id_name,id_info} hte_class hte_mark hte_left hte_right)
+//		= ({boxed_ident=ident}, hte_symbol_heap, HTE_Ident ident ident_class hte_mark0 HTE_Empty HTE_Empty)
+		# boxed_ident={boxed_ident=ident}
+		= (boxed_ident, hte_symbol_heap, HTE_Ident boxed_ident ident_class hte_mark0 HTE_Empty HTE_Empty)
+//	insert name ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{id_name,id_info} hte_class hte_mark hte_left hte_right)
+	insert name ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{boxed_ident={id_name,id_info}} hte_class hte_mark hte_left hte_right)
 		# cmp = (name,ident_class) =< (id_name,hte_class)
 		| cmp == Equal
-			= ({boxed_ident=hte_ident}, hte_symbol_heap, HTE_Ident hte_ident hte_class (hte_mark bitand hte_mark0) hte_left hte_right)
+//			= ({boxed_ident=hte_ident}, hte_symbol_heap, HTE_Ident hte_ident hte_class (hte_mark bitand hte_mark0) hte_left hte_right)
+			= (hte_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class (hte_mark bitand hte_mark0) hte_left hte_right)
 		| cmp == Smaller
 			#! (boxed_ident, hte_symbol_heap, hte_left) = insert name ident_class hte_mark0 hte_symbol_heap hte_left
 			= (boxed_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)

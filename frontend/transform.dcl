@@ -12,11 +12,14 @@ partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunD
 partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
 
+::	CopiedLocalFunctions
+
 ::	UnfoldState =
 	{	us_var_heap				:: !.VarHeap
 	,	us_symbol_heap			:: !.ExpressionHeap
 	,	us_opt_type_heaps		:: !.Optional .TypeHeaps,
-		us_cleanup_info			:: ![ExprInfoPtr]
+		us_cleanup_info			:: ![ExprInfoPtr],
+		us_local_macro_functions :: !Optional CopiedLocalFunctions
 	}
 
 ::	UnfoldInfo =

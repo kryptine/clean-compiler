@@ -1124,7 +1124,7 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 			= weightedRefCountInPatternExpr rc_main_dcl_module_n dcl_functions common_defs depth expr info
 		weighted_ref_count_in_default dcl_functions common_defs depth No info
 			= ([], info)
-						
+		
 		weighted_ref_count_in_case_patterns dcl_functions common_defs depth (AlgebraicPatterns type patterns) collected_imports var_heap expr_heap
 			= mapSt (weighted_ref_count_in_algebraic_pattern dcl_functions common_defs depth) patterns ([], collected_imports, var_heap, expr_heap)
 		where
@@ -1411,7 +1411,7 @@ my_zip [x:xs][y:ys] = [(x,y) : my_zip xs ys]
 
 instance distributeLets Case
 where 
-	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr} dl_info=:{di_var_heap, di_expr_heap}
+	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr} dl_info=:{di_var_heap, di_expr_heap}	
 		# (EI_CaseTypeAndRefCounts case_type { rcc_all_variables = tot_ref_counts , rcc_default_variables = ref_counts_in_default, rcc_pattern_variables = ref_counts_in_patterns }, di_expr_heap) = readPtr case_info_ptr di_expr_heap
 //		  di_expr_heap = di_expr_heap <:= (case_info_ptr, EI_CaseType case_type)
 		  new_depth = inc depth
@@ -1567,10 +1567,15 @@ where
 instance <<< (Ptr a)
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  
+/*
+instance <<< BoundVar
+where
+	(<<<) file {var_name,var_info_ptr} = file <<< var_name <<< '[' <<< var_info_ptr <<< ']'
 
 instance  <<<  FunctionBody
 where
 	(<<<) file (TransformedBody {tb_rhs}) = file <<<  tb_rhs
+*/
 
 instance  <<<  CountedVariable
 where

@@ -1,7 +1,7 @@
 implementation module analtypes
 
 import StdEnv
-import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes, RWSDebug
+import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes //, RWSDebug
 
 ::	UnifyKindsInfo = 
 	{	uki_kind_heap	::!.KindHeap

@@ -19,7 +19,6 @@ Start world
 					(ms.ms_out, ms.ms_files))) world
 	= fclose ms_out world
 
-
 CommandLoop proj ms=:{ms_io}
 	# (answer, ms_io)		= freadline (ms_io <<< "> ")
 	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
@@ -43,7 +42,7 @@ CommandLoop proj ms=:{ms_io}
 	}
 	
 
-::	*MainState funs funtypes types conses classes instances members selectors =
+::	*MainState =
 	{	ms_io			:: !*File
 	,	ms_error		:: !*File
 	,	ms_out			:: !*File
@@ -51,48 +50,68 @@ CommandLoop proj ms=:{ms_io}
 	,	ms_files		:: !*Files
 	}	
 
-::	ModuleTree = ModuleNode !InterMod !ModuleTree !ModuleTree | NoModules
+::	InterMod =
+	{	inter_name					:: !String
+	,	inter_modules				:: !{# String}
+/*	,	inter_fun_defs				:: !{# FunDef}
+	,	inter_icl_dcl_conversions	:: !Optional {# Index}
+*/
+	}
 
-containsModule name (ModuleNode {inter_name = {id_name}} left right)
-	# cmp = id_name =< name
-	| cmp == Equal
+::	ModuleTree = ModuleNode !String !ModuleTree !ModuleTree | NoModules
+
+containsModule name (ModuleNode inter_name left right)
+	| inter_name == name
 		= True
-	| cmp == Smaller
+	| inter_name < name
 		= containsModule name right
 		= containsModule name left
 containsModule name NoModules
 	= False
 
-addModule name mod tree=:(ModuleNode this_mod=:{inter_name = {id_name}} left right)
-	# cmp = id_name =< name
-	| cmp == Equal
+addModule name mod tree=:(ModuleNode this_mod left right)
+	| this_mod == name
 		= tree
-	| cmp == Smaller
+	| this_mod < name
 		= ModuleNode this_mod left (addModule name mod right)
 		= ModuleNode this_mod (addModule name mod left) right
 addModule _ mod NoModules
 	= ModuleNode mod NoModules NoModules
 
+:: DclCache = {
+	dcl_modules::!{#DclModule},
+	functions_and_macros::!{#FunDef},
+	predef_symbols::!.PredefinedSymbols,
+	hash_table::!.HashTable,
+	heaps::!.Heaps
+ };
+
 ::	Project =
-	{	proj_main_module	:: !Ident
-	,	proj_hash_table		:: !.HashTable
-	,	proj_predef_symbols	:: !.PredefinedSymbols
+	{	proj_main_module	:: !String
 	,	proj_modules		:: !ModuleTree
+	,	proj_cache			:: !.DclCache
 	}
 
-::	InterMod =
-	{	inter_name					:: Ident
-	,	inter_modules				:: !{# Ident}
-	,	inter_fun_defs				:: !{# FunDef}
-	,	inter_icl_dcl_conversions	:: !Optional {# Index}
-	,	inter_dcl_icl_conversions	:: !Optional {# Index}
-	}
-
+empty_cache :: *DclCache
+empty_cache
+	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}}
+	# (predef_symbols, hash_table) = buildPredefinedSymbols newHashTable
+	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
 
 DoCommand ['c':_] argument proj ms 
 	# (file_name, rest_input) = SplitAtLayoutChar (dropWhile isSpace argument)
-	  (opt_mod, ms) = compileModule (toString file_name) ms
+	  (opt_mod,dcl_cache,ms) = compileModule (toString file_name) empty_cache ms
 	= (False, proj, ms)
+
+DoCommand ['m':_] argument proj ms 
+	# (file_name, rest_input) = SplitAtLayoutChar (dropWhile isSpace argument)
+	# mod_name = toString file_name
+	# dcl_cache=empty_cache
+  	# (opt_mod, ms) = makeProject { proj_main_module=mod_name,
+  									proj_modules=NoModules,
+  									proj_cache=dcl_cache} ms
+	= (False, proj, ms)
+
 DoCommand ['s':_] argument proj ms=:{ms_io, ms_files} 
 	# (file_name, rest_input)	= SplitAtLayoutChar (dropWhile isSpace argument)
 	  file_name 				= toString (file_name++['.icl'])
@@ -100,26 +119,33 @@ DoCommand ['s':_] argument proj ms=:{ms_io, ms_files}
 	  (lines,file)				= freadlines file
 	  (ok,files)				= fclose file files
 	= (False, proj, {ms & ms_io = ms_io <<< ("file "+++file_name+++" "+++toString (length lines)+++" lines\n") <<< lines <<< "\n", ms_files = files})
+
 DoCommand ['t':_] argument proj ms=:{ms_files, ms_io}
 	# (file_names, ms_files, ms_io) = converFileToListOfStrings "testfiles" ms_files ms_io
-	= (False, proj, foldSt check_module file_names { ms & ms_files = ms_files, ms_io = ms_io })
+	# (dcl_cache,ms) = foldSt check_module file_names (empty_cache,{ ms & ms_files = ms_files, ms_io = ms_io })
+	= (False, proj, ms)
 where
-	check_module file_name ms
-  		# (opt_mod, ms) = compileModule file_name (ms ---> file_name)
+	check_module file_name (dcl_cache,ms)
+		# ms = {ms & ms_io = ms.ms_io <<< "Compiling " <<< file_name <<< "\n"}
+  		# (opt_mod, dcl_cache,ms) = compileModule file_name dcl_cache ms
 		= case opt_mod of
 			No
-				-> { ms & ms_io = ms.ms_io <<< file_name <<< " is not OK\n" }
+				-> (dcl_cache,{ ms & ms_io = ms.ms_io <<< file_name <<< " is not OK\n" })
 			_
-				-> ms
+				-> (dcl_cache,ms)
+
 DoCommand ['p':_] argument proj ms=:{ms_io, ms_files}
 	# (file_name, rest_input)		= SplitAtLayoutChar (dropWhile isSpace argument)
 	  (predef_symbols, hash_table) 	= buildPredefinedSymbols newHashTable
 	  (mod_ident, hash_table) 		= putIdentInHashTable (toString file_name) IC_Module hash_table
-	= (False, Yes { proj_main_module = mod_ident.boxed_ident, proj_hash_table = hash_table, proj_predef_symbols = predef_symbols, proj_modules = NoModules }, ms)
+	= (False, Yes { proj_main_module = mod_ident.boxed_ident.id_name,proj_modules = NoModules,proj_cache=empty_cache }, ms)
+
 DoCommand ['q':_] argument proj ms
 	= (True, proj, ms)
+
 DoCommand ['h':_] argument proj  ms=:{ms_io}
 	= (False, proj, {ms & ms_io = ms_io <<< "No help available. Sorry.\n"})
+
 DoCommand command argument proj  ms=:{ms_io}
 	= (False, proj, {ms & ms_io = ms_io <<< toString command <<< "?\n"})
 
@@ -139,79 +165,111 @@ SplitAtLayoutChar [x:xs]
 where
 	(word, rest_input) = SplitAtLayoutChar xs
 
-compileModule mod_name ms
-	# (predef_symbols, hash_table) = buildPredefinedSymbols newHashTable
-	  (mod_ident, hash_table) = putIdentInHashTable mod_name IC_Module hash_table
-	  (opt_module, predef_symbols, hash_table, ms) = loadModule mod_ident.boxed_ident predef_symbols hash_table ms
-	= (opt_module, ms)
+compileModule :: String *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
+compileModule mod_name dcl_cache ms
+	# (mod_ident, hash_table) = putIdentInHashTable mod_name IC_Module dcl_cache.hash_table
+	  dcl_cache = {dcl_cache & hash_table=hash_table}
+	= loadModule mod_ident.boxed_ident dcl_cache ms
 
-loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
-	# heaps = { hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = { th_vars = newHeap, th_attrs = newHeap }}
-	# (optional_syntax_tree,_,_,_,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,_)
-		=	frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} {} {} No predef_symbols hash_table ms_files ms_error ms_io ms_out No heaps
+loadModule :: Ident *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
+loadModule mod_ident {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
+	# (optional_syntax_tree,cached_functions_and_macros,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
+		= frontEndInterface FrontEndPhaseAll mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules functions_and_macros No predef_symbols hash_table ms_files ms_error ms_io ms_out No heaps
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
-		Yes {fe_icl={icl_functions}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
-			->	(Yes (buildInterMod mod_ident fe_dcls icl_functions fe_dclIclConversions fe_iclDclConversions), predef_symbols, hash_table, ms)
+		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
+			# dcl_modules={{dcl_module \\ dcl_module<-:fe_dcls} & [main_dcl_module_n].dcl_conversions=No}
+			# var_heap = remove_expanded_types_from_dcl_modules 0 dcl_modules icl_used_module_numbers heaps.hp_var_heap
+			# heaps = {heaps & hp_var_heap = var_heap }
+			->	(Yes (buildInterMod mod_ident icl_used_module_numbers fe_dcls /*icl_functions fe_dclIclConversions fe_iclDclConversions*/),
+					{dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}, ms)
 		No
-			->	(No, predef_symbols, hash_table, ms)
+			->	(No, {dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps},ms)
 
-makeProject (Yes proj=:{proj_main_module,proj_hash_table,proj_predef_symbols}) ms
-	# (main_mod, proj_predef_symbols, proj_hash_table, ms) = loadModule proj_main_module proj_predef_symbols proj_hash_table ms
-	  proj = { proj & proj_hash_table = proj_hash_table, proj_predef_symbols = proj_predef_symbols }
+remove_expanded_types_from_dcl_modules :: Int {#DclModule} NumberSet *VarHeap -> *VarHeap
+remove_expanded_types_from_dcl_modules module_n dcls used_module_numbers var_heap
+	| module_n<size dcls
+		| module_n==cPredefinedModuleIndex || not (inNumberSet module_n used_module_numbers)
+			= remove_expanded_types_from_dcl_modules (module_n+1) dcls used_module_numbers var_heap
+			# var_heap = remove_expanded_types_from_dcl_module 0 dcls.[module_n].dcl_functions var_heap
+				with
+					remove_expanded_types_from_dcl_module :: Int {#FunType} *VarHeap -> *VarHeap
+					remove_expanded_types_from_dcl_module function_n dcl_functions var_heap
+						| function_n<size dcl_functions
+							# {ft_type_ptr} = dcl_functions.[function_n]
+							# (ft_type,var_heap) = readPtr ft_type_ptr var_heap
+							= case ft_type of
+								VI_ExpandedType expandedType
+									# var_heap = writePtr ft_type_ptr VI_Empty var_heap
+									-> remove_expanded_types_from_dcl_module (function_n+1) dcl_functions var_heap
+								_
+									-> remove_expanded_types_from_dcl_module (function_n+1) dcl_functions var_heap
+							= var_heap
+			= remove_expanded_types_from_dcl_modules (module_n+1) dcls used_module_numbers var_heap
+		= var_heap
+
+choose_random_module random_n modules
+	# n_modules = length modules;
+	# module_n = toInt (random_n*toReal n_modules)
+	# module_n = if (module_n<0) 0 (if (module_n>=n_modules) (n_modules-1) module_n)
+	# r = find_and_remove_module 0 modules;
+		with
+		find_and_remove_module n [modjule:modules]
+			| n==module_n
+				= (modjule,modules);
+				# (found_module,modules) = find_and_remove_module (n+1) modules;
+				= (found_module,[modjule:modules]);
+	= r;
+
+//import MersenneTwister
+
+makeProject :: *Project *MainState -> *(!Optional Project,!*MainState);
+makeProject proj=:{proj_main_module,proj_cache} ms
+	# (main_mod,dcl_cache,ms) = compileModule proj_main_module proj_cache ms
+	# proj = {proj & proj_cache=dcl_cache}
 	= case main_mod of
 		Yes main_mod=:{inter_modules}
-			# (proj_modules, ms) = collect_modules [ mod \\ mod <-: inter_modules ] (ModuleNode main_mod NoModules NoModules) ms
+//			# random_numbers = genRandReal 100;
+			# random_numbers = []
+			# (proj_modules,proj,ms) = collect_modules [ mod \\ mod <-: inter_modules ] (ModuleNode main_mod.inter_name NoModules NoModules) random_numbers proj ms
 			-> (Yes { proj & proj_modules = proj_modules }, ms)
 		_
-			-> (Yes proj, ms)
+			-> (Yes proj,ms)
 where
-	collect_modules [{id_name} : modules] collected_modules ms
+	collect_modules :: [String] ModuleTree [Real] *Project *MainState -> *(!ModuleTree,!*Project,!*MainState);
+	collect_modules [] collected_modules random_numbers proj ms
+		= (collected_modules,proj,ms)
+	collect_modules [id_name : modules] collected_modules random_numbers proj ms
+//	collect_modules modules collected_modules [random_number:random_numbers] proj ms
+//		# (id_name,modules) = choose_random_module random_number modules
+		| id_name=="_predefined"
+			= collect_modules modules collected_modules random_numbers proj ms
 		| containsModule id_name collected_modules
-			= collect_modules modules collected_modules ms
-			# (this_mod, ms) = compileModule id_name ms
+			= collect_modules modules collected_modules random_numbers proj ms
+			# ms = {ms & ms_io = ms.ms_io <<< "Compiling " <<< id_name <<< "\n"}
+			# dcl_cache = proj.proj_cache
+//			# dcl_cache = empty_cache
+			# (this_mod,dcl_cache,ms) = compileModule id_name dcl_cache ms
+			# proj = {proj & proj_cache=dcl_cache}
 			= case this_mod of
 				Yes new_mod
-					-> collect_modules (modules ++ [ mod \\ mod <-: new_mod.inter_modules ]) (addModule id_name new_mod collected_modules) ms
+					# collected_modules = addModule id_name new_mod.inter_name collected_modules
+					# modules = modules ++ [ mod \\ mod <-: new_mod.inter_modules | not (containsModule mod collected_modules) && not (isMember mod modules)]
+					-> collect_modules modules collected_modules random_numbers proj ms
 				_
-					-> (NoModules, ms)
-	collect_modules [{id_name} : modules] collected_modules ms
-		= (collected_modules, ms)
+					# ms = {ms & ms_io = ms.ms_io <<< "Compiling " <<< id_name <<< " failed \n"}
+					-> collect_modules modules collected_modules random_numbers proj ms
+//					-> (NoModules, ms)
 
-buildInterMod name dcl_modules fun_defs dcl_icl_conversions /* RWS ... */ icl_dcl_conversions /* ... RWS */
-	=	{	inter_name					= name
-		,	inter_modules				= { dcl_name \\ {dcl_name} <-: dcl_modules }
+buildInterMod name icl_used_module_numbers dcl_modules // fun_defs dcl_icl_conversions icl_dcl_conversions
+	# used_dcl_modules = [modjule \\ modjule <-: dcl_modules & module_n<-[0..] | inNumberSet module_n icl_used_module_numbers ]
+	=	{	inter_name					= name.id_name
+		,	inter_modules				= { dcl_name.id_name \\ {dcl_name} <- used_dcl_modules }
+/*
 		,	inter_fun_defs				= fun_defs
-/* RWS ...
-		,	inter_icl_dcl_conversions	= build_icl_dcl_conversions (size fun_defs) dcl_icl_conversions
-*/
 		,	inter_icl_dcl_conversions	= icl_dcl_conversions
-/* ... RWS */
-		,	inter_dcl_icl_conversions	= dcl_icl_conversions
-		}
-/* RWS
-where
-	build_icl_dcl_conversions table_size (Yes conversion_table)
-		# dcl_table_size = size conversion_table
-		  icl_dcl_conversions = update_conversion_array 0 dcl_table_size conversion_table (createArray table_size NoIndex)
-		= Yes (fill_empty_positions 0 table_size dcl_table_size icl_dcl_conversions)
-	build_icl_dcl_conversions table_size No
-		= No
-		
-	update_conversion_array	dcl_index dcl_table_size conversion_table icl_conversions
-		| dcl_index < dcl_table_size
-			#  icl_index = conversion_table.[dcl_index]
-			= update_conversion_array (inc dcl_index) dcl_table_size conversion_table
-					{ icl_conversions & [icl_index] = dcl_index }
-			= icl_conversions
-
-	fill_empty_positions next_index table_size next_new_index icl_conversions
-		| next_index < table_size
-			| icl_conversions.[next_index] == NoIndex
-				= fill_empty_positions (inc next_index) table_size (inc next_new_index) { icl_conversions & [next_index] = next_new_index }
-				= fill_empty_positions (inc next_index) table_size next_new_index icl_conversions
-			= icl_conversions
 */
+		}
 
 /* RWS			
 showComponents :: !*{! Group} !Int !Bool !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
@@ -231,7 +289,6 @@ where
 			= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_symb)
 
-	
 showComponents2 :: !{! Group} !Int !*{# FunDef} !{! ConsClasses} !*File  -> (!*{# FunDef},!*File)
 showComponents2 comps comp_index fun_defs acc_args file
 	| comp_index >= (size comps)

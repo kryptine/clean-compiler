@@ -847,7 +847,8 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			# (guard_expr, ti) = transformCase {outer_case & case_expr = guard_expr} ro ti
 			= ([guard_expr], ti)
 		lift_patterns_2 default_exists [guard_expr : guard_exprs] outer_case ro ti
-			# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info}
+			# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
+					 us_local_macro_functions = No }
 			  ui = {ui_handle_aci_free_vars = LeaveThem, ui_convert_module_n= -1,ui_conversion_table=No }
 			  (outer_guards, us=:{us_cleanup_info}) = unfold outer_case.case_guards ui us
 			  (expr_info, ti_symbol_heap) = readPtr outer_case.case_info_ptr us.us_symbol_heap
@@ -880,7 +881,8 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 				  non_unfoldable_args = filterWith not_unfoldable zipped
 				  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
 				  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module ds_index ro ti.ti_symbol_heap
-				  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info}
+				  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
+				  				   us_local_macro_functions = No }
 				  ui= {ui_handle_aci_free_vars = LeaveThem, ui_convert_module_n= -1,ui_conversion_table=No }
 				  (unfolded_expr, unfold_state) = unfold new_expr ui unfold_state
 				  (final_expr, ti) = transform unfolded_expr { ro & ro_root_case_mode = NotRootCase } (unfold_state_to_ti unfold_state ti)
@@ -990,7 +992,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		  (_, fresh_arg_types, ti_type_heaps) = substitute arg_types { th_vars = th_vars, th_attrs = th_attrs }
 		  (_, fresh_result_type, ti_type_heaps) = substitute ct_result_type ti_type_heaps
 		  us = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = Yes ti_type_heaps, 
-					us_cleanup_info=ti.ti_cleanup_info }
+					us_cleanup_info=ti.ti_cleanup_info, us_local_macro_functions=No }
 		  ui = {ui_handle_aci_free_vars = SubstituteThem, ui_convert_module_n= -1,ui_conversion_table=No }
 		  (copied_expr, {us_var_heap=ti_var_heap, us_symbol_heap=ti_symbol_heap, us_cleanup_info=ti_cleanup_info,
 								us_opt_type_heaps = Yes ti_type_heaps})
@@ -1016,7 +1018,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 									,	fi_properties = outer_fun_def.fun_info.fi_properties
 									}	
 					}
-		  cc_args_from_outer_fun = [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
+		# cc_args_from_outer_fun = [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
 		  cc_linear_bits_from_outer_fun = [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
 		  new_cons_args = { cc_size	= fun_arity, cc_args = repeatn nr_of_lifted_vars cPassive++cc_args_from_outer_fun,
 							cc_linear_bits = repeatn nr_of_lifted_vars False++cc_linear_bits_from_outer_fun }
@@ -1425,7 +1427,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  us 	
 	  		= { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap,
 	  			us_opt_type_heaps = Yes { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs },
-				 us_cleanup_info=ti_cleanup_info }
+				 us_cleanup_info=ti_cleanup_info,us_local_macro_functions=No }
  	  ui	
  	  		= {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1,ui_conversion_table=No }
 	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})

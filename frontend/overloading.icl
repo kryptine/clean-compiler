@@ -96,7 +96,6 @@ instanceError symbol types err
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type "
 									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
 
-
 uniqueError symbol types err
 	# err = errorHeading "Overloading/Uniqueness error" err
 	  format = { form_properties = cAnnotated, form_attr_position = No }

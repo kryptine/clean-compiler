@@ -2,7 +2,7 @@ implementation module unitype
 
 import StdEnv
 
-import syntax, analunitypes, type, utilities, checktypes, RWSDebug
+import syntax, analunitypes, type, utilities, checktypes //, RWSDebug
 
 import cheat
 
@@ -455,7 +455,7 @@ where
 				(AVI_Attr attr, attr_var_heap)
 					-> (True,attr, attr_var_heap)
 				(info, attr_var_heap)
-					-> abort ("expand_attribute (unitype.icl)" ---> (av_name <<- info ))
+					-> abort ("expand_attribute (unitype.icl)" )//---> (av_name <<- info ))
 		expand_attribute attr attr_var_heap
 			= (False,attr, attr_var_heap)
 
@@ -479,7 +479,7 @@ where
 				(AVI_Attr attr, attr_var_heap)
 					-> (True,attr, attr_var_heap)
 				(info, attr_var_heap)
-					-> abort ("expand_attribute (unitype.icl)" ---> (av_name <<- info ))
+					-> abort ("expand_attribute (unitype.icl)" )//---> (av_name <<- info ))
 		expand_attribute attr attr_var_heap
 			= (False,attr, attr_var_heap)
 	

@@ -78,10 +78,10 @@ where
 	lift (TupleSelect symbol argn_nr expr) ls
 		# (expr, ls) = lift expr ls
 		= (TupleSelect symbol argn_nr expr, ls)
-	lift (Lambda vars expr) ls
+/*	lift (Lambda vars expr) ls
 		# (expr, ls) = lift expr ls
 		= (Lambda vars expr, ls)
-	lift (MatchExpr opt_tuple cons_symb expr) ls
+*/	lift (MatchExpr opt_tuple cons_symb expr) ls
 		# (expr, ls) = lift expr ls
 		= (MatchExpr opt_tuple cons_symb expr, ls)
 	lift expr ls
@@ -100,62 +100,43 @@ where
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
 		# (app_args, ls) = lift app_args ls
 		| glob_module == ls.ls_x.LiftStateX.x_main_dcl_module_n
-//			#! fun_def = ls.ls_fun_defs.[glob_object]
 			#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
 			# {fun_info={fi_free_vars}} = fun_def
 			  fun_lifted = length fi_free_vars
 			| fun_lifted > 0
-				# (app_args, ls_var_heap, ls_expr_heap) = add_free_variables fi_free_vars app_args ls.ls_var_heap ls.ls_expr_heap
+				# (app_args, ls_var_heap, ls_expr_heap) = add_free_variables_in_app fi_free_vars app_args ls.ls_var_heap ls.ls_expr_heap
 				= ({ app & app_args = app_args, app_symb = { app_symbol & symb_arity = symb_arity + fun_lifted }},
 						{ ls & ls_var_heap = ls_var_heap, ls_expr_heap = ls_expr_heap })
 				= ({ app & app_args = app_args }, ls)
 			= ({ app & app_args = app_args }, ls)
-	where
-		add_free_variables :: ![FreeVar] ![Expression] !u:VarHeap !*ExpressionHeap -> (![Expression],!u:VarHeap,!*ExpressionHeap)
-		add_free_variables [] app_args var_heap expr_heap
-			= (app_args, var_heap, expr_heap)
-		add_free_variables [{fv_name, fv_info_ptr} : free_vars] app_args var_heap expr_heap
-			#! var_info = sreadPtr fv_info_ptr var_heap
-			= case var_info of
-				VI_LiftedVariable var_info_ptr
-				 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> add_free_variables free_vars [Var { var_name = fv_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
-							var_heap expr_heap
-				_
-				 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> add_free_variables free_vars [Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
-							var_heap expr_heap
-
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_LocalMacroFunction glob_object}, app_args} ls
 		# (app_args, ls) = lift app_args ls
-//		#! fun_def = ls.ls_fun_defs.[glob_object]
 		#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
 		# {fun_info={fi_free_vars}} = fun_def
 		  fun_lifted = length fi_free_vars
 		| fun_lifted > 0
-			# (app_args, ls_var_heap, ls_expr_heap) = add_free_variables fi_free_vars app_args ls.ls_var_heap ls.ls_expr_heap
+			# (app_args, ls_var_heap, ls_expr_heap) = add_free_variables_in_app fi_free_vars app_args ls.ls_var_heap ls.ls_expr_heap
 			= ({ app & app_args = app_args, app_symb = { app_symbol & symb_arity = symb_arity + fun_lifted }},
 					{ ls & ls_var_heap = ls_var_heap, ls_expr_heap = ls_expr_heap })
 			= ({ app & app_args = app_args }, ls)
-	where
-		add_free_variables :: ![FreeVar] ![Expression] !u:VarHeap !*ExpressionHeap -> (![Expression],!u:VarHeap,!*ExpressionHeap)
-		add_free_variables [] app_args var_heap expr_heap
-			= (app_args, var_heap, expr_heap)
-		add_free_variables [{fv_name, fv_info_ptr} : free_vars] app_args var_heap expr_heap
-			#! var_info = sreadPtr fv_info_ptr var_heap
-			= case var_info of
-				VI_LiftedVariable var_info_ptr
-				 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> add_free_variables free_vars [Var { var_name = fv_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
-							var_heap expr_heap
-				_
-				 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					-> add_free_variables free_vars [Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
-							var_heap expr_heap
-
 	lift app=:{app_args} ls
 		# (app_args, ls) = lift app_args ls
 		= ({ app & app_args = app_args }, ls)
+
+add_free_variables_in_app :: ![FreeVar] ![Expression] !u:VarHeap !*ExpressionHeap -> (![Expression],!u:VarHeap,!*ExpressionHeap)
+add_free_variables_in_app [] app_args var_heap expr_heap
+	= (app_args, var_heap, expr_heap)
+add_free_variables_in_app [{fv_name, fv_info_ptr} : free_vars] app_args var_heap expr_heap
+	#! var_info = sreadPtr fv_info_ptr var_heap
+	= case var_info of
+		VI_LiftedVariable var_info_ptr
+		 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+			-> add_free_variables_in_app free_vars [Var { var_name = fv_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
+					var_heap expr_heap
+		_
+		 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+			-> add_free_variables_in_app free_vars [Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr } : app_args]
+					var_heap expr_heap
 
 instance lift LetBind
 where
@@ -205,23 +186,6 @@ where
 		# (dp_rhs, ls) = lift dp_rhs ls
 		= ({ pattern & dp_rhs = dp_rhs }, ls)
 
-::	UnfoldState =
-	{	us_var_heap				:: !.VarHeap
-	,	us_symbol_heap			:: !.ExpressionHeap
-	,	us_opt_type_heaps		:: !.Optional .TypeHeaps,
-		us_cleanup_info			:: ![ExprInfoPtr]
-	}
-
-::	UnfoldInfo =
-	{	ui_handle_aci_free_vars	:: !AciFreeVarHandleMode,
-		ui_convert_module_n :: !Int, // -1 if no conversion
-		ui_conversion_table :: !Optional ConversionTable
-	}
-
-:: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem
-
-class unfold a :: !a !UnfoldInfo !*UnfoldState -> (!a, !*UnfoldState)
-
 unfoldVariable :: !BoundVar !*UnfoldState -> (!Expression, !*UnfoldState)
 unfoldVariable var=:{var_name,var_info_ptr} us
 	#! (var_info, us) = readVarInfo var_info_ptr us
@@ -244,10 +208,10 @@ unfoldVariable var=:{var_name,var_info_ptr} us
 		_
 			-> (Var var, us)
   where
-	substitute_class_types class_types no=:No
-		= (class_types, no)
+	substitute_class_types class_types No
+		= (class_types, No)
 	substitute_class_types class_types (Yes type_heaps)
-		# (_, new_class_types, type_heaps) = substitute class_types type_heaps
+		# (_,new_class_types, type_heaps) = substitute class_types type_heaps
 		= (new_class_types, Yes type_heaps)
 
 readVarInfo var_info_ptr us
@@ -262,6 +226,36 @@ writeVarInfo var_info_ptr new_var_info var_heap
 	= case old_var_info of
 		VI_Extended extensions _	-> writePtr var_info_ptr (VI_Extended extensions new_var_info) var_heap
 		_							-> writePtr var_info_ptr new_var_info var_heap
+
+::	CopiedLocalFunction = {
+		old_function_n :: !Int,
+		new_function_n :: !Int
+	}
+
+::	CopiedLocalFunctions = {
+		copied_local_functions :: [CopiedLocalFunction],
+		used_copied_local_functions :: [CopiedLocalFunction],
+		new_copied_local_functions :: [CopiedLocalFunction],
+		next_local_function_n :: !Int
+	}
+
+::	UnfoldState =
+	{	us_var_heap				:: !.VarHeap
+	,	us_symbol_heap			:: !.ExpressionHeap
+	,	us_opt_type_heaps		:: !.Optional .TypeHeaps,
+		us_cleanup_info			:: ![ExprInfoPtr],
+		us_local_macro_functions :: !Optional CopiedLocalFunctions
+	}
+
+::	UnfoldInfo =
+	{	ui_handle_aci_free_vars	:: !AciFreeVarHandleMode,
+		ui_convert_module_n :: !Int, // -1 if no conversion
+		ui_conversion_table :: !Optional ConversionTable
+	}
+
+:: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem
+
+class unfold a :: !a !UnfoldInfo !*UnfoldState -> (!a, !*UnfoldState)
 
 instance unfold Expression
 where
@@ -291,10 +285,10 @@ where
 	unfold (TupleSelect symbol argn_nr expr) ui us
 		# (expr, us) = unfold expr ui us
 		= (TupleSelect symbol argn_nr expr, us)
-	unfold (Lambda vars expr) ui us
+/*	unfold (Lambda vars expr) ui us
 		# (expr, us) = unfold expr ui us
 		= (Lambda vars expr, us)
-	unfold (MatchExpr opt_tuple cons_symb expr) ui us
+*/	unfold (MatchExpr opt_tuple cons_symb expr) ui us
 		# (expr, us) = unfold expr ui us
 		= (MatchExpr opt_tuple cons_symb expr, us)
 	unfold (DynamicExpr expr) ui us
@@ -340,7 +334,7 @@ instance unfold App
 where
 	unfold app=:{app_symb={symb_kind}, app_args, app_info_ptr} ui=:{ui_convert_module_n,ui_conversion_table} us
 		= case symb_kind of
-			SK_Function 	{glob_module,glob_object}
+			SK_Function {glob_module,glob_object}
 				| ui_convert_module_n==glob_module 
 					# (Yes conversion_table) = ui_conversion_table
 					# app={app & app_symb.symb_kind=SK_Function {glob_module=glob_module,glob_object=conversion_table.[cFunctionDefs].[glob_object]}}
@@ -358,8 +352,48 @@ where
 					# app={app & app_symb.symb_kind=SK_OverloadedFunction {glob_module=glob_module,glob_object=conversion_table.[cFunctionDefs].[glob_object]}}
 					-> unfold_function_app app ui us
 					-> unfold_function_app app ui us
-			SK_LocalMacroFunction _
-				-> unfold_function_app app ui us
+			SK_LocalMacroFunction local_macro_function_n
+				# (us_local_macro_functions,us) = us!us_local_macro_functions
+				-> case us_local_macro_functions of
+					No
+						-> unfold_function_app app ui us
+					uslocal_macro_functions=:(Yes local_macro_functions)
+						# (new_local_macro_function_n,us_local_macro_functions) = determine_new_local_macro_function_n local_macro_function_n local_macro_functions
+							with
+								determine_new_local_macro_function_n local_macro_function_n local_macro_functions=:{copied_local_functions,used_copied_local_functions,new_copied_local_functions,next_local_function_n}
+									# new_local_macro_function_n = search_new_local_macro_function_n used_copied_local_functions
+									| new_local_macro_function_n>=0
+										= (new_local_macro_function_n,us_local_macro_functions)
+									# (new_local_macro_function_n,used_copied_local_functions) = search_new_local_macro_function_n_and_add_to_used_functions copied_local_functions used_copied_local_functions
+									| new_local_macro_function_n>=0
+										= (new_local_macro_function_n,Yes {local_macro_functions & used_copied_local_functions=used_copied_local_functions})
+									# (new_local_macro_function_n,used_copied_local_functions) = search_new_local_macro_function_n_and_add_to_used_functions new_copied_local_functions used_copied_local_functions
+									| new_local_macro_function_n>=0
+										= (new_local_macro_function_n,Yes {local_macro_functions & used_copied_local_functions=used_copied_local_functions})
+										# new_local_function = {old_function_n=local_macro_function_n,new_function_n=next_local_function_n}
+										# new_copied_local_functions=new_copied_local_functions++[new_local_function]
+										# us_local_macro_functions=Yes {copied_local_functions=copied_local_functions,
+																		new_copied_local_functions=new_copied_local_functions,
+																		used_copied_local_functions=[new_local_function:used_copied_local_functions],
+																		next_local_function_n=next_local_function_n+1}
+										= (next_local_function_n,us_local_macro_functions)
+									where
+										search_new_local_macro_function_n [{old_function_n,new_function_n}:local_functions]
+											| local_macro_function_n==old_function_n
+												= new_function_n
+											 	= search_new_local_macro_function_n local_functions
+										search_new_local_macro_function_n []
+											= -1
+
+										search_new_local_macro_function_n_and_add_to_used_functions [copied_local_function=:{old_function_n,new_function_n}:local_functions] used_copied_local_functions
+											| local_macro_function_n==old_function_n
+												= (new_function_n,[copied_local_function:used_copied_local_functions])
+											 	= search_new_local_macro_function_n_and_add_to_used_functions local_functions used_copied_local_functions
+										search_new_local_macro_function_n_and_add_to_used_functions [] used_copied_local_functions
+											= (-1,used_copied_local_functions)
+						# us={us & us_local_macro_functions=us_local_macro_functions}
+						# app={app & app_symb.symb_kind=SK_LocalMacroFunction new_local_macro_function_n}
+						-> unfold_function_app app ui us
 			SK_Constructor _
 				| not (isNilPtr app_info_ptr)
 					# (app_info, us_symbol_heap) = readPtr app_info_ptr us.us_symbol_heap
@@ -381,7 +415,7 @@ where
 			= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, us) 
 
 		substitute_EI_DictionaryType (EI_DictionaryType class_type) (Yes type_heaps)
-			# (_, new_class_type, type_heaps) = substitute class_type type_heaps
+			# (_,new_class_type, type_heaps) = substitute class_type type_heaps
 			= (EI_DictionaryType new_class_type, Yes type_heaps)
 		substitute_EI_DictionaryType x opt_type_heaps
 			= (x, opt_type_heaps)
@@ -495,11 +529,10 @@ substitute_let_or_case_type	(EI_Extended extensions expr_info) yes_type_heaps
 	# (new_expr_info, yes_type_heaps) = substitute_let_or_case_type expr_info yes_type_heaps
 	= (EI_Extended extensions new_expr_info, yes_type_heaps)
 substitute_let_or_case_type	(EI_CaseType case_type) (Yes type_heaps)
-	# (_, new_case_type, type_heaps) = substitute case_type type_heaps
+	# (_,new_case_type, type_heaps) = substitute case_type type_heaps
 	= (EI_CaseType new_case_type, Yes type_heaps)
-//	= (EI_CaseType case_type, Yes type_heaps)
 substitute_let_or_case_type	(EI_LetType let_type) (Yes type_heaps)
-	# (_, new_let_type, type_heaps) = substitute let_type type_heaps
+	# (_,new_let_type, type_heaps) = substitute let_type type_heaps
 	= (EI_LetType new_let_type, Yes type_heaps)
 
 instance unfold CasePatterns
@@ -564,13 +597,16 @@ where
 	unfold no ui us
 		= (no, us)
 
+//import StdDebug
+
 updateFunctionCalls :: ![FunCall] ![FunCall] !*{# FunDef} !*SymbolTable
 	-> (![FunCall], !*{# FunDef}, !*SymbolTable)
 updateFunctionCalls calls collected_calls fun_defs symbol_table
 	= foldSt add_function_call calls (collected_calls, fun_defs, symbol_table)
 where
-	add_function_call fc (collected_calls, fun_defs, symbol_table)
-		# ({fun_symb}, fun_defs) = fun_defs![fc.fc_index]
+	add_function_call fc=:{fc_index} (collected_calls, fun_defs, symbol_table)
+//		# fc_index = trace ("add_function_call: "+++toString fc_index+++" ") fc_index
+		# ({fun_symb}, fun_defs) = fun_defs![fc_index]
 		  (collected_calls, symbol_table) = examineFunctionCall fun_symb fc (collected_calls, symbol_table) 
 		= (collected_calls, fun_defs, symbol_table)
 
@@ -585,29 +621,149 @@ examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
 			-> ( [ fc : calls ], symbol_table <:=
 					(id_info, { ste_kind = STE_Called [fc_index], ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = entry }))
 
-unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
-unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_symb} args (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table,es_fun_defs,es_expand_in_imp_module,	es_main_dcl_module_n,es_dcl_modules})
-	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
-	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No,us_cleanup_info = []}
-	# (result_expr,dcl_modules,us_symbol_heap,us_var_heap) = unfold_and_convert tb_rhs es_dcl_modules us
+copy_macro_and_local_functions :: FunDef (Optional CopiedLocalFunctions) *ExpandState -> (!FunDef,![(CopiedLocalFunction,FunDef)],!Optional CopiedLocalFunctions,!*ExpandState);
+copy_macro_and_local_functions macro=:{fun_kind} local_macro_functions es
+	# is_def_macro=case fun_kind of FK_DefMacro->True; _->False
+	# (macro,local_macro_functions,es) = copy_macro_or_local_macro_function is_def_macro macro local_macro_functions es
+	# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions is_def_macro [] es
+	= (macro,new_functions,local_macro_functions,es)
+
+copy_local_functions_of_macro :: (Optional CopiedLocalFunctions) Bool [CopiedLocalFunction] *ExpandState -> (![(CopiedLocalFunction,FunDef)],!Optional CopiedLocalFunctions,!*ExpandState);
+copy_local_functions_of_macro local_macro_functions is_def_macro local_functions_to_be_copied es
+	# (local_functions_to_be_copied,local_macro_functions) = add_new_local_functions_to_be_copied local_functions_to_be_copied local_macro_functions
 		with
-			unfold_and_convert tb_rhs dcl_modules us
-				# is_def_macro=case fun_kind of FK_DefMacro->True; _->False
+			add_new_local_functions_to_be_copied local_functions_to_be_copied local_macro_functions=:(Yes copied_local_macro_functions=:{new_copied_local_functions=[]})
+				= (local_functions_to_be_copied,Yes {copied_local_macro_functions & used_copied_local_functions=[]})
+			add_new_local_functions_to_be_copied local_functions_to_be_copied (Yes {copied_local_functions,new_copied_local_functions,next_local_function_n})
+				# local_macro_functions=Yes {copied_local_functions=copied_local_functions++new_copied_local_functions,
+											new_copied_local_functions=[],used_copied_local_functions=[],next_local_function_n=next_local_function_n}
+				= (local_functions_to_be_copied++new_copied_local_functions,local_macro_functions)
+	= case local_functions_to_be_copied of
+		[]
+			-> ([],local_macro_functions,es)
+		[(old_and_new_function_n=:{old_function_n,new_function_n}):local_functions_to_be_copied]
+			# (function,es)=es!es_fun_defs.[old_function_n]
+			
+			#! function_group_index=function.fun_info.fi_group_index
+			# es = {es & es_fun_defs.[old_function_n].fun_info.fi_group_index= if (function_group_index>NoIndex) (-2-function_group_index) function_group_index}
+			# function = {function & fun_info.fi_group_index=if (function_group_index<NoIndex) (-2-function_group_index) function_group_index}
+
+			# (function,local_macro_functions,es) = copy_macro_or_local_macro_function is_def_macro function local_macro_functions es
+			# function={function & fun_index=new_function_n}
+			# (new_functions,local_macro_functions,es) = copy_local_functions_of_macro local_macro_functions is_def_macro local_functions_to_be_copied es
+			-> ([(old_and_new_function_n,function):new_functions],local_macro_functions,es)
+
+update_calls calls No
+	= calls
+update_calls calls (Yes {used_copied_local_functions=[]})
+	= calls
+update_calls calls (Yes {used_copied_local_functions})
+	# calls = remove_old_calls calls
+	= add_new_calls used_copied_local_functions calls
+where
+	remove_old_calls [call=:{fc_index}:calls]
+		| contains_old_function_n used_copied_local_functions
+//			# calls = trace ("remove_old_calls1: "+++toString fc_index) calls
+			= remove_old_calls calls
+//			# calls = trace ("remove_old_calls2: "+++toString fc_index) calls
+			= [call:remove_old_calls calls]
+	where
+		contains_old_function_n [{old_function_n}:local_functions]
+			= fc_index==old_function_n || contains_old_function_n local_functions
+		contains_old_function_n []
+			= False
+	remove_old_calls []
+		= []
+	
+	add_new_calls [{new_function_n}:local_functions] calls
+//		# local_functions = trace ("add_new_calls: "+++toString new_function_n) local_functions
+		= add_new_calls local_functions [{fc_index=new_function_n,fc_level=NotALevel}:calls]
+	add_new_calls [] calls
+		= calls
+
+copy_macro_or_local_macro_function :: !Bool !FunDef !(Optional CopiedLocalFunctions) !*ExpandState -> (!FunDef,!Optional CopiedLocalFunctions,!.ExpandState);
+copy_macro_or_local_macro_function is_def_macro macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls}} local_macro_functions es=:{es_var_heap,es_symbol_heap,es_expand_in_imp_module,es_main_dcl_module_n,es_dcl_modules}
+	# (tb_args,es_var_heap) = create_new_arguments tb_args es_var_heap
+		with
+			create_new_arguments [var=:{fv_name,fv_info_ptr} : vars] var_heap
+				# (new_vars,var_heap) = create_new_arguments vars var_heap
+				# (new_info, var_heap) = newPtr VI_Empty var_heap
+				# new_var = { fv_name = fv_name, fv_def_level = NotALevel, fv_info_ptr = new_info, fv_count = 0 }
+				= ([new_var : new_vars], writePtr fv_info_ptr (VI_Variable fv_name new_info) var_heap)
+			create_new_arguments [] var_heap
+				= ([],var_heap)
+	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = es_var_heap, us_opt_type_heaps = No,us_cleanup_info = [],
+			 us_local_macro_functions = local_macro_functions }
+	# (result_expr,dcl_modules,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold_and_convert es_dcl_modules us
+		with
+			unfold_and_convert dcl_modules us
 				| es_expand_in_imp_module && is_def_macro
 					# (dcl_mod,dcl_modules) = dcl_modules![es_main_dcl_module_n]
-					# ui = {ui_handle_aci_free_vars = RemoveThem,  ui_convert_module_n = es_main_dcl_module_n, ui_conversion_table=dcl_mod.dcl_conversions }
-					# (result_expr,{us_symbol_heap,us_var_heap})= unfold tb_rhs ui us
-					= (result_expr,dcl_modules,us_symbol_heap,us_var_heap)
+					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = es_main_dcl_module_n, ui_conversion_table=dcl_mod.dcl_conversions }
+					# (expr,es) = unfold tb_rhs ui us
+					= (expr,dcl_modules,es)
+			
+					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = -1 ,ui_conversion_table=No }
+					# (expr,es) = unfold tb_rhs ui us
+					= (expr,dcl_modules,es)
+	# (fi_local_vars,us_var_heap) = update_local_vars fi_local_vars us_var_heap
+		with
+			update_local_vars :: ![FreeVar] !*(Heap VarInfo) -> (![FreeVar],!*Heap VarInfo);
+			update_local_vars [fv=:{fv_info_ptr}:fvs] var_heap
+				# (fvs,var_heap)=update_local_vars fvs var_heap
+				# (fv_info,var_heap) = readPtr fv_info_ptr var_heap
+//				# fv = {fv & fv_info_ptr=case fv_info of (VI_Variable _ info_ptr) -> info_ptr}
+				# fv = {fv & fv_info_ptr=case fv_info of 
+											(VI_Variable _ info_ptr) -> info_ptr
+						}
+				= ([fv:fvs],var_heap)
+			update_local_vars [] var_heap
+				= ([],var_heap)
+	# fi_calls = update_calls fi_calls us_local_macro_functions
+	= ({macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=result_expr},fun_info.fi_local_vars=fi_local_vars,fun_info.fi_calls=fi_calls},us_local_macro_functions,
+		{es & es_var_heap=us_var_heap, es_symbol_heap=us_symbol_heap, es_dcl_modules=dcl_modules})
 
-					# ui = {ui_handle_aci_free_vars = RemoveThem,  ui_convert_module_n = -1 ,ui_conversion_table=No }
-					# (result_expr,{us_symbol_heap,us_var_heap})= unfold tb_rhs ui us
-					= (result_expr,dcl_modules,us_symbol_heap,us_var_heap)
+unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
+unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_symb} args (calls, es=:{es_var_heap,es_symbol_heap,es_fun_defs,es_expand_in_imp_module,es_main_dcl_module_n,es_dcl_modules})
+	# is_def_macro=case fun_kind of FK_DefMacro->True; _->False
+	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
+	#! size_fun_defs = size es_fun_defs
+	# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=size_fun_defs}
+	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No,us_cleanup_info = [], us_local_macro_functions = copied_local_functions }
+	# (result_expr,dcl_modules,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold_and_convert es_dcl_modules us
+		with
+			unfold_and_convert dcl_modules us
+				| es_expand_in_imp_module && is_def_macro
+					# (dcl_mod,dcl_modules) = dcl_modules![es_main_dcl_module_n]
+					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = es_main_dcl_module_n, ui_conversion_table=dcl_mod.dcl_conversions }
+					# (result_expr,us) = unfold tb_rhs ui us
+					= (result_expr,dcl_modules,us)
+
+					# ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = -1 ,ui_conversion_table=No }
+					# (result_expr,us) = unfold tb_rhs ui us
+					= (result_expr,dcl_modules,us)
+					
+	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_dcl_modules=dcl_modules}
+	# fi_calls = update_calls fi_calls us_local_macro_functions
+	# (new_functions,us_local_macro_functions,es) = copy_local_functions_of_macro us_local_macro_functions is_def_macro [] es
+	# {es_symbol_heap,es_symbol_table,es_fun_defs,es_new_fun_def_numbers} = es
+	# (es_fun_defs,es_new_fun_def_numbers) = case new_functions of
+		[]
+			-> (es_fun_defs,es_new_fun_def_numbers)
+		_
+			# last_function_index = case us_local_macro_functions of (Yes {next_local_function_n}) -> next_local_function_n-1
+			# new_fun_defs = new_fun_defs
+				with
+					new_fun_defs :: *{!FunDef}
+					new_fun_defs => {fun_def \\ (_,fun_def)<-new_functions}
+			-> ({if (i<size_fun_defs) es_fun_defs.[i] new_fun_defs.[i-size_fun_defs] \\ i<-[0..last_function_index]} // inefficient
+				,[size_fun_defs:es_new_fun_def_numbers])
 	# (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls es_fun_defs es_symbol_table
 	| isEmpty let_binds
-		= (result_expr, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table, es_fun_defs=fun_defs,es_dcl_modules=dcl_modules }))
-		#  (new_info_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
-		= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr, let_expr_position = NoPos }, 
-					(calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table,es_fun_defs=fun_defs,es_dcl_modules=dcl_modules }))
+		= (result_expr, (calls, { es & es_symbol_table = es_symbol_table, es_fun_defs=fun_defs,es_new_fun_def_numbers=es_new_fun_def_numbers }))
+		# (new_info_ptr, es_symbol_heap) = newPtr EI_Empty es_symbol_heap
+		# result_expr=Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr, let_expr_position = NoPos }
+		= (result_expr, (calls, { es & es_symbol_table = es_symbol_table, es_symbol_heap=es_symbol_heap, es_fun_defs=fun_defs,es_new_fun_def_numbers=es_new_fun_def_numbers }))
 where
 	bind_expressions [var : vars] [expr : exprs] binds var_heap
 		# (binds, var_heap) = bind_expressions vars exprs binds var_heap
@@ -615,6 +771,7 @@ where
 	bind_expressions _ _ binds var_heap
 		= (binds, var_heap)
 
+	bind_expression :: FreeVar Expression [LetBind] *(Heap VarInfo) -> (![LetBind],!*Heap VarInfo);
 	bind_expression {fv_count} expr binds var_heap
 		| fv_count == 0
 			= (binds, var_heap)
@@ -655,6 +812,10 @@ partitionateMacros {ir_from,ir_to} mod_index alias_dummy fun_defs modules var_he
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
 	  (fun_defs, modules, {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_error, pi_next_group, pi_groups, pi_deps})
 	  		= iFoldSt (pationate_macro mod_index max_fun_nr) ir_from ir_to (fun_defs, modules, partitioning_info)
+
+//	# (size_fun_defs,fun_defs) = usize fun_defs
+//	# fun_defs=trace ("size_fun_defs: "+++toString size_fun_defs+++" ") fun_defs;
+
 	= (foldSt reset_body_of_rhs_macro pi_deps fun_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 where
 	reset_body_of_rhs_macro macro_index macro_defs
@@ -692,11 +853,11 @@ where
 			  es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
 					 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error,
 					 es_fun_defs=macro_defs, es_main_dcl_module_n = mod_index, es_dcl_modules=modules,
-					 es_expand_in_imp_module=expand_in_imp_module
-					  }
+					 es_expand_in_imp_module=expand_in_imp_module,es_new_fun_def_numbers=[]
+					  }			
 			# (tb_args, tb_rhs, local_vars, fi_calls, {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
 					= expandMacrosInBody [] body alias_dummy es
-			  macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
+			# macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
 			= ({ es_fun_defs & [macro_index] = macro }, es_dcl_modules,
 					{ pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_error = es_error })
@@ -715,6 +876,64 @@ where
 			= True
 		is_a_pattern_macro _ _
 			= False
+
+add_new_macros_to_groups :: ![Int] !Int Int *{#FunDef} [Int] [[Int]] -> (!Int,!*{#FunDef},![Int],![[Int]]);
+add_new_macros_to_groups [new_macro_fun_def_index] n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
+	= add_new_macro_and_local_functions_to_groups new_macro_fun_def_index n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
+add_new_macros_to_groups [new_macro_fun_def_index:macro_fun_def_numbers=:[next_macro_fun_def_index:_]] n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
+	# (pi_next_group,es_fun_defs,functions_in_group,pi_groups)
+		= add_new_macro_and_local_functions_to_groups new_macro_fun_def_index next_macro_fun_def_index pi_next_group es_fun_defs functions_in_group pi_groups
+	= add_new_macros_to_groups macro_fun_def_numbers n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
+add_new_macros_to_groups [] n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
+	= (pi_next_group,es_fun_defs,functions_in_group,pi_groups)
+
+add_new_macro_and_local_functions_to_groups :: !Int !Int Int *{#FunDef} [Int] [[Int]] -> (!Int,!*{#FunDef},![Int],![[Int]]);
+add_new_macro_and_local_functions_to_groups new_macro_fun_def_index n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
+	# (pi_next_group,es_fun_defs,functions_in_group,macros)
+		= add_macros_to_current_group new_macro_fun_def_index n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group []
+	# (macros_with_group_numbers,es_fun_defs) = add_group_numbers macros es_fun_defs
+		with
+			add_group_numbers [fun_def_index:l] es_fun_defs
+				# (group_number,es_fun_defs) = es_fun_defs![fun_def_index].fun_info.fi_group_index
+//				# group_number=trace ("add_group_numbers: "+++toString fun_def_index+++" "+++toString group_number+++"\n") group_number;
+				# (l,es_fun_defs) = add_group_numbers l es_fun_defs
+				= ([(fun_def_index,group_number):l],es_fun_defs)
+			add_group_numbers [] es_fun_defs
+				= ([],es_fun_defs)
+	# sorted_macros_with_group_numbers = sortBy (\(_,group_number1) (_,group_number2) -> group_number1<group_number2) macros_with_group_numbers
+	# (pi_next_group,pi_groups) = partition_macros_in_groups sorted_macros_with_group_numbers [] (-1) pi_next_group pi_groups
+		with
+			partition_macros_in_groups [(fun_def_index,fun_def_group_number):l] [] group_number pi_next_group pi_groups
+				= partition_macros_in_groups l [fun_def_index] fun_def_group_number pi_next_group pi_groups
+			partition_macros_in_groups [(fun_def_index,fun_def_group_number):l] group group_number pi_next_group pi_groups
+				| fun_def_group_number==group_number
+					= partition_macros_in_groups l [fun_def_index:group] group_number pi_next_group pi_groups
+					# pi_groups=[group:pi_groups]
+					# pi_next_group=pi_next_group+1
+					= partition_macros_in_groups l [fun_def_index] fun_def_group_number pi_next_group pi_groups			
+			partition_macros_in_groups [] [] group_number pi_next_group pi_groups
+				= (pi_next_group,pi_groups)
+			partition_macros_in_groups [] last_group group_number pi_next_group pi_groups
+				= (pi_next_group+1,[last_group:pi_groups])
+	= (pi_next_group,es_fun_defs,functions_in_group,pi_groups)
+
+add_macros_to_current_group :: !Int !Int Int *{#FunDef} [Int] [Int] -> (!Int,!*{#FunDef},![Int],![Int]);
+add_macros_to_current_group new_macro_fun_def_index n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group macros
+	| new_macro_fun_def_index>=n_fun_defs_after_expanding_macros
+		= (pi_next_group,es_fun_defs,functions_in_group,macros)
+	| es_fun_defs.[new_macro_fun_def_index].fun_info.fi_group_index<=NoIndex
+		= abort ("add_macros_to_current_group: "+++toString new_macro_fun_def_index)
+//				+++" "+++toString es_fun_defs.[new_macro_fun_def_index].fun_info.fi_group_index)
+
+	| es_fun_defs.[new_macro_fun_def_index].fun_info.fi_group_index==pi_next_group
+//		# new_macro_fun_def_index=trace ("add_macros_to_current_group1: "+++toString new_macro_fun_def_index+++"\n") new_macro_fun_def_index;
+		# functions_in_group=[new_macro_fun_def_index:functions_in_group]
+		= add_macros_to_current_group (new_macro_fun_def_index+1) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group macros
+
+//		# new_macro_fun_def_index=trace ("add_macros_to_current_group2: "+++toString new_macro_fun_def_index+++"\n") new_macro_fun_def_index;
+//		# pi_groups=[[new_macro_fun_def_index]:pi_groups]
+//		# pi_next_group=pi_next_group+1
+		= add_macros_to_current_group (new_macro_fun_def_index+1) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group [new_macro_fun_def_index:macros]
 
 partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
@@ -737,9 +956,11 @@ where
 	where
 		remove_macros_from_group [fun:funs] fun_defs
 			# (funs,fun_defs)=remove_macros_from_group funs fun_defs
+
 			| fun_defs.[fun].fun_info.fi_group_index<NoIndex
 				= (funs,fun_defs)
-				= ([fun:funs],fun_defs)
+
+			= ([fun:funs],fun_defs)
 		remove_macros_from_group [] fun_defs
 			= ([],fun_defs);
 	remove_macros_from_groups_and_reverse [] fun_defs result_groups
@@ -753,6 +974,7 @@ where
 		= funs_modules_pi
 
 	partitionate_function mod_index max_fun_nr fun_index (fun_defs, modules, pi)
+//		# fun_index = trace ("partitionate_function: "+++toString fun_index+++" ") fun_index
 		# (fun_def, fun_defs) = fun_defs![fun_index]
 		= case fun_def.fun_body of
 			CheckedBody body
@@ -766,8 +988,8 @@ where
 			TransformedBody _
 				| fun_def.fun_info.fi_group_index == NoIndex
 					# (fun_defs, pi) =  add_called_macros fun_def.fun_info.fi_calls (fun_defs, pi)
-//					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = pi.pi_next_group }}, modules,
-					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = -2-pi.pi_next_group }}, modules,
+					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = pi.pi_next_group }}, modules,
+//					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = -2-pi.pi_next_group }}, modules,
 							{pi & pi_next_group = inc pi.pi_next_group, pi_groups = [ [fun_index] : pi.pi_groups]}
 //							{pi & pi_next_group = pi.pi_next_group}
 							))
@@ -776,27 +998,29 @@ where
 	visit_function mod_index max_fun_nr {fc_index} (min_dep, funs_modules_pi)
 		# (next_min, funs_modules_pi) = partitionate_function mod_index max_fun_nr fc_index funs_modules_pi
 		= (min next_min min_dep, funs_modules_pi)
-		
+
 	try_to_close_group mod_index max_fun_nr fun_index fun_number min_dep def_level (fun_defs, modules,
 					pi=:{pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_deps, pi_groups, pi_next_group, pi_error})
 		| fun_number <= min_dep
 			# (pi_deps, functions_in_group, macros_in_group, fun_defs)
 					= close_group fun_index pi_deps [] [] max_fun_nr pi_next_group fun_defs
 			  {ls_x={x_fun_defs=fun_defs}, ls_var_heap=pi_var_heap, ls_expr_heap=pi_symbol_heap}
-			  		= liftFunctions def_level (functions_in_group ++ macros_in_group) pi_next_group main_dcl_module_n fun_defs pi_var_heap pi_symbol_heap
-			  es	
+			  		= liftFunctions def_level (functions_in_group ++ macros_in_group) pi_next_group main_dcl_module_n fun_defs pi_var_heap pi_symbol_heap		  
+			# es
 			  		= expand_macros_in_group macros_in_group
-			  				{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
-			  					es_fun_defs=fun_defs, es_main_dcl_module_n=mod_index, es_dcl_modules=modules,
-			  					es_expand_in_imp_module=False, // function expand_macros fills in correct value
-				  				es_error = pi_error }
-			  {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs}
+			  			{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
+			  				es_fun_defs=fun_defs, es_main_dcl_module_n=mod_index, es_dcl_modules=modules, es_new_fun_def_numbers=[],
+			  				es_expand_in_imp_module=False, // function expand_macros fills in correct value
+				  			es_error = pi_error }
+			# {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs,es_new_fun_def_numbers}
 			  		= expand_macros_in_group functions_in_group es
+			# (n_fun_defs_after_expanding_macros,es_fun_defs) = usize es_fun_defs
+			# (pi_next_group,es_fun_defs,functions_in_group,pi_groups)
+				= add_new_macros_to_groups (reverse es_new_fun_def_numbers) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
 			= (max_fun_nr, (es_fun_defs, es_dcl_modules, { pi & pi_deps = pi_deps, pi_var_heap = es_var_heap,
 						pi_symbol_table = es_symbol_table, pi_error = es_error, pi_symbol_heap = es_symbol_heap, 
 						pi_next_group = inc pi_next_group, 
 						pi_groups = [ functions_in_group ++ macros_in_group : pi_groups ] }))
-//						pi_groups = if (isEmpty functions_in_group) pi_groups [ functions_in_group : pi_groups ] }))
 			= (min_dep, (fun_defs, modules, pi))
 	where
 		close_group fun_index [d:ds] functions_in_group macros_in_group nr_of_fun_defs group_number fun_defs
@@ -805,6 +1029,7 @@ where
 //			| fun_def.fun_kind == FK_Macro
 			| case fun_def.fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
 				# fun_defs = { fun_defs & [d] = { fun_def & fun_info.fi_group_index = -2-group_number }}
+//				# fun_defs = { fun_defs & [d] = { fun_def & fun_info.fi_group_index = group_number }}
 				# macros_in_group = [d : macros_in_group]
 				| d == fun_index
 					= (ds, functions_in_group, macros_in_group, fun_defs)
@@ -833,14 +1058,17 @@ where
 	add_called_macros calls macro_defs_and_pi
 		= foldSt add_called_macro calls macro_defs_and_pi
 	where
-		add_called_macro {fc_index} (macro_defs, pi)
+		add_called_macro {fc_index} (macro_defs, pi)		
+//			# fc_index = trace ("add_called_macro: "+++toString fc_index+++" ") fc_index
 			# (macro_def, macro_defs) = macro_defs![fc_index]
 			= case macro_def.fun_body of
 				TransformedBody _
 					| macro_def.fun_info.fi_group_index == NoIndex
 						# (macro_defs, pi) = add_called_macros macro_def.fun_info.fi_calls (macro_defs, pi)
 //						->	({ macro_defs & [fc_index] = {macro_def & fun_info.fi_group_index = pi.pi_next_group }},
-						->	({ macro_defs & [fc_index] = {macro_def & fun_info.fi_group_index = -2-pi.pi_next_group }},
+//						# fc_index = trace ("add_called_macro2: "+++toString fc_index+++" ") fc_index
+//						->	({ macro_defs & [fc_index] = {macro_def & fun_info.fi_group_index = -2-pi.pi_next_group }},
+						->	({ macro_defs & [fc_index] = {macro_def & fun_info.fi_group_index = pi.pi_next_group }},
 								{pi & pi_next_group = inc pi.pi_next_group,pi_groups = [ [fc_index] : pi.pi_groups]}
 //								{pi & pi_next_group = pi.pi_next_group}
 								)
@@ -897,11 +1125,13 @@ expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
 	= ((ca_rhs, ca_position), ei)
 
+/*
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
 
 cMacroIsCalled 		:== True
 cNoMacroIsCalled 	:== False
+*/
 
 class GetSetPatternRhs a
 where
@@ -957,6 +1187,7 @@ where
 													( \ guard_expr -> { this_case & case_guards = AlgebraicPatterns type [{ alg_pattern & ap_expr = guard_expr }] } )
 														split_case symbol_heap
 							-> (Yes cees, var_heap, symbol_heap)
+
 						No
 							-> (No, var_heap, symbol_heap) 
 				BasicPatterns type [basic_pattern]
@@ -967,6 +1198,7 @@ where
 													( \ guard_expr -> { this_case & case_guards = BasicPatterns type [ { basic_pattern & bp_expr = guard_expr }] })
 													split_case symbol_heap
 							-> (Yes cees, var_heap, symbol_heap)
+
 						No
 							-> (No, var_heap, symbol_heap)
 				DynamicPatterns [dynamic_pattern]
@@ -977,6 +1209,7 @@ where
 										( \ guard_expr -> { this_case & case_guards = DynamicPatterns [ { dynamic_pattern & dp_rhs = guard_expr }] })
 										split_case symbol_heap
 							-> (Yes cees, var_heap, symbol_heap)
+
 						No
 							-> (No, var_heap, symbol_heap)
 				_
@@ -1011,7 +1244,14 @@ where
 		= var_heap <:= (fv_info_ptr, VI_Alias var)
 	set_alias _ var_heap
 		= var_heap
-
+/*
+	push_expression_into_guards expr_fun (AlgebraicPatterns type patterns) 
+		= AlgebraicPatterns type (map (\algpattern -> { algpattern & ap_expr = expr_fun algpattern.ap_expr }) patterns)
+	push_expression_into_guards expr_fun (BasicPatterns type patterns) 
+		= BasicPatterns type (map (\baspattern -> { baspattern & bp_expr = expr_fun baspattern.bp_expr }) patterns)
+	push_expression_into_guards expr_fun (DynamicPatterns patterns) 
+		= DynamicPatterns (map (\dynpattern -> { dynpattern & dp_rhs = expr_fun dynpattern.dp_rhs }) patterns)
+*/
 	push_expression_into_guards_and_default expr_fun split_case symbol_heap
 		= push_expression_into_guards_and_default split_case symbol_heap
 	where
@@ -1048,7 +1288,7 @@ where
 			= (Case {cees & case_info_ptr=new_case_info_ptr},symbol_heap)
 
 	replace_variables_in_expression expr var_heap symbol_heap
-		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info = []}
+		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info = [], us_local_macro_functions = No }
 		  ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n = -1, ui_conversion_table = No}
 		  (expr, us) = unfold expr ui us
 		= (expr, us.us_var_heap, us.us_symbol_heap)
@@ -1072,7 +1312,6 @@ where
 			# (lb_src, var_heap, expr_heap) = replace_variables_in_expression lb_src var_heap expr_heap
 			= ([{ bind & lb_src = lb_src } : rev_binds], var_heap, expr_heap)
 
-		
 	push_let_expression_into_guards lad (AlgebraicPatterns type patterns) var_heap expr_heap
 		# (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
 		= (AlgebraicPatterns type patterns, var_heap, expr_heap)
@@ -1147,8 +1386,9 @@ where
 			= ([ pattern : patterns ], var_heap, symbol_heap, error)
 	where
 		replace_variables vars expr ap_vars var_heap symbol_heap
-			# us = { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info=[]}
-			  ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1, ui_conversion_table=No}
+			# var_heap = build_aliases vars ap_vars var_heap
+			# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,us_cleanup_info=[], us_local_macro_functions = No }
+			  ui = {ui_handle_aci_free_vars = RemoveThem, ui_convert_module_n= -1, ui_conversion_table=No }
 			  (expr, us) = unfold expr ui us
 			= (expr, us.us_var_heap, us.us_symbol_heap)
 
@@ -1288,7 +1528,8 @@ where
 		es_fun_defs :: !.{#FunDef},
 		es_main_dcl_module_n :: !Int,
 		es_dcl_modules :: !.{# DclModule},
-		es_expand_in_imp_module :: !Bool
+		es_expand_in_imp_module :: !Bool,
+		es_new_fun_def_numbers :: ![Int]
 	}
 
 class expand a :: !a !*ExpandInfo -> (!a, !*ExpandInfo)
@@ -1297,18 +1538,49 @@ instance expand Expression
 where
 	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_Macro {glob_object,glob_module}}, app_args}) ei
 		# (app_args, (calls, es)) = expand app_args ei
-		  (macro, es) = es!es_fun_defs.[glob_object]
-		| macro.fun_arity == symb_arity
+		# (macro, es) = es!es_fun_defs.[glob_object]
+		#! macro_group_index=macro.fun_info.fi_group_index
+		# es = {es & es_fun_defs.[glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
+		| macro.fun_arity == symb_arity			
 			= unfoldMacro macro app_args (calls, es)
-		# (calls, es_symbol_table)
-				= examineFunctionCall macro.fun_symb {fc_index = glob_object, fc_level = NotALevel}
-						(calls, es.es_symbol_table)
-		  es = { es & es_symbol_table = es_symbol_table }
-		| macro.fun_info.fi_group_index<NoIndex
-			# macro = {macro & fun_info.fi_group_index= -2-macro.fun_info.fi_group_index}
-			  es= {es & es_fun_defs.[glob_object]=macro}
-			= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },(calls, es))
-		= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },(calls, es))
+
+			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
+			#! new_function_index = size es.es_fun_defs
+			# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=new_function_index+1}
+
+			# (macro,new_functions,local_macro_functions,es) = copy_macro_and_local_functions macro copied_local_functions es			
+//			# new_function_index=trace ("new_function_index: "+++toString new_function_index+++"\n") new_function_index;
+			# macro={macro & fun_index=new_function_index}
+			# last_function_index = case local_macro_functions of (Yes {next_local_function_n}) -> next_local_function_n-1
+			# es = add_new_fun_defs [({old_function_n=glob_object,new_function_n=new_function_index},macro):new_functions] new_function_index last_function_index es
+				with
+					add_new_fun_defs new_functions new_function_index last_function_index es=:{es_fun_defs,es_new_fun_def_numbers}
+						# new_fun_defs = new_fun_defs
+							with
+								new_fun_defs :: *{!FunDef}
+								new_fun_defs => {fun_def \\ (_,fun_def)<-new_functions}
+						# es_fun_defs = {if (i<new_function_index) es_fun_defs.[i] new_fun_defs.[i-new_function_index] \\ i<-[0..last_function_index]} // inefficient
+						= {es & es_fun_defs=es_fun_defs,es_new_fun_def_numbers=[new_function_index:es_new_fun_def_numbers]}
+
+			# (calls, es_symbol_table) = examineFunctionCall macro.fun_symb {fc_index = new_function_index, fc_level = NotALevel} (calls, es.es_symbol_table)
+			# app = App { app & app_symb = { symb & symb_kind = SK_LocalMacroFunction new_function_index }, app_args = app_args }
+
+/*			| macro.fun_info.fi_group_index>NoIndex
+				# macro = {macro & fun_info.fi_group_index= -2-macro.fun_info.fi_group_index}
+				# es= {es & es_fun_defs.[new_function_index]=macro}
+				= (app, (calls, { es & es_symbol_table = es_symbol_table }))
+*/
+			= (app, (calls, { es & es_symbol_table = es_symbol_table }))
+
+/*
+			# (calls, es_symbol_table) = examineFunctionCall macro.fun_symb {fc_index = glob_object, fc_level = NotALevel} (calls, es.es_symbol_table)
+			# app = App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args }
+			| macro.fun_info.fi_group_index<NoIndex
+				# macro = {macro & fun_info.fi_group_index= -2-macro.fun_info.fi_group_index}
+				# es= {es & es_fun_defs.[glob_object]=macro}
+				= (app, (calls, { es & es_symbol_table = es_symbol_table }))
+				= (app, (calls, { es & es_symbol_table = es_symbol_table }))
+*/
 	expand (App app=:{app_args}) ei
 		# (app_args, ei) = expand app_args ei
 		= (App { app & app_args = app_args }, ei)
@@ -1335,10 +1607,10 @@ where
 	expand (TupleSelect symbol argn_nr expr) ei
 		# (expr, ei) = expand expr ei
 		= (TupleSelect symbol argn_nr expr, ei)
-	expand (Lambda vars expr) ei
+/*	expand (Lambda vars expr) ei
 		# (expr, ei) = expand expr ei
 		= (Lambda vars expr, ei)
-	expand (MatchExpr opt_tuple cons_symb expr) ei
+*/	expand (MatchExpr opt_tuple cons_symb expr) ei
 		# (expr, ei) = expand expr ei
 		= (MatchExpr opt_tuple cons_symb expr, ei)
 	expand expr ei
@@ -1668,7 +1940,6 @@ where
 		# (case_guards, free_vars, cos) = collectVariables case_guards free_vars cos
 		# (case_default, free_vars, cos) = collectVariables case_default free_vars cos
 		=  ({ kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, free_vars, cos)
-
 
 instance collectVariables CasePatterns
 where

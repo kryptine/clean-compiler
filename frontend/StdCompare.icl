@@ -178,7 +178,7 @@ where
 			compare_arguments (App app1) (App app2)						= app1 =< app2
 			compare_arguments (Var v1) (Var v2)							= v1 =< v2
 			compare_arguments (fun1 @ args1) (fun2 @ args2)				= (fun1,args1) =< (fun2,args2) 
-			compare_arguments (Lambda vars1 expr1) (Lambda vars2 expr2)	= (vars1,expr1) =< (vars2,expr2)
+//			compare_arguments (Lambda vars1 expr1) (Lambda vars2 expr2)	= (vars1,expr1) =< (vars2,expr2)
 			compare_arguments EE EE										= Equal		
 			compare_arguments _ _										= Greater		
 		| less_constructor expr1 expr2
