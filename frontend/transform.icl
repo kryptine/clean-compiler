@@ -692,7 +692,7 @@ where
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
-					---> ("expand_macros", fun_symb, fi_local_vars)
+//					---> ("expand_macros", fun_symb, fi_local_vars)
 	 
 	add_called_macros calls macro_defs_and_pi
 		= foldSt add_called_macro calls macro_defs_and_pi
@@ -746,7 +746,7 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modu
 	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
-		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), (new_args, local_vars, new_rhs, '\n'))
+//		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), (new_args, local_vars, new_rhs, '\n'))
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
