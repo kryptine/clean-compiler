@@ -2134,12 +2134,14 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 
 	# (dcl_common, modules, hp_type_heaps, hp_var_heap, cs)
 	  		= checkCommonDefinitions cIsADclModule mod_index dcl_common modules hp_type_heaps hp_var_heap cs
+	  heaps
+	  		= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap}
+	| not cs.cs_error.ea_ok
+		= ((0, 0, []), (expl_imp_info, modules, icl_functions, heaps, cs))
 	#!nr_of_members
 	  		= count_members mod_index dcl_common.com_instance_defs dcl_common.com_class_defs modules
 	# nr_of_dcl_functions_and_instances
 			= nr_of_dcl_functions+nr_of_members
-	  heaps
-	  		= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap}
 	  (nr_of_dcl_funs_insts_and_specs, rev_function_list, rev_special_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 	  		= checkDclFunctions mod_index nr_of_dcl_functions_and_instances mod_defs.def_funtypes
 	  			dcl_common.com_type_defs dcl_common.com_class_defs modules heaps cs
