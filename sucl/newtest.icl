@@ -1,3 +1,9 @@
+implementation module newtest
+
+// $Id$
+
+/*
+
 newtest.lit - Testing the new trace implementation
 ==================================================
 
@@ -392,3 +398,5 @@ sym with the given arguments, curried if there are too few.
 >             =   (tnode,updategraph tnode (fn,[targ,troot]) tgraph,tnodes)
 
 >   newsymbols main = map (User main.("New_"++)) identifiers
+
+*/

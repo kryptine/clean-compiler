@@ -1,3 +1,9 @@
+implementation module canon
+
+// $Id$
+
+/*
+
 canon.lit - Area canonicalization
 =================================
 
@@ -118,3 +124,5 @@ steps:
 >             f cont = nosingle
 >             nc = nodecontents graph
 >             root = rgraphroot rgraph; graph = rgraphgraph rgraph
+
+*/

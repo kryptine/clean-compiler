@@ -1,5 +1,7 @@
 definition module loop
 
+// $Id$
+
 from strat import Strategy
 from spine import Answer
 from trace import Trace

@@ -1,3 +1,9 @@
+implementation module hunt
+
+// $Id$
+
+/*
+
 >|| Literal script "hunt.lit"
 
 >   %export
@@ -47,3 +53,5 @@
 >   =   filter (~=[]) ((concat.map (split ' ').lines) stdout), if return=0
 >   =   error ("glob: "++stderr), otherwise
 >       where (stdout,stderr,return) = system ("echo "++pattern)
+
+*/

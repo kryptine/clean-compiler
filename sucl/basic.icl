@@ -1,5 +1,7 @@
 implementation module basic
 
+// $Id$
+
 /*
 
 Basic definitions

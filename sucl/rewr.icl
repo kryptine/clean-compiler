@@ -1,5 +1,7 @@
 implementation module rewr
 
+// $Id$
+
 import rule
 import graph
 import pfun

@@ -1,5 +1,7 @@
 implementation module pfun
 
+// $Id$
+
 import basic
 import StdEnv
 

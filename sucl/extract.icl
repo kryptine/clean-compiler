@@ -1,3 +1,9 @@
+implementation module extract
+
+// $Id$
+
+/*
+
 extract.lit - Folding of subject graphs
 =======================================
 
@@ -172,3 +178,5 @@ bearing a delta function symbol).
 >             =   updategraph node cnt, if def
 >             =   id, otherwise
 >                 where (def,cnt) = dnc (const "in finishfold/2") graph node
+
+*/

@@ -1,3 +1,9 @@
+implementation module newfold
+
+// $Id$
+
+/*
+
 newfold.lit - New folding function
 ==================================
 
@@ -341,3 +347,5 @@ Uses foldspine with
 >             force nodes = (True,nodes)
 >             partial rule matching nodes = (False,nodes)
 >             redex rule matching = none
+
+*/

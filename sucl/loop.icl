@@ -1,5 +1,7 @@
 implementation module loop
 
+// $Id$
+
 import trace
 import strat
 import history

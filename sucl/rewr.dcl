@@ -1,5 +1,7 @@
 definition module rewr
 
+// $Id$
+
 from rule import Rule
 from graph import Graph
 from pfun import Pfun
