@@ -14,7 +14,7 @@ SwitchFunctionFusion		fuse dont_fuse :== fuse
 SwitchConstructorFusion		fuse dont_fuse :== dont_fuse
 SwitchRnfConstructorFusion  rnf  linear	   :== rnf
 SwitchCurriedFusion			fuse xtra dont_fuse :== fuse 
-SwitchExtraCurriedFusion	fuse macro :== (fuse && macro)//fuse
+SwitchExtraCurriedFusion	fuse macro	   :== fuse//(fuse && macro)//fuse
 SwitchTrivialFusion			fuse dont_fuse :== fuse
 SwitchUnusedFusion			fuse dont_fuse :== fuse
 SwitchReanalyseFunction		rean dont_rean :== dont_rean
@@ -29,6 +29,7 @@ SwitchAlwaysIntroduceCaseFunction yes no   :== no//yes
 SwitchNonRecFusion			fuse dont_fuse :== dont_fuse
 SwitchHOFusion				fuse dont_fuse :== fuse
 SwitchHOFusion`				fuse dont_fuse :== fuse
+SwitchStrictPossiblyAddLet  strict lazy    :== lazy//strict
 
 //import RWSDebug
 
@@ -151,6 +152,7 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	ro_fun_root				:: !SymbIdent		// original function
 	,	ro_fun_case				:: !SymbIdent		// original function or possibly generated case
 	,	ro_fun_args				:: ![FreeVar]		// args of above
+	,	ro_fun_vars				:: ![FreeVar]		// strict variables
 	,	ro_fun_geni				:: !(!Int,!Int)
 	,	ro_fun_orig				:: !SymbIdent		// original consumer
 
@@ -217,7 +219,8 @@ where
 
 	transform (Case kees) ro ti
 		# ti = store_type_info_of_patterns_in_heap kees ti
-		= transformCase kees ro ti
+		# (res,ti) = transformCase kees ro ti
+		= (res,ti) // ---> ("transform (Case kees)",Case kees,res)
 	  where
 		store_type_info_of_patterns_in_heap {case_guards,case_info_ptr} ti
 			= case case_guards of
@@ -307,7 +310,8 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 									_			-> transCase True (Yes aci) this_case ro ti
 							_	-> transCase False No this_case ro ti
 	  ti = { ti & ti_symbol_heap = remove_aci_free_vars_info case_info_ptr ti.ti_symbol_heap }
-	= (removeNeverMatchingSubcases result_expr ro, ti)
+	# final_expr = removeNeverMatchingSubcases result_expr ro
+	= (final_expr, ti) // ---> ("transformCase",result_expr,final_expr)
 where
 	is_variable (Var _) = True
 	is_variable _ 		= False
@@ -428,7 +432,8 @@ where
 
 	possiblyFoldOuterCase` final guard_expr outer_case ro ti
 		| final
-			= transformCase {outer_case & case_expr = guard_expr} ro ti
+			# new_case = {outer_case & case_expr = guard_expr}
+			= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
 		# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No
 				,us_cleanup_info=ti.ti_cleanup_info, us_local_macro_functions = No }
 		  ui									= {ui_handle_aci_free_vars = LeaveThem }
@@ -441,7 +446,7 @@ where
 		  		_ 	-> us_cleanup_info
 		  ti = { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
 		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
-		= transformCase new_case ro ti
+		= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
 	
 transCase is_active opt_aci this_case=:{case_expr = case_expr=:(App app=:{app_symb,app_args}),case_guards,case_default,case_explicit,case_ident} ro ti
 	= case app_symb.symb_kind of
@@ -663,12 +668,20 @@ where
 
 	instantiate linearity app_args ap_vars ap_expr cons_type_args_strictness cons_type_args ti
 		# zipped = zip2 ap_vars app_args
-		  unfoldables = [ ((not (arg_is_strict i cons_type_args_strictness)) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
+// XXX
+//		  unfoldables = [ ((not (arg_is_strict i cons_type_args_strictness)) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
+// YYY
+		  (body_strictness,ti_fun_defs,ti_fun_heap) = body_strict ap_expr ap_vars ro ti.ti_fun_defs ti.ti_fun_heap
+		  ti = {ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap}
+//		  		---> ("body_strictness",[if (arg_is_strict i body_strictness) '!' '.' \\ i <- [0..] & a <- ap_vars],ap_vars,ap_expr)
+		  unfoldables = [ (arg_is_strict i body_strictness || ((not (arg_is_strict i cons_type_args_strictness))) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
+// ZZZ
 		  unfoldable_args = filterWith unfoldables zipped
 		  not_unfoldable = map not unfoldables
 		  non_unfoldable_args = filterWith not_unfoldable zipped
 		  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
-		  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap
+//		  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap
+		  (new_expr, ti_symbol_heap) = possibly_add_let zipped ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap cons_type_args_strictness
 		  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
 		  				   us_local_macro_functions = No }
 		  ui= {ui_handle_aci_free_vars = LeaveThem }
@@ -676,8 +689,45 @@ where
 		  (final_expr, ti) = transform unfolded_expr
 		  						{ ro & ro_root_case_mode = NotRootCase }
 		  						{ ti & ti_var_heap = unfold_state.us_var_heap, ti_symbol_heap = unfold_state.us_symbol_heap,ti_cleanup_info=unfold_state.us_cleanup_info }
+//		| False ---> ("instantiate",app_args,ap_vars,ap_expr,final_expr,unfoldables) = undef
 		= (Yes final_expr, ti)
+	where
+		body_strict (Var v) ap_vars ro fun_defs fun_heap
+			# lazy_args = insert_n_lazy_values_at_beginning (length app_args) NotStrict
+			# is = [i \\ i <- [0..] & var <- ap_vars | v.var_info_ptr == var.fv_info_ptr]
+			= case is of
+				[]		-> (lazy_args,fun_defs,fun_heap)
+				[i:_]	-> (add_strictness i lazy_args,fun_defs,fun_heap)
+		body_strict (App app) ap_vars ro fun_defs fun_heap
+			# (is,fun_defs,fun_heap) = app_indices app ro fun_defs fun_heap
+			# lazy_args = insert_n_lazy_values_at_beginning (length app_args) NotStrict
+			= (seq (map add_strictness is) lazy_args, fun_defs,fun_heap)
+		body_strict _ _ ro fun_defs fun_heap
+			# lazy_args = insert_n_lazy_values_at_beginning (length app_args) NotStrict
+			= (lazy_args,fun_defs,fun_heap)
+		
+		app_indices {app_symb,app_args} ro fun_defs fun_heap
+			# ({st_args_strictness,st_arity},fun_defs,fun_heap)	= get_producer_type app_symb ro fun_defs fun_heap
+			| length app_args == st_arity
+				= find_indices st_args_strictness 0 app_args ro fun_defs fun_heap
+				= ([],fun_defs,fun_heap)
+		where
+			find_indices st_args_strictness i [] ro fun_defs fun_heap
+				= ([],fun_defs,fun_heap)
+			find_indices st_args_strictness i [e:es] ro fun_defs fun_heap
+				# (is,fun_defs,fun_heap)	= find_index st_args_strictness i e ro fun_defs fun_heap
+				# (iss,fun_defs,fun_heap)	= find_indices st_args_strictness (i+1) es ro fun_defs fun_heap
+				= (is++iss,fun_defs,fun_heap)
 
+			find_index st_args_strictness i e ro fun_defs fun_heap
+				| arg_is_strict i st_args_strictness
+					= case e of
+						Var v	-> ([i \\ i <- [0..] & var <- ap_vars | v.var_info_ptr == var.fv_info_ptr],fun_defs,fun_heap)
+						App	a	-> app_indices a ro fun_defs fun_heap
+						_		-> ([],fun_defs,fun_heap)
+				= ([],fun_defs,fun_heap)
+		
+		
 	expr_or_never_matching_case (Yes match_expr) case_ident ti
 		= (match_expr, ti)
 	expr_or_never_matching_case No case_ident ti
@@ -728,31 +778,43 @@ filterWith [False:t2] [h1:t1]
 filterWith _ _
 	= []
 
-possibly_add_let [] ap_expr _ _ _ ti_symbol_heap
+possibly_add_let [] ap_expr _ _ _ ti_symbol_heap cons_type_args_strictness
 	= (ap_expr, ti_symbol_heap)
-possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti_symbol_heap
+possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti_symbol_heap cons_type_args_strictness
 	# let_type = filterWith not_unfoldable cons_type_args
 	  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
-/* DvA... STRICT_LET
-	= ( Let	{	let_strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+	= SwitchStrictPossiblyAddLet
+		( Let
+			{	let_strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
 										\\ (lb_dst,lb_src)<-non_unfoldable_args
-										& type <- let_type | type.at_annotation == AN_Strict
+										& n <- not_unfoldable
+										& i <- [0..]
+										| n && arg_is_strict i cons_type_args_strictness
 										]
 			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
 										\\ (lb_dst,lb_src)<-non_unfoldable_args
-										& type <- let_type | type.at_annotation == AN_None
+										& n <- not_unfoldable
+										& i <- [0..]
+										| n && not (arg_is_strict i cons_type_args_strictness)
 										]
-...DvA */
-	= ( Let	{	let_strict_binds	= []
-			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-										\\ (lb_dst,lb_src)<-non_unfoldable_args]
 			,	let_expr			= ap_expr
 			,	let_info_ptr		= new_info_ptr
 			,	let_expr_position	= NoPos
 			}
 	  , ti_symbol_heap
 	  ) 
-
+	  ( Let	{	let_strict_binds	= []
+			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+										\\ (lb_dst,lb_src)<-non_unfoldable_args
+										& n <- not_unfoldable
+										| n
+										]
+			,	let_expr			= ap_expr
+			,	let_info_ptr		= new_info_ptr
+			,	let_expr_position	= NoPos
+			}
+	  , ti_symbol_heap
+	  ) 
 possibly_generate_case_function :: !Case !ActiveCaseInfo !ReadOnlyTI !*TransformInfo -> *(!Expression, !*TransformInfo)
 possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 //	| False -!-> ("possibly_generate_case_function",ro.ro_fun_root.symb_name.id_name,ro.ro_fun_case.symb_name.id_name,ro.ro_root_case_mode)
@@ -816,7 +878,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 	  ti
 	  		= { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 	  (new_expr, ti)
-	  		= transformCase kees new_ro ti
+	  		= transformCase kees new_ro ti //---> ("possibly_generate_case_function",Case kees)
 	  (ti_recursion_introduced, ti)
 	  		= ti!ti_recursion_introduced
 	  			<-!- ("transformCaseFunction>>>",fun_ident)
@@ -1088,6 +1150,13 @@ where
 			= compare_producers (inc prod_index) nr_of_prods prods1 prods2
 		= cmp
 
+instance =< Bool
+where
+	(=<) True True = Equal
+	(=<) True False = Smaller
+	(=<) False True = Greater
+	(=<) False False = Equal
+	
 instance =< Producer
 where
 	(=<) pr1 pr2
@@ -1219,12 +1288,12 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
  * GENERATE FUSED FUNCTION
  */
 
-generateFunction :: !SymbIdent !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !*TransformInfo -> (!Index, !Int, !*TransformInfo)
+generateFunction :: !SymbIdent !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !Int !*TransformInfo -> (!Index, !Int, !*TransformInfo)
 generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
-				 cc_args cc_linear_bits prods fun_def_ptr ro
+				 cc_args cc_linear_bits prods fun_def_ptr ro n_extra
 				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
 				 		ti_type_heaps,ti_cons_args,ti_cleanup_info, ti_type_def_infos}
-//	| False--->("generating new function",fd.fun_symb.id_name,"->",ti_next_fun_nr,prods)		= undef
+//	| False--->("generating new function",fd.fun_symb.id_name,"->",ti_next_fun_nr,prods,tb_args)		= undef
 /*
 	| False-!->("generating new function",fd.fun_symb.id_name,"->",ti_next_fun_nr)		= undef
 	| False-!->("with type",fd.fun_type)												= undef
@@ -1303,6 +1372,10 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 			, das_predef					= ti.ti_predef_symbols
 			}
 	# das		= determine_args cc_linear_bits cc_args 0 prods opt_sound_function_producer_types tb_args ro das
+	  uvar		= [arg \\ prod <-: prods & arg <- tb_args | isUnused prod]
+	  				with
+	  					isUnused PR_Unused = True
+	  					isUnused _ = False
 	  
 	  new_fun_args				= das.das_vars
 	  new_arg_types_array		= das.das_arg_types
@@ -1543,15 +1616,18 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	| False -!-> ("genFun",(tb_args,new_fun_args),args1,(args2o,args2n),args3,(resto,restn)) = undef
 	| not (isEmpty resto)	= abort "genFun:resto"
 	| not (isEmpty restn)	= abort "genFun:restn"
+
 	# ro 	=	{ ro &	ro_root_case_mode = ro_root_case_mode,
 						ro_fun_root = ro_fun,
 						ro_fun_case = ro_fun,
 						ro_fun_orig = app_symb,
 						ro_fun_args = new_fun_args,
+						ro_fun_vars = uvar ++ [arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness],
+										// evt ++ verwijderde stricte arg...
 						ro_fun_geni = (length args1,length args2n)
-				}
+				} // ---> ("genfun uvars",uvar,[arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness])
 //	| False ---> ("transform generated function:",ti_next_fun_nr,ro_root_case_mode)		= undef
-//	| False -!-> ("transforming new function:",ti_next_fun_nr)		= undef
+//	| False ---> ("transforming new function:",ti_next_fun_nr,tb_rhs)		= undef
 //	| False -!-> ("transforming new function:",tb_rhs)		= undef
 	# ti
 			= { ti & ti_var_heap = us_var_heap, ti_fun_heap = ti_fun_heap, ti_symbol_heap = us_symbol_heap,
@@ -1562,52 +1638,28 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  			ti_predef_symbols = ti_predef_symbols }
 	# ti = arity_warning "generateFunction" fd.fun_symb.id_name ti_next_fun_nr new_fun_arity ti
 
+	# (tb_rhs,ti)		= case n_extra of
+							0	-> (tb_rhs,ti)
+							_
+								# act_args = map f2b (reverse (take n_extra (reverse new_fun_args)))
+									with
+										f2b { fv_name, fv_info_ptr }
+											= Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr }
+								-> add_args_to_fun_body act_args fresh_result_type tb_rhs ro ti
+
 	  (new_fun_rhs, ti)
 			= transform tb_rhs ro ti
 	  new_fd
 	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
-//	| False -!-> ("generated function", new_fd, new_cons_args)		= undef
+//	| False ---> ("generated function", new_fd)		= undef
 
 	# new_gen_fd = { new_gen_fd & gf_fun_def = new_fd, gf_cons_args = new_fd_cons_args}
-	# (new_gen_fd,fun_defs,var_heap,fun_heap,cons_args)
-		= SwitchReanalyseFunction
-					(reanalyse_function new_gen_fd ti_next_fun_nr ti.ti_cons_args ti.ti_fun_heap ti.ti_fun_defs ti.ti_var_heap fi_group_index new_fun_rhs
-					)
-					(new_gen_fd,ti.ti_fun_defs,ti.ti_var_heap,ti.ti_fun_heap,ti.ti_cons_args)
-
 	# ti =
 		{ ti
-		& ti_fun_heap 	= fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
-		, ti_cons_args	= cons_args
-		, ti_fun_defs	= fun_defs
-		, ti_var_heap	= var_heap
+		& ti_fun_heap 	= ti.ti_fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
 		}
 	= (ti_next_fun_nr, new_fun_arity, ti)
 where
-	reanalyse_function new_gen_fd ti_next_fun_nr ti_cons_args ti_fun_heap ti_fun_defs ti_var_heap fi_group_index new_fun_rhs
-		# prs	=
-			{ prs_group				= [dec ti_next_fun_nr]
-			, prs_cons_args 		= ti_cons_args
-			, prs_main_dcl_module_n	= ro.ro_main_dcl_module_n
-			, prs_fun_heap			= ti_fun_heap
-			, prs_fun_defs			= ti_fun_defs
-			, prs_group_index		= fi_group_index
-			}
-		# (safe,prs)	= producerRequirements new_fun_rhs prs
-		# (new_fd_cons_args`,fun_defs,var_heap,fun_heap,cons_args) = reanalyseFunction
-					ti_next_fun_nr
-					fun_def_ptr
-					ro.ro_common_defs
-					ro.ro_imported_funs
-					ro.ro_main_dcl_module_n
-					ro.ro_stdStrictLists_module_n
-					prs.prs_fun_defs
-					ti_var_heap
-					(prs.prs_fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd))
-					prs.prs_cons_args
-		# new_gen_fd = { new_gen_fd & gf_cons_args = {new_fd_cons_args` & cc_producer = safe}}
-		= (new_gen_fd,fun_defs,var_heap,fun_heap,cons_args)
-
 	st_args_array :: ![AType] !StrictnessList -> .{#ATypesWithStrictness}
 	st_args_array st_args args_strictness
 		# strict1=Strict 1
@@ -1823,9 +1875,10 @@ determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index prod
 	# das = determine_args linear_bits cons_args (inc prod_index) producers prod_atypes forms input das
 //	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
 	# producer	= case cons_arg of
-					CActive		-> producers.[prod_index]
-					CUnused		-> producers.[prod_index]
-					_			-> PR_Empty
+					CActive			-> producers.[prod_index]
+					CUnusedStrict	-> producers.[prod_index]
+					CUnusedLazy		-> producers.[prod_index]
+					_				-> PR_Empty
 	= determine_arg producer prod_atype form prod_index ((linear_bit,cons_arg), input) das
 
 determine_arg
@@ -1938,6 +1991,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	# (succ, das_subst, das_type_heaps)
 	  		= unify application_type arg_type type_input das_subst das_type_heaps
 	| not succ
+		| False ---> ("94",application_type,arg_type,symbol) = undef
 		= abort "sanity check nr 94 in module trans failed\n"
 	# (attr_inequalities, das_type_heaps)
 			= accAttrVarHeap (mapSt substitute_attr_inequality st_attr_env) das_type_heaps
@@ -2069,8 +2123,9 @@ where
 	copy_classes 0 _ = []
 	copy_classes n [cc:ccs]
 		= case cc of
-			CUnused		-> [CActive:copy_classes (dec n) ccs]
-			cc			-> [cc:copy_classes (dec n) ccs]
+			CUnusedStrict	-> [CActive:copy_classes (dec n) ccs]
+			CUnusedLazy		-> [CActive:copy_classes (dec n) ccs]
+			cc				-> [cc:copy_classes (dec n) ccs]
 
 /*
 	build_application_type st_arity nr_context_args st_result st_args nr_of_applied_args
@@ -2351,27 +2406,33 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 							non_var (Var _)					= False
 							non_var _						= True
 	  	# ok_non_rec_consumer	= non_rec_consumer && safe_args
-	  	#! (producers, new_args, ti)
+	  	#! (producers, new_args, strict_let_binds, ti)
 	  		= determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_def.fun_type cc_linear_bits cc_args app_args 0 (createArray cc_size PR_Empty) ro ti
-		#! (arity_changed,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+		#! (arity_changed,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,n_extra,ti)
 			= determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
 	  	| containsProducer cc_size producers || arity_changed
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
 	  			# ti							= update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
-	  			# (fun_index, fun_arity, ti)	= generateFunction app_symb fun_def cc_args cc_linear_bits producers fun_def_ptr ro ti
+	  			# (fun_index, fun_arity, ti)	= generateFunction app_symb fun_def cc_args cc_linear_bits producers fun_def_ptr ro n_extra ti
 				| fun_index == (-1)
-					= (build_application { app & app_args = app_args } extra_args, ti)
+					= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("failed instance")
 	  			# app_symb = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr fun_index }
 				# (app_args, extra_args) = complete_application fun_arity new_args extra_args
-	  			= transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
+	  			
+//	  			# (FI_Function {gf_fun_def},ti_fun_heap) = readPtr fun_def_ptr ti.ti_fun_heap
+//	  			# ti = {ti & ti_fun_heap = ti_fun_heap} ---> ("generated",fun_def_ptr,gf_fun_def)
+	  			
+	  			# (expr,ti) = transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
+	  			= possiblyAddStrictLetBinds expr strict_let_binds ti
   			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 			| gf_fun_index == (-1)
-				= (build_application { app & app_args = app_args } extra_args, ti)
+				= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("known failed instance")
 			# app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
 			  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
-  			# ti = {ti & ti_fun_heap = ti_fun_heap }
-  			= transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti
+  			# ti = {ti & ti_fun_heap = ti_fun_heap } // ---> ("known instance",gf_fun_index)
+  			# (expr,ti) = transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti
+  			= possiblyAddStrictLetBinds expr strict_let_binds ti
 		| SwitchTrivialFusion ro.ro_transform_fusion False
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
@@ -2384,6 +2445,19 @@ where
 	is_not_caf FK_Caf	= False
 	is_not_caf _		= True
 
+	possiblyAddStrictLetBinds expr strict_lets ti
+		# (strict_let_binds,let_type) = unzip strict_lets
+		= case strict_let_binds of
+			[]	-> (expr,ti)
+			_
+				# (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti.ti_symbol_heap
+				  ti = {ti & ti_symbol_heap = ti_symbol_heap}
+				-> (Let 	{	let_strict_binds	= strict_let_binds
+							,	let_lazy_binds		= []
+							,	let_expr			= expr
+							,	let_info_ptr		= new_info_ptr
+							,	let_expr_position	= NoPos
+							},ti) ---> "added strict_let_binds"
 	transform_trivial_function :: !.App ![.Expression] ![.Expression] !.ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 	transform_trivial_function app=:{app_symb} app_args extra_args ro ti
 		# (fun_def,ti_fun_defs,ti_fun_heap)		= get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
@@ -2426,27 +2500,30 @@ is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
 		  in type.st_arity>0 && not (isEmpty type.st_context);
 
-determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !Bool !{!.Producer} ![Int] ![Bool] !FunDef !ReadOnlyTI !*TransformInfo -> *(!Bool,![Expression],![Expression],!{!Producer},![Int],![Bool],!FunDef,!*TransformInfo)
+determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !Bool !{!.Producer} ![Int] ![Bool] !FunDef !ReadOnlyTI !*TransformInfo -> *(!Bool,![Expression],![Expression],!{!Producer},![Int],![Bool],!FunDef,!Int,!*TransformInfo)
 determineCurriedProducersInExtraArgs new_args [] is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
-	= (False,new_args,[],producers,cc_args,cc_linear_bits,fun_def,ti)
+	= (False,new_args,[],producers,cc_args,cc_linear_bits,fun_def,0,ti)
 determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
 	| not (SwitchExtraCurriedFusion ro.ro_transform_fusion is_applied_to_macro_fun)
-		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,0,ti)
 	# n_extra_args													= length extra_args
 	# {fun_type = Yes symbol_type=:{st_args,st_result,st_arity}}	= fun_def
 	# (ok,new_args_types,new_result_type)							= get_new_args_types_from_result_type st_result n_extra_args
 	| not ok
-		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,ti)
+		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,0,ti)
 	# symbol_type	= {symbol_type & st_result=new_result_type,st_args=st_args++new_args_types,st_arity=st_arity+n_extra_args}
 	# fun_def							= {fun_def & fun_type=Yes symbol_type}
-	# (form_args,act_args,var_heap)		= create_new_args n_extra_args ti.ti_var_heap
+	# (form_args,var_heap)				= create_new_args n_extra_args ti.ti_var_heap
 	# ti								= {ti & ti_var_heap=var_heap}
-	# (fun_body,ti)						= add_args_to_fun_body form_args act_args new_result_type fun_def.fun_body ro ti
-	# fun_def							= {fun_def & fun_body=fun_body}
+	# fun_def							= case fun_def.fun_body of
+											TransformedBody tb
+												-> {fun_def & fun_body=TransformedBody 
+													{tb & tb_args = add_args_to_fun_args form_args tb.tb_args
+													}}
 	# new_producers						= arrayPlusList producers [PR_Empty \\ i<-[0..n_extra_args-1]]
 	# new_cc_args						= cc_args ++ [CPassive \\ i<-[0..n_extra_args-1]]
 	# new_cc_linear_bits				= cc_linear_bits ++ [True \\ i<-[0..n_extra_args-1]]
-	= (True,new_args++extra_args,[],new_producers,new_cc_args,new_cc_linear_bits,fun_def,ti)
+	= (True,new_args++extra_args,[],new_producers,new_cc_args,new_cc_linear_bits,fun_def,n_extra_args,ti)
 where
 	get_new_args_types_from_result_type type 0
 		= (True,[],type)
@@ -2458,20 +2535,19 @@ where
 
 	create_new_args n_new_args var_heap
 		| n_new_args==0
-			= ([], [], var_heap)            
+			= ([], var_heap)            
 		# new_name				= { id_name = "_a", id_info = nilPtr }
 		  (info_ptr, var_heap)	= newPtr VI_Empty var_heap
 		  form_var				= { fv_name = new_name, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
-		  act_var				= { var_name = new_name, var_info_ptr = info_ptr, var_expr_ptr = nilPtr }
-		  (form_vars,act_vars,var_heap)
-		  						= create_new_args (n_new_args-1) var_heap
-		= ([form_var : form_vars],[Var act_var : act_vars],var_heap)
+		  (form_vars,var_heap)	= create_new_args (n_new_args-1) var_heap
+		= ([form_var : form_vars],var_heap)
 
-	add_args_to_fun_body form_args act_args new_result_type (TransformedBody {tb_args,tb_rhs}) ro ti
-		# tb_args		= tb_args ++ form_args
-		# (tb_rhs,ti)	= add_arguments tb_rhs act_args new_result_type ro ti
-		= (TransformedBody {tb_args=tb_args,tb_rhs=tb_rhs},ti)
+add_args_to_fun_args form_args tb_args
+	= tb_args ++ form_args
 
+add_args_to_fun_body act_args new_result_type tb_rhs ro ti
+		= add_arguments tb_rhs act_args new_result_type ro ti
+where
 	add_arguments (App app=:{app_symb,app_args}) extra_args new_result_type ro ti
 		# (form_arity,fun_defs,fun_heap) = get_arity app_symb ro ti.ti_fun_defs ti.ti_fun_heap
 		# ti = {ti & ti_fun_defs=fun_defs,ti_fun_heap=fun_heap}
@@ -2495,7 +2571,7 @@ where
 	add_arguments (expr1 @ expr2) extra_args _ ro ti
 		= (expr1 @ (expr2++extra_args),ti)
 	add_arguments expr extra_args _ ro ti
-		= (expr @ extra_args,ti)
+		= (expr @ extra_args,ti) // ---> ("????",expr)
 	
 	add_arguments_opt No _ _ ro ti = (No,ti)
 	add_arguments_opt (Yes expr) extra_args new_result_type ro ti
@@ -2520,13 +2596,13 @@ where
 	add_arguments_apats [] extra_args _ ro ti = ([],ti)
 	add_arguments_apats [ap=:{ap_expr}:aps] extra_args new_result_type ro ti
 		# (ap_expr, ti)	= add_arguments ap_expr extra_args new_result_type ro ti
-		# (aps, ti)	= add_arguments_apats aps extra_args new_result_type ro ti
+		# (aps, ti)		= add_arguments_apats aps extra_args new_result_type ro ti
 		= ([{ap & ap_expr = ap_expr}:aps],ti)
 
 	add_arguments_bpats [] extra_args _ ro ti = ([],ti)
 	add_arguments_bpats [bp=:{bp_expr}:bps] extra_args new_result_type ro ti
 		# (bp_expr, ti)	= add_arguments bp_expr extra_args new_result_type ro ti
-		# (bps, ti)	= add_arguments_bpats bps extra_args new_result_type ro ti
+		# (bps, ti)		= add_arguments_bpats bps extra_args new_result_type ro ti
 		= ([{bp & bp_expr = bp_expr}:bps],ti)
 
 	add_arguments_dpats [] extra_args _ ro ti = ([],ti)
@@ -2919,27 +2995,62 @@ transformSelection selector_kind selectors expr ro ti
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: !Bool !Bool !Bool !(Optional SymbolType) ![Bool] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo);
+determineProducers :: !Bool !Bool !Bool !(Optional SymbolType) ![Bool] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo -> *(!*{!Producer},![Expression],![(LetBind,AType)],!*TransformInfo);
 determineProducers _ _ _ _ _ _ [] _ producers _ ti
-	= (producers, [], ti)
+	= (producers, [], [], ti)
 determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
  	| cons_arg == CActive
 		# (producers, new_arg, ti) = determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
-			= (producers, new_arg++args, ti)
-		#! (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
-		= (producers, new_arg++new_args, ti)
-	| SwitchUnusedFusion (ro.ro_transform_fusion && cons_arg == CUnused && isLazyArg fun_type prod_index) False
+			= (producers, new_arg++args, [], ti)
+		#! (producers, new_args, lb, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+		= (producers, new_arg++new_args, lb, ti)
+	| SwitchUnusedFusion
+		(	ro.ro_transform_fusion 
+		&&	cons_arg == CUnusedStrict 
+		&&	isStrictArg fun_type prod_index
+		) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		= (producers, args, ti)
-	#! (producers, new_args, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
-	= (producers, [arg : new_args], ti)
+		# (lb,ti) = case isStrictVar arg of
+						True	-> ([],ti)
+						_		# (info_ptr, ti_var_heap)	= newPtr VI_Empty ti.ti_var_heap
+								  ti						= {ti & ti_var_heap = ti_var_heap}
+								  lb =	{lb_dst=
+								  			{ fv_name = { id_name = "dummy_for_strict_unused", id_info = nilPtr }
+								  			, fv_info_ptr = info_ptr
+								  			, fv_count = 0
+								  			, fv_def_level = NotALevel 
+								  			}
+								  		,lb_src=arg
+								  		,lb_position=NoPos
+								  		}
+								-> ([(lb,getArgType fun_type prod_index)],ti)
+		  
+		= (producers, args, lb, ti)	 ---> ("UnusedStrict",lb,arg,fun_type)
+	| SwitchUnusedFusion
+		(	ro.ro_transform_fusion 
+		&&	cons_arg == CUnusedStrict 
+		&&	not (isStrictArg fun_type prod_index)
+		&&	isStrictVar arg
+		) False
+		# producers = { producers & [prod_index] = PR_Unused }
+		= (producers, args, [], ti)	 ---> ("UnusedMixed",arg,fun_type)
+	| SwitchUnusedFusion (ro.ro_transform_fusion && cons_arg == CUnusedLazy) False
+		# producers = { producers & [prod_index] = PR_Unused }
+		= (producers, args, [], ti)	 ---> ("UnusedLazy",arg,fun_type)
+	#! (producers, new_args, lb, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+	= (producers, [arg : new_args], lb, ti)
 where
 	isProducer PR_Empty	= False
 	isProducer _		= True
 	
-	isLazyArg No _ = True
-	isLazyArg (Yes {st_args_strictness}) index = not (arg_is_strict (inc index) st_args_strictness)
+	isStrictArg No _ = False
+	isStrictArg (Yes {st_args_strictness}) index = arg_is_strict index st_args_strictness
+	
+	getArgType (Yes {st_args}) index = st_args!!index
+	
+	isStrictVar (Var bv) = not (isEmpty [fv \\ fv <- ro.ro_fun_vars | fv.fv_info_ptr == bv.var_info_ptr])
+	isStrictVar _ = False
 	
 	determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
@@ -3337,7 +3448,7 @@ where
 			// assign group_nr to group_members
 			# ti = ti <-!- ("transform_group",group_nr)
 			# ti = foldSt (assign_group group_nr) group_members ti
-			// store old consumer classification			
+
 			# (before,ti) = ti!ti_next_fun_nr
 			// transform group_members
 			# ti = foldSt (transform_function common_defs imported_funs) group_members ti
@@ -3367,7 +3478,7 @@ where
 			// producer annotation for finished components!
 			# ti = reannotate_producers group_nr group_members ti
 			= (inc group_nr,(reverse new_groups)++acc_groups,ti)
-	
+
 	changed_group_classification [] ti
 		= (False,ti)
 	changed_group_classification [fun:funs] ti
@@ -3447,8 +3558,8 @@ where
 	transform_function common_defs imported_funs fun ti
 		# (fun_def, ro_fun, ti)	= get_fun_def_and_symb_ident fun ti
 		# ti = ti <-!- ("transform_function",fun,ro_fun,fun_def)
-		# (Yes {st_args})					= fun_def.fun_type
-		  {fun_body = TransformedBody tb} = fun_def
+		# (Yes {st_args,st_args_strictness})= fun_def.fun_type
+		  {fun_body = TransformedBody tb} 	= fun_def
 		  ti_var_heap						= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
 		  ro =	{ ro_imported_funs				= imported_funs
 				, ro_common_defs 				= common_defs
@@ -3457,6 +3568,7 @@ where
 				, ro_fun_case					= ro_fun
 				, ro_fun_orig					= ro_fun
 				, ro_fun_args					= tb.tb_args
+				, ro_fun_vars					= [arg \\ arg <- tb.tb_args & i <- [0..] | arg_is_strict i st_args_strictness]
 				, ro_fun_geni					= (-1,-1)
 				, ro_main_dcl_module_n			= main_dcl_module_n
 				, ro_transform_fusion			= compile_with_fusion
