@@ -470,7 +470,7 @@ where
 					   is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols
 				-> (unboxable, No, (predef_symbols, type_heaps))
 			SynType {at_type}
-				# (expanded_type, type_heaps) = expandTypeSyn td_attribute td_args type_args at_type type_heaps
+				# (_, expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args type_args at_type type_heaps
 				-> try_to_unbox expanded_type defs (predef_symbols, type_heaps)
 			_
 				-> (False, No, (predef_symbols, type_heaps))				
@@ -558,15 +558,10 @@ tryToExpandTypeSyn defs cons_id=:{type_name,type_index={glob_object,glob_module}
 	# {td_name,td_rhs,td_args,td_attribute} = defs.[glob_module].com_type_defs.[glob_object]
 	= case td_rhs of
 		SynType {at_type}
-			# (expanded_type, type_heaps) = expandTypeSyn td_attribute td_args type_args at_type type_heaps
+			# (_, expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args type_args at_type type_heaps
 			-> (True, expanded_type, type_heaps) 
 		_
 			-> (False, TA cons_id type_args, type_heaps)
-
-expandTypeSyn td_attribute td_args type_args td_rhs type_heaps
-	# type_heaps = bindTypeVarsAndAttributes td_attribute TA_Multi td_args type_args type_heaps
-	  (_, expanded_type, type_heaps) = substitute td_rhs type_heaps
-	= (expanded_type, clearBindingsOfTypeVarsAndAttributes td_attribute td_args type_heaps)
 
 class match type ::  !{# CommonDefs} !type !type !*TypeHeaps -> (!Bool, !*TypeHeaps)
 
@@ -1053,7 +1048,7 @@ where
 			# (fun_def, fun_defs) = fun_defs![fun_index]  
 			  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb,fun_pos} = fun_def
-			  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap) // ---> ("remove_overloaded_function", fun_symb, st_context))
+			  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
 			  error = setErrorAdmin (newPosition fun_symb fun_pos) error
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
@@ -1200,7 +1195,6 @@ getTCDictionary symb_name var_info_ptr (var_heap, error)
 		_
 			-> (var_info_ptr, (var_heap, overloadingError symb_name error))
 
-// import RWSDebug
 		
 ::	TypeCodeInfo =
 	{	tci_next_index			:: !Index
@@ -1266,8 +1260,6 @@ where
 	,	x_module_id		:: Optional LetBind
 // ... MV
 	}
-
-import RWSDebug
 
 class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
 
@@ -1448,9 +1440,6 @@ where
 		= (Yes x, ui)
 	updateExpression group_index No ui
 		= (No, ui)
-
-//import StdDebug
-//import RWSDebug
 
 instance updateExpression CasePatterns
 where

@@ -2,6 +2,321 @@ implementation module comparedefimp
 
 import syntax, checksupport, compare_constructor, utilities, StdCompare, compilerSwitches
 
+::	CompareState =
+	{	comp_type_var_heap	:: !.TypeVarHeap
+	,	comp_attr_var_heap	:: !.AttrVarHeap
+	,	comp_error			:: !.ErrorAdmin
+	}
+	
+type_def_error		= "type definition in the impl module conflicts with the def module"
+class_def_error		= "class definition in the impl module conflicts with the def module"
+instance_def_error	= "instance definition in the impl module conflicts with the def module"
+
+compareError message pos error_admin
+	= popErrorAdmin (checkError "" message (pushErrorAdmin pos error_admin))
+
+markCheckedDefinitions :: !Int ![Index] -> *{# Bool}
+markCheckedDefinitions nr_of_defs not_to_be_checked
+	# marks = createArray nr_of_defs True
+	= foldSt mark_def not_to_be_checked marks
+where
+	mark_def index marks = { marks & [index] = False }
+
+compareTypeDefs ::  !{# Int} ![Index] !{# CheckedTypeDef} !{# ConsDef} !u:{# CheckedTypeDef} !v:{# ConsDef} !*CompareState
+	-> (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState) 
+compareTypeDefs dcl_sizes copied_from_dcl dcl_type_defs dcl_cons_defs icl_type_defs icl_cons_defs comp_st
+	# nr_of_dcl_types = dcl_sizes.[cTypeDefs]
+	  to_be_checked = markCheckedDefinitions nr_of_dcl_types copied_from_dcl
+	= iFoldSt (compare_type_defs to_be_checked dcl_type_defs dcl_cons_defs) 0 nr_of_dcl_types (icl_type_defs, icl_cons_defs, comp_st)
+where
+	compare_type_defs :: !{# Bool} !{# CheckedTypeDef} !{# ConsDef} !Index (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState)
+		-> (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState) 
+	compare_type_defs to_be_checked dcl_type_defs dcl_cons_defs type_index (icl_type_defs, icl_cons_defs, comp_st=:{comp_type_var_heap,comp_attr_var_heap})
+		| to_be_checked.[type_index]
+			# dcl_type_def = dcl_type_defs.[type_index]
+			  (icl_type_def, icl_type_defs) = icl_type_defs![type_index]
+			  comp_type_var_heap = initialyseATypeVars dcl_type_def.td_args comp_type_var_heap
+			  comp_type_var_heap = initialyseATypeVars icl_type_def.td_args comp_type_var_heap
+			  comp_attr_var_heap = initialyseAttributeVars dcl_type_def.td_attrs comp_attr_var_heap
+			  comp_attr_var_heap = initialyseAttributeVars icl_type_def.td_attrs comp_attr_var_heap
+			  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
+			  (ok, icl_cons_defs, comp_st) = compare_rhs_of_types dcl_type_def.td_rhs icl_type_def.td_rhs dcl_cons_defs icl_cons_defs comp_st
+			| ok
+				= (icl_type_defs, icl_cons_defs, comp_st)
+				# comp_error = compareError type_def_error (newPosition icl_type_def.td_name icl_type_def.td_pos) comp_st.comp_error
+				= (icl_type_defs, icl_cons_defs, { comp_st & comp_error = comp_error })
+//						 ---> ("compare_type_defs", dcl_type_def.td_name, dcl_type_def.td_rhs, icl_type_def.td_name, icl_type_def.td_rhs)
+			= (icl_type_defs, icl_cons_defs, comp_st)
+
+	compare_rhs_of_types (AlgType dclConstructors) (AlgType iclConstructors) dcl_cons_defs icl_cons_defs comp_st
+		= compare_constructor_lists dclConstructors iclConstructors dcl_cons_defs icl_cons_defs comp_st
+	where
+		compare_constructor_lists [ dcl_cons : dcl_conses ][icl_cons : icl_conses] dcl_cons_defs icl_cons_defs comp_st
+			| dcl_cons.ds_index == icl_cons.ds_index
+				# last_cons = isEmpty dcl_conses
+				# (ok, icl_cons_defs, comp_st) = compare_constructors last_cons dcl_cons.ds_index dcl_cons_defs icl_cons_defs comp_st
+				| ok
+					| last_cons
+						= (isEmpty icl_conses, icl_cons_defs, comp_st) 
+						= compare_constructor_lists dcl_conses icl_conses dcl_cons_defs icl_cons_defs comp_st
+					= (False, icl_cons_defs, comp_st)	
+				= (False, icl_cons_defs, comp_st)	
+
+	compare_rhs_of_types (SynType dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
+		# (ok, comp_st) = compare dclType iclType comp_st
+		= (ok, icl_cons_defs, comp_st)
+	compare_rhs_of_types (RecordType dclRecord) (RecordType iclRecord) dcl_cons_defs icl_cons_defs comp_st
+		= compare_records dclRecord iclRecord dcl_cons_defs icl_cons_defs comp_st
+	where
+		compare_records dcl_rec icl_rec dcl_cons_defs icl_cons_defs comp_st
+			# nr_of_dcl_fields = size dcl_rec.rt_fields
+			| nr_of_dcl_fields == size icl_rec.rt_fields && compare_fields nr_of_dcl_fields dcl_rec.rt_fields icl_rec.rt_fields
+				= compare_constructors True dcl_rec.rt_constructor.ds_index dcl_cons_defs icl_cons_defs comp_st
+				= (False, icl_cons_defs, comp_st)
+		
+		compare_fields field_nr dcl_fields icl_fields
+			| field_nr == 0
+				= True
+				# field_nr = dec field_nr
+				= dcl_fields.[field_nr].fs_index == icl_fields.[field_nr].fs_index && compare_fields field_nr dcl_fields icl_fields
+
+	compare_rhs_of_types (AbstractType _) icl_type dcl_cons_defs icl_cons_defs comp_st
+		= (True, icl_cons_defs, comp_st)
+	compare_rhs_of_types dcl_type icl_type dcl_cons_defs icl_cons_defs comp_st
+		= (False, icl_cons_defs, comp_st)
+	
+	compare_constructors do_compare_result_types cons_index dcl_cons_defs icl_cons_defs comp_st=:{comp_type_var_heap}
+		# dcl_cons_def = dcl_cons_defs.[cons_index]
+		  (icl_cons_def, icl_cons_defs) = icl_cons_defs![cons_index]
+		  dcl_cons_type = dcl_cons_def.cons_type
+		  icl_cons_type = icl_cons_def.cons_type
+		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars comp_type_var_heap
+		  comp_type_var_heap = initialyseATypeVars icl_cons_def.cons_exi_vars comp_type_var_heap
+		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
+		  (ok, comp_st) = compare dcl_cons_type.st_args icl_cons_type.st_args comp_st
+		| dcl_cons_def.cons_priority == icl_cons_def.cons_priority
+			| ok && do_compare_result_types
+				# (ok, comp_st) = compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
+				= (ok, icl_cons_defs, comp_st)
+				= (ok, icl_cons_defs, comp_st)
+			= (False, icl_cons_defs, comp_st)
+
+
+compareClassDefs :: !{# Int} ![Index]  !{# ClassDef} !{# MemberDef} !u:{# ClassDef} !v:{# MemberDef} !*CompareState
+	-> (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
+compareClassDefs dcl_sizes copied_from_dcl dcl_class_defs dcl_member_defs icl_class_defs icl_member_defs comp_st
+	# nr_of_dcl_classes = dcl_sizes.[cClassDefs]
+	  to_be_checked = markCheckedDefinitions nr_of_dcl_classes copied_from_dcl
+	= iFoldSt (compare_class_defs to_be_checked dcl_class_defs dcl_member_defs) 0 nr_of_dcl_classes (icl_class_defs, icl_member_defs, comp_st)
+where	  	
+	compare_class_defs ::  !{# Bool} {# ClassDef} {# MemberDef} !Index (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
+		-> (!u:{# ClassDef}, v:{# MemberDef}, !*CompareState)
+	compare_class_defs to_be_checked dcl_class_defs dcl_member_defs class_index (icl_class_defs, icl_member_defs, comp_st)
+		| to_be_checked.[class_index]
+			# dcl_class_def = dcl_class_defs.[class_index]
+			  (icl_class_def, icl_class_defs) = icl_class_defs![class_index]
+			# (ok, icl_member_defs, comp_st) = compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st
+			| ok // ---> ("compare_class_defs",  dcl_class_def.class_name, icl_class_def.class_name)
+				= (icl_class_defs, icl_member_defs, comp_st)
+				# comp_error = compareError class_def_error (newPosition icl_class_def.class_name icl_class_def.class_pos) comp_st.comp_error
+				= (icl_class_defs, icl_member_defs, { comp_st & comp_error = comp_error })
+			= (icl_class_defs, icl_member_defs, comp_st)
+
+	compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st=:{comp_type_var_heap}
+		# comp_type_var_heap = initialyseTypeVars dcl_class_def.class_args comp_type_var_heap
+		  comp_type_var_heap = initialyseTypeVars icl_class_def.class_args comp_type_var_heap
+		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
+		# (ok, comp_st) = compare dcl_class_def.class_context icl_class_def.class_context comp_st
+		| ok
+			# nr_of_dcl_members = size dcl_class_def.class_members
+			| nr_of_dcl_members == size icl_class_def.class_members
+				= compare_array_of_class_members nr_of_dcl_members dcl_class_def.class_members icl_class_def.class_members dcl_member_defs icl_member_defs comp_st
+				= (False, icl_member_defs, comp_st)
+			= (False, icl_member_defs, comp_st)
+
+	compare_array_of_class_members loc_member_index dcl_members icl_members dcl_member_defs icl_member_defs comp_st
+		| loc_member_index == 0
+			= (True, icl_member_defs, comp_st)
+		# loc_member_index = dec loc_member_index 
+		# dcl_member = dcl_members.[loc_member_index]
+		# icl_member = icl_members.[loc_member_index]
+		| dcl_member == icl_member
+			# glob_member_index = dcl_member.ds_index
+			# dcl_member_def = dcl_member_defs.[glob_member_index]
+			  (icl_member_def, icl_member_defs) = icl_member_defs![glob_member_index]
+			  (ok, comp_st) = compare dcl_member_def.me_type icl_member_def.me_type comp_st
+			| ok && dcl_member_def.me_priority == icl_member_def.me_priority
+				= compare_array_of_class_members loc_member_index dcl_members icl_members dcl_member_defs icl_member_defs comp_st
+				= (False, icl_member_defs, comp_st)
+			= (False, icl_member_defs, comp_st)
+
+compareInstanceDefs :: !{# Int} !{# ClassInstance} !u:{# ClassInstance} !*CompareState -> (!u:{# ClassInstance}, !*CompareState)
+compareInstanceDefs dcl_sizes dcl_instance_defs icl_instance_defs comp_st
+	# nr_of_dcl_instances = dcl_sizes.[cInstanceDefs]
+	= iFoldSt (compare_instance_defs dcl_instance_defs) 0 nr_of_dcl_instances (icl_instance_defs, comp_st)
+where
+	compare_instance_defs ::  !{# ClassInstance} !Index (!u:{# ClassInstance}, !*CompareState) -> (!u:{# ClassInstance}, !*CompareState)
+	compare_instance_defs dcl_instance_defs instance_index (icl_instance_defs, comp_st)
+		# dcl_instance_def = dcl_instance_defs.[instance_index]
+		  (icl_instance_def, icl_instance_defs) = icl_instance_defs![instance_index]
+		  (ok, comp_st) = compare dcl_instance_def.ins_type icl_instance_def.ins_type comp_st
+		| ok
+			= (icl_instance_defs, comp_st)
+			# comp_error = compareError instance_def_error (newPosition icl_instance_def.ins_ident icl_instance_def.ins_pos) comp_st.comp_error
+			= (icl_instance_defs, { comp_st & comp_error = comp_error })
+//				---> ("compare_instance_defs", dcl_instance_def.ins_ident, dcl_instance_def.ins_type, icl_instance_def.ins_ident, icl_instance_def.ins_type)
+		  
+
+class compare a :: !a !a !*CompareState -> (!Bool, !*CompareState)
+
+
+instance compare (a,b) | compare a & compare b
+where
+	compare (x1, y1) (x2, y2) comp_st
+		# (ok, comp_st) = compare x1 x2 comp_st
+		| ok
+			= compare y1 y2 comp_st
+			= (False, comp_st)
+
+instance compare (Global a) | == a
+where
+	compare g1 g2 comp_st
+		= (g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object, comp_st)
+
+instance compare [a] | compare a
+where
+	compare [x:xs] [y:ys] comp_st
+		= compare (x, xs) (y, ys) comp_st
+	compare [] [] comp_st
+		= (True, comp_st)
+	compare _ _ comp_st
+		= (False, comp_st)
+		
+instance compare Type
+where
+	compare (TA dclIdent dclArgs) (TA iclIdent iclArgs) comp_st
+		= compare (dclIdent.type_index, dclArgs) (iclIdent.type_index, iclArgs) comp_st
+	compare (dclFun --> dclArg) (iclFun --> iclArg) comp_st
+		= compare (dclFun, dclArg) (iclFun, iclArg) comp_st
+	compare (CV dclVar :@: dclArgs) (CV iclVar :@: iclArgs) comp_st
+		= compare (dclVar, dclArgs) (iclVar, iclArgs) comp_st
+	compare (TB dclDef) (TB iclDef) comp_st
+		= (dclDef == iclDef, comp_st)
+	compare (GTV dclDef) (GTV iclDef) comp_st
+		= compare dclDef iclDef comp_st
+	compare (TV dclVar) (TV iclVar) comp_st
+		= compare dclVar iclVar comp_st
+	compare _ _ comp_st
+		= (False, comp_st)
+
+instance compare AType
+where
+	compare at1 at2 comp_st
+		= compare (at1.at_attribute, (at1.at_annotation,  at1.at_type)) (at2.at_attribute, (at2.at_annotation, at2.at_type)) comp_st
+
+instance compare TypeAttribute
+where
+	compare ta1 ta2 comp_st
+		| equal_constructor ta1 ta2
+			= compare_equal_constructor ta1 ta2 comp_st
+			= (False, comp_st)
+	where
+		compare_equal_constructor (TA_Var dclDef) (TA_Var iclDef) comp_st
+			= compare dclDef iclDef comp_st
+		compare_equal_constructor (TA_RootVar dclDef) (TA_RootVar iclDef) comp_st
+			= compare dclDef iclDef comp_st
+		compare_equal_constructor _ _ comp_st
+			= (True, comp_st)
+	
+instance compare Annotation
+where
+	compare an1 an2 comp_st
+		= (equal_constructor an1 an2, comp_st)
+	
+instance compare AttributeVar
+where
+	compare {av_info_ptr = dcl_info_ptr} {av_info_ptr = icl_info_ptr} comp_st=:{comp_attr_var_heap}
+		# (dcl_info, comp_attr_var_heap) = readPtr dcl_info_ptr comp_attr_var_heap
+		  (icl_info, comp_attr_var_heap) = readPtr icl_info_ptr comp_attr_var_heap
+		  (ok, comp_attr_var_heap) = compare_vars dcl_info icl_info dcl_info_ptr icl_info_ptr comp_attr_var_heap
+		= (ok, { comp_st & comp_attr_var_heap = comp_attr_var_heap })
+	where
+		compare_vars AVI_Empty AVI_Empty dcl_av_info_ptr icl_av_info_ptr comp_attr_var_heap
+			= (True, comp_attr_var_heap <:= (dcl_av_info_ptr, AVI_AttrVar icl_av_info_ptr) <:= (icl_av_info_ptr, AVI_AttrVar dcl_av_info_ptr))
+		compare_vars (AVI_AttrVar dcl_forward) (AVI_AttrVar icl_forward) dcl_av_info_ptr icl_av_info_ptr comp_attr_var_heap
+			= (dcl_forward == icl_av_info_ptr && icl_forward == dcl_av_info_ptr, comp_attr_var_heap)
+		compare_vars dcl_info icl_info dcl_av_info_ptr icl_av_info_ptr comp_attr_var_heap
+			= (True, comp_attr_var_heap)
+
+instance compare TypeVar
+where
+	compare {tv_info_ptr = dcl_info_ptr} {tv_info_ptr = icl_info_ptr} comp_st=:{comp_type_var_heap}
+		# (dcl_info, comp_type_var_heap) = readPtr dcl_info_ptr comp_type_var_heap
+		  (icl_info, comp_type_var_heap) = readPtr icl_info_ptr comp_type_var_heap
+		  (ok, comp_type_var_heap) = compare_vars dcl_info icl_info dcl_info_ptr icl_info_ptr comp_type_var_heap
+		= (ok, { comp_st & comp_type_var_heap = comp_type_var_heap })
+	where
+		compare_vars TVI_Empty TVI_Empty dcl_tv_info_ptr icl_tv_info_ptr type_var_heap
+			= (True, type_var_heap <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr) <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr))
+		compare_vars (TVI_TypeVar dcl_forward) (TVI_TypeVar icl_forward) dcl_tv_info_ptr icl_tv_info_ptr type_var_heap
+			= (dcl_forward == icl_tv_info_ptr && icl_forward == dcl_tv_info_ptr, type_var_heap)
+		compare_vars dcl_info icl_info dcl_tv_info_ptr icl_tv_info_ptr type_var_heap
+			= (True, type_var_heap)
+		
+instance compare AttrInequality
+where
+	compare dcl_ineq icl_ineq comp_st
+		= compare (dcl_ineq.ai_demanded, dcl_ineq.ai_offered) (icl_ineq.ai_demanded, icl_ineq.ai_offered) comp_st
+
+instance compare SymbolType
+where
+	compare dcl_st icl_st comp_st=:{comp_type_var_heap,comp_attr_var_heap}
+		# comp_type_var_heap = initialyseTypeVars dcl_st.st_vars comp_type_var_heap
+		  comp_type_var_heap = initialyseTypeVars icl_st.st_vars comp_type_var_heap
+		  comp_attr_var_heap = initialyseAttributeVars dcl_st.st_attr_vars comp_attr_var_heap
+		  comp_attr_var_heap = initialyseAttributeVars icl_st.st_attr_vars comp_attr_var_heap
+		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
+		= compare	(dcl_st.st_args, (dcl_st.st_result, (dcl_st.st_context, dcl_st.st_attr_env)))
+					(icl_st.st_args, (icl_st.st_result, (icl_st.st_context, icl_st.st_attr_env))) comp_st
+//						---> ("compare SymbolType", dcl_st, icl_st)
+
+instance compare InstanceType
+where
+	compare dcl_it icl_it comp_st=:{comp_type_var_heap,comp_attr_var_heap}
+		# comp_type_var_heap = initialyseTypeVars dcl_it.it_vars comp_type_var_heap
+		  comp_type_var_heap = initialyseTypeVars icl_it.it_vars comp_type_var_heap
+		  comp_attr_var_heap = initialyseAttributeVars dcl_it.it_attr_vars comp_attr_var_heap
+		  comp_attr_var_heap = initialyseAttributeVars icl_it.it_attr_vars comp_attr_var_heap
+		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
+		= compare (dcl_it.it_types, dcl_it.it_context) (icl_it.it_types, icl_it.it_context) comp_st
+//						---> ("compare InstanceType", dcl_it, icl_it)
+
+instance compare TypeContext
+where
+	compare dcl_tc icl_tc comp_st
+		| dcl_tc.tc_class == icl_tc.tc_class
+			= compare dcl_tc.tc_types icl_tc.tc_types comp_st
+			= (False, comp_st)
+
+
+initialyseTypeVars type_vars type_var_heap
+	= foldSt init_type_var type_vars type_var_heap
+where
+	init_type_var {tv_info_ptr} type_var_heap
+		= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+
+initialyseATypeVars atype_vars type_var_heap
+	= foldSt init_atype_var atype_vars type_var_heap
+where
+	init_atype_var {atv_variable={tv_info_ptr}} type_var_heap
+		= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+
+initialyseAttributeVars attr_vars attr_var_heap
+	= foldSt init_attr_var attr_vars attr_var_heap
+where
+	init_attr_var {av_info_ptr} attr_var_heap
+		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+	
 :: TypesCorrespondState =
 		{	tc_type_vars
 				:: !.HeapWithNumber TypeVarInfo
@@ -72,39 +387,46 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !{#Int} !{!FunctionBody} !Int !{#CheckedTypeDef} !DclModule !*IclModule !*Heaps !*ErrorAdmin 
+compareDefImp :: !{#Int} !{!FunctionBody} !Int !DclModule !*IclModule !*Heaps !*ErrorAdmin 
 				-> (!.IclModule,!.Heaps,!.ErrorAdmin)
-compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_type_defs main_dcl_module 
+compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n main_dcl_module 
 			icl_module heaps error_admin
 
-
-//	| print_function_body_array untransformed
-//		&& print_function_body_array icl_module.icl_functions
-
-
-	// icl definitions with indices >= size_uncopied_icl_defs.[def_type] don't have to be compared,
-	// because they are copies of definitions that appear exclusively in the dcl module
 	= case main_dcl_module.dcl_conversions of
 		No	-> (icl_module, heaps, error_admin)
 		Yes conversion_table
 			# {dcl_functions, dcl_macros, dcl_common} = main_dcl_module
-			  {icl_common, icl_functions}
+			  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs}}
 					= icl_module
 			  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
 			  		= heaps
-			  { com_cons_defs=icl_com_cons_defs,
-				com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
+			  { com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
+				com_selector_defs=icl_com_selector_defs, com_class_defs = icl_com_class_defs,
 				com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
 					= icl_common
-			  tc_state
-			  		=	{ tc_type_vars = initial_hwn th_vars
-						, tc_attr_vars = initial_hwn th_attrs
-						, tc_ignore_strictness = False
-						}
-			  (_, tc_state, error_admin)
+			  comp_st
+			  	=	{	comp_type_var_heap	= th_vars
+			  		,	comp_attr_var_heap	= th_attrs
+			  		,	comp_error			= error_admin
+			  		}
+
+			  (icl_com_type_defs, icl_com_cons_defs, comp_st)
+			  		= compareTypeDefs main_dcl_module.dcl_sizes copied_type_defs	dcl_common.com_type_defs dcl_common.com_cons_defs
+			  																		icl_com_type_defs icl_com_cons_defs comp_st
+			  (icl_com_class_defs, icl_com_member_defs, comp_st)
+			  		= compareClassDefs main_dcl_module.dcl_sizes copied_class_defs 	dcl_common.com_class_defs dcl_common.com_member_defs
+			  																		icl_com_class_defs icl_com_member_defs comp_st
+
+			  (icl_com_instance_defs, comp_st)
+			  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs comp_st
+
+
+/*
+			  (icl_com_type_defs, tc_state, error_admin)
 					= compareWithConversions 
 						size_uncopied_icl_defs.[cTypeDefs] conversion_table.[cTypeDefs]
-						dcl_common.com_unexpanded_type_defs icl_com_type_defs tc_state error_admin
+//						dcl_common.com_unexpanded_type_defs icl_com_type_defs tc_state error_admin
+						dcl_common.com_type_defs icl_com_type_defs tc_state error_admin
 			  (icl_com_cons_defs, tc_state, error_admin)
 					= compareWithConversions 
 						size_uncopied_icl_defs.[cConstructorDefs] conversion_table.[cConstructorDefs]
@@ -125,6 +447,15 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_typ
 					= compareWithConversions
 						size_uncopied_icl_defs.[cInstanceDefs] conversion_table.[cInstanceDefs]
 						dcl_common.com_instance_defs icl_com_instance_defs tc_state error_admin
+*/
+
+			  {	comp_type_var_heap = th_vars, comp_attr_var_heap = th_attrs, comp_error = error_admin } = comp_st
+
+			  tc_state
+			  		=	{ tc_type_vars = initial_hwn th_vars
+						, tc_attr_vars = initial_hwn th_attrs
+						, tc_ignore_strictness = False
+						}
 			  (icl_functions, hp_var_heap, hp_expression_heap, tc_state, error_admin)
 					= compareMacrosWithConversion main_dcl_module_n
 												conversion_table.[cMacroDefs] conversion_table.[cFunctionDefs]
@@ -136,7 +467,7 @@ compareDefImp size_uncopied_icl_defs untransformed main_dcl_module_n icl_com_typ
 			  { tc_type_vars, tc_attr_vars } 
 			   		= tc_state
 			  icl_common
-			  		= { icl_common & com_cons_defs=icl_com_cons_defs,
+			  		= { icl_common & com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
 			  			com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
 			  			com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
 			  heaps

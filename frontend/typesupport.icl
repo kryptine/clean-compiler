@@ -26,20 +26,18 @@ import syntax, parse, check, unitype, utilities, checktypes, compilerSwitches
 simplifyTypeApplication :: !Type ![AType] -> (!Bool, !Type)
 simplifyTypeApplication (TA type_cons=:{type_arity} cons_args) type_args
 	= (True, TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args))
-simplifyTypeApplication (TV tv) type_args
-	= (True, CV tv :@: type_args)
 simplifyTypeApplication (CV tv :@: type_args1) type_args2
 	= (True, CV tv :@: (type_args1 ++ type_args2))
-simplifyTypeApplication (TB _) _
-	= (False, TE)
-//AA..
 simplifyTypeApplication TArrow [type1, type2] 
 	= (True, type1 --> type2)
 simplifyTypeApplication TArrow [type] 
 	= (True, TArrow1 type)
 simplifyTypeApplication (TArrow1 type1) [type2] 
 	= (True, type1 --> type2)
-//AA..
+simplifyTypeApplication (TV tv) type_args
+	= (True, CV tv :@: type_args)
+simplifyTypeApplication (TB _) _
+	= (False, TE)
 simplifyTypeApplication (TArrow1 _) _ 
 	= (False, TE)
 	
@@ -271,11 +269,9 @@ where
 	cleanUpClosed (argtype --> restype) env
 		# (cur, (argtype,restype), env) = cleanUpClosed (argtype,restype) env
 		= (cur, argtype --> restype, env)
-//AA..
 	cleanUpClosed (TArrow1 argtype) env
 		# (cur, argtype, env) = cleanUpClosed argtype env
 		= (cur, TArrow1 argtype, env)
-//..AA		
 	cleanUpClosed (TempCV tv_number :@: types) env
 		# (type, env) = env![tv_number]
 		# (cur1, type, env) = cleanUpClosedVariable type env
@@ -646,6 +642,39 @@ instance bindInstances AType
 	bindInstances {at_type=t1} {at_type=t2} type_var_heap
 			= bindInstances t1 t2 type_var_heap
 
+substituteType :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !Type !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
+substituteType form_root_attribute act_root_attribute form_type_args act_type_args orig_type type_heaps
+	# type_heaps = bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
+	  (ok, expanded_type, type_heaps) = substitute orig_type type_heaps
+	= (ok, expanded_type, clearBindingsOfTypeVarsAndAttributes form_root_attribute form_type_args type_heaps)
+
+
+bindTypeVarsAndAttributes :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !*TypeHeaps -> *TypeHeaps
+bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
+	# th_attrs = bind_attribute form_root_attribute act_root_attribute type_heaps.th_attrs
+	= fold2St bind_type_and_attr form_type_args act_type_args { type_heaps & th_attrs = th_attrs }
+where
+	bind_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} {at_type,at_attribute} type_heaps=:{th_vars,th_attrs}
+		= { type_heaps &	th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type),
+							th_attrs = bind_attribute atv_attribute at_attribute th_attrs }
+		
+	bind_attribute (TA_Var {av_info_ptr}) attr th_attrs
+		= th_attrs <:= (av_info_ptr, AVI_Attr attr)
+	bind_attribute _ _ th_attrs
+		= th_attrs
+
+clearBindingsOfTypeVarsAndAttributes :: !TypeAttribute ![ATypeVar] !*TypeHeaps -> *TypeHeaps
+clearBindingsOfTypeVarsAndAttributes form_root_attribute form_type_args type_heaps
+	# th_attrs = clear_attribute form_root_attribute type_heaps.th_attrs
+	= foldSt clear_type_and_attr form_type_args { type_heaps & th_attrs = th_attrs }
+where
+	clear_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+		= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attribute atv_attribute th_attrs }
+		
+	clear_attribute (TA_Var {av_info_ptr}) th_attrs
+		= th_attrs <:= (av_info_ptr, AVI_Empty)
+	clear_attribute _ th_attrs
+		= th_attrs
 
 class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 
@@ -685,50 +714,45 @@ where
 		  (ok_ts, ts, heaps) = substitute ts heaps
 		= (ok_t && ok_ts, [t:ts], heaps)
 
-
 instance substitute TypeContext
 where
 	substitute tc=:{tc_types} heaps
 		# (ok, tc_types, heaps) = substitute tc_types heaps
 		= (ok, { tc & tc_types = tc_types }, heaps)
 
-substituteTypeVariable tv=:{tv_name,tv_info_ptr} heaps=:{th_vars}
-	# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
-	  heaps = { heaps & th_vars = th_vars }
-	= case tv_info of
-		TVI_Type type
-				-> (type, heaps)
-		_
-			-> (TV tv, heaps)
-
 instance substitute Type
 where
-	substitute (TV tv) heaps
-		# (type, heaps) = substituteTypeVariable tv heaps
-		= (True, type, heaps)
+	substitute tv=:(TV {tv_info_ptr}) heaps=:{th_vars}
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		  heaps = { heaps & th_vars = th_vars }
+		= case tv_info of
+			TVI_Type type
+				-> (True, type, heaps)
+			_
+				-> (True, tv, heaps)
 	substitute (arg_type --> res_type) heaps
 		# (ok, (arg_type, res_type), heaps) = substitute (arg_type, res_type) heaps
 		= (ok, arg_type --> res_type, heaps)
-//AA..
 	substitute (TArrow1 arg_type) heaps
 		# (ok, arg_type, heaps) = substitute arg_type heaps
 		= (ok, TArrow1 arg_type, heaps)
-
-//..AA		
 	substitute (TA cons_id cons_args) heaps
 		# (ok, cons_args, heaps) = substitute cons_args heaps
 		= (ok, TA cons_id cons_args,  heaps)
 	substitute (CV type_var :@: types) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
 		  heaps = { heaps & th_vars = th_vars }
-		  (ok1, types, heaps) = substitute types heaps
+		  (ok_types, types, heaps) = substitute types heaps
 		= case tv_info of
-			TVI_Type tv=:(TempV i)
-				-> (ok1, TempCV i :@: types, heaps)
+			TVI_Type type
+				-> case type of
+					TempV i
+						-> (ok_types, TempCV i :@: types, heaps)
+					_
+						#  (ok_type, simplified_type) = simplifyTypeApplication type types
+						-> (ok_type && ok_types, simplified_type, heaps)
 			_
-				# (type, heaps) = substituteTypeVariable type_var heaps
-				  (ok2, simplified_type) = simplifyTypeApplication type types
-				-> (ok1 && ok2, simplified_type, heaps)
+				-> 	(ok_types, CV type_var :@: types, heaps)
 	substitute type heaps
 		= (True, type, heaps)
 
@@ -825,11 +849,13 @@ where
 			= (True, { st & st_args = st_args, st_result = st_result })
 			= (False, st)
 
+/*
 expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
 expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
 	# type_heaps = bindTypeVarsAndAttributes form_attr act_attr type_args arg_types type_heaps 
 	  (_, exp_type, type_heaps) = substitute type_rhs type_heaps
 	= (exp_type, clearBindingsOfTypeVarsAndAttributes form_attr type_args type_heaps)
+*/
 
 VarIdTable :: {# String}
 VarIdTable =: { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" }

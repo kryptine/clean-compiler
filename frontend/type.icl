@@ -349,8 +349,8 @@ tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_att
 	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
 	= case type_def.td_rhs of
 		SynType {at_type}
-			# (res_type, type_heaps) = expandTypeApplication type_def.td_args type_def.td_attribute at_type type_args type_attr type_heaps
-			-> (True, res_type, type_heaps)
+			# (_, expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps)
 		_
 			-> (False, type, type_heaps)
 tryToExpand type type_attr modules type_heaps

@@ -821,11 +821,12 @@ tryToExpandTypeSyn :: !{#CommonDefs} !{#BOOLVECT} !TypeSymbIdent ![AType] !TypeA
 tryToExpandTypeSyn defs cons_vars cons_id=:{type_index={glob_object,glob_module}} type_args attribute type_heaps td_infos
 	# {td_rhs,td_args,td_attribute,td_name} = defs.[glob_module].com_type_defs.[glob_object]
 	= case td_rhs of
-		SynType {at_type}
+		SynType {at_type}			
 			# type_heaps = bindTypeVarsAndAttributes td_attribute attribute td_args type_args type_heaps
 			  (_, expanded_type, (_, {es_type_heaps, es_td_infos})) = expandType defs cons_vars at_type
 			  		({}, { es_type_heaps = type_heaps, es_td_infos = td_infos })
 			-> (True, expanded_type, clearBindingsOfTypeVarsAndAttributes attribute td_args es_type_heaps, es_td_infos)
+
 		_
 			-> (False, TA cons_id type_args, type_heaps, td_infos)
 		

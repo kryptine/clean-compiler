@@ -167,15 +167,15 @@ compileModule mod_name dcl_cache ms
 
 loadModule :: Ident *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
 loadModule mod_ident {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
-	# (optional_syntax_tree,cached_functions_and_macros,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
-		= frontEndInterface {feo_up_to_phase=FrontEndPhaseAll,feo_generics=False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules functions_and_macros No predef_symbols hash_table ms_files ms_error ms_io ms_out No heaps
+	# (optional_syntax_tree,cached_functions_and_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
+		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll,feo_generics = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules functions_and_macros No predef_symbols hash_table ms_files ms_error ms_io ms_out No heaps
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
 		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
-			# dcl_modules={{dcl_module \\ dcl_module<-:fe_dcls} & [main_dcl_module_n].dcl_conversions=No}
+			# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_conversions=No}
 			# var_heap = remove_expanded_types_from_dcl_modules 0 dcl_modules icl_used_module_numbers heaps.hp_var_heap
 			# heaps = {heaps & hp_var_heap = var_heap }
-			->	(Yes (buildInterMod mod_ident icl_used_module_numbers fe_dcls /*icl_functions fe_dclIclConversions fe_iclDclConversions*/),
+			->	(Yes (buildInterMod mod_ident icl_used_module_numbers fe_dcls),
 					{dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}, ms)
 		No
 			->	(No, {dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps},ms)
@@ -242,7 +242,7 @@ where
 			= collect_modules modules collected_modules random_numbers proj ms
 			# ms = {ms & ms_io = ms.ms_io <<< "Compiling " <<< id_name <<< "\n"}
 			# dcl_cache = proj.proj_cache
-//			# dcl_cache = empty_cache
+//			# dcl_cache = (empty_cache proj.proj_cache.hash_table.hte_symbol_heap)
 			# (this_mod,dcl_cache,ms) = compileModule id_name dcl_cache ms
 			# proj = {proj & proj_cache=dcl_cache}
 			= case this_mod of

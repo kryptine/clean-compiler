@@ -57,6 +57,7 @@ where toString {import_module} = toString import_module
 				| STE_ExplImpSymbol !Int
 				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
 				| STE_BelongingSymbol !Int
+				| STE_UsedType !Index !STE_Kind
 
 ::	Declaration = Declaration !DeclarationRecord
 
@@ -373,11 +374,20 @@ cIsImportedObject :== False
 ::	CheckedTypeDef :== TypeDef TypeRhs
 
 cAllBitsClear			:== 0
-
 cIsHyperStrict			:== 1
 cIsNonCoercible			:== 2
-cMayBeNonCoercible		:== 4
+cIsAnalysed				:== 4
+cIsAbstractType			:== 8
 
+::	GlobalIndex =
+	{	gi_module	::!Int
+	,	gi_index	::!Int
+	}
+
+instance == GlobalIndex
+where
+	(==) gi1 gi2 = gi1.gi_module == gi2.gi_module && gi1.gi_index == gi2.gi_index
+	
 ::	TypeDef type_rhs =
  	{	td_name			:: !Ident
 	,	td_index		:: !Int
@@ -388,6 +398,7 @@ cMayBeNonCoercible		:== 4
 	,	td_rhs			:: !type_rhs
 	,	td_attribute	:: !TypeAttribute
 	,	td_pos			:: !Position
+	,	td_used_types	:: ![GlobalIndex]
 	}
 
 ::	FunType =
@@ -929,11 +940,11 @@ cNotVarNumber :== -1
 ::	TypeDefInfo =
 	{	tdi_kinds			:: ![TypeKind]
 	,	tdi_properties		:: !BITVECT
-	,	tdi_group			:: ![Global Index]
+	,	tdi_group			:: ![GlobalIndex]
 	,	tdi_group_nr		:: !Int
 	,	tdi_group_vars		:: ![Int]
 	,	tdi_cons_vars		:: ![Int]
-	,	tdi_tmp_index		:: !Int
+	,	tdi_index_in_group	:: !Index
 	,	tdi_classification	:: !TypeClassification
 	}
 
@@ -1010,7 +1021,11 @@ cNonUniqueSelection	:== False
 					| PS_Array  !ParsedExpr
 					| PS_Erroneous
 
-::	GeneratorKind = IsListGenerator | IsOverloadedListGenerator | IsArrayGenerator
+
+::	GeneratorKind :== Bool
+
+IsListGenerator 	:== True
+IsArrayGenerator	:== False
 
 :: LineAndColumn = {lc_line :: !Int, lc_column :: !Int}
 
@@ -1480,11 +1495,7 @@ where
 instance <<< Generator
 where
 	(<<<) file {gen_kind,gen_pattern,gen_expr}
-		= file <<< gen_pattern <<< (gen_kind_to_string gen_kind) <<< gen_expr
-	where
-		gen_kind_to_string IsListGenerator = "<-"
-		gen_kind_to_string IsOverloadedListGenerator = "<|-"
-		gen_kind_to_string IsArrayGenerator = "<-:"
+		= file <<< gen_pattern <<< (if gen_kind "<-" "<-:") <<< gen_expr
 
 instance <<< BasicValue
 where
@@ -1799,7 +1810,8 @@ where
 instance <<< TypeDefInfo
 where
 	(<<<) file {tdi_group,tdi_group_vars,tdi_cons_vars}
-		= file <<< '[' <<< tdi_group <<< '=' <<< tdi_group_vars <<< '=' <<< tdi_cons_vars <<< ']'
+//		= file <<< '[' <<< tdi_group <<< '=' <<< tdi_group_vars <<< '=' <<< tdi_cons_vars <<< ']'
+		= file <<< '[' <<< tdi_group_vars <<< '=' <<< tdi_cons_vars <<< ']'
 
 instance <<< DefinedSymbol
 where
@@ -2111,7 +2123,7 @@ abort_empty_SymbolTableEntry = abort "empty SymbolTableEntry"
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_tmp_index = NoIndex }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex }
 
 MakeTypeVar name :== { tv_name = name, tv_info_ptr = nilPtr }
 MakeVar name :== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
@@ -2168,7 +2180,7 @@ ParsedInstanceToClassInstance pi members :==
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
 	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,
-		td_pos = pos, td_rhs = rhs }
+		td_pos = pos, td_rhs = rhs, td_used_types = [] }
 
 MakeDefinedSymbol ident index arity :== { ds_ident = ident, ds_arity = arity, ds_index = index }
 

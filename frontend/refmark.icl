@@ -352,17 +352,8 @@ where
 		  var_heap = refMark [ [ fv \\ (fv,_) <- used_pattern_vars ] : free_vars ] sel def ap_expr var_heap // (var_heap ---> ("ref_mark_of_algebraic_pattern", ap_expr))
 		  var_heap = restore_binding_of_pattern_variable opt_pattern_var used_pattern_vars var_heap
 		  (used_lets, var_heap) = collectUsedLetVars local_lets (used_lets, var_heap)
-//		  var_heap = clear_local_vars used_pattern_vars var_heap
 		= (with_pattern_bindings || not (isEmpty used_pattern_vars), pattern_depth, used_lets, var_heap)
 	
-	clear_local_vars vars var_heap
-		= foldSt clear_occurrence vars var_heap
-	where
-		clear_occurrence ({fv_name,fv_info_ptr},_) var_heap 
-			# (var_info, var_heap) = readPtr fv_info_ptr var_heap
-			= case var_info of
-				VI_Occurrence occ
-					-> var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = RC_Unused, occ_previous = [], occ_bind = OB_Empty })
 
 	bind_optional_pattern_variable _ [] var_heap
 		= var_heap

@@ -53,7 +53,7 @@ cConversionTableSize	:== 9 // AA
 
 ::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
-	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
+//	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
 	,	com_cons_defs		:: !.{# ConsDef}
 	,	com_selector_defs	:: !.{# SelectorDef}
 	,	com_class_defs		:: !.{# ClassDef}
@@ -83,16 +83,21 @@ cConversionTableSize	:== 9 // AA
 	,	di_belonging	::	!NumberSet
 	}
 
+::	CopiedDefinitions =
+	{	copied_type_defs	:: [Index]
+	,	copied_class_defs	:: [Index]
+	}
+	
 ::	IclModule  =
 	{	icl_name				:: !Ident
 	,	icl_functions			:: !.{# FunDef }
 	,	icl_instances			:: !IndexRange
 	,	icl_specials			:: !IndexRange
 	,	icl_common				:: !.CommonDefs
-//	,	icl_declared		:: !Declarations
-	,	icl_import		:: !{!Declaration}
+	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_used_module_numbers :: !NumberSet
+	,	icl_copied_from_dcl 	:: !CopiedDefinitions
 	}
 
 ::	DclModule =

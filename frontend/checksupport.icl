@@ -45,12 +45,12 @@ cConstructorDefs		:== 1
 cSelectorDefs			:== 2
 cClassDefs				:== 3
 cMemberDefs				:== 4
-cGenericDefs			:== 5 // AA 
+cGenericDefs			:== 5
 cInstanceDefs			:== 6
 cFunctionDefs			:== 7
 cMacroDefs				:== 8
 
-cConversionTableSize	:== 9 // AA
+cConversionTableSize	:== 9
 
 instance toInt STE_Kind
 where
@@ -67,9 +67,7 @@ where
 
 ::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
-
-	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
-
+//	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
 	,	com_cons_defs		:: !.{# ConsDef}
 	,	com_selector_defs	:: !.{# SelectorDef}
 	,	com_class_defs		:: !.{# ClassDef}
@@ -98,16 +96,21 @@ where
 	,	di_belonging	::	!NumberSet
 	}
 
+::	CopiedDefinitions =
+	{	copied_type_defs	:: [Index]
+	,	copied_class_defs	:: [Index]
+	}
+	
 ::	IclModule  =
-	{	icl_name			:: !Ident
-	,	icl_functions		:: !.{# FunDef }
-	,	icl_instances		:: !IndexRange
-	,	icl_specials		:: !IndexRange
-	,	icl_common			:: !.CommonDefs
-//	,	icl_declared		:: !Declarations
-	,	icl_import		:: !{!Declaration}
+	{	icl_name				:: !Ident
+	,	icl_functions			:: !.{# FunDef }
+	,	icl_instances			:: !IndexRange
+	,	icl_specials			:: !IndexRange
+	,	icl_common				:: !.CommonDefs
+	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_used_module_numbers :: !NumberSet
+	,	icl_copied_from_dcl 	:: !CopiedDefinitions
 	}
 
 ::	DclModule =

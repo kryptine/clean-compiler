@@ -5,9 +5,9 @@ import syntax, containers, checksupport, utilities
 
 //import RWSDebug
 
-checkKindCorrectness :: !Index IndexRange !{#CommonDefs} !Int !u:{# FunDef} !*{#DclModule} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
+checkKindCorrectness :: !Index !Index IndexRange !{#CommonDefs} !Int !u:{# FunDef} !*{#DclModule} !*TypeVarHeap !*TypeDefInfos !*ErrorAdmin
 																						-> (!u:{# FunDef}, !*{#DclModule}, !*TypeVarHeap, !*TypeDefInfos, !*ErrorAdmin)
-checkKindCorrectness main_dcl_module_n icl_instances common_defs n_cached_dcl_modules fun_defs dcl_mods th_vars td_infos error_admin
+checkKindCorrectness main_dcl_module_n first_uncached_function icl_instances common_defs n_cached_dcl_modules fun_defs dcl_mods th_vars td_infos error_admin
 	#! n_fun_defs = size fun_defs
 	   size_dcl_mods = size dcl_mods
 	# (dcl_mods, th_vars, td_infos, error_admin)
@@ -32,7 +32,7 @@ checkKindCorrectness main_dcl_module_n icl_instances common_defs n_cached_dcl_mo
 					0 size_dcl_mods (bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	  // check_icl_function: don't check the types that were generated for instances
 	  state
-			= iFoldSt (check_icl_function common_defs) 0 icl_instances.ir_from
+			= iFoldSt (check_icl_function common_defs) first_uncached_function /* 0 */ icl_instances.ir_from
 					(fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 	  (fun_defs, bv_uninitialized_mods, th_vars, td_infos, error_admin)
 			= iFoldSt (check_icl_function common_defs) icl_instances.ir_to n_fun_defs state
@@ -120,6 +120,7 @@ checkKindCorrectness main_dcl_module_n icl_instances common_defs n_cached_dcl_mo
 
 	get_expected_kinds class_index=:{glob_module, glob_object} common_defs bv_uninitialized_mods th_vars
 		| bitvectSelect glob_module bv_uninitialized_mods
+//			---> ("get_expected_kinds", glob_module)
 			/* the desired class is defined in a module which is a cached one 
 				=> check_classes has not been called for all the classes
 				   within that module
@@ -325,17 +326,7 @@ checkKindCorrectness main_dcl_module_n icl_instances common_defs n_cached_dcl_mo
 			= "type of argument nr "+++toString i
 		= "type context nr "+++toString (~i)
 		
-	get_common_defs dcl_mods
-		#! size = size dcl_mods
-		# ({dcl_common=arbitrary_value_for_initializing}, dcl_mods) = dcl_mods![0]
-		= loop 0 (createArray size arbitrary_value_for_initializing) dcl_mods
-	  where
-		loop :: !Int !*{#CommonDefs} !u:{#DclModule} -> (!*{#CommonDefs}, !u:{#DclModule})
-		loop i common_defs dcl_mods
-			| i==size dcl_mods
-				= (common_defs, dcl_mods)
-			# ({dcl_common}, dcl_mods) = dcl_mods![i]
-			= loop (i+1) { common_defs & [i] = dcl_common } dcl_mods
 
 in_index_range test ir :== test>=ir.ir_from && test < ir.ir_to
+
 
