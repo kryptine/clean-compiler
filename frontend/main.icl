@@ -80,7 +80,7 @@ addModule _ mod NoModules
 
 :: DclCache = {
 	dcl_modules::!{#DclModule},
-	functions_and_macros::!{#FunDef},
+	cached_macros::!.{#.{#FunDef}},
 	predef_symbols::!.PredefinedSymbols,
 	hash_table::!.HashTable,
 	heaps::!.Heaps
@@ -96,7 +96,7 @@ empty_cache :: *SymbolTable -> *DclCache
 empty_cache symbol_heap
 	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}}
 	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
-	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
+	= {dcl_modules={},cached_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
 
 DoCommand ['c':_] argument symbol_heap ms 
 	# (file_name, rest_input) = SplitAtLayoutChar (dropWhile isSpace argument)
@@ -170,19 +170,19 @@ dummyModTime _ f
 	=	("", f)
 
 loadModule :: Ident *DclCache *MainState -> *(!Optional InterMod,!*DclCache,!*MainState);
-loadModule mod_ident {dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
-	# (optional_syntax_tree,cached_functions_and_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
-		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules functions_and_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out No heaps
+loadModule mod_ident {dcl_modules,cached_macros,predef_symbols,hash_table,heaps} ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
+	# (optional_syntax_tree,cached_cached_macros,cached_dcl_mods,_,main_dcl_module_n,predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out,_,heaps)
+		= frontEndInterface { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_fusion = False} mod_ident {sp_locations = [], sp_paths = ms_paths} dcl_modules cached_macros No predef_symbols hash_table dummyModTime ms_files ms_error ms_io ms_out No heaps
 	# ms = {ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
 	= case optional_syntax_tree of
-		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
-			# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_conversions=No}
+		Yes {fe_icl={/*icl_functions,*/icl_used_module_numbers}, fe_dcls}
+			# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_macro_conversions=No}
 			# var_heap = remove_expanded_types_from_dcl_modules 0 dcl_modules icl_used_module_numbers heaps.hp_var_heap
 			# heaps = {heaps & hp_var_heap = var_heap }
 			->	(Yes (buildInterMod mod_ident icl_used_module_numbers fe_dcls),
-					{dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}, ms)
+					{dcl_modules=dcl_modules,cached_macros=cached_cached_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}, ms)
 		No
-			->	(No, {dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps},ms)
+			->	(No, {dcl_modules=dcl_modules,cached_macros=cached_cached_macros,predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps},ms)
 
 remove_expanded_types_from_dcl_modules :: Int {#DclModule} NumberSet *VarHeap -> *VarHeap
 remove_expanded_types_from_dcl_modules module_n dcls used_module_numbers var_heap
