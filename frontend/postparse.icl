@@ -173,6 +173,11 @@ where
 		= collectFunctions (transformSequence sequence ca_predefs) ca
 	collectFunctions (PE_ArrayDenot exprs) ca=:{ca_predefs}
 		= collectFunctions (transformArrayDenot exprs ca_predefs) ca
+// MV ..
+	collectFunctions (PE_Dynamic exprs opt_dyn_type) ca
+		# (exprs, ca) = collectFunctions exprs ca
+		= (PE_Dynamic exprs opt_dyn_type, ca)
+// .. MV
 	collectFunctions expr ca
 		= (expr, ca)
 

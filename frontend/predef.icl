@@ -150,7 +150,7 @@ where
 					<<- ("P_laceholder",		IC_Expression, PD_variablePlaceholder)
 					<<- ("_unify",				IC_Expression, PD_unify)
 					<<-	("_coerce",				IC_Expression, PD_coerce) /* MV */
-					<<- ("StdDynamics",			IC_Module, PD_StdDynamics)
+					<<- ("StdDynamic",			IC_Module, PD_StdDynamics)
 					<<- ("_undo_indirections",	IC_Expression, PD_undo_indirections)
 					<<- ("Start",				IC_Expression, PD_Start)
 
