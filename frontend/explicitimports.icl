@@ -777,7 +777,10 @@ instance consequences Expression
 	consequences (FreeVar _) 	= []
 	consequences (DynamicExpr dynamicExpr)	= consequences dynamicExpr
 	consequences EE	= []
-
+// RWS ...
+	consequences (Update expr1 selections expr2)	=  consequences expr1++consequences selections++consequences expr2
+	consequences expr	= abort "explicitimports:consequences (Expression) does not match" <<- expr
+// ... RWS
 instance consequences FunctionBody
   where	consequences (CheckedBody body) = consequences body
 		consequences (TransformedBody body) = consequences body
