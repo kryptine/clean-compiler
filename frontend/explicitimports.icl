@@ -136,6 +136,12 @@ imp_decl_to_string (ID_OldSyntax idents) = "ID_OldSyntax "+++idents_to_string id
 		idents_to_string [{id_name}:l] = toString id_name+++","+++idents_to_string l
 */
 
+getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
+getBelongingSymbolsFromID (ID_Class _ x)						= x
+getBelongingSymbolsFromID (ID_Type _ x)						= x
+getBelongingSymbolsFromID (ID_Record _ x)						= x
+getBelongingSymbolsFromID _									= No
+
 solveExplicitImports :: !(IntKeyHashtable [(Int,Position,[ImportNrAndIdents])]) !{#Int} !Index 
 				!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
 			-> (!.SolvedImports,!(!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))

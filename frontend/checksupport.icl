@@ -540,20 +540,6 @@ local_declaration_for_import decl=:(Declaration {decl_kind=STE_Imported _ _}) mo
 local_declaration_for_import decl=:(Declaration declaration_record=:{decl_kind}) module_n
 	= Declaration {declaration_record & decl_kind = STE_Imported decl_kind module_n}
 
-	
-get_ident :: !ImportDeclaration -> Ident
-get_ident (ID_Function {ii_ident})						= ii_ident
-get_ident (ID_Class {ii_ident} _)						= ii_ident
-get_ident (ID_Type {ii_ident} _)						= ii_ident
-get_ident (ID_Record {ii_ident} _)						= ii_ident
-get_ident (ID_Instance class_ident instance_ident _)	= instance_ident
-
-getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
-getBelongingSymbolsFromID (ID_Class _ x)						= x
-getBelongingSymbolsFromID (ID_Type _ x)						= x
-getBelongingSymbolsFromID (ID_Record _ x)						= x
-getBelongingSymbolsFromID _									= No
-
 class toIdent a :: !a -> Ident
 
 instance toIdent SymbIdent

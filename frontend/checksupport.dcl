@@ -52,9 +52,7 @@ cConversionTableSize	:== 9 // AA
 
 ::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
-	
 	,	com_unexpanded_type_defs :: !{# CheckedTypeDef}
-	
 	,	com_cons_defs		:: !.{# ConsDef}
 	,	com_selector_defs	:: !.{# SelectorDef}
 	,	com_class_defs		:: !.{# ClassDef}
@@ -176,9 +174,6 @@ removeLocalsFromSymbolTable :: !Level ![Ident] !LocalDefs !u:{# FunDef} !*(Heap 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
 
 local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]
-
-get_ident :: !ImportDeclaration -> Ident
-getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
 
 :: BelongingSymbols
 	=	BS_Constructors ![DefinedSymbol]
