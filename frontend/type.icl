@@ -1101,7 +1101,7 @@ where
 		# let_binds = let_strict_binds ++ let_lazy_binds
 		  (rev_var_types, ts) = make_base let_binds [] ts
 		  var_types = reverse rev_var_types
-		  (reqs, ts) = requirements_of_binds NoPos ti let_binds var_types (reqs, ts)
+		  (reqs, ts) = requirements_of_binds let_binds var_types NoPos [] reqs ts
 		  (res_type, opt_expr_ptr, (reqs, ts)) = requirements_of_let_expr let_expr_position ti let_expr (reqs, ts)
 		  ts_expr_heap = writePtr let_info_ptr (EI_LetType var_types) ts.ts_expr_heap
 		= ( res_type, opt_expr_ptr, ({ reqs & req_case_and_let_exprs = [let_info_ptr : reqs.req_case_and_let_exprs]},{ ts & ts_expr_heap = ts_expr_heap }))
@@ -1114,21 +1114,39 @@ where
 		make_base [] var_types ts
 			= (var_types, ts)
 	
-		requirements_of_binds _ _ [] _ reqs_ts
-			= reqs_ts
-		requirements_of_binds last_position ti [{lb_src, lb_position}:bs] [b_type:bts] reqs_ts
-			# position = if (is_a_new_position lb_position last_position) lb_position NoPos
-			  reqs_ts
-					= possibly_accumulate_reqs_in_new_group position (requirements_of_bind b_type ti lb_src) reqs_ts
-			= requirements_of_binds lb_position ti bs bts reqs_ts
+		requirements_of_binds [] bts last_position new_type_coercions reqs ts
+			# reqs=add_new_group last_position new_type_coercions reqs
+			= (reqs,ts)
+		requirements_of_binds [{lb_src, lb_position}:bs] [b_type:bts] last_position new_type_coercions reqs ts
+			| is_same_position lb_position last_position
+				# (new_type_coercions,reqs,ts) = add_requirements_of_bind_to_group lb_src b_type new_type_coercions reqs ts
+				= requirements_of_binds bs bts last_position new_type_coercions reqs ts
+				# reqs=add_new_group last_position new_type_coercions reqs
+				# new_type_coercions=[]
+				# (new_type_coercions,reqs,ts) = add_requirements_of_bind_to_group_or_list lb_position lb_src b_type new_type_coercions reqs ts
+				= requirements_of_binds bs bts lb_position new_type_coercions reqs ts
 		  where
-			is_a_new_position (LinePos _ line_nr1) (LinePos _ line_nr2)
-				= line_nr1<>line_nr2
-			is_a_new_position (FunPos _ line_nr1 _) (FunPos _ line_nr2 _)
-				= line_nr1<>line_nr2
-			is_a_new_position _ _
-				= True
+			is_same_position (LinePos _ line_nr1) (LinePos _ line_nr2)
+				= line_nr1==line_nr2
+			is_same_position (FunPos _ line_nr1 _) (FunPos _ line_nr2 _)
+				= line_nr1==line_nr2
+			is_same_position _ _
+				= False
 
+			add_requirements_of_bind_to_group_or_list NoPos lb_src b_type new_type_coercions reqs ts
+				# (reqs,ts) = requirements_of_bind b_type ti lb_src (reqs,ts)
+				= (new_type_coercions,reqs,ts)
+			add_requirements_of_bind_to_group_or_list _ lb_src b_type new_type_coercions reqs ts
+				= add_requirements_of_bind_to_group lb_src b_type new_type_coercions reqs ts
+			
+			add_requirements_of_bind_to_group lb_src b_type new_type_coercions reqs ts
+				# old_req_type_coercions=reqs.req_type_coercions
+				# reqs = {reqs & req_type_coercions=new_type_coercions}
+				# (reqs,ts) = requirements_of_bind b_type ti lb_src (reqs,ts)
+				# new_type_coercions=reqs.req_type_coercions
+				# reqs = {reqs & req_type_coercions=old_req_type_coercions}
+				= (new_type_coercions,reqs,ts)
+	
 			requirements_of_bind b_type ti lb_src reqs_ts
 				# (exp_type, opt_expr_ptr, (reqs, ts))
 						= requirements ti lb_src reqs_ts
@@ -1136,6 +1154,11 @@ where
 				  req_type_coercions = [ { tc_demanded = b_type, tc_offered = exp_type, tc_position = CP_Expression lb_src, tc_coercible = True }
 				  		: reqs.req_type_coercions ]
 				= ({ reqs & req_type_coercions = req_type_coercions }, { ts & ts_expr_heap = ts_expr_heap })
+
+		add_new_group position [] reqs
+			= reqs
+		add_new_group position new_type_coercions reqs 
+			= { reqs & req_type_coercion_groups = [{ tcg_type_coercions = new_type_coercions,	tcg_position = position } : reqs.req_type_coercion_groups]}
 
 		requirements_of_let_expr NoPos ti let_expr reqs_ts
 			= requirements ti let_expr reqs_ts
@@ -1152,7 +1175,7 @@ where
 			  				req_type_coercion_groups = [new_group:reqs_with_new_group_in_accu.req_type_coercion_groups],
 				  			req_type_coercions = old_req_type_coercions }
 			= (res_type, opt_expr_ptr, (reqs_with_new_group, ts))
-		
+
 
 instance requirements DynamicExpr
 where
