@@ -129,10 +129,8 @@ where
 	collectFunctions (PE_Bound bound_expr) ca
 		# (bound_expr, ca) = collectFunctions bound_expr ca
 		= (PE_Bound bound_expr, ca)
-// MW was:	collectFunctions (PE_Lambda lam_ident args res) ca
 	collectFunctions (PE_Lambda lam_ident args res pos) ca
 		# ((args,res), ca) = collectFunctions (args,res) ca
-// MW was:		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res] ca
 		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos] ca
 		= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = range, loc_nodes = [] })
 				(PE_Ident lam_ident), ca)
@@ -173,11 +171,9 @@ where
 		= collectFunctions (transformSequence sequence ca_predefs) ca
 	collectFunctions (PE_ArrayDenot exprs) ca=:{ca_predefs}
 		= collectFunctions (transformArrayDenot exprs ca_predefs) ca
-// MV ..
 	collectFunctions (PE_Dynamic exprs opt_dyn_type) ca
 		# (exprs, ca) = collectFunctions exprs ca
 		= (PE_Dynamic exprs opt_dyn_type, ca)
-// .. MV
 	collectFunctions expr ca
 		= (expr, ca)
 

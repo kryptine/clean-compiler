@@ -20,6 +20,15 @@ import RWSDebug
 
 :: Backender :== *BackEnd -> *BackEnd
 
+// foldr` :: (.a -> .(.b -> .b)) .b ![.a] -> .b	//	op e0 (op e1(...(op r e##)...)
+foldr` op r l :== foldr l
+	where
+		foldr []	= r
+		foldr [a:x]	= op a (foldr x)
+
+flip` f x y
+	:==	f y x
+
 /* +++
 :: *BackEndState = {bes_backEnd :: BackEnd, bes_varHeap :: *VarHeap}
 
@@ -32,7 +41,7 @@ accVarHeap f beState
 		=	f beState.bes_varHeap
 	=	(result, {beState & bes_varHeap = varHeap})
 */
-appBackEnd f beState :== f beState
+appBackEnd f :== f
 accVarHeap f beState :== f beState
 
 beFunction0 f
@@ -231,8 +240,8 @@ notYetImplementedExpr
 	=	(BasicExpr (BVS "\"error in compiler (something was not implemented by lazy Ronny)\"") BT_Int)
 
 backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree VarHeap *BackEnd -> *BackEnd
-backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common, icl_imported_objects}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions} varHeap backEnd
-	// sanity check ...
+backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_common, icl_imported_objects}, fe_components, fe_dcls, fe_arrayInstances, fe_dclIclConversions, fe_iclDclConversions, fe_globalFunctions} varHeap backEnd
+// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
 //		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"
 	// ... sanity check
@@ -245,9 +254,9 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 	#  backEnd
 		=	abort "front end abort" backEnd
 */
-	#! backEnd
+	# backEnd
 		=	BEDeclareModules (size fe_dcls) backEnd
-	#! backEnd
+	# backEnd
 		=	predefineSymbols fe_dcls.[cPredefinedModuleIndex] predefs backEnd
 
 	#  currentDcl
@@ -277,32 +286,32 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 				,	(rstypes, types)
 				)
 */
-	#! backEnd
+	# backEnd
 		=	declareCurrentDclModule fe_icl fe_dcls.[cIclModIndex] (backEnd -*-> "declareCurrentDclModule")
-	#! backEnd
+	# backEnd
 		=	declareOtherDclModules fe_dcls (backEnd -*-> "declareOtherDclModules")
-	#! backEnd
+	# backEnd
 		=	defineDclModule varHeap cIclModIndex fe_dcls.[cIclModIndex] (backEnd -*-> "defineDclModule(cIclMoIndex)")
-	#! backEnd
+	# backEnd
 		=	reshuffleTypes (size icl_common.com_type_defs) typeConversions (backEnd -*-> "reshuffleTypes")
-	#! backEnd
+	# backEnd
 		=	defineOtherDclModules fe_dcls varHeap (backEnd -*-> "defineOtherDclModules")
 
-	#! backEnd
+	# backEnd
 		=	BEDeclareIclModule icl_name.id_name (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs) (backEnd -*-> "BEDeclareIclModule")
-	#! backEnd
-		=	declareFunctionSymbols icl_functions (getConversions fe_iclDclConversions) functionIndices (backEnd -*-> "declareFunctionSymbols")
+	# backEnd
+		=	declareFunctionSymbols icl_functions (getConversions fe_iclDclConversions) functionIndices fe_globalFunctions (backEnd -*-> "declareFunctionSymbols")
 		with
 			getConversions :: (Optional {#Int}) -> {#Int}
 			getConversions No
 				=	{}
 			getConversions (Yes conversions)
 				=	conversions
-	#! backEnd
+	# backEnd
 		=	declare cIclModIndex varHeap icl_common (backEnd -*-> "declare (cIclModIndex)")
-	#! backEnd
+	# backEnd
 		=	declareArrayInstances fe_arrayInstances icl_functions (backEnd -*-> "declareArrayInstances")
-	#! backEnd
+	# backEnd
 		=	adjustArrayFunctions predefs fe_arrayInstances icl_functions fe_dcls varHeap (backEnd -*-> "adjustArrayFunctions")
 	#! (rules, backEnd)
 // MW was:		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] varHeap (backEnd -*-> "convertRules")
@@ -311,12 +320,12 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 					varHeap (backEnd -*-> "convertRules")
 	#! backEnd
 		=	BEDefineRules rules (backEnd -*-> "BEDefineRules")
-	#! backEnd
+	# backEnd
 		=	beDefineImportedObjsAndLibs
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | not imported.io_is_library])
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | imported.io_is_library])
 				(backEnd -*-> "beDefineImportedObjsAndLibs")
-	#! backEnd
+	# backEnd
 		=	markExports fe_dcls.[cIclModIndex] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs fe_dclIclConversions (backEnd -*-> "markExports")
 			with
 				dcl_common
@@ -364,9 +373,9 @@ defineOtherDclModule varHeap moduleIndex dclModule
 		=	defineDclModule varHeap moduleIndex dclModule
 
 defineDclModule :: VarHeap ModuleIndex DclModule -> Backender
-defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_is_system}
+defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_instances, dcl_functions, dcl_is_system}
 	=	declare moduleIndex varHeap dcl_common
-	o`	declareFunTypes moduleIndex dcl_functions varHeap
+	o`	declareFunTypes moduleIndex dcl_functions dcl_instances.ir_from varHeap
 
 // move types from their dcl to icl positions
 
@@ -419,7 +428,7 @@ non trivial changes are indicated with a comment
 instance declareVars [a] | declareVars a where
 	declareVars :: [a] VarHeap -> Backender | declareVars a
 	declareVars list varHeap
-		=	foldState (flip declareVars varHeap) list
+		=	foldState (flip` declareVars varHeap) list
 
 instance declareVars (Ptr VarInfo) where
 	declareVars varInfoPtr varHeap
@@ -582,13 +591,22 @@ instance declare {#a} | declareWithIndex a & Array {#} a where
 	declare moduleIndex varHeap array
 		=	foldStateWithIndexA (\i -> declareWithIndex i moduleIndex varHeap) array
 
-declareFunctionSymbols :: {#FunDef} {#Int} [(Int, Int)] *BackEnd -> *BackEnd
-declareFunctionSymbols functions iclDclConversions functionIndices backEnd
-	=	foldr (declare iclDclConversions) backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
+declareFunctionSymbols :: {#FunDef} {#Int} [(Int, Int)] IndexRange *BackEnd -> *BackEnd
+declareFunctionSymbols functions iclDclConversions functionIndices globalFunctions backEnd
+	=	foldr` (declare iclDclConversions) backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
 	where
 		declare :: {#Int} (Int, Int, FunDef) *BackEnd -> *BackEnd
 		declare iclDclConversions (functionIndex, componentIndex, function) backEnd
-			=	BEDeclareFunction (function.fun_symb.id_name +++ ";" +++ toString iclDclConversions.[functionIndex]) function.fun_arity functionIndex componentIndex backEnd
+			=	BEDeclareFunction
+					(functionName function.fun_symb.id_name functionIndex iclDclConversions globalFunctions)
+					function.fun_arity functionIndex componentIndex backEnd
+			where
+				functionName :: {#Char} Int {#Int} IndexRange -> {#Char}
+				functionName name functionIndex iclDclConversions {ir_from, ir_to}
+					| functionIndex >= ir_to || functionIndex < ir_from
+						=	(name +++ ";" +++ toString iclDclConversions.[functionIndex])
+					// otherwise
+						=	name
 
 // move to backendsupport
 foldStateWithIndexRangeA function frm to array
@@ -621,18 +639,25 @@ instance declareWithIndex (TypeDef a) where
 	declareWithIndex typeIndex moduleIndex _ {td_name}
 		=	BEDeclareType typeIndex moduleIndex td_name.id_name
 
-declareFunTypes :: ModuleIndex {#FunType} VarHeap -> Backender
-declareFunTypes moduleIndex funTypes varHeap
-		=	foldStateWithIndexA (declareFunType moduleIndex varHeap) funTypes
+declareFunTypes :: ModuleIndex {#FunType} Int VarHeap -> Backender
+declareFunTypes moduleIndex funTypes nrOfDclFunctions varHeap
+		=	foldStateWithIndexA (declareFunType moduleIndex varHeap nrOfDclFunctions) funTypes
 
-declareFunType :: ModuleIndex VarHeap Index FunType -> Backender
-declareFunType moduleIndex varHeap functionIndex {ft_symb, ft_type_ptr}
+declareFunType :: ModuleIndex VarHeap Index Int FunType -> Backender
+declareFunType moduleIndex varHeap nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
 	=	case (sreadPtr ft_type_ptr varHeap) of
 			VI_ExpandedType expandedType
-				->	beDeclareRuleType functionIndex moduleIndex (ft_symb.id_name +++ ";" +++ toString functionIndex)
+				->	beDeclareRuleType functionIndex moduleIndex (functionName ft_symb.id_name functionIndex nrOfDclFunctions)
 				o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
 			_
 				->	identity
+		where
+			functionName :: {#Char} Int Int -> {#Char}
+			functionName name functionIndex nrOfDclFunctions 
+				| functionIndex < nrOfDclFunctions
+					=	name
+				// otherwise
+					=	name +++ ";" +++ toString functionIndex
 
 currentModuleTypeConversions :: {#ClassDef} {#ClassDef} (Optional ConversionTable) -> {#Int}
 currentModuleTypeConversions iclClasses dclClasses (Yes conversionTable)
@@ -703,7 +728,7 @@ convertTypeLhs moduleIndex typeIndex args
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
 convertTypeVars typeVars
-	=	foldr (beTypeVars o convertTypeVar) beNoTypeVars typeVars
+	=	foldr` (beTypeVars o convertTypeVar) beNoTypeVars typeVars
 
 convertTypeVar :: ATypeVar -> BEMonad BETypeVarP
 convertTypeVar typeVar
@@ -745,7 +770,7 @@ defineType _ _ _ _ _ _ be
 
 convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] VarHeap -> BEMonad BEConstructorListP
 convertConstructors typeIndex typeName moduleIndex constructors symbols varHeap
-	=	foldr (beConstructors o convertConstructor typeIndex typeName moduleIndex constructors varHeap) beNoConstructors symbols
+	=	foldr` (beConstructors o convertConstructor typeIndex typeName moduleIndex constructors varHeap) beNoConstructors symbols
 
 convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} VarHeap DefinedSymbol -> BEMonad BEConstructorListP
 convertConstructor typeIndex typeName moduleIndex constructorDefs varHeap {ds_index}
@@ -915,8 +940,8 @@ adjustArrayFunctions predefs arrayInstancesRange functions dcls varHeap
 /*
 convertRules :: [(Int, FunDef)] VarHeap -> BEMonad BEImpRuleP
 convertRules rules varHeap
-//	=	foldr (beRules o flip convertRule varHeap) beNoRules rules
-	=	foldl (flip beRules) beNoRules (map (flip convertRule varHeap) rules)
+//	=	foldr` (beRules o flip` convertRule varHeap) beNoRules rules
+	=	foldl (flip` beRules) beNoRules (map (flip` convertRule varHeap) rules)
 */
 
 /* MW was
@@ -928,7 +953,7 @@ convertRules aliasDummyId rules varHeap be
 	# (null, be)
 		=	BENoRules be
 	=	convert rules varHeap null be
-//	=	foldr (beRules o flip convertRule varHeap) beNoRules rules
+//	=	foldr` (beRules o flip` convertRule varHeap) beNoRules rules
 	where
 		convert :: [(Int, FunDef)] VarHeap BEImpRuleP *BackEnd -> (BEImpRuleP, *BackEnd)
 		convert [] _ rulesP be
@@ -1055,7 +1080,7 @@ consVariableToType (TempQCV varId)
 
 convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args
-	=	foldr (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
+	=	foldr` (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
 
 /* MW was
 convertBackendBodies :: Int Int [BackendBody] VarHeap -> BEMonad BERuleAltP
@@ -1108,11 +1133,11 @@ convertBackendBody functionIndex lineNumber aliasDummyId body=:{bb_args, bb_rhs}
 
 convertStrings :: [{#Char}] -> BEMonad BEStringListP
 convertStrings strings
-	=	foldr (beStrings o beString) beNoStrings strings
+	=	foldr` (beStrings o beString) beNoStrings strings
 
 convertCodeParameters :: (CodeBinding a) VarHeap -> BEMonad BECodeParameterP | varInfoPtr a
 convertCodeParameters codeParameters varHeap
-	=	foldr (beCodeParameters o flip convertCodeParameter varHeap) beNoCodeParameters codeParameters
+	=	foldr` (beCodeParameters o flip` convertCodeParameter varHeap) beNoCodeParameters codeParameters
 
 class varInfoPtr a :: a -> VarInfoPtr
 
@@ -1138,7 +1163,7 @@ convertBackendLhs functionIndex patterns varHeap
 
 convertPatterns :: [FunctionPattern] VarHeap -> BEMonad BEArgP
 convertPatterns patterns varHeap
-	=	foldr (beArgs o flip convertPattern varHeap) beNoArgs patterns
+	=	foldr` (beArgs o flip` convertPattern varHeap) beNoArgs patterns
 
 convertPattern :: FunctionPattern VarHeap -> BEMonad BENodeP
 convertPattern (FP_Variable freeVar) varHeap
@@ -1162,7 +1187,7 @@ convertFreeVarPattern freeVar varHeap
 
 convertLhsArgs :: [FreeVar] VarHeap -> BEMonad BEArgP
 convertLhsArgs freeVars varHeap
-	=	foldr (beArgs o (flip convertFreeVarPattern) varHeap) beNoArgs freeVars
+	=	foldr` (beArgs o (flip` convertFreeVarPattern) varHeap) beNoArgs freeVars
 
 convertVarPtr :: VarInfoPtr  VarHeap -> BEMonad BENodeP
 convertVarPtr var varHeap
@@ -1170,7 +1195,7 @@ convertVarPtr var varHeap
 
 convertVars :: [VarInfoPtr] VarHeap -> BEMonad BEArgP
 convertVars vars varHeap
-	=	foldr (beArgs o flip convertVarPtr varHeap) beNoArgs vars
+	=	foldr` (beArgs o flip` convertVarPtr varHeap) beNoArgs vars
 
 /* MW was
 convertRootExpr :: Expression VarHeap -> BEMonad BENodeP
@@ -1287,7 +1312,7 @@ convertNodeDef {bind_src=expr, bind_dst=freeVar} varHeap
 
 convertNodeDefs :: [Bind Expression FreeVar] VarHeap -> BEMonad BENodeDefP
 convertNodeDefs binds varHeap
-	=	foldr (beNodeDefs o flip convertNodeDef varHeap) beNoNodeDefs binds
+	=	foldr` (beNodeDefs o flip` convertNodeDef varHeap) beNoNodeDefs binds
 
 collectStrictNodeIds :: Expression -> [FreeVar]
 collectStrictNodeIds (Let {let_strict_binds, let_expr})
@@ -1301,7 +1326,7 @@ convertStrictNodeId freeVar varHeap
 
 convertStrictNodeIds :: [FreeVar] VarHeap -> BEMonad BEStrictNodeIdP
 convertStrictNodeIds freeVars varHeap
-	=	foldr (beStrictNodeIds o flip convertStrictNodeId varHeap) beNoStrictNodeIds freeVars
+	=	foldr` (beStrictNodeIds o flip` convertStrictNodeId varHeap) beNoStrictNodeIds freeVars
 
 convertRhsStrictNodeIds :: Expression VarHeap -> BEMonad BEStrictNodeIdP
 convertRhsStrictNodeIds expression varHeap
@@ -1321,7 +1346,7 @@ convertLiteralSymbol (BVS string)
 
 convertArgs :: [Expression] VarHeap -> BEMonad BEArgP
 convertArgs exprs varHeap
-	=	foldr (beArgs o flip convertExpr varHeap) beNoArgs exprs
+	=	foldr` (beArgs o flip` convertExpr varHeap) beNoArgs exprs
 
 convertSymbol :: !SymbIdent -> BEMonad BESymbolP
 convertSymbol {symb_kind=SK_Function {glob_module, glob_object}}
@@ -1367,7 +1392,7 @@ convertExpr (Selection isUnique expression selections) varHeap
 		addKinds _ []
 			=	[]
 convertExpr (RecordUpdate _ expr updates) varHeap
-	=	foldl (convertUpdate varHeap) (convertExpr expr varHeap) updates
+	=	foldl (convertUpdate varHeap) (convertExpr expr varHeap) updates -*-> "be: RecordUpdate"
 	where
 		convertUpdate varHeap  expr {bind_src=NoBind _}
 			=	expr
@@ -1383,7 +1408,7 @@ convertExpr (RecordUpdate _ expr updates) varHeap
 convertExpr (Update expr1 [singleSelection] expr2) varHeap
 	=	case singleSelection of
 			RecordSelection _ _
-				->	beUpdateNode (convertArgs [expr1, Selection No expr2 [singleSelection]] varHeap)
+				->	beUpdateNode (convertArgs [expr1, Selection No expr2 [singleSelection]] varHeap) -*-> "be: Update [single]"
 			ArraySelection {glob_object={ds_index}, glob_module} _ index
 // RWS not used?, eleminate beSpecialArrayFunctionSymbol?
 				->	beNormalNode

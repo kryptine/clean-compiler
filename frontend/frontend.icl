@@ -10,6 +10,7 @@ import RWSDebug
 		,	fe_varHeap :: !.VarHeap
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
+		,	fe_globalFunctions :: !IndexRange
 		,	fe_arrayInstances :: !IndexRange
 		}
 
@@ -78,6 +79,7 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 			,	fe_varHeap = var_heap
 			,	fe_dclIclConversions =  optional_dcl_icl_conversions
 			,	fe_iclDclConversions =  build_optional_icl_dcl_conversions (size fun_defs) optional_dcl_icl_conversions
+			,	fe_globalFunctions = global_fun_range
 			,	fe_arrayInstances = array_instances
 			}
 		)

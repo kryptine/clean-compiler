@@ -55,12 +55,12 @@ foldStateWithIndexA function array
 				o`	foldStateWithIndexA (index+1)
 
 foldrA function result array
-	:== foldrA result 0
+	:== foldrA 0
 	where
 		arraySize
 			=	size array
-		foldrA result index
+		foldrA index
 			| index == arraySize
 				=	result
 			// otherwise
-				=	function array.[index] (foldrA result (index+1))
+				=	function array.[index] (foldrA (index+1))

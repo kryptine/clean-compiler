@@ -11,6 +11,7 @@ import checksupport, transform, overloading
 		,	fe_varHeap :: !.VarHeap
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
+		,	fe_globalFunctions :: !IndexRange
 		,	fe_arrayInstances :: !IndexRange
 		}
 
