@@ -14,8 +14,10 @@ coclMain :: ![{#Char}] !*World -> *World
 coclMain  testArgs world
 	# (commandArgs, world)
 		=	getCommandArgs (tl [arg \\ arg <-: getCommandLine]) testArgs world 
+	# (symbol_table,world)
+		= init_identifiers newHeap world
 	# (success, world)
-		=	accFiles (compiler commandArgs) world
+		=	accFiles (compiler commandArgs symbol_table) world
 	=	set_return_code (if success 0(-1)) world
 	where
 		getCommandArgs :: [{#Char}] [{#Char}] *World -> ([{#Char}], *World)
@@ -77,9 +79,9 @@ import thread_message;
 
 import code from "thread_message.obj";
 
-compiler :: ![{#Char}] *Files -> *(!Bool,!*Files);
-compiler commandArgs files
-	# dcl_cache = empty_cache (init_identifiers newHeap)
+compiler :: ![{#Char}] *SymbolTable *Files -> *(!Bool,!*Files);
+compiler commandArgs symbol_table files
+	# dcl_cache = empty_cache symbol_table
 	| length commandArgs==2 && commandArgs!!0=="-ide"
 		# wm_number=get_message_number;
 		# thread_id=hex_to_int (commandArgs!!1);
