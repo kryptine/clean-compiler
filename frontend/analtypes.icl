@@ -703,7 +703,7 @@ where
 		
 		check_possitive_sign mod_index type_index modules td_args type_var_heap type_def_infos error
 			# top_signs = [ TopSignClass \\ _ <- td_args ]
-			# (signs, type_var_heap, type_def_infos) = signClassification mod_index type_index top_signs modules type_var_heap type_def_infos
+			# (signs, type_var_heap, type_def_infos) = signClassification type_index mod_index top_signs modules type_var_heap type_def_infos
 			| signs.sc_neg_vect == 0
 				= (type_var_heap, type_def_infos, error)
 				# error = checkError "signs of abstract type variables should be positive" "" error
