@@ -1599,6 +1599,9 @@ where
 	expand (MatchExpr cons_symb expr) ei
 		# (expr, ei) = expand expr ei
 		= (MatchExpr cons_symb expr, ei)
+	expand (DynamicExpr dyn) ei
+		# (dyn, ei) = expand dyn ei
+		= (DynamicExpr dyn, ei)
 	expand expr ei
 		= (expr, ei)
 
@@ -1699,6 +1702,12 @@ where
 	expand dyn_pattern=:{dp_rhs} ei
 		# (dp_rhs, ei) = expand dp_rhs ei
 		= ({ dyn_pattern & dp_rhs = dp_rhs }, ei)
+
+instance expand DynamicExpr
+where
+	expand (dyn=:{dyn_expr}) ei
+		# (dyn_expr, ei) = expand dyn_expr ei
+		= ({dyn & dyn_expr = dyn_expr}, ei)
 
 instance expand [a] | expand a
 where
