@@ -259,7 +259,7 @@ split sep
               where (ys,yss) = spl xs
 
 // `Stub modulename functionname message' aborts with a explanatory message
-stub :: .String .String .String -> a
+stub :: .String .String .String -> .a
 stub modulename functionname message
 = abort (modulename+++": "+++functionname+++": "+++message)
 

@@ -180,7 +180,7 @@ showtriple :: !.(.a -> .String) !.(.b -> .String) !.(.c -> .String) !(.a,.b,.c) 
 split :: a -> .(.[a] -> [.[a]]) | == a
 
 // `Stub modulename functionname message' aborts with a explanatory message
-stub :: .String .String .String -> a
+stub :: .String .String .String -> .a
 
 // `Superset xs ys' determines whether ys is a superset (actually, super-multi-set or super-list) of xs.
 superset :: .[a] -> .(.[a] -> Bool) | == a
