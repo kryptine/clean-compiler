@@ -317,7 +317,7 @@ where
 					//	loadandrun2 _ _ = abort "Loader: process and input do not match"
 					//
 					# (Yes old_case_default) = this_case_default
-					# (let_info_ptr,  ci) = let_ptr ci
+//					# (let_info_ptr,  ci) = let_ptr ci
 					# (default_var, ci) = newVariable "s" (VI_BoundVar {at_attribute=TA_None,at_annotation=AN_None,at_type=TE}) ci
 					# default_fv = varToFreeVar default_var 1
 					# ci
@@ -332,6 +332,8 @@ where
 						= map (patch_defaults new_case_default) algebraic_patterns
 					#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
 														(zip2 algebraic_patterns ct_cons_types) ci
+/* Sjaak */
+					# (let_info_ptr,  ci) = let_ptr 1 ci
 					# letje
 						= Let {
 							let_strict_binds	= []
@@ -408,7 +410,8 @@ where
 			[]	-> (App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident, //twoTuple_symb,
 							app_args 		= [dyn_expr, dyn_type_code],
 							app_info_ptr	= nilPtr }, ci)
-			_ 	#  (let_info_ptr,  ci) = let_ptr ci
+/* Sjaak */
+			_ 	#  (let_info_ptr,  ci) = let_ptr (length let_binds) ci
 				-> ( Let {	let_strict_binds	= [],
 							let_lazy_binds		= let_binds,
 							let_expr			= App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident,
@@ -438,7 +441,7 @@ where
 /* Sjaak ... */
 convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args binds placeholders_and_tc_args ci
 		# (let_binds,     ci) 	= createVariables uni_vars [] ci
-		  (let_info_ptr,  ci)	= let_ptr ci
+		  (let_info_ptr,  ci)	= let_ptr (length let_binds) ci
 		  (e, type_code_expr, binds, placeholders_and_tc_args, ci)	= convertTypecode2 cinp type_code False [] [] ci
 		= (e, Let {	let_strict_binds	= [],
 					let_lazy_binds		= let_binds,
@@ -642,12 +645,12 @@ convertDynamicPatterns cinp=:{cinp_st_args} bound_vars {case_expr, case_guards =
 
 																// c_1 ind_0
 	  (binds, expr, ci) = convert_dynamic_pattern cinp bound_vars new_default 1 opened_dynamic result_type case_default patterns ci
-	  (let_info_ptr, ci) = let_ptr ci
-
 	# ci
 		= { ci & ci_placeholders_and_tc_args=old_ci_placeholders_and_tc_args}
 	# (tc_binds,ci)
 		= foldSt remove_non_used_arg tc_binds ([],ci) 
+/* Sjaak */		
+	  (let_info_ptr, ci) = let_ptr (length  binds + length tc_binds + 1) ci
 
 // MW0	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr, let_info_ptr = let_info_ptr}, ci)
 	= (Let {let_strict_binds = [], let_lazy_binds = [ dt_bind : binds ] ++ tc_binds, let_expr = expr,
@@ -716,8 +719,7 @@ where
 		#		
 		  (coerce_symb, ci)		= getSymbol PD_coerce SK_Function (extended_unify_and_coerce 2 3) ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
-		  (let_info_ptr, ci) 	= let_ptr ci
-		  (case_info_ptr, ci)	= case_ptr ci
+//Sjaak		  (case_info_ptr, ci)	= case_ptr ci
 		
 		  (coerce_result_var, ci)	= newVariable "result" VI_Empty ci
 		  coerce_result_fv 			= varToFreeVar coerce_result_var 1
@@ -747,26 +749,25 @@ where
 			= toExpression this_default ci
 			
 		#! app_args2 = extended_unify_and_coerce [Var a_ij_var, Var a_ij_tc_var] [Var a_ij_var, Var a_ij_tc_var, ci_module_id_symbol ]
+/* Sjaak ... */
 
+		# let_lazy_binds		= (if (isNo this_default) [] [ {lb_src = opt opt_expr, lb_dst = c_inc_i_fv, lb_position = NoPos }]) ++ [
+										  { lb_src = App { app_symb = coerce_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
+										   lb_dst = coerce_result_fv, lb_position = NoPos }
+										   ,
+										 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var coerce_result_var) /*) sel_type*/,
+										   lb_dst = coerce_bool_fv, lb_position = NoPos } : let_binds
+										]
+		  (let_info_ptr, ci) 	= let_ptr (length let_lazy_binds) ci
+		  (case_info_ptr, ci)	= bool_case_ptr ci
+/* ... Sjaak */
 
 		# let_expr
 			= Let {
 					let_strict_binds	= []
-// MW0				,	let_lazy_binds		= (if (isNo this_default) [] [ {bind_src = opt opt_expr		,	bind_dst = c_inc_i_fv }]) ++ [
-// MW0										  { bind_src = App { app_symb = coerce_symb,  app_args = [Var a_ij_var, Var a_ij_tc_var],  app_info_ptr = nilPtr },
-// MW0										   bind_dst = coerce_result_fv }
-				,	let_lazy_binds		= (if (isNo this_default) [] [ {lb_src = opt opt_expr, lb_dst = c_inc_i_fv, lb_position = NoPos }]) ++ [
-										  { lb_src = App { app_symb = coerce_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
-										   lb_dst = coerce_result_fv, lb_position = NoPos }
-										   ,
-// MW0										 { bind_src = TupleSelect twotuple 0 (Var coerce_result_var),
-// MW0										   bind_dst = coerce_bool_fv } : let_binds
-										 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var coerce_result_var) /*) sel_type*/,
-										   lb_dst = coerce_bool_fv, lb_position = NoPos } : let_binds
-										],
-							let_expr =
-							 Case {	case_expr 		= Var coerce_bool_var,
-		// MW was:												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs}],
+				,	let_lazy_binds		= let_lazy_binds
+				,	let_expr =
+							 Case {			case_expr 		= Var coerce_bool_var,
 											case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = new_dp_rhs, bp_position = NoPos }],
 											case_default	= default_expr,
 											case_ident		= No,
@@ -849,8 +850,7 @@ where
 		  /***  generate the expression  ***/
 	 	  (unify_symb, ci) 		= getSymbol (if generate_coerce PD_coerce PD_unify ) SK_Function (extended_unify_and_coerce 2 3) /*3 was 2 */ ci
 		  (twotuple, ci) 		= getTupleSymbol 2 ci
-		  (let_info_ptr, ci) 	= let_ptr ci
-		  (case_info_ptr, ci)	= case_ptr ci
+//Sjaak		  (case_info_ptr, ci)	= case_ptr ci
 		  (default_expr, ci) 	= toExpression this_default ci
 		  
 		  // was coercions
@@ -885,21 +885,20 @@ where
 			App module_symb
 		// ...TIJDELIJK
 */
+/* Sjaak ... */
+		  (let_info_ptr, ci) 	= let_ptr 2 ci
+		  (case_info_ptr, ci)	= bool_case_ptr ci
+/* ... Sjaak */
 
 		  app_args2 = extended_unify_and_coerce [opened_dynamic.opened_dynamic_type, type_code] [opened_dynamic.opened_dynamic_type, type_code, ci_module_id_symbol ]
 		  
 		  let_expr = Let {	let_strict_binds = [],
-// MW0		  					let_lazy_binds = [{ bind_src = App { app_symb = unify_symb,  app_args = [opened_dynamic.opened_dynamic_type, type_code],  app_info_ptr = nilPtr },
-// MW0		  								   bind_dst = unify_result_fv },
-// MW0		  								 { bind_src = TupleSelect twotuple 0 (Var unify_result_var),
-// MW0		  								   bind_dst = unify_bool_fv } : let_binds
 		  					let_lazy_binds = [{ lb_src = App { app_symb = unify_symb,  app_args = app_args2,  app_info_ptr = nilPtr },
 		  								   lb_dst = unify_result_fv, lb_position = NoPos },
 		  								 { lb_src = /*USE_TUPLES (*/ TupleSelect twotuple 0 (Var unify_result_var) /*) sel_type*/,
 		  								   lb_dst = unify_bool_fv, lb_position = NoPos } : let_binds
 		  								],
 		  					let_expr = Case {	case_expr 		= Var unify_bool_var,
-// MW was:												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs}],
 												case_guards		= BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = NoPos }],
 												case_default	= default_expr,
 												case_ident		= No,
@@ -908,7 +907,6 @@ where
 												case_explicit	= False,
 // ... RWS
 												case_default_pos= NoPos }, // MW4++
-// MW0		  					let_info_ptr = let_info_ptr	}
 		  					let_info_ptr = let_info_ptr,
 		  					let_expr_position = NoPos }
 		  					
@@ -1177,6 +1175,9 @@ v_tc_placeholder		:== "tc_placeholder"
 
 a_aij_tc_var_name 	:== { id_name = "a_ij_tc", id_info = nilPtr }
 
+/* Sjaak ...
+WAS
+
 case_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 case_ptr ci=:{ci_expr_heap}
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = empty_attributed_type,
@@ -1189,9 +1190,28 @@ let_ptr ci=:{ci_expr_heap}
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeat empty_attributed_type)) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
 
+REPLACED BY:
+Sjaak ... */
+
+bool_case_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
+bool_case_ptr ci=:{ci_expr_heap}
+	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_CaseType {	ct_pattern_type = toAType (TB BT_Bool),
+															ct_result_type = empty_attributed_type,
+															ct_cons_types = [[toAType (TB BT_Bool)]]}) ci_expr_heap
+	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
+
+let_ptr :: !Int !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
+let_ptr nr_of_binds ci=:{ci_expr_heap}
+	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ci_expr_heap
+	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
+
+/* Sjaak ... */
+toAType :: Type -> AType
+toAType type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }
 
 empty_attributed_type :: AType
-empty_attributed_type = { at_attribute = TA_Multi, at_annotation = AN_None, at_type = TE }
+empty_attributed_type = toAType TE
+/* ... Sjaak */
 
 
 isNo :: (Optional a) -> Bool
