@@ -2,18 +2,21 @@ definition module history
 
 // $Id$
 
-from spine import Spine
-from rule import Rgraph
 from graph import Graph
+from spine import Spine
+from StdOverloaded import ==
 
-from spine import Subspine // for Spine
+// Transitive necessities
+
+from spine import Subspine
 
 :: History sym var
-   :== [(var,[Rgraph sym var])]
 
 extendhistory
- :: (Graph sym var)
-    (var -> var)
-    (Spine sym var pvar)
-    (History sym var)
- -> History sym var
+ :: (Graph sym var)         // Subject graph
+    (Spine sym var pvar)    // Spine leading to the reduction operation
+    (History sym var)       // Old history
+ -> History sym var         // New history
+ |  == sym
+ &  == var
+ &  == pvar
