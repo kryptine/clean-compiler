@@ -37,6 +37,13 @@ where
 	toString BT_World		= "World"
 	toString (BT_String _)	= "String"
 
+instance toString BoundVar
+where toString {var_name, var_info_ptr, var_expr_ptr}
+      = "{var_name = "+++toString var_name+++
+        ", var_info_ptr = "+++toString var_info_ptr+++
+        ", var_expr_ptr = "+++toString var_expr_ptr+++
+		"}"
+
 instance <<< ClassDef
 where (<<<) file {class_name, class_arity, class_args, class_context, class_members, class_dictionary, class_pos, class_cons_vars, class_arg_kinds}
       = file <<< "Class name: " <<< toString class_name <<< nl
@@ -96,6 +103,12 @@ where toString {fs_name, fs_var, fs_index}
 	    ", fs_var = "+++toString fs_var+++
 		", fs_index = "+++toString fs_index+++
 		"}"
+
+/*
+instance toString FreeVar
+where toString {fv_def_level,fv_name,fv_info_ptr,fv_count}
+      = "{fv_def_level=" +++ toString fv_def_level +++ ",fv_name=" +++ toString fv_name +++ ",fv_info_ptr=" +++ toString fv_info_ptr +++ ",fv_count=" +++ toString fv_count +++ "}"
+*/
 
 instance <<< GenericDef
 where (<<<) file {gen_name, gen_member_name, gen_type, gen_pos, gen_kinds_ptr, gen_cons_ptr, gen_classes, gen_isomap}
@@ -284,6 +297,11 @@ arrayToString row
 = "{"+++repr+++"}"
   where (_,repr) = iFoldSt convelem 0 (size row) ("", "")
         convelem i (prefix, repr) = (",", repr+++prefix+++toString row.[i])
+
+/*
+instance toString (a,b) | toString a & toString b
+where toString (x,y) = "("+++toString x+++","+++toString y+++")"
+*/
 
 // Just looks nicer
 nl =: '\n'

@@ -162,7 +162,7 @@ recurse foldarea fnsymbol
                   (pclosed,popen) = graphvars rgraph rargs
                   (_,ropen) = graphvars rgraph [rroot]
                   newhist` = [(rroot,rgraph):newhist]
-                  (newhist,hist) = newhisthist
+                  (newhist,_) = newhisthist
         f newhisthist (Trace stricts rule answer history (Annotate trace))
         | isEmpty pclosed && superset popen ropen
           = f (newhist`,hist) trace

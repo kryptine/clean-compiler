@@ -17,7 +17,6 @@ import Heaprepr
 import syntaxrepr
 
 mstub = stub "convert"
-block func = mstub func "blocked"
 
 // Derive a symbol representation function for the program
 suclsymbol_to_string ::
@@ -66,7 +65,6 @@ cts_function ::
     )
  ,  [u<=v]
 
-//cts_function main_dcl_module_n fundefs = block "cts_function"
 cts_function showsuclsymbol main_dcl_module_n fundefs
 = tm (typerules,stricts,funbodies,funkinds,fundefs`)
   where ((typerules,stricts,funbodies,funkinds),fundefs`)
@@ -273,10 +271,6 @@ maparrayindex f xs
         = [f j xs.[j]:map (j+1)]
         sizexs = size xs
 
-fun_type_sanity_check :: FunType -> String
-fun_type_sanity_check ft
-= ft.ft_symb.id_name+++": ft_arity = "+++toString ft.ft_arity+++", ft_type = {st_arity = "+++toString ft.ft_type.st_arity+++", #st_args = "+++toString (length ft.ft_type.st_args)+++", #st_context = "+++toString (length ft.ft_type.st_context)+++"}"
-
 
 /******************************************************************************
 *  ALGEBRAIC TYPE CONVERSION                                                  *
@@ -290,7 +284,6 @@ cts_getconstrs ::
  -> [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])]
                     // List of constructor symbols for each type symbol
 
-// cts_getconstrs dcl_mods main_dcl_module_n icl_common = block "cts_getconstrs"
 cts_getconstrs dcl_mods main_dcl_module_n icl_common
 = tm flatten (zipwith f (a2l dcl_mods) [0..])
   where f dcl_mod dcli
@@ -452,7 +445,7 @@ convert_expression main_dcl_module_n (Yes (introduced_function_symbol,funargs)) 
                -> (heap2,([],fundefs6,error "convert: convert_expression: unhandled CasePatterns constructor"))
         patroot = lookup bindings selvar.var_info_ptr
         // (0.5) Convert selector
-        (heap2,(nodes8,fundefs8,globals9,selectorroots,_))
+        (heap2,(nodes8,fundefs8,globals9,_,_))
          = convert_expression main_dcl_module_n No bindings caseinfo.case_expr (heap1,(nodes7,fundefs7,globals8,[],False))
         // (0) Claim root node
         [root:heap1] = heap0
@@ -674,7 +667,6 @@ convert_kind _ = error "convert: convert_kind: unhandled DefOrImpFunKind constru
 ****************************************************************/
 
 cts_exports :: {#DclModule} *PredefinedSymbols Int -> (.PredefinedSymbols,[SuclSymbol])
-// cts_exports dcl_mods predefs main_dcl_module_n = block "cts_exports"
 cts_exports dcl_mods predefs main_dcl_module_n
 = tm add_start main_dcl_module_n (predefs,map (mk_symbol main_dcl_module_n) (getconversion cFunctionDefs dcl_mods.[main_dcl_module_n]))
 
@@ -759,7 +751,6 @@ stc_funcdefs ::
  |  Array c FunDef
 0.2*/
 
-// stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex exprheap0 varheap0 srrs oldfundefs0 = block "stc_funcdefs"
 stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex exprheap0 varheap0 srrs oldfundefs0
 = tm (exprheap1,varheap1,new_fundefs)
   where new_fundef_limit = foldr max n_oldfundefs [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
@@ -817,12 +808,14 @@ getconsdef dcl_mods main_dcl_module_n icl_common {glob_module,glob_object}
              dcl_mods.[glob_module].dcl_common
 
 copy_oldfuns srcfundefs0 dstfundefs0
-= foldlArrayStWithIndex copyone srcfundefs1 dstfundefs1
+= foldlArrayStWithIndex copyone srcfundefs0 dstfundefs0
   where copyone i srcfundef dstfundefs
         = {dstfundefs & [i]=srcfundef}
+        /*
         (srcsize,srcfundefs1) = usize srcfundefs0
         (dstsize,dstfundefs1) = usize dstfundefs0
         sizes = "convert.copy_oldfuns begins (#srcfundefs="+++toString srcsize+++" #dstfundefs="+++toString dstsize+++")"
+        */
 
 store_newfuns stringtype suclinfo getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 [] suclinfo0 fundefs0
 = (exprheap0,varalloc0,suclinfo0,fundefs0)
@@ -889,7 +882,6 @@ stc_funcdef ::
     , [ExprInfoPtr]                     // List of expression pointers from the function body
     )
 
-// stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body) = block "stc_funcdef"
 stc_funcdef stringtype suclinfo getconsdef exprheap0 varalloc0 (args,body)
 = (exprheap1,varalloc2,TransformedBody tb,/*tb.tb_args++*/localvars,eips)
   where tb
@@ -1461,6 +1453,7 @@ showfundefs filefundefs
         = file <<< "Function #" <<< toString index <<< nl
                <<< fundef <<< nl
 
+/*
 instance <<< DefinedSymbol
 where (<<<) file {ds_ident,ds_arity,ds_index}
       = file <<< "{ds_ident=" <<< ds_ident <<< ",ds_arity=" <<< ds_arity <<< ",ds_index=" <<< ds_index <<< "}"
@@ -1468,10 +1461,7 @@ where (<<<) file {ds_ident,ds_arity,ds_index}
 instance <<< AlgebraicPattern
 where (<<<) file {ap_symbol,ap_vars,ap_expr,ap_position}
       = file <<< "{ap_symbol=" <<< ap_symbol <<< ",ap_vars=" <<< ap_vars <<< ",ap_expr=" <<< ap_expr <<< ",ap_position=" <<< ap_position <<< "}"
-
-instance toString FreeVar
-where toString {fv_def_level,fv_name,fv_info_ptr,fv_count}
-      = "{fv_def_level=" +++ toString fv_def_level +++ ",fv_name=" +++ toString fv_name +++ ",fv_info_ptr=" +++ toString fv_info_ptr +++ ",fv_count=" +++ toString fv_count +++ "}"
+*/
 
 :: Environment
    = { env_getcommon :: Index -> CommonDefs
@@ -1515,6 +1505,3 @@ get_formal_name_and_arity_from_funtype env modindex funindex
 # symtype = funtype.ft_type
 = (funtype.ft_symb,symtype.st_arity+length symtype.st_context)
     // NOTE: ft_arity does not account for the context because DCL functions are not transformed
-
-instance toString (a,b) | toString a & toString b
-where toString (x,y) = "("+++toString x+++","+++toString y+++")"

@@ -36,6 +36,9 @@ from syntax import AttributeVar
 from syntax import BasicType
 instance toString  BasicType
 
+from syntax import BoundVar
+instance toString  BoundVar
+
 from syntax import ClassDef
 instance <<<       ClassDef
 instance toString  ClassDef

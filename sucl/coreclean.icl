@@ -12,9 +12,6 @@ import syntax
 import syntaxrepr
 import Heaprepr
 
-mstub = stub "coreclean"
-block func = mstub func "blocked"
-
 :: SuclTypeSymbol
  = SuclUSER (Global Index)
  | SuclTCVAR ConsVariable   // A type constructor variable
@@ -122,8 +119,13 @@ where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
 instance toString SuclSymbol
 where toString (SuclUser  sk  ) = toString sk
       toString (SuclCase  eptr) = "_lift"+++toString eptr
+      toString (SuclTupleSelect n i) = "_tupleselect_"+++toString n+++"_"+++toString i
+      toString (SuclFieldSelect gds i) = "_fieldselect_"+++toString gds+++"_"+++toString i
+      toString (SuclArraySelect gds) = "_arrayselect_"+++toString gds
+      toString (SuclDictSelect bv) = "_dictselect_"+++toString bv
       toString (SuclApply int ) = "Apply/"+++toString int
       toString (SuclInt   int ) = toString int
+      toString (SuclChar  c   ) = {'\'',c,'\''}
       toString (SuclReal  real) = toString real
       toString (SuclBool  bool) = toString bool
       toString (SuclString str) = toString str

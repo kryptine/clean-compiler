@@ -14,9 +14,6 @@ import basic
 from general import Yes,No
 import StdEnv
 
-mstub = stub "loop"
-block func = mstub func "blocked for debugging"
-
 /*
 
 loop.lit - Looping to produce a trace
@@ -231,7 +228,6 @@ loop
  &  toString var    // Debugging
  &  <<< var         // Debugging
 
-// loop _ _ _ = block "loop"
 loop strategy matchable (initheap,rule)
 = result
   where result = maketrace inithistory initfailinfo initinstdone initstricts initsroot initsubject initheap
