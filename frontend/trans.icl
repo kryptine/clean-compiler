@@ -2272,6 +2272,7 @@ renewVariables exprs var_heap
 	
 
 ::	ImportedConstructors	:== [Global Index]
+::	ImportedFunctions	:== [Global Index]
 
 transformGroups :: !CleanupInfo !Int !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap

@@ -466,8 +466,6 @@ toOptionalFreeVar (Yes (var_info_ptr, type)) var_heap
 toOptionalFreeVar No var_heap
 	= (No, var_heap)
 
-::	ImportedFunctions 	:== [Global Index]
-
 cDontRemoveAnnatations :== False
 
 addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !Int !*{! Group} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap

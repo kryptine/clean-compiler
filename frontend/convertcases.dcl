@@ -2,8 +2,6 @@ definition module convertcases
 
 import syntax, transform, trans
 
-::	ImportedFunctions 	:== [Global Index]
-
 convertCasesOfFunctionsIntoPatterns :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!ImportedFunctions, !*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
