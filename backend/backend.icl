@@ -28,6 +28,7 @@ from StdString import String;
 :: BECodeBlockP :== CPtr;
 :: BEStringListP :== CPtr;
 :: BENodeIdListP :== CPtr;
+:: BENodeIdRefCountListP :== CPtr;
 :: BEAnnotation :== Int;
 :: BEAttribution :== Int;
 :: BESymbKind :== Int;
@@ -227,6 +228,18 @@ BEGuardNode a0 a1 a2 a3 a4 a5 a6 a7 = code {
 };
 // BENodeP BEGuardNode (BENodeP cond,BENodeDefP thenNodeDefs,BEStrictNodeIdP thenStricts,BENodeP then,BENodeDefP elseNodeDefs,BEStrictNodeIdP elseStricts,BENodeP elsje);
 
+BESetNodeDefRefCounts :: !BENodeP !BackEnd -> BackEnd;
+BESetNodeDefRefCounts a0 a1 = code {
+	ccall BESetNodeDefRefCounts "I:V:I"
+};
+// void BESetNodeDefRefCounts (BENodeP lhs);
+
+BEAddNodeIdsRefCounts :: !Int !BESymbolP !BENodeIdListP !BackEnd -> BackEnd;
+BEAddNodeIdsRefCounts a0 a1 a2 a3 = code {
+	ccall BEAddNodeIdsRefCounts "III:V:I"
+};
+// void BEAddNodeIdsRefCounts (int sequenceNumber,BESymbolP symbol,BENodeIdListP nodeIds);
+
 BESwitchNode :: !BENodeIdP !BEArgP !BackEnd -> (!BENodeP,!BackEnd);
 BESwitchNode a0 a1 a2 = code {
 	ccall BESwitchNode "II:I:I"
@@ -238,6 +251,18 @@ BECaseNode a0 a1 a2 a3 a4 a5 = code {
 	ccall BECaseNode "IIIII:I:I"
 };
 // BENodeP BECaseNode (int symbolArity,BESymbolP symbol,BENodeDefP nodeDefs,BEStrictNodeIdP strictNodeIds,BENodeP node);
+
+BEEnterLocalScope :: !BackEnd -> BackEnd;
+BEEnterLocalScope a0 = code {
+	ccall BEEnterLocalScope ":V:I"
+};
+// void BEEnterLocalScope ();
+
+BELeaveLocalScope :: !BENodeP !BackEnd -> BackEnd;
+BELeaveLocalScope a0 a1 = code {
+	ccall BELeaveLocalScope "I:V:I"
+};
+// void BELeaveLocalScope (BENodeP node);
 
 BEPushNode :: !Int !BESymbolP !BEArgP !BENodeIdListP !BackEnd -> (!BENodeP,!BackEnd);
 BEPushNode a0 a1 a2 a3 a4 = code {
@@ -646,9 +671,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 };
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02000207;
+kBEVersionCurrent:==0x02000208;
 kBEVersionOldestDefinition:==0x02000204;
-kBEVersionOldestImplementation:==0x02000206;
+kBEVersionOldestImplementation:==0x02000208;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;
