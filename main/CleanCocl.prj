@@ -7,7 +7,7 @@ Global
 		KeepABC:	False
 		TargetProcessor:	CurrentProcessor
 	Application
-		HeapSize:	12582912
+		HeapSize:	16777216
 		StackSize:	1048576
 		ExtraMemory:	4194304
 		IntialHeapSize:	4194304
@@ -31,10 +31,6 @@ Global
 	Link
 		DefaultSystemObjects:	True
 		DefaultLibraries:	True
-		ExtraObjects
-			Path:	{Project}:MacLibraries:MSL RuntimePPC.Lib
-			Path:	{Project}:MacLibraries:MSL SIOUX.PPC.Lib
-			Path:	{Project}:MacLibraries:MSL C.PPC.Lib
 		ExtraLibraries
 			Path:	{Project}:main:Mac:CodeGenImportLibrary
 	Paths
