@@ -292,7 +292,7 @@ where
 
 	transform (Selection opt_type expr selectors) ro ti
 		# (expr, ti) = transform expr ro ti
-		= transformSelection opt_type selectors expr ti
+		= transformSelection opt_type selectors expr ro ti
 	transform (Update expr1 selectors expr2) ro ti
 		# (expr1,ti) = transform expr1 ro ti
 		# (selectors,ti) = transform_expressions_in_selectors selectors ti
@@ -2017,22 +2017,43 @@ transformApplication app [] ro ti
 transformApplication app extra_args ro ti
 	= (App app @ extra_args, ti)
 
-transformSelection :: SelectorKind [Selection] Expression *TransformInfo -> (!Expression,!*TransformInfo)
+transformSelection :: SelectorKind [Selection] Expression ReadOnlyTI *TransformInfo -> (!Expression,!*TransformInfo)
 transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors] 
-					app=:(App {app_symb={symb_kind= SK_Constructor _ }, app_args, app_info_ptr})
-					ti=:{ti_symbol_heap}
+					app=:(App appi=:{app_symb={symb_kind= SK_Constructor _ }, app_args, app_info_ptr})
+					ro ti=:{ti_symbol_heap}
 	| isNilPtr app_info_ptr
+		// urgh: now reevaluates cnf for each nested strict selector :-(
+		| cnf_app_args appi ro
+			= transformSelection NormalSelector selectors (app_args !! field_index) ro ti
 		= (Selection NormalSelector app s, ti)
 	# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti_symbol_heap
 	  ti = { ti & ti_symbol_heap = ti_symbol_heap }
 	= case app_info of
 		EI_DictionaryType _
-			-> transformSelection NormalSelector selectors (app_args !! field_index) ti
+			-> transformSelection NormalSelector selectors (app_args !! field_index) ro ti
 		_
+			// urgh: now reevaluates cnf for each nested strict selector :-(
+			| cnf_app_args appi ro
+				-> transformSelection NormalSelector selectors (app_args !! field_index) ro ti
 			-> (Selection NormalSelector app s, ti)
-transformSelection NormalSelector [] expr ti
+where
+	cnf_args [] index strictness ro = True
+	cnf_args [arg:args] index strictness ro
+		| arg_is_strict index strictness
+			= case arg of
+				BasicExpr _	-> cnf_args args (inc index) strictness ro
+				App app		-> cnf_app_args app ro
+				_			-> False
+		= cnf_args args (inc index) strictness ro
+	
+	cnf_app_args {app_symb=symb=:{symb_kind = SK_Constructor cons_index, symb_name}, app_args} ro
+		# {cons_type}		= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
+		= cnf_args app_args 0 cons_type.st_args_strictness ro
+	cnf_app_args {app_symb=symb=:{symb_kind}, app_args} ro
+		= False
+transformSelection NormalSelector [] expr ro ti
 	= (expr, ti)
-transformSelection selector_kind selectors expr ti
+transformSelection selector_kind selectors expr ro ti
 	= (Selection selector_kind expr selectors, ti)
 
 //@	determineProducers
