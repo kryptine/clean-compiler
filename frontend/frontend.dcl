@@ -9,6 +9,9 @@ import checksupport, transform, overloading
 		,	fe_dcls :: !{#DclModule}
 		,	fe_components :: !{!Group}
 		,	fe_varHeap :: !.VarHeap
+// MdM
+		,	fe_typeHeap :: !.TypeVarHeap
+// ... MdM
 		,	fe_dclIclConversions ::!Optional {# Index}
 		,	fe_iclDclConversions ::!Optional {# Index}
 		,	fe_globalFunctions :: !IndexRange
