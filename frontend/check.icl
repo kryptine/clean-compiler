@@ -422,7 +422,7 @@ where
 			# class_member = class_members.[mem_offset]
 			  ({me_symb,me_type,me_priority,me_class_vars}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
 			  (instance_type, new_ins_specials, type_heaps) = determineTypeOfMemberInstance me_type me_class_vars ins_type ins_specials type_heaps
-	  		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  inst_def = MakeNewFunctionType me_symb me_type.st_arity me_priority instance_type ins_pos new_ins_specials new_info_ptr
 			  (inst_symbols, memb_inst_defs, member_defs, modules, type_heaps, var_heap)
 			  		= determine_instance_symbols_and_types first_inst_index (inc mem_offset) module_index member_mod_index
@@ -1974,7 +1974,12 @@ updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
 
-memcpy :: u:(a b) -> (!.(c b),!v:(a b)) | Array .a & createArray_u , createArrayc_u , size_u , update_u , uselect_u b & Array .c, [u <= v];
+//1.3
+memcpy :: u:(a b) -> (!.(c b),!v:(a b)) | Array a & createArray_u , createArrayc_u , size_u , update_u , uselect_u b & Array c, [u <= v];
+//3.1
+/*2.0
+memcpy :: u:(a b) -> (!.(c b),!u:(a b)) | Array c b & Array a b
+0.2*/
 memcpy src
 	#! size
 			= size src
@@ -2007,7 +2012,7 @@ doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked mod_index
 	  		= size dcl_functions
 	  (memb_inst_defs, nr_of_dcl_functions_and_instances2, rev_spec_class_inst, 
 		com_instance_defs, com_class_defs, com_member_defs, dcl_modules, hp_type_heaps, hp_var_heap, cs)
-	  		= determineTypesOfInstances nr_of_dcl_functions mod_index
+			= determineTypesOfInstances nr_of_dcl_functions mod_index
 	  				(fst (memcpy dcl_common.com_instance_defs))
 	  				(fst (memcpy dcl_common.com_class_defs))
 	  				(fst (memcpy dcl_common.com_member_defs))
@@ -2018,12 +2023,22 @@ doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked mod_index
 			= checkSpecialsOfInstances mod_index nr_of_dcl_functions rev_spec_class_inst nr_of_dcl_funs_insts_and_specs []
 					rev_special_defs { mem \\ mem <- memb_inst_defs } { [] \\ mem <- memb_inst_defs } heaps cs.cs_error
 	  dcl_functions
-	  		= array_plus_list dcl_functions
+	  		= arrayPlusList dcl_functions
 	  			(   [ { mem_inst & ft_specials = if (isEmpty spec_types) SP_None (SP_ContextTypes spec_types) } 
 				  	  \\ mem_inst <- memb_inst_defs & spec_types <-: all_spec_types 
 				  	]
 	  			 ++ reverse rev_special_defs
 	  			)
+	  cs
+	  		= { cs & cs_error = cs_error }
+	#! mod_index_of_std_array = cs.cs_predef_symbols.[PD_StdArray].pds_def
+	# (com_member_defs, com_instance_defs, dcl_functions, cs)
+	  		= case mod_index_of_std_array==mod_index of
+				False
+					-> (com_member_defs, com_instance_defs, dcl_functions, cs)
+				True
+					-> adjust_instance_types_of_array_functions_in_std_array_dcl mod_index
+							com_member_defs com_instance_defs dcl_functions cs
 	  dcl_mod
 	  		= { dcl_mod & 
 	  				dcl_functions = dcl_functions,
@@ -2033,8 +2048,6 @@ doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked mod_index
 	  								com_class_defs = com_class_defs, com_member_defs = com_member_defs }}
 	  dcl_modules
 	  		= { dcl_modules & [mod_index] = dcl_mod }
-	  cs
-	  		= { cs & cs_error = cs_error }
 	= (dcl_modules, heaps, cs)
   where
 	expand_syn_types_of_dcl_mod mod_index (dcl_modules, hp_type_heaps, cs_error)
@@ -2048,6 +2061,30 @@ doSomeThingsThatHaveToBeDoneAfterTheWholeComponentHasBeenChecked mod_index
 		  		= { dcl_modules & [mod_index].dcl_common.com_type_defs = expanded_type_defs }
 		= (dcl_modules, hp_type_heaps, cs_error)
 
+	adjust_instance_types_of_array_functions_in_std_array_dcl array_mod_index class_members class_instances fun_types cs=:{cs_predef_symbols}
+		#! nr_of_instances = size class_instances
+		# ({pds_def}, cs_predef_symbols) = cs_predef_symbols![PD_ArrayClass]
+		  (offset_table, class_members, cs_predef_symbols) = arrayFunOffsetToPD_IndexTable class_members cs_predef_symbols
+		  (class_instances, fun_types, cs_predef_symbols) 
+				= iFoldSt (adjust_instance_types_of_array_functions array_mod_index pds_def offset_table) 0 nr_of_instances
+						(class_instances, fun_types, cs_predef_symbols)
+		= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols })
+	where
+		adjust_instance_types_of_array_functions :: .Index !Index !{#.Index} !Int !*(!u:{# ClassInstance},!*{# FunType},!v:{#PredefinedSymbol})
+			 -> (!u:{# ClassInstance},!*{# FunType},!v:{#PredefinedSymbol})
+		adjust_instance_types_of_array_functions array_mod_index array_class_index offset_table inst_index (class_instances, fun_types, predef_symbols)
+			# ({ins_class={glob_module,glob_object={ds_index}},ins_type,ins_members}, class_instances) = class_instances![inst_index]
+			| glob_module == array_mod_index && ds_index == array_class_index && elemTypeIsStrict ins_type.it_types predef_symbols
+				# fun_types = iFoldSt (make_instance_strict ins_members offset_table) 0 (size ins_members) fun_types
+				= (class_instances, fun_types, predef_symbols)
+				= (class_instances, fun_types, predef_symbols)
+		
+		make_instance_strict :: !{#DefinedSymbol} !{#Index} !Int !*{# FunType} -> *{# FunType}
+		make_instance_strict instances offset_table ins_offset instance_defs
+			# {ds_index} = instances.[ins_offset]
+			  (inst_def, instance_defs) = instance_defs![ds_index]
+			  (Yes symbol_type) = inst_def.ft_type
+			= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
 	
 
 checkDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect
@@ -2136,9 +2173,7 @@ where
 			# cs = { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjust_predef_symbols PD_CreateArrayFun PD_UnqArraySizeFun mod_index STE_Member
 				<=< adjust_predef_symbol PD_ArrayClass mod_index STE_Class
-			  (class_members, class_instances, fun_types, cs_predef_symbols)
-			  		= adjust_instance_types_of_array_functions_in_std_array_dcl mod_index class_members class_instances fun_types cs.cs_predef_symbols
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols })
+			= (class_members, class_instances, fun_types, cs)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_PredefinedModule]
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
@@ -2194,31 +2229,6 @@ where
 					= ste_index
 					= NoIndex
 		
-		adjust_instance_types_of_array_functions_in_std_array_dcl array_mod_index class_members class_instances fun_types predef_symbols
-			#! nr_of_instances = size class_instances
-			# ({pds_def}, predef_symbols) = predef_symbols![PD_ArrayClass]
-			  (offset_table, class_members, predef_symbols) = arrayFunOffsetToPD_IndexTable class_members predef_symbols
-			  (class_instances, fun_types, predef_symbols) 
-					= iFoldSt (adjust_instance_types_of_array_functions array_mod_index pds_def offset_table) 0 nr_of_instances
-							(class_instances, fun_types, predef_symbols)
-			= (class_members, class_instances, fun_types, predef_symbols)
-		where
-			adjust_instance_types_of_array_functions :: .Index !Index !{#.Index} !Int !*(!u:{# ClassInstance},!*{# FunType},!v:{#PredefinedSymbol})
-				 -> (!u:{# ClassInstance},!*{# FunType},!v:{#PredefinedSymbol})
-			adjust_instance_types_of_array_functions array_mod_index array_class_index offset_table inst_index (class_instances, fun_types, predef_symbols)
-				# ({ins_class={glob_module,glob_object={ds_index}},ins_type,ins_members}, class_instances) = class_instances![inst_index]
-				| glob_module == array_mod_index && ds_index == array_class_index && elemTypeIsStrict ins_type.it_types predef_symbols
-					# fun_types = iFoldSt (make_instance_strict ins_members offset_table) 0 (size ins_members) fun_types
-					= (class_instances, fun_types, predef_symbols)
-					= (class_instances, fun_types, predef_symbols)
-			
-			make_instance_strict :: !{#DefinedSymbol} !{#Index} !Int !*{# FunType} -> *{# FunType}
-			make_instance_strict instances offset_table ins_offset instance_defs
-				# {ds_index} = instances.[ins_offset]
-				  (inst_def, instance_defs) = instance_defs![ds_index]
-				  (Yes symbol_type) = inst_def.ft_type
-				= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
-
 	count_members :: !Index !{# ClassInstance} !{# ClassDef} !{# DclModule} -> Int
 	count_members mod_index com_instance_defs com_class_defs modules
 		# (sum, _, _)
@@ -2229,6 +2239,7 @@ where
 		# ({class_members}, com_class_defs, modules)
 				= getClassDef ins_class mod_index com_class_defs modules
 	 	= (size class_members + sum, com_class_defs, modules)
+
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
