@@ -382,6 +382,7 @@ ScanComment input
 		# (eof2, c2, input)	= ReadChar input
 		| eof2				= (Yes "end of file encountered inside comment", input)
 		| c2 == '/'			= (No, input)
+		| c2 == '*'			= ScanComment (charBack input)
 							= ScanComment input
 	| otherwise				= ScanComment input
 
