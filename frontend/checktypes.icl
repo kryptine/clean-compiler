@@ -2,7 +2,7 @@ implementation module checktypes
 
 import StdEnv
 import syntax, checksupport, check, typesupport, utilities,
-		compilerSwitches //, RWSDebug
+		compilerSwitches // , RWSDebug
 
 
 ::	TypeSymbols = 
@@ -1281,7 +1281,7 @@ where
 			= (type_defs, class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
 
 	create_icl_class_dictionaries mod_index class_index class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
-		| class_index < size class_defs 
+		| class_index < size class_defs
 			| class_defs.[class_index].class_dictionary.ds_index==NoIndex
 				# (class_defs, modules, type_id_info, indexes, type_var_heap, var_heap, symbol_table)
 					= create_class_dictionary mod_index class_index class_defs modules indexes type_var_heap var_heap symbol_table
@@ -1303,10 +1303,9 @@ where
 		  { index_type, index_cons, index_selector } = indexes
 
 		  type_symb = MakeTypeSymbIdent { glob_object = index_type, glob_module = mod_index } rec_type_id class_arity
-
+				
 		  rec_type		= makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
 		  field_type	= makeAttributedType TA_Multi AN_None TE
-
 		  (rev_fields, var_heap, symbol_table)
 	  			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] var_heap symbol_table
 		  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, symbol_table)
@@ -1371,6 +1370,18 @@ where
 		# ({class_name, class_arity, class_dictionary = {ds_ident, ds_index}}, _, class_defs, modules) = getClassDef ds_index glob_module mod_index class_defs modules
 		  type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
 		  field_type = makeAttributedType TA_Multi AN_Strict (TA type_symb [makeAttributedType TA_Multi AN_None TE \\ i <- [1..class_arity]])
+/* RWS FIXME ...
+	This is a patch for the case that the class has a context field which class
+	has not yet been seen. For example (note the order of definitions):
+		class C2 a | C1 a
+		class C1 a :: a
+	A proper solution would be to split this in two phases. For example
+		1) assign class indices
+		2) bind context fields
+	This should then also work across (dcl) module boundaries.
+*/
+		  field_type = if (ds_index == NoIndex) (makeAttributedType TA_Multi AN_Strict TE) field_type
+// ... RWS
 		  (field, var_heap, symbol_table) = build_field field_nr class_name.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
 				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
