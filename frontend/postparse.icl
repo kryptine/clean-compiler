@@ -1306,7 +1306,6 @@ where
 		= ([field : fields], next_selector_index)
 	determine_symbols_of_selectors [] next_selector_index
 		= ([], next_selector_index)
-
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = TypeSpec type} : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = SynType type }
@@ -1315,6 +1314,11 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = TypeSpec type} : d
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = EmptyRhs properties} : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = AbstractType properties }
+	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
+	= (fun_defs, c_defs, imports, imported_objects, ca)  
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = AbstractTypeSpec properties type} : defs] cons_count sel_count mem_count type_count ca
+	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	  type_def = { type_def & td_rhs = AbstractSynType properties type }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_name,class_arity,class_args} members : defs] cons_count sel_count mem_count type_count ca
