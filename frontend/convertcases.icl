@@ -135,45 +135,45 @@ class weightedRefCount e :: !RCInfo !e !*RCState -> *RCState
 
 instance weightedRefCount BoundVar
 where
-	weightedRefCount rci=:{rci_depth} {var_name,var_info_ptr} rcs_info=:{rcs_var_heap,rcs_free_vars}
+	weightedRefCount rci=:{rci_depth} {var_name,var_info_ptr} rcs=:{rcs_var_heap,rcs_free_vars}
 		#! var_info = sreadPtr var_info_ptr rcs_var_heap
 		= case var_info of
 			VI_LetVar lvi
 				# (is_new, lvi=:{lvi_expression}, rcs_free_vars) = weightedRefCountOfVariable rci_depth var_info_ptr lvi 1 rcs_free_vars
 				| is_new
-					# rcs_info = weightedRefCount rci lvi_expression
-							{ rcs_info & rcs_free_vars = rcs_free_vars,
-							  rcs_var_heap = rcs_info.rcs_var_heap  <:= (var_info_ptr, VI_LetVar {lvi & lvi_expression = EE, lvi_new = False})}
-					  (VI_LetVar lvi, rcs_var_heap) = readPtr var_info_ptr rcs_info.rcs_var_heap
-					-> { rcs_info & rcs_var_heap = rcs_var_heap <:= (var_info_ptr, VI_LetVar { lvi & lvi_expression = lvi_expression }) }
+					# rcs = weightedRefCount rci lvi_expression
+							{ rcs & rcs_free_vars = rcs_free_vars,
+							  rcs_var_heap = rcs.rcs_var_heap  <:= (var_info_ptr, VI_LetVar {lvi & lvi_expression = EE, lvi_new = False})}
+					  (VI_LetVar lvi, rcs_var_heap) = readPtr var_info_ptr rcs.rcs_var_heap
+					-> { rcs & rcs_var_heap = rcs_var_heap <:= (var_info_ptr, VI_LetVar { lvi & lvi_expression = lvi_expression }) }
 //							 ==> (var_name, var_info_ptr, depth, lvi.lvi_count)
-					-> { rcs_info & rcs_var_heap = rcs_info.rcs_var_heap <:= (var_info_ptr, VI_LetVar lvi) }
+					-> { rcs & rcs_var_heap = rcs.rcs_var_heap <:= (var_info_ptr, VI_LetVar lvi) }
 			_
-				-> rcs_info
+				-> rcs
 				
 instance weightedRefCount Expression
 where
-	weightedRefCount rci (Var var) rcs_info
-		= weightedRefCount rci var rcs_info
-	weightedRefCount rci (App app) rcs_info
-		= weightedRefCount rci app rcs_info
-	weightedRefCount rci (fun_expr @ exprs) rcs_info
-		= weightedRefCount rci (fun_expr, exprs) rcs_info
-	weightedRefCount rci=:{rci_depth} (Let {let_strict_binds,let_lazy_binds,let_expr, let_info_ptr}) rcs_info=:{rcs_var_heap}
-		# rcs_info = weightedRefCount rci let_strict_binds { rcs_info & rcs_var_heap = foldSt store_binding let_lazy_binds rcs_var_heap }
-		  rcs_info = weightedRefCount rci let_expr rcs_info
-		  (let_info, rcs_expr_heap) = readPtr let_info_ptr rcs_info.rcs_expr_heap
-		  rcs_info = { rcs_info & rcs_expr_heap = rcs_expr_heap }
+	weightedRefCount rci (Var var) rcs
+		= weightedRefCount rci var rcs
+	weightedRefCount rci (App app) rcs
+		= weightedRefCount rci app rcs
+	weightedRefCount rci (fun_expr @ exprs) rcs
+		= weightedRefCount rci (fun_expr, exprs) rcs
+	weightedRefCount rci=:{rci_depth} (Let {let_strict_binds,let_lazy_binds,let_expr, let_info_ptr}) rcs=:{rcs_var_heap}
+		# rcs = weightedRefCount rci let_strict_binds { rcs & rcs_var_heap = foldSt store_binding let_lazy_binds rcs_var_heap }
+		  rcs = weightedRefCount rci let_expr rcs
+		  (let_info, rcs_expr_heap) = readPtr let_info_ptr rcs.rcs_expr_heap
+		  rcs = { rcs & rcs_expr_heap = rcs_expr_heap }
 		= case let_info of
 			EI_LetType let_type
-		  		# (ref_counts, rcs_var_heap) = mapSt get_ref_count let_lazy_binds rcs_info.rcs_var_heap
-				  (rcs_free_vars, rcs_var_heap) = foldl remove_variable (rcs_info.rcs_free_vars, rcs_var_heap) let_lazy_binds
-				-> { rcs_info & rcs_free_vars = rcs_free_vars, rcs_var_heap = rcs_var_heap,
-						rcs_expr_heap = rcs_info.rcs_expr_heap <:= (let_info_ptr, EI_LetTypeAndRefCounts let_type ref_counts)}
+		  		# (ref_counts, rcs_var_heap) = mapSt get_ref_count let_lazy_binds rcs.rcs_var_heap
+				  (rcs_free_vars, rcs_var_heap) = foldl remove_variable (rcs.rcs_free_vars, rcs_var_heap) let_lazy_binds
+				-> { rcs & rcs_free_vars = rcs_free_vars, rcs_var_heap = rcs_var_heap,
+						rcs_expr_heap = rcs.rcs_expr_heap <:= (let_info_ptr, EI_LetTypeAndRefCounts let_type ref_counts)}
 //							---> ("weightedRefCount (EI_LetType)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_lazy_binds])
 			_
-				# (rcs_free_vars, rcs_var_heap) = foldl remove_variable (rcs_info.rcs_free_vars, rcs_info.rcs_var_heap) let_lazy_binds
-				-> { rcs_info & rcs_free_vars = rcs_free_vars, rcs_var_heap = rcs_var_heap }
+				# (rcs_free_vars, rcs_var_heap) = foldl remove_variable (rcs.rcs_free_vars, rcs.rcs_var_heap) let_lazy_binds
+				-> { rcs & rcs_free_vars = rcs_free_vars, rcs_var_heap = rcs_var_heap }
 //							---> ("weightedRefCount (_)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_lazy_binds])
 	where
 		remove_variable ([], var_heap) let_bind
@@ -194,32 +194,32 @@ where
 			# (VI_LetVar {lvi_count}, var_heap) = readPtr fv_info_ptr var_heap
 		  	= (lvi_count, var_heap)
 //				==> (fv_name,fv_info_ptr,lvi_count)
-	weightedRefCount rci (Case case_expr) rcs_info=:{rcs_expr_heap}
+	weightedRefCount rci (Case case_expr) rcs=:{rcs_expr_heap}
 		# (case_info, rcs_expr_heap) = readPtr case_expr.case_info_ptr rcs_expr_heap
-		= weightedRefCountOfCase rci case_expr case_info { rcs_info & rcs_expr_heap = rcs_expr_heap }
-	weightedRefCount rci expr=:(BasicExpr _ _) rcs_info
-		= rcs_info
-	weightedRefCount rci (MatchExpr _ constructor expr) rcs_info
-		= weightedRefCount rci expr rcs_info
-	weightedRefCount rci (Selection opt_tuple expr selections) rcs_info
-		= weightedRefCount rci (expr, selections) rcs_info
-	weightedRefCount rci (Update expr1 selections expr2) rcs_info
-		= weightedRefCount rci (expr1, (selections, expr2)) rcs_info
-	weightedRefCount rci (RecordUpdate cons_symbol expression expressions) rcs_info
-		= weightedRefCount rci (expression, expressions) rcs_info
-	weightedRefCount rci (TupleSelect tuple_symbol arg_nr expr) rcs_info
-		= weightedRefCount rci expr rcs_info
-	weightedRefCount rci (AnyCodeExpr _ _ _) rcs_info
-		= rcs_info
-	weightedRefCount rci (ABCCodeExpr _ _) rcs_info
-		= rcs_info
-	weightedRefCount rci (TypeCodeExpression type_code_expr) rcs_info
-		= weightedRefCount rci type_code_expr rcs_info
-	weightedRefCount rci EE rcs_info
-		= rcs_info
-	weightedRefCount rci (NoBind ptr) rcs_info
-		= rcs_info
-	weightedRefCount rci expr rcs_info
+		= weightedRefCountOfCase rci case_expr case_info { rcs & rcs_expr_heap = rcs_expr_heap }
+	weightedRefCount rci expr=:(BasicExpr _ _) rcs
+		= rcs
+	weightedRefCount rci (MatchExpr _ constructor expr) rcs
+		= weightedRefCount rci expr rcs
+	weightedRefCount rci (Selection opt_tuple expr selections) rcs
+		= weightedRefCount rci (expr, selections) rcs
+	weightedRefCount rci (Update expr1 selections expr2) rcs
+		= weightedRefCount rci (expr1, (selections, expr2)) rcs
+	weightedRefCount rci (RecordUpdate cons_symbol expression expressions) rcs
+		= weightedRefCount rci (expression, expressions) rcs
+	weightedRefCount rci (TupleSelect tuple_symbol arg_nr expr) rcs
+		= weightedRefCount rci expr rcs
+	weightedRefCount rci (AnyCodeExpr _ _ _) rcs
+		= rcs
+	weightedRefCount rci (ABCCodeExpr _ _) rcs
+		= rcs
+	weightedRefCount rci (TypeCodeExpression type_code_expr) rcs
+		= weightedRefCount rci type_code_expr rcs
+	weightedRefCount rci EE rcs
+		= rcs
+	weightedRefCount rci (NoBind ptr) rcs
+		= rcs
+	weightedRefCount rci expr rcs
 		= abort ("weightedRefCount [Expression] (convertcases, 864))" ---> expr)
 
 addPatternVariable depth {cv_variable = var_info_ptr, cv_count = ref_count} (free_vars, var_heap)
@@ -232,14 +232,14 @@ addPatternVariable depth {cv_variable = var_info_ptr, cv_count = ref_count} (fre
 			-> (free_vars, var_heap)
 
 weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseType case_type)
-			rcs_info=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
+			rcs=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
 	# (local_vars, vars_and_heaps) = weighted_ref_count_in_case_patterns {rci & rci_depth=rci_depth+1} case_guards rcs_imports rcs_var_heap rcs_expr_heap
 	  (default_vars, (all_vars, rcs_imports, var_heap, expr_heap)) = weighted_ref_count_in_default {rci & rci_depth=rci_depth+1} case_default vars_and_heaps
-	  rcs_info = weightedRefCount rci case_expr { rcs_info & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports }
-	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) all_vars (rcs_info.rcs_free_vars, rcs_info.rcs_var_heap)
-	  rcs_expr_heap = rcs_info.rcs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type 
+	  rcs = weightedRefCount rci case_expr { rcs & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports }
+	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) all_vars (rcs.rcs_free_vars, rcs.rcs_var_heap)
+	  rcs_expr_heap = rcs.rcs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type 
 	  		{ rcc_all_variables = all_vars, rcc_default_variables = default_vars, rcc_pattern_variables = local_vars })
-	= { rcs_info & rcs_var_heap = rcs_var_heap, rcs_expr_heap = rcs_expr_heap, rcs_free_vars = rcs_free_vars   }
+	= { rcs & rcs_var_heap = rcs_var_heap, rcs_expr_heap = rcs_expr_heap, rcs_free_vars = rcs_free_vars   }
 //			---> ("weightedRefCountOfCase", ptrToInt case_info_ptr, case_expr)
 	where
 		weighted_ref_count_in_default rci (Yes expr) info
@@ -266,22 +266,22 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr rci dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
 
 weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case_default, case_info_ptr} (EI_CaseTypeAndRefCounts case_type {rcc_all_variables})
-			rcs_info=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
-	# rcs_info = weightedRefCount rci case_expr rcs_info
-	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) rcc_all_variables (rcs_info.rcs_free_vars, rcs_info.rcs_var_heap)
-	= { rcs_info & rcs_var_heap = rcs_var_heap, rcs_free_vars = rcs_free_vars }	
+			rcs=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
+	# rcs = weightedRefCount rci case_expr rcs
+	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) rcc_all_variables (rcs.rcs_free_vars, rcs.rcs_var_heap)
+	= { rcs & rcs_var_heap = rcs_var_heap, rcs_free_vars = rcs_free_vars }	
 //			---> ("weightedRefCountOfCase 2", ptrToInt case_info_ptr, case_expr)
 
 instance weightedRefCount Selection
 where
-	weightedRefCount rci=:{rci_imported} (ArraySelection {glob_module,glob_object={ds_index}} _ index_expr) rcs_info
-		# rcs_info = weightedRefCount rci index_expr rcs_info
-		= checkImportOfDclFunction rci_imported glob_module ds_index rcs_info
-	weightedRefCount rci (DictionarySelection _ selectors _ index_expr) rcs_info
-		# rcs_info = weightedRefCount rci index_expr rcs_info
-		= weightedRefCount rci selectors rcs_info
-	weightedRefCount rci=:{rci_imported} (RecordSelection selector _) rcs_info
-		= checkRecordSelector rci_imported selector rcs_info
+	weightedRefCount rci=:{rci_imported} (ArraySelection {glob_module,glob_object={ds_index}} _ index_expr) rcs
+		# rcs = weightedRefCount rci index_expr rcs
+		= checkImportOfDclFunction rci_imported glob_module ds_index rcs
+	weightedRefCount rci (DictionarySelection _ selectors _ index_expr) rcs
+		# rcs = weightedRefCount rci index_expr rcs
+		= weightedRefCount rci selectors rcs
+	weightedRefCount rci=:{rci_imported} (RecordSelection selector _) rcs
+		= checkRecordSelector rci_imported selector rcs
 
 weightedRefCountInPatternExpr rci=:{rci_depth} pattern_expr (previous_free_vars, collected_imports, var_heap, expr_heap)
 	# {rcs_free_vars,rcs_var_heap,rcs_imports,rcs_expr_heap} = weightedRefCount rci pattern_expr
@@ -320,14 +320,14 @@ where
 
 */
 
-checkImportOfDclFunction {cii_main_dcl_module_n, cii_dcl_functions} mod_index fun_index rcs_info=:{rcs_imports, rcs_var_heap}
+checkImportOfDclFunction {cii_main_dcl_module_n, cii_dcl_functions} mod_index fun_index rcs=:{rcs_imports, rcs_var_heap}
 //	| mod_index <> cIclModIndex
 	| mod_index <> cii_main_dcl_module_n
 		# {ft_type_ptr} = cii_dcl_functions.[mod_index].[fun_index]
 		  (rcs_imports, rcs_var_heap) = checkImportedSymbol (SK_Function {glob_module=mod_index,glob_object=fun_index}) ft_type_ptr (rcs_imports, rcs_var_heap)
-		= { rcs_info & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
-		= rcs_info
-checkRecordSelector {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} rcs_info=:{rcs_imports,rcs_var_heap}
+		= { rcs & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
+		= rcs
+checkRecordSelector {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} rcs=:{rcs_imports,rcs_var_heap}
 	| glob_module <> cii_main_dcl_module_n
 		# {com_selector_defs,com_cons_defs,com_type_defs} = cii_common_defs.[glob_module]
 		  {sd_type_index} = com_selector_defs.[ds_index]
@@ -335,51 +335,51 @@ checkRecordSelector {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_
 		  {cons_type_ptr} = com_cons_defs.[cons_index]
 		  (rcs_imports, rcs_var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = cons_index})
 											cons_type_ptr (rcs_imports, rcs_var_heap)
-		= { rcs_info & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
-		= rcs_info
+		= { rcs & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
+		= rcs
 	
 
 
 instance weightedRefCount App
 where
-	weightedRefCount rci=:{rci_imported} {app_symb,app_args} rcs_info
-		# rcs_info = weightedRefCount rci app_args rcs_info
-		= check_import rci_imported app_symb rcs_info
+	weightedRefCount rci=:{rci_imported} {app_symb,app_args} rcs
+		# rcs = weightedRefCount rci app_args rcs
+		= check_import rci_imported app_symb rcs
 	where
-		check_import cci {symb_kind=SK_Function {glob_module,glob_object}} rcs_info=:{rcs_imports, rcs_var_heap}
-			= checkImportOfDclFunction cci glob_module glob_object rcs_info
-		check_import cci=:{cii_dcl_functions, cii_common_defs, cii_main_dcl_module_n} {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rcs_info=:{rcs_imports, rcs_var_heap}
+		check_import cci {symb_kind=SK_Function {glob_module,glob_object}} rcs=:{rcs_imports, rcs_var_heap}
+			= checkImportOfDclFunction cci glob_module glob_object rcs
+		check_import cci=:{cii_dcl_functions, cii_common_defs, cii_main_dcl_module_n} {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rcs=:{rcs_imports, rcs_var_heap}
 			| glob_module <> cii_main_dcl_module_n
 				# {cons_type_ptr} = cii_common_defs.[glob_module].com_cons_defs.[glob_object]
 				  (rcs_imports, rcs_var_heap) = checkImportedSymbol symb_kind cons_type_ptr (rcs_imports, rcs_var_heap)
-				= { rcs_info & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
-				= rcs_info
-		check_import _ _ rcs_info
-			= rcs_info
+				= { rcs & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
+				= rcs
+		check_import _ _ rcs
+			= rcs
 
 
 instance weightedRefCount TypeCodeExpression
 where
-	weightedRefCount rci type_code_expr rcs_info
-		= rcs_info
+	weightedRefCount rci type_code_expr rcs
+		= rcs
 
 instance weightedRefCount [a] | weightedRefCount a
 where
-	weightedRefCount rci l rcs_info = foldr (weightedRefCount rci) rcs_info l 
+	weightedRefCount rci l rcs = foldr (weightedRefCount rci) rcs l 
 		
 instance weightedRefCount (a,b) | weightedRefCount a & weightedRefCount b
 where
-	weightedRefCount rci (x,y) rcs_info = weightedRefCount rci y (weightedRefCount rci x rcs_info) 
+	weightedRefCount rci (x,y) rcs = weightedRefCount rci y (weightedRefCount rci x rcs) 
 
 instance weightedRefCount LetBind
 where
-	weightedRefCount rci {lb_src} rcs_info
-		= weightedRefCount rci lb_src rcs_info
+	weightedRefCount rci {lb_src} rcs
+		= weightedRefCount rci lb_src rcs
 
 instance weightedRefCount (Bind a b) | weightedRefCount a
 where
-	weightedRefCount rci bind=:{bind_src} rcs_info
-		= weightedRefCount rci bind_src rcs_info
+	weightedRefCount rci bind=:{bind_src} rcs
+		= weightedRefCount rci bind_src rcs
 
 
 /*
