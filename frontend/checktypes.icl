@@ -1230,7 +1230,7 @@ where
 */
 
 createClassDictionaries ::
-	Index                   // Module index of dictionary being converted
+	Index                   // Index of module being converted
 	*{#ClassDef}            // Array of classes to convert
 	u1:{#MemberDef}         // Array of class members of classes to convert
 	u2:{#.DclModule}        // DCL modules for looking up context classes
@@ -1240,15 +1240,15 @@ createClassDictionaries ::
 	*TypeHeaps              // Heaps to allocate fresh type and attribute variables from
 	*VarHeap                // Heap to allocate fresh variable from
 	*SymbolTable            // Symbol table to store dictionary types, constructors, and field selectors
- ->	( .{#ClassDef}          // Updated array of classes (class_dictionary)
-	, v1:{#MemberDef}       // Used array of class members
-	, v2:{#DclModule}       // Used DCL modules
-	, v3:{#CheckedTypeDef}  // Typedef array updated with dictionary types
-	, v4:{#SelectorDef}     // Selectordef array updated with dictionary field selectors
-	, v5:{#ConsDef}         // Consdef array updated with dictionary constructors
-	, .TypeHeaps            // Extended type heaps
-	, .VarHeap              // Extended heap
-	, .SymbolTable          // Updated symbol table
+ ->	( .{#ClassDef}          // Updated array of classes (class_dictionary is updated)
+	, v1:{#MemberDef}       // Consulted array of class members
+	, v2:{#DclModule}       // Consulted DCL modules
+	, v3:{#CheckedTypeDef}  // Typedef array extended with dictionary types
+	, v4:{#SelectorDef}     // Selectordef array extended with dictionary field selectors
+	, v5:{#ConsDef}         // Consdef array extended with dictionary constructors
+	, .TypeHeaps            // Updated and extended type heaps
+	, .VarHeap              // Updated and extended heap
+	, .SymbolTable          // Extended symbol table
 	)
  ,	[u1<=v1, u2<=v2, u3<=v3, u4<=v4, u5<=v5]
 
