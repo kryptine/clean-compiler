@@ -692,6 +692,7 @@ where
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
+					---> ("expand_macros", fun_symb, fi_local_vars)
 	 
 	add_called_macros calls macro_defs_and_pi
 		= foldSt add_called_macro calls macro_defs_and_pi
@@ -745,7 +746,7 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modu
 	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
-//		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), (new_args, new_rhs, '\n'))
+		---> ("expandMacrosInBody", (cb_args, cb_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), (new_args, local_vars, new_rhs, '\n'))
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
@@ -761,7 +762,8 @@ mergeCases (Let lad=:{let_expr}) exprs var_heap symbol_heap error
 	# (let_expr, var_heap, symbol_heap, error) = mergeCases let_expr exprs var_heap symbol_heap error
 	= (Let {lad & let_expr = let_expr}, var_heap,symbol_heap, error)
 mergeCases case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No}) [expr : exprs] var_heap symbol_heap error
-	= case (split_case var_info_ptr expr) of
+	# (split_result, var_heap, symbol_heap) = split_case var_info_ptr expr var_heap symbol_heap
+	= case split_result of
 		Yes {case_guards,case_default}
 			# (case_guards, var_heap, symbol_heap, error) = merge_guards first_case.case_guards case_guards var_heap symbol_heap error
 			-> mergeCases (Case { first_case & case_guards = case_guards, case_default = case_default }) exprs var_heap symbol_heap error
@@ -770,54 +772,60 @@ mergeCases case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_de
 			-> (Case { first_case & case_default = Yes case_default}, var_heap, symbol_heap, error)
 
 where
-	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default})
+	split_case split_var_info_ptr (Case this_case=:{case_expr = Var {var_info_ptr}, case_guards, case_default}) var_heap symbol_heap
 		| split_var_info_ptr == var_info_ptr
-			= Yes this_case
+			= (Yes this_case, var_heap, symbol_heap)
 		| has_no_default case_default
 			= case case_guards of
 				AlgebraicPatterns type [alg_pattern]
-					-> case (split_case split_var_info_ptr alg_pattern.ap_expr) of
+					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr alg_pattern.ap_expr var_heap symbol_heap
+					-> case split_result of
 						Yes split_case
-							-> Yes { split_case & case_guards = push_expression_into_guards (
+							-> (Yes { split_case & case_guards = push_expression_into_guards (
 										\guard_expr -> Case { this_case & case_guards = 
 												AlgebraicPatterns type [ { alg_pattern & ap_expr = guard_expr }] })
-													split_case.case_guards }
+													split_case.case_guards }, var_heap, symbol_heap)
 									
 						No
-							-> No
+							-> (No, var_heap, symbol_heap) 
 				BasicPatterns type [basic_pattern]
-					-> case (split_case split_var_info_ptr basic_pattern.bp_expr) of
+					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr basic_pattern.bp_expr var_heap symbol_heap
+					-> case split_result of
 						Yes split_case
-							-> Yes { split_case & case_guards = push_expression_into_guards (
+							-> (Yes { split_case & case_guards = push_expression_into_guards (
 										\guard_expr -> Case { this_case & case_guards = 
 												BasicPatterns type [ { basic_pattern & bp_expr = guard_expr }] })
-													split_case.case_guards }
+													split_case.case_guards }, var_heap, symbol_heap)
 									
 						No
-							-> No
+							-> (No, var_heap, symbol_heap)
 				DynamicPatterns [dynamic_pattern]
-					-> case (split_case split_var_info_ptr dynamic_pattern.dp_rhs) of
+					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr dynamic_pattern.dp_rhs var_heap symbol_heap
+					-> case split_result of
 						Yes split_case
-							-> Yes { split_case & case_guards = push_expression_into_guards (
+							-> (Yes { split_case & case_guards = push_expression_into_guards (
 										\guard_expr -> Case { this_case & case_guards = 
 												DynamicPatterns [ { dynamic_pattern & dp_rhs = guard_expr }] })
-													split_case.case_guards }
+													split_case.case_guards }, var_heap, symbol_heap)
 									
 						No
-							-> No
+							-> (No, var_heap, symbol_heap)
 				_
-					-> No
+					-> (No, var_heap, symbol_heap)
 		| otherwise
-			= No
-	split_case split_var_info_ptr (Let lad=:{let_expr})
-		= case (split_case split_var_info_ptr let_expr) of
-			Yes split_case		
-				-> Yes { split_case & case_guards = push_expression_into_guards (
-						\let_expr -> Let { lad & let_expr = let_expr}) split_case.case_guards }
-			No
-				-> No
-	split_case split_var_info_ptr expr
-		= No
+			= (No, var_heap, symbol_heap)
+	split_case split_var_info_ptr (Let lad=:{let_expr,let_strict_binds}) var_heap symbol_heap
+		| isEmpty let_strict_binds
+			# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr let_expr var_heap symbol_heap
+			= case split_result of
+				Yes split_case
+					# (case_guards, var_heap, symbol_heap) = push_let_expression_into_guards lad split_case.case_guards var_heap symbol_heap
+					-> (Yes { split_case & case_guards = case_guards }, var_heap, symbol_heap)
+				No
+					-> (No, var_heap, symbol_heap)
+			= (No, var_heap, symbol_heap)
+	split_case split_var_info_ptr expr var_heap symbol_heap
+		= (No, var_heap, symbol_heap)
 	
 	has_no_default No 		= True
 	has_no_default (Yes _) 	= False
@@ -829,16 +837,62 @@ where
 	push_expression_into_guards expr_fun (DynamicPatterns patterns) 
 		= DynamicPatterns (map (\dynpattern -> { dynpattern & dp_rhs = expr_fun dynpattern.dp_rhs }) patterns)
 
-/*  Happened already */
-/*
-	skip_aliases info_ptr []
-		= info_ptr
-	skip_aliases info_ptr [{bind_src=Var {var_info_ptr},bind_dst} : binds ]
-		| info_ptr == var_info_ptr
-			= skip_aliases bind_dst.fv_info_ptr binds
-			= skip_aliases info_ptr binds
-*/
+	replace_variables_in_expression expr var_heap symbol_heap
+		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,
+				 us_cleanup_info = [], us_handle_aci_free_vars = RemoveThem }
+		  (expr, us) = unfold expr us
+		= (expr, us.us_var_heap, us.us_symbol_heap)
 
+	new_variable fv=:{fv_name, fv_info_ptr} var_heap
+		# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+		= ({fv & fv_info_ptr = new_info_ptr}, var_heap <:= (fv_info_ptr, VI_Variable fv_name new_info_ptr))
+		
+	rebuild_let_expression lad expr var_heap expr_heap
+		# (rev_let_lazy_binds, var_heap) = foldSt renew_let_var lad.let_lazy_binds ([], var_heap)
+		  (let_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
+		  (expr, var_heap, expr_heap) = replace_variables_in_expression expr var_heap expr_heap
+		  (let_lazy_binds, var_heap, expr_heap) = foldSt replace_variables_in_bound_expression rev_let_lazy_binds ([], var_heap, expr_heap)
+		= (Let { lad & let_lazy_binds = let_lazy_binds, let_info_ptr = let_info_ptr, let_expr = expr}, var_heap, expr_heap)
+	where
+		renew_let_var bind=:{bind_dst} (rev_binds, var_heap)
+			# (bind_dst, var_heap) = new_variable bind_dst var_heap
+			= ([{ bind & bind_dst = bind_dst } : rev_binds], var_heap)
+
+		replace_variables_in_bound_expression bind=:{bind_src} (rev_binds, var_heap, expr_heap)
+			# (bind_src, var_heap, expr_heap) = replace_variables_in_expression bind_src var_heap expr_heap
+			= ([{ bind & bind_src = bind_src } : rev_binds], var_heap, expr_heap)
+
+		
+	push_let_expression_into_guards lad (AlgebraicPatterns type patterns) var_heap expr_heap
+		# (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
+		= (AlgebraicPatterns type patterns, var_heap, expr_heap)
+	where
+		push_let_expression_into_algebraic_pattern lad [pattern=:{ap_expr}] var_heap expr_heap
+			= ([{ pattern & ap_expr = Let { lad & let_expr = ap_expr}}], var_heap, expr_heap)
+		push_let_expression_into_algebraic_pattern lad [pattern=:{ap_expr}:patterns] var_heap expr_heap
+			# (ap_expr, var_heap, expr_heap) = rebuild_let_expression lad ap_expr var_heap expr_heap
+			  (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
+			= ([{pattern & ap_expr = ap_expr} : patterns], var_heap, expr_heap)
+	push_let_expression_into_guards lad (BasicPatterns type patterns) var_heap expr_heap 
+		# (patterns, var_heap, expr_heap) = push_let_expression_into_basic_pattern lad patterns var_heap expr_heap
+		= (BasicPatterns type patterns, var_heap, expr_heap)
+	where
+		push_let_expression_into_basic_pattern lad [pattern=:{bp_expr}] var_heap expr_heap
+			= ([{ pattern & bp_expr = Let { lad & let_expr = bp_expr}}], var_heap, expr_heap)
+		push_let_expression_into_basic_pattern lad [pattern=:{bp_expr}:patterns] var_heap expr_heap
+			# (bp_expr, var_heap, expr_heap) = rebuild_let_expression lad bp_expr var_heap expr_heap
+			  (patterns, var_heap, expr_heap) = push_let_expression_into_basic_pattern lad patterns var_heap expr_heap
+			= ([{pattern & bp_expr = bp_expr} : patterns], var_heap, expr_heap)
+	push_let_expression_into_guards lad (DynamicPatterns patterns) var_heap expr_heap
+		# (patterns, var_heap, expr_heap) = push_let_expression_into_dynamic_pattern lad patterns var_heap expr_heap
+		= (DynamicPatterns patterns, var_heap, expr_heap)
+	where
+		push_let_expression_into_dynamic_pattern lad [pattern=:{dp_rhs}] var_heap expr_heap
+			= ([{ pattern & dp_rhs = Let { lad & let_expr = dp_rhs}}], var_heap, expr_heap)
+		push_let_expression_into_dynamic_pattern lad [pattern=:{dp_rhs}:patterns] var_heap expr_heap
+			# (dp_rhs, var_heap, expr_heap) = rebuild_let_expression lad dp_rhs var_heap expr_heap
+			  (patterns, var_heap, expr_heap) = push_let_expression_into_dynamic_pattern lad patterns var_heap expr_heap
+			= ([{pattern & dp_rhs = dp_rhs} : patterns], var_heap, expr_heap)
 
 	merge_guards guards=:(AlgebraicPatterns type1 patterns1) (AlgebraicPatterns type2 patterns2) var_heap symbol_heap error
 		| type1 == type2
@@ -873,14 +927,15 @@ where
 
 	merge_algebraic_pattern_with_patterns new_pattern [pattern=:{ap_symbol,ap_vars,ap_expr} : patterns] var_heap symbol_heap error
 		| new_pattern.ap_symbol == ap_symbol
-			# (new_expr, var_heap, symbol_heap) = replace_variables new_pattern.ap_vars new_pattern.ap_expr ap_vars var_heap symbol_heap
-			  (ap_expr, var_heap, symbol_heap, error) = mergeCases ap_expr [new_expr] var_heap symbol_heap error
-			= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
+			| isEmpty new_pattern.ap_vars
+				# (ap_expr, var_heap, symbol_heap, error) = mergeCases ap_expr [new_pattern.ap_expr] var_heap symbol_heap error
+				= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
+				# (new_expr, var_heap, symbol_heap) = replace_variables new_pattern.ap_vars new_pattern.ap_expr ap_vars var_heap symbol_heap
+				  (ap_expr, var_heap, symbol_heap, error) = mergeCases ap_expr [new_expr] var_heap symbol_heap error
+				= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
 			# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
 			= ([ pattern : patterns ], var_heap, symbol_heap, error)
 	where
-		replace_variables [] expr ap_vars var_heap symbol_heap
-			= (expr, var_heap, symbol_heap)
 		replace_variables vars expr ap_vars var_heap symbol_heap
 			# us = { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,
 					 us_cleanup_info=[], us_handle_aci_free_vars = RemoveThem }
@@ -1037,11 +1092,7 @@ where
 		= (Yes x, fun_and_macro_defs, modules, es)
 	expand no fun_and_macro_defs mod_index modules es
 		= (no, fun_and_macro_defs, modules, es)
-/*
-determineArity (SK_Function)
-determineArity (SK_OverloadedFunction
-determineArity (SK_Constructor
-*/
+
 instance expand Expression
 where
 
