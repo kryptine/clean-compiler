@@ -2391,16 +2391,17 @@ buildNodeDef lhsExpr rhsExpr
 wantRecordOrArrayExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantRecordOrArrayExp is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == CurlyCloseToken
-		= (PE_ArrayDenot [], pState)
 	| is_pattern
 		| token == SquareOpenToken
 			# (elems, pState) =  want_array_assignments cIsAPattern pState
 			= (PE_ArrayPattern elems, wantToken FunctionContext "array selections in pattern" CurlyCloseToken pState)
-// MW was	= (PE_Empty, parseError "array selection" No "No array selection in pattern" pState)
+		| token == CurlyCloseToken
+			= (PE_Empty, parseError "record or array pattern" No "Array denotation not" pState)
 		// otherwise // is_pattern && token <> SquareOpenToken
 			= want_record_pattern token pState
 	// otherwise // ~ is_pattern
+	| token == CurlyCloseToken
+		= (PE_ArrayDenot [], pState)		
 		# (opt_type, pState) = try_type_specification token pState
 		= case opt_type of
 			Yes _
