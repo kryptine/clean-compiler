@@ -696,6 +696,7 @@ where
 		  (case_guards, ds)  = distribute_lets_in_patterns new_di ref_counts_in_patterns case_guards ds
 		  (case_default, ds=:{ds_var_heap}) = distribute_lets_in_default new_di ref_counts_in_default case_default ds
 		  (outer_vars, ds_var_heap) = foldSt (is_outer_var new_di) tot_ref_counts (False, ds.ds_var_heap)
+		  
 		# ds_var_heap = foldSt reset_local_let_var local_lets ds_var_heap ->> ("outer_vars", di_depth, outer_vars)
 		  (case_expr, ds) = distributeLets di case_expr { ds & ds_var_heap = ds_var_heap}
 		  kees = { kees & case_guards = case_guards, case_expr = case_expr,
@@ -710,7 +711,7 @@ where
 			| is_guard case_guards case_default case_explicit case_expr
 				=	(CaseKindGuard, var_heap)
 		case_kind outer_vars {case_expr, case_explicit}  var_heap
-			|  case_explicit || outer_vars || not (is_lhs_var case_expr var_heap)
+			| case_explicit || outer_vars || not (is_lhs_var case_expr var_heap)
 				=	(CaseKindTransform, var_heap)
 			// otherwise
 				=	(CaseKindLeave, var_heap)
@@ -819,11 +820,15 @@ where
 			= var_heap <:= (var_info_ptr, VI_LetExpression { lei & lei_depth = lei_depth, lei_count = lei_count, lei_status = LES_Moved })
 //					-*-> ("reset_local_let_var", var_info_ptr)
 					->> ("reset_local_let_var", lei.lei_var.fv_name.id_name, lei.lei_depth, lei.lei_count, " ->> ", lei_depth, lei_count)
-
+   
 		is_outer_var {di_depth, di_explicit_case_depth} {cv_variable}  (outer, var_heap)
-			# (VI_LetExpression lei=:{lei_depth}, var_heap) = readPtr cv_variable var_heap
-			= (outer || ((di_explicit_case_depth < lei_depth) && (lei_depth <= di_depth)), var_heap)
-					->> ("is_outer_var", lei.lei_var.fv_name.id_name, lei.lei_depth, di_depth, di_explicit_case_depth)
+			| outer
+				= (True,var_heap)
+			# (VI_LetExpression {lei_depth,lei_status}, var_heap) = readPtr cv_variable var_heap
+			| di_explicit_case_depth < lei_depth &&
+				(lei_depth < di_depth || (lei_depth == di_depth && case lei_status of LES_Moved -> False; _ -> True))
+			= (True,var_heap)
+			= (False,var_heap);
 
 		distribute_lets_in_pattern_expr di=:{di_depth} local_vars pattern_expr ds=:{ds_var_heap}
 			# ds_var_heap = foldSt (mark_local_let_var_of_pattern_expr di_depth) local_vars ds_var_heap
