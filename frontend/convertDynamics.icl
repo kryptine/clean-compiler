@@ -702,7 +702,7 @@ convertTypeCode pattern cinp (TCE_Constructor index cons args) st
 	=	convertTypeCode pattern cinp curried_type st
 convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, ci)
 		# (tv_symb, ci)
-			=	getSymbol PD_Dyn_TypeVar SK_Constructor 1 ci
+			=	getSymbol (if pattern PD_Dyn__TypeFixedVar PD_Dyn_TypeVar) SK_Constructor 1 ci
 		# init_count
 			=	if pattern ci.ci_type_var_count ci.ci_type_pattern_var_count
 		# (count, ci_var_heap)
@@ -851,4 +851,3 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 			,	dr_dynamic_symbol	= dynamic_defined_symbol
 			}, predefined_symbols)
 
-	
