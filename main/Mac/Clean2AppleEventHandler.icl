@@ -5,6 +5,8 @@ import files,events;
 
 import StdDebug,StdString;
 
+import code from "cae.obj"; // "cae.carbon.o";
+
 HandleAppleEvent :: !Event (!{#Char} *Files -> (!Int,!*Files)) !*Files -> (!Bool,!Bool,!*Files);
 HandleAppleEvent (b,what,message,when,p1,p2,modifiers) script_handler files
 	| what==HighLevelEvent
