@@ -20,6 +20,8 @@ instance <<< [a] | <<< a
 
 ::	Optional x = Yes !x | No
 
+hasOption :: (Optional x) -> Bool
+
 ::	Choice a b  = Either a | Or b
 
 (--->) infix :: .a !b -> .a | <<< b

@@ -17,6 +17,10 @@ cMAXINT :== 2147483647
 
 ::	BITVECT :== Int
 
+hasOption :: (Optional x) -> Bool
+hasOption (Yes _) 	= True
+hasOption No 		= False
+
 instance ~ Bool
 where ~ b = not b
 

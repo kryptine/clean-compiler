@@ -15,24 +15,16 @@ instance_def_error	= "instance definition in the impl module conflicts with the 
 compareError message pos error_admin
 	= popErrorAdmin (checkError "" message (pushErrorAdmin pos error_admin))
 
-markCheckedDefinitions :: !Int ![Index] -> *{# Bool}
-markCheckedDefinitions nr_of_defs not_to_be_checked
-	# marks = createArray nr_of_defs True
-	= foldSt mark_def not_to_be_checked marks
-where
-	mark_def index marks = { marks & [index] = False }
-
-compareTypeDefs ::  !{# Int} ![Index] !{# CheckedTypeDef} !{# ConsDef} !u:{# CheckedTypeDef} !v:{# ConsDef} !*CompareState
+compareTypeDefs ::  !{# Int} !{#Bool} !{# CheckedTypeDef} !{# ConsDef} !u:{# CheckedTypeDef} !v:{# ConsDef} !*CompareState
 	-> (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState) 
 compareTypeDefs dcl_sizes copied_from_dcl dcl_type_defs dcl_cons_defs icl_type_defs icl_cons_defs comp_st
 	# nr_of_dcl_types = dcl_sizes.[cTypeDefs]
-	  to_be_checked = markCheckedDefinitions nr_of_dcl_types copied_from_dcl
-	= iFoldSt (compare_type_defs to_be_checked dcl_type_defs dcl_cons_defs) 0 nr_of_dcl_types (icl_type_defs, icl_cons_defs, comp_st)
+	= iFoldSt (compare_type_defs copied_from_dcl dcl_type_defs dcl_cons_defs) 0 nr_of_dcl_types (icl_type_defs, icl_cons_defs, comp_st)
 where
 	compare_type_defs :: !{# Bool} !{# CheckedTypeDef} !{# ConsDef} !Index (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState)
 		-> (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState) 
-	compare_type_defs to_be_checked dcl_type_defs dcl_cons_defs type_index (icl_type_defs, icl_cons_defs, comp_st=:{comp_type_var_heap,comp_attr_var_heap})
-		| to_be_checked.[type_index]
+	compare_type_defs copied_from_dcl dcl_type_defs dcl_cons_defs type_index (icl_type_defs, icl_cons_defs, comp_st=:{comp_type_var_heap,comp_attr_var_heap})
+		| not copied_from_dcl.[type_index]
 			# dcl_type_def = dcl_type_defs.[type_index]
 			  (icl_type_def, icl_type_defs) = icl_type_defs![type_index]
 			  comp_type_var_heap = initialyseATypeVars dcl_type_def.td_args comp_type_var_heap
@@ -102,17 +94,16 @@ where
 			= (False, icl_cons_defs, comp_st)
 
 
-compareClassDefs :: !{# Int} ![Index]  !{# ClassDef} !{# MemberDef} !u:{# ClassDef} !v:{# MemberDef} !*CompareState
+compareClassDefs :: !{#Int} {#Bool} !{# ClassDef} !{# MemberDef} !u:{# ClassDef} !v:{# MemberDef} !*CompareState
 	-> (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
 compareClassDefs dcl_sizes copied_from_dcl dcl_class_defs dcl_member_defs icl_class_defs icl_member_defs comp_st
 	# nr_of_dcl_classes = dcl_sizes.[cClassDefs]
-	  to_be_checked = markCheckedDefinitions nr_of_dcl_classes copied_from_dcl
-	= iFoldSt (compare_class_defs to_be_checked dcl_class_defs dcl_member_defs) 0 nr_of_dcl_classes (icl_class_defs, icl_member_defs, comp_st)
+	= iFoldSt (compare_class_defs copied_from_dcl dcl_class_defs dcl_member_defs) 0 nr_of_dcl_classes (icl_class_defs, icl_member_defs, comp_st)
 where	  	
 	compare_class_defs ::  !{# Bool} {# ClassDef} {# MemberDef} !Index (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
 		-> (!u:{# ClassDef}, v:{# MemberDef}, !*CompareState)
-	compare_class_defs to_be_checked dcl_class_defs dcl_member_defs class_index (icl_class_defs, icl_member_defs, comp_st)
-		| to_be_checked.[class_index]
+	compare_class_defs copied_from_dcl dcl_class_defs dcl_member_defs class_index (icl_class_defs, icl_member_defs, comp_st)
+		| not copied_from_dcl.[class_index]
 			# dcl_class_def = dcl_class_defs.[class_index]
 			  (icl_class_def, icl_class_defs) = icl_class_defs![class_index]
 			# (ok, icl_member_defs, comp_st) = compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st

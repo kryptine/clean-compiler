@@ -311,20 +311,26 @@ where
 CS_Checked	:== 1
 CS_Checking	:== 0
 
-
-checkTypeDefs :: !Bool !*{# CheckedTypeDef} !Index !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
+checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int)) !*{# CheckedTypeDef} !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
-checkTypeDefs is_main_dcl type_defs module_index  cons_defs selector_defs modules var_heap type_heaps cs
+checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs modules var_heap type_heaps cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
-	   ti = { ti_type_heaps = type_heaps, ti_var_heap = var_heap, ti_used_types = []  }
-	= check_type_defs is_main_dcl 0 nr_of_types module_index ts ti cs
+	   ti = { ti_type_heaps = type_heaps, ti_var_heap = var_heap, ti_used_types = [] }
+	   ({ts_type_defs,ts_cons_defs, ts_selector_defs, ts_modules}, {ti_var_heap,ti_type_heaps}, cs)
+	  		= iFoldSt (check_type_def module_index opt_icl_info) 0 nr_of_types (ts, ti, cs)
+	= (ts_type_defs, ts_cons_defs, ts_selector_defs, ts_modules, ti_var_heap, ti_type_heaps, cs)
 where
-	check_type_defs is_main_dcl type_index nr_of_types module_index ts ti=:{ti_type_heaps,ti_var_heap} cs
-		| type_index == nr_of_types
-			= (ts.ts_type_defs, ts.ts_cons_defs, ts.ts_selector_defs, ts.ts_modules, ti_var_heap, ti_type_heaps, cs)
-			# (ts, ti, cs) = checkTypeDef  type_index module_index ts ti cs
-			= check_type_defs is_main_dcl (inc type_index) nr_of_types module_index ts ti cs
+	check_type_def module_index opt_icl_info type_index (ts, ti, cs)
+		| has_to_be_checked module_index opt_icl_info type_index
+			= checkTypeDef  type_index module_index ts ti cs
+			= (ts, ti, cs)
+
+	has_to_be_checked module_index No type_index
+		= True
+	has_to_be_checked module_index (Yes ({copied_type_defs}, n_cached_dcl_mods)) type_index
+		= not (module_index < n_cached_dcl_mods && type_index < size copied_type_defs && copied_type_defs.[type_index])
+
 
 ::	OpenTypeInfo =
 	{	oti_heaps		:: !.TypeHeaps
@@ -1218,7 +1224,7 @@ where
 		-> (!*{#ClassDef}, !w:{#DclModule}, !v:[SymbolPtr], !u:Indexes, !*TypeVarHeap, !*VarHeap, !*SymbolTable)
 	create_class_dictionary mod_index class_index  class_defs =:{[class_index] = class_def } modules rev_dictionary_list
 			indexes type_var_heap var_heap symbol_table
-		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}}} = class_def
+		# {class_name,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name}}} = class_def
 		# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 		  nr_of_members = size class_members
 		  nr_of_fields = nr_of_members + length class_context

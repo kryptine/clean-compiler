@@ -76,20 +76,28 @@ where
 				# (gv, st_vars, error) = find gv st_vars error 
 				= (gv, [st_var:st_vars], error)
 				
-checkTypeClasses :: !Index !Index !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*TypeHeaps !*CheckState
+checkTypeClasses :: !Index !(Optional (CopiedDefinitions, Int)) !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*TypeHeaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*TypeHeaps, !*CheckState)
-checkTypeClasses class_index module_index class_defs member_defs type_defs modules type_heaps cs=:{cs_symbol_table,cs_error}
-	| class_index == size class_defs
-		= (class_defs, member_defs, type_defs, modules, type_heaps, cs)
-		# (class_def=:{class_name,class_pos,class_args,class_context,class_members,class_dictionary}, class_defs) = class_defs![class_index]
-		  cs = {cs & cs_error = setErrorAdmin (newPosition class_name class_pos) cs_error }
-		  (class_args, class_context, type_defs, class_defs, modules, type_heaps, cs)
-		  		= checkSuperClasses class_args class_context module_index type_defs class_defs modules type_heaps cs
-		  class_dictionary = { class_dictionary & ds_ident.id_info = nilPtr }
-		  class_defs = { class_defs & [class_index] = { class_def & class_context = class_context, class_args = class_args, class_dictionary = class_dictionary }}
-		  member_defs = set_classes_in_member_defs 0 class_members {glob_object = class_index, glob_module = module_index} member_defs 
-		= checkTypeClasses (inc class_index) module_index class_defs member_defs type_defs modules type_heaps cs
+checkTypeClasses module_index opt_icl_info class_defs member_defs type_defs modules type_heaps cs
+	#! n_classes = size class_defs
+	= iFoldSt (check_type_class module_index opt_icl_info) 0 n_classes (class_defs, member_defs, type_defs, modules, type_heaps, cs)
 where
+	check_type_class module_index opt_icl_info class_index (class_defs, member_defs, type_defs, modules, type_heaps, cs=:{cs_symbol_table,cs_error})
+		| has_to_be_checked module_index opt_icl_info class_index
+			# (class_def=:{class_name,class_pos,class_args,class_context,class_members}, class_defs) = class_defs![class_index]
+			  cs = {cs & cs_error = setErrorAdmin (newPosition class_name class_pos) cs_error }
+			  (class_args, class_context, type_defs, class_defs, modules, type_heaps, cs)
+			  		= checkSuperClasses class_args class_context module_index type_defs class_defs modules type_heaps cs
+			  class_defs = { class_defs & [class_index] = { class_def & class_context = class_context, class_args = class_args }}
+			  member_defs = set_classes_in_member_defs 0 class_members {glob_object = class_index, glob_module = module_index} member_defs 
+			= (class_defs, member_defs, type_defs, modules, type_heaps, cs)
+			= (class_defs, member_defs, type_defs, modules, type_heaps, cs)
+
+	has_to_be_checked module_index No class_index
+		= True
+	has_to_be_checked module_index (Yes ({copied_class_defs}, n_cached_dcl_mods)) class_index
+		= not (module_index < n_cached_dcl_mods && class_index < size copied_class_defs && copied_class_defs.[class_index])
+
 	set_classes_in_member_defs mem_offset class_members glob_class_index member_defs
 		| mem_offset == size class_members
 			= member_defs
@@ -183,22 +191,29 @@ where
 checkSpecialsOfInstances mod_index first_mem_index [] next_inst_index all_class_instances all_specials inst_spec_defs all_spec_types heaps predef_symbols error
 	= (next_inst_index, all_class_instances, all_specials, all_spec_types, heaps, predef_symbols,error)
 
-checkMemberTypes :: !Index !*{#MemberDef} !*{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*TypeHeaps !*VarHeap !*CheckState
+checkMemberTypes :: !Index !(Optional (CopiedDefinitions, Int)) !*{#MemberDef} !*{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*TypeHeaps !*VarHeap !*CheckState
 	-> (!*{#MemberDef}, !*{#CheckedTypeDef}, !*{#ClassDef}, !*{#DclModule}, !*TypeHeaps,  !*VarHeap, !*CheckState)
-checkMemberTypes module_index member_defs type_defs class_defs modules type_heaps var_heap cs
+checkMemberTypes module_index opt_icl_info member_defs type_defs class_defs modules type_heaps var_heap cs
 	#! nr_of_members = size member_defs
-	= iFoldSt (check_class_member module_index) 0 nr_of_members (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
+	= iFoldSt (check_class_member module_index opt_icl_info) 0 nr_of_members (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
 where
-	check_class_member module_index member_index (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
-		# (member_def=:{me_symb,me_type,me_pos}, member_defs) = member_defs![member_index]
-		  position = newPosition me_symb me_pos
-		  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
-		  (me_type, type_defs, class_defs, modules, type_heaps, cs)
-		   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
-		  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
-		  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
-		= ({ member_defs & [member_index] = { member_def & me_type = me_type, me_class_vars = me_class_vars, me_type_ptr = me_type_ptr }},
-				type_defs, class_defs, modules, type_heaps, var_heap, cs)
+	check_class_member module_index opt_icl_info member_index (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
+		# (member_def=:{me_symb,me_type,me_pos,me_class}, member_defs) = member_defs![member_index]
+		| has_to_be_checked opt_icl_info me_class
+			# position = newPosition me_symb me_pos
+			  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
+			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
+			   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
+			  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
+			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
+			= ({ member_defs & [member_index] = { member_def & me_type = me_type, me_class_vars = me_class_vars, me_type_ptr = me_type_ptr }},
+					type_defs, class_defs, modules, type_heaps, var_heap, cs)
+			= (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
+
+	has_to_be_checked No glob_class_index
+		= True
+	has_to_be_checked (Yes ({copied_class_defs}, n_cached_dcl_mods)) {glob_module,glob_object}
+		= not (glob_module < n_cached_dcl_mods && glob_object < size copied_class_defs && copied_class_defs.[glob_object])
 	
 ::	InstanceSymbols =
 	{	is_type_defs		:: !.{# CheckedTypeDef}
@@ -900,17 +915,17 @@ createCommonDefinitions {def_types,def_constructors,def_selectors,def_macros,def
 array_plus_list a [] = a
 array_plus_list a l = arrayPlusList a l
 
-checkCommonDefinitions :: !Bool !Index !*CommonDefs !*{# DclModule} !*TypeHeaps !*VarHeap !*CheckState
+checkCommonDefinitions :: !(Optional (CopiedDefinitions, Int)) !Index !*CommonDefs !*{# DclModule} !*TypeHeaps !*VarHeap !*CheckState
 	-> (!*CommonDefs, !*{# DclModule}, !*TypeHeaps,  !*VarHeap, !*CheckState)
-checkCommonDefinitions is_dcl module_index common modules type_heaps var_heap cs
-	#! is_main_dcl_mod = is_dcl && module_index == cs.cs_x.x_main_dcl_module_n
+checkCommonDefinitions opt_icl_info module_index  common modules type_heaps var_heap cs
+	#! is_main_dcl_mod = hasOption opt_icl_info && module_index == cs.cs_x.x_main_dcl_module_n
 	# (com_type_defs, com_cons_defs, com_selector_defs, modules, var_heap, type_heaps, cs)
-			= checkTypeDefs is_main_dcl_mod common.com_type_defs module_index
-							common.com_cons_defs common.com_selector_defs modules var_heap type_heaps cs
+			= checkTypeDefs module_index opt_icl_info
+					common.com_type_defs common.com_cons_defs common.com_selector_defs modules var_heap type_heaps cs
 	  (com_class_defs, com_member_defs, com_type_defs, modules, type_heaps, cs)
-	  		= checkTypeClasses 0 module_index common.com_class_defs common.com_member_defs com_type_defs modules type_heaps cs
+	  		= checkTypeClasses module_index opt_icl_info common.com_class_defs common.com_member_defs com_type_defs modules type_heaps cs
 	  (com_member_defs, com_type_defs, com_class_defs, modules, type_heaps, var_heap, cs)
-	  		= checkMemberTypes module_index com_member_defs com_type_defs com_class_defs modules type_heaps var_heap cs
+	  		= checkMemberTypes module_index opt_icl_info com_member_defs com_type_defs com_class_defs modules type_heaps var_heap cs
 // AA..
 	  (com_generic_defs, com_class_defs, com_type_defs, modules, type_heaps, cs)
 			= checkGenerics 0 module_index common.com_generic_defs com_class_defs com_type_defs modules type_heaps cs
@@ -1092,7 +1107,7 @@ renumber_icl_definitions_as_dcl_definitions _ icl_decl_symbols modules cdefs icl
 combineDclAndIclModule :: ModuleKind *{#DclModule} [Declaration] (CollectedDefinitions a b) *{#Int} *CheckState
 	-> (!CopiedDefinitions, !*{#DclModule}, ![Declaration], !CollectedDefinitions a b, !*{#Int}, !*CheckState);
 combineDclAndIclModule MK_Main modules icl_decl_symbols icl_definitions icl_sizes cs
-	= ({ copied_type_defs = [], copied_class_defs = [] }, modules, icl_decl_symbols, icl_definitions, icl_sizes, cs)
+	= ({ copied_type_defs = {}, copied_class_defs = {} }, modules, icl_decl_symbols, icl_definitions, icl_sizes, cs)
 combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
 	# (dcl_mod=:{dcl_declared={dcls_local},dcl_macros, dcl_sizes, dcl_common}, modules) =  modules![main_dcl_module_n]
@@ -1102,12 +1117,15 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 	  (moved_dcl_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local ([], { createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
             
-	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
-			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], { copied_type_defs = [], copied_class_defs = [] }, cs)
+	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
+			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], ([], []), cs)
 	  cs_symbol_table
 	  		= removeDeclarationsFromSymbolTable icl_decl_symbols cGlobalScope cs.cs_symbol_table
-
-	=	( copied_defs
+	# n_dcl_classes		= dcl_sizes.[cClassDefs]
+	# n_dcl_types		= dcl_sizes.[cTypeDefs]
+	# copied_type_defs	= mark_copied_definitions n_dcl_types	cop_td_indexes
+	# copied_class_defs	= mark_copied_definitions n_dcl_classes	cop_cd_indexes
+	=	( { copied_type_defs = copied_type_defs, copied_class_defs = copied_class_defs }
 		, { modules & [main_dcl_module_n] = { dcl_mod & dcl_conversions = Yes conversion_table }}
 		, icl_decl_symbols
 		, { icl_definitions
@@ -1122,6 +1140,14 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		, { cs & cs_symbol_table = cs_symbol_table }
 		)
 where
+
+	mark_copied_definitions :: !Int ![Index] -> *{# Bool}
+	mark_copied_definitions nr_of_defs not_to_be_checked
+		# marks = createArray nr_of_defs False
+		= foldSt mark_def not_to_be_checked marks
+	where
+		mark_def index marks = { marks & [index] = True }
+		
 	add_to_conversion_table first_macro_index dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
 			(moved_dcl_defs, conversion_table, icl_sizes, icl_defs, cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
@@ -1170,11 +1196,11 @@ where
 			)
 	
 	add_dcl_definition {com_type_defs} dcl=:(Declaration {decl_kind = STE_Type, decl_index})
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs=:{copied_type_defs}, cs)
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
 		# type_def = com_type_defs.[decl_index]
 		  (new_type_defs, cs) = add_type_def type_def new_type_defs cs
-		  copied_defs = { copied_defs & copied_type_defs = [decl_index : copied_type_defs] } 
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
+		  cop_td_indexes = [decl_index : cop_td_indexes] 
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
 	where
 		add_type_def td=:{td_pos, td_rhs = AlgType conses} new_type_defs cs
 			# (conses, cs) = mapSt (redirect_defined_symbol STE_Constructor td_pos) conses cs
@@ -1213,11 +1239,11 @@ where
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
 		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[decl_index] : new_selector_defs ], new_member_defs, new_generic_defs, copied_defs, cs)
 	add_dcl_definition {com_class_defs} dcl=:(Declaration {decl_kind = STE_Class, decl_index, decl_pos})
-			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs=:{copied_class_defs}, cs)
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
 		# class_def = com_class_defs.[decl_index]
-		  copied_defs = { copied_defs & copied_class_defs = [decl_index : copied_class_defs] } 
+		  cop_cd_indexes = [decl_index : cop_cd_indexes] 
 		  (new_class_defs, cs) = add_class_def decl_pos class_def new_class_defs cs
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, cs)
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes), cs)
 	  where
 		add_class_def decl_pos cd=:{class_members} new_class_defs cs
 			# (new_class_members, cs) = mapSt (redirect_defined_symbol STE_Member decl_pos) [ cm \\ cm<-:class_members ] cs
@@ -1589,10 +1615,9 @@ checkModule :: !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional Scanned
 	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache 
 	optional_dcl_mod scanned_modules dcl_modules functions_and_macros predef_symbols symbol_table err_file heaps
-//	| False--->("checkModule", m.mod_name)
-//		= undef
+	# nr_of_cached_modules = size dcl_modules
 	# (optional_pre_def_mod,predef_symbols)
-		= case size dcl_modules of
+		= case nr_of_cached_modules of
 			0	# (predef_mod,predef_symbols) = buildPredefinedModule predef_symbols
 				-> (Yes predef_mod,predef_symbols)
 			_	-> (No,predef_symbols)
@@ -1600,8 +1625,7 @@ checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_m
 		= check_module1 m icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules functions_and_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# icl_instance_range = {ir_from = first_inst_index, ir_to = nr_of_functions}
 	
-	// llslsls CheckState
-	= check_module2 mod_name m.mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
+	= check_module2 mod_name m.mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_cached_modules nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 
 check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs} icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules functions_and_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
@@ -1620,17 +1644,19 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 	  (icl_functions, sizes_and_local_defs) = collectGlobalFunctions cFunctionDefs icl_global_function_range.ir_from icl_global_function_range.ir_to icl_functions sizes_and_local_defs
 	  (icl_functions, (sizes, local_defs)) = collectMacros cdefs.def_macros icl_functions sizes_and_local_defs
 
-	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache (size dcl_modules)
+	# nr_of_cached_modules = size dcl_modules
+
+	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache nr_of_cached_modules
 	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n}}
 
-	  (scanned_modules, icl_functions, cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules (size dcl_modules) icl_functions cs
+	  (scanned_modules, icl_functions, cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules nr_of_cached_modules icl_functions cs
 
-	  init_new_dcl_modules = gimme_a_strict_array_type { initialDclModule scanned_module module_n \\ scanned_module <- scanned_modules & module_n<-[size dcl_modules..]}
+	  init_new_dcl_modules = gimme_a_strict_array_type { initialDclModule scanned_module module_n \\ scanned_module <- scanned_modules & module_n<-[nr_of_cached_modules..]}
 			
-	  init_dcl_modules = {	if (i<size dcl_modules) 
+	  init_dcl_modules = {	if (i<nr_of_cached_modules) 
 	  							dcl_modules.[i]
-		  						init_new_dcl_modules.[i-size dcl_modules] 
-	  						\\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
+		  						init_new_dcl_modules.[i-nr_of_cached_modules] 
+	  						\\ i<-[0..nr_of_cached_modules+size init_new_dcl_modules-1]}
 	= (mod_name,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,local_defs,icl_functions,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 
 	where
@@ -1769,12 +1795,12 @@ add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n 
 			# dcl_modules = {dcl_modules & [main_dcl_module_n].dcl_conversions=Yes conversion_table}
 			-> dcl_modules
 
-check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int 
+check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int !Int 
 				(Optional (Module a)) [Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState 
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!Optional {#Int},!.{#FunDef},!Int,!.Heaps,!.{#PredefinedSymbol},
 				!.Heap SymbolTableEntry,!.File,[String]);
-check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
+check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_cached_modules nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 	  (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
 	  (copied_dcl_defs, dcl_modules, local_defs, cdefs, icl_sizes, cs)
@@ -1858,7 +1884,7 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 	  (local_defs,dcl_modules,cs ) = replace_icl_macros_by_dcl_macros mod_type cdefs.def_macros local_defs dcl_modules cs 
 	   
 	  (icl_common, dcl_modules, hp_type_heaps, hp_var_heap, cs)
-	  		= checkCommonDefinitions cIsNotADclModule main_dcl_module_n icl_common dcl_modules heaps.hp_type_heaps heaps.hp_var_heap cs
+	  		= checkCommonDefinitions (Yes (copied_dcl_defs, nr_of_cached_modules)) main_dcl_module_n icl_common dcl_modules heaps.hp_type_heaps heaps.hp_var_heap cs
 /*	  
 	  (unexpanded_icl_type_defs, icl_common)
 	  		= copy_com_type_defs icl_common
@@ -2634,7 +2660,7 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 	#! main_dcl_module_n = cs.cs_x.x_main_dcl_module_n
 
 	# (dcl_common, modules, hp_type_heaps, hp_var_heap, cs)
-	  		= checkCommonDefinitions cIsADclModule mod_index dcl_common modules hp_type_heaps hp_var_heap cs
+	  		= checkCommonDefinitions No mod_index dcl_common modules hp_type_heaps hp_var_heap cs
 	  heaps
 	  		= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap, hp_expression_heap=hp_expression_heap}
 	| not cs.cs_error.ea_ok

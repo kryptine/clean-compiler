@@ -499,7 +499,7 @@ freshCopyOfAttributeVar {av_name,av_info_ptr} attr_var_heap
 		AVI_Attr attr
 			-> (attr, attr_var_heap)
 		_
-			-> abort ("freshCopyOfAttributeVar (type,icl)" ---> av_name)
+			-> abort ("freshCopyOfAttributeVar (type,icl)" ---> (av_name,av_info_ptr))
 
 
 freshCopyOfTypeAttribute (TA_Var avar) attr_var_heap
@@ -586,8 +586,9 @@ where
 		# (exi_attr_vars, attr_store, th_attrs) = fresh_existential_attribute atv_attribute (exi_attr_vars, attr_store, th_attrs)
 		= (exi_attr_vars, var_store, attr_store, { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
 
-	fresh_existential_attribute (TA_Var {av_info_ptr}) (exi_attr_vars, attr_store, attr_heap)
+	fresh_existential_attribute (TA_Var {av_name,av_info_ptr}) (exi_attr_vars, attr_store, attr_heap)
 		= ([ attr_store : exi_attr_vars ], inc attr_store, attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)))
+//			---> ("fresh_existential_attribute", av_info_ptr,av_name)
 	fresh_existential_attribute attr state
 		= state
 	
@@ -645,8 +646,9 @@ freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_s
 //		---> ("freshAlgebraicType", alg_type, cons_types)
 where
 	fresh_symbol_types [{ap_symbol={glob_object},ap_expr}] cons_defs var_store attr_store type_heaps all_exis_variables
-		# {cons_type = {st_args,st_attr_env,st_result}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
+		# {cons_type = ct=:{st_args,st_attr_env,st_result}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
 		  (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
+//		  	-?-> (not (isEmpty cons_exi_vars), ("fresh_symbol_types", cons_exi_vars, ct))
 	  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
 	  	  (result_type, type_heaps)	= freshCopy st_result { type_heaps & th_attrs = th_attrs }
 	  	  (fresh_args, type_heaps)	= freshCopy st_args type_heaps
@@ -655,8 +657,9 @@ where
 	fresh_symbol_types [{ap_symbol={glob_object},ap_expr} : patterns] cons_defs var_store attr_store type_heaps all_exis_variables
 		# (cons_types, result_type, attr_env, var_store, attr_store, type_heaps, all_exis_variables)
 				= fresh_symbol_types patterns cons_defs var_store attr_store type_heaps all_exis_variables
-		  {cons_type = {st_args,st_attr_env}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
+		  {cons_type = ct=:{st_args,st_attr_env}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
 		  (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
+//		  	-?-> (not (isEmpty cons_exi_vars), ("fresh_symbol_types", cons_exi_vars, ct))
 		  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
 	  	  (fresh_args, type_heaps) 	= freshCopy st_args { type_heaps & th_attrs = th_attrs }
 	  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
@@ -1037,8 +1040,9 @@ determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr
 			-> currySymbolType copy_symb_type act_arity ts
 
 standardFieldSelectorType pos {glob_object={ds_ident,ds_index},glob_module} {ti_common_defs} ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
-	# {sd_type,sd_exi_vars} = ti_common_defs.[glob_module].com_selector_defs.[ds_index]
+	# (st=:{sd_type,sd_exi_vars}) = ti_common_defs.[glob_module].com_selector_defs.[ds_index]
 	  (new_exis_variables, ts_var_store, ts_attr_store, ts_type_heaps) = freshExistentialVariables sd_exi_vars ts_var_store ts_attr_store ts_type_heaps
+//		  	-?-> (not (isEmpty sd_exi_vars), ("standardFieldSelectorType", sd_exi_vars, st))
 	  ts_exis_variables = addToExistentialVariables pos new_exis_variables ts_exis_variables
 	  ts = { ts & ts_type_heaps = ts_type_heaps, ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_exis_variables = ts_exis_variables }
 	= freshSymbolType (Yes pos) cWithFreshContextVars sd_type ti_common_defs ts
@@ -1049,15 +1053,26 @@ standardTupleSelectorType pos {ds_index} arg_nr {ti_common_defs} ts
 	= freshSymbolType (Yes pos) cWithFreshContextVars { cons_type & st_args = [cons_type.st_result], st_result = cons_type.st_args !! arg_nr } ti_common_defs ts
 
 standardRhsConstructorType pos index mod arity {ti_common_defs} ts
-	#! {cons_symb, cons_type, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
-	# cons_type = { cons_type & st_vars = mapAppend (\{atv_variable} -> atv_variable) cons_exi_vars cons_type.st_vars }
+	# {cons_symb, cons_type=ct=:{st_vars,st_attr_vars}, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
+	  (st_vars, st_attr_vars) = foldSt add_vars_and_attr cons_exi_vars (st_vars, st_attr_vars)
+	  cons_type = { ct & st_vars = st_vars, st_attr_vars = st_attr_vars }
 	  (fresh_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars cons_type ti_common_defs ts
 	= currySymbolType fresh_type arity ts
+where
+	add_vars_and_attr {atv_variable, atv_attribute} (type_variables, attr_variables)
+		= ([ atv_variable : type_variables ], add_attr_var atv_attribute attr_variables)
+	
+	add_attr_var (TA_Var avar) attr_variables
+		= [ avar : attr_variables ]
+	add_attr_var attr attr_variables
+		= attr_variables
+	
 //		 ---> ("standardRhsConstructorType", cons_symb, fresh_type)
 
 standardLhsConstructorType pos index mod arity {ti_common_defs} ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
 	# {cons_symb, cons_type, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
 	  (new_exis_variables, ts_var_store, ts_attr_store, ts_type_heaps) = freshExistentialVariables cons_exi_vars ts_var_store ts_attr_store ts_type_heaps
+//	  	-?-> (not (isEmpty cons_exi_vars), ("standardLhsConstructorType", cons_exi_vars, cons_type))
 	  ts_exis_variables = addToExistentialVariables pos new_exis_variables ts_exis_variables
 	  ts = { ts & ts_type_heaps = ts_type_heaps, ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_exis_variables = ts_exis_variables }
 	= freshSymbolType No cWithFreshContextVars cons_type ti_common_defs ts
@@ -2521,6 +2536,10 @@ getPositionOfExpr expr var_heap
 	= (CP_Expression expr, var_heap)
 
 empty_id =: { id_name = "", id_info = nilPtr }
+
+instance <<< (Ptr a)
+where
+	(<<<) file ptr = file <<< ptrToInt ptr
 
 instance <<< AttrCoercion
 where

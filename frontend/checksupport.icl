@@ -17,9 +17,6 @@ cModuleScope	:== 0
 cGlobalScope	:== 1
 cRankTwoScope	:== 2
 
-cIsNotADclModule 	:== False
-cIsADclModule 		:== True
-
 cNeedStdArray	:== 1
 cNeedStdEnum	:== 2
 cNeedStdDynamic :== 4
@@ -97,8 +94,8 @@ where
 	}
 
 ::	CopiedDefinitions =
-	{	copied_type_defs	:: [Index]
-	,	copied_class_defs	:: [Index]
+	{	copied_type_defs	:: {#Bool}
+	,	copied_class_defs	:: {#Bool}
 	}
 	
 ::	IclModule  =
