@@ -263,18 +263,19 @@ where
 		# (VI_Occurrence var_occ=:{occ_bind,occ_ref_count}, var_heap) = readPtr var_info_ptr var_heap
 		= case occ_bind of
 			OB_Empty
-		  		# (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
-				-> ref_mark_of_algebraic_case_with_variable_pattern var_info_ptr var_expr_ptr var_occ free_vars sel local_lets patterns defaul var_heap
-			_
-				-> ref_mark_of_algebraic_case_with_non_variable_pattern free_vars sel expr patterns defaul var_heap
+				-> ref_mark_of_algebraic_case_with_variable_pattern False var_info_ptr var_expr_ptr var_occ free_vars sel patterns defaul var_heap
+			OB_OpenLet let_expr
+				# var_heap = var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count, occ_bind = OB_LockedLet let_expr })
+				  var_heap = refMark free_vars sel let_expr var_heap
+				-> ref_mark_of_algebraic_case_with_variable_pattern True var_info_ptr var_expr_ptr var_occ free_vars sel patterns defaul var_heap
+			OB_LockedLet _
+				-> ref_mark_of_algebraic_case_with_variable_pattern True var_info_ptr var_expr_ptr var_occ free_vars sel patterns defaul var_heap
 	ref_mark_of_algebraic_case free_vars sel expr patterns defaul var_heap
 		= ref_mark_of_algebraic_case_with_non_variable_pattern free_vars sel expr patterns defaul var_heap
 
-	ref_mark_of_algebraic_case_with_variable_pattern var_info_ptr var_expr_ptr {occ_ref_count = RC_Unused}
-					free_vars sel local_lets patterns case_default var_heap
-		# (_, pattern_depth, used_lets, var_heap)
-				= foldSt (ref_mark_of_algebraic_pattern free_vars sel (Yes var_info_ptr) local_lets) patterns (False, 0, [], var_heap)		
-		  var_heap = refMarkOfDefault False pattern_depth free_vars sel case_default used_lets var_heap
+	ref_mark_of_algebraic_case_with_variable_pattern with_composite_pattern var_info_ptr var_expr_ptr {occ_ref_count = RC_Unused}
+					free_vars sel patterns case_default var_heap
+		# var_heap = ref_mark_of_patterns with_composite_pattern free_vars sel (Yes var_info_ptr) patterns case_default var_heap
 		  (VI_Occurrence var_occ, var_heap) = readPtr var_info_ptr var_heap
 		= case var_occ.occ_ref_count of
 				RC_Unused
@@ -283,21 +284,22 @@ where
 				RC_Used rcu
 					-> var_heap <:= (var_info_ptr, VI_Occurrence { var_occ &
 								occ_ref_count = RC_Used { rcu & rcu_uniquely = [var_expr_ptr : rcu.rcu_uniquely] }})					
-	ref_mark_of_algebraic_case_with_variable_pattern var_info_ptr var_expr_ptr var_occ=:{occ_ref_count = RC_Used {rcu_multiply,rcu_uniquely,rcu_selectively}}
-					free_vars sel local_lets patterns case_default var_heap
+	ref_mark_of_algebraic_case_with_variable_pattern with_composite_pattern var_info_ptr var_expr_ptr
+			var_occ=:{occ_ref_count = RC_Used {rcu_multiply,rcu_uniquely,rcu_selectively}} free_vars sel patterns case_default var_heap
 		# var_occ = { var_occ & occ_ref_count = RC_Used { rcu_multiply = collectAllSelections rcu_selectively (rcu_uniquely ++ [var_expr_ptr : rcu_multiply]),
 														  rcu_uniquely = [], rcu_selectively = [] }}
 		  var_heap = var_heap <:= (var_info_ptr, VI_Occurrence var_occ )
-		  (with_pattern_bindings, pattern_depth, used_lets, var_heap)
-			= foldSt (ref_mark_of_algebraic_pattern free_vars sel (Yes var_info_ptr) local_lets) patterns (False, 0, [], var_heap)		
-		= refMarkOfDefault False pattern_depth free_vars sel case_default used_lets var_heap
+		= ref_mark_of_patterns with_composite_pattern free_vars sel (Yes var_info_ptr) patterns case_default var_heap
 
 	ref_mark_of_algebraic_case_with_non_variable_pattern free_vars sel expr patterns case_default var_heap
 		# var_heap = refMark free_vars NotASelector expr var_heap
-		  (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
+		= ref_mark_of_patterns True free_vars sel No patterns case_default var_heap
+
+	ref_mark_of_patterns with_composite_pattern free_vars sel opt_pattern_var patterns case_default var_heap
+		# (local_lets, var_heap) = collectLocalLetVars free_vars var_heap
 		  (with_pattern_bindings, pattern_depth, used_lets, var_heap)
 			= foldSt (ref_mark_of_algebraic_pattern free_vars sel No local_lets) patterns (False, 0, [], var_heap)		
-		= refMarkOfDefault with_pattern_bindings pattern_depth free_vars sel case_default used_lets var_heap
+		= refMarkOfDefault (with_composite_pattern && with_pattern_bindings) pattern_depth free_vars sel case_default used_lets var_heap
 
 	ref_mark_of_algebraic_pattern free_vars sel opt_pattern_var local_lets {ap_vars,ap_expr}
 					(with_pattern_bindings, pattern_depth, used_lets, var_heap) 
