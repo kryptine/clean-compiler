@@ -106,7 +106,11 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void);
 extern int next_update_function_n,next_match_function_n;
 
 extern ImpRuleS *first_update_function,**update_function_p;
-extern SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node);
+extern SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+	,int unbox_record
+#endif
+);
 #if U_RECORD_SELECTORS
 extern SymbDef create_select_function (Symbol selector_symbol,int selector_kind);
 #endif
