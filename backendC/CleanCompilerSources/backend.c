@@ -198,26 +198,35 @@ PredefinedSymbol (SymbKind symbolKind, int arity)
 } /* PredefinedSymbol */
 
 static SymbolP
-AllocateSymbols (int nSymbols, SymbolP otherSymbols)
+AllocateSymbols (int nTypeRecordAndConstructorSymbols,int nFieldSymbols, SymbolP allSymbols)
 {
-	int		i;
-	SymbolP	symbols;
+	int	nSymbols;
 
-	if (nSymbols > 0)
-	{
-		symbols	= (SymbolP) ConvertAlloc (nSymbols * sizeof (SymbolS));
+	nSymbols=nTypeRecordAndConstructorSymbols+nFieldSymbols;
 	
-		for (i = 0; i < nSymbols; i++)
-		{
+	if (nSymbols > 0){
+		int i;
+		SymbolP	symbols;
+
+		symbols	= (SymbolP) ConvertAlloc (nSymbols * sizeof (SymbolS));
+
+		for (i = 0; i < nTypeRecordAndConstructorSymbols; i++){
 			symbols [i].symb_kind	= erroneous_symb;
 			symbols [i].symb_next	= &symbols [i+1];
 		}
-		symbols [nSymbols-1].symb_next	= otherSymbols;
+		
+		if (nTypeRecordAndConstructorSymbols>0){
+			symbols [nTypeRecordAndConstructorSymbols-1].symb_next	= allSymbols;
+			allSymbols=symbols;
+		}
+		
+		for (i = nTypeRecordAndConstructorSymbols; i < nSymbols; i++){
+			symbols [i].symb_kind	= erroneous_symb;
+			symbols [i].symb_next	= NULL;
+		}
 	}
-	else
-		symbols	= otherSymbols;
 
-	return (symbols);
+	return (allSymbols);
 } /* AllocateSymbols */
 
 static void
@@ -288,7 +297,6 @@ NewGuardNode (NodeP ifNode, NodeP node, NodeDefP nodeDefs, StrictNodeIdP stricts
 	return (guardNode);
 } /* NewGuardNode */
 
-
 static void
 DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 											int nTypes, int nConstructors, int nFields)
@@ -298,7 +306,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 
 	allSymbols	= gBEState.be_allSymbols;
 
-	allSymbols	= AllocateSymbols (nFunctions + nTypes + nConstructors + nFields, allSymbols);
+	allSymbols	= AllocateSymbols (nFunctions + nTypes + nConstructors, nFields, allSymbols);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -333,6 +341,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 			SymbDef	newSymbDef;
 
 			newSymbDef	= ConvertAllocType (SymbDefS);
+			newSymbDef->sdef_mark		= 0;
 			newSymbDef->sdef_isused	= False;
 			symbols [i].symb_def	= newSymbDef;
 		}
@@ -747,6 +756,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			newsdef->sdef_ident			= newIdent;
 			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name->symb_def->sdef_module; /* phew! */
 			newsdef->sdef_over_arity	= 0;
+			newsdef->sdef_mark		= 0;
 			newsdef->sdef_isused		= True;
 			newsdef->sdef_exported		= False;
 			newsdef->sdef_arity			= newTypeAlt->type_alt_lhs->type_node_arity;
@@ -2578,6 +2588,7 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 	newSymbDef->sdef_line		= 0;	/* used in PrintSymbolOfIdent */
 
@@ -2676,6 +2687,7 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_kind		= NEWDEFINITION;
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_dcl_icl	= NULL;
+	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 
 	newSymbDef->sdef_module		= module->bem_name;
@@ -2955,6 +2967,7 @@ BEDeclareField (int fieldIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 
 	fields [fieldIndex].symb_kind	= definition;
@@ -3038,6 +3051,7 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 	newSymbDef->sdef_no_sa		= False;
 
