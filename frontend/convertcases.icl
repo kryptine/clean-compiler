@@ -1256,7 +1256,7 @@ instance convertRootCases Expression where
 			_
 				-> case case_expr of
 					(Var var)
-						| not case_explicit || (case ci.ci_case_level of
+						| not case_explicit && (case ci.ci_case_level of
 													CaseLevelAfterGuardRoot -> False 
 													_ -> True)
 							# (varInfo, cs_var_heap) = readPtr var.var_info_ptr cs.cs_var_heap
@@ -1645,10 +1645,7 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 	| is_degenerate
 		# (EI_CaseTypeAndSplits case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
 		  cs = { cs & cs_expr_heap = cs_expr_heap }
-		
-// test ...
-		  (defoult, cs) = convertRootCases ci defoult cs
-// ... test
+		  (defoult, cs) = convertRootCases {ci & ci_case_level=CaseLevelRoot} defoult cs
 		  (act_vars, form_vars, local_vars, caseExpr, old_fv_info_ptr_values,cs_var_heap)
 				= copy_case_expr ci_bound_vars (defoult) cs.cs_var_heap
 	
@@ -1685,9 +1682,7 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 
 	  (case_expr, cs) = convertCases ci case_expr cs
 
-// test ...
-	  (caseExpr, cs) = convertRootCases ci (Case kees) cs
-// ... test
+	  (caseExpr, cs) = convertRootCases {ci & ci_case_level=CaseLevelRoot} (Case kees) cs
 	  (act_vars, form_vars, local_vars, caseExpr, old_fv_info_ptr_values,cs_var_heap)
 			= copy_case_expr ci_bound_vars caseExpr cs.cs_var_heap
 
