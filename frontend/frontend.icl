@@ -4,7 +4,7 @@
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
-		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics1
+		convertimportedtypes, compilerSwitches, analtypes, generics1
 
 //import coredump
 
@@ -39,8 +39,9 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	| not ok
 		= (No,{},{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
+	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, files)
-		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics hash_table error search_paths modtimefunction files
+		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
 	/* JVG: */
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
@@ -99,11 +100,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			= partionateAndExpandTypes icl_used_module_numbers main_dcl_module_n icl_common dcl_mods type_heaps error_admin
 	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
 	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
-/*
-	  (fun_defs, dcl_mods, th_vars, td_infos, error_admin) 
-      		= checkKindCorrectness main_dcl_module_n nr_of_cached_functions_and_macros icl_instances ti_common_defs n_cached_dcl_modules fun_defs dcl_mods type_heaps.th_vars td_infos error_admin
-*/
-	  (class_infos, td_infos, th_vars, error_admin)
+	# (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
 	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)
 			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers icl_global_functions
