@@ -50,7 +50,7 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
   #  logfile = logfile <<< "Start fullsymred." <<< nl
   #  symredresults = fullsymred fresh_symbols sucl_module
   #  logfile = sfoldl (<<<) (logfile<<<"All symredresults before macro expansion" <<< nl) symredresults
-  #  symredresults = expand_macros suclheap (flip isMember (exports sucl_module)) symredresults
+  #  symredresults = expand_macros toString toString suclheap (flip isMember (exports sucl_module)) symredresults
   #  logfile = sfoldl (<<<) (logfile<<<"All symredresults after macro expansion" <<< nl) symredresults
   #  n_symredresults = length symredresults
   #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl

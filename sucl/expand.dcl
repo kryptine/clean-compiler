@@ -10,6 +10,7 @@ from trace import Trace,Transformation
 from spine import Answer,Spine,Subspine
 from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
+from cleanversion import String
 from general import Optional
 
 /*
@@ -48,6 +49,8 @@ from general import Optional
 :: Reference sym = Reference Bool sym sym
 
 expand_macros ::
+    (sym->String)
+    (var->String)
     [var]                               // Heap of node-ids for rule expansion
     (sym->Bool)                         // Whether the function is exported.
     [Symredresult sym var tsym tvar]    // Symbolic reduction results of all functions

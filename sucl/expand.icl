@@ -86,7 +86,13 @@ mstub = stub "expand"
 
 :: Reference sym = Reference Bool sym sym
 
+showreference :: (sym->String) (Reference sym) -> String
+showreference showsym (Reference cyclecand fromsym tosym)
+= "(Reference "+++toString cyclecand+++" "+++showsym fromsym+++" "+++showsym tosym+++")"
+
 expand_macros ::
+    (sym->String)
+    (var->String)
     [var]                               // Heap of variables for the expanded graphs
     (sym->Bool)                         // Whether the function is exported.
     [Symredresult sym var tsym tvar]    // Symbolic reduction results of all functions
@@ -94,8 +100,13 @@ expand_macros ::
  |  == sym
  &  == var
 
-expand_macros heap exported srrs
-= result
+expand_macros showsym showvar heap exported srrs
+= (((((result <--- ("expand.expand_macros.references_to is "+++showlist (showreference showsym) references)
+      )       <--- ("expand.expand_macros.cycle_candidates is "+++showlist (showpair showsym (showlist showsym)) cycle_candidates)
+     )        <--- ("expand.expand_macros.recursiveness is "+++showlist (showpair showsym toString) recursiveness)
+    )         <--- ("expand.expand_macros.expandable_table is "+++showlist (showpair showsym toString) expandable_table)
+   )          <--- ("expand.expand_macros.references_to is "+++showlist (showpair showsym (showlist showsym)) references_to)
+  )           <--- ("expand.expand_macros.finalruletable is "+++showlist (showpair showsym (showrule showsym showvar)) finalruletable)
   where
 
         // Collect references
@@ -119,6 +130,8 @@ expand_macros heap exported srrs
         = foldmap (localfn_expandable sym) False recursiveness sym
         localfn_expandable sym recursive
         = not (recursive && reference_count sym>1)
+        expandable_table = map isexp recursiveness
+                            where isexp (sym,recursive) = (sym,localfn_expandable sym recursive)
 
         result = map (expandone heap getrule) srrs
         getrule = foldmap Yes No finalruletable
