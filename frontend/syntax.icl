@@ -500,9 +500,14 @@ cIsALocalVar	:== False
 	{	cc_size			::!Int
 	,	cc_args			::![ConsClass]
 	,	cc_linear_bits	::![Bool]
+	,	cc_producer		::!ProdClass
 	}
 					
 ::	ConsClass	:== Int
+
+::	ProdClass	:== Bool
+
+pIsSafe			:== True
 
 ::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
 
@@ -627,7 +632,7 @@ cNotVarNumber :== -1
 ::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Index
 				| PR_Class !App ![(BoundVar, Type)] !Type
-//				| PR_Constructor !SymbIdent ![Expression]
+				| PR_Constructor !SymbIdent ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Index
 				| PR_Curried !SymbIdent
 
@@ -1735,6 +1740,7 @@ where
 	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
 	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< " = " <<< tb_rhs <<< '\n'
 	(<<<) file (BackendBody body) = file <<< body <<< '\n'
+	(<<<) file (Expanding vars) = file <<< "E " <<< vars 
 	(<<<) file NoBody = file <<< "Array function\n"
 
 instance <<< FunCall

@@ -507,9 +507,14 @@ cIsALocalVar	:== False
 	{	cc_size			::!Int
 	,	cc_args			::![ConsClass]
 	,	cc_linear_bits	::![Bool]
+	,	cc_producer		::!ProdClass
 	}
 					
 ::	ConsClass	:== Int
+
+::	ProdClass	:== Bool
+
+pIsSafe			:== True
 
 ::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
 
@@ -639,7 +644,7 @@ cNonRecursiveAppl	:== False
 ::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Index
 				| PR_Class !App ![(BoundVar, Type)] !Type
-//				| PR_Constructor !SymbIdent ![Expression]
+				| PR_Constructor !SymbIdent ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Index
 				| PR_Curried !SymbIdent
 

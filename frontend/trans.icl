@@ -548,7 +548,7 @@ analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdSt
 	   nr_of_groups = size groups
 	# consumerAnalysisRO=ConsumerAnalysisRO {common_defs=common_defs,imported_funs=imported_funs,main_dcl_module_n=main_dcl_module_n,stdStrictLists_module_n=stdStrictLists_module_n}
 	= iFoldSt (analyse_group consumerAnalysisRO) 0 nr_of_groups
-				([], createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = []}, groups, fun_defs, var_heap, expr_heap)
+				([], createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = [], cc_producer=False}, groups, fun_defs, var_heap, expr_heap)
 where	
 	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 		# ({group_members}, groups) = groups![group_nr]
@@ -602,7 +602,7 @@ where
 		#  (TransformedBody {tb_args}) = fun_def.fun_body
 		   (fresh_vars, next_var_number, var_heap) = fresh_variables tb_args 0 next_var_number var_heap
 		= initial_cons_class funs next_var_number (length fun_def.fun_info.fi_local_vars + nr_of_local_vars) var_heap
-			{ class_env & [fun] = { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[]}} fun_defs
+			{ class_env & [fun] = { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}} fun_defs
 	initial_cons_class [] next_var_number nr_of_local_vars var_heap class_env fun_defs
 		= (next_var_number, nr_of_local_vars, var_heap, class_env, fun_defs)
 		
@@ -1143,7 +1143,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		# cc_args_from_outer_fun = [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
 		  cc_linear_bits_from_outer_fun = [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
 		  new_cons_args = { cc_size	= fun_arity, cc_args = repeatn nr_of_lifted_vars cPassive++cc_args_from_outer_fun,
-							cc_linear_bits = repeatn nr_of_lifted_vars False++cc_linear_bits_from_outer_fun }
+							cc_linear_bits = repeatn nr_of_lifted_vars False++cc_linear_bits_from_outer_fun, cc_producer = False}
 		  gf = { gf_fun_def = fun_def, gf_instance_info = II_Empty, gf_cons_args = new_cons_args, gf_fun_index = fun_index}
 		  ti_fun_heap = writePtr fun_info_ptr (FI_Function gf) ti.ti_fun_heap
 		  ti = { ti & ti_new_functions = [fun_info_ptr:ti.ti_new_functions], ti_var_heap = ti_var_heap, ti_fun_heap = ti_fun_heap,
@@ -1537,9 +1537,11 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  new_fd_expanding 
 	  		= { fd & fun_body = Expanding new_fun_args, fun_arity = fun_arity,fun_type=new_fun_type, 
 	  					fun_info.fi_group_index = fi_group_index}
+	  new_fd_cons_args
+	  		= {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits, cc_producer = False}
 	  new_gen_fd
 	  		= { gf_fun_def = new_fd_expanding,	gf_instance_info = II_Empty, gf_fun_index = ti_next_fun_nr,
-				 gf_cons_args = {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits} }
+				 gf_cons_args = new_fd_cons_args }
 	  ti_fun_heap
 	  		= writePtr fun_def_ptr (FI_Function new_gen_fd) ti_fun_heap
 	  (subst, _)
@@ -1573,7 +1575,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 				}
 	  ti_trace
 	  		=False
-	| ti_trace && (False--->("transforming new function:",tb_rhs))
+	| False -!-> ("transforming new function:",tb_rhs)
 		= undef
 	# ti
 			= { ti & ti_var_heap = us_var_heap, ti_fun_heap = ti_fun_heap, ti_symbol_heap = us_symbol_heap,
@@ -1584,9 +1586,27 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 			= transform tb_rhs ro ti
 	  new_fd
 	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
-//	| (False--->("generated function", new_fd, new_cons_args))
-//		= undef
-	= (ti_next_fun_nr, fun_arity, { ti & ti_fun_heap = ti.ti_fun_heap <:= (fun_def_ptr, FI_Function { new_gen_fd & gf_fun_def = new_fd })})
+	| False -!-> ("generated function", new_fd, new_cons_args)
+		= undef
+// DvA...
+	# fun_heap = ti.ti_fun_heap
+	// producer requirements for generated function here...
+	#! prs	=
+		{ prs_group				= [dec ti_next_fun_nr]
+		, prs_cons_args 		= ti.ti_cons_args
+		, prs_main_dcl_module_n	= ro.ro_main_dcl_module_n
+		, prs_fun_heap			= fun_heap
+		}
+	# (safe,prs)	= producerRequirements new_fun_rhs prs
+	# fun_heap = prs.prs_fun_heap
+	// put back prs info into ti?
+// ...DvA
+	# new_gen_fd = { new_gen_fd & gf_fun_def = new_fd, gf_cons_args = {new_fd_cons_args & cc_producer = safe}}
+	# ti =
+		{ ti
+		& ti_fun_heap = fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
+		}
+	= (ti_next_fun_nr, fun_arity, ti)
 where
 	is_dictionary {at_type=TA {type_index} _} es_td_infos
 		= type_index.glob_object>=size es_td_infos.[type_index.glob_module]
@@ -1764,11 +1784,13 @@ where
 					Yes cons_classes
 						-> ({ cc_size = symb_arity, cc_args = take symb_arity cons_classes.cc_args, 
 				  				cc_linear_bits = if curried (repeatn symb_arity linear_bit) 
-				  									(take symb_arity cons_classes.cc_linear_bits)}
+				  									(take symb_arity cons_classes.cc_linear_bits),
+				  				cc_producer = False}
 				  			, fun_heap)
 					No
 						-> ({cc_size = symb_arity, cc_args = repeatn symb_arity cPassive,
-								cc_linear_bits = repeatn symb_arity linear_bit}, fun_heap)
+								cc_linear_bits = repeatn symb_arity linear_bit,
+								cc_producer = False}, fun_heap)
 
 
  			get_fun_def (SK_Function {glob_module, glob_object}) main_dcl_module_n fun_defs fun_heap
@@ -2448,10 +2470,52 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 			# (ti_fun_defs, imported_types, collected_imports, ti_type_heaps, ti_var_heap) 
 					= foldSt (convert_function_type common_defs) group_members
 							(ti.ti_fun_defs, imported_types, collected_imports, ti.ti_type_heaps, ti.ti_var_heap)
-			= transform_groups (inc  group_nr) groups common_defs imported_funs imported_types collected_imports
-					(foldSt (transform_function common_defs imported_funs) group_members
-						{ ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap })
+			# ti = { ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap }
+			# ti = foldSt (transform_function common_defs imported_funs) group_members ti
+			# ti = reannotate_producers (group_members -!-> ("reannotate_producers",group_nr)) ti
+			= transform_groups (inc  group_nr) groups common_defs imported_funs imported_types collected_imports ti
 			= (groups, imported_types, collected_imports, ti)
+
+// DvA ...
+	reannotate_producers group_members ti
+		// determine if safe group
+		# (safe,ti) = safe_producers group_members group_members ti
+		| safe
+			// if safe mark all members as safe
+			= foldSt mark_producer_safe group_members ti
+		= ti
+	
+	safe_producers group_members [] ti
+		= (True,ti)
+	safe_producers group_members [fun:funs] ti
+		// look for occurrence of group_members in safe argument position of fun RHS
+		// i.e. linearity ok && ...
+		#! prs	=
+			{ prs_group				= group_members
+			, prs_cons_args 		= ti.ti_cons_args
+			, prs_main_dcl_module_n	= main_dcl_module_n
+			, prs_fun_heap			= ti.ti_fun_heap
+			}
+		# (fun_def, ti)	= ti!ti_fun_defs.[fun]
+		  {fun_body		= TransformedBody tb} = fun_def
+		  fun_body		= tb.tb_rhs
+		# (safe,prs)	= producerRequirements fun_body prs
+		// put back prs info into ti?
+		| safe -!-> ("producerRequirements",fun_def.fun_symb,safe)
+						= safe_producers group_members funs ti
+		= (safe,ti)
+	
+	mark_producer_safe fun ti
+		// update cc_prod for fun
+		// doesn't work with array update since that requires unique array?!
+		#!	ti_cons_args = {safe x fun tca \\ tca <-: ti.ti_cons_args & x <- [0..]}
+			ti = {ti & ti_cons_args = ti_cons_args}
+		= ti
+	where
+		safe x f t
+			| x ==f = {t & cc_producer = pIsSafe}
+					= t
+// ... DvA		
 
 	transform_function common_defs imported_funs fun ti=:{ti_fun_defs, ti_var_heap}
 		# (fun_def, ti_fun_defs) = ti_fun_defs![fun]
@@ -2965,3 +3029,199 @@ foldrExprSt f expr st :== foldr_expr_st expr st
 		= f lad st
 	foldr_expr_st sel=:(Selection a expr b) st
 		= f sel (foldr_expr_st expr st)
+
+:: *PRState =
+	{ prs_group				:: ![Int]
+	, prs_cons_args 		:: !{!ConsClasses}
+	, prs_main_dcl_module_n	:: !Int
+	, prs_fun_heap			:: !*FunctionHeap
+	}
+
+class producerRequirements a
+	:: !a !PRState -> (!Bool,!PRState)
+
+instance producerRequirements [a] | producerRequirements a where
+	producerRequirements [] prs
+		= (True,prs)
+	producerRequirements [x:xs] prs
+		# (safe,prs)	= producerRequirements x prs
+		| safe			= producerRequirements xs prs
+						= (safe,prs)
+
+instance producerRequirements Expression where
+	producerRequirements (Var var) prs
+		= (True,prs)
+	producerRequirements (App {app_symb={symb_kind=(SK_Constructor _)},app_args}) prs
+		= producerRequirements app_args prs
+	producerRequirements (App {app_symb,app_args}) prs
+		// look up consumer class for app_symb args
+		#! (maybe_ca,prs)	= retrieve_consumer_args app_symb prs
+		// need to check for recursive call in safe arg...
+		= case maybe_ca of
+			No			// assuming that for functions that have no consumer info no unfolding will occur
+						// note that this means that generated functions must be visible this way...
+						-> (True,prs)
+			Yes ca		// for each arg:
+						// if safe && top of arg is App of group member...
+						// else recurse into arg
+						-> check_app_arguments ca.cc_args ca.cc_linear_bits app_args prs
+	where
+		check_app_arguments [cc_arg:cc_args] [cc_linear_bit:cc_bits] [app_arg:app_args] prs
+			| cc_arg == cActive && cc_linear_bit
+				# (rec,prs)	= is_recursive_app app_arg prs
+				| rec		= (False,prs)
+				# (safe,prs)= producerRequirements app_arg prs
+				| safe		= check_app_arguments cc_args cc_bits app_args prs
+							= (safe,prs)
+			# (safe,prs)	= producerRequirements app_arg prs
+			| safe			= check_app_arguments cc_args cc_bits app_args prs
+							= (safe,prs)
+		check_app_arguments _ _ _ prs
+			= (True,prs)
+		
+		is_recursive_app (App {app_symb}) prs
+			// check if app_symb member of prs_group
+			# {symb_kind}	= app_symb
+			| is_SK_Function_or_SK_LocalMacroFunction symb_kind
+			#! main_dcl_module_n	= prs.prs_main_dcl_module_n
+			# { glob_module, glob_object }
+				= case symb_kind of
+					SK_Function global_index -> global_index
+					SK_LocalMacroFunction index -> { glob_module = main_dcl_module_n, glob_object = index }
+			| glob_module <> main_dcl_module_n
+				= (False,prs)
+			#! rec = isMember glob_object prs.prs_group
+			= (rec,prs)
+		is_recursive_app _ prs
+			= (False,prs)
+
+	producerRequirements (fun_expr @ exprs) prs
+		// recurse
+		# (safe,prs)	= producerRequirements fun_expr prs
+		| safe			= producerRequirements exprs prs
+						= (safe,prs)
+	producerRequirements (Let {let_strict_binds,let_lazy_binds,let_expr}) prs
+		// watch out for function shadowing by 'let' binds
+		// recurse into binding exprs
+		// continue with 'in' body
+		= (False,prs)
+	producerRequirements (Case {case_expr,case_guards,case_default,case_ident}) prs
+		// watch out for function shadowing by guards or case ident
+		// check case_expr
+		# (safe,prs)	= producerRequirements case_expr prs
+		| not safe		= (safe,prs)
+		// check case_guards
+		# (safe,prs)	= producerRequirements case_guards prs
+		| not safe		= (safe,prs)
+		// check case_default
+		# (safe,prs)	= producerRequirements case_default prs
+		| not safe		= (safe,prs)
+		= (True,prs)
+	producerRequirements (Selection _ _ _) prs
+		// ...
+		= (False,prs)
+	producerRequirements (Update _ _ _) prs
+		// ...
+		= (False,prs)
+	producerRequirements (RecordUpdate _ expr exprs) prs
+		// ...
+		# (safe,prs)	= producerRequirements expr prs
+		| safe			= producerFieldRequirements exprs prs
+						= (safe,prs)
+	where
+		producerFieldRequirements [] prs
+			= (True,prs)
+		producerFieldRequirements [{bind_src}:fields] prs
+			# (safe,prs)	= producerRequirements bind_src prs
+			| safe			= producerFieldRequirements fields prs
+							= (safe,prs)
+	producerRequirements (TupleSelect _ _ expr) prs
+		= producerRequirements expr prs
+	producerRequirements (BasicExpr _ _) prs
+		= (True,prs)
+	producerRequirements (AnyCodeExpr _ _ _) prs
+		= (False,prs)
+	producerRequirements (ABCCodeExpr _ _) prs
+		= (False,prs)
+	producerRequirements (MatchExpr _ _ _) prs
+		// what's this?
+		= (False,prs)
+	producerRequirements (DynamicExpr _) prs
+		// what's this?
+		= (False,prs)
+	producerRequirements (TypeCodeExpression _) prs
+		// what's this?
+		= (False,prs)
+	producerRequirements (EE) prs
+		// what's this?
+		= (False,prs)
+	producerRequirements (NoBind var) prs
+		// what's this?
+		= (False,prs)
+	producerRequirements expr prs
+		= abort ("producerRequirements " ---> expr)
+
+instance producerRequirements (Optional a) | producerRequirements a where
+	producerRequirements (Yes x) prs
+		= producerRequirements x prs
+	producerRequirements No prs
+		= (True,prs)
+
+instance producerRequirements CasePatterns where
+	producerRequirements (AlgebraicPatterns index patterns) prs
+		// name shadowing...
+		# (safe,prs)	= producerRequirements patterns prs
+		= (safe,prs)
+	producerRequirements (BasicPatterns type patterns) prs
+		// name shadowing...
+		# (safe,prs)	= producerRequirements patterns prs
+		= (safe,prs)
+	producerRequirements (DynamicPatterns patterns) prs
+		//...disallow for now...
+		= (False,prs)
+	producerRequirements NoPattern prs
+		= (True,prs)
+
+instance producerRequirements AlgebraicPattern where
+	producerRequirements {ap_expr} prs
+		// name shadowing...
+		= producerRequirements ap_expr prs
+
+instance producerRequirements BasicPattern where
+	producerRequirements {bp_expr} prs
+		// name shadowing...
+		= producerRequirements bp_expr prs
+
+// compare with 'get_fun_def_and_cons_args'
+retrieve_consumer_args si=:{symb_kind, symb_arity} prs=:{prs_cons_args, prs_main_dcl_module_n}
+	= case symb_kind of
+		SK_Function {glob_module, glob_object}
+			| glob_module == prs_main_dcl_module_n && glob_object < size prs_cons_args
+				-> (Yes prs_cons_args.[glob_object],prs)
+			-> (No,prs) -!-> ("r_c_a",si)
+		SK_LocalMacroFunction glob_object
+			| glob_object < size prs_cons_args
+				-> (Yes prs_cons_args.[glob_object],prs)
+			-> (No,prs) -!-> ("r_c_a",si)
+		SK_GeneratedFunction fun_ptr fun_index
+			| fun_index < size prs_cons_args
+				-> (Yes prs_cons_args.[fun_index],prs)
+			# (FI_Function {gf_cons_args}, fun_heap)	= readPtr fun_ptr prs.prs_fun_heap
+			# prs										= {prs & prs_fun_heap = fun_heap}
+			-> (Yes gf_cons_args,prs)
+//		SK_Constructor cons_index
+		sk -> (No -!-> ("Unexpected symbol kind: ", si, sk),prs)
+
+instance <<< SymbIdent
+where
+	(<<<) file symb=:{symb_kind = SK_Function symb_index }
+		= file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_LocalMacroFunction symb_index }
+		= file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_GeneratedFunction _ symb_index }
+		= file <<< symb.symb_name <<<  '@' <<< symb_index
+	(<<<) file symb=:{symb_kind = SK_OverloadedFunction symb_index }
+		= file <<< symb.symb_name <<<  "[o]@" <<< symb_index
+	(<<<) file symb
+		= file <<< symb.symb_name 
+
