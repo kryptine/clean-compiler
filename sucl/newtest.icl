@@ -172,7 +172,7 @@ where toString srr
 
 instance <<< (Symredresult sym var tsym tvar) | toString sym & <<<,==,toString var
 where (<<<) file0 srr
-      = file5
+      = file7
         where file1
               = file0 <<< "==[BEGIN]==" <<< nl
                       <<< "Task expression: " <<< srr.srr_task_expression <<< nl
@@ -180,13 +180,11 @@ where (<<<) file0 srr
                       <<< "Strictness: " <<< srr.srr_strictness <<< nl
                       //<<< "Type rule: ..." <<< nl
               file2 = printtrace srr.srr_assigned_symbol toString toString toString "" srr.srr_trace file1
-              file3
-              = file2 //<<< "Function definition:" <<< nl
-                      //<<< srr.srr_function_def
-                      <<< "Areas:" <<< nl
-              file4 = printareas toString toString "    " srr.srr_areas file3
-              file5
-              = file4 <<< "==[END]==" <<< nl
+              file3 = file2 <<< "Function definition:" <<< nl
+              file4 = printfuncdef toString toString srr.srr_function_def file3
+              file5 = file4 <<< "Areas:" <<< nl
+              file6 = printareas toString toString "    " srr.srr_areas file5
+              file7 = file6 <<< "==[END]==" <<< nl
 
 printareas :: (sym->String) (var->String) String [Rgraph sym var] *File -> .File | == var
 printareas showsym showvar indent areas file

@@ -10,6 +10,7 @@ from general import Optional
 from StdOverloaded import ==
 from StdFile import <<<
 from StdString import toString
+from cleanversion import String
 
 :: FuncDef sym var
    :== ( [var]              // Arguments of function
@@ -46,3 +47,5 @@ fullfold ::
  &  <<< pvar
 
 instance <<< (FuncBody sym var) | toString sym & ==,toString var
+
+printfuncdef :: (sym->String) (var->String) (FuncDef sym var) *File -> .File | == var
