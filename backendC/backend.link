@@ -30,6 +30,10 @@
 /EXPORT: BETupleSelectNode
 /EXPORT: BEIfNode
 /EXPORT: BEGuardNode
+/EXPORT: BESwitchNode
+/EXPORT: BECaseNode
+/EXPORT: BEPushNode
+/EXPORT: BEDefaultNode
 /EXPORT: BESelectorNode
 /EXPORT: BEUpdateNode
 /EXPORT: BENodeIdNode
@@ -77,6 +81,9 @@
 /EXPORT: BECodeParameter
 /EXPORT: BECodeParameters
 /EXPORT: BENoCodeParameters
+/EXPORT: BENodeIdListElem
+/EXPORT: BENodeIds
+/EXPORT: BENoNodeIds
 /EXPORT: BEAbcCodeBlock
 /EXPORT: BEAnyCodeBlock
 /EXPORT: BEDeclareIclModule
