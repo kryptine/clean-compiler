@@ -4,16 +4,6 @@ import	StdEnv, compare_constructor, StdCompare, general, compilerSwitches
 
 from utilities import revCharListToString, isSpecialChar
 
-/*
-Known bug:
-functions names starting with '->' require a ';' after the type. Solutions:
-1) Make '->' an ordinary token. This implies that we have to write 'a-> .b' instead 
-   of 'a->.b'.
-2) re-scan token in new context. Requires substantial changes.
-3) Determine offsides before token is generated. Tricky since we do not know the
-   actual context of the new token or/and have to take care of generating the right
-   amount of offsides. 
-*/
 // RWS Proof ... ::	SearchPaths	:== [String]
 :: SearchPaths = 
 	{ sp_locations   :: [(String, String)]       // (module, path)
@@ -300,12 +290,26 @@ where
 			token_back input=:(Input {inp_pos,inp_stream=OldLine currentIndex string stream,inp_filename,inp_tabsize}) // one old token in wrong context.
 				|	inp_pos.fp_line == lt_position.fp_line
 				#	old_input
-					=	{ inp_stream	= OldLine lt_index string stream
+					 =	{ inp_stream	= OldLine (lt_index+1) string stream
 						, inp_filename	= inp_filename
 						, inp_pos		= lt_position
 						, inp_tabsize	= inp_tabsize
 						} -->> ("token_back in input", lt_token)
-				=	nextToken newContext {ss_input = Input old_input, ss_offsides=ss_offsides, ss_scanOptions=ss_scanOptions, ss_tokenBuffer=ss_tokenBuffer}
+				#	c				= string.[lt_index]
+				#	(token, inp)	= Scan c old_input newContext
+				= ( token
+				  , {	ss_input 		= Input inp
+					,	ss_tokenBuffer	= store
+											{	lt_position 	= lt_position
+											,	lt_index		= lt_index
+											,	lt_token		= token
+											,	lt_context		= newContext
+											}
+											(pop ss_tokenBuffer)
+					,	ss_offsides=ss_offsides
+					,	ss_scanOptions=ss_scanOptions
+					}
+				  )	 -->> ("renewed token",token,lt_position)
 				=	(	lt_token
 					,	{ss_input = input , ss_tokenBuffer	= store token ss_tokenBuffer, ss_offsides=ss_offsides, ss_scanOptions=ss_scanOptions}
 					) -->> ("unable to push token_back in input; line is lost",(inp_pos.fp_line,lt_position.fp_line), lt_token)
@@ -359,7 +363,7 @@ where
 												}
 												ss_tokenBuffer,
 							ss_offsides=ss_offsides,	ss_scanOptions=ss_scanOptions
-						}	 //-->> (token,pos)
+						}	 -->> (token,pos)
 	where
 		mark_position {inp_stream=input=:(OldLine i _ _),inp_filename,inp_pos,inp_tabsize}
 			= {inp_stream=input, inp_filename=inp_filename, inp_pos={inp_pos &fp_col=1}, inp_tabsize=inp_tabsize}
@@ -403,15 +407,30 @@ where
 			}
 
 notContextDependent :: !Token -> Bool
-notContextDependent NewDefinitionToken	= True
-notContextDependent EndGroupToken		= True
-notContextDependent EndOfFileToken		= True
-// RWS ..
-notContextDependent InToken		= True
-// ... RWS
-notContextDependent (ErrorToken _)		= True
-notContextDependent (CodeBlockToken _)	= True
-notContextDependent _					= False
+notContextDependent token
+ = case token of
+	NewDefinitionToken	-> True
+	EndGroupToken		-> True
+	EndOfFileToken		-> True
+	InToken				-> True
+	ErrorToken _		-> True
+	CodeBlockToken _	-> True
+	OpenToken			-> True
+	CloseToken			-> True
+	CurlyOpenToken		-> True
+	CurlyCloseToken		-> True
+	SquareOpenToken		-> True
+	SquareCloseToken	-> True
+	SemicolonToken		-> True
+	CommaToken			-> True
+	ExclamationToken	-> True
+	ClassToken			-> True
+	InstanceToken		-> True
+	OtherwiseToken		-> True
+	IfToken				-> True
+	WhereToken			-> True
+	WithToken			-> True
+	_					-> False
 
 class replaceToken state :: !Token !*state -> *state
 
@@ -603,12 +622,13 @@ Scan c0=:'.' input co	// PK incorrect ?
 						-> ScanOperator 1 input [c1, c0] co
 						-> (DotToken, charBack input)
 Scan '!' input TypeContext	= (ExclamationToken, input)
-Scan '\\' input co
+Scan c0=:'\\' input co
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (BackSlashToken, input)
-	| c == '\\'				= (DoubleBackSlashToken, input)
+	| c == '\\'				= possibleKeyToken DoubleBackSlashToken [c, c0] co input
+	| isSpecialChar c		= ScanOperator 1 input [c, c0] co
 							= (BackSlashToken, charBack input)
-Scan c0=:'_' input=:{inp_stream=OldLine i line stream,inp_pos} co //PK ..
+Scan c0=:'_' input=:{inp_stream=OldLine i line stream,inp_pos} co
 	# size	= size line
 	# end_i	= scan_underscores i size line
 		with
@@ -630,16 +650,6 @@ Scan c0=:'_' input=:{inp_stream=OldLine i line stream,inp_pos} co //PK ..
 		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
 		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
 		= (ErrorToken (line % (i-1,end_i-1)+++" is an illegal token"),input)
-/* PK
-Scan c0=:'_' input co
-	# (eof, c1, input)		= ReadNormalChar input
-	| eof					= (WildCardToken, input)
-	| IsIdentChar c1	co
-//		= ScanIdent 1 input [c1, c0] co
-		= ScanIdentFast 2 input co
-//	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
-							= (WildCardToken, charBack input)
-*/
 Scan c0=:'<' input TypeContext
 	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (ErrorToken "< just before end of file in TypeContext", input)
@@ -663,15 +673,11 @@ Scan c0=:'-' input co
 
 	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (IdentToken "-", input)
-//	# new					= newExp input.inp_charBuffer
-//	| IsDigit c1 && new		= ScanNumeral 1 input [c1,c0]
-
 	| IsDigit c1 && new_exp_char previous_char
 		= ScanNumeral 1 input [c1,c0]
 
 	| c1 <> '>'				= ScanOperator 0 (charBack input) [c0] co
-	| co == TypeContext		= (ArrowToken, input)	// -> is a reserved symbol in a type context
-							// Can cause an error when token (like ->.) is read in wrong context
+	| co == TypeContext		= (ArrowToken, input)
 	# (eof, c2, input)		= ReadNormalChar input		
 	| eof					= (ArrowToken, input)
 	| isSpecialChar c2		= ScanOperator 2 input [c2, c1, c0] co
@@ -704,25 +710,21 @@ Scan c0=:':' input co
 							= ScanOperator 1 (charBack input) [c1, c0] co
 Scan c0=:'\'' input co		= ScanChar input [c0]
 Scan c0=:'\"' input co		= ScanString 0 [c0] input
-// PK ..
+
 Scan 'E' input TypeContext
 	# (eof,c1,input)		= ReadNormalChar input
 	| eof					= (IdentToken "E", input)
 	| c1 == '.'				= (ExistsToken, input)
-//							= ScanIdent 1 (charBack input) TypeContext
 							= ScanIdentFast 1 (charBack input) TypeContext
 Scan 'A' input TypeContext
 	# (eof,c1,input)		= ReadNormalChar input
 	| eof					= (IdentToken "A", input)
 	| c1 == '.'				= (ForAllToken, input)
-//							= ScanIdent 1 (charBack input) TypeContext
 							= ScanIdentFast 1 (charBack input) TypeContext
-// .. PK
 Scan c    input co
 	| IsDigit c				= ScanNumeral 0 input [c]
 	| IsIdentChar c	co	
 		= ScanIdentFast 1 input co
-//		= ScanIdent 0 input [c] co
 	| isSpecialChar c		= ScanOperator 0 input [c] co
 							= (ErrorToken ScanErrIllegal, input)
 
@@ -787,7 +789,6 @@ CheckEveryContext s input
 	"generic" 	->	(GenericToken		, input)
 	"otherwise"	->	(OtherwiseToken		, input)
 	"!"			->	(ExclamationToken	, input)
-//	"::"		->	(DoubleColonToken	, input)
 	"*/"		->	(ErrorToken "Unexpected end of comment, */", input)
 	"infixr"	#	(error, n, input) = GetPrio  input
 				->	case error of
@@ -979,8 +980,8 @@ ScanChar input chars
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (ErrorToken "End of file inside Char denotation", input)
 	| '\'' == c				= (CharListToken "", input)
-	| '\\' <> c				= ScanEndOfChar 1 [c: chars] input
-	= ScanBSChar 0 chars input ScanEndOfChar
+	| '\\' == c				= ScanBSChar 0 chars input ScanEndOfChar
+							= ScanEndOfChar 1 [c: chars] input
 
 ScanBSChar :: !Int ![Char] !Input (!Int ![Char] !Input -> (!Token, !Input)) -> (!Token, !Input)
 ScanBSChar n chars input cont
@@ -1460,8 +1461,6 @@ openScanner file_name searchPaths files
 									 			, inp_filename		= file_name
 									 			, inp_pos			= {fp_line = 1, fp_col = 0}
 												, inp_tabsize		= 4
-//												, inp_charBuffer	= Buffer0
-											//	, inp_curToken		= []
 												}
 						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
 						,	ss_scanOptions	=	0
@@ -1528,7 +1527,6 @@ NewLineChar	:== '\n'
 LFChar		:== '\xA'
 CRChar		:== '\xD'
 
-//isNewLine c :== c == LFChar || c == CRChar
 isNewLine :: !Char -> Bool
 isNewLine LFChar = True
 isNewLine CRChar = True
@@ -1624,25 +1622,11 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 										scanState.ss_tokenBuffer
 								} -->> ("end group generated",pos) // insert EndGroupToken 
 			  | n == 1
-			// 	# (new_offsides, scanState) = scanState!ss_offsides // for tracing XXX
+			 	// # (new_offsides, scanState) = scanState!ss_offsides // for tracing XXX
 			  	= (newToken, scanState) // -->> ("new offsides",new_offsides)
 			  	= gen_end_groups (dec n) scanState
 	| token == InToken
 		= (token, { scanState & ss_offsides = tl ss_offsides })
-/*		# scanState			= tokenBack { scanState & ss_offsides = tl ss_offsides }
-		  newToken			= EndGroupToken
-		= ( newToken
-		  , { scanState
-			& ss_tokenBuffer
-				= store 
-					{	lt_position		= pos
-					,	lt_token		= newToken
-				//	,	lt_context		= FunctionContext
-					}
-					scanState.ss_tokenBuffer
-			}
-		  ) -->> (token,"EndGroupToken generated: in",pos,ss_offsides)
-*/	// otherwise
 		= newOffside token scanState
 where
 	newOffside token scanState=:{ss_offsides}
@@ -1682,12 +1666,10 @@ definesOffside WhereToken		= True
 definesOffside WithToken		= True
 definesOffside SpecialToken		= True
 definesOffside OfToken			= True
-//definesOffside BarToken			= True // There are too many BarTokens in Clean
 definesOffside _				= False
 
 needsNewDefinitionToken :: !Token -> Bool
 needsNewDefinitionToken OfToken			= True
-//needsNewDefinitionToken WithToken		= True
 needsNewDefinitionToken SpecialToken	= True
 needsNewDefinitionToken _				= False
 
@@ -1730,6 +1712,12 @@ get (Buffer1 x)     = (x, Buffer0)
 get (Buffer2 x y)   = (x, Buffer1 y)
 get (Buffer3 x y z) = (x, Buffer2 y z)
 
+pop :: !(Buffer x) -> Buffer x
+pop  Buffer0        = Buffer0 //abort "pop from empty buffer"
+pop (Buffer1 x)     = Buffer0
+pop (Buffer2 x y)   = Buffer1 y
+pop (Buffer3 x y z) = Buffer2 y z
+
 head :: !(Buffer x) -> x
 head  Buffer0			= abort "head of empty buffer"
 head (Buffer1 x)		= x
@@ -1755,7 +1743,6 @@ where
   //--------------------//
  //--- Preprocessor ---//
 //--------------------//
-
 
 freadPreprocessedLine :: !*File -> (!.{#Char},!*File)
 freadPreprocessedLine file
