@@ -6,11 +6,11 @@ import syntax, checksupport
 	{	group_members	:: ![Int]
 	}
 
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-	-> (!*{! Group}, !*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
 
-partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-	-> (!*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
+partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+	-> (!*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
 
 ::	UnfoldState =
 	{	us_var_heap				:: !.VarHeap
@@ -25,56 +25,3 @@ partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !u:{# Dc
 class unfold a :: !a !*UnfoldState -> (!a, !*UnfoldState)
 
 instance unfold Expression, CasePatterns
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

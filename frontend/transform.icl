@@ -100,7 +100,6 @@ instance lift App
 where
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
 		# (app_args, ls) = lift app_args ls
-//		| glob_module == cIclModIndex
 		| glob_module == ls.ls_x.LiftStateX.x_main_dcl_module_n
 //			#! fun_def = ls.ls_fun_defs.[glob_object]
 			#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
@@ -555,22 +554,19 @@ examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
 			-> ( [ fc : calls ], symbol_table <:=
 					(id_info, { ste_kind = STE_Called [fc_index], ste_index = NoIndex, ste_def_level = NotALevel, ste_previous = entry }))
 
-
-//unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
-unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}} args fun_defs (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table})
+unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
+unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}} args (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table,es_fun_defs})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
 	  us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No, us_cleanup_info = [],
 			 us_handle_aci_free_vars = RemoveThem }
 	  (result_expr, {us_symbol_heap,us_var_heap}) = unfold tb_rhs us
-	  (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls fun_defs es_symbol_table
+	  (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls es_fun_defs es_symbol_table
 	| isEmpty let_binds
-		= (result_expr, fun_defs, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
+		= (result_expr, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table, es_fun_defs=fun_defs }))
 		#  (new_info_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
-		= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr,
-				let_info_ptr = new_info_ptr, let_expr_position = NoPos }, fun_defs, 
-			(calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
+		= (Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr, let_expr_position = NoPos }, 
+					(calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table,es_fun_defs=fun_defs }))
 where
-
 	bind_expressions [var : vars] [expr : exprs] binds var_heap
 		# (binds, var_heap) = bind_expressions vars exprs binds var_heap
 		= bind_expression var expr binds var_heap
@@ -588,7 +584,6 @@ where
 		# (new_info, var_heap) = newPtr VI_Empty var_heap
 		  new_var = { fv_name = fv_name, fv_def_level = NotALevel, fv_info_ptr = new_info, fv_count = 0 }
 		= ([{ lb_src = expr, lb_dst = new_var, lb_position = NoPos} : binds], writePtr fv_info_ptr (VI_Variable fv_name new_info) var_heap)
-
 
 ::	Group =
 	{	group_members	:: ![Int]
@@ -609,8 +604,8 @@ where
 
 NotChecked :== -1	
 
-partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-	-> (!*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
+partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+	-> (!*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
 partitionateMacros {ir_from,ir_to} mod_index alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
@@ -620,7 +615,6 @@ partitionateMacros {ir_from,ir_to} mod_index alias_dummy fun_defs modules var_he
 	  		= iFoldSt (pationate_macro mod_index max_fun_nr) ir_from ir_to (fun_defs, modules, partitioning_info)
 	= (foldSt reset_body_of_rhs_macro pi_deps fun_defs, modules, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 where
-	
 	reset_body_of_rhs_macro macro_index macro_defs
 		# (macro_def, macro_defs) = macro_defs![macro_index]
 		= case macro_def.fun_body of
@@ -646,18 +640,20 @@ where
 
 	visit_macro mod_index max_fun_nr {fc_index} macros_modules_pi
 		= pationate_macro mod_index max_fun_nr fc_index macros_modules_pi
-		
+	
 	expand_simple_macro mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info, fun_symb, fun_pos}
 			(macro_defs, modules, pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_error})
 		| macros_are_simple fun_info.fi_calls macro_defs
 		  	# identPos = newPosition fun_symb fun_pos
 			  es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
-					 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error }
-			  (tb_args, tb_rhs, local_vars, fi_calls, macro_defs, modules, {es_symbol_table, es_var_heap, es_symbol_heap, es_error})
-					= expandMacrosInBody [] body macro_defs mod_index alias_dummy modules es
+					 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error,
+					 es_fun_defs=macro_defs, es_module_n = mod_index, es_dcl_modules=modules
+					  }
+			  (tb_args, tb_rhs, local_vars, fi_calls, {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
+					= expandMacrosInBody [] body alias_dummy es
 			  macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
-			= ({ macro_defs & [macro_index] = macro }, modules,
+			= ({ es_fun_defs & [macro_index] = macro }, es_dcl_modules,
 					{ pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_error = es_error })
 			# pi = { pi & pi_deps = [macro_index:pi.pi_deps] }
 			= ({ macro_defs & [macro_index] = { macro & fun_body = RhsMacroBody body }}, modules, pi)
@@ -672,9 +668,9 @@ where
 			= True
 		is_a_pattern_macro _ _
 			= False
-			
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-	-> (!*{! Group}, !*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
+
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !*{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+	-> (!*{! Group}, !*{# FunDef}, !.{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
 partitionateAndLiftFunctions ranges main_dcl_module_n alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap, pi_symbol_table = symbol_table,
@@ -725,13 +721,14 @@ where
 			  {ls_x={x_fun_defs=fun_defs}, ls_var_heap=pi_var_heap, ls_expr_heap=pi_symbol_heap}
 //			  		= liftFunctions def_level (group_without_macros ++ group_without_funs) pi_next_group cIclModIndex fun_defs pi_var_heap pi_symbol_heap
 			  		= liftFunctions def_level (group_without_macros ++ group_without_funs) pi_next_group main_dcl_module_n fun_defs pi_var_heap pi_symbol_heap
-			  (fun_defs, modules, es)
-			  		= expand_macros_in_group mod_index group_without_funs (fun_defs, modules,
-			  				{ es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
-			  				  es_error = pi_error })
-			  (fun_defs, modules, {es_symbol_table, es_var_heap, es_symbol_heap, es_error})
-			  		= expand_macros_in_group mod_index group_without_macros (fun_defs, modules, es)
-			= (max_fun_nr, (fun_defs, modules, { pi & pi_deps = pi_deps, pi_var_heap = es_var_heap,
+			  es
+			  		= expand_macros_in_group group_without_funs
+			  				{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
+			  					es_fun_defs=fun_defs, es_module_n=mod_index, es_dcl_modules=modules,
+				  				es_error = pi_error }
+			  {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs}
+			  		= expand_macros_in_group group_without_macros es
+			= (max_fun_nr, (es_fun_defs, es_dcl_modules, { pi & pi_deps = pi_deps, pi_var_heap = es_var_heap,
 						pi_symbol_table = es_symbol_table, pi_error = es_error, pi_symbol_heap = es_symbol_heap, 
 						pi_next_group = inc pi_next_group, pi_groups = [ group_without_macros ++ group_without_funs : pi_groups ] }))
 			= (min_dep, (fun_defs, modules, pi))
@@ -749,20 +746,19 @@ where
 					= (ds, group_without_macros, group_without_funs, fun_defs)
 					= close_group fun_index ds group_without_macros group_without_funs nr_of_fun_defs group_number fun_defs
 		
-		expand_macros_in_group mod_index group funs_modules_es
-			= foldSt (expand_macros mod_index) group (funs_modules_es)
+		expand_macros_in_group group es
+			= foldSt expand_macros group es
 
-		expand_macros mod_index fun_index (fun_and_macro_defs, modules, es)
-			# (fun_def, fun_and_macro_defs) = fun_and_macro_defs![fun_index]
+		expand_macros fun_index es
+			# (fun_def,es) = es!es_fun_defs.[fun_index]
 			  {fun_symb,fun_body = PartioningFunction body _, fun_info, fun_pos} = fun_def
 		  	  identPos = newPosition fun_symb fun_pos
-			  (tb_args, tb_rhs, fi_local_vars, fi_calls, fun_and_macro_defs, modules, es)
-					= expandMacrosInBody fun_info.fi_calls body fun_and_macro_defs mod_index alias_dummy modules
-							{ es & es_error = setErrorAdmin identPos es.es_error }
+			  (tb_args, tb_rhs, fi_local_vars, fi_calls, es)
+					= expandMacrosInBody fun_info.fi_calls body alias_dummy { es & es_error = setErrorAdmin identPos es.es_error }
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
-			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
-	 
+			= {es & es_fun_defs.[fun_index] = fun_def }
+	
 	add_called_macros calls macro_defs_and_pi
 		= foldSt add_called_macro calls macro_defs_and_pi
 	where
@@ -801,30 +797,29 @@ where
 				-> (fun_defs, symbol_table <:= (id_info, entry.ste_previous))
 			_
 				-> (fun_defs, symbol_table)
-		
 
-expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modules es=:{es_symbol_table}
+expandMacrosInBody :: [.FunCall] CheckedBody PredefinedSymbol *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],.ExpandState);
+expandMacrosInBody fi_calls {cb_args,cb_rhs} alias_dummy es=:{es_symbol_table,es_fun_defs}
 	# (prev_calls, fun_defs, es_symbol_table)
-			= addFunctionCallsToSymbolTable fi_calls fun_defs es_symbol_table
-	  ([rhs:rhss], (fun_defs, modules, (all_calls, es)) )
-	  		= mapSt (expandCheckedAlternative mod_index) cb_rhs 
-	  					(fun_defs, modules,	(prev_calls, { es & es_symbol_table = es_symbol_table }))
-	  (fun_defs, es_symbol_table)
-	  		= removeFunctionCallsFromSymbolTable all_calls fun_defs es.es_symbol_table
+			= addFunctionCallsToSymbolTable fi_calls es_fun_defs es_symbol_table
+	  ([rhs:rhss], (all_calls, es) )
+	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, { es & es_fun_defs=fun_defs, es_symbol_table = es_symbol_table })
+	  (fun_defs, symbol_table)
+	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
 	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
 	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
 	  					cos_alias_dummy = alias_dummy }
-	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
+	= (new_args, new_rhs, local_vars, all_calls,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
-												es_symbol_table = es_symbol_table })
+												es_fun_defs=fun_defs, es_symbol_table = symbol_table })
 //		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
 
-expandCheckedAlternative mod_index {ca_rhs, ca_position} (fun_defs, modules, es)
-	# (ca_rhs, fun_defs, modules, es) = expand ca_rhs fun_defs mod_index modules es
-	= ((ca_rhs, ca_position), (fun_defs, modules, es))
+expandCheckedAlternative {ca_rhs, ca_position} ei
+	# (ca_rhs, ei) = expand ca_rhs ei
+	= ((ca_rhs, ca_position), ei)
 
 cContainsFreeVars 	:== True
 cContainsNoFreeVars :== False
@@ -1168,139 +1163,139 @@ where
 	{	es_symbol_table	:: !.SymbolTable
 	,	es_var_heap		:: !.VarHeap
 	,	es_symbol_heap 	:: !.ExpressionHeap
-	,	es_error 		:: !.ErrorAdmin
+	,	es_error 		:: !.ErrorAdmin,
+		es_fun_defs :: !.{#FunDef},
+		es_module_n :: !Int,
+		es_dcl_modules :: !.{# DclModule}
 	}
 
-class expand a :: !a !*{#FunDef} !Int !v:{# DclModule} !*ExpandInfo -> (!a, !*{#FunDef}, !v:{# DclModule}, !*ExpandInfo)
-
-instance expand [a] | expand a
-where
-	expand [x:xs] fun_and_macro_defs mod_index modules es
-		# (x, fun_and_macro_defs, modules, es) = expand x fun_and_macro_defs mod_index modules es
-		  (xs, fun_and_macro_defs, modules, es) = expand xs fun_and_macro_defs mod_index modules es
-		= ([x:xs], fun_and_macro_defs, modules, es)
-	expand [] fun_and_macro_defs mod_index modules es
-		= ([], fun_and_macro_defs, modules, es)
-
-instance expand (a,b) | expand a & expand b
-where
-	expand (x,y) fun_and_macro_defs mod_index modules es
-		# (x, fun_and_macro_defs, modules, es) = expand x fun_and_macro_defs mod_index modules es
-		  (y, fun_and_macro_defs, modules, es) = expand y fun_and_macro_defs mod_index modules es
-		= ((x,y), fun_and_macro_defs, modules, es)
-
-instance expand (Optional a) | expand a
-where
-	expand (Yes x) fun_and_macro_defs mod_index modules es
-		# (x, fun_and_macro_defs, modules, es) = expand x fun_and_macro_defs mod_index modules es
-		= (Yes x, fun_and_macro_defs, modules, es)
-	expand no fun_and_macro_defs mod_index modules es
-		= (no, fun_and_macro_defs, modules, es)
+class expand a :: !a !*ExpandInfo -> (!a, !*ExpandInfo)
 
 instance expand Expression
 where
-
-	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_Macro {glob_object,glob_module}}, app_args}) fun_and_macro_defs mod_index modules es
-		# (app_args, fun_and_macro_defs, modules, (calls, state)) = expand app_args fun_and_macro_defs mod_index modules es
-		# (macro, fun_and_macro_defs) = fun_and_macro_defs![glob_object]
+	expand (App app=:{app_symb = symb=:{symb_arity, symb_kind = SK_Macro {glob_object,glob_module}}, app_args}) ei
+		# (app_args, (calls, es)) = expand app_args ei
+		# (macro, es) = es!es_fun_defs.[glob_object]
 		| macro.fun_arity == symb_arity
-			# (expr, fun_and_macro_defs, es) = unfoldMacro macro app_args fun_and_macro_defs (calls, state)
-			= (expr, fun_and_macro_defs, modules, es)
-			# (calls, es_symbol_table) = examineFunctionCall macro.fun_symb {fc_index = glob_object, fc_level = NotALevel} (calls, state.es_symbol_table)
+			# (expr, ei) = unfoldMacro macro app_args (calls, es)
+			= (expr, ei)
+			# (calls, es_symbol_table) = examineFunctionCall macro.fun_symb {fc_index = glob_object, fc_level = NotALevel} (calls, es.es_symbol_table)
 			= (App { app & app_symb = { symb & symb_kind = SK_Function {glob_object = glob_object, glob_module = glob_module} }, app_args = app_args },
-					fun_and_macro_defs, modules, (calls, { state & es_symbol_table = es_symbol_table }))
-	expand (App app=:{app_args}) fun_and_macro_defs mod_index modules es
-		# (app_args, fun_and_macro_defs, modules, es) = expand app_args fun_and_macro_defs mod_index modules es
-		= (App { app & app_args = app_args }, fun_and_macro_defs, modules, es)
-	expand (expr @ exprs) fun_and_macro_defs mod_index modules es
-		# ((expr,exprs), fun_and_macro_defs, modules, es) = expand (expr,exprs) fun_and_macro_defs mod_index modules es
-		= (expr @ exprs, fun_and_macro_defs, modules, es)
-	expand (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) fun_and_macro_defs mod_index modules es
-		# (let_strict_binds, fun_and_macro_defs, modules, es) = expand let_strict_binds fun_and_macro_defs mod_index modules es
-		# (let_lazy_binds, fun_and_macro_defs, modules, es) = expand let_lazy_binds fun_and_macro_defs mod_index modules es
-		# (let_expr, fun_and_macro_defs, modules, es) = expand let_expr fun_and_macro_defs mod_index modules es
-		= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, fun_and_macro_defs, modules, es)
-	expand (Case case_expr) fun_and_macro_defs mod_index modules es
-		# (case_expr, fun_and_macro_defs, modules, es) = expand case_expr fun_and_macro_defs mod_index modules es
-		= (Case case_expr, fun_and_macro_defs, modules, es)
-	expand (Selection is_unique expr selectors) fun_and_macro_defs mod_index modules es
-		# ((expr, selectors), fun_and_macro_defs, modules, es) = expand (expr, selectors) fun_and_macro_defs mod_index modules es
-		= (Selection is_unique expr selectors, fun_and_macro_defs, modules, es)
-	expand (Update expr1 selectors expr2) fun_and_macro_defs mod_index modules es
-		# (((expr1, expr2), selectors), fun_and_macro_defs, modules, es) = expand ((expr1, expr2), selectors) fun_and_macro_defs mod_index modules es
-		= (Update expr1 selectors expr2, fun_and_macro_defs, modules, es)
-	expand (RecordUpdate cons_symbol expression expressions) fun_and_macro_defs mod_index modules es
-		# ((expression, expressions), fun_and_macro_defs, modules, es) = expand (expression, expressions) fun_and_macro_defs mod_index modules es
-		= (RecordUpdate cons_symbol expression expressions, fun_and_macro_defs, modules, es)
-	expand (TupleSelect symbol argn_nr expr) fun_and_macro_defs mod_index modules es
-		# (expr, fun_and_macro_defs, modules, es) = expand expr fun_and_macro_defs mod_index modules es
-		= (TupleSelect symbol argn_nr expr, fun_and_macro_defs, modules, es)
-	expand (Lambda vars expr) fun_and_macro_defs mod_index modules es
-		# (expr, fun_and_macro_defs, modules, es) = expand expr fun_and_macro_defs mod_index modules es
-		= (Lambda vars expr, fun_and_macro_defs, modules, es)
-	expand (MatchExpr opt_tuple cons_symb expr) fun_and_macro_defs mod_index modules es
-		# (expr, fun_and_macro_defs, modules, es) = expand expr fun_and_macro_defs mod_index modules es
-		= (MatchExpr opt_tuple cons_symb expr, fun_and_macro_defs, modules, es)
-	expand expr fun_and_macro_defs mod_index modules es
-		= (expr, fun_and_macro_defs, modules, es)
+					(calls, { es & es_symbol_table = es_symbol_table }))
+	expand (App app=:{app_args}) ei
+		# (app_args, ei) = expand app_args ei
+		= (App { app & app_args = app_args }, ei)
+	expand (expr @ exprs) ei
+		# ((expr,exprs), ei) = expand (expr,exprs) ei
+		= (expr @ exprs, ei)
+	expand (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) ei
+		# (let_strict_binds, ei) = expand let_strict_binds ei
+		# (let_lazy_binds, ei) = expand let_lazy_binds ei
+		# (let_expr, ei) = expand let_expr ei
+		= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, ei)
+	expand (Case case_expr) ei
+		# (case_expr, ei) = expand case_expr ei
+		= (Case case_expr, ei)
+	expand (Selection is_unique expr selectors) ei
+		# ((expr, selectors), ei) = expand (expr, selectors) ei
+		= (Selection is_unique expr selectors, ei)
+	expand (Update expr1 selectors expr2) ei
+		# (((expr1, expr2), selectors), ei) = expand ((expr1, expr2), selectors) ei
+		= (Update expr1 selectors expr2, ei)
+	expand (RecordUpdate cons_symbol expression expressions) ei
+		# ((expression, expressions), ei) = expand (expression, expressions) ei
+		= (RecordUpdate cons_symbol expression expressions, ei)
+	expand (TupleSelect symbol argn_nr expr) ei
+		# (expr, ei) = expand expr ei
+		= (TupleSelect symbol argn_nr expr, ei)
+	expand (Lambda vars expr) ei
+		# (expr, ei) = expand expr ei
+		= (Lambda vars expr, ei)
+	expand (MatchExpr opt_tuple cons_symb expr) ei
+		# (expr, ei) = expand expr ei
+		= (MatchExpr opt_tuple cons_symb expr, ei)
+	expand expr ei
+		= (expr, ei)
 
 instance expand Selection
 where
-	expand (ArraySelection array_select expr_ptr index_expr) fun_and_macro_defs mod_index modules es
-		# (index_expr, fun_and_macro_defs, modules, es) = expand index_expr fun_and_macro_defs mod_index modules es
-		= (ArraySelection array_select expr_ptr index_expr, fun_and_macro_defs, modules, es)
-	expand record_selection fun_and_macro_defs mod_index modules es
-		= (record_selection, fun_and_macro_defs, modules, es)
-
+	expand (ArraySelection array_select expr_ptr index_expr) ei
+		# (index_expr, ei) = expand index_expr ei
+		= (ArraySelection array_select expr_ptr index_expr, ei)
+	expand record_selection ei
+		= (record_selection, ei)
 
 instance expand LetBind
 where
-	expand bind=:{lb_src} fun_and_macro_defs mod_index modules es
-		# (lb_src, fun_and_macro_defs, modules, es) = expand lb_src fun_and_macro_defs mod_index modules es
-		= ({ bind & lb_src = lb_src }, fun_and_macro_defs, modules, es)
+	expand bind=:{lb_src} ei
+		# (lb_src, ei) = expand lb_src ei
+		= ({ bind & lb_src = lb_src }, ei)
 
 instance expand (Bind a b) | expand a
 where
-	expand bind=:{bind_src} fun_and_macro_defs mod_index modules es
-		# (bind_src, fun_and_macro_defs, modules, es) = expand bind_src fun_and_macro_defs mod_index modules es
-		= ({ bind & bind_src = bind_src }, fun_and_macro_defs, modules, es)
+	expand bind=:{bind_src} ei
+		# (bind_src, ei) = expand bind_src ei
+		= ({ bind & bind_src = bind_src }, ei)
 
 instance expand Case
 where
-	expand kees=:{ case_expr,case_guards,case_default } fun_and_macro_defs mod_index modules es
-		# ((case_expr,(case_guards,case_default)), fun_and_macro_defs, modules, es) = expand (case_expr,(case_guards,case_default)) fun_and_macro_defs mod_index modules es
-		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default }, fun_and_macro_defs, modules, es)
+	expand kees=:{ case_expr,case_guards,case_default } ei
+		# ((case_expr,(case_guards,case_default)), ei) = expand (case_expr,(case_guards,case_default)) ei
+		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default }, ei)
 
 instance expand CasePatterns
 where
-	expand (AlgebraicPatterns type patterns) fun_and_macro_defs mod_index modules es
-		# (patterns, fun_and_macro_defs, modules, es) = expand patterns fun_and_macro_defs mod_index modules es
-		= (AlgebraicPatterns type patterns, fun_and_macro_defs, modules, es) 
-	expand (BasicPatterns type patterns) fun_and_macro_defs mod_index modules es
-		# (patterns, fun_and_macro_defs, modules, es) = expand patterns fun_and_macro_defs mod_index modules es
-		= (BasicPatterns type patterns, fun_and_macro_defs, modules, es) 
-	expand (DynamicPatterns patterns) fun_and_macro_defs mod_index modules es
-		# (patterns, fun_and_macro_defs, modules, es) = expand patterns fun_and_macro_defs mod_index modules es
-		= (DynamicPatterns patterns, fun_and_macro_defs, modules, es) 
+	expand (AlgebraicPatterns type patterns) ei
+		# (patterns, ei) = expand patterns ei
+		= (AlgebraicPatterns type patterns, ei) 
+	expand (BasicPatterns type patterns) ei
+		# (patterns, ei) = expand patterns ei
+		= (BasicPatterns type patterns, ei) 
+	expand (DynamicPatterns patterns) ei
+		# (patterns, ei) = expand patterns ei
+		= (DynamicPatterns patterns, ei) 
 
 instance expand AlgebraicPattern
 where
-	expand alg_pattern=:{ap_expr} fun_and_macro_defs mod_index modules es
-		# (ap_expr, fun_and_macro_defs, modules, es) = expand ap_expr fun_and_macro_defs mod_index modules es
-		= ({ alg_pattern & ap_expr = ap_expr }, fun_and_macro_defs, modules, es)
+	expand alg_pattern=:{ap_expr} ei
+		# (ap_expr, ei) = expand ap_expr ei
+		= ({ alg_pattern & ap_expr = ap_expr }, ei)
 
 instance expand BasicPattern
 where
-	expand bas_pattern=:{bp_expr} fun_and_macro_defs mod_index modules es
-		# (bp_expr, fun_and_macro_defs, modules, es) = expand bp_expr fun_and_macro_defs mod_index modules es
-		= ({ bas_pattern & bp_expr = bp_expr }, fun_and_macro_defs, modules, es)
+	expand bas_pattern=:{bp_expr} ei
+		# (bp_expr, ei) = expand bp_expr ei
+		= ({ bas_pattern & bp_expr = bp_expr }, ei)
 
 instance expand DynamicPattern
 where
-	expand dyn_pattern=:{dp_rhs} fun_and_macro_defs mod_index modules es
-		# (dp_rhs, fun_and_macro_defs, modules, es) = expand dp_rhs fun_and_macro_defs mod_index modules es
-		= ({ dyn_pattern & dp_rhs = dp_rhs }, fun_and_macro_defs, modules, es)
+	expand dyn_pattern=:{dp_rhs} ei
+		# (dp_rhs, ei) = expand dp_rhs ei
+		= ({ dyn_pattern & dp_rhs = dp_rhs }, ei)
 
+instance expand [a] | expand a
+where
+	expand [x:xs] ei
+		# (x, ei) = expand x ei
+		  (xs, ei) = expand xs ei
+		= ([x:xs], ei)
+	expand [] ei
+		= ([], ei)
+
+instance expand (a,b) | expand a & expand b
+where
+	expand (x,y) ei
+		# (x, ei) = expand x ei
+		  (y, ei) = expand y ei
+		= ((x,y), ei)
+
+instance expand (Optional a) | expand a
+where
+	expand (Yes x) ei
+		# (x, ei) = expand x ei
+		= (Yes x, ei)
+	expand no ei
+		= (no, ei)
 
 ::	CollectState =
 	{	cos_var_heap	:: !.VarHeap
