@@ -1680,7 +1680,8 @@ buildClassDef
 	    class_pos = gen_pos, 
 	    class_members = createArray 1 class_member, 
 	    class_cons_vars = case kind of KindConst -> 0; _ -> 1,
-	    class_dictionary = class_dictionary
+	    class_dictionary = class_dictionary,
+	    class_arg_kinds = [kind]
 	    }	 
 	    
 	#! com_class_defs = append_array com_class_defs class_def
@@ -1772,7 +1773,8 @@ where
 		    class_pos = gen_pos, 
 		    class_members = createArray 1 class_member, 
 		    class_cons_vars = case kind of KindConst -> 0; _ -> 1,
-		    class_dictionary = class_dictionary
+		    class_dictionary = class_dictionary,
+		    class_arg_kinds = [kind]
 		    }	 
 			
 		= class_def	

@@ -123,16 +123,16 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 
 // AA..
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
-
-	# ti_common_defs = {dcl_common \\ {dcl_common} <-: dcl_mods }
-	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
-
+	# (ti_common_defs, dcl_mods) = get_common_defs dcl_mods
+	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
 	# (td_infos, type_heaps, error_admin) = analTypeDefs ti_common_defs icl_used_module_numbers type_heaps error_admin
-      (fun_defs, th_vars, td_infos, error_admin) 
-      		= checkKindCorrectness icl_used_module_numbers main_dcl_module_n icl_instances 
-      				ti_common_defs dcl_mods fun_defs type_heaps.th_vars td_infos error_admin
+      (fun_defs, dcl_mods, th_vars, td_infos, error_admin) 
+      		= checkKindCorrectness main_dcl_module_n icl_instances 
+      				fun_defs ti_common_defs dcl_mods type_heaps.th_vars td_infos error_admin
       type_heaps = { type_heaps & th_vars = th_vars }
 	# heaps = { heaps & hp_type_heaps = type_heaps }
+	# ti_common_defs = {dcl_common \\ {dcl_common} <-: dcl_mods }
+	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
 
 	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, optional_dcl_icl_conversions, error_admin) = 
 		case SupportGenerics of
@@ -249,6 +249,17 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 					= fill_empty_positions (inc next_index) table_size (inc next_new_index) { icl_conversions & [next_index] = next_new_index }
 					= fill_empty_positions (inc next_index) table_size next_new_index icl_conversions
 				= icl_conversions
+		get_common_defs dcl_mods
+			#! size = size dcl_mods
+			# ({dcl_common=arbitrary_value_for_initializing}, dcl_mods) = dcl_mods![0]
+			= loop 0 (createArray size arbitrary_value_for_initializing) dcl_mods
+		  where
+			loop :: !Int !*{#CommonDefs} !u:{#DclModule} -> (!*{#CommonDefs}, !u:{#DclModule})
+			loop i common_defs dcl_mods
+				| i==size dcl_mods
+					= (common_defs, dcl_mods)
+				# ({dcl_common}, dcl_mods) = dcl_mods![i]
+				= loop (i+1) { common_defs & [i] = dcl_common } dcl_mods
 
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size

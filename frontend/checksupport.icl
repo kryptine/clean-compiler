@@ -120,6 +120,7 @@ where
 	,	dcl_conversions		:: !Optional ConversionTable
 	,	dcl_is_system		:: !Bool
 	,	dcl_imported_module_numbers :: !NumberSet
+	,	dcl_is_cashed		:: !Bool
 	}
 
 class Erroradmin state // PK...

@@ -365,7 +365,7 @@ where
 			//| ins_generate 
 			//	= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 			| size ins_members <> 1 				
-				# cs = { cs & cs_error = checkError gen_name "generic instance must have one memeber" cs.cs_error }
+				# cs = { cs & cs_error = checkError gen_name "generic instance must have one member" cs.cs_error }
 				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 			# member_name = ins_members.[0].ds_ident
 			| member_name <> gen_member_name
@@ -385,6 +385,7 @@ where
 			= (instance_types, member_defs, type_defs, modules, var_heap, type_heaps, cs)
 			# ins_member = ins_members.[mem_offset]
 			  class_member = class_members.[mem_offset]
+			  cs = setErrorAdmin (newPosition class_name ins_pos) cs
 			| ins_member.ds_ident <> class_member.ds_ident
 				= check_member_instances module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_name ins_pos ins_type 
 						instance_types member_defs type_defs modules var_heap type_heaps
@@ -394,10 +395,8 @@ where
 						instance_types member_defs type_defs modules var_heap type_heaps
 							{ cs & cs_error = checkError class_member.ds_ident "used with wrong arity" cs.cs_error}
 				# ({me_symb, me_type,me_class_vars,me_pos}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
-				  cs_error = pushErrorAdmin (newPosition class_name ins_pos) cs.cs_error
 				  (instance_type, _, type_heaps, Yes (modules, type_defs), Yes cs_error)
-				  		= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, x_main_dcl_module_n)) (Yes cs_error)
-				  cs_error = popErrorAdmin cs_error
+				  		= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, x_main_dcl_module_n)) (Yes cs.cs_error)
 				  (st_context, var_heap) = initializeContextVariables instance_type.st_context var_heap
 				= check_member_instances module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_name ins_pos ins_type
 						[ (ins_member.ds_index, { instance_type & st_context = st_context }) : instance_types ] member_defs type_defs modules var_heap type_heaps { cs & cs_error = cs_error }
@@ -1332,8 +1331,7 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions heaps cs=:{cs_symbo
 						= { ini_symbol_nr = nr_of_expl_imp_symbols, ini_imp_decl = imp_decl }
 				-> ([ident:expl_imp_symbols_accu], nr_of_expl_imp_symbols+1,
 					[ini:expl_imp_indices_accu], cs_symbol_table)
-
-//import StdDebug
+				
 
 checkDclComponent :: !{![Int]} !{![Int]} ![[(Index, Position, [ImportNrAndIdents])]] ![Int] 
 				!(!Int, !*ExplImpInfos, !*{# DclModule}, !*{# FunDef}, !*Heaps,!*CheckState)
@@ -1523,7 +1521,8 @@ checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cyc
 
 checkModule :: !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !{#FunDef} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
 	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !(Optional {# Index}), !.{#FunDef},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
-checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod scanned_modules dcl_modules functions_and_macros predef_symbols symbol_table err_file heaps
+checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache 
+	optional_dcl_mod scanned_modules dcl_modules functions_and_macros predef_symbols symbol_table err_file heaps
 //	| False--->("checkModule", m.mod_name)
 //		= undef
 	# (optional_pre_def_mod,predef_symbols)
@@ -1562,7 +1561,10 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 
 	  init_new_dcl_modules = gimme_a_strict_array_type { initialDclModule scanned_module module_n \\ scanned_module <- scanned_modules & module_n<-[size dcl_modules..]}
 			
-	  init_dcl_modules = {if (i<size dcl_modules) dcl_modules.[i] init_new_dcl_modules.[i-size dcl_modules] \\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
+	  init_dcl_modules = {	if (i<size dcl_modules) 
+	  							{ dcl_modules.[i] & dcl_is_cashed = True }
+		  						init_new_dcl_modules.[i-size dcl_modules] 
+	  						\\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
 	= (mod_name,mod_imported_objects,mod_imports,mod_type,icl_global_function_range,nr_of_functions,first_inst_index,local_defs,icl_functions,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 
 	where
@@ -2162,7 +2164,8 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 		,	dcl_is_system	= case mod_type of
 								MK_System 	-> True
 								_			-> False
-		, dcl_imported_module_numbers = EndNumbers
+		,	dcl_imported_module_numbers = EndNumbers
+		,	dcl_is_cashed	= False
 		}
 
 addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_component_set imports_ikh

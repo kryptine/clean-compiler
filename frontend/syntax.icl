@@ -236,6 +236,7 @@ cNameLocationDependent :== True
 	,	class_dictionary	:: !DefinedSymbol
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
+	,	class_arg_kinds		:: ![TypeKind] // filled in in checkKindCorrectness phase
 	}
 
 ::	MemberDef =

@@ -371,7 +371,8 @@ where
 		
 		  class_def = { class_name = tc_class_name.pds_ident, class_arity = 1, class_args = [class_var], class_context = [],
 		  				class_members = {{ds_ident = tc_member_name.pds_ident, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
-						class_dictionary = { ds_ident = { tc_class_name.pds_ident & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos }
+						class_dictionary = { ds_ident = { tc_class_name.pds_ident & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos,
+						class_arg_kinds = [] }
 
 		= (class_def, member_def, pre_def_symbols)
 
