@@ -4,6 +4,9 @@ import checksupport, StdCompare
 
 from unitype import Coercions, CoercionTree, AttributePartition
 
+do_fusion :== False
+// MW: this switch is used to en(dis)able the fusion algorithm which currently isn't ready
+
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
 class (<::) infixl a :: !*File (!Format, !a) -> *File

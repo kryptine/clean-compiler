@@ -8,9 +8,12 @@ cPassive   		:== -1
 cActive			:== -2
 cAccumulating   :== -3
 
-analyseGroups :: !*{! Group} !*{#FunDef} !*VarHeap -> (!*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap)
+::	CleanupInfo
 
-transformGroups :: !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap
+analyseGroups	:: !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
+				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
+
+transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap
 	-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
 
 partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{! Group}, !*{# FunDef})

@@ -348,6 +348,7 @@ cMayBeNonCoercible		:== 4
 	,	fi_free_vars		:: ![FreeVar]
 	,	fi_local_vars		:: ![FreeVar]
 	,	fi_dynamics			:: ![ExprInfoPtr]
+	,	fi_is_macro_fun		:: !Bool // whether the function is a local function of a macro
 	}
 
 ::	ParsedBody =
@@ -373,7 +374,7 @@ cMayBeNonCoercible		:== 4
 					| RhsMacroBody !CheckedBody
 	/* macro expansion the transforms a CheckedBody into a TransformedBody */
 					| TransformedBody !TransformedBody
-					| Expanding
+					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| BackendBody ![BackendBody]
 					
 ::	BackendBody =
@@ -399,8 +400,9 @@ cIsAGlobalVar	:== True
 cIsALocalVar	:== False
 
 ::	ConsClasses =
-	{	cc_size	::!Int
-	,	cc_args	::![ConsClass]
+	{	cc_size			::!Int
+	,	cc_args			::![ConsClass]	// the lists have the
+	,	cc_linear_bits	::![Bool]		// same length
 	}
 					
 ::	ConsClass	:== Int
@@ -418,10 +420,10 @@ cIsALocalVar	:== False
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro
 
-::	VarInfo  =	VI_Empty | VI_Type !AType | VI_Occurrence !Occurrence | VI_UsedVar (!Ident, ![Int]) |
+::	VarInfo  =	VI_Empty | VI_Type !AType | VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
-				VI_AccVar !ConsClass /* used during fusion to determine accumulating parameters of functions */ |
+				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
@@ -433,6 +435,8 @@ cIsALocalVar	:== False
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
 				VI_Default !Int /* used during conversion of dynamics; the Int indiacted the refenrence count */
+
+::	ArgumentPosition :== Int
 
 ::	VarInfoPtr	:== Ptr VarInfo
 
@@ -508,10 +512,10 @@ cNotVarNumber :== -1
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
 ::	Producer	= PR_Empty
-				| PR_Function !SymbIdent !Index
+				| PR_Function !SymbIdent !Index !Int // Int: number of actual arguments in application
 				| PR_Class !App ![BoundVar] ![Type]
 //				| PR_Constructor !SymbIdent ![Expression]
-				| PR_GeneratedFunction !SymbIdent !Index
+				| PR_GeneratedFunction !SymbIdent !Index !Int // Int: number of actual arguments in application
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
@@ -581,6 +585,21 @@ cNotVarNumber :== -1
 
 					| EI_Default !Expression !AType !ExprInfoPtr
 					| EI_DefaultFunction !SymbIdent ![Expression]
+					| EI_Extended ![ExtendedExprInfo] !ExprInfo
+
+::	ExtendedExprInfo
+					= EEI_ActiveCase !ActiveCaseInfo
+
+::	ActiveCaseInfo =
+	{	aci_arg_pos		:: !Int
+	,	aci_opt_unfolder:: !(Optional SymbIdent)
+	,	aci_free_vars	:: !Optional [VarId]
+	}
+
+::	VarId =
+	{	v_name		:: !Ident
+	,	v_info_ptr	:: !VarInfoPtr
+	}
 
 ::	RefCountsInCase = 
 	{	rcc_all_variables		:: ![CountedVariable]
@@ -725,6 +744,7 @@ cNotVarNumber :== -1
 					| TVI_CorrespondenceNumber !Int
 					| TVI_Used /* to adminster that this variable is encountered (in checkOpenTypes) */
 					| TVI_TypeCode !TypeCodeExpression
+					| TVI_FreshTypeVar TypeVar /* auxiliary used during fusion */
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
@@ -1728,7 +1748,7 @@ MakeAttributedType type :== { at_attribute = TA_None, at_annotation = AN_None, a
 MakeAttributedTypeVar type_var :== { atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = type_var }
 
 EmptyFunInfo :== { fi_calls = [], fi_group_index = NoIndex, fi_def_level = NotALevel,
-				   fi_free_vars = [], fi_local_vars = [], fi_dynamics = [] }
+				   fi_free_vars = [], fi_local_vars = [], fi_dynamics = [], fi_is_macro_fun=False }
 
 BottomSignClass		:== { sc_pos_vect = 0, sc_neg_vect = 0 }
 PostiveSignClass	:== { sc_pos_vect = bitnot 0, sc_neg_vect = 0 }

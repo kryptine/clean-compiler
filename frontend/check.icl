@@ -596,6 +596,7 @@ where
 	,	ef_member_defs		:: !.{# MemberDef}
 	,	ef_class_defs		:: !.{# ClassDef}
 	,	ef_modules			:: !.{# DclModule}
+	,	ef_is_macro_fun		:: !Bool
 	}
 
 ::	ExpressionState =
@@ -2048,7 +2049,7 @@ where
 
 checkFunction :: !Index !Index !Level !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef},!*ExpressionInfo, !*Heaps, !*CheckState);
 checkFunction mod_index fun_index def_level fun_defs
-			e_info=:{ef_type_defs,ef_modules,ef_class_defs} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps} cs=:{cs_error}
+			e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps} cs=:{cs_error}
 	#! fun_def = fun_defs.[fun_index]
 	# {fun_symb,fun_pos,fun_body,fun_type} = fun_def
 	  position = newPosition fun_symb fun_pos
@@ -2065,7 +2066,8 @@ checkFunction mod_index fun_index def_level fun_defs
 	  (ef_type_defs, ef_modules, es_type_heaps, es_expression_heap, cs) = 
 	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_modules es_type_heaps es_expression_heap cs
 	  cs = { cs & cs_error = popErrorAdmin cs.cs_error }
-	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics }
+	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics,
+	  					fi_is_macro_fun = ef_is_macro_fun }
 	  fun_defs = { es_fun_defs & [fun_index] = { fun_def & fun_body = fun_body, fun_index = fun_index, fun_info = fun_info, fun_type = fun_type}}
 	  (fun_defs, cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls fun_defs cs.cs_symbol_table
 	= (fun_defs,
@@ -2106,9 +2108,10 @@ checkFunctions mod_index level from_index to_index fun_defs e_info heaps cs
 
 checkMacros ::  !Index !IndexRange !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 	-> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState);
-checkMacros mod_index range fun_defs e_info heaps cs
-	# (fun_defs, e_info=:{ef_modules}, heaps=:{hp_var_heap, hp_expression_heap}, cs=:{cs_symbol_table,cs_error})
-			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to fun_defs e_info heaps cs
+checkMacros mod_index range fun_defs e_info=:{ef_is_macro_fun=ef_is_macro_fun_old} heaps cs
+	# (fun_defs, e_info, heaps=:{hp_var_heap, hp_expression_heap}, cs=:{cs_symbol_table,cs_error})
+			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to fun_defs { e_info & ef_is_macro_fun=True } heaps cs
+	  (e_info=:{ef_modules}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	  (fun_defs, ef_modules, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
 	  		= partitionateMacros range mod_index fun_defs ef_modules hp_var_heap hp_expression_heap cs_symbol_table cs_error
 	= (fun_defs, { e_info & ef_modules = ef_modules }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
@@ -2375,7 +2378,8 @@ checkModule {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs
 	  heaps = { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }
 
 	  e_info = { ef_type_defs = icl_common.com_type_defs, ef_selector_defs = icl_common.com_selector_defs, ef_class_defs = icl_common.com_class_defs, 
-	  			  ef_cons_defs = icl_common.com_cons_defs, ef_member_defs = icl_common.com_member_defs, ef_modules = dcl_modules }
+	  			  ef_cons_defs = icl_common.com_cons_defs, ef_member_defs = icl_common.com_member_defs, ef_modules = dcl_modules,
+					ef_is_macro_fun = False }
 
 	  (icl_functions, e_info, heaps, cs) = checkMacros cIclModIndex cdefs.def_macros icl_functions e_info heaps cs
 	  (icl_functions, e_info, heaps, cs) = checkFunctions cIclModIndex cGlobalScope 0 nr_of_global_funs icl_functions e_info heaps cs
@@ -2791,7 +2795,8 @@ checkDclModule {mod_name,mod_imports,mod_defs} mod_index modules icl_functions h
 	  						reverse rev_special_defs) }
 	  
 	  e_info = { ef_type_defs = com_type_defs, ef_selector_defs = dcl_common.com_selector_defs, ef_class_defs = com_class_defs,
-	  			 ef_cons_defs = dcl_common.com_cons_defs, ef_member_defs = dcl_common.com_member_defs, ef_modules = modules }
+	  			 ef_cons_defs = dcl_common.com_cons_defs, ef_member_defs = dcl_common.com_member_defs, ef_modules = modules,
+				 ef_is_macro_fun = False }
 
 	  (icl_functions, e_info, heaps, cs)
 			= checkMacros mod_index dcl_macros icl_functions e_info heaps { cs & cs_error = cs_error }

@@ -161,6 +161,7 @@ where
 ::	UnfoldState =
 	{	us_var_heap		:: !.VarHeap
 	,	us_symbol_heap	:: !.ExpressionHeap
+	,	us_cleanup_info	:: ![ExprInfoPtr]
 	}
 	
 class unfold a :: !a !*UnfoldState -> (!a, !*UnfoldState)
@@ -281,12 +282,15 @@ where
 
 instance unfold Case
 where
-	unfold kees=:{ case_expr,case_guards,case_default,case_info_ptr} us
+	unfold kees=:{ case_expr,case_guards,case_default,case_info_ptr} us=:{us_cleanup_info}
 		# ((case_expr,(case_guards,case_default)), us) = unfold (case_expr,(case_guards,case_default)) us
 		  (old_case_info, us_symbol_heap) = readPtr case_info_ptr us.us_symbol_heap
 		  (new_info_ptr, us_symbol_heap) = newPtr old_case_info us_symbol_heap
-		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr},
-				{ us & us_symbol_heap = us_symbol_heap })
+		  us_cleanup_info = case old_case_info of
+								EI_Extended _ _	-> [new_info_ptr:us_cleanup_info]
+								_				-> us_cleanup_info
+	= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr},
+				{ us & us_symbol_heap = us_symbol_heap, us_cleanup_info=us_cleanup_info })
 
 instance unfold Let
 where
@@ -360,7 +364,7 @@ examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
 //unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
 unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}} args fun_defs (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
-	  (result_expr, {us_symbol_heap,us_var_heap}) = unfold tb_rhs { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap }
+	  (result_expr, {us_symbol_heap,us_var_heap}) = unfold tb_rhs { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_cleanup_info=[] }
 	  (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls fun_defs es_symbol_table
 	| isEmpty let_binds
 		= (result_expr, fun_defs, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
@@ -721,7 +725,7 @@ where
 		replace_variables [] expr ap_vars var_heap symbol_heap
 			= (expr, var_heap, symbol_heap)
 		replace_variables vars expr ap_vars var_heap symbol_heap
-			# (expr, us) = unfold expr { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap }
+			# (expr, us) = unfold expr { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap, us_cleanup_info=[] }
 			= (expr, us.us_var_heap, us.us_symbol_heap)
 
 		build_aliases [var1 : vars1] [ {fv_name,fv_info_ptr} : vars2 ] var_heap

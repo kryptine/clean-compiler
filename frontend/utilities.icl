@@ -148,9 +148,9 @@ where
 	fold_st2 [] [] st
 		= st
 	fold_st2 [] ys st
-		= abort ("fold_st2: second argument list contains more elements" ---> ys)
+		= abort ("fold_st2: second argument list contains more elements")
 	fold_st2 xs [] st
-		= abort ("fold_st2: first argument list contains more elements" ---> xs)
+		= abort ("fold_st2: first argument list contains more elements")
 
 // foldSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 foldSt op r l :== fold_st r l

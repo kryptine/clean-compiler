@@ -15,11 +15,12 @@ partitionateMacros :: !IndexRange !Index !*{# FunDef} !u:{# DclModule} !*VarHeap
 ::	UnfoldState =
 	{	us_var_heap		:: !.VarHeap
 	,	us_symbol_heap	:: !.ExpressionHeap
+	,	us_cleanup_info	:: ![ExprInfoPtr]
 	}
 	
 class unfold a :: !a !*UnfoldState -> (!a, !*UnfoldState)
 
-instance unfold Expression//, PatternExpression
+instance unfold Expression, CasePatterns
 
 
 

@@ -268,7 +268,7 @@ newFunction opt_id fun_bodies arg_types result_type group_index (ci_next_fun_nr,
 	= ({ symb_name = fun_id, symb_kind = SK_GeneratedFunction fun_def_ptr ci_next_fun_nr, symb_arity = arity },
 			(inc ci_next_fun_nr, [fun_def_ptr : ci_new_functions],
 				ci_fun_heap <:= (fun_def_ptr,  FI_Function { gf_fun_def = fun_def, gf_instance_info = II_Empty,
-	  				  gf_fun_index = ci_next_fun_nr, gf_cons_args = {cc_args = [], cc_size=0} })))
+	  				  gf_fun_index = ci_next_fun_nr, gf_cons_args = {cc_size=0, cc_args = [], cc_linear_bits = []} })))
 
 
 consOptional (Yes x) xs = [x : xs]

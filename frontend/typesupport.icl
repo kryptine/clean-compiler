@@ -3,6 +3,9 @@ implementation module typesupport
 import StdEnv, StdCompare
 import syntax, parse, check, unitype, utilities, RWSDebug
 
+do_fusion :== False
+// MW: this switch is used to en(dis)able the fusion algorithm which currently isn't ready
+
 ::	Store	:== Int
 
 ::	AttrCoercion =
@@ -341,9 +344,18 @@ where
 instance substitute TypeAttribute
 where
 	substitute (TA_Var {av_name, av_info_ptr}) heaps=:{th_attrs}
+/* MW: was:
 		#! av_info = sreadPtr av_info_ptr th_attrs
 		# (AVI_Attr attr) = av_info
 		= (attr, heaps)
+*/
+// XXX this alternative's code can be replaced with the original again, when the fusion algorithm becomes able to
+// infer correct type attributes
+		#! av_info = sreadPtr av_info_ptr th_attrs
+		= case av_info of
+			 (AVI_Attr attr)	-> (attr, heaps)
+			 _ | do_fusion		-> (TA_Multi, heaps)
+								-> abort "compiler bug nr 7689 in module typesupport"
 	substitute TA_None heaps
 		= (TA_Multi, heaps)
 	substitute attr heaps
