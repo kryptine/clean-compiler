@@ -74,7 +74,9 @@ typedef struct string_list *BEStringListP;
 Clean (:: BEStringListP :== Int)
 
 /* constants */
+/*
 # define	kIclModuleIndex			0
+*/
 # define	kPredefinedModuleIndex	1
 
 /* enum types */

@@ -327,6 +327,13 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	gBEState.be_allSymbols	= allSymbols;
 } /* DeclareModule */
 
+static int main_dcl_module_n=0;
+
+void BESetMainDclModuleN (int main_dcl_module_n_parameter)
+{
+	main_dcl_module_n=main_dcl_module_n_parameter;
+}
+
 void
 BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstructors, int nFields)
 {
@@ -336,23 +343,25 @@ BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstruct
 	ImpMod	iclModule;
 	BEIclP	icl;
 
-	cName	= ConvertCleanString (name);
+/*	cName	= ConvertCleanString (name); */
+	cName	= gBEState.be_modules [main_dcl_module_n].bem_name;
 
 	moduleNameSymbol	= ConvertAllocType (SymbolS);
 	moduleNameSymbol->symb_ident	= Identifier (cName);
 
-	Assert (strcmp (gBEState.be_modules [kIclModuleIndex].bem_name, cName) == 0);
+/*	Assert (strcmp (gBEState.be_modules [main_dcl_module_n].bem_name, cName) == 0); */
+	Assert (strncmp (cName, name->chars, name->length) == 0);
 
 	icl	= &gBEState.be_icl;
 
 	icl->beicl_module		= ConvertAllocType (ImpRepr);
-	icl->beicl_dcl_module	= gBEState.be_modules [kIclModuleIndex];
+	icl->beicl_dcl_module	= gBEState.be_modules [main_dcl_module_n];
 	icl->beicl_previousAncestor	= UINT_MAX;
 	scc_dependency_list	= NULL;
 	icl->beicl_depsP	= &scc_dependency_list;
 
 	nFunctions	+= ArraySize (gLocallyGeneratedFunctions);
-	DeclareModule (kIclModuleIndex, cName, False, nFunctions, nTypes, nConstructors, nFields);
+	DeclareModule (main_dcl_module_n, cName, False, nFunctions, nTypes, nConstructors, nFields);
 
 	iclModule	= icl->beicl_module;
 	iclModule->im_name			= moduleNameSymbol;
@@ -406,7 +415,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, int isSystemModule, int n
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
 
-	if (moduleIndex != kIclModuleIndex)
+	if (moduleIndex != main_dcl_module_n)
 		AddOpenDefinitionModule (moduleNameSymbol, dclModule);
 } /* BEDeclareDclModule */
 
@@ -685,8 +694,8 @@ CreateLocallyDefinedFunction (int index, char ** abcCode, TypeArgs lhsArgs, Type
 	TypeAlt			*typeAlt;
 	ArgP			args;
 
-	functionIndex	= gBEState.be_modules[kIclModuleIndex].bem_nFunctions - ArraySize (gLocallyGeneratedFunctions) + index;
-	functionSymbol	= BEFunctionSymbol (functionIndex, kIclModuleIndex);
+	functionIndex	= gBEState.be_modules[main_dcl_module_n].bem_nFunctions - ArraySize (gLocallyGeneratedFunctions) + index;
+	functionSymbol	= BEFunctionSymbol (functionIndex, main_dcl_module_n);
 	functionSymbol->symb_def->sdef_isused	= False;
 
 	instructionsP	= &instructions;
@@ -877,7 +886,7 @@ BETypeSymbol (int typeIndex, int moduleIndex)
 /*	Assert (typeSymbol->symb_kind == definition
 				|| (moduleIndex == kPredefinedModuleIndex && typeSymbol->symb_kind != erroneous_symb));
 */
-	if (moduleIndex == kIclModuleIndex)
+	if (moduleIndex == main_dcl_module_n)
 		typeSymbol->symb_def->sdef_isused	= True;
 
 	return (typeSymbol);
@@ -1620,7 +1629,7 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 
 	icl	= &gBEState.be_icl;
 
-	module	= &gBEState.be_modules [kIclModuleIndex];
+	module	= &gBEState.be_modules [main_dcl_module_n];
 	functions	=	module->bem_functions;
 	Assert (functions != NULL);
 
@@ -1706,7 +1715,7 @@ BERule (int functionIndex, int isCaf, BETypeAltP type, BERuleAltP alts)
 
 	rule	= ConvertAllocType (ImpRuleS);
 
-	module	= &gBEState.be_modules [kIclModuleIndex];
+	module	= &gBEState.be_modules [main_dcl_module_n];
 	functionSymbol	= &module->bem_functions [functionIndex];
 	functionDef	= functionSymbol->symb_def;
 	functionDef->sdef_rule	= rule;
@@ -1800,11 +1809,11 @@ BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int modul
 
 	sdef	= functionSymbol->symb_def;
 
-	Assert (sdef->sdef_kind == DEFRULE || (moduleIndex == kIclModuleIndex && sdef->sdef_kind == IMPRULE));
+	Assert (sdef->sdef_kind == DEFRULE || (moduleIndex == main_dcl_module_n && sdef->sdef_kind == IMPRULE));
 	sdef->sdef_arfun	= arrayFunKind;
 	sdef->sdef_mark		= 0;
 
-	if (sdef->sdef_kind == DEFRULE  && moduleIndex == kIclModuleIndex)
+	if (sdef->sdef_kind == DEFRULE  && moduleIndex == main_dcl_module_n)
 	{
 		AddUserDefinedArrayFunction (functionSymbol);
 		sdef->sdef_kind	= SYSRULE;
@@ -2365,7 +2374,7 @@ BEExportType (int dclTypeIndex, int iclTypeIndex)
 	SymbolP		typeSymbol;
 	SymbDefP	iclDef, dclDef;
 
-	iclModule	= &gBEState.be_modules [kIclModuleIndex];
+	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) iclTypeIndex < iclModule->bem_nTypes);
 	typeSymbol	= iclModule->bem_types [iclTypeIndex];
@@ -2398,7 +2407,7 @@ BESwapTypes (int frm, int to)
 	BEModuleP	module;
 	SymbolP		save;
 
-	module	= &gBEState.be_modules [kIclModuleIndex];
+	module	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) frm < module->bem_nTypes);
 	Assert ((unsigned int) to < module->bem_nTypes);
@@ -2415,7 +2424,7 @@ BEExportConstructor (int dclConstructorIndex, int iclConstructorIndex)
 	SymbolP		constructorSymbol;
 	SymbDefP	iclDef, dclDef;
 
-	iclModule	= &gBEState.be_modules [kIclModuleIndex];
+	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) iclConstructorIndex < iclModule->bem_nConstructors);
 	constructorSymbol	= iclModule->bem_constructors [iclConstructorIndex];
@@ -2449,7 +2458,7 @@ BEExportField (int dclFieldIndex, int iclFieldIndex)
 	SymbolP		fieldSymbol;
 	SymbDefP	iclDef, dclDef;
 
-	iclModule	= &gBEState.be_modules [kIclModuleIndex];
+	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) iclFieldIndex < iclModule->bem_nFields);
 	fieldSymbol	= &iclModule->bem_fields [iclFieldIndex];
@@ -2484,7 +2493,7 @@ BEExportFunction (int dclFunctionIndex, int iclFunctionIndex)
 	SymbolP		functionSymbol;
 	SymbDefP	iclDef, dclDef;
 
-	iclModule	= &gBEState.be_modules [kIclModuleIndex];
+	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) iclFunctionIndex < iclModule->bem_nFunctions);
 	functionSymbol	= &iclModule->bem_functions [iclFunctionIndex];
