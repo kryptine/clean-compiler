@@ -1257,6 +1257,9 @@ extern Symbol UnboxedArrayFunctionSymbols [];
 
 static 	Label	ApplyLabel;
 static 	StateS  	ApplyState;
+#if CLEAN2
+static int CaseFailNumber;
+#endif
 
 extern SymbDef ApplyDef; /* from codegen2.c */
 
@@ -3391,9 +3394,9 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 }
 
 #if CLEAN2
+
 void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 {
-	static int case_number;
 
 	GenPopA (asp);
 	GenPopB (bsp);
@@ -3402,16 +3405,16 @@ void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 	FPrintF (OutFile, "m_%s", CurrentModule);
 
 	put_instruction_b (pushD);
-	FPrintF (OutFile, "case_fail%u",case_number);
+	FPrintF (OutFile, "case_fail%u",CaseFailNumber);
 
 	GenJmp (&match_error_lab);
 	
 	put_directive_ (Dstring);
-	FPrintF (OutFile, "case_fail%u \"",case_number);		
+	FPrintF (OutFile, "case_fail%u \"",CaseFailNumber);		
 	PrintSymbolOfIdent (case_def->sdef_ident,case_def->sdef_line,OutFile);
 	FPrintF (OutFile, "\"");		
 
-	case_number++;
+	CaseFailNumber++;
 }
 #endif
 
@@ -3631,6 +3634,10 @@ void GenImpLib (char *lib_name)
 
 void InitInstructions (void)
 {
+#if CLEAN2
+	CaseFailNumber = 0;
+#endif
+
     ABCFileName	= NULL;
 	SetUnaryState (& ApplyState, StrictRedirection, UnknownObj);
 	ApplyLabel = NULL;
