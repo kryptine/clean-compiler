@@ -1042,7 +1042,7 @@ where
 build_type_identification dyn_type_code ui=:{ui_x={x_module_id=No}}
 	= (dyn_type_code,ui)
 build_type_identification dyn_type_code ui=:{ui_x={x_module_id=Yes let_bind}}
-	# (let_info_ptr,  ui)	= let_ptr ui
+	# (let_info_ptr,  ui)	= let_ptr 1 ui
 	# letje
 		= Let {	let_strict_binds	= [],
 				let_lazy_binds		= [let_bind],
@@ -1607,7 +1607,7 @@ where
 		convertTypecode (TCE_UniType uni_vars type_code) ui
 			# (let_binds, ui)		= createVariables uni_vars ui
 			  (let_expr, ui)		= convertTypecode type_code ui
-			  (let_info_ptr,ui) = let_ptr ui
+			  (let_info_ptr,ui) = let_ptr (length let_binds) ui
 			= ( Let {	let_strict_binds	= []
 					,	let_lazy_binds		= let_binds
 					,	let_expr			= let_expr
@@ -1679,8 +1679,8 @@ where
 	adjustClassExpression symb_name  expr ui
 		= (expr, ui)
 
-let_ptr ui=:{ui_symbol_heap}
-	# (expr_info_ptr, ui_symbol_heap) = newPtr (EI_LetType (repeat empty_attributed_type)) ui_symbol_heap
+let_ptr nr_of_binds ui=:{ui_symbol_heap}
+	# (expr_info_ptr, ui_symbol_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ui_symbol_heap
 	= (expr_info_ptr, {ui &  ui_symbol_heap = ui_symbol_heap})
 where 
 	empty_attributed_type :: AType
