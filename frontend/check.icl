@@ -279,6 +279,7 @@ where
 	check_member_instances :: !Index !Index !Int !Int !{#DefinedSymbol} !{#DefinedSymbol} !InstanceType ![(Index,SymbolType)]
 		!v:{# MemberDef} !u:{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 			-> (![(Index,SymbolType)], !v:{# MemberDef}, !u:{# DclModule},!*VarHeap, !*TypeHeaps, !*CheckState)
+
 	check_member_instances module_index member_mod_index mem_offset class_size ins_members class_members
 				ins_type instance_types member_defs modules var_heap type_heaps cs
 		| mem_offset == class_size
@@ -562,7 +563,6 @@ where
 					-> (Yes (type_def,glob_module), selector_defs, type_defs, modules, cs)
 			No
 				-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError "" " could not determine the type of this record" cs.cs_error })
-			
 
 	check_and_rearrange_fields mod_index field_index fields field_ass cs_error
 		| field_index < size fields
@@ -733,7 +733,6 @@ where
 		= (id_index, import_mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
 	determine_pattern_symbol mod_index id_index id_kind id_name cons_defs modules error
 		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError id_name " constructor expected" error)
-
 
 checkIdentPattern :: !Bool !Ident !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)
@@ -963,6 +962,12 @@ where
 	bind_opt_record_variable no is_node_pattern patterns _ var_heap
 		= (patterns, var_heap)
 
+checkPattern (PE_Bound bind) opt_var p_input accus ps e_info cs
+	= checkBoundPattern bind opt_var p_input accus ps e_info cs
+checkPattern (PE_Ident id) opt_var p_input accus ps e_info cs
+	= checkIdentPattern cIsNotInExpressionList id opt_var p_input accus ps e_info cs
+checkPattern PE_WildCard opt_var p_input accus ps e_info cs
+	= (AP_WildCard No, accus, ps, e_info, cs)
 checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patterns) ps e_info cs
 	# (var_env, ap_selections, ps_var_heap, cs)
 			= foldSt (check_array_selection p_input.pi_def_level) selections (var_env, [], ps.ps_var_heap, cs)
@@ -998,14 +1003,6 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 	check_rhs _ _ (var_env, ap_selections, var_heap, cs)
 		= (var_env, ap_selections, var_heap, 
 			{ cs & cs_error = checkError "" "variable expected on right hand side of array pattern" cs.cs_error })
-
-checkPattern (PE_Bound bind) opt_var p_input accus ps e_info cs
-	= checkBoundPattern bind opt_var p_input accus ps e_info cs
-
-checkPattern (PE_Ident id) opt_var p_input accus ps e_info cs
-	= checkIdentPattern cIsNotInExpressionList id opt_var p_input accus ps e_info cs
-checkPattern PE_WildCard opt_var p_input accus ps e_info cs
-	= (AP_WildCard No, accus, ps, e_info, cs)
 checkPattern expr opt_var p_input accus ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
@@ -1829,6 +1826,8 @@ transfromPatternIntoBind _ _ pattern src_expr var_store expr_heap e_info cs
 checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,ir_to}}) fun_defs e_info heaps cs
 	= checkFunctions mod_index level ir_from ir_to fun_defs e_info heaps cs
 
+// JVG: added type
+checkRhs :: [FreeVar] OptGuardedAlts LocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 	# ei_expr_level = inc ei_expr_level
 	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index rhs_locals e_state e_info cs
@@ -1890,6 +1889,8 @@ where
 		  (expr, free_vars, e_state, e_info, cs) = check_opt_guarded_alts free_vars alt_expr e_input e_state e_info cs
 	  	= (let_vars_list, [(let_binds, guard, expr) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
 
+	// JVG: added type
+	check_unguarded_expression :: [FreeVar] ExprWithLocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_unguarded_expression free_vars {ewl_nodes,ewl_expr,ewl_locals} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# this_expr_level = inc ei_expr_level
 		  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
@@ -1931,6 +1932,8 @@ where
 	check_sequential_lets free_vars [] let_vars_list e_input=:{ei_expr_level} e_state e_info cs
 		= ([], let_vars_list, ei_expr_level, free_vars, e_state, e_info, cs)
 
+	// JVG: added type
+	check_sequential_let :: [FreeVar] NodeDefWithLocals ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,!AuxiliaryPattern,!(![Ident],![ArrayPattern]),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals} e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars bind_src e_input e_state e_info cs
@@ -2013,6 +2016,7 @@ convertSubPattern (AP_WildCard opt_var) result_expr var_store expr_heap opt_dyna
 	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0  }, result_expr, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Empty _) result_expr var_store expr_heap opt_dynamics cs
 	= convertSubPattern (AP_WildCard No) EE var_store expr_heap opt_dynamics cs
+
 
 typeOfBasicValue :: !BasicValue !*CheckState -> (!BasicType, !*CheckState)
 typeOfBasicValue (BVI _) cs = (BT_Int, cs)

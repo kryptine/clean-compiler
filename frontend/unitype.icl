@@ -228,7 +228,6 @@ liftTempTypeVariable modules cons_vars tv_number subst ls
 class lift a :: !{# CommonDefs } !{# BOOLVECT } !a !*{! Type} !*LiftState
 	-> (!a, !*{! Type}, !*LiftState)
 
-
 instance lift Type
 where
 	lift modules cons_vars (TempV tv_number) subst ls
@@ -542,6 +541,8 @@ makeUnique attr {coer_demanded, coer_offered}
 	  coer_demanded = { coer_demanded & [attr] = CT_Unique }
 	= make_unique off_coercions {coer_offered = coer_offered, coer_demanded = coer_demanded}// ---> ("makeUnique :", attr)
 where
+	// JVG added type:
+	make_unique :: !CoercionTree !*Coercions -> *Coercions;
 	make_unique (CT_Node this_attr ct_less ct_greater) coercions
 		# coercions = makeUnique this_attr coercions
 		  coercions = make_unique ct_less coercions
@@ -563,6 +564,8 @@ makeNonUnique attr {coer_demanded, coer_offered}
 	= make_non_unique dem_coercions {coer_offered = coer_offered, coer_demanded = coer_demanded}
 //		---> ("makeNonUnique", attr)
 where
+	// JVG added type:
+	make_non_unique :: !CoercionTree !*Coercions -> *Coercions;
 	make_non_unique (CT_Node this_attr ct_less ct_greater) coercions
 		# coercions = makeNonUnique this_attr coercions
 		  coercions = make_non_unique ct_less coercions
@@ -588,7 +591,9 @@ Success (Yes _)	=  False
 instance coerce AType
 where
 	coerce sign defs cons_vars tpos at1=:{at_attribute=attr1, at_type = type1} at2=:{at_attribute=attr2}  cs=:{crc_coercions}
-		# attr_sign = adjust_sign sign type1 cons_vars
+		// JVG: added !
+		#!attr_sign = adjust_sign sign type1 cons_vars
+//		# attr_sign = adjust_sign sign type1 cons_vars
 		  (succ, crc_coercions) = coerceAttributes attr1 attr2 attr_sign crc_coercions
 		| succ
 			# (succ, cs) = coerceTypes sign defs cons_vars tpos at1 at2 { cs & crc_coercions = crc_coercions }

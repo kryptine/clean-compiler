@@ -36,6 +36,9 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 		= (predef_symbols, hash_table, files, error, io, out, No)
 	# {icl_functions,icl_instances,icl_specials,icl_common,icl_declared} = icl_mod
 //	  (components, icl_functions, error) = showComponents components 0 True icl_functions error
+
+	  dcl_mods = {{dcl_mod & dcl_declared={dcls_import=[],dcls_local=[],dcls_explicit=[]}}\\ dcl_mod<-:dcl_mods}
+
 	  (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, error)
 		= typeProgram (components -*-> "Typing") icl_functions icl_specials icl_common icl_declared.dcls_import dcl_mods heaps predef_symbols error
 	| not ok
@@ -57,11 +60,15 @@ frontEndInterface mod_ident search_paths predef_symbols hash_table files error i
 	  	= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics var_heap type_heaps expression_heap
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule dcl_mods common_defs dcl_types used_conses var_heap type_heaps
+
+//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+
 	  (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctionsIntoPatterns components imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
 	  (dcl_types, type_heaps, var_heap)
 			= convertImportedTypeSpecifications dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
+//	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
 	= (predef_symbols,hash_table,files,error,io,out,

@@ -518,8 +518,9 @@ freshSymbolType fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_
 			| new_var_id == var_id
 				= vars
 				= [var_id : add_variable new_var_id var_ids]
-		
-			
+	
+// JVG: added type:
+freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap
 	# (av_dem_info, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
 	  (av_off_info, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
@@ -810,12 +811,20 @@ where
 	requirements ti {var_name,var_info_ptr,var_expr_ptr} (reqs, ts)
 		# (var_info, ts_var_heap) = readPtr var_info_ptr ts.ts_var_heap
 		  ts = { ts & ts_var_heap = ts_var_heap }
+/* JVG: changed to reduce allocation because the case is polymorphic and lazy in req and ts: */
+		= (case var_info of
+			VI_Type type
+				-> type
+			_
+				-> abort ("requirements BoundVar" ---> (var_name <<- var_info))
+			, Yes var_expr_ptr, (reqs, ts))
+/*
 		= case var_info of
 			VI_Type type
 				-> (type, Yes var_expr_ptr, (reqs, ts))
 			_
 				-> abort ("requirements BoundVar" ---> (var_name <<- var_info))
-
+*/
 instance requirements App
 where
 	requirements ti {app_symb,app_args,app_info_ptr} (reqs=:{req_cons_variables, req_attr_coercions}, ts)
@@ -1422,6 +1431,7 @@ typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_ex
 	  type_code_instances = {createArray si_next_TC_member_index GTT_Function & [gtci_index] = gtci_type \\ {gtci_index, gtci_type} <- si_TC_instances}
 	= (not type_error, fun_defs, { ir_from = fun_env_size, ir_to = si_next_array_member_index }, type_code_instances, ti_common_defs, ti_functions,
 			{hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps }, predef_symbols, ts_error.ea_file)
+//				---> ("typeProgram", array_inst_types)
 where
 	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
 		= foldSt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
