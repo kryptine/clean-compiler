@@ -1124,7 +1124,9 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 		combine_patterns mod_index opt_var [first_expr] args nr_of_args ps e_info cs
 			= case first_expr of
 				AP_Constant kind constant=:{glob_object={ds_ident,ds_arity}} _
-					| ds_arity == nr_of_args
+					| ds_arity == nr_of_args || (case kind of
+												  APK_Macro -> True
+												  _ -> False)
 						# (pattern, ps, e_info, cs) = buildPattern mod_index kind constant args opt_var ps e_info cs
 						-> (pattern, ps, e_info, cs)
 						-> (AP_Empty ds_ident, ps, e_info, { cs & cs_error = checkError ds_ident "used with wrong arity" cs.cs_error})
@@ -1134,14 +1136,6 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 						-> (first_expr, ps, e_info, { cs & cs_error = checkError "<pattern>" "(curried) application not allowed " cs.cs_error })
 		combine_patterns mod_index opt_var [rev_arg : rev_args] args arity ps e_info cs
 			= combine_patterns mod_index opt_var rev_args [rev_arg : args] (inc arity) ps e_info cs
-/*
-		combine_optional_variables (Yes var1) (Yes var2) error
-			= (Yes var1, checkError var2.bind_dst "pattern already bound" error)
-		combine_optional_variables No opt_var error
-			= (opt_var, error)
-		combine_optional_variables opt_var _ error
-			= (opt_var, error)
-*/
 
 checkPattern (PE_DynamicPattern pattern type) opt_var p_input accus ps e_info cs=:{cs_x}
 	# (dyn_pat, accus, ps, e_info, cs) = checkPattern pattern No p_input accus ps e_info cs
@@ -1241,7 +1235,7 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 	check_index_expr (PE_Basic (BVI _)) states
 			= states
 	check_index_expr _ (var_env, ap_selections, var_heap, cs)
-		= (var_env, ap_selections, var_heap, { cs & cs_error = checkError "" "variable or integer constant expected as index expression" cs.cs_error })
+		= (var_env, ap_selections, var_heap, { cs & cs_error = checkError "variable or integer constant expected as index expression" "" cs.cs_error })
 
 	check_rhs def_level {bind_src=PE_Ident ident, bind_dst} (var_env, ap_selections, var_heap, cs)
 		| isLowerCaseName ident.id_name
@@ -1252,7 +1246,7 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 		// further with next alternative
 	check_rhs _ _ (var_env, ap_selections, var_heap, cs)
 		= (var_env, ap_selections, var_heap, 
-			{ cs & cs_error = checkError "" "variable expected on right hand side of array pattern" cs.cs_error })
+			{ cs & cs_error = checkError "variable expected on right hand side of array pattern" "" cs.cs_error })
 checkPattern expr opt_var p_input accus ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
@@ -1261,7 +1255,7 @@ checkPattern expr opt_var p_input accus ps e_info cs
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkPatternConstructor _ _ {ste_kind = STE_Empty} ident _  ps e_info cs=:{cs_error}
-	= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident " not defined" cs_error })
+	= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
 checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _,ste_index} ident opt_var  ps=:{ps_fun_defs} e_info cs=:{cs_error,cs_x}
 	# ({fun_symb,fun_arity,fun_kind,fun_priority},ps_fun_defs) = ps_fun_defs![ste_index]
 	  ps = { ps & ps_fun_defs = ps_fun_defs }
@@ -1273,8 +1267,8 @@ checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _
 			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
 					= unfoldPatternMacro mod_index ste_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
 			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
-			= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident " not defined" cs_error })
-		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_symb " not allowed in a pattern" cs_error })
+			= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
+		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_symb "not allowed in a pattern" cs_error })
 checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_symb opt_var ps
 		e_info=:{ef_cons_defs,ef_modules} cs=:{cs_error}
 	# (cons_index, cons_module, cons_arity, cons_priority, cons_type_index, ef_cons_defs, ef_modules, cs_error)
@@ -1285,7 +1279,7 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_symb o
 		= (AP_Constant (APK_Constructor cons_type_index) cons_symbol cons_priority, ps, e_info, { cs & cs_error = cs_error })
 	| cons_arity == 0
 		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = cs_error })
-		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = checkError cons_symb " constructor arguments are missing" cs_error })
+		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = checkError cons_symb "constructor arguments are missing" cs_error })
 where
 	determine_pattern_symbol mod_index id_index STE_Constructor id_name cons_defs modules error
 		# ({cons_type={st_arity},cons_priority, cons_type_index}, cons_defs) = cons_defs![id_index]
@@ -1296,7 +1290,7 @@ where
 		  id_index = convertIndex id_index (toInt STE_Constructor) dcl_conversions
 		= (id_index, import_mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
 	determine_pattern_symbol mod_index id_index id_kind id_name cons_defs modules error
-		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError id_name " constructor expected" error)
+		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError id_name "constructor expected" error)
 
 
 
@@ -1433,7 +1427,7 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 		src_expr position var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
 	# (src_expr, opt_var_bind, var_store, expr_heap) = bind_opt_var opt_var src_expr position var_store expr_heap
 	| ds_arity == 0
-		= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident " constant not allowed in a node pattern" cs.cs_error})
+		= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident "constant not allowed in a node pattern" cs.cs_error})
 	# (is_tuple, cs) = is_tuple_symbol glob_module ds_index cs
 	| is_tuple
 		# (tuple_var, tuple_bind, var_store, expr_heap) = bind_match_expr src_expr opt_var_bind position var_store expr_heap
@@ -1525,24 +1519,28 @@ where
 transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind _ _ pattern src_expr _ var_store expr_heap e_info cs
-	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" " illegal node pattern" cs.cs_error})
+	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" "illegal node pattern" cs.cs_error})
 
 
 
-unfoldPatternMacro mod_index macro_index macro_args opt_var ps=:{ps_var_heap, ps_fun_defs} modules cons_defs error
+unfoldPatternMacro mod_index macro_index all_macro_args opt_var ps=:{ps_var_heap, ps_fun_defs} modules cons_defs error
 	# (macro, ps_fun_defs) = ps_fun_defs![macro_index]
 	= case macro.fun_body of
 		TransformedBody {tb_args,tb_rhs}
 			| no_sharing tb_args
-				# ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
-				  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_symb opt_var tb_rhs ums
+				# length_macro_args = length tb_args
+				  (macro_args, extra_args)
+					= if (length all_macro_args==length_macro_args) 
+							(all_macro_args, []) 
+							(splitAt length_macro_args all_macro_args)
+				  ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
+				  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_symb opt_var extra_args tb_rhs ums
 				-> (pattern, { ps_fun_defs = ps_fun_defs, ps_var_heap = ums_var_heap}, ums_modules, ums_cons_defs, ums_error)
 				-> (AP_Empty macro.fun_symb, { ps_fun_defs = ps_fun_defs, ps_var_heap = ps_var_heap},
-						modules, cons_defs, checkError macro.fun_symb " sharing not allowed" error)
+						modules, cons_defs, checkError macro.fun_symb "sharing not allowed" error)
 		_
 			-> (AP_Empty macro.fun_symb, { ps_fun_defs = ps_fun_defs, ps_var_heap = ps_var_heap},
-					modules, cons_defs, checkError macro.fun_symb " illegal macro in pattern" error)
-	
+					modules, cons_defs, checkError macro.fun_symb "illegal macro in pattern" error)
 where
 	no_sharing [{fv_count} : args]
 		= fv_count <= 1 && no_sharing args
@@ -1552,21 +1550,23 @@ where
 	bind_var {fv_info_ptr} pattern ps_var_heap
 		= ps_var_heap <:= (fv_info_ptr, VI_Pattern pattern)
 
-	unfold_pattern_macro mod_index macro_ident _ (Var {var_name,var_info_ptr}) ums=:{ums_var_heap}
+	unfold_pattern_macro mod_index macro_ident _ extra_args (Var {var_name,var_info_ptr}) ums=:{ums_var_heap, ums_error}
+		| not (isEmpty extra_args)
+			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too much arguments for pattern macro" ums_error })
 		# (VI_Pattern pattern, ums_var_heap) = readPtr var_info_ptr ums_var_heap
 		= (pattern, { ums & ums_var_heap = ums_var_heap})
-	unfold_pattern_macro mod_index macro_ident opt_var (App {app_symb,app_args}) ums
-		= unfold_application  mod_index macro_ident opt_var app_symb app_args ums
+	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb,app_args}) ums
+		= unfold_application  mod_index macro_ident opt_var extra_args app_symb app_args ums
 	where
-		unfold_application  mod_index macro_ident opt_var {symb_kind=SK_Constructor {glob_module,glob_object},symb_name,symb_arity} args 
+		unfold_application  mod_index macro_ident opt_var extra_args {symb_kind=SK_Constructor {glob_module,glob_object},symb_name,symb_arity} app_args
 										ums=:{ums_cons_defs, ums_modules,ums_error}
 				# (cons_def, cons_index, ums_cons_defs, ums_modules) = get_cons_def mod_index glob_module glob_object ums_cons_defs ums_modules
-				| cons_def.cons_type.st_arity == symb_arity
-					# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
-					  cons_symbol = { glob_object = MakeDefinedSymbol symb_name cons_index symb_arity, glob_module = glob_module }	
-					= (AP_Algebraic cons_symbol cons_def.cons_type_index patterns opt_var, ums)	
+				| cons_def.cons_type.st_arity == symb_arity+length extra_args
+					# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
+					  cons_symbol = { glob_object = MakeDefinedSymbol symb_name cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
+					= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
 					= (AP_Empty cons_def.cons_symb, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
-							ums_error = checkError cons_def.cons_symb " missing argument(s)" ums_error })
+							ums_error = checkError cons_def.cons_symb "wrong number of arguments" ums_error })
 
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			| mod_index == cons_mod
@@ -1576,10 +1576,12 @@ where
 				  cons_def = dcl_common.com_cons_defs.[cons_index]
 				= (cons_def, convertIndex cons_index (toInt STE_Constructor) dcl_conversions, cons_defs, modules)
 
-	unfold_pattern_macro mod_index macro_ident opt_var (BasicExpr bv bt) ums
+	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv bt) ums=:{ums_error}
+		| not (isEmpty extra_args)
+			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too much arguments for pattern macro" ums_error })
 		= (AP_Basic bv opt_var, ums)
-	unfold_pattern_macro mod_index macro_ident opt_var expr ums=:{ums_error}
-		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident " illegal rhs for a pattern macro" ums_error })
+	unfold_pattern_macro mod_index macro_ident opt_var _ expr ums=:{ums_error}
+		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
 	
 	
 			
@@ -1603,7 +1605,7 @@ where
 		get_field_nr :: !Index !Ident !(Optional Ident) ![Global Index] !u:{#SelectorDef} !v:{# DclModule} !*CheckState
 				-> (!Index, !Index, !Index, u:{#SelectorDef}, v:{#DclModule}, !*CheckState)
 		get_field_nr mod_index sel_id _ [] selector_defs modules cs=:{cs_error}
-			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError id_name " selector not defined" cs_error })
+			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError id_name "selector not defined" cs_error })
 		get_field_nr mod_index sel_id (Yes type_id=:{id_info}) selectors selector_defs modules cs=:{cs_symbol_table,cs_error}
 			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 			# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type mod_index
@@ -1613,9 +1615,9 @@ where
 				| selector_offset <> NoIndex
 					= (type_module, selector_index, selector_offset, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table })
 					= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table,
-								cs_error = checkError id_name " selector not defined" cs_error })
+								cs_error = checkError id_name "selector not defined" cs_error })
 				= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table,
-						cs_error = checkError type_id " type not defined" cs_error })
+						cs_error = checkError type_id "type not defined" cs_error })
 		get_field_nr mod_index sel_id No [{glob_object,glob_module}] selector_defs modules cs
 			| mod_index == glob_module
 				# (selector_offset,selector_defs) = selector_defs![glob_object].sd_field_nr
@@ -1623,7 +1625,7 @@ where
 				# (selector_offset,modules) = modules![glob_module].dcl_common.com_selector_defs.[glob_object].sd_field_nr
 				= (glob_module, glob_object, selector_offset, selector_defs, modules, cs)
 		get_field_nr mod_index sel_id No _  selector_defs modules cs=:{cs_error}
-			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError sel_id " ambiguous selector specified" cs_error })
+			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError sel_id "ambiguous selector specified" cs_error })
 
 		determine_selector :: !Index !Index !Index ![Global Index] !u:{# SelectorDef} !v:{# DclModule} -> (!Int, !Int, !u:{# SelectorDef}, !v:{# DclModule})
 		determine_selector mod_index type_mod_index type_index [] selector_defs modules
@@ -1703,7 +1705,7 @@ where
 			 	= (Yes (type_def, type_mod_index), selector_defs, type_defs, modules, { cs & cs_symbol_table = cs_symbol_table })
 				# (type_def, modules) = modules![type_mod_index].dcl_common.com_type_defs.[type_index]
 				= (Yes (type_def, type_mod_index), selector_defs, type_defs, modules, { cs & cs_symbol_table = cs_symbol_table })
-			= (No, selector_defs, type_defs, modules, { cs & cs_error = checkError type_id " not defined" cs_error, cs_symbol_table = cs_symbol_table})
+			= (No, selector_defs, type_defs, modules, { cs & cs_error = checkError type_id "not defined" cs_error, cs_symbol_table = cs_symbol_table})
 	determine_record_type mod_index No fields selector_defs type_defs modules cs=:{cs_error}
 		# succ = try_to_get_unique_field fields
 		= case succ of
@@ -1717,7 +1719,7 @@ where
 					  type_def = com_type_defs.[sd_type_index]
 					-> (Yes (type_def,glob_module), selector_defs, type_defs, modules, cs)
 			No
-				-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError "" " could not determine the type of this record" cs.cs_error })
+				-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError "could not determine the type of this record" "" cs.cs_error })
 
 	check_and_rearrange_fields :: !Int !Int !{#FieldSymbol} ![Bind ParsedExpr (Ident,[Global .Int])] !*ErrorAdmin -> (![Bind ParsedExpr .(Global FieldSymbol)],!.ErrorAdmin);
 	check_and_rearrange_fields mod_index field_index fields field_ass cs_error
@@ -1744,7 +1746,7 @@ where
 			= mod_index == glob_module && fs_index == glob_object || field_list_contains_field mod_index fs_index fields
 
 		field_error {bind_dst=(field_id,_)} error
-			= checkError field_id " field is either multiply used or not a part of this record" error
+			= checkError field_id "field is either multiply used or not a part of this record" error
 
 
 
@@ -1763,7 +1765,7 @@ checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_
 	  (es_fun_defs, cs_symbol_table, cs_error) = addLocalFunctionDefsToSymbolTable def_level ir_from ir_to ef_is_macro_fun ps_fun_defs cs.cs_symbol_table cs.cs_error
 	= (loc_defs, accus, { e_state & es_fun_defs = es_fun_defs, es_var_heap = ps_var_heap }, e_info, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
 where
-	check_patterns [ (_,node_def) : node_defs ] p_input accus var_store e_info cs
+	check_patterns [ node_def : node_defs ] p_input accus var_store e_info cs
 		# (pattern, accus, var_store, e_info, cs) = checkPattern node_def.nd_dst No p_input accus var_store e_info cs
 		  (patterns, accus, var_store, e_info, cs) = check_patterns node_defs p_input accus var_store e_info cs
 		= ([{ node_def & nd_dst = pattern } : patterns], accus, var_store, e_info, cs)
@@ -1870,7 +1872,7 @@ buildApplication symbol form_arity act_arity is_fun args e_state=:{es_expr_heap}
 			= (App app, { e_state & es_expr_heap = es_expr_heap }, error)
 		# app = App { app_symb = { symbol & symb_arity = act_arity }, app_args = args, app_info_ptr = nilPtr }
 		| form_arity < act_arity
-			= (app, e_state, checkError symbol.symb_name " used with too many arguments" error)
+			= (app, e_state, checkError symbol.symb_name "used with too many arguments" error)
 			= (app, e_state, error)
 
 
