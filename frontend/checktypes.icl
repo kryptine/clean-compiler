@@ -719,8 +719,18 @@ where
 
 	check_type_context :: !TypeContext !Index v:{#CheckedTypeDef} !x:{#ClassDef} !u:{#.DclModule} !*TypeHeaps !*CheckState
 		-> (!TypeContext,!z:{#CheckedTypeDef},!x:{#ClassDef},!w:{#DclModule},!*TypeHeaps,!*CheckState), [u v <= w, v u <= z]
-	check_type_context tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident={id_name,id_info},ds_arity}},tc_types}
-		mod_index type_defs class_defs modules heaps cs=:{cs_symbol_table}
+	check_type_context tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
+		mod_index type_defs class_defs modules heaps cs=:{cs_symbol_table, cs_predef_symbols}
+// MW..
+  		#! {pds_ident} = cs_predef_symbols.[PD_TypeCodeClass]	
+		   pre_mod = cs_predef_symbols.[PD_PredefinedModule]
+		# (modules, cs) = case ds_ident==pds_ident of
+							True	# ({dcl_name}, modules) = modules![mod_index]
+									| pre_mod.pds_def <> mod_index
+										-> (modules, { cs & cs_needed_modules = cs.cs_needed_modules bitor cNeedStdDynamics })
+									-> (modules, cs) // the predefined module does not have to import StdDynamics
+							_	 	-> (modules, cs)
+// .. MW 
 		#! entry = sreadPtr id_info cs_symbol_table
 		# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
 		| class_index <> NotFound

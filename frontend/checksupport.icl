@@ -17,6 +17,12 @@ cGlobalScope	:== 1
 cIsNotADclModule 	:== False
 cIsADclModule 		:== True
 
+// MW..
+cNeedStdArray	:== 1
+cNeedStdEnum	:== 2
+cNeedStdDynamics:== 4
+// ..MW
+
 ::	Heaps =
 	{	hp_var_heap			::!.VarHeap
 	,	hp_expression_heap	::!.ExpressionHeap
@@ -25,7 +31,8 @@ cIsADclModule 		:== True
 
 ::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![IdentPos], ea_ok :: !Bool }
 
-::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin }
+::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,
+					cs_needed_modules :: !BITVECT } // MW++
 
 ::	ConversionTable		:== {# .{# Int }}
 

@@ -14,6 +14,12 @@ cGlobalScope	:== 1
 cIsNotADclModule 	:== False
 cIsADclModule 		:== True
 
+// MW..
+cNeedStdArray	:== 1
+cNeedStdEnum	:== 2
+cNeedStdDynamics:== 4
+// ..MW
+
 ::	VarHeap :== Heap VarInfo
 
 ::	Heaps =
@@ -24,7 +30,8 @@ cIsADclModule 		:== True
 
 ::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![IdentPos], ea_ok :: !Bool }
 
-::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin }
+::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,
+					cs_needed_modules :: !BITVECT } // MW++
 
 //	SymbolTable			:== {# SymbolTableEntry}
 
