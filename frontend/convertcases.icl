@@ -10,12 +10,18 @@ exactZip [] []
 exactZip [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
 
-::	*ConversionInfo =
+::	ConvertState =
 	{	cs_new_functions 	:: ![FunctionInfoPtr]
-	,	cs_fun_heap			:: !*FunctionHeap
-	,	cs_var_heap			:: !*VarHeap
-	,	cs_expr_heap		:: !*ExpressionHeap
+	,	cs_fun_heap			:: !.FunctionHeap
+	,	cs_var_heap			:: !.VarHeap
+	,	cs_expr_heap		:: !.ExpressionHeap
 	,	cs_next_fun_nr		:: !Index
+	}
+
+:: ConvertInfo =
+	{	ci_bound_vars :: ![(FreeVar, AType)]
+	,	ci_group_index :: !Index
+	,	ci_common_defs :: !{#CommonDefs}
 	}
 
 getIdent (Yes ident) fun_nr
@@ -24,46 +30,46 @@ getIdent No fun_nr
 	= { id_name = "_f" +++ toString fun_nr, id_info = nilPtr }
 
 
-class convertCases a :: ![(FreeVar, AType)] !Index !{# CommonDefs } !a  !*ConversionInfo -> (!a, !*ConversionInfo)
+class convertCases a :: !ConvertInfo !a  !*ConvertState -> (!a, !*ConvertState)
 
 instance convertCases [a] | convertCases a
 where
-	convertCases bound_vars group_index common_defs l cs = mapSt (convertCases bound_vars group_index common_defs) l cs 
+	convertCases ci l cs = mapSt (convertCases ci) l cs 
 		
 instance convertCases (a,b) | convertCases a & convertCases b
 where
-	convertCases bound_vars group_index common_defs t cs
-		= app2St (convertCases bound_vars group_index common_defs, convertCases bound_vars group_index common_defs) t cs
+	convertCases ci t cs
+		= app2St (convertCases ci, convertCases ci) t cs
 
 instance convertCases LetBind
 where
-	convertCases bound_vars group_index common_defs bind=:{lb_src} cs
-		# (lb_src, cs) = convertCases bound_vars group_index common_defs lb_src cs
+	convertCases ci bind=:{lb_src} cs
+		# (lb_src, cs) = convertCases ci lb_src cs
 		= ({ bind & lb_src = lb_src }, cs)
 
 instance convertCases (Bind a b) | convertCases a
 where
-	convertCases bound_vars group_index common_defs bind=:{bind_src} cs
-		# (bind_src, cs) = convertCases bound_vars group_index common_defs bind_src cs
+	convertCases ci bind=:{bind_src} cs
+		# (bind_src, cs) = convertCases ci bind_src cs
 		= ({ bind & bind_src = bind_src }, cs)
 
 instance convertCases DynamicExpr
 where
-	convertCases bound_vars group_index common_defs dynamik=:{dyn_expr} cs
-		# (dyn_expr, cs) = convertCases bound_vars group_index common_defs dyn_expr cs
+	convertCases ci dynamik=:{dyn_expr} cs
+		# (dyn_expr, cs) = convertCases ci dyn_expr cs
 		= ({ dynamik & dyn_expr = dyn_expr }, cs)
 	
 instance convertCases Let
 where
-	convertCases bound_vars group_index common_defs lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr} cs=:{cs_expr_heap}
+	convertCases ci lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr} cs=:{cs_expr_heap}
 		# (let_info, cs_expr_heap) =  readPtr let_info_ptr cs_expr_heap
 		  cs = { cs & cs_expr_heap = cs_expr_heap }
 		= case let_info of
 			EI_LetType let_type
 				# bound_vars = addLetVars (let_strict_binds ++ let_lazy_binds) let_type bound_vars
-				# (let_strict_binds, cs) = convertCases bound_vars group_index common_defs let_strict_binds cs
-				# (let_lazy_binds, cs) = convertCases bound_vars group_index common_defs let_lazy_binds cs
-				# (let_expr, cs) = convertCases bound_vars group_index common_defs let_expr cs
+				# (let_strict_binds, cs) = convertCases ci let_strict_binds cs
+				# (let_lazy_binds, cs) = convertCases ci let_lazy_binds cs
+				# (let_expr, cs) = convertCases ci let_expr cs
 				-> ({ lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cs)
 			_
 				-> abort "convertCases [Let] (convertcases 53)" // <<- let_info 
@@ -77,63 +83,63 @@ addLetVars [] _ bound_vars
 
 instance convertCases Expression  
 where
-	convertCases bound_vars group_index common_defs (App app=:{app_args}) cs
-		# (app_args, cs) = convertCases bound_vars group_index common_defs app_args cs
+	convertCases ci (App app=:{app_args}) cs
+		# (app_args, cs) = convertCases ci app_args cs
 		= (App {app & app_args = app_args}, cs)
-	convertCases bound_vars group_index common_defs (fun_expr @ exprs) cs
-		# ((fun_expr, exprs), cs) = convertCases bound_vars group_index common_defs (fun_expr, exprs) cs
+	convertCases ci (fun_expr @ exprs) cs
+		# ((fun_expr, exprs), cs) = convertCases ci (fun_expr, exprs) cs
 		= (fun_expr @ exprs, cs)
-	convertCases bound_vars group_index common_defs (Let lad) cs
-		# (lad, cs) = convertCases bound_vars group_index common_defs lad cs
+	convertCases ci (Let lad) cs
+		# (lad, cs) = convertCases ci lad cs
 		= (Let lad, cs)
-	convertCases bound_vars group_index common_defs (MatchExpr opt_tuple constructor expr) cs
-		# (expr, cs) = convertCases bound_vars group_index common_defs expr cs
+	convertCases ci (MatchExpr opt_tuple constructor expr) cs
+		# (expr, cs) = convertCases ci expr cs
 		= (MatchExpr opt_tuple constructor expr, cs)
-	convertCases bound_vars group_index common_defs (Selection is_unique expr selectors) cs
-		# (expr, cs) = convertCases bound_vars group_index common_defs expr cs
-		  (selectors, cs) = convertCases bound_vars group_index common_defs selectors cs
+	convertCases ci (Selection is_unique expr selectors) cs
+		# (expr, cs) = convertCases ci expr cs
+		  (selectors, cs) = convertCases ci selectors cs
 		= (Selection is_unique expr selectors, cs)		
-	convertCases bound_vars group_index common_defs (Update expr1 selectors expr2) cs
-		# (expr1, cs) = convertCases bound_vars group_index common_defs expr1 cs
-		  (selectors, cs) = convertCases bound_vars group_index common_defs selectors cs
-		  (expr2, cs) = convertCases bound_vars group_index common_defs expr2 cs
+	convertCases ci (Update expr1 selectors expr2) cs
+		# (expr1, cs) = convertCases ci expr1 cs
+		  (selectors, cs) = convertCases ci selectors cs
+		  (expr2, cs) = convertCases ci expr2 cs
 		= (Update expr1 selectors expr2, cs)		
-	convertCases bound_vars group_index common_defs (RecordUpdate cons_symbol expression expressions) cs
-		# (expression, cs) = convertCases bound_vars group_index common_defs expression cs
-		  (expressions, cs) = convertCases bound_vars group_index common_defs expressions cs
+	convertCases ci (RecordUpdate cons_symbol expression expressions) cs
+		# (expression, cs) = convertCases ci expression cs
+		  (expressions, cs) = convertCases ci expressions cs
 		= (RecordUpdate cons_symbol expression expressions, cs)		
-	convertCases bound_vars group_index common_defs (TupleSelect tuple_symbol arg_nr expr) cs
-		# (expr, cs) = convertCases bound_vars group_index common_defs expr cs
+	convertCases ci (TupleSelect tuple_symbol arg_nr expr) cs
+		# (expr, cs) = convertCases ci expr cs
 		= (TupleSelect tuple_symbol arg_nr expr, cs)
-	convertCases bound_vars group_index common_defs (Case case_expr) cs
-		= convertCasesInCaseExpression bound_vars group_index common_defs cHasNoDefault case_expr cs
+	convertCases ci (Case case_expr) cs
+		= convertCasesInCaseExpression ci cHasNoDefault case_expr cs
 /*
-	convertCases bound_vars group_index common_defs (DynamicExpr dynamik) cs
-		# (dynamik, cs) = convertCases bound_vars group_index common_defs dynamik cs
+	convertCases ci (DynamicExpr dynamik) cs
+		# (dynamik, cs) = convertCases ci dynamik cs
 		= (DynamicExpr dynamik, cs)
 */
-	convertCases bound_vars group_index common_defs expr cs
+	convertCases ci expr cs
 		= (expr, cs)
 
 instance convertCases Selection  
 where
-	convertCases bound_vars group_index common_defs (DictionarySelection record selectors expr_ptr index_expr) cs
-		# (index_expr, cs) = convertCases bound_vars group_index common_defs index_expr cs
-		  (selectors, cs) = convertCases bound_vars group_index common_defs selectors cs
+	convertCases ci (DictionarySelection record selectors expr_ptr index_expr) cs
+		# (index_expr, cs) = convertCases ci index_expr cs
+		  (selectors, cs) = convertCases ci selectors cs
 		= (DictionarySelection record selectors expr_ptr index_expr, cs)
-	convertCases bound_vars group_index common_defs (ArraySelection selector expr_ptr index_expr) cs
-		# (index_expr, cs) = convertCases bound_vars group_index common_defs index_expr cs
+	convertCases ci (ArraySelection selector expr_ptr index_expr) cs
+		# (index_expr, cs) = convertCases ci index_expr cs
 		= (ArraySelection selector expr_ptr index_expr, cs)
-	convertCases bound_vars group_index common_defs selector cs
+	convertCases ci selector cs
 		= (selector, cs)
 
 cHasNoDefault :== nilPtr
 
-convertDefaultToExpression default_ptr (EI_Default expr type prev_default) bound_vars group_index common_defs cs=:{cs_var_heap}
-    # cs_var_heap = foldSt (\({fv_info_ptr}, type) -> writePtr fv_info_ptr (VI_BoundVar type)) bound_vars cs_var_heap
+convertDefaultToExpression default_ptr (EI_Default expr type prev_default) ci cs=:{cs_var_heap}
+    # cs_var_heap = foldSt (\({fv_info_ptr}, type) -> writePtr fv_info_ptr (VI_BoundVar type)) ci.ci_bound_vars cs_var_heap
 	  (expression, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy expr { cp_free_vars = [], cp_var_heap = cs_var_heap, cp_local_vars = [] }
 	  (act_args, free_typed_vars, cs_var_heap) = foldSt retrieveVariable cp_free_vars ([], [], cp_var_heap)
-	  (fun_symb, cs) = new_default_function free_typed_vars cp_local_vars expression type prev_default group_index common_defs { cs & cs_var_heap = cs_var_heap }
+	  (fun_symb, cs) = new_default_function free_typed_vars cp_local_vars expression type prev_default ci.ci_group_index ci.ci_common_defs { cs & cs_var_heap = cs_var_heap }
 	= (App { app_symb = fun_symb, app_args = act_args, app_info_ptr = nilPtr }, 
 		{ cs & cs_expr_heap = cs.cs_expr_heap <:= (default_ptr, EI_DefaultFunction fun_symb act_args)})
 where
@@ -149,15 +155,15 @@ where
 	build_pattern ([ right_patterns : _ ], bb_rhs)
 		= { bb_args = right_patterns, bb_rhs = bb_rhs }
 
-convertDefaultToExpression default_ptr (EI_DefaultFunction fun_symb act_args) bound_vars group_index common_defs cs
+convertDefaultToExpression default_ptr (EI_DefaultFunction fun_symb act_args) ci cs
 	= (App { app_symb = fun_symb, app_args = act_args, app_info_ptr = nilPtr }, cs)
 
-combineDefaults default_ptr No bound_vars guards group_index common_defs cs=:{cs_expr_heap}
+combineDefaults default_ptr guards No ci cs=:{cs_expr_heap}
 	| isNilPtr default_ptr
 		= (No, cs)
-	| case_is_partial guards common_defs
+	| case_is_partial guards ci.ci_common_defs
 		# (default_info, cs_expr_heap) = readPtr default_ptr cs_expr_heap
-		  (default_expr, cs) = convertDefaultToExpression default_ptr default_info bound_vars group_index common_defs { cs & cs_expr_heap = cs_expr_heap }
+		  (default_expr, cs) = convertDefaultToExpression default_ptr default_info ci { cs & cs_expr_heap = cs_expr_heap }
 		= (Yes default_expr, cs)
 		= (No, cs)
 where
@@ -173,27 +179,27 @@ where
 		has_partial_pattern []
 			= False
 		has_partial_pattern [{ap_expr} : patterns]
-			= is_partial_expression ap_expr || has_partial_pattern patterns
+			= is_partial_expression ap_expr common_defs || has_partial_pattern patterns
 	case_is_partial (BasicPatterns BT_Bool bool_patterns) common_defs
 		= length bool_patterns < 2 || has_partial_basic_pattern bool_patterns
 	where
 		has_partial_basic_pattern []
 			= False
 		has_partial_basic_pattern [{bp_expr} : patterns]
-			= is_partial_expression bp_expr || has_partial_basic_pattern patterns
+			= is_partial_expression bp_expr common_defs || has_partial_basic_pattern patterns
 	case_is_partial patterns common_defs
 		= True
 	
-	is_partial_expression (Case {case_guards,case_default=No})
+	is_partial_expression (Case {case_guards,case_default=No}) common_defs
 		= case_is_partial case_guards common_defs
-	is_partial_expression (Case {case_guards,case_default=Yes case_default})
-		= is_partial_expression case_default && case_is_partial case_guards common_defs
-	is_partial_expression (Let {let_expr})
-		= is_partial_expression let_expr
-	is_partial_expression _
+	is_partial_expression (Case {case_guards,case_default=Yes case_default}) common_defs
+		= is_partial_expression case_default common_defs && case_is_partial case_guards common_defs
+	is_partial_expression (Let {let_expr}) common_defs
+		= is_partial_expression let_expr common_defs
+	is_partial_expression _ _
 		= False
 
-combineDefaults default_ptr this_default bound_vars guards group_index common_defs cs
+combineDefaults default_ptr guards this_default ci cs
 	= (this_default, cs)
 	
 
@@ -219,14 +225,14 @@ retrieveVariable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
 	= ( [Var { var_name = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
 		[({ fv_def_level = NotALevel, fv_name = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
 
-convertCasesInCaseExpression bound_vars group_index common_defs default_ptr { case_expr, case_guards, case_default, case_ident, case_info_ptr} cs
-	# (case_default, cs) = combineDefaults default_ptr case_default bound_vars case_guards group_index common_defs cs
-	  (case_expr, cs) = convertCases bound_vars group_index common_defs case_expr cs
+convertCasesInCaseExpression ci default_ptr { case_expr, case_guards, case_default, case_ident, case_info_ptr} cs
+	# (case_default, cs) = combineDefaults default_ptr case_guards case_default ci cs
+	  (case_expr, cs) = convertCases ci case_expr cs
 	  (EI_CaseTypeAndRefCounts case_type ref_counts, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
 	  (act_vars, form_vars, opt_free_var, local_vars, (case_guards, case_default), cs_var_heap)
-			= copy_case_expression bound_vars (get_variable case_expr case_type.ct_pattern_type) (case_guards,case_default) cs.cs_var_heap
+			= copy_case_expression ci.ci_bound_vars (get_variable case_expr case_type.ct_pattern_type) (case_guards,case_default) cs.cs_var_heap
 	  (fun_symb, cs) = new_case_function case_ident case_guards case_default case_type opt_free_var form_vars local_vars
-	  							group_index common_defs default_ptr { cs & cs_var_heap = cs_var_heap, cs_expr_heap = cs_expr_heap }
+	  							ci.ci_group_index ci.ci_common_defs default_ptr { cs & cs_var_heap = cs_var_heap, cs_expr_heap = cs_expr_heap }
 	= (App { app_symb = fun_symb, app_args = [ case_expr : act_vars ], app_info_ptr = nilPtr }, cs)
 where
 	get_variable (Var var) pattern_type
@@ -273,7 +279,7 @@ convertDefault default_ptr opt_var left_vars right_vars group_index common_defs 
 		= convert_default default_info opt_var left_vars right_vars group_index common_defs (fun_bodies, { cs & cs_expr_heap = cs_expr_heap})
 where
 	convert_default (EI_Default default_expr type prev_default) opt_var left_vars right_vars group_index common_defs (fun_bodies, cs)
-		# (bb_rhs, cs) = convertRootExpression (left_vars ++ consOptional opt_var right_vars) group_index common_defs prev_default default_expr cs
+		# (bb_rhs, cs) = convertRootExpression {ci_bound_vars=left_vars ++ consOptional opt_var right_vars, ci_group_index=group_index, ci_common_defs=common_defs} prev_default default_expr cs
 		  bb_args = build_args opt_var left_vars right_vars
 		= (fun_bodies ++ [{ bb_args = bb_args, bb_rhs = bb_rhs }], cs)	
 	convert_default (EI_DefaultFunction fun_symb act_args) opt_var left_vars right_vars group_index common_defs (fun_bodies, cs)
@@ -337,7 +343,7 @@ optionalToListofLists No
 hasOption (Yes _)	= True
 hasOption No		= False
 
-convertPatterns :: CasePatterns [[AType]] (Optional (FreeVar,AType)) [.(FreeVar,AType)] [(FreeVar,AType)] (Ptr ExprInfo) Index {#CommonDefs} *ConversionInfo -> *(!.[BackendBody],!*ConversionInfo);
+convertPatterns :: CasePatterns [[AType]] (Optional (FreeVar,AType)) [.(FreeVar,AType)] [(FreeVar,AType)] (Ptr ExprInfo) Index {#CommonDefs} *ConvertState -> *(!.[BackendBody],!*ConvertState);
 convertPatterns (AlgebraicPatterns algtype patterns) cons_types opt_var left_vars right_vars default_ptr group_index common_defs cs
 	# (guarded_exprs_list, cs) = mapSt (convert_algebraic_guard_into_function_pattern opt_var left_vars right_vars
 			group_index common_defs default_ptr) (exactZip patterns cons_types) cs
@@ -366,8 +372,8 @@ where
 			# bb_args = mapAppend selectFreeVar left_vars [FP_Basic value optional_var : right_patterns ]
 			= { bb_args = bb_args, bb_rhs = bb_rhs }
 
-convertPatternExpression :: ![(FreeVar,AType)] ![[(FreeVar,AType)]] !Index !{#CommonDefs} !ExprInfoPtr !Expression !*ConversionInfo
-	-> *(![([[FunctionPattern]], !Expression)], !*ConversionInfo)
+convertPatternExpression :: ![(FreeVar,AType)] ![[(FreeVar,AType)]] !Index !{#CommonDefs} !ExprInfoPtr !Expression !*ConvertState
+	-> *(![([[FunctionPattern]], !Expression)], !*ConvertState)
 convertPatternExpression left_vars right_vars group_index common_defs default_ptr
 		case_expr=:(Case {case_expr = Var var=:{var_info_ptr}, case_guards, case_default, case_info_ptr}) cs
 	| list_contains_variable var_info_ptr right_vars
@@ -454,7 +460,7 @@ convertPatternExpression left_vars right_vars group_index common_defs default_pt
 	= convertToRhsExpression left_vars right_vars group_index common_defs default_ptr expr cs
 
 convertToRhsExpression left_vars right_vars group_index common_defs default_ptr expr cs
-	# (bb_rhs, cs) = convertRootExpression (left_vars ++ flatten right_vars) group_index common_defs default_ptr expr cs
+	# (bb_rhs, cs) = convertRootExpression {ci_bound_vars=left_vars ++ flatten right_vars, ci_group_index=group_index, ci_common_defs=common_defs} default_ptr expr cs
 	= ([(map (map selectFreeVar) right_vars, bb_rhs)], cs)
 	
 selectFreeVar (fv,_) = FP_Variable fv
@@ -541,7 +547,7 @@ where
 				# (form_var, left, right) = split_vars var_info_ptr free_vars
 				= (form_var, [form_var_with_type : left], right)			
 	convert_cases_into_function_patterns (TransformedBody {tb_args,tb_rhs}) (Yes {st_result,st_args}) group_index common_defs cs
-		# (tb_rhs, cs) = convertRootExpression (exactZip tb_args st_args) group_index common_defs cHasNoDefault tb_rhs cs
+		# (tb_rhs, cs) = convertRootExpression {ci_bound_vars=exactZip tb_args st_args, ci_group_index=group_index, ci_common_defs=common_defs} cHasNoDefault tb_rhs cs
 		= (BackendBody [ { bb_args = map FP_Variable tb_args, bb_rhs = tb_rhs }], cs)
 
 	eliminate_code_sharing_in_function dcl_functions common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, cs=:{cs_expr_heap,cs_var_heap})
@@ -558,78 +564,30 @@ where
 	split (SK_Constructor cons_symb) (collected_functions, collected_conses)
 		= (collected_functions, [ cons_symb : collected_conses])
 
-convertRootExpression bound_vars group_index common_defs default_ptr (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) cs=:{cs_expr_heap}
+convertRootExpression ci default_ptr (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) cs=:{cs_expr_heap}
 	# (EI_LetType let_type, cs_expr_heap) = readPtr let_info_ptr cs_expr_heap
-	  bound_vars = addLetVars (let_strict_binds ++ let_lazy_binds) let_type bound_vars
-	  (let_strict_binds, cs)	= convertCases bound_vars group_index common_defs let_strict_binds { cs & cs_expr_heap = cs_expr_heap }
-	  (let_lazy_binds, cs)		= convertCases bound_vars group_index common_defs let_lazy_binds cs
-	  (let_expr, cs)			= convertRootExpression bound_vars group_index common_defs default_ptr let_expr cs
+	  bound_vars = addLetVars (let_strict_binds ++ let_lazy_binds) let_type ci.ci_bound_vars
+	  ci = {ci & ci_bound_vars=bound_vars}
+	  (let_strict_binds, cs)	= convertCases ci let_strict_binds { cs & cs_expr_heap = cs_expr_heap }
+	  (let_lazy_binds, cs)		= convertCases ci let_lazy_binds cs
+	  (let_expr, cs)			= convertRootExpression ci default_ptr let_expr cs
 	= (Let { lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cs)
-convertRootExpression bound_vars group_index common_defs default_ptr (Case kees=:{case_expr, case_guards, case_default, case_info_ptr}) cs
+convertRootExpression ci default_ptr (Case kees=:{case_expr, case_guards, case_default, case_info_ptr}) cs
 	= case case_guards of
 		BasicPatterns BT_Bool patterns
-			-> convert_boolean_case_into_guard bound_vars group_index common_defs default_ptr case_expr patterns case_default case_info_ptr cs
+			-> convert_boolean_case_into_guard ci default_ptr case_expr patterns case_default case_info_ptr cs
 		_
-			-> convertCasesInCaseExpression bound_vars group_index common_defs default_ptr kees cs
+			-> convertCasesInCaseExpression ci default_ptr kees cs
 
 where
-/*
-	convert_boolean_case_into_guard bound_vars  group_index common_defs default_ptr guard [ alt : alts ] case_default case_info_ptr cs
-		# (guard, cs) = convertRootExpression bound_vars group_index common_defs cHasNoDefault guard cs
-		  (then_bool, then_expr, opt_else_expr) = check_reachability alt alts
-		= case opt_else_expr of
-			Yes else_expr
-				# (then_expr, cs) = convertRootExpression bound_vars group_index common_defs cHasNoDefault then_expr cs
-				  (else_expr, cs) = convertRootExpression bound_vars group_index common_defs cHasNoDefault else_expr cs
-				-> (build_conditional then_bool guard then_expr else_expr, cs)
-			No
-				-> case case_default of
-					Yes default_expr
-						# (EI_CaseTypeAndRefCounts case_type ref_counts, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
-						  (default_ptr, cs_expr_heap) = makePtrToDefault case_default case_type.ct_result_type default_ptr cs_expr_heap
-						  (then_expr, cs) = convertRootExpression bound_vars group_index common_defs default_ptr then_expr { cs & cs_expr_heap = cs_expr_heap }
-						  (default_info, cs_expr_heap) = readPtr default_ptr cs.cs_expr_heap
-						  (else_expr, cs) = convertDefaultToExpression default_ptr default_info bound_vars group_index common_defs
-													{ cs & cs_expr_heap = cs_expr_heap }
-						-> (build_conditional then_bool guard then_expr else_expr, cs)
-					No
-						# (then_expr, cs) = convertRootExpression bound_vars group_index common_defs default_ptr then_expr cs
-						| isNilPtr default_ptr
-							-> (Conditional { if_cond = convert_guard then_bool guard, if_then = then_expr, if_else = No }, cs)
-							# (default_info, cs_expr_heap) = readPtr default_ptr cs.cs_expr_heap
-							  (else_expr, cs) = convertDefaultToExpression default_ptr default_info bound_vars group_index common_defs
-														{ cs & cs_expr_heap = cs_expr_heap }
-							-> (build_conditional then_bool guard then_expr else_expr, cs)
-
-	convert_guard guard_bool guard
-		| guard_bool
-			= guard
-			= Conditional { if_cond = guard, if_then = BasicExpr (BVB False) BT_Bool, if_else = Yes (BasicExpr (BVB True) BT_Bool) }
-
-	build_conditional then_bool guard then_expr else_expr
-		| then_bool
-			= Conditional { if_cond = guard, if_then = then_expr, if_else =  Yes else_expr }
-			= Conditional { if_cond = guard, if_then = else_expr, if_else =  Yes then_expr }
-		
-
-	check_reachability {bp_value=BVB bool,bp_expr} alts
-		= (bool, bp_expr, check_other_alternatives bool alts)
-	where
-		check_other_alternatives then_bool []
-			= No
-		check_other_alternatives then_bool [{bp_value=BVB else_bool,bp_expr} : alts ]
-			| then_bool == else_bool
-				= check_other_alternatives then_bool alts
-				= Yes bp_expr
-*/
 
 //	convert_boolean_case_into_guard bound_vars  group_index common_defs default_ptr guard [ alt : alts ] case_default case_info_ptr cs
-	convert_boolean_case_into_guard bound_vars  group_index common_defs has_default guard [ alt=:{bp_value=BVB sign_of_then_part,bp_expr} : alts ] case_default case_info_ptr cs
-		# (guard, cs) = convertRootExpression bound_vars group_index common_defs cHasNoDefault guard cs
+	convert_boolean_case_into_guard ci has_default guard [ alt=:{bp_value=BVB sign_of_then_part,bp_expr} : alts ] case_default case_info_ptr cs
+		# (guard, cs) = convertRootExpression ci cHasNoDefault guard cs
 		# (EI_CaseTypeAndRefCounts case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
 		# (default_ptr, cs_expr_heap) = makePtrToDefault case_default case_type.ct_result_type has_default cs_expr_heap
-		# (then_part, cs) = convertRootExpression bound_vars group_index common_defs default_ptr bp_expr {cs &cs_expr_heap=cs_expr_heap}
-		# (opt_else_part, cs) = convert_to_else_part bound_vars group_index common_defs default_ptr sign_of_then_part alts case_default cs
+		# (then_part, cs) = convertRootExpression ci default_ptr bp_expr {cs &cs_expr_heap=cs_expr_heap}
+		# (opt_else_part, cs) = convert_to_else_part ci default_ptr sign_of_then_part alts case_default cs
 //		= (Conditional { if_cond = { con_positive = sign_of_then_part, con_expression = guard }, if_then = then_part, if_else = opt_else_part }, cs)
 		= (build_conditional sign_of_then_part guard then_part opt_else_part, cs)
 	where
@@ -641,20 +599,19 @@ where
 			= Conditional { if_cond = Conditional { if_cond = guard, if_then = BasicExpr (BVB False) BT_Bool, if_else = Yes (BasicExpr (BVB True) BT_Bool) },
 								if_then = then_expr, if_else = No }
 
-		convert_to_else_part bound_vars group_index common_defs default_ptr sign_of_then_part [ alt=:{bp_value=BVB sign_of_else_part,bp_expr} : alts ] case_default cs
-			# (else_part, cs) = convertRootExpression bound_vars group_index common_defs default_ptr bp_expr cs
+		convert_to_else_part ci default_ptr sign_of_then_part [ alt=:{bp_value=BVB sign_of_else_part,bp_expr} : alts ] case_default cs
+			# (else_part, cs) = convertRootExpression ci default_ptr bp_expr cs
 			| sign_of_then_part == sign_of_else_part
-				= convert_to_else_part bound_vars group_index common_defs default_ptr sign_of_then_part alts case_default cs
+				= convert_to_else_part ci default_ptr sign_of_then_part alts case_default cs
 				= (Yes else_part, cs)
-		convert_to_else_part bound_vars group_index common_defs default_ptr sign_of_then_part [ ] (Yes else_part) cs
-			# (else_part, cs) = convertRootExpression bound_vars group_index common_defs has_default else_part cs
+		convert_to_else_part ci default_ptr sign_of_then_part [ ] (Yes else_part) cs
+			# (else_part, cs) = convertRootExpression ci has_default else_part cs
 			= (Yes else_part, cs)
-		convert_to_else_part bound_vars group_index common_defs default_ptr sign_of_then_part [ ] No cs
+		convert_to_else_part ci default_ptr sign_of_then_part [ ] No cs
 			= (No, cs)
 
-convertRootExpression bound_vars group_index common_defs _ expr cs
-	= convertCases bound_vars group_index common_defs expr cs
-
+convertRootExpression ci _ expr cs
+	= convertCases ci expr cs
 
 ::	CopyInfo =
 	{	cp_free_vars	:: ![(VarInfoPtr,AType)]
@@ -932,7 +889,6 @@ where
 	where
 		remove_variable ([], var_heap) let_bind
 			= ([], var_heap)
-// MW0		remove_variable ([var_ptr : var_ptrs], var_heap) bind=:{bind_dst={fv_name,fv_info_ptr}}
 		remove_variable ([var_ptr : var_ptrs], var_heap) bind=:{lb_dst={fv_name,fv_info_ptr}}
 			| fv_info_ptr == var_ptr
 				# (VI_LetVar {lvi_count,lvi_depth}, var_heap) = readPtr fv_info_ptr var_heap
@@ -941,13 +897,10 @@ where
 				# (var_ptrs, var_heap) = remove_variable (var_ptrs, var_heap) bind
 				= ([var_ptr : var_ptrs], var_heap)
 
-// MW0		store_binding {bind_dst={fv_name,fv_info_ptr},bind_src} var_heap
 		store_binding {lb_dst={fv_name,fv_info_ptr},lb_src} var_heap
 			= var_heap <:= (fv_info_ptr, VI_LetVar {lvi_count = 0, lvi_depth = depth, lvi_previous = [],
-// MW0													lvi_new = True, lvi_expression = bind_src, lvi_var = fv_name})
 													lvi_new = True, lvi_expression = lb_src, lvi_var = fv_name})
 
-// MW0		get_ref_count {bind_dst={fv_name,fv_info_ptr}} var_heap 
 		get_ref_count {lb_dst={fv_name,fv_info_ptr}} var_heap 
 			# (VI_LetVar {lvi_count}, var_heap) = readPtr fv_info_ptr var_heap
 		  	= (lvi_count, var_heap)
@@ -1015,7 +968,6 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 			weighted_ref_count_in_algebraic_pattern dcl_functions common_defs depth {ap_expr,ap_symbol={glob_module, glob_object={ds_index}}} wrc_state
 				# (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
 						= weightedRefCountInPatternExpr rc_main_dcl_module_n dcl_functions common_defs depth ap_expr wrc_state
-//				| glob_module <> cIclModIndex
 				| glob_module <> rc_main_dcl_module_n
 					# {cons_type_ptr} = common_defs.[glob_module].com_cons_defs.[ds_index]
 					  (collected_imports, var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
@@ -1036,7 +988,6 @@ weightedRefCountOfCase dcl_functions common_defs depth this_case=:{case_expr, ca
 //			---> ("weightedRefCountOfCase 2", ptrToInt case_info_ptr, case_expr)
 
 checkRecordSelector common_defs {glob_module, glob_object={ds_index}} rc_info=:{rc_imports,rc_var_heap}
-//	| glob_module <> cIclModIndex
 	| glob_module <> rc_info.rc_main_dcl_module_n
 		# {com_selector_defs,com_cons_defs,com_type_defs} = common_defs.[glob_module]
 		  {sd_type_index} = com_selector_defs.[ds_index]
@@ -1113,7 +1064,6 @@ where
 		check_import dcl_functions common_defs {symb_kind=SK_Function {glob_module,glob_object}} rc_info=:{rc_imports, rc_var_heap}
 			= checkImportOfDclFunction dcl_functions common_defs glob_module glob_object rc_info
 		check_import dcl_functions common_defs {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rc_info=:{rc_imports, rc_var_heap}
-//			| glob_module <> cIclModIndex
 			| glob_module <> rc_info.rc_main_dcl_module_n
 				# {cons_type_ptr} = common_defs.[glob_module].com_cons_defs.[glob_object]
 				  (rc_imports, rc_var_heap) = checkImportedSymbol symb_kind cons_type_ptr (rc_imports, rc_var_heap)
@@ -1238,13 +1188,6 @@ where
 				_	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
 						{dl_info & di_expr_heap = dl_info.di_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
 	where
-/* MW0
-		set_let_expression_info depth [(let_strict, {bind_src,bind_dst}):binds][ref_count:ref_counts][type:types] var_heap
-			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { bind_dst & fv_info_ptr = new_info_ptr },
-			  			lei_expression = bind_src, lei_type = type, lei_status = LES_Untouched }
-			= set_let_expression_info depth binds ref_counts types (var_heap <:= (bind_dst.fv_info_ptr, VI_LetExpression lei))
-*/
 		set_let_expression_info depth [(let_strict, {lb_src,lb_dst}):binds][ref_count:ref_counts][type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { lb_dst & fv_info_ptr = new_info_ptr },
@@ -1253,7 +1196,6 @@ where
 		set_let_expression_info depth [] _ _ var_heap
 			= var_heap
 		
-// MW0		distribute_lets_in_non_distributed_let depth {bind_dst={fv_name,fv_info_ptr}} dl_info=:{di_var_heap}
 		distribute_lets_in_non_distributed_let depth {lb_dst={fv_name,fv_info_ptr}} dl_info=:{di_var_heap}
 			# (VI_LetExpression lei=:{lei_depth,lei_count,lei_status}, di_var_heap) = readPtr fv_info_ptr di_var_heap
 			| lei_count > 0
@@ -1394,12 +1336,9 @@ buildLetExpr let_vars let_expr (var_heap, expr_heap)
 				-> (Let { inner_let & let_lazy_binds = lazy_binds }, (var_heap, expr_heap))
 			_
 				# (let_info_ptr, expr_heap) = newPtr (EI_LetType lazy_binds_types) expr_heap
-// MW0				-> (Let { let_strict_binds = [], let_lazy_binds = lazy_binds, let_expr = let_expr, let_info_ptr = let_info_ptr }, (var_heap, expr_heap))
 				-> (Let { let_strict_binds = [], let_lazy_binds = lazy_binds, let_expr = let_expr,
 						let_info_ptr = let_info_ptr, let_expr_position = NoPos }, (var_heap, expr_heap))
 where
-// MW0	build_bind :: !VarInfoPtr !(!Env Expression FreeVar, ![AType], !*VarHeap)
-// MW0		-> (!Env Expression FreeVar, ![AType], !*VarHeap)
 	build_bind :: !VarInfoPtr !(![LetBind], ![AType], !*VarHeap)
 		-> (![LetBind], ![AType], !*VarHeap)
 	build_bind info_ptr (lazy_binds, lazy_binds_types, var_heap)
@@ -1408,8 +1347,6 @@ where
 		  (LES_Updated updated_expr) = lei_status
 		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap 
 		  var_heap = var_heap <:= (info_ptr, VI_LetExpression { lei & lei_status = LES_Untouched, lei_var = { lei_var & fv_info_ptr = new_info_ptr }})
-//			==> (lei_var.fv_name, info_ptr, new_info_ptr)
-// MW0		= ([{ bind_src = updated_expr, bind_dst = lei_var } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
 		= ([{ lb_src = updated_expr, lb_dst = lei_var, lb_position = NoPos } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
 
 instance distributeLets Selection
