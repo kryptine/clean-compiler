@@ -58,6 +58,7 @@ void GenFill1 (Label symblab,int arity,int offset,char bits[]);
 void GenFill2 (Label symblab, int arity,int offset,char bits[]);
 void GenBuild (Label symblab,int arity,Label contlab);
 void GenBuildh (Label symblab,int arity);
+void GenBuildPartialFunctionh (Label symblab,int arity);
 void GenBuildU (Label symblab,int a_size,int b_size,Label contlab);
 void GenBuildArray (int argoffset);
 void GenBuildString (SymbValue val);
@@ -103,6 +104,7 @@ void GenCreate (int arity);
 void GenDumpString (char *str);
 
 void GenLabelDefinition (Label lab);
+void GenNodeEntryLabelDefinition (Label lab);
 
 void GenFieldLabelDefinition (Label label,char *record_name);
 
@@ -152,6 +154,7 @@ void GenOStackLayout (int asize,int bsize,Args fun_args);
 void GenNodeEntryDirective (int arity,Label label,Label label2);
 void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label label2);
 void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label2);
+void GenLazyRecordNodeEntryDirective (int arity,Label label);
 void GenFieldNodeEntryDirective (int arity, Label label, Label label2,char *record_name);
 void GenConstructorDescriptorAndExport (SymbDef sdef);
 void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef);
@@ -200,6 +203,7 @@ void GenFillCaf (Label label,int a_stack_size,int b_stack_size);
 void GenCaf (Label label,int a_stack_size,int b_stack_size);
 
 void GenPB (char *function_name);
+void GenPB_with_line_number (char *function_name,int line_number);
 void GenPD (void);
 void GenPN (void);
 void GenPL (void);

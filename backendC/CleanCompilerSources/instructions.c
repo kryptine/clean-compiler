@@ -185,6 +185,42 @@ static void GenLabel (Label label)
 		FPrintF (OutFile,".%u",label->lab_post);
 }
 
+static void GenDescriptorOrNodeEntryLabel (Label label)
+{
+	if (label->lab_issymbol){
+		SymbDef def;
+		char *module_name;
+
+		def=label->lab_symbol;
+
+		module_name = label->lab_mod;
+		
+		if (module_name!=NULL)
+			FPrintF (OutFile,"e_%s_%s%s",module_name,label->lab_pref,def->sdef_ident->ident_name);
+		else if (ExportLocalLabels){
+			if (def->sdef_kind==IMPRULE)
+				FPrintF (OutFile,"e_%s_%s%s.%u",CurrentModule,label->lab_pref,def->sdef_ident->ident_name,def->sdef_number);
+			else
+				FPrintF (OutFile,"e_%s_%s%s",CurrentModule,label->lab_pref,def->sdef_ident->ident_name);
+		} else if (DoDebug){
+			if (def->sdef_kind==IMPRULE)
+				FPrintF (OutFile, "%s%s.%u",label->lab_pref,def->sdef_ident->ident_name,def->sdef_number);
+			else
+				FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_ident->ident_name);
+		} else if (def->sdef_number==0)
+			FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_ident->ident_name);
+		else if (label->lab_pref[0] == '\0')
+			FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
+		else
+			FPrintF (OutFile,"%s%u",label->lab_pref,def->sdef_number);
+	} else {
+		FPutS (label->lab_pref,OutFile);
+		FPutS (label->lab_name,OutFile);
+	}
+	if (label->lab_post!=0)
+		FPrintF (OutFile,".%u",label->lab_post);
+}
+
 static void GenGetWL (int offset)
 {
 	FPrintF (OutFile, "\n\tgetWL %d", offset);
@@ -1752,20 +1788,20 @@ void GenPushNodeU (Label contlab,int a_size,int b_size)
 	put_arguments__nn_b (a_size,b_size);
 }
 
-void GenFill (Label symblab, int arity,Label contlab, int offset, FillKind fkind)
+void GenFill (Label symblab,int arity,Label contlab,int offset,FillKind fkind)
 {
 	TreatWaitListBeforeFill (offset, fkind);
 
 	put_instruction_b (fill);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 	
 	put_arguments__n__b (arity);
 	
-	GenLabel (contlab);
+	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments__n_b (offset);
 
@@ -1779,13 +1815,13 @@ void GenFillU (Label symblab,int a_size,int b_size,Label contlab,int offset)
 	put_instruction_ (Ifill_u);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 	
 	FPrintF (OutFile," %d %d ",a_size,b_size);
 		
-	GenLabel (contlab);
+	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments__n_b (offset);
 }
@@ -1795,13 +1831,13 @@ void GenFillcp (Label symblab,int arity,Label contlab,int offset,char bits[])
 	put_instruction_b (fillcp);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 	
 	put_arguments__n__b (arity);
 	
-	GenLabel (contlab);
+	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments__n_b (offset);
 
@@ -1813,13 +1849,13 @@ void GenFillcpU (Label symblab,int a_size,int b_size,Label contlab,int offset,ch
 	put_instruction_b (fillcp_u);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 		
 	FPrintF (OutFile," %d %d ",a_size,b_size);
 
-	GenLabel (contlab);
+	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments__n_b (offset);
 
@@ -1833,7 +1869,7 @@ void GenFillh (Label symblab, int arity, int offset, FillKind fkind)
 	put_instruction_b (fillh);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 	
@@ -1868,13 +1904,13 @@ void GenBuild (Label symblab,int arity,Label contlab)
 	put_instruction_b (build);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 	
 	put_arguments__n__b (arity);
 	
-	GenLabel (contlab);
+	GenDescriptorOrNodeEntryLabel (contlab);
 }
 
 void GenBuildh (Label symblab,int arity)
@@ -1889,18 +1925,30 @@ void GenBuildh (Label symblab,int arity)
 	put_arguments__n_b (arity);
 }
 
+void GenBuildPartialFunctionh (Label symblab,int arity)
+{
+	put_instruction_b (buildh);
+	
+	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
+		GenDescriptorOrNodeEntryLabel (symblab);
+	else
+		FPutS (empty_lab.lab_name, OutFile);
+	
+	put_arguments__n_b (arity);
+}
+
 void GenBuildU (Label symblab,int a_size,int b_size,Label contlab)
 {
 	put_instruction_ (Ibuild_u);
 	
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
-		GenLabel (symblab);
+		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		FPutS (empty_lab.lab_name, OutFile);
 	
 	FPrintF (OutFile," %d %d ",a_size,b_size);
 	
-	GenLabel (contlab);
+	GenDescriptorOrNodeEntryLabel (contlab);
 }
 
 void GenBuildArray (int argoffset)
@@ -2206,6 +2254,12 @@ void GenLabelDefinition (Label lab)
 		FPutC ('\n', OutFile);
 		GenLabel (lab);
 	}
+}
+
+void GenNodeEntryLabelDefinition (Label lab)
+{
+	FPutC ('\n', OutFile);
+	GenDescriptorOrNodeEntryLabel (lab);
 }
 
 void GenUpdateA (int src, int dst)
@@ -2540,7 +2594,7 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 		put_arguments_n__b (arity);
 
 		if (DescriptorNeeded (label->lab_symbol))
-			GenLabel (label);
+			GenDescriptorOrNodeEntryLabel (label);
 		else
 			FPutS (empty_lab.lab_name, OutFile);
 
@@ -2548,6 +2602,26 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 			FPutC (' ', OutFile);
 			GenLabel (label2);
 		}
+#ifdef MEMORY_PROFILING_WITH_N_STRING
+		if (DoProfiling && arity>=0 && !DoParallel){
+			put_directive_ (Dn_string);
+			FPrintF (OutFile,"\"%s\"",label->lab_symbol->sdef_ident->ident_name);
+		}
+#endif
+	}
+}
+
+void GenLazyRecordNodeEntryDirective (int arity,Label label)
+{
+	if (DoStackLayout){
+		put_directive_b (n);
+		put_arguments_n__b (arity);
+
+		if (DescriptorNeeded (label->lab_symbol))
+			GenLabel (label);
+		else
+			FPutS (empty_lab.lab_name, OutFile);
+
 #ifdef MEMORY_PROFILING_WITH_N_STRING
 		if (DoProfiling && arity>=0 && !DoParallel){
 			put_directive_ (Dn_string);
@@ -2586,7 +2660,7 @@ void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label
 		FPrintF (OutFile,"%d %d ",a_size,b_size);
 
 		if (DescriptorNeeded (label->lab_symbol))
-			GenLabel (label);
+			GenDescriptorOrNodeEntryLabel (label);
 		else
 			FPutS (empty_lab.lab_name, OutFile);
 
@@ -2725,6 +2799,11 @@ void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
 	
 	name = arr_fun_def->sdef_ident->ident_name;
 	
+	if (ExportLocalLabels){
+		put_directive_ (Dexport);
+		FPrintF (OutFile,"e_%s_" D_PREFIX "%s",CurrentModule,name);
+	}
+
 	descriptor_label=*desclab;
 	descriptor_label.lab_pref=d_pref;
 	
@@ -2733,7 +2812,10 @@ void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
 	else
 		put_directive_ (Ddescn);
 	
-	GenLabel (&descriptor_label);
+	if (ExportLocalLabels)
+		FPrintF (OutFile,"e_%s_" D_PREFIX "%s ",CurrentModule,name);
+	else
+		GenLabel (&descriptor_label);
 
 	FPutC (' ', OutFile);
 	GenLabel (&empty_lab);
@@ -2767,45 +2849,87 @@ void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 					CurrentModule,name,CurrentModule,name,CurrentModule,name);
 	} else {
 		if (sdef->sdef_mark & SDEF_USED_CURRIED_MASK){
-			put_directive_ (Ddesc);
-			
-			if (DoDebug)
-				FPrintF (OutFile, D_PREFIX "%s.%u ", name,sdef->sdef_number);
-			else
-				FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
+			int sdef_n;
+						
+			sdef_n=sdef->sdef_number;
+
+			if (ExportLocalLabels){
+				put_directive_ (Dexport);
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u",CurrentModule,name,sdef_n);
+
+				if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+					put_directive_ (Dexport);
+					FPrintF (OutFile,"e_%s_" N_PREFIX "%s.%u",CurrentModule,name,sdef_n);
+				}
+
+				put_directive_ (Ddesc);
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u ",CurrentModule,name,sdef_n);
+			} else {
+				put_directive_ (Ddesc);
+				if (DoDebug)
+					FPrintF (OutFile,D_PREFIX "%s.%u ",name,sdef_n);
+				else
+					FPrintF (OutFile,LOCAL_D_PREFIX "%u ",sdef_n);
+			}
 			
 			if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
-				if (DoDebug)
-					FPrintF (OutFile,N_PREFIX "%s.%u ",name,sdef->sdef_number);
+				if (ExportLocalLabels)
+					FPrintF (OutFile,"e_%s_" N_PREFIX "%s.%u ",CurrentModule,name,sdef_n);
+				else if (DoDebug)
+					FPrintF (OutFile,N_PREFIX "%s.%u ",name,sdef_n);
 				else
-					FPrintF (OutFile,N_PREFIX "%u ",sdef->sdef_number);
+					FPrintF (OutFile,N_PREFIX "%u ",sdef_n);
 			} else
 				FPrintF (OutFile, "%s ", hnf_lab.lab_name);
 			
 			if (DoDebug)
-				FPrintF (OutFile,L_PREFIX "%s.%u ",name,sdef->sdef_number);
+				FPrintF (OutFile,L_PREFIX "%s.%u ",name,sdef_n);
 			else
-				FPrintF (OutFile,L_PREFIX "%u ",sdef->sdef_number);
+				FPrintF (OutFile,L_PREFIX "%u ",sdef_n);
 		} else {
-			put_directive_ (Ddescn);
+			int sdef_n;
 
-			if (DoDebug)
-				FPrintF (OutFile, D_PREFIX "%s.%u ", name,sdef->sdef_number);
-			else
-				FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
+			sdef_n=sdef->sdef_number;
 
-			if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+			if (ExportLocalLabels){
+				put_directive_ (Dexport);
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u",CurrentModule,name,sdef_n);
+
+				if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+					put_directive_ (Dexport);
+					FPrintF (OutFile,"e_%s_" N_PREFIX "%s.%u",CurrentModule,name,sdef_n);
+				}
+
+				put_directive_ (Ddescn);
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u ",CurrentModule,name,sdef_n);
+			} else {
+				put_directive_ (Ddescn);
 				if (DoDebug)
-					FPrintF (OutFile,N_PREFIX "%s.%u ",name,sdef->sdef_number);
+					FPrintF (OutFile,D_PREFIX "%s.%u ",name,sdef_n);
 				else
-					FPrintF (OutFile,N_PREFIX "%u ",sdef->sdef_number);
+					FPrintF (OutFile,LOCAL_D_PREFIX "%u ",sdef_n);
+			}
+			
+			if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+				if (ExportLocalLabels)
+					FPrintF (OutFile,"e_%s_" N_PREFIX "%s.%u ",CurrentModule,name,sdef_n);
+				else if (DoDebug)
+					FPrintF (OutFile,N_PREFIX "%s.%u ",name,sdef_n);
+				else
+					FPrintF (OutFile,N_PREFIX "%u ",sdef_n);
 			} else
 				FPrintF (OutFile, "%s ", hnf_lab.lab_name);				
 		}
 	}
 	
 	FPrintF (OutFile, "%d 0 \"", sdef->sdef_arity);
-	PrintSymbolOfIdent (name_id, 0, OutFile);
+	if (ExportLocalLabels){
+		if (sdef->sdef_exported)
+			FPrintF (OutFile,"%s",name);
+		else
+			FPrintF (OutFile,"%s.%u",name,sdef->sdef_number);
+	} else
+		PrintSymbolOfIdent (name_id, 0, OutFile);
 	FPutC ('\"',OutFile);
 }
 
@@ -3099,6 +3223,11 @@ void GenStart (SymbDef startsymb)
 		
 		if (startsymb->sdef_exported)
 			FPrintF (OutFile, "e_%s_" D_PREFIX "Start",CurrentModule);
+		else if (ExportLocalLabels)
+			if (DoParallel)
+				FPrintF (OutFile,"e_%s_" D_PREFIX "Start.%u",CurrentModule,startsymb->sdef_number);
+			else
+				FPutS (empty_lab.lab_name, OutFile);		
 		else if (DoDebug){
 			if (DoParallel)
 				FPrintF (OutFile, D_PREFIX "Start.%u",startsymb->sdef_number);
@@ -3115,6 +3244,8 @@ void GenStart (SymbDef startsymb)
 
 		if (startsymb->sdef_exported)
 			FPrintF (OutFile, "e_%s_" N_PREFIX "Start",CurrentModule);
+		else if (ExportLocalLabels)
+			FPrintF (OutFile, "e_%s_" N_PREFIX "Start.%u",CurrentModule,startsymb->sdef_number);
 		else if (DoDebug)
 			FPrintF (OutFile, N_PREFIX "Start.%u",startsymb->sdef_number);
 		else
@@ -3184,7 +3315,12 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 		FPrintF (OutFile, "x_%u", sdef->sdef_number);
 	else if (sdef->sdef_exported)
 		FPrintF (OutFile, "e_%s_" D_PREFIX "%s", CurrentModule, sdef->sdef_ident->ident_name);
-	else if (DoDebug){
+	else if (ExportLocalLabels){
+		if (sdef->sdef_kind==IMPRULE)
+			FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u",CurrentModule,sdef->sdef_ident->ident_name,sdef->sdef_number);
+		else
+			FPrintF (OutFile,"e_%s_" D_PREFIX "%s",CurrentModule,sdef->sdef_ident->ident_name);
+	} else if (DoDebug){
 		if (sdef->sdef_kind==IMPRULE)
 			FPrintF (OutFile, D_PREFIX "%s.%u", sdef->sdef_ident->ident_name,sdef->sdef_number);
 		else
@@ -3364,6 +3500,12 @@ void GenPB (char *function_name)
 {
 	put_directive_ (Dpb);
 	FPrintF (OutFile,"\"%s\"",function_name);
+}
+
+void GenPB_with_line_number (char *function_name,int line_number)
+{
+	put_directive_ (Dpb);
+	FPrintF (OutFile,"\"%s[line:%d]\"",function_name,line_number);
 }
 
 void GenPD (void)

@@ -258,7 +258,10 @@ void BuildLazyTupleSelectorLabel (Label slab, int arity, int argnr)
 void BuildLazyTupleSelectorAndRemoveLabel (Label slab,int arity,int argnr)
 {
 	if (argnr > NrOfGlobalSelectors){
+		MakeLabel (slab,glob_selr,argnr,n_pref);
+#if 0
 		error_in_function ("BuildLazyTupleSelectorAndRemoveLabel");
+#endif
 	} else 
 		MakeLabel (slab,glob_selr,argnr,n_pref);
 }
@@ -892,7 +895,7 @@ static void GenLazyRecordEntry (SymbDef rdef)
 
 	GenLazyRecordDescriptorAndExport (rdef);
 
-	GenNodeEntryDirective (arity,&d_label,NULL);
+	GenLazyRecordNodeEntryDirective (arity,&d_label);
 
 	GenOAStackLayout (1);
 	GenLabelDefinition (&CurrentAltLabel);
@@ -1222,7 +1225,7 @@ Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef roo
 	GenNodeEntryDirective (arity,&d_lab,ea_label_in_node_directive);
 	
 	GenOAStackLayout (1);
-	GenLabelDefinition (&n_lab);
+	GenNodeEntryLabelDefinition (&n_lab);
 	GenPushNode (ReduceError,arity);
 
 	if (! update_root_node)
@@ -1380,7 +1383,7 @@ Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args
 		GenNodeEntryDirective (args_a_size,&d_lab,ea_label_in_node_directive);
 	
 	GenOAStackLayout (1);
-	GenLabelDefinition (&n_lab);
+	GenNodeEntryLabelDefinition (&n_lab);
 	if (args_b_size!=0)
 		GenPushNodeU (ReduceError,args_a_size,args_b_size);
 	else
@@ -1826,7 +1829,7 @@ static void GenerateCodeForLazyTupleSelectorEntry (int argnr)
 	GenPushArg			(0,1,1);
 	GenPushA			(2);
 	GenKeep (1,0);
-	GenFill (& ind_lab, -2, & indirection_lab, 2, PartialFill);
+	GenFill (& ind_lab, -2, &indirection_lab, 2, PartialFill);
 	GenKeep (1,0);
 #if UPDATE_POP
 	GenUpdatePopA		(0, 1);
@@ -1922,7 +1925,11 @@ ImpRuleP create_simple_imp_rule (NodeP lhs_root,NodeP rhs_root,SymbDefP function
 	return imp_rule;
 }
 
-SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node)
+SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+	,int unbox_record
+#endif
+	)
 {
 	static char update_function_name[16];
 	SymbDef update_function_sdef;
@@ -1938,7 +1945,12 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node)
 	++next_update_function_n;
 	
 	n_arguments=node->node_arity;
-	
+	record_state=node->node_symbol->symb_def->sdef_record_state;
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+	if (unbox_record)
+		n_arguments=record_state.state_arity;
+#endif
+
 	update_function_ident=PutStringInHashTable (update_function_name,SymbolIdTable);
 	update_function_sdef=MakeNewSymbolDefinition (CurrentModule,update_function_ident,n_arguments,IMPRULE);
 
@@ -1957,14 +1969,72 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node)
 	update_function_symbol=NewSymbol (definition);
 	update_function_symbol->symb_def=update_function_sdef;
 
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+	if (unbox_record){
+		ArgS **lhs_new_fields_arg_p,**lhs_old_fields_arg_p,*lhs_new_fields_p,**rhs_arg_p;
+		int field_number;
+		
+		lhs_root=NewNode (update_function_symbol,NULL,n_arguments);
+#if UPDATE_NODE_IN_STRICT_ENTRY
+		lhs_root->node_state=StrictState;
+#else
+		lhs_root->node_state=record_state;
+#endif
+
+		rhs_root=NewNode (node->node_symbol,NULL,n_arguments);
+#if UPDATE_NODE_IN_STRICT_ENTRY
+		rhs_root->node_state=StrictState;
+#else
+		rhs_root->node_state=record_state;
+#endif
+		rhs_root->node_number=0;
+
+		lhs_old_fields_arg_p=&lhs_root->node_arguments;
+		lhs_new_fields_arg_p=&lhs_new_fields_p;
+		rhs_arg_p=&rhs_root->node_arguments;
+		
+		for (field_number=0; field_number<n_arguments; ++field_number){
+			ArgS *rhs_arg,*lhs_arg;
+			NodeId arg_node_id;
+			StateS *state_p;
+
+			state_p=&record_state.state_record_arguments [field_number];
+
+			arg_node_id=NewNodeId (NULL);
+			arg_node_id->nid_refcount=-2;
+			
+			lhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
+			lhs_arg->arg_state=LazyState;
+			
+			rhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
+			rhs_arg->arg_state=*state_p;
+
+			*rhs_arg_p=rhs_arg;			
+			rhs_arg_p=&rhs_arg->arg_next;
+
+			if (first_field_arg==NULL || first_field_arg->arg_node->node_symbol->symb_def->sdef_sel_field_number!=field_number){
+				*lhs_old_fields_arg_p=lhs_arg;
+				lhs_old_fields_arg_p=&lhs_arg->arg_next;
+			
+				lhs_arg->arg_state=*state_p;
+			} else {
+				*lhs_new_fields_arg_p=lhs_arg;
+				lhs_new_fields_arg_p=&lhs_arg->arg_next;
+
+				first_field_arg=first_field_arg->arg_next;
+			}
+		}
+		*lhs_old_fields_arg_p=lhs_new_fields_p;
+		*lhs_new_fields_arg_p=NULL;
+		*rhs_arg_p=NULL;
+	} else
+#endif
 	{
 		NodeId record_node_id;
 		ArgS *lhs_record_arg,*rhs_record_arg,**lhs_arg_p,**rhs_arg_p;
 		
 		record_node_id=NewNodeId (NULL);
 		record_node_id->nid_refcount=-1;
-
-		record_state=node->node_symbol->symb_def->sdef_record_state;
 		
 		lhs_record_arg=NewArgument (NewNodeIdNode (record_node_id));
 		lhs_record_arg->arg_state=LazyState;
@@ -2017,14 +2087,15 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node)
 			
 			lhs_arg_p=&lhs_arg->arg_next;
 			rhs_arg_p=&rhs_arg->arg_next;
-			
+#if !UNBOX_UPDATE_FUNCTION_ARGUMENTS
 			field_node->node_arguments->arg_next=NULL;
-			
 			previous_arg->arg_next=arg;
+#endif
 			previous_arg=arg;
 		}
+#if !UNBOX_UPDATE_FUNCTION_ARGUMENTS
 		previous_arg->arg_next=NULL;
-	
+#endif	
 		*lhs_arg_p=NULL;
 		*rhs_arg_p=NULL;
 	}

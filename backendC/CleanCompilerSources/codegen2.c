@@ -1565,6 +1565,8 @@ static void FillOrReduceSelectSymbol (Node node,int *asp_p,int *bsp_p,NodeId upd
 						GenFill1 (&tuple_lab,arity,*asp_p+1-tupindex,bits);
 					else
 						GenFill2 (&tuple_lab,arity,*asp_p+1-tupindex,bits);
+					
+					GenKeep (*asp_p-tupindex,0);
 				} else {
 					GenPushArg (*asp_p-tupindex,arity,argnr);
 					*asp_p+=1;
@@ -2148,10 +2150,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 						
 						DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
 						
-						if (b_size!=0)
-							BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-						else
-							BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+						BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 						
 #if OPTIMIZE_LAZY_TUPLE_RECURSION
 						if (update_node_id!=NULL){
@@ -2438,7 +2437,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 				
 		if (update_node_id==NULL){
 			*asp_p+=1-node->node_arity;
-			GenBuildh (&name,node->node_arity);
+			GenBuildPartialFunctionh (&name,node->node_arity);
 		} else {
 			GenFillh (&name,node->node_arity,*asp_p-update_node_id->nid_a_index,NormalFill);
 			*asp_p-=node->node_arity;
@@ -2870,6 +2869,110 @@ void RemoveSelectorsFromUpdateNode (ArgS *previous_arg,ArgS *arg)
 	previous_arg->arg_next=NULL;
 }
 
+#if UPDATE_RECORD_NOT_ON_TOP
+void UpdateRecordAndAddSelectorsToUpdateNode
+	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *n_a_elements_above_record_p,int *n_b_elements_above_record_p)
+{
+	ArgS *arg,*previous_arg;
+	int a_offset,b_offset,arg_a_offset,arg_b_offset,previous_field_number;
+	
+	a_offset=0;
+	b_offset=0;
+	arg_a_offset=record_a_size;
+	arg_b_offset=record_b_size;
+	
+	previous_field_number=0;
+	
+	previous_arg=record_arg;
+	for_l (arg,first_field_arg,arg_next){
+		int field_number,arg_a_size,arg_b_size;
+		Node field_node;
+		
+		field_node=arg->arg_node;
+		field_node->node_arguments->arg_next=NULL;
+		
+		field_number=field_node->node_symbol->symb_def->sdef_sel_field_number;
+		
+		while (field_number!=previous_field_number){
+			AddSizeOfState (field_states[previous_field_number],&a_offset,&b_offset);
+			++previous_field_number;
+		}
+		
+		DetermineSizeOfState (field_states[field_number],&arg_a_size,&arg_b_size);
+		
+		while (arg_a_size){
+			GenUpdateA (arg_a_offset,a_offset);
+			++arg_a_offset;
+			++a_offset;
+			--arg_a_size;
+		}
+	
+		while (arg_b_size){
+			GenUpdateB (arg_b_offset,b_offset);
+			++arg_b_offset;
+			++b_offset;
+			--arg_b_size;
+		}
+	
+		++previous_field_number;
+						
+		previous_arg->arg_next=arg;
+		previous_arg=arg;
+	}
+	previous_arg->arg_next=NULL;
+	
+	*n_a_elements_above_record_p = arg_a_offset-record_a_size;
+	*n_b_elements_above_record_p = arg_b_offset-record_b_size;
+}
+
+void RemoveFieldsFromStackAfterUpdate (int n_a_elements_above_record,int n_b_elements_above_record,int record_a_size,int record_b_size,int *asp_p,int *bsp_p)
+{
+	if (n_a_elements_above_record!=0){
+		int arg_a_offset,a_offset;
+	
+		arg_a_offset=record_a_size+n_a_elements_above_record;
+		a_offset=record_a_size;
+		while (a_offset>0){
+			--a_offset;
+			--arg_a_offset;
+#if UPDATE_POP
+			if (a_offset==0)
+				GenUpdatePopA (a_offset,arg_a_offset);
+			else
+#endif
+			GenUpdateA (a_offset,arg_a_offset);
+		}
+#if UPDATE_POP
+		if (record_a_size==0)
+#endif
+			GenPopA (arg_a_offset);
+
+		*asp_p -= arg_a_offset;
+	}
+	
+	if (n_b_elements_above_record!=0){
+		int arg_b_offset,b_offset;
+		
+		arg_b_offset=record_b_size+n_b_elements_above_record;
+		b_offset=record_b_size;
+		while (b_offset>0){
+			--b_offset;
+			--arg_b_offset;
+#if UPDATE_POP
+			if (b_offset==0)
+				GenUpdatePopB (b_offset,arg_b_offset);
+			else
+#endif
+			GenUpdateB (b_offset,arg_b_offset);
+		}
+#if UPDATE_POP
+		if (record_b_size==0)
+#endif
+			GenPopB (arg_b_offset);
+		*bsp_p -= arg_b_offset;
+	}
+}
+#else
 void UpdateNodeAndAddSelectorsToUpdateNode
 	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *asp_p,int *bsp_p)
 {
@@ -2960,15 +3063,16 @@ void UpdateNodeAndAddSelectorsToUpdateNode
 		*bsp_p -= arg_b_offset;
 	}
 }
+#endif
 
 #ifdef DESTRUCTIVE_RECORD_UPDATES
-void compute_bits_and_add_selectors_to_update_node
+static void compute_bits_and_add_selectors_to_update_node
 	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,
 	char bits[],int *n_a_fill_bits_p,int *n_b_fill_bits_p)
 {
 	ArgP arg,previous_arg;
 	int a_offset,b_offset,previous_field_number;
-	unsigned int a_bits,b_bits,n,arg_n,n_args;
+	unsigned int a_bits,b_bits,n;
 	int n_a_fill_bits,n_b_fill_bits;
 
 	a_bits=0;
@@ -3034,6 +3138,41 @@ void compute_bits_and_add_selectors_to_update_node
 
 	*n_a_fill_bits_p=n_a_fill_bits;
 	*n_b_fill_bits_p=n_b_fill_bits;
+}
+#endif
+
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+static void remove_updated_fields_from_record (int field_number,ArgP field_arg,int a_from_offset,int b_from_offset,int *a_to_offset_p,int *b_to_offset_p,int n_fields,StateP field_states)
+{
+	if (field_number<n_fields){
+		int field_a_size,field_b_size;
+
+		DetermineSizeOfState (field_states[field_number],&field_a_size,&field_b_size);
+
+		a_from_offset+=field_a_size;
+		b_from_offset+=field_b_size;
+
+		if (field_arg==NULL || field_arg->arg_node->node_symbol->symb_def->sdef_sel_field_number!=field_number){
+			remove_updated_fields_from_record (field_number+1,field_arg,a_from_offset,b_from_offset,a_to_offset_p,b_to_offset_p,n_fields,field_states);
+				
+			while (field_a_size){
+				--a_from_offset;
+				--*a_to_offset_p;
+				if (a_from_offset!=*a_to_offset_p)
+					GenUpdateA (a_from_offset,*a_to_offset_p);
+				--field_a_size;
+			}
+			
+			while (field_b_size){
+				--b_from_offset;
+				--*b_to_offset_p;
+				if (b_from_offset!=*b_to_offset_p)
+					GenUpdateB (b_from_offset,*b_to_offset_p);
+				--field_b_size;
+			}		
+		} else
+			remove_updated_fields_from_record (field_number+1,field_arg->arg_next,a_from_offset,b_from_offset,a_to_offset_p,b_to_offset_p,n_fields,field_states);
+	}
 }
 #endif
 
@@ -3150,24 +3289,42 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
 			DetermineSizeOfState (*record_node_id_state_p,&record_a_size,&record_b_size);
-		
+
+#if UPDATE_RECORD_NOT_ON_TOP
+			{
+			int n_a_elements_above_record,n_b_elements_above_record;
+			
+			UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
+				record_node_id_state_p->state_record_arguments,record_a_size,record_b_size,&n_a_elements_above_record,&n_b_elements_above_record);
+#else
 			UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
 				record_node_id_state_p->state_record_arguments,record_a_size,record_b_size,asp_p,bsp_p);
-			
+#endif			
 			if (update_node_id==NULL){
 				BuildRecord (record_node_id_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 						0,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,True);
 				*asp_p+=1;
+#if UPDATE_RECORD_NOT_ON_TOP
+				GenUpdateA (0,record_a_size+n_a_elements_above_record);
+#else
 				GenUpdateA (0,record_a_size);
+#endif
 			} else
 				BuildRecord (record_node_id_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 						*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,False);
 
+#if UPDATE_RECORD_NOT_ON_TOP
+			GenPopA (record_a_size+n_a_elements_above_record);
+			*asp_p-=record_a_size+n_a_elements_above_record;
+			GenPopB (record_b_size+n_b_elements_above_record);
+			*bsp_p-=record_b_size+n_b_elements_above_record;
+			}
+#else
 			GenPopA (record_a_size);
 			*asp_p-=record_a_size;
 			GenPopB (record_b_size);
 			*bsp_p-=record_b_size;
-
+#endif
 			return;
 		}
 #else
@@ -3192,7 +3349,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					
 					if (!FieldArgumentNodeStatesAreStricter (record_arg->arg_next,first_field_arg,record_states))
 						update_immediately=0;
-					else  {
+					else {
 						ArgP node_arg,field_arg;
 						
 						for_ll (node_arg,field_arg,record_arg->arg_next,first_field_arg,arg_next,arg_next){
@@ -3220,23 +3377,41 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 					DetermineSizeOfState (*record_node_id_state_p,&record_a_size,&record_b_size);
 				
+#if UPDATE_RECORD_NOT_ON_TOP
+					{
+					int n_a_elements_above_record,n_b_elements_above_record;
+					
+					UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
+						record_node_id_state_p->state_record_arguments,record_a_size,record_b_size,&n_a_elements_above_record,&n_b_elements_above_record);
+#else
 					UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
 						record_node_id_state_p->state_record_arguments,record_a_size,record_b_size,asp_p,bsp_p);
-					
+#endif					
 					if (update_node_id==NULL){
 						BuildRecord (record_node_id_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 								0,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,True);
 						*asp_p+=1;
+#if UPDATE_RECORD_NOT_ON_TOP
+						GenUpdateA (0,record_a_size+n_a_elements_above_record);
+#else
 						GenUpdateA (0,record_a_size);
+#endif
 					} else
 						BuildRecord (record_node_id_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 								*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,False);
 
+#if UPDATE_RECORD_NOT_ON_TOP
+					GenPopA (record_a_size+n_a_elements_above_record);
+					*asp_p-=record_a_size+n_a_elements_above_record;
+					GenPopB (record_b_size+n_b_elements_above_record);
+					*bsp_p-=record_b_size+n_b_elements_above_record;
+					}
+#else
 					GenPopA (record_a_size);
 					*asp_p-=record_a_size;
 					GenPopB (record_b_size);
 					*bsp_p-=record_b_size;
-			
+#endif			
 					return;
 				}
 			}
@@ -3245,9 +3420,242 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 		n_arguments=node->node_arity;
 
+#if UNBOX_UPDATE_FUNCTION_ARGUMENTS
+		if (update_node_id==NULL){
+			ArgP call_arg_p,lhs_arg_p,rhs_arg_p,*call_arg_h;
+			StateP record_state_p;
+			int i,unbox_record;
+			ImpRuleP update_rule_p;
+			NodeP call_node_p;
+
+			call_arg_p=node->node_arguments;
+
+			unbox_record =	call_arg_p->arg_node->node_kind!=NodeIdNode ? 
+							call_arg_p->arg_node->node_state.state_type==RecordState :
+							call_arg_p->arg_node->node_node_id->nid_state.state_type==RecordState;
+			
+			new_update_sdef=CreateUpdateFunction (record_arg,first_field_arg,node,unbox_record);
+
+			update_rule_p=new_update_sdef->sdef_rule;
+			
+			lhs_arg_p=update_rule_p->rule_alts->alt_lhs_root->node_arguments;
+			rhs_arg_p=update_rule_p->rule_alts->alt_rhs_root->node_arguments;
+			i=0;
+			
+			record_state_p=&node->node_symbol->symb_def->sdef_record_state;
+
+			if (unbox_record){
+				int record_size,n_old_fields,field_number;
+				ArgP field_arg_p;
+				
+				record_size=record_state_p->state_arity;
+				
+				n_old_fields=record_size-(node->node_arity-1);
+
+				call_node_p=NewNode (NULL,NULL,record_size);
+				call_arg_h=&call_node_p->node_arguments;
+				
+				field_arg_p=first_field_arg;
+				field_number=0;
+				
+				while (n_old_fields){
+					if (field_arg_p==NULL || field_arg_p->arg_node->node_symbol->symb_def->sdef_sel_field_number!=field_number){
+						StateP arg_state_p;
+						NodeP new_node_p;
+						ArgP new_arg_p;
+					
+						new_node_p=NewNode (NULL,NULL,0);
+						new_arg_p=NewArgument (new_node_p);
+						
+						arg_state_p=&record_state_p->state_record_arguments[field_number];
+						
+						new_arg_p->arg_state=*arg_state_p;
+						new_node_p->node_state=*arg_state_p;
+						lhs_arg_p->arg_state=*arg_state_p;
+						update_rule_p->rule_state_p[i]=*arg_state_p;
+						
+						*call_arg_h=new_arg_p;
+						call_arg_h=&new_arg_p->arg_next;
+						
+						lhs_arg_p=lhs_arg_p->arg_next;
+						++i;
+						--n_old_fields;
+					} else
+						field_arg_p=field_arg_p->arg_next;
+					
+					++field_number;
+				}
+				
+				call_arg_p->arg_state=*record_state_p;
+
+				call_arg_p=call_arg_p->arg_next;
+				*call_arg_h=call_arg_p;
+
+				while (call_arg_p!=NULL){
+					StateP arg_state_p;
+					
+					while (rhs_arg_p->arg_node->node_node_id!=lhs_arg_p->arg_node->node_node_id)
+						rhs_arg_p=rhs_arg_p->arg_next;
+					
+					if (call_arg_p->arg_node->node_kind!=NodeIdNode)
+						arg_state_p=&call_arg_p->arg_node->node_state;
+					else
+						arg_state_p=&call_arg_p->arg_node->node_node_id->nid_state;
+
+					if (rhs_arg_p->arg_state.state_type==SimpleState){
+						if (rhs_arg_p->arg_state.state_kind==OnB && (arg_state_p->state_type==SimpleState && arg_state_p->state_kind==OnB)){
+							call_arg_p->arg_state=*arg_state_p;
+							lhs_arg_p->arg_state=*arg_state_p;
+							update_rule_p->rule_state_p[i]=*arg_state_p;									
+						} else if (!IsLazyState (*arg_state_p) && !IsLazyStateKind (rhs_arg_p->arg_state.state_kind)){
+							lhs_arg_p->arg_state.state_kind=StrictOnA;
+							update_rule_p->rule_state_p[i].state_kind=StrictOnA;										
+						}
+					} else {
+						if ((rhs_arg_p->arg_state.state_type==ArrayState && arg_state_p->state_type==ArrayState) ||
+							(rhs_arg_p->arg_state.state_type==RecordState && arg_state_p->state_type==RecordState))
+						{
+							call_arg_p->arg_state=*arg_state_p;
+							lhs_arg_p->arg_state=*arg_state_p;
+							update_rule_p->rule_state_p[i]=*arg_state_p;									
+						} else if (!IsLazyState (*arg_state_p)){
+							lhs_arg_p->arg_state.state_kind=StrictOnA;
+							update_rule_p->rule_state_p[i].state_kind=StrictOnA;									
+						}
+					}
+					call_arg_p=call_arg_p->arg_next;
+					lhs_arg_p=lhs_arg_p->arg_next;
+					rhs_arg_p=rhs_arg_p->arg_next;
+					++i;
+				}
+			} else {
+				while (call_arg_p!=NULL){
+					StateP arg_state_p;
+					
+					if (call_arg_p->arg_node->node_kind!=NodeIdNode)
+						arg_state_p=&call_arg_p->arg_node->node_state;
+					else
+						arg_state_p=&call_arg_p->arg_node->node_node_id->nid_state;
+
+					if (rhs_arg_p->arg_state.state_type==SimpleState){
+						if (rhs_arg_p->arg_state.state_kind==OnB && (arg_state_p->state_type==SimpleState && arg_state_p->state_kind==OnB)){
+							call_arg_p->arg_state=*arg_state_p;
+							lhs_arg_p->arg_state=*arg_state_p;
+							update_rule_p->rule_state_p[i]=*arg_state_p;									
+						} else if (!IsLazyState (*arg_state_p) && !IsLazyStateKind (rhs_arg_p->arg_state.state_kind)){
+							lhs_arg_p->arg_state.state_kind=StrictOnA;
+							update_rule_p->rule_state_p[i].state_kind=StrictOnA;										
+						}
+					} else {
+						if ((rhs_arg_p->arg_state.state_type==ArrayState && arg_state_p->state_type==ArrayState) ||
+							(rhs_arg_p->arg_state.state_type==RecordState && arg_state_p->state_type==RecordState))
+						{
+							call_arg_p->arg_state=*arg_state_p;
+							lhs_arg_p->arg_state=*arg_state_p;
+							update_rule_p->rule_state_p[i]=*arg_state_p;									
+						} else if (!IsLazyState (*arg_state_p)){
+							lhs_arg_p->arg_state.state_kind=StrictOnA;
+							update_rule_p->rule_state_p[i].state_kind=StrictOnA;									
+						}
+					}
+					call_arg_p=call_arg_p->arg_next;
+					lhs_arg_p=lhs_arg_p->arg_next;
+					rhs_arg_p=rhs_arg_p->arg_next;
+					++i;
+				}
+				{
+				ArgP arg1_p;
+				
+				arg1_p=NewArgument (NULL);
+				*arg1_p=*node->node_arguments;
+				
+				call_node_p=NewNode (NULL,arg1_p,node->node_arity);
+				call_arg_h=&arg1_p->arg_next;
+				}
+			}
+			
+			while (*call_arg_h){
+				ArgP new_call_arg_p;
+				NodeP new_node_p;
+					
+				new_node_p=NewNode (NULL,NULL,0);
+				new_call_arg_p=NewArgument (NULL);
+				*new_call_arg_p=**call_arg_h;
+			
+				new_call_arg_p->arg_node=new_node_p;
+				new_node_p->node_state=(*call_arg_h)->arg_state;
+			
+				new_call_arg_p->arg_next=(*call_arg_h)->arg_next;
+				
+				*call_arg_h=new_call_arg_p;
+				call_arg_h=&new_call_arg_p->arg_next;
+			}
+			
+			update_rule_p->rule_mark |= RULE_UNBOXED_LAZY_CALL;
+			update_rule_p->rule_lazy_call_node=call_node_p;
+
+			BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+
+			{
+			int a_size,b_size;
+			
+			DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+
+			if (unbox_record){
+				int a_to_offset,b_to_offset;
+								
+				DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
+
+				a_to_offset=record_a_size;
+				b_to_offset=record_b_size;
+				
+				remove_updated_fields_from_record (0,first_field_arg,0,0,&a_to_offset,&b_to_offset,record_state_p->state_arity,record_state_p->state_record_arguments);
+				
+				GenPopA (a_to_offset);
+				GenPopB (b_to_offset);
+
+				*asp_p-=a_to_offset;
+				*bsp_p-=b_to_offset;
+
+				a_size-=a_to_offset;
+				b_size-=b_to_offset;
+			}
+
+			{
+				ArgP previous_arg,arg;
+				
+				previous_arg=record_arg;
+				for_l (arg,first_field_arg,arg_next){
+					Node field_node;
+					
+					field_node=arg->arg_node;
+					field_node->node_arguments->arg_next=NULL;
+											
+					previous_arg->arg_next=arg;
+					previous_arg=arg;
+				}
+				previous_arg->arg_next=NULL;
+			}
+			
+			ConvertSymbolToDandNLabel (&name,&codelab,new_update_sdef);
+										
+			*asp_p += 1-a_size;
+			*bsp_p -= b_size;
+
+			if (b_size!=0)
+				GenBuildU (&name,a_size,b_size,&codelab);
+			else
+				GenBuild (&name,a_size,&codelab);
+
+			return;
+			}
+		} else
+			new_update_sdef=CreateUpdateFunction (record_arg,first_field_arg,node,False);
+#else
 		BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
 		new_update_sdef=CreateUpdateFunction (record_arg,first_field_arg,node);
+#endif
 
 		ConvertSymbolToDandNLabel (&name,&codelab,new_update_sdef);
 
@@ -3259,12 +3667,20 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			*asp_p-=n_arguments;
 		}
 	} else {
+#if UPDATE_RECORD_NOT_ON_TOP
+		int n_a_elements_above_record,n_b_elements_above_record;
+#endif		
 		BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 	
 		DetermineSizeOfState (node->node_state,&record_a_size,&record_b_size);
-	
+#if UPDATE_RECORD_NOT_ON_TOP
+		UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
+			node->node_state.state_record_arguments,record_a_size,record_b_size,&n_a_elements_above_record,&n_b_elements_above_record);
+		RemoveFieldsFromStackAfterUpdate (n_a_elements_above_record,n_b_elements_above_record,record_a_size,record_b_size,asp_p,bsp_p);
+#else
 		UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
 			node->node_state.state_record_arguments,record_a_size,record_b_size,asp_p,bsp_p);
+#endif
 	}
 }
 
