@@ -568,8 +568,8 @@ where
 		| macro_def.fun_kind == FK_Macro
 		 	= case macro_def.fun_body of
 		 		CheckedBody body
-			  		# macros_modules_pi = foldSt (visit_macro mod_index max_fun_nr) macro_def.fun_info.fi_calls (
-			  						{ macro_defs & [macro_index] = { macro_def & fun_body = PartioningMacro }}, modules, pi)
+			  		# macros_modules_pi = foldSt (visit_macro mod_index max_fun_nr) macro_def.fun_info.fi_calls
+			  					({ macro_defs & [macro_index] = { macro_def & fun_body = PartioningMacro }}, modules, pi)
 					-> expand_simple_macro mod_index macro_index macro_def macros_modules_pi
 		 		PartioningMacro
 		  			# identPos = newPosition macro_def.fun_symb macro_def.fun_pos
@@ -639,6 +639,7 @@ where
 				-> (fun_number, (fun_defs, modules, pi))
 			TransformedBody _
 				| fun_def.fun_info.fi_group_index == NoIndex
+					# (fun_defs, pi) =  add_called_macros fun_def.fun_info.fi_calls (fun_defs, pi)
 					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = pi.pi_next_group }}, modules,
 							{pi & pi_next_group = inc pi.pi_next_group, pi_groups = [ [fun_index] : pi.pi_groups]}))
 					-> (max_fun_nr, (fun_defs, modules, pi))
@@ -690,7 +691,21 @@ where
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
-//				---> ("expand_macros", fun_symb, tb_args, tb_rhs)
+	 
+	add_called_macros calls macro_defs_and_pi
+		= foldSt add_called_macro calls macro_defs_and_pi
+	where
+		add_called_macro {fc_index} (macro_defs, pi)
+			# (macro_def, macro_defs) = macro_defs![fc_index]
+			= case macro_def.fun_body of
+				TransformedBody _
+					| macro_def.fun_info.fi_group_index == NoIndex
+						# (macro_defs, pi) = add_called_macros macro_def.fun_info.fi_calls (macro_defs, pi)
+						->	({ macro_defs & [fc_index] = {macro_def & fun_info.fi_group_index = pi.pi_next_group }},
+								{pi & pi_next_group = inc pi.pi_next_group, pi_groups = [ [fc_index] : pi.pi_groups]})
+						-> (macro_defs, pi)
+
+
 
 addFunctionCallsToSymbolTable calls fun_defs symbol_table
 	= foldSt add_function_call_to_symbol_table calls ([], fun_defs, symbol_table)
