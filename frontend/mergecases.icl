@@ -94,6 +94,23 @@ where
 						No
 							-> (No, var_heap, symbol_heap) 
 				DynamicPatterns [dynamic_pattern]
+/*
+	Don't merge dynamic cases, as a work around for the following case
+		apply :: Dynamic Dynamic -> Int
+		apply _ (_ :: Int)
+			=	1
+		apply (f :: a ) (x :: a)
+			=	2
+	This work around leads to less efficient code.
+
+	mergeCases changes the order of matching of (f :: a) and
+	(x :: a), but the auxilary dynamics administration is not
+	updated.
+	
+	FIXME: Update auxilary dynamics administration when dynamic cases
+	are reversed.
+
+
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr dynamic_pattern.dp_rhs var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
@@ -103,6 +120,7 @@ where
 							-> (Yes cees, var_heap, symbol_heap)
 
 						No
+*/
 							-> (No, var_heap, symbol_heap)
 				_
 					-> (No, var_heap, symbol_heap)
