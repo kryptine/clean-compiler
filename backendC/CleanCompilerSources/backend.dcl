@@ -220,9 +220,13 @@ BEDefineImportedObjsAndLibs :: !BEStringListP !BEStringListP !BackEnd -> BackEnd
 // void BEDefineImportedObjsAndLibs(BEStringListP objs,BEStringListP libs);
 BESetMainDclModuleN :: !Int !BackEnd -> BackEnd;
 // void BESetMainDclModuleN(int main_dcl_module_n_parameter);
-kBEVersionCurrent:==0x02000204;
+BEDeclareDynamicTypeSymbol :: !Int !Int !BackEnd -> BackEnd;
+// void BEDeclareDynamicTypeSymbol(int typeIndex,int moduleIndex);
+BEDynamicTempTypeSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
+// BESymbolP BEDynamicTempTypeSymbol();
+kBEVersionCurrent:==0x02000206;
 kBEVersionOldestDefinition:==0x02000204;
-kBEVersionOldestImplementation:==0x02000204;
+kBEVersionOldestImplementation:==0x02000206;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;

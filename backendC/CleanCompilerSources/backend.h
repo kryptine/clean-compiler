@@ -1,8 +1,8 @@
 /* version info */
 
-# define	kBEVersionCurrent		0x02000205
+# define	kBEVersionCurrent		0x02000206
 # define	kBEVersionOldestDefinition	0x02000204
-# define	kBEVersionOldestImplementation	0x02000204
+# define	kBEVersionOldestImplementation	0x02000206
 
 # define	kBEDebug	1
 
@@ -427,3 +427,10 @@ Clean (BEDefineImportedObjsAndLibs :: BEStringListP BEStringListP BackEnd -> Bac
 
 void BESetMainDclModuleN (int main_dcl_module_n_parameter);
 Clean (BESetMainDclModuleN :: Int BackEnd -> BackEnd)
+
+// temporary hack
+void BEDeclareDynamicTypeSymbol (int typeIndex, int moduleIndex);
+Clean (BEDeclareDynamicTypeSymbol :: Int Int BackEnd -> BackEnd)
+
+BESymbolP BEDynamicTempTypeSymbol (void);
+Clean (BEDynamicTempTypeSymbol :: BackEnd -> (BESymbolP, BackEnd))

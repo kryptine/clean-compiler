@@ -304,6 +304,9 @@ beDefineImportedObjsAndLibs
 	:== beApFunction2 BEDefineImportedObjsAndLibs
 beAbsType
 	:== beApFunction1 BEAbsType
+// temporary hack
+beDynamicTempTypeSymbol
+	:== beFunction0 BEDynamicTempTypeSymbol
 
 notYetImplementedExpr :: Expression
 notYetImplementedExpr
@@ -370,6 +373,11 @@ backEndConvertModulesH predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl
 		=	declareCurrentDclModule fe_icl fe_dcls.[main_dcl_module_n] main_dcl_module_n (backEnd -*-> "declareCurrentDclModule")
 	#! backEnd
 		=	declareOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers (backEnd -*-> "declareOtherDclModules")
+
+// tempory hack
+	#! backEnd
+		=	declareDynamicTemp predefs (backEnd -*-> "declareDynamicTemp")
+
 	#! backEnd
 		=	defineDclModule varHeap main_dcl_module_n fe_dcls.[main_dcl_module_n] (backEnd -*-> "defineDclModule(cIclMoIndex)")
 	#! backEnd
@@ -834,6 +842,10 @@ convertSelector moduleIndex selectorDefs varHeap {fs_index}
 					_
 						->	(selectorDef.sd_type,be))
 
+declareDynamicTemp :: PredefinedSymbols -> BackEnder
+declareDynamicTemp predefs
+	=	appBackEnd (BEDeclareDynamicTypeSymbol predefs.[PD_StdDynamics].pds_def predefs.[PD_DynamicTemp].pds_def)
+
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
 	=	appBackEnd (BEDeclarePredefinedModule (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs))
@@ -1044,7 +1056,8 @@ convertBasicTypeKind BT_File
 convertBasicTypeKind BT_World
 	=	BEWorldType
 convertBasicTypeKind BT_Dynamic
-	=	BEDynamicType
+	=	undef <<- "convertBasicTypeKind (BT_Dynamic) shouldn't occur"
+//	=	BEDynamicType
 convertBasicTypeKind (BT_String _)
 	=	undef <<- "convertBasicTypeKind (BT_String _) shouldn't occur"
 
@@ -1080,6 +1093,11 @@ convertAnnotTypeNode {at_type, at_annotation, at_attribute}
 convertTypeNode :: Type -> BEMonad BETypeNodeP
 convertTypeNode (TB (BT_String type))
 	=	convertTypeNode type
+// tempory hack
+convertTypeNode (TB BT_Dynamic)
+	=	beNormalTypeNode beDynamicTempTypeSymbol beNoTypeArgs	
+convertTypeNode (TB basicType)
+	=	beNormalTypeNode (beBasicSymbol (convertBasicTypeKind basicType)) beNoTypeArgs	
 convertTypeNode (TB basicType)
 	=	beNormalTypeNode (beBasicSymbol (convertBasicTypeKind basicType)) beNoTypeArgs	
 convertTypeNode (TA typeSymbolIdent typeArgs)

@@ -91,3 +91,5 @@
 /EXPORT: BEAbsType
 /EXPORT: BESwapTypes
 /EXPORT: BESetMainDclModuleN
+/EXPORT: BEDeclareDynamicTypeSymbol
+/EXPORT: BEDynamicTempTypeSymbol
