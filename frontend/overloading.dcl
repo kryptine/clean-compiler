@@ -35,7 +35,7 @@ import syntax, check
 
 ::	LocalTypePatternVariable
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos)] !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
 
 ::	TypeCodeInfo =
@@ -44,7 +44,7 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos)] !{
 	,	tci_type_var_heap		:: !.TypeVarHeap
 	}
 
-removeOverloadedFunctions :: ![Int] ![(Optional [TypeContext], IdentPos)] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap
+removeOverloadedFunctions :: ![(Optional [TypeContext], IdentPos, Index)] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin
 		-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
 

@@ -1257,7 +1257,7 @@ where
 
 instance <<< TypeContext
 where
-	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types
+	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< ptrToInt co.tc_var <<< '>'
 
 instance <<< SymbIdent
 where
@@ -1374,7 +1374,7 @@ where
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
 
 	(<<<) file (FreeVar {fv_name})         	= file <<< "FREEVAR " <<< fv_name
-	(<<<) file (ClassVariable _)         	= file <<< "ClassVariable "
+	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< ptrToInt info_ptr
 
 	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
 	

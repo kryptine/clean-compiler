@@ -1152,7 +1152,7 @@ instance == ModuleKind, Ident
 instance <<< Module a | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, Global object | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, Bind a b | <<< a & <<< b, ParsedConstructor, TypeDef a | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
-			 Optional a | <<< a, ConsVariable, BasicType, Annotation
+			 Optional a | <<< a, ConsVariable, BasicType, Annotation, Selection
 
 instance == TypeAttribute
 instance == Annotation

@@ -1366,6 +1366,7 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars} nr_of
 ::	FunctionRequirements =
 	{	fe_requirements	:: !Requirements
 	,	fe_context		:: !Optional [TypeContext]
+	,	fe_index		:: !Index
 	,	fe_location		:: !IdentPos
 	}
 
@@ -1497,7 +1498,7 @@ where
 	type_component comp class_instances ti=:{ti_common_defs} (type_error, fun_defs, predef_symbols, special_instances, ts)
 		# (fun_defs, predef_symbols, cons_variables, ts) = CreateInitialSymbolTypes ti_common_defs comp (fun_defs, predef_symbols, [], ts)
 		  (names, fun_defs) = show_component comp fun_defs
-		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts //(ts ---> names)
+		  (fun_reqs, (cons_variables, fun_defs, ts)) = type_functions comp ti cons_variables fun_defs ts /* (ts ---> names) */
 		#! nr_of_type_variables = ts.ts_var_store
 										
 		# (subst, ts_type_heaps, ts_error)
@@ -1550,7 +1551,7 @@ where
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
 									tci_type_var_heap = ts_type_heaps.th_vars } 
 			  (fun_defs, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap}, ts_var_heap, ts_error)
-			  		= removeOverloadedFunctions comp (map (\(co,_,pos) -> (co,pos)) over_info)
+			  		= removeOverloadedFunctions [(co, pos, index) \\ (co, _, pos, index) <- over_info]
 			  			contexts local_pattern_variables fun_defs ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error
 			= (	type_error || not ts_error.ea_ok,
 				fun_defs, os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances },
@@ -1610,12 +1611,12 @@ where
 
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
-	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls}, fe_location}:reqs] calls (subst, expr_heap)
+	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
 		# (context, subst) = arraySubst context subst
-		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_location) : calls]
+		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_location, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 	
-	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls}, fe_location}:reqs] calls (subst, expr_heap)
-		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_location) : calls]
+	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
+		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_location, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 	
 
 	expand_type_contexts over_info_ptr (subst, expr_heap)
@@ -1693,7 +1694,7 @@ where
 		  req_type_coercions = [{tc_demanded = temp_fun_type.tst_result,tc_offered = rhs_type, tc_position = {cp_expression = tb_rhs }, tc_coercible = True} :
 		  		rhs_reqs.req_type_coercions ]
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap
-		= ({fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No,
+		= ({fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
 			fe_requirements = { rhs_reqs & req_type_coercions = req_type_coercions, req_cons_variables = [] }}, (rhs_reqs.req_cons_variables, fun_defs,
 				{ ts & ts_expr_heap = ts_expr_heap }))
 //					 ---> ("type_function", fun_symb, tb_args, tb_rhs, fun_info.fi_local_vars)

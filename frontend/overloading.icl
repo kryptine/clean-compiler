@@ -525,13 +525,13 @@ where
 	try_specialized_instances type_contexts_types [] type_var_heap
 		= (ObjectNotFound, type_var_heap)
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos)] !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
 tryToSolveOverloading ocs defs instance_info coercion_env os
 	= foldSt (try_to_solve_overloading defs instance_info) ocs ([], coercion_env, [], os)
 where
 
-	try_to_solve_overloading  defs instance_info (fun_context, call_ptrs, location) (contexts, coercion_env, type_pattern_vars, os=:{os_error})
+	try_to_solve_overloading  defs instance_info (fun_context, call_ptrs, location, _) (contexts, coercion_env, type_pattern_vars, os=:{os_error})
 		| isEmpty call_ptrs
 			= (contexts, coercion_env, type_pattern_vars, os)
 			# os = { os & os_error = setErrorAdmin location os_error }
@@ -541,10 +541,10 @@ where
 					# (_, coercion_env, type_pattern_vars, os)
 						= reduce_and_simplify_contexts call_ptrs defs instance_info True specified_context coercion_env type_pattern_vars os
 					-> (contexts, coercion_env, type_pattern_vars, os)
-//							---> ("try_to_solve_overloading (Yes ...)", specified_context)
+//							---> ("try_to_solve_overloading (Yes ...)", location, specified_context)
 				No
 					-> reduce_and_simplify_contexts call_ptrs defs instance_info False contexts coercion_env type_pattern_vars os
-//							---> ("try_to_solve_overloading (No)", contexts)
+//							---> ("try_to_solve_overloading (No)", location, contexts)
 		
 	reduce_and_simplify_contexts :: ![ExprInfoPtr] !{# CommonDefs } !ClassInstanceInfo !Bool ![TypeContext] !*Coercions ![LocalTypePatternVariable]
 			!*OverloadingState -> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
@@ -600,6 +600,7 @@ simplifyOverloadedCall {symb_kind = SK_OverloadedFunction {glob_module,glob_obje
 	  (inst_expr, contexts, (type_heaps, var_heap, symbol_heap), error)
 	  		= adjust_member_application mem_def symb_arity class_appl class_exprs defs has_context contexts heaps error
 	= (contexts, type_heaps, var_heap, symbol_heap <:= (expr_info_ptr, inst_expr), error)
+//				---> ("simplifyOverloadedCall", expr_info_ptr, inst_expr)
 
 where
 	adjust_member_application {me_symb,me_offset,me_class} symb_arity (CA_Instance red_contexts) class_exprs defs has_context contexts heaps error
@@ -616,6 +617,7 @@ where
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
 		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
 				contexts, (type_heaps, var_heap, symbol_heap), error)
+//					---> ("adjust_member_application", contexts, class_context.tc_var)
 
 	adjust_member_application _ _ (CA_GlobalTypeCode {tci_index,tci_contexts}) _ defs has_context contexts heaps error
 		# (exprs, (contexts, heaps, error)) = convertClassApplsToExpressions defs has_context tci_contexts (contexts, heaps, error)
@@ -641,6 +643,7 @@ simplifyOverloadedCall _ expr_info_ptr appls defs has_context contexts type_heap
 	# (class_expressions, (contexts, (type_heaps, var_heap, symbol_heap), error))
 			= convertClassApplsToExpressions defs has_context appls (contexts, (type_heaps, var_heap, symbol_heap), error)
 	= (contexts, type_heaps, var_heap, symbol_heap <:= (expr_info_ptr, EI_Context class_expressions), error)
+//		---> ("simplifyOverloadedCall", expr_info_ptr, class_expressions)
 
 
 expressionToTypeCodeExpression (TypeCodeExpression texpr) 			= texpr
@@ -665,7 +668,7 @@ where
 	convert_class_appl_to_expression defs has_context (CA_Context tc) (contexts, (type_heaps, var_heap, expr_heap), error)
 		# (class_context, context_address, contexts, type_heaps, var_heap, error)
 				= determineContextAddress tc has_context contexts defs type_heaps var_heap error
-		| isEmpty context_address
+		| isEmpty context_address // ---> ("convert_class_appl_to_expression", tc , contexts, class_context)
 			= (ClassVariable class_context.tc_var, (contexts, (type_heaps, var_heap, expr_heap), error))
 			= (Selection No (ClassVariable class_context.tc_var) (generateClassSelection context_address []), (contexts, (type_heaps, var_heap, expr_heap), error))
 	convert_class_appl_to_expression defs has_context (CA_LocalTypeCode new_var_ptr) contexts_heaps_error
@@ -761,8 +764,12 @@ where
 				-> find_super_instance context tcs (inc tc_index) address  dict_mod dict_index defs type_heaps
 
 getClassVariable var_info_ptr var_heap
-	# (VI_ClassVar var_name new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
-	= (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)))
+	# (var_info, var_heap) = readPtr var_info_ptr var_heap
+	= case var_info of
+		VI_ClassVar var_name new_info_ptr count
+			-> (var_name, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_name new_info_ptr (inc count)))
+		_
+			-> abort "getClassVariable" ---> var_info_ptr
 
 updateDynamics :: ![Int] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin
 	-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
@@ -785,17 +792,17 @@ where
 		 	  fun_def = { fun_def & fun_body = TransformedBody {tb & tb_rhs = tb_rhs}}
 			= update_dynamics funs type_contexts { ui_fun_defs & [fun] = fun_def } ui_symbol_heap type_code_info { ltp & ltp_var_heap = ui_var_heap } error
 
-removeOverloadedFunctions :: ![Int] ![(Optional [TypeContext], IdentPos)] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap
+removeOverloadedFunctions :: ![(Optional [TypeContext], IdentPos, Index)] ![TypeContext] ![LocalTypePatternVariable] !*{#FunDef} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin
 		-> (!*{#FunDef}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin)
-removeOverloadedFunctions funs opt_spec_contexts type_contexts type_pattern_vars fun_defs symbol_heap type_code_info var_heap error
+removeOverloadedFunctions opt_spec_contexts type_contexts type_pattern_vars fun_defs symbol_heap type_code_info var_heap error
 	| error.ea_ok
 		# (_, fun_defs, symbol_heap, type_code_info, ltp, error)
-			= fold2St (remove_overloaded_function type_contexts) funs opt_spec_contexts
+			= foldSt (remove_overloaded_function type_contexts) opt_spec_contexts
 					(False, fun_defs, symbol_heap, type_code_info, { ltp_var_heap = var_heap, ltp_variables = type_pattern_vars}, error)
 		= (fun_defs, symbol_heap, type_code_info, ltp.ltp_var_heap, error)
 where
-	remove_overloaded_function derived_context fun_index (opt_context, location)
+	remove_overloaded_function derived_context (opt_context, location, fun_index)
 			(refresh_variables, fun_defs, symbol_heap, type_code_info, ltp, error)
 		# (fun_def, fun_defs) = fun_defs![fun_index]
 		  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_symb} = fun_def
@@ -1131,18 +1138,18 @@ where
 
 adjustClassExpressions exprs tail_exprs var_heap 
 	= mapAppendSt adjustClassExpression exprs tail_exprs var_heap
-
-adjustClassExpression (App app=:{app_args}) var_heap
-	# (app_args, var_heap) = adjustClassExpressions app_args [] var_heap
-	= (App { app & app_args = app_args }, var_heap)
-adjustClassExpression (ClassVariable var_info_ptr) var_heap
-	# (var_name, var_info_ptr, var_heap) = getClassVariable var_info_ptr var_heap
-	= (Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }, var_heap)
-adjustClassExpression (Selection opt_type expr selectors) var_heap
-	# (expr, var_heap) = adjustClassExpression expr var_heap
-	= (Selection opt_type expr selectors, var_heap)
-adjustClassExpression expr var_heap
-	= (expr, var_heap)
+where
+	adjustClassExpression (App app=:{app_args}) var_heap
+		# (app_args, var_heap) = adjustClassExpressions app_args [] var_heap
+		= (App { app & app_args = app_args }, var_heap)
+	adjustClassExpression (ClassVariable var_info_ptr) var_heap
+		# (var_name, var_info_ptr, var_heap) = getClassVariable var_info_ptr var_heap
+		= (Var { var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr }, var_heap)
+	adjustClassExpression (Selection opt_type expr selectors) var_heap
+		# (expr, var_heap) = adjustClassExpression expr var_heap
+		= (Selection opt_type expr selectors, var_heap)
+	adjustClassExpression expr var_heap
+		= (expr, var_heap)
 
 class equalTypes a :: !a !a !*TypeVarHeap -> (!Bool, !*TypeVarHeap)
 
@@ -1198,7 +1205,7 @@ where
 
 instance <<< TypeContext
 where
-	(<<<) file tc = file <<< tc.tc_class.glob_object.ds_ident <<< ' ' <<< tc.tc_types
+	(<<<) file tc = file <<< tc.tc_class.glob_object.ds_ident <<< ' ' <<< tc.tc_types <<< " <" <<< tc.tc_var <<< '>'
 
 instance <<< FunCall
 where
@@ -1217,3 +1224,14 @@ instance <<< TypeCodeExpression
 where
 	(<<<) file _ = file
 
+
+instance <<< DefinedSymbol
+where
+	(<<<) file ds = file <<< ds.ds_ident
+
+instance <<< ExprInfo
+where
+	(<<<) file (EI_Instance symb exprs) = file <<< symb <<< exprs
+	(<<<) file (EI_Selection sels var_ptr exprs) = file <<< sels <<< var_ptr <<< exprs
+	(<<<) file (EI_Context exprs) = file <<< exprs
+	(<<<) file _ = file
