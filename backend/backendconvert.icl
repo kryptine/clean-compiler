@@ -7,8 +7,8 @@ import StdEnv
 import frontend
 import backend
 import backendsupport, backendpreprocess
-import RWSDebug
-import StdDebug
+
+//import RWSDebug
 
 // trace macro
 (-*->) infixl
@@ -197,6 +197,10 @@ beDictionaryUpdateFunSymbol
 	:==	beFunction0 BEDictionaryUpdateFunSymbol
 beConstructorSymbol moduleIndex constructorIndex
 	:==	beFunction0 (BEConstructorSymbol constructorIndex moduleIndex)
+
+beOverloadedConsSymbol moduleIndex constructorIndex deconsModuleIndex deconsIndex
+	:==	beFunction0 (BEOverloadedConsSymbol constructorIndex moduleIndex deconsIndex deconsModuleIndex)
+
 beFieldSymbol fieldIndex moduleIndex
 	:==	beFunction0 (BEFieldSymbol fieldIndex moduleIndex)
 beTypeSymbol typeIndex moduleIndex
@@ -448,9 +452,15 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		=	declare main_dcl_module_n icl_common (backEnd -*-> "declare (main_dcl_module_n)")
 	#! backEnd
-		=	declareArrayInstances fe_arrayInstances main_dcl_module_n icl_functions (backEnd -*-> "declareArrayInstances")
+		=	declareArrayInstances /*fe_arrayInstances.ali_instances_range*/fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls (backEnd -*-> "declareArrayInstances")
 	#! backEnd
-		=	adjustArrayFunctions predefs fe_arrayInstances main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers (backEnd -*-> "adjustArrayFunctions")
+		=	declareListInstances fe_arrayInstances.ali_list_first_instance_indices PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	#! backEnd
+		=	declareListInstances fe_arrayInstances.ali_tail_strict_list_first_instance_indices PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	#! backEnd
+		=	adjustArrayFunctions /*fe_arrayInstances.ali_instances_range*/fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers (backEnd -*-> "adjustArrayFunctions")
+	#! backEnd
+		=	adjustStrictListFunctions fe_arrayInstances.ali_list_first_instance_indices fe_arrayInstances.ali_tail_strict_list_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd;
 	#! (rules, backEnd)
 		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefs.[PD_DummyForStrictAliasFun].pds_ident (backEnd -*-> "convertRules")
 	#! backEnd
@@ -676,6 +686,8 @@ instance declareVars CasePatterns where
 		=	declareVars patterns dvInput
 	declareVars (BasicPatterns _ patterns) dvInput
 		=	declareVars patterns dvInput
+	declareVars (OverloadedListPatterns _ decons_expr patterns) dvInput
+		=	declareVars patterns dvInput
 
 instance declareVars AlgebraicPattern where
 	declareVars {ap_vars, ap_expr} dvInput
@@ -730,13 +742,61 @@ foldStateWithIndexRangeA function frm to array
 				=	function index array.[index]
 				o`	foldStateWithIndexRangeA (index+1)
 
-declareArrayInstances :: IndexRange Int {#FunDef} -> BackEnder
-declareArrayInstances {ir_from, ir_to} main_dcl_module_n functions
-//	| trace_tn ("declareArrayInstances "+++toString ir_from+++" "+++toString ir_to)
-	=	foldStateWithIndexRangeA (declareArrayInstance) ir_from ir_to functions
+folds op l r :== folds l r
 	where
+		folds [] r = r
+		folds [a:x]	r = folds x (op a r)
+
+declareArrayInstances :: [Int] /*IndexRange*/ PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
+declareArrayInstances [] predefs main_dcl_module_n functions dcls
+	= identity
+declareArrayInstances array_first_instance_indices /*{ir_from, ir_to}*/ predefs main_dcl_module_n functions dcls
+//	| trace_tn ("declareArrayInstances "+++toString ir_from+++" "+++toString ir_to)
+//	=	foldStateWithIndexRangeA declareArrayInstance ir_from ir_to functions
+	= folds (declareArrayInstances 0) array_first_instance_indices
+	where
+		arrayModuleIndex = predefs.[PD_StdArray].pds_def
+		arrayClassIndex = predefs.[PD_ArrayClass].pds_def
+		stdArray = dcls.[arrayModuleIndex]
+		arrayClass = stdArray.dcl_common.com_class_defs.[arrayClassIndex]
+		n_array_class_members=size arrayClass.class_members
+
+		declareArrayInstances :: Int Index *BackEndState -> *BackEndState
+		declareArrayInstances member_n first_member_index backend
+			| member_n==n_array_class_members
+				= backend
+				# function_index=first_member_index+member_n
+				# backend = declareArrayInstance function_index functions.[function_index] backend
+				= declareArrayInstances (member_n+1) first_member_index backend
+
 		declareArrayInstance :: Index FunDef -> BackEnder
 		declareArrayInstance index {fun_symb={id_name}, fun_type=Yes type}
+			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
+			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
+
+declareListInstances :: [Int] Int PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
+declareListInstances [] predef_list_class_index predefs main_dcl_module_n functions dcls
+	= identity
+declareListInstances array_first_instance_indices predef_list_class_index predefs main_dcl_module_n functions dcls
+	= folds (declareListInstances 0) array_first_instance_indices
+	where
+		strictListModuleIndex = predefs.[PD_StdStrictLists].pds_def
+		listClassIndex = predefs.[predef_list_class_index].pds_def
+		stdStrictLists = dcls.[strictListModuleIndex]
+		listClass = stdStrictLists.dcl_common.com_class_defs.[listClassIndex]
+		n_list_class_members=size listClass.class_members
+
+		declareListInstances :: Int Index *BackEndState -> *BackEndState
+		declareListInstances member_n first_member_index backend
+			| member_n==n_list_class_members
+				= backend
+				# function_index=first_member_index+member_n
+				# backend = declareListInstance function_index functions.[function_index] backend
+				= declareListInstances (member_n+1) first_member_index backend
+
+		declareListInstance :: Index FunDef -> BackEnder
+		declareListInstance index {fun_symb={id_name}, fun_type=Yes type}
+//			| trace_tn ("declareListInstance "+++toString index+++" "+++toString main_dcl_module_n)
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
@@ -766,11 +826,10 @@ declareFunType moduleIndex nrOfDclFunctions functionIndex {ft_symb, ft_type_ptr}
 						_
 							->	identity) be
 		where
-/*
-			functionName :: Int {#Char} Int Int -> {#Char}
-			functionName moduleIndex name functionIndex nrOfDclFunctions 
-				| trace_t (":"+++toString moduleIndex+++" "+++toString functionIndex)
-*/
+//			functionName :: Int {#Char} Int Int -> {#Char}
+//			functionName moduleIndex name functionIndex nrOfDclFunctions 
+//				| trace_t (":"+++toString moduleIndex+++" "+++toString functionIndex)
+
 			functionName :: {#Char} Int Int -> {#Char}
 			functionName name functionIndex nrOfDclFunctions 
 				| functionIndex < nrOfDclFunctions
@@ -926,9 +985,40 @@ declareDynamicTemp predefs
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
 	=	appBackEnd (BEDeclarePredefinedModule (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs))
+	o`	foldState predefine_list_type list_types
 	o`	foldState predefineType types
+	o`	foldState predefine_list_constructor list_constructors
 	o`	foldState predefineConstructor constructors
 	where
+		list_types :: [(Int,Int,Int)]
+		list_types
+			=	[
+					(PD_ListType,0,0),
+					(PD_StrictListType,2,0),
+					(PD_UnboxedListType,3,0),
+					(PD_TailStrictListType,0,1),
+					(PD_StrictTailStrictListType,2,1),
+					(PD_UnboxedTailStrictListType,3,1)
+				]
+
+		predefine_list_type (index,head_strictness,tail_strictness)
+			// sanity check ...
+			| predefs.[index].pds_def == NoIndex
+				=	abort "backendconvert, predefineSymbols predef is not a type"
+			// ... sanity check
+			=	appBackEnd (BEPredefineListTypeSymbol predefs.[index].pds_def cPredefinedModuleIndex BEListType head_strictness tail_strictness) // id
+
+		types :: [(Int, Int, BESymbKind)]
+		types
+			=	[	
+//					(PD_ListType, 1, BEListType),
+					
+					(PD_LazyArrayType, 1, BEArrayType)
+				,	(PD_StrictArrayType, 1, BEStrictArrayType)
+				,	(PD_UnboxedArrayType, 1, BEUnboxedArrayType)
+				:	[(index, index-PD_Arity2TupleType+2, BETupleType) \\ index <- [PD_Arity2TupleType..PD_Arity32TupleType]]
+				]
+
 		predefineType (index, arity, symbolKind)
 			// sanity check ...
 			| predefs.[index].pds_def == NoIndex
@@ -936,6 +1026,41 @@ predefineSymbols {dcl_common} predefs
 			// ... sanity check
 			=	appBackEnd (BEPredefineTypeSymbol arity predefs.[index].pds_def cPredefinedModuleIndex symbolKind)
 
+		list_constructors :: [(Int,BESymbKind,Int,Int)]
+		list_constructors
+			=	[
+					(PD_NilSymbol, BENilSymb,0,0),
+					(PD_StrictNilSymbol, BENilSymb,2,0),
+					(PD_UnboxedNilSymbol, BENilSymb,4/*3*/,0),
+					(PD_TailStrictNilSymbol, BENilSymb,0,1),
+					(PD_StrictTailStrictNilSymbol, BENilSymb,2,1),
+					(PD_UnboxedTailStrictNilSymbol, BENilSymb,4/*3*/,1),
+					(PD_OverloadedNilSymbol, BENilSymb,0,0),
+					(PD_ConsSymbol, BEConsSymb,0,0),
+					(PD_StrictConsSymbol, BEConsSymb,2,0),
+					(PD_UnboxedConsSymbol, BEConsSymb,3,0),
+					(PD_TailStrictConsSymbol, BEConsSymb,0,1),
+					(PD_StrictTailStrictConsSymbol, BEConsSymb,2,1),
+					(PD_UnboxedTailStrictConsSymbol, BEConsSymb,3,1),
+					(PD_OverloadedConsSymbol, BEConsSymb,1,0)
+				]
+
+		predefine_list_constructor (index,symbolKind,head_strictness,tail_strictness)
+			// sanity check ...
+			| predefs.[index].pds_def == NoIndex
+				=	abort "backendconvert, predefineSymbols predef is not a constructor"
+			// ... sanity check
+			= appBackEnd (BEPredefineListConstructorSymbol predefs.[index].pds_def cPredefinedModuleIndex symbolKind head_strictness tail_strictness) // id
+		
+		constructors :: [(Int, Int, BESymbKind)]
+		constructors
+			=	
+//				[(PD_NilSymbol, 0, BENilSymb), (PD_ConsSymbol, 3, BEConsSymb) : 
+
+				[(index, index-PD_Arity2TupleSymbol+2, BETupleSymb) \\ index <- [PD_Arity2TupleSymbol..PD_Arity32TupleSymbol]]
+
+//				]
+ 
 		predefineConstructor (index, arity, symbolKind)
 			// sanity check ...
 			| predefs.[index].pds_def == NoIndex
@@ -943,21 +1068,76 @@ predefineSymbols {dcl_common} predefs
 			// ... sanity check
 			=	appBackEnd (BEPredefineConstructorSymbol arity predefs.[index].pds_def cPredefinedModuleIndex symbolKind)
 
-		types :: [(Int, Int, BESymbKind)]
-		types
-			=	[	(PD_ListType, 1, BEListType)
-				,	(PD_LazyArrayType, 1, BEArrayType)
-				,	(PD_StrictArrayType, 1, BEStrictArrayType)
-				,	(PD_UnboxedArrayType, 1, BEUnboxedArrayType)
-				:	[(index, index-PD_Arity2TupleType+2, BETupleType) \\ index <- [PD_Arity2TupleType..PD_Arity32TupleType]]
-				]
+adjustStrictListFunctions :: [Int] [Int] {#PredefinedSymbol} {#DclModule} NumberSet Int *BackEndState -> *BackEndState;
+adjustStrictListFunctions list_first_instance_indices tail_strict_list_first_instance_indices predefs dcls used_module_numbers main_dcl_module_n backEnd
+	| std_strict_list_module_index==NoIndex || not (inNumberSet std_strict_list_module_index used_module_numbers)
+		|| std_strict_list_module_index==main_dcl_module_n
+		= backEnd
+		# std_strict_lists_instances=std_strict_lists.dcl_common.com_instance_defs
+		# backEnd = adjust_strict_list_instances 0 std_strict_lists_instances backEnd
+		# std_strict_lists_nil_functions=std_strict_lists.dcl_functions
+		# first_instance_index=std_strict_lists.dcl_instances.ir_from;
+		# backEnd=adjust_overloaded_nil_functions 0 first_instance_index std_strict_lists_nil_functions backEnd
+		# backEnd=adjustRecordListInstances list_first_instance_indices backEnd
+		= adjustRecordListInstances tail_strict_list_first_instance_indices backEnd
+where
+	std_strict_lists=dcls.[std_strict_list_module_index]
+	std_strict_list_module_index=predefs.[PD_StdStrictLists].pds_def
 
-		constructors :: [(Int, Int, BESymbKind)]
-		constructors
-			=	[	(PD_NilSymbol, 0, BENilSymb)
-				,	(PD_ConsSymbol, 2, BEConsSymb)
-				:	[(index, index-PD_Arity2TupleSymbol+2, BETupleSymb) \\ index <- [PD_Arity2TupleSymbol..PD_Arity32TupleSymbol]]
-				]
+	adjust_strict_list_instances i instances backEnd
+		| i<size instances
+			# instance_i = instances.[i]
+//			| is_instance_for_basic_type instance_i.ins_type.it_types && trace_tn ("instance: "+++toString instance_i.ins_ident) && trace_tn (types_to_string instance_i.ins_type.it_types)
+			| isEmpty instance_i.ins_type.it_context // && trace_t ("instance: "+++toString instance_i.ins_ident+++" ") && trace_t (types_to_string instance_i.ins_type.it_types+++" ")
+				# backEnd = adjust_strict_list_members 0 instance_i.ins_members backEnd
+				= adjust_strict_list_instances (i+1) instances backEnd
+				= adjust_strict_list_instances (i+1) instances backEnd
+			= backEnd
+	where
+//		is_instance_for_basic_type [TB _] = True
+//		is_instance_for_basic_type _ = False
+		
+		adjust_strict_list_members i members backEnd
+			| i<size members
+				# member=members.[i]
+				# member_name=member.ds_ident.id_name
+				| size member_name>0 && member_name.[0]=='c' // && trace_tn ("member: "+++member_name)
+					# (ft_type,backEnd) = read_from_var_heap std_strict_lists.dcl_functions.[member.ds_index].ft_type_ptr backEnd
+					= case ft_type of
+						VI_ExpandedType _
+							# backEnd=appBackEnd (BEAdjustStrictListConsInstance member.ds_index std_strict_list_module_index) backEnd
+							-> adjust_strict_list_members (i+1) members backEnd
+						_
+							-> adjust_strict_list_members (i+1) members backEnd					
+					= adjust_strict_list_members (i+1) members backEnd
+				= backEnd
+
+	adjust_overloaded_nil_functions function_index first_instance_index std_strict_lists_nil_functions backEnd
+		| function_index<first_instance_index
+			# backEnd = appBackEnd (BEAdjustOverloadedNilFunction function_index std_strict_list_module_index) backEnd
+			= adjust_overloaded_nil_functions (function_index+1) first_instance_index std_strict_lists_nil_functions backEnd
+			= backEnd
+
+	adjustRecordListInstances [] back_end
+		= back_end
+	adjustRecordListInstances [index:indices] backend
+//		| trace_tn ("adjustRecordListInstances "+++toString index+++" "+++toString main_dcl_module_n)
+		# backend = appBackEnd (BEAdjustStrictListConsInstance index main_dcl_module_n) backend
+		# backend = appBackEnd (BEAdjustUnboxedListDeconsInstance (index+1) main_dcl_module_n) backend
+		= adjustRecordListInstances indices backend
+
+
+types_to_string []
+	= ""
+types_to_string [e:l]
+	= type_to_string e+++" "+++types_to_string l
+	
+type_to_string (TB BT_Int) = "Int"
+type_to_string (TB BT_Char) = "Char"
+type_to_string (TB BT_Real) = "Real"
+type_to_string (TB BT_Bool) = "Bool"
+type_to_string (TB BT_File) = "File"
+type_to_string _ = "?"
 
 :: AdjustStdArrayInfo =
 	{	asai_moduleIndex	:: !Int
@@ -965,20 +1145,20 @@ predefineSymbols {dcl_common} predefs
 	,	asai_funs			:: !{#FunType}
 	}
 
-adjustArrayFunctions :: PredefinedSymbols IndexRange Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet -> BackEnder
-adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcls icl_instances used_module_numbers
+adjustArrayFunctions :: [Int]/*IndexRange*/ PredefinedSymbols Int {#FunDef} {#DclModule} {#ClassInstance} NumberSet -> BackEnder
+adjustArrayFunctions array_first_instance_indices/*arrayInstancesRange*/ predefs main_dcl_module_n functions dcls icl_instances used_module_numbers
 	=	adjustStdArray arrayInfo predefs
 				(if (arrayModuleIndex == main_dcl_module_n) icl_instances stdArray.dcl_common.com_instance_defs)
-	o`	adjustIclArrayInstances arrayInstancesRange arrayMemberMapping functions
+	o`	adjustIclArrayInstances /*arrayInstancesRange*/array_first_instance_indices arrayMemberMapping (size arrayClass.class_members) /*functions*/
 	where
 		arrayModuleIndex
 			=	predefs.[PD_StdArray].pds_def
 		arrayClassIndex
 			=	predefs.[PD_ArrayClass].pds_def
-		arrayClass
-			=	stdArray.dcl_common.com_class_defs.[arrayClassIndex]
 		stdArray
 			=	dcls.[arrayModuleIndex]
+		arrayClass
+			=	stdArray.dcl_common.com_class_defs.[arrayClassIndex]
 		arrayMemberMapping
 			=	getArrayMemberMapping predefs arrayClass.class_members
 		arrayInfo
@@ -1047,9 +1227,9 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 											_
 												->	identity) be
 
-
-		adjustIclArrayInstances :: IndexRange {#BEArrayFunKind} {#FunDef} -> BackEnder
-		adjustIclArrayInstances  {ir_from, ir_to} mapping instances
+		adjustIclArrayInstances :: [Int]/*IndexRange*/ {#BEArrayFunKind} Int /*{#FunDef}*/ -> BackEnder
+		adjustIclArrayInstances array_first_instance_indices/*{ir_from, ir_to}*/ mapping n_array_members /*instances*/
+/*
 			=	foldStateWithIndexRangeA (adjustIclArrayInstance mapping) ir_from ir_to instances
 			where
 				adjustIclArrayInstance :: {#BEArrayFunKind} Index FunDef -> BackEnder
@@ -1057,6 +1237,37 @@ adjustArrayFunctions predefs arrayInstancesRange main_dcl_module_n functions dcl
 				// but its member index in the Array class
 				adjustIclArrayInstance mapping index {fun_index}
 					=	beAdjustArrayFunction mapping.[fun_index] index main_dcl_module_n
+*/
+/*			= adjustIclArrayInstances r_from 0
+			where
+				adjustIclArrayInstances index member_index
+					| index==ir_to
+						= identity
+						# next_member_index=member_index+1
+						=	beAdjustArrayFunction mapping.[member_index] index main_dcl_module_n
+						o`	adjustIclArrayInstances (index+1) (if (next_member_index<n_array_members) next_member_index 0)
+*/
+			= adjustIclArrayInstances array_first_instance_indices
+			where
+				adjustIclArrayInstances [array_first_instance_index:array_first_instance_indices]
+					=	adjustIclArrayInstanceMembers array_first_instance_index 0
+					o`	adjustIclArrayInstances array_first_instance_indices
+				adjustIclArrayInstances []
+					= identity
+
+				adjustIclArrayInstanceMembers index member_index
+					| member_index==n_array_members
+						= identity
+						# next_member_index=member_index+1
+						=	beAdjustArrayFunction mapping.[member_index] index main_dcl_module_n
+						o`	adjustIclArrayInstanceMembers (index+1) next_member_index
+
+		foldStateWithIndexRangeA index
+			| index == to
+				=	identity
+			// otherwise
+				=	function index array.[index]
+				o`	foldStateWithIndexRangeA (index+1)
 
 convertRules :: [(Int, FunDef)] Int Ident *BackEndState -> (BEImpRuleP, *BackEndState)
 convertRules rules main_dcl_module_n aliasDummyId be
@@ -1092,7 +1303,7 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 		cafness FK_ImpCaf
 			=	BEIsACaf
 		cafness funKind
-			=	BEIsNotACaf <<- ("backendconvert, cafness: unknown fun kind", funKind)
+			=	BEIsNotACaf // <<- ("backendconvert, cafness: unknown fun kind", funKind)
 
 		positionToLineNumber :: Position -> Int
 		positionToLineNumber (FunPos  _ lineNumber _)
@@ -1183,10 +1394,10 @@ convertBasicTypeKind BT_File
 convertBasicTypeKind BT_World
 	=	BEWorldType
 convertBasicTypeKind BT_Dynamic
-	=	undef <<- "convertBasicTypeKind (BT_Dynamic) shouldn't occur"
+	=	undef // <<- "convertBasicTypeKind (BT_Dynamic) shouldn't occur"
 //	=	BEDynamicType
 convertBasicTypeKind (BT_String _)
-	=	undef <<- "convertBasicTypeKind (BT_String _) shouldn't occur"
+	=	undef // <<- "convertBasicTypeKind (BT_String _) shouldn't occur"
 
 convertAnnotation :: Annotation -> BEAnnotation
 convertAnnotation AN_None
@@ -1231,7 +1442,7 @@ convertAttribution TA_MultiOfPropagatingConsVar
 convertAttribution _
 	=	return BENoUniAttr
 convertAttribution attr
-	=	abort "backendconvert, convertAttribution: unknown TypeAttribute" <<- attr
+	=	abort "backendconvert, convertAttribution: unknown TypeAttribute" // <<- attr
 
 convertAnnotTypeNode :: AType -> BEMonad BETypeNodeP
 convertAnnotTypeNode {at_type, at_annotation, at_attribute}
@@ -1272,7 +1483,7 @@ convertTypeNode (a :@: b)
 convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
 convertTypeNode typeNode
-	=	abort "convertTypeNode" <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
+	=	abort "convertTypeNode" //  <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 
 consVariableToType :: ConsVariable -> Type
 consVariableToType (CV typeVar)
@@ -1608,7 +1819,7 @@ where
 			convertSymbol {symb_kind=SK_Constructor {glob_module, glob_object}}
 				=	beConstructorSymbol glob_module glob_object // ->> ("convertSymbol", (glob_module, glob_object))
 			convertSymbol symbol
-				=	undef <<- ("backendconvert, convertSymbol: unknown symbol") // , symbol)
+				=	undef // <<- ("backendconvert, convertSymbol: unknown symbol") // , symbol)
 	convertExpr (Var var)
 		=	beNodeIdNode (convertVar var.var_info_ptr) beNoArgs
 	convertExpr (f @ [a])
@@ -1697,7 +1908,7 @@ where
 		=	beIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
 
 	convertExpr  expr
-		=	undef <<- ("backendconvert, convertExpr: unknown expression" , expr)
+		=	undef // <<- ("backendconvert, convertExpr: unknown expression" , expr)
 
 	convertArgs :: [Expression] -> BEMonad BEArgP
 	convertArgs exprs
@@ -1732,7 +1943,7 @@ caseVar :: Expression -> BoundVar
 caseVar (Var var)
 	=	var
 caseVar expr
-	=	undef <<- ("backendconvert, caseVar: unknown expression", expr)
+	=	undef // <<- ("backendconvert, caseVar: unknown expression", expr)
 
 class convertCases a :: a Ident BoundVar (Optional Expression) Int -> BEMonad BEArgP
 
@@ -1741,6 +1952,8 @@ instance convertCases CasePatterns where
 		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n
 	convertCases (BasicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n
 		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n
+	convertCases (OverloadedListPatterns _ decons_expr patterns) aliasDummyId var default_case main_dcl_module_n
+		=	convertOverloadedListPatterns patterns decons_expr aliasDummyId var default_case main_dcl_module_n
 	// +++ other patterns ???
 
 instance convertCases [a] | convertCase a where
@@ -1808,6 +2021,22 @@ pushNode arity var symbolM argM nodeIdsM be
 		=	argM be
 	=	accBackEnd (BEPushNode arity symbol arg nodeIds) be
 
+overloadedPushNode arity var symbolM argM nodeIdsM deconsNodeM be
+	:== let
+			(symbol, be1)
+				=	symbolM be
+			(nodeIds, be2)
+				=	nodeIdsM be1
+			(sequenceNumber, be3)
+				=	getVariableSequenceNumber var.var_info_ptr be2
+			be4
+				=	appBackEnd (BEAddNodeIdsRefCounts sequenceNumber symbol nodeIds) be3
+			(arg, be5)
+				=	argM be4
+			(deconsNodeP,be6)
+				= deconsNodeM be5
+	in		accBackEnd (BEOverloadedPushNode arity symbol arg nodeIds deconsNodeP) be6
+
 instance convertCase AlgebraicPattern where
 	convertCase main_dcl_module_n localRefCounts aliasDummyId var {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
 		| symbolArity == 0
@@ -1836,6 +2065,46 @@ instance convertCase BasicPattern where
 				(convertRhsNodeDefs aliasDummyId bp_expr main_dcl_module_n)
 				(convertRhsStrictNodeIds bp_expr)
 				(convertRootExpr aliasDummyId bp_expr main_dcl_module_n)
+
+convertOverloadedListPatterns patterns decons_expr aliasDummyId var optionalCase main_dcl_module_n
+	=	sfoldr (beArgs o convertOverloadedListPattern decons_expr (localRefCounts patterns optionalCase))
+				(convertDefaultCase optionalCase aliasDummyId main_dcl_module_n) patterns
+where
+	localRefCounts [x] No
+		=	False
+	localRefCounts _ _
+		=	True
+
+	convertOverloadedListPattern :: Expression Bool AlgebraicPattern -> BEMonad BENodeP
+	convertOverloadedListPattern decons_expr localRefCounts {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars=[], ap_expr}
+		=	caseNode localRefCounts 0
+				(beConstructorSymbol glob_module ds_index)
+				(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n)
+				(convertRhsStrictNodeIds ap_expr)
+				(convertRootExpr aliasDummyId ap_expr main_dcl_module_n)
+	convertOverloadedListPattern decons_expr=:(App {app_args=[],app_symb={symb_kind=SK_Function {glob_module=decons_module,glob_object=deconsindex}}}) localRefCounts {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
+		=	caseNode localRefCounts symbolArity
+				(beOverloadedConsSymbol glob_module ds_index decons_module deconsindex)
+				(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n)
+				(convertRhsStrictNodeIds ap_expr)
+				(pushNode symbolArity var
+					(beOverloadedConsSymbol glob_module ds_index decons_module deconsindex)
+					(beArgs (convertExpr (Var var) main_dcl_module_n) (beArgs (convertRootExpr aliasDummyId ap_expr main_dcl_module_n) beNoArgs))
+					(convertPatternVars ap_vars))
+		where
+			symbolArity = length ap_vars
+	convertOverloadedListPattern decons_expr localRefCounts {ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr}
+		=	caseNode localRefCounts symbolArity
+				(beConstructorSymbol glob_module ds_index)
+				(convertRhsNodeDefs aliasDummyId ap_expr main_dcl_module_n)
+				(convertRhsStrictNodeIds ap_expr)
+				(overloadedPushNode symbolArity var
+					(beConstructorSymbol glob_module ds_index)
+					(beArgs (convertExpr (Var var) main_dcl_module_n) (beArgs (convertRootExpr aliasDummyId ap_expr main_dcl_module_n) beNoArgs))
+					(convertPatternVars ap_vars)
+					(convertExpr decons_expr main_dcl_module_n))
+		where
+			symbolArity = length ap_vars
 
 convertPatternVars :: [FreeVar] -> BEMonad BENodeIdListP
 convertPatternVars vars
@@ -1881,7 +2150,7 @@ getVariableSequenceNumber varInfoPtr be
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
 		vi
-			-> abort "getVariableSequenceNumber" <<- vi
+			-> abort "getVariableSequenceNumber" // <<- vi
 
 markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} (Optional {#Int}) -> BackEnder
 markExports {dcl_conversions = Yes conversionTable} dclClasses dclTypes iclClasses iclTypes (Yes functionConversions)
