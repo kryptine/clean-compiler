@@ -192,15 +192,3 @@ extern UniquenessErrorKind EquateAttributesOfType (TypeCell type1, AttributeCell
 
 extern TypeCell gErroneousTypeCell;
 extern Bool gDemandedIsErroneous;
-
-#ifdef SHORT_CLASS_NAMES
-
-extern ModuleInfo gModuleInfo, gIclModuleInfo;
-
-extern ModuleInfo NewModuleInfo (Symbol module_symbol);
-
-extern int ConvertSymbolListToNumber (SymbolList class_symbols);
-
-#endif
-
-

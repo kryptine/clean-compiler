@@ -64,8 +64,6 @@ extern void  SetOverloadedTypeVars (int over_arity, TypeContext type_cont, struc
 
 extern void DetermineClassNumber (SymbDef class_symb);
 
-extern ClassInstance RetrieveSpecificInstance (ClassDefinition class, struct type_cell * inst_type);
-
 extern SymbDef CopySymbDef (SymbDef old);
 
 extern SymbDef NewEmptyRule (Symbol rule_symb, int arity, unsigned line);
@@ -73,8 +71,6 @@ extern SymbDef NewEmptyRule (Symbol rule_symb, int arity, unsigned line);
 extern Bool EqualTypeClasses (int var_nr1, int var_nr2);
 
 extern void InitOverloading (void);
-
-extern void AddToInstanceList (ClassInstance class_instance, ClassDefinition class_def);
 
 extern FieldList RetrieveClassSelector (SymbolList class_symbols, SymbDef class_symbol);
 

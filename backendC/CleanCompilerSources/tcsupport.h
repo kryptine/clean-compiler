@@ -8,10 +8,6 @@ Author: Sjaak Smetsers
 
 extern jmp_buf ExitTypeComponent;
 
-#ifdef SHORT_CLASS_NAMES
-extern int gNextTypeNumber;
-#endif
-
 extern void OverloadingError (Symbol symbol, char *msg, TypeCell type, Bool make_jump);
 
 extern void Unify (TypeCell offtype, TypeCell demtype, Node uni_node, int argnr);

@@ -30,8 +30,3 @@ extern SymbolTypeInfoP NewSymbolTypeInfo (void);
 extern void PrintTypeClass (SymbDef class_def, File file);
 
 #define NewTypeCells(n,hd)	TH_AllocArray (hd,n,TypeCell)
-
-#ifdef SHORT_CLASS_NAMES
-extern void ConvertTypeContextToNumbers (DefMod dmod);
-#endif
-
