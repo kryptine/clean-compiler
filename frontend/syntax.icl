@@ -6,6 +6,8 @@ import RWSDebug
 
 import scanner, general, Heap, typeproperties, utilities
 
+PA_BUG on off :== on
+
 ::	Ident =
 	{ 	id_name		:: !String
 	,	id_info 	:: !SymbolPtr
@@ -1157,8 +1159,6 @@ where
 		= "u" + toString tav_number + ": "
 	toString (TA_Var avar)
 		= toString avar + ": "
-	toString TA_TempExVar
-		= "(E)"
 	toString (TA_RootVar avar)
 		= toString avar + ": "
 	toString (TA_Anonymous)
@@ -1169,6 +1169,8 @@ where
 		= "o "
 	toString (TA_List _ _)
 		= "??? "
+	toString TA_TempExVar
+		= PA_BUG "(E)" (abort "toString TA_TempExVar")
 
 instance <<< Annotation
 where

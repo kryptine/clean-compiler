@@ -34,9 +34,10 @@ import syntax, check, typesupport
 	}
 
 ::	LocalTypePatternVariable
+::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
 tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
-	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
+	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 
 ::	TypeCodeInfo =
 	{	tci_next_index			:: !Index

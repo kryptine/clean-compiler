@@ -402,7 +402,7 @@ where
 	 toInt (TA_TempVar av_number)	= av_number
 	 toInt TA_Multi 				= AttrMulti
 	 toInt TA_None 					= AttrMulti
-	 toInt TA_TempExVar 			= AttrExi
+	 toInt TA_TempExVar 			= PA_BUG AttrExi (abort "toInt TA_TempExVar")
 
 
 ::	CoercionState =
@@ -423,9 +423,9 @@ offered_attribute according to sign. Failure is indicated by returning False as 
 /* Just Temporary */
 
 coerceAttributes TA_TempExVar dem_attr _ coercions
-	= (True, coercions)
+	= PA_BUG (True, coercions) (abort "coerceAttributes TA_TempExVar")
 coerceAttributes _ TA_TempExVar _ coercions
-	= (True, coercions)
+	= PA_BUG (True, coercions) (abort "coerceAttributes TA_TempExVar")
 /* ... remove this !!!! */
 
 coerceAttributes TA_Unique dem_attr {neg_sign} coercions

@@ -4,6 +4,8 @@ import StdEnv
 
 import scanner, general, typeproperties, Heap
 
+PA_BUG on off :== on
+
 ::	Ident =
 	{ 	id_name		:: !String
 	,	id_info 	:: !SymbolPtr

@@ -66,8 +66,6 @@ attrIsUndefined _ 		= False
 
 instance clean_up TypeAttribute
 where
-	clean_up cui TA_TempExVar cus
-		= (TA_Multi, cus)
 	clean_up cui TA_Unique cus
 		= (TA_Unique, cus)
 	clean_up cui TA_Multi cus
@@ -88,6 +86,8 @@ where
 						 cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})
 				= (attr, cus)
 			= (TA_Multi, cus)
+	clean_up cui TA_TempExVar cus
+		= PA_BUG (TA_Multi, cus) (abort "clean_up cui (TA_TempExVar)")
 			
 instance clean_up Type
 where
@@ -386,6 +386,10 @@ where
 			EI_LetType let_type
 				# (let_type, cus) = clean_up cui let_type cus
 				-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cus)
+			EI_DictionaryType dict_type
+				# (dict_type, cus) = clean_up cui dict_type cus
+				-> (expr_heap <:= (expr_ptr, EI_DictionaryType dict_type), cus)
+
 
  	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
  		| is_start_rule
@@ -422,12 +426,12 @@ where
 */ 
 
 updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*ExpressionHeap -> (!*TypeHeaps, !*ExpressionHeap)
-updateExpressionTypes {st_args,st_vars,st_result,st_attr_vars} st_copy case_and_let_exprs heaps=:{th_vars,th_attrs} expr_heap
+updateExpressionTypes {st_args,st_vars,st_result,st_attr_vars} st_copy type_ptrs heaps=:{th_vars,th_attrs} expr_heap
 	# th_vars = foldSt (\{tv_info_ptr} var_heap -> var_heap <:= (tv_info_ptr, TVI_Empty)) st_vars th_vars
 	  th_attrs = foldSt (\{av_info_ptr} attr_heap -> attr_heap <:= (av_info_ptr, AVI_Empty)) st_attr_vars th_attrs
 	  th_vars = bindInstances st_args st_copy.st_args th_vars
 	  th_vars = bindInstances st_result st_copy.st_result th_vars
-	= foldSt update_expression_type case_and_let_exprs ({heaps & th_vars = th_vars, th_attrs = th_attrs}, expr_heap)
+	= foldSt update_expression_type type_ptrs ({heaps & th_vars = th_vars, th_attrs = th_attrs}, expr_heap)
 where
 	update_expression_type expr_ptr (type_heaps, expr_heap)
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
@@ -438,6 +442,9 @@ where
 			EI_LetType let_type
 				# (let_type, type_heaps) = substitute let_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type))
+			EI_DictionaryType dict_type
+				# (dict_type, type_heaps) = substitute dict_type type_heaps
+				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
 
 
 class bindInstances a :: !a !a !*TypeVarHeap -> *TypeVarHeap
@@ -877,14 +884,14 @@ where
 			= file <<< '*' 
 		show_attribute TA_Multi coercions file 
 			= file 
-		show_attribute TA_TempExVar coercions file 
-			= file <<< "(E)" 
 		show_attribute (TA_TempVar av_number) coercions file 
 			| isUniqueAttribute av_number coercions
 				= file <<< '*' 
 			| isNonUniqueAttribute av_number coercions
 				= file 
 				= file <<< '.' <<< "[[" <<< av_number <<< "]]"
+		show_attribute TA_TempExVar coercions file 
+			= PA_BUG (file <<< "(E)") (abort "show_attribute TA_TempExVar")
 
 instance <:: Type
 where

@@ -357,8 +357,7 @@ freshCopyOfTypeAttribute (TA_Var avar) attr_var_heap
 /* Should be removed !!!!!!!!!! */
 
 freshCopyOfTypeAttribute (TA_RootVar avar) attr_var_heap
-//	= freshCopyOfAttributeVar avar attr_var_heap
-	= (TA_TempExVar, attr_var_heap)
+	= PA_BUG (TA_TempExVar, attr_var_heap) (freshCopyOfAttributeVar avar attr_var_heap)
 freshCopyOfTypeAttribute TA_None attr_var_heap
 	= (TA_Multi, attr_var_heap)
 freshCopyOfTypeAttribute TA_Unique attr_var_heap
@@ -1324,42 +1323,51 @@ specification_error type err
 	  format = { form_properties = cAttributed, form_attr_position = No}
 	= { err & ea_file = err.ea_file <<< " specified type conflicts with derived type " <:: (format, type) <<< '\n' }
 
-cleanUpAndCheckFunctionTypes [] _ start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+
+cleanUpAndCheckFunctionTypes [] _ _ start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 	= (fun_defs, ts)
-cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] start_index defs type_contexts coercion_env
+cleanUpAndCheckFunctionTypes [fun : funs] [ {fe_requirements = {req_case_and_let_exprs}} : reqs] dict_types start_index defs type_contexts coercion_env
 				attr_partition type_var_env attr_var_env (fun_defs, ts)
 	# (fd, fun_defs) = fun_defs![fun]
-	# (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun (start_index == fun) defs type_contexts
-				req_case_and_let_exprs coercion_env attr_partition type_var_env attr_var_env ts
-	= cleanUpAndCheckFunctionTypes funs reqs start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
+	  dict_ptrs = get_dict_ptrs fun dict_types
+	  (type_var_env, attr_var_env, ts) = clean_up_and_check_function_type fd fun (start_index == fun) defs type_contexts
+													(dict_ptrs ++ req_case_and_let_exprs) coercion_env attr_partition type_var_env attr_var_env ts
+	= cleanUpAndCheckFunctionTypes funs reqs dict_types start_index defs type_contexts coercion_env attr_partition type_var_env attr_var_env (fun_defs, ts)
 where
-	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun is_start_rule defs type_contexts case_and_let_exprs
+	get_dict_ptrs fun_index []
+		= []
+	get_dict_ptrs fun_index [(index, ptrs) : dict_types]
+		| fun_index == index
+			= ptrs
+			= get_dict_ptrs fun_index dict_types
+		
+	clean_up_and_check_function_type {fun_symb,fun_pos,fun_type = opt_fun_type} fun is_start_rule defs type_contexts type_ptrs
 					coercion_env attr_partition type_var_env attr_var_env ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_symb fun_pos) ts.ts_error}
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
-					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts case_and_let_exprs coercion_env 
+					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env 
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
-			  			= check_function_type fun_type tmp_fun_type clean_fun_type case_and_let_exprs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
+			  			= check_function_type fun_type tmp_fun_type clean_fun_type type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
 					-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
 					-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error })
 		  	UncheckedType exp_fun_type
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
-					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts case_and_let_exprs coercion_env
+					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
 				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
 
-	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} case_and_let_exprs
+	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} type_ptrs
 				defs fun_env attr_var_env type_heaps expr_heap error
 		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type (length fun_type.st_context) defs attr_var_env type_heaps
 		| equi
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context
-			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types case_and_let_exprs type_heaps expr_heap
+			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
 			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
 //					---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
 			= (fun_env, attr_var_env, type_heaps, expr_heap, specification_error clean_fun_type error)
@@ -1529,8 +1537,7 @@ where
 		  coer_offered = {{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrMulti] = CT_NonUnique }
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }
 		  (over_info, (subst, ts_expr_heap)) = collect_and_expand_overloaded_calls fun_reqs [] (subst, ts_expr_heap)
-		  (ts_expr_heap, subst) = expand_types_of_cases_and_lets fun_reqs (ts_expr_heap, subst)
-		  (contexts, coercion_env, local_pattern_variables,
+		  (contexts, coercion_env, local_pattern_variables, dict_types,
 		  	{ os_type_heaps, os_var_heap, os_symbol_heap, os_predef_symbols, os_special_instances, os_error })
 		  		= tryToSolveOverloading over_info ti_common_defs class_instances coercion_env
 		  			{	os_type_heaps = {ts_type_heaps & th_vars = th_vars}, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap,
@@ -1547,7 +1554,7 @@ where
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
-		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs start_index ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
+		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 									(fun_defs,  { ts &	ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps,
 		  												ts_td_infos = ts_td_infos, ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap })
 		| not ts.ts_error.ea_ok
@@ -1628,32 +1635,32 @@ where
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
 
-	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
-		# (context, subst) = arraySubst context subst 
+	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
+		# (context, subst) = arraySubst context subst
+		  subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs (subst, expr_heap)
 		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_location, fe_index) : calls]
-				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 	
-	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
+				(foldSt expand_type_contexts req_overloaded_calls subst_expr_heap) 	
+	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls subst_expr_heap
+		# subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs subst_expr_heap
 		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_location, fe_index) : calls]
-				(foldSt expand_type_contexts req_overloaded_calls (subst, expr_heap)) 
+				(foldSt expand_type_contexts req_overloaded_calls subst_expr_heap) 
 
 	expand_type_contexts over_info_ptr (subst, expr_heap)
 		# (EI_Overloaded info, expr_heap) = readPtr over_info_ptr expr_heap
 		  (oc_context, subst) = arraySubst info.oc_context subst
 		= (subst, expr_heap <:= (over_info_ptr, EI_Overloaded { info & oc_context = oc_context })) //---> oc_context
 
-	expand_types_of_cases_and_lets [] heap_and_subst
-		= heap_and_subst
-	expand_types_of_cases_and_lets [{fe_requirements={req_case_and_let_exprs}}:reqs] heap_and_subst
-		= expand_types_of_cases_and_lets reqs (foldl expand_case_or_let_type heap_and_subst req_case_and_let_exprs)
+	expand_case_or_let_types info_ptrs subst_expr_heap
+		= foldSt expand_case_or_let_type info_ptrs subst_expr_heap
 
-	expand_case_or_let_type (expr_heap, subst) info_ptr
+	expand_case_or_let_type info_ptr (subst, expr_heap)
 		= case (readPtr info_ptr expr_heap) of
 			(EI_CaseType case_type, expr_heap)
 				# (case_type, subst) = arraySubst case_type subst
-				-> (expr_heap <:= (info_ptr, EI_CaseType case_type), subst)
+				-> (subst, expr_heap <:= (info_ptr, EI_CaseType case_type))
 			(EI_LetType let_type, expr_heap)
 				# (let_type, subst) = arraySubst let_type subst
-				-> (expr_heap <:= (info_ptr, EI_LetType let_type), subst)
+				-> (subst, expr_heap <:= (info_ptr, EI_LetType let_type))
 
 	expand_function_types :: ![Int] !*{!Type} *{! FunctionType} -> (!*{!Type}, *{! FunctionType})
 	expand_function_types [fun : funs] subst ts_fun_env
