@@ -789,7 +789,6 @@ cNonRecursiveAppl	:== False
 					| TVI_Used /* to administer that this variable is encountered (in checkOpenTypes) */
 //					| TVI_Clean !Int /* to keep the unique number that has been assigned to this variable during 'clean_up' */
 					| TVI_TypeCode !TypeCodeExpression
-					| TVI_FreshTypeVar TypeVar /* auxiliary used during fusion */
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo

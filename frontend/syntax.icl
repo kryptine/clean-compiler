@@ -749,7 +749,6 @@ cNotVarNumber :== -1
 					| TVI_AType !AType /* auxiliary used in module comparedefimp */
 					| TVI_Used /* to adminster that this variable is encountered (in checkOpenTypes) */
 					| TVI_TypeCode !TypeCodeExpression
-					| TVI_FreshTypeVar TypeVar /* auxiliary used during fusion */
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
