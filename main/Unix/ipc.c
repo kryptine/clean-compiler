@@ -106,8 +106,6 @@ int get_command (CleanString cleanString)
 {
 	log ("%s\n", command_buffer);
 	strncpy (cleanString->chars, command_buffer, cleanString->length);
-	cleanString->chars [cleanString->length]	= '\0';
-
 	return (0);
 }
 
