@@ -17,6 +17,7 @@ SelectPredefinedIdents :: *PredefinedSymbols -> (!PredefinedIdents, !*Predefined
 SelectPredefinedIdents predefs
 	=	selectIdents 0 (createArray PD_NrOfPredefSymbols {id_name="", id_info = nilPtr}) predefs
 	where
+		selectIdents :: Int *PredefinedIdents *PredefinedSymbols -> (*PredefinedIdents, *PredefinedSymbols)
 		selectIdents i idents symbols
 			| i == PD_NrOfPredefSymbols
 				=	(idents, symbols)
@@ -28,12 +29,30 @@ predef :: Int PredefinedIdents -> ParsedExpr
 predef index ids
 	=	PE_Ident ids.[index]
 
-(##) infixl 9
-(##) f a
-	:== \idents -> apply (f idents) (toParsedExpr a idents)
+optGuardedAltToRhs :: OptGuardedAlts -> Rhs
+optGuardedAltToRhs optGuardedAlt
+	=	{	rhs_alts	= optGuardedAlt
+		,	rhs_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+		}
 
-(#<) a b
-	:==	predef PD_SmallerFun ## a ## b
+exprToRhs expr 
+	:==	{	rhs_alts	= UnGuardedExpr
+ 						{	ewl_nodes	= []
+						,	ewl_expr	= expr
+						,	ewl_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+						}
+		,	rhs_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+		}
+
+prefixAndPositionToIdent :: !String !LineAndColumn !*CollectAdmin -> (!Ident, !*CollectAdmin)
+prefixAndPositionToIdent prefix {lc_line, lc_column} ca=:{ca_hash_table}
+	# (ident, ca_hash_table)
+		=	putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
+	=	(ident, { ca & ca_hash_table = ca_hash_table } )
+
+(`) infixl 9
+(`) f a
+	:== \idents -> apply (f idents) (toParsedExpr a idents)
 
 // apply :: ParsedExpr ParsedExpr -> ParsedExpr
 
@@ -43,43 +62,33 @@ apply (PE_List application) a
 apply f a
 	=	PE_List [f, a]
 
-class toParsedExpr a :: !a !PredefinedIdents -> ParsedExpr
+class toParsedExpr a :: !a -> !PredefinedIdents -> ParsedExpr
 
 instance toParsedExpr [a] | toParsedExpr a where
-	toParsedExpr [] ids
-		=	predef PD_NilSymbol ids
-	toParsedExpr [hd:tl] ids
-		=	(predef PD_ConsSymbol ## hd ## tl) ids
-
-//instance toParsedExpr a where
-//	toParsedExpr _ _
-//		=	abort "toParsedExpr (a) shouldn't be called"
+	toParsedExpr []
+		=	predef PD_NilSymbol
+	toParsedExpr [hd:tl]
+		=	predef PD_ConsSymbol ` hd ` tl
 
 instance toParsedExpr ParsedExpr where
-	toParsedExpr x _
-		=	x
+	toParsedExpr x
+		=	const x
 
 instance toParsedExpr Int where
-	toParsedExpr x _
-		=	PE_Basic (BVI (toString x))
+	toParsedExpr x
+		=	const (PE_Basic (BVI (toString x)))
 
-instance toParsedExpr Char where
-	toParsedExpr x _
-		=	PE_Basic (BVC (toString x))
-
-instance toParsedExpr Ident where
-	toParsedExpr x _
-		=	PE_Ident x
-
+postParseError :: Position {#Char} *CollectAdmin -> *CollectAdmin
 postParseError pos msg ps=:{ca_error={pea_file}}
 	# (filename, line, funname) = get_file_and_line_nr pos
-	  pea_file	= pea_file <<< "Post Parse Error [" <<< filename <<< "," <<< line // PK
+	  pea_file	= pea_file <<< "Post Parse Error [" <<< filename <<< "," <<< line
 	  pea_file	= case funname of
 	  				Yes name	-> pea_file <<< "," <<< name
 	  				No			-> pea_file
 	  pea_file	= pea_file <<< "]: " <<< msg <<< ".\n"
 	= {ps & ca_error = { pea_file = pea_file, pea_ok = False }}
 where
+	get_file_and_line_nr :: Position -> (FileName, LineNr, Optional FunctName)
 	get_file_and_line_nr (FunPos filename linenr funname)
 		= (filename, linenr, Yes funname)
 	get_file_and_line_nr (LinePos filename linenr)
@@ -89,6 +98,7 @@ where
 	{	ca_error		:: !ParseErrorAdmin
 	,	ca_fun_count	:: !Int
 	,	ca_predefs		:: !PredefinedIdents
+	,	ca_hash_table	:: !*HashTable
 	}
 
 class collectFunctions a :: a !CollectAdmin -> (a, ![FunDef], !CollectAdmin)
@@ -130,22 +140,32 @@ where
 							[ {calt_pattern = true_pattern , calt_rhs = exprToRhs t}
 							, {calt_pattern = false_pattern, calt_rhs = exprToRhs e}
 							]) ca
-	where
-		exprToRhs expr 
-		 =	{	rhs_alts	= UnGuardedExpr
-		 						{	ewl_nodes	= []
-								,	ewl_expr	= expr
-								,	ewl_locals	= LocalParsedDefs []
-								}
-			,	rhs_locals	= LocalParsedDefs []
-			}
 	collectFunctions (PE_Let strict locals in_expr) ca
 		# ((node_defs,in_expr), fun_defs, ca) = collectFunctions (locals,in_expr) ca
 		= (PE_Let strict node_defs in_expr, fun_defs, ca)
 	collectFunctions (PE_Compr gen_kind expr qualifiers) ca=:{ca_predefs}
-		= transformComprehension gen_kind expr qualifiers ca
-	collectFunctions (PE_Array expr assignments _) ca=:{ca_predefs}
+		# (expr, expr_fun_defs, ca)
+			=	collectFunctions expr ca
+		# (qualifiers, qualifiers_fun_defs, ca)
+			=	collectFunctions qualifiers ca
+		# (compr, compr_fun_defs, ca)
+			= transformComprehension gen_kind expr qualifiers ca
+		=	(compr, expr_fun_defs ++ qualifiers_fun_defs ++ compr_fun_defs, ca)
+	collectFunctions (PE_Array expr assignments) ca=:{ca_predefs}
 		= collectFunctions (transformArrayUpdate expr assignments ca_predefs) ca
+	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) ca
+// +++ remove recollection		= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
+		# (expr, expr_fun_defs, ca)
+			=	collectFunctions expr ca
+		# (updateExpr, update_expr_fun_defs, ca)
+			=	collectFunctions updateExpr ca
+		# (identExpr, ident_expr_fun_defs, ca)
+			=	collectFunctions identExpr ca
+		# (qualifiers, qualifiers_fun_defs, ca)
+			=	collectFunctions qualifiers ca
+		# (compr, compr_fun_defs, ca)
+			= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
+		=	(compr, expr_fun_defs ++ update_expr_fun_defs ++ ident_expr_fun_defs ++ qualifiers_fun_defs ++ compr_fun_defs, ca)
 	collectFunctions (PE_Sequ sequence) ca=:{ca_predefs}
 		= collectFunctions (transformSequence sequence ca_predefs) ca
 	collectFunctions (PE_ArrayDenot exprs) ca=:{ca_predefs}
@@ -161,7 +181,7 @@ where
 		= ([x:xs], fun_defs_in_x ++ fun_defs_in_xs, ca)
 	collectFunctions [] ca
 		= ([], [], ca)
-		
+
 instance collectFunctions (a,b) | collectFunctions a & collectFunctions b
 where
 	collectFunctions (x,y) ca
@@ -174,12 +194,12 @@ where
 	collectFunctions qual=:{qual_generators, qual_filter} ca
 		# ((qual_generators, qual_filter), fun_defs, ca) = collectFunctions (qual_generators, qual_filter) ca
 		= ({ qual & qual_generators = qual_generators, qual_filter = qual_filter }, fun_defs, ca) 
-		
+
 instance collectFunctions Generator
 where
 	collectFunctions gen=:{gen_pattern,gen_expr} ca
 		# ((gen_pattern,gen_expr), fun_defs, ca) = collectFunctions (gen_pattern,gen_expr) ca
-		= ({gen & gen_pattern = gen_pattern, gen_expr = gen_expr}, fun_defs, ca) 
+		= ({gen & gen_pattern = gen_pattern, gen_expr = gen_expr}, fun_defs, ca)
 
 
 instance collectFunctions (Optional a) | collectFunctions a
@@ -273,14 +293,18 @@ where
 		  (fun_defs, collected_fun_defs, ca) = reorganizeLocalDefinitionsOfFunctions fun_defs ca
 		= (CollectedLocalDefs { loc_functions = { ir_from = ir_from, ir_to = ir_to }, loc_nodes = node_defs },
 			fun_defs ++ fun_defs_in_node_defs ++ collected_fun_defs, ca)
-
 	where
+		collect_functions_in_node_defs :: [(Optional SymbolType,NodeDef ParsedExpr)] *CollectAdmin -> ([(Optional SymbolType,NodeDef ParsedExpr)],[FunDef],*CollectAdmin)
 		collect_functions_in_node_defs [ (node_def_type, bind) : node_defs ] ca
 			# (bind, fun_defs_in_bind, ca) = collectFunctions bind ca
 			  (node_defs, fun_defs_in_node_defs, ca) = collect_functions_in_node_defs node_defs ca
 			= ([(node_def_type, bind):node_defs], fun_defs_in_bind ++ fun_defs_in_node_defs, ca)
 		collect_functions_in_node_defs [] ca
 			= ([], [], ca)
+// RWS ... +++ remove recollection
+	collectFunctions locals ca
+		=	(locals, [], ca)
+// ... RWS
 
 instance collectFunctions NodeDef a | collectFunctions a
 where
@@ -288,13 +312,6 @@ where
 		# ((nd_dst,(nd_alts,nd_locals)), fun_defs, ca) = collectFunctions (nd_dst,(nd_alts,nd_locals)) ca
 		= ({ node_def & nd_dst = nd_dst, nd_alts = nd_alts, nd_locals = nd_locals }, fun_defs, ca)
 	
-/*
-instance collectFunctions a
-where
-	collectFunctions e ca
-		= (e, [], ca)
-*/
-
 instance collectFunctions Ident
 where
 	collectFunctions e ca
@@ -302,6 +319,7 @@ where
 
 NoCollectedLocalDefs :== CollectedLocalDefs { loc_functions = { ir_from = 0, ir_to = 0 }, loc_nodes = [] }
 
+transformLambda :: Ident [ParsedExpr] ParsedExpr -> FunDef
 transformLambda lam_ident args result
 	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs },
 	  			  rhs_locals = NoCollectedLocalDefs }
@@ -309,142 +327,332 @@ transformLambda lam_ident args result
 	  fun_def = MakeNewFunction lam_ident (length args) lam_body FK_Function NoPrio No NoPos
 	= fun_def
 
+makeNilExpression :: *CollectAdmin -> (ParsedExpr,*CollectAdmin)
 makeNilExpression ca=:{ca_predefs}
 	#! nil_id = ca_predefs.[PD_NilSymbol]
 	= (PE_List [PE_Ident nil_id], ca)
+
+makeConsExpression :: ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
 makeConsExpression a1 a2 ca=:{ca_predefs}
 	#! cons_id = ca_predefs.[PD_ConsSymbol]
 	= (PE_List [PE_Ident cons_id, a1, a2], ca)
 
-transformComprehension gen_kind expr qualifiers ca
+// +++ change to accessor functions
+:: TransformedGenerator =
+	{	tg_expr :: ParsedExpr
+	,	tg_lhs_arg :: ParsedExpr
+	,	tg_case_end_expr :: ParsedExpr
+	,	tg_case_end_pattern :: ParsedExpr
+	,	tg_element :: ParsedExpr
+	,	tg_pattern :: ParsedExpr
+	,	tg_case1 :: Ident
+	,	tg_case2 :: Ident
+	,	tg_rhs_continuation :: ParsedExpr
+	}
+
+transformGenerator :: Generator *CollectAdmin -> (TransformedGenerator, *CollectAdmin)
+transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} ca
 	| gen_kind == cIsListGenerator
-		# (nil_expr, ca) = makeNilExpression ca
-		= build_list_comprehension expr nil_expr qualifiers ca
+		# (gen_var, ca) = prefixAndPositionToIdent "g_l" gen_position ca
+		  (gen_var_i, ca) = prefixAndPositionToIdent "g_h" gen_position ca
+		  (gen_var_n, ca) = prefixAndPositionToIdent "g_t" gen_position ca
+		  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+		  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+		# list
+			=	PE_Ident gen_var
+		  hd
+			=	PE_Ident gen_var_i
+		  tl
+		  	=	PE_Ident gen_var_n
+		# (cons, ca)
+			=	makeConsExpression hd tl ca
+		  transformed_generator
+		  	=	{	tg_expr = gen_expr
+		  		,	tg_lhs_arg = list
+		  		,	tg_case_end_expr = list
+		  		,	tg_case_end_pattern = cons
+				,	tg_element = hd
+				,	tg_case1 = gen_var_case1
+				,	tg_case2 = gen_var_case2
+				,	tg_pattern = gen_pattern
+				,	tg_rhs_continuation = PE_Ident gen_var_n
+				}
+		=	(transformed_generator, ca)
 	// gen_kind == cIsArrayGenerator
-		= abort "transformComprehension: cIsArrayGenerator NYI" ---> "transformComprehension: cIsArrayGenerator NYI" // PK
-where		
-		
-	build_list_comprehension expr nil_case [] ca
-		# (expr, fun_defs, ca) = collectFunctions expr ca
-		  (cons_expr, ca) = makeConsExpression expr nil_case ca
-		= (cons_expr, fun_defs, ca)
-	build_list_comprehension expr nil_case [qual: quals] ca
-		# fun_count = ca.ca_fun_count
-		  next_fun_count = inc fun_count
-		  ({qual_generators,qual_fun_id,qual_filter}, fun_defs, ca) = collectFunctions qual {ca & ca_fun_count = next_fun_count}
-		  (cons_patterns, nil_patterns, tail_args, args, arity, opt_index, sizes, selections, ca)
-		  		= build_patterns qual_generators ca 
-		  (selectId,ca) = get_predef_id PD_AndOp ca /* ????????? */
-		  (incId,ca) = get_predef_id PD_IncFun ca
-		  (smallerId,ca) = get_predef_id PD_SmallerFun ca
-		  (cons_patterns, nil_patterns, tail_args, args, arity)
-				= add_index cons_patterns nil_patterns tail_args args arity incId opt_index
-  		  tail_call = PE_List [PE_Ident qual_fun_id : tail_args]
-		  (compr, tail_fun_defs, ca) = build_list_comprehension expr tail_call quals ca
-		  (andId,ca) = get_predef_id PD_AndOp ca
-		  bound_checks = make_bounds_check opt_index smallerId andId sizes
-		  guard = combine_guards qual_filter bound_checks andId
-		  fun_def = build_generator_function guard qual_fun_id compr nil_case arity cons_patterns nil_patterns
-		  gen_appl =  PE_List [PE_Ident fun_def.fun_symb : args]
-		= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = { ir_from = fun_count, ir_to = next_fun_count }, loc_nodes = [] }) gen_appl,
-				[fun_def : fun_defs ++ tail_fun_defs], ca)
-	where  
-		// +++ combine
-		build_generator_function No qual_fun_id expr nil_case arity cons_patterns nil_patterns
-			# cons_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = expr, ewl_locals = NoCollectedLocalDefs }, rhs_locals = NoCollectedLocalDefs }
-			  nil_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = nil_case, ewl_locals = NoCollectedLocalDefs }, rhs_locals = NoCollectedLocalDefs }
-			  body = [{pb_args = cons_patterns, pb_rhs = cons_rhs },{pb_args = nil_patterns, pb_rhs = nil_rhs }]
-			  fun_def = MakeNewFunction qual_fun_id arity body FK_Function NoPrio No NoPos
-			= fun_def
-		build_generator_function (Yes guard) qual_fun_id expr nil_case arity cons_patterns nil_patterns
-			# cons_rhs = { rhs_alts = GuardedAlts [{alt_nodes = [], alt_guard = guard, alt_expr = UnGuardedExpr { ewl_nodes = [], ewl_expr = expr, ewl_locals = NoCollectedLocalDefs}}] No, rhs_locals = NoCollectedLocalDefs }
-			  nil_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = nil_case, ewl_locals = NoCollectedLocalDefs }, rhs_locals = NoCollectedLocalDefs }
-			  body = [{pb_args = cons_patterns, pb_rhs = cons_rhs },{pb_args = nil_patterns, pb_rhs = nil_rhs }]
-			  fun_def = MakeNewFunction qual_fun_id arity body FK_Function NoPrio No NoPos
-			= fun_def
+		# (gen_var, ca) = prefixAndPositionToIdent "g_a" gen_position ca
+		  (gen_var_i, ca) = prefixAndPositionToIdent "g_i" gen_position ca
+		  (gen_var_n, ca) = prefixAndPositionToIdent "g_s" gen_position ca
+		  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+		  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+		# (inc, ca)
+			=	get_predef_id PD_IncFun ca
+		  (smaller, ca)
+		  	=	get_predef_id PD_SmallerFun ca
+		  (usize, ca)
+		  	=	get_predef_id PD_UnqArraySizeFun ca
+		  (uselect, ca)
+		  	=	get_predef_id PD_UnqArraySelectFun ca
+		# array
+			=	PE_Ident gen_var
+		  i
+			=	PE_Ident gen_var_i
+		  n
+		  	=	PE_Ident gen_var_n
+		  transformed_generator
+		  	=	{	tg_expr = PE_Tuple [PE_Basic (BVI "0"), PE_List [PE_Ident usize, gen_expr]]
+		  		,	tg_lhs_arg = PE_Tuple [i, PE_Tuple [n, array]]
+		  		,	tg_case_end_expr = PE_List [PE_Ident smaller, i, n]
+		  		,	tg_case_end_pattern = PE_Basic (BVB True)
+				,	tg_element = PE_List [PE_Ident uselect, array, i]
+				,	tg_case1 = gen_var_case1
+				,	tg_case2 = gen_var_case2
+				,	tg_pattern = PE_Tuple [gen_pattern, array]
+				,	tg_rhs_continuation = PE_Tuple [PE_List [PE_Ident inc, i], PE_Tuple [n, array]]
+				}
+		=	(transformed_generator, ca)
 
-	build_patterns [{gen_pattern,gen_expr,gen_var} : gens] ca
-		| gen_kind == cIsListGenerator
-			# tail_arg = PE_Ident gen_var
-			  (cons_pattern, ca) = makeConsExpression gen_pattern tail_arg ca
-			  nil_pattern = PE_WildCard
-			  (cons_patterns, nil_patterns, tail_args, gen_exprs, nr_of_args, opt_index, sizes, selections, ca)
-			  		= build_patterns gens ca
-			= ([cons_pattern : cons_patterns], [nil_pattern : nil_patterns], [tail_arg : tail_args], [gen_expr : gen_exprs],
-					inc nr_of_args, opt_index, sizes, selections, ca)
-		// gen_kind == cIsArrayGenerator
-			# array_arg = PE_Ident gen_var
-			  (cons_patterns, nil_patterns, tail_args, gen_exprs, nr_of_args, opt_index, sizes, selections, ca)
-			  		= build_patterns gens ca
-			  index_ident = get_index_ident opt_index gen_var
-			  selection = make_selection gen_pattern array index
-			= ([array_arg : cons_patterns], [array_arg : nil_patterns], [array_arg : tail_args], [gen_expr : gen_exprs],
-					inc nr_of_args, Yes index_ident, sizes, selections, ca)
-		where
-			get_index_ident No var
-				=	PE_Ident var
-			get_index_ident (Yes var) _
-				=	var
-	build_patterns [] ca
-		= ([], [], [], [], 0, No, [], [], ca)
+::	TransformedQualifier =
+	{	tq_generators :: [TransformedGenerator]
+	,	tq_call :: ParsedExpr
+	,	tq_lhs_args :: [ParsedExpr]
+	,	tq_filter :: Optional ParsedExpr
+	,	tq_continue :: ParsedExpr
+	,	tq_success :: ParsedExpr
+	,	tq_end :: ParsedExpr
+	,	tq_fun_id :: Ident
+	}
 
-	add_index cons_patterns nil_patterns tail_args gen_exprs arity _ _
-		= (cons_patterns, nil_patterns, tail_args, gen_exprs, arity)
-	add_index cons_patterns nil_patterns tail_args gen_exprs arity incId (Yes index)
-		= ([index : cons_patterns], [PE_WildCard : nil_patterns], [next_index : tail_args], [PE_Basic (BVI "0") : gen_exprs], arity+1)
-		where
-			next_index
-				=	PE_List [PE_Ident incId, index]
+transformQualifier :: Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
+transformQualifier {qual_generators, qual_filter, qual_position} ca
+	# (transformedGenerators, ca)
+		=	mapSt transformGenerator qual_generators ca
+	# (qual_fun_id, ca)
+		=	prefixAndPositionToIdent "c" qual_position ca
+	=	({	tq_generators = transformedGenerators
+		,	tq_call = PE_List [PE_Ident qual_fun_id : [generator.tg_expr \\ generator <- transformedGenerators]]
+		,	tq_lhs_args = [generator.tg_lhs_arg \\ generator <- transformedGenerators]
+		,	tq_filter = qual_filter
+		,	tq_continue = PE_List [PE_Ident qual_fun_id : [generator.tg_rhs_continuation \\ generator <- transformedGenerators]]
+		,	tq_success = PE_Empty
+		,	tq_end = PE_Empty
+		,	tq_fun_id = qual_fun_id
+		}, ca)
 
-	make_selection pattern array index
-		=	PD_NodeDef (PE_List [Arity2TupleConsIndex, array, pattern]) (PE_List [selectId, array, index])
+// +++ bug nested updates, callArray is misnomer (can also be record)
+transformUpdateQualifier :: ParsedExpr ParsedExpr Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
+transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position} ca
+	# (transformedGenerators, ca)
+		=	mapSt transformGenerator qual_generators ca
+	# (qual_fun_id, ca)
+		=	prefixAndPositionToIdent "cu" qual_position ca
+	=	({	tq_generators = transformedGenerators
+		,	tq_call = PE_List [PE_Ident qual_fun_id, callArray : [generator.tg_expr \\ generator <- transformedGenerators]]
+		,	tq_lhs_args = [array : [generator.tg_lhs_arg \\ generator <- transformedGenerators]]
+		,	tq_filter = qual_filter
+		,	tq_continue = PE_List [PE_Ident qual_fun_id, array : [generator.tg_rhs_continuation \\ generator <- transformedGenerators]]
+		,	tq_success = PE_Empty
+		,	tq_end = PE_Empty
+		,	tq_fun_id = qual_fun_id
+		}, ca)
 
-	combine_guards No No _
-		=	No
-	combine_guards a No _
-		=	a
-	combine_guards No b _
-		=	b
-	combine_guards (Yes a) (Yes b) andId
-		=	Yes (PE_List [PE_Ident andId, a, b])
+transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
+transformComprehension gen_kind expr qualifiers ca=:{ca_fun_count}
+	| gen_kind == cIsListGenerator
+		# (transformed_qualifiers, ca)
+		  	=	mapSt transformQualifier qualifiers ca
+		  (success, ca)
+			=	makeConsExpression expr (last transformed_qualifiers).tq_continue ca
+		  (nil, ca)
+			=	makeNilExpression ca
+		  transformed_qualifiers
+		  	=	[	{qual & tq_success = success, tq_end = end}
+		  		\\	qual <- transformed_qualifiers
+		  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
+		  		&	end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
+		  		]
+		  (expr, compr_fun_defs, ca)
+		 	=	makeComprehensions transformed_qualifiers success ca
+		=	(expr, compr_fun_defs, ca)
+	// gen_kin == cIsArrayGenerator
+		# [hd_qualifier : tl_qualifiers] = qualifiers
+		  qual_position = hd_qualifier.qual_position
+		  (c_i, ca) = prefixAndPositionToIdent "c_i" qual_position ca
+		  (c_a, ca) = prefixAndPositionToIdent "c_a" qual_position ca
+		  (frm, ca)
+		  	=	get_predef_id PD_From ca
+		  index_range
+		  	=	PE_List [PE_Ident frm, PE_Basic (BVI "0")]
+		  index_generator = {gen_kind=cIsListGenerator, gen_pattern=PE_Ident c_i, gen_expr=index_range, gen_position=qual_position}
+		  qualifiers = [{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] } : tl_qualifiers]
+		# (create_array, ca)
+		  	=	get_predef_id PD__CreateArrayFun ca
+		  (length, length_fun_defs, ca)
+		  	=	computeLength qualifiers qual_position ca
+		  new_array
+		  	=	PE_List [PE_Ident create_array, length]
+		  update
+		  	=	PE_Update (PE_Ident c_a) [PS_Array  (PE_Ident c_i)] expr
+		# (compr, compr_fun_defs, ca)
+			=	transformUpdateComprehension new_array update (PE_Ident c_a) qualifiers ca
+		=	(compr, length_fun_defs ++ compr_fun_defs, ca)
 
-	get_predef_id predef_index ca=:{ca_predefs}
-		#! symb = ca_predefs.[predef_index]
-		= (symb, ca)
+computeLength :: [Qualifier] LineAndColumn *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
+computeLength qualifiers qual_position ca=:{ca_fun_count}
+	# next_fun_count = ca_fun_count + 1
+	  ca = {ca & ca_fun_count = next_fun_count}
+	  (fun_ident, ca)
+		=	prefixAndPositionToIdent "c_l" qual_position ca
+	  (tail_ident, ca)
+		=	prefixAndPositionToIdent "c_l_t" qual_position ca
+	  (i_ident, ca)
+		=	prefixAndPositionToIdent "c_l_i" qual_position ca
+	  (list, list_fun_defs, ca)
+		=	transformComprehension cIsListGenerator (PE_Basic (BVI "0")) qualifiers ca
+	  (cons, ca)
+	  	=	makeConsExpression PE_WildCard (PE_Ident tail_ident) ca
+	  (inc, ca)
+		=	get_predef_id PD_IncFun ca
+	  body
+			  	=	[	{pb_args = [cons, PE_Ident i_ident], pb_rhs = exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]) }
+					,	{pb_args = [PE_WildCard, PE_Ident i_ident], pb_rhs = exprToRhs (PE_Ident i_ident)}
+			  		]
+	  fun_def
+		=	MakeNewFunction fun_ident 2 body FK_Function NoPrio No NoPos
+	= (PE_Let cIsStrict (CollectedLocalDefs {loc_functions = { ir_from = ca_fun_count, ir_to = next_fun_count}, loc_nodes = [] })
+				(PE_List [PE_Ident fun_ident, list, PE_Basic (BVI "0")]),
+			[fun_def : list_fun_defs], ca)
 
-	make_bounds_check _ _ _ []
-		=	No
-	make_bounds_check (Yes index) andId smallerId [size : sizes]
-		= combine_guards (Yes check) (make_bounds_check (Yes index) andId smallerId sizes) andId
-		where
-			check
-				=	PE_List [PE_Ident smallerId, index, size]
+transformUpdateComprehension :: ParsedExpr ParsedExpr ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
+transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca=:{ca_fun_count, ca_predefs}
+	# (transformed_first_qualifier, ca)
+	  	=	transformUpdateQualifier identExpr expr qualifier ca
+	  (transformed_rest_qualifiers, ca)
+	  	=	mapSt (transformUpdateQualifier identExpr identExpr) qualifiers ca
+	  transformed_qualifiers
+		=	[transformed_first_qualifier : transformed_rest_qualifiers]
+	  success
+	  	// +++ remove hack
+	  	=	this_is_definitely_a_hack (last transformed_qualifiers).tq_continue updateExpr
+			with
+				this_is_definitely_a_hack (PE_List [f, a : arg]) update
+					=	PE_List [f, update : arg]
+	  transformed_qualifiers
+	  	=	[	{qual & tq_success = success, tq_end = end}
+	  		\\	qual <- transformed_qualifiers
+	  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
+	  		&	end <- [identExpr : [qual.tq_continue \\ qual <- transformed_qualifiers]]
+	  		]
+	  (expr, compr_fun_defs, ca)
+	 	=	makeComprehensions transformed_qualifiers success ca
+	=	(expr, compr_fun_defs, ca)
 
+makeComprehensions :: [TransformedQualifier] ParsedExpr *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
+makeComprehensions [] success ca
+	=	(success, [], ca)
+makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id} : qualifiers] success ca
+	# (success, other_fun_defs, ca)
+		=	makeComprehensions qualifiers success ca
+	  (comprehension, fun_defs, ca)
+	  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id ca
+	=	(comprehension, other_fun_defs ++ fun_defs, ca)
+	where
+		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr (Optional ParsedExpr) ParsedExpr Ident *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
+		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident ca=:{ca_fun_count}
+			# next_fun_count = ca_fun_count + 1
+			  ca = {ca & ca_fun_count = next_fun_count}
+			  continue
+				=	PE_List [PE_Ident fun_ident : [generator.tg_rhs_continuation \\ generator <- generators]]
+			  failure
+				=	continue
+			  (rhs, fun_defs, ca)
+			  	=	collectFunctions (build_rhs generators success optional_filter failure end) ca
+			  rhs
+			  	=	build_rhs generators success optional_filter failure end
+			  body
+			  	=	[{pb_args = lhsArgs, pb_rhs = rhs }]
+			  fun_def
+			  	=	MakeNewFunction fun_ident (length lhsArgs) body FK_Function NoPrio No NoPos
+			= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = { ir_from = ca_fun_count, ir_to = next_fun_count}, loc_nodes = [] }) call_comprehension,
+					[fun_def : fun_defs], ca)
+
+		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
+		build_rhs [generator : generators] success optional_filter failure end
+			=	case_with_default generator.tg_case1 generator.tg_case_end_expr generator.tg_case_end_pattern
+					(foldr (case_end end)
+						(case_with_default generator.tg_case2 generator.tg_element generator.tg_pattern
+							(foldr (case_pattern failure) rhs generators) failure)
+						generators)
+					end
+			where
+				rhs
+					=	case optional_filter of
+							Yes filter
+								->	optGuardedAltToRhs (GuardedAlts [
+										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
+												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }}}] No)
+							No
+								->	exprToRhs success
+
+	/* +++ avoid code duplication (bug in 2.0 with nested cases)
+		case_end :: TransformedGenerator Rhs -> Rhs
+		case_end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
+			=	single_case tg_case1 tg_case_end_expr tg_case_end_pattern rhs
+	
+		case_pattern :: TransformedGenerator Rhs -> Rhs
+		case_pattern {tg_case2, tg_element, tg_pattern} rhs
+			=	single_case tg_case2 tg_element tg_pattern rhs
+	*/
+		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
+		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
+			=	case_with_default tg_case1 tg_case_end_expr tg_case_end_pattern rhs end
+	
+		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
+		case_pattern failure {tg_case2, tg_element, tg_pattern} rhs
+			=	case_with_default tg_case2 tg_element tg_pattern rhs failure
+	
+		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
+		single_case case_ident expr pattern rhs
+			=	exprToRhs (PE_Case case_ident expr
+					[	{calt_pattern = pattern, calt_rhs = rhs}
+					])
+	
+		case_with_default :: Ident ParsedExpr ParsedExpr Rhs ParsedExpr -> Rhs
+		case_with_default case_ident expr pattern rhs default_rhs
+			=	exprToRhs (PE_Case case_ident expr
+					[	{calt_pattern = pattern, calt_rhs = rhs}
+					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs}
+					])
+
+get_predef_id :: Int *CollectAdmin -> (Ident, *CollectAdmin)
+get_predef_id predef_index ca=:{ca_predefs}
+	#! symb = ca_predefs.[predef_index]
+	= (symb, ca)
 
 transformSequence :: Sequence -> PredefinedIdents -> ParsedExpr
 transformSequence (SQ_FromThen frm then)
-	=	predef PD_FromThen ## frm ## then
+	=	predef PD_FromThen ` frm ` then
 transformSequence (SQ_FromThenTo frm then to)
-	=	predef PD_FromThenTo ## frm ## then ## to
+	=	predef PD_FromThenTo ` frm ` then ` to
 transformSequence (SQ_From frm)
-	=	predef PD_From ## frm
+	=	predef PD_From ` frm
 transformSequence (SQ_FromTo frm to)
-	=	predef PD_FromTo ## frm ## to
+	=	predef PD_FromTo ` frm ` to
 
 transformArrayUpdate :: ParsedExpr [ElemAssignment] PredefinedIdents -> ParsedExpr
 transformArrayUpdate expr updates pi
-	=	foldr (update (predef PD_ArrayUpdateFun)) expr updates
+	=	foldr (update pi (predef PD_ArrayUpdateFun)) expr updates
 	where
-		update updateIdent {bind_src=value, bind_dst=index} expr
-			=	(updateIdent ## expr ## index ## value) pi
+		update :: PredefinedIdents (PredefinedIdents -> ParsedExpr) ElemAssignment ParsedExpr -> ParsedExpr
+		update pi updateIdent {bind_src=value, bind_dst=index} expr
+			=	(updateIdent ` expr ` index ` value) pi
 
 transformArrayDenot :: [ParsedExpr] PredefinedIdents -> ParsedExpr
 transformArrayDenot exprs pi
 	=	PE_Array
-			((predef PD__CreateArrayFun ## length exprs) pi)
+			((predef PD__CreateArrayFun ` length exprs) pi)
 			[{bind_dst=toParsedExpr i pi, bind_src=expr} \\ expr <- exprs & i <- [0..]]
-			[]
 
+scanModules :: [ParsedImport] [ScannedModule] Int *HashTable *File SearchPaths *PredefinedSymbols *Files -> (Bool, [ScannedModule],[FunDef],Int, *HashTable, *File, *PredefinedSymbols, *Files)
 scanModules [] parsed_modules fun_count hash_table err_file searchPaths predefs files 
 	= (True, parsed_modules, [], fun_count, hash_table, err_file, predefs, files)
 scanModules [{import_module,import_symbols} : mods] parsed_modules fun_count hash_table err_file searchPaths predefs files 
@@ -457,6 +665,7 @@ scanModules [{import_module,import_symbols} : mods] parsed_modules fun_count has
 		  		= scanModules mods parsed_modules fun_count hash_table err_file searchPaths predefs files
 		= (succ && mods_succ, parsed_modules, local_fun_defs ++ local_fun_defs_in_imports, fun_count, hash_table, err_file, predefs, files)
 where
+	try_to_find :: Ident [ScannedModule] -> (Bool, ScannedModule)
 	try_to_find mod_id []
 		= (False, abort "module not found")
 	try_to_find mod_id [pmod : pmods]
@@ -469,19 +678,20 @@ MakeEmptyModule name :==  { mod_name = name, mod_type = MK_None, mod_imports = [
 					def_members = [], def_funtypes = [], def_instances = [] } }
 
 parseAndScanDclModule :: !Ident ![ScannedModule] !Int !*HashTable !*File !SearchPaths !*PredefinedSymbols !*Files
-	-> *(!Bool, ![ScannedModule], ![FunDef], !Int, !*HashTable, !*File, !*PredefinedSymbols, !*Files);
+	-> *(!Bool, ![ScannedModule], ![FunDef], !Int, !*HashTable, !*File, !*PredefinedSymbols, !*Files)
 parseAndScanDclModule dcl_module parsed_modules fun_count hash_table err_file searchPaths predefs files 
 	# (parse_ok, mod, hash_table, err_file, predefs, files) = wantModule cWantDclFile dcl_module hash_table err_file searchPaths predefs files
 	| parse_ok
 		= scan_dcl_module mod parsed_modules fun_count hash_table err_file searchPaths predefs files
 		= (False, [ MakeEmptyModule mod.mod_name : parsed_modules ], [], fun_count, hash_table, err_file, predefs, files)
 where
+	scan_dcl_module :: ParsedModule [ScannedModule] Int *HashTable *File SearchPaths *PredefinedSymbols *Files -> (Bool, [ScannedModule], [FunDef], Int, *HashTable, *File, *PredefinedSymbols, *Files)
 	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules fun_count hash_table err_file searchPaths predefs files
 		# (predefIdents, predefs) = SelectPredefinedIdents predefs
-		# state = {ca_error = { pea_file = err_file, pea_ok = True }, ca_fun_count = 0, ca_predefs = predefIdents}
+		# state = {ca_error = { pea_file = err_file, pea_ok = True }, ca_fun_count = 0, ca_predefs = predefIdents, ca_hash_table = hash_table}
 		  (_, defs, imports, imported_objects, state) = reorganizeDefinitions False pdefs 0 0 0 state
 		  macro_count = length defs.def_macros + fun_count
-	  	  (macro_defs, local_fun_defs, {ca_fun_count=new_fun_count, ca_error={pea_file,pea_ok}, ca_predefs})
+	  	  (macro_defs, local_fun_defs, {ca_fun_count=new_fun_count, ca_error={pea_file,pea_ok}, ca_predefs, ca_hash_table=hash_table})
 	  	  	= reorganizeLocalDefinitionsOfFunctions defs.def_macros {state & ca_fun_count = macro_count}
 		  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros = { ir_from = fun_count, ir_to = macro_count } }}
 		  (import_ok, parsed_modules, imported_local_fun_defs, fun_count, hash_table, err_file, predefs, files)
@@ -492,12 +702,12 @@ scanModule :: !ParsedModule !*HashTable !*File !SearchPaths !*PredefinedSymbols 
 	-> (!Bool, !ScannedModule, !Int, ![FunDef], !ScannedModule, !ScannedModule, ![ScannedModule], !*HashTable, !*File, !*PredefinedSymbols, !*Files)
 scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} hash_table err_file searchPaths predefs files
 	# (predefIdents, predefs) = SelectPredefinedIdents predefs
-	# state = {ca_fun_count = 0, ca_error = { pea_file = err_file, pea_ok = True }, ca_predefs = predefIdents}
+	# state = {ca_fun_count = 0, ca_error = { pea_file = err_file, pea_ok = True }, ca_predefs = predefIdents, ca_hash_table = hash_table}
 	  (fun_defs, defs, imports, imported_objects, ca) = reorganizeDefinitions True pdefs 0 0 0 state
 	  fun_count = length fun_defs
 	  macro_count = length defs.def_macros
 	  (fun_defs, local_defs, ca) = reorganizeLocalDefinitionsOfFunctions (fun_defs ++ defs.def_macros) {ca & ca_fun_count = fun_count + macro_count}
-	  (def_instances, local_defs_in_insts, {ca_fun_count=tot_fun_count, ca_error = {pea_file,pea_ok}, ca_predefs})
+	  (def_instances, local_defs_in_insts, {ca_fun_count=tot_fun_count, ca_error = {pea_file,pea_ok}, ca_predefs, ca_hash_table=hash_table})
 	  		= reorganizeLocalDefinitionsOfInstances defs.def_instances ca
 	  (import_ok, parsed_modules, local_defs_in_dcl, tot_fun_count, hash_table, err_file, ca_predefs, files)
 	  		= scan_dcl_module mod_name mod_type tot_fun_count hash_table pea_file predefs files
@@ -510,6 +720,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} hash_table err_file searchP
 	  (pre_def_mod, ca_predefs) = buildPredefinedModule ca_predefs
 	= (pea_ok && import_ok, mod, fun_count, all_local_defs, dcl_mod, pre_def_mod, modules, hash_table, err_file, ca_predefs, files)
 where
+	scan_dcl_module :: Ident ModuleKind Int *HashTable *File *PredefinedSymbols *Files -> (Bool, [ScannedModule], [FunDef], Int, *HashTable, *File, *PredefinedSymbols, *Files)
 	scan_dcl_module mod_name MK_Main fun_count hash_table err_file predefs files
 		= (True, [MakeEmptyModule mod_name ], [], fun_count, hash_table, err_file, predefs, files)
 	scan_dcl_module mod_name MK_None fun_count hash_table err_file predefs files
@@ -517,6 +728,7 @@ where
 	scan_dcl_module mod_name kind fun_count hash_table err_file predefs files
 		= parseAndScanDclModule mod_name [] fun_count hash_table err_file searchPaths predefs files 
 		
+reorganizeLocalDefinitionsOfInstances :: [ParsedInstance FunDef] *CollectAdmin -> ([ParsedInstance FunDef], [FunDef], *CollectAdmin)
 reorganizeLocalDefinitionsOfInstances [] ca
 	= ([], [], ca)
 reorganizeLocalDefinitionsOfInstances [inst=:{pi_members} : insts] ca
@@ -524,10 +736,12 @@ reorganizeLocalDefinitionsOfInstances [inst=:{pi_members} : insts] ca
 	  (insts, local_defs_in_insts, ca) = reorganizeLocalDefinitionsOfInstances insts ca
 	= ([{inst & pi_members = pi_members } : insts], local_defs ++ local_defs_in_insts, ca)
 
+reorganizeLocalDefinitionsOfFunction :: FunDef *CollectAdmin -> (FunDef, [FunDef], *CollectAdmin)
 reorganizeLocalDefinitionsOfFunction fun_def=:{fun_body = ParsedBody bodies} ca
 	# (bodies, rhs_fun_defs, ca) = collect_local_definitions_in_bodies bodies ca
 	= ({fun_def & fun_body = ParsedBody bodies}, rhs_fun_defs, ca)
 where	
+	collect_local_definitions_in_bodies :: [ParsedBody] *CollectAdmin -> ([ParsedBody], [FunDef], CollectAdmin)
 	collect_local_definitions_in_bodies [pb=:{pb_rhs} : bodies] ca
 		# (pb_rhs, rhs_fun_defs, ca) = collectFunctions pb_rhs ca
 		  (bodies, body_fun_defs, ca) = collect_local_definitions_in_bodies bodies ca
@@ -535,6 +749,7 @@ where
 	collect_local_definitions_in_bodies [] ca
 		= ([], [], ca)
 
+reorganizeLocalDefinitionsOfFunctions :: [FunDef] *CollectAdmin -> ([FunDef], [FunDef], *CollectAdmin)
 reorganizeLocalDefinitionsOfFunctions [] ca
 	= ([], [], ca)
 reorganizeLocalDefinitionsOfFunctions [fun_def : fun_defs] ca
@@ -563,6 +778,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 			  )
 		= ([], fun_kind, all_defs, ca)
 	where
+		combine_fun_kinds :: Position FunKind FunKind *CollectAdmin -> (FunKind, *CollectAdmin)
 		combine_fun_kinds pos FK_Unknown fun_kind ca
 			= (fun_kind, ca)
 		combine_fun_kinds pos fun_kind new_fun_kind ca
@@ -572,6 +788,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
+reorganizeDefinitions :: Bool [ParsedDefinition] Index Index Index *CollectAdmin -> ([FunDef],CollectedDefinitions (ParsedInstance FunDef) [FunDef], [ParsedImport], [ImportedObject], *CollectAdmin)
 reorganizeDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
@@ -599,7 +816,6 @@ reorganizeDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
 			//	-> reorganizeDefinitions icl_module defs cons_count sel_count mem_count (postParseError fun_pos "function body expected (1)" ca)
 		_
 			-> reorganizeDefinitions icl_module defs cons_count sel_count mem_count (postParseError fun_pos "function alternative expected (2)" ca)
-// ... PK
 reorganizeDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_arity}) specials : defs] cons_count sel_count mem_count ca
 	# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganizeDefinitions icl_module defs cons_count sel_count mem_count ca
@@ -617,11 +833,10 @@ reorganizeDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs
 	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganizeDefinitions icl_module defs cons_count sel_count mem_count ca
 	  type_def = { type_def & td_rhs = AlgType 	cons_symbs }
-/* Sjaak ... */
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors }
-/* ... Sjaak */
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 where
+	determine_symbols_of_conses :: [ParsedConstructor] Index -> ([DefinedSymbol], Index)
 	determine_symbols_of_conses [{pc_cons_name,pc_cons_arity} : conses] next_cons_index
 		# cons = { ds_ident = pc_cons_name, ds_arity = pc_cons_arity, ds_index = next_cons_index }
 		  (conses, next_cons_index) = determine_symbols_of_conses conses (inc next_cons_index)
@@ -634,15 +849,13 @@ reorganizeDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorL
 	  cons_arity = new_count - sel_count
 	  cons_def = {	pc_cons_name = rec_cons_id, pc_cons_prio = NoPrio, pc_cons_arity = cons_arity, pc_cons_pos = td_pos,
 	  				pc_arg_types = [ ps_field_type \\ {ps_field_type} <- sel_defs ], pc_exi_vars = exivars }
-// MW was	  type_def = { type_def & td_rhs = RecordType {rt_constructor = { ds_ident = td_name, ds_arity = cons_arity, ds_index = cons_count },
 	  type_def = { type_def & td_rhs = RecordType {rt_constructor = { ds_ident = rec_cons_id, ds_arity = cons_arity, ds_index = cons_count },
 	  							rt_fields =  { sel \\ sel <- sel_syms }}}
-/* Sjaak ... */
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors],
 	  				def_selectors = mapAppend ParsedSelectorToSelectorDef sel_defs c_defs.def_selectors }
-/* ... Sjaak */
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 where
+	determine_symbols_of_selectors :: [ParsedSelector] Index -> ([FieldSymbol], Index)
 	determine_symbols_of_selectors [{ps_field_name,ps_field_var} : sels] next_selector_index
 		# field = { fs_name = ps_field_name, fs_var = ps_field_var, fs_index = next_selector_index }
 		  (fields, next_selector_index) = determine_symbols_of_selectors sels (inc next_selector_index)
@@ -702,13 +915,17 @@ where
 		  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
 		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] FK_Macro prio No fun_pos
 		= (mem_defs, [macro : mem_macros], ca)
+	check_symbols_of_class_members [def : _] type_context ca
+		= abort "postparse.check_symbols_of_class_members: unknown def"  <<- def
 	check_symbols_of_class_members [] type_context ca
 		= ([], [], ca)
 	
+	reorganize_member_defs :: [MemberDef] Index -> ([DefinedSymbol], [MemberDef], Index)
 	reorganize_member_defs mem_defs first_mem_index
 		# mem_defs = sort mem_defs
 		= determine_indexes_of_class_members mem_defs first_mem_index 0
 		
+	determine_indexes_of_class_members :: [MemberDef] Index Index -> ([DefinedSymbol], [MemberDef], Index)
 	determine_indexes_of_class_members [member=:{me_symb,me_type}:members] first_mem_index mem_offset
 		#! (member_symbols, member_defs, last_mem_offset) = determine_indexes_of_class_members members first_mem_index (inc mem_offset)
 		= ([{ds_ident = me_symb, ds_index = first_mem_index + mem_offset, ds_arity = me_type.st_arity } : member_symbols],
@@ -725,6 +942,7 @@ reorganizeDefinitions icl_module [PD_Instance class_instance=:{pi_members,pi_pos
 		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = []} : c_defs.def_instances] }, imports, imported_objects,
 			postParseError pi_pos "instance specifications of members not allowed" ca)
 where	  
+	collect_member_instances :: [ParsedDefinition] *CollectAdmin -> ([FunDef], *CollectAdmin)
 	collect_member_instances [PD_Function pos name is_infix args rhs fun_kind : defs] ca
 		# fun_arity = length args
 		  prio = if is_infix (Prio NoAssoc 9) NoPrio
@@ -736,7 +954,7 @@ where
 		= case defs of
 			[PD_Function pos name is_infix args rhs fun_kind : defs]
 				| belongsToTypeSpec fun_name prio name is_infix
-  					# (fun_arity, ca) = determineArity args type pos ca
+  					# fun_arity = determineArity args type
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (fun_defs, ca) = collect_member_instances defs ca
 					  fun = MakeNewFunction name fun_arity [ { pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio type pos
@@ -750,11 +968,9 @@ reorganizeDefinitions icl_module [PD_Instances class_instances : defs] cons_coun
 reorganizeDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_count mem_count ca
 	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganizeDefinitions icl_module defs cons_count sel_count mem_count ca
 	= (fun_defs, c_defs, new_imports ++ imports, imported_objects, ca)
-// RWS ...
 reorganizeDefinitions icl_module [PD_ImportedObjects new_imported_objects : defs] cons_count sel_count mem_count ca
 	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganizeDefinitions icl_module defs cons_count sel_count mem_count ca
 	= (fun_defs, c_defs, imports, new_imported_objects ++ imported_objects, ca)
-// ... RWS
 reorganizeDefinitions icl_module [def:defs] _ _ _ ca
 	= abort ("reorganizeDefinitions does not match" ---> def)
 
@@ -762,11 +978,14 @@ reorganizeDefinitions icl_module [] _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [], def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [] }, [], [], ca)
 
+checkRhsOfNodeDef :: Position Rhs *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 checkRhsOfNodeDef pos { rhs_alts = UnGuardedExpr {ewl_expr,ewl_nodes = [],ewl_locals = LocalParsedDefs []}, rhs_locals = LocalParsedDefs []} ca
 	= (ewl_expr, ca)
 checkRhsOfNodeDef pos rhs ca
 	= (PE_Empty, postParseError pos "illegal node definition" ca)
 
+
+reorganizeLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
 reorganizeLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
 	# (fun_defs, node_defs, ca) = reorganizeLocalDefinitions defs ca
 	= (fun_defs, [(No, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals }) : node_defs], ca)
@@ -782,7 +1001,7 @@ reorganizeLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 	= case defs of
 		[PD_Function pos name is_infix args rhs fun_kind : defs]
 			| belongsToTypeSpec name1 prio name is_infix
-				# (fun_arity, ca) = determineArity args type pos ca
+				# fun_arity = determineArity args type
 				# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
 				  (fun_defs, node_defs, ca) = reorganizeLocalDefinitions defs ca
 				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio type pos
@@ -804,15 +1023,17 @@ reorganizeLocalDefinitions [] ca
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix
 
-determineArity args (Yes {st_arity}) pos ca
-	# arity = length args
+determineArity :: [ParsedExpr] (Optional SymbolType) -> Int
+determineArity args (Yes {st_arity})
+	# arity
+		=	length args
 	| arity == st_arity
-		= (arity, ca)
-determineArity args No pos ca
-	= (length args, ca)
-	
-sameFixity (Prio _ _) is_infix = is_infix
-sameFixity NoPrio is_infix = not is_infix
+		=	arity
+determineArity args No
+	=	length args
 
-
-		  
+sameFixity :: Priority Bool -> Bool
+sameFixity (Prio _ _) is_infix
+	=	is_infix
+sameFixity NoPrio is_infix
+	=	not is_infix

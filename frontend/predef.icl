@@ -133,7 +133,9 @@ where
 					<<- ("uselect", IC_Expression, PD_UnqArraySelectFun) <<- ("update", IC_Expression, PD_ArrayUpdateFun)
 					<<- ("replace", IC_Expression, PD_ArrayReplaceFun) <<- ("size", IC_Expression, PD_ArraySizeFun)
 					<<- ("usize", IC_Expression, PD_UnqArraySizeFun)
-					<<- ("_smaller", IC_Expression, PD_SmallerFun) <<- ("_inc", IC_Expression, PD_IncFun)
+// RWS ...					<<- ("_smaller", IC_Expression, PD_SmallerFun) <<- ("_inc", IC_Expression, PD_IncFun)
+					<<- ("<", IC_Expression, PD_SmallerFun) <<- ("inc", IC_Expression, PD_IncFun)
+// ... RWS
 					<<- ("_from", IC_Expression, PD_From) <<- ("_from_then", IC_Expression, PD_FromThen)
 					<<- ("_from_to", IC_Expression, PD_FromTo) <<- ("_from_then_to", IC_Expression, PD_FromThenTo)
 					

@@ -68,9 +68,7 @@ where toString {import_module} = toString import_module
 	{	mod_name		:: !Ident
 	,	mod_type		:: !ModuleKind
 	, 	mod_imports		:: ![ParsedImport]
-// RWS ...
 	,	mod_imported_objects :: ![ImportedObject]
-// ... RWS
 	,	mod_defs		:: !defs
 	}
 
@@ -136,9 +134,7 @@ cIsNotAFunction :== False
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
-// RWS ...
 	|	PD_ImportedObjects [ImportedObject]
-// ... RWS
 	|	PD_Erroneous
 
 ::	FunKind	= FK_Function | FK_Macro | FK_Caf | FK_Unknown
@@ -271,14 +267,12 @@ cIsNotAFunction :== False
 
 // MW2 moved some type definitions
 
-// RWS ...
 cIsImportedLibrary :== True
 cIsImportedObject :== False
 :: ImportedObject =
 	{	io_is_library :: !Bool
 	,	io_name    :: !{#Char}
 	}
-// ... RWS 
 
 ::	RecordType =
 	{	rt_constructor	:: !DefinedSymbol
@@ -860,7 +854,8 @@ cNonUniqueSelection	:== False
 				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr
 				| PE_Tuple ![ParsedExpr]				
 				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
-				| PE_Array  !ParsedExpr ![ElemAssignment] ![Qualifier] 
+				| PE_Array  !ParsedExpr ![ElemAssignment]  // RWS +++ remove PE_Array (not really used anymore) ![Qualifier] 
+				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
 				| PE_Selection !Bool !ParsedExpr ![ParsedSelection]
 				| PE_Update !ParsedExpr [ParsedSelection] ParsedExpr
@@ -888,18 +883,20 @@ cNonUniqueSelection	:== False
 
 cIsListGenerator 	:== True
 cIsArrayGenerator	:== False
-			
+
+:: LineAndColumn = {lc_line :: !Int, lc_column :: !Int}
+
 ::	Generator =
 	{	gen_kind	:: !GeneratorKind
 	,	gen_pattern :: !ParsedExpr
 	,	gen_expr	:: !ParsedExpr
-	,	gen_var		:: !Ident
+	,	gen_position :: !LineAndColumn
 	}
 
 ::	Qualifier	=
 	{	qual_generators	:: ![Generator]
 	,	qual_filter		:: !Optional ParsedExpr
-	,	qual_fun_id		:: !Ident
+	,	qual_position	:: !LineAndColumn
 	}
 
 ::	Sequence	= SQ_FromThen ParsedExpr ParsedExpr

@@ -3,9 +3,11 @@ implementation module parse
 import StdEnv
 import scanner, syntax, hashtable, utilities, predef
 
-// RWS ...
 ParseOnly :== False
 import RWSDebug
+
+toLineAndColumn {fp_line, fp_col}
+	=	{lc_line = fp_line, lc_column = fp_col}
 
 // +++ move to utilities?
 
@@ -17,19 +19,6 @@ groupBy eq [h : t]
     where
         (this, other)
             =   span (eq h) t
-/*
-ident = { id_name = "id name", id_info = nilPtr }
-Start
-	=	is_record_update [{nu_selectors=[PS_Record ident No],nu_update_expr=PE_Empty}]
-
-is_record_update :: [NestedUpdate] -> Bool
-is_record_update [{nu_selectors=[(PS_Record _ _) : _]}]
-	=	True ->> "is_record_update"
-is_record_update updates
-	=	False ->> ("not is_record_update", updates)
-*/
-
-// ... RWS
 
 /*
 
@@ -267,11 +256,9 @@ where
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
 			  {ps_scanState,ps_hash_table,ps_error,ps_pre_def_symbols}
 			  						= pState
-// RWS ...
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics")
 						[PD_Import imports \\ PD_Import imports <- defs]
 						defs
-// ... RWS
 			  mod					= { mod_name = mod_ident, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs = defs }
 			= ( ps_error.pea_ok
 			  , mod, ps_hash_table
@@ -790,7 +777,6 @@ wantFromImports pState
 	  pState = wantEndOfDefinition "from imports" pState
 	= ( { import_module = mod_ident, import_symbols = import_symbols, import_file_position = (file_name, line_nr) }, pState)
 
-// RWS ...
 instance want ImportedObject where
 	want pState
 		# (token, pState) = nextToken GeneralContext pState
@@ -810,7 +796,6 @@ wantCodeImports pState
 	# pState = wantToken GeneralContext "import code declaration" FromToken pState
 	  (importObjects, pState) = wantSequence CommaToken GeneralContext pState
 	= (importObjects, wantEndOfDefinition "import code declaration" pState)
-// ... RWS
 
 instance want ImportDeclaration
 where
@@ -2037,47 +2022,47 @@ where
 
 wantComprehension :: !GeneratorKind !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
 wantComprehension gen_kind exp pState
-	# (qualifiers, pState) = wantQualifiers 0 0 pState
+	# (qualifiers, pState) = wantQualifiers pState
 	| gen_kind == cIsListGenerator
 		= (PE_Compr cIsListGenerator exp qualifiers, wantToken FunctionContext "list comprehension" SquareCloseToken pState)
 		= (PE_Compr cIsArrayGenerator exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
 
-wantQualifiers :: !Int !Int !ParseState -> (![Qualifier], !ParseState)
-wantQualifiers nr_of_quals nr_of_gens pState
-	# (qual, nr_of_gens, pState) = want_qualifier nr_of_quals nr_of_gens pState
+wantQualifiers :: !ParseState -> (![Qualifier], !ParseState)
+wantQualifiers pState
+	# (qual, pState) = want_qualifier pState
 	  (token, pState) = nextToken FunctionContext pState
 	| token == CommaToken
-		# (quals, pState) = wantQualifiers (inc nr_of_quals) nr_of_gens pState
+		# (quals, pState) = wantQualifiers pState
 		= ([qual : quals], pState)
 		= ([qual], tokenBack pState)
 where
-
-	want_qualifier :: !Int !Int !ParseState -> (!Qualifier, !Int, !ParseState)
-	want_qualifier qual_nr gen_nr pState
-		# (lhs_expr, pState) = wantExpression cIsAPattern pState
+	want_qualifier :: !ParseState -> (!Qualifier, !ParseState)
+	want_qualifier pState
+		# (qual_position, pState) = getPosition pState
+		  (lhs_expr, pState) = wantExpression cIsAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == LeftArrowToken
-			= want_generators cIsListGenerator qual_nr gen_nr lhs_expr pState
+			= want_generators cIsListGenerator (toLineAndColumn qual_position) lhs_expr pState
 		| token == LeftArrowColonToken
-			= want_generators cIsArrayGenerator qual_nr gen_nr lhs_expr pState
-			= ({qual_generators = [], qual_filter = No, qual_fun_id = { id_name = "", id_info = nilPtr}}, gen_nr,
+			= want_generators cIsArrayGenerator (toLineAndColumn qual_position) lhs_expr pState
+			= ({qual_generators = [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}},
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)
 
-	want_generators :: !GeneratorKind !Int !Int !ParsedExpr !ParseState -> (!Qualifier, !Int, !ParseState)
-	want_generators gen_kind qual_nr gen_nr pattern_exp pState
+	want_generators :: !GeneratorKind !LineAndColumn !ParsedExpr !ParseState -> (!Qualifier, !ParseState)
+	want_generators gen_kind qual_position pattern_exp pState
+		# (gen_position, pState)			= getPosition pState
 		# (gen_expr, pState) = wantExpression cIsNotAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
-		  (gen_var, pState) = stringToIdent ("tl" +++ toString gen_nr) IC_Expression pState
-		  generator = { gen_kind = gen_kind, gen_expr = gen_expr, gen_pattern = pattern_exp, gen_var = gen_var }
+		  generator = { gen_kind = gen_kind, gen_expr = gen_expr, gen_pattern = pattern_exp,
+							gen_position = toLineAndColumn gen_position
+			}
 		| token == BarToken
 			# (filter_expr, pState) = wantExpression cIsNotAPattern pState
-			  (qual_fun_id, pState) = stringToIdent ("_compr" +++ toString qual_nr) IC_Expression pState
-			= ({qual_generators = [generator], qual_filter = Yes filter_expr, qual_fun_id = qual_fun_id }, inc gen_nr, pState)
+			= ({qual_generators = [generator], qual_filter = Yes filter_expr, qual_position = qual_position }, pState)
 		| token == AndToken
-			# (qualifier, gen_nr, pState) = want_qualifier qual_nr (inc gen_nr) pState
-			= ({qualifier & qual_generators = [ generator : qualifier.qual_generators] }, gen_nr, pState)
-		# (qual_fun_id, pState) = stringToIdent ("_compr" +++ toString qual_nr) IC_Expression pState
-		= ({qual_generators = [generator], qual_filter = No, qual_fun_id = qual_fun_id}, inc gen_nr, tokenBack pState)
+			# (qualifier, pState) = want_qualifier pState
+			= ({qualifier & qual_generators = [ generator : qualifier.qual_generators] }, pState)
+		= ({qual_generators = [generator], qual_filter = No, qual_position = qual_position}, tokenBack pState)
 
 /**
 	Case Expressions
@@ -2231,19 +2216,20 @@ where
 	try_type_specification _ pState
 		= (No, pState)
 
-	want_updates :: !(Optional Ident) Token ParsedExpr ParseState -> (ParsedExpr, ParseState)
-	want_updates type token update_expr pState
+	want_updates :: !(Optional Ident) Token ParseState -> ([NestedUpdate], ParseState)
+	want_updates type token pState
 		# (updates, pState)
-			= parse_updates token update_expr pState
-		=	transform_record_or_array_update type update_expr updates 0 pState
+			= parse_updates token pState
+// RWS +++ error message if updates == []
+		= (updates, pState)
 	where
-		parse_updates :: Token ParsedExpr ParseState -> ([NestedUpdate], ParseState)
-		parse_updates token update_expr pState
+		parse_updates :: Token ParseState -> ([NestedUpdate], ParseState)
+		parse_updates token pState
 				# (update, pState) = want_update token pState
 				  (token, pState) = nextToken FunctionContext pState
 				| token == CommaToken
 					# (token, pState) = nextToken FunctionContext pState
-					  (updates, pState) = parse_updates token update_expr pState 
+					  (updates, pState) = parse_updates token pState 
 					= ([update : updates], pState)
 				// otherwise
 					= ([update], tokenBack pState)
@@ -2465,17 +2451,35 @@ where
 			= want_update type expr token pState
 
 	want_update :: !(Optional Ident) !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
-	want_update type exp token pState
-		# (update_expr, pState)	= want_updates type token exp pState
-	//	  (qualifiers, pState) = try_qualifiers pState // Bug: for RWS
-		= (update_expr, wantToken FunctionContext "record update" CurlyCloseToken pState)
-/*		where
+	want_update type expr token pState
+		# (position, pState) = getPosition pState
+		  (updates, pState)	= want_updates type token pState
+		  (qualifiers, pState) = try_qualifiers pState
+		  (updatable_expr, pState) = test_qualifiers expr (toLineAndColumn position) qualifiers pState
+		  (updated_expr, pState) = transform_record_or_array_update type updatable_expr updates 0 pState
+		= (add_qualifiers qualifiers expr updated_expr updatable_expr, wantToken FunctionContext "update" CurlyCloseToken pState)
+		where
+			try_qualifiers :: !ParseState -> (![Qualifier], !ParseState)
 			try_qualifiers pState
 				# (token, pState) = nextToken FunctionContext pState
 				| token == DoubleBackSlashToken
-					= wantQualifiers 0 0 pState
+					= wantQualifiers pState
 					= ([], tokenBack pState)
-*/
+
+			test_qualifiers :: !ParsedExpr !LineAndColumn [Qualifier] !ParseState -> (!ParsedExpr, !ParseState)
+			test_qualifiers updateExpr _ [] pState
+				=	(updateExpr, pState)
+			test_qualifiers updateExpr {lc_line, lc_column} qualifiers pState
+				# (ident, pState)
+					=	stringToIdent ("a;" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression pState
+				=	(PE_Ident ident, pState)
+
+			add_qualifiers :: ![Qualifier] !ParsedExpr !ParsedExpr !ParsedExpr -> ParsedExpr
+			add_qualifiers [] _ update_expr _
+				=	update_expr
+			add_qualifiers qualifiers expr update_expr ident_expr
+				=	PE_UpdateComprehension expr update_expr ident_expr qualifiers
+
 	want_record_or_array_update token expr pState
 		= want_update No expr token pState
 
