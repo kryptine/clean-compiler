@@ -469,7 +469,7 @@ backEndConvertModulesH predefs {fe_icl =
 	=	(backEnd -*-> "backend done")
 	where
 		functionIndices
-			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: fe_components & componentIndex <- [0..]]
+			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: fe_components & componentIndex <- [1..]]
 
 declareOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
 declareOtherDclModules dcls main_dcl_module_n used_module_numbers
@@ -705,9 +705,9 @@ instance declare {#a} | declareWithIndex a & Array {#} a where
 
 declareFunctionSymbols :: {#FunDef} {#Int} [(Int, Int)] IndexRange *BackEndState -> *BackEndState
 declareFunctionSymbols functions iclDclConversions functionIndices globalFunctions backEnd
-	=	foldr (declare iclDclConversions) backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
+	=	foldl (declare iclDclConversions) backEnd [(functionIndex, componentIndex, functions.[functionIndex]) \\ (componentIndex, functionIndex) <- functionIndices]
 	where
-		declare iclDclConversions (functionIndex, componentIndex, function) backEnd
+		declare iclDclConversions backEnd (functionIndex, componentIndex, function)
 			=	appBackEnd (BEDeclareFunction (functionName function.fun_symb.id_name functionIndex iclDclConversions globalFunctions) 
 					function.fun_arity functionIndex componentIndex) backEnd
 			where
