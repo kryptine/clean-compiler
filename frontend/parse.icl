@@ -489,7 +489,7 @@ where
 			# (lhs, pState) = want_lhs_of_def token pState
 		      (token, pState) = nextToken FunctionContext pState
 		      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
-			= (True, def, pState) -->>  def
+			= (True, def, pState)
 			with
 				determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
 		 		determine_position lhs           		pos           = pos
@@ -544,20 +544,20 @@ where
 		# pState			= want_node_def_token pState token
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		  localsExpected	= ~ ss_useLayout
-		  (rhs, pState)		= wantRhs isEqualToken localsExpected (tokenBack pState)
+		  (rhs, pState)		= wantRhs (isRhsStartToken parseContext) localsExpected (tokenBack pState)
 		| isGlobalContext parseContext
  			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
  			= (PD_NodeDef pos (combine_args args) rhs, pState)
 	where		
 		want_node_def_token s EqualToken		= s
-		want_node_def_token s DefinesColonToken = replaceToken EqualToken s
+		want_node_def_token s DefinesColonToken = s // PK replaceToken EqualToken s
 		want_node_def_token s token				= parseError "RHS" (Yes token) "defines token (= or =:)" s
 
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
 	want_rhs_of_def parseContext (Yes (name, False), []) token pos pState
-		| isIclContext parseContext && isLocalContext parseContext && token == EqualToken &&
-		  isLowerCaseName name.id_name && not (isClassOrInstanceDefsContext parseContext)
+		| isIclContext parseContext && isLocalContext parseContext && (token == EqualToken || token == DefinesColonToken) &&
+		/* PK isLowerCaseName name.id_name && */ not (isClassOrInstanceDefsContext parseContext)
 			# (rhs, pState) = wantRhs (\_ -> True) False (tokenBack pState)
 			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 
@@ -567,9 +567,9 @@ where
 		| isIclContext parseContext && token == CodeToken
 			# (rhs, pState) = wantCodeRhs pState
 			| code_allowed
-  				= (PD_Function pos name is_infix args rhs fun_kind, pState)
-  			// otherwise // ~ code_allowed
-  				= (PD_Function pos name is_infix args rhs fun_kind, parseError "rhs of def" No "no code" pState)
+				= (PD_Function pos name is_infix args rhs fun_kind, pState)
+			// otherwise // ~ code_allowed
+				= (PD_Function pos name is_infix args rhs fun_kind, parseError "rhs of def" No "no code" pState)
 		# pState = tokenBack (tokenBack pState)
 		  (ss_useLayout, pState) = accScanState UseLayout pState
 		  localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
@@ -579,7 +579,7 @@ where
 				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
 			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
-  			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
+			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
 	where
 		token_to_fun_kind s BarToken			= (FK_Function cNameNotLocationDependent, False,  s)
 		token_to_fun_kind s (SeqLetToken _)		= (FK_Function cNameNotLocationDependent, False,  s)
@@ -602,8 +602,9 @@ isEqualToken _					= False
 
 isRhsStartToken :: !ParseContext !Token -> Bool
 isRhsStartToken parseContext EqualToken			= True
-isRhsStartToken parseContext ColonDefinesToken	= True
-isRhsStartToken parseContext DefinesColonToken	= True // RWS test isGlobalContext parseContext
+isRhsStartToken parseContext ColonDefinesToken	= isGlobalOrClassOrInstanceDefsContext parseContext
+isRhsStartToken parseContext DefinesColonToken	= True
+isRhsStartToken parseContext DoubleArrowToken	= True // PK
 isRhsStartToken parseContext _					= False
 
 optionalSpecials :: !ParseState -> (!Specials, !ParseState)
@@ -753,25 +754,25 @@ where
 
 wantRhs :: !(!Token -> Bool) !Bool !ParseState -> (Rhs, !ParseState) // FunctionAltDefRhs
 wantRhs separator localsExpected pState
-	# (alts, pState)	= want_LetsFunctionBody separator pState
+	# (alts, pState)	= want_LetsFunctionBody pState
 	  (locals, pState)	= optionalLocals WhereToken localsExpected pState
 	= ({ rhs_alts = alts, rhs_locals = locals}, pState)
 where
-	want_LetsFunctionBody :: !(!Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState) 
-	want_LetsFunctionBody sep pState
+	want_LetsFunctionBody :: !ParseState -> (!OptGuardedAlts, !ParseState) 
+	want_LetsFunctionBody pState
 		# (token, pState)			= nextToken FunctionContext pState
 		  (nodeDefs, token, pState)	= want_LetBefores token pState
-		= want_FunctionBody token nodeDefs [] sep pState
+		= want_FunctionBody token nodeDefs [] pState
 
-	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
-	want_FunctionBody BarToken nodeDefs alts sep pState
+	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !ParseState -> (!OptGuardedAlts, !ParseState)
+	want_FunctionBody BarToken nodeDefs alts pState
 //		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
 		#	(file_name, line_nr, pState)= getFileAndLineNr pState
 			(token, pState)				= nextToken FunctionContext pState
 		|	token == OtherwiseToken
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token pState
-			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts sep pState // to allow | otherwise | c1 = .. | c2 = ..
+			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts pState // to allow | otherwise | c1 = .. | c2 = ..
 /* PK ??? 
 			=	case token of
 				BarToken
@@ -780,36 +781,36 @@ where
 				_	->	root_expression True token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
 */		|	token == LetToken True
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
-			=	root_expression True token nodeDefs (reverse alts) sep pState
+			=	root_expression True token nodeDefs (reverse alts) pState
 		#	(guard, pState)				= wantRhsExpressionT token pState
 			(token, pState)				= nextToken FunctionContext pState
 			(nodeDefs2, token, pState)	= want_LetBefores token pState
 		|	token == BarToken // nested guard
 			#	(position, pState)			= getPosition pState
 				offside						= position.fp_col
-				(expr, pState)				= want_FunctionBody token nodeDefs2 [] sep pState
+				(expr, pState)				= want_FunctionBody token nodeDefs2 [] pState
 				pState						= wantEndNestedGuard (default_found expr) offside pState
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
 												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
-			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
+			=	want_FunctionBody token nodeDefs [alt:alts] pState
 		// otherwise
-			#	(expr, pState)				= root_expression True token nodeDefs2 [] sep pState
+			#	(expr, pState)				= root_expression True token nodeDefs2 [] pState
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
 												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
-			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
+			=	want_FunctionBody token nodeDefs [alt:alts] pState
 	  where
 	  	guard_ident line_nr
 			= { id_name = "_g;" +++ toString line_nr +++ ";", id_info = nilPtr }
-	want_FunctionBody token nodeDefs alts sep pState
-		=	root_expression localsExpected token nodeDefs (reverse alts) sep pState
+	want_FunctionBody token nodeDefs alts pState
+		=	root_expression localsExpected token nodeDefs (reverse alts) pState
 	
-	root_expression :: !Bool !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
-	root_expression withExpected token nodeDefs alts sep pState
-		# (optional_expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
+	root_expression :: !Bool !Token ![NodeDefWithLocals] ![GuardedExpr] !ParseState -> (!OptGuardedAlts, !ParseState)
+	root_expression withExpected token nodeDefs alts pState
+		# (optional_expr,pState) = want_OptExprWithLocals withExpected token nodeDefs pState
 		= build_root token optional_expr alts nodeDefs pState
 	where
 		build_root :: !Token !(Optional ExprWithLocalDefs) ![GuardedExpr] ![NodeDefWithLocals] !ParseState -> (!OptGuardedAlts, !ParseState)
@@ -829,11 +830,11 @@ where
 	default_found (GuardedAlts _ No)	= False
 	default_found _						= True
 
-	want_OptExprWithLocals :: !Bool !Token ![NodeDefWithLocals] !(Token -> Bool) !ParseState -> (!Optional !ExprWithLocalDefs, !ParseState)
-	want_OptExprWithLocals withExpected DoubleArrowToken nodeDefs sep pState
-		= want_OptExprWithLocals True EqualToken nodeDefs sep (replaceToken EqualToken pState)
-	want_OptExprWithLocals withExpected token nodeDefs sep pState
-		| sep token
+	want_OptExprWithLocals :: !Bool !Token ![NodeDefWithLocals] !ParseState -> (!Optional !ExprWithLocalDefs, !ParseState)
+//	want_OptExprWithLocals withExpected DoubleArrowToken nodeDefs pState
+//		= want_OptExprWithLocals True EqualToken nodeDefs (replaceToken EqualToken pState)
+	want_OptExprWithLocals withExpected token nodeDefs pState
+		| separator token
 		# (file_name, line_nr, pState)	= getFileAndLineNr pState
 		  (expr, pState)	= wantExpression cIsNotAPattern pState
 		  pState			= wantEndRootExpression pState
@@ -899,6 +900,14 @@ where
 				)
 		// otherwise // ~ succ
 			= (False, abort "no definition", pState)
+	
+	try_let_lhs pState
+		# (succ, lhs_exp, pState) = trySimpleLhsExpression pState
+		| succ
+			= (True, lhs_exp, pState)
+			# (token,pState) = nextToken FunctionContext pState
+			= case token of
+				_ -> (False, lhs_exp, tokenBack pState)
 
 optionalLocals :: !Token !Bool !ParseState -> (!LocalDefs, !ParseState)
 optionalLocals dem_token localsExpected pState
@@ -2352,21 +2361,21 @@ wantListExp is_pattern pState
 	# pState=appScanState setNoNewOffsideForSeqLetBit pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
-	# (head_strictness,token,pState) = wantHeadStrictness token pState
+	# (head_strictness,token,pState) = want_head_strictness token pState
 		with
-			wantHeadStrictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
-			wantHeadStrictness ExclamationToken pState
+			want_head_strictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
+			want_head_strictness ExclamationToken pState
 				# (token,pState) = nextToken FunctionContext pState
 				= (HeadStrict,token,pState)
-			wantHeadStrictness (SeqLetToken strict) pState
+			want_head_strictness (SeqLetToken strict) pState
 				# (token,pState) = nextToken FunctionContext pState
 				| strict
 					= (HeadUnboxedAndTailStrict,token,pState);
 					= (HeadUnboxed,token,pState)
-			wantHeadStrictness BarToken pState
+			want_head_strictness BarToken pState
 				# (token,pState) = nextToken FunctionContext pState
 				= (HeadOverloaded,token,pState)
-			wantHeadStrictness token pState
+			want_head_strictness token pState
 				= (HeadLazy,token,pState)
 	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
 		# (token, pState) = nextToken FunctionContext pState
@@ -2426,7 +2435,9 @@ wantListExp is_pattern pState
 						| token==ExclamationToken && head_strictness<>HeadOverloaded
 							# pState = wantToken FunctionContext "list" SquareCloseToken pState
 							-> gen_tail_strict_cons_nodes acc exp pState
-							# pState = parseError "list" (Yes token) (toString SquareCloseToken) pState
+						| token==ColonToken // to allow [1:2:[]] etc.
+							-> want_list [exp:acc] (tokenBack pState)
+							# pState = parseError "list" (Yes token) "] or :" pState
 							-> gen_cons_nodes acc exp pState
 					DotDotToken
 						| is_pattern
@@ -2468,7 +2479,7 @@ wantListExp is_pattern pState
 			gen_cons_nodes [e:r] exp pState
 				# (exp, pState) = makeConsExpression head_strictness is_pattern e exp pState
 				= gen_cons_nodes r exp pState
-
+	
 			gen_tail_strict_cons_nodes [] exp pState
 				= (exp, pState)
 			gen_tail_strict_cons_nodes [e:r] exp pState
@@ -2638,7 +2649,7 @@ where
 				= (False, abort "no case alt", pState)
 			= (False, abort "no case alt", tokenBack pState)
 
-	caseSeperator t = t == EqualToken || t == ArrowToken // to enable Clean 1.x case expressions
+	caseSeperator t = t == EqualToken || t == ArrowToken // to enable Clean 1.3.x case expressions
 
 	try_pattern :: !ParseState -> (!Bool, ParsedExpr, !ParseState)
 	try_pattern pState
@@ -3289,11 +3300,11 @@ where
 instance currentToken ParseState
 where
 	currentToken pState = accScanState currentToken pState
-*/	
+	
 instance replaceToken ParseState
 where
 	replaceToken t pState = appScanState (replaceToken t) pState
-
+*/
 instance tokenBack ParseState
 where
 	tokenBack pState=:{ps_skipping}

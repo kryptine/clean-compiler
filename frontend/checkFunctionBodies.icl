@@ -2109,11 +2109,29 @@ checkLhssOfLocalDefs def_level mod_index (CollectedLocalDefs {loc_functions={ir_
 		= (loc_defs, accus, { e_state & es_fun_defs = ps_fun_defs, es_var_heap = ps_var_heap }, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
 where
 	check_patterns [ node_def : node_defs ] p_input accus var_store e_info cs
-		# (pattern, accus, var_store, e_info, cs) = checkPattern node_def.nd_dst No p_input accus var_store e_info cs
+		# (pattern, accus, var_store, e_info, cs) = check_local_lhs_pattern node_def.nd_dst No p_input accus var_store e_info cs
 		  (patterns, accus, var_store, e_info, cs) = check_patterns node_defs p_input accus var_store e_info cs
 		= ([{ node_def & nd_dst = pattern } : patterns], accus, var_store, e_info, cs)
 	check_patterns [] p_input accus var_store e_info cs
 		= ([], accus, var_store, e_info, cs)
+
+	/* RWS: FIXME
+		This is a patch for the case
+			...
+			where
+				X = 10
+		in which X should be a node-id (a.k.a. AP_Variable) and not a pattern.
+		I think the distinction between node-ids and constructors should be done
+		in an earlier phase, but this will need a larger rewrite.
+	*/
+	check_local_lhs_pattern (PE_Ident id=:{id_name, id_info}) opt_var {pi_def_level, pi_mod_index} accus=:(var_env, array_patterns)
+				 ps e_info cs=:{cs_symbol_table}
+		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
+		  cs = checkPatternVariable pi_def_level entry id new_info_ptr { cs & cs_symbol_table = cs_symbol_table }
+		= (AP_Variable id new_info_ptr opt_var, ([ id : var_env ], array_patterns), { ps & ps_var_heap = ps_var_heap}, e_info, cs)
+	check_local_lhs_pattern pattern opt_var p_input accus var_store e_info cs
+		=	checkPattern pattern opt_var p_input accus var_store e_info cs
 
 addArraySelections [] rhs_expr free_vars e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)

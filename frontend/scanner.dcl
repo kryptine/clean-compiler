@@ -134,13 +134,13 @@ instance nextToken ScanState
 
 class currentToken state :: !*state -> (!Token, !*state)
 instance currentToken ScanState
-
+/*
 class insertToken state :: !Token !ScanContext !*state -> *state
 instance insertToken ScanState
 
 class replaceToken state :: !Token !*state -> *state
 instance replaceToken ScanState
-
+*/
 class getPosition state :: !*state -> (!FilePosition,!*state)  // Position of current Token (or Char)
 instance getPosition ScanState
 

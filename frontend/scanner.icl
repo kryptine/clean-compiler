@@ -46,7 +46,7 @@ where
 	currentToken (ScanState scan_state)
 		# (token,scan_state) = currentToken scan_state
 		= (token,ScanState scan_state) 
-
+/*
 instance insertToken ScanState
 where
 	insertToken token context (ScanState scan_state) = ScanState (insertToken token context scan_state)
@@ -54,7 +54,7 @@ where
 instance replaceToken ScanState
 where
 	replaceToken token (ScanState scan_state) = ScanState (replaceToken token scan_state)
-
+*/
 instance getPosition ScanState
 where
 	getPosition (ScanState scan_state)
@@ -396,7 +396,7 @@ where currentToken scanState=:{ss_tokenBuffer}
 		| isEmptyBuffer ss_tokenBuffer
 			= (ErrorToken "dummy", scanState)
 			= ((head ss_tokenBuffer).lt_token, scanState)
-
+/*
 class insertToken state :: !Token !ScanContext !*state -> *state
 
 instance insertToken RScanState
@@ -412,7 +412,7 @@ where
 							}
 							ss_input
 			}
-
+*/
 notContextDependent :: !Token -> Bool
 notContextDependent token
  = case token of
@@ -438,7 +438,7 @@ notContextDependent token
 	WhereToken			-> True
 	WithToken			-> True
 	_					-> False
-
+/*
 class replaceToken state :: !Token !*state -> *state
 
 instance replaceToken RScanState
@@ -448,7 +448,7 @@ where
 		= { scanState
 		  & ss_tokenBuffer = store { longToken & lt_token = tok } buffer
 		  }
-
+*/
 SkipWhites :: !Input -> (!Optional String, !Char, !Input)
 SkipWhites {inp_stream=OldLine i line stream,inp_pos={fp_line,fp_col},inp_tabsize,inp_filename}
 	| i<size line
@@ -608,11 +608,11 @@ Scan c0=:'#' input co
 	// otherwise
 		= (SeqLetToken strict, charBack input)
 Scan '*' input TypeContext	= (AsteriskToken, input)
-Scan c0=:'&' input co
-	# (eof, c1, input)		= ReadNormalChar input
+Scan c0=:'&' input co		= possibleKeyToken AndToken [c0] co input
+/*	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (AndToken, input)
 	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
-							= (AndToken, charBack input)
+							= (AndToken, charBack input) */
 Scan c0=:'.' input co	// PK incorrect ?
 	= case co of
 		TypeContext
@@ -723,7 +723,7 @@ Scan c0=:':' input co
 	| c1 == ':'
 		# (eof, c2, input)	= ReadNormalChar input
 		| eof				= (DoubleColonToken, input)
-		| isSpecialChar c2	&& ~(c2=='!' || c2=='*') // for type rules and the like
+		| isSpecialChar c2	&& ~(c2=='!' || c2=='*' || c2=='.') // for type rules and the like
 							= ScanOperator 2 input [c2, c1, c0] co
 							= (DoubleColonToken, charBack input)
 	| c1 == '='
@@ -758,7 +758,7 @@ possibleKeyToken :: !Token ![Char] !ScanContext !Input -> (!Token, !Input)
 possibleKeyToken token reversedPrefix context input
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= (token, input)
-	| isSpecialChar c		= ScanOperator 2 input [c : reversedPrefix] context
+	| isSpecialChar c		= ScanOperator (length reversedPrefix) input [c : reversedPrefix] context
 							= (token, charBack input)
 
 new_exp_char ',' = True
@@ -1003,7 +1003,7 @@ ScanOctNumeral n input
 
 ScanChar :: !Input ![Char] -> (!Token, !Input)
 ScanChar input chars
-	# (eof, c, input)		= ReadNormalChar input
+	# (eof, c, input)		= ReadChar input // PK: was ReadNormalChar input
 	| eof					= (ErrorToken "End of file inside Char denotation", input)
 	| '\'' == c				= (CharListToken "", input)
 	| '\\' == c				= ScanBSChar 0 chars input ScanEndOfChar
@@ -1226,17 +1226,15 @@ ReadChar {inp_stream = OldLine i line stream,inp_pos,inp_tabsize,inp_filename}
 			#	pos = NextPos c inp_pos inp_tabsize
 				(c,stream)	= correctNewline_OldLine c i inp_tabsize line stream
 			=	(	False,	c
-				,	{
-						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
-						inp_stream = stream
+				,	{	inp_filename = inp_filename, inp_tabsize = inp_tabsize
+					,	inp_stream = stream
 					,	inp_pos	= pos
 					}
 				)
 			#	pos = {inp_pos & fp_col = inp_pos.fp_col + 1}
 			=	(	False, c
-				,	{
-						inp_filename=inp_filename,inp_tabsize=inp_tabsize,
-						inp_stream = OldLine (i+1) line stream
+				,	{	inp_filename = inp_filename, inp_tabsize = inp_tabsize
+					,	inp_stream = OldLine (i+1) line stream
 					,	inp_pos	= pos
 					}
 				)

@@ -2,7 +2,7 @@ implementation module postparse
 
 import StdEnv
 import syntax, parse, utilities, StdCompare
-// import RWSDebug
+//import RWSDebug
 
 :: *CollectAdmin =
 	{	ca_error		:: !*ParseErrorAdmin
@@ -303,7 +303,10 @@ where
 			= ([ fun : fun_defs ], node_defs, ca)
 		reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 			= case defs of
-				[PD_Function pos name is_infix args rhs fun_kind : _]
+				[PD_Function pos name is_infix args rhs fun_kind : othe] // PK ..
+					| fun_kind == FK_Caf 
+						# ca = postParseError pos "No typespecification for local graph definitions allowed" ca // .. PK
+						-> reorganiseLocalDefinitions (tl defs) ca
 					| belongsToTypeSpec name1 prio name is_infix
 						# fun_arity = determineArity args type
 						# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
