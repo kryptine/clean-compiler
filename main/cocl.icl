@@ -8,7 +8,6 @@ import StdEnv
 import coclmain
 
 import frontend
-import StdDebug
 
 Start :: *World -> *World
 Start world
