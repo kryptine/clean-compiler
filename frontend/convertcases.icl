@@ -148,17 +148,35 @@ combineDefaults default_ptr No bound_vars guards group_index common_defs ci=:{ci
 where
 	case_is_partial (AlgebraicPatterns {glob_module, glob_object} patterns) common_defs
 		# {td_rhs} = common_defs.[glob_module].com_type_defs.[glob_object]
-		= length patterns < nr_of_alternatives td_rhs
+		= length patterns < nr_of_alternatives td_rhs || has_partial_pattern patterns
 	where
 		nr_of_alternatives (AlgType conses)
 			= length conses
 		nr_of_alternatives _
 			= 1
 
+		has_partial_pattern []
+			= False
+		has_partial_pattern [{ap_expr} : patterns]
+			= is_partial_expression ap_expr || has_partial_pattern patterns
 	case_is_partial (BasicPatterns BT_Bool bool_patterns) common_defs
-		= length bool_patterns < 2
+		= length bool_patterns < 2 || has_partial_basic_pattern bool_patterns
+	where
+		has_partial_basic_pattern []
+			= False
+		has_partial_basic_pattern [{bp_expr} : patterns]
+			= is_partial_expression bp_expr || has_partial_basic_pattern patterns
 	case_is_partial patterns common_defs
 		= True
+	
+	is_partial_expression (Case {case_guards,case_default=No})
+		= case_is_partial case_guards common_defs
+	is_partial_expression (Case {case_guards,case_default=Yes case_default})
+		= is_partial_expression case_default && case_is_partial case_guards common_defs
+	is_partial_expression (Let {let_expr})
+		= is_partial_expression let_expr
+	is_partial_expression _
+		= False
 
 combineDefaults default_ptr this_default bound_vars guards group_index common_defs ci
 	= (this_default, ci)
@@ -304,6 +322,7 @@ optionalToListofLists No
 hasOption (Yes _)	= True
 hasOption No		= False
 
+convertPatterns :: CasePatterns [[AType]] (Optional (FreeVar,AType)) [.(FreeVar,AType)] [(FreeVar,AType)] (Ptr ExprInfo) Index {#CommonDefs} *ConversionInfo -> *(!.[BackendBody],!*ConversionInfo);
 convertPatterns (AlgebraicPatterns algtype patterns) cons_types opt_var left_vars right_vars default_ptr group_index common_defs ci
 	# (guarded_exprs_list, ci) = mapSt (convert_algebraic_guard_into_function_pattern opt_var left_vars right_vars
 			group_index common_defs default_ptr) (zip2 patterns cons_types) ci
