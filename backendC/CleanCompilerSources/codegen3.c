@@ -972,7 +972,10 @@ static void CodeRootFieldSelector (Node root,NodeId rootid,int asp,int bsp,CodeG
 				CoerceArgumentOnTopOfStack (&asp,&bsp,arg->arg_state,offstate,offstate_a_size,offstate_b_size);
 
 #if BOXED_RECORDS
-				if (arg->arg_state.state_type==SimpleState){
+				if (root->node_arity<SELECTOR_L ?
+					arg->arg_state.state_type==SimpleState :
+					arg->arg_state.state_type==TupleState && arg->arg_state.state_tuple_arguments[0].state_type==SimpleState
+				){
 					if (root->node_arity<SELECTOR_L){
 						PushField (*record_state_p,fieldnr,0,&asp,&bsp,&asize,&bsize);
 						RedirectResultAndReturn (asp,bsp,asp,bsp,root->node_state,demstate,1+asize,bsize);
@@ -1649,8 +1652,8 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 #endif
 			NodeIdListElementP node_id_list;
 			char bits[MaxNodeArity+2];
-			unsigned int a_bits,b_bits,a_size,b_size,a_size2,b_size2,n,arg_n;
-			int a_destination_offset,b_destination_offset;
+			unsigned int a_bits,b_bits,a_size,b_size,a_size2,b_size2,arg_n;
+			int n,a_destination_offset,b_destination_offset;
 			int total_a_size2,total_b_size2;
 			int node_arity;
 			ArgP arg_p;
@@ -1710,7 +1713,7 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 
 			a_destination_offset=a_size;
 			for (n=a_size-1; n>=0; --n)
-				if ((a_bits>>n) & 1){
+				if ((a_bits>>(unsigned)n) & 1){
 					bits[n]='1';
 					--a_destination_offset;
 					if (a_destination_offset!=n)
@@ -1725,7 +1728,7 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 			
 			b_destination_offset=b_size;				
 			for (n=b_size-1; n>=0; --n)
-				if ((b_bits>>n) & 1){
+				if ((b_bits>>(unsigned)n) & 1){
 					bits[n+a_size]='1';
 					--b_destination_offset;
 					if (b_destination_offset!=n)
