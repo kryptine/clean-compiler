@@ -244,7 +244,7 @@ checkTypeDef /* TD */ is_dcl_module type_index module_index ts=:{ts_type_defs} t
 	// in case of an icl-module, the arguments i.e. the type variables of type constructors are normalized which makes
 	// comparison by the static linker easier.
 	# (cs=:{cs_error})
-		= { cs & cs_x = { cs.cs_x & x_is_dcl_module = is_dcl_module, x_type_var_position = 0 } }
+		= { cs & cs_x = { cs.cs_x & x_is_dcl_module = /*is_dcl_module*/ True, x_type_var_position = 0 } }
 // 	| FB (not is_dcl_module)  ("checkTypeDef: " +++ td_name.id_name) True
 	#
  	// ... TD
