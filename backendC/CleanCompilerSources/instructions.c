@@ -3044,15 +3044,21 @@ void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 		} else {
 			if (ExportLocalLabels){
 				put_directive_ (Dexport);
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s",CurrentModule,name);
+				put_directive_ (Dexport);
 				FPrintF (OutFile,"e_%s_" N_PREFIX "%s",CurrentModule,name);
 			}
 
 			put_directive_ (Ddescn);
 
-			if (DoDebug)
-				FPrintF (OutFile, D_PREFIX "%s ", name);
-			else
-				FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
+			if (ExportLocalLabels)
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s ",CurrentModule,name);
+			else {
+				if (DoDebug)
+					FPrintF (OutFile, D_PREFIX "%s ", name);
+				else
+					FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
+			}
 
 			if (ExportLocalLabels)
 				FPrintF (OutFile,"e_%s_" N_PREFIX "%s ",CurrentModule,name);
