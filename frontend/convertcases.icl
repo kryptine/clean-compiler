@@ -3,7 +3,7 @@
 */
 implementation module convertcases
 
-import syntax, transform, checksupport, StdCompare, check, utilities, trans, general; // , RWSDebug
+import syntax, transform, checksupport, StdCompare, check, utilities, trans, general; //, RWSDebug
 
 // exactZip fails when its arguments are of unequal length
 exactZip` :: ![.a] ![.b] -> [(.a,.b)]
@@ -12,7 +12,7 @@ exactZip` [] []
 exactZip` [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
 exactZip
-	:==	zip2
+	:==	exactZip`
 
 getIdent :: (Optional Ident) Int -> Ident
 getIdent (Yes ident) fun_nr
@@ -493,11 +493,15 @@ where
 		    = case let_expr of
 		    	Let inner_let=:{let_info_ptr=inner_let_info_ptr}
 		    		# (EI_LetType strict_inner_types, ds_expr_heap) = readPtr inner_let_info_ptr ds.ds_expr_heap
-		    		  ds_expr_heap = writePtr inner_let_info_ptr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) ds_expr_heap
-					-> (Let { inner_let & let_strict_binds = let_strict_binds++inner_let.let_strict_binds}, 
+					# (inner_let_info_ptr, ds_expr_heap)
+						=	newPtr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) ds_expr_heap
+					-> (Let { inner_let & let_strict_binds = let_strict_binds++inner_let.let_strict_binds,
+									let_info_ptr = inner_let_info_ptr}, 
 						{ds & ds_expr_heap = ds_expr_heap})
-				_	-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = []}, 
-						{ds & ds_expr_heap = ds.ds_expr_heap <:= (let_info_ptr, EI_LetType (take nr_of_strict_lets let_type))})
+				_	# (let_info_ptr, ds_expr_heap)
+						=	newPtr (EI_LetType (take nr_of_strict_lets let_type)) ds.ds_expr_heap
+					-> (Let { lad & let_strict_binds = let_strict_binds, let_expr = let_expr, let_lazy_binds = [], let_info_ptr = let_info_ptr}, 
+						{ds & ds_expr_heap = ds_expr_heap})
 	where
 		set_let_expr_info depth [{lb_src,lb_dst}:binds] [ref_count:ref_counts] [type:types] var_heap
 			# (new_info_ptr, var_heap) = newPtr (VI_Labelled_Empty "set_let_expr_info") var_heap
@@ -540,7 +544,11 @@ where
 instance distributeLets Case
 where 
 	distributeLets depth kees=:{case_info_ptr,case_guards,case_default,case_expr,case_explicit} ds=:{ds_var_heap, ds_expr_heap}
-		# (EI_CaseTypeAndRefCounts _ { rcc_all_variables = tot_ref_counts , rcc_default_variables = ref_counts_in_default, rcc_pattern_variables = ref_counts_in_patterns }, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
+		# (case_info, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
+		  (EI_CaseTypeAndRefCounts _
+		  	{	rcc_all_variables = tot_ref_counts ,
+		  		rcc_default_variables = ref_counts_in_default,
+		  		rcc_pattern_variables = ref_counts_in_patterns }) = case_info
 //		  ds_expr_heap = ds_expr_heap <:= (case_info_ptr, EI_CaseType case_type)
 		  new_depth = depth + 1
 
@@ -560,7 +568,9 @@ where
 		  (case_default, ds=:{ds_var_heap}) = distribute_lets_in_default new_depth ref_counts_in_default case_default ds
 		  ds_var_heap = foldSt reset_local_let_var local_lets ds.ds_var_heap
 		  (case_expr, ds) = distributeLets depth case_expr { ds & ds_var_heap = ds_var_heap}
-		= ({ kees & case_guards = case_guards, case_expr = case_expr, case_default = case_default }, ds)
+		  (case_info_ptr, ds_expr_heap) = newPtr case_info ds.ds_expr_heap
+		= ({ kees & case_guards = case_guards, case_expr = case_expr,
+				case_default = case_default, case_info_ptr = case_info_ptr }, { ds & ds_expr_heap = ds_expr_heap})
 	where
 		distribute_lets_in_patterns depth ref_counts (AlgebraicPatterns conses patterns) ds
 			# (patterns, ds) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) ds
@@ -905,30 +915,6 @@ instance findSplitCases Case where
 				where
 					case_type (EI_CaseTypeAndRefCounts type _)
 						=	type
-					case_type (EI_CaseTypeAndSplits type _)
-						/*
-							The same case is encountered twice by findSplitCases. This can
-							happen because distributeLets doesn't copy expressions. So
-
-								Start
-									# x = case 1 of 1 -> 1
-									| True
-										=	 x
-										=	 x
-
-							is transformed to
-
-								Start
-									| True
-										=	 case 1 of 1 -> 1
-										=	 case 1 of 1 -> 1
-
-							but the two cases are shared in the syntax tree (and thus
-							have the same case_info_ptr). We just leave the case shared
-							under the assumption that in both instances it will be split
-							in exactly the same way.
-						*/
-						=	type
 					case_type info
 						=	abort "case_type???" <<- info
 
@@ -1243,21 +1229,24 @@ instance convertRootCases Expression where
 						| not case_explicit || (case ci.ci_case_level of
 													CaseLevelAfterGuardRoot -> False 
 													_ -> True)
-							# (EI_CaseTypeAndSplits case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
 							# (varInfo, cs_var_heap) = readPtr var.var_info_ptr cs.cs_var_heap
-							# cs = {cs & cs_expr_heap=cs_expr_heap, cs_var_heap=cs_var_heap} // -*-> varInfo
+							# cs = {cs & cs_var_heap=cs_var_heap} // -*-> varInfo
 							-> case varInfo of
 								VI_LocalLetVar
 									->	convertNonRootCase ci kees cs // -*-> "convertRootCases, no guards"
 								_
 //									| True <<- ("convertRootCases",varInfo)
-									# ({case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
+									# (kees=:{case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
 										=	splitCase ci kees cs
+									# (EI_CaseTypeAndSplits case_type _, cs_expr_heap)
+											= readPtr case_info_ptr cs.cs_expr_heap
+									# cs = {cs & cs_expr_heap=cs_expr_heap} // -*-> varInfo
 
 							  		# (case_expr, cs)	= convertCases ci case_expr cs
 									# (case_guards, cs) = convertRootCasesCasePatterns ci case_guards case_type.ct_cons_types cs
 							  		# (case_default, cs)= convertRootCases ci case_default cs
-									-> (Case {kees & case_expr=case_expr, case_guards=case_guards, case_default=case_default}, cs)
+									-> (Case {kees & case_expr=case_expr,
+												case_guards=case_guards, case_default=case_default}, cs)
 						// otherwise
 							-> convertNonRootCase ci kees cs
 					expr
