@@ -17,21 +17,6 @@ typedef struct poly_list
 	struct poly_list *	pl_next;
 } * PolyList;
 
-typedef struct export_list
-{
-	union
-	{	IdentStringP 		exp_u_ident_string;
-		struct symbol_def *	exp_u_class;
-	} exp_union;
-
-	unsigned	long		exp_type_vector;
-	unsigned				exp_line;
-	struct export_list *	exp_next;
-} *ExportList;
-
-#define exp_class	exp_union.exp_u_class
-#define exp_ident	exp_union.exp_u_ident_string
-
 typedef struct type_arg * TypeArgs, TypeArg;
 typedef struct type_node *	TypeNode;
 typedef struct type_alt *	TypeAlts;
@@ -112,97 +97,6 @@ STRUCT (type_context, TypeContext)
 
 };
 
-typedef	struct _instance
-{
-	Symbol				ins_overloaded_symbol;
-	Symbol				ins_symbol;
-
-	TypeNode			ins_type;
-	TypeContext			ins_type_context;
-
-	struct type_alt *	ins_type_alt;
-	struct type_cell *	ins_over_vars;
-
-	union /* struct */
-	{	struct type_cell * 	u1_ins_type_cell;
-		struct _instance *	u1_ins_next;
-	} ins_union1;
-	
-	union
-	{	ImpRules 	u2_ins_imprule;
-		RuleTypes	u2_ins_defrule;
-	} ins_union2;
-	
-	int					ins_context_arity;
-	unsigned			ins_line;
-	Bool				ins_exported:1;
-	Bool				ins_unq_attributed:1;
-	Bool				ins_is_default:1;
-	unsigned			ins_kind:5;
-
-} * Instance;
-
-#define ins_type_cell	ins_union1.u1_ins_type_cell
-#define ins_next		ins_union1.u1_ins_next
-#define ins_imprule		ins_union2.u2_ins_imprule
-#define ins_defrule		ins_union2.u2_ins_defrule
-
-/*
-
-typedef struct type_list
-{
-	TypeNode			tl_type;
-	TypeContext			tl_type_context;
-	Bool				tl_is_default;
-	struct type_list *	tl_next;
-} *TypeList;
-
-typedef struct dcl_instance
-{
-	IdentStringP			di_symbol;
-	TypeList				di_types;
-	unsigned				di_line;
-	struct dcl_instance *	di_next;
-
-} * DclInstance;
-
-typedef struct icl_instance
-{
-	IdentStringP			ii_symbol;
-	TypeNode				ii_type;
-	TypeContext				ii_type_context;
-	PolyList				ii_instances;
-	unsigned				ii_line;
-	Bool					ii_is_default;
-	struct icl_instance *	ii_next;
-
-} * IclInstance;
-
-*/
-
-typedef struct overloaded
-{
-	Symbol					ol_symbol;
-	TypeVar					ol_type_var;
-	TypeAlts				ol_type;
-
-/*
-	Instance				ol_instances;
-	Instance				ol_generic_instance;
-*/	
-	unsigned long			ol_basic_instances;
-	struct overloaded *		ol_next;
-	struct class_def *		ol_class;
-
-	AttributeKind			ol_attribute;
-	AttributeKind			ol_next_attribute;
-
-	unsigned				ol_line;
-	unsigned				ol_number;
-	Bool					ol_has_default_instance;
-
-} * Overloaded;
-
 typedef struct field_list
 {
 	Symbol				fl_symbol;
@@ -210,13 +104,6 @@ typedef struct field_list
 	StateS				fl_state;
 	struct field_list *	fl_next;
 } * FieldList;
-
-typedef struct member_list
-{
-	Symbol				ml_symbol;
-	Overloaded			ml_rule;
-	struct member_list *ml_next;
-} * MemberList;
 
 typedef struct constructor_list
 {
@@ -235,7 +122,6 @@ typedef struct type
 	struct type *		type_next;
 	unsigned			type_line;
 	int					type_nr_of_constructors;	/* 0 for records */
-	int					type_number;
 	TypeArgClass		type_argclass;
 
 	BITVECT				type_exivars;
@@ -246,86 +132,6 @@ typedef struct type
 
 #define type_fields 	type_constructors -> cl_fields
 #define type_symbol		type_lhs -> ft_symbol
-
-typedef struct class_instance
-{
-	union
-	{	IdentStringP ci_u1_ident_string;
-		Symbol		 ci_u1_class_symbol;
-	} ci_union1;
-	
-	Symbol						ci_instance_symbol;
-	TypeNode					ci_type;
-	TypeContext					ci_type_context;
-	struct uni_var_admin *		ci_attr_vars;
-
-	union
-	{	struct class_instance *	ci_u3_link;
-		struct type_cell *		ci_u3_type_cell;
-	} ci_union3;
-
-	struct type_cell **			ci_over_vars;
-	
-	union
-	{	Instance	ci_u2_member_instance_list;
-		Instance *	ci_u2_member_instances;
-	} ci_union2;
-	
-	int							ci_context_arity;
-	
-	struct class_instance *	ci_next;
-
-	unsigned					ci_line;
-	Bool						ci_is_default:1;
-	Bool						ci_is_imported:1;
-	Bool						ci_is_member_instance_list:1;
-	unsigned					ci_kind:5;
-
-} * ClassInstance;
-
-#define ci_class_symbol 		ci_union1.ci_u1_class_symbol
-#define ci_ident_string			ci_union1.ci_u1_ident_string
-#define ci_member_instance_list ci_union2.ci_u2_member_instance_list
-#define ci_member_instances		ci_union2.ci_u2_member_instances
-#define ci_link					ci_union3.ci_u3_link
-#define ci_type_cell			ci_union3.ci_u3_type_cell
-
-typedef struct class_def
-{
-	Symbol					cd_symbol;
-	TypeVar					cd_variable;
-
-	AttributeKind			cd_attribute;
-
-	TypeContext				cd_context;
-		
-	union
-	{	MemberList		cd_u_all_members;
-		Overloaded	*	cd_u_members;
-	} cd_union;
-
-	MemberList				cd_derived_members;
-
-	SymbolList				cd_context_classes;
-
-	ClassInstance			cd_instances;
-	ClassInstance			cd_generic_instance;
-	
-	unsigned long			cd_imported_basic_instances;
-	unsigned long			cd_defined_basic_instances;
-	
-	struct class_def *		cd_next;
-	unsigned				cd_line;
-	unsigned				cd_nr_of_members;
-
-	Bool					cd_has_default_instance:1;
-	Bool					cd_internal:1;
-	Bool					cd_is_member_list:1;
-
-} * ClassDefinition;
-
-#define cd_all_members	cd_union.cd_u_all_members 
-#define cd_members		cd_union.cd_u_members 
 
 struct rule_type
 {	TypeAlts			rule_type_rule;
@@ -379,13 +185,6 @@ typedef struct abs_type
 
 #define abstype_symbol	abs_graph -> ft_symbol
 
-#ifdef THINK_C
-#define DTypeNodeKind(v) \
-	(v==VariableTypeNode?"VariableTypeNode": \
-	 v==NormalTypeNode?"NormalTypeNode": \
-	 v==SelectorTypeNode?"SelectorTypeNode":"")
-#endif
-
 struct type_node
 {
 	union
@@ -394,9 +193,6 @@ struct type_node
 	} type_node_contents;
 
 	struct type_arg *		type_node_arguments;
-#if 0
-	StateS					type_node_state;
-#endif
 	AttributeKind			type_node_attribute;
 	short					type_node_arity;
 	Annotation				type_node_annotation;
@@ -533,6 +329,7 @@ typedef struct uni_var_admin
 
 } * UniVarAdministration;
 
+
 #ifdef SHORT_CLASS_NAMES
 STRUCT (module_info, ModuleInfo)
 {
@@ -554,7 +351,4 @@ STRUCT (type_conversion_table, TypeConversionTable)
 	struct symbol_def *				tct_type_symbol;
 	struct type_conversion_table *	tct_next;
 };
-
 #endif
-
-
