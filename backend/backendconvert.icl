@@ -309,8 +309,6 @@ beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
 beFlatType
 	:==	beFunction2 BEFlatType
-//beFlatTypeX
-//	:==	beFunction3 BEFlatTypeX
 beNoTypeVars
 	:==	beFunction0 BENoTypeVars
 beTypeVars
@@ -319,14 +317,14 @@ beTypeVar name
 	:==	beFunction0 (BETypeVar name)
 beTypeVarListElem
 	:==	beFunction2 BETypeVarListElem
-beExportType dclTypeIndex iclTypeIndex
-	:==	beApFunction0 (BEExportType dclTypeIndex iclTypeIndex)
-beExportConstructor dclConstructorIndex iclConstructorIndex
-	:==	beApFunction0 (BEExportConstructor dclConstructorIndex iclConstructorIndex)
-beExportField dclFieldIndex iclFieldIndex
-	:==	beApFunction0 (BEExportField dclFieldIndex iclFieldIndex)
-beExportFunction dclIndexFunctionIndex iclFunctionIndex
-	:==	beApFunction0 (BEExportFunction dclIndexFunctionIndex iclFunctionIndex)
+beExportType isDictionary typeIndex
+	:==	beApFunction0 (BEExportType isDictionary typeIndex)
+beExportConstructor constructorIndex
+	:==	beApFunction0 (BEExportConstructor constructorIndex)
+beExportField isDictionaryField fieldIndex
+	:==	beApFunction0 (BEExportField isDictionaryField fieldIndex)
+beExportFunction functionIndex
+	:==	beApFunction0 (BEExportFunction functionIndex)
 beTupleSelectNode arity index
 	:==	beFunction1 (BETupleSelectNode arity index)
 beMatchNode arity
@@ -2105,38 +2103,36 @@ getVariableSequenceNumber varInfoPtr be
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
 
-foldStateWithIndexTwice function n
+foldStateWithIndex function n
 	:== foldStateWithIndexTwice 0
 	where
 		foldStateWithIndexTwice index
 			| index == n
 				=	identity
 			// otherwise
-				=	function index index
+				=	function index
 				o`	foldStateWithIndexTwice (index+1)
 
 markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} -> BackEnder
 markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_defs,com_class_defs}} dclClasses dclTypes iclClasses iclTypes
-	=	foldStateWithIndexTwice beExportType (size com_type_defs)
-	o	foldStateWithIndexTwice beExportConstructor (size com_cons_defs)
-	o	foldStateWithIndexTwice beExportField (size com_selector_defs)
-	o	foldStateWithIndexTwice (exportDictionary iclClasses iclTypes) (size com_class_defs)
-	o	foldStateWithIndexTwice beExportFunction (size dcl_functions)
+	=	foldStateWithIndex (beExportType False) (size com_type_defs)
+	o	foldStateWithIndex beExportConstructor (size com_cons_defs)
+	o	foldStateWithIndex (beExportField False) (size com_selector_defs)
+	o	foldStateWithIndex (exportDictionary iclClasses iclTypes) (size com_class_defs)
+	o	foldStateWithIndex beExportFunction (size dcl_functions)
 	where
-		exportDictionary :: {#ClassDef} {#CheckedTypeDef} Index Index -> BackEnder
-		exportDictionary iclClasses iclTypes dclClassIndex iclClassIndex
-			=	beExportType (-1) iclTypeIndex	// remove -1 hack
+		exportDictionary :: {#ClassDef} {#CheckedTypeDef} Index -> BackEnder
+		exportDictionary iclClasses iclTypes classIndex
+			=	beExportType True classIndex
 			o	foldStateA exportDictionaryField rt_fields
 			where
-				dclTypeIndex
-					=	dclClasses.[dclClassIndex].class_dictionary.ds_index
 				iclTypeIndex
-					=	iclClasses.[iclClassIndex].class_dictionary.ds_index
+					=	iclClasses.[classIndex].class_dictionary.ds_index
+				dclTypeIndex
+					=	dclClasses.[classIndex].class_dictionary.ds_index
 				{td_rhs = RecordType {rt_fields}}
 					=	iclTypes.[iclTypeIndex]
 
 				exportDictionaryField :: FieldSymbol -> BackEnder
 				exportDictionaryField {fs_index}
-					=	beExportField (-1) fs_index	// remove -1 hack
-markExports _ _ _ _ _
-	=	identity
+					=	beExportField True fs_index

@@ -6,7 +6,7 @@ from StdString import String;
 
 :: CPtr :== Int;
 :: *UWorld :== Int;
-:: *BackEnd :== Int;
+:: *BackEnd :== CPtr;
 :: BESymbolP :== CPtr;
 :: BETypeNodeP :== CPtr;
 :: BETypeArgP :== CPtr;
@@ -542,13 +542,6 @@ BEFlatType a0 a1 a2 = code {
 	ccall BEFlatType "II:I:I"
 }
 // BEFlatTypeP BEFlatType (BESymbolP symbol,BETypeVarListP arguments);
-/*
-BEFlatTypeX :: !BESymbolP !BEAttribution !BETypeVarListP !BackEnd -> (!BEFlatTypeP,!BackEnd);
-BEFlatTypeX a0 a1 a2 a3 = code {
-	ccall BEFlatTypeX "III:I:I"
-}
-*/
-// BEFlatTypeP BEFlatTypeX (BESymbolP symbol,BETypeVarListP arguments,BEAttribution attribute);
 
 BEAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
 BEAlgebraicType a0 a1 a2 = code {
@@ -561,13 +554,6 @@ BERecordType a0 a1 a2 a3 a4 = code {
 	ccall BERecordType "IIII:V:I"
 }
 // void BERecordType (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,BEFieldListP fields);
-/*
-BERecordTypeX :: !Int !BEFlatTypeP !BETypeNodeP !Int !BEFieldListP !BackEnd -> BackEnd;
-BERecordTypeX a0 a1 a2 a3 a4 a5 = code {
-	ccall BERecordTypeX "IIIII:V:I"
-}
-*/
-// void BERecordTypeX (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,int is_boxed_record,BEFieldListP fields);
 
 BEAbsType :: !BEFlatTypeP !BackEnd -> BackEnd;
 BEAbsType a0 a1 = code {
@@ -743,35 +729,29 @@ BEGenerateCode a0 a1 = code {
 }
 // int BEGenerateCode (CleanString outputFile);
 
-BEExportType :: !Int !Int !BackEnd -> BackEnd;
+BEExportType :: !Bool !Int !BackEnd -> BackEnd;
 BEExportType a0 a1 a2 = code {
 	ccall BEExportType "II:V:I"
 }
-// void BEExportType (int dclTypeIndex,int iclTypeIndex);
+// void BEExportType (int isDictionary,int typeIndex);
 
-BESwapTypes :: !Int !Int !BackEnd -> BackEnd;
-BESwapTypes a0 a1 a2 = code {
-	ccall BESwapTypes "II:V:I"
+BEExportConstructor :: !Int !BackEnd -> BackEnd;
+BEExportConstructor a0 a1 = code {
+	ccall BEExportConstructor "I:V:I"
 }
-// void BESwapTypes (int frm,int to);
+// void BEExportConstructor (int constructorIndex);
 
-BEExportConstructor :: !Int !Int !BackEnd -> BackEnd;
-BEExportConstructor a0 a1 a2 = code {
-	ccall BEExportConstructor "II:V:I"
-}
-// void BEExportConstructor (int dclConstructorIndex,int iclConstructorIndex);
-
-BEExportField :: !Int !Int !BackEnd -> BackEnd;
+BEExportField :: !Bool !Int !BackEnd -> BackEnd;
 BEExportField a0 a1 a2 = code {
 	ccall BEExportField "II:V:I"
 }
-// void BEExportField (int dclTypeIndex,int iclTypeIndex);
+// void BEExportField (int isDictionaryField,int fieldIndex);
 
-BEExportFunction :: !Int !Int !BackEnd -> BackEnd;
-BEExportFunction a0 a1 a2 = code {
-	ccall BEExportFunction "II:V:I"
+BEExportFunction :: !Int !BackEnd -> BackEnd;
+BEExportFunction a0 a1 = code {
+	ccall BEExportFunction "I:V:I"
 }
-// void BEExportFunction (int dclFunctionIndex,int iclFunctionIndex);
+// void BEExportFunction (int functionIndex);
 
 BEDefineImportedObjsAndLibs :: !BEStringListP !BEStringListP !BackEnd -> BackEnd;
 BEDefineImportedObjsAndLibs a0 a1 a2 = code {
@@ -808,9 +788,9 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":I:I"
 }
 // BESymbolP BEDynamicTempTypeSymbol ();
-kBEVersionCurrent:==0x02010801;
-kBEVersionOldestDefinition:==0x02000213;
-kBEVersionOldestImplementation:==0x02010801;
+kBEVersionCurrent:==0x02030407;
+kBEVersionOldestDefinition:==0x02030407;
+kBEVersionOldestImplementation:==0x02030407;
 kBEDebug:==1;
 kPredefinedModuleIndex:==1;
 BENoAnnot:==0;
