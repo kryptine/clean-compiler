@@ -3544,6 +3544,8 @@ foldExpr f expr=:(MatchExpr _ expr1) st
 foldExpr f expr=:(DynamicExpr {dyn_expr}) st 
 	# st = f expr st
 	= foldExpr f dyn_expr st
+foldExpr f EE st 
+	= st
 foldExpr f expr st 
 	= abort "generic.icl: foldExpr does not match\n"//f expr st
 		---> ("foldExpr does not match", expr)
