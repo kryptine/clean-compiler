@@ -608,6 +608,7 @@ where
 			, td_arity_expr
 			, num_conses_expr 
 			, td_conses_expr
+			// TODO: module_name_expr
 			] 
 			predefs heaps	
 						
@@ -719,7 +720,9 @@ where
 
 	build_field_dsc group_index cons_dsc_ds field_dsc_ds {fs_ident, fs_index} (modules, heaps)
 		# name_expr = makeStringExpr fs_ident.id_name
-		# index_expr = makeIntExpr fs_index
+		# ({sd_field_nr}, modules)	
+			= modules! [td_module].com_selector_defs.[fs_index]  		
+		# index_expr = makeIntExpr sd_field_nr
 		# (cons_expr, heaps) = buildFunApp main_module_index cons_dsc_ds [] heaps				
 		# (body_expr, heaps) 
 			= buildPredefConsApp PD_CGenericFieldDescriptor 
@@ -1088,7 +1091,7 @@ where
 		= build_case_expr case_patterns heaps 
 	
 	// REC case
-	build_case_field var body_expr heaps
+	build_case_rec var body_expr heaps
 		# pat = buildPredefConsPattern PD_ConsREC [var] body_expr predefs	
 		# {pds_module, pds_def} = predefs.[PD_TypeREC]
 		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
