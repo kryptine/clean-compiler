@@ -1,4 +1,4 @@
-system module _aconcat
+definition module _aconcat
 
 import StdArray,StdInt,StdEnum,StdList
 
@@ -59,3 +59,9 @@ where
 			# (e,a1) = a1![i]
 			= copy_elements a1 {a2 & [i]=e} (i+1)
 			= (a2,a1)
+
+arrayCopy a s
+	:== arrayCopyBegin a1 s
+	where
+		(s, a1)
+			=	usize a
