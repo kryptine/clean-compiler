@@ -27,13 +27,12 @@
 #include "buildtree.h"
 #include "comparser.h"
 #include "checker.h"
-#include "typechecker.h"
+#include "tcsupport.h"
 #include "statesgen.h"
 #include "codegen_types.h"
 #include "codegen1.h"
 #include "codegen2.h"
 #include "instructions.h"
-#include "overloading.h"
 #include "checksupport.h"
 #include "dbprint.h"
 
@@ -562,18 +561,6 @@ void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
 					PrintNodeSymbol (node, arg_nr, StdError);
 					break;
 				}
-				case 'T':
-					PrintTCType (va_arg (ap, struct type_cell *),NULL);
-					break;
-				case 'U':
-				{
-					struct type_cell *type,*sub_type;
-					
-					type=va_arg (ap, struct type_cell *);
-					sub_type=va_arg (ap, struct type_cell *);
-					PrintTCType (type,sub_type);
-					break;
-				}
 				default:
 					FPutC ('%', StdError);
 					FPutC (format_spec, StdError);
@@ -654,7 +641,6 @@ void InitCompiler (void)
 	InitScanner		();
 	InitParser		();
 	InitChecker		();
-	InitTypeChecker	();
 	InitStatesGen		();
 	InitCoding		();
 	InitInstructions	();
