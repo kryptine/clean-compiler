@@ -345,16 +345,19 @@ newextract ::
 newextract trc newname (Trace stricts rule answer history transf)
 | recursive
   = (stricts,[recrule],recareas)
-= subex transf
-  where subex (Reduce reductroot trace) = newextract trc newname trace
-        subex (Annotate trace) = newextract trc newname trace
-        subex (Instantiate yestrace notrace)
-        = (stricts,yesrules++norules,yesareas++noareas)
-          where (yesstricts,yesrules,yesareas) = newextract trc newname yestrace
-                (nostricts,norules,noareas) = newextract trc newname notrace
-        subex Stop = (stricts,[mkrule rargs rroot stoprgraph],stopareas)
+= case transf
+  of Reduce reductroot trace
+      -> newextract trc newname trace
+     Annotate trace
+      -> newextract trc newname trace
+     Instantiate yestrace notrace
+      -> (stricts,yesrules++norules,yesareas++noareas)
+         where (yesstricts,yesrules,yesareas) = newextract trc newname yestrace
+               (nostricts,norules,noareas) = newextract trc newname notrace
+     Stop
+      -> (stricts,[mkrule rargs rroot stoprgraph],stopareas)
 
-        (recursive,unsafearea)
+  where (recursive,unsafearea)
         = if (isreduce transf)
              (foldoptional (False,undef) (findspinepart rule transf) answer)
              (False,abort "newextract: not a Reduce transformation")
