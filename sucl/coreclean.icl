@@ -94,12 +94,15 @@ where (==) (SuclAnonymous i1) (SuclAnonymous i2) = i1 == i2
       (==) _                  _                  = False
 
 // Get the type rule and strictness of a built in core clean symbol
-coretypeinfo :: SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
-coretypeinfo sym
- = (trule,corestricts sym)
-   where corestricts (SuclApply argc) = [True,False]
-         corestricts sym = map (const False) (arguments trule)
-         trule = coretyperule sym
+
+corestricts :: SuclSymbol -> [Bool]
+corestricts sym
+= case sym
+  of (SuclApply argc)
+      -> maphd (const True) stricts
+     _
+      -> stricts
+  where stricts = map (const False) (arguments (coretyperule sym))
 
 coretyperule :: SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 coretyperule (SuclApply argc)

@@ -59,7 +59,8 @@ instance == SuclSymbol
 instance == SuclVariable
 
 // Get the type rule and strictness of a built in core clean symbol
-coretypeinfo :: SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
+coretyperule :: SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+corestricts :: SuclSymbol -> [Bool]
 
 // Determine if a list of constructors completely covers a given type
 corecomplete :: SuclTypeSymbol -> [SuclSymbol] -> Bool

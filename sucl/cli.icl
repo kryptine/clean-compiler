@@ -124,12 +124,12 @@ exports :: Cli -> [SuclSymbol]
 exports m = m.exportedsymbols
 
 /*
->   typerule (tdefs,(es,as,ts,rs)) = fst.maxtypeinfo ts
+>   typerule (tdefs,(es,as,ts,rs)) = maxtyperule ts
 */
 
 typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 typerule m sym
-= fst (maxtypeinfo m.typerules sym)
+= maxtyperule m.typerules sym
 
 /*
 >   rules (tdefs,(es,as,ts,rs)) = foldmap Present Absent rs
@@ -154,7 +154,7 @@ typerule m sym
 
 clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
 clistrategy {typeconstructors=tcs,typerules=ts,rules=rs} matchable
- = ( checkarity (typearity o maxtypeinfo ts)        // Checks curried occurrences and strict arguments
+ = ( checkarity (typearity o maxtyperule ts)        // Checks curried occurrences and strict arguments
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
    o checkimport islocal                            // Checks for delta symbols
@@ -163,11 +163,17 @@ clistrategy {typeconstructors=tcs,typerules=ts,rules=rs} matchable
    where islocal rsym=:(SuclUser s) = isMember rsym (map fst rs)
          islocal rsym = True                        // Symbols in the language core are always completely known
 
-typearity :: (Rule SuclTypeSymbol SuclTypeVariable,[Bool]) -> Int
-typearity ti = length (arguments (fst ti))
+typearity :: (Rule SuclTypeSymbol SuclTypeVariable) -> Int
+typearity ti = length (arguments ti)
 
-maxtypeinfo :: [(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))] SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
-maxtypeinfo defs sym = extendfn defs coretypeinfo sym
+//maxtypeinfo :: [(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))] SuclSymbol -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
+//maxtypeinfo defs sym = extendfn defs coretypeinfo sym
+
+maxtyperule :: [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)] SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
+maxtyperule defs sym = extendfn defs coretyperule sym
+
+maxstricts :: [(SuclSymbol,[Bool])] SuclSymbol -> [Bool]
+maxstricts defs sym = extendfn defs corestricts sym
 
 /*
 >   constrs ((tes,tas,tcs),defs) = tcs
@@ -176,7 +182,7 @@ maxtypeinfo defs sym = extendfn defs coretypeinfo sym
 */
 
 complete :: Cli -> [SuclSymbol] -> Bool
-complete m = mkclicomplete m.typeconstructors (fst o maxtypeinfo m.typerules)
+complete m = mkclicomplete m.typeconstructors (maxtyperule m.typerules)
 
 /*
 >   showcli = printcli
@@ -310,3 +316,19 @@ Compiling clean parts into module information...
 >             ctgraph = updategraph ctroot (fn,[last targs,troot]) tgraph
 
 */
+
+mkcli ::
+    [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]
+    [(SuclSymbol,[Bool])]
+    [SuclSymbol]
+    [(SuclTypeSymbol,[SuclSymbol])]
+    [(SuclSymbol,[Rule SuclSymbol SuclVariable])]
+ -> Cli
+
+mkcli typerules stricts exports constrs bodies
+= { typeconstructors = constrs
+  , exportedsymbols  = exports
+  , typerules        = typerules
+  , stricts          = stricts
+  , rules            = bodies
+  }

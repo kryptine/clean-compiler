@@ -36,10 +36,12 @@ supercompile common_defs array_instances dcl_mods main_dcl_module_n components f
 = (components,fun_defs,dcl_types,used_conses,var_heap,type_heaps,expression_heap)
   where used_conses = abort "supercompile: not implemented"
 		// Determine defined functions
-        _ = cts_function fun_defs
+        (sucl_typerules,sucl_stricts,sucl_bodies,sucl_kinds) = cts_function fun_defs
 		// Determine exported functions
-        _ = cts_exports fun_defs dcl_mods main_dcl_module_n
+        sucl_exports = cts_exports fun_defs dcl_mods main_dcl_module_n
 		// Get constructor lists of algebraic types
-		_ = cts_getconstrs dcl_mods main_dcl_module_n
+		sucl_constrs = cts_getconstrs dcl_mods main_dcl_module_n
+        // Build abstract CLI module
+        sucl_module = mkcli sucl_typerules sucl_stricts sucl_exports sucl_constrs sucl_bodies
         // Convert sucl-generated function body back to core clean
         (expression_heap`,var_heap`,func_body) = stc_funcdef dcl_mods expression_heap var_heap undef

@@ -20,3 +20,12 @@ typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 exports :: Cli -> [SuclSymbol]
 complete :: Cli -> [SuclSymbol] -> Bool
 clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) -> Strategy SuclSymbol var SuclVariable answer | == var
+
+// Build a cli structure
+mkcli ::
+    [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]
+    [(SuclSymbol,[Bool])]
+    [SuclSymbol]
+    [(SuclTypeSymbol,[SuclSymbol])]
+    [(SuclSymbol,[Rule SuclSymbol SuclVariable])]
+ -> Cli
