@@ -565,7 +565,7 @@ where
 				// otherwise
 					= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 	want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
-		# code_allowed  = code_block_allowed token
+		# code_allowed  = token == EqualToken || token == DoubleArrowToken
 		  (token, pState) = nextToken FunctionContext pState
 		| isIclContext parseContext && token == CodeToken
 			# (rhs, pState) = wantCodeRhs pState
@@ -585,10 +585,6 @@ where
 			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
 			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
-	where
-		code_block_allowed token
-			=	token == EqualToken || token == DoubleArrowToken
-
 	check_name_and_fixity No hasprio pState
 		= (erroneousIdent, False, parseError "Definition" No "identifier" pState)
 	check_name_and_fixity (Yes (name,is_infix)) hasprio pState
