@@ -1503,13 +1503,14 @@ optBeautifulizeIdent id_name
 	prefix_to_readable_name "_c"	= "case"
 	prefix_to_readable_name "_g"	= "guard"
 	prefix_to_readable_name "_f"	= "filter"
+	prefix_to_readable_name "_if"	= "if"
 	prefix_to_readable_name "\\"	= "lambda"
 	prefix_to_readable_name prefix
 		| prefix.[0] == 'c'
 			= "comprehension"
 		| prefix.[0] == 'g'
 			= "generator"
-	prefix_to_readable_name _		= abort "fatal error 21 in type.icl"
+	prefix_to_readable_name _		= abort "fatal error 21 in typesupport.icl"
 
 // search for an element in an array
 searchlArrElt p s i
