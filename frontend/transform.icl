@@ -164,6 +164,10 @@ where
 	lift (BasicPatterns type patterns) ls
 		# (patterns, ls) = lift patterns ls
 		= (BasicPatterns type patterns, ls)
+	lift (OverloadedListPatterns type decons_expr patterns) ls
+		# (patterns, ls) = lift patterns ls
+		# (decons_expr, ls) = lift decons_expr ls
+		= (OverloadedListPatterns type decons_expr patterns, ls)
 	lift (DynamicPatterns patterns) ls
 		# (patterns, ls) = lift patterns ls
 		= (DynamicPatterns patterns, ls)
@@ -545,15 +549,13 @@ where
 	unfold (BasicPatterns type patterns) ui us
 		# (patterns, us) = unfold patterns ui us
 		= (BasicPatterns type patterns, us)
+	unfold (OverloadedListPatterns type decons_expr patterns) ui us
+		# (patterns, us) = unfold patterns ui us
+		# (decons_expr, us) = unfold decons_expr ui us
+		= (OverloadedListPatterns type decons_expr patterns, us)
 	unfold (DynamicPatterns patterns) ui us
 		# (patterns, us) = unfold patterns ui us
 		= (DynamicPatterns patterns, us)
-
-instance unfold BasicPattern
-where
-	unfold guard=:{bp_expr} ui us
-		# (bp_expr, us) = unfold bp_expr ui us
-		= ({ guard & bp_expr = bp_expr }, us)
 
 instance unfold AlgebraicPattern
 where
@@ -561,6 +563,12 @@ where
 		# (ap_vars, us) = unfold ap_vars ui us
 		  (ap_expr, us) = unfold ap_expr ui us
 		= ({ guard & ap_vars = ap_vars, ap_expr = ap_expr }, us)
+
+instance unfold BasicPattern
+where
+	unfold guard=:{bp_expr} ui us
+		# (bp_expr, us) = unfold bp_expr ui us
+		= ({ guard & bp_expr = bp_expr }, us)
 
 instance unfold DynamicPattern
 where
@@ -859,10 +867,10 @@ where
 					 es_fun_defs=macro_defs, es_main_dcl_module_n = mod_index, es_dcl_modules=modules,
 					 es_expand_in_imp_module=expand_in_imp_module,es_new_fun_def_numbers=[]
 					  }			
-			# (tb_args, tb_rhs, local_vars, fi_calls, fun_info, {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
-					= expandMacrosInBody [] body predef_symbols_for_transform macro_index es
+			# (tb_args, tb_rhs, local_vars, fi_calls, fi_dynamics,{es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_dcl_modules,es_fun_defs})
+					= expandMacrosInBody [] body fun_info.fi_dynamics predef_symbols_for_transform es
 			# macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
-			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
+			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars, fi_dynamics=fi_dynamics }}
 			= ({ es_fun_defs & [macro_index] = macro }, es_dcl_modules,
 					{ pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_error = es_error })
 			# pi = { pi & pi_deps = [macro_index:pi.pi_deps] }
@@ -1136,10 +1144,10 @@ where
 		  	  identPos = newPosition fun_symb fun_pos
 			# expand_in_imp_module=case fun_kind of FK_ImpFunction _->True; FK_ImpMacro->True; FK_ImpCaf->True; _ -> False
 			  es={ es & es_expand_in_imp_module=expand_in_imp_module, es_error = setErrorAdmin identPos es.es_error }
-			# (tb_args, tb_rhs, fi_local_vars, fi_calls, fun_info, es)
-					= expandMacrosInBody fun_info.fi_calls body predef_symbols_for_transform fun_index es
+			# (tb_args, tb_rhs, fi_local_vars, fi_calls,fi_dynamics, es)
+					= expandMacrosInBody fun_info.fi_calls body fun_info.fi_dynamics predef_symbols_for_transform es
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
-			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
+			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars,fi_dynamics=fi_dynamics }}
 			= {es & es_fun_defs.[fun_index] = fun_def }
 	
 	add_called_macros calls macro_defs_and_pi
@@ -1189,23 +1197,18 @@ where
 			_
 				-> (fun_defs, symbol_table)
 
-expandMacrosInBody :: [.FunCall] CheckedBody PredefSymbolsForTransform !Int *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],/* MV ... */ !FunInfo, /* ... MV */ .ExpandState);
-expandMacrosInBody fi_calls {cb_args,cb_rhs} predef_symbols_for_transform es_current_fun_index es=:{es_symbol_heap,es_fun_defs}
-// MV ...
-	# (fun_def=:{fun_info},es_fun_defs)
-		= es_fun_defs![es_current_fun_index]
-	# (max_index,es_symbol_heap)
-		= determine_amount_of_dynamics 0 fun_info.fi_dynamics es_symbol_heap 
-	# (es=:{es_symbol_table,es_fun_defs})
-		= { es & es_symbol_heap = es_symbol_heap, es_fun_defs = es_fun_defs } 
+expandMacrosInBody :: [.FunCall] CheckedBody ![ExprInfoPtr] PredefSymbolsForTransform *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],![ExprInfoPtr],.ExpandState);
+expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_symbol_heap,es_fun_defs}
+	// MV ..
+    # (max_index,es_symbol_heap)
+    	   = determine_amount_of_dynamics 0 fi_dynamics es_symbol_heap
 	# cos_used_dynamics
 		= createArray (inc max_index) False // means not removed
-// ... MV
-
+	// ... MV
 	# (prev_calls, fun_defs, es_symbol_table)
 			= addFunctionCallsToSymbolTable fi_calls es_fun_defs es_symbol_table
 	  ([rhs:rhss], (all_calls, es) )
-	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, { es & es_fun_defs=fun_defs, es_symbol_table = es_symbol_table })
+	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, { es & es_fun_defs=fun_defs, es_symbol_table = es_symbol_table, es_symbol_heap=es_symbol_heap })
 	  (fun_defs, symbol_table)
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
@@ -1216,15 +1219,12 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} predef_symbols_for_transform es_cur
 	  					cos_predef_symbols_for_transform = predef_symbols_for_transform, cos_used_dynamics = cos_used_dynamics }
 	// MV ...
 	# (changed,fi_dynamics,_,cos_symbol_heap)
-		= foldSt remove_fi_dynamic fun_info.fi_dynamics (False,[],cos_used_dynamics,cos_symbol_heap)
-	# fun_info
-		= if changed { fun_info & fi_dynamics = fi_dynamics } fun_info
-	// ... MV
-	= (new_args, new_rhs, local_vars, all_calls, /* MV ... */ fun_info, /* ... MV */
+		= foldSt remove_fi_dynamic fi_dynamics (False,[],cos_used_dynamics,cos_symbol_heap)
+	= (new_args, new_rhs, local_vars, all_calls,fi_dynamics,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_fun_defs=fun_defs, es_symbol_table = symbol_table })
-//		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
-// MV ...
+	//		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
+	// MV ...
 where
 	remove_fi_dynamic dyn_expr_ptr (changed,accu,cos_used_dynamics,cos_symbol_heap)
 		# (expr_info,cos_symbol_heap)
@@ -1271,16 +1271,15 @@ cMacroIsCalled 		:== True
 cNoMacroIsCalled 	:== False
 */
 
+liftFunctions :: [Int] Int Int *{#FunDef} *(Heap VarInfo) *(Heap ExprInfo) -> .LiftState;
 liftFunctions group group_index main_dcl_module_n fun_defs var_heap expr_heap
 	# (contains_free_vars, lifted_function_called, fun_defs)
 			= foldSt (add_free_vars_of_non_recursive_calls_to_function group_index) group (False, False, fun_defs)
 	| contains_free_vars
 		# fun_defs = iterateSt (add_free_vars_of_recursive_calls_to_functions group_index group) fun_defs
-//		= lift_functions group fun_defs var_heap expr_heap
 		= lift_functions group {ls_x={x_fun_defs=fun_defs,x_main_dcl_module_n=main_dcl_module_n},ls_var_heap=var_heap,ls_expr_heap=expr_heap}
 	| lifted_function_called
 		= lift_functions group {ls_x={x_fun_defs=fun_defs,x_main_dcl_module_n=main_dcl_module_n},ls_var_heap=var_heap,ls_expr_heap=expr_heap}
-//		= (fun_defs, var_heap, expr_heap)
 		= {ls_x={x_fun_defs=fun_defs,x_main_dcl_module_n=main_dcl_module_n},ls_var_heap=var_heap, ls_expr_heap=expr_heap}
 where
 	add_free_vars_of_non_recursive_calls_to_function group_index fun (contains_free_vars, lifted_function_called, fun_defs)
@@ -1337,23 +1336,18 @@ where
 			# (free_var_added, free_vars) = newFreeVariable var free_vars
 			= add_free_global_variables vars (free_var_added || free_vars_added, free_vars)
 
-//	lift_functions group fun_defs var_heap expr_heap
-//		= foldSt lift_function group (fun_defs, var_heap, expr_heap)
 	lift_functions group lift_state
 		= foldSt lift_function group lift_state
 	where
-//		lift_function fun (fun_defs=:{[fun] = fun_def}, var_heap, expr_heap)
 		lift_function fun {ls_x=ls_x=:{x_fun_defs=fun_defs=:{[fun] = fun_def}}, ls_var_heap=var_heap, ls_expr_heap=expr_heap}
 			# {fi_free_vars} = fun_def.fun_info
 			  fun_lifted = length fi_free_vars
 			  (PartioningFunction {cb_args,cb_rhs} fun_number) = fun_def.fun_body
 			  (cb_args, var_heap) = add_lifted_args fi_free_vars cb_args var_heap
-//			  (cb_rhs, {ls_fun_defs,ls_var_heap,ls_expr_heap}) = lift cb_rhs { ls_fun_defs = fun_defs, ls_var_heap = var_heap, ls_expr_heap = expr_heap }
 			  (cb_rhs, {ls_x,ls_var_heap,ls_expr_heap}) = lift cb_rhs { ls_x={ls_x & x_fun_defs = fun_defs}, ls_var_heap = var_heap, ls_expr_heap = expr_heap }
 			  ls_var_heap = remove_lifted_args fi_free_vars ls_var_heap
 			  ls_fun_defs = ls_x.x_fun_defs
 			  ls_fun_defs = { ls_fun_defs & [fun] = { fun_def & fun_lifted = fun_lifted, fun_body = PartioningFunction {cb_args = cb_args, cb_rhs = cb_rhs} fun_number}}
-//			= (ls_fun_defs, ls_var_heap, ls_expr_heap)
 			= {ls_x={ls_x & x_fun_defs=ls_fun_defs}, ls_var_heap=ls_var_heap, ls_expr_heap= ls_expr_heap}
 //				 ---> ("lift_function", fun_def.fun_symb, fi_free_vars, cb_args, cb_rhs)
 
@@ -1499,6 +1493,9 @@ where
 	expand (BasicPatterns type patterns) ei
 		# (patterns, ei) = expand patterns ei
 		= (BasicPatterns type patterns, ei) 
+	expand (OverloadedListPatterns type decons_expr patterns) ei
+		# (patterns, ei) = expand patterns ei
+		= (OverloadedListPatterns type decons_expr patterns, ei) 
 	expand (DynamicPatterns patterns) ei
 		# (patterns, ei) = expand patterns ei
 		= (DynamicPatterns patterns, ei) 
@@ -1787,7 +1784,6 @@ where
 	collectVariables record_selection free_vars cos
 		= (record_selection, free_vars, cos)
 
-
 instance collectVariables [a] | collectVariables a
 where
 	collectVariables [x:xs] free_vars cos
@@ -1833,10 +1829,12 @@ where
 	collectVariables (BasicPatterns type patterns) free_vars cos
 		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
 		= (BasicPatterns type patterns, free_vars, cos)
+	collectVariables (OverloadedListPatterns type decons_expr patterns) free_vars cos
+		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
+		= (OverloadedListPatterns type decons_expr patterns, free_vars, cos)
 	collectVariables (DynamicPatterns patterns) free_vars cos
 		# (patterns, free_vars, cos) = collectVariables patterns free_vars cos
 		= (DynamicPatterns patterns, free_vars, cos)
-
 
 instance collectVariables AlgebraicPattern
 where
