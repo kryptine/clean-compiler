@@ -1289,9 +1289,6 @@ where
 		= (EE, dl_info)
 	distributeLets depth (NoBind ptr) dl_info
 		= (NoBind ptr, dl_info)
-	
-my_zip [] [] = []
-my_zip [x:xs][y:ys] = [(x,y) : my_zip xs ys]
 
 instance distributeLets Case
 where 
@@ -1307,7 +1304,7 @@ where
 		= ({ kees & case_guards = case_guards, case_expr = case_expr, case_default = case_default }, dl_info)
 	where
 		distribute_lets_in_patterns depth ref_counts (AlgebraicPatterns conses patterns) heaps
-			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (my_zip ref_counts patterns) heaps
+			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern depth) (exactZip ref_counts patterns) heaps
 			= (AlgebraicPatterns conses patterns, heaps)
 		where
 			distribute_lets_in_alg_pattern depth (ref_counts,pattern) (di_var_heap, di_expr_heap)
