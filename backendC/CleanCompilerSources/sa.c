@@ -39,14 +39,11 @@
 #include "syntaxtr.t"
 #include "comsupport.h"
 #include "checker.h"
-#include "typechecker.h"
 #include "sa.t"
 #include "sa.h"
 #ifdef _DB_TEST_
 # include "saprint.h"
 #endif
-#include "typechecker.h"
-#include "tctypes.t"
 #include "typeconv.h"
 #include "statesgen.h"
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
