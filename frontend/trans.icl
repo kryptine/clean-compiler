@@ -1436,7 +1436,9 @@ where
 					# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
 					= (symbol_type, fun_defs, fun_heap)
 				# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
-				= (ft_type, fun_defs, fun_heap)
+				  st_args = mapAppend (add_types_of_dictionary ro.ro_common_defs) ft_type.st_context ft_type.st_args
+				= ({ft_type & st_args = st_args, st_arity = length st_args, st_context = [] },
+					fun_defs, fun_heap)
 			get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
 				# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
 				= (symbol_type, fun_defs, fun_heap)
@@ -1895,9 +1897,7 @@ determineProducer _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app
 		= (Var var, writeVarInfo var_info_ptr VI_Empty (writeVarInfo var.var_info_ptr VI_Empty var_heap))
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{symb_kind = SK_Function { glob_module, glob_object }, symb_arity}, app_args} _
 				  new_args prod_index producers ro ti
-	# (fun_arity, is_overloaded, ti) = get_fun_arity glob_module glob_object ro ti
-	| is_overloaded // XXX this restriction (producers must not be overloaded) is just temporary 
-		= (producers, [App app : new_args ], ti)
+	# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
 	| symb_arity<>fun_arity
 		| is_applied_to_macro_fun
 			= ({ producers & [prod_index] = PR_Curried symb}, app_args ++ new_args, ti)
@@ -1916,12 +1916,11 @@ determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{sym
 	get_fun_arity glob_module glob_object ro ti
 		| glob_module <> cIclModIndex
 			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
-			  nr_dictionaries = length st_context
-			= (st_arity+nr_dictionaries, nr_dictionaries>0, ti)
+			= (st_arity+length st_context, ti)
 		// for imported functions you have to add ft_arity and length st_context, but for unimported
 		// functions fun_arity alone is sufficient
-		# ({fun_symb, fun_arity, fun_type=Yes {st_context}}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
-		= (fun_arity, (length st_context)>0, { ti & ti_fun_defs=ti_fun_defs })
+		# ({fun_arity}, ti_fun_defs) = (ti.ti_fun_defs)![glob_object]
+		= (fun_arity, { ti & ti_fun_defs=ti_fun_defs })
 determineProducer is_applied_to_macro_fun linear_bit app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index, symb_arity}, app_args} _
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_fun_def={fun_body, fun_arity, fun_type=Yes symbol_type}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
@@ -2104,12 +2103,12 @@ where
 		# ((st_args,st_result), ets) = expandSynTypes common_defs (st_args,st_result) ets
 		# st_args = mapAppend (add_types_of_dictionary common_defs) st_context st_args
 		= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
-	where
-		add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
-			# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
-			  dict_type_symb = 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
-			= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
-					map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
+
+add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
+	# {class_arity, class_dictionary={ds_ident,ds_index}} = common_defs.[glob_module].com_class_defs.[ds_index]
+	  dict_type_symb = 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
+	= { at_attribute = TA_Multi, at_annotation = AN_Strict, at_type = TA dict_type_symb (
+			map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
 
 instance expandSynTypes Type
 where
