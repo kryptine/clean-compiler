@@ -128,6 +128,50 @@ BELiteralSymbol a0 a1 a2 = code {
 };
 // BESymbolP BELiteralSymbol (BESymbKind kind,CleanString value);
 
+
+BEPredefineListConstructorSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
+BEPredefineListConstructorSymbol a0 a1 a2 a3 a4 a5 = code {
+	ccall BEPredefineListConstructorSymbol "IIIII:V:I"
+};
+// void BEPredefineListConstructorSymbol(int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictnes,int tail_stricness);
+
+BEPredefineListTypeSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
+BEPredefineListTypeSymbol a0 a1 a2 a3 a4 a5 = code {
+	ccall BEPredefineListTypeSymbol "IIIII:V:I"
+};
+// void BEPredefineListTypeSymbol(int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictnes,int tail_stricness);
+
+BEAdjustStrictListConsInstance :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustStrictListConsInstance a0 a1 a2 = code {
+	ccall BEAdjustStrictListConsInstance "II:V:I"
+};
+// void BEAdjustStrictListConsInstance(int functionIndex,int moduleIndex);
+
+BEAdjustUnboxedListDeconsInstance :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustUnboxedListDeconsInstance a0 a1 a2 = code {
+	ccall BEAdjustUnboxedListDeconsInstance "II:V:I"
+};
+// void BEAdjustUnboxedListDeconsInstance(int functionIndex,int moduleIndex);
+
+BEAdjustOverloadedNilFunction :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustOverloadedNilFunction a0 a1 a2 = code {
+	ccall BEAdjustOverloadedNilFunction "II:V:I"
+};
+// void BEAdjustOverloadedNilFunction(int functionIndex,int moduleIndex);
+
+BEOverloadedConsSymbol :: !Int !Int !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+BEOverloadedConsSymbol a0 a1 a2 a3 a4 = code {
+	ccall BEOverloadedConsSymbol "IIII:I:I"
+};
+// BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex);
+
+BEOverloadedPushNode :: !Int !BESymbolP !BEArgP !BENodeIdListP !BENodeP !BackEnd -> (!BENodeP,!BackEnd);
+BEOverloadedPushNode a0 a1 a2 a3 a4 a5 = code {
+	ccall BEOverloadedPushNode "IIIII:I:I"
+};
+// BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENodeIdListP nodeIds,BENodeP decons_node);
+
+
 BEPredefineConstructorSymbol :: !Int !Int !Int !BESymbKind !BackEnd -> BackEnd;
 BEPredefineConstructorSymbol a0 a1 a2 a3 a4 = code {
 	ccall BEPredefineConstructorSymbol "IIII:V:I"

@@ -67,6 +67,22 @@ BEBoolSymbol :: !Bool !BackEnd -> (!BESymbolP,!BackEnd);
 // BESymbolP BEBoolSymbol (int value);
 BELiteralSymbol :: !BESymbKind !String !BackEnd -> (!BESymbolP,!BackEnd);
 // BESymbolP BELiteralSymbol (BESymbKind kind,CleanString value);
+
+BEPredefineListConstructorSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
+// void BEPredefineListConstructorSymbol(int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictnes,int tail_stricness);
+BEPredefineListTypeSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
+// void BEPredefineListTypeSymbol(int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictnes,int tail_stricness);
+BEAdjustStrictListConsInstance :: !Int !Int !BackEnd -> BackEnd;
+// void BEAdjustStrictListConsInstance(int functionIndex,int moduleIndex);
+BEAdjustUnboxedListDeconsInstance :: !Int !Int !BackEnd -> BackEnd;
+// void BEAdjustUnboxedListDeconsInstance(int functionIndex,int moduleIndex);
+BEAdjustOverloadedNilFunction :: !Int !Int !BackEnd -> BackEnd;
+// void BEAdjustOverloadedNilFunction(int functionIndex,int moduleIndex);
+BEOverloadedConsSymbol :: !Int !Int !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+// BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex);
+BEOverloadedPushNode :: !Int !BESymbolP !BEArgP !BENodeIdListP !BENodeP !BackEnd -> (!BENodeP,!BackEnd);
+// BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENodeIdListP nodeIds,BENodeP decons_node);
+
 BEPredefineConstructorSymbol :: !Int !Int !Int !BESymbKind !BackEnd -> BackEnd;
 // void BEPredefineConstructorSymbol (int arity,int constructorIndex,int moduleIndex,BESymbKind symbolKind);
 BEPredefineTypeSymbol :: !Int !Int !Int !BESymbKind !BackEnd -> BackEnd;
