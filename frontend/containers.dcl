@@ -18,6 +18,9 @@ nsFromTo :: !Int -> NumberSet
 	// all numbers from 0 to (i-1)
 bitvectToNumberSet :: !LargeBitvect -> .NumberSet
 
+numberSetToList :: !NumberSet -> [Int]
+
+
 :: LargeBitvect :== {#Int}
 
 bitvectCreate :: !Int -> .LargeBitvect 

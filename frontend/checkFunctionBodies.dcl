@@ -6,11 +6,12 @@ import syntax, checksupport
 
 ::	ExpressionState =
 	{	es_expr_heap	:: !.ExpressionHeap
-	,	es_var_heap		:: !.VarHeap
-	,	es_type_heaps	:: !.TypeHeaps
-	,	es_calls		:: ![FunCall]
-	,	es_dynamics		:: !Dynamics
-	,	es_fun_defs		:: !.{# FunDef}
+	,	es_var_heap			:: !.VarHeap
+	,	es_type_heaps		:: !.TypeHeaps
+	,	es_generic_heap		:: !.GenericHeap
+	,	es_calls			:: ![FunCall]
+	,	es_dynamics			:: ![ExprInfoPtr]
+	,	es_fun_defs			:: !.{# FunDef}
 	}
 	
 ::	ExpressionInput =

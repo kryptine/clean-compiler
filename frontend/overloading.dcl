@@ -30,6 +30,7 @@ import syntax, check, typesupport
 	{	os_type_heaps			:: !.TypeHeaps
 	,	os_var_heap				:: !.VarHeap
 	,	os_symbol_heap			:: !.ExpressionHeap
+	,	os_generic_heap			:: !.GenericHeap
 	,	os_predef_symbols		:: !.PredefinedSymbols
 	,	os_special_instances	:: !.SpecialInstances
 	,	os_error				:: !.ErrorAdmin				

@@ -23,7 +23,7 @@ from type_io import openTclFile, closeTclFile, baseName, directoryName, splitBy
 	,	searchPaths:: SearchPaths
 	,	listTypes :: ListTypesOption
 	,	compile_for_dynamics	:: !Bool
-	,	support_generics :: !Bool
+	,	support_generics 		:: !Bool
 	,	compile_with_fusion		:: !Bool
 	,	compile_with_generics   :: !Bool
 	}
@@ -38,9 +38,9 @@ InitialCoclOptions =
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
 	,	compile_for_dynamics	= False
-	, 	support_generics = False
+	, 	support_generics 		= True	//???
 	,	compile_with_fusion		= False
-	,	compile_with_generics 	= False
+	,	compile_with_generics 	= True
 	}
 
 :: DclCache = {
@@ -53,7 +53,7 @@ InitialCoclOptions =
 
 empty_cache :: *SymbolTable -> *DclCache
 empty_cache symbol_heap
-	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}}
+	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}, hp_generic_heap = newHeap}
 	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
 	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
 

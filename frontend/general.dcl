@@ -14,6 +14,8 @@ instance <<< (a,b) | <<< a & <<< b
 instance <<< (a,b,c) | <<< a & <<< b & <<< c
 instance <<< (a,b,c,d) | <<< a & <<< b & <<< c & <<< d
 instance <<< (a,b,c,d,e) | <<< a & <<< b & <<< c & <<< d & <<< e
+instance <<< (a,b,c,d,e,f) | <<< a & <<< b & <<< c & <<< d & <<< e & <<< f
+instance <<< (a,b,c,d,e,f,g) | <<< a & <<< b & <<< c & <<< d & <<< e & <<< f & <<< g
 instance <<< [a] | <<< a
 
 ::	Bind a b =

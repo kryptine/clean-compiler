@@ -4,7 +4,7 @@
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
-		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics
+		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics1
 
 //import print
 
@@ -81,8 +81,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			select_and_remove_icl_functions_from_record :: !*IclModule -> (!.{#FunDef},!.IclModule)
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
-	# {icl_global_functions,icl_instances,icl_specials,icl_common,icl_import,icl_name,icl_imported_objects,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
-/*
+	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_import,icl_name,icl_imported_objects,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
+/**/
 	  (_,f,files) = fopen "components" FWriteText files
 	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
 	/*	
@@ -93,11 +93,12 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	  (ok,files) = fclose f files
 	| ok<>ok
 		= abort "";
-*/
+/**/
 
 //	# dcl_mods = {{dcl_mod & dcl_declared={dcls_import={},dcls_local=[],dcls_local_for_import={},dcls_explicit={}}}\\ dcl_mod<-:dcl_mods}
 
 	# var_heap = heaps.hp_var_heap
+	  gen_heap = heaps.hp_generic_heap
 	  type_heaps = heaps.hp_type_heaps
 	  fun_defs = icl_functions
 
@@ -124,30 +125,30 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 */
 	  (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
-	# (fun_defs, dcl_mods, td_infos, th_vars, error_admin)
+	# (fun_defs, dcl_mods, td_infos, th_vars, gen_heap, error_admin)
 			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers icl_global_functions
-				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars error_admin
+				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars gen_heap error_admin
 
       type_heaps = { type_heaps & th_vars = th_vars }
 
-	# heaps = { heaps & hp_type_heaps = type_heaps }
+	# heaps = { heaps & hp_type_heaps = type_heaps, hp_generic_heap = gen_heap }
 	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
 		with 
 			dcl_common_defs :: .{#DclModule} -> .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading
 			dcl_common_defs dcl_mods
 				=	{dcl_common \\ {dcl_common} <-: dcl_mods }
 
-	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
+	#! (ti_common_defs, components, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
 		SwitchGenerics
 			(case options.feo_generics of
 				True -> 
 					convertGenerics
-							components main_dcl_module_n ti_common_defs fun_defs td_infos 
+							main_dcl_module_n icl_used_module_numbers ti_common_defs components fun_defs td_infos 
 							heaps hash_table predef_symbols dcl_mods error_admin
 				False -> 
-					(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+					(ti_common_defs, components, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
 			)
-			(components, ti_common_defs, fun_defs, {ir_to=0,ir_from=0}, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
+			(ti_common_defs, components, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
 	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
 		with 
 			copied_ti_common_defs :: .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
@@ -178,7 +179,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			
 
 	# (fun_def_size, fun_defs) = usize fun_defs
-	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") (icl_global_functions++icl_instances++[icl_specials, generic_range])
+	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") (icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges)
 		
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (components, fun_defs, out)	= showComponents components 0 True fun_defs out
@@ -195,7 +196,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 //	  (components, fun_defs, error)	= showComponents components 0 True fun_defs error
 
 	| options.feo_up_to_phase == FrontEndPhaseConvertDynamics
-		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
+		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap, hp_generic_heap=newHeap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
@@ -217,7 +218,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion
 
 	| options.feo_up_to_phase == FrontEndPhaseTransformGroups
-		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
+		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
@@ -227,7 +228,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
 	| options.feo_up_to_phase == FrontEndPhaseConvertModules
-		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
+		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
@@ -250,10 +251,12 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 */
 //	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
-	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps}
+	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
 	# 	fe ={	fe_icl =
 //							 {icl_mod & icl_functions=fun_defs }
-							 {icl_functions=fun_defs,icl_global_functions=icl_global_functions,icl_instances=icl_instances,icl_specials=icl_specials,icl_common=icl_common,icl_import=icl_import,
+							 {icl_functions=fun_defs,icl_global_functions=icl_global_functions,icl_instances=icl_instances,icl_specials=icl_specials,
+							 icl_common=icl_common,icl_import=icl_import,
+							 icl_gencases = icl_gencases ++ generic_ranges,
 							 icl_name=icl_name,icl_imported_objects=icl_imported_objects,icl_used_module_numbers=icl_used_module_numbers,
 							 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time}
 
@@ -261,6 +264,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			,	fe_components = components
 			,	fe_arrayInstances = array_instances
 			}
+
 	= (Yes fe,cached_dcl_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps)
 	where
 		copy_dcl_modules dcl_mods

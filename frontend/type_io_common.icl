@@ -82,17 +82,6 @@ where
 	toString (GTT_Constructor type_symb_indent mod_name)	= create_type_string type_symb_indent.type_name.id_name mod_name
 //	 +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ mod_name) "")
 
-instance toString BasicType
-where
-	toString BT_Int 		= "Int"
-	toString BT_Char		= "Char"
-	toString BT_Real		= "Real"
-	toString BT_Bool		= "Bool"
-	toString BT_Dynamic		= "Dynamic"
-	toString BT_File		= "File"
-	toString BT_World		= "World"
-	toString (BT_String _)	= "String"
-
 create_type_string type_name module_name
 	:== type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) "")
 

@@ -655,6 +655,7 @@ where
 		
 	bind_attribute (TA_Var {av_info_ptr}) attr th_attrs
 		= th_attrs <:= (av_info_ptr, AVI_Attr attr)
+			---> ("typesupport 1 writePtr av_info_ptr", ptrToInt av_info_ptr, attr)
 	bind_attribute _ _ th_attrs
 		= th_attrs
 

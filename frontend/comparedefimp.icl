@@ -11,6 +11,7 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare, compile
 type_def_error		= "type definition in the impl module conflicts with the def module"
 class_def_error		= "class definition in the impl module conflicts with the def module"
 instance_def_error	= "instance definition in the impl module conflicts with the def module"
+generic_def_error		= "generic definition in the impl module conflicts with the def module"
 
 compareError message pos error_admin
 	= popErrorAdmin (checkError "" message (pushErrorAdmin pos error_admin))
@@ -159,6 +160,27 @@ where
 			= (icl_instance_defs, { comp_st & comp_error = comp_error })
 //				---> ("compare_instance_defs", dcl_instance_def.ins_ident, dcl_instance_def.ins_type, icl_instance_def.ins_ident, icl_instance_def.ins_type)
 		  
+
+compareGenericDefs :: !{# Int} !{#Bool} !{# GenericDef} !u:{# GenericDef} !*CompareState -> (!u:{# GenericDef}, !*CompareState)
+compareGenericDefs dcl_sizes copied_from_dcl dcl_generic_defs icl_generic_defs comp_st
+	# nr_of_dcl_generics = dcl_sizes.[cGenericDefs]
+	= iFoldSt (compare_generic_defs copied_from_dcl dcl_generic_defs) 0 nr_of_dcl_generics (icl_generic_defs, comp_st)
+where
+	compare_generic_defs :: !{#Bool} !{# GenericDef} !Index (!u:{# GenericDef}, !*CompareState) -> (!u:{# GenericDef}, !*CompareState)
+	compare_generic_defs copied_from_dcl dcl_generic_defs generic_index (icl_generic_defs, comp_st)
+		| not copied_from_dcl.[generic_index]
+			# dcl_generic_def = dcl_generic_defs.[generic_index]
+			  (icl_generic_def, icl_generic_defs) = icl_generic_defs![generic_index]
+			  
+			# (ok1, comp_st) = compare dcl_generic_def.gen_type icl_generic_def.gen_type comp_st
+			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st			
+			| ok1 && ok2 
+				= (icl_generic_defs, comp_st)
+				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_name icl_generic_def.gen_pos) comp_st.comp_error
+				= (icl_generic_defs, { comp_st & comp_error = comp_error })
+		| otherwise
+			= (icl_generic_defs, comp_st)
+		
 
 class compare a :: !a !a !*CompareState -> (!Bool, !*CompareState)
 
@@ -384,13 +406,14 @@ compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=Yes macr
 //		&& Trace_array macro_defs.[main_dcl_module_n]
 
 	# {dcl_functions,dcl_macros,dcl_common} = main_dcl_module
-	  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs}}
+	  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs,copied_generic_defs}}
 			= icl_module
 	  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
 	  		= heaps
 	  { com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
 		com_selector_defs=icl_com_selector_defs, com_class_defs = icl_com_class_defs,
-		com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
+		com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs,
+		com_generic_defs=icl_com_generic_defs}
 			= icl_common
 	  comp_st
 	  	=	{	comp_type_var_heap	= th_vars
@@ -408,6 +431,11 @@ compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=Yes macr
 	  (icl_com_instance_defs, comp_st)
 	  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs comp_st
 
+	  (icl_com_generic_defs, comp_st)
+	  		= compareGenericDefs 
+	  			main_dcl_module.dcl_sizes copied_generic_defs 
+	  			dcl_common.com_generic_defs icl_com_generic_defs comp_st
+
 	  {	comp_type_var_heap = th_vars, comp_attr_var_heap = th_attrs, comp_error = error_admin } = comp_st
 
 	  tc_state
@@ -424,9 +452,10 @@ compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=Yes macr
 	  icl_common
 	  		= { icl_common & com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
 	  			com_selector_defs=icl_com_selector_defs, com_class_defs=icl_com_class_defs,
-	  			com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs }
-	  heaps
-	  		= { hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap,
+	  			com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs,
+	  			com_generic_defs=icl_com_generic_defs }
+	  heaps 
+	  		= { heaps & hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap,
 	  			hp_type_heaps = { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}}
 	= ({ icl_module & icl_common = icl_common, icl_functions = icl_functions },macro_defs,heaps, error_admin )
 

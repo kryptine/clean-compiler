@@ -77,8 +77,6 @@ LowLevelInterfaceModule			:== "StdDynamicLowLevelInterface"
  
 instance toString GlobalTCType
 
-instance toString BasicType
-
 create_type_string type_name module_name
 	:== type_name +++ (APPEND_DEFINING_TYPE_MODULE_NAMES_TO_TYPE_NAMES ("'" +++ module_name ) "")
 

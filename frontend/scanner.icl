@@ -193,6 +193,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ErrorToken String		//		an error has occured
 
 	| 	GenericToken			//		generic
+	| 	DeriveToken				//		derive
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
 
@@ -813,6 +814,7 @@ CheckEveryContext s input
 	"class" 	->	(ClassToken			, input)
 	"instance"	->	(InstanceToken		, input)
 	"generic" 	->	(GenericToken		, input)
+	"derive"	-> 	(DeriveToken		, input)
 	"otherwise"	->	(OtherwiseToken		, input)
 	"!"			->	(ExclamationToken	, input)
 	"*/"		->	(ErrorToken "Unexpected end of comment, */", input)

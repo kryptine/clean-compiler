@@ -20,6 +20,8 @@ import predef, syntax, StdCompare, compare_constructor
 				| IC_Field !Ident
 				| IC_Selector
 				| IC_Instance ![Type]
+				| IC_Generic
+				| IC_GenericCase !Type
 				| IC_Unknown
 
 :: BoxedIdent = {boxed_ident::!Ident}
@@ -46,6 +48,8 @@ where
 			= Smaller
 		compare_types _ []
 			= Greater
+	(=<) (IC_GenericCase type1) (IC_GenericCase type2)
+		= type1 =< type2
 	(=<) (IC_Field typ_id1) (IC_Field typ_id2)
 		= typ_id1 =< typ_id2
 	(=<) ic1 ic2

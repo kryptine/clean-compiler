@@ -107,6 +107,7 @@ instance <<< FilePosition
 	|	ErrorToken String		//		if an error occured
 
 	| 	GenericToken			//		generic	
+	| 	DeriveToken				//		derive
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
 

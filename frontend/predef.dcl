@@ -155,10 +155,10 @@ PD_ModuleConsSymbol			:== 176
 /* Generics */
 PD_StdGeneric				:== 177
 
-PD_TypeISO					:== 178
-PD_ConsISO					:== 179
-PD_iso_to					:== 180
-PD_iso_from					:== 181
+PD_TypeBimap				:== 178
+PD_ConsBimap				:== 179
+PD_map_to					:== 180
+PD_map_from					:== 181
 
 PD_TypeUNIT					:== 182
 PD_ConsUNIT					:== 183
@@ -167,25 +167,11 @@ PD_ConsLEFT					:== 185
 PD_ConsRIGHT				:== 186
 PD_TypePAIR					:== 187
 PD_ConsPAIR					:== 188
-PD_TypeARROW				:== 189
-PD_ConsARROW				:== 190
 
-PD_TypeConsDefInfo			:== 191 
-PD_ConsConsDefInfo			:== 192
-PD_TypeTypeDefInfo			:== 193 
-PD_ConsTypeDefInfo			:== 194
-PD_cons_info				:== 195
-PD_TypeCONS					:== 196
-PD_ConsCONS					:== 197
+PD_GenericBimap				:== 189
+PD_bimapId					:== 190
 
-PD_isomap_ARROW_			:== 198
-PD_isomap_ID				:== 199
-
-PD_TypeType					:== 200
-PD_ConsTypeApp				:== 201
-PD_ConsTypeVar				:== 202
-
-PD_NrOfPredefSymbols		:== 203
+PD_NrOfPredefSymbols		:== 191
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

@@ -26,6 +26,7 @@ cNeedStdStrictLists :== 16
 	{	hp_var_heap			::!.VarHeap
 	,	hp_expression_heap	::!.ExpressionHeap
 	,	hp_type_heaps		::!.TypeHeaps
+	,	hp_generic_heap		::!.GenericHeap
 	}
 
 ::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![IdentPos], ea_ok :: !Bool }
@@ -42,11 +43,12 @@ cSelectorDefs			:== 2
 cClassDefs				:== 3
 cMemberDefs				:== 4
 cGenericDefs			:== 5
-cInstanceDefs			:== 6
-cFunctionDefs			:== 7
-cMacroDefs				:== 8
+cGenericCaseDefs		:== 6
+cInstanceDefs			:== 7
+cFunctionDefs			:== 8
+cMacroDefs				:== 9
 
-cConversionTableSize	:== 9
+cConversionTableSize	:== 10
 
 instance toInt STE_Kind
 where
@@ -55,6 +57,7 @@ where
 	toInt (STE_Field _)				= cSelectorDefs
 	toInt STE_Class					= cClassDefs
 	toInt STE_Generic				= cGenericDefs
+	toInt STE_GenericCase			= cGenericCaseDefs
 	toInt STE_Member				= cMemberDefs
 	toInt (STE_Instance _)			= cInstanceDefs
 	toInt STE_DclFunction			= cFunctionDefs
@@ -71,6 +74,7 @@ where
 	,	com_member_defs		:: !.{# MemberDef}
 	,	com_instance_defs	:: !.{# ClassInstance}
 	,	com_generic_defs	:: !.{# GenericDef} // AA
+	,	com_gencase_defs 	:: !.{# GenericCaseDef} // AA
 	}
 
 ::	Declarations = {
@@ -96,6 +100,7 @@ where
 ::	CopiedDefinitions =
 	{	copied_type_defs	:: {#Bool}
 	,	copied_class_defs	:: {#Bool}
+	,	copied_generic_defs :: {#Bool}
 	}
 	
 ::	IclModule  =
@@ -104,6 +109,7 @@ where
 	,	icl_global_functions	:: ![IndexRange]
 	,	icl_instances			:: ![IndexRange]
 	,	icl_specials			:: !IndexRange
+	,	icl_gencases			:: ![IndexRange]
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
@@ -120,6 +126,7 @@ where
 	,	dcl_instances		:: !IndexRange
 	,	dcl_macros			:: !IndexRange
 	,	dcl_specials		:: !IndexRange
+	,	dcl_gencases		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
 	,	dcl_sizes			:: !{# Int}
 	,	dcl_dictionary_info	:: !DictionaryInfo

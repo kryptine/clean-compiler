@@ -48,7 +48,8 @@ instance == FunctionOrMacroIndex
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
-				| STE_Generic			// AA: For generic declarations
+				| STE_Generic			// AA
+				| STE_GenericCase   // AA
 				| STE_Instance !Ident // the class (for explicit imports (1.3 syntax only))
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -116,9 +117,10 @@ instance == FunctionOrMacroIndex
 	,	def_macro_indices	:: !IndexRange
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
-	,	def_generics		:: ![GenericDef] // AA
 	,	def_funtypes		:: ![FunType]
 	,	def_instances		:: ![instance_kind]
+	,	def_generics		:: ![GenericDef] 		// AA
+	, 	def_generic_cases 	:: ![GenericCaseDef]	// AA	
 	}
 
 ::	LocalDefs = LocalParsedDefs [ParsedDefinition] | CollectedLocalDefs CollectedLocalDefs
@@ -165,11 +167,13 @@ cIsNotAFunction :== False
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
 	|	PD_Class ClassDef [ParsedDefinition]
-	|	PD_Generic GenericDef // AA
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
+	|	PD_Generic GenericDef // AA
+	| 	PD_GenericCase GenericCaseDef // AA	
+	|	PD_Derive [GenericCaseDef] // AA
 	|	PD_Erroneous
 
 ::	StrictnessList = NotStrict | Strict !Int | StrictList !Int StrictnessList
@@ -206,7 +210,6 @@ cNameLocationDependent :== True
 	,	pi_pos		:: !Position
 	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
-	,	pi_generate  :: !Bool // AA: instance is to be generated
 	}
 
 
@@ -277,15 +280,54 @@ cNameLocationDependent :== True
 
 // AA.. 
 ::	GenericDef = 
-	{	gen_name		:: !Ident	// the generics name in IC_Class 
-	,	gen_member_name	:: !Ident	// the generics name in IC_Member
-	,	gen_type		:: !GenericType
+	{	gen_name		:: !Ident		// the generics name in IC_Class 
+	,	gen_member_name	:: !Ident		// the generics name in IC_Member
 	, 	gen_pos			:: !Position
-	,	gen_kinds_ptr	:: !TypeVarInfoPtr		// hack: contains all used kinds 
-	,	gen_cons_ptr 	:: !TypeVarInfoPtr		// hack: cons instance function
-	, 	gen_classes		:: !GenericClassInfos 	// generated classes
-	,	gen_isomap		:: !DefinedSymbol		// isomap function
+	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
+	,	gen_vars		:: ![TypeVar]	// Generic type variables
+	,	gen_info_ptr	:: !GenericInfoPtr
+	, 	gen_bimap		:: !DefinedSymbol 	// fun def index of the bimap for the generic type 
 	}
+
+:: GenericClassInfo = 
+	{	gci_kind	:: !TypeKind	// the kind
+	,	gci_module 	:: !Index		// filled with main_module_index
+	,	gci_class	:: !Index		// class_index in the main module
+	,	gci_member	:: !Index 		// the class member index 
+	}
+:: GenericClassInfos :== {[GenericClassInfo]}
+
+:: GenericInfo = 
+	{	gen_classes		:: !GenericClassInfos
+	,	gen_cases		:: ![GlobalIndex]
+	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
+	, 	gen_star_case	:: !GlobalIndex 	// general case for kind-star types
+	}
+:: GenericInfoPtr :== Ptr GenericInfo	
+:: GenericHeap :== Heap GenericInfo
+
+:: TypeCons 
+	= TypeConsSymb TypeSymbIdent
+	| TypeConsBasic BasicType 
+	| TypeConsArrow
+	| TypeConsVar TypeVar 
+
+:: GenericCaseDef = 
+	{	gc_name			:: !Ident				// name in IC_GenricInstance namespace
+	,	gc_gname		:: !Ident  				// name in IC_Generic namespace
+	,	gc_generic		:: !GlobalIndex  		// index of the generic
+	,	gc_arity		:: !Int					// number of value arguments
+	,	gc_pos			:: !Position			// position in the source file
+	,	gc_type			:: !Type				// the type argument
+	,   gc_type_cons	:: !TypeCons			// type constructor of the type argument
+	,	gc_body			:: !GenericCaseBody		// the body function or NoIndex
+	,	gc_kind			:: !TypeKind			// kind of the instance type
+	}
+:: GenericCaseBody 
+	= GCB_None 
+	| GCB_FunIndex !Index 
+	| GCB_FunDef !FunDef 
+	| GCB_ParsedBody ![ParsedExpr] !Rhs 
 
 :: GenericType = 
 	{	gt_type 		:: !SymbolType
@@ -293,12 +335,7 @@ cNameLocationDependent :== True
 	,	gt_arity		:: !Int					// number of generic arguments	
 	}
 
-:: GenericClassInfo = 
-	{	gci_kind 	:: !TypeKind
-	,	gci_class	:: !DefinedSymbol
-	}
-:: GenericClassInfos :== [GenericClassInfo] 	 
-
+/*
 getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
 getGenericClassForKind	{gen_classes} kind
 	= get_class gen_classes kind
@@ -319,7 +356,7 @@ addGenericKind generic_def=:{gen_name, gen_classes} kind
 		,	ds_arity = 1
 		}
 	= {generic_def & gen_classes = [{gci_kind = kind, gci_class = class_ds}:gen_classes]} 	
-
+*/
 // ..AA
 
 ::	InstanceType =
@@ -336,10 +373,7 @@ addGenericKind generic_def=:{gen_name, gen_classes} kind
 	,	ins_members		:: !{# DefinedSymbol}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
-	,	ins_is_generic	:: !Bool			//AA 
-	, 	ins_generate	:: !Bool			//AA
-	,	ins_partial		:: !Bool			//AA
-	,	ins_generic		:: !Global Index	//AA
+	,	ins_generated	:: !Bool // AA
 	}
 
 ::	Import from_symbol =
@@ -400,6 +434,7 @@ cIsAbstractType			:== 8
 	{	gi_module	::!Int
 	,	gi_index	::!Int
 	}
+NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}	
 
 instance == GlobalIndex
 where
@@ -485,6 +520,7 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 					| TransformedBody !TransformedBody
 					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| BackendBody ![BackendBody]
+					| GeneratedBody // the body will be generated automatically - for generics
 					| NoBody
 					
 ::	BackendBody =
@@ -883,6 +919,7 @@ cNotVarNumber :== -1
 					| TVI_Kind !TypeKind
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
+					| TVI_Expr !Expression	/* AA: Expression corresponding to the type var during generic specialization */
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
@@ -935,7 +972,7 @@ cNotVarNumber :== -1
 
 ::	BasicValue	= BVI !String | BVInt !Int |BVC !String | BVB !Bool | BVR !String | BVS !String
 
-::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle | KindError
 
 ::	PatternVar =
 	{	pv_var		:: !FreeVar
@@ -985,7 +1022,16 @@ cNotVarNumber :== -1
 	,	tdi_cons_vars		:: ![Int]
 	,	tdi_index_in_group	:: !Index
 	,	tdi_classification	:: !TypeClassification
+	,	tdi_mark			:: !Bool //AA
+	,	tdi_gen_rep			:: !Optional GenericTypeRep //AA
 	}
+
+// AA..
+:: GenericTypeRep = 
+	{ gtr_type :: AType				// generic structure type
+	, gtr_iso  :: DefinedSymbol		// the conversion isomorphism
+	}
+// ..AA
 
 ::	TypeDefInfos :== {# .{# TypeDefInfo}}
 
@@ -1319,16 +1365,19 @@ instance needs_brackets a
 where
 	needs_brackets _ = False
 
+instance toString BasicType  where
+	toString BT_Int = "Int"
+	toString BT_Char = "Char"
+	toString BT_Real = "Real"
+	toString BT_Bool = "Bool"
+	toString (BT_String _) = "String"
+	toString BT_Dynamic = "Dynamic"
+	toString BT_File = "File"
+	toString BT_World = "World"
+	
 instance <<< BasicType
 where
-	(<<<) file BT_Int			= file <<< "Int"
-	(<<<) file BT_Char			= file <<< "Char"
-	(<<<) file BT_Real			= file <<< "Real"
-	(<<<) file BT_Bool			= file <<< "Bool"
-/*	(<<<) file (BT_String _)	= file <<< "String" */
-	(<<<) file BT_Dynamic		= file <<< "Dynamic"
-	(<<<) file BT_File			= file <<< "File"
-	(<<<) file BT_World			= file <<< "World"
+	(<<<) file bt			= file <<< toString bt
 
 instance <<< TypeVar
 where
@@ -1349,6 +1398,13 @@ instance <<< AType
 where
 	(<<<) file {at_attribute,at_type}
 		= file <<< at_attribute <<< at_type
+
+instance <<< TypeCons 
+where
+	(<<<) file (TypeConsSymb name) = file <<< name
+	(<<<) file (TypeConsBasic basic_type) = file <<< basic_type
+	(<<<) file TypeConsArrow = file <<< "(->)"
+	(<<<) file (TypeConsVar tv) = file <<< tv
 
 instance <<< TypeAttribute
 where
@@ -1575,7 +1631,10 @@ instance <<< Expression
 where
 	(<<<) file (Var ident) = file <<< ident
 	(<<<) file (App {app_symb, app_args, app_info_ptr})
-		= file <<< app_symb <<< ' ' <<< app_args
+		= case app_symb.symb_kind of
+			SK_Generic _ kind 
+				->  file <<< app_symb <<< kind <<< ' ' <<< app_args
+			_ 	-> file <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
 	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
 			= write_binds "" (write_binds "!" (file <<< "let" <<< '\n') let_strict_binds) let_lazy_binds <<< "in\n" <<< let_expr
@@ -1781,6 +1840,10 @@ where
 	(<<<) file FK_Caf = file <<< "FK_Caf"
 	(<<<) file FK_Unknown = file <<< "FK_Unknown"
 
+instance <<< FunType 
+where
+	(<<<) file {ft_symb,ft_type} = file <<< ft_symb <<< "::" <<< ft_type
+
 instance <<< FunDef
 where
 	(<<<) file {fun_symb,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< ' ' <<< bodies 
@@ -1806,7 +1869,9 @@ where
 	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< " = " <<< tb_rhs <<< '\n'
 	(<<<) file (BackendBody body) = file <<< body <<< '\n'
 	(<<<) file (Expanding vars) = file <<< "E " <<< vars 
+	(<<<) file GeneratedBody = file <<< "Generic function\n"
 	(<<<) file NoBody = file <<< "Array function\n"
+	
 
 instance <<< FunCall
 where
@@ -1843,7 +1908,6 @@ where
 					= write_signs (file <<< '+') (sc_pos_vect bitand (bitnot index_bit)) sc_neg_vect (inc index)
 					= write_signs (file <<< 'T') (sc_pos_vect bitand (bitnot index_bit)) (sc_neg_vect bitand (bitnot index_bit)) (inc index)
 
-// AA..
 instance toString TypeKind
 where
 	toString (KindVar _) 		= "**"
@@ -1853,8 +1917,6 @@ where
 		to_string []		= "??????" 
 		to_string [k]		= toString k  
 		to_string [k:ks]	= (toString k) +++ "->" +++ (to_string ks)
-
-// ..AA
 
 				
 instance <<< TypeKind
@@ -1921,6 +1983,10 @@ where
 			= write_data_defs (file <<< d <<< '\n') ds
 */
 
+instance <<< GenericClassInfo 
+where
+	(<<<) file {gci_kind, gci_class} = file <<< gci_kind <<< ":" <<< gci_class 
+
 instance <<< InstanceType
 where
 	(<<<) file it = write_contexts it.it_context (file <<< it.it_types) 
@@ -1981,6 +2047,9 @@ where
 	(<<<) file (PD_NodeDef  _ pattern rhs) = file <<< pattern <<< " =: " <<< rhs
 	(<<<) file (PD_TypeSpec _ name prio st sp) = file <<< name <<< st
 	(<<<) file (PD_Type td) = file <<< td
+	(<<<) file (PD_Generic {gen_name}) = file <<< "generic " <<< gen_name
+	(<<<) file (PD_GenericCase {gc_name,gc_type_cons}) = file <<< gc_name <<< "{|" <<< gc_type_cons <<< "|}"
+	 
 	(<<<) file _ = file
 
 instance <<< Rhs
@@ -2027,14 +2096,35 @@ instance <<< TypeVarInfo
 where
 	(<<<) file TVI_Empty				= file <<< "TVI_Empty"
 	(<<<) file (TVI_Type _)				= file <<< "TVI_Type"
+	(<<<) file (TVI_TypeVar ptr)		= file <<< (ptrToInt ptr) 
 	(<<<) file (TVI_Forward	_) 			= file <<< "TVI_Forward"
-	(<<<) file (TVI_TypeKind _)			= file <<< "TVI_TypeKind"
 	(<<<) file (TVI_SignClass _ _ _) 	= file <<< "TVI_SignClass"
+	(<<<) file (TVI_Attribute ta) 		= file <<< "TVI_Attribute " <<< ta
+	(<<<) file (TVI_CorrespondenceNumber n) = file <<< "TVI_CorrespondenceNumber " <<< n
+	(<<<) file (TVI_AType at) 			= file <<< "TVI_AType " <<< at
+	(<<<) file TVI_Used					= file <<< "TVI_Used"
+	(<<<) file (TVI_TypeCode	_)		= file <<< "TVI_TypeCode"
+	(<<<) file (TVI_CPSLocalTypeVar	_)	= file <<< "TVI_CPSLocalTypeVar"		
+	(<<<) file (TVI_Kinds _)		= file <<< "TVI_Kinds"
+	(<<<) file (TVI_TypeKind _)			= file <<< "TVI_TypeKind"
 	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
 	(<<<) file (TVI_TypeKind kind_info_ptr) = file <<< "TVI_TypeKind " <<< (ptrToInt kind_info_ptr)
 	(<<<) file (TVI_Kind kind) 			= file <<< "TVI_Kind" <<< kind
-	
+	(<<<) file (TVI_Expr expr) 			= file <<< "TVI_Expr " <<< expr
 
+instance <<< AttrVarInfo
+where
+	(<<<) file AVI_Empty				= file <<< "AVI_Empty"
+	(<<<) file (AVI_Attr attr)			= file <<< "AVI_Attr " <<< attr
+	(<<<) file (AVI_AttrVar av_info_ptr) = file <<< "AVI_AttrVar " <<< ptrToInt av_info_ptr
+	(<<<) file (AVI_Forward temp_attr_id) = file <<< "AVI_Forward " <<< temp_attr_id 
+	(<<<) file (AVI_CorrespondenceNumber n) = file <<< "AVI_CorrespondenceNumber " <<< n
+	(<<<) file AVI_Used					= file <<< "AVI_Used"
+	(<<<) file (AVI_Count n) 			= file <<< "AVI_Count " <<< n
+	(<<<) file (AVI_SequenceNumber n) 	= file <<< "AVI_SequenceNumber " <<< n
+	(<<<) file AVI_Collected 			= file <<< "AVI_Collected"
+
+	
 instance <<< (Import from_symbol) | <<< from_symbol
 where
 	(<<<) file {import_module, import_symbols}
@@ -2104,6 +2194,9 @@ where
 	(<<<) file
 		STE_Generic
 			= file <<< "STE_Generic"
+	(<<<) file
+		STE_GenericCase
+			= file <<< "STE_GenericCase"
 // ..AA
 	(<<<) file
 		(STE_Field _)
@@ -2196,7 +2289,7 @@ abort_empty_SymbolTableEntry = abort "empty SymbolTableEntry"
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_mark=False, tdi_gen_rep = No }
 
 MakeTypeVar name :== { tv_name = name, tv_info_ptr = nilPtr }
 MakeVar name :== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
@@ -2241,12 +2334,8 @@ ParsedConstructorToConsDef pc :==
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
  		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
- 					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, 
- 		/*AA*/
-  		ins_is_generic = False, 
- 		ins_generate = pi.pi_generate,
- 		ins_partial = False, 
- 		ins_generic = {glob_module = NoIndex, glob_object = NoIndex}}
+ 					 it_context = pi.pi_context }, 
+ 		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, ins_generated = False}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
 	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,

@@ -3,7 +3,7 @@ implementation module overloading
 import StdEnv
 
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
-import generics, compilerSwitches, type_io_common
+import genericsupport, compilerSwitches, type_io_common
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 
@@ -61,6 +61,7 @@ import generics, compilerSwitches, type_io_common
 	{	os_type_heaps			:: !.TypeHeaps
 	,	os_var_heap				:: !.VarHeap
 	,	os_symbol_heap			:: !.ExpressionHeap
+	,	os_generic_heap			:: !.GenericHeap
 	,	os_predef_symbols		:: !.PredefinedSymbols
 	,	os_special_instances	:: !.SpecialInstances
 	,	os_error				:: !.ErrorAdmin				
@@ -764,9 +765,9 @@ tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os d
 	| os.os_error.ea_ok
 		# (contexts, os_var_heap) = foldSt add_spec_contexts ocs (contexts, os.os_var_heap)
 		  (contexts, os_type_heaps) = remove_super_classes contexts os.os_type_heaps
-		  ({ hp_var_heap, hp_expression_heap, hp_type_heaps}, dict_types) = foldSt (convert_dictionaries defs contexts) reduced_contexts
-		  					({ hp_var_heap = os_var_heap, hp_expression_heap = os.os_symbol_heap, hp_type_heaps = os_type_heaps}, [])
-		= (contexts, coercion_env, type_pattern_vars, dict_types, { os & os_type_heaps = hp_type_heaps, os_symbol_heap = hp_expression_heap, os_var_heap = hp_var_heap} )
+		  ({ hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap}, dict_types, os_error) = foldSt (convert_dictionaries defs contexts) reduced_contexts
+		  					({ hp_var_heap = os_var_heap, hp_expression_heap = os.os_symbol_heap, hp_type_heaps = os_type_heaps,hp_generic_heap=os.os_generic_heap}, [], os.os_error)
+		= (contexts, coercion_env, type_pattern_vars, dict_types, { os & os_type_heaps = hp_type_heaps, os_symbol_heap = hp_expression_heap, os_var_heap = hp_var_heap, os_generic_heap = hp_generic_heap, os_error = os_error} )
 		= ([], coercion_env, type_pattern_vars, [], os)
 where
 	reduce_contexts defs instance_info (opt_spec_contexts, expr_ptrs, pos, index) rc_state
@@ -827,12 +828,12 @@ where
 			= context
 			= [tc : context]
 
-	convert_dictionaries :: !{# CommonDefs } ![TypeContext] !(!SymbIdent,!Index,!ExprInfoPtr,![ClassApplication]) !(!*Heaps,!DictionaryTypes) -> (!*Heaps,!DictionaryTypes)
-	convert_dictionaries defs contexts (oc_symbol, index, over_info_ptr, class_applications) (heaps, dict_types)
-		# (heaps, ptrs) = convertOverloadedCall defs contexts oc_symbol over_info_ptr class_applications (heaps, [])
+	convert_dictionaries :: !{# CommonDefs } ![TypeContext] !(!SymbIdent,!Index,!ExprInfoPtr,![ClassApplication]) !(!*Heaps,!DictionaryTypes, !*ErrorAdmin) -> (!*Heaps,!DictionaryTypes, !*ErrorAdmin)
+	convert_dictionaries defs contexts (oc_symbol, index, over_info_ptr, class_applications) (heaps, dict_types, error)
+		# (heaps, ptrs, error) = convertOverloadedCall defs contexts oc_symbol over_info_ptr class_applications (heaps, [], error)
 		| isEmpty ptrs
-			= (heaps, dict_types)
-			= (heaps, add_to_dict_types index ptrs dict_types)
+			= (heaps, dict_types, error)
+			= (heaps, add_to_dict_types index ptrs dict_types, error)
 	
 	add_to_dict_types index ptrs []
 		= [(index, ptrs)]
@@ -851,12 +852,12 @@ getDictionaryTypeAndConstructor {glob_module, glob_object = {ds_ident,ds_index}}
 	  (RecordType {rt_constructor}) = defs.[glob_module].com_type_defs.[class_dictionary.ds_index].td_rhs
 	= (class_dictionary, rt_constructor)
 
-convertOverloadedCall :: !{#CommonDefs} ![TypeContext] !SymbIdent !ExprInfoPtr ![ClassApplication] !(!*Heaps, ![ExprInfoPtr]) -> (!*Heaps, ![ExprInfoPtr])
-convertOverloadedCall defs contexts {symb_name,symb_kind = SK_OverloadedFunction {glob_module,glob_object}} expr_ptr [class_appl:class_appls] heaps_and_ptrs
+convertOverloadedCall :: !{#CommonDefs} ![TypeContext] !SymbIdent !ExprInfoPtr ![ClassApplication] !(!*Heaps, ![ExprInfoPtr],!*ErrorAdmin) -> (!*Heaps, ![ExprInfoPtr],!*ErrorAdmin)
+convertOverloadedCall defs contexts {symb_name,symb_kind = SK_OverloadedFunction {glob_module,glob_object}} expr_ptr [class_appl:class_appls] (heaps,ptrs,error)
 	# mem_def = defs.[glob_module].com_member_defs.[glob_object]
-	  (class_exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts class_appls heaps_and_ptrs
+	  (class_exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
 	  (inst_expr, (heaps, ptrs)) = adjust_member_application defs contexts  mem_def class_appl class_exprs heaps_and_ptrs
-	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_ptr, inst_expr)}, ptrs)
+	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_ptr, inst_expr)}, ptrs, error)
 where
 	adjust_member_application defs contexts {me_symb,me_offset,me_class} (CA_Instance red_contexts) class_exprs heaps_and_ptrs
 		# ({glob_module,glob_object}, red_contexts) = find_instance_of_member me_class me_offset red_contexts
@@ -885,20 +886,23 @@ where
 			= find_instance_of_member me_class me_offset {rcs & rcs_constraints_contexts = rcs_constraints_contexts ++ rcss}
 		find_instance_of_member_in_constraints me_class me_offset []
 			= abort "Error in module overloading: find_instance_of_member_in_constraints\n"
-// AA..			
-convertOverloadedCall defs contexts symbol=:{symb_kind = SK_Generic gen_glob kind} expr_ptr class_appls heaps_and_ptrs
-	# (found, member_glob) = getGenericMember gen_glob kind defs
-	| not found
-		= abort "convertOverloadedCall: no class for kind"	
- 		=  convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls heaps_and_ptrs  				
+// AA..	
+convertOverloadedCall defs contexts symbol=:{symb_name, symb_kind = SK_Generic gen_glob kind} expr_ptr class_appls (heaps, expr_info_ptrs, error)
+	#! (opt_member_glob, hp_generic_heap) = getGenericMember gen_glob kind defs heaps.hp_generic_heap
+	#! heaps = { heaps & hp_generic_heap = hp_generic_heap }
+	= case opt_member_glob of		
+		No 
+			# error = checkError ("no generic instances of " +++ toString symb_name +++ " for kind") kind error
+			-> (heaps, expr_info_ptrs, error)	
+ 		Yes member_glob -> convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls (heaps, expr_info_ptrs, error)  				
 // ..AA
 
-convertOverloadedCall defs contexts {symb_name,symb_kind = SK_TypeCode} expr_info_ptr class_appls heaps_and_ptrs
-	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls heaps_and_ptrs
-	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs)
-convertOverloadedCall defs contexts {symb_name} expr_info_ptr appls heaps_and_ptrs
-	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls heaps_and_ptrs
-	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_Context class_expressions)}, ptrs)
+convertOverloadedCall defs contexts {symb_name,symb_kind = SK_TypeCode} expr_info_ptr class_appls (heaps, ptrs, error)
+	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
+	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs, error)
+convertOverloadedCall defs contexts {symb_name} expr_info_ptr appls (heaps,ptrs, error)
+	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
+	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_Context class_expressions)}, ptrs, error)
 
 
 expressionToTypeCodeExpression (TypeCodeExpression texpr) 			= texpr
@@ -1166,7 +1170,7 @@ where
 						# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 						-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
 					_
-						-> abort ("determine_class_argument 1 (overloading.icl)")//  <<- var_info)
+						-> abort ("determine_class_argument 1 (overloading.icl)")  //<<- var_info)
 
 			VI_Empty
 				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap

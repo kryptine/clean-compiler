@@ -326,15 +326,15 @@ where
 CS_Checked	:== 1
 CS_Checking	:== 0
 
-checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int)) !*{# CheckedTypeDef} !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
-	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*VarHeap, !*TypeHeaps, !*CheckState)
-checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs modules var_heap type_heaps cs
+checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int)) !*{# CheckedTypeDef} !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*Heaps !*CheckState
+	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*Heaps, !*CheckState)
+checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs modules heaps=:{hp_type_heaps,hp_var_heap} cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
-	   ti = { ti_type_heaps = type_heaps, ti_var_heap = var_heap, ti_used_types = [] }
+	   ti = { ti_type_heaps = hp_type_heaps, ti_var_heap = hp_var_heap, ti_used_types = [] }
 	   ({ts_type_defs,ts_cons_defs, ts_selector_defs, ts_modules}, {ti_var_heap,ti_type_heaps}, cs)
 	  		= iFoldSt (check_type_def module_index opt_icl_info) 0 nr_of_types (ts, ti, cs)
-	= (ts_type_defs, ts_cons_defs, ts_selector_defs, ts_modules, ti_var_heap, ti_type_heaps, cs)
+	= (ts_type_defs, ts_cons_defs, ts_selector_defs, ts_modules, {heaps& hp_var_heap=ti_var_heap, hp_type_heaps=ti_type_heaps}, cs)
 where
 	check_type_def module_index opt_icl_info type_index (ts, ti, cs)
 		| has_to_be_checked module_index opt_icl_info type_index
@@ -371,6 +371,11 @@ determineAttributeVariable attr_var=:{av_name=attr_name=:{id_info}} oti=:{oti_he
 		= ({ attr_var & av_info_ptr = attr_ptr}, oti, symbol_table)
 
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
+instance toString DemandedAttributeKind where
+	toString DAK_Ignore = "DAK_Ignore"
+	toString DAK_Unique = "DAK_Unique"
+	toString DAK_None = "DAK_None"
+	
 
 newAttribute :: !DemandedAttributeKind {#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute, !*OpenTypeInfo, !*CheckState)
 newAttribute DAK_Ignore var_name attr oti cs

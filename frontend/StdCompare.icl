@@ -117,6 +117,11 @@ where
 instance == SignClassification where
 	(==) sc1 sc2 = sc1.sc_pos_vect == sc2.sc_pos_vect && sc1.sc_neg_vect == sc2.sc_neg_vect
 
+instance == TypeCons where
+	(==) (TypeConsSymb x) (TypeConsSymb y) = x == y 
+	(==) (TypeConsBasic x) (TypeConsBasic y) = x == y 
+	(==) TypeConsArrow TypeConsArrow = True
+
 ::	CompareValue :== Int
 Smaller :== -1
 Greater	:== 1

@@ -155,10 +155,10 @@ PD_ModuleConsSymbol			:== 176
 /* Generics */
 PD_StdGeneric				:== 177
 
-PD_TypeISO					:== 178
-PD_ConsISO					:== 179
-PD_iso_to					:== 180
-PD_iso_from					:== 181
+PD_TypeBimap				:== 178
+PD_ConsBimap				:== 179
+PD_map_to					:== 180
+PD_map_from					:== 181
 
 PD_TypeUNIT					:== 182
 PD_ConsUNIT					:== 183
@@ -167,25 +167,11 @@ PD_ConsLEFT					:== 185
 PD_ConsRIGHT				:== 186
 PD_TypePAIR					:== 187
 PD_ConsPAIR					:== 188
-PD_TypeARROW				:== 189
-PD_ConsARROW				:== 190
 
-PD_TypeConsDefInfo			:== 191 
-PD_ConsConsDefInfo			:== 192
-PD_TypeTypeDefInfo			:== 193 
-PD_ConsTypeDefInfo			:== 194
-PD_cons_info				:== 195
-PD_TypeCONS					:== 196
-PD_ConsCONS					:== 197
+PD_GenericBimap				:== 189
+PD_bimapId					:== 190
 
-PD_isomap_ARROW_			:== 198
-PD_isomap_ID				:== 199
-
-PD_TypeType					:== 200
-PD_ConsTypeApp				:== 201
-PD_ConsTypeVar				:== 202
-
-PD_NrOfPredefSymbols		:== 203
+PD_NrOfPredefSymbols		:== 191
 
 (<<=) infixl
 (<<=) symbol_table val
@@ -296,9 +282,11 @@ predefined_idents
 					[PD_TypeID] = i "T_ypeID",
 					[PD_ModuleID] = i "ModuleID",
 				
-					[PD_StdGeneric] = i "StdGeneric",
-					[PD_TypeISO] = i "ISO",
-					[PD_ConsISO] = i "_ISO",
+					[PD_StdGeneric] = i "StdGeneric2",
+					[PD_TypeBimap] = i "Bimap",
+					[PD_ConsBimap] = i "_Bimap",
+					[PD_map_to] = i "map_to",
+					[PD_map_from] = i "map_from",
 					[PD_TypeUNIT] = i "UNIT",
 					[PD_ConsUNIT] = i "UNIT",
 					[PD_TypeEITHER] = i "EITHER",
@@ -306,30 +294,15 @@ predefined_idents
 					[PD_ConsRIGHT] = i "RIGHT",
 					[PD_TypePAIR] = i "PAIR",
 					[PD_ConsPAIR] = i "PAIR",
-					[PD_TypeARROW] = i "ARROW",
-					[PD_ConsARROW] = i "ARROW",
-					[PD_isomap_ARROW_] = i "isomap_ARROW_",
-					[PD_isomap_ID] = i "isomap_ID",
-					[PD_TypeConsDefInfo] = i "ConsDefInfo",
-					[PD_ConsConsDefInfo] = i "_ConsDefInfo",
-					[PD_TypeTypeDefInfo] = i "TypeDefInfo",
-					[PD_ConsTypeDefInfo] = i "_TypeDefInfo",
-					[PD_TypeCONS] = i "CONS",
-					[PD_ConsCONS] = i "CONS",
-					[PD_cons_info] = i "CONS_INFO",
-					[PD_TypeType] = i "Type",
-					[PD_ConsTypeApp] = i "TypeApp",
-					[PD_ConsTypeVar] = i "TypeVar",
-				
+					[PD_GenericBimap] = i "bimap",
+					[PD_bimapId] = i "bimapId",
+									
 					[PD_StdMisc] = i "StdMisc",
 					[PD_abort] = i "abort",
 					[PD_undef] = i "undef",
 					
 					[PD_Start] = i "Start",
-				
-					[PD_iso_from] = i "iso_from",
-					[PD_iso_to] = i "iso_to",
-				
+								
 					[PD_DynamicType] = i "type",
 					[PD_DynamicValue] = i "value"
 		}
@@ -462,41 +435,29 @@ where
 					<<- (local_predefined_idents,			IC_Expression, PD_ModuleID)
 
 					<<- (local_predefined_idents,			IC_Module, 		PD_StdGeneric)
-					<<- (local_predefined_idents,					IC_Type, 		PD_TypeISO)
-					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsISO)					
+					<<- (local_predefined_idents,				IC_Type, 		PD_TypeBimap)
+					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsBimap)	
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeUNIT)
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsUNIT)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeEITHER)
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsLEFT)
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsRIGHT)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypePAIR)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsPAIR)					
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeARROW)
-					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsARROW)										
-					<<- (local_predefined_idents,		IC_Expression, 	PD_isomap_ARROW_)										
-					<<- (local_predefined_idents,			IC_Expression, 	PD_isomap_ID)										
-					<<- (local_predefined_idents,			IC_Type, 		PD_TypeConsDefInfo)					
-					<<- (local_predefined_idents,		IC_Expression,	PD_ConsConsDefInfo)					
-					<<- (local_predefined_idents,			IC_Type, 		PD_TypeTypeDefInfo)					
-					<<- (local_predefined_idents,		IC_Expression,	PD_ConsTypeDefInfo)					
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeCONS)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsCONS)					
-					<<- (local_predefined_idents,			IC_Expression, 	PD_cons_info)										
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeType)										
-					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsTypeApp)										
-					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsTypeVar)										
-
+					<<- (local_predefined_idents,				IC_Expression,	PD_ConsPAIR)	
+					<<- (local_predefined_idents,				IC_Generic,		PD_GenericBimap)	
+					<<- (local_predefined_idents,				IC_Expression,	PD_bimapId)	
+									
 					<<- (local_predefined_idents,				IC_Module, 		PD_StdMisc)
 					<<- (local_predefined_idents,				IC_Expression, 	PD_abort)
 					<<- (local_predefined_idents,				IC_Expression, 	PD_undef)					
 					
 					<<- (local_predefined_idents,				IC_Expression, PD_Start)
 
-		# type_iso_ident = local_predefined_idents.[PD_TypeISO]
-		# hash_table= hash_table 
-					<<- (local_predefined_idents, IC_Field type_iso_ident, PD_iso_from)
-					<<- (local_predefined_idents, IC_Field type_iso_ident, PD_iso_to)
-
+		# bimap_type = local_predefined_idents.[PD_TypeBimap]
+		# hash_table = hash_table 
+					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
+					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_from)
+					
 		# dynamic_temp_ident = local_predefined_idents.[PD_DynamicTemp]
 		# hash_table = hash_table 
 					<<- (local_predefined_idents, IC_Field dynamic_temp_ident, PD_DynamicType)
@@ -577,7 +538,8 @@ buildPredefinedModule pre_def_symbols
 						def_constructors = [cons_def,strict_cons_def,unboxed_cons_def,tail_strict_cons_def,strict_tail_strict_cons_def,unboxed_tail_strict_cons_def,overloaded_cons_def,
 											nil_def,strict_nil_def,unboxed_nil_def,tail_strict_nil_def,strict_tail_strict_nil_def,unboxed_tail_strict_nil_def,overloaded_nil_def : cons_defs],
 						def_selectors = [], def_classes = [class_def],
-			def_macro_indices= { ir_from = 0, ir_to = 0 },def_macros=[],def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [], def_generics = [] }}, pre_def_symbols)
+			def_macro_indices= { ir_from = 0, ir_to = 0 },def_macros=[],def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [], 
+			def_generics = [], def_generic_cases = []}}, pre_def_symbols)
 where
 
 	add_tuple_defs pre_mod_id tup_arity type_defs cons_defs pre_def_symbols

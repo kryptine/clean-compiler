@@ -40,7 +40,8 @@ instance == FunctionOrMacroIndex
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
-				| STE_Generic			// AA: For generic declarations
+				| STE_Generic			// AA
+				| STE_GenericCase  // AA
 				| STE_Instance !Ident // argument: the class (used in explicitimports (1.3 syntax only))
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -115,9 +116,10 @@ instance == FunctionOrMacroIndex
 	,	def_macro_indices	:: !IndexRange
 	,	def_classes			:: ![ClassDef]
 	,	def_members			:: ![MemberDef]
-	,	def_generics		:: ![GenericDef]
 	,	def_funtypes		:: ![FunType]
 	,	def_instances		:: ![instance_kind]
+	,	def_generics		:: ![GenericDef] // AA
+	, 	def_generic_cases 	:: ![GenericCaseDef]	 // AA	
 	}
 
 ::	LocalDefs	= LocalParsedDefs [ParsedDefinition]
@@ -167,11 +169,13 @@ cIsNotAFunction :== False
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
 	|	PD_Class ClassDef [ParsedDefinition]
-	|	PD_Generic GenericDef
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
+	|	PD_Generic GenericDef // AA
+	| 	PD_GenericCase GenericCaseDef // AA	
+	|	PD_Derive [GenericCaseDef] // AA
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -208,7 +212,6 @@ cNameLocationDependent :== True
 	,	pi_pos		:: !Position
 	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
-	,	pi_generate  :: !Bool // AA: instance is to be generated
 	}
 
 /*
@@ -282,16 +285,55 @@ cNameLocationDependent :== True
 
 // AA ... 
 
-::	GenericDef = 
-	{	gen_name		:: !Ident				// the generics name in the IC_Class
-	,	gen_member_name	:: !Ident				// the generics name in the IC_Member
-	,	gen_type		:: !GenericType
+:: GenericDef = 
+	{	gen_name		:: !Ident		// the generics name in IC_Class 
+	,	gen_member_name	:: !Ident		// the generics name in IC_Member
 	, 	gen_pos			:: !Position
-	,	gen_kinds_ptr	:: !TypeVarInfoPtr		// hack: contains all used kinds 
-	,	gen_cons_ptr 	:: !TypeVarInfoPtr		// hack: cons instance function
-	, 	gen_classes		:: !GenericClassInfos 	// generated classes
-	,	gen_isomap		:: !DefinedSymbol		// isomap function
+	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
+	,	gen_vars		:: ![TypeVar]	// Generic type variables
+	,	gen_info_ptr	:: !GenericInfoPtr
+	, 	gen_bimap		:: !DefinedSymbol 	// fun def index of the bimap for the generic type 
 	}
+
+:: GenericClassInfo = 
+	{	gci_kind	:: !TypeKind	// the kind
+	,	gci_module 	:: !Index		// filled with main_module_index
+	,	gci_class	:: !Index		// class_index in the main module
+	,	gci_member	:: !Index 		// the class member index 
+	}
+:: GenericClassInfos :== {[GenericClassInfo]}
+
+:: GenericInfo = 
+	{	gen_classes		:: !GenericClassInfos
+	,	gen_cases		:: ![GlobalIndex] 
+	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
+	, 	gen_star_case	:: !GlobalIndex 	// general case for kind-star types
+	}
+:: GenericInfoPtr :== Ptr GenericInfo	
+:: GenericHeap :== Heap GenericInfo
+
+:: TypeCons 
+	= TypeConsSymb TypeSymbIdent 
+	| TypeConsBasic BasicType 
+	| TypeConsArrow
+	| TypeConsVar TypeVar 
+
+:: GenericCaseDef = 
+	{	gc_name			:: !Ident				// name in IC_GenricCase namespace
+	,	gc_gname		:: !Ident  				// name in IC_Generic namespace
+	,	gc_generic		:: !GlobalIndex  		// index of the generic
+	,	gc_arity		:: !Int					// arity of the function
+	,	gc_pos			:: !Position			// position in the source file
+	,	gc_type			:: !Type				// the instance type
+	,   gc_type_cons	:: !TypeCons			// type constructor of the type argument
+	,	gc_body			:: !GenericCaseBody		// the body function or NoIndex
+	,	gc_kind			:: !TypeKind			// kind of the instance type
+	}
+:: GenericCaseBody 
+	= GCB_None 									// to be generated
+	| GCB_FunIndex !Index 
+	| GCB_FunDef !FunDef 
+	| GCB_ParsedBody ![ParsedExpr] !Rhs 
 
 :: GenericType = 
 	{	gt_type 		:: !SymbolType
@@ -299,14 +341,9 @@ cNameLocationDependent :== True
 	,	gt_arity		:: !Int					// number of generic arguments	
 	}
 	
-:: GenericClassInfo = 
-	{	gci_kind 	:: !TypeKind
-	,	gci_class	:: !DefinedSymbol
-	}
-:: GenericClassInfos :== [GenericClassInfo] 	 
 
-getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
-addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
+//getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
+//addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
 
 // ... AA
 
@@ -324,10 +361,7 @@ addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
 	,	ins_members		:: !{# DefinedSymbol}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
-	,	ins_is_generic	:: !Bool				//AA 
-	, 	ins_generate	:: !Bool				//AA
-	,	ins_partial		:: !Bool				//AA
-	,	ins_generic		:: !Global Index		//AA 	
+	,	ins_generated	:: !Bool				//AA 
 	}
 
 /*
@@ -395,6 +429,7 @@ cIsAnalysed				:== 4
 	{	gi_module	::!Int
 	,	gi_index	::!Int
 	}
+NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}	
 
 ::	TypeDef type_rhs =
  	{	td_name			:: !Ident
@@ -418,7 +453,16 @@ cIsAnalysed				:== 4
 	,	tdi_cons_vars		:: ![Int]
 	,	tdi_index_in_group	:: !Index
 	,	tdi_classification	:: !TypeClassification
+	,	tdi_mark			:: !Bool //AA
+	,	tdi_gen_rep 		:: !Optional GenericTypeRep //AA
 	}
+
+// AA..
+:: GenericTypeRep = 
+	{ gtr_type :: AType				// generic structure type
+	, gtr_iso  :: DefinedSymbol		// the conversion isomorphism
+	}
+// ..AA
 
 ::	TypeDefInfos :== {# .{# TypeDefInfo}}
 
@@ -495,6 +539,7 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 					| TransformedBody !TransformedBody
 					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| BackendBody ![BackendBody]
+					| GeneratedBody // the body will be generated automatically - for generics
 					| NoBody
 					
 ::	BackendBody =
@@ -900,6 +945,7 @@ cNonRecursiveAppl	:== False
 					| TVI_Kind !TypeKind
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
+					| TVI_Expr !Expression	/* AA: Expression corresponding to the type var during generic specialization */
 					
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
@@ -951,7 +997,7 @@ cNonRecursiveAppl	:== False
 
 ::	BasicValue	= BVI !String | BVInt !Int |BVC !String | BVB !Bool | BVR !String | BVS !String
 
-::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle | KindError
 
 instance toString 	TypeKind
 instance <<< 		TypeKind
@@ -1299,12 +1345,19 @@ cNotALineNumber :== -1
 
 instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
-			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
+			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar
+			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
+			 TypeSymbIdent,
+			 TypeCons,
+			 IndexRange,
+			 FunType,
+			 GenericClassInfo
 
 instance <<< FunctionBody
+
+instance toString BasicType
 
 instance == TypeAttribute
 instance == Annotation
@@ -1321,7 +1374,7 @@ EmptySymbolTableEntryCAF :: BoxedSymbolTableEntry
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_mark=False, tdi_gen_rep = No }
 
 MakeTypeVar name	:== { tv_name = name, tv_info_ptr = nilPtr }
 MakeVar name		:== { var_name = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
@@ -1361,9 +1414,8 @@ ParsedConstructorToConsDef pc :==
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
  		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
- 					 it_context = pi.pi_context }, ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, 
- 		ins_is_generic = False, ins_generate = pi.pi_generate, ins_partial = False, 
- 		ins_generic = {glob_module = NoIndex, glob_object = NoIndex}}
+ 					 it_context = pi.pi_context }, 
+ 		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos, ins_generated = False}
 
 MakeTypeDef name lhs rhs attr contexts pos  :== 
 	{	td_name = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,

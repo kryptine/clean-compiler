@@ -15,7 +15,7 @@ instance =< Type, SymbIdent
 
 instance == BasicType, TypeVar, AttributeVar, AttrInequality, TypeSymbIdent, DefinedSymbol, 
 			TypeContext , BasicValue, FunKind, (Global a) | == a, Priority, Assoc, Type, 
-			ConsVariable, SignClassification
+			ConsVariable, SignClassification, TypeCons
 
 instance < MemberDef
 

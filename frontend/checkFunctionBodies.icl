@@ -14,11 +14,12 @@ cEndWithSelection		:== False
 
 ::	ExpressionState =
 	{	es_expr_heap	:: !.ExpressionHeap
-	,	es_var_heap		:: !.VarHeap
-	,	es_type_heaps	:: !.TypeHeaps
-	,	es_calls		:: ![FunCall]
-	,	es_dynamics		:: !Dynamics
-	,	es_fun_defs		:: !.{# FunDef}
+	,	es_var_heap			:: !.VarHeap
+	,	es_type_heaps		:: !.TypeHeaps
+	,	es_generic_heap		:: !.GenericHeap
+	,	es_calls			:: ![FunCall]
+	,	es_dynamics			:: ![ExprInfoPtr]
+	,	es_fun_defs			:: !.{# FunDef}
 	}
 
 ::	ExpressionInput =
@@ -308,8 +309,11 @@ where
 		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (Var { var_name = fv_name, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
 
+checkFunctionBodies  GeneratedBody function_ident_for_errors e_input e_state e_info cs
+	= (GeneratedBody, [], e_state, e_info, cs)
+		//---> ("checkFunctionBodies: function to derive ", function_ident_for_errors)
 checkFunctionBodies  _ function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap, es_fun_defs} e_info cs
-	= abort ("checkFunctionBodies "+++toString function_ident_for_errors)
+	= abort ("checkFunctionBodies " +++ toString function_ident_for_errors +++ "\n")
 
 
 removeLocalsFromSymbolTable :: !Index !Level ![Ident] !LocalDefs !Int !*{#FunDef} !*{#*{#FunDef}} !*(Heap SymbolTableEntry)
@@ -329,11 +333,11 @@ checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index,ei_l
 	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index rhs_locals ei_local_functions_index_offset e_state e_info cs
 	  (es_fun_defs, e_info, heaps, cs)
 	  		= checkLocalFunctions ei_mod_index ei_expr_level rhs_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
-	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
+	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps, hp_generic_heap = e_state.es_generic_heap } cs
 	  (rhs_expr, free_vars, e_state, e_info, cs) 
 	  		= check_opt_guarded_alts free_vars rhs_alts { e_input & ei_expr_level = ei_expr_level }
 	  			{ e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap, es_expr_heap = heaps.hp_expression_heap,
-					es_type_heaps = heaps.hp_type_heaps } e_info cs
+					es_type_heaps = heaps.hp_type_heaps,es_generic_heap=heaps.hp_generic_heap } e_info cs
 	  (expr, free_vars, e_state, e_info, cs)
 			= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs expr e_input e_state e_info cs
@@ -414,10 +418,11 @@ where
 				= checkRhssAndTransformLocalDefs free_vars loc_defs seq_let_expr e_input { e_state & es_expr_heap = es_expr_heap} e_info cs
 	  	  (es_fun_defs, e_info, heaps, cs)
 	  	  		= checkLocalFunctions ei_mod_index rhs_expr_level ewl_locals ei_local_functions_index_offset e_state.es_fun_defs e_info 
-	  	  		{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
+	  	  		{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps,hp_generic_heap=e_state.es_generic_heap } cs
 		  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index this_expr_level var_env ewl_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	  	= (expr, free_vars, {e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap,
-	  			es_expr_heap = heaps.hp_expression_heap, es_type_heaps = heaps.hp_type_heaps }, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table} )
+	  			es_expr_heap = heaps.hp_expression_heap, es_type_heaps = heaps.hp_type_heaps, es_generic_heap=heaps.hp_generic_heap},
+	  		{e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table} )
 	
 	remove_seq_let_vars level [] symbol_table
 		= symbol_table
@@ -457,14 +462,14 @@ where
 		  (src_expr, free_vars, e_state, e_info, cs)
 				= addArraySelections loc_array_patterns src_expr free_vars e_input e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs src_expr e_input e_state e_info cs
-		  (es_fun_defs, e_info, {hp_var_heap,hp_expression_heap,hp_type_heaps}, cs)
+		  (es_fun_defs, e_info, {hp_var_heap,hp_expression_heap,hp_type_heaps,hp_generic_heap}, cs)
 				= checkLocalFunctions ei_mod_index ei_expr_level ndwl_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
-	  				{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
+	  				{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps,hp_generic_heap=e_state.es_generic_heap} cs
 	  	  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index ei_expr_level loc_env ndwl_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 		  (pattern, accus, {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern bind_dst No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = True } ([], []) 
 					{ps_var_heap = hp_var_heap,ps_fun_defs = es_fun_defs } {e_info & ef_macro_defs=macro_defs} { cs & cs_symbol_table = cs_symbol_table }
-		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,es_fun_defs = ps_fun_defs }
+		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,es_generic_heap=hp_generic_heap,es_fun_defs = ps_fun_defs }
 		= (src_expr, pattern, accus, free_vars, e_state, e_info, popErrorAdmin cs)
 	
 	build_sequential_lets :: ![(![LetBind],![LetBind])] !Expression !Position !*ExpressionHeap -> (!Position, !Expression, !*ExpressionHeap)
@@ -606,11 +611,12 @@ checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_leve
 	  (expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs expr e_input e_state e_info cs
 	  (es_fun_defs, e_info, heaps, cs)
 			= checkLocalFunctions ei_mod_index ei_expr_level let_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
-	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps } cs
+	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps, hp_generic_heap = e_state.es_generic_heap } cs
 	  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index ei_expr_level var_env let_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	= (expr, free_vars,
 		{ e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap, es_expr_heap = heaps.hp_expression_heap,
-			es_type_heaps = heaps.hp_type_heaps }, {e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table })
+			es_type_heaps = heaps.hp_type_heaps,es_generic_heap = heaps.hp_generic_heap }, 
+		{e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table })
 
 checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info cs
 	# (pattern_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
@@ -1187,13 +1193,14 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 
 		add_kind :: !Index !TypeKind !u:{#GenericDef} !*ExpressionState 
 			-> (!u:{#GenericDef}, !*ExpressionState)			
-		add_kind generic_index kind generic_defs e_state=:{es_type_heaps=es_type_heaps=:{th_vars}}
-			#! (generic_def=:{gen_kinds_ptr}, generic_defs) = generic_defs ! [generic_index]
-			#! (TVI_Kinds kinds, th_vars) = readPtr gen_kinds_ptr th_vars			
-			#! kinds = eqMerge [kind] kinds  
-			#! th_vars = writePtr gen_kinds_ptr (TVI_Kinds kinds) th_vars
-			#! e_state = { e_state & es_type_heaps = {es_type_heaps & th_vars = th_vars}}
-			= (generic_defs, e_state) 									 
+		add_kind generic_index kind generic_defs e_state=:{es_generic_heap}
+		/*			
+			#! ({gen_info_ptr}, generic_defs) = generic_defs ! [generic_index]
+			#! (gen_info, es_generic_heap) = readPtr gen_info_ptr es_generic_heap						
+			#! gen_kinds = eqMerge [(kind,NoIndex)] gen_info.gen_kinds   
+			#! es_generic_heap = writePtr gen_info_ptr {gen_info&gen_kinds=gen_kinds} es_generic_heap
+		*/	
+			= (generic_defs, {e_state & es_generic_heap = es_generic_heap}) 									 
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl, line 868)" // <<- expr
 

@@ -3,7 +3,7 @@ implementation module type
 import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
 import compilerSwitches
-import generics // AA
+import genericsupport // AA
 
 ::	TypeInput =
 	{	ti_common_defs	:: !{# CommonDefs }
@@ -18,6 +18,7 @@ import generics // AA
 	,	ts_var_heap			:: !.VarHeap 
 	,	ts_type_heaps		:: !.TypeHeaps
 	,	ts_expr_heap		:: !.ExpressionHeap 
+	,	ts_generic_heap		:: !.GenericHeap
 	,	ts_td_infos			:: !.TypeDefInfos
 	,	ts_cons_variables	:: ![TempVarId]
 	,	ts_exis_variables	:: ![(CoercionPosition, [TempAttrId])]
@@ -570,8 +571,12 @@ freshConsVariable {tv_info_ptr} type_var_heap
 					-> TempCV temp_var_id
 				TempQV temp_var_id
 					-> TempQCV temp_var_id
-				TV var
+				TV var		
 					-> CV var
+				_ 	
+					-> abort "type.icl: to_constructor_variable, fresh_type\n" ---> fresh_type		
+		to_constructor_variable tvi 
+			= abort "type.icl: to_constructor_variable, tvi\n" ---> tvi
 
 instance freshCopy AType
 where 	
@@ -884,6 +889,7 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 							-> (inc attr_store, [attr_store : exis_variables], [av_info_ptr : bound_attr_vars], attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)))
 						AVI_Attr (TA_TempVar _)
 							-> (attr_store, exis_variables, bound_attr_vars, attr_heap)
+						_ -> (abort "invalid av_info") ---> ("freshSymbolType av_info", var, av_info)	
 				fresh_attr attr state
 					= state
 				
@@ -1235,16 +1241,20 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 		_
 			-> abort ("getSymbolType SK_LocalMacroFunction: "+++toString symb_name+++" " +++toString glob_object)
 //			-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
-getSymbolType pos ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}} n_app_args ts
+getSymbolType pos ti=:{ti_common_defs} { symb_kind = SK_OverloadedFunction {glob_module,glob_object}} n_app_args ts
 	# {me_symb, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
 	  (fun_type_copy, ts) = determineSymbolTypeOfFunction pos me_symb n_app_args me_type me_type_ptr ti_common_defs ts
 	= (fun_type_copy, [], ts)
 // AA..	
-getSymbolType pos ti=:{ti_common_defs} symbol=:{symb_kind = SK_Generic gen_glob kind} n_app_args ts
-	# (found, member_glob) = getGenericMember gen_glob kind ti_common_defs
-	| not found
-		= abort "getSymbolType: no class for kind"	
- 		= getSymbolType pos ti {symbol & symb_kind = SK_OverloadedFunction member_glob} n_app_args ts
+getSymbolType pos ti=:{ti_common_defs} symbol=:{symb_name, symb_kind = SK_Generic gen_glob kind} n_app_args ts
+	# (opt_member_glob, ts_generic_heap) = getGenericMember gen_glob kind ti_common_defs ts.ts_generic_heap
+	# ts = { ts & ts_generic_heap = ts_generic_heap }
+	= case opt_member_glob of
+		No
+			# empty_tst	= {tst_args=[], tst_arity=0, tst_lifted=0, tst_result={at_type=TE,at_attribute=TA_Multi}, tst_context=[], tst_attr_env=[]}
+			# ts_error = checkError ("no generic instances of " +++ toString symb_name +++ " for kind") kind ts.ts_error
+			-> (empty_tst, [], {ts & ts_error = ts_error})	
+		Yes member_glob -> getSymbolType pos ti {symbol & symb_kind = SK_OverloadedFunction member_glob} n_app_args ts
 // ..AA
 
 class requirements a :: !TypeInput !a !(!u:Requirements, !*TypeState) -> (!AType, !Optional ExprInfoPtr, !(!u:Requirements, !*TypeState))
@@ -2109,7 +2119,7 @@ ste_kind_to_string s
 
 typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule} 
 	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
-typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file out dcl_modules
+typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap} predef_symbols file out dcl_modules
 
 	#! fun_env_size = size fun_defs
 
@@ -2123,13 +2133,13 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
-	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
+	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_out = out }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [], si_next_TC_member_index = 0, si_TC_instances = [] }
 	# (type_error, fun_defs, predef_symbols, special_instances, ts) = type_components list_inferred_types 0 comps class_instances ti (False, fun_defs, predef_symbols, special_instances, ts)
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env fun_defs
-	  (type_error, fun_defs, predef_symbols, special_instances, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_out})
+	  (type_error, fun_defs, predef_symbols, special_instances, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_out})
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, fun_defs, predef_symbols, special_instances,
 							{ ts & ts_fun_env = ts_fun_env })
 	  (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,type_code_instances,predef_symbols,ts_type_heaps,ts_error)
@@ -2141,7 +2151,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 			ali_instances_range={ ir_from = fun_env_size, ir_to = special_instances.si_next_array_member_index }
 		}
 	= (not type_error, fun_defs, array_and_list_instances, type_code_instances, ti_common_defs, ti_functions,
-			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps },
+			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
 			predef_symbols, ts_error.ea_file, ts_out)
 //				---> ("typeProgram", array_inst_types)
 where
@@ -2284,14 +2294,15 @@ where
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }
 		  (over_info, (subst, ts_expr_heap)) = collect_and_expand_overloaded_calls fun_reqs [] (subst, ts_expr_heap)
 		  (contexts, coercion_env, local_pattern_variables, dict_types,
-		  	{ os_type_heaps, os_var_heap, os_symbol_heap, os_predef_symbols, os_special_instances, os_error })
+		  	{ os_type_heaps, os_var_heap, os_symbol_heap, os_generic_heap, os_predef_symbols, os_special_instances, os_error })
 		  		= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
-		  			{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap,
+		  			{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap, os_generic_heap = ts.ts_generic_heap,
 		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances } modules
+		  //ts = {ts & ts_generic_heap = os_generic_heap}
 		| not os_error.ea_ok
 			= (True, fun_defs, os_predef_symbols, os_special_instances, create_erroneous_function_types comp { ts & ts_type_heaps = os_type_heaps,
 					ts_error = { os_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap })
+					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap,ts_generic_heap=os_generic_heap})
 		# (fun_defs, coercion_env, subst, ts_td_infos, os_var_heap, os_symbol_heap, os_error)
 		  		= makeSharedReferencesNonUnique comp fun_defs coercion_env subst ts_td_infos os_var_heap os_symbol_heap os_error
 		  (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
@@ -2306,10 +2317,10 @@ where
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
 		  (fun_defs, ts) = cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 									(fun_defs,  { ts &	ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps,
-		  												ts_td_infos = ts_td_infos, ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap })
+		  												ts_td_infos = ts_td_infos, ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap,ts_generic_heap=os_generic_heap})
 		| not ts.ts_error.ea_ok
 			= (True, fun_defs, os_predef_symbols, os_special_instances, create_erroneous_function_types comp
-					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True } })
+					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
 		| isEmpty over_info 
 			# ts_type_heaps = ts.ts_type_heaps
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,

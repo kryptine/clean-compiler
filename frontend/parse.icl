@@ -474,23 +474,84 @@ where
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
 	   		# (gendef, pState) = wantGenericDefinition parseContext pos pState
-	   		= (True, gendef, pState)	 
-	// ..AA  		
+	   		= (True, gendef, pState)
+	
+	try_definition parseContext DeriveToken pos pState
+		| ~(isGlobalContext parseContext)
+			= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)   		
+	   		# (gendef, pState) = wantDeriveDefinition parseContext pos pState
+	   		= (True, gendef, pState)
+	// ..AA 
+	 		
 	try_definition parseContext InstanceToken pos pState
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
 	   		# (instdef, pState) = wantInstanceDeclaration parseContext pos pState
 	   		= (True, instdef, pState)
+
+// AA : new syntax for generics ...
+	try_definition parseContext (IdentToken name) pos pState
+		# (token, pState) = nextToken FunctionContext pState
+		= case token of
+			GenericOpenToken // generic function
+				# (type, pState) = wantType pState
+				# (type_cons, pState) = get_type_cons type pState
+					with
+						get_type_cons (TA type_symb []) pState 
+							= (TypeConsSymb type_symb, pState)
+						get_type_cons (TB tb) pState 
+							= (TypeConsBasic tb, pState)
+						get_type_cons TArrow pState
+							= (TypeConsArrow, pState)				 
+						get_type_cons (TV tv) pState
+							= (TypeConsVar tv, pState)				 
+						get_type_cons _ pState 
+							# pState = parseError "generic type" No " invalid" pState
+							= (abort "no TypeCons", pState)
+				# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
+				# (ident, pState) = stringToIdent name (IC_GenericCase type) pState					
+				# (generic_ident, pState) = stringToIdent name IC_Generic pState					
+
+				# (args, pState) = parseList trySimpleLhsExpression pState
+
+				// must be EqualToken or HashToken or ???
+				//# pState = wantToken FunctionContext "generic definition" EqualToken pState
+				//# pState = tokenBack pState
+
+			  	#(ss_useLayout, pState) = accScanState UseLayout pState
+			    # localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
+			    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
+
+				# generic_case = 
+					{ gc_name = ident
+					, gc_gname = generic_ident
+					, gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
+					, gc_arity = length args
+					, gc_pos = pos
+					, gc_type = type
+					, gc_type_cons = type_cons
+					, gc_body = GCB_ParsedBody args rhs
+					, gc_kind = KindError	
+					}					
+				-> (True, PD_GenericCase generic_case, pState)
+			_   // normal function
+				# pState = tokenBack pState
+				# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
+			      (token, pState) = nextToken FunctionContext pState
+			      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
+				-> (True, def, pState)
+// ... AA
+	   		
 	try_definition parseContext token pos pState
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState
 		      (token, pState) = nextToken FunctionContext pState
 		      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
 			= (True, def, pState)
-			with
-				determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
-		 		determine_position lhs           		pos           = pos
 		= (False, abort "no def(1)", tokenBack pState)
+
+	determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
+	determine_position lhs           		pos           = pos
 
 	want_lhs_of_def :: !Token !ParseState -> (!(Optional (Ident, Bool), ![ParsedExpr]), !ParseState)
 	want_lhs_of_def token pState
@@ -1240,28 +1301,28 @@ wantInstanceDeclaration parseContext pi_pos pState
 	  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
 // AA..
 	# (token, pState) = nextToken TypeContext pState
+/*
 	| token == GenericToken
 		# pState = wantEndOfDefinition "generic instance declaration" pState
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-							pi_members = [], pi_specials = SP_None, pi_pos = pi_pos, pi_generate = True}, pState)
+							pi_members = [], pi_specials = SP_None, pi_pos = pi_pos}, pState)
+*/
 // ..AA
 	| isIclContext parseContext
-		# // PK pState = tokenBack pState // AA
-		  pState = want_begin_group token pState
+		# pState = want_begin_group token pState
 		  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
 		  pState = wantEndGroup "instance" pState
 
 		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos, pi_generate = False }, pState)
+						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos}, pState)
 	// otherwise // ~ (isIclContext parseContext)
 		| token == CommaToken
-			// AA: # (token, pState) = nextToken TypeContext pState 		
 			# (pi_types_and_contexts, pState)	= want_instance_types pState
 			  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
 			= (PD_Instances
 //				[	{ pi_class = pi_class, pi_ident = pi_ident, pi_types = type, pi_context = context // voor martin
 				[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
-					, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos, pi_generate = False}
+					, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos}
 				\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
 				&	ident			<- [ pi_ident : idents ]
 				]
@@ -1271,7 +1332,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 			# (specials, pState) = optionalSpecials (tokenBack pState)
 			  pState = wantEndOfDefinition "instance declaration" pState
 			= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-							pi_members = [], pi_specials = specials, pi_pos = pi_pos, pi_generate = False}, pState)
+							pi_members = [], pi_specials = specials, pi_pos = pi_pos}, pState)
 		
 where
 	want_begin_group token pState  // For JvG layout
@@ -1379,13 +1440,13 @@ optionalCoercions pState
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition parseContext pos pState
 	| SwitchGenerics False True 
-		= (PD_Erroneous, parseError "generic definition" No "generics are not supported" pState)
+		= (PD_Erroneous, parseErrorSimple "generic definition" "generics are not supported by this compiler" pState)
 	| not pState.ps_support_generics
-		= (PD_Erroneous, parseError "generic definition" No "to enable generics use the command line flag -generics" pState)
+		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
 	| name == "" 
 		= (PD_Erroneous, pState)
-	# (ident, pState) = stringToIdent name IC_Class pState
+	# (ident, pState) = stringToIdent name IC_Generic/*IC_Class*/ pState
 	# (member_ident, pState) = stringToIdent name IC_Expression pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
 		
@@ -1395,16 +1456,15 @@ wantGenericDefinition parseContext pos pState
 	# gen_def = 
 		{	gen_name = ident
 		,	gen_member_name = member_ident 
-		,	gen_type = 
-				{	gt_type = type			 
-				,	gt_vars = arg_vars
-				,	gt_arity = length arg_vars
-				}
+		,	gen_type = type
+		,	gen_vars = arg_vars
 		,	gen_pos = pos
-		,	gen_kinds_ptr = nilPtr
-		,	gen_classes = []
-		,	gen_isomap = MakeDefinedSymbol {id_name="",id_info=nilPtr} NoIndex 0
-		,	gen_cons_ptr = nilPtr
+		,	gen_info_ptr = nilPtr
+		, 	gen_bimap = 
+			{ ds_ident = {id_name = "", id_info = nilPtr} 
+			, ds_index = NoIndex
+			, ds_arity = 0 
+			}
 		}
 	= (PD_Generic gen_def, pState)	
 	where
@@ -1419,7 +1479,65 @@ wantGenericDefinition parseContext pos pState
 		try_variable pState
 			# (token, pState) = nextToken TypeContext pState
 			= tryTypeVarT token pState
-
+			
+wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
+wantDeriveDefinition parseContext pos pState
+	| SwitchGenerics False True 
+		= (PD_Erroneous, parseErrorSimple "generic definition" "generics are not supported by this compiler" pState)
+	| not pState.ps_support_generics
+		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
+	# (name, pState) = want_name pState
+	| name == "" 
+		= (PD_Erroneous, pState)
+	# (derive_defs, pState) = want_derive_types name pState
+	= (PD_Derive derive_defs, pState)
+where	
+	want_name pState 
+		# (token, pState) = nextToken TypeContext pState
+		= 	case token of
+			IdentToken name -> (name, pState)
+			_ -> ("", parseError "Generic Definition" (Yes token) "<identifier>" pState)
+	want_derive_types :: String !*ParseState -> ([GenericCaseDef], !*ParseState)			
+	want_derive_types name pState
+		# (derive_def, pState) = want_derive_type name pState
+		# (token, pState) = nextToken TypeContext pState
+		| token == CommaToken
+			# (derive_defs, pState) = want_derive_types name pState
+			= ([derive_def:derive_defs], pState)
+			= ([derive_def], pState)
+			
+	want_derive_type :: String !*ParseState -> (GenericCaseDef, !*ParseState)			
+	want_derive_type name pState
+		# (type, pState) = wantType pState
+		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
+		# (generic_ident, pState) = stringToIdent name IC_Generic pState
+		# (type_cons, pState) = get_type_cons type pState
+		# derive_def = 
+			{	gc_name	= ident
+			, 	gc_gname = generic_ident
+			, 	gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
+			,	gc_arity = 0
+			,	gc_pos = pos
+			,	gc_type = type
+			,	gc_type_cons = type_cons
+			,	gc_body = GCB_None
+			,	gc_kind = KindError
+			}
+		= (derive_def, pState) 
+	get_type_cons :: Type !*ParseState -> (TypeCons, !*ParseState)	
+	get_type_cons (TA type_symb []) pState 
+		= (TypeConsSymb type_symb, pState)
+	get_type_cons (TB tb) pState 
+		= (TypeConsBasic tb, pState)
+	get_type_cons TArrow pState
+		= (TypeConsArrow, pState)
+	get_type_cons (TV tv) pState
+		| isDclContext parseContext
+			= (TypeConsVar tv, pState)			 
+	get_type_cons type pState 
+		# pState = parseError "generic type" No " type constructor" pState
+		= (abort "no TypeCons", pState)
+		
 // ..AA
 
 /*
@@ -3542,9 +3660,9 @@ wantBeginGroup msg pState
 wantKind :: !ParseState -> !(!TypeKind, !ParseState)
 wantKind pState
 	| SwitchGenerics False True 
-		= (KindConst, parseError "kind" No "generics are not supported" pState)
+		= (KindConst, parseErrorSimple "kind" "generics are not supported by this compiler" pState)
 	| not pState.ps_support_generics
-		= (KindConst, parseError "kind" No "to enable generics use -generics command line flag" pState)
+		= (KindConst, parseErrorSimple "kind" "to enable generics use -generics command line flag" pState)
 	# (token, pState) = nextToken TypeContext pState
 	# (kind, pState) = want_simple_kind token pState
 	# (token, pState) = nextToken TypeContext pState
@@ -3669,6 +3787,26 @@ parseError act opt_token msg pState
 		= case opt_token of
 			Yes _	-> tokenBack pState
 			No		-> pState
+
+parseErrorSimple :: !{# Char} !{# Char} !ParseState -> ParseState
+parseErrorSimple act msg pState
+	| pState.ps_skipping
+		= pState
+	| otherwise // not pState.ps_skipping
+		# (pos,pState) 	= getPosition pState
+		  (filename,pState=:{ps_error={pea_file}})	= getFilename pState
+		  pea_file 	= 	pea_file
+		  				<<< "Parse error ["
+		  				<<< filename <<< ","
+		  				<<< pos 
+		  				<<< (if (size act > 0) ("," + act) "") <<< "]: "
+		  				<<< msg
+		  				<<< '\n'
+		  pState 	=	{ pState
+						& ps_skipping	= True
+						, ps_error		= { pea_file = pea_file, pea_ok = False }
+						}
+		= pState
 
 getFileAndLineNr :: !ParseState -> (!String, !Int, !ParseState)
 getFileAndLineNr pState =: {ps_scanState}

@@ -1341,7 +1341,24 @@ where
 //							{pi & pi_next_group = pi.pi_next_group}
 							))
 					-> (max_fun_nr, (modules, pi))
-
+			GeneratedBody
+/*	
+				// allocate a group that contains this and only this function		
+				| fun_def.fun_info.fi_group_index == NoIndex
+					# pi = 
+						{ pi 
+						& pi_fun_defs.[fun_index] =
+							{ fun_def
+							& fun_info.fi_group_index = pi.pi_next_group
+							}
+						, pi_groups = [[FunctionOrIclMacroIndex fun_index] : pi.pi_groups]
+						, pi_next_group = inc pi.pi_next_group
+						}
+					-> (max_fun_nr, (modules, pi))
+					-> abort ("generated function already has a group index: " +++ toString fun_def.fun_symb +++ " " +++ toString fun_index +++ "\n")
+*/
+				// do not allocate a group, it will be allocated during generic phase
+				-> (max_fun_nr, (modules, pi))					
 	partitionate_macro mod_index max_fun_nr macro_module_index macro_index (modules, pi)
 		# (fun_def, pi) = pi!pi_macro_defs.[macro_module_index,macro_index]
 		= case fun_def.fun_body of

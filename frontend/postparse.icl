@@ -2,7 +2,9 @@ implementation module postparse
 
 import StdEnv
 import syntax, parse, utilities, containers, StdCompare
+import genericsupport
 //import RWSDebug
+
 
 :: *CollectAdmin =
 	{	ca_error		:: !*ParseErrorAdmin
@@ -350,6 +352,13 @@ instance collectFunctions (ParsedInstance a) | collectFunctions a where
 	collectFunctions inst=:{pi_members} icl_module ca
 		# (pi_members, ca) = collectFunctions pi_members icl_module ca
 		= ({inst & pi_members = pi_members }, ca)
+
+instance collectFunctions GenericCaseDef where
+	collectFunctions gc=:{gc_body=GCB_FunDef fun_def} icl_module ca
+		# (fun_def, ca) = collectFunctions fun_def icl_module ca 
+		= ({gc & gc_body = GCB_FunDef fun_def}, ca)
+	collectFunctions gc=:{gc_body=GCB_None} icl_module ca
+		= (gc, ca)
 
 instance collectFunctions FunDef where
 	collectFunctions fun_def=:{fun_body = ParsedBody bodies} icl_module ca
@@ -1033,7 +1042,8 @@ where
 MakeEmptyModule name mod_type
 	:== { mod_name = name, mod_modification_time = "", mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_defs =
 				{	def_types = [], def_constructors = [], def_selectors = [], def_classes = [], def_macro_indices={ir_from=0,ir_to=0},
-					def_macros=[],def_members = [], def_funtypes = [], def_instances = [], def_generics = [] } }
+					def_macros=[],def_members = [], def_funtypes = [], def_instances = [], 
+					def_generics = [], def_generic_cases = []} }
 
 parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !Bool (ModTimeFunction *Files) !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule],!*Files, !*CollectAdmin)
@@ -1070,6 +1080,7 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_gene
 			,	ca_hash_table	= hash_table
 			}
 	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitions True pdefs 0 0 0 0 ca
+
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
@@ -1098,10 +1109,13 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_gene
 	  (macro_defs, ca) = collectFunctions defs.def_macros True ca
 	  (macro_range, ca) = addFunctionsRange macro_defs ca
 	  (def_instances, ca) = collectFunctions defs.def_instances True ca
+	  (def_generic_cases, ca) = collectFunctions defs.def_generic_cases True ca  
 
 	  {	ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table } = ca
-	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_instances = def_instances,
-	  				def_macro_indices = macro_range }}
+	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, 
+	  				mod_defs = { defs & def_instances = def_instances,
+	  								def_generic_cases = def_generic_cases,
+	  								def_macro_indices = macro_range }}
 	  
 	  hash_table = set_hte_mark 0 ca_hash_table
 	  	  
@@ -1179,6 +1193,27 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 				= (fun_kind, postParseError pos "illegal combination of function alternatives" ca)
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
+
+collectGenericBodies :: !GenericCaseDef ![ParsedDefinition] !*CollectAdmin
+	-> (![ParsedBody], ![ParsedDefinition], !*CollectAdmin)
+collectGenericBodies first_case all_defs=:[PD_GenericCase gc : defs] ca
+	| first_case.gc_name == gc.gc_name && first_case.gc_type_cons == gc.gc_type_cons		
+		# (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
+		# (GCB_ParsedBody args rhs) = gc.gc_body
+		# body = 
+			{ pb_args = args
+			, pb_rhs = rhs
+			, pb_position = gc.gc_pos 
+			}
+		| first_case.gc_arity == gc.gc_arity
+			= ([body : bodies ], rest_defs, ca)
+			# msg = "This alternative has " + toString gc.gc_arity + " argument" 
+				+ (if (gc.gc_arity <> 1) "s" "")+" instead of " + toString first_case.gc_arity
+			# ca = postParseError gc.gc_pos msg ca	
+			= ([body : bodies ], rest_defs, ca)
+		= ([], all_defs, ca)
+collectGenericBodies first_case defs ca
+	= ([], defs, ca)
 
 strictness_from_fields :: ![ParsedSelector] -> StrictnessList
 strictness_from_fields fields
@@ -1372,10 +1407,35 @@ where
 	    = ([], ca)	
 reorganiseDefinitions icl_module [PD_Instances class_instances : defs] cons_count sel_count mem_count type_count ca
 	= reorganiseDefinitions icl_module ([PD_Instance class_instance \\ class_instance <- class_instances] ++ defs) cons_count sel_count mem_count type_count ca
+// AA ..
 reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count mem_count type_count ca
 	# 	(fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
 	= (fun_defs, c_defs, imports, imported_objects, ca)
+reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count mem_count type_count ca
+	#! (bodies, defs, ca) = collectGenericBodies gc defs ca  
+	#! (fun_defs, c_defs, imports, imported_objects, ca) 
+		= reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
+	# (GCB_ParsedBody args rhs) = gc.gc_body
+	# body = 
+		{ pb_args = args
+		, pb_rhs = rhs
+		, pb_position = gc.gc_pos 
+		}
+	#! bodies = [body : bodies ]
+	#! fun_name = genericIdentToFunIdent gc.gc_name gc.gc_type_cons 
+	#! fun = MakeNewImpOrDefFunction fun_name gc.gc_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
+	#! inst = { gc & gc_body = GCB_FunDef fun } 
+	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
+		---> ("collected", gc.gc_name, gc.gc_type_cons, length bodies)
+	= (fun_defs, c_defs, imports, imported_objects, ca)
+
+reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca
+	#! (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	#! c_defs = { c_defs & def_generic_cases = derive_defs ++ c_defs.def_generic_cases}
+	= (fun_defs, c_defs, imports, imported_objects, ca)  
+// .. AA
+	
 reorganiseDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	= (fun_defs, c_defs, new_imports ++ imports, imported_objects, ca)
@@ -1386,7 +1446,8 @@ reorganiseDefinitions icl_module [def:defs] _ _ _ _ ca
 	= abort ("reorganiseDefinitions does not match" ---> def)
 reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [],def_macro_indices={ir_from=0,ir_to=0},def_classes = [], def_members = [],
-			def_instances = [], def_funtypes = [], def_generics = [] }, [], [], ca)
+			def_instances = [], def_funtypes = [], 
+			def_generics = [], def_generic_cases = []}, [], [], ca)
 
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix
