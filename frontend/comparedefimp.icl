@@ -77,6 +77,9 @@ where
 
 	compare_rhs_of_types (AbstractType _) icl_type dcl_cons_defs icl_cons_defs comp_st
 		= (True, icl_cons_defs, comp_st)
+	compare_rhs_of_types (AbstractSynType _ dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
+		# (ok, comp_st) = compare dclType iclType comp_st
+		= (ok, icl_cons_defs, comp_st)
 	compare_rhs_of_types dcl_type icl_type dcl_cons_defs icl_cons_defs comp_st
 		= (False, icl_cons_defs, comp_st)
 	
@@ -851,6 +854,9 @@ instance t_corresponds TypeRhs where
 		=	t_corresponds dclRecord iclRecord
 	t_corresponds (AbstractType _) _
 		=	return True
+	t_corresponds (AbstractSynType _ dclType) (SynType iclType)
+		=	t_corresponds dclType iclType
+
 // sanity check ...
 	t_corresponds UnknownType _
 		=	undef // <<- "t_corresponds (TypeRhs): dclDef == UnknownType" 
