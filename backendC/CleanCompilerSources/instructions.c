@@ -1279,7 +1279,23 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 	StateP function_state_p;
 	
 	fkind = (ArrayFunKind)array_def->sdef_arfun;
+/* RWS ...
 	function_state_p = array_def->sdef_rule_type->rule_type_state_p;
+*/
+	switch (array_def->sdef_kind)
+	{
+		case DEFRULE:
+		case SYSRULE:
+			function_state_p = array_def->sdef_rule_type->rule_type_state_p;
+			break;
+		case IMPRULE:
+			function_state_p = array_def->sdef_rule->rule_state_p;
+			break;
+		default:
+			error_in_function ("CallArrayFunction RWS");
+			break;
+	}
+/* RWS */
 		
 	if (function_state_p[0].state_type==SimpleState && function_state_p[0].state_object==UnknownObj){
 		StateS	elem_state;
