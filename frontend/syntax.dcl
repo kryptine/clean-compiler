@@ -4,6 +4,7 @@ import StdEnv
 
 import scanner, general, typeproperties, Heap
 
+SupportGenerics :== False
 PA_BUG on off :== on
 
 switch_import_syntax one_point_three two_point_zero :== one_point_three

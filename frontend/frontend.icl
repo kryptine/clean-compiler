@@ -130,7 +130,7 @@ frontEndInterface upToPhase mod_ident search_paths dcl_modules functions_and_mac
 	# heaps = { heaps & hp_type_heaps = type_heaps }
 
 	#! (components, ti_common_defs, fun_defs, generic_range, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
-		case True of
+		case SupportGenerics of
 		True -> convertGenerics 
 					components main_dcl_module_n ti_common_defs fun_defs td_infos 
 					heaps hash_table predef_symbols dcl_mods error_admin
