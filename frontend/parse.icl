@@ -530,7 +530,7 @@ where
 										-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
 									| type_name == type_FIELD_ident 
 										# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
-										-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)							_ 	
+										-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState) 	
 									| otherwise
 										-> (geninfo_arg, pState)
 						| otherwise

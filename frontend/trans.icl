@@ -2146,7 +2146,12 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 			  ,	ti_main_dcl_module_n	= ro.ro_main_dcl_module_n
 			  }
 	  (succ, das_subst, das_type_heaps)
-	  		= unify application_type arg_type type_input das_subst das_type_heaps
+	  		= unify (skip_TFA application_type) (skip_TFA arg_type) type_input das_subst das_type_heaps
+			with
+				skip_TFA at=:{at_type = TFA vars type}
+					= { at & at_type = type }
+				skip_TFA at
+					= at
 	| not succ
 		= abort ("sanity check nr 94 in module trans failed"--->(application_type, arg_type))
 	# (attr_inequalities, das_type_heaps)
@@ -3061,13 +3066,11 @@ where
 	expandSynTypes rem_annots common_defs type=:(TAS type_symb types _) ets
 		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
 // Sjaak 240801 ...
-	/*
 	expandSynTypes rem_annots common_defs tfa_type=:(TFA vars type) ets
 		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
 		| changed
 			= (True,TFA vars type, ets)
 			= (False,tfa_type, ets)
-	*/
 	expandSynTypes rem_annots common_defs tfa_type=:(TST atvs st=:{st_args, st_result}) ets
 		# (changed, (st_args, st_result), ets) = expandSynTypes rem_annots common_defs (st_args, st_result) ets	
 		| changed

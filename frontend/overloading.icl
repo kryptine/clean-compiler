@@ -1270,8 +1270,8 @@ where
 		add_universal_vars_to_type [] at
 			= at
 		// FIXME: RANKN	
-		//add_universal_vars_to_type uni_vars at=:{at_type}
-		//	= { at & at_type = TFA uni_vars at_type }
+		add_universal_vars_to_type uni_vars at=:{at_type}
+			= { at & at_type = TFA uni_vars at_type }
 
 		
 		convert_local_dynamics loc_dynamics state

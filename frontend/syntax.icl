@@ -878,6 +878,8 @@ cNotVarNumber :== -1
 
 			|	TST [ATypeVar] SymbolType		/* Universally quantified types */
 
+			|	TFA [ATypeVar] Type				/* Universally quantified types, Auxiliary (type checking) */
+
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */
@@ -1360,9 +1362,9 @@ where
 		= True
 	needs_brackets (TArrow1 _)
 		= True		
-/*	needs_brackets (TFA _ _)
+	needs_brackets (TFA _ _)
 		= True
-*/	needs_brackets _
+	needs_brackets _
 		= False
 
 instance needs_brackets Expression
@@ -1496,7 +1498,7 @@ where
 	(<<<) file (TAS consid types strictness)
 		= file  <<< consid <<< ' ' <<< strictness <<< ' ' <<< types
 	(<<<) file (arg_type --> res_type)
-		= file <<< arg_type <<< " -> " <<< res_type
+		= file <<< '(' <<< arg_type <<< " -> " <<< res_type <<< ')'
 	(<<<) file TArrow
 		= file <<< "(->)"	
 	(<<<) file (TArrow1 t)
@@ -1507,6 +1509,8 @@ where
 		= file <<< tb
 	(<<<) file (TST atvs st)
 		= file <<< "(A. " <<< atvs <<< ": " <<< st <<< ")"
+	(<<<) file (TFA vars types)
+		= file <<< "(TFA." <<< vars <<< ':' <<< types <<< ")"
 	(<<<) file (TQV varid)
 		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)
@@ -2167,7 +2171,10 @@ where
 
 instance <<< CoercionPosition
 where
-	(<<<) file (CP_FunArg fun_name arg_nr) = file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_FunArg fun_name arg_nr)
+		| arg_nr == 0
+			= file <<< "result of " <<< readable fun_name
+			= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
 	(<<<) file (CP_Expression expression) = show_expression file expression
 	where
 		show_expression file (Var {var_name})

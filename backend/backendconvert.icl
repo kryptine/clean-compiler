@@ -1467,10 +1467,11 @@ convertTypeNode (a :@: b)
 	=	beNormalTypeNode (beBasicSymbol BEApplySymb) (convertTypeArgs [{at_attribute=TA_Multi, at_type = consVariableToType a} : b])
 convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
-//convertTypeNode (TFA vars type)
-//	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
-convertTypeNode (TST atvs _)
-	=	abort "convertTypeNode: RANKN\n"
+convertTypeNode (TFA vars type)
+	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
+convertTypeNode (TST atvs {st_result={at_type}})
+	=	beAddForAllTypeVariables (convertTypeVars atvs) (convertTypeNode at_type)
+//	=	abort "convertTypeNode: RANKN\n"
 convertTypeNode typeNode
 	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 

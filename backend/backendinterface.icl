@@ -302,6 +302,8 @@ instance collectAttrVars Type where
 		=	collectAttrVars type collect
 	collectAttrVars (_ :@: types) collect
 		=	collectAttrVars types collect
+	collectAttrVars (TFA _ type) collect
+		=	collectAttrVars type collect
 	collectAttrVars (TST atvs {st_args, st_result}) collect
 		// RANKN FIXME : what to do with local forall variables????
 		=	collectAttrVars (st_args, st_result)  collect

@@ -915,6 +915,8 @@ cNonRecursiveAppl	:== False
 
 			|	TST [ATypeVar] SymbolType		/* Universally quantified types */
 
+			|	TFA [ATypeVar] Type				/* Universally quantified types, Auxiliary (type checking) */
+
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */

@@ -27,7 +27,7 @@ Global
 			Output:	NoConsole
 			Font:	MS Sans Serif
 			FontSize:	8
-			WriteStdErr:	False
+			WriteStdErr:	True
 	Link
 		LinkMethod:	Static
 		GenerateRelocations:	False
@@ -77,7 +77,7 @@ MainModule
 OtherModules
 	Module
 		Name:	StdEnv
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -105,7 +105,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdBool
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -133,7 +133,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdOverloaded
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -161,7 +161,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdInt
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -189,7 +189,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdMisc
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -217,7 +217,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdString
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -245,7 +245,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdReal
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -273,7 +273,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdArray
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -301,7 +301,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	_SystemArray
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -329,7 +329,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdClass
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -357,7 +357,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdChar
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -385,7 +385,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdEnum
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -413,7 +413,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	_SystemEnum
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -441,7 +441,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdFile
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -469,7 +469,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdList
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -497,7 +497,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdOrdList
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -525,7 +525,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdTuple
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -553,7 +553,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdCharList
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -581,7 +581,7 @@ OtherModules
 		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	StdFunc
-		Dir:	{Application}\StdEnv
+		Dir:	{Application}\Libraries\StdEnv 2.0
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -775,10 +775,10 @@ OtherModules
 		DclOpen:	False
 		Icl
 			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
+				X:	88
+				Y:	-6
+				SizeX:	846
+				SizeY:	620
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1169,8 +1169,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	987
+				SizeY:	583
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1281,8 +1281,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	858
+				SizeY:	479
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1337,8 +1337,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	998
+				SizeY:	493
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1419,10 +1419,10 @@ OtherModules
 		DclOpen:	False
 		Icl
 			WindowPosition
-				X:	0
-				Y:	0
-				SizeX:	751
-				SizeY:	300
+				X:	-5
+				Y:	68
+				SizeX:	999
+				SizeY:	623
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1449,8 +1449,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	889
-				SizeY:	445
+				SizeX:	845
+				SizeY:	618
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1533,8 +1533,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	871
+				SizeY:	504
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1677,8 +1677,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	999
+				SizeY:	462
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1929,8 +1929,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	769
-				SizeY:	354
+				SizeX:	500
+				SizeY:	300
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -2106,25 +2106,25 @@ OtherModules
 Static
 	Mods
 		Path:	{Project}\main\cocl.icl
-		Path:	{Application}\StdEnv\StdEnv.icl
-		Path:	{Application}\StdEnv\StdBool.icl
-		Path:	{Application}\StdEnv\StdOverloaded.icl
-		Path:	{Application}\StdEnv\StdInt.icl
-		Path:	{Application}\StdEnv\StdMisc.icl
-		Path:	{Application}\StdEnv\StdString.icl
-		Path:	{Application}\StdEnv\StdReal.icl
-		Path:	{Application}\StdEnv\StdArray.icl
-		Path:	{Application}\StdEnv\_SystemArray.icl
-		Path:	{Application}\StdEnv\StdClass.icl
-		Path:	{Application}\StdEnv\StdChar.icl
-		Path:	{Application}\StdEnv\StdEnum.icl
-		Path:	{Application}\StdEnv\_SystemEnum.icl
-		Path:	{Application}\StdEnv\StdFile.icl
-		Path:	{Application}\StdEnv\StdList.icl
-		Path:	{Application}\StdEnv\StdOrdList.icl
-		Path:	{Application}\StdEnv\StdTuple.icl
-		Path:	{Application}\StdEnv\StdCharList.icl
-		Path:	{Application}\StdEnv\StdFunc.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdEnv.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdBool.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdOverloaded.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdInt.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdMisc.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdString.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdReal.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdArray.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\_SystemArray.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdClass.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdChar.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdEnum.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\_SystemEnum.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdFile.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdList.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdOrdList.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdTuple.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdCharList.icl
+		Path:	{Application}\Libraries\StdEnv 2.0\StdFunc.icl
 		Path:	{Project}\main\coclmain.icl
 		Path:	{Project}\ArgEnvWindows\ArgEnv.icl
 		Path:	{Project}\main\Windows\set_return_code.icl
@@ -2179,63 +2179,59 @@ Static
 		Path:	{Project}\main\Version.icl
 		Path:	{Project}\main\Windows\thread_message.icl
 	Objs
-		Path:	{Application}\StdEnv\Clean System Files\_startup0.o
-		Path:	{Application}\StdEnv\Clean System Files\_startup1Trace.o
-		Path:	{Application}\StdEnv\Clean System Files\_startup2.o
-		Path:	{Application}\StdEnv\Clean System Files\_system.o
-		Path:	{Project}\backend\Clean System Files\backendconvert.o
-		Path:	{Project}\backend\Clean System Files\backendsupport.o
-		Path:	{Project}\backend\Clean System Files\backendpreprocess.o
-		Path:	{Project}\backend\Clean System Files\backend.o
-		Path:	{Project}\main\Clean System Files\cocl.o
-		Path:	{Application}\StdEnv\Clean System Files\StdEnv.o
-		Path:	{Application}\StdEnv\Clean System Files\StdBool.o
-		Path:	{Application}\StdEnv\Clean System Files\StdOverloaded.o
-		Path:	{Application}\StdEnv\Clean System Files\StdInt.o
-		Path:	{Application}\StdEnv\Clean System Files\StdMisc.o
-		Path:	{Application}\StdEnv\Clean System Files\StdString.o
-		Path:	{Application}\StdEnv\Clean System Files\StdReal.o
-		Path:	{Application}\StdEnv\Clean System Files\StdArray.o
-		Path:	{Application}\StdEnv\Clean System Files\_SystemArray.o
-		Path:	{Application}\StdEnv\Clean System Files\StdClass.o
-		Path:	{Application}\StdEnv\Clean System Files\StdChar.o
-		Path:	{Application}\StdEnv\Clean System Files\StdEnum.o
-		Path:	{Application}\StdEnv\Clean System Files\_SystemEnum.o
-		Path:	{Application}\StdEnv\Clean System Files\StdFile.o
-		Path:	{Application}\StdEnv\Clean System Files\StdList.o
-		Path:	{Application}\StdEnv\Clean System Files\StdOrdList.o
-		Path:	{Application}\StdEnv\Clean System Files\StdTuple.o
-		Path:	{Application}\StdEnv\Clean System Files\StdCharList.o
-		Path:	{Application}\StdEnv\Clean System Files\StdFunc.o
-		Path:	{Project}\main\Clean System Files\coclmain.o
-		Path:	{Project}\ArgEnvWindows\Clean System Files\ArgEnv.o
-		Path:	{Project}\main\Windows\Clean System Files\set_return_code.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\_startup0.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\_startup1Trace.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\_startup2.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\_system.o
+		Path:	{Project}\compiler\Clean System Files\type.o
+		Path:	{Project}\compiler\Clean System Files\genericsupport.o
+		Path:	{Project}\compiler\Clean System Files\checktypes.o
+		Path:	{Project}\compiler\Clean System Files\analtypes.o
+		Path:	{Project}\compiler\Clean System Files\analunitypes.o
+		Path:	{Project}\compiler\Clean System Files\unitype.o
+		Path:	{Project}\compiler\Clean System Files\typesupport.o
+		Path:	{Project}\compiler\Clean System Files\check.o
+		Path:	{Project}\compiler\Clean System Files\transform.o
+		Path:	{Project}\compiler\Clean System Files\frontend.o
 		Path:	{Project}\main\Clean System Files\compile.o
+		Path:	{Project}\main\Windows\Clean System Files\set_return_code.o
+		Path:	{Project}\ArgEnvWindows\Clean System Files\ArgEnv.o
+		Path:	{Project}\compiler\Clean System Files\containers.o
+		Path:	{Project}\compiler\Clean System Files\type_io_common.o
+		Path:	{Project}\compiler\Clean System Files\hashtable.o
+		Path:	{Project}\compiler\Clean System Files\predef.o
 		Path:	{Project}\compiler\Clean System Files\checksupport.o
-		Path:	{Project}\compiler\Clean System Files\syntax.o
-		Path:	{Project}\compiler\Clean System Files\scanner.o
-		Path:	{Project}\compiler\Clean System Files\general.o
+		Path:	{Project}\compiler\Clean System Files\compilerSwitches.o
+		Path:	{Project}\compiler\Clean System Files\_aconcat.o
+		Path:	{Project}\compiler\Clean System Files\utilities.o
 		Path:	{Project}\compiler\Clean System Files\compare_constructor.o
+		Path:	{Project}\compiler\Clean System Files\Heap.o
 		Path:	{Project}\compiler\Clean System Files\StdCompare.o
 		Path:	{Project}\compiler\Clean System Files\typeproperties.o
-		Path:	{Project}\compiler\Clean System Files\Heap.o
-		Path:	{Project}\compiler\Clean System Files\compilerSwitches.o
-		Path:	{Project}\compiler\Clean System Files\utilities.o
-		Path:	{Project}\compiler\Clean System Files\_aconcat.o
-		Path:	{Project}\compiler\Clean System Files\predef.o
-		Path:	{Project}\compiler\Clean System Files\hashtable.o
-		Path:	{Project}\compiler\Clean System Files\type_io_common.o
-		Path:	{Project}\compiler\Clean System Files\containers.o
-		Path:	{Project}\compiler\Clean System Files\frontend.o
-		Path:	{Project}\compiler\Clean System Files\transform.o
-		Path:	{Project}\compiler\Clean System Files\check.o
-		Path:	{Project}\compiler\Clean System Files\typesupport.o
-		Path:	{Project}\compiler\Clean System Files\unitype.o
-		Path:	{Project}\compiler\Clean System Files\analunitypes.o
-		Path:	{Project}\compiler\Clean System Files\analtypes.o
-		Path:	{Project}\compiler\Clean System Files\checktypes.o
-		Path:	{Project}\compiler\Clean System Files\genericsupport.o
-		Path:	{Project}\compiler\Clean System Files\type.o
+		Path:	{Project}\compiler\Clean System Files\syntax.o
+		Path:	{Project}\compiler\Clean System Files\general.o
+		Path:	{Project}\compiler\Clean System Files\scanner.o
+		Path:	{Project}\main\Clean System Files\coclmain.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdFunc.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdCharList.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdTuple.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdOrdList.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\_SystemEnum.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdEnum.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdList.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdFile.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdString.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdReal.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdMisc.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\_SystemArray.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdArray.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdClass.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdChar.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdInt.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdOverloaded.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdBool.o
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\StdEnv.o
+		Path:	{Project}\main\Clean System Files\cocl.o
 		Path:	{Project}\compiler\Clean System Files\overloading.o
 		Path:	{Project}\compiler\Clean System Files\convertDynamics.o
 		Path:	{Project}\compiler\Clean System Files\convertcases.o
@@ -2245,15 +2241,19 @@ Static
 		Path:	{Project}\main\Clean System Files\filesystem.o
 		Path:	{Project}\compiler\Clean System Files\refmark.o
 		Path:	{Project}\compiler\Clean System Files\parse.o
+		Path:	{Project}\compiler\Clean System Files\portToNewSyntax.o
 		Path:	{Project}\compiler\Clean System Files\explicitimports.o
 		Path:	{Project}\compiler\Clean System Files\comparedefimp.o
 		Path:	{Project}\compiler\Clean System Files\checkFunctionBodies.o
-		Path:	{Project}\compiler\Clean System Files\portToNewSyntax.o
 		Path:	{Project}\compiler\Clean System Files\mergecases.o
 		Path:	{Project}\compiler\Clean System Files\postparse.o
 		Path:	{Project}\compiler\Clean System Files\convertimportedtypes.o
 		Path:	{Project}\compiler\Clean System Files\generics1.o
 		Path:	{Project}\backend\Clean System Files\backendinterface.o
+		Path:	{Project}\backend\Clean System Files\backend.o
+		Path:	{Project}\backend\Clean System Files\backendpreprocess.o
+		Path:	{Project}\backend\Clean System Files\backendsupport.o
+		Path:	{Project}\backend\Clean System Files\backendconvert.o
 		Path:	{Project}\main\Clean System Files\Version.o
 		Path:	{Project}\main\Windows\Clean System Files\thread_message.o
 		Path:	{Project}\ArgEnvWindows\Clean System Files\ArgEnvC.obj
@@ -2261,10 +2261,10 @@ Static
 		Path:	{Project}\main\Windows\Clean System Files\set_return_code.obj
 		Path:	{Project}\main\Windows\Clean System Files\thread_message.obj
 	Dlib
-		Path:	{Application}\StdEnv\Clean System Files\kernel_library
-		Path:	{Application}\StdEnv\Clean System Files\comdlg_library
-		Path:	{Application}\StdEnv\Clean System Files\gdi_library
-		Path:	{Application}\StdEnv\Clean System Files\user_library
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\kernel_library
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\user_library
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\gdi_library
+		Path:	{Application}\Libraries\StdEnv 2.0\Clean System Files\comdlg_library
 		Path:	{Project}\backend\Clean System Files\backend_library
 		Path:	{Project}\main\Windows\Clean System Files\directory_library
 	Pths
@@ -2275,6 +2275,6 @@ Static
 		Path:	{Project}\backendCModules
 		Path:	{Project}\main
 		Path:	{Project}\main\Windows
-		Path:	{Application}\StdEnv
-	AppP:	C:\Clean134
-	PrjP:	C:\Clean20rc21\rankn
+		Path:	{Application}\Libraries\StdEnv 2.0
+	AppP:	C:\applications\Clean 2.0
+	PrjP:	E:\onderzoek\ranknstuff\cocl
