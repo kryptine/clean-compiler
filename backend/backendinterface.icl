@@ -44,7 +44,9 @@ backEndInterface outputFileName commandLineArgs predefs syntaxTree errorFile fil
 	| not compatible
 		=	(False, errorFile, files)
 	# varHeap
-		=	backendPreprocess functionIndices syntaxTree.fe_icl syntaxTree.fe_varHeap
+// MW was:		=	backendPreprocess functionIndices syntaxTree.fe_icl syntaxTree.fe_varHeap
+		=	backendPreprocess predefs.[PD_DummyForStrictAliasFun].pds_ident functionIndices
+								syntaxTree.fe_icl syntaxTree.fe_varHeap
 		with
 			functionIndices
 				=	flatten [[member \\ member <- group.group_members] \\ group <-: syntaxTree.fe_components]

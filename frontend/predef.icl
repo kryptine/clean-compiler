@@ -73,7 +73,6 @@ PD_TypeCodeClass			:== 122
 PD_TypeObjectType			:== 124
 PD_TypeConsSymbol			:== 125
 PD_unify					:== 126
-// MV ..
 PD_coerce					:== 127
 PD_variablePlaceholder		:== 128
 PD_StdDynamics				:== 129
@@ -81,8 +80,11 @@ PD_undo_indirections		:== 130
 
 PD_Start					:== 131
 
-PD_NrOfPredefSymbols		:== 132
-// .. MV
+// MW..
+PD_DummyForStrictAliasFun	:== 132
+
+PD_NrOfPredefSymbols		:== 133
+// ..MW
 
 
 (<<=) infixl
@@ -113,6 +115,7 @@ where
 			<<= ("_list", PD_ListType) <<= ("_cons", PD_ConsSymbol) <<= ("_nil", PD_NilSymbol)
 			<<= ("_array", PD_LazyArrayType) <<= ("_!array", PD_StrictArrayType) <<= ("_#array", PD_UnboxedArrayType)
 			<<= ("_type_code", PD_TypeCodeMember)
+			<<= ("_dummyForStrictAlias", PD_DummyForStrictAliasFun) // MW++
 	where
 
 		build_tuples tup_arity max_arity tables
@@ -198,6 +201,7 @@ buildPredefinedModule pre_def_symbols
 	  (list_id, pre_def_symbols)		= pre_def_symbols![PD_ListType]
 	  (unb_array_id, pre_def_symbols)	= pre_def_symbols![PD_UnboxedArrayType]
 	  (pre_mod_symb, pre_def_symbols)	= pre_def_symbols![PD_PredefinedModule]
+	  (alias_dummy_symb, pre_def_symbols)	= pre_def_symbols![PD_DummyForStrictAliasFun] // MW++
 	  (cons_symb, pre_def_symbols)		= new_defined_symbol PD_ConsSymbol 2 cConsSymbIndex pre_def_symbols
 	  (nil_symb, pre_def_symbols)		= new_defined_symbol PD_NilSymbol 0 cNilSymbIndex pre_def_symbols
 	  pre_mod_id						= pre_mod_symb.pds_ident
@@ -220,12 +224,14 @@ buildPredefinedModule pre_def_symbols
 	  (unboxed_def, pre_def_symbols)	= make_type_def PD_UnboxedArrayType [type_var] (AbstractType cIsHyperStrict) pre_def_symbols
 
 	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_id MaxTupleArity [array_def,strict_def,unboxed_def] [] pre_def_symbols
+	  alias_dummy_type = make_identity_fun_type alias_dummy_symb.pds_ident type_var // MW++
 	  (class_def, member_def, pre_def_symbols) = make_TC_class_def pre_def_symbols
 	= ({ mod_name = pre_mod_id, mod_type = MK_System, mod_imports = [],  mod_imported_objects = [],
 		 mod_defs = {
-			def_types = [string_def, list_def : type_defs], def_constructors
-						= [ParsedConstructorToConsDef cons_def, ParsedConstructorToConsDef nil_def : cons_defs], def_selectors = [], def_classes = [class_def],
-			def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def], def_funtypes = [], def_instances = [] }}, pre_def_symbols)
+			def_types = [string_def, list_def : type_defs],
+			def_constructors = [ParsedConstructorToConsDef cons_def, ParsedConstructorToConsDef nil_def : cons_defs],
+			def_selectors = [], def_classes = [class_def], def_macros = { ir_from = 0, ir_to = 0 }, def_members = [member_def],
+			def_funtypes = [alias_dummy_type], def_instances = [] }}, pre_def_symbols)
 where
 	add_tuple_defs pre_mod_id tup_arity type_defs cons_defs pre_def_symbols
 		| tup_arity >= 2
@@ -276,7 +282,14 @@ where
 
 		= (class_def, member_def, pre_def_symbols)
 
-		
+// MW..
+	make_identity_fun_type alias_dummy_id type_var
+		# a = { at_attribute = TA_Anonymous, at_annotation = AN_Strict, at_type = TV type_var }
+		  id_symbol_type = { st_vars = [], st_args = [a], st_arity = 1, st_result = a, st_context = [], 
+							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
+		= { ft_symb = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
+			ft_specials = SP_None, ft_type_ptr = nilPtr }
+// ..MW
 		
 
 

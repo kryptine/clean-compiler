@@ -7,11 +7,18 @@ import Heap
 import backendsupport
 import RWSDebug
 
+/* MW was
 backendPreprocess :: ![Index] !IclModule !*VarHeap -> *VarHeap
-backendPreprocess functionIndices iclModule varHeap
+backendPreprocess predefSymblos functionIndices iclModule varHeap
 	=	preprocess [iclModule.icl_functions.[i] \\ i <- functionIndices] varHeap
+*/
+backendPreprocess :: !Ident ![Index] !IclModule !*VarHeap -> *VarHeap
+backendPreprocess aliasDummyId functionIndices iclModule varHeap
+	=	preprocess aliasDummyId
+					[iclModule.icl_functions.[i] \\ i <- functionIndices] varHeap
 
-class preprocess a :: a -> Preprocessor
+// MW was class preprocess a :: a -> Preprocessor
+class preprocess a :: !Ident a -> Preprocessor
 :: Preprocessor
 	:==	*PreprocessState -> *PreprocessState
 :: PreprocessState
@@ -23,31 +30,52 @@ instance preprocess {#a} | preprocess a & ArrayElem a where
 /*2.0
 instance preprocess {#a} | preprocess a & Array {#} a where
 0.2*/
+/* MW was
 	preprocess array
 		=	foldStateA preprocess array
+*/
+	preprocess aliasDummyId array
+		=	foldStateA (preprocess aliasDummyId) array
 
 instance preprocess [a] | preprocess a where
+/* MW was
 	preprocess list
 		=	foldState preprocess list
+*/
+	preprocess aliasDummyId list
+		=	foldState (preprocess aliasDummyId) list
 
 // +++ this assigns sequence numbers per function, should be per alternative and move to backendconvert
 instance preprocess FunDef where
+/* MW was
 	preprocess funDef
 		=	fromSequencerToPreprocessor (sequence funDef.fun_body)
+*/
+	preprocess aliasDummyId funDef
+		=	fromSequencerToPreprocessor aliasDummyId (sequence funDef.fun_body)
 
 class sequence a :: a -> Sequencer
 :: Sequencer
 	:== *SequenceState -> *SequenceState
 :: SequenceState
-	=	{ss_sequenceNumber :: !Int, ss_varHeap :: .VarHeap}
+	=	{ss_sequenceNumber :: !Int, ss_varHeap :: .VarHeap, ss_aliasDummyId :: !Ident}
+// MW added ss_aliasDummyId (remove it if you don't like it, Ronny)
 
+/* MW was
 toSequenceState varHeap
 	:==	{ss_sequenceNumber = 0, ss_varHeap = varHeap}
+*/
+toSequenceState aliasDummyId varHeap
+	:==	{ss_sequenceNumber = 0, ss_varHeap = varHeap, ss_aliasDummyId = aliasDummyId}
 fromSequenceState sequenceState
 	:==	sequenceState.ss_varHeap
 
+/* MW was
 fromSequencerToPreprocessor sequencer
 	:==	toSequenceState
+*/
+fromSequencerToPreprocessor aliasDummyId sequencer
+	:==	toSequenceState aliasDummyId
 	o`	sequencer
 	o`	fromSequenceState
 
@@ -100,7 +128,8 @@ instance sequence Expression where
 		=	sequence exp
 		o`	sequence selections
 	sequence (AnyCodeExpr _ outParams _)
-		=	sequence outParams
+// MW was:		=	sequence outParams
+		=	foldState (\{bind_dst}->sequence bind_dst) outParams
 	sequence _
 		=	identity
 
@@ -112,7 +141,27 @@ instance sequence Selection where
 	sequence (DictionarySelection dictionaryVar dictionarySelections _ index)
 		=	sequence index
 
-instance sequence (Bind a b) | sequence b where
+// MW was:instance sequence (Bind a b) | sequence b where
+instance sequence (Bind Expression FreeVar) where
+// MW.. PD_DummyForStrictAliasFun
+	sequence {bind_src=App app , bind_dst}
+		= sequence` app bind_dst
+	  where
+	  	sequence` {app_symb, app_args} bind_dst sequenceState=:{ss_aliasDummyId}
+			| app_symb.symb_name==ss_aliasDummyId
+				// the compiled source was a strict alias like "#! x = y"
+				= case hd app_args of
+					Var bound_var=:{var_info_ptr}
+						# (vi, ss_varHeap) = readPtr var_info_ptr sequenceState.ss_varHeap
+						  non_alias_bound_var = case vi of
+													VI_SequenceNumber _		-> bound_var
+													VI_Alias alias_bound_var-> alias_bound_var
+						  ss_varHeap = writePtr bind_dst.fv_info_ptr (VI_Alias non_alias_bound_var) ss_varHeap
+						-> { sequenceState & ss_varHeap = ss_varHeap }
+					_
+						-> sequence bind_dst sequenceState
+		= sequence bind_dst sequenceState
+// ..MW
 	sequence bind
 		=	sequence bind.bind_dst
 

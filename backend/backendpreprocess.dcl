@@ -4,4 +4,5 @@ import checksupport
 
 // assign sequence numbers to all variables in the syntax tree
 
-backendPreprocess :: ![Index] !IclModule !*VarHeap -> *VarHeap
+// MW was:backendPreprocess :: ![Index] !IclModule !*VarHeap -> *VarHeap
+backendPreprocess :: !Ident ![Index] !IclModule !*VarHeap -> *VarHeap

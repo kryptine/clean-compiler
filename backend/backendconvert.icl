@@ -305,7 +305,10 @@ backEndConvertModules predefs {fe_icl = fe_icl =: {icl_name, icl_functions, icl_
 	#! backEnd
 		=	adjustArrayFunctions predefs fe_arrayInstances icl_functions fe_dcls varHeap (backEnd -*-> "adjustArrayFunctions")
 	#! (rules, backEnd)
-		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] varHeap (backEnd -*-> "convertRules")
+// MW was:		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] varHeap (backEnd -*-> "convertRules")
+		=	convertRules predefs.[PD_DummyForStrictAliasFun].pds_ident
+					[(index, icl_functions.[index]) \\ (_, index) <- functionIndices]
+					varHeap (backEnd -*-> "convertRules")
 	#! backEnd
 		=	BEDefineRules rules (backEnd -*-> "BEDefineRules")
 	#! backEnd
@@ -407,7 +410,11 @@ reshuffleTypes nIclTypes dclIclConversions be
 				#! to` = if (to` >= nDclTypes) frm` to`
 				=	(swap frm` to` p, swap frm to p`, swapTypes frm to be)
 
+/* MW changed into
+class declareVars a :: a !(!Ident, !VarHeap) -> Backender
+before it was:
 class declareVars a :: a !VarHeap -> Backender
+non trivial changes are indicated with a comment
 
 instance declareVars [a] | declareVars a where
 	declareVars :: [a] VarHeap -> Backender | declareVars a
@@ -476,6 +483,88 @@ instance declareVars BackendBody where
 	declareVars {bb_args, bb_rhs} varHeap
 		=	declareVars bb_args varHeap
 		o`	declareVars bb_rhs varHeap
+*/
+:: DeclVarsInput :== (!Ident, !VarHeap)
+
+class declareVars a :: a !DeclVarsInput -> Backender
+
+instance declareVars [a] | declareVars a where
+	declareVars :: [a] !DeclVarsInput -> Backender | declareVars a
+	declareVars list dvInput
+		=	foldState (flip declareVars dvInput) list
+
+instance declareVars (Ptr VarInfo) where
+	declareVars varInfoPtr (_, varHeap)
+		=	declareVariable BELhsNodeId varInfoPtr "_var???" varHeap	// +++ name
+
+instance declareVars FreeVar where
+	declareVars :: FreeVar !DeclVarsInput -> Backender
+	declareVars freeVar (_, varHeap)
+		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+
+// MW this rule was changed non trivially
+instance declareVars (Bind Expression FreeVar) where
+	declareVars :: (Bind Expression FreeVar) !DeclVarsInput -> Backender
+	declareVars {bind_src=App {app_symb, app_args=[Var _:_]}, bind_dst=freeVar} (aliasDummyId, varHeap)
+		| app_symb.symb_name==aliasDummyId
+			= identity		// we have an alias. Don't declare the same variable twice
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+	declareVars {bind_dst=freeVar} (_, varHeap)
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+
+declareVariable :: Int (Ptr VarInfo) {#Char} !VarHeap -> Backender
+declareVariable lhsOrRhs varInfoPtr name varHeap
+	=	beDeclareNodeId (getVariableSequenceNumber varInfoPtr varHeap) lhsOrRhs name
+
+instance declareVars (Optional a) | declareVars a where
+	declareVars :: (Optional a) !DeclVarsInput -> Backender | declareVars a
+	declareVars (Yes x) dvInput
+		=	declareVars x dvInput
+	declareVars No _
+		=	identity
+
+instance declareVars FunctionPattern where
+	declareVars :: FunctionPattern !DeclVarsInput -> Backender
+	declareVars (FP_Algebraic _ freeVars optionalVar) dvInput
+		=	declareVars freeVars dvInput
+		o`	declareVars optionalVar dvInput
+	declareVars (FP_Variable freeVar) dvInput
+		=	declareVars freeVar dvInput
+	declareVars (FP_Basic _ optionalVar) dvInput
+		=	declareVars optionalVar dvInput
+	declareVars FP_Empty dvInput
+		=	identity
+
+instance declareVars Expression where
+	declareVars :: Expression !DeclVarsInput -> Backender
+	declareVars (Let {let_strict_binds, let_lazy_binds, let_expr}) dvInput
+		=	declareVars let_strict_binds dvInput
+		o`	declareVars let_lazy_binds dvInput
+		o`	declareVars let_expr dvInput
+	declareVars (Conditional {if_then, if_else}) dvInput
+		=	declareVars if_then dvInput
+		o`	declareVars if_else dvInput
+// MW here was a non trivial change
+	declareVars (AnyCodeExpr _ outParams _) (_, varHeap)
+		=	foldState (declVar varHeap) outParams 
+	  where
+		declVar varHeap {bind_dst=freeVar} 
+			= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_name.id_name varHeap
+	declareVars _ _
+		=	identity
+
+instance declareVars TransformedBody where
+	declareVars :: TransformedBody !DeclVarsInput -> Backender
+	declareVars {tb_args, tb_rhs} dvInput
+		=	declareVars tb_args dvInput
+		o`	declareVars tb_rhs dvInput
+
+instance declareVars BackendBody where
+	declareVars :: BackendBody !DeclVarsInput -> Backender
+	declareVars {bb_args, bb_rhs} dvInput
+		=	declareVars bb_args dvInput
+		o`	declareVars bb_rhs dvInput
+
 
 :: ModuleIndex :== Index
 
@@ -830,8 +919,12 @@ convertRules rules varHeap
 	=	foldl (flip beRules) beNoRules (map (flip convertRule varHeap) rules)
 */
 
+/* MW was
 convertRules :: [(Int, FunDef)] VarHeap *BackEnd -> (BEImpRuleP, *BackEnd)
 convertRules rules varHeap be
+*/
+convertRules :: Ident [(Int, FunDef)] VarHeap *BackEnd -> (BEImpRuleP, *BackEnd)
+convertRules aliasDummyId rules varHeap be
 	# (null, be)
 		=	BENoRules be
 	=	convert rules varHeap null be
@@ -842,14 +935,22 @@ convertRules rules varHeap be
 			=	(rulesP, be)
 		convert [h:t] varHeap rulesP be
 			# (ruleP, be)
-				=	convertRule h varHeap be
+// MW was				=	convertRule h varHeap be
+				=	convertRule aliasDummyId h varHeap be
 			# (rulesP, be)
 				=	BERules ruleP rulesP be
 			=	convert t varHeap rulesP be
 
+/* MW was
 convertRule :: (Int,FunDef) VarHeap -> BEMonad BEImpRuleP
 convertRule (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) varHeap
-	=	beRule index (cafness fun_kind) (convertTypeAlt index cIclModIndex (type /* ->> ("convertRule", fun_symb.id_name, index, type) */)) (convertFunctionBody index (positionToLineNumber fun_pos) body varHeap)
+*/
+convertRule :: Ident (Int,FunDef) VarHeap -> BEMonad BEImpRuleP
+convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) varHeap
+// MW was:	=	beRule index (cafness fun_kind) (convertTypeAlt index cIclModIndex (type /* ->> ("convertRule", fun_symb.id_name, index, type) */)) (convertFunctionBody index (positionToLineNumber fun_pos) body varHeap)
+	=	beRule index (cafness fun_kind)
+			(convertTypeAlt index cIclModIndex (type /* ->> ("convertRule", fun_symb.id_name, index, type) */))
+			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body varHeap)
 	where
 		cafness :: FunKind -> Int
 		cafness (FK_Function _)
@@ -869,9 +970,14 @@ convertRule (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_sy
 		positionToLineNumber _
 			=	-1
 
+/* MW was
 convertFunctionBody :: Int Int FunctionBody VarHeap -> BEMonad BERuleAltP
 convertFunctionBody functionIndex lineNumber (BackendBody bodies) varHeap
 	=	convertBackendBodies functionIndex lineNumber bodies varHeap
+*/
+convertFunctionBody :: Int Int Ident FunctionBody VarHeap -> BEMonad BERuleAltP
+convertFunctionBody functionIndex lineNumber aliasDummyId (BackendBody bodies) varHeap
+	=	convertBackendBodies functionIndex lineNumber aliasDummyId bodies varHeap
 
 convertTypeAlt :: Int ModuleIndex SymbolType -> BEMonad BETypeAltP
 convertTypeAlt functionIndex moduleIndex symbol=:{st_result}
@@ -951,37 +1057,54 @@ convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args
 	=	foldr (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
 
+/* MW was
 convertBackendBodies :: Int Int [BackendBody] VarHeap -> BEMonad BERuleAltP
 convertBackendBodies functionIndex lineNumber bodies varHeap
 	=	foldr (beRuleAlts o (flip (convertBackendBody functionIndex lineNumber)) varHeap) beNoRuleAlts bodies
+*/
+convertBackendBodies :: Int Int Ident [BackendBody] VarHeap -> BEMonad BERuleAltP
+convertBackendBodies functionIndex lineNumber aliasDummyId bodies varHeap
+	=	foldr (beRuleAlts o (flip (convertBackendBody functionIndex lineNumber aliasDummyId)) varHeap)
+				beNoRuleAlts bodies
 
+/* MW was
 convertBackendBody :: Int Int BackendBody VarHeap -> BEMonad BERuleAltP
 convertBackendBody functionIndex lineNumber body=:{bb_args, bb_rhs=ABCCodeExpr instructions inline} varHeap
+*/
+convertBackendBody :: Int Int Ident BackendBody VarHeap -> BEMonad BERuleAltP
+convertBackendBody functionIndex lineNumber aliasDummyId body=:{bb_args, bb_rhs=ABCCodeExpr instructions inline} varHeap
 	=	beNoNodeDefs ==> \noNodeDefs
-	->	declareVars body varHeap
+// MW was	->	declareVars body varHeap
+	->	declareVars body (aliasDummyId, varHeap)
 	o`	beCodeAlt
 			lineNumber
 			(convertLhsNodeDefs bb_args noNodeDefs varHeap)
 			(convertBackendLhs functionIndex bb_args varHeap)
 			(beAbcCodeBlock inline (convertStrings instructions))
-convertBackendBody functionIndex lineNumber body=:{bb_args, bb_rhs=AnyCodeExpr inParams outParams instructions} varHeap
+// MW was:convertBackendBody functionIndex lineNumber body=:{bb_args, bb_rhs=AnyCodeExpr inParams outParams instructions} varHeap
+convertBackendBody functionIndex lineNumber aliasDummyId body=:{bb_args, bb_rhs=AnyCodeExpr inParams outParams instructions} varHeap
 	=	beNoNodeDefs ==> \noNodeDefs
-	->	declareVars body varHeap
+// MW was	->	declareVars body varHeap
+	->	declareVars body (aliasDummyId, varHeap)
 	o`	beCodeAlt
 			lineNumber
 			(convertLhsNodeDefs bb_args noNodeDefs varHeap)
 			(convertBackendLhs functionIndex bb_args varHeap)
 			(beAnyCodeBlock (convertCodeParameters inParams varHeap) (convertCodeParameters outParams varHeap) (convertStrings instructions))
-convertBackendBody functionIndex lineNumber body=:{bb_args, bb_rhs} varHeap
+// MW was:convertBackendBody functionIndex lineNumber body=:{bb_args, bb_rhs} varHeap
+convertBackendBody functionIndex lineNumber aliasDummyId body=:{bb_args, bb_rhs} varHeap
 	=	beNoNodeDefs ==> \noNodeDefs
-	->	declareVars body varHeap
+// MW was	->	declareVars body varHeap
+	->	declareVars body (aliasDummyId, varHeap)
 	o`	beRuleAlt
 			lineNumber
 			(convertLhsNodeDefs bb_args noNodeDefs varHeap)
 			(convertBackendLhs functionIndex bb_args varHeap)
-			(convertRhsNodeDefs bb_rhs varHeap)
+// MW was:			(convertRhsNodeDefs bb_rhs varHeap)
+			(convertRhsNodeDefs aliasDummyId bb_rhs varHeap)
 			(convertRhsStrictNodeIds bb_rhs varHeap)
-			(convertRootExpr bb_rhs varHeap)
+// MW was:			(convertRootExpr bb_rhs varHeap)
+			(convertRootExpr aliasDummyId bb_rhs varHeap)
 
 convertStrings :: [{#Char}] -> BEMonad BEStringListP
 convertStrings strings
@@ -1049,6 +1172,7 @@ convertVars :: [VarInfoPtr] VarHeap -> BEMonad BEArgP
 convertVars vars varHeap
 	=	foldr (beArgs o flip convertVarPtr varHeap) beNoArgs vars
 
+/* MW was
 convertRootExpr :: Expression VarHeap -> BEMonad BENodeP
 convertRootExpr (Let {let_expr}) varHeap
 	=	convertRootExpr let_expr varHeap
@@ -1057,24 +1181,41 @@ convertRootExpr (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) var
 	where
 		convertConditional :: Expression Expression Expression VarHeap -> BEMonad BENodeP
 		convertConditional cond then else varHeap
+*/
+convertRootExpr :: Ident Expression VarHeap -> BEMonad BENodeP
+convertRootExpr aliasDummyId (Let {let_expr}) varHeap
+	=	convertRootExpr aliasDummyId let_expr varHeap
+convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) varHeap
+	=	convertConditional aliasDummyId cond then else varHeap
+	where
+		convertConditional :: Ident Expression Expression Expression VarHeap -> BEMonad BENodeP
+		convertConditional aliasDummyId cond then else varHeap
 			=	beGuardNode
 					(convertExpr cond varHeap)
-					(convertRhsNodeDefs then varHeap)
+// MW was:					(convertRhsNodeDefs then varHeap)
+					(convertRhsNodeDefs aliasDummyId then varHeap)
 					(convertRhsStrictNodeIds then varHeap)
-					(convertRootExpr then varHeap)
-					(convertRhsNodeDefs else varHeap)
+// MW was:					(convertRootExpr then varHeap)
+					(convertRootExpr aliasDummyId then varHeap)
+// MW was:					(convertRhsNodeDefs else varHeap)
+					(convertRhsNodeDefs aliasDummyId else varHeap)
 					(convertRhsStrictNodeIds else varHeap)
-					(convertRootExpr else varHeap)
-convertRootExpr (Conditional {if_cond=cond, if_then=then, if_else=No}) varHeap
+// MW was:					(convertRootExpr else varHeap)
+					(convertRootExpr aliasDummyId else varHeap)
+// MW was:convertRootExpr (Conditional {if_cond=cond, if_then=then, if_else=No}) varHeap
+convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=No}) varHeap
 		=	beGuardNode
 				(convertExpr cond varHeap)
-				(convertRhsNodeDefs then varHeap)
+// MW was:				(convertRhsNodeDefs then varHeap)
+				(convertRhsNodeDefs aliasDummyId then varHeap)
 				(convertRhsStrictNodeIds then varHeap)
-				(convertRootExpr then varHeap)
+// MW was:				(convertRootExpr then varHeap)
+				(convertRootExpr aliasDummyId then varHeap)
 				beNoNodeDefs
 				beNoStrictNodeIds
 				(beNormalNode (beBasicSymbol BEFailSymb) beNoArgs)
-convertRootExpr expr varHeap
+// MW was:convertRootExpr expr varHeap
+convertRootExpr _ expr varHeap
 	=	convertExpr expr varHeap
 
 // RWS +++ rewrite
@@ -1103,15 +1244,42 @@ defineLhsNodeDef freeVar pattern nodeDefs varHeap
 			(beNodeDef (getVariableSequenceNumber freeVar.fv_info_ptr varHeap) (convertPattern pattern varHeap))
 			(return nodeDefs)
 
+/* MW was
 collectNodeDefs :: Expression -> [Bind Expression FreeVar]
 collectNodeDefs (Let {let_strict_binds, let_lazy_binds})
 	=	let_strict_binds ++ let_lazy_binds
-collectNodeDefs _
+*/
+collectNodeDefs :: Ident Expression -> [Bind Expression FreeVar]
+collectNodeDefs aliasDummyId (Let {let_strict_binds, let_lazy_binds})
+// MW was:	=	let_strict_binds ++ let_lazy_binds
+	= filterStrictAlias let_strict_binds let_lazy_binds
+  where
+	filterStrictAlias [] let_lazy_binds
+		= let_lazy_binds
+	filterStrictAlias [strict_bind=:{bind_src=App app}:strict_binds] let_lazy_binds
+		| app.app_symb.symb_name==aliasDummyId
+			// the compiled source was a strict alias like "#! x = y"
+			= case hd app.app_args of
+				Var _
+					// the node is still such an alias and must be ignored
+					-> filterStrictAlias strict_binds let_lazy_binds
+				hd_app_args
+					// the node is not an alias anymore: remove just the _dummyForStrictAlias call
+					-> [{ strict_bind & bind_src = hd_app_args } : filterStrictAlias strict_binds let_lazy_binds]
+	filterStrictAlias [strict_bind:strict_binds] let_lazy_binds
+		= [strict_bind: filterStrictAlias strict_binds let_lazy_binds]
+// MW was:collectNodeDefs _
+collectNodeDefs _ _
 	=	[]
 
+/* MW was
 convertRhsNodeDefs :: Expression VarHeap -> BEMonad BENodeDefP
 convertRhsNodeDefs expr varHeap
 	=	convertNodeDefs (collectNodeDefs expr) varHeap
+*/
+convertRhsNodeDefs :: Ident Expression VarHeap -> BEMonad BENodeDefP
+convertRhsNodeDefs aliasDummyId expr varHeap
+	=	convertNodeDefs (collectNodeDefs aliasDummyId expr) varHeap
 
 convertNodeDef :: !(Bind Expression FreeVar) VarHeap -> BEMonad BENodeDefP
 convertNodeDef {bind_src=expr, bind_dst=freeVar} varHeap
@@ -1305,10 +1473,19 @@ convertVar varInfo varHeap
 	=	beNodeId (getVariableSequenceNumber varInfo varHeap)
 
 getVariableSequenceNumber :: VarInfoPtr VarHeap -> Int
+/* MW was
 getVariableSequenceNumber varInfoPtr varHeap
 	# (VI_SequenceNumber sequenceNumber)
 		=	sreadPtr varInfoPtr varHeap
 	=	sequenceNumber
+*/
+getVariableSequenceNumber varInfoPtr varHeap
+	# vi = sreadPtr varInfoPtr varHeap
+	= case vi of
+		VI_SequenceNumber sequenceNumber
+			-> sequenceNumber
+		VI_Alias {var_info_ptr}
+			-> getVariableSequenceNumber var_info_ptr varHeap
 
 markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} (Optional {#Int}) -> Backender
 markExports {dcl_conversions = Yes conversionTable} dclClasses dclTypes iclClasses iclTypes (Yes functionConversions)

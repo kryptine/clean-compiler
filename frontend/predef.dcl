@@ -75,7 +75,6 @@ PD_TypeCodeClass			:== 122
 PD_TypeObjectType			:== 124
 PD_TypeConsSymbol			:== 125
 PD_unify					:== 126
-// MV ..
 PD_coerce					:== 127
 PD_variablePlaceholder		:== 128
 PD_StdDynamics				:== 129
@@ -83,8 +82,11 @@ PD_undo_indirections		:== 130
 
 PD_Start					:== 131
 
-PD_NrOfPredefSymbols		:== 132
-// .. MV
+// MW..
+PD_DummyForStrictAliasFun	:== 132
+
+PD_NrOfPredefSymbols		:== 133
+// ..MW
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

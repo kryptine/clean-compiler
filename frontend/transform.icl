@@ -543,9 +543,9 @@ where
 
 NotChecked :== -1	
 
-partitionateMacros :: !IndexRange !Index !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+partitionateMacros :: !IndexRange !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap, !*SymbolTable, !*ErrorAdmin )
-partitionateMacros {ir_from,ir_to} mod_index fun_defs modules var_heap symbol_heap symbol_table error
+partitionateMacros {ir_from,ir_to} mod_index alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
 							pi_symbol_table = symbol_table,
@@ -588,7 +588,7 @@ where
 			  es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
 					 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error }
 			  (tb_args, tb_rhs, local_vars, fi_calls, macro_defs, modules, {es_symbol_table, es_var_heap, es_symbol_heap, es_error})
-					= expandMacrosInBody [] body macro_defs mod_index modules es
+					= expandMacrosInBody [] body macro_defs mod_index alias_dummy modules es
 			  macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars }}
 			= ({ macro_defs & [macro_index] = macro }, modules,
@@ -607,9 +607,9 @@ where
 		is_a_pattern_macro _ _
 			= False
 			
-partitionateAndLiftFunctions :: ![IndexRange] !Index !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefinedSymbol !*{# FunDef} !u:{# DclModule} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 	-> (!*{! Group}, !*{# FunDef}, !u:{# DclModule}, !*VarHeap, !*ExpressionHeap,  !*SymbolTable, !*ErrorAdmin )
-partitionateAndLiftFunctions ranges mod_index fun_defs modules var_heap symbol_heap symbol_table error
+partitionateAndLiftFunctions ranges mod_index alias_dummy fun_defs modules var_heap symbol_heap symbol_table error
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap, pi_symbol_table = symbol_table,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
@@ -687,7 +687,8 @@ where
 			  {fun_symb,fun_body = PartioningFunction body _, fun_info, fun_pos} = fun_def
 		  	  identPos = newPosition fun_symb fun_pos
 			  (tb_args, tb_rhs, fi_local_vars, fi_calls, fun_and_macro_defs, modules, es)
-					= expandMacrosInBody fun_info.fi_calls body fun_and_macro_defs mod_index modules { es & es_error = setErrorAdmin identPos es.es_error }
+					= expandMacrosInBody fun_info.fi_calls body fun_and_macro_defs mod_index alias_dummy modules
+							{ es & es_error = setErrorAdmin identPos es.es_error }
 			  fun_def = { fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 			  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = fi_local_vars }}
 			= ({ fun_and_macro_defs & [fun_index] = fun_def }, modules, es)
@@ -732,13 +733,15 @@ where
 				-> (fun_defs, symbol_table)
 		
 
-expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index modules es=:{es_symbol_table}
+expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index alias_dummy modules es=:{es_symbol_table}
 	# (prev_calls, fun_defs, es_symbol_table) = addFunctionCallsToSymbolTable fi_calls fun_defs es_symbol_table
 	  ([rhs:rhss], fun_defs, modules, (all_calls, es)) = expand cb_rhs fun_defs mod_index modules (prev_calls, { es & es_symbol_table = es_symbol_table })
 	  (fun_defs, es_symbol_table) = removeFunctionCallsFromSymbolTable all_calls fun_defs es.es_symbol_table
 	  (merged_rhs, es_var_heap, es_symbol_heap, es_error) = mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap}) = determineVariablesAndRefCounts cb_args merged_rhs
-	  		{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap }
+	  (new_rhs, new_args, local_vars, {cos_error, cos_var_heap, cos_symbol_heap})
+	  		= determineVariablesAndRefCounts cb_args merged_rhs
+	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
+	  					cos_alias_dummy = alias_dummy }
 	= (new_args, new_rhs, local_vars, all_calls, fun_defs, modules,
 		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap,
 												es_symbol_table = es_symbol_table })
@@ -1142,6 +1145,7 @@ where
 	{	cos_var_heap	:: !.VarHeap
 	,	cos_symbol_heap :: !.ExpressionHeap
 	,	cos_error		:: !.ErrorAdmin
+	,	cos_alias_dummy	:: !PredefinedSymbol
 	}
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], !*CollectState)
@@ -1206,15 +1210,17 @@ where
 		= (expr @ exprs, free_vars, cos)
 	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) free_vars cos=:{cos_var_heap}
 		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
-// XXX:	# cos_var_heap = foldSt (\bind cos_var_heap->clearCount bind cIsALocalVar cos_var_heap) let_strict_binds cos_var_heap
-		# cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
-		  (is_cyclic_s, let_strict_binds, cos_var_heap) = detect_cycles_and_remove_alias_binds let_strict_binds cos_var_heap
-		  (is_cyclic_l, let_lazy_binds, cos_var_heap)	= detect_cycles_and_remove_alias_binds let_lazy_binds cos_var_heap
+		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+		  (is_cyclic_s, let_strict_binds, cos) 
+		  		= detect_cycles_and_handle_alias_binds True let_strict_binds
+		  											{ cos & cos_var_heap = cos_var_heap }
+		  (is_cyclic_l, let_lazy_binds, cos) 
+		  		= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
 		| is_cyclic_s || is_cyclic_l
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars,
-					{ cos & cos_var_heap = cos_var_heap, cos_error = checkError "" "cyclic let definition" cos.cos_error})
+					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
 //		| otherwise
-			# (let_expr, free_vars, cos) = collectVariables let_expr free_vars { cos & cos_var_heap = cos_var_heap }
+			# (let_expr, free_vars, cos) = collectVariables let_expr free_vars cos
 			  all_binds = mapAppend (\sb->(True, sb)) let_strict_binds [(False, lb) \\ lb<-let_lazy_binds]
 			  (collected_binds, free_vars, cos) = collect_variables_in_binds all_binds [] free_vars cos
 			  (let_strict_binds, let_lazy_binds) = split collected_binds
@@ -1236,20 +1242,28 @@ where
 				= var_heap
 
 			
-		/*	Remove all aliases from the list of 'let'-binds. Be careful with cycles! */
+		/*	Remove all aliases from the list of lazy 'let'-binds. Add a _dummyForStrictAlias
+			function call for the strict aliases. Be careful with cycles! */
 		
-			detect_cycles_and_remove_alias_binds [] var_heap
-				= (cContainsNoCycle, [], var_heap)
-			detect_cycles_and_remove_alias_binds [bind=:{bind_dst={fv_info_ptr}} : binds] var_heap
-				#! var_info = sreadPtr fv_info_ptr var_heap
+			detect_cycles_and_handle_alias_binds is_strict [] cos
+				= (cContainsNoCycle, [], cos)
+			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
+				#! var_info = sreadPtr fv_info_ptr cos.cos_var_heap
 				= case var_info of
 					VI_Alias {var_info_ptr}
-						| is_cyclic fv_info_ptr var_info_ptr var_heap
-							-> (cContainsACycle, binds, var_heap)
-							-> detect_cycles_and_remove_alias_binds binds var_heap
+						| is_cyclic fv_info_ptr var_info_ptr cos.cos_var_heap
+							-> (cContainsACycle, binds, cos)
+						| is_strict
+							# cos_var_heap = writePtr fv_info_ptr (VI_Count 0 cIsALocalVar) cos.cos_var_heap
+							  (new_bind_src, cos) = add_dummy_id_for_strict_alias bind.bind_src 
+							  								{ cos & cos_var_heap = cos_var_heap }
+							  (is_cyclic, binds, cos) 
+							  		= detect_cycles_and_handle_alias_binds is_strict binds cos
+							-> (is_cyclic, [{ bind & bind_src = new_bind_src } : binds], cos)
+						-> detect_cycles_and_handle_alias_binds is_strict binds cos
 					_
-						# (is_cyclic, binds, var_heap) = detect_cycles_and_remove_alias_binds binds var_heap
-						-> (is_cyclic, [bind : binds], var_heap)
+						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
+						-> (is_cyclic, [bind : binds], cos)
 			where
 				is_cyclic orig_info_ptr info_ptr var_heap
 					| orig_info_ptr == info_ptr
@@ -1260,6 +1274,15 @@ where
 								-> is_cyclic orig_info_ptr var_info_ptr var_heap
 							_
 								-> False
+				
+				add_dummy_id_for_strict_alias bind_src cos=:{cos_symbol_heap, cos_alias_dummy}
+					# (new_app_info_ptr, cos_symbol_heap) = newPtr EI_Empty cos_symbol_heap
+					  {pds_ident, pds_module, pds_def} = cos_alias_dummy
+					  app_symb = { symb_name = pds_ident, 
+					  				symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def},
+									symb_arity = 1 }
+					= (App { app_symb = app_symb, app_args = [bind_src], app_info_ptr = new_app_info_ptr },
+						{ cos & cos_symbol_heap = cos_symbol_heap } )
 								
 		/*	Apply 'collectVariables' to the bound expressions (the 'bind_src' field of 'let'-bind) if
 		    the corresponding bound variable (the 'bind_dst' field) has been used. This can be determined
