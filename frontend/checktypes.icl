@@ -279,6 +279,7 @@ where
 		= ({ ts & ts_cons_defs = { ts.ts_cons_defs & [ds_index] =
 				{ cons_def & cons_type = cons_type, cons_index = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
 						cons_type_ptr = new_type_ptr, cons_arg_vars = cons_arg_vars }}}, { ti & ti_var_heap = ti_var_heap }, cs)
+//				---> ("bind_types_of_constructors", cons_def.cons_symb, exi_vars, cons_type)
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 			-> !(![AType], ![[ATypeVar]], ![AttrInequality], !(!*TypeSymbols, !*TypeInfo, !*CheckState))
@@ -1056,27 +1057,31 @@ where
 		= (TA_Unique, attr_vars, attr_var_heap, cs)
 	check_attribute is_rank_two attr name attr_vars attr_var_heap cs
 		| is_rank_two
-			= check_rank_two_attribute attr name attr_vars attr_var_heap cs
+			= check_rank_two_attribute attr attr_vars attr_var_heap cs
 			= check_global_attribute attr name attr_vars attr_var_heap cs
 	where
 		check_global_attribute TA_Multi name attr_vars attr_var_heap cs
-				# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-				  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
-				= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
-		check_global_attribute TA_None name attr_vars attr_var_heap cs
-				# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-				  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
-				= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
-		check_global_attribute _ name attr_vars attr_var_heap cs
-			= (TA_Multi, attr_vars, attr_var_heap, checkError name "specified attribute variable not allowed" cs)
-
-		check_rank_two_attribute TA_Anonymous name attr_vars attr_var_heap cs
 			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 			  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
 			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
-		check_rank_two_attribute attr name attr_vars attr_var_heap cs
-			= (attr, attr_vars, attr_var_heap, cs)
+		check_global_attribute TA_None name attr_vars attr_var_heap cs
+			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+			  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
+			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
+		check_global_attribute _ name attr_vars attr_var_heap cs
+			= (TA_Multi, attr_vars, attr_var_heap, checkError name "specified attribute variable not allowed" cs)
 
+		check_rank_two_attribute (TA_Var var) attr_vars attr_var_heap cs
+			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+			  new_var = { var & av_info_ptr = attr_info_ptr}
+			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
+		check_rank_two_attribute TA_Anonymous attr_vars attr_var_heap cs
+			= abort "check_rank_two_attribute (TA_Anonymous, check_types.icl)"
+/*			# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+			  new_var = { av_name = emptyIdent name, av_info_ptr = attr_info_ptr}
+			= (TA_Var new_var, [new_var : attr_vars], attr_var_heap, cs)
+*/		check_rank_two_attribute attr attr_vars attr_var_heap cs
+			= (attr, attr_vars, attr_var_heap, cs)
 
 addExistentionalTypeVariablesToSymbolTable :: !TypeAttribute ![ATypeVar] !*TypeHeaps !*CheckState
 	-> (![ATypeVar], !(!*TypeHeaps, !*CheckState))
@@ -1092,15 +1097,15 @@ where
 		| entry.ste_def_level < cGlobalScope // cOuterMostLevel
 			# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
-		      (atv_attribute, cs_error) = check_attribute atv_attribute root_attr tv_name.id_name cs_error
+		      (atv_attribute, th_attrs, cs_error) = check_attribute atv_attribute root_attr tv_name.id_name th_attrs cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
 			  						stv_info_ptr = tv_info_ptr, stv_count = 0  }, ste_def_level = cGlobalScope /* cOuterMostLevel */, ste_previous = entry })
-			  heaps = { heaps & th_vars = th_vars }
+			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
 					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error}))
 			= (atv, ({ heaps & th_vars = th_vars },
 					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_name.id_name "type variable already defined" cs_error}))
-
+/*
 	check_attribute :: !TypeAttribute !TypeAttribute !String !*ErrorAdmin
 		-> (!TypeAttribute, !*ErrorAdmin)
 	check_attribute TA_Multi root_attr name error
@@ -1117,6 +1122,28 @@ where
 				-> (PA_BUG (TA_RootVar (abort "SwitchUniquenessBug is on")) root_attr, error)
 	check_attribute attr root_attr name error
 		= (TA_Multi, checkError name "specified attribute not allowed" error)
+*/
+	
+
+	check_attribute :: !TypeAttribute !TypeAttribute !String !*AttrVarHeap !*ErrorAdmin
+		-> (!TypeAttribute, !*AttrVarHeap, !*ErrorAdmin)
+	check_attribute TA_Multi root_attr name attr_var_heap error
+		= (TA_Multi, attr_var_heap, error)
+	check_attribute TA_None root_attr name attr_var_heap error
+		= (TA_Multi, attr_var_heap, error)
+	check_attribute TA_Unique root_attr name attr_var_heap error
+		= (TA_Unique, attr_var_heap, error)
+	check_attribute (TA_Var var) root_attr name attr_var_heap error
+		= case root_attr of
+			TA_Var root_var
+				-> (TA_RootVar root_var, attr_var_heap, error)
+			TA_Unique
+				# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+				-> (TA_Var { var & av_info_ptr = attr_info_ptr}, attr_var_heap, error)
+//				-> (PA_BUG (TA_RootVar (abort "SwitchUniquenessBug is on")) root_attr, error)
+	check_attribute attr root_attr name attr_var_heap error
+		= (TA_Multi, attr_var_heap, checkError name "specified attribute not allowed" error)
+
 	
 retrieveKinds :: ![ATypeVar] *TypeVarHeap -> (![TypeKind], !*TypeVarHeap)
 retrieveKinds type_vars var_heap = mapSt retrieve_kind type_vars var_heap

@@ -51,9 +51,9 @@ partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{
 		= (reverse pi_groups, common_defs, pi_type_def_infos, {icl_common & com_type_defs = icl_type_defs}, dcl_modules, type_heaps, error)
 where
 	copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod nr_of_modules  (icl_type_defs, dcl_modules)
-		# type_defs 		= { {}	\\ module_nr <- [0..nr_of_modules] }
-		  marks				= { {}	\\ module_nr <- [0..nr_of_modules] }
-	  	  type_def_infos	= { {}	\\ module_nr <- [0..nr_of_modules] }
+		# type_defs 		= { {}	\\ module_nr <- [1..nr_of_modules] }
+		  marks				= { {}	\\ module_nr <- [1..nr_of_modules] }
+	  	  type_def_infos	= { {}	\\ module_nr <- [1..nr_of_modules] }
 		= iFoldSt (copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index nr_of_types_in_icl_mod) 0 nr_of_modules
 				(icl_type_defs, dcl_modules, type_defs, marks, type_def_infos)
 	where
