@@ -2470,7 +2470,7 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr ti_fun_heap
 // Sjaak
 		  {fun_type = Yes ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
-		  ((st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
+		  (_,(st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
 		  		= expandSynTypes (fi_properties bitand FI_HasTypeSpec == 0) common_defs (st_result,st_args)
 				  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps = type_heaps, ets_var_heap = var_heap,
 				  		  ets_main_dcl_module_n=main_dcl_module_n }
@@ -2501,7 +2501,7 @@ set_extended_expr_info expr_info_ptr extension expr_info_heap
 convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*{#{# CheckedTypeDef}} !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 convertSymbolType  rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
-	# (st, {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypes rem_annots common_defs st
+	# (st, {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}) = expandSynTypesInSymbolType rem_annots common_defs st
 		  		{ ets_type_defs = imported_types, ets_collected_conses = collected_imports, ets_type_heaps= type_heaps, ets_var_heap = var_heap,
 		  		  ets_main_dcl_module_n=main_dcl_module_n }
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
@@ -2532,49 +2532,59 @@ where
 						   	)
 						  	tc_types
 						  	class_cons_vars))}
+
+expandSynTypesInSymbolType rem_annots common_defs st=:{st_args,st_result,st_context} ets
+	# (_,(st_args,st_result), ets) = expandSynTypes rem_annots common_defs (st_args,st_result) ets
+	  st_args = addTypesOfDictionaries common_defs st_context st_args
+	= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
 	
-class expandSynTypes a :: !Bool !{# CommonDefs} !a !*ExpandTypeState -> (!a, !*ExpandTypeState)
-
-
-instance expandSynTypes SymbolType
-where
-	expandSynTypes rem_annots common_defs st=:{st_args,st_result,st_context} ets
-		# ((st_args,st_result), ets) = expandSynTypes rem_annots common_defs (st_args,st_result) ets
-		  st_args = addTypesOfDictionaries common_defs st_context st_args
-		= ({st & st_args = st_args, st_result = st_result, st_arity = length st_args, st_context = [] }, ets)
+class expandSynTypes a :: !Bool !{# CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
 
 instance expandSynTypes Type
 where
-	expandSynTypes rem_annots common_defs (arg_type --> res_type) ets
-		# ((arg_type, res_type), ets) = expandSynTypes rem_annots common_defs (arg_type, res_type) ets
-		= (arg_type --> res_type, ets)
+	expandSynTypes rem_annots common_defs type=:(arg_type --> res_type) ets
+		# (changed,(arg_type, res_type), ets) = expandSynTypes rem_annots common_defs (arg_type, res_type) ets
+		| changed
+			= (True,arg_type --> res_type, ets)
+			= (False,type, ets)
 	expandSynTypes rem_annots common_defs type=:(TB _) ets
-		= (type, ets)
-	expandSynTypes rem_annots common_defs (cons_var :@: types) ets
-		# (types, ets) = expandSynTypes rem_annots common_defs types ets
-		= (cons_var :@: types, ets) 
+		= (False,type, ets)
+	expandSynTypes rem_annots common_defs type=:(cons_var :@: types) ets
+		# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+		| changed
+			= (True,cons_var :@: types, ets)
+			= (False,type, ets)
 	expandSynTypes rem_annots common_defs type=:(TA type_symb types) ets
 		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
 // Sjaak 240801 ...
-	expandSynTypes rem_annots common_defs (TFA vars type) ets
-		# (type, ets) = expandSynTypes rem_annots common_defs type ets
-		= (TFA vars type, ets)
+	expandSynTypes rem_annots common_defs tfa_type=:(TFA vars type) ets
+		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
+		| changed
+			= (True,TFA vars type, ets)
+			= (False,tfa_type, ets)
 // ... Sjaak
 	expandSynTypes rem_annots common_defs type ets
-		= (type, ets)
+		= (False,type, ets)
 
 instance expandSynTypes [a] | expandSynTypes a
 where
-	expandSynTypes rem_annots common_defs list ets
-		= mapSt (expandSynTypes rem_annots common_defs) list ets
-
+	expandSynTypes rem_annots common_defs [] ets
+		= (False,[],ets)
+	expandSynTypes rem_annots common_defs t=:[type:types] ets
+		# (changed_type,type,ets) = expandSynTypes rem_annots common_defs type ets
+		# (changed_types,types,ets) = expandSynTypes rem_annots common_defs types ets
+		| changed_type || changed_types
+			= (True,[type:types],ets)
+			= (False,t,ets)
 
 instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b
 where
-	expandSynTypes rem_annots common_defs tuple ets
-		= app2St (expandSynTypes rem_annots common_defs, expandSynTypes rem_annots common_defs) tuple ets
+	expandSynTypes rem_annots common_defs (type1,type2) ets
+		# (changed_type1,type1,ets) = expandSynTypes rem_annots common_defs type1 ets
+		# (changed_type2,type2,ets) = expandSynTypes rem_annots common_defs type2 ets
+		= (changed_type1 || changed_type2,(type1,type2),ets)
 
-expand_syn_types_in_TA rem_annots common_defs (TA type_symb=:{type_index={glob_object,glob_module},type_name} types) attribute ets=:{ets_type_defs}
+expand_syn_types_in_TA rem_annots common_defs ta_type=:(TA type_symb=:{type_index={glob_object,glob_module},type_name} types) attribute ets=:{ets_type_defs}
 	# ({td_rhs,td_name,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
 	  ets = { ets & ets_type_defs = ets_type_defs }
 	= case td_rhs of
@@ -2582,12 +2592,14 @@ expand_syn_types_in_TA rem_annots common_defs (TA type_symb=:{type_index={glob_o
 			# ets_type_heaps = bind_attr td_attribute attribute ets.ets_type_heaps
 			  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
 			  (_, type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
-			-> expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
+			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
+			-> (True,type,ets)
 		_
-			# (types, ets) = expandSynTypes rem_annots common_defs types ets
+			# (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+			# ta_type = if changed (TA type_symb types) ta_type
 			| glob_module == ets.ets_main_dcl_module_n
-				-> ( TA type_symb types, ets)
-				-> ( TA type_symb types, collect_imported_constructors common_defs glob_module td_rhs ets)
+				-> (changed,ta_type, ets)
+				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
 where
 		bind_var_and_attr {	atv_attribute = TA_Var {av_info_ptr},  atv_variable = {tv_info_ptr} } {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}
 			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }
@@ -2633,11 +2645,15 @@ where
 		= expand_syn_types_in_a_type rem_annots common_defs atype ets
 	where
 		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TA type_symb types,at_attribute} ets
-			# (at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
-			= ({ atype & at_type = at_type }, ets)
+			# (changed,at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
+			| changed
+				= (True,{ atype & at_type = at_type }, ets)
+				= (False,atype,ets)
 		expand_syn_types_in_a_type rem_annots common_defs atype ets
-			# (at_type, ets) = expandSynTypes rem_annots common_defs atype.at_type ets
-			= ({ atype & at_type = at_type }, ets)
+			# (changed,at_type, ets) = expandSynTypes rem_annots common_defs atype.at_type ets
+			| changed
+				= (True,{ atype & at_type = at_type }, ets)
+				= (False,atype,ets)
 
 ::	FreeVarInfo =
 	{	fvi_var_heap	:: !.VarHeap
