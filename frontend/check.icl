@@ -2573,6 +2573,7 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 		  (decls_accu, dcl_modules, cs) = foldSt (add_expl_imp_declaration opt_macro_range importing_mod) decls (decls_accu, dcl_modules, cs)
 		= (decls_accu, dcl_modules, popErrorAdmin cs)		
 		
+	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],*CheckState) -> (![Declaration],!*CheckState)
 	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, cs)
 		# (not_already_imported, cs)
 				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod cs
@@ -2580,8 +2581,7 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 			= ([declaration:decls_accu], cs)
 		= (decls_accu, cs)
 
-	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration
-			(decls_accu, dcl_modules, cs)
+	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, dcl_modules, cs)
 		# (not_already_imported, cs)
 				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod cs
 		| not_already_imported
