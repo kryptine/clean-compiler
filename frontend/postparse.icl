@@ -417,6 +417,9 @@ is_zero_expression (PE_Basic (BVI "0")) = True
 is_zero_expression (PE_Basic (BVInt 0)) = True
 is_zero_expression _ = False
 
+is_overloaded_list_generator IsOverloadedListGenerator = True
+is_overloaded_list_generator _ = False
+
 transformGenerator :: Generator String IndexGenerator *CollectAdmin -> (!TransformedGenerator,!IndexGenerator,!Int,!*CollectAdmin)
 transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
 	# (array, ca) = prefixAndPositionToIdentExp "g_a" gen_position ca
@@ -480,118 +483,120 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 				=([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
 				  					(PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]),n2)
 			-> (transformed_generator,Yes (i,[size_expression:size_expressions]),0,ca)
-transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo from_exp to_exp), gen_pattern, gen_position} qual_filename index_generator ca
-	# (n, ca) = prefixAndPositionToIdentExp "g_s" gen_position ca
-	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
-	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
-	| is_zero_expression from_exp
-		= case index_generator of
-			No
-				# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
-				# inc = get_predef_id PD_IncFun
-				  less_or_equal = get_predef_id PD_LessOrEqualFun
-				# transformed_generator
-				  	=	{	tg_expr = ([],[from_exp,to_exp])
-				  		,	tg_lhs_arg = [i,n]
-				  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
-				  		,	tg_case_end_pattern = PE_Basic (BVB True)
-						,	tg_element = i
-						,	tg_element_is_uselect=False
-						,	tg_pattern = gen_pattern
-						,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
-						,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-						}
-				-> (transformed_generator,Yes (i,[([],to_exp,n)]),2,ca)
-			Yes (i,[])
-				# inc = get_predef_id PD_IncFun
-				  less_or_equal = get_predef_id PD_LessOrEqualFun
-				# transformed_generator
-				  	=	{	tg_expr = ([],[to_exp])
-				  		,	tg_lhs_arg = [n]
-				  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
-				  		,	tg_case_end_pattern = PE_Basic (BVB True)
-						,	tg_element = i
-						,	tg_element_is_uselect=False
-						,	tg_pattern = gen_pattern
-						,	tg_rhs_continuation = [n]
-						,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-						}
-				-> (transformed_generator,Yes (i,[([],to_exp,n)]),1,ca)
-			Yes (i,size_expressions)
-				# transformed_generator
-				  	=	{	tg_expr = ([],[])
-				  		,	tg_lhs_arg = []
-				  		,	tg_case_end_expr = PE_Empty
-				  		,	tg_case_end_pattern = PE_Empty
-						,	tg_element = i
-						,	tg_element_is_uselect=False
-						,	tg_pattern = gen_pattern
-						,	tg_rhs_continuation = []
-						,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-						}
-				-> (transformed_generator,Yes (i,[([],to_exp,n):size_expressions]),0,ca)
-		# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
-		# inc = get_predef_id PD_IncFun
-		  less_or_equal = get_predef_id PD_LessOrEqualFun
-		# transformed_generator
-		  	=	{	tg_expr = ([],[from_exp,to_exp])
-		  		,	tg_lhs_arg = [i,n]
-		  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
-		  		,	tg_case_end_pattern = PE_Basic (BVB True)
-				,	tg_element = i
-				,	tg_element_is_uselect=False
-				,	tg_pattern = gen_pattern
-				,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
-				,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-				}
-		= (transformed_generator,index_generator,0,ca)
-transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From from_exp), gen_pattern, gen_position} qual_filename index_generator ca
-	# (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
-	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
-	| is_zero_expression from_exp
-		= case index_generator of
-			No
-				# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
-				# inc = get_predef_id PD_IncFun
-				# transformed_generator
-				  	=	{	tg_expr = ([],[from_exp])
-				  		,	tg_lhs_arg = [i]
-				  		,	tg_case_end_expr = PE_Empty
-				  		,	tg_case_end_pattern = PE_Empty
-						,	tg_element = i
-						,	tg_element_is_uselect=False
-						,	tg_pattern = gen_pattern
-						,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
-						,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-						}
-				-> (transformed_generator,Yes (i,[]),0,ca)
-			Yes (i,size_expressions)
-				# transformed_generator
-				  	=	{	tg_expr = ([],[])
-				  		,	tg_lhs_arg = []
-				  		,	tg_case_end_expr = PE_Empty
-				  		,	tg_case_end_pattern = PE_Empty
-						,	tg_element = i
-						,	tg_element_is_uselect=False
-						,	tg_pattern = gen_pattern
-						,	tg_rhs_continuation = []
-						,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-						}
-				-> (transformed_generator,index_generator,0,ca)
-		# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
-		# inc = get_predef_id PD_IncFun
-		# transformed_generator
-		  	=	{	tg_expr = ([],[from_exp])
-		  		,	tg_lhs_arg = [i]
-		  		,	tg_case_end_expr = PE_Empty
-		  		,	tg_case_end_pattern = PE_Empty
-				,	tg_element = i
-				,	tg_element_is_uselect=False
-				,	tg_pattern = gen_pattern
-				,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
-				,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
-				}
-		= (transformed_generator,index_generator,0,ca)
+transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_exp to_exp), gen_pattern, gen_position} qual_filename index_generator ca
+	| is_overloaded_list_generator gen_kind || pd_from_to_index==PD_FromTo
+		# (n, ca) = prefixAndPositionToIdentExp "g_s" gen_position ca
+		  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+	 	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+		| is_zero_expression from_exp
+			= case index_generator of
+				No
+					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# inc = get_predef_id PD_IncFun
+					  less_or_equal = get_predef_id PD_LessOrEqualFun
+					# transformed_generator
+					  	=	{	tg_expr = ([],[from_exp,to_exp])
+					  		,	tg_lhs_arg = [i,n]
+					  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
+					  		,	tg_case_end_pattern = PE_Basic (BVB True)
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[([],to_exp,n)]),2,ca)
+				Yes (i,[])
+					# inc = get_predef_id PD_IncFun
+					  less_or_equal = get_predef_id PD_LessOrEqualFun
+					# transformed_generator
+					  	=	{	tg_expr = ([],[to_exp])
+					  		,	tg_lhs_arg = [n]
+					  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
+					  		,	tg_case_end_pattern = PE_Basic (BVB True)
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = [n]
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[([],to_exp,n)]),1,ca)
+				Yes (i,size_expressions)
+					# transformed_generator
+					  	=	{	tg_expr = ([],[])
+					  		,	tg_lhs_arg = []
+					  		,	tg_case_end_expr = PE_Empty
+					  		,	tg_case_end_pattern = PE_Empty
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = []
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[([],to_exp,n):size_expressions]),0,ca)
+			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# inc = get_predef_id PD_IncFun
+			  less_or_equal = get_predef_id PD_LessOrEqualFun
+			# transformed_generator
+			  	=	{	tg_expr = ([],[from_exp,to_exp])
+			  		,	tg_lhs_arg = [i,n]
+			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
+			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+					,	tg_element = i
+					,	tg_element_is_uselect=False
+					,	tg_pattern = gen_pattern
+					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			= (transformed_generator,index_generator,0,ca)
+transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp), gen_pattern, gen_position} qual_filename index_generator ca
+	| is_overloaded_list_generator gen_kind || pd_from_index==PD_From
+		# (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
+		  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
+		| is_zero_expression from_exp
+			= case index_generator of
+				No
+					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# inc = get_predef_id PD_IncFun
+					# transformed_generator
+					  	=	{	tg_expr = ([],[from_exp])
+					  		,	tg_lhs_arg = [i]
+					  		,	tg_case_end_expr = PE_Empty
+					  		,	tg_case_end_pattern = PE_Empty
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,Yes (i,[]),0,ca)
+				Yes (i,size_expressions)
+					# transformed_generator
+					  	=	{	tg_expr = ([],[])
+					  		,	tg_lhs_arg = []
+					  		,	tg_case_end_expr = PE_Empty
+					  		,	tg_case_end_pattern = PE_Empty
+							,	tg_element = i
+							,	tg_element_is_uselect=False
+							,	tg_pattern = gen_pattern
+							,	tg_rhs_continuation = []
+							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							}
+					-> (transformed_generator,index_generator,0,ca)
+			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# inc = get_predef_id PD_IncFun
+			# transformed_generator
+			  	=	{	tg_expr = ([],[from_exp])
+			  		,	tg_lhs_arg = [i]
+			  		,	tg_case_end_expr = PE_Empty
+			  		,	tg_case_end_pattern = PE_Empty
+					,	tg_element = i
+					,	tg_element_is_uselect=False
+					,	tg_pattern = gen_pattern
+					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
+					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					}
+			= (transformed_generator,index_generator,0,ca)
 transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
 	# (list, ca) = prefixAndPositionToIdentExp "g_l" gen_position ca
 	  (hd, ca) = prefixAndPositionToIdentExp "g_h" gen_position ca
@@ -775,8 +780,7 @@ transformArrayComprehension expr qualifiers ca
 	  (c_a_ident_exp, ca) = prefixAndPositionToIdentExp "c_a" qual_position ca
 	  create_array = get_predef_id PD__CreateArrayFun
 	| same_index_for_update_and_array_generators qualifiers
-		# index_range = PE_Sequ (SQ_From (PE_Basic (BVInt 0)))
-		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From (PE_Basic (BVInt 0))), gen_position=qual_position}
+		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0))), gen_position=qual_position}
 		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
 		| size_of_generators_can_be_computed_quickly qualifiers
 			# {qual_generators,qual_filter,qual_position,qual_filename} = hd_qualifier
@@ -835,9 +839,13 @@ makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_e
 
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsArrayGenerator}
 	= pattern_will_always_match gen_pattern
-size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_FromTo (PE_Basic (BVInt 0)) to_exp)}
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_FromTo PD_FromTo (PE_Basic (BVInt 0)) to_exp)}
 	= pattern_will_always_match gen_pattern	
-size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From from_exp)}
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From PD_From from_exp)}
+	= pattern_will_always_match gen_pattern	
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_FromTo _ (PE_Basic (BVInt 0)) to_exp)}
+	= pattern_will_always_match gen_pattern	
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 	= pattern_will_always_match gen_pattern	
 size_of_generator_can_be_computed_quickly _
 	= False
@@ -845,7 +853,9 @@ size_of_generator_can_be_computed_quickly _
 size_of_generators_can_be_computed_quickly qualifiers=:[qualifier=:{qual_generators,qual_filter=No}]
 	= All size_of_generator_can_be_computed_quickly qual_generators && not (All is_from_generator qual_generators)
 	where
-		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From from_exp)}
+		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
+			= True
+		is_from_generator {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 			= True
 		is_from_generator _
 			= False
@@ -980,14 +990,14 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 					])
 
 transformSequence :: Sequence -> ParsedExpr
-transformSequence (SQ_FromThen frm then)
-	=	predef_ident_expr PD_FromThen ` frm ` then
-transformSequence (SQ_FromThenTo frm then to)
-	=	predef_ident_expr PD_FromThenTo ` frm ` then ` to
-transformSequence (SQ_From frm)
-	=	predef_ident_expr PD_From ` frm
-transformSequence (SQ_FromTo frm to)
-	=	predef_ident_expr PD_FromTo ` frm ` to
+transformSequence (SQ_FromThen pd_from_then frm then)
+	=	predef_ident_expr pd_from_then ` frm ` then
+transformSequence (SQ_FromThenTo pd_from_then_to frm then to)
+	=	predef_ident_expr pd_from_then_to ` frm ` then ` to
+transformSequence (SQ_From pd_from frm)
+	=	predef_ident_expr pd_from ` frm
+transformSequence (SQ_FromTo pd_from_to frm to)
+	=	predef_ident_expr pd_from_to ` frm ` to
 
 transformArrayUpdate :: ParsedExpr [Bind ParsedExpr ParsedExpr] -> ParsedExpr
 transformArrayUpdate expr updates
@@ -1003,25 +1013,25 @@ transformArrayDenot exprs
 			(predef_ident_expr PD__CreateArrayFun ` length exprs)
 			[{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
 
-scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
-scanModules [] parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool Bool (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
+scanModules [] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	= (True, parsed_modules,files, ca)
-scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	| in_cache import_module cached_modules
-		= scanModules mods parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+		= scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	# (found_module,mod_type) = try_to_find import_module parsed_modules
 	| found_module
 		= case mod_type of
 			MK_NoMainDcl
 				# ca = postParseError import_file_position ("main module \'"+++import_module.id_name+++"\' does not have a definition module") ca
-				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 				-> (False,parsed_modules,files,ca)
 			_
-				-> scanModules mods parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+				-> scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 		# (succ, parsed_modules,files, ca)
-				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 		  (mods_succ, parsed_modules,files, ca)
-		  		= scanModules mods parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+		  		= scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 		= (succ && mods_succ, parsed_modules,files, ca)
 where
 	in_cache mod_id []
@@ -1045,9 +1055,9 @@ MakeEmptyModule name mod_type
 					def_macros=[],def_members = [], def_funtypes = [], def_instances = [], 
 					def_generics = [], def_generic_cases = []} }
 
-parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !Bool (ModTimeFunction *Files) !*Files !*CollectAdmin
+parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !Bool Bool (ModTimeFunction *Files) !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule],!*Files, !*CollectAdmin)
-parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	# {ca_error, ca_hash_table} = ca
 	# (parse_ok, mod, ca_hash_table, err_file, files) = wantModule cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
@@ -1058,7 +1068,7 @@ where
 	scan_dcl_module :: ParsedModule [ScannedModule] !SearchPaths (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
 	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
 		# (_, defs, imports, imported_objects, ca)
-			= reorganiseDefinitionsAndAddTypes False pdefs 0 0 0 0 ca
+			= reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
 	  	  (def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=0,ca_rev_fun_defs=[]}
 		  (range, ca) = addFunctionsRange def_macros ca
 		  (rev_fun_defs,ca) = ca!ca_rev_fun_defs
@@ -1067,26 +1077,26 @@ where
 		  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros=reverse rev_fun_defs,def_macro_indices = range }}
 		  ca = {ca & ca_rev_fun_defs=[]}
 		  (import_ok, parsed_modules,files, ca)
-			= scanModules imports [mod : parsed_modules] cached_modules searchPaths support_generics modtimefunction files ca
+			= scanModules imports [mod : parsed_modules] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 		= (pea_ok && import_ok, parsed_modules,files, ca)
 
-scanModule :: !ParsedModule ![Ident] !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
+scanModule :: !ParsedModule ![Ident] !Bool !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
 	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!Int,!*HashTable, !*File, !*Files)
-scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_generics hash_table err_file searchPaths /*predefs*/ modtimefunction files
+scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
 	# predefIdents = predefined_idents
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
 			,	ca_fun_count	= 0
 			,	ca_rev_fun_defs	= []
 			,	ca_hash_table	= hash_table
 			}
-	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes True pdefs 0 0 0 0 ca
+	  (fun_defs, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes support_dynamics True pdefs ca
 
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
 	  		= scan_main_dcl_module mod_name mod_type modtimefunction files ca
 	  (import_dcls_ok, parsed_modules, files, ca)
-	  		= scanModules imports parsed_modules cached_modules searchPaths support_generics modtimefunction files ca
+	  		= scanModules imports parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 
 	  (pea_dcl_ok,optional_dcl_mod,ca) =  collect_main_dcl_module optional_parsed_dcl_mod dcl_module_n ca
 
@@ -1146,10 +1156,10 @@ where
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
-			# (_, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes False pdefs 0 0 0 0 ca
+			# (_, defs, imports, imported_objects, ca) = reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_name:cached_modules]
-			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics modtimefunction files ca
+			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
 
 	collect_main_dcl_module (Yes mod=:{mod_defs=defs}) dcl_module_n ca
@@ -1286,7 +1296,7 @@ where
 		= ([cons : conses], next_cons_index)
 	determine_symbols_of_conses [] next_cons_index
 		= ([], next_cons_index)
-reorganiseDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorList rec_cons_id exivars sel_defs, td_pos } : defs] cons_count sel_count mem_count type_count ca
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorList rec_cons_id exivars is_boxed_record sel_defs, td_pos } : defs] cons_count sel_count mem_count type_count ca
 	# (sel_syms, new_count) = determine_symbols_of_selectors sel_defs sel_count
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs (inc cons_count) new_count mem_count (type_count+1) ca
 	  cons_arity = new_count - sel_count
@@ -1294,7 +1304,7 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_name, td_rhs = SelectorL
 	  cons_def = {	pc_cons_name = rec_cons_id, pc_cons_prio = NoPrio, pc_cons_arity = cons_arity, pc_cons_pos = td_pos,
 	  				pc_arg_types = pc_arg_types, pc_args_strictness=strictness_from_fields sel_defs,pc_exi_vars = exivars }
 	  type_def = { type_def & td_rhs = RecordType {rt_constructor = { ds_ident = rec_cons_id, ds_arity = cons_arity, ds_index = cons_count },
-	  							rt_fields =  { sel \\ sel <- sel_syms }}}
+	  							rt_fields =  { sel \\ sel <- sel_syms }, rt_is_boxed_record = is_boxed_record}}
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors],
 	  				def_selectors = mapAppend (ParsedSelectorToSelectorDef type_count) sel_defs c_defs.def_selectors }
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
@@ -1452,10 +1462,12 @@ reorganiseDefinitions icl_module [] _ _ _ _ ca
 			def_instances = [], def_funtypes = [], 
 			def_generics = [], def_generic_cases = []}, [], [], ca)
 
-reorganiseDefinitionsAndAddTypes icl_module defs cons_count sel_count mem_count type_count ca
-	# (rev_defs, ca)
-		=	addTypeConstructors defs [] ca
-	=	reorganiseDefinitions icl_module (reverse rev_defs) cons_count sel_count mem_count type_count ca
+reorganiseDefinitionsAndAddTypes support_dynamics icl_module defs ca
+	| support_dynamics
+		# (rev_defs, ca)
+			=	addTypeConstructors defs [] ca
+		= reorganiseDefinitions icl_module (reverse rev_defs) 0 0 0 0 ca
+		= reorganiseDefinitions icl_module defs 0 0 0 0 ca
 	where
 		addTypeConstructors [] rev_defs ca
 			=	(rev_defs, ca)
