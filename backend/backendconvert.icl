@@ -1270,13 +1270,6 @@ adjustArrayFunctions array_first_instance_indices/*arrayInstancesRange*/ predefs
 						=	beAdjustArrayFunction mapping.[member_index] index main_dcl_module_n
 						o`	adjustIclArrayInstanceMembers (index+1) next_member_index
 
-		foldStateWithIndexRangeA index
-			| index == to
-				=	identity
-			// otherwise
-				=	function index array.[index]
-				o`	foldStateWithIndexRangeA (index+1)
-
 convertRules :: [(Int, FunDef)] Int Ident *BackEndState -> (BEImpRuleP, *BackEndState)
 convertRules rules main_dcl_module_n aliasDummyId be
 	# (null, be)
