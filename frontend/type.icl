@@ -1843,7 +1843,7 @@ where
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context
 			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
 			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
-//					---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
+					// ---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
 			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
 			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
 			
@@ -1856,7 +1856,7 @@ where
 
 addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
 	= { st & st_args = take nr_of_lifted_arguments new_args ++ st_args, st_vars = st_vars ++ drop (length st_vars) new_vars,
-			st_attr_vars = st_attr_vars ++ take (length new_attrs - length st_attr_vars) new_attrs, st_arity = st_arity + nr_of_lifted_arguments,
+			st_attr_vars = (take (length new_attrs - length st_attr_vars) new_attrs) ++ st_attr_vars, st_arity = st_arity + nr_of_lifted_arguments,
 				st_context = take (length new_context - length st_context) new_context ++ st_context }
 
 ::	FunctionRequirements =
@@ -2349,8 +2349,8 @@ where
 	
 			create_instance_type members array_members unboxed_array_type offset_table record_type member_index (array_defs, type_heaps)
 				# {me_type,me_symb,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
-				  (instance_type, _, type_heaps, _) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
-														it_types = [unboxed_array_type, record_type]} SP_None type_heaps No
+				  (instance_type, _, type_heaps, _, _) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
+														it_types = [unboxed_array_type, record_type]} SP_None type_heaps No No
 				  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
 				  fun = 
 					{	fun_symb		= me_symb
