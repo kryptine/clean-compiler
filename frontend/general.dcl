@@ -1,6 +1,11 @@
 definition module general
 
+/*2.0
+from StdEnv import instance <<< Int,class <<< (..),instance + Int,class + (..),instance ~ Int,class ~ (..)
+0.2*/
+//1.3
 from StdEnv import <<<, +, ~
+//3.1
 
 instance ~ Bool
 

@@ -15,7 +15,7 @@ import type_io;
 //import RWSDebug;
 
 /*2.0
-from type_io_common import toString;
+from type_io_common import class toString (..),instance toString GlobalTCType;
 0.2*/
 
 ::	*ConversionInfo =

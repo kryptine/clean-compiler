@@ -3,14 +3,15 @@
 */
 definition module backendsupport
 
+/*2.0
+from StdArray import class Array(size,usize)
+from StdInt import class +,class ==
+0.2*/
 //1.3
 from StdArray import size, size_u
-//3.1
-/*2.0
-from StdArray import size, usize
-0.2*/
-from StdFunc import `bind`
 from StdInt import +, ==
+//3.1
+from StdFunc import `bind`
 
 import utilities
 

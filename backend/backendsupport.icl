@@ -4,8 +4,13 @@
 implementation module backendsupport
 
 import StdArray
-from StdFunc import `bind`
+/*2.0
+from StdInt import class + (..),class == (..)
+0.2*/
+//1.3
 from StdInt import +, ==
+//3.1
+from StdFunc import `bind`
 
 identity
 	:==	\x -> x

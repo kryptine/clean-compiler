@@ -2,7 +2,12 @@ definition module typesupport
 
 import checksupport, StdCompare
 
+/*2.0
+from unitype import ::Coercions, ::CoercionTree, ::AttributePartition, CT_Empty
+0.2*/
+//1.3
 from unitype import Coercions, CoercionTree, AttributePartition, CT_Empty
+//3.1
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 

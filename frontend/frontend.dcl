@@ -3,8 +3,14 @@
 */
 definition module frontend
 
+/*2.0
+from scanner import ::SearchPaths
+from general import ::Optional, Yes, No
+0.2*/
+//1.3
 from scanner import SearchPaths
 from general import Optional, Yes, No
+//3.1
 import checksupport, transform, overloading
 
 :: FrontEndOptions 
