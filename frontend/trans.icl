@@ -1793,15 +1793,10 @@ transformSelection No s=:[RecordSelection _ field_index : selectors]
 			= ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object]
     | isEmpty [i \\ {at_annotation=AN_Strict} <- cons_def.cons_type.st_args & i<-[0..] 
 				| i<>field_index]
-    	= transform_selections selectors (app_args !! field_index) ti
+    	= transformSelection No selectors (app_args !! field_index) ro ti
 	= (Selection No app s, ti)
-where
-	transform_selections [] expr ti
-		= (expr, ti)
-	transform_selections [RecordSelection _ field_index : selectors] (App {app_symb={symb_kind= SK_Constructor _ }, app_args}) ti
-		= transform_selections selectors (app_args !! field_index) ti
-	transform_selections selectors expr ti
-		= (Selection No expr selectors, ti)
+transformSelection No [] expr ro ti
+	= (expr, ti)
 transformSelection opt_type selectors expr _ ti
 	= (Selection opt_type expr selectors, ti)
 
