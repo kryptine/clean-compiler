@@ -1858,19 +1858,18 @@ where
 			addKinds _ []
 				=	[]
 	convertExpr (RecordUpdate _ expr updates)
-		=	foldl (convertUpdate) (convertExpr expr) updates
+		=	beUpdateNode (beArgs (convertExpr expr) (convertUpdates updates))
 		where
-			convertUpdate  expr {bind_src=NoBind _}
-				=	expr
-			convertUpdate expr {bind_src, bind_dst=bind_dst=:{glob_module, glob_object={fs_index}}}
-				=	beUpdateNode
-						(beArgs
-							expr
-							(beArgs
-								(beSelectorNode BESelector (beFieldSymbol fs_index glob_module)
-								(beArgs (convertExpr bind_src)
-								beNoArgs))
-							beNoArgs))
+			convertUpdates []
+				=	beNoArgs
+			convertUpdates [{bind_src=NoBind _}:updates]
+				=	convertUpdates updates
+			convertUpdates [{bind_src, bind_dst=bind_dst=:{glob_module, glob_object={fs_index}}}:updates]
+				=	(beArgs
+						(beSelectorNode BESelector (beFieldSymbol fs_index glob_module)
+						(beArgs (convertExpr bind_src)
+						beNoArgs))
+					(convertUpdates updates))
 	convertExpr (Update expr1 [singleSelection] expr2)
 		=	case singleSelection of
 				RecordSelection _ _
