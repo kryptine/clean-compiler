@@ -2483,6 +2483,27 @@ where
 		= cnf_args app_args 0 cons_type.st_args_strictness ro
 	cnf_app_args {app_symb=symb=:{symb_kind}, app_args} ro
 		= False
+transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors] 
+					app=:(App appi=:{app_symb=app_symb=:{symb_kind}, app_args, app_info_ptr})
+					ro ti
+	| isOKSymbol symb_kind && isEmpty app_args
+		# (fun_def,ti_fun_defs,ti_fun_heap)		= get_fun_def symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
+		# ti = {ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap}
+		# {fun_body,fun_type,fun_kind}			= fun_def
+		| is_not_caf fun_kind
+			= case fun_body of
+				TransformedBody {tb_rhs}	-> case tb_rhs of
+					App app						-> transformSelection NormalSelector s tb_rhs ro ti
+					_							-> (Selection NormalSelector app s, ti)
+			= (Selection NormalSelector app s, ti)
+where
+	isOKSymbol (SK_Function {glob_module})	= glob_module == ro.ro_main_dcl_module_n
+	isOKSymbol (SK_LocalMacroFunction _)	= True
+	isOKSymbol (SK_GeneratedFunction _ _)	= True
+	isOKSymbol _							= False
+	
+	is_not_caf FK_Caf	= False
+	is_not_caf _		= True
 transformSelection NormalSelector [] expr ro ti
 	= (expr, ti)
 transformSelection selector_kind selectors expr ro ti
