@@ -593,7 +593,7 @@ cNonRecursiveAppl	:== False
 
 ::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Index
-				| PR_Class !App ![BoundVar] !Type
+				| PR_Class !App ![(BoundVar, Type)] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Index
 				| PR_Curried !SymbIdent
@@ -1198,7 +1198,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind
+			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar
 
 instance == TypeAttribute
 instance == Annotation

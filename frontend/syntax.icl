@@ -545,7 +545,7 @@ cNotVarNumber :== -1
 
 ::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Index
-				| PR_Class !App ![BoundVar] !Type
+				| PR_Class !App ![(BoundVar, Type)] !Type
 //				| PR_Constructor !SymbIdent ![Expression]
 				| PR_GeneratedFunction !SymbIdent !Index
 				| PR_Curried !SymbIdent
