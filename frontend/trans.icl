@@ -1258,13 +1258,14 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 	  		= { new_fd_expanding & fun_body = TransformedBody {tb_args = new_fun_args, tb_rhs = new_fun_rhs} }
 //	| False -!-> ("generated function", new_fd, new_cons_args)		= undef
 // DvA...
-	# fun_heap = ti.ti_fun_heap
 	// producer requirements for generated function here...
 	#! prs	=
 		{ prs_group				= [dec ti_next_fun_nr]
 		, prs_cons_args 		= ti.ti_cons_args
 		, prs_main_dcl_module_n	= ro.ro_main_dcl_module_n
-		, prs_fun_heap			= fun_heap
+		, prs_fun_heap			= ti.ti_fun_heap
+		, prs_fun_defs			= ti.ti_fun_defs
+		, prs_group_index		= fi_group_index
 		}
 	# (safe,prs)	= producerRequirements new_fun_rhs prs
 	# fun_heap = prs.prs_fun_heap
@@ -1274,6 +1275,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 		{ ti
 		& ti_fun_heap = fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
 		, ti_cons_args= prs.prs_cons_args
+		, ti_fun_defs	= prs.prs_fun_defs
 		}
 	= (ti_next_fun_nr, fun_arity, ti)
 where
@@ -2290,7 +2292,7 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 							(ti.ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti.ti_type_heaps, ti.ti_var_heap)
 			# ti = { ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap }
 			# ti = foldSt (transform_function common_defs imported_funs) group_members ti
-			# ti = reannotate_producers (group_members -!-> ("reannotate_producers",group_nr)) ti
+			# ti = reannotate_producers group_nr (group_members -!-> ("reannotate_producers",group_nr)) ti
 			= transform_groups (inc  group_nr) groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 			= (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 
@@ -2321,32 +2323,54 @@ transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n groups fu
 		get_root_case_mode {tb_rhs=Case _}	= RootCase
 		get_root_case_mode _ 				= NotRootCase
 
-	reannotate_producers group_members ti
+	reannotate_producers group_nr group_members ti
 		// determine if safe group
-		# (safe,ti) = safe_producers group_members group_members ti
+		# (safe,ti) = safe_producers group_nr group_members group_members ti
 		| safe
 			// if safe mark all members as safe
 			= foldSt mark_producer_safe group_members ti
 		= ti
 	
-	safe_producers group_members [] ti
+	get_fun_def fun ti
+		| fun < size ti.ti_fun_defs
+			# (fun_def, ti)						= ti!ti_fun_defs.[fun]
+			= (fun_def,ti)
+		# (fun_def_ptr,ti_fun_heap)			= lookup_ptr fun ti.ti_new_functions ti.ti_fun_heap
+			with
+				lookup_ptr fun [] ti_fun_heap = abort "drat"
+				lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
+					# (FI_Function {gf_fun_index}, ti_fun_heap)
+							= readPtr fun_def_ptr ti_fun_heap
+					| gf_fun_index == fun
+						= (fun_def_ptr, ti_fun_heap)
+						= lookup_ptr fun new_functions ti_fun_heap
+		# (FI_Function {gf_fun_def}, ti_fun_heap)
+											= readPtr fun_def_ptr ti_fun_heap
+		  ti								= { ti & ti_fun_heap = ti_fun_heap }
+		= (gf_fun_def,ti)
+
+	safe_producers group_nr group_members [] ti
 		= (True,ti)
-	safe_producers group_members [fun:funs] ti
+	safe_producers group_nr group_members [fun:funs] ti
 		// look for occurrence of group_members in safe argument position of fun RHS
 		// i.e. linearity ok && ...
+		#! (fun_def, ti)	= get_fun_def fun ti
+		   {fun_body		= TransformedBody tb} = fun_def
+		   fun_body			= tb.tb_rhs
+
 		#! prs	=
 			{ prs_group				= group_members
 			, prs_cons_args 		= ti.ti_cons_args
 			, prs_main_dcl_module_n	= main_dcl_module_n
 			, prs_fun_heap			= ti.ti_fun_heap
+			, prs_fun_defs			= ti.ti_fun_defs
+			, prs_group_index		= group_nr
 			}
-		# (fun_def, ti)	= ti!ti_fun_defs.[fun]
-		  {fun_body		= TransformedBody tb} = fun_def
-		  fun_body		= tb.tb_rhs
 		# (safe,prs)	= producerRequirements fun_body prs
+		#! ti = {ti & ti_fun_defs = prs.prs_fun_defs, ti_fun_heap = prs.prs_fun_heap, ti_cons_args = prs.prs_cons_args}
 		// put back prs info into ti?
-		| safe -!-> ("producerRequirements",fun_def.fun_symb,safe)
-						= safe_producers group_members funs ti
+		| safe //-!-> ("producerRequirements",fun_def.fun_symb,safe)
+						= safe_producers group_nr group_members funs ti
 		= (safe,ti)
 	
 	mark_producer_safe fun ti
@@ -2816,11 +2840,13 @@ isYes _ = False
 
 //@ producerRequirements
 
-:: PRState =
+:: *PRState =
 	{ prs_group				:: ![Int]
-	, prs_cons_args 		:: !.{!ConsClasses}
+	, prs_cons_args 		:: !*{!ConsClasses}
 	, prs_main_dcl_module_n	:: !Int
-	, prs_fun_heap			:: !.FunctionHeap
+	, prs_fun_heap			:: !*FunctionHeap
+	, prs_fun_defs			:: !*{#FunDef}
+	, prs_group_index		:: !Int
 	}
 
 class producerRequirements a
@@ -2876,8 +2902,13 @@ instance producerRequirements Expression where
 					SK_LocalMacroFunction index -> { glob_module = main_dcl_module_n, glob_object = index }
 			| glob_module <> main_dcl_module_n
 				= (False,prs)
-			#! rec = isMember glob_object prs.prs_group
-			= (rec,prs)
+//			#! rec = isMember glob_object prs.prs_group
+			#! (fun_def,fun_defs,fun_heap)	= get_fun_def symb_kind prs.prs_main_dcl_module_n prs.prs_fun_defs prs.prs_fun_heap
+			   prs = {prs & prs_fun_defs = fun_defs, prs_fun_heap = fun_heap}
+			   rec` = fun_def.fun_info.fi_group_index == prs.prs_group_index
+//			| rec <> rec`
+//				= (rec`,prs			---> ("is_recursive_app mismatch!"))
+			= (rec`,prs)
 		is_recursive_app _ prs
 			= (False,prs)
 
@@ -2890,7 +2921,13 @@ instance producerRequirements Expression where
 		// watch out for function shadowing by 'let' binds
 		// recurse into binding exprs
 		// continue with 'in' body
-		= (False,prs)
+		# (safe,prs)	= producerRequirements let_lazy_binds prs
+		| not safe		= (safe,prs)
+		# (safe,prs)	= producerRequirements let_strict_binds prs
+		| not safe		= (safe,prs)
+		# (safe,prs)	= producerRequirements let_expr prs
+		| not safe		= (safe,prs)
+		= (safe,prs)
 	producerRequirements (Case {case_expr,case_guards,case_default,case_ident}) prs
 		// watch out for function shadowing by guards or case ident
 		// check case_expr
@@ -2903,12 +2940,18 @@ instance producerRequirements Expression where
 		# (safe,prs)	= producerRequirements case_default prs
 		| not safe		= (safe,prs)
 		= (True,prs)
-	producerRequirements (Selection _ _ _) prs
-		// ...
-		= (False,prs)
-	producerRequirements (Update _ _ _) prs
-		// ...
-		= (False,prs)
+	producerRequirements (Selection _ expr sels) prs
+		# (safe,prs)	= producerRequirements expr prs
+		| safe			= producerRequirements sels prs
+						= (safe,prs)
+	producerRequirements (Update expr1 sels expr2) prs
+		# (safe,prs)	= producerRequirements expr1 prs
+		| not safe		= (safe,prs)
+		# (safe,prs)	= producerRequirements expr2 prs
+		| not safe		= (safe,prs)
+		# (safe,prs)	= producerRequirements sels prs
+		| not safe		= (safe,prs)
+		= (True,prs)
 	producerRequirements (RecordUpdate _ expr exprs) prs
 		// ...
 		# (safe,prs)	= producerRequirements expr prs
@@ -2929,21 +2972,16 @@ instance producerRequirements Expression where
 		= (False,prs)
 	producerRequirements (ABCCodeExpr _ _) prs
 		= (False,prs)
-	producerRequirements (MatchExpr _ _) prs
-		// what's this?
-		= (False,prs)
+	producerRequirements (MatchExpr _ expr) prs
+		= producerRequirements expr prs
 	producerRequirements (DynamicExpr _) prs
-		// what's this?
 		= (False,prs)
 	producerRequirements (TypeCodeExpression _) prs
-		// what's this?
 		= (False,prs)
 	producerRequirements (EE) prs
-		// what's this?
 		= (False,prs)
 	producerRequirements (NoBind var) prs
-		// what's this?
-		= (False,prs)
+		= (True,prs)
 	producerRequirements expr prs
 		= abort ("producerRequirements " ---> expr)
 
@@ -2980,6 +3018,20 @@ instance producerRequirements BasicPattern where
 	producerRequirements {bp_expr} prs
 		// name shadowing...
 		= producerRequirements bp_expr prs
+
+instance producerRequirements LetBind where
+	producerRequirements {lb_src} prs
+		= producerRequirements lb_src prs
+
+instance producerRequirements Selection where
+	producerRequirements (RecordSelection _ _) prs
+		= (True,prs)
+	producerRequirements (ArraySelection _ _ expr) prs
+		= producerRequirements expr prs
+	producerRequirements (DictionarySelection _ sels _ expr) prs
+		# (safe,prs)	= producerRequirements expr prs
+		| safe			= producerRequirements sels prs
+						= (safe,prs)
 
 //@ fun_def & cons_arg getters...
 
@@ -3019,7 +3071,7 @@ get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr fun_index) cons_arg
 	# (FI_Function {gf_fun_def, gf_cons_args}, fun_heap) = readPtr fun_info_ptr fun_heap
 	= (gf_fun_def, gf_cons_args, cons_args, fun_defs, fun_heap)
 
-retrieve_consumer_args :: !SymbIdent !u:PRState -> (!Optional ConsClasses, !u:PRState)
+retrieve_consumer_args :: !SymbIdent !*PRState -> (!Optional ConsClasses, !*PRState)
 retrieve_consumer_args si=:{symb_kind} prs=:{prs_cons_args, prs_main_dcl_module_n}
 	# (prs_size, prs_cons_args) = usize prs_cons_args
 	  prs = {prs & prs_cons_args = prs_cons_args}
@@ -3046,6 +3098,10 @@ retrieve_consumer_args si=:{symb_kind} prs=:{prs_cons_args, prs_main_dcl_module_
 
 //@ <<<
 
+instance <<< Group where
+	(<<<) file {group_members}
+	 = file <<< "Group: " <<< group_members
+	
 instance <<< RootCaseMode where
 	(<<<) file mode = case mode of NotRootCase -> file <<< "NotRootCase"; RootCase -> file <<< "RootCase"; RootCaseOfZombie -> file <<< "RootCaseOfZombie";
 
@@ -3057,6 +3113,7 @@ where
 */	
 
 // XXX	
+/*
 instance <<< Producer
 where
 	(<<<) file (PR_Function symbol _ index)
@@ -3067,21 +3124,50 @@ where
 	(<<<) file (PR_Class app vars type) = file <<< "(Class(" <<< App app<<<","<<< type <<< "))"
 	(<<<) file (PR_Curried {symb_name, symb_kind} _) = file <<< "(Curried)" <<< symb_name <<< symb_kind
 	(<<<) file _ = file
+*/
+/*
+instance <<< {!Producer}
+where
+	(<<<) file array
+		# file = file <<< "{"
+		= showBody 0 (size array) array file
+	where
+		showBody i m a f
+			| i >= m	= f <<< "}"
+						= showBody (inc i) m a (f <<< a.[i] <<< ", ")
+*/
+instance <<< Producer where
+	(<<<) file PR_Empty
+		= file <<< "(E)"
+	(<<<) file (PR_Function ident int index)
+		= file <<< "(F:" <<< ident <<< ")"
+	(<<<) file (PR_Class app binds type)
+		= file <<< "(O::" <<< app.app_symb <<< ")"
+	(<<<) file (PR_Constructor ident int exprl)
+		= file <<< "(C:" <<< ident <<< ")"
+	(<<<) file (PR_GeneratedFunction ident int index)
+		= file <<< "(G:" <<< ident <<< ")"
+	(<<<) file (PR_Curried ident int)
+		= file <<< "(P:" <<< ident <<< ")"
 
 instance <<< SymbKind
 where
+	(<<<) file SK_Unknown = file <<< "(SK_Unknown)"
 	(<<<) file (SK_Function gi) = file <<< "(SK_Function)" <<< gi
-	(<<<) file (SK_LocalMacroFunction gi) = file <<< gi
+	(<<<) file (SK_IclMacro gi) = file <<< "(SK_IclMacro)" <<< gi
+	(<<<) file (SK_LocalMacroFunction gi) = file <<< "(SK_LocalMacroFunction)" <<< gi
+	(<<<) file (SK_DclMacro gi) = file <<< "(SK_DclMacro)" <<< gi
+	(<<<) file (SK_LocalDclMacroFunction gi) = file <<< "(SK_LocalDclMacroFunction)" <<< gi
 	(<<<) file (SK_OverloadedFunction gi) = file <<< "(SK_OverloadedFunction)" <<< gi
-	(<<<) file (SK_Constructor gi) = file <<< gi
-	(<<<) file (SK_DclMacro gi) = file <<< gi
-	(<<<) file (SK_IclMacro gi) = file <<< gi
 	(<<<) file (SK_GeneratedFunction _ gi) = file <<< "(SK_GeneratedFunction)" <<< gi
-	(<<<) file _ = file
+	(<<<) file (SK_Constructor gi) = file <<< "(SK_Constructor)" <<< gi
+	(<<<) file (SK_Generic gi tk) = file <<< "(SK_Constructor)" <<< gi
+	(<<<) file SK_TypeCode = file <<< "(SK_TypeCode)"
+	(<<<) file _ = file <<< "(SK_UNKNOWN)"
 	
 instance <<< ConsClasses
 where
-	(<<<) file {cc_args,cc_linear_bits} = file <<< cc_args <<< cc_linear_bits
+	(<<<) file {cc_args,cc_linear_bits,cc_producer} = file <<< cc_args <<< cc_linear_bits <<< cc_producer
 	
 instance <<< InstanceInfo
   where
