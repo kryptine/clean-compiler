@@ -1530,6 +1530,11 @@ static Bool AdjustState (StateS *old_state_p, StateS newstate)
 		return False;
 }
 
+#if 0
+# include "dbprint.h"
+extern File rules_file;
+#endif
+
 static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs *t_or_e_defs, StateS demstate,int local_scope)
 {
 	Node node;
@@ -1542,8 +1547,12 @@ static void DetermineStateOfThenOrElse (Args t_or_e_args, NodeDefs *t_or_e_defs,
 		node_id=node->node_node_id;
 		if (node_id->nid_ref_count_copy>=0)
 			--node_id->nid_ref_count_copy__;	
-	} else
+	} else {
+#if 0
+		FPrintF (rules_file,"DetermineStateOfThenOrElse %d\n",local_scope);
+#endif
 		DetermineStatesOfRootNodeAndDefs (node,t_or_e_defs,demstate, local_scope);
+	}
 
 	AdjustState (&t_or_e_args->arg_state,demstate);
 }
@@ -1553,10 +1562,6 @@ static void DecrementRefCountCopy (NodeId nid)
 	if (nid->nid_ref_count_copy>0)
 		--nid->nid_ref_count_copy__;
 }
-
-#if 0
-# include "dbprint.h"
-#endif
 
 static Bool AdjustStateOfSharedNode (NodeId nid, StateS demstate, int local_scope)
 {
@@ -1581,9 +1586,9 @@ static Bool AdjustStateOfSharedNode (NodeId nid, StateS demstate, int local_scop
 				node_id_scope=-node_id_scope;
 
 #if 0
-			printf ("AdjustStateOfSharedNode ");
-			DPrintNodeId (nid,StdOut);
-			printf (" %d %d\n",node_id_scope,local_scope);
+			FPrintF (rules_file,"AdjustStateOfSharedNode ");
+			DPrintNodeId (nid,rules_file);
+			FPrintF (rules_file," %d %d\n",node_id_scope,local_scope);
 #endif
 
 			if (node_id_scope>=local_scope){
@@ -1845,9 +1850,9 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 							node_id_scope=-node_id_scope;
 
 #if 0
-						printf ("NodeInAStrictContext select_symb ");
-						DPrintNodeId (node_id,StdOut);
-						printf (" %d %d\n",node_id_scope,local_scope);
+						FPrintF (rules_file,"NodeInAStrictContext select_symb %d ",node->node_arity);
+						DPrintNodeId (node_id,rules_file);
+						FPrintF (rules_file," %d %d\n",node_id_scope,local_scope);
 #endif
 						if (node_id_scope>=local_scope){
 							if (IsSimpleState (argnode->node_state)){
@@ -1873,6 +1878,11 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 								AdjustState (&argnode->node_state.state_tuple_arguments[node->node_arity-1],demanded_state);
 							}
 						}
+						
+#if 0
+						PrintState (argnode->node_state,rules_file);
+						FPrintF (rules_file,"\n");
+#endif
 					}
 				}
 				node->node_state = demanded_state;
@@ -3594,7 +3604,7 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 		
 			for_l (arg_p,root_node->node_arguments,arg_next){
 				NodeP node;
-
+				
 				node=arg_p->arg_node;
 				if (node->node_kind==CaseNode){
 					NodeP case_alt_node_p;
@@ -3631,6 +3641,7 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 			break;
 		}
 		default:
+			scope=1;
 			last=CollectSharedNodeIdsInNode (node_p,parent_node_id,last);
 			break;
 
@@ -3644,9 +3655,9 @@ static void CollectSharedAndAnnotatedNodesInRhs (NodeS **root_p,NodeDefS **defs_
 {
 	NodeDefS **last;
 	NodeP root_node;
-	
+/*	
 	scope=1;
-
+*/
 	NodeIdCount=1;
 	NodeIdStackTop = (NodeId)-1;
 
