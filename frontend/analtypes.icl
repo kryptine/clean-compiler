@@ -749,8 +749,9 @@ where
 //						---> ("determine_kinds_of_class", class_name, class_kinds)
 				= ({class_infos & [class_module,class_index] = [ KindConst \\ _ <- [1..class_arity]] }, { as & as_error = popErrorAdmin as.as_error })
 		| isCyclicClass class_infos.[class_module,class_index]
-			# class_name = modules.[class_module].com_class_defs.[class_index].class_name
-			= (class_infos, { as & as_error = checkError class_name class_def_error as.as_error })
+			# {class_name,class_arity} = modules.[class_module].com_class_defs.[class_index]
+			= ({ class_infos & [class_module,class_index] = [ KindConst \\ _ <- [1..class_arity]]},
+				{ as & as_error = checkError class_name class_def_error as.as_error })
 			= (class_infos, as)
 	where
 		fresh_kind_vars nr_of_vars fresh_vars kind_heap
