@@ -33,7 +33,7 @@ sucltypeheap :: [SuclTypeVariable]
  | SuclCase ExprInfoPtr
  | SuclApply Int
  | SuclInt Int
- | SuclChar Char
+ | SuclReal Real
  | SuclBool Bool
 
 :: SuclSymbolKind

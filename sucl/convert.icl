@@ -54,14 +54,13 @@ convert_fundef fundef (typerulemap,strictsmap,fundefs0,kindmap)
 /* Convert the SymbolType data structure
    This type describes the types of (function) symbols
    We use the principal type
-   Strictness annotations are to be done yet
+   Strictness annotations are only handled for direct function arguments
 */
 convert_symboltype :: SymbolType -> (Rule SuclTypeSymbol SuclTypeVariable,[Bool])
 convert_symboltype {st_vars,st_args,st_arity,st_result,st_context,st_attr_vars,st_attr_env}
- = (mkrule typeargs typeroot graph``,nostricts)
-   where (heap`,(graph``,typeargs,_)) = convert_atypes (sucltypeheap,graph`) st_args // _ => forget annotations of subtypes
-         (_,(graph`,[typeroot:_],[_:_])) = convert_atype st_result (heap`,(emptygraph,[],[])) // _ => forget annotations of subtypes
-         nostricts = abort "convert_symboltype: strictness info not implemented"
+ = (mkrule typeargs typeroot graph``,stricts)
+   where (heap`,(graph``,typeargs,stricts)) = convert_atypes (sucltypeheap,graph`) st_args // _ => forget annotations of subtypes
+         (_,(graph`,[typeroot:_],[_:_])) = convert_atype st_result (heap`,(emptygraph,[],[])) // _ => forget annotations of result
 
 /* Convert a list of attributed type (deriving its principal type for now)
    Intended to be used by foldlr.
@@ -136,7 +135,7 @@ convert_btype BT_Bool = SuclBOOL
 convert_btype BT_Dynamic = SuclDYNAMIC
 convert_btype BT_File = SuclFILE
 convert_btype BT_World = SuclWORLD
-convert_btype _ = abort "convert: convert_btype: unhandledRule basic type"
+convert_btype _ = abort "convert: convert_btype: unhandled BasicType constructor"
 
 /******************************************************************************
 *  EXPRESSION CONVERSION                                                      *
@@ -295,9 +294,13 @@ convert_bvalue :: BasicValue -> SuclSymbol
 convert_bvalue (BVI intrepr) = SuclInt (toInt intrepr)
 //convert_bvalue (BVC charrepr) = SuclChar (fromString charrepr)
 convert_bvalue (BVB bool) = SuclBool bool
-//convert_bvalue (BVR realrepr) = SuclReal (fromString realrepr)
+convert_bvalue (BVR realrepr) = SuclReal (toReal realrepr)
 //convert_bvalue (BVS stringrepr) = SuclString (fromString stringrepr)
 convert_bvalue _ = abort "convert: convert_bvalue: unhandled BasicValue constructor"
 
 convert_kind :: DefOrImpFunKind -> SuclSymbolKind
-convert_kind _ = abort "convert: convert_kind: not implemented"
+convert_kind (FK_DefFunction b) = SuclPrimitive // Function from a definition module
+convert_kind (FK_ImpFunction b) = SuclFunction  // Function from a (the) implementation module
+convert_kind  FK_DefMacro       = SuclFunction  // Macro from a definition module
+convert_kind  FK_ImpMacro       = SuclFunction  // Macro from an implementation module
+convert_kind _ = abort "convert: convert_kind: unhandled DefOrImpFunKind constructor"
