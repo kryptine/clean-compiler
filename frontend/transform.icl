@@ -1829,7 +1829,13 @@ where
 	collectVariables (expr @ exprs) free_vars dynamics cos
 		# ((expr, exprs), free_vars, dynamics, cos) = collectVariables (expr, exprs) free_vars dynamics cos
 		= (expr @ exprs, free_vars, dynamics, cos)
-	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) free_vars dynamics cos=:{cos_var_heap}
+	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) free_vars dynamics cos=:{cos_var_heap}
+		# (let_info,cos_symbol_heap)	= readPtr let_info_ptr cos.cos_symbol_heap
+		  zipped_let_info = case let_info of
+		  	EI_LetType let_types	-> [(lb_dst.fv_info_ptr,type) \\ {lb_dst} <- let_strict_binds ++ let_lazy_binds & type <- let_types]
+		  	_						-> []
+		  cos = {cos & cos_symbol_heap = cos_symbol_heap}
+		  cos_var_heap = cos.cos_var_heap
 		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
 		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
 		  (is_cyclic_s, let_strict_binds, cos) 
@@ -1847,8 +1853,17 @@ where
 			  (let_strict_binds, let_lazy_binds) = split collected_binds
 			| isEmpty let_strict_binds && isEmpty let_lazy_binds
 				= (let_expr, free_vars, dynamics, cos)
+				# let_info = case let_info of
+					EI_LetType _	-> EI_LetType (retrieve_types zipped_let_info (let_strict_binds ++ let_lazy_binds))
+					_				-> let_info
+				  cos_symbol_heap = writePtr let_info_ptr let_info cos.cos_symbol_heap
+				  cos = {cos & cos_symbol_heap = cos_symbol_heap}
 				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, dynamics, cos)
 		where
+			retrieve_types _ [] = []
+			retrieve_types [(dst,type):zipped] binds=:[{lb_dst}:rest_binds]
+				| dst == lb_dst.fv_info_ptr	= [type : retrieve_types zipped rest_binds]
+								= retrieve_types zipped binds
 
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
 			this variable is an alias for 'var') or to 'VI_Count 0 cIsALocalVar' to initialise
