@@ -433,9 +433,6 @@ static void remove_aliases_from_node (NodeP node)
 		case IfNode:
 		{
 			ArgP cond_arg,then_arg;
-			int local_scope;
-					
-			local_scope=node->node_if_scope+2;
 
 			cond_arg=node->node_arguments;
 			then_arg=cond_arg->arg_next;
