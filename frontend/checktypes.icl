@@ -1197,10 +1197,9 @@ where
 			= (bind, { cs & cs_symbol_table= cs_symbol_table, cs_error = checkError id_name "type variable not defined" cs_error })
 checkSpecialTypeVars SP_None cs
 	= (SP_None, cs)
-/*	
-checkSpecialTypes :: !Index !Specials !u:{#.CheckedTypeDef} !u:{#.DclModule} !*TypeHeaps !*CheckState
-	-> (!Specials, !u:{#CheckedTypeDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
-*/
+
+checkSpecialTypes :: !Index !Specials !v:{#CheckedTypeDef} !u:{#.DclModule} !*TypeHeaps !*CheckState
+	-> (!Specials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
 checkSpecialTypes mod_index (SP_ParsedSubstitutions envs) type_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  (specials, (heaps, ots, cs)) = mapSt (check_environment mod_index) envs (heaps, ots, cs)
