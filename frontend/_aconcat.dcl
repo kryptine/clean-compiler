@@ -31,6 +31,6 @@ where
 //	r0=_createArray sr	// 2.0
 	r0=_createArrayc sr
 	sr=s1+s2
-	s2=length l
 	s1=size a
+	s2=length l
 
