@@ -100,9 +100,9 @@ instanceError symbol types err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type " <:: (format, types) <<< '\n' }
 
-contextError err
+contextError {tc_class={glob_object={ds_ident}}} err
 	# err = errorHeading "Overloading error" err
-	= { err & ea_file = err.ea_file <<< " specified context is too general\n"}
+	= { err & ea_file = err.ea_file <<< " unresolved class \"" <<< ds_ident <<< "\" not occurring in specified type\n"}
 
 uniqueError symbol types err
 	# err = errorHeading "Overloading/Uniqueness error" err
@@ -692,9 +692,9 @@ where
 	
 createBoundVar :: !TypeContext -> BoundVar
 createBoundVar {tc_class={glob_object={ds_ident}}, tc_var}
-	| isNilPtr tc_var
+/*	| isNilPtr tc_var
 		= abort ("createBoundVar : NIL ptr" ---> ds_ident)
-		= { var_name = { id_name = "_v" +++ ds_ident.id_name, id_info = nilPtr }, var_info_ptr = tc_var, var_expr_ptr = nilPtr }
+*/	= { var_name = { id_name = "_v" +++ ds_ident.id_name, id_info = nilPtr }, var_info_ptr = tc_var, var_expr_ptr = nilPtr }
 
 createFreeVar :: !TypeContext -> FreeVar
 createFreeVar {tc_class={glob_object={ds_ident}}, tc_var}
@@ -712,7 +712,7 @@ where
 			-> (!TypeContext, ![(Int, Global DefinedSymbol)], ![TypeContext], !*TypeHeaps, !*VarHeap, !*ErrorAdmin)
 	determine_context_and_address context [] has_context contexts defs type_heaps var_heap error
 		| has_context
-			= (context, [], contexts, type_heaps, var_heap, contextError error)
+			= (context, [], contexts, type_heaps, var_heap, contextError context error)
 			#! (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			# new_context = { context & tc_var = new_info_ptr}
 			= (new_context, [], [new_context : contexts], type_heaps, var_heap, error)
@@ -802,28 +802,6 @@ where
 	determine_class_arguments No type_contexts tb_args
 		= mapAppend (\tc -> createFreeVar tc) type_contexts tb_args
 
-/*	
-	type_contexts fun_symb fun_info_ptr tb_args symbol_heap error
-		#! fun_info = sreadPtr fun_info_ptr symbol_heap
-		= case fun_info of
-			EI_Empty
-				-> (mapAppend (\tc -> createFreeVar tc) type_contexts tb_args, symbol_heap, error)
-			EI_Context class_expressions
-				# (tb_args, error) = convert_class_expressions fun_symb class_expressions tb_args error
-				-> (tb_args, symbol_heap, error)
-			_
-//				-> (tb_args, symbol_heap, contextError fun_symb error)
-				-> (tb_args, symbol_heap, contextError error)
-				
-	convert_class_expressions fun_symb [] tb_args error
-		= (tb_args, error)
-	convert_class_expressions fun_symb [Var {var_name,var_info_ptr} : class_exprs] tb_args error
-		# (tb_args, error) = convert_class_expressions fun_symb class_exprs tb_args error
-		= ([ { fv_name = var_name, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = -1 } : tb_args], error)
-	convert_class_expressions fun_symb [class_expr : class_exprs] tb_args error
-//		= (tb_args, contextError fun_symb error)
-		= (tb_args, contextError error)
-*/
 convertDynamicTypes dyn_ptrs update_info
 	= foldSt update_dynamic dyn_ptrs update_info
 where		
