@@ -758,6 +758,8 @@ where
 		| glob_module==pds_module && glob_object==pds_def
 			= True
 			= False
+	is_lazy_or_strict_array _ predef_symbols
+		= False
 
 	is_lazy_or_strict_list [TA {type_index={glob_module,glob_object}} [],TV var] predef_symbols
 		# {pds_def,pds_module} = predef_symbols.[PD_ListType]
@@ -773,6 +775,8 @@ where
 		| glob_module==pds_module && glob_object==pds_def
 			= True
 			= False
+	is_lazy_or_strict_list _ predef_symbols
+		= False
 
 initializeContextVariables :: ![TypeContext] !*VarHeap ->  (![TypeContext], !*VarHeap)
 initializeContextVariables contexts var_heap
