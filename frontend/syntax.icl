@@ -768,6 +768,8 @@ cNotVarNumber :== -1
 
 ::	AttrVarInfo  	= AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
+					| AVI_Count !Int /* auxiliary used in module typesupport */
+
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo
 
@@ -1179,15 +1181,15 @@ where
 instance toString TypeAttribute
 where
 	toString (TA_Unique)
-		= "* "
+		= "*"
 	toString (TA_TempVar tav_number)
-		= "u" + toString tav_number + ": "
+		= "u" + toString tav_number + ":"
 	toString (TA_Var avar)
-		= toString avar + ": "
+		= toString avar + ":"
 	toString (TA_RootVar avar)
-		= toString avar + ": "
+		= toString avar + ":"
 	toString (TA_Anonymous)
-		= ". "
+		= "."
 	toString TA_None
 		= ""
 	toString TA_Multi
@@ -1808,8 +1810,8 @@ readable :: !Ident -> String // somewhat hacky
 readable {id_name}
 	| id_name=="_cons" || id_name=="_nil"
 		= "list constructor"
-	| id_name % (0,5) == "_tuple"
-		= "tuple"
+	| size id_name>0 && id_name.[0]=='_'
+		= id_name%(1, size id_name-1)
 	= id_name
 
 instance <<< ImportedIdent

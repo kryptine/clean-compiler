@@ -78,7 +78,7 @@ instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !Bool !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 frontEndInterface upToPhase mod_ident search_paths list_inferred_types predef_symbols hash_table files error io out
 	# (ok, mod, hash_table, error, predef_symbols, files)
 		= wantModule cWantIclFile mod_ident NoPos (hash_table -*-> ("Parsing:", mod_ident)) error search_paths predef_symbols files

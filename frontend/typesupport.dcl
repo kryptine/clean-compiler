@@ -2,7 +2,7 @@ definition module typesupport
 
 import checksupport, StdCompare
 
-from unitype import Coercions, CoercionTree, AttributePartition
+from unitype import Coercions, CoercionTree, AttributePartition, CT_Empty
 
 // MW: this switch is used to en(dis)able the fusion algorithm
 SwitchFusion fuse dont_fuse :== dont_fuse
@@ -47,6 +47,8 @@ expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribut
 
 equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
 
+beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
+
 ::	AttrCoercion =
 	{	ac_demanded	:: !Int
 	,	ac_offered	:: !Int
@@ -72,3 +74,34 @@ class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a
 
 instance <<< TempSymbolType
+
+removeInequality :: !Int !Int !*Coercions -> .Coercions
+anonymizeAttrVars :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
+flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
+assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
+getImplicitAttrInequalities :: !SymbolType -> [AttrInequality]
+	// retrieve those inequalities  that are implied by propagation
+emptyCoercions :: !Int -> .Coercions
+	// Int: nr of attribute variables
+addAttrEnvInequalities :: ![AttrInequality] !*Coercions !u:AttrVarHeap
+						-> (!.Coercions, !u:AttrVarHeap)
+	// assertion: the attribute variables point to (AVI_Attr (TA_TempVar nr)) where
+	// nr corresponds to the attribute variable
+
+//accCoercionTree :: !.(u:CoercionTree -> (.a,u:CoercionTree)) !Int !*{!u:CoercionTree} -> (!.a,!{!u:CoercionTree})
+accCoercionTree f i coercion_trees
+	:== acc_coercion_tree i coercion_trees
+  where
+	acc_coercion_tree i coercion_trees
+		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		  (x, coercion_tree) = f coercion_tree
+		= (x, snd (replace coercion_trees i coercion_tree))
+	
+//accCoercionTree :: !.(u:CoercionTree -> u:CoercionTree) !Int !*{!u:CoercionTree} -> {!u:CoercionTree}
+appCoercionTree f i coercion_trees
+	:== acc_coercion_tree i coercion_trees
+  where
+	acc_coercion_tree i coercion_trees
+		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		= snd (replace coercion_trees i (f coercion_tree))
+	

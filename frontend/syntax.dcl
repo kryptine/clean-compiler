@@ -808,6 +808,8 @@ cNonRecursiveAppl	:== False
 
 ::	AttrVarInfo  	= AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId 
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
+					| AVI_Count !Int /* auxiliary used in module typesupport */
+					
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo
 
@@ -1159,7 +1161,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, FunctionPattern, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression, CoercionPosition
+			 TypeCodeExpression, CoercionPosition, AttrInequality
 
 instance == TypeAttribute
 instance == Annotation

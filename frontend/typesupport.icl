@@ -1,7 +1,7 @@
 implementation module typesupport
 
 import StdEnv, StdCompare
-import syntax, parse, check, unitype, utilities, checktypes // , RWSDebug
+import syntax, parse, check, unitype, utilities, checktypes, RWSDebug
 
 // MW: this switch is used to en(dis)able the fusion algorithm
 SwitchFusion fuse dont_fuse :== dont_fuse
@@ -827,6 +827,7 @@ cMarkAttribute		:== 4
 cBrackets			:== 8
 cCommaSeparator		:== 16
 cArrowSeparator		:== 32
+cAndSeparator		:== 64
 
 checkProperty	form property	:== not (form.form_properties bitand property == 0)
 setProperty		form property	:== {form & form_properties = form.form_properties bitor property}
@@ -838,6 +839,11 @@ clearProperty	form property	:== {form & form_properties = form.form_properties b
 	= file
 	
 class writeType a :: !*File !(Optional TypeVarBeautifulizer) (!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
+
+instance writeType AttributeVar
+where
+	writeType file opt_beautifulizer (form, av)
+		= (file <<< av, opt_beautifulizer)
 
 instance writeType SymbolType
 where
@@ -858,13 +864,32 @@ where
 			False
 				# (file, opt_beautifulizer)
 					= writeType (file <<< ", [") opt_beautifulizer 
-								(setProperty form cCommaSeparator, st_attr_env)
+									(setProperty form cCommaSeparator, grouped (hd st_attr_env).ai_demanded [] st_attr_env)
 				-> (file <<< ']', opt_beautifulizer)
 	where
 		show_context form [] file_opt_beautifulizer
 			= file_opt_beautifulizer
 		show_context form contexts (file, opt_beautifulizer)
-			= writeType (file <<< " | ") opt_beautifulizer (setProperty form cCommaSeparator, contexts)
+			= writeType (file <<< " | ") opt_beautifulizer (setProperty form cAndSeparator, contexts)
+		// grouped takes care that inequalityies like [a<=c, b<=c] are printed like [a b <= c]
+		grouped group_var accu []
+			= [{ ig_offered = accu, ig_demanded = group_var}]
+		grouped group_var accu [{ai_offered, ai_demanded}:ineqs]
+			| group_var==ai_demanded
+				= grouped group_var [ai_offered:accu] ineqs
+			=[{ ig_offered = accu, ig_demanded = group_var}: grouped ai_demanded [ai_offered] ineqs]
+			
+:: InequalityGroup =
+	{	ig_offered	:: ![AttributeVar] 
+	,	ig_demanded	:: !AttributeVar
+	}
+
+instance writeType InequalityGroup
+where
+	writeType file opt_beautifulizer (form, {ig_offered,ig_demanded})
+		# (file, opt_beautifulizer)
+				= writeType file opt_beautifulizer (form, ig_offered)
+		= writeType (file <<< " <= ") opt_beautifulizer (form, ig_demanded)
 
 instance writeType TypeContext
 where
@@ -935,6 +960,8 @@ where
 				= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 			| is_tuple type_name type_arity
 				= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+			| is_string_type type_name
+				= (file <<< "String", opt_beautifulizer)
 			| type_arity == 0
 				= (file <<< type_name, opt_beautifulizer)
 			| checkProperty form cBrackets
@@ -957,6 +984,7 @@ where
 			is_lazy_array {id_name} 		= id_name == "_array"
 			is_strict_array {id_name} 		= id_name == "_!array"
 			is_unboxed_array {id_name} 		= id_name == "_#array"
+			is_string_type {id_name}		= id_name == "_string"
 
 // MW4 was:	writeType file (form, arg_type --> res_type)
 	writeType file opt_beautifulizer (form, arg_type --> res_type)
@@ -997,11 +1025,12 @@ writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
 writeBeautifulTypeVar file beautifulizer=:{tvb_visited_typevars, tvb_fresh_vars} type_variable
 	| sanity_check_failed type_variable
 		= abort "bug nr 12345 in module typesupport"
-	= case assoc_list_lookup type_variable tvb_visited_typevars of
+	# type_var_ptr = toTypeVarPtr type_variable
+	= case assoc_list_lookup type_var_ptr tvb_visited_typevars of
 		No
 			-> (file <<< hd tvb_fresh_vars, 
 				Yes { beautifulizer &
-						tvb_visited_typevars = [(type_variable, hd tvb_fresh_vars):tvb_visited_typevars],
+						tvb_visited_typevars = [(type_var_ptr, hd tvb_fresh_vars):tvb_visited_typevars],
 						tvb_fresh_vars = tl tvb_fresh_vars })
 		Yes (_, beautiful_var_name)
 			-> (file <<< beautiful_var_name, Yes beautifulizer)
@@ -1019,16 +1048,23 @@ instance writeType ConsVariable where
 		= (file <<< cons_variable, No)
 	writeType file yes_beautifulizer (_, cv=:(TempQCV _))
 		= (file <<< cv, yes_beautifulizer)
-	writeType file yes_beautifulizer=:(Yes beautifulizer=:{tvb_visited_consvars, tvb_fresh_vars}) 
+	writeType file yes_beautifulizer=:(Yes beautifulizer=:{tvb_visited_typevars, tvb_fresh_vars}) 
 			(_, cons_variable)
-		= case assoc_list_lookup cons_variable tvb_visited_consvars of
+		# cons_var_ptr = toTypeVarPtrCV cons_variable
+		= case assoc_list_lookup cons_var_ptr tvb_visited_typevars of
 			No
 				-> (file <<< hd tvb_fresh_vars, 
 					Yes { beautifulizer &
-							tvb_visited_consvars = [(cons_variable, hd tvb_fresh_vars):tvb_visited_consvars],
+							tvb_visited_typevars = [(cons_var_ptr, hd tvb_fresh_vars):tvb_visited_typevars],
 							tvb_fresh_vars = tl tvb_fresh_vars })
 			Yes (_, beautiful_var_name)
 				-> (file <<< beautiful_var_name, yes_beautifulizer)
+
+toTypeVarPtrCV (CV {tv_info_ptr}) = tv_info_ptr
+
+toTypeVarPtr (TV {tv_info_ptr}) = tv_info_ptr
+toTypeVarPtr (GTV {tv_info_ptr}) = tv_info_ptr
+toTypeVarPtr (TQV {tv_info_ptr}) = tv_info_ptr
 
 assoc_list_lookup _ [] = No
 assoc_list_lookup t1 [hd=:(t2, _):tl]
@@ -1049,12 +1085,15 @@ where
 				= show_elem elem_number (clearProperty form cCommaSeparator) type file_opt_beautifulizer
 			| checkProperty form cArrowSeparator
 				= show_elem elem_number (clearProperty form cArrowSeparator) type file_opt_beautifulizer
+			| checkProperty form cAndSeparator
+				= show_elem elem_number (clearProperty form cAndSeparator) type file_opt_beautifulizer
 				= show_elem elem_number (setProperty form cBrackets) type file_opt_beautifulizer
 		show_list elem_number form [type : types] file_opt_beautifulizer
 			# (elem_format, seperator)
 					= if (checkProperty form cCommaSeparator) (clearProperty form cCommaSeparator, ",")
 						(if (checkProperty form cArrowSeparator) (clearProperty form cArrowSeparator, " -> ")
-							(setProperty form cBrackets, " "))
+							(if (checkProperty form cAndSeparator) (clearProperty form cAndSeparator, " & ")
+								(setProperty form cBrackets, " ")))
 			  (file, opt_beautifulizer)
 			  		= show_elem elem_number elem_format type file_opt_beautifulizer
 			= show_list (inc elem_number) form types (file <<< seperator, opt_beautifulizer)
@@ -1096,19 +1135,321 @@ where
 
 // MW4..
 :: TypeVarBeautifulizer =
-	{	tvb_visited_typevars 	:: ![(Type, String)]
-	,	tvb_visited_consvars	:: ![(ConsVariable, String)]
-			// tvb_visited_typevars and tvb_visited_consvars associate type (constructor) variables with
-			// strings, the type in tvb_visited_typevars should be only GTV, TV, TempV, TQV, TempQV, TLifted.
-			// (associations lists are slow but cool)
+	{	tvb_visited_typevars 	:: ![(TypeVarInfoPtr, String)]
 	,	tvb_fresh_vars			::	![String]
 	}
 
 initialTypeVarBeautifulizer :: TypeVarBeautifulizer
 initialTypeVarBeautifulizer 
-	= {	tvb_visited_typevars = [], tvb_visited_consvars = [], tvb_fresh_vars = fresh_vars 'a' (-1) }
+	= {	tvb_visited_typevars = [], tvb_fresh_vars = fresh_vars 'a' (-1) }
   where
 	fresh_vars 'i' i
 		= fresh_vars 'a' (i+1)
 	fresh_vars ch i
 		= [if (i==(-1)) (toString ch) (toString ch+++toString i): fresh_vars (inc ch) i]
+
+getImplicitAttrInequalities :: !SymbolType -> [AttrInequality]
+	// retrieve those inequalities  that are implied by propagation
+getImplicitAttrInequalities st=:{st_args, st_result}
+	# ineqs1 = get_ineqs_of_atype_list st_args
+	  ineqs2 = get_ineqs_of_atype st_result
+	= uniqueBagToList (Pair ineqs1 ineqs2)
+  where
+	get_ineqs_of_atype :: !AType -> !.Bag AttrInequality
+	get_ineqs_of_atype a_type=:{at_attribute=TA_Var outer_av, at_type=at_type=:TA type_symb_ident type_args}
+		# ({tsp_propagation}) = type_symb_ident.type_prop
+		  implicit_ineqs_1 = get_superflous_ineqs outer_av type_args tsp_propagation
+		| isEmptyBag implicit_ineqs_1
+			= get_ineqs_of_type at_type
+		# implicit_ineqs_2 = get_ineqs_of_type at_type
+		= Pair implicit_ineqs_1 implicit_ineqs_2
+	  where
+		get_superflous_ineqs :: !AttributeVar ![AType] !PropClassification -> .Bag AttrInequality
+		get_superflous_ineqs outer_av [] tsp_propagation
+			= Empty
+		get_superflous_ineqs outer_av [{at_attribute}:type_args] tsp_propagation
+			# other_ineqs = get_superflous_ineqs outer_av type_args (tsp_propagation>>1)
+			| tsp_propagation bitand 1==0
+				// the type doesn't propagate in this argument
+				= other_ineqs
+			= case at_attribute of
+				TA_Var inner_av
+					-> Pair (Single {ai_demanded=inner_av, ai_offered=outer_av}) other_ineqs
+				_	-> other_ineqs
+	get_ineqs_of_atype {at_type}
+		= get_ineqs_of_type at_type
+
+	get_ineqs_of_type (TA ts args)
+		= get_ineqs_of_atype_list args
+	get_ineqs_of_type (l --> r)
+		= Pair (get_ineqs_of_atype l) (get_ineqs_of_atype r)
+	get_ineqs_of_type (cv :@: args)
+		= get_ineqs_of_atype_list args
+	get_ineqs_of_type _
+		= Empty
+
+	get_ineqs_of_atype_list []
+		= Empty
+	get_ineqs_of_atype_list [a_type:a_types]
+		= Pair (get_ineqs_of_atype a_type) (get_ineqs_of_atype_list a_types)
+			
+beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
+beautifulizeAttributes symbol_type th_attrs
+	# (nr_of_attr_vars, all_attr_vars, th_attrs)
+	  		= assignNumbersToAttrVars symbol_type th_attrs
+	  (attr_env_coercions, th_attrs)
+	  		= addAttrEnvInequalities symbol_type.st_attr_env (emptyCoercions nr_of_attr_vars) th_attrs
+	  (all_int_inequalities, th_attrs)
+	  		= mapSt pointers_to_int symbol_type.st_attr_env th_attrs
+	  (_, attr_env_coercions)
+	  		= foldSt removeRedundancy all_int_inequalities
+	  				(createArray nr_of_attr_vars False, attr_env_coercions)
+	  implicit_inequalities
+	  		= getImplicitAttrInequalities symbol_type
+	  (implicit_int_inequalities, th_attrs)
+	  		= mapSt pointers_to_int implicit_inequalities th_attrs
+	  attr_env_coercions
+	  		= foldSt remove_inequality implicit_int_inequalities attr_env_coercions
+	  st_attr_env
+	  		= coercionsToAttrEnv {el \\ el<-all_attr_vars } attr_env_coercions
+	  (symbol_type, th_attrs)
+	  		= anonymizeAttrVars { symbol_type & st_attr_env = st_attr_env } th_attrs
+	= (symbol_type, th_attrs)
+  where
+	pointers_to_int {ai_offered, ai_demanded} th_attrs
+		# (AVI_Attr (TA_TempVar offered), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
+		  (AVI_Attr (TA_TempVar demanded), th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
+  		= ({ ac_offered = offered, ac_demanded = demanded }, th_attrs)
+	remove_inequality {ac_offered, ac_demanded} attr_env_coercions
+		= removeInequality ac_offered ac_demanded attr_env_coercions
+
+	coercionsToAttrEnv :: !{AttributeVar} !Coercions -> [AttrInequality]
+	coercionsToAttrEnv attr_vars {coer_offered}
+		= flatten [ [ {ai_offered = attr_vars.[offered], ai_demanded = attr_vars.[demanded] }
+					\\ offered <- fst (flattenCoercionTree offered_tree) ]
+				  \\ offered_tree<-:coer_offered & demanded<-[0..] ]
+
+	
+	removeRedundancy :: !AttrCoercion !(!*{#Bool}, !*Coercions) -> (!.{#Bool}, !.Coercions)
+	removeRedundancy {ac_offered, ac_demanded} (visited, attr_env_coercions=:{coer_demanded})
+		// all i:not visited.[i]
+		# (descendants, coer_demanded)
+				= accCoercionTree flattenCoercionTree ac_offered coer_demanded
+		  (path_exists, (visited, coer_demanded))
+		  		= searchPath (removeMember ac_demanded descendants) ac_demanded (visited, coer_demanded)
+		#! size 
+				= size visited
+		# visited
+				= { visited & [i] = False \\ i<-[0..size-1] }
+		  attr_env_coercions
+		  		 = { attr_env_coercions & coer_demanded = coer_demanded }
+		| path_exists
+			// the inequality was redundant (like the first one in [a<=c, a<=b, b<=c] 
+			= (visited, removeInequality ac_offered ac_demanded attr_env_coercions)
+		= (visited, attr_env_coercions)
+	  where
+		searchPath :: ![Int] Int !(!*{#Bool}, !{!*CoercionTree}) -> (!Bool, (!.{#Bool}, !{!.CoercionTree}))
+		searchPath [] _ visited_coer_demanded
+			= (False, visited_coer_demanded)
+		searchPath [x:xs] goal (visited, coer_demanded)
+			// not visited.[x]
+			| x==goal
+				= (True, (visited, coer_demanded))
+			# visited
+					= { visited & [x] = True }
+		 	  (descendants, coer_demanded)
+					= accCoercionTree flattenCoercionTree x coer_demanded
+			  (xs, visited)
+			 		= foldSt add_unvisited_node descendants (xs, visited)
+			= searchPath xs goal (visited, coer_demanded)
+			
+		add_unvisited_node :: !Int !(![Int], !u:{#Bool}) -> !(![Int], !u:{#Bool})
+		add_unvisited_node candidate (accu, visited)
+			| visited.[candidate]
+				= (accu, visited)
+			= ([candidate:accu], visited)
+		
+assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
+assignNumbersToAttrVars {st_attr_vars, st_args, st_result, st_attr_env} th_attrs
+	# th_attrs
+			= foldSt initialise_to_AVI_Empty st_attr_vars th_attrs
+	  (next_number, numbered_vars_accu, th_attrs)
+	  		= foldSt assign_numbers_attr_ineq st_attr_env
+				(assign_numbers_atype st_result
+					(foldSt assign_numbers_atype st_args (0, [], th_attrs)))
+	= (next_number, reverse numbered_vars_accu, th_attrs)
+  where
+	assign_numbers_atype atype=:{at_attribute=TA_Var av=:{av_info_ptr}, at_type}
+						(next_number, numbered_vars_accu, th_attrs)
+		# (avi, th_attrs) = readPtr av_info_ptr th_attrs
+		= assign_numbers_type at_type
+			(assign_number avi av (next_number, numbered_vars_accu, th_attrs))
+	assign_numbers_atype atype=:{at_type} assign_state
+		= assign_numbers_type at_type assign_state
+
+	assign_numbers_type (TA _ args) assign_state
+		= foldSt assign_numbers_atype args assign_state
+	assign_numbers_type (l --> r) assign_state
+		= assign_numbers_atype l (assign_numbers_atype r assign_state)
+	assign_numbers_type (_ :@: args) assign_state
+		= foldSt assign_numbers_atype args assign_state
+	assign_numbers_type _ assign_state
+		= assign_state
+
+	assign_numbers_attr_ineq {ai_offered, ai_demanded} (next_number, numbered_vars_accu, th_attrs)
+		# (avi_offered, th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
+		  (avi_demanded, th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
+		= assign_number avi_offered ai_offered
+			(assign_number avi_demanded ai_demanded (next_number, numbered_vars_accu, th_attrs))
+	
+	assign_number AVI_Empty av=:{av_info_ptr} (next_number, numbered_vars_accu, th_attrs)
+		= (next_number+1, [av:numbered_vars_accu],
+			writePtr av_info_ptr (AVI_Attr (TA_TempVar next_number)) th_attrs)
+	assign_number _ _ assign_state
+		= assign_state
+
+//accCoercionTree :: !.(u:CoercionTree -> (.a,u:CoercionTree)) !Int !*{!u:CoercionTree} -> (!.a,!{!u:CoercionTree})
+accCoercionTree f i coercion_trees
+	:== acc_coercion_tree i coercion_trees
+  where
+	acc_coercion_tree i coercion_trees
+		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		  (x, coercion_tree) = f coercion_tree
+		= (x, snd (replace coercion_trees i coercion_tree))
+	
+appCoercionTree f i coercion_trees
+	:== acc_coercion_tree i coercion_trees
+  where
+	acc_coercion_tree i coercion_trees
+		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		= snd (replace coercion_trees i (f coercion_tree))
+	
+flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
+flattenCoercionTree tree
+	= flatten_ct ([], tree)
+  where
+	flatten_ct (accu, CT_Empty)
+		= (accu, CT_Empty)
+	flatten_ct (accu, CT_Node i left right)
+		# (accu, right) = flatten_ct (accu, right)
+		  (accu, left) = flatten_ct ([i:accu], left)
+		= (accu, CT_Node i left right)
+
+anonymizeAttrVars :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
+anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} th_attrs
+	# th_attrs
+	  		= countAttrVars st th_attrs
+	  th_attrs
+	  		= foldSt markUsedAttrVars st_attr_env th_attrs
+	  (st_args, th_attrs) = mapSt anonymize_atype st_args th_attrs
+	  (st_result, th_attrs) = anonymize_atype st_result th_attrs
+	= ({ st & st_args = st_args, st_result = st_result }, th_attrs)
+  where
+	anonymize_atype atype=:{at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
+		# (at_type, th_attrs) = anonymize_type at_type th_attrs
+		  (avi, th_attrs) = readPtr av_info_ptr th_attrs
+		= case avi of
+			AVI_Count c
+				// this attribute variable doesn't occur in the attribute inequalities
+				| isTypeVar at_type || c==1
+					// number of occurences doesn't matter for type variables
+					-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
+				-> ({ atype & at_type = at_type }, th_attrs)
+			_
+				-> ({ atype & at_type = at_type }, th_attrs)
+	  where
+		isTypeVar (TV _) = True 
+		isTypeVar (GTV _) = True
+		isTypeVar (TQV _) = True
+		isTypeVar _ = False
+	anonymize_atype atype=:{at_type} th_attrs
+		# (at_type, th_attrs) = anonymize_type at_type th_attrs
+		= ({ atype & at_type = at_type }, th_attrs)
+
+	anonymize_type (TA tsi args) th_attrs
+		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
+		= (TA tsi args, th_attrs)
+	anonymize_type (l --> r) th_attrs
+		# (l, th_attrs) = anonymize_atype l th_attrs
+		  (r, th_attrs) = anonymize_atype r th_attrs
+		= (l --> r, th_attrs)
+	anonymize_type (cv :@: args) th_attrs
+		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
+		= (cv :@: args, th_attrs)
+	anonymize_type x th_attrs
+		= (x, th_attrs)
+
+	countAttrVars :: !SymbolType !*AttrVarHeap -> .AttrVarHeap
+	// for all attribute variables: set the attrVarInfo to (AVI_count c) where c is the number of
+	// occurences in of that attribute variable in the SymbolType (excluding inequalities)
+	countAttrVars {st_attr_vars, st_args, st_result} th_attrs
+		# th_attrs
+				= foldSt (\av=:{av_info_ptr} th_attrs -> writePtr av_info_ptr (AVI_Count 0) th_attrs)
+						st_attr_vars th_attrs
+		= foldSt count_attr_vars_of_atype st_args (count_attr_vars_of_atype st_result th_attrs)
+	  where
+		count_attr_vars_of_atype {at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
+			# (AVI_Count c, th_attrs) = readPtr av_info_ptr th_attrs
+			= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c+1)) th_attrs)
+		count_attr_vars_of_atype {at_type} th_attrs
+			= count_attr_vars_of_type at_type th_attrs
+	
+		count_attr_vars_of_type (TA _ args) th_attrs
+			= foldSt count_attr_vars_of_atype args th_attrs
+		count_attr_vars_of_type (l --> r) th_attrs
+			= count_attr_vars_of_atype l (count_attr_vars_of_atype r th_attrs)
+		count_attr_vars_of_type (_ :@: args) th_attrs
+			= foldSt count_attr_vars_of_atype args th_attrs
+		count_attr_vars_of_type _ th_attrs
+			= th_attrs
+
+		
+initialise_to_AVI_Empty {av_info_ptr} th_attrs
+	= writePtr av_info_ptr AVI_Empty th_attrs
+
+markUsedAttrVars {ai_offered, ai_demanded} th_attrs
+	= writePtr ai_offered.av_info_ptr (AVI_Forward 0)
+		(writePtr ai_demanded.av_info_ptr (AVI_Forward 0) th_attrs)
+	// misuse AVI_Forward to indicate that this attribute variable is referenced in
+	// the attribute inequalities
+
+removeInequality :: !Int !Int !*Coercions -> .Coercions
+removeInequality offered demanded attr_env_coercions=:{coer_offered, coer_demanded}
+	# coer_offered = appCoercionTree (removeNode offered) demanded coer_offered
+	  coer_demanded = appCoercionTree (removeNode demanded) offered coer_demanded
+	= { attr_env_coercions & coer_demanded = coer_demanded, coer_offered = coer_offered }
+  where
+	removeNode :: !Int !*CoercionTree -> !.CoercionTree
+	removeNode i1 (CT_Node i2 left right)
+		| i1<i2
+			= CT_Node i2 (removeNode i1 left) right
+		| i1>i2
+			= CT_Node i2 left (removeNode i1 right)
+		= rightInsert left right
+	removeNode i1 CT_Empty
+		= CT_Empty
+
+	rightInsert :: !*CoercionTree !*CoercionTree -> !.CoercionTree
+	rightInsert CT_Empty right
+		= right
+	rightInsert (CT_Node i left right2) right1
+		= CT_Node i left (rightInsert right2 right1)
+
+			
+emptyCoercions :: !Int -> .Coercions
+emptyCoercions nr_of_attr_vars
+		= { coer_demanded = create_a_unique_array nr_of_attr_vars,
+			coer_offered = create_a_unique_array nr_of_attr_vars }
+	  where
+		create_a_unique_array :: !Int -> .{!.CoercionTree}
+		create_a_unique_array n
+			= { CT_Empty \\ i <- [1..n] }
+
+addAttrEnvInequalities :: ![AttrInequality] !*Coercions !u:AttrVarHeap -> (!.Coercions, !u:AttrVarHeap)
+addAttrEnvInequalities st_attr_env coercions th_attrs
+	= foldSt add_attr_env_inequality st_attr_env (coercions, th_attrs)
+  where
+	add_attr_env_inequality {ai_offered, ai_demanded} (coercions, th_attrs)
+		# (AVI_Attr (TA_TempVar offered), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
+		  (AVI_Attr (TA_TempVar demanded), th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
+  		= (newInequality offered demanded coercions, th_attrs)

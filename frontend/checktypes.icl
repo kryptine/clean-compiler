@@ -950,22 +950,6 @@ checkSpecialTypes mod_index SP_None type_defs modules heaps cs
 	= (SP_None, type_defs, modules, heaps, cs)
 
 
-/* MW: already defined in module syntax
-instance <<< SelectorDef
-where
-	(<<<) file {sd_symb} = file <<< sd_symb
-*/
-
-instance <<< AttrInequality
-where
-	(<<<) file {ai_demanded,ai_offered}
-		= file <<< ai_offered <<< " <= " <<< ai_demanded
-/*
-instance <<< VarBind
-where
-	(<<<) file vb = file <<< (vb.vb_var,vb.vb_vars)
-*/
-
 cOuterMostLevel :== 0
 
 addTypeVariablesToSymbolTable :: ![ATypeVar] ![AttributeVar] !*TypeHeaps !*CheckState

@@ -1561,17 +1561,26 @@ where
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 // MW4..
 				  ts_out = ts.ts_out
-				  ts_out = case list_inferred_types of
-				  			False
-				  				-> ts_out
-				  			_
-								# form = { form_properties = cNoProperties, form_attr_position = No }
-				  				-> ts_out <<< fun_symb <<< " :: " 
-				  						<:: (form, clean_fun_type, Yes initialTypeVarBeautifulizer) <<< '\n'
+				  th_attrs = ts_type_heaps.th_attrs
+				  (ts_out, th_attrs)
+				  		= case list_inferred_types of
+				  			No
+				  				-> (ts_out, th_attrs)
+				  			Yes show_attributes
+								# form = { form_properties = if show_attributes cAttributed cNoProperties, form_attr_position = No }
+//								  ts_out = ts_out <<< show_attributes <<< "\n"
+				  				  (printable_type, th_attrs)
+				  				  		= case show_attributes of
+				  				  			True
+				  				  				-> beautifulizeAttributes clean_fun_type th_attrs
+				  				  			_
+				  				  				-> (clean_fun_type, th_attrs)	
+				  				-> (ts_out <<< fun_symb <<< " :: " 
+				  						<:: (form, printable_type, Yes initialTypeVarBeautifulizer) <<< '\n', th_attrs)
 // ..MW4
 				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
 // MW4 was:				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
-				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error, ts_out = ts_out })
+				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = { ts_type_heaps & th_attrs = th_attrs }, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error, ts_out = ts_out })
 
 	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} type_ptrs
 						defs fun_env attr_var_env type_heaps expr_heap error
@@ -1602,7 +1611,7 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_vars,st_attr_vars,st_con
 	}
 
 // MW4 was:typeProgram ::!{! Group} !*{# FunDef} !IndexRange !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File
-typeProgram ::!{! Group} !*{# FunDef} !IndexRange !Bool !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File !*File
+typeProgram ::!{! Group} !*{# FunDef} !IndexRange !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !*Heaps !*PredefinedSymbols !*File !*File
 // MW4 was:	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File)
 	-> (!Bool, !*{# FunDef}, !IndexRange, {! GlobalTCType}, !{# CommonDefs}, !{# {# FunType} }, !*Heaps, !*PredefinedSymbols, !*File, !*File)
 // MW4 was:typeProgram comps fun_defs specials icl_defs imports modules {hp_var_heap, hp_expression_heap, hp_type_heaps} predef_symbols file

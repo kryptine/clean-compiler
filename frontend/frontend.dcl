@@ -25,5 +25,5 @@ import checksupport, transform, overloading
 	|	FrontEndPhaseConvertModules
 	|	FrontEndPhaseAll
 
-frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !Bool !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
+frontEndInterface :: !FrontEndPhase !Ident !SearchPaths !(Optional Bool) !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File -> (!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *FrontEndSyntaxTree) 
 // upToPhase name paths list_inferred_types predefs files error io out
