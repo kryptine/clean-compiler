@@ -1880,14 +1880,21 @@ where
 						  		combine [(tp,lb):let_strict_binds] let_lazy_binds
 						  			= [(True, tp, lb) : combine let_strict_binds let_lazy_binds]
 			  (collected_binds, free_vars, dynamics, cos) = collect_variables_in_binds all_binds [] free_vars dynamics cos
-			  (let_strict_binds, let_lazy_binds) = split collected_binds
-			| isEmpty let_strict_binds && isEmpty let_lazy_binds
+			| isEmpty collected_binds
 				= (let_expr, free_vars, dynamics, cos)
+			 	# (let_strict_bind_types,let_lazy_bind_types,let_strict_binds,let_lazy_binds) = split_binds collected_binds
+						  	with
+				  				split_binds :: ![(Bool, AType, LetBind)] -> (!*[AType],!*[AType],!*[LetBind],!*[LetBind])
+								split_binds []
+									= ([],[],[],[])
+								split_binds [(strict, t, b):xs]
+									# (st,lt,sb,lb) = split_binds xs
+									| strict
+										= ([t:st],lt,[b:sb],lb)
+										= (st,[t:lt],sb,[b:lb])
 				# let_info = case let_info of
-					EI_LetType _	-> EI_LetType (map fst (let_strict_binds ++ let_lazy_binds))
+					EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 					_				-> let_info
-				  let_strict_binds = map snd let_strict_binds
-				  let_lazy_binds = map snd let_lazy_binds
 				  cos_symbol_heap = writePtr let_info_ptr let_info cos.cos_symbol_heap
 				  cos = {cos & cos_symbol_heap = cos_symbol_heap}
 				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, dynamics, cos)
@@ -1956,33 +1963,32 @@ where
 		    by examining the reference count.
 		*/
 
-			collect_variables_in_binds :: ![(.a,.b,.LetBind)] !u:[v:(.a,.b,w:LetBind)] ![FreeVar] ![(Ptr ExprInfo)] !*CollectState -> (!x:[y:(.a,.b,z:LetBind)],![FreeVar],![(Ptr ExprInfo)],!.CollectState), [u <= x,v <= y,w <= z]
+			collect_variables_in_binds :: ![(Bool,.b,.LetBind)] !u:[v:(Bool,.b,w:LetBind)] ![FreeVar] ![(Ptr ExprInfo)] !*CollectState -> (!x:[y:(Bool,.b,z:LetBind)],![FreeVar],![(Ptr ExprInfo)],!.CollectState), [u <= x,v <= y,w <= z]
 			collect_variables_in_binds binds collected_binds free_vars dynamics cos
 				# (continue, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds False binds collected_binds free_vars dynamics cos
 				| continue
 					= collect_variables_in_binds binds collected_binds free_vars dynamics cos
+					# cos = {cos & cos_error=report_unused_strict_binds binds cos.cos_error}
 					= (collected_binds, free_vars, dynamics, cos)
 		
-			examine_reachable_binds :: !u:Bool ![v:(.a,.b,w:LetBind)] !x:[y:(.a,.b,z:LetBind)] ![.FreeVar] ![.(Ptr ExprInfo)] !*CollectState -> *(!u0:Bool,![v0:(.a,.b,w0:LetBind)],!x0:[y0:(.a,.b,z0:LetBind)],![FreeVar],![(Ptr ExprInfo)],!*CollectState), [u <= u0,v <= v0,w <= w0,x <= x0,y <= y0,z <= z0]
+			examine_reachable_binds :: !Bool ![v:(.a,.b,w:LetBind)] !x:[y:(.a,.b,z:LetBind)] ![.FreeVar] ![.(Ptr ExprInfo)] !*CollectState -> *(!Bool,![v0:(.a,.b,w0:LetBind)],!x0:[y0:(.a,.b,z0:LetBind)],![FreeVar],![(Ptr ExprInfo)],!*CollectState), [v <= v0,w <= w0,x <= x0,y <= y0,z <= z0]
 			examine_reachable_binds bind_found [bind=:(is_strict, type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
 				# (bind_found, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds bind_found binds collected_binds free_vars dynamics cos
 				# (VI_Count count is_global, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
 				# cos = { cos & cos_var_heap = cos_var_heap }
 				| count > 0
 					# (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-					= (True, binds, [ (is_strict, type, { letb/*snd bind*/ & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+					= (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 					= (bind_found, [bind : binds], collected_binds, free_vars, dynamics, cos)
 			examine_reachable_binds bind_found [] collected_binds free_vars dynamics cos
 				= (bind_found, [], collected_binds, free_vars, dynamics, cos)
 
-			split :: ![(Bool, AType, x)] -> (![(AType,x)], ![(AType,x)])
-			split []
-				= ([], [])
-			split [(p, t, x):xs]
-				# (l, r) = split xs
-				| p
-					= ([(t,x):l], r)
-				= (l, [(t,x):r])
+			report_unused_strict_binds [(is_strict,type,{lb_dst={fv_ident},lb_position}):binds] errors
+				| not is_strict
+					= report_unused_strict_binds binds errors
+					= report_unused_strict_binds binds (checkWarningWithPosition fv_ident lb_position "not used, ! ignored" errors)
+			report_unused_strict_binds [] errors
+				= errors
 
 	collectVariables (Case case_expr) free_vars dynamics cos
 		# (case_expr, free_vars, dynamics, cos) = collectVariables case_expr free_vars dynamics cos
