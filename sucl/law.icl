@@ -9,7 +9,6 @@ import rule
 import dnc
 import graph
 import basic
-from general import --->
 import StdEnv
 
 /*
@@ -180,7 +179,7 @@ corestrategy matchable =(\ substrat subject found rnf snode
 applyrule :: (Bool,Node sym var) -> Rule sym SuclVariable
 applyrule (sdef,scont)
  = aprule (anode,(sym,aargs)) [enode] aroot
-   where (aargs,[anode,aroot,enode:_]) = (claim--->"basic.claim begins from law.applyrule") sargs suclheap
+   where (aargs,[anode,aroot,enode:_]) = claim sargs suclheap
          (sym,sargs)
           = if sdef scont (nosym,[])
          nosym = abort "applyrule: no function symbol available"

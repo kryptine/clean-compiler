@@ -101,12 +101,7 @@ expand_macros ::
  &  == var
 
 expand_macros showsym showvar heap exported srrs
-= (((((result <--- ("expand.expand_macros.references_to is "+++showlist (showreference showsym) references)
-      )       <--- ("expand.expand_macros.cycle_candidates is "+++showlist (showpair showsym (showlist showsym)) cycle_candidates)
-     )        <--- ("expand.expand_macros.recursiveness is "+++showlist (showpair showsym toString) recursiveness)
-    )         <--- ("expand.expand_macros.expandable_table is "+++showlist (showpair showsym toString) expandable_table)
-   )          <--- ("expand.expand_macros.references_to is "+++showlist (showpair showsym (showlist showsym)) references_to)
-  )           <--- ("expand.expand_macros.finalruletable is "+++showlist (showpair showsym (showrule showsym showvar)) finalruletable)
+= result
   where
 
         // Collect references

@@ -6,7 +6,7 @@ import rule
 import graph
 import pfun
 import basic
-from general import Optional,Yes,No,--->
+from general import Optional,Yes,No
 import StdEnv
 
 // A history relates node-ids in the subject graph to patterns
@@ -43,12 +43,12 @@ matchhistory
  &  Eq var
 
 matchhistory hist spinenodes sgraph snode
-= foldr ((checkassoc--->"history.checkassoc begins from history.matchhistory") spinenodes sgraph snode) [] hist <--- "history.matchhistory ends"
+= foldr (checkassoc spinenodes sgraph snode) [] hist
 
 checkassoc spinenodes sgraph snode (var,pats) rest
-= ((if (isMember var spinenodes) (foldr (checkpat--->"history.checkassoc.checkpat begins from history.checkassoc") rest pats) (rest--->"history.checkassoc history attachment node is not part of the spine nodes")) <--- "history.checkassoc ends") ---> ("history.checkassoc number of history patterns for node is "+++toString (length pats))
+= if (isMember var spinenodes) (foldr checkpat rest pats) rest
   where checkpat pat rest
-        = (if ((isinstance--->"graph.isinstance begins from history.checkassoc.checkpat") (hgraph,hroot) (sgraph,snode)) [pat:rest] rest) <--- "history.checkassoc.checkpat ends"
+        = if (isinstance (hgraph,hroot) (sgraph,snode)) [pat:rest] rest
           where hgraph = rgraphgraph pat; hroot = rgraphroot pat
 
 /*

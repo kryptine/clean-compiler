@@ -172,7 +172,7 @@ corestricts sym
       -> maphd (const True) stricts
      _
       -> stricts
-  where stricts = map (const False) (arguments ((coretyperule--->"coreclean.coretyperule begins from coreclean.corestricts") sym))
+  where stricts = map (const False) (arguments (coretyperule sym))
 
 coretyperule :: !SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 coretyperule (SuclApply argc)
@@ -188,11 +188,11 @@ coretyperule (SuclTupleSelect tuplesize elemindex)
 = mkrule [tupletype] (elemtypes!!elemindex) (updategraph tupletype (SuclTUPLE tuplesize,elemtypes) emptygraph)
   where [tupletype:theap1] = sucltypeheap
         elemtypes = take tuplesize theap1
-coretyperule (SuclInt _) = consttyperule SuclINT <--- "coreclean.coretyperule ends (Int)"
-coretyperule (SuclChar _) = consttyperule SuclCHAR <--- "coreclean.coretyperule ends (Char)"
-coretyperule (SuclReal _) = consttyperule SuclREAL <--- "coreclean.coretyperule ends (Real)"
-coretyperule (SuclBool _) = consttyperule SuclBOOL <--- "coreclean.coretyperule ends (Bool)"
-coretyperule (SuclString _) = consttyperule SuclSTRING <--- "coreclean.coretyperule ends (String)"
+coretyperule (SuclInt _) = consttyperule SuclINT
+coretyperule (SuclChar _) = consttyperule SuclCHAR
+coretyperule (SuclReal _) = consttyperule SuclREAL
+coretyperule (SuclBool _) = consttyperule SuclBOOL
+coretyperule (SuclString _) = consttyperule SuclSTRING
 coretyperule sym = error ("coreclean: coretyperule: untyped user symbol: "+++toString sym)
 
 consttyperule tsym

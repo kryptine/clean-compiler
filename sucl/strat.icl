@@ -9,7 +9,7 @@ import dnc
 import graph
 import pfun
 import basic
-from general import No,Yes,--->
+from general import No,Yes
 import StdEnv
 
 /*
@@ -125,7 +125,7 @@ makernfstrategy hist strat rnfnodes node graph
           where (def,cnt) = dnc (const "in makernfstrategy") graph node
                 spinenodes` = [node:spinenodes]
                 subspinecont subspine = spinecont (node,subspine)
-                strat` = (checkhistory--->"strat.checkhistory begins from strat.makernfstrategy.substrat.strat`") (graph,node) spinenodes` hist strat
+                strat` = checkhistory (graph,node) spinenodes` hist strat
 
 /*
 
@@ -352,9 +352,9 @@ checkhistory
  &  Eq var
 
 checkhistory (sgraph,snode) spinenodes history defaultstrategy
-= (if (isEmpty histpats) defaultstrategy unsafestrategy) <--- "strat.checkhistory ends"
+= if (isEmpty histpats) defaultstrategy unsafestrategy
   where histpats
-        = (matchhistory--->"history.matchhistory begins from strat.checkhistory.histpats") history spinenodes sgraph snode
+        = matchhistory history spinenodes sgraph snode
         unsafestrategy _ _ found _ _
         = found (Unsafe (hd histpats))
 
@@ -481,6 +481,6 @@ checkconstr
  -> .result
 
 checkconstr showsym isconstr defstrat substrat subject found rnf (ssym,sargs)
-| isconstr ssym ---> ("strat.checkconstr begins for "+++showsym ssym)
-= rnf <--- ("strat.checkconstr ends (RNF)")
-= defstrat substrat subject found rnf (ssym,sargs) <--- ("strat.checkconstr ends (default strategy)")
+| isconstr ssym
+= rnf
+= defstrat substrat subject found rnf (ssym,sargs)

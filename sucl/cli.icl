@@ -128,7 +128,7 @@ exports (CliAlias ss m) = m.exportedsymbols
 // Determine the arity of a core clean symbol
 arity :: Cli SuclSymbol -> Int
 arity (CliAlias ss m) sym
-= extendfn m.arities (length o arguments o (extendfn m.typerules (coretyperule--->"coreclean.coretyperule begins from cli.arity"))) sym
+= extendfn m.arities (length o arguments o (extendfn m.typerules coretyperule)) sym
 
 /*
 >   typerule (tdefs,(es,as,ts,rs)) = maxtyperule ts
@@ -165,16 +165,12 @@ clistrategy (CliAlias showsymbol {arities=as,typeconstructors=tcs,typerules=ts,r
    o checklaws cleanlaws                            // Checks for special (hard coded) rules (+x0=x /y1=y ...)
    o checkrules matchable (foldmap id [] rs)        // Checks normal rewrite rules
    o checkimport islocal                            // Checks for delta symbols
-   o ( checkconstr toString (flip isMember (flatten (map snd tcs))) // Checks for constructors
-        ---> ("cli.clistrategy.checkconstr",tcs)
-     )
+   o checkconstr toString (flip isMember (flatten (map snd tcs))) // Checks for constructors
    ) (corestrategy matchable)                       // Checks rules for symbols in the language core (IF, _AP, ...)
    where islocal rsym=:(SuclUser (SK_Function _)) = isMember rsym (map fst rs)  // User-defined function symbols can be imported, so they're known if we have a list of rules for them
          islocal _                                = True                        // Symbols in the language core (the rest) are always completely known
                                                                                 // This includes lifted case symbols; we lifted them ourselves, after all
-         getarity sym
-         = (arity <--- ("cli.clistrategy.getarity ends with "+++toString arity)) ---> ("cli.clistrategy.getarity begins for "+++showsymbol sym)
-           where arity = extendfn as (typearity o (maxtyperule--->"cli.clistrategy.getarity uses maxtyperule") ts) sym 
+         getarity = extendfn as (typearity o maxtyperule ts)
 
 typearity :: (Rule SuclTypeSymbol SuclTypeVariable) -> Int
 typearity ti = length (arguments ti)
@@ -183,7 +179,7 @@ typearity ti = length (arguments ti)
 //maxtypeinfo defs sym = extendfn defs coretypeinfo sym
 
 maxtyperule :: [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)] SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
-maxtyperule defs sym = extendfn defs (coretyperule--->"coreclean.coretyperule begins from cli.maxtyperule") sym
+maxtyperule defs sym = extendfn defs coretyperule sym
 
 maxstricts :: [(SuclSymbol,[Bool])] SuclSymbol -> [Bool]
 maxstricts defs sym = extendfn defs corestricts sym

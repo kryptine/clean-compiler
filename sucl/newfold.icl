@@ -150,9 +150,11 @@ recurse ::
 
 recurse foldarea fnsymbol
 = f ([],[])
-  where f newhisthist trace
-        | (trace--->trace) $ False
+  where /*
+        f newhisthist trace
+        | trace $ False
           = error "shouldn't happen"
+        */
         f newhisthist (Trace stricts rule answer history (Reduce reductroot trace))
         | isEmpty pclosed && superset popen ropen
           = f (newhist`,newhist`) trace

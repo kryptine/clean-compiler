@@ -8,7 +8,7 @@ Global
 		CheckIndexes:	True
 		TargetProcessor:	CurrentProcessor
 	Application
-		HeapSize:	25165824
+		HeapSize:	50331648
 		StackSize:	2097152
 		ExtraMemory:	0
 		IntialHeapSize:	8388608
@@ -24,7 +24,7 @@ Global
 			Time:	True
 			Stack:	False
 		Output
-			Output:	ShowConstructors
+			Output:	NoConsole
 			Font:	MS Sans Serif
 			FontSize:	8
 			WriteStdErr:	True
@@ -76,6 +76,62 @@ MainModule
 	IclOpen:	False
 	LastModified:	No 0 0 0 0 0 0
 OtherModules
+	Module
+		Name:	Heaprepr
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	True
+		Dcl
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
+	Module
+		Name:	syntaxrepr
+		Dir:	{Project}\compiler
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	AllTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	True
+		Dcl
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		DclOpen:	False
+		Icl
+			WindowPosition
+				X:	0
+				Y:	0
+				SizeX:	500
+				SizeY:	300
+		IclOpen:	False
+		LastModified:	No 0 0 0 0 0 0
 	Module
 		Name:	filesystem
 		Dir:	{Project}\main
@@ -1252,8 +1308,8 @@ OtherModules
 		DclOpen:	False
 		Icl
 			WindowPosition
-				X:	0
-				Y:	0
+				X:	155
+				Y:	260
 				SizeX:	936
 				SizeY:	394
 		IclOpen:	False
@@ -1359,15 +1415,15 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	1000
-				SizeY:	300
+				SizeX:	1128
+				SizeY:	768
 		DclOpen:	False
 		Icl
 			WindowPosition
 				X:	0
-				Y:	0
-				SizeX:	955
-				SizeY:	486
+				Y:	249
+				SizeX:	1102
+				SizeY:	509
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1504,10 +1560,10 @@ OtherModules
 		DclOpen:	False
 		Icl
 			WindowPosition
-				X:	64
-				Y:	31
-				SizeX:	890
-				SizeY:	577
+				X:	17
+				Y:	254
+				SizeX:	1104
+				SizeY:	519
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1590,8 +1646,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	870
-				SizeY:	507
+				SizeX:	1065
+				SizeY:	723
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -1732,8 +1788,8 @@ OtherModules
 		DclOpen:	False
 		Icl
 			WindowPosition
-				X:	0
-				Y:	0
+				X:	140
+				Y:	304
 				SizeX:	977
 				SizeY:	302
 		IclOpen:	False
@@ -1745,7 +1801,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2063,8 +2119,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	1018
+				SizeY:	209
 		DclOpen:	False
 		Icl
 			WindowPosition
@@ -2237,9 +2293,9 @@ OtherModules
 		Icl
 			WindowPosition
 				X:	0
-				Y:	0
+				Y:	317
 				SizeX:	1136
-				SizeY:	748
+				SizeY:	431
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -2305,7 +2361,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2501,7 +2557,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2529,7 +2585,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2585,7 +2641,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2613,7 +2669,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2641,7 +2697,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2697,7 +2753,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2770,8 +2826,8 @@ OtherModules
 			WindowPosition
 				X:	0
 				Y:	0
-				SizeX:	500
-				SizeY:	300
+				SizeX:	975
+				SizeY:	582
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 		NeededObjFiles
@@ -2799,9 +2855,9 @@ OtherModules
 		Icl
 			WindowPosition
 				X:	0
-				Y:	0
-				SizeX:	500
-				SizeY:	300
+				Y:	180
+				SizeX:	1077
+				SizeY:	516
 		IclOpen:	False
 		LastModified:	No 0 0 0 0 0 0
 	Module
@@ -2867,7 +2923,7 @@ OtherModules
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
 			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
+			ListTypes:	AllTypes
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
@@ -2919,107 +2975,109 @@ OtherModules
 Static
 	Mods
 		Path:	{Project}\main\cocl.icl
-		Path:	{Project}\main\Windows\thread_message.icl
-		Path:	{Application}\1.3.3\StdEnv\_SystemArray.icl
-		Path:	{Project}\compiler\compilerSwitches.icl
-		Path:	{Project}\compiler\type_io.icl
-		Path:	{Project}\compiler\portToNewSyntax.icl
-		Path:	{Project}\main\coclmain.icl
-		Path:	{Application}\1.3.3\StdEnv\StdEnv.icl
-		Path:	{Application}\1.3.3\StdEnv\StdBool.icl
-		Path:	{Application}\1.3.3\StdEnv\StdOverloaded.icl
-		Path:	{Application}\1.3.3\StdEnv\StdInt.icl
-		Path:	{Application}\1.3.3\StdEnv\StdReal.icl
-		Path:	{Application}\1.3.3\StdEnv\StdChar.icl
-		Path:	{Application}\1.3.3\StdEnv\StdArray.icl
-		Path:	{Application}\1.3.3\StdEnv\StdString.icl
-		Path:	{Application}\1.3.3\StdEnv\StdFile.icl
-		Path:	{Application}\1.3.3\StdEnv\StdClass.icl
-		Path:	{Application}\1.3.3\StdEnv\StdList.icl
-		Path:	{Application}\1.3.3\StdEnv\StdOrdList.icl
-		Path:	{Application}\1.3.3\StdEnv\StdTuple.icl
-		Path:	{Application}\1.3.3\StdEnv\StdCharList.icl
-		Path:	{Application}\1.3.3\StdEnv\StdFunc.icl
-		Path:	{Application}\1.3.3\StdEnv\StdMisc.icl
-		Path:	{Application}\1.3.3\StdEnv\StdEnum.icl
-		Path:	{Application}\1.3.3\StdEnv\_SystemEnum.icl
-		Path:	{Project}\compiler\frontend.icl
-		Path:	{Project}\compiler\scanner.icl
-		Path:	{Project}\compiler\general.icl
-		Path:	{Project}\compiler\checksupport.icl
-		Path:	{Project}\compiler\syntax.icl
-		Path:	{Project}\compiler\typeproperties.icl
-		Path:	{Project}\compiler\Heap.icl
-		Path:	{Project}\compiler\predef.icl
-		Path:	{Project}\compiler\hashtable.icl
-		Path:	{Project}\compiler\containers.icl
-		Path:	{Project}\compiler\utilities.icl
-		Path:	{Project}\compiler\_aconcat.icl
-		Path:	{Project}\compiler\transform.icl
-		Path:	{Project}\compiler\overloading.icl
-		Path:	{Project}\compiler\check.icl
-		Path:	{Project}\compiler\typesupport.icl
-		Path:	{Project}\compiler\StdCompare.icl
-		Path:	{Project}\compiler\compare_constructor.icl
-		Path:	{Project}\compiler\unitype.icl
-		Path:	{Project}\compiler\analunitypes.icl
-		Path:	{Project}\ArgEnvWindows\ArgEnv.icl
-		Path:	{Project}\main\Version.icl
-		Path:	{Project}\main\Windows\set_return_code.icl
-		Path:	{Project}\main\compile.icl
-		Path:	{Project}\compiler\parse.icl
-		Path:	{Project}\compiler\postparse.icl
-		Path:	{Project}\compiler\type.icl
-		Path:	{Project}\compiler\trans.icl
-		Path:	{Project}\compiler\convertcases.icl
-		Path:	{Project}\compiler\convertDynamics.icl
-		Path:	{Project}\WrapDebug\RWSDebug.icl
-		Path:	{Project}\compiler\checktypes.icl
-		Path:	{Project}\compiler\explicitimports.icl
-		Path:	{Project}\compiler\comparedefimp.icl
-		Path:	{Project}\compiler\checkFunctionBodies.icl
-		Path:	{Project}\compiler\analtypes.icl
-		Path:	{Project}\backend\backendinterface.icl
-		Path:	{Project}\main\Windows\CoclSystemDependent.icl
-		Path:	{Project}\compiler\refmark.icl
-		Path:	{Project}\WrapDebug\Debug.icl
-		Path:	{Project}\backend\backend.icl
-		Path:	{Project}\backend\backendpreprocess.icl
-		Path:	{Project}\backend\backendsupport.icl
-		Path:	{Project}\backend\backendconvert.icl
-		Path:	{Project}\WrapDebug\Wrap.icl
-		Path:	{Project}\WrapDebug\ShowWrapped.icl
-		Path:	{Project}\compiler\generics.icl
-		Path:	{Project}\compiler\type_io_common.icl
-		Path:	{Application}\1.3.3\StdEnv\StdDebug.icl
-		Path:	{Project}\compiler\convertimportedtypes.icl
-		Path:	{Project}\compiler\mergecases.icl
-		Path:	{Project}\sucl\supercompile.icl
-		Path:	{Project}\sucl\cleanversion.icl
-		Path:	{Project}\sucl\convert.icl
-		Path:	{Project}\sucl\newtest.icl
-		Path:	{Project}\sucl\cli.icl
-		Path:	{Project}\sucl\coreclean.icl
-		Path:	{Project}\sucl\strat.icl
-		Path:	{Project}\sucl\spine.icl
-		Path:	{Project}\sucl\history.icl
-		Path:	{Project}\sucl\rule.icl
-		Path:	{Project}\sucl\graph.icl
-		Path:	{Project}\sucl\pfun.icl
-		Path:	{Project}\sucl\basic.icl
-		Path:	{Project}\sucl\dnc.icl
-		Path:	{Project}\sucl\law.icl
-		Path:	{Project}\sucl\absmodule.icl
-		Path:	{Project}\sucl\newfold.icl
-		Path:	{Project}\sucl\trace.icl
-		Path:	{Project}\sucl\extract.icl
-		Path:	{Project}\sucl\complete.icl
-		Path:	{Project}\sucl\trd.icl
-		Path:	{Project}\sucl\loop.icl
-		Path:	{Project}\sucl\rewr.icl
-		Path:	{Project}\sucl\canon.icl
-		Path:	{Project}\sucl\expand.icl
+		Path:	{Project}\compiler\Heaprepr.icl
+		Path:	{Project}\compiler\syntaxrepr.icl
 		Path:	{Project}\main\filesystem.icl
+		Path:	{Project}\sucl\expand.icl
+		Path:	{Project}\sucl\canon.icl
+		Path:	{Project}\sucl\rewr.icl
+		Path:	{Project}\sucl\loop.icl
+		Path:	{Project}\sucl\trd.icl
+		Path:	{Project}\sucl\complete.icl
+		Path:	{Project}\sucl\extract.icl
+		Path:	{Project}\sucl\trace.icl
+		Path:	{Project}\sucl\newfold.icl
+		Path:	{Project}\sucl\absmodule.icl
+		Path:	{Project}\sucl\law.icl
+		Path:	{Project}\sucl\dnc.icl
+		Path:	{Project}\sucl\basic.icl
+		Path:	{Project}\sucl\pfun.icl
+		Path:	{Project}\sucl\graph.icl
+		Path:	{Project}\sucl\rule.icl
+		Path:	{Project}\sucl\history.icl
+		Path:	{Project}\sucl\spine.icl
+		Path:	{Project}\sucl\strat.icl
+		Path:	{Project}\sucl\coreclean.icl
+		Path:	{Project}\sucl\cli.icl
+		Path:	{Project}\sucl\newtest.icl
+		Path:	{Project}\sucl\convert.icl
+		Path:	{Project}\sucl\cleanversion.icl
+		Path:	{Project}\sucl\supercompile.icl
+		Path:	{Project}\compiler\mergecases.icl
+		Path:	{Project}\compiler\convertimportedtypes.icl
+		Path:	{Application}\1.3.3\StdEnv\StdDebug.icl
+		Path:	{Project}\compiler\type_io_common.icl
+		Path:	{Project}\compiler\generics.icl
+		Path:	{Project}\WrapDebug\ShowWrapped.icl
+		Path:	{Project}\WrapDebug\Wrap.icl
+		Path:	{Project}\backend\backendconvert.icl
+		Path:	{Project}\backend\backendsupport.icl
+		Path:	{Project}\backend\backendpreprocess.icl
+		Path:	{Project}\backend\backend.icl
+		Path:	{Project}\WrapDebug\Debug.icl
+		Path:	{Project}\compiler\refmark.icl
+		Path:	{Project}\main\Windows\CoclSystemDependent.icl
+		Path:	{Project}\backend\backendinterface.icl
+		Path:	{Project}\compiler\analtypes.icl
+		Path:	{Project}\compiler\checkFunctionBodies.icl
+		Path:	{Project}\compiler\comparedefimp.icl
+		Path:	{Project}\compiler\explicitimports.icl
+		Path:	{Project}\compiler\checktypes.icl
+		Path:	{Project}\WrapDebug\RWSDebug.icl
+		Path:	{Project}\compiler\convertDynamics.icl
+		Path:	{Project}\compiler\convertcases.icl
+		Path:	{Project}\compiler\trans.icl
+		Path:	{Project}\compiler\type.icl
+		Path:	{Project}\compiler\postparse.icl
+		Path:	{Project}\compiler\parse.icl
+		Path:	{Project}\main\compile.icl
+		Path:	{Project}\main\Windows\set_return_code.icl
+		Path:	{Project}\main\Version.icl
+		Path:	{Project}\ArgEnvWindows\ArgEnv.icl
+		Path:	{Project}\compiler\analunitypes.icl
+		Path:	{Project}\compiler\unitype.icl
+		Path:	{Project}\compiler\compare_constructor.icl
+		Path:	{Project}\compiler\StdCompare.icl
+		Path:	{Project}\compiler\typesupport.icl
+		Path:	{Project}\compiler\check.icl
+		Path:	{Project}\compiler\overloading.icl
+		Path:	{Project}\compiler\transform.icl
+		Path:	{Project}\compiler\_aconcat.icl
+		Path:	{Project}\compiler\utilities.icl
+		Path:	{Project}\compiler\containers.icl
+		Path:	{Project}\compiler\hashtable.icl
+		Path:	{Project}\compiler\predef.icl
+		Path:	{Project}\compiler\Heap.icl
+		Path:	{Project}\compiler\typeproperties.icl
+		Path:	{Project}\compiler\syntax.icl
+		Path:	{Project}\compiler\checksupport.icl
+		Path:	{Project}\compiler\general.icl
+		Path:	{Project}\compiler\scanner.icl
+		Path:	{Project}\compiler\frontend.icl
+		Path:	{Application}\1.3.3\StdEnv\_SystemEnum.icl
+		Path:	{Application}\1.3.3\StdEnv\StdEnum.icl
+		Path:	{Application}\1.3.3\StdEnv\StdMisc.icl
+		Path:	{Application}\1.3.3\StdEnv\StdFunc.icl
+		Path:	{Application}\1.3.3\StdEnv\StdCharList.icl
+		Path:	{Application}\1.3.3\StdEnv\StdTuple.icl
+		Path:	{Application}\1.3.3\StdEnv\StdOrdList.icl
+		Path:	{Application}\1.3.3\StdEnv\StdList.icl
+		Path:	{Application}\1.3.3\StdEnv\StdClass.icl
+		Path:	{Application}\1.3.3\StdEnv\StdFile.icl
+		Path:	{Application}\1.3.3\StdEnv\StdString.icl
+		Path:	{Application}\1.3.3\StdEnv\StdArray.icl
+		Path:	{Application}\1.3.3\StdEnv\StdChar.icl
+		Path:	{Application}\1.3.3\StdEnv\StdReal.icl
+		Path:	{Application}\1.3.3\StdEnv\StdInt.icl
+		Path:	{Application}\1.3.3\StdEnv\StdOverloaded.icl
+		Path:	{Application}\1.3.3\StdEnv\StdBool.icl
+		Path:	{Application}\1.3.3\StdEnv\StdEnv.icl
+		Path:	{Project}\main\coclmain.icl
+		Path:	{Project}\compiler\portToNewSyntax.icl
+		Path:	{Project}\compiler\type_io.icl
+		Path:	{Project}\compiler\compilerSwitches.icl
+		Path:	{Application}\1.3.3\StdEnv\_SystemArray.icl
+		Path:	{Project}\main\Windows\thread_message.icl
 	Objs
 		Path:	{Application}\1.3.3\StdEnv\Clean System Files\_startup0.o
 		Path:	{Application}\1.3.3\StdEnv\Clean System Files\_startup1Profile.o
@@ -3033,100 +3091,102 @@ Static
 		Path:	{Project}\backend\Clean System Files\backendpreprocess.o
 		Path:	{Project}\backend\Clean System Files\backend.o
 		Path:	{Project}\backend\Clean System Files\backendinterface.o
-		Path:	{Project}\sucl\Clean System Files\expand.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdDebug.o
-		Path:	{Project}\WrapDebug\Clean System Files\ShowWrapped.o
-		Path:	{Project}\WrapDebug\Clean System Files\Wrap.o
-		Path:	{Project}\WrapDebug\Clean System Files\Debug.o
-		Path:	{Project}\WrapDebug\Clean System Files\RWSDebug.o
-		Path:	{Project}\sucl\Clean System Files\canon.o
-		Path:	{Project}\sucl\Clean System Files\rewr.o
 		Path:	{Project}\sucl\Clean System Files\loop.o
-		Path:	{Project}\sucl\Clean System Files\trd.o
-		Path:	{Project}\sucl\Clean System Files\complete.o
-		Path:	{Project}\sucl\Clean System Files\extract.o
-		Path:	{Project}\sucl\Clean System Files\trace.o
 		Path:	{Project}\sucl\Clean System Files\newfold.o
 		Path:	{Project}\sucl\Clean System Files\absmodule.o
-		Path:	{Project}\sucl\Clean System Files\law.o
-		Path:	{Project}\sucl\Clean System Files\dnc.o
-		Path:	{Project}\sucl\Clean System Files\basic.o
-		Path:	{Project}\sucl\Clean System Files\pfun.o
 		Path:	{Project}\sucl\Clean System Files\graph.o
 		Path:	{Project}\sucl\Clean System Files\rule.o
-		Path:	{Project}\sucl\Clean System Files\history.o
-		Path:	{Project}\sucl\Clean System Files\spine.o
 		Path:	{Project}\sucl\Clean System Files\strat.o
-		Path:	{Project}\sucl\Clean System Files\coreclean.o
 		Path:	{Project}\sucl\Clean System Files\cli.o
 		Path:	{Project}\sucl\Clean System Files\newtest.o
 		Path:	{Project}\sucl\Clean System Files\convert.o
 		Path:	{Project}\sucl\Clean System Files\cleanversion.o
-		Path:	{Project}\sucl\Clean System Files\supercompile.o
+		Path:	{Project}\main\Clean System Files\cocl.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdEnv.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdBool.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdOverloaded.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdInt.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdMisc.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdString.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdReal.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdArray.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\_SystemArray.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdClass.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdChar.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdEnum.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\_SystemEnum.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdFile.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdList.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdOrdList.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdTuple.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdCharList.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdFunc.o
+		Path:	{Project}\main\Clean System Files\coclmain.o
+		Path:	{Project}\ArgEnvWindows\Clean System Files\ArgEnv.o
+		Path:	{Project}\main\Clean System Files\Version.o
+		Path:	{Project}\main\Windows\Clean System Files\set_return_code.o
+		Path:	{Project}\main\Clean System Files\compile.o
+		Path:	{Project}\compiler\Clean System Files\checksupport.o
+		Path:	{Project}\compiler\Clean System Files\syntax.o
+		Path:	{Project}\compiler\Clean System Files\scanner.o
+		Path:	{Project}\compiler\Clean System Files\general.o
+		Path:	{Project}\compiler\Clean System Files\compare_constructor.o
+		Path:	{Project}\compiler\Clean System Files\StdCompare.o
+		Path:	{Project}\compiler\Clean System Files\typeproperties.o
+		Path:	{Project}\compiler\Clean System Files\Heap.o
+		Path:	{Project}\compiler\Clean System Files\compilerSwitches.o
+		Path:	{Project}\compiler\Clean System Files\utilities.o
+		Path:	{Project}\compiler\Clean System Files\_aconcat.o
+		Path:	{Project}\compiler\Clean System Files\predef.o
+		Path:	{Project}\compiler\Clean System Files\hashtable.o
+		Path:	{Project}\compiler\Clean System Files\containers.o
+		Path:	{Project}\compiler\Clean System Files\check.o
+		Path:	{Project}\compiler\Clean System Files\transform.o
+		Path:	{Project}\compiler\Clean System Files\typesupport.o
+		Path:	{Project}\compiler\Clean System Files\unitype.o
+		Path:	{Project}\compiler\Clean System Files\analunitypes.o
+		Path:	{Project}\compiler\Clean System Files\analtypes.o
+		Path:	{Project}\compiler\Clean System Files\checktypes.o
+		Path:	{Project}\sucl\Clean System Files\basic.o
+		Path:	{Project}\compiler\Clean System Files\type.o
+		Path:	{Project}\compiler\Clean System Files\overloading.o
+		Path:	{Project}\compiler\Clean System Files\convertDynamics.o
+		Path:	{Project}\compiler\Clean System Files\convertcases.o
+		Path:	{Project}\compiler\Clean System Files\trans.o
+		Path:	{Project}\compiler\Clean System Files\type_io_common.o
+		Path:	{Project}\compiler\Clean System Files\syntaxrepr.o
+		Path:	{Project}\compiler\Clean System Files\Heaprepr.o
+		Path:	{Project}\compiler\Clean System Files\type_io.o
+		Path:	{Project}\compiler\Clean System Files\generics.o
+		Path:	{Project}\compiler\Clean System Files\refmark.o
+		Path:	{Project}\compiler\Clean System Files\parse.o
+		Path:	{Project}\compiler\Clean System Files\mergecases.o
+		Path:	{Project}\compiler\Clean System Files\explicitimports.o
+		Path:	{Project}\compiler\Clean System Files\comparedefimp.o
+		Path:	{Project}\compiler\Clean System Files\checkFunctionBodies.o
+		Path:	{Project}\compiler\Clean System Files\portToNewSyntax.o
+		Path:	{Project}\compiler\Clean System Files\frontend.o
 		Path:	{Project}\compiler\Clean System Files\convertimportedtypes.o
 		Path:	{Project}\compiler\Clean System Files\postparse.o
-		Path:	{Project}\compiler\Clean System Files\frontend.o
-		Path:	{Project}\compiler\Clean System Files\portToNewSyntax.o
-		Path:	{Project}\compiler\Clean System Files\checkFunctionBodies.o
-		Path:	{Project}\compiler\Clean System Files\comparedefimp.o
-		Path:	{Project}\compiler\Clean System Files\explicitimports.o
-		Path:	{Project}\compiler\Clean System Files\mergecases.o
-		Path:	{Project}\compiler\Clean System Files\parse.o
-		Path:	{Project}\compiler\Clean System Files\refmark.o
-		Path:	{Project}\compiler\Clean System Files\generics.o
-		Path:	{Project}\compiler\Clean System Files\type_io.o
-		Path:	{Project}\compiler\Clean System Files\type_io_common.o
-		Path:	{Project}\compiler\Clean System Files\trans.o
-		Path:	{Project}\compiler\Clean System Files\convertcases.o
-		Path:	{Project}\compiler\Clean System Files\convertDynamics.o
-		Path:	{Project}\compiler\Clean System Files\overloading.o
-		Path:	{Project}\compiler\Clean System Files\type.o
-		Path:	{Project}\compiler\Clean System Files\checktypes.o
-		Path:	{Project}\compiler\Clean System Files\analtypes.o
-		Path:	{Project}\compiler\Clean System Files\analunitypes.o
-		Path:	{Project}\compiler\Clean System Files\unitype.o
-		Path:	{Project}\compiler\Clean System Files\typesupport.o
-		Path:	{Project}\compiler\Clean System Files\transform.o
-		Path:	{Project}\compiler\Clean System Files\check.o
-		Path:	{Project}\compiler\Clean System Files\containers.o
-		Path:	{Project}\compiler\Clean System Files\hashtable.o
-		Path:	{Project}\compiler\Clean System Files\predef.o
-		Path:	{Project}\compiler\Clean System Files\_aconcat.o
-		Path:	{Project}\compiler\Clean System Files\utilities.o
-		Path:	{Project}\compiler\Clean System Files\compilerSwitches.o
-		Path:	{Project}\compiler\Clean System Files\Heap.o
-		Path:	{Project}\compiler\Clean System Files\typeproperties.o
-		Path:	{Project}\compiler\Clean System Files\StdCompare.o
-		Path:	{Project}\compiler\Clean System Files\compare_constructor.o
-		Path:	{Project}\compiler\Clean System Files\general.o
-		Path:	{Project}\compiler\Clean System Files\scanner.o
-		Path:	{Project}\compiler\Clean System Files\syntax.o
-		Path:	{Project}\compiler\Clean System Files\checksupport.o
-		Path:	{Project}\main\Clean System Files\compile.o
-		Path:	{Project}\main\Windows\Clean System Files\set_return_code.o
-		Path:	{Project}\main\Clean System Files\Version.o
-		Path:	{Project}\ArgEnvWindows\Clean System Files\ArgEnv.o
-		Path:	{Project}\main\Clean System Files\coclmain.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdFunc.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdCharList.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdTuple.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdOrdList.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdList.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdFile.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\_SystemEnum.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdEnum.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdChar.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdClass.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\_SystemArray.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdArray.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdReal.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdString.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdMisc.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdInt.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdOverloaded.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdBool.o
-		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdEnv.o
-		Path:	{Project}\main\Clean System Files\cocl.o
+		Path:	{Project}\sucl\Clean System Files\supercompile.o
+		Path:	{Project}\sucl\Clean System Files\coreclean.o
+		Path:	{Project}\sucl\Clean System Files\spine.o
+		Path:	{Project}\sucl\Clean System Files\history.o
+		Path:	{Project}\sucl\Clean System Files\pfun.o
+		Path:	{Project}\sucl\Clean System Files\dnc.o
+		Path:	{Project}\sucl\Clean System Files\law.o
+		Path:	{Project}\sucl\Clean System Files\trace.o
+		Path:	{Project}\sucl\Clean System Files\extract.o
+		Path:	{Project}\sucl\Clean System Files\complete.o
+		Path:	{Project}\sucl\Clean System Files\trd.o
+		Path:	{Project}\sucl\Clean System Files\rewr.o
+		Path:	{Project}\sucl\Clean System Files\canon.o
+		Path:	{Project}\WrapDebug\Clean System Files\RWSDebug.o
+		Path:	{Project}\WrapDebug\Clean System Files\Debug.o
+		Path:	{Project}\WrapDebug\Clean System Files\Wrap.o
+		Path:	{Project}\WrapDebug\Clean System Files\ShowWrapped.o
+		Path:	{Application}\1.3.3\StdEnv\Clean System Files\StdDebug.o
+		Path:	{Project}\sucl\Clean System Files\expand.o
 		Path:	{Project}\ArgEnvWindows\Clean System Files\ArgEnvC.obj
 		Path:	{Project}\main\Windows\Clean System Files\cDirectory.obj
 		Path:	{Project}\main\Windows\Clean System Files\set_return_code.obj
@@ -3149,4 +3209,4 @@ Static
 		Path:	{Project}\sucl
 		Path:	{Application}\1.3.3\StdEnv
 	AppP:	C:\Clean
-	PrjP:	C:\Vincent\tmp\cocl
+	PrjP:	C:\Vincent\cocl

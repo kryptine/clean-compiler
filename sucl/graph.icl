@@ -238,7 +238,7 @@ isinstance
  &  == pvar
 
 isinstance (pgraph,pvar) (sgraph,svar)
-= isEmpty (thd3 (findmatching (pgraph,sgraph) (pvar,svar) ([],[],[]))) <--- "graph.isinstance ends"
+= isEmpty (thd3 (findmatching (pgraph,sgraph) (pvar,svar) ([],[],[])))
 
 /*
 
