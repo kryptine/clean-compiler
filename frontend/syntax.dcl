@@ -546,14 +546,8 @@ FI_IsUnboxedListOfRecordsConsOrNil :== 8
 	/* macro expansion transforms a CheckedBody into a TransformedBody */
 					| TransformedBody !TransformedBody
 					| Expanding ![FreeVar] // the parameters of the newly generated function
-					| BackendBody ![BackendBody]
 					| GeneratedBody // the body will be generated automatically - for generics
 					| NoBody
-					
-::	BackendBody =
-	{	bb_args	:: ![FunctionPattern]
-	,	bb_rhs	:: !Expression
-	}
 
 ::	FunDef =
 	{	fun_ident		:: !Ident

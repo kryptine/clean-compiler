@@ -29,10 +29,6 @@ sfoldr op r l s
 		foldr [] = r
 		foldr [a:x] = op a (foldr x)
 
-// fix spelling, this will be removed when cases are implemented in the back end
-:: BackEndBody :== BackendBody
-BackEndBody x :== BackendBody x
-
 :: BEMonad a :== *BackEndState -> *(!a,!*BackEndState)
 :: BackEnder :== *BackEndState -> *BackEndState
 
@@ -616,12 +612,6 @@ instance declareVars TransformedBody where
 	declareVars {tb_args, tb_rhs} dvInput
 		=	declareVars tb_args dvInput
 		o`	declareVars tb_rhs dvInput
-
-instance declareVars BackendBody where
-	declareVars :: BackendBody !DeclVarsInput -> BackEnder
-	declareVars {bb_args, bb_rhs} dvInput
-		=	declareVars bb_args dvInput
-		o`	declareVars bb_rhs dvInput
 
 instance declareVars Case where
 	declareVars {case_expr, case_guards, case_default} dvInput
@@ -1440,17 +1430,6 @@ isCodeBlock expr
 	=	False
 
 convertFunctionBody :: Int Int Ident FunctionBody Int -> BEMonad BERuleAltP
-convertFunctionBody functionIndex lineNumber aliasDummyId (BackEndBody bodies) main_dcl_module_n
-	=	convertBackEndBodies functionIndex lineNumber bodies main_dcl_module_n
-where
-	convertBackEndBodies :: Int Int [BackEndBody] Int -> BEMonad BERuleAltP
-	convertBackEndBodies functionIndex lineNumber bodies main_dcl_module_n
-		=	sfoldr (beRuleAlts o convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n) beNoRuleAlts bodies
-	where
-		convertBackEndBody :: Int Int Ident Int BackEndBody -> BEMonad BERuleAltP
-		convertBackEndBody functionIndex lineNumber aliasDummyId main_dcl_module_n body
-			=	declareVars body aliasDummyId
-			o`	convertBody False functionIndex lineNumber aliasDummyId body.bb_args body.bb_rhs main_dcl_module_n
 convertFunctionBody functionIndex lineNumber aliasDummyId (TransformedBody body) main_dcl_module_n
 	=	convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
 

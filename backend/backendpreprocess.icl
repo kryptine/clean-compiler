@@ -81,8 +81,6 @@ instance sequence (Optional a) | sequence a where
 
 // +++ this assigns sequence numbers per function, should be per alternative and moved to backendconvert
 instance sequence FunctionBody where
-	sequence (BackendBody backEndBodies)
-		=	sequence backEndBodies
 	sequence (TransformedBody transformedBody)
 		=	sequence transformedBody
 	sequence body
@@ -94,11 +92,6 @@ instance sequence TransformedBody where
 		=	sequence body.tb_args
 		o`	sequence body.tb_rhs
 // ... case test
-
-instance sequence BackendBody where
-	sequence body
-		=	sequence body.bb_args
-		o`	sequence body.bb_rhs
 
 instance sequence FreeVar where
 	sequence freeVar

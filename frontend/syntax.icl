@@ -525,10 +525,6 @@ where
 instance <<< ParsedBody
 where
 	(<<<) file {pb_args,pb_rhs} = file <<< pb_args <<< " = " <<< pb_rhs
-	
-instance <<< BackendBody
-where
-	(<<<) file {bb_args,bb_rhs} = file <<< bb_args <<< " = " <<< bb_rhs
 
 instance <<< FunctionPattern
 where
@@ -570,8 +566,6 @@ where
 //			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
 			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n\t= " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_ident,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
-			<<< fun_ident <<< '.' <<< body <<< '\n'
 	(<<<) file {fun_ident,fun_body=NoBody,fun_type=Yes type} = file // <<< type <<< '\n'
 			<<< fun_ident <<< '.' <<< "Array function\n"
 
@@ -582,7 +576,6 @@ where
 	(<<<) file (ParsedBody bodies) = file <<< bodies 
 	(<<<) file (CheckedBody {cb_args,cb_rhs}) = file <<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
 	(<<<) file (TransformedBody {tb_args,tb_rhs}) = file <<< "T "  <<< tb_args <<< " = " <<< tb_rhs <<< '\n'
-	(<<<) file (BackendBody body) = file <<< body <<< '\n'
 	(<<<) file (Expanding vars) = file <<< "E " <<< vars 
 	(<<<) file GeneratedBody = file <<< "Generic function\n"
 	(<<<) file NoBody = file <<< "Array function\n"
