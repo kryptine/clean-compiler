@@ -551,10 +551,11 @@ checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
 	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs) 
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
-checkOpenAType mod_index scope dem_attr type=:{at_type = GTV var_id=:{tv_ident={id_info}}} (ots, oti=:{oti_heaps,oti_global_vars}, cs=:{cs_symbol_table})
-	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+checkOpenAType mod_index scope dem_attr type=:{at_type = GTV var_id=:{tv_ident={id_info}}, at_attribute} (ots, oti, cs)
+	# (new_attr, oti=:{oti_heaps,oti_global_vars}, cs=:{cs_symbol_table}) = newAttribute dem_attr "GTV" at_attribute oti cs
+	  (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  (type_var, oti_global_vars, th_vars, entry) = retrieve_global_variable var_id entry oti_global_vars oti_heaps.th_vars
-	= ({type & at_type = TV type_var, at_attribute = TA_Multi }, (ots, { oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_global_vars = oti_global_vars },
+	= ({type & at_type = TV type_var, at_attribute = new_attr }, (ots, { oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_global_vars = oti_global_vars },
 								{ cs & cs_symbol_table = cs_symbol_table <:= (id_info, entry) }))
 where
 	retrieve_global_variable var entry=:{ste_kind = STE_Empty} global_vars var_heap
@@ -1036,7 +1037,11 @@ where
 		  ots = { ots_type_defs = type_defs, ots_modules = modules }
 		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
 		  (dt_type, ( {ots_type_defs, ots_modules}, {oti_heaps,oti_all_vars,oti_all_attrs, oti_global_vars}, cs))
-		  		= checkOpenAType mod_index scope DAK_Ignore dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
+		  		= checkOpenAType mod_index scope DAK_None dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
+		  cs = check_dynamic_uniqueness dt_type.at_attribute cs
+		  
+		  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_global_vars=oti_global_vars, oti_heaps = oti_heaps }
+
 		# cs = { cs & cs_x = {cs.cs_x & x_check_dynamic_types = False} }
 		  th_vars = foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) oti_global_vars oti_heaps.th_vars
 	  	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable scope dt_uni_vars cs.cs_symbol_table
@@ -1047,6 +1052,13 @@ where
 			= ({ dt & dt_uni_vars = dt_uni_vars, dt_global_vars = oti_global_vars, dt_type = dt_type },
 					oti_all_vars, ots_type_defs, ots_modules, { oti_heaps & th_vars = th_vars },
 					{ cs & cs_symbol_table = cs_symbol_table, cs_error = checkError (hd oti_all_attrs).av_ident "type attribute variable not allowed" cs.cs_error})
+		where
+			check_dynamic_uniqueness TA_None cs
+				=	cs
+			check_dynamic_uniqueness TA_Multi cs
+				=	cs
+			check_dynamic_uniqueness _ cs
+				= {cs & cs_error = checkError "result type of dynamic must be non-unique " "" cs.cs_error}
 		
 	add_type_variable_to_symbol_table :: !Level !ATypeVar !*(!*TypeVarHeap,!*CheckState) -> (!ATypeVar,!(!*TypeVarHeap, !*CheckState))
 	add_type_variable_to_symbol_table scope atv=:{atv_variable=atv_variable=:{tv_ident}, atv_attribute} (type_var_heap, cs=:{cs_symbol_table,cs_error})

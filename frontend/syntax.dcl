@@ -1280,6 +1280,7 @@ instance == OverloadedListType
 						| TCE_App			!TypeCodeExpression !TypeCodeExpression
 						| TCE_Selector		![Selection]	!VarInfoPtr
 						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
+						| TCE_UnqType		!TypeCodeExpression
 
 ::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !SymbIdent | GTT_PredefTypeConstructor !(Global Index) | GTT_Function
 	

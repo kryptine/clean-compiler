@@ -729,6 +729,14 @@ convertTypeCode pattern cinp (TCE_UniType uni_vars type_code) (has_var, binds, c
 				=	App {	app_symb = tv_symb,
 							app_args = [BasicExpr (BVInt number)],
 							app_info_ptr = nilPtr }
+convertTypeCode pattern cinp (TCE_UnqType type) (has_var, binds, ci)
+	# (typeunique_symb, ci)
+		=	getSymbol PD_Dyn_TypeUnique SK_Constructor 1 ci
+	# (type, (has_var, binds, ci))
+		=	convertTypeCode pattern cinp type (has_var, binds, ci)
+	= (App {app_symb		= typeunique_symb,
+			app_args 		= [type],
+			app_info_ptr	= nilPtr}, (has_var, binds, ci))
 
 convertTypeCode pattern cinp (TCE_Selector selections var_info_ptr) st
 	# (var, st)		

@@ -1367,7 +1367,12 @@ instance toTypeCodeExpression TypeVar where
 
 instance toTypeCodeExpression AType
 where
-	toTypeCodeExpression {at_type} tci_and_var_heap_and_error = toTypeCodeExpression at_type tci_and_var_heap_and_error
+	toTypeCodeExpression {at_attribute=TA_Unique, at_type} tci_and_var_heap_and_error
+		# (tce, st)
+			=	toTypeCodeExpression at_type tci_and_var_heap_and_error
+		=	(TCE_UnqType tce, st)
+	toTypeCodeExpression {at_type} tci_and_var_heap_and_error
+		=	toTypeCodeExpression at_type tci_and_var_heap_and_error
 
 ::	UpdateInfo =
 	{	ui_instance_calls	:: ![FunCall]
