@@ -1,5 +1,7 @@
 definition module complete
 
+// $Id$
+
 from graph import Graph
 from StdOverloaded import ==
 

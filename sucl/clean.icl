@@ -1,3 +1,9 @@
+implementation module clean
+
+// $Id$
+
+/*
+
 clean.lit - Clean core language
 ===============================
 
@@ -439,3 +445,5 @@ Useful (higher order) functions.
 >             =   foldclosed sym (map unravel args), if def
 >             =   foldopen node, otherwise
 >                 where (def,(sym,args)) = nodecontents graph node
+
+*/

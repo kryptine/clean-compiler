@@ -1,5 +1,7 @@
 implementation module strat
 
+// $Id$
+
 import history
 import spine
 import dnc

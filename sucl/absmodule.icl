@@ -1,5 +1,7 @@
 implementation module absmodule
 
+// $Id$
+
 import rule
 
 /*

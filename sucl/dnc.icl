@@ -1,5 +1,7 @@
 implementation module dnc
 
+// $Id$
+
 import graph
 import StdEnv
 

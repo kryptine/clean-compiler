@@ -1,5 +1,7 @@
 implementation module spine
 
+// $Id$
+
 import rule
 import pfun
 import basic

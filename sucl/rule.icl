@@ -1,5 +1,7 @@
 implementation module rule
 
+// $Id$
+
 import graph
 import basic
 

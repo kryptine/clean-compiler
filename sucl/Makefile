@@ -1,3 +1,7 @@
+#! /usr/bin/make -f
+
+# $Id$
+
 COCL = cocl
 #COCLFLAGS = -lat
 SYS = Clean\ System\ Files

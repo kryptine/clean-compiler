@@ -1,5 +1,7 @@
 implementation module trd
 
+// $Id$
+
 import rule
 import graph
 import basic

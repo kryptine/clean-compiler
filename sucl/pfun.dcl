@@ -1,5 +1,7 @@
 definition module pfun
 
+// $Id$
+
 from StdString import toString
 from StdOverloaded import ==
 

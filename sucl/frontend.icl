@@ -1,5 +1,7 @@
 implementation module frontend
 
+// $Id$
+
 // vi:set tabstop=4 noet:
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,

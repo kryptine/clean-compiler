@@ -1,5 +1,7 @@
 definition module graph
 
+// $Id$
+
 from StdOverloaded import ==
 
 // A rule associating a replacement with a pattern

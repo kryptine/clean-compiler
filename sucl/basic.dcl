@@ -1,5 +1,7 @@
 definition module basic
 
+// $Id$
+
 /*
 
 Basic definitions

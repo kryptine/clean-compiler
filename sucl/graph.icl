@@ -1,5 +1,7 @@
 implementation module graph
 
+// $Id$
+
 import pfun
 import basic
 import StdEnv

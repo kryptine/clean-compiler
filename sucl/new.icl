@@ -1,3 +1,9 @@
+implementation module new
+
+// $Id$
+
+/*
+
 new.lit - One line module description
 =====================================
 
@@ -44,3 +50,5 @@ Implementation of identifier
 >   =   body
 
 ...
+
+*/

@@ -1,5 +1,7 @@
 definition module absmodule
 
+// $Id$
+
 from rule import Rule
 
 :: Module sym pvar tsym tvar

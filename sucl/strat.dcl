@@ -1,5 +1,7 @@
 definition module strat
 
+// $Id$
+
 from history import History
 from spine import Answer
 from rule import Rule

@@ -1,5 +1,7 @@
 definition module rule
 
+// $Id$
+
 from graph import Graph,Node
 
 // --- Exported types

@@ -1,5 +1,7 @@
 definition module trd
 
+// $Id$
+
 from rule import Rule
 from graph import Node
 from StdOverloaded import ==

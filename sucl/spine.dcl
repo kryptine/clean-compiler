@@ -1,5 +1,7 @@
 definition module spine
 
+// $Id$
+
 from rule import Rgraph,Rule
 from pfun import Pfun
 from basic import Optional

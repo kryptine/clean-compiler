@@ -1,5 +1,7 @@
 definition module dnc
 
+// $Id$
+
 from graph import Graph,Node
 from StdString import String
 from StdOverloaded import ==
