@@ -413,7 +413,7 @@ element_appears imported_st element_ident dcl_index
 		#	structureInfo	= case opt_element_idents of
 								No					-> SI_DotDot
 								Yes element_idents	-> (SI_Elements element_idents False)
-			newStructure	= (struct_id, SI_DotDot, st, (if defined No (Yes dcl_index)))
+			newStructure	= (struct_id, structureInfo, st, (if defined No (Yes dcl_index)))
 		= element_appears imported_st element_ident dcl_index t [newStructure:akku] index modules cs
 	#	(Yes element_idents)	= opt_element_idents
 		oneLess	= filter ((<>) element_ident) element_idents
@@ -475,8 +475,6 @@ element_appears_in_stomm_struct imported_st element_ident dcl_index index type_n
 		#	com_member_def	= dcl_module.dcl_common.com_member_defs.[dcl_index]
 			{glob_object}	= com_member_def.me_class
 			com_class_def	= dcl_module.dcl_common.com_class_defs.[glob_object]
-			allMembers		= com_class_def.class_members
-			member_idents	= [ ds_ident \\ {ds_ident} <-: allMembers]
 			appears	= com_class_def.class_name.id_name==type_name_string
 		= (appears, modules, cs)
 	continuation _ _ _ modules cs
@@ -575,7 +573,7 @@ consequences_of count (expl_imp_ident_kind=:(_,expl_imp_kind), (dcl_index, mod_i
 	
 consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
 	#	(icl_function, icl_functions)	= icl_functions![dcl_index]
-		{fun_symb, fun_type, fun_body}	= icl_function
+		{fun_body}	= icl_function
 		result = consequences fun_body
 	= expand_functions_and_dynamics result [] (f_consequences, icl_functions, expr_heap)
   where
@@ -599,8 +597,6 @@ consequences_of_macro count dcl_index f_consequences icl_functions expr_heap
 			 	= case exprInfo of
 							(EI_Dynamic No)	
 								-> ([], expr_heap)
-							(EI_Dynamic (Yes dynamicType))
-								-> (consequences dynamicType, expr_heap)
 							(EI_Dynamic (Yes dynamicType))
 								-> (consequences dynamicType, expr_heap)
 							(EI_DynamicType dynamicType further_dynamic_ptrs)

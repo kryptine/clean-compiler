@@ -3,8 +3,8 @@ implementation module typesupport
 import StdEnv, StdCompare
 import syntax, parse, check, unitype, utilities, RWSDebug
 
-
-SwitchFusion x y = y
+// MW: this switch is used to en(dis)able the fusion algorithm
+SwitchFusion fuse dont_fuse :== fuse
 
 ::	Store	:== Int
 
@@ -380,6 +380,8 @@ instance bindInstances Type
 		= type_var_heap
 	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances (TV l1) (TV l2) type_var_heap)
+	bindInstances a b  tvh
+		= abort ("abort"--->(a,b))
 
 instance bindInstances [a] | bindInstances a
   where
@@ -453,7 +455,6 @@ substituteTypeVariable tv=:{tv_name,tv_info_ptr} heaps=:{th_vars}
 			-> (type, heaps)
 		_
 			-> (TV tv, heaps)
-//			-> abort ("Error in substitute (Type)" ---> (tv_info, tv_name))
 
 instance substitute Type
 where

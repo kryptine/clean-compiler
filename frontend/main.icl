@@ -3,6 +3,8 @@ module main
 import scanner, parse, postparse, check, type, trans, convertcases, utilities, convertDynamics
 
 import StdEnv
+// XXX
+import RWSDebug
 
 Start world
 	# (std_io, world) = stdio world
@@ -17,6 +19,17 @@ Start world
 	= fclose ms_out world
 
 CommandLoop proj ms=:{ms_io}
+	# answer = "c t5"
+	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
+	| command == []
+		= CommandLoop proj { ms & ms_io = ms_io}
+		# (ready, proj, ms) = DoCommand command argument proj { ms & ms_io = ms_io}
+		| ready
+			= ms
+		= ms
+
+/*
+CommandLoop proj ms=:{ms_io}
 	# (answer, ms_io)		= freadline (ms_io <<< "> ")
 	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
 	| command == []
@@ -25,6 +38,7 @@ CommandLoop proj ms=:{ms_io}
 		| ready
 			= ms
 			= CommandLoop proj ms
+*/
 
 ::	MainStateDefs funs funtypes types conses classes instances members selectors =
 	{	msd_funs		:: !funs
@@ -163,19 +177,20 @@ loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_o
 		= (No,  predef_symbols, { hash_table & hte_symbol_heap = symbol_table}, { ms & ms_files = ms_files, ms_error = ms_error, ms_io = ms_io, ms_out = ms_out })
 
 	# (components, fun_defs) = partitionateFunctions (fun_defs ---> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
-	  (components, fun_defs, ms_io) = showTypes components 0 fun_defs ms_io
-//	  (components, fun_defs, ms_out) = showComponents components 0 True fun_defs ms_out
+//	  (components, fun_defs, ms_error) = showTypes components 0 fun_defs ms_error
+	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
 	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups (components ---> "Transform") fun_defs heaps.hp_var_heap heaps.hp_expression_heap
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+		 = analyseGroups common_defs (components ---> "Transform") fun_defs imported_funs heaps.hp_var_heap heaps.hp_expression_heap
+	#!(components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs var_heap heaps.hp_type_heaps expression_heap
-///	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
+	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
+//	  (components, fun_defs, ms_error) = showTypes components 0 fun_defs ms_error
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 	  (components, fun_defs, predef_symbols, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components ---> "convertDynamics") fun_defs predef_symbols
 					dcl_types used_conses var_heap type_heaps expression_heap
-	  (components, fun_defs, ms_out) = showComponents components 0 True fun_defs ms_out
+//	  (components, fun_defs, ms_out) = showComponents components 0 True fun_defs ms_out
 	  (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctionsIntoPatterns components imported_funs common_defs fun_defs dcl_types used_conses var_heap type_heaps expression_heap
 	  (dcl_types, var_heap, type_heaps)
@@ -247,6 +262,8 @@ where
 	show_component [] show_types fun_defs file
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] show_types fun_defs file
+		| fun>=size fun_defs
+			= abort ("YYY "+++toString fun+++" "+++toString (size fun_defs))
 		#! fun_def = fun_defs.[fun]
 		| show_types
 			= show_component funs show_types fun_defs (file <<< '\n' <<< fun_def)
@@ -297,9 +314,7 @@ where
 		= (fun_defs, file <<< '\n')
 	show_types [fun:funs] fun_defs file
 		#! fun_def = fun_defs.[fun]
-		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
-		  (Yes ftype) = fun_def.fun_type
-		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype) <<< '\n' )
+		= show_types funs fun_defs (file <<< '\n' <<< fun_def.fun_type)
 
 converFileToListOfStrings file_name files error
 	# (ok, file, files) = fopen file_name FReadText files

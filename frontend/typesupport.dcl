@@ -4,6 +4,8 @@ import checksupport, StdCompare
 
 from unitype import Coercions, CoercionTree, AttributePartition
 
+// MW: this switch is used to en(dis)able the fusion algorithm
+SwitchFusion fuse dont_fuse :== fuse
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
@@ -54,4 +56,5 @@ updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*Ex
 class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 
 instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a
+
 instance <<< TempSymbolType

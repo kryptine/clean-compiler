@@ -10,7 +10,7 @@ cAccumulating   :== -3
 
 ::	CleanupInfo
 
-analyseGroups	:: !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
+analyseGroups	:: !{# CommonDefs} !*{! Group} !*{#FunDef} !*VarHeap !*ExpressionHeap 
 				-> (!CleanupInfo, !*{! ConsClasses}, !*{! Group}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
 
 transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap

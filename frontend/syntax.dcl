@@ -478,7 +478,12 @@ cIsALocalVar	:== False
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
-				VI_Default !Int /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_Default !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
+				VI_Dictionary !SymbIdent ![Expression] ![Type] | /* used during fusion */
+				VI_Extended !ExtendedVarInfo !VarInfo
+
+::	ExtendedVarInfo = EVI_VarType !AType
 
 ::	ArgumentPosition :== Int
 
@@ -638,20 +643,16 @@ cNonRecursiveAppl	:== False
 
 					| EI_Default !Expression !AType !ExprInfoPtr
 					| EI_DefaultFunction !SymbIdent ![Expression]
-					| EI_Extended ![ExtendedExprInfo] !ExprInfo
+					| EI_Extended !ExtendedExprInfo !ExprInfo
 
 ::	ExtendedExprInfo
 					= EEI_ActiveCase !ActiveCaseInfo
 
 ::	ActiveCaseInfo =
-	{	aci_arg_pos		:: !Int
-	,	aci_opt_unfolder:: !(Optional SymbIdent)
-	,	aci_free_vars	:: !Optional [VarId]
-	}
-
-::	VarId =
-	{	v_name		:: !Ident
-	,	v_info_ptr	:: !VarInfoPtr
+	{	aci_params					:: ![FreeVar]
+	,	aci_opt_unfolder			:: !(Optional SymbIdent)
+	,	aci_free_vars				:: !Optional [BoundVar]
+	,	aci_linearity_of_patterns	:: ![[Bool]]
 	}
 
 ::	RefCountsInCase = 

@@ -434,7 +434,12 @@ cIsALocalVar	:== False
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
-				VI_Default !Int /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_Default !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
+				VI_Dictionary !SymbIdent ![Expression] ![Type] | /* used during fusion */
+				VI_Extended !ExtendedVarInfo !VarInfo
+
+::	ExtendedVarInfo = EVI_VarType !AType
 
 ::	ArgumentPosition :== Int
 
@@ -585,20 +590,16 @@ cNotVarNumber :== -1
 
 					| EI_Default !Expression !AType !ExprInfoPtr
 					| EI_DefaultFunction !SymbIdent ![Expression]
-					| EI_Extended ![ExtendedExprInfo] !ExprInfo
+					| EI_Extended !ExtendedExprInfo !ExprInfo
 
 ::	ExtendedExprInfo
 					= EEI_ActiveCase !ActiveCaseInfo
 
 ::	ActiveCaseInfo =
-	{	aci_arg_pos		:: !Int
-	,	aci_opt_unfolder:: !(Optional SymbIdent)
-	,	aci_free_vars	:: !Optional [VarId]
-	}
-
-::	VarId =
-	{	v_name		:: !Ident
-	,	v_info_ptr	:: !VarInfoPtr
+	{	aci_params					:: ![FreeVar]
+	,	aci_opt_unfolder			:: !(Optional SymbIdent)
+	,	aci_free_vars				:: !Optional [BoundVar]
+	,	aci_linearity_of_patterns	:: ![[Bool]]
 	}
 
 ::	RefCountsInCase = 
@@ -1276,7 +1277,7 @@ where
 instance <<< BoundVar
 where
 	(<<<) file {var_name,var_info_ptr,var_expr_ptr}
-		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr <<< ',' <<< ptrToInt var_expr_ptr <<< '>'
+		= file <<< var_name <<< '<' <<< ptrToInt var_info_ptr /*<<< ',' <<< ptrToInt var_expr_ptr*/ <<< '>'
 
 instance <<< Bind a b | <<< a & <<< b 
 where
@@ -1326,8 +1327,10 @@ where
 instance <<< Expression
 where
 	(<<<) file (Var ident) = file <<< ident
-	(<<<) file (App {app_symb, app_args})
-		= file <<< app_symb <<< ' ' <<< app_args
+	(<<<) file (App {app_symb, app_args, app_info_ptr})
+		= file <<< app_symb <<< (if (app_symb.symb_name.id_name=="==" && isNilPtr app_info_ptr) "\"NIL\"" "") <<< ' ' <<< app_args
+// was	(<<<) file (App {app_symb, app_args})
+//		= file <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
 	(<<<) file (Let {let_binds, let_expr}) = write_binds (file <<< "let " <<< '\n') let_binds <<< "in\n" <<< let_expr
 	where

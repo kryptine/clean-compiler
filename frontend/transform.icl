@@ -159,11 +159,16 @@ where
 		= ({ pattern & dp_rhs = dp_rhs }, ls)
 
 ::	UnfoldState =
-	{	us_var_heap		:: !.VarHeap
-	,	us_symbol_heap	:: !.ExpressionHeap
-	,	us_cleanup_info	:: ![ExprInfoPtr]
+	{	us_var_heap				:: !.VarHeap
+	,	us_symbol_heap			:: !.ExpressionHeap
+	,	us_opt_type_heaps		:: !.Optional .TypeHeaps
+	,	us_cleanup_info			:: ![ExprInfoPtr]
+	,	us_subst_vars			:: !Bool // XXX currently not used
+	,	us_handle_aci_free_vars	:: !AciFreeVarHandleMode
 	}
 	
+:: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem
+
 class unfold a :: !a !*UnfoldState -> (!a, !*UnfoldState)
 
 instance unfold [a] | unfold a
@@ -183,17 +188,48 @@ where
 		= (no, us)
 
 unfoldVariable :: !BoundVar !*UnfoldState -> (!Expression, !*UnfoldState)
-unfoldVariable var=:{var_name,var_info_ptr} us=:{us_var_heap}
-	#! var_info = sreadPtr var_info_ptr us_var_heap
+unfoldVariable var=:{var_name,var_info_ptr} us
+//	XXX | not us.us_subst_vars
+//		= (Var var, us)
+	#! (var_info, us) = readVarInfo var_info_ptr us
 	= case var_info of 
 		VI_Expression expr
 			-> (expr, us)
 		VI_Variable var_name var_info_ptr
-			 	# (var_expr_ptr, us_symbol_heap) = newPtr EI_Empty us.us_symbol_heap
+		 	# (var_expr_ptr, us_symbol_heap) = newPtr EI_Empty us.us_symbol_heap
 			-> (Var {var_name = var_name, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr}, { us & us_symbol_heap = us_symbol_heap})
+		VI_Body fun_symb _ vars
+			-> (App {	app_symb = fun_symb,
+						app_args = [ Var { var_name=fv_name, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr }
+									\\ {fv_name,fv_info_ptr}<-vars],
+						app_info_ptr = nilPtr }, us)
+		VI_Dictionary app_symb app_args class_types
+			# (new_class_types, us_opt_type_heaps) = substitute_class_types class_types us.us_opt_type_heaps
+			  (new_info_ptr, us_symbol_heap) = newPtr (EI_ClassTypes new_class_types) us.us_symbol_heap
+			-> (App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr },
+				{ us & us_opt_type_heaps = us_opt_type_heaps, us_symbol_heap = us_symbol_heap })
 		_
 			-> (Var var, us)
-		
+  where
+	substitute_class_types class_types no=:No
+		= (class_types, no)
+	substitute_class_types class_types (Yes type_heaps)
+		# (new_class_types, type_heaps) = substitute class_types type_heaps
+		= (new_class_types, Yes type_heaps)
+
+readVarInfo var_info_ptr us
+	#! var_info = sreadPtr var_info_ptr us.us_var_heap
+	= case var_info of
+		VI_Extended _ original	-> (original, us)
+		_						-> (var_info, us)
+
+writeVarInfo :: VarInfoPtr VarInfo *VarHeap -> *VarHeap
+writeVarInfo var_info_ptr new_var_info var_heap
+	# (old_var_info, var_heap) = readPtr var_info_ptr var_heap
+	= case old_var_info of
+		VI_Extended extensions _	-> writePtr var_info_ptr (VI_Extended extensions new_var_info) var_heap
+		_							-> writePtr var_info_ptr new_var_info var_heap
+
 instance unfold Expression
 where
 	unfold (Var var) us
@@ -258,12 +294,34 @@ where
 
 instance unfold App
 where
-	unfold app=:{app_symb, app_args} us
-		# (app_args, us) = unfold app_args us
-		| is_function_or_macro app_symb.symb_kind
-			# (new_info_ptr, us_symbol_heap) = newPtr EI_Empty us.us_symbol_heap
-			= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, { us & us_symbol_heap = us_symbol_heap }) 
-			= ({ app & app_args = app_args,  app_info_ptr = nilPtr }, us)
+	unfold app=:{app_symb, app_args, app_info_ptr} us
+		# (new_info_ptr, us)
+				= case is_function_or_macro app_symb.symb_kind of
+					True	# (new_ptr, us_symbol_heap) = newPtr EI_Empty us.us_symbol_heap
+							-> (new_ptr, { us & us_symbol_heap = us_symbol_heap })
+					_		-> case (app_symb.symb_kind, isNilPtr app_info_ptr) of
+								(SK_Constructor _, False)
+									# (app_info, us_symbol_heap) = readPtr app_info_ptr us.us_symbol_heap
+									  (new_app_info, us_opt_type_heaps) = substitute_EI_ClassTypes app_info us.us_opt_type_heaps
+									  (new_ptr, us_symbol_heap) = newPtr new_app_info us_symbol_heap
+									-> (new_ptr, { us & us_symbol_heap = us_symbol_heap, us_opt_type_heaps = us_opt_type_heaps })
+								_	-> (nilPtr, us)
+		  (app_args, us) = unfold app_args us
+		= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, us) 
+/*
+	unfold app=:{app_symb, app_args, app_info_ptr} us=:{us_symbol_heap}
+		# (new_info_ptr, us_symbol_heap)
+				= case is_function_or_macro app_symb.symb_kind of
+					True	-> newPtr EI_Empty us_symbol_heap
+					_		-> case (app_symb.symb_kind, isNilPtr app_info_ptr) of
+								(SK_Constructor _, False)
+									# (app_info, us_symbol_heap) = readPtr app_info_ptr us_symbol_heap
+									-> newPtr app_info us_symbol_heap
+								_	-> (nilPtr, us_symbol_heap)
+		  us = { us & us_symbol_heap = us_symbol_heap }
+		  (app_args, us) = unfold app_args us
+		= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, us) 
+*/
 	where
 		is_function_or_macro (SK_Function _)
 			= True
@@ -271,8 +329,13 @@ where
 			= True
 		is_function_or_macro (SK_OverloadedFunction _)
 			= True
-		is_function_or_macro symb_kind
+		is_function_or_macro _
 			= False
+		substitute_EI_ClassTypes (EI_ClassTypes class_types) (Yes type_heaps)
+			# (new_class_types, type_heaps) = substitute class_types type_heaps
+			= (EI_ClassTypes new_class_types, Yes type_heaps)
+		substitute_EI_ClassTypes x opt_type_heaps
+			= (x, opt_type_heaps)
 
 instance unfold (Bind a b) | unfold a
 where
@@ -283,14 +346,72 @@ where
 instance unfold Case
 where
 	unfold kees=:{ case_expr,case_guards,case_default,case_info_ptr} us=:{us_cleanup_info}
-		# ((case_expr,(case_guards,case_default)), us) = unfold (case_expr,(case_guards,case_default)) us
-		  (old_case_info, us_symbol_heap) = readPtr case_info_ptr us.us_symbol_heap
-		  (new_info_ptr, us_symbol_heap) = newPtr old_case_info us_symbol_heap
+		# (old_case_info, us_symbol_heap) = readPtr case_info_ptr us.us_symbol_heap
+		  (new_case_info, us_opt_type_heaps) = substitute_let_or_case_type old_case_info us.us_opt_type_heaps
+		  (new_info_ptr, us_symbol_heap) = newPtr new_case_info us_symbol_heap
 		  us_cleanup_info = case old_case_info of
 								EI_Extended _ _	-> [new_info_ptr:us_cleanup_info]
 								_				-> us_cleanup_info
-	= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr},
-				{ us & us_symbol_heap = us_symbol_heap, us_cleanup_info=us_cleanup_info })
+		  us = { us & us_symbol_heap = us_symbol_heap, us_opt_type_heaps = us_opt_type_heaps, us_cleanup_info=us_cleanup_info }
+		  ((case_guards,case_default), us) = unfold (case_guards,case_default) us
+		  (case_expr, us) = update_active_case_info_and_unfold case_expr new_info_ptr us
+		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr}, us)
+	where
+		update_active_case_info_and_unfold case_expr=:(Var {var_info_ptr}) case_info_ptr us=:{us_handle_aci_free_vars}
+			#! case_info = sreadPtr case_info_ptr us.us_symbol_heap
+			= case case_info of
+				EI_Extended (EEI_ActiveCase aci=:{aci_free_vars}) ei
+					#!(new_aci_free_vars, us) = case us_handle_aci_free_vars of
+													LeaveThem		-> (aci_free_vars, us)
+													RemoveThem		-> (No, us)
+													SubstituteThem	-> case aci_free_vars of
+																		No		-> (No, us)
+																		Yes fvs	# (fvs_subst, us) = mapSt unfoldBoundVar fvs us
+																				-> (Yes fvs_subst, us)
+					  var_info = sreadPtr var_info_ptr us.us_var_heap
+					-> case var_info of
+						VI_Body fun_symb {tb_args, tb_rhs} new_aci_params
+							# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
+							  (original_bindings, us_var_heap) = mapSt readPtr tb_args_ptrs us.us_var_heap
+							  us_var_heap = fold2St bind tb_args_ptrs new_aci_params us_var_heap
+							  (tb_rhs, us) = unfold tb_rhs { us & us_var_heap = us_var_heap }
+							  us_var_heap = fold2St writePtr tb_args_ptrs original_bindings us.us_var_heap
+							  new_aci = { aci & aci_params = new_aci_params, aci_opt_unfolder = Yes fun_symb, aci_free_vars = new_aci_free_vars }
+							  new_eei = (EI_Extended (EEI_ActiveCase new_aci) ei)
+							  us_symbol_heap = writePtr case_info_ptr new_eei us.us_symbol_heap
+							-> (tb_rhs, { us & us_var_heap = us_var_heap, us_symbol_heap = us_symbol_heap })
+						_	# new_eei = EI_Extended (EEI_ActiveCase { aci & aci_free_vars = new_aci_free_vars }) ei
+							  us_symbol_heap = writePtr case_info_ptr new_eei us.us_symbol_heap
+							-> unfold case_expr { us & us_symbol_heap = us_symbol_heap }
+				_	-> unfold case_expr us	
+		  where 
+			// XXX consider to store BoundVars in VI_Body
+			bind fv_info_ptr {fv_name=name, fv_info_ptr=info_ptr} var_heap
+				= writeVarInfo fv_info_ptr (VI_Expression (Var {var_name=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+/*
+			bind ({fv_info_ptr}, var_bound_var) var_heap
+				= writeVarInfo fv_info_ptr (VI_Expression var_bound_var) var_heap
+*/
+
+/*		update_active_case_info_and_unfold case_expr=:(Var {var_info_ptr}) case_info_ptr us
+			#! var_info = sreadPtr var_info_ptr us.us_var_heap
+			= case var_info of
+				VI_Body fun_symb fun_body new_aci_var_info_ptr
+					# (fun_body, us) = unfold fun_body us
+					  (EI_Extended (EEI_ActiveCase aci) ei, us_symbol_heap) = readPtr case_info_ptr us.us_symbol_heap
+					  new_aci = { aci & aci_var_info_ptr = new_aci_var_info_ptr, aci_opt_unfolder = Yes fun_symb }
+					  us_symbol_heap = writePtr case_info_ptr (EI_Extended (EEI_ActiveCase new_aci) ei) us_symbol_heap
+					-> (fun_body, { us & us_symbol_heap = us_symbol_heap })
+				_	-> unfold case_expr us
+*/
+		update_active_case_info_and_unfold case_expr _ us
+			= unfold case_expr us
+
+		unfoldBoundVar {var_info_ptr} us
+			#!var_info = sreadPtr var_info_ptr us.us_var_heap
+			# (VI_Expression (Var act_var)) = var_info
+		= (act_var, us)
+
 
 instance unfold Let
 where
@@ -298,8 +419,10 @@ where
 		# (let_binds, us) = copy_bound_vars let_binds us
 		# ((let_binds,let_expr), us) = unfold (let_binds,let_expr) us
 		  (old_let_info, us_symbol_heap) = readPtr let_info_ptr us.us_symbol_heap
-		  (new_info_ptr, us_symbol_heap) = newPtr old_let_info us_symbol_heap
-		= ({lad & let_binds = let_binds, let_expr = let_expr, let_info_ptr = new_info_ptr}, { us & us_symbol_heap = us_symbol_heap })
+		  (new_let_info, us_opt_type_heaps) = substitute_let_or_case_type old_let_info us.us_opt_type_heaps
+		  (new_info_ptr, us_symbol_heap) = newPtr new_let_info us_symbol_heap
+		= ({lad & let_binds = let_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
+			{ us & us_symbol_heap = us_symbol_heap, us_opt_type_heaps = us_opt_type_heaps })
 		where
 			copy_bound_vars [bind=:{bind_dst} : binds] us
 				# (bind_dst, us) = unfold bind_dst us
@@ -307,6 +430,19 @@ where
 				= ([ {bind & bind_dst = bind_dst} : binds ], us)
 			copy_bound_vars [] us
 				= ([], us)
+
+substitute_let_or_case_type	expr_info No
+	= (expr_info, No)
+substitute_let_or_case_type	(EI_Extended extensions expr_info) yes_type_heaps
+	# (new_expr_info, yes_type_heaps) = substitute_let_or_case_type expr_info yes_type_heaps
+	= (EI_Extended extensions new_expr_info, yes_type_heaps)
+substitute_let_or_case_type	(EI_CaseType case_type) (Yes type_heaps)
+	# (new_case_type, type_heaps) = substitute case_type type_heaps
+	= (EI_CaseType new_case_type, Yes type_heaps)
+//	= (EI_CaseType case_type, Yes type_heaps)
+substitute_let_or_case_type	(EI_LetType let_type) (Yes type_heaps)
+	# (new_let_type, type_heaps) = substitute let_type type_heaps
+	= (EI_LetType new_let_type, Yes type_heaps)
 
 instance unfold CasePatterns
 where
@@ -364,7 +500,9 @@ examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
 //unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
 unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}} args fun_defs (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
-	  (result_expr, {us_symbol_heap,us_var_heap}) = unfold tb_rhs { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_cleanup_info=[] }
+	  us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No, us_cleanup_info = [],
+			 us_subst_vars = True, us_handle_aci_free_vars = RemoveThem }
+	  (result_expr, {us_symbol_heap,us_var_heap}) = unfold tb_rhs us
 	  (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls fun_defs es_symbol_table
 	| isEmpty let_binds
 		= (result_expr, fun_defs, (calls, { es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap, es_symbol_table = es_symbol_table }))
@@ -725,7 +863,9 @@ where
 		replace_variables [] expr ap_vars var_heap symbol_heap
 			= (expr, var_heap, symbol_heap)
 		replace_variables vars expr ap_vars var_heap symbol_heap
-			# (expr, us) = unfold expr { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap, us_cleanup_info=[] }
+			# us = { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,
+					 us_cleanup_info=[], us_subst_vars = True, us_handle_aci_free_vars = RemoveThem }
+			  (expr, us) = unfold expr us
 			= (expr, us.us_var_heap, us.us_symbol_heap)
 
 		build_aliases [var1 : vars1] [ {fv_name,fv_info_ptr} : vars2 ] var_heap
@@ -1231,9 +1371,10 @@ where
 			_
 				-> abort "collectVariables [BoundVar] (transform, 1227)" <<- (var_info ---> var_name)
 
+// XXX
 instance <<< FreeVar
 where
-	(<<<) file { fv_name } = file <<< fv_name
+	(<<<) file { fv_name,fv_info_ptr } = file <<< fv_name <<< "<" <<< fv_info_ptr <<< ">"
 	
 instance <<< Ptr a
 where
@@ -1243,3 +1384,7 @@ instance <<< FunCall
 where
 	(<<<) file {fc_index} = file <<< fc_index
 
+instance <<< VarInfo
+  where
+	(<<<) file (VI_Expression expr) = file <<< expr
+	(<<<) file vi					= file <<< "VI??"
