@@ -560,6 +560,11 @@ static Node copy_root_node (Node old)
 					copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
 					new_push_node_arg_1->arg_node = copy_node (push_node_arg_1->arg_node,False);
 					new_push_node_arg_2->arg_node = copy_root_node (push_node_arg_2_node);
+					
+#if STRICT_LISTS
+					if (new_push_node->node_push_symbol->symb_kind==cons_symb && (new_push_node->node_push_symbol->symb_head_strictness & 1))
+						new_push_node->node_decons_node=copy_node (new_push_node->node_decons_node,False);
+#endif
 				} else {
 					copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
 					new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
@@ -1391,7 +1396,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				ArgP new_arg;
 				StateP selector_arg_state_p;
 				StateS tuple_state,tuple_arg_states[2];
-	
+
 				n_arguments=new_n_arguments;
 
 				selector_node=NewSelectorNode (arg_node->node_symbol,NULL,arg_node->node_arity);
@@ -1402,7 +1407,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				new_arg->arg_state=LazyState;
 				*rhs_arg_p=new_arg;
 				rhs_arg_p=&new_arg->arg_next;
-				
+
 				selector_arg_state_p=&arg_node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
 
 				if (arg_node->node_arity>=SELECTOR_L)
@@ -1413,7 +1418,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				
 				++arg_state_p;	
 				continue;
-			}			
+			}
 		}
 #endif
 		if (arg_node->node_kind==NodeIdNode && (arg_node->node_node_id->nid_mark & NID_LIFTED_BY_OPTIMISE) && arg_node->node_node_id->nid_forward_node_id!=NULL){
