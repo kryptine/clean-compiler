@@ -1260,27 +1260,28 @@ createClassDictionaries modindex classdefs0 memberdefs0 dcls0 typedefs0 seldefs0
 		  where (classdef, _, classdefs_b, dcls_b) = getClassDef glob_object glob_module modindex classdefs_a dcls_a
 
 convert_classdefs ::
-	((Global Index) (.env, .{#ClassDef}) -> (ClassDef, (.env, *{#ClassDef}))) // Getting the definition of a context class
-	.Int                                     // Module index of dictionary being converted
-	( *{#ClassDef}                           // Array of classes to convert
-	, u1:{#MemberDef}                         // Array of class members of classes to convert
-	, u2:{#CheckedTypeDef}                     // Typedef array to update with dictionary type
-	, u3:{#ConsDef}                            // Consdef array to update with dictionary constructor
-	, u4:{#SelectorDef}                        // Selectordef array to update with dictionary field selectors
-	, *SymbolTable                           // Symbol table to store dictionary types, constructors, and field selectors
-	, *VarHeap                               // Heap to allocate fresh variable from
-	, *TypeHeaps                             // Heaps to allocate fresh type and attribute variables from
-	, .env                                   // Environment for looking up context classes
+	((Global Index) (.env, .{#ClassDef}) -> (ClassDef, (.env, *{#ClassDef})))
+                           // Getting the definition of a context class
+	.Int                   // Module index of dictionary being converted
+	( *{#ClassDef}         // Array of classes to convert
+	, u1:{#MemberDef}      // Array of class members of classes to convert
+	, u2:{#CheckedTypeDef} // Typedef array to update with dictionary type
+	, u3:{#ConsDef}        // Consdef array to update with dictionary constructor
+	, u4:{#SelectorDef}    // Selectordef array to update with dictionary field selectors
+	, *SymbolTable         // Symbol table to store dictionary types, constructors, and field selectors
+	, *VarHeap             // Heap to allocate fresh variable from
+	, *TypeHeaps           // Heaps to allocate fresh type and attribute variables from
+	, .env                 // Environment for looking up context classes
 	)
- ->	( .{#ClassDef}                           // Updated array of classes (class_dictionary)
-	, v1:{#MemberDef}                         // Used array of class members
-	, v2:{#CheckedTypeDef}                     // Typedef array updated with dictionary type
-	, v3:{#ConsDef}                            // Consdef array updated with dictionary constructor
-	, v4:{#SelectorDef}                        // Selectordef array updated with dictionary field selectors
-	, .SymbolTable                           // Updated symbol table
-	, .VarHeap                               // Extended heap
-	, .TypeHeaps                             // Extended heaps
-	, .env                                   // Used environment
+ ->	( .{#ClassDef}         // Updated array of classes (class_dictionary)
+	, v1:{#MemberDef}      // Used array of class members
+	, v2:{#CheckedTypeDef} // Typedef array updated with dictionary type
+	, v3:{#ConsDef}        // Consdef array updated with dictionary constructor
+	, v4:{#SelectorDef}    // Selectordef array updated with dictionary field selectors
+	, .SymbolTable         // Updated symbol table
+	, .VarHeap             // Extended heap
+	, .TypeHeaps           // Extended heaps
+	, .env                 // Used environment
 	)
  ,	[u1<=v1, u2<=v2, u3<=v3, u4<=v4]
 
@@ -1435,22 +1436,22 @@ build_dicttypedef get_classdef0 mod_index classindex classdef0 memberdefs0 typed
 ***********************************/
 
 build_recordtype ::
-	ClassDef                                 // Class being converted
-	.Index                                   // Index of dictionary type
-	AType                                    // Dictionary type
-	.Index                                   // Where to store the constructor symbol
-	.{#FieldSymbol}                          // Field symbols that comprise the record type
-	[.FieldInfo]                             // Information about the type arguments of the record constructor type
-	*{#ConsDef}                              // Consdef array to update with created dictionary constructor
-	*SymbolTable                             // Symbol table to store the constructor symbol
-	*VarHeap                                 // Heap for allocating fresh constructor variable pointer
-	*TypeHeaps                               // For allocating fresh type variables
- ->	( Bool                                   // Success of substitutions?
-    , RecordType                             // RecordType of dictionary (RHS of its TypeDef)
-	, .{#ConsDef}                            // Consdef array updated with created dictionary constructor
-	, .SymbolTable                           // Updated symbol table
-	, .VarHeap                               // Used variable heap
-	, .TypeHeaps                             // Used type heaps
+	ClassDef        // Class being converted
+	.Index          // Index of dictionary type
+	AType           // Dictionary type
+	.Index          // Where to store the constructor symbol
+	.{#FieldSymbol} // Field symbols that comprise the record type
+	[.FieldInfo]    // Information about the type arguments of the record constructor type
+	*{#ConsDef}     // Consdef array to update with created dictionary constructor
+	*SymbolTable    // Symbol table to store the constructor symbol
+	*VarHeap        // Heap for allocating fresh constructor variable pointer
+	*TypeHeaps      // For allocating fresh type variables
+ ->	( Bool          // Success of substitutions?
+	, RecordType    // RecordType of dictionary (RHS of its TypeDef)
+	, .{#ConsDef}   // Consdef array updated with created dictionary constructor
+	, .SymbolTable  // Updated symbol table
+	, .VarHeap      // Used variable heap
+	, .TypeHeaps    // Used type heaps
 	)
 
 build_recordtype classdef dict_index dict_type constr_index fields fieldinfos consdefs0 symboltable0 varheap0 typeheaps0
