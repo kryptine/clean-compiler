@@ -3,6 +3,7 @@
 
 #define SHARE_UPDATE_CODE 0 /* also in codegen1.c */
 #define SELECTORS_FIRST 1 /* also in codegen2.c */
+#define UNBOXED_RECORDS_IN_UNBOXED_CLOSURES 1 /* 1 if UNBOX_UPDATE_FUNCTION_ARGUMENTS */
 
 #include "compiledefines.h"
 #include "types.t"
@@ -304,7 +305,7 @@ void EvaluateAndMoveStateArguments (int state_arity,StateP states,int oldasp,int
 	FreeAFrameSpace (oldaframesize);
 }
 
-static void EvaluateArgumentIfNecesary (StateS argstate,int *asp_p,int index,struct state *state_p)
+static void EvaluateArgumentIfNecesary (StateS argstate,int *asp_p,int a_index,struct state *state_p)
 {
 	if (!IsLazyState (argstate)){
 		switch (argstate.state_type){
@@ -312,7 +313,7 @@ static void EvaluateArgumentIfNecesary (StateS argstate,int *asp_p,int index,str
 			case RecordState:
 			case ArrayState:
 				if (IsLazyState (*state_p))
-					GenJsrEval (*asp_p-index);
+					GenJsrEval (*asp_p-a_index);
 				break;
 			case TupleState:
 			{
@@ -320,8 +321,8 @@ static void EvaluateArgumentIfNecesary (StateS argstate,int *asp_p,int index,str
 				
 				arity = argstate.state_arity;
 
-				if (*asp_p-index > 0){
-					GenPushA (*asp_p-index);
+				if (*asp_p-a_index > 0){
+					GenPushA (*asp_p-a_index);
 					if (IsLazyState (*state_p))
 						GenJsrEval (0);
 					GenReplArgs (arity,arity);
@@ -346,14 +347,14 @@ static void EvaluateArgumentIfNecesary (StateS argstate,int *asp_p,int index,str
 	}
 }
 
-static void EvaluateArgumentsForFunctionWithOneCall (int n_states,StateP arg_state_p,int *asp_p,int index,ArgP call_arg)
+static void EvaluateArgumentsForFunctionWithOneCall (int n_states,StateP arg_state_p,int *asp_p,int a_index,ArgP call_arg)
 {
 	if (call_arg==NULL)
-		EvaluateStateArguments (n_states,arg_state_p,asp_p,index);
+		EvaluateStateArguments (n_states,arg_state_p,asp_p,a_index);
 	else
 		if (n_states>0){
-			EvaluateArgumentsForFunctionWithOneCall (n_states-1,arg_state_p+1,asp_p,index-1,call_arg->arg_next);
-			EvaluateArgumentIfNecesary (*arg_state_p,asp_p,index,state_of_node_or_node_id (call_arg->arg_node));
+			EvaluateArgumentsForFunctionWithOneCall (n_states-1,arg_state_p+1,asp_p,a_index-1,call_arg->arg_next);
+			EvaluateArgumentIfNecesary (*arg_state_p,asp_p,a_index,state_of_node_or_node_id (call_arg->arg_node));
 		}
 }
 
@@ -393,17 +394,35 @@ void EvalArgsEntry (StateS *const function_state_p,SymbDef rule_sdef,int maxasiz
 		EvaluateAndMoveStateArguments (asp,function_state_p,asp,maxasize);
 }
 
-static void EvaluateArgumentsForFunctionWithUnboxedArguments (int n_states,StateP arg_state_p,int *asp_p,int index,ArgP call_arg)
+static void EvaluateArgumentsForFunctionWithUnboxedArguments (int n_states,StateP arg_state_p,int *asp_p,int a_index,ArgP call_arg)
 {
 	if (n_states==0)
 		return;
 	else {
-		if (call_arg->arg_state.state_type==SimpleState && call_arg->arg_state.state_kind==OnB)
-			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,index,call_arg->arg_next);
-		else {
-			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,index-1,call_arg->arg_next);
-			EvaluateArgumentIfNecesary (*arg_state_p,asp_p,index,!IsLazyState (call_arg->arg_state) ? &call_arg->arg_state : state_of_node_or_node_id (call_arg->arg_node));
+#if UNBOXED_RECORDS_IN_UNBOXED_CLOSURES
+		if (call_arg->arg_state.state_type==SimpleState && call_arg->arg_state.state_kind==OnB){
+			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
+			return;
+		} else if (call_arg->arg_state.state_type==RecordState){
+			int a_size,b_size;
+			
+			DetermineSizeOfStates (call_arg->arg_state.state_arity,call_arg->arg_state.state_record_arguments,&a_size,&b_size);
+			a_index -= a_size;
+
+			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
+			return;
 		}
+		
+		EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index-1,call_arg->arg_next);
+		EvaluateArgumentIfNecesary (*arg_state_p,asp_p,a_index,!IsLazyState (call_arg->arg_state) ? &call_arg->arg_state : state_of_node_or_node_id (call_arg->arg_node));
+#else
+		if (call_arg->arg_state.state_type==SimpleState && call_arg->arg_state.state_kind==OnB)
+			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index,call_arg->arg_next);
+		else {
+			EvaluateArgumentsForFunctionWithUnboxedArguments (n_states-1,arg_state_p+1,asp_p,a_index-1,call_arg->arg_next);
+			EvaluateArgumentIfNecesary (*arg_state_p,asp_p,a_index,!IsLazyState (call_arg->arg_state) ? &call_arg->arg_state : state_of_node_or_node_id (call_arg->arg_node));
+		}
+#endif
 	}
 }
 
@@ -450,6 +469,15 @@ static void MoveArgumentsToBStack (StateS src_state,StateS dest_state,
 			
 				DetermineSizeOfStates (arity,dest_state.state_record_arguments,&asize,&bsize);
 
+#if UNBOXED_RECORDS_IN_UNBOXED_CLOSURES
+				if (src_state.state_type==RecordState){
+					for (element_n=asize-1; element_n>=0; --element_n)
+						PutInAFrames (a_index-element_n,dest_asp_p);
+					PutInBFrames (b_index,dest_bsp_p,bsize);									
+					return;
+				}
+#endif
+
 				if (*current_asp_p==a_index){
 					GenReplRArgs (asize,bsize);
 					*current_asp_p += asize-1;
@@ -491,6 +519,15 @@ static void MoveArgumentsForFunctionWithUnboxedArguments (int n_states,StateP st
 		if (call_arg->arg_state.state_type==SimpleState && call_arg->arg_state.state_kind==OnB){
 			next_a_index=a_index;
 			next_b_index=b_index-ObjectSizes[call_arg->arg_state.state_object];
+#if UNBOXED_RECORDS_IN_UNBOXED_CLOSURES
+		} else if (call_arg->arg_state.state_type==RecordState){
+			int a_size,b_size;
+			
+			DetermineSizeOfStates (call_arg->arg_state.state_arity,call_arg->arg_state.state_record_arguments,&a_size,&b_size);
+
+			next_a_index=a_index-a_size;
+			next_b_index=b_index-b_size;
+#endif
 		} else {
 			next_a_index=a_index-1;
 			next_b_index=b_index;
@@ -1110,7 +1147,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if 0
 		PrintRules (imod->im_rules);
 #endif
-		if (DoCode){
+		if (DoCode && !CompilerError){
 			ImpRuleS *rule;
 
 			Verbose ("Code generation");
