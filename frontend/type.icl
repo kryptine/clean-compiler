@@ -826,10 +826,12 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 				= attr_heap <:= (av_info_ptr, AVI_Empty)
 
 
-		collect_cons_variables_in_tc common_defs tc=:{tc_class={glob_module,glob_object={ds_index}}, tc_types} collected_cons_vars
+		collect_cons_variables_in_tc common_defs tc=:{tc_class=TCClass {glob_module,glob_object={ds_index}}, tc_types} collected_cons_vars
 			# {class_cons_vars} = common_defs.[glob_module].com_class_defs.[ds_index]
 			= collect_cons_variables tc_types class_cons_vars collected_cons_vars
-		
+		collect_cons_variables_in_tc common_defs tc=:{tc_class=TCGeneric {gtc_class}} collected_cons_vars
+			= collect_cons_variables_in_tc common_defs {tc & tc_class=TCClass gtc_class} collected_cons_vars 
+		 
 		collect_cons_variables [] class_cons_vars collected_cons_vars
 			= collected_cons_vars
 		collect_cons_variables [type : tc_types] class_cons_vars collected_cons_vars
@@ -1904,7 +1906,7 @@ where
  		  		  pds_ident = predefined_idents.[PD_TypeCodeMember]
 				  tc_member_symb = { symb_name = pds_ident, symb_kind = SK_OverloadedFunction {glob_module = pds_module, glob_object = pds_def }}
 		 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
-				  context = {tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
+				  context = {tc_class = TCClass tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
 		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 				-> fresh_local_dynamics loc_dynamics (inc var_store, type_heaps, var_heap,
 						expr_heap <:= (dyn_ptr, EI_TempDynamicType No loc_dynamics tdt_type [context] expr_ptr tc_member_symb), predef_symbols)
@@ -1976,7 +1978,7 @@ where
 	build_type_context tc_class_symb {tv_info_ptr} (var_heap, type_var_heap)
 		# (TVI_Type fresh_var, type_var_heap) = readPtr tv_info_ptr type_var_heap
 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
-		= ({tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}, (var_heap, type_var_heap))
+		= ({tc_class = TCClass tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}, (var_heap, type_var_heap))
 
 	add_universal_vars_to_type [] at
 		= at

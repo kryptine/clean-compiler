@@ -171,7 +171,9 @@ PD_ConsPAIR					:== 188
 PD_GenericBimap				:== 189
 PD_bimapId					:== 190
 
-PD_NrOfPredefSymbols		:== 191
+PD_TypeGenericDict 			:== 191
+
+PD_NrOfPredefSymbols		:== 192
 
 (<<=) infixl
 (<<=) symbol_table val
@@ -296,6 +298,8 @@ predefined_idents
 					[PD_ConsPAIR] = i "PAIR",
 					[PD_GenericBimap] = i "bimap",
 					[PD_bimapId] = i "bimapId",
+				
+					[PD_TypeGenericDict] = i "GenericDict",
 									
 					[PD_StdMisc] = i "StdMisc",
 					[PD_abort] = i "abort",
@@ -445,7 +449,8 @@ where
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypePAIR)					
 					<<- (local_predefined_idents,				IC_Expression,	PD_ConsPAIR)	
 					<<- (local_predefined_idents,				IC_Generic,		PD_GenericBimap)	
-					<<- (local_predefined_idents,				IC_Expression,	PD_bimapId)	
+					<<- (local_predefined_idents,				IC_Expression,	PD_bimapId)
+					<<- (local_predefined_idents,				IC_Type,		PD_TypeGenericDict)
 									
 					<<- (local_predefined_idents,				IC_Module, 		PD_StdMisc)
 					<<- (local_predefined_idents,				IC_Expression, 	PD_abort)
@@ -572,7 +577,7 @@ where
 
 		  me_type = { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_arity = 0,
 					  st_result = { at_attribute = TA_None, at_type = TV class_var },
-					  st_context = [ {tc_class = {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name, ds_arity = 1, ds_index = NoIndex }},
+					  st_context = [ {tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name, ds_arity = 1, ds_index = NoIndex }},
 					   				tc_types = [ TV class_var ], tc_var = nilPtr}],
 					  st_attr_vars = [], st_attr_env = [] }
 

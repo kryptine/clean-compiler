@@ -884,7 +884,7 @@ checkAndCollectTypesOfContextsOfSpecials :: [TypeContext] *PredefinedSymbols *Er
 checkAndCollectTypesOfContextsOfSpecials type_contexts predef_symbols error
 	= mapSt2 check_and_collect_context_types_of_special type_contexts predef_symbols error
 where	
-	check_and_collect_context_types_of_special {tc_class={glob_object={ds_ident,ds_index},glob_module},tc_types} predef_symbols error
+	check_and_collect_context_types_of_special {tc_class=TCClass {glob_object={ds_ident,ds_index},glob_module},tc_types} predef_symbols error
 		| hasNoTypeVariables tc_types
 			= (tc_types, predef_symbols,error)
 		# {pds_def,pds_module} = predef_symbols.[PD_ArrayClass]
@@ -894,6 +894,8 @@ where
 		| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_list tc_types predef_symbols
 			= (tc_types, predef_symbols,error)
 			= (tc_types, predef_symbols,checkError ds_ident.id_name "illegal specialization" error)
+	check_and_collect_context_types_of_special {tc_class=TCGeneric {gtc_generic},tc_types} predef_symbols error
+		= (tc_types, predef_symbols,checkError gtc_generic.glob_object.ds_ident.id_name "genenric specials are illegal" error) 
 
 	hasNoTypeVariables []
 		= True
@@ -3408,6 +3410,7 @@ where
 				<=< adjustPredefSymbol PD_ConsRIGHT				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index STE_Generic
 				<=< adjustPredefSymbol PD_bimapId				mod_index STE_DclFunction				
+				<=< adjustPredefSymbol PD_TypeGenericDict		mod_index STE_Type				
 				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
 		| pre_mod.pds_def == mod_index

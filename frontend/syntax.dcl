@@ -871,13 +871,22 @@ cNonRecursiveAppl	:== False
 	}
 
 ::	TypeContext =
-	{	tc_class	:: !Global DefinedSymbol
+	{	tc_class	:: !TCClass
 	,	tc_types	:: ![Type]
 	,	tc_var		:: !VarInfoPtr
 	}
 
-:: TCClass 	= TCClass 		!(Global DefinedSymbol)
-			| TCGeneric 	!(Global DefinedSymbol) !TypeKind
+//AA: class in a type context is either normal class or a generic class
+:: TCClass 	= TCClass 		!(Global DefinedSymbol) // Normal class
+			| TCGeneric 	!GenericTypeContext		// Generic class
+
+:: GenericTypeContext = 
+	{ gtc_generic 	:: !(Global DefinedSymbol)
+	, gtc_kind		:: !TypeKind 
+	, gtc_class		:: !(Global DefinedSymbol) // generated class
+	, gtc_dictionary:: !(Global DefinedSymbol) // HACK: dictionary different from the one contained in the class
+	}
+//..AA
 
 ::	AType =
 	{	at_attribute	:: !TypeAttribute
@@ -1355,7 +1364,8 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 TypeCons,
 			 IndexRange,
 			 FunType,
-			 GenericClassInfo
+			 GenericClassInfo,
+			 TCClass
 
 instance <<< FunctionBody
 
@@ -1364,6 +1374,8 @@ instance toString BasicType
 instance == TypeAttribute
 instance == Annotation
 instance == GlobalIndex
+
+instance toString TCClass
 
 instance <<< FunCall
 

@@ -16,6 +16,15 @@ from transform import Group
 
 import genericsupport
 
+//****************************************************************************************
+//	tracing
+//****************************************************************************************
+traceGenerics context message x
+	//:== traceValue context message x
+	:== x
+
+
+
 //**************************************************************************************
 // Data types
 //**************************************************************************************
@@ -77,30 +86,40 @@ convertGenerics
 
 	#! td_infos = clearTypeDefInfos td_infos
 		//---> ("used module numbers ", main_dcl_module_n, numberSetToList used_module_numbers)
-	#! (modules, heaps) = clearGenericDefs modules heaps 
+	#! (modules, heaps) 
+		= traceGenerics "convertGenerics" "buildGenericRepresentations" 
+			(clearGenericDefs modules heaps) 
 
-	#! (iso_range, funs, groups, td_infos, modules, heaps, error)
-		= buildGenericRepresentations 
-			(main_dcl_module_n /*---> "====================== call buildGenericRepresentations"*/)
-			predefs 
-			funs groups td_infos modules heaps error
+	# (iso_range, funs, groups, td_infos, modules, heaps, error)
+		= traceGenerics "convertGenerics" "buildGenericRepresentations" 
+			(buildGenericRepresentations main_dcl_module_n predefs 
+				funs groups td_infos modules heaps error)
+				
 	| not error.ea_ok
 		= (modules, groups, funs, [], td_infos, heaps, hash_table, u_predefs, dcl_modules, error)
 
 	// build classes for each kind of each generic function
 	#! (modules, dcl_modules, heaps, symbol_table, td_infos, error) 
-		= buildClasses 
+		= traceGenerics "convertGenerics" "buildClasses" 
+			(buildClasses 
 				main_dcl_module_n used_module_numbers 
-				modules dcl_modules heaps hash_table.hte_symbol_heap td_infos error
-			//---> ("====================== call buildClasses")
+				modules dcl_modules heaps hash_table.hte_symbol_heap td_infos error)
 	#! hash_table = { hash_table & hte_symbol_heap = symbol_table }	
 	| not error.ea_ok
 		= (modules, groups, funs, [], td_infos, heaps, hash_table, u_predefs, dcl_modules, error)
 
 	#! (instance_range, funs, groups, modules, dcl_modules, td_infos, heaps, error)
-		= convertGenericCases main_dcl_module_n used_module_numbers predefs funs groups modules dcl_modules td_infos heaps error
-			//---> ("====================== call convertGenericCases")
+		= traceGenerics "convertGenerics" "convertGenericCases"
+			(convertGenericCases main_dcl_module_n used_module_numbers predefs funs groups modules dcl_modules td_infos heaps error)
 
+	| not error.ea_ok
+		= (modules, groups, funs, [], td_infos, heaps, hash_table, u_predefs, dcl_modules, error)
+	
+	
+	#! (funs, modules, dcl_modules, heaps, error)
+		= traceGenerics "convertGenerics" "convertGenericTypeContexts"
+			(convertGenericTypeContexts main_dcl_module_n used_module_numbers predefs funs modules dcl_modules heaps error)
+	
 	| not error.ea_ok
 		= (modules, groups, funs, [], td_infos, heaps, hash_table, u_predefs, dcl_modules, error)
 	
@@ -907,7 +926,7 @@ where
 		#! (type_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap 
 		#! (tc_var_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap 
 		#! type_context = 
-			{	tc_class = {glob_module = module_index, glob_object=class_ds}
+			{	tc_class = TCClass {glob_module = module_index, glob_object=class_ds}
 			,	tc_types = [ TV class_var ] 
 			,	tc_var = tc_var_ptr 
 			}
@@ -1183,7 +1202,7 @@ where
 			build_context {gci_class, gci_module, gci_kind} tv hp_var_heap
 				# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
 				# type_context =		
-					{	tc_class = 
+					{	tc_class = TCClass
 							{ glob_module=gci_module // the same as icl module
 							, glob_object =
 								{ ds_ident = genericIdentToClassIdent gc_name gci_kind
@@ -1454,6 +1473,165 @@ where
 buildGenericCaseBody main_module_index {gc_name,gc_pos} st predefs td_infos modules heaps error
 	# error = reportError gc_name gc_pos "cannot specialize to this type" error
 	= (TransformedBody {tb_args=[], tb_rhs=EE}, td_infos, modules, heaps, error)
+
+//****************************************************************************************
+//  convert generic type contexts into normal type contexts
+//****************************************************************************************
+
+convertGenericTypeContexts ::
+		!Index !NumberSet !PredefinedSymbols !*FunDefs !*Modules !*DclModules !*Heaps !*ErrorAdmin
+	-> (!*FunDefs, !*Modules, !*DclModules, !*Heaps, !*ErrorAdmin)
+convertGenericTypeContexts main_module_index used_module_numbers predefs funs modules dcl_modules heaps error
+	# (funs, (modules, heaps, error)) = convert_functions 0 funs (modules, heaps, error)
+
+	# (modules, dcl_modules, (heaps, error)) = convert_modules 0 modules dcl_modules (heaps, error)
+
+	= (funs, modules, dcl_modules, heaps, error)
+where
+	convert_functions fun_index funs st
+		| fun_index == size funs 
+			= (funs, st)
+			# (fun, funs) = funs ! [fun_index]
+			# (fun, st) = convert_function fun st
+ 			# funs = {funs & [fun_index] = fun}
+			= convert_functions (inc fun_index) funs st
+	where		
+		convert_function :: !FunDef (!*Modules, !*Heaps, !*ErrorAdmin) 
+			-> (!FunDef, (!*Modules, !*Heaps, !*ErrorAdmin))		
+		convert_function fun=:{fun_type=Yes symbol_type=:{st_context}, fun_symb, fun_pos} st
+			# (has_converted, st_context, st) = convert_contexts fun_symb fun_pos st_context st  
+			| has_converted
+				# fun = {fun & fun_type = Yes {symbol_type & st_context = st_context}}
+				= (fun, st)
+				= (fun, st)		 
+		convert_function fun st
+			= (fun, st)
+
+	convert_modules module_index modules dcl_modules st
+		| module_index == size modules
+			= (modules, dcl_modules, st)
+			# (modules, dcl_modules, st) = convert_module module_index modules dcl_modules st
+			= convert_modules (inc module_index) modules dcl_modules st
+	
+	convert_module :: 
+			!Index !*Modules !*DclModules (!*Heaps, !*ErrorAdmin)
+		-> (!*Modules, !*DclModules, (!*Heaps, !*ErrorAdmin))
+	convert_module module_index modules dcl_modules st
+		| inNumberSet module_index used_module_numbers		 
+			#! (common_defs, modules) = modules ! [module_index]
+			#! (dcl_module=:{dcl_functions, dcl_common}, dcl_modules) = dcl_modules ! [module_index]
+			
+			#! (common_defs, modules, st) = convert_common_defs common_defs modules st
+			#! (dcl_common, modules, st) = convert_common_defs dcl_common modules st
+			#! (dcl_functions, modules, st) = convert_dcl_functions {x\\x<-:dcl_functions} modules st
+						
+			# dcl_modules = 
+				{ dcl_modules & [module_index] = 
+					{ dcl_module 
+					& dcl_functions = dcl_functions
+					, dcl_common = dcl_common
+					}
+				}
+			# modules = {modules & [module_index] = common_defs}
+			= (modules, dcl_modules, st)
+		| otherwise
+			= (modules, dcl_modules, st)	
+	
+	convert_common_defs common_defs=:{com_class_defs, com_member_defs, com_instance_defs} modules (heaps, error)	
+		# (com_class_defs, st) 
+			= updateArraySt convert_class {x\\x<-:com_class_defs} (modules, heaps, error)
+		# (com_member_defs, st)
+			= updateArraySt convert_member {x\\x<-:com_member_defs} st
+		# (com_instance_defs, (modules, heaps, error))
+			= updateArraySt convert_instance {x\\x<-:com_instance_defs} st
+		
+		# common_defs = 
+			{ common_defs 
+			& com_class_defs = com_class_defs
+			, com_member_defs = com_member_defs
+			, com_instance_defs = com_instance_defs
+			}
+		
+		= (common_defs, modules, (heaps, error))
+	where
+		convert_class _ class_def=:{class_name, class_pos, class_context} st
+			# (ok, class_context, st) = convert_contexts class_name class_pos class_context st
+			| ok 
+				# class_def={class_def & class_context = class_context}
+				= (class_def, st) 	
+				= (class_def, st) 	
+		convert_member _ member_def=:{me_symb, me_pos, me_type=me_type=:{st_context}} st
+			# (ok, st_context, st) = convert_contexts me_symb me_pos st_context st
+			| ok 
+				# member_def={member_def & me_type = {me_type & st_context = st_context}}
+				= (member_def, st) 	
+				= (member_def, st) 	
+									
+		convert_instance _ ins=:{ins_type=ins_type=:{it_context}, ins_ident, ins_pos} st
+			# (ok, it_context, st) = convert_contexts ins_ident ins_pos it_context st
+			| ok 
+				# ins={ins & ins_type = {ins_type & it_context = it_context}}
+				= (ins, st) 	
+				= (ins, st) 	
+	
+	convert_dcl_functions dcl_functions modules (heaps, error)
+		# (dcl_functions, (modules, heaps, error)) 
+			= updateArraySt convert_dcl_function dcl_functions (modules, heaps, error)	
+		= (dcl_functions, modules, (heaps, error))
+	where
+		convert_dcl_function _ fun=:{ft_type=ft_type=:{st_context}, ft_symb, ft_pos} st	
+			# (ok, st_context, st) = convert_contexts ft_symb ft_pos st_context st
+			| ok 
+				# fun={fun & ft_type = {ft_type & st_context = st_context}}
+				= (fun, st) 	
+				= (fun, st) 	
+	
+	convert_contexts fun_name fun_pos [] st 
+		= (False, [], st)
+	convert_contexts fun_name fun_pos all_tcs=:[tc:tcs] st
+		# (ok1, tc, st) = convert_context fun_name fun_pos tc st
+		# (ok2, tcs, st) = convert_contexts fun_name fun_pos tcs st
+		| ok1 || ok2
+			= (True, [tc:tcs], st) 
+			= (False, all_tcs, st)
+		
+	convert_context :: !Ident !Position !TypeContext (!*Modules, !*Heaps, !*ErrorAdmin)
+		-> (!Bool, !TypeContext, (!*Modules, !*Heaps, !*ErrorAdmin))	
+	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind, gtc_class}} (modules, heaps=:{hp_generic_heap}, error)		
+	
+		# ({gen_info_ptr}, modules) = modules ! [gtc_generic.glob_module] . com_generic_defs . [gtc_generic.glob_object.ds_index]
+		# ({gen_classes}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap		
+		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
+		# (tc_class, error) = case opt_class_info of 
+			No
+				# error = reportError fun_name fun_pos "no generic cases for this kind" error  
+				-> (TCGeneric gtc, error)
+			Yes class_info 
+				# clazz = 
+					{ glob_module = class_info.gci_module
+					, glob_object = 
+						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident gtc_kind 
+						, ds_arity = 1
+						, ds_index = class_info.gci_class
+						}
+					}
+				//-> (TCClass clazz, error)
+				
+				/* 
+					AA HACK: dummy dictionary
+				*/
+				#! {pds_module, pds_def} = predefs.[PD_TypeGenericDict]
+				#! pds_ident = predefined_idents.[PD_TypeGenericDict]
+				# dictionary = 
+					{ glob_module = pds_module
+					, glob_object={ds_ident=pds_ident, ds_arity=1, ds_index=pds_def}
+					}				
+				-> (TCGeneric {gtc & gtc_class=clazz, gtc_dictionary=dictionary}, error)
+	
+		= (True, {tc & tc_class=tc_class}, (modules, {heaps & hp_generic_heap=hp_generic_heap}, error))
+	convert_context fun_name fun_pos tc st 
+		= (False, tc, st)
+	
 			 							 
 //****************************************************************************************
 //  specialization

@@ -2,6 +2,7 @@ implementation module typesupport
 
 import StdEnv, StdCompare
 import syntax, parse, check, unitype, utilities, checktypes, compilerSwitches
+import genericsupport
 
 ::	Store	:== Int
 
@@ -428,19 +429,19 @@ where
 				= var_heap <:= (spec_tc.tc_var, VI_ForwardClassVar tc_var)
 			= mark_specified_context tcs spec_tc var_heap
 				
-	clean_up_type_context tc=:{tc_types} (collected_contexts, env, error)
-		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
+	clean_up_type_context tc=:{tc_types, tc_class} (collected_contexts, env, error)
+		# (cur, tc_types, env) = cleanUpClosed tc_types env
 		| checkCleanUpResult cur cUndefinedVar
 			= (collected_contexts, env, error)
 		| checkCleanUpResult cur cLiftedVar
-			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, liftedContextError tc.tc_class.glob_object.ds_ident error)
+			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, liftedContextError (toString tc_class) error)
 			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, error)
 
 	clean_up_lifted_type_context tc=:{tc_types,tc_var} (collected_contexts, env, error)
 		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
 		| checkCleanUpResult cur cLiftedVar
 			| checkCleanUpResult cur cDefinedVar
-				= (collected_contexts, env, liftedContextError tc.tc_class.glob_object.ds_ident error)
+				= (collected_contexts, env, liftedContextError (toString tc.tc_class) error)
 				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
 		| otherwise
 			= (collected_contexts, env, error)
@@ -985,12 +986,12 @@ equivalent st=:{st_args,st_result,st_context,st_attr_env} tst=:{tst_args,tst_res
 			= (False, attr_env, heaps)
 		= (False, attr_env, heaps)
 where
-	equivalent_list_of_contexts [] contexts defs heaps 
+	equivalent_list_of_contexts [] contexts defs heaps
 		= (True, heaps)
 	equivalent_list_of_contexts [tc : tcs] contexts defs heaps 
 		# (ok, heaps) = contains_context tc contexts defs heaps
 		| ok
-			= equivalent_list_of_contexts tcs contexts defs heaps
+			= equivalent_list_of_contexts tcs contexts defs heaps 
 			= (False, heaps)
 
 	contains_context tc1 [tc2 : tcs] defs heaps
@@ -1001,16 +1002,23 @@ where
 	contains_context tc1 [] defs heaps
 		= (False, heaps)
 	
-	equivalent_contexts tc {tc_class,tc_types} defs heaps
-		| tc_class == tc.tc_class
-			= equiv tc.tc_types tc_types heaps
-		# {glob_object={ds_index},glob_module} = tc_class
+	equivalent_contexts tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2=:{tc_class=TCGeneric {gtc_class=class2}} defs heaps
+		= equivalent_contexts {tc1 & tc_class = TCClass class1} {tc2 & tc_class = TCClass class2} defs heaps
+	equivalent_contexts tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2 defs heaps
+		= equivalent_contexts {tc1 & tc_class = TCClass class1} tc2 defs heaps
+	equivalent_contexts tc1 tc2=:{tc_class=TCGeneric {gtc_class=class2}} defs heaps
+		= equivalent_contexts tc1 {tc2 & tc_class = TCClass class2} defs heaps
+	equivalent_contexts tc1=:{tc_class=TCClass class1, tc_types=types1} {tc_class=TCClass class2, tc_types=types2} defs heaps
+		| class1 == class2
+			# (ok, heaps) = equiv types1 types2 heaps
+			= (ok, heaps)
+		# {glob_object={ds_index},glob_module} = class2
 		#! class_def = defs.[glob_module].com_class_defs.[ds_index]
 		# {class_context,class_args} = class_def
 		| isEmpty class_context
 			= (False, heaps)
-		# th_vars = bind_class_args class_args tc_types heaps.th_vars
-		= equivalent_superclasses class_context tc defs { heaps & th_vars = th_vars }
+		# th_vars = bind_class_args class_args types2 heaps.th_vars
+		= equivalent_superclasses class_context tc1 defs { heaps & th_vars = th_vars }
 	where	
 		bind_class_args [{tv_info_ptr} : vars] [type : types] type_var_heap
 			= bind_class_args vars types (writePtr tv_info_ptr (TVI_Type type) type_var_heap)
@@ -1210,8 +1218,16 @@ where
 
 instance writeType TypeContext
 where
-	writeType file opt_beautifulizer (form, {tc_class={glob_object={ds_ident}}, tc_types})
-		= writeType (file <<< ds_ident <<< ' ') opt_beautifulizer (form, tc_types)
+	//writeType file opt_beautifulizer (form, {tc_class={glob_object={ds_ident}}, tc_types})
+	//	= writeType (file <<< ds_ident <<< ' ') opt_beautifulizer (form, tc_types)
+	writeType file opt_beautifulizer (form, {tc_class, tc_types})
+		# file = write_tc_class tc_class file
+		= writeType (file <<< ' ') opt_beautifulizer (form, tc_types)
+	where
+		write_tc_class (TCClass {glob_object={ds_ident}}) file
+			= file <<< ds_ident
+		write_tc_class (TCGeneric {gtc_class={glob_object={ds_ident}}}) file
+			= file <<< ds_ident
 
 instance writeType SAType
 where
@@ -1493,7 +1509,7 @@ where
 
 instance <<< TypeContext
 where
-	(<<<) file co = file <<< co.tc_class.glob_object.ds_ident <<< " <" <<< ptrToInt co.tc_var <<< '>' <<< " " <<< co.tc_types
+	(<<<) file co = file <<< co.tc_class <<< " <" <<< ptrToInt co.tc_var <<< '>' <<< " " <<< co.tc_types
 	
 
 instance <<< AttrCoercion

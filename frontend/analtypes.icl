@@ -681,12 +681,17 @@ determine_kinds_of_type_contexts modules type_contexts class_infos as
 	= foldSt (determine_kinds_of_type_context modules) type_contexts (class_infos, as)
 where
 	determine_kinds_of_type_context :: !{#CommonDefs} !TypeContext !(!*ClassDefInfos, !*AnalyseState) -> (!*ClassDefInfos, !*AnalyseState)
-	determine_kinds_of_type_context modules {tc_class={glob_module,glob_object={ds_ident,ds_index}},tc_types} (class_infos, as)
+	determine_kinds_of_type_context modules {tc_class=TCClass {glob_module,glob_object={ds_ident,ds_index}},tc_types} (class_infos, as)
 		# (class_kinds, class_infos) = class_infos![glob_module,ds_index]
 		| length class_kinds == length tc_types
 			# as = fold2St (verify_kind_of_type modules) class_kinds tc_types as
 			= (class_infos, as)
 			= abort ("determine_kinds_of_type_context" ---> (ds_ident, class_kinds, tc_types))
+	determine_kinds_of_type_context modules {tc_class=TCGeneric {gtc_generic,gtc_kind},tc_types} (class_infos, as)
+		| length tc_types == 1
+			# as = verify_kind_of_type modules gtc_kind (hd tc_types) as 
+			= (class_infos, as)
+			= abort ("determine_kinds_of_type_context" ---> (gtc_generic.glob_object.ds_ident, gtc_kind, tc_types))
 			
 	verify_kind_of_type modules req_kind type as
 		# (kind_of_type, as=:{as_kind_heap,as_error}) = determineKind modules type as
@@ -772,8 +777,10 @@ where
 	determine_kinds_of_context_classes contexts class_infos_and_as
 		= foldSt (determine_kinds_of_context_class modules) contexts class_infos_and_as
 	where
-		determine_kinds_of_context_class modules {tc_class={glob_module,glob_object={ds_index}}} infos_and_as
+		determine_kinds_of_context_class modules {tc_class=TCClass {glob_module,glob_object={ds_index}}} infos_and_as
 			= determine_kinds_of_class modules glob_module ds_index infos_and_as
+		determine_kinds_of_context_class modules {tc_class=TCGeneric {gtc_kind}} infos_and_as
+			= infos_and_as 
 
 	bind_kind_vars type_vars kind_ptrs type_var_heap
 		= fold2St bind_kind_var type_vars kind_ptrs type_var_heap
@@ -880,7 +887,7 @@ where
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
 			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }
 			  (class_infos, as) = determine_kinds_of_type_contexts common_defs
-			  		[{tc_class = ins_class, tc_types = it_types, tc_var = nilPtr} : it_context] class_infos as
+			  		[{tc_class = TCClass ins_class, tc_types = it_types, tc_var = nilPtr} : it_context] class_infos as
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
 
 	check_kinds_of_generics common_defs index generic_defs class_infos gen_heap as

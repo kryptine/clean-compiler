@@ -2,6 +2,21 @@ implementation module genericsupport
 
 import syntax, checksupport
 
+getGenericClassInfo ::
+	!(Global Index)
+	!TypeKind
+	!{#CommonDefs}		
+	!*GenericHeap
+	-> 		
+	( Optional GenericClassInfo
+	, !*GenericHeap					
+	)
+getGenericClassInfo {glob_module, glob_object} kind modules generic_heap
+	#! (gen_def=:{gen_info_ptr}) = modules.[glob_module].com_generic_defs.[glob_object]
+	#! ({gen_classes}, generic_heap) = readPtr gen_info_ptr generic_heap
+	#! opt_class_info = lookupGenericClassInfo kind gen_classes
+	= (opt_class_info, generic_heap)
+
 getGenericMember :: 
 	!(Global Index) 	// generic
 	!TypeKind 			// kind argument
@@ -11,14 +26,31 @@ getGenericMember ::
 	( Optional (Global Index)
 	, !*GenericHeap					
 	)
-getGenericMember {glob_module, glob_object} kind modules generic_heap
-	#! (gen_def=:{gen_info_ptr}) = modules.[glob_module].com_generic_defs.[glob_object]
-	#! ({gen_classes}, generic_heap) = readPtr gen_info_ptr generic_heap
-	= case lookupGenericClassInfo kind gen_classes of
+getGenericMember gen kind modules generic_heap
+	# (opt_class_info, generic_heap) = getGenericClassInfo  gen kind modules generic_heap
+	= case opt_class_info of
 		No -> (No, generic_heap) 
 		Yes {gci_module, gci_member}
 			#! member_glob = {glob_module = gci_module, glob_object = gci_member}
 			-> (Yes member_glob, generic_heap)
+
+getGenericClass :: 
+	!(Global Index) 	// generic
+	!TypeKind 			// kind argument
+	!{#CommonDefs} 		// modules
+	!*GenericHeap
+	-> 		
+	( Optional (Global Index)
+	, !*GenericHeap					
+	)
+getGenericClass gen kind modules generic_heap
+	# (opt_class_info, generic_heap) = getGenericClassInfo  gen kind modules generic_heap
+	= case opt_class_info of
+		No -> (No, generic_heap) 
+		Yes {gci_module, gci_class}
+			#! class_glob = {glob_module = gci_module, glob_object = gci_class}
+			-> (Yes class_glob, generic_heap)
+
 				 
 lookupGenericClassInfo :: !TypeKind !GenericClassInfos	-> !(Optional GenericClassInfo)
 lookupGenericClassInfo kind class_infos

@@ -844,13 +844,22 @@ cNotVarNumber :== -1
 	}
 
 ::	TypeContext =
-	{	tc_class	:: !Global DefinedSymbol
+	{	tc_class	:: !TCClass
 	,	tc_types	:: ![Type]
 	,	tc_var		:: !VarInfoPtr
 	}
 
-:: TCClass 	= TCClass 		!(Global DefinedSymbol)
-			| TCGeneric 	!(Global DefinedSymbol) !TypeKind
+//AA: class in a type context is either normal class or a generic class
+:: TCClass 	= TCClass 		!(Global DefinedSymbol) // Normal class
+			| TCGeneric 	!GenericTypeContext		// Generic class
+
+:: GenericTypeContext = 
+	{ gtc_generic 	:: !(Global DefinedSymbol)
+	, gtc_kind		:: !TypeKind 
+	, gtc_class		:: !(Global DefinedSymbol) // generated class
+	, gtc_dictionary:: !(Global DefinedSymbol) // HACK: dictionary different from the one contained in the class
+	}
+//..AA
 
 ::	AType =
 	{	at_attribute	:: !TypeAttribute
@@ -1544,6 +1553,16 @@ instance <<< TypeContext
 where
 	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
 
+instance <<< TCClass 
+where
+	(<<<) file (TCClass glob) = file <<< glob
+	(<<<) file (TCGeneric {gtc_generic,gtc_kind}) = file <<< gtc_generic <<< gtc_kind
+
+instance toString TCClass
+where
+	toString (TCClass clazz) = clazz.glob_object.ds_ident.id_name
+	toString (TCGeneric {gtc_generic,gtc_kind}) = gtc_generic.glob_object.ds_ident.id_name +++ toString gtc_kind
+	 
 instance <<< SymbIdent
 where
 	(<<<) file symb=:{symb_kind = SK_Function symb_index }

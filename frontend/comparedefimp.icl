@@ -724,6 +724,15 @@ instance t_corresponds TypeContext where
 		=	t_corresponds dclDef.tc_class iclDef.tc_class
 		&&& t_corresponds dclDef.tc_types iclDef.tc_types
 
+instance t_corresponds TCClass where
+	t_corresponds (TCClass class1) (TCClass class2) 
+		= t_corresponds class1 class2
+	t_corresponds (TCGeneric {gtc_generic=gen1, gtc_kind=kind1}) (TCGeneric {gtc_generic=gen2, gtc_kind=kind2}) 
+		= t_corresponds gen1 gen2 
+		&&& equal kind1 kind2  
+	t_corresponds _ _ 
+		= return False
+
 instance t_corresponds DefinedSymbol where
 	t_corresponds dclDef iclDef
 		=	equal dclDef.ds_ident iclDef.ds_ident

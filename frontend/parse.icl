@@ -1381,7 +1381,8 @@ where
 			# (more_contexts, pState) = want_contexts pState
 			= (contexts ++ more_contexts, pState)
 			= (contexts, tokenBack pState)
-			
+
+/*			
 	want_context pState
 		# (class_names, pState) = wantSequence CommaToken TypeContext pState
 		  (types, pState)	= wantList "type arguments" tryBrackType pState // tryBrackAType ??
@@ -1394,7 +1395,57 @@ where
 			  (class_ident, pState) = stringToIdent class_name IC_Class pState
 			  tc_class = { glob_object = MakeDefinedSymbol class_ident NoIndex (length types), glob_module = NoIndex }
 			= ([{ tc_class = tc_class, tc_types = types, tc_var = nilPtr } : contexts], pState)
+*/
+/**/
+	want_context pState 
+		# (tc_classes, pState) = wantSepList "classes" CommaToken TypeContext try_tc_class pState
+		# (types, pState)	= wantList "type arguments" tryBrackType pState // tryBrackAType ??
+		# {ps_error} = pState
+		#! ok = ps_error.pea_ok
+		# pState = {pState & ps_error = ps_error}
+		| ok
+			= mapSt (build_context types (length types)) tc_classes pState
+			= ([], pState)
+	
+	try_tc_class pState
+		# (token, pState) = nextToken GeneralContext pState
+		= case token of 
+			IdentToken name 
+				# (token, pState) = nextToken GeneralContext pState
+				-> case token of
+					GenericOpenToken 
+						# (ident, pState) = stringToIdent name IC_Generic pState			
+						# (kind, pState) = wantKind pState						 
+			 			# generic_global_ds = { glob_object = MakeDefinedSymbol ident NoIndex 1, glob_module = NoIndex }
+						# class_global_ds = { glob_object = MakeDefinedSymbol {id_name="<no class>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex}
+						
+						# gen_type_context = 
+							{ gtc_generic = { glob_object = MakeDefinedSymbol ident NoIndex 1, glob_module = NoIndex }
+							, gtc_kind = kind
+							, gtc_class = { glob_object = MakeDefinedSymbol {id_name="<no class>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex}
+							, gtc_dictionary = { glob_object = MakeDefinedSymbol {id_name="<no generic dictionary>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex} 							
+							}
+						
+						-> (True, TCGeneric gen_type_context, pState)
+					_ 
+						# pState = tokenBack pState
+						# (ident, pState) = stringToIdent name IC_Class pState			
+			 			# class_global_ds = { glob_object = MakeDefinedSymbol ident NoIndex (-1), glob_module = NoIndex }
+						-> (True, TCClass class_global_ds, pState)
+			_ 
+				-> (False, abort "no tc_class", tokenBack pState)
+	
+	build_context types length_types (TCClass class_global_ds=:{glob_object}) pState
+		# tc_class = TCClass {class_global_ds & glob_object = {glob_object & ds_arity = length_types}}
+		= ({ tc_class = tc_class, tc_var = nilPtr, tc_types = types}, pState)
+	build_context types 1 (TCGeneric gtc=:{gtc_generic=gtc_generic=:{glob_object}}) pState
+		# gtc = { gtc & gtc_generic = {gtc_generic & glob_object = {glob_object & ds_arity = 1}}} 
+		= ({ tc_class = TCGeneric gtc, tc_var = nilPtr, tc_types = types }, pState)
 
+	build_context types length_types tc_class=:(TCGeneric _) pState
+		# pState = parseErrorSimple "type context" "generic class can have only one class argument" pState					
+		= (abort "No TypeContext", pState)
+/**/						 
 optionalCoercions :: !ParseState -> ([AttrInequality], ParseState)
 optionalCoercions pState 
 	# (token, pState) = nextToken TypeContext pState

@@ -385,7 +385,7 @@ where
 		=	([type : reversedTypes], reversedContexts)
 	
 	dictionary_to_context klass args
-		=	{tc_class = klass, tc_types = [at_type \\ {at_type} <- args], tc_var = nilPtr}
+		=	{tc_class = TCClass klass, tc_types = [at_type \\ {at_type} <- args], tc_var = nilPtr}
 
 typeToClass :: DictionaryToClassInfo TypeSymbIdent -> Optional (Global DefinedSymbol)
 typeToClass info {type_name, type_arity, type_index={glob_module, glob_object}}

@@ -67,6 +67,17 @@ where
 		= val
 		= halt
 
+// Strict version of --->, which evaluates its lhs first
+(<---) infix :: !.a !b -> .a | <<< b
+(<---) value message = value ---> message
+
+// Tracing evaluation of a value, otherwise acts like identity
+traceValue :: !String !String .a -> .a
+traceValue contextdesc valuedesc value
+= (value <--- (contextdesc+++" <<== "+++valuedesc)) ---> (contextdesc+++" ==>> "+++valuedesc)
+
+
+
 (-?->) infix :: .a !(!Bool, !b) -> .a | <<< b
 (-?->) val (cond, message)  
 	| cond

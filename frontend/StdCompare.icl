@@ -48,6 +48,14 @@ instance == TypeContext
 where
  (==) tc1 tc2 = tc1.tc_class == tc2.tc_class && tc1.tc_types == tc2.tc_types
 
+instance == TCClass
+where
+	(==) (TCClass x) (TCClass y) 				= x == y
+	(==) (TCGeneric {gtc_class}) (TCClass y) 	= gtc_class == y
+	(==) (TCClass x) (TCGeneric {gtc_class}) 	= x == gtc_class
+	(==) (TCGeneric {gtc_generic=g1,gtc_kind=k1}) (TCGeneric {gtc_generic=g2,gtc_kind=k2}) 	
+		= g1 == g2 && k1 == k2
+
 instance == BasicType
 where
 	(==) bt1 bt2 = equal_constructor bt1 bt2

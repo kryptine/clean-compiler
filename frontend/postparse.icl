@@ -1318,7 +1318,7 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = EmptyRhs propertie
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
 	= (fun_defs, c_defs, imports, imported_objects, ca)  
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_name,class_arity,class_args} members : defs] cons_count sel_count mem_count type_count ca
-	# type_context = { tc_class = {glob_module = NoIndex, glob_object = {ds_ident = class_name, ds_arity = class_arity, ds_index = NoIndex }},
+	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_name, ds_arity = class_arity, ds_index = NoIndex }},
 					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}
 	  (mem_defs, mem_macros, ca) = check_symbols_of_class_members members type_context ca
 	  (mem_symbs, mem_defs, class_size) = reorganise_member_defs mem_defs mem_count
@@ -1427,7 +1427,6 @@ reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count
 	#! fun = MakeNewImpOrDefFunction fun_name gc.gc_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
 	#! inst = { gc & gc_body = GCB_FunDef fun } 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
-		---> ("collected", gc.gc_name, gc.gc_type_cons, length bodies)
 	= (fun_defs, c_defs, imports, imported_objects, ca)
 
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca

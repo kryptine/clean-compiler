@@ -15,7 +15,7 @@ import backendsupport, backendpreprocess
 // trace macro
 (-*->) infixl
 (-*->) value trace
-	:==	value // ---> trace
+	:==	value //---> trace
 /*
 sfoldr op r l
 	:== foldr l
@@ -1257,10 +1257,10 @@ convertRules rules main_dcl_module_n aliasDummyId be
 			=	convert t rulesP be
 
 convertRule :: Ident (Int,FunDef) Int -> BEMonad BEImpRuleP
-convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb}) main_dcl_module_n
+convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_symb, fun_info}) main_dcl_module_n
 //	| trace_tn fun_symb.id_name
 	=	beRule index (cafness fun_kind)
-			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_symb.id_name, index, type)))
+			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_symb.id_name, index, type, (fun_info.fi_group_index, body))))
 			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
 	where
 		cafness :: FunKind -> Int

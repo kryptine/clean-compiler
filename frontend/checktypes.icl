@@ -3,7 +3,7 @@ implementation module checktypes
 import StdEnv
 import syntax, checksupport, check, typesupport, utilities,
 		compilerSwitches // , RWSDebug
-
+import genericsupport
 
 ::	TypeSymbols = 
 	{	ts_type_defs		:: !.{# CheckedTypeDef}
@@ -671,9 +671,11 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 	  where
 		is_type_var (TV _) = True
 		is_type_var _ = False
-
-	compare_context_and_instance_types ins_class it_types {tc_class, tc_types} cs_error
-		| ins_class<>tc_class
+	
+	compare_context_and_instance_types ins_class it_types {tc_class=TCGeneric _, tc_types} cs_error
+		= cs_error
+	compare_context_and_instance_types ins_class it_types {tc_class=TCClass clazz, tc_types} cs_error
+		| ins_class<>clazz
 			= cs_error
 		# are_equal
 				= fold2St compare_context_and_instance_type it_types tc_types True
@@ -807,76 +809,59 @@ where
 
 checkTypeContext ::  !Index !TypeContext !(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!TypeContext,!(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-checkTypeContext mod_index tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
-	  	(class_defs, ots, oti, cs=:{cs_symbol_table, cs_predef_symbols})
-	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-	  cs = { cs & cs_symbol_table = cs_symbol_table }
-	# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
-	| class_index <> NotFound
-		# (class_def, class_index, class_defs, ots_modules) = getClassDef class_index class_module mod_index class_defs ots.ots_modules
-		  ots = { ots & ots_modules = ots_modules }
-		  (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
-		  cs = check_context_types 	class_def.class_name tc_types cs
-		  tc = { tc & tc_class = { tc_class & glob_object = { class_name & ds_index = class_index }, glob_module = class_module }, tc_types = tc_types}
-		| class_def.class_arity == ds_arity
-			= (tc, (class_defs, ots, oti, cs))
-			= (tc, (class_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
-		= ({tc & tc_types = []}, (class_defs, ots, oti, { cs & cs_error = checkError id_name "undefined" cs.cs_error }))
+checkTypeContext mod_index tc=:{tc_class, tc_types} (class_defs, ots, oti, cs)
+	# (tc_class, (class_defs, ots, cs=:{cs_error})) = check_context_class tc_class (class_defs, ots, cs)
+	| cs_error.ea_ok
+		# (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
+		# cs = check_context_types tc_class tc_types cs
+		= ({tc & tc_class = tc_class, tc_types = tc_types}, (class_defs, ots, oti, cs))
+		= ({tc & tc_types = []}, (class_defs, ots, oti, cs))
 where
-	
-	check_context_types tc_class [] cs=:{cs_error}
-		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
-	check_context_types tc_class [((CV {tv_name}) :@: _):_] cs=:{cs_error}
-		= cs
-//		= { cs & cs_error = checkError tv_name "not allowed as higher order type variable in context" cs_error}
-	check_context_types tc_class [TV _ : types] cs
-		= cs
-	check_context_types tc_class [type : types] cs
-		= check_context_types tc_class types cs
 
-checkTypeContext1 ::  !Index !TypeContext !(!v:{# ClassDef}, !x:{# GenericDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
-	-> (!TypeContext,!(!v:{# ClassDef}, !x:{# GenericDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-checkTypeContext1 mod_index tc (class_defs, generic_defs, ots, oti, cs)
-	# (entry, cs) = get_entry tc cs
-	= check_context mod_index entry tc (class_defs, generic_defs, ots, oti, cs)
-where
-	get_entry tc cs=:{cs_symbol_table}
-		# (entry, cs_symbol_table) = readPtr tc.tc_class.glob_object.ds_ident.id_info cs_symbol_table
-		= (entry, {cs & cs_symbol_table = cs_symbol_table}) 
-
-	check_context 
-			mod_index 
-			entry 
-			tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
-	  		(class_defs, generic_defs, ots, oti, cs)
+	check_context_class (TCClass cl) (class_defs, ots, cs) 
+		# (entry, cs_symbol_table) = readPtr cl.glob_object.ds_ident.id_info cs.cs_symbol_table
+	  	# cs = { cs & cs_symbol_table = cs_symbol_table }
 		# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
 		| class_index <> NotFound
 			# (class_def, class_index, class_defs, ots_modules) = getClassDef class_index class_module mod_index class_defs ots.ots_modules
-			  ots = { ots & ots_modules = ots_modules }
-			  (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
-			  cs = check_context_types 	class_def.class_name tc_types cs
-			  tc = { tc & tc_class = { tc_class & glob_object = { class_name & ds_index = class_index }, glob_module = class_module }, tc_types = tc_types}
-			| class_def.class_arity == ds_arity
-				= (tc, (class_defs, generic_defs, ots, oti, cs))
-				= (tc, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
-			= ({tc & tc_types = []}, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "class undefined" cs.cs_error }))
-	check_context 
-			mod_index
-			entry
-			tc=:{tc_class=tc_class=:{glob_object=class_name=:{ds_ident=ds_ident=:{id_name,id_info},ds_arity}},tc_types}
-			(class_defs, generic_defs, ots, oti, cs)	
-		# 	(generic_index, generic_module) = retrieveGlobalDefinition entry STE_Generic mod_index
+		  	# ots = { ots & ots_modules = ots_modules }
+			| class_def.class_arity == cl.glob_object.ds_arity			
+				# checked_class =  
+					{ cl 
+					& glob_module = class_module
+					, glob_object = {cl.glob_object & ds_index = class_index}
+					}			
+				= (TCClass checked_class, (class_defs, ots, cs)) 
+				# cs_error = checkError cl.glob_object.ds_ident	"class used with wrong arity" cs.cs_error
+				= (TCClass cl, (class_defs, ots, {cs & cs_error = cs_error}))
+			# cs_error = checkError cl.glob_object.ds_ident	"class undefined" cs.cs_error	
+			= (TCClass cl, (class_defs, ots, {cs & cs_error = cs_error}))					 
+	check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) (class_defs, ots, cs) 			
+	  	# gen_name = gtc_generic.glob_object.ds_ident	
+		# (entry, cs_symbol_table) = readPtr gen_name.id_info cs.cs_symbol_table
+	  	# cs = { cs & cs_symbol_table = cs_symbol_table }
+	  	# clazz = 
+	  		{ glob_module = -1
+	  		, glob_object = 
+	  			{ ds_ident = genericIdentToClassIdent gen_name gtc_kind
+	  			, ds_arity = 1
+	  			, ds_index = -1
+	  			}
+	  		}
+	  		
+		# (generic_index, generic_module) = retrieveGlobalDefinition entry STE_Generic mod_index
 		| generic_index <> NotFound
-			# (generic_def, generic_index, generic_defs, ots_modules) = getGenericDef generic_index generic_module mod_index generic_defs ots.ots_modules
-			  ots = { ots & ots_modules = ots_modules }
-			  (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
-			  //cs = check_context_types 	generic_def.gen_name tc_types cs
-			  tc = { tc & tc_class = { tc_class & glob_object = { class_name & ds_index = generic_index }, glob_module = generic_module }, tc_types = tc_types}
-			| ds_arity == 1
-				= (tc, (class_defs, generic_defs, ots, oti, cs))
-				= (tc, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "used with wrong arity" cs.cs_error }))
-			= ({tc & tc_types = []}, (class_defs, generic_defs, ots, oti, { cs & cs_error = checkError id_name "generic undefined" cs.cs_error }))
-			
+			| gtc_generic.glob_object.ds_arity == 1
+				# checked_gen = 
+					{ glob_module = generic_module
+					, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
+					}			
+				= (TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz}, (class_defs, ots, cs))
+				# cs_error = checkError gen_name "generic used with wrong arity: generic has always has one class argument" cs.cs_error  
+				= (TCGeneric {gtc & gtc_class=clazz}, (class_defs, ots, {cs & cs_error = cs_error}))
+			# cs_error = checkError gen_name "generic undefined" cs.cs_error
+			= (TCGeneric {gtc & gtc_class=clazz}, (class_defs, ots, {cs & cs_error = cs_error}))	
+					
 	check_context_types tc_class [] cs=:{cs_error}
 		= { cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
 	check_context_types tc_class [((CV {tv_name}) :@: _):_] cs=:{cs_error}
@@ -886,6 +871,7 @@ where
 		= cs
 	check_context_types tc_class [type : types] cs
 		= check_context_types tc_class types cs
+
 
 checkTypeContexts :: ![TypeContext] !Index !v:{# ClassDef} !u:OpenTypeSymbols !*OpenTypeInfo !*CheckState
 	-> (![TypeContext], !u:{# CheckedTypeDef}, !v:{# ClassDef}, u:{# DclModule}, !*TypeHeaps, !*CheckState)
@@ -1412,7 +1398,7 @@ where
 				 [ field : rev_fields ] var_heap symbol_table
 			= (rev_fields, var_heap, symbol_table)			
 
-	build_context_fields mod_index field_nr [{tc_class = {glob_module, glob_object={ds_index}}}:tcs] rec_type rec_type_index
+	build_context_fields mod_index field_nr [{tc_class = TCClass {glob_module, glob_object={ds_index}}}:tcs] rec_type rec_type_index
 			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
 		# ({class_name, class_arity, class_dictionary = {ds_ident, ds_index}}, _, class_defs, modules) = getClassDef ds_index glob_module mod_index class_defs modules
 		  type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
@@ -1432,6 +1418,17 @@ where
 		  (field, var_heap, symbol_table) = build_field field_nr class_name.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
 				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
+
+	build_context_fields mod_index field_nr [{tc_class = TCGeneric {gtc_generic, gtc_kind}} :tcs] rec_type rec_type_index
+			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
+		// FIXME: We do not know the type before the generic phase.
+		// The generic phase currently does not update the type.
+		# field_type = makeAttributedType TA_Multi TE 
+		# class_name = genericIdentToClassIdent gtc_generic.glob_object.ds_ident gtc_kind
+		# (field, var_heap, symbol_table) = build_field field_nr class_name.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
+		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
+				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
+
 	build_context_fields mod_index field_nr [] rec_type rec_type_index next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
 		= (next_selector_index, rev_fields, rev_field_types , class_defs, modules, var_heap, symbol_table)			
 

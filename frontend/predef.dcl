@@ -171,7 +171,9 @@ PD_ConsPAIR					:== 188
 PD_GenericBimap				:== 189
 PD_bimapId					:== 190
 
-PD_NrOfPredefSymbols		:== 191
+PD_TypeGenericDict 			:== 191
+
+PD_NrOfPredefSymbols		:== 192
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

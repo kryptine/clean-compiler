@@ -5,6 +5,7 @@ from StdEnv import instance <<< Int,class <<< (..),instance + Int,class + (..),i
 0.2*/
 //1.3
 from StdEnv import <<<, +, ~
+from StdString import String
 //3.1
 
 instance ~ Bool
@@ -32,6 +33,9 @@ hasOption :: (Optional x) -> Bool
 ::	Choice a b  = Either a | Or b
 
 (--->) infix :: .a !b -> .a | <<< b
+(<---) infix :: !.a !b -> .a | <<< b
+traceValue :: !String !String .a -> .a
+
 (-?->) infix :: .a !(!Bool, !b) -> .a | <<< b
 
 instance + {#Char}

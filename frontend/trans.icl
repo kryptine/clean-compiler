@@ -2494,7 +2494,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 		| glob_module==ro.ro_stdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && (not (isEmpty app_args))
 //			&& trace_tn ("transformApplication "+++toString symb.symb_name)
 			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
-			# [{tc_class={glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
+			# [{tc_class=TCClass {glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
 			# member_n=find_member_n 0 symb.symb_name.id_name ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members
 			# cons_u_member_index=ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members.[member_n].ds_index
 			# {me_symb,me_offset}=ro.ro_common_defs.[glob_module].com_member_defs.[cons_u_member_index]
@@ -2966,6 +2966,7 @@ convertSymbolType  rem_annots common_defs st main_dcl_module_n imported_types co
 	# {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap}
 										= ets
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+
 /*
 expandSynTypesInSymbolType rem_annots common_defs st=:{st_args,st_args_strictness,st_result,st_context} ets
 	# (_,(st_args,st_result), ets) = expandSynTypes rem_annots common_defs (st_args,st_result) ets
@@ -2988,12 +2989,28 @@ addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
 where
-	add_types_of_dictionary common_defs {tc_class = {glob_module, glob_object={ds_index}}, tc_types}
+	add_types_of_dictionary common_defs {tc_class = TCGeneric {gtc_dictionary={glob_module,glob_object={ds_ident,ds_index}}}, tc_types}
+
+		/*
+			AA HACK:
+			Generic classes are always generated locally, 
+			and therefore the their dictionaries are also generated localy. 
+			Overloaded functions in DCL modules can have generic context restrictions, i.e. they will 
+			get generic class dictionaries. 
+			Problem: DCL function types refer to ICL type defs of dictionaries.
+			Solution: plug a dummy dictinary type, defined in StdGeneric.
+			It is possible because all generic class have one class argument and one member.
+		*/  
+		# dict_type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident 1
+		# type_arg = { at_attribute = TA_Multi, at_type=hd tc_types }
+		= {at_attribute = TA_Multi, at_type = TA dict_type_symb [type_arg]}
+
+	add_types_of_dictionary common_defs {tc_class = TCClass {glob_module, glob_object={ds_index,ds_ident}}, tc_types}
 		# {class_arity, class_dictionary={ds_ident,ds_index}, class_cons_vars}
 				= common_defs.[glob_module].com_class_defs.[ds_index]
-		  dict_type_symb
+		# dict_type_symb
 		  		= 	MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
-		= { at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb (
+		=  { at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb (
 //				map (\type -> { at_attribute = TA_Multi, at_annotation = AN_None, at_type = type }) tc_types) }
 				fst (mapSt 	(\type class_cons_vars
 								-> let at_attribute = if (lowest_bit class_cons_vars) TA_MultiOfPropagatingConsVar TA_Multi
@@ -3002,6 +3019,7 @@ where
 						   	)
 						  	tc_types
 						  	class_cons_vars))}
+
 
 lowest_bit int :== int bitand 1 <> 0
 

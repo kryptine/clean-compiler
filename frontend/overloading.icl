@@ -162,7 +162,11 @@ where
 			= (CA_Context tc, [{ tc & tc_var = tc_var } : new_contexts], special_instances,
 					type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
 
-	reduce_any_context tc=:{tc_class=class_symb=:{glob_object={ds_index},glob_module},tc_types} defs instance_info new_contexts
+	reduce_any_context tc=:{tc_class=class_symb=:(TCGeneric {gtc_class})} defs instance_info new_contexts
+			special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
+		= reduce_any_context {tc & tc_class = TCClass gtc_class} defs instance_info new_contexts
+			special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
+	reduce_any_context tc=:{tc_class=class_symb=:(TCClass {glob_object={ds_index},glob_module}),tc_types} defs instance_info new_contexts
 				special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
 		| is_predefined_symbol glob_module ds_index PD_TypeCodeClass predef_symbols
 			# (red_context, (new_contexts, special_instances, type_pattern_vars, var_heap))
@@ -173,7 +177,9 @@ where
 							(var_heap, type_heaps) coercion_env predef_symbols error
 			= (CA_Instance class_appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 
-	reduce_context {tc_class=class_symb=:{glob_object={ds_index},glob_module},tc_types} defs
+	reduce_context tc=:{tc_class=TCGeneric {gtc_class}} defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+		= reduce_context {tc & tc_class = TCClass gtc_class} defs instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
+	reduce_context {tc_class=TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types} defs
 						instance_info new_contexts special_instances type_pattern_vars heaps coercion_env predef_symbols error
 		# {class_members,class_context,class_args,class_name} = defs.[glob_module].com_class_defs.[ds_index]
 		| size class_members > 0
@@ -342,9 +348,11 @@ where
 				_
 					-> (False, coercion_env)
 	
-	context_is_reducible {tc_class,tc_types = [type : types]} predef_symbols
+	context_is_reducible {tc_class=TCClass class_symb,tc_types = [type : types]} predef_symbols
 //		= type_is_reducible type && is_reducible types
-		= type_is_reducible type && types_are_reducible types type tc_class predef_symbols
+		= type_is_reducible type && types_are_reducible types type class_symb predef_symbols
+	context_is_reducible tc=:{tc_class=TCGeneric {gtc_class}, tc_types = [type : types]} predef_symbols
+		= type_is_reducible type && types_are_reducible types type gtc_class predef_symbols
 
 	type_is_reducible (TempV _)
 		= False
@@ -810,7 +818,10 @@ where
 		  sub_classes = foldSt (remove_doubles super_classes) contexts []
 		= (sub_classes, type_heaps)
 	
-	generate_super_classes {tc_class={glob_object={ds_index},glob_module},tc_types} (super_classes, type_heaps)
+	
+	generate_super_classes tc=:{tc_class=TCGeneric {gtc_class}} st
+		= generate_super_classes {tc & tc_class=TCClass gtc_class} st
+	generate_super_classes {tc_class=TCClass {glob_object={ds_index},glob_module},tc_types} (super_classes, type_heaps)
 		# {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 		  th_vars = fold2St set_type class_args tc_types type_heaps.th_vars
 		= foldSt subst_context_and_generate_super_classes class_context (super_classes, { type_heaps & th_vars = th_vars })
@@ -1029,10 +1040,16 @@ where
 
 	determine_address :: !TypeContext !TypeContext ![(Int, Global DefinedSymbol)] !{#CommonDefs} !*TypeHeaps
 		-> (!Optional [(Int, Global DefinedSymbol)],!*TypeHeaps)
+	determine_address tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2=:{tc_class=TCGeneric {gtc_class=class2}} address defs type_heaps
+		= determine_address {tc1 & tc_class=TCClass class1} {tc2 & tc_class=TCClass class2} address defs type_heaps
+	determine_address tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2 address defs type_heaps
+		= determine_address {tc1 & tc_class=TCClass class1} tc2 address defs type_heaps
+	determine_address tc1 tc2=:{tc_class=TCGeneric {gtc_class=class2}} address defs type_heaps
+		= determine_address tc1 {tc2 & tc_class=TCClass class2} address defs type_heaps		
 	determine_address tc1 tc2 address defs type_heaps=:{th_vars}
 		| tc1 == tc2
 			= (Yes address, type_heaps)
-			# {tc_class={glob_object={ds_index},glob_module}} = tc2
+			# {tc_class=TCClass {glob_object={ds_index},glob_module}} = tc2
 			  {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 			  th_vars = foldr2 (\{tv_info_ptr} type -> writePtr tv_info_ptr (TVI_Type type)) th_vars class_args tc2.tc_types
 			  (_, super_instances, type_heaps) = substitute class_context { type_heaps & th_vars = th_vars } 
@@ -1161,7 +1178,7 @@ where
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 
-	determine_class_argument {tc_class={glob_object={ds_ident={id_name}}}, tc_var} (variables, var_heap)
+	determine_class_argument {tc_class, tc_var} (variables, var_heap)
 		# (var_info, var_heap) = readPtr tc_var var_heap
 		= case var_info of 
 			VI_ForwardClassVar var_info_ptr
@@ -1169,14 +1186,14 @@ where
 				-> case var_info of
 					VI_Empty
 						# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-						-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
+						-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0))
 					_
 						-> abort ("determine_class_argument 1 (overloading.icl)")  //<<- var_info)
 
 			VI_Empty
 				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 				  var_heap	= var_heap
-				-> ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name id_name) new_info_ptr 0))
+				-> ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0))
 			_
 				-> abort ("determine_class_argument 2 (overloading.icl)") // <<- var_info)
 
@@ -1848,7 +1865,7 @@ where
 
 instance <<< TypeContext
 where
-	(<<<) file tc = file <<< tc.tc_class.glob_object.ds_ident <<< ' ' <<< tc.tc_types <<< " <" <<< tc.tc_var <<< '>'
+	(<<<) file tc = file <<< toString tc.tc_class <<< ' ' <<< tc.tc_types <<< " <" <<< tc.tc_var <<< '>'
 
 instance <<< Special
 where

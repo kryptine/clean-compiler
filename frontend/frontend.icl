@@ -211,7 +211,6 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 					= (-1,predef_symbols)
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
-
 //	# (components, fun_defs, error) = showComponents2 components 0 fun_defs acc_args error
 
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, acc_args)
