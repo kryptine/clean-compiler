@@ -2,6 +2,7 @@ definition module graph
 
 // $Id$
 
+from pfun import Pfun
 from StdOverloaded import ==
 
 // A rule associating a replacement with a pattern
@@ -213,5 +214,7 @@ compilegraph :: ![(var,Node sym var)] -> Graph sym var
 >                 where (sdef,scont) = nodecontents sgraph snode
 
 */
+
+extgraph :: (Graph sym var) (Graph sym pvar) [pvar] (Pfun pvar var) (Graph sym var) -> Graph sym var | == var & == pvar
 
 instance == (Graph sym var) | == sym & == var

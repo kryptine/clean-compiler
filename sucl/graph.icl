@@ -359,21 +359,16 @@ Uses in Miranda:
 
 `Extgraph' is excluded in most import statements,
 but there doesn't seem to be any other definition of it.
-
->   extgraph :: graph * ** -> graph * *** -> [***] -> pfun *** ** -> graph * ** -> graph * **
->   extgraph sgraph pattern pnodes matching graph
->   =   foldr addnode graph pnodes
->       where addnode pnode
->             =   total id (postcomp addnode' matching) pnode, if fst (nodecontents pattern pnode)
->             =   id, otherwise
->             addnode' snode
->             =   updategraph snode scont, if sdef
->             =   id, otherwise
->||           =   error "extgraph: closed node mapped to open node", otherwise
->                 ||  Could have used id, but let's report error when there is one...
->                 where (sdef,scont) = nodecontents sgraph snode
-
 */
+
+extgraph :: (Graph sym var) (Graph sym pvar) [pvar] (Pfun pvar var) (Graph sym var) -> Graph sym var | == var & == pvar
+extgraph sgraph pattern pnodes matching graph
+= foldr addnode graph pnodes
+  where addnode pnode
+        = if (fst (varcontents pattern pnode)) (total id (postcomp addnode` matching) pnode) id
+        addnode` snode
+        = if sdef (updategraph snode scont) id
+          where (sdef,scont) = varcontents sgraph snode
 
 mapgraph ::
     !(  (Pfun var1 (sym1,[var1]))
