@@ -721,10 +721,15 @@ where
 removeFunctionCallsFromSymbolTable calls fun_defs symbol_table
 	= foldSt remove_function_call_from_symbol_table calls (fun_defs, symbol_table)
 where
+
 	remove_function_call_from_symbol_table {fc_index} (fun_defs, symbol_table)
 		# ({fun_symb = { id_info }}, fun_defs) = fun_defs![fc_index]
-		# (entry, symbol_table) = readPtr id_info symbol_table
-		= (fun_defs, symbol_table <:= (id_info, entry.ste_previous))
+		  (entry, symbol_table) = readPtr id_info symbol_table
+		= case entry.ste_kind of
+			STE_Called indexes
+				-> (fun_defs, symbol_table <:= (id_info, entry.ste_previous))
+			_
+				-> (fun_defs, symbol_table)
 		
 
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fun_defs mod_index modules es=:{es_symbol_table}
