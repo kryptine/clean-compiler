@@ -3035,7 +3035,11 @@ static void init_predefined_symbols (void)
 	   strict functions (for strict annots), lists (2), conditional (4)
 	   and the apply. Also for the two list functions if necessary.
 	 */
-	nr_funs = MaxNodeArity + MaxNodeArity + MaxNrAnnots + 2 + 4 + 1;
+	nr_funs = MaxNodeArity + MaxNodeArity + MaxNrAnnots + 2 + 4 + 1
+#if STRICT_LISTS
+				+3
+#endif
+	;
 	if (StrictDoLists)
 		nr_funs += 2;
 		
