@@ -98,15 +98,15 @@ instance lift App
 where
 	lift app=:{app_symb = app_symbol=:{symb_arity,symb_kind = SK_Function {glob_object,glob_module}}, app_args} ls
 		| glob_module == ls.ls_x.LiftStateX.x_main_dcl_module_n
-			#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
+			# (fun_def,ls) = ls!ls_x.x_fun_defs.[glob_object]
 			= lift_function_app app fun_def.fun_info.fi_free_vars ls
 			# (app_args, ls) = lift app_args ls
 			= ({ app & app_args = app_args }, ls)
 	lift app=:{app_symb = {symb_kind = SK_LocalMacroFunction glob_object},app_args} ls
-		#! fun_def = ls.ls_x.x_fun_defs.[glob_object]
+		# (fun_def,ls) = ls!ls_x.x_fun_defs.[glob_object]
 		= lift_function_app app fun_def.fun_info.fi_free_vars ls
 	lift app=:{app_symb = {symb_kind = SK_LocalDclMacroFunction {glob_object,glob_module}}} ls
-		#! fun_def = ls.ls_x.x_macro_defs.[glob_module,glob_object]
+		# (fun_def,ls) = ls!ls_x.x_macro_defs.[glob_module,glob_object]
 		= lift_function_app app fun_def.fun_info.fi_free_vars ls
 	lift app=:{app_args} ls
 		# (app_args, ls) = lift app_args ls
@@ -125,7 +125,7 @@ where
 	add_free_variables_in_app [] app_args var_heap expr_heap
 		= (app_args, var_heap, expr_heap)
 	add_free_variables_in_app [{fv_name, fv_info_ptr} : free_vars] app_args var_heap expr_heap
-		#! var_info = sreadPtr fv_info_ptr var_heap
+		# (var_info,var_heap) = readPtr fv_info_ptr var_heap
 		= case var_info of
 			VI_LiftedVariable var_info_ptr
 			 	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
