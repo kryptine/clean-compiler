@@ -177,8 +177,8 @@ where
 	reduce_any_context tc=:{tc_class=class_symb=:(TCClass {glob_object={ds_index},glob_module}),tc_types} defs instance_info new_contexts
 				special_instances type_pattern_vars (var_heap, type_heaps) coercion_env predef_symbols error
 		| is_predefined_symbol glob_module ds_index PD_TypeCodeClass predef_symbols
-			# (red_context, (new_contexts, special_instances, type_pattern_vars, var_heap))
-						= reduce_TC_context class_symb (hd tc_types) new_contexts special_instances type_pattern_vars var_heap
+			# (red_context, (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps))
+						= reduce_TC_context class_symb (hd tc_types) new_contexts special_instances type_pattern_vars var_heap type_heaps
 			= (red_context, new_contexts, special_instances, type_pattern_vars, (var_heap, type_heaps), coercion_env, predef_symbols, error)
 			# (class_appls, new_contexts, special_instances, type_pattern_vars, heaps, coercion_env, predef_symbols, error)
 					= reduce_context tc defs instance_info new_contexts special_instances type_pattern_vars
@@ -536,43 +536,47 @@ where
 			ai_record = record }
 				
 
-	reduce_TC_context type_code_class tc_type new_contexts special_instances type_pattern_vars var_heap
-		= reduce_tc_context type_code_class tc_type (new_contexts, special_instances, type_pattern_vars, var_heap)
+	reduce_TC_context type_code_class tc_type new_contexts special_instances type_pattern_vars var_heap type_heaps
+		= reduce_tc_context type_code_class tc_type (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps)
 	where							
-		reduce_tc_context type_code_class (TA cons_id=:{type_index} cons_args) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+		reduce_tc_context type_code_class type=:(TA cons_id=:{type_index} cons_args) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap, type_heaps)
+			# (expanded, type, type_heaps)
+				=	tryToExpandTypeSyn defs type cons_id cons_args type_heaps
+			| expanded
+				=	reduce_tc_context type_code_class type (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps)
 			# type_constructor = toTypeCodeConstructor type_index defs
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance type_constructor (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
-			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
+			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap, type_heaps)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
-		reduce_tc_context type_code_class (TAS cons_id=:{type_index} cons_args _) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+		reduce_tc_context type_code_class (TAS cons_id=:{type_index} cons_args _) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap, type_heaps)
 			# type_constructor = toTypeCodeConstructor type_index defs
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance type_constructor (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class cons_args
-			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
+			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap, type_heaps)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, instances)
-		reduce_tc_context type_code_class (TB basic_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+		reduce_tc_context type_code_class (TB basic_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap, type_heaps)
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance (GTT_Basic basic_type) (si_next_TC_member_index, si_TC_instances)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = GTT_Basic basic_type, tci_contexts = [] },
-					(new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap))
-		reduce_tc_context type_code_class (arg_type --> result_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap)
+					(new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap, type_heaps))
+		reduce_tc_context type_code_class (arg_type --> result_type) (new_contexts, special_instances=:{si_next_TC_member_index, si_TC_instances}, type_pattern_vars, var_heap, type_heaps)
 			# (inst_index, (si_next_TC_member_index, si_TC_instances))
 			  		= addGlobalTCInstance GTT_Function (si_next_TC_member_index, si_TC_instances)
 			  (rc_red_contexts, instances) = reduce_TC_contexts type_code_class [arg_type, result_type]
-			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap)
+			  		 (new_contexts, { special_instances & si_next_TC_member_index = si_next_TC_member_index, si_TC_instances = si_TC_instances }, type_pattern_vars, var_heap, type_heaps)
 			= (CA_GlobalTypeCode { tci_index = inst_index, tci_constructor = GTT_Function, tci_contexts = rc_red_contexts }, instances)
-		reduce_tc_context type_code_class (TempQV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap)
+		reduce_tc_context type_code_class (TempQV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps)
 			# (inst_var, (type_pattern_vars, var_heap)) = addLocalTCInstance var_number (type_pattern_vars, var_heap)
-			= (CA_LocalTypeCode inst_var, (new_contexts, special_instances, type_pattern_vars, var_heap))
-		reduce_tc_context type_code_class (TempV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap)
+			= (CA_LocalTypeCode inst_var, (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps))
+		reduce_tc_context type_code_class (TempV var_number) (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps)
 			# (tc_var, var_heap) = newPtr VI_Empty var_heap
 			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
 			| containsContext tc new_contexts
-				= (CA_Context tc, (new_contexts, special_instances, type_pattern_vars, var_heap))
-				= (CA_Context tc, ([tc : new_contexts], special_instances, type_pattern_vars, var_heap))
+				= (CA_Context tc, (new_contexts, special_instances, type_pattern_vars, var_heap, type_heaps))
+				= (CA_Context tc, ([tc : new_contexts], special_instances, type_pattern_vars, var_heap, type_heaps))
 
 		reduce_TC_contexts type_code_class cons_args instances
 			= mapSt (\{at_type} -> reduce_tc_context type_code_class at_type) cons_args instances
@@ -1332,7 +1336,6 @@ class toTypeCodeExpression type :: type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin)
 
 instance toTypeCodeExpression Type where
 	toTypeCodeExpression type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules,tci_common_defs},var_heap,error)
-// RWS ...
 		# type_heaps
 			=	{th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
 		# (expanded, type, type_heaps)
@@ -1341,7 +1344,6 @@ instance toTypeCodeExpression Type where
 			=	{tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
 		| expanded
 			=	toTypeCodeExpression type (tci,var_heap,error)
-// ... RWS
 		# type_constructor
 			=	toTypeCodeConstructor type_index tci_common_defs
 		# (inst_index, (tci_next_index, tci_instances))
