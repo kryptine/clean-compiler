@@ -1665,24 +1665,18 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	= ({ st & st_args = st_args, st_result = st_result }, th_attrs)
   where
 	anonymize_atype atype=:{at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
-		# (at_type, th_attrs) = anonymize_type at_type th_attrs
-		  (avi, th_attrs) = readPtr av_info_ptr th_attrs
+		# (at_type, th_attrs)	= anonymize_type at_type th_attrs
+		  (avi, th_attrs)		= readPtr av_info_ptr th_attrs
 		= case avi of
 			AVI_Count c
 				// this attribute variable doesn't occur in the attribute inequalities
-				| isTypeVar at_type || c==1
-					// number of occurences doesn't matter for type variables
+				| c <= 1
 					-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
-				-> ({ atype & at_type = at_type }, th_attrs)
+					-> ({ atype & at_type = at_type }, th_attrs)
 			AVI_Attr TA_None
 				-> ({ atype & at_type = at_type, at_attribute = TA_None }, th_attrs)
 			_
 				-> ({ atype & at_type = at_type }, th_attrs)
-	  where
-		isTypeVar (TV _) = True 
-		isTypeVar (GTV _) = True
-		isTypeVar (TQV _) = True
-		isTypeVar _ = False
 	anonymize_atype atype=:{at_type} th_attrs
 		# (at_type, th_attrs) = anonymize_type at_type th_attrs
 		= ({ atype & at_type = at_type }, th_attrs)
@@ -1713,10 +1707,22 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 				= foldSt (\av=:{av_info_ptr} th_attrs -> writePtr av_info_ptr (AVI_Count 0) th_attrs)
 						st_attr_vars th_attrs
 		= foldSt count_attr_vars_of_atype st_args (count_attr_vars_of_atype st_result th_attrs)
-	  where
+	where
 		count_attr_vars_of_atype {at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
 			# (AVI_Count c, th_attrs) = readPtr av_info_ptr th_attrs
-			= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c+1)) th_attrs)
+			| isTypeVar at_type
+				| c > 0
+					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c + 1)) th_attrs)
+					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c - 1)) th_attrs)
+				| c > 0
+					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c + 1)) th_attrs)
+					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (~c + 1)) th_attrs)
+		where
+			isTypeVar (TV _)	= True 
+			isTypeVar (GTV _)	= True
+			isTypeVar (TQV _)	= True
+			isTypeVar _			= False
+			
 		count_attr_vars_of_atype {at_type} th_attrs
 			= count_attr_vars_of_type at_type th_attrs
 	
