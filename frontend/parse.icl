@@ -978,7 +978,7 @@ want_2_0_import_declaration token pState
 				| token == OpenToken
 				  	#	(members, pState)			= want_names want IC_Expression CloseToken pState
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } (Yes members), pState)
-				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, pState)
+				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, tokenBack pState)
 			InstanceToken
 				#	(class_name, pState)	= want pState
 //					(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
