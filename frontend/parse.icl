@@ -1170,11 +1170,13 @@ where
 		# name					= td_name.id_name
 		  pState				= verify_annot_attr annot td_attribute name pState
 		  (exi_vars, pState)	= optionalQuantifiedVariables ExistentialQuantifier pState
-// MW  		  (token, pState)		= nextToken TypeContext pState
- 		  (token, pState)		= nextToken GeneralContext pState
+		  (token, pState)		= nextToken GeneralContext pState
+// PK		  (token, pState)		= nextToken TypeContext pState
+// PK // MW   		  (token, pState)		= nextToken GeneralContext pState
  		  (token, pState)		= case token of	// Make the ':' optional for now to handle 1.3 files
-// MW  		  							ColonToken	-> nextToken TypeContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
- 		  							ColonToken	-> nextToken GeneralContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
+		  							ColonToken	-> nextToken GeneralContext pState
+// PK		  							ColonToken	-> nextToken TypeContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
+// PK // MW   		  							ColonToken	-> nextToken GeneralContext (parseWarning "type RHS" ":-symbol after extential quantified variable should be removed" pState)
  		  							_			-> (token, pState)
  		= case token of
   			CurlyOpenToken
@@ -1182,11 +1184,11 @@ where
 					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
 				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
 				->	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars fields }, pState)
-			ColonToken
+/*			ColonToken
 				| isEmpty exi_vars
 				->	(PD_Erroneous, parseError "Algebraic type" No "no colon, :," pState)
 				->	(PD_Erroneous, parseError "Algebraic type" No "in this version of Clean no colon, :, after quantified variables" pState)
-			_
+*/			_
 				#	(condefs, pState)	= want_constructor_list exi_vars token pState
 					td					= { td & td_rhs = ConsList condefs }
 				|	annot == AN_None
@@ -1260,6 +1262,12 @@ where
 		      (token, pState) = nextToken TypeContext (wantToken TypeContext "type: constructor and prio" CloseToken pState)
 			  (prio, pState) = optionalPriority cIsInfix token pState
 			= (ident, prio, LinePos fname linenr, pState)
+		want_cons_name_and_prio DotToken pState
+			# (token,pState)	= nextToken GeneralContext pState
+			= case token of
+				IdentToken name
+					| isFunnyIdName name -> want_cons_name_and_prio (IdentToken ("."+name)) pState
+				_	-> (erroneousIdent, NoPrio, NoPos, parseError "Algebraic type: constructor list" (Yes DotToken) "constructor name" (tokenBack pState))
 		want_cons_name_and_prio token pState
 			= (erroneousIdent, NoPrio, NoPos, parseError "Algebraic type: constructor list" (Yes token) "constructor name" pState)
 
@@ -1666,8 +1674,8 @@ where
 
 optionalQuantifiedVariables :: !QuantifierKind !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalQuantifiedVariables req_quant pState
-// MW 	# (token, pState) = nextToken TypeContext pState
-	# (token, pState) = nextToken GeneralContext pState
+	# (token, pState) = nextToken TypeContext pState
+// PK	# (token, pState) = nextToken GeneralContext pState // was wrong "correction" of MW
 	  (optional_quantifier, pState) = try token pState
 	= case optional_quantifier of
 		Yes off_quant
@@ -1750,13 +1758,16 @@ wantLhsExpressionT (IdentToken name) pState /* PK: to make a=:C x equivalent to 
 	| isLowerCaseName name
 		# (id, pState)		= stringToIdent name IC_Expression pState
 		  (token, pState)	= nextToken FunctionContext pState
-	| token == DefinesColonToken 
-		# (token, pState)	= nextToken FunctionContext pState
-		  (expr, pState)	= wantLhsExpressionT2 token pState
-		= (PE_Bound { bind_dst = id, bind_src = expr }, pState)
-	// token <> DefinesColonToken // token back and call to wantLhsExpressionT2 would do also.
-	# (exprs, pState) = parseList trySimpleLhsExpression (tokenBack pState)
-	= (combineExpressions (PE_Ident id) exprs, pState)
+		| token == DefinesColonToken 
+			# (token, pState)	= nextToken FunctionContext pState
+			  (expr, pState)	= wantLhsExpressionT2 token pState
+			= (PE_Bound { bind_dst = id, bind_src = expr }, pState)
+		| token == DoubleColonToken
+			# (dyn_type, pState) = wantDynamicType pState
+			= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
+		// token <> DefinesColonToken // token back and call to wantLhsExpressionT2 would do also.
+		# (exprs, pState) = parseList trySimpleLhsExpression (tokenBack pState)
+		= (combineExpressions (PE_Ident id) exprs, pState)
 wantLhsExpressionT token pState
 	= wantLhsExpressionT2 token pState
 
@@ -1871,7 +1882,7 @@ trySimpleExpressionT (IdentToken name) is_pattern pState
 	# (id, pState) = stringToIdent name IC_Expression pState
 	| is_pattern
 		# (token, pState) = nextToken FunctionContext pState
-		| token == DefinesColonToken && is_pattern
+		| token == DefinesColonToken
 			# (succ, expr, pState) = trySimpleExpression is_pattern pState
 			| succ
 				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
