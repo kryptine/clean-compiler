@@ -1,4 +1,4 @@
-backend.dll
+CleanCompilerLib
 BEGetVersion
 BEInit
 BEFree
@@ -111,3 +111,11 @@ BEDefineImportedObjsAndLibs
 BESetMainDclModuleN
 BEDeclareDynamicTypeSymbol
 BEDynamicTempTypeSymbol
+BEDeclarePredefinedSymbols
+BEPredefineListTypeSymbol
+BEPredefineListConstructorSymbol
+BEAdjustStrictListConsInstance
+BEAdjustUnboxedListDeconsInstance
+BEAdjustOverloadedNilFunction
+BEOverloadedConsSymbol
+BEOverloadedPushNode
