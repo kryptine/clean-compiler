@@ -1313,28 +1313,35 @@ getTCDictionary symb_name var_info_ptr (var_heap, error)
 	{	tci_next_index						:: !Index
 	,	tci_instances						:: ![GlobalTCInstance]
 	,	tci_type_var_heap					:: !.TypeVarHeap
+	,	tci_attr_var_heap					:: !.AttrVarHeap
 	,	tci_dcl_modules						:: !{# DclModule}
+	,	tci_common_defs						:: !{# CommonDefs }
 	,	tci_type_constructors_in_patterns	:: ![Index]
 	}
-		
+
 class toTypeCodeExpression type :: !Ident type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
 
 instance toTypeCodeExpression Type
 where
-	toTypeCodeExpression symb_name (TA cons_id=:{type_index={glob_module}} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules},var_heap,error)
+	toTypeCodeExpression symb_name type=:(TA cons_id=:{type_index={glob_module}} type_args) (tci=:{tci_next_index,tci_instances,tci_dcl_modules,tci_common_defs},var_heap,error)
 		# defining_module_name
 			= tci_dcl_modules.[glob_module].dcl_name.id_name
+// RWS ...
+		# type_heaps
+			=	{th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
+		# (expanded, type, type_heaps)
+			=	tryToExpandTypeSyn tci_common_defs type cons_id type_args type_heaps
+		# tci
+			=	{tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
+		| expanded
+			=	toTypeCodeExpression symb_name type (tci,var_heap,error)
+// ... RWS
 		# (inst_index, (tci_next_index, tci_instances))
 		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name False) (tci_next_index, tci_instances)
 		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
 		= (TCE_Constructor inst_index type_code_args, tci)
-	toTypeCodeExpression symb_name (TAS cons_id=:{type_index={glob_module}} type_args _) (tci=:{tci_next_index,tci_instances,tci_dcl_modules},var_heap,error)
-		# defining_module_name
-			= tci_dcl_modules.[glob_module].dcl_name.id_name
-		# (inst_index, (tci_next_index, tci_instances))
-		  		= addGlobalTCInstance (GTT_Constructor cons_id defining_module_name False) (tci_next_index, tci_instances)
-		  (type_code_args, tci) = mapSt (toTypeCodeExpression symb_name) type_args ({ tci & tci_next_index = tci_next_index, tci_instances = tci_instances },var_heap,error)
-		= (TCE_Constructor inst_index type_code_args, tci)
+	toTypeCodeExpression symb_name (TAS cons_id type_args _) state
+		=	toTypeCodeExpression symb_name (TA cons_id type_args) state
 	toTypeCodeExpression symb_name (TB basic_type) (tci=:{tci_next_index,tci_instances},var_heap,error)
 		# (inst_index, (tci_next_index, tci_instances))
 		  		= addGlobalTCInstance (GTT_Basic basic_type) (tci_next_index, tci_instances)
@@ -1356,11 +1363,10 @@ where
 		# (new_vars, (tci_type_var_heap, var_heap)) = newTypeVariables vars (tci_type_var_heap, var_heap)
 		  (type_code, tci) = toTypeCodeExpression symb_name type ({tci & tci_type_var_heap = tci_type_var_heap}, var_heap, error)
 		= (TCE_UniType new_vars type_code, tci)
-
 instance toTypeCodeExpression AType
 where
 	toTypeCodeExpression symb_ident {at_type} tci_and_var_heap_and_error = toTypeCodeExpression symb_ident at_type tci_and_var_heap_and_error
-	
+
 ::	UpdateInfo =
 	{	ui_instance_calls	:: ![FunCall]
 	,	ui_local_vars		:: ![FreeVar]

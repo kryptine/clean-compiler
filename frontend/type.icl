@@ -2352,25 +2352,30 @@ where
 		| isEmpty over_info 
 			# ts_type_heaps = ts.ts_type_heaps
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances,
-									tci_type_var_heap = ts_type_heaps.th_vars,  tci_dcl_modules = dcl_modules, tci_type_constructors_in_patterns = os_special_instances.si_type_constructors_in_patterns } 
-			# (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap,tci_type_constructors_in_patterns}, ts_var_heap, ts_error, os_predef_symbols)
+									tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
+									tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs,
+									tci_type_constructors_in_patterns = os_special_instances.si_type_constructors_in_patterns } 
+			# (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap,tci_attr_var_heap,tci_type_constructors_in_patterns}, ts_var_heap, ts_error, os_predef_symbols)
 			  		= updateDynamics comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok, 
 				os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances, si_type_constructors_in_patterns = tci_type_constructors_in_patterns }, out,
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 						ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
-					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
+					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap  },
+					  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
 			# ts_type_heaps = ts.ts_type_heaps
 			  type_code_info = {	tci_next_index = os_special_instances.si_next_TC_member_index, tci_instances = os_special_instances.si_TC_instances, tci_type_constructors_in_patterns = os_special_instances.si_type_constructors_in_patterns,
-									tci_type_var_heap = ts_type_heaps.th_vars, tci_dcl_modules = dcl_modules } 
-			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap,tci_type_constructors_in_patterns}, ts_var_heap, ts_error, os_predef_symbols)
+									tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
+									tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
+			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_next_index,tci_instances,tci_type_var_heap,tci_attr_var_heap, tci_type_constructors_in_patterns}, ts_var_heap, ts_error, os_predef_symbols)
 			  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
 			  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 			= (	type_error || not ts_error.ea_ok,
 				os_predef_symbols, { os_special_instances & si_next_TC_member_index = tci_next_index, si_TC_instances = tci_instances, si_type_constructors_in_patterns = tci_type_constructors_in_patterns }, out,
 				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 						ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
-					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap }, ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
+					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
+					  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
 
 	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (ts_fun_env, coercions)
 		# (env_type, ts_fun_env) = ts_fun_env![fun]

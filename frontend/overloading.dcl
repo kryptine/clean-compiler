@@ -47,7 +47,9 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	{	tci_next_index						:: !Index
 	,	tci_instances						:: ![GlobalTCInstance]
 	,	tci_type_var_heap					:: !.TypeVarHeap
+	,	tci_attr_var_heap					:: !.AttrVarHeap
 	,	tci_dcl_modules						:: !{# DclModule}
+	,	tci_common_defs						:: !{# CommonDefs }
 	,	tci_type_constructors_in_patterns	:: ![Index]
 	}
 
