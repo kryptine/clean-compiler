@@ -3485,6 +3485,7 @@ where
 
 RemoveAnnotationsMask:==1
 ExpandAbstractSynTypesMask:==2
+DontCollectImportedConstructors:==4
 		
 convertSymbolType :: !Bool !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
@@ -3492,6 +3493,13 @@ convertSymbolType rem_annots common_defs st main_dcl_module_n imported_types col
 	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 		= convertSymbolType_  (if rem_annots (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+
+convertSymbolTypeWithoutCollectingImportedConstructors :: !Bool !{# CommonDefs} !SymbolType !Int !*ImportedTypes !*TypeHeaps !*VarHeap 
+	-> (!SymbolType, !*ImportedTypes, !*TypeHeaps, !*VarHeap)
+convertSymbolTypeWithoutCollectingImportedConstructors rem_annots common_defs st main_dcl_module_n imported_types type_heaps var_heap
+	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+		= convertSymbolType_  (if rem_annots (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors) (ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors)) common_defs st main_dcl_module_n imported_types [] type_heaps var_heap
+	= (st, ets_type_defs, ets_type_heaps, ets_var_heap)
 
 convertSymbolType_ :: !Int !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !Bool,!*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
@@ -3674,7 +3682,7 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 								TA  type_symb _				-> TA  type_symb types
 								TAS type_symb _ strictness	-> TAS type_symb types strictness
 							) ta_type
-			| glob_module == ets.ets_main_dcl_module_n
+			| glob_module == ets.ets_main_dcl_module_n || (rem_annots bitand DontCollectImportedConstructors)<>0
 				-> (changed,ta_type, ets)
 				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
 where

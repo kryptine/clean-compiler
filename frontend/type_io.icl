@@ -225,7 +225,6 @@ where
 	write_type_info symbol_type tcl_file wtis
 		#! ({st_vars,st_args,st_args_strictness,st_arity,st_result},wtis)
 			= expand_symbol_type symbol_type wtis
-
 		# (tcl_file,wtis)
 			= write_type_info st_vars tcl_file wtis
 		# (tcl_file,wtis)
@@ -239,8 +238,8 @@ where
 		= (tcl_file,wtis)
 	where
 		expand_symbol_type symbol_type wtis=:{wtis_common_defs,wtis_type_defs,wtis_main_dcl_module_n,wtis_collected_conses,wtis_type_heaps,wtis_var_heap}
-			# (expanded_symbol_type,wtis_type_defs,wtis_collected_conses,wtis_type_heaps,wtis_var_heap)
-				= convertSymbolType False wtis_common_defs symbol_type wtis_main_dcl_module_n wtis_type_defs [] /* ? */ wtis_type_heaps wtis_var_heap;
+			# (expanded_symbol_type,wtis_type_defs,wtis_type_heaps,wtis_var_heap)
+				= convertSymbolTypeWithoutCollectingImportedConstructors False wtis_common_defs symbol_type wtis_main_dcl_module_n wtis_type_defs wtis_type_heaps wtis_var_heap;
 			# wtis
 				= { wtis &
 					wtis_type_defs							= wtis_type_defs
