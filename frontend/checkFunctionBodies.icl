@@ -1318,10 +1318,19 @@ where
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]) macro_mod_index})}
 			# e_state = { e_state & es_calls = [MacroCall macro_mod_index ste_index ste_def_level : es_calls ]}
 			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
+	determine_info_of_symbol entry=:{ste_kind=STE_Imported STE_DclFunction mod_index,ste_index} symb_index e_input e_state=:{es_calls} e_info=:{ef_is_macro_fun} cs
+		# ({ft_type={st_arity},ft_priority}, e_info) = e_info!ef_modules.[mod_index].dcl_functions.[ste_index]
+		# kind = SK_Function { glob_object = ste_index, glob_module = mod_index }
+		| not ef_is_macro_fun
+			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info, cs)
+		| dcl_fun_is_called_before ste_index mod_index es_calls
+			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info , cs)
+			# e_state = { e_state & es_calls = [DclFunCall mod_index ste_index : es_calls ]}
+			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info, cs)
 	determine_info_of_symbol entry=:{ste_kind=STE_Imported kind mod_index,ste_index} symb_index e_input e_state e_info=:{ef_modules} cs
 		# (mod_def, ef_modules) = ef_modules![mod_index]
-		# (kind, arity, priotity, is_fun) = ste_kind_to_symbol_kind kind ste_index mod_index mod_def
-		= (kind, arity, priotity, is_fun, e_state, { e_info & ef_modules = ef_modules }, cs)
+		# (kind, arity, priority, is_fun) = ste_kind_to_symbol_kind kind ste_index mod_index mod_def
+		= (kind, arity, priority, is_fun, e_state, { e_info & ef_modules = ef_modules }, cs)
 	where
 		ste_kind_to_symbol_kind :: !STE_Kind !Index !Index !DclModule -> (!SymbKind, !Int, !Priority, !Bool);
 		ste_kind_to_symbol_kind STE_DclFunction def_index mod_index {dcl_functions}
@@ -1341,16 +1350,27 @@ where
 		# ({cons_type={st_arity},cons_priority}, ef_cons_defs) = ef_cons_defs![ste_index]
 		= (SK_Constructor { glob_object = ste_index, glob_module =  ei_mod_index}, st_arity, cons_priority, cIsNotAFunction,
 				e_state, { e_info & ef_cons_defs = ef_cons_defs }, cs)
-	determine_info_of_symbol {ste_kind=STE_DclFunction, ste_index} _ e_input=:{ei_mod_index} e_state e_info=:{ef_modules} cs
-		# (mod_def, ef_modules) = ef_modules![ei_mod_index]
-		# {ft_type={st_arity},ft_priority} = mod_def.dcl_functions.[ste_index]
-		= (SK_Function { glob_object = ste_index, glob_module =  ei_mod_index}, st_arity, ft_priority, cIsAFunction,
-				e_state, { e_info & ef_modules = ef_modules }, cs)
+	determine_info_of_symbol {ste_kind=STE_DclFunction, ste_index} _ e_input=:{ei_mod_index} e_state=:{es_calls} e_info=:{ef_is_macro_fun} cs
+		# ({ft_type={st_arity},ft_priority}, e_info) = e_info!ef_modules.[ei_mod_index].dcl_functions.[ste_index]
+		# kind = SK_Function { glob_object = ste_index, glob_module = ei_mod_index }
+		| not ef_is_macro_fun
+			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info, cs)
+		| dcl_fun_is_called_before ste_index ei_mod_index es_calls
+			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info, cs)
+			# e_state = { e_state & es_calls = [DclFunCall ei_mod_index ste_index : es_calls ]}
+			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info, cs)
 
 	is_called_before caller_index []
 		= False
 	is_called_before caller_index [called_index : calls]
 		= caller_index == called_index || is_called_before caller_index calls
+
+	dcl_fun_is_called_before ste_index mod_index []
+		= False
+	dcl_fun_is_called_before ste_index mod_index [DclFunCall dcl_fun_mod_index dcl_fun_index:calls]
+		= (ste_index==dcl_fun_index && mod_index==dcl_fun_mod_index) || dcl_fun_is_called_before ste_index mod_index calls
+	dcl_fun_is_called_before ste_index mod_index [_:calls]
+		= dcl_fun_is_called_before ste_index mod_index calls
 
 	convert_DefOrImpFunKind_to_icl_SymbKind FK_Macro index fi_properties
 		= SK_IclMacro index.glob_object;
