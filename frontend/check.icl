@@ -2169,9 +2169,13 @@ initialDclModule ({mod_name, mod_defs=mod_defs=:{def_funtypes,def_macros}, mod_t
 			,	dcls_local_for_import = {local_declaration_for_import decl module_n \\ decl<-all_defs}
 			}
 		,	dcl_conversions = No
+/* RWS ...
 		,	dcl_is_system	= case mod_type of
 								MK_System 	-> True
 								_			-> False
+*/
+		,	dcl_module_kind	= mod_type
+// ... RWS
 		,	dcl_imported_module_numbers = EndNumbers
 		,	dcl_is_cashed	= False
 		}

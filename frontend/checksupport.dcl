@@ -105,7 +105,9 @@ cConversionTableSize	:== 9 // AA
 	,	dcl_sizes			:: !{# Int}
 	,	dcl_declared		:: !Declarations
 	,	dcl_conversions		:: !Optional ConversionTable
-	,	dcl_is_system		:: !Bool
+// RWS ...	,	dcl_is_system		:: !Bool
+	,	dcl_module_kind		:: !ModuleKind
+// ... RWS
 	,	dcl_imported_module_numbers :: !NumberSet
 	,	dcl_is_cashed		:: !Bool
 	}

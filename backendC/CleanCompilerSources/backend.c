@@ -370,8 +370,10 @@ BEDeclareIclModule (CleanString name, int nFunctions, int nTypes, int nConstruct
 	ImpMod	iclModule;
 	BEIclP	icl;
 
-/*	cName	= ConvertCleanString (name); */
 	cName	= gBEState.be_modules [main_dcl_module_n].bem_name;
+
+	if (cName == NULL)
+		cName	= ConvertCleanString (name);
 
 	moduleNameSymbol	= ConvertAllocType (SymbolS);
 	moduleNameSymbol->symb_ident	= Identifier (cName);
@@ -449,9 +451,9 @@ BEDeclareDclModule (int moduleIndex, CleanString name, int isSystemModule, int n
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
 
-	if (moduleIndex != main_dcl_module_n)
-		AddOpenDefinitionModule (moduleNameSymbol, dclModule);
-	else
+	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
+
+	if (moduleIndex == main_dcl_module_n)
 		gBEState.be_allSymbols	= saveSymbols;
 } /* BEDeclareDclModule */
 
@@ -468,10 +470,15 @@ BEDeclarePredefinedModule (int nTypes, int nConstructors)
 void
 BEDeclareModules (int nModules)
 {
+	int	i;
+
 	Assert (gBEState.be_modules == NULL);
 
 	gBEState.be_nModules	= (unsigned int) nModules;
 	gBEState.be_modules		= (BEModuleP) ConvertAlloc (nModules * sizeof (BEModuleS));
+
+	for (i = 0; i < nModules; i++)
+		gBEState.be_modules [i].bem_name	= NULL;
 } /* BEDeclareModules */
 
 BESymbolP

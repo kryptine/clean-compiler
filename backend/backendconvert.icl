@@ -464,13 +464,23 @@ where
 		// otherwise
 			=	defineDclModule varHeap moduleIndex dclModule
 
+isSystem :: ModuleKind -> Bool
+isSystem MK_System
+	=	True
+isSystem MK_Module
+	=	False
+isSystem _
+	=	abort "backendconvert:isSystem, unknown module kind"
+
 declareCurrentDclModule :: IclModule DclModule Int -> BackEnder
-declareCurrentDclModule {icl_common} {dcl_name, dcl_functions, dcl_is_system, dcl_common} main_dcl_module_n
-	=	appBackEnd (BEDeclareDclModule main_dcl_module_n dcl_name.id_name dcl_is_system (size dcl_functions) (size icl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
-	
+declareCurrentDclModule _ {dcl_module_kind=MK_None} _
+	=	identity
+declareCurrentDclModule {icl_common} {dcl_name, dcl_functions, dcl_module_kind, dcl_common} main_dcl_module_n
+	=	appBackEnd (BEDeclareDclModule main_dcl_module_n dcl_name.id_name (isSystem dcl_module_kind) (size dcl_functions) (size icl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
+
 declareDclModule :: ModuleIndex DclModule -> BackEnder
-declareDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_is_system}
-	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name dcl_is_system (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
+declareDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_module_kind}
+	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 /*
 defineCurrentDclModule :: VarHeap IclModule DclModule {#Int} -> BackEnder
 defineCurrentDclModule varHeap {icl_common} {dcl_name, dcl_common, dcl_functions, dcl_is_system, dcl_conversions} typeConversions
@@ -478,7 +488,7 @@ defineCurrentDclModule varHeap {icl_common} {dcl_name, dcl_common, dcl_functions
 	o`	defineCurrentDclModuleTypes dcl_common.com_cons_defs dcl_common.com_selector_defs dcl_common.com_type_defs typeConversions varHeap
 */
 defineDclModule :: VarHeap ModuleIndex DclModule -> BackEnder
-defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_is_system,dcl_instances}
+defineDclModule varHeap moduleIndex {dcl_name, dcl_common, dcl_functions,dcl_instances}
 	=	declare moduleIndex varHeap dcl_common
 	o`	declareFunTypes moduleIndex dcl_functions dcl_instances.ir_from  varHeap
 
