@@ -918,15 +918,8 @@ where
 		  cs = checkPatternVariable pi_def_level entry fs_var new_info_ptr cs
 		= (AP_Variable fs_var new_info_ptr No, ([ fs_var : var_env ], { ps & ps_var_heap = ps_var_heap }, e_info, cs))
 	check_field_pattern p_input {bind_src = PE_WildCard, bind_dst={glob_object={fs_var}}} (var_env, ps, e_info, cs)
-		# (new_info_ptr1, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
-		  (new_info_ptr2, ps_var_heap) = newPtr VI_Empty ps_var_heap
-		= (AP_WildCard new_info_ptr1 (Yes { bind_src = fs_var, bind_dst = new_info_ptr2}), (var_env, { ps & ps_var_heap = ps_var_heap }, e_info, cs))
-/* MW was
-	check_field_pattern p_input {bind_src = PE_WildCard, bind_dst={glob_object={fs_var}}} (var_env, ps, e_info, cs)
 		# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
-		  (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
 		= (AP_WildCard (Yes { bind_src = fs_var, bind_dst = new_info_ptr}), (var_env, { ps & ps_var_heap = ps_var_heap }, e_info, cs))
-*/
 	check_field_pattern p_input {bind_src,bind_dst} (var_env, ps, e_info, cs)
 		# (pattern, var_env, ps, e_info, cs) = checkPattern bind_src No p_input var_env ps e_info cs
 		= (pattern, (var_env, ps, e_info, cs))
@@ -963,12 +956,7 @@ checkPattern (PE_Bound bind) opt_var p_input var_env ps e_info cs
 checkPattern (PE_Ident id) opt_var p_input var_env ps e_info cs
 	= checkIdentPattern cIsNotInExpressionList id opt_var p_input var_env ps e_info cs
 checkPattern PE_WildCard opt_var p_input var_env ps e_info cs
-	# (new_info_ptr, ps_var_heap) = newPtr VI_Empty ps.ps_var_heap
-	= (AP_WildCard new_info_ptr No, var_env, { ps & ps_var_heap = ps_var_heap }, e_info, cs)
-/* MW was
-checkPattern PE_WildCard opt_var p_input var_env ps e_info cs
 	= (AP_WildCard No, var_env, ps, e_info, cs)
-*/
 checkPattern expr opt_var p_input var_env ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
@@ -1379,18 +1367,18 @@ where
 				{ cs & cs_error = checkError name "illegal combination of patterns" cs.cs_error })
 */
 // MW added the following alternative
-	transform_pattern (AP_WildCard _ (Yes opt_var)) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
+	transform_pattern (AP_WildCard (Yes opt_var)) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
 		= transform_pattern (AP_Variable opt_var.bind_src opt_var.bind_dst No) patterns pattern_scheme pattern_variables defaul
 							result_expr case_name var_store expr_heap opt_dynamics cs
-	transform_pattern (AP_WildCard _ no) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
+	transform_pattern (AP_WildCard no) NoPattern pattern_scheme pattern_variables No result_expr _ var_store expr_heap opt_dynamics cs
 		= (NoPattern, pattern_scheme, pattern_variables, Yes ([], result_expr), var_store, expr_heap, opt_dynamics, cs)
 /*
 	transform_pattern (AP_WildCard _) NoPattern pattern_variables No result_expr var_store expr_heap opt_dynamics cs
 		= (NoPattern, pattern_variables, Yes ([], result_expr), var_store, expr_heap, opt_dynamics, cs)
 */
-	transform_pattern (AP_WildCard fresh_info_ptr _) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
-		# var_ident = { id_name = "wc", id_info = nilPtr }
-		= transform_pattern (AP_Variable var_ident fresh_info_ptr No) patterns pattern_scheme pattern_variables defaul
+	transform_pattern (AP_WildCard _) patterns pattern_scheme pattern_variables defaul result_expr case_name var_store expr_heap opt_dynamics cs
+		# (new_info_ptr, var_store) = newPtr VI_Empty var_store
+		= transform_pattern (AP_Variable (newVarId "wc") new_info_ptr No) patterns pattern_scheme pattern_variables defaul
 							result_expr case_name var_store expr_heap opt_dynamics cs
 /*
 	transform_pattern (AP_WildCard _) patterns pattern_variables defaul result_expr var_store expr_heap opt_dynamics cs
@@ -1417,7 +1405,7 @@ where
 				# (let_expression, expr_heap) = bind_default_variables expr vars result expr_heap
 				-> (let_expression, expr_heap)
 			No
-				-> (abort "incorrect case expression in build_case", expr_heap)
+				-> (EE, expr_heap)
 /*
 	build_case NoPattern defaul expr case_ident expr_heap
 		= case defaul of
@@ -1643,7 +1631,7 @@ where
 		= (bind_src, bind_dst)
 	get_field_var (AP_Variable id var_ptr _)
 		= (id, var_ptr)
-	get_field_var (AP_WildCard _ (Yes {bind_src,bind_dst}))
+	get_field_var (AP_WildCard (Yes {bind_src,bind_dst}))
 		= (bind_src, bind_dst)
 	get_field_var _
 		= ({ id_name = "** ERRONEOUS **", id_info = nilPtr }, nilPtr)
@@ -1896,7 +1884,7 @@ where
 		  free_var = { fv_name = new_name, fv_info_ptr = var_info_ptr, fv_def_level = def_level, fv_count = 0 }
 		= (Var bound_var, [{bind_src = match_expr, bind_dst = free_var} : opt_var_bind], var_heap, expr_heap)
 
-transfromPatternIntoBind mod_index def_level (AP_WildCard _ _) src_expr var_store expr_heap e_info cs
+transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind _ _ pattern src_expr var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" " illegal node pattern" cs.cs_error})
@@ -2071,12 +2059,15 @@ convertSubPattern (AP_Dynamic pattern type opt_var) result_expr var_store expr_h
 	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
 			buildTypeCase (Var { var_name = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }) type_case_patterns No type_case_info_ptr,
 				var_store, expr_heap, [dynamic_info_ptr], cs)
-convertSubPattern (AP_WildCard _ opt_var) result_expr var_store expr_heap opt_dynamics cs
+convertSubPattern (AP_WildCard opt_var) result_expr var_store expr_heap opt_dynamics cs
  	# ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
 	= ({ fv_name = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0  }, result_expr, var_store, expr_heap, opt_dynamics, cs)
+convertSubPattern (AP_Empty _) result_expr var_store expr_heap opt_dynamics cs
+	= convertSubPattern (AP_WildCard No) EE var_store expr_heap opt_dynamics cs
+/* MW was
 convertSubPattern ap result_expr var_store expr_heap opt_dynamics cs
 	= abort ("convertSubPattern: unknown pattern " ---> ap) 
-
+*/
 
 typeOfBasicValue :: !BasicValue !*CheckState -> (!BasicType, !*CheckState)
 typeOfBasicValue (BVI _) cs = (BT_Int, cs)
@@ -2213,7 +2204,7 @@ where
 	  	  (act_var, result_expr, expr_heap) = transform_pattern_variable fun_arg opt_var result_expr expr_heap
 	  	  type_case_patterns = [{ dp_var = var_arg, dp_type	= dynamic_info_ptr,	dp_rhs = result_expr, dp_type_patterns_vars = [], dp_type_code = TCE_Empty }]
 		= (buildTypeCase act_var type_case_patterns No type_case_info_ptr, var_store, expr_heap, [dynamic_info_ptr], cs)	
-	transform_pattern_into_cases (AP_WildCard _ _) fun_arg result_expr var_store expr_heap opt_dynamics cs
+	transform_pattern_into_cases (AP_WildCard _) fun_arg result_expr var_store expr_heap opt_dynamics cs
 		= (result_expr, var_store, expr_heap, opt_dynamics, cs)	
 	transform_pattern_into_cases (AP_Empty name) fun_arg result_expr var_store expr_heap opt_dynamics cs
 		= (result_expr, var_store, expr_heap, opt_dynamics, cs)
@@ -3184,7 +3175,7 @@ where
 		= file <<< val
 	(<<<) file (AP_Constant kind symbol prio)
 		= file <<< symbol
-	(<<<) file (AP_WildCard _ _)
+	(<<<) file (AP_WildCard _)
 		= file <<< '_'
 	(<<<) file (AP_Empty ident)
 		= file <<< "<?" <<< ident <<< "?>"

@@ -415,7 +415,7 @@ cIsALocalVar	:== False
 		| AP_Basic !BasicValue OptionalVariable
 		| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
 		| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
-		| AP_WildCard !VarInfoPtr !OptionalVariable
+		| AP_WildCard !OptionalVariable
 		| AP_Empty !Ident
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro
