@@ -614,11 +614,11 @@ transformSequence (SQ_From frm)
 transformSequence (SQ_FromTo frm to)
 	=	predef PD_FromTo ` frm ` to
 
-transformArrayUpdate :: ParsedExpr [ElemAssignment] PredefinedIdents -> ParsedExpr
+transformArrayUpdate :: ParsedExpr [Bind ParsedExpr ParsedExpr] PredefinedIdents -> ParsedExpr
 transformArrayUpdate expr updates pi
 	=	foldr (update pi (predef PD_ArrayUpdateFun)) expr updates
 	where
-		update :: PredefinedIdents (PredefinedIdents -> ParsedExpr) ElemAssignment ParsedExpr -> ParsedExpr
+		update :: PredefinedIdents (PredefinedIdents -> ParsedExpr) (Bind ParsedExpr ParsedExpr) ParsedExpr -> ParsedExpr
 		update pi updateIdent {bind_src=value, bind_dst=index} expr
 			=	(updateIdent ` expr ` index ` value) pi
 

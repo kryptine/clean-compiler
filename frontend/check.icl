@@ -755,7 +755,7 @@ checkIdentPattern is_expr_list id=:{id_name,id_info} opt_var {pi_def_level, pi_m
 ::	ArrayPattern =
 	{	ap_opt_var		:: !Optional (Bind Ident VarInfoPtr)
 	,	ap_array_var	:: !FreeVar
-	,	ap_selections	:: ![Bind FreeVar ParsedExpr]
+	,	ap_selections	:: ![Bind FreeVar [ParsedExpr]]
 	}
 
 buildPattern mod_index (APK_Constructor type_index) cons_symb args opt_var ps e_info cs
@@ -967,7 +967,7 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 		{ ps & ps_var_heap = ps_var_heap }, e_info, cs)
   where
 	check_array_selection def_level bind=:{bind_dst} states
-		= check_rhs def_level bind (check_index_expr bind_dst states)
+		= check_rhs def_level bind (foldSt check_index_expr bind_dst states)
 		
 	check_index_expr (PE_Ident {id_name}) states
 		| isLowerCaseName id_name
@@ -1895,7 +1895,7 @@ where
 				= transfromPatternIntoBind ei_mod_index ei_expr_level pattern_expr src_expr e_state.es_var_heap e_state.es_expr_heap e_info cs
 		  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 		  (_, array_pattern_binds, free_vars, e_state, e_info, cs) // XXX arrays currently not strictly evaluated
-				= foldSt (buildSelectCalls e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
+				= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
 		  all_binds = [(seq_let.ndwl_strict, let_binds), (nOT_STRICT, array_pattern_binds) : binds] with nOT_STRICT = False
 	    = (all_binds, loc_envs, max_expr_level, free_vars, e_state, e_info, cs)
 	check_sequential_lets free_vars [] let_vars_list e_input=:{ei_expr_level} e_state e_info cs
@@ -2000,7 +2000,7 @@ addArraySelections [] rhs_expr free_vars e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	# (let_strict_binds, let_lazy_binds, free_vars, e_state, e_info, cs)
-			= foldSt (buildSelectCalls e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
+			= foldSt (buildSelections e_input) array_patterns ([], [], free_vars, e_state, e_info, cs)
 	  (let_expr_ptr, es_expr_heap)
 	  		= newPtr EI_Empty e_state.es_expr_heap
 	= ( Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds,
@@ -2011,7 +2011,7 @@ addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  , cs
 	  )
 
-buildSelectCalls e_input {ap_opt_var, ap_array_var, ap_selections}
+buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 					(strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
 	# (ap_array_var, strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
 			= foldSt (build_sc e_input) ap_selections 
@@ -2027,7 +2027,7 @@ buildSelectCalls e_input {ap_opt_var, ap_array_var, ap_selections}
 	  			no	-> (lazy_binds, e_state)
 	= (strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
   where
-	build_sc e_input {bind_dst, bind_src=array_element_var} (ap_array_var, strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
+	build_sc e_input {bind_dst=parsed_index_exprs, bind_src=array_element_var} (ap_array_var, strict_binds, lazy_binds, free_vars, e_state, e_info, cs)
 		# (var_for_uselect_result, es_var_heap)
 				= allocate_free_var { id_name = "_x", id_info = nilPtr } e_state.es_var_heap
 		  (new_array_var, es_var_heap)
@@ -2036,21 +2036,27 @@ buildSelectCalls e_input {ap_opt_var, ap_array_var, ap_selections}
 		  		= allocate_bound_var ap_array_var e_state.es_expr_heap
 		  (bound_var_for_uselect_result, es_expr_heap)
 		  		= allocate_bound_var var_for_uselect_result es_expr_heap
-		  (new_expr_ptr, es_expr_heap)
-		  		= newPtr EI_Empty es_expr_heap
+		  dimension = length parsed_index_exprs
+		  (new_expr_ptrs, es_expr_heap)
+		  		= mapSt newPtr (repeatn dimension EI_Empty) es_expr_heap
 		  (tuple_cons, cs)
 		  		= getPredefinedGlobalSymbol (GetTupleConsIndex 2) PD_PredefinedModule STE_Constructor 2 cs
-		  (glob_select_symb, cs)
-		  		= getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
+		  (glob_select_symb, opt_tuple_type, cs)
+		  		= case dimension of
+		  			1	# (unq_select_symb, cs) = getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
+		  				-> (unq_select_symb, No, cs)
+		  			_	# (select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
+						  (tuple_type, cs) = getPredefinedGlobalSymbol (GetTupleTypeIndex 2) PD_PredefinedModule STE_Type 2 cs
+		  				-> (select_symb, Yes tuple_type, cs)
 		  e_state
 		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
-		  (index_expr, free_vars, e_state, e_info, cs)
-		  		= checkExpression free_vars bind_dst e_input e_state e_info cs
-		  selection
-		  		= ArraySelection glob_select_symb new_expr_ptr index_expr
+		  (index_exprs, (free_vars, e_state, e_info, cs))
+		  		= mapSt (check_index_expr e_input) parsed_index_exprs (free_vars, e_state, e_info, cs)
+		  selections
+		  		= [ ArraySelection glob_select_symb new_expr_ptr index_expr \\ new_expr_ptr<-new_expr_ptrs & index_expr<-index_exprs ]
 		= (	new_array_var
 		  ,	strict_binds
-		  ,	[ {bind_dst = var_for_uselect_result, bind_src = Selection No (Var bound_array_var) [selection]}
+		  ,	[ {bind_dst = var_for_uselect_result, bind_src = Selection opt_tuple_type (Var bound_array_var) selections}
 			, {bind_dst = new_array_var, bind_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result)}
 		    , {bind_dst = array_element_var, bind_src = TupleSelect tuple_cons.glob_object 0 (Var bound_var_for_uselect_result)}
 		  	: lazy_binds
@@ -2061,6 +2067,10 @@ buildSelectCalls e_input {ap_opt_var, ap_array_var, ap_selections}
 		  , cs
 		  )
 
+	check_index_expr e_input parsed_index_expr (free_vars, e_state, e_info, cs)
+		# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars parsed_index_expr e_input e_state e_info cs
+		= (index_expr, (free_vars, e_state, e_info, cs))
+		
 allocate_free_var ident var_heap
 	# (new_var_info_ptr, var_heap) = newPtr VI_Empty var_heap
 	= ({ fv_def_level = NotALevel, fv_name = ident, fv_info_ptr = new_var_info_ptr,	fv_count = 0 }, var_heap)

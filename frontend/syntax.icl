@@ -913,7 +913,7 @@ cIsArrayGenerator	:== False
 
 ::	FieldAssignment :== Bind ParsedExpr Ident
 
-::	ElemAssignment :== Bind ParsedExpr ParsedExpr
+::	ElemAssignment :== Bind ParsedExpr [ParsedExpr]
 
 //::	NodeDef :== Bind ParsedExpr ParsedExpr
 
@@ -1331,7 +1331,7 @@ where
 			= file
 		write_binds file [bind : binds]
 			= write_binds (file <<< bind <<< '\n') binds
-	(<<<) file (Case {case_expr,case_guards,case_default=No})
+ 	(<<<) file (Case {case_expr,case_guards,case_default=No})
 		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
 	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr})
 		= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t-> " <<< def_expr

@@ -949,7 +949,7 @@ cIsArrayGenerator	:== False
 
 ::	FieldAssignment :== Bind ParsedExpr Ident
 
-::	ElemAssignment :== Bind ParsedExpr ParsedExpr
+::	ElemAssignment :== Bind ParsedExpr [ParsedExpr]
 
 
 cIsStrict		:== True

@@ -17,7 +17,6 @@ partitionateMacros :: !IndexRange !Index !*{# FunDef} !u:{# DclModule} !*VarHeap
 	,	us_symbol_heap			:: !.ExpressionHeap
 	,	us_opt_type_heaps		:: !.Optional .TypeHeaps
 	,	us_cleanup_info			:: ![ExprInfoPtr]
-	,	us_subst_vars			:: !Bool
 	,	us_handle_aci_free_vars	:: !AciFreeVarHandleMode
 	}
 	

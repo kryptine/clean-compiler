@@ -165,7 +165,6 @@ where
 	,	us_symbol_heap			:: !.ExpressionHeap
 	,	us_opt_type_heaps		:: !.Optional .TypeHeaps
 	,	us_cleanup_info			:: ![ExprInfoPtr]
-	,	us_subst_vars			:: !Bool // XXX currently not used
 	,	us_handle_aci_free_vars	:: !AciFreeVarHandleMode
 	}
 	
@@ -191,8 +190,6 @@ where
 
 unfoldVariable :: !BoundVar !*UnfoldState -> (!Expression, !*UnfoldState)
 unfoldVariable var=:{var_name,var_info_ptr} us
-//	XXX | not us.us_subst_vars
-//		= (Var var, us)
 	#! (var_info, us) = readVarInfo var_info_ptr us
 	= case var_info of 
 		VI_Expression expr
@@ -497,7 +494,7 @@ examineFunctionCall {id_info} fc=:{fc_index} (calls, symbol_table)
 unfoldMacro {fun_body = TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls}} args fun_defs (calls, es=:{es_var_heap,es_symbol_heap, es_symbol_table})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
 	  us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No, us_cleanup_info = [],
-			 us_subst_vars = True, us_handle_aci_free_vars = RemoveThem }
+			 us_handle_aci_free_vars = RemoveThem }
 	  (result_expr, {us_symbol_heap,us_var_heap}) = unfold tb_rhs us
 	  (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls fun_defs es_symbol_table
 	| isEmpty let_binds
@@ -861,7 +858,7 @@ where
 			= (expr, var_heap, symbol_heap)
 		replace_variables vars expr ap_vars var_heap symbol_heap
 			# us = { us_var_heap = build_aliases vars ap_vars var_heap, us_symbol_heap = symbol_heap, us_opt_type_heaps = No,
-					 us_cleanup_info=[], us_subst_vars = True, us_handle_aci_free_vars = RemoveThem }
+					 us_cleanup_info=[], us_handle_aci_free_vars = RemoveThem }
 			  (expr, us) = unfold expr us
 			= (expr, us.us_var_heap, us.us_symbol_heap)
 

@@ -526,7 +526,7 @@ where
 			# (VI_AccVar _ arg_position, var_heap) = readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},class_env) = class_env![fun_index]
 			  (aci_linearity_of_patterns, var_heap) = get_linearity_info cc_linear_bits case_guards var_heap
-			| /*XXX*/arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==cActive) && cc_linear_bits!!arg_position
+			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==cActive) && cc_linear_bits!!arg_position
 				// mark non multimatch cases whose case_expr is an active linear function argument
 				# aci = { aci_params = [], aci_opt_unfolder = No, aci_free_vars=No, aci_linearity_of_patterns = aci_linearity_of_patterns }
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
@@ -869,7 +869,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			= ([guard_expr], ti)
 		lift_patterns_2 default_exists [guard_expr : guard_exprs] outer_case ro ti
 			# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No,
-					 us_cleanup_info=ti.ti_cleanup_info, us_subst_vars = False, us_handle_aci_free_vars = LeaveThem }
+					 us_cleanup_info=ti.ti_cleanup_info, us_handle_aci_free_vars = LeaveThem }
 			  (outer_guards, us=:{us_cleanup_info}) = unfold outer_case.case_guards us
 			  (expr_info, ti_symbol_heap) = readPtr outer_case.case_info_ptr us.us_symbol_heap
 			  (new_info_ptr, ti_symbol_heap) = newPtr expr_info ti_symbol_heap
@@ -899,7 +899,7 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 				  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
 				  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable glob_module ds_index ro ti.ti_symbol_heap
 				  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,
-									us_cleanup_info=ti.ti_cleanup_info, us_subst_vars = True, us_handle_aci_free_vars = LeaveThem }
+									us_cleanup_info=ti.ti_cleanup_info, us_handle_aci_free_vars = LeaveThem }
 				  (unfolded_expr, unfold_state) = unfold new_expr unfold_state
 				  (final_expr, ti) = transform unfolded_expr { ro & ro_root_case_mode = NotRootCase } (unfold_state_to_ti unfold_state ti)
 				= (Yes final_expr, ti)
@@ -934,7 +934,6 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 			= match_and_instantiate linearities cons_index app_args guards case_default ro ti
 		match_and_instantiate _ cons_index app_args [] default_expr ro ti
 			= transform default_expr { ro & ro_root_case_mode = NotRootCase } ti
-
 
 possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 //	| False->>("possibly_generate_case_function")
@@ -1000,7 +999,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		  types_from_outer_fun = [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
 		  nr_of_lifted_vars = fun_arity-(length types_from_outer_fun)
 		  (lifted_types, ti_var_heap) = mapSt get_type_of_local_var (take nr_of_lifted_vars ro_fun_args) ti.ti_var_heap
-		  (EI_CaseType {ct_result_type}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap 
+		  (EI_CaseType {ct_result_type}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  (form_vars, ti_var_heap) = mapSt bind_to_fresh_var ro_fun_args ti_var_heap
 		  arg_types = lifted_types++types_from_outer_fun
 		  type_variables = getTypeVars [ct_result_type:arg_types]
@@ -1009,7 +1008,7 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 		  (fresh_arg_types, ti_type_heaps) = substitute arg_types { th_vars = th_vars, th_attrs = th_attrs }
 		  (fresh_result_type, ti_type_heaps) = substitute ct_result_type ti_type_heaps
 		  us = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = Yes ti_type_heaps, 
-					us_cleanup_info=ti.ti_cleanup_info, us_subst_vars = True, us_handle_aci_free_vars = SubstituteThem }
+					us_cleanup_info=ti.ti_cleanup_info, us_handle_aci_free_vars = SubstituteThem }
 		  (copied_expr, {us_var_heap=ti_var_heap, us_symbol_heap=ti_symbol_heap, us_cleanup_info=ti_cleanup_info,
 						 us_opt_type_heaps = Yes ti_type_heaps}) = unfold new_expr us
 		  fun_type = { st_vars = fresh_type_vars, st_args = fresh_arg_types, st_arity = fun_arity, st_result = fresh_result_type,
@@ -1226,13 +1225,7 @@ searchInstance prods1 (II_Node prods2 fun_info_ptr left right)
 		= searchInstance prods1 right
 	= searchInstance prods1 left
 */
-/* Fragen/to do:
-	- wird die neu generierte Funktion bereits in der folgenden Transformation gebraucht ?
-		Antwort: Ich verbiete das einfach, indem generierte funktionen,deren Koerper "Expanding" nicht als Produzent
-				klassifiziert werden.
-	- wie wird die neu generierte Funktion klassifiziert ? Antwort: Die Klassifikationen werden weitervererbt (auch die linear_bits)
-	- type attributes
-*/
+
 generateFunction :: !FunDef !ConsClasses !{! Producer} !FunctionInfoPtr !ReadOnlyTI !*TransformInfo -> (!Index, !Int, !*TransformInfo)
 generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
 				 {cc_args,cc_linear_bits} prods fun_def_ptr ro
@@ -1263,7 +1256,7 @@ generateFunction fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi
 					 gf_cons_args = {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits} }
 	  ti_fun_heap = writePtr fun_def_ptr (FI_Function new_gen_fd) ti_fun_heap
 	  us = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = Yes ti_type_heaps,
-			 us_cleanup_info=ti_cleanup_info, us_subst_vars = True, us_handle_aci_free_vars = RemoveThem }
+			 us_cleanup_info=ti_cleanup_info, us_handle_aci_free_vars = RemoveThem }
 	  (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes type_heaps, us_cleanup_info}) = unfold tb_rhs us
 	  ro =	{ ro &	ro_root_case_mode = case tb_rhs of {Case _ -> RootCase; _ -> NotRootCase},
 					ro_fun= { symb_name = fd.fun_symb, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr, symb_arity = fun_arity},
@@ -2103,7 +2096,7 @@ where
 	freeVariables (Selection _ expr selectors) fvi
 		= freeVariables expr fvi
 	freeVariables (Update expr1 selectors expr2) fvi
-		= freeVariables expr2 (freeVariables expr1 fvi)
+		= freeVariables expr2 (freeVariables selectors (freeVariables expr1 fvi))
 	freeVariables (RecordUpdate cons_symbol expression expressions) fvi
 		= free_variables_of_record_expression expression expressions fvi
 	where
@@ -2130,6 +2123,15 @@ where
 	freeVariables _ fvi
 		= fvi
 
+instance freeVariables Selection
+where
+	freeVariables (RecordSelection _ _) fvi
+		= fvi
+	freeVariables (ArraySelection _ _ expr) fvi
+		= freeVariables expr fvi
+	freeVariables (DictionarySelection dict_var selections _ expr) fvi
+		= freeVariables dict_var (freeVariables selections (freeVariables expr fvi))
+	
 removeVariables global_variables var_heap
 	= foldSt remove_variable global_variables ([], var_heap)
 where

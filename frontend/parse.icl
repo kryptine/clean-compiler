@@ -2525,12 +2525,20 @@ where
 			= ([ assign ], tokenBack pState)
 	where
 		want_array_assignment is_pattern pState
-			# (index_exp,  pState) = wantExpression cIsNotAPattern pState
-			  pState = wantToken FunctionContext "array assignment" SquareCloseToken pState
+			# (index_exprs, pState) = want_index_exprs pState
 			  pState = wantToken FunctionContext "array assignment" EqualToken pState
 			  (pattern_exp, pState) = wantExpression is_pattern pState
-			= ({bind_dst = index_exp, bind_src = pattern_exp}, pState)
+			= ({bind_dst = index_exprs, bind_src = pattern_exp}, pState)
 
+		want_index_exprs pState
+			# (index_expr,  pState) = wantExpression cIsNotAPattern pState
+			  (token, pState) = nextToken GeneralContext pState
+			| token==CommaToken
+				# (index_exprs, pState) = want_index_exprs pState
+				= ([index_expr:index_exprs], pState)
+			| token==SquareCloseToken
+				= ([index_expr], pState)
+			= ([], parseError "" (Yes token) "] or ," pState)
 /**
 	End of definitions
 **/
