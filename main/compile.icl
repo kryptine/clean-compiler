@@ -167,14 +167,8 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	fopen options.outPath options.outMode files
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
-// MV ...
-	# tcl_path
-		= ((directoryName options.pathName) +++ "Clean System Files\\" +++ (baseName options.pathName) +++ ".tcl")
-	# (opened,tcl_file, files)
-		=	fopen tcl_path FWriteData files
-	| not opened
-		=	abort ("couldn't open file \"" +++ tcl_path +++ "\n")
-// ... MV
+	# (tcl_file, files)
+		= openTclFile options.pathName files
 	# (io, files)
 		=	stdio files
 //	  (moduleIdent, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
@@ -184,12 +178,10 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table files error io out tcl_file heaps 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 
-// MV ...
 	# (closed, files)
 		=	fclose tcl_file files
 	| not closed
-		=	abort ("couldn't open tcl file \"" +++ options.pathName +++ "tcl\"\n")
-// ... MV
+		=	abort ("couldn't close tcl file \"" +++ options.pathName +++ "tcl\"\n")
 
 	# (closed, files)
 		=	fclose io files
@@ -246,3 +238,26 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 		= (success,cache,files)
 		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
+
+
+openTclFile :: !String !*Files -> (!.File, !*Files)
+openTclFile icl_mod_pathname files
+	# csf_path
+		= directoryName icl_mod_pathname +++ "Clean System Files"
+	# tcl_path
+		= csf_path +++ {DirectorySeparator} +++ baseName icl_mod_pathname +++ ".tcl"
+	# (opened, tcl_file, files)
+		= fopen tcl_path FWriteData files
+	| opened
+		= (tcl_file, files)
+	// try again after creating Clean System Files folder
+	# (ok, files)
+		= ensureCleanSystemFilesExists csf_path files
+	| not ok
+		= abort ("can't create folder \"" +++ csf_path +++"\"\n")
+	# (opened, tcl_file, files)
+		= fopen tcl_path FWriteData files
+	| opened
+		=(tcl_file, files)
+	= abort ("couldn't open file \"" +++ tcl_path +++ "\"\n")
+
