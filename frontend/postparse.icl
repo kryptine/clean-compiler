@@ -997,14 +997,17 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 reorganiseLocalDefinitions [] ca
 	= ([], [], ca)
 
+
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix
+
 
 determineArity :: [ParsedExpr] (Optional SymbolType) -> Int
 determineArity args (Yes {st_arity})
 	=	st_arity
 determineArity args No
 	=	length args
+
 
 sameFixity :: Priority Bool -> Bool
 sameFixity (Prio _ _) is_infix
