@@ -458,6 +458,30 @@ void set_global_reference_counts (NodeP case_node)
 	replace_local_ref_count_by_global_ref_count (case_node->node_node_id_ref_counts);
 }
 
+#if BOXED_RECORDS
+void set_global_reference_counts_and_exchange_record_update_marks (NodeP case_node)
+{
+	NodeIdRefCountListP node_id_ref_count_elem;
+
+	for_l (node_id_ref_count_elem,case_node->node_node_id_ref_counts,nrcl_next){
+		int local_ref_count;
+		NodeIdP node_id;
+		unsigned int node_id_mark2;
+		
+		node_id=node_id_ref_count_elem->nrcl_node_id;
+
+		node_id_mark2=node_id->nid_mark2;
+		node_id->nid_mark2=(node_id_mark2 & ~NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES) | node_id_ref_count_elem->nrcl_mark2;
+		node_id_ref_count_elem->nrcl_mark2=node_id_mark2 & NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
+
+		local_ref_count=node_id->nid_refcount;
+
+		node_id->nid_refcount = local_ref_count + node_id_ref_count_elem->nrcl_ref_count;
+		node_id_ref_count_elem->nrcl_ref_count=local_ref_count;
+	}
+}
+#endif
+
 static void merge_node_id_ref_count_lists (NodeIdRefCountListP *list1_p,NodeIdRefCountListP list2)
 {
 	while (list2!=NULL){
