@@ -187,7 +187,11 @@ where
 	write_type_info (AbstractType _) tcl_file wtis
  		#! tcl_file
  			= fwritec AbstractTypeCode tcl_file;
- 			
+ 		// unimplemented
+		= (tcl_file,wtis)
+
+	write_type_info (AbstractSynType _ _) tcl_file wtis
+ 		#! tcl_file	= fwritec AbstractTypeCode tcl_file;
  		// unimplemented
 		= (tcl_file,wtis)
 		
