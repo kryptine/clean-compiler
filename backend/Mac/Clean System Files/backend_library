@@ -126,3 +126,4 @@ BEStrictPositions
 BECopyInts
 BEDeclareDynamicTypeSymbol
 BEDynamicTempTypeSymbol
+BEInsertForeignExport
