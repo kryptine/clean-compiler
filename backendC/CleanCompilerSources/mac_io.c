@@ -804,6 +804,32 @@ extern char *clean_abc_path; /* imported from clm.c */
 	}
 #endif
 
+<<<<<<< mac_io.c
+#if defined (GNU_C)
+static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
+{
+	CFURLRef hfs_url;
+	CFStringRef	hfs_string, posix_string;
+	char buffer[512+1];
+	
+	hfs_string = CFStringCreateWithCString (NULL/*kCFAllocatorDefault*/,file_name,kCFStringEncodingMacRoman);
+	hfs_url = CFURLCreateWithFileSystemPath (NULL/*kCFAllocatorDefault*/,hfs_string,kCFURLHFSPathStyle,/*isDirectory*/false);
+	CFRelease (hfs_string);
+	posix_string = CFURLCopyFileSystemPath (hfs_url,kCFURLPOSIXPathStyle);
+	CFRelease (hfs_url);
+	if (! CFStringGetCString (posix_string,buffer,512,kCFStringEncodingMacRoman)){
+		CFRelease (posix_string);
+		return NULL;
+	}
+	file_name=buffer;
+
+	return fopen (file_name,mode);
+}
+
+# define fopen fopen_with_file_name_conversion
+#endif
+
+=======
 #if defined (GNU_C)
 static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
 {
@@ -842,6 +868,7 @@ static FILE *fopen_with_file_name_conversion (char *file_name,char *mode)
 # define fopen fopen_with_file_name_conversion
 #endif
 
+>>>>>>> 1.4
 #if WRITE_DCL_MODIFICATION_TIME
 File FOpenWithFileTime (char *file_name,FileKind kind, char *mode,FileTime *file_time_p)
 {
