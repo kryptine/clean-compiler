@@ -100,12 +100,13 @@ predefined_idents
 					[PD_StdDynamic] = i UnderscoreSystemDynamicModule_String,
 					[PD_Dyn_DynamicTemp] = i DynamicRepresentation_String,
 
-					[PD_Dyn_Type] = i "TypeCode",
+					[PD_Dyn_TypeCode] = i "TypeCode",
 					[PD_Dyn_TypeScheme] = i "TypeScheme",
 					[PD_Dyn_TypeApp] = i "TypeApp",
 					[PD_Dyn_TypeVar] = i "TypeVar",
 					[PD_Dyn_TypeCons] = i "TypeCons",
-//					[PD_Dyn_TypePatternVar] = i "_TypePatternVar",
+					[PD_Dyn_TypeUnique] = i "TypeUnique",
+					[PD_Dyn__TypeFixedVar] = i "_TypeFixedVar",
 					[PD_Dyn_UnificationEnvironment] = i "_UnificationEnvironment",
 					[PD_Dyn_initial_unification_environment] = i "_initial_unification_environment",
 					[PD_Dyn_bind_global_type_pattern_var] = i "_bind_global_type_pattern_var",
@@ -330,12 +331,13 @@ where
 					<<- (local_predefined_idents,	IC_Module, PD_StdDynamic)
 
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_DynamicTemp)
-					<<- (local_predefined_idents,	IC_Type, PD_Dyn_Type)
+					<<- (local_predefined_idents,	IC_Type, PD_Dyn_TypeCode)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeScheme)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeApp)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeVar)
-//					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypePatternVar)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCons)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeUnique)
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn__TypeFixedVar)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_UnificationEnvironment)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_unify)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_initial_unification_environment)

@@ -3440,12 +3440,13 @@ where
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_Dyn_DynamicTemp			mod_index STE_Type
-				<=< adjustPredefSymbol PD_Dyn_Type					mod_index STE_Type
+				<=< adjustPredefSymbol PD_Dyn_TypeCode				mod_index STE_Type
 				<=< adjustPredefSymbol PD_Dyn_TypeScheme 			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_TypeVar				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_Dyn_TypeCons				mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_Dyn_TypeApp				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_TypeVar				mod_index STE_Constructor
-//				<=< adjustPredefSymbol PD_Dyn_TypePatternVar		mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn_TypeUnique			mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_Dyn__TypeFixedVar			mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_Dyn_UnificationEnvironment				mod_index STE_Type
 				<=< adjustPredefSymbol PD_Dyn_initial_unification_environment		mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_Dyn_bind_global_type_pattern_var	mod_index STE_DclFunction
