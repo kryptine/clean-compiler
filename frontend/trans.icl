@@ -1617,8 +1617,10 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  		= substitute (st_args, st_result) { das_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  nr_of_applied_args
 			= symbol_arity
-	  application_type
-	  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args
+//	  application_type
+//	  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args
+	  (application_type, attr_env, das_next_attr_nr)
+	  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args [] das_next_attr_nr
 	  type_input
 	  		= { ti_common_defs			= ro.ro_common_defs
 	  		  , ti_functions			= ro.ro_imported_funs
@@ -1633,7 +1635,8 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  new_uniqueness_requirement
 	  		= { ur_offered		= application_type
 	  		  , ur_demanded		= arg_type
-	  		  , ur_attr_ineqs	= attr_inequalities 
+//	  		  , ur_attr_ineqs	= attr_inequalities 
+	  		  , ur_attr_ineqs	= attr_inequalities ++ attr_env
 	  		  }
 	  (opt_body, var_names, das_fun_defs, das_fun_heap)
 	  		= case producer of
@@ -1643,11 +1646,22 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  				| glob_module <> ro.ro_main_dcl_module_n
 	  					// we do not have good names for the formal variables of that function: invent some
 	  					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
-	  				// GOTO next alternative
-	  			_
-					# ({fun_body=fun_body=:TransformedBody tb}, das_fun_defs, das_fun_heap)
+	  			(PR_Curried _ arity)
+					# ({fun_body}, das_fun_defs, das_fun_heap)
 							= get_fun_def symbol.symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
-					-> (fun_body, take nr_of_applied_args [ fv_name \\ {fv_name}<-tb.tb_args ], das_fun_defs, das_fun_heap)
+					-> case fun_body of
+						(TransformedBody tb)
+							-> (NoBody, take nr_of_applied_args [ fv_name \\ {fv_name}<-tb.tb_args ], das_fun_defs, das_fun_heap)
+						_
+							-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
+	  			_
+					# ({fun_body}, das_fun_defs, das_fun_heap)
+							= get_fun_def symbol.symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
+					-> case fun_body of
+						(TransformedBody tb)
+							-> (fun_body, take nr_of_applied_args [ fv_name \\ {fv_name}<-tb.tb_args ], das_fun_defs, das_fun_heap)
+						_
+							-> abort ("determine_args:not a Transformed Body:"--->("producer",producer))
 	  (form_vars, act_vars, das_var_heap) 
 	  		= build_var_args (reverse var_names) das.das_vars [] das_var_heap
 	  (expr_to_unfold, das_var_heap)
@@ -1748,6 +1762,7 @@ where
 			CUnused		-> [CActive:copy_classes (dec n) ccs]
 			cc			-> [cc:copy_classes (dec n) ccs]
 
+/*
 	build_application_type st_arity nr_context_args st_result st_args nr_of_applied_args
 		| st_arity+nr_context_args==nr_of_applied_args
 			= st_result
@@ -1760,6 +1775,85 @@ where
 	  where
 		has_unique_attribute {at_attribute=TA_Unique} = True
 		has_unique_attribute _ = False
+*/
+	build_application_type st_arity nr_context_args st_result st_args nr_of_applied_args attr_env attr_store
+		| st_arity+nr_context_args==nr_of_applied_args
+			= (st_result, attr_env, attr_store)
+		| nr_of_applied_args<nr_context_args
+			= abort "sanity check nr 234 failed in module trans"
+		# req_arity	= nr_of_applied_args - nr_context_args
+
+		= currySymbolType st_args st_arity st_result attr_env req_arity attr_store
+/*
+		# (type`,attr_env`,attr_store`)
+			= currySymbolType st_args st_arity st_result attr_env req_arity attr_store
+		# (applied_args, unapplied_args) = splitAt req_arity st_args
+		  attr_approx = if (any has_unique_attribute applied_args) TA_Unique TA_Multi			// DvA: should be var instead of multi...
+		# type = foldr (\atype1 atype2->{at_attribute=attr_approx, at_type=atype1-->atype2})
+				st_result unapplied_args
+		| False ---> ("build",type,type`) = undef
+//		= (type, attr_env, attr_store)
+		= (type`, attr_env`, attr_store`)
+	  where
+		has_unique_attribute {at_attribute=TA_Unique} = True
+		has_unique_attribute _ = False
+*/
+// DvA: from type.icl...
+currySymbolType tst_args tst_arity tst_result tst_attr_env req_arity ts_attr_store
+	| tst_arity == req_arity
+		= (tst_result, tst_attr_env, ts_attr_store)
+	# (tst_args, rest_args, is_unique)			= split_args req_arity tst_args 
+	| is_unique
+		# (type, _, _)							= buildCurriedType rest_args tst_result TA_Unique [] 0
+		= (type, tst_attr_env, ts_attr_store)
+		# tst_attr_env							= build_attr_env ts_attr_store tst_args tst_attr_env
+		# (type, tst_attr_env, ts_attr_store)	= buildCurriedType rest_args tst_result (TA_TempVar ts_attr_store)
+		  												tst_attr_env (inc ts_attr_store)
+		= (type, tst_attr_env, ts_attr_store)
+where
+	split_args 0 args = ([], args, False)
+	split_args n [atype=:{at_attribute} : args]
+		# (left, right, is_unique) = split_args (dec n) args
+		= ([ atype : left ], right, is_unique || attr_is_unique at_attribute)
+	
+	attr_is_unique TA_Unique = True
+	attr_is_unique _ = False
+	
+	build_attr_env cum_attr_var [] attr_env
+		= attr_env
+	build_attr_env cum_attr_var [{at_attribute=(TA_TempVar attr_var)} : args] attr_env
+		# attr_env = [{ ac_demanded = attr_var, ac_offered = cum_attr_var } : attr_env]
+		= build_attr_env cum_attr_var args attr_env
+	build_attr_env cum_attr_var [_ : args] attr_env
+		= build_attr_env cum_attr_var args attr_env
+
+buildCurriedType [] type cum_attr attr_env attr_store
+	= (type, attr_env, attr_store)
+buildCurriedType [at=:{at_attribute}:ats] type cum_attr attr_env attr_store
+	# (next_cum_attr, attr_env, attr_store) = combine_attributes at_attribute cum_attr attr_env attr_store
+	  (res_type, attr_env, attr_store) = buildCurriedType ats type next_cum_attr attr_env attr_store
+	= ({at_attribute = cum_attr , at_type = at --> res_type }, attr_env, attr_store)
+where
+	combine_attributes TA_Unique cum_attr attr_env attr_store
+		= (TA_Unique, attr_env, attr_store)
+	combine_attributes (TA_TempVar attr_var) (TA_TempVar cum_attr_var) attr_env attr_store
+		# attr_env =
+			[{ ac_demanded = cum_attr_var,ac_offered = attr_store }
+			,{ ac_demanded = attr_var,ac_offered = attr_store }
+			:attr_env]
+		= (TA_TempVar attr_store, attr_env, inc attr_store)
+	combine_attributes (TA_TempVar _) cum_attr attr_env attr_store
+		= (cum_attr, attr_env, attr_store)
+	combine_attributes _ (TA_TempVar cum_attr_var) attr_env attr_store
+		# attr_env = [{ ac_demanded = cum_attr_var,ac_offered = attr_store }:attr_env]
+		= (TA_TempVar attr_store, attr_env, inc attr_store)
+	combine_attributes _ cum_attr attr_env attr_store
+		= (cum_attr, attr_env, attr_store)
+
+freshAttrVar attr_var th_attrs
+	# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
+	= ({ av_name = NewAttrVarId attr_var, av_info_ptr = new_info_ptr }, th_attrs)
+
 
 //@ max_group_index
 
