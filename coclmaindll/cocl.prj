@@ -1,6 +1,6 @@
 Version: 1.4
 Global
-	Built:	True
+	Built:	False
 	Target:	StdEnv
 	Exec:	{Project}\cocl.exe
 	CodeGen
@@ -43,36 +43,10 @@ Global
 		Path:	{Project}\main\Windows
 		Path:	{Project}\backend\Windows
 		Path:	{Application}\Libraries\ArgEnvWindows 1.0.3
+		Path:	{Application}\Libraries\ArgEnvWindows
 	Precompile:	
 	Postlink:	
 MainModule
 	Name:	cocl
 	Dir:	{Project}\main
-	Compiler
-		NeverMemoryProfile:	False
-		NeverTimeProfile:	False
-		StrictnessAnalysis:	True
-		ListTypes:	StrictExportTypes
-		ListAttributes:	True
-		Warnings:	True
-		Verbose:	True
-		ReadableABC:	False
-		ReuseUniqueNodes:	True
-	Dcl
-		WindowPosition
-			X:	0
-			Y:	0
-			SizeX:	500
-			SizeY:	300
-	DclOpen:	False
-	Icl
-		WindowPosition
-			X:	0
-			Y:	0
-			SizeX:	500
-			SizeY:	300
-	IclOpen:	False
-	LastModified:	No 0 0 0 0 0 0
-Static
-	AppP:	
-	PrjP:	
+
