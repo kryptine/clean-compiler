@@ -17,10 +17,21 @@
 
 void
 AssertionFailed (char *conditionString, char *file, int line)
-{
+{	
 	FPrintF (StdError, "Error in backend: File %s, Line %d (%s)\n", file, line, conditionString);
 
+# ifdef _WINDOWS_
+	{
+		static char error[200];
+
+		sprintf (error, "Error in backend: File %s, Line %d (%s)\nDebug ?", file, line, conditionString);
+	
+		if (MessageBox (NULL,error,"AssertionFailed",MB_YESNO)==IDYES)
+			Debugger ();
+	}
+#else
 	Debugger ();
+#endif
 } /* AssertionFailed */
 
 /*
