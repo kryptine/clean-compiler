@@ -214,7 +214,7 @@ where
 		= True
 	has_to_be_checked (Yes ({copied_class_defs}, n_cached_dcl_mods)) {glob_module,glob_object}
 		= not (glob_module < n_cached_dcl_mods && glob_object < size copied_class_defs && copied_class_defs.[glob_object])
-	
+
 ::	InstanceSymbols =
 	{	is_type_defs		:: !.{# CheckedTypeDef}
 	,	is_class_defs		:: !.{# ClassDef}
@@ -332,7 +332,7 @@ where
 			# cs_error = checkError id_name "arity of a generic instance must be 1" cs_error 
 			# cs = {cs & cs_error = cs_error}
 			= (ins, is, type_heaps, cs)
-						 
+
 checkInstances :: !Index !*CommonDefs !u:{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (![(Index,SymbolType)], !*CommonDefs, !u:{# DclModule}, !*VarHeap , !*TypeHeaps, !*CheckState)
 checkInstances mod_index icl_common=:{com_instance_defs,com_class_defs,com_member_defs,com_generic_defs,com_type_defs} modules var_heap type_heaps cs=:{cs_error}
@@ -1630,7 +1630,7 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 			= (No, (already_visited, cs_symbol_table))
 		= (Yes ste_index, (bitvectSet ste_index already_visited, cs_symbol_table))
 
-	set_to_false :: (Import x) !(!*LargeBitvect, !u:SymbolTable) -> !(!.LargeBitvect, !u:SymbolTable)
+	set_to_false :: (Import x) !(!*LargeBitvect, !u:SymbolTable) -> (!.LargeBitvect, !u:SymbolTable)
 	set_to_false {import_module} (bitvect, cs_symbol_table)
 		#! ste_index
 				= (sreadPtr import_module.id_info cs_symbol_table).ste_index
@@ -1854,9 +1854,9 @@ checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cyc
   	  				mod ste_index expl_imp_infos dcl_modules icl_functions macro_defs heaps
   	  				{ cs & cs_symbol_table = cs_symbol_table }
 
-renumber_icl_module :: ModuleKind IndexRange IndexRange Index Int {#Int} (Optional {#{#Int}}) IndexRange  *{#FunDef}  *CommonDefs  [Declaration]  *{#DclModule}
-												 -> (![IndexRange],![IndexRange],!Int,!Index,!IndexRange,!*{#FunDef},!*CommonDefs,![Declaration],!*{#DclModule});
-renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules
+renumber_icl_module :: ModuleKind IndexRange IndexRange Index Int {#Int} (Optional {#{#Int}}) IndexRange  *{#FunDef}  *CommonDefs  [Declaration]  *{#DclModule} *ErrorAdmin
+												 -> (![IndexRange],![IndexRange],!Int,!Index,!IndexRange,!*{#FunDef},!*CommonDefs,![Declaration],!*{#DclModule},*ErrorAdmin);
+renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules error
 
 	# (optional_icl_to_dcl_index_table,optional_old_conversion_table,dcl_modules,icl_functions)
 		= create_icl_to_dcl_index_table mod_type icl_sizes icl_global_function_range main_dcl_module_n dcl_conversions dcl_modules icl_functions
@@ -1864,8 +1864,11 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 	# (dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n]
 	# icl_functions = add_dummy_specialized_functions mod_type dcl_mod icl_functions
 	# class_instances = icl_common.com_instance_defs
-	# (dcl_icl_conversions, class_instances)
-		= add_dcl_instances_to_conversion_table optional_old_conversion_table nr_of_functions dcl_mod class_instances
+	# (dcl_icl_conversions, class_instances,error)
+		= add_dcl_instances_to_conversion_table optional_old_conversion_table nr_of_functions dcl_mod class_instances error
+	| not error.ea_ok
+		= ([],[],0,0,def_macro_indices,icl_functions,{icl_common & com_instance_defs=class_instances},local_defs,dcl_modules,error)
+
 	# (n_functions,icl_functions) = usize icl_functions
 	# optional_icl_to_dcl_index_table = recompute_icl_to_dcl_index_table_for_functions optional_icl_to_dcl_index_table dcl_icl_conversions n_functions
 	# class_instances = renumber_member_indexes_of_class_instances optional_icl_to_dcl_index_table class_instances
@@ -1904,7 +1907,7 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 	# def_macro_indices={ir_from=first_macro_index,ir_to=end_macro_indexes}
 	# icl_instances_ranges = [dcl_instances,{ir_from=icl_instance_range.ir_from+n_dcl_specials+n_dcl_instances,ir_to=icl_instance_range.ir_to+n_dcl_specials}]
 
-	= (icl_global_functions_ranges,icl_instances_ranges,n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules)
+	= (icl_global_functions_ranges,icl_instances_ranges,n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules,error)
 	where
 		add_dummy_specialized_functions MK_Main dcl_mod icl_functions
 			= icl_functions
@@ -1915,18 +1918,18 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 				# dummy_function = {fun_symb={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_specials-1]]
 
-		add_dcl_instances_to_conversion_table :: (Optional {#{#Int}}) !Index !DclModule !*{# ClassInstance} -> (!*Optional *{#Index},!*{# ClassInstance})
- 		add_dcl_instances_to_conversion_table optional_old_conversion_table first_free_index dcl_mod=:{dcl_specials,dcl_functions,dcl_common,dcl_macro_conversions} icl_instances
+		add_dcl_instances_to_conversion_table :: (Optional {#{#Int}}) !Index !DclModule !*{# ClassInstance} *ErrorAdmin -> (!*Optional *{#Index},!*{# ClassInstance},*ErrorAdmin)
+ 		add_dcl_instances_to_conversion_table optional_old_conversion_table first_free_index dcl_mod=:{dcl_specials,dcl_functions,dcl_common,dcl_macro_conversions} icl_instances error
 			= case dcl_macro_conversions of
 				Yes _
-					# (new_conversion_table, icl_instances)
+					# (new_conversion_table, icl_instances,error)
 					  		= build_conversion_table_for_instances_of_dcl_mod dcl_specials first_free_index optional_old_conversion_table
-					  				dcl_functions dcl_common.com_instance_defs icl_instances
-					-> (Yes new_conversion_table,icl_instances)
+					  				dcl_functions dcl_common.com_instance_defs icl_instances error
+					-> (Yes new_conversion_table,icl_instances,error)
 				No
-					-> (No,icl_instances)
+					-> (No,icl_instances,error)
 		where
-			build_conversion_table_for_instances_of_dcl_mod {ir_from,ir_to} first_free_index optional_old_conversion_table dcl_functions dcl_instances icl_instances
+			build_conversion_table_for_instances_of_dcl_mod {ir_from,ir_to} first_free_index optional_old_conversion_table dcl_functions dcl_instances icl_instances error
 				#! nr_of_dcl_functions = size dcl_functions
 				# (Yes old_conversion_table) = optional_old_conversion_table
 				# dcl_instances_table = old_conversion_table.[cInstanceDefs]
@@ -1934,21 +1937,25 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_
 				  new_table = { createArray nr_of_dcl_functions NoIndex & [i] = icl_index \\ icl_index <-: dcl_function_table & i <- [0..] }
 				  index_diff = first_free_index - ir_from
 				  new_table = { new_table & [i] = i + index_diff \\ i <- [ir_from .. ir_to - 1] }
-				= build_conversion_table_for_instances 0 dcl_instances dcl_instances_table icl_instances new_table
+				= build_conversion_table_for_instances 0 dcl_instances dcl_instances_table icl_instances new_table error
 
-			build_conversion_table_for_instances dcl_class_inst_index dcl_instances class_instances_table icl_instances new_table 
+			build_conversion_table_for_instances dcl_class_inst_index dcl_instances class_instances_table icl_instances new_table error
 				| dcl_class_inst_index < size class_instances_table
 					# icl_index = class_instances_table.[dcl_class_inst_index]				
 					# (icl_instance, icl_instances) = icl_instances![icl_index]
-					  dcl_instance = dcl_instances.[dcl_class_inst_index]
-					# new_table = build_conversion_table_for_instances_of_members 0 dcl_instance.ins_members icl_instance.ins_members new_table
-					= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances class_instances_table icl_instances new_table
-					= (new_table, icl_instances)
+					  dcl_members = dcl_instances.[dcl_class_inst_index].ins_members
+					  icl_members = icl_instance.ins_members
+					| size dcl_members == size icl_members
+						# new_table = build_conversion_table_for_instances_of_members 0 dcl_members icl_members new_table
+						= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances class_instances_table icl_instances new_table error
+						# error = checkErrorWithIdentPos (newPosition icl_instance.ins_ident icl_instance.ins_pos) "incorrect number of members specified" error
+						= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances class_instances_table icl_instances new_table error
+					= (new_table, icl_instances,error)
 			
 			build_conversion_table_for_instances_of_members mem_index dcl_members icl_members new_table
 				| mem_index < size dcl_members
 					# dcl_member = dcl_members.[mem_index]
-					  icl_member = icl_members.[mem_index]
+					# icl_member = icl_members.[mem_index]
 					# new_table = {new_table & [dcl_member.ds_index] = icl_member.ds_index}
 					= build_conversion_table_for_instances_of_members (inc mem_index) dcl_members icl_members new_table
 					= new_table
@@ -2124,14 +2131,17 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 		= (False, abort "evaluated error 2 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 
 	# def_macro_indices=cdefs.def_macro_indices
-	# (icl_global_functions_ranges,icl_instances_ranges,n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules)
-		= renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules
+	# (icl_global_functions_ranges,icl_instances_ranges,n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules,error)
+		= renumber_icl_module mod_type icl_global_function_range icl_instance_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules cs.cs_error
+
+	| not error.ea_ok
+		= (False, abort "evaluated error 3 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, error.ea_file, [])
 
 	# (imported_module_numbers_of_main_dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n].dcl_imported_module_numbers
 	  (imported_module_numbers, dcl_modules)
 	  		= foldSt compute_used_module_nrs expl_imp_indices (addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod, dcl_modules)
 	 
-	  cs = { cs & cs_x.x_needed_modules = 0 }
+	  cs = { cs & cs_error=error,cs_x.x_needed_modules = 0 }
 	
 	  (nr_of_modules, dcl_modules)	= usize dcl_modules
 
@@ -2337,7 +2347,7 @@ check_module2 mod_name mod_modification_time mod_imported_objects mod_imports mo
 				# (fv_info_ptr, var_heap) = newPtr VI_Empty var_heap
 				= ({ fv & fv_info_ptr = fv_info_ptr, fv_def_level = NotALevel, fv_count = 0}, var_heap)
 			
-		copy_instance_types :: [(Index,SymbolType)] !*{# FunDef} -> !*{# FunDef}
+		copy_instance_types :: [(Index,SymbolType)] !*{# FunDef} -> *{# FunDef}
 		copy_instance_types types fun_defs 
 			= foldl copy_instance_type fun_defs types
 		
