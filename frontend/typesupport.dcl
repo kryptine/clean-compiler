@@ -135,3 +135,30 @@ accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r,
 class removeAnnotations a :: !a  -> (!Bool, !a)
 
 instance removeAnnotations Type, SymbolType
+
+foldATypeSt on_atype on_type type st :== fold_atype_st type st
+  where
+	fold_type_st type=:(TA type_symb_ident args) st
+		#! st
+				= foldSt fold_atype_st args st
+		= on_type type st
+	fold_type_st type=:(l --> r) st
+		#! st
+				= fold_atype_st r (fold_atype_st l st)
+		= on_type type st
+	fold_type_st type=:(_ :@: args) st
+		#! st
+				= foldSt fold_atype_st args st
+		= on_type type st
+	fold_type_st type=:(TB _) st
+		= on_type type st
+	fold_type_st type=:(GTV _) st
+		= on_type type st
+	fold_type_st type=:(TV _) st
+		= on_type type st
+
+	fold_atype_st atype=:{at_type} st
+		#! st
+				= fold_type_st at_type st
+		= on_atype atype st
+

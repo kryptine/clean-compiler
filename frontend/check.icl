@@ -386,9 +386,12 @@ where
 				= check_member_instances module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_name ins_pos ins_type
 						instance_types member_defs type_defs modules var_heap type_heaps
 							{ cs & cs_error = checkError class_member.ds_ident "used with wrong arity" cs.cs_error}
-				# ({me_type,me_class_vars,me_pos}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
-				  (instance_type, _, type_heaps, Yes cs_error) = determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes cs.cs_error)
-				  (type_defs, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n True ins_pos class_name instance_type type_defs modules cs_error
+				# ({me_symb, me_type,me_class_vars,me_pos}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
+				  cs_error = pushErrorAdmin (newPosition class_name ins_pos) cs.cs_error
+				  (instance_type, _, type_heaps, Yes (modules, type_defs), Yes cs_error)
+				  		= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, x_main_dcl_module_n)) (Yes cs_error)
+				  (type_defs, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n True me_symb instance_type type_defs modules cs_error
+				  cs_error = popErrorAdmin cs_error
 				  (st_context, var_heap) = initializeContextVariables instance_type.st_context var_heap
 				= check_member_instances module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_name ins_pos ins_type
 						[ (ins_member.ds_index, { instance_type & st_context = st_context }) : instance_types ] member_defs type_defs modules var_heap type_heaps { cs & cs_error = cs_error }
@@ -447,6 +450,7 @@ instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_en
 	  							-> Yes (checkError "instance type incompatible with class type" "" 
 	  										error_admin)
 	  								// e.g.:class c a :: (a Int); instance c Real
+
 	= (inst_vars, inst_attr_vars, inst_types, inst_contexts ++ new_ss_context, inst_attr_env, special_subst_list, { type_heaps & th_vars = th_vars }, opt_error)
 where
 	clear_vars type_vars type_var_heap = foldSt (\tv -> writePtr tv.tv_info_ptr TVI_Empty) type_vars type_var_heap
@@ -494,14 +498,16 @@ hasTypeVariables [TV tvar : types]
 hasTypeVariables [ _ : types]
 	= hasTypeVariables types
 
-determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !(Optional *ErrorAdmin)
-		-> (!SymbolType, !Specials, !*TypeHeaps, !Optional *ErrorAdmin)
-determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_error
+determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !(Optional *ErrorAdmin)
+		-> (!SymbolType, !Specials, !*TypeHeaps, !u:Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !Optional *ErrorAdmin)
+determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_modules opt_error
 	# env = { ss_environ = foldl2 (\binds var type -> [ {bind_src = type, bind_dst = var} : binds]) [] class_vars it_types,
 			  ss_context = it_context, ss_vars = it_vars, ss_attrs = it_attr_vars} 
 	  (st, specials, type_heaps, opt_error)
 	  		= determine_type_of_member_instance mem_st env specials type_heaps opt_error
-	= (st, specials, type_heaps, opt_error)
+	  (type_heaps, opt_modules, opt_error)
+	  		= check_attribution_consistency mem_st type_heaps opt_modules opt_error
+	= (st, specials, type_heaps, opt_modules, opt_error)
 where
 	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps opt_error
 		# (mem_st, substs, type_heaps, opt_error) 
@@ -518,6 +524,59 @@ where
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, specials, type_heaps, opt_error)
 
+	check_attribution_consistency {st_args, st_result} type_heaps No No
+		= (type_heaps, No, No)
+	check_attribution_consistency {st_args, st_result} type_heaps=:{th_vars} (Yes (modules, type_defs, x_main_dcl_module_n)) (Yes error)
+		// it is assumed that all type vars bindings done in instantiateTypes are still valid
+		# (_, th_vars, modules, type_defs, error)
+				= foldSt (foldATypeSt (check_it x_main_dcl_module_n) (\_ st -> st))
+						[st_result:st_args]
+						(False, th_vars, modules, type_defs, error)
+		= ({ type_heaps & th_vars = th_vars }, Yes (modules, type_defs), Yes error)
+	
+	check_it _ {at_attribute} (error_already_given, th_vars, modules, type_defs, error)
+		| at_attribute==TA_Unique || error_already_given
+			= (error_already_given, th_vars, modules, type_defs, error)
+		// otherwise GOTO next alternative
+	check_it x_main_dcl_module_n {at_type=TV tv} (_, th_vars, modules, type_defs, error)
+  		= must_not_be_essentially_unique x_main_dcl_module_n tv th_vars modules type_defs error
+	check_it x_main_dcl_module_n {at_type= (CV tv) :@: _} (_, th_vars, modules, type_defs, error)
+  		= must_not_be_essentially_unique x_main_dcl_module_n tv th_vars modules type_defs error
+	check_it _ _ state
+		= state
+		
+	must_not_be_essentially_unique x_main_dcl_module_n {tv_name, tv_info_ptr} th_vars modules type_defs error
+		# (TVI_Type type, th_vars)
+				= readPtr tv_info_ptr th_vars
+		= case type of
+			TA {type_name, type_index} _
+				# (type_def, type_defs, modules)
+						= getTypeDef x_main_dcl_module_n type_index type_defs modules
+				-> case type_def.td_attribute of
+					TA_Unique
+						-> (True, th_vars, modules, type_defs,
+							checkError type_name 
+								(   "is unique but instanciates class variable "
+								 +++tv_name.id_name
+								 +++" that is non uniquely used in a member type"
+								) error
+						   )
+					_
+						-> (False, th_vars, modules, type_defs, error)
+			_
+				-> (False, th_vars, modules, type_defs, error)
+
+getTypeDef :: !Index !(Global Index) !v:{#CheckedTypeDef} !w:{#DclModule}
+		-> (!CheckedTypeDef, !v:{#CheckedTypeDef}, !w:{#DclModule})
+getTypeDef x_main_dcl_module_n {glob_module,glob_object} type_defs modules
+	| glob_module==x_main_dcl_module_n
+		# (type_def, type_defs)
+				= type_defs![glob_object]
+		= (type_def, type_defs, modules)
+	# (type_def, modules)
+			= modules![glob_module].dcl_common.com_type_defs.[glob_object]
+	= (type_def, type_defs, modules)
+		
 determineTypesOfInstances :: !Index !Index !*{#ClassInstance} !*{# ClassDef} !*{# MemberDef}
 							 !*{#DclModule} !*TypeHeaps !*VarHeap !*CheckState
 	-> (![FunType], !Index, ![ClassInstance], !*{#ClassInstance}, !*{# ClassDef}, !*{# MemberDef}, !*{#DclModule}, !*TypeHeaps, !*VarHeap, !*CheckState)
@@ -565,8 +624,13 @@ where
 			=  ([], [], member_defs, modules, type_heaps, var_heap, cs_error)
 			# class_member = class_members.[mem_offset]
 			  ({me_symb,me_type,me_priority,me_class_vars}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
-			  (instance_type, new_ins_specials, type_heaps, Yes cs_error) = determineTypeOfMemberInstance me_type me_class_vars ins_type ins_specials type_heaps (Yes cs_error)
-			  (_, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n False ins_pos class_name instance_type cDummyArray modules cs_error
+			  cs_error
+			  		= pushErrorAdmin (newPosition class_name ins_pos) cs_error
+			  (instance_type, new_ins_specials, type_heaps, Yes (modules, _), Yes cs_error)
+			  		= determineTypeOfMemberInstance me_type me_class_vars ins_type ins_specials type_heaps (Yes (modules, {}, cUndef)) (Yes cs_error)
+			  (_, modules, cs_error) = checkTopLevelKinds x_main_dcl_module_n False me_symb instance_type cDummyArray modules cs_error
+			  cs_error
+			  		= popErrorAdmin cs_error
 			  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  inst_def = MakeNewFunctionType me_symb me_type.st_arity me_priority instance_type ins_pos new_ins_specials new_info_ptr
 			  (inst_symbols, memb_inst_defs, member_defs, modules, type_heaps, var_heap, cs_error)
@@ -603,21 +667,24 @@ where
 			= (tc_types, error)
 
 
-checkTopLevelKinds :: !Index !Bool !Position Ident !SymbolType n:{# CheckedTypeDef} !r:{# DclModule} !*ErrorAdmin
+checkTopLevelKinds :: !Index !Bool Ident !SymbolType n:{# CheckedTypeDef} !r:{# DclModule} !*ErrorAdmin
 					-> (!n:{# CheckedTypeDef}, !r:{# DclModule}, !*ErrorAdmin)
-checkTopLevelKinds x_main_dcl_module_n is_icl_module ins_pos class_ident st=:{st_args, st_result} type_defs modules cs_error
-	#! ok = all (\{at_type} -> kind_is_ok x_main_dcl_module_n is_icl_module type_defs modules 0 at_type) [st_result:st_args]
+checkTopLevelKinds x_main_dcl_module_n is_icl_module me_symb st=:{st_args, st_result} type_defs modules cs_error
+	#! first_wrong = firstIndex (\{at_type} -> not (kind_is_ok x_main_dcl_module_n is_icl_module type_defs modules 0 at_type)) [st_result:st_args]
 	# cs_error
-	  		= case ok of
-	  			True
+	  		= case first_wrong of
+	  			(-1)
 	  				-> cs_error
 	  			_ 
-	  				# cs_error
-	  						= pushErrorAdmin (newPosition class_ident ins_pos) cs_error
-	  				  cs_error
-	  				  		= checkError "instance types have wrong kind" "" cs_error
-	  				-> popErrorAdmin cs_error
-	= (type_defs, modules, cs_error)
+	  				-> checkError "instance type has wrong kind" 
+	  				  			(   "(e.g. "
+	  				  			 +++arg_string first_wrong
+	  				  			 +++" of member "
+	  				  			 +++toString me_symb
+	  				  			 +++")"
+	  				  			) 
+	  				  			cs_error
+= (type_defs, modules, cs_error)
   where
 	kind_is_ok x_main_dcl_module_n is_icl_module type_defs modules demanded_kind type=:(TA {type_index={glob_object,glob_module}} args)
 		# {td_arity}
@@ -1744,7 +1811,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  	= checkInstanceBodies icl_instance_range icl_functions e_info heaps cs
 	 
 	  (icl_functions, hp_type_heaps, cs_error)
-	  		= // foldSt checkSpecifiedInstanceType instance_types 
+	  		= foldSt checkSpecifiedInstanceType instance_types 
 	  				(icl_functions, heaps.hp_type_heaps, cs_error)
 	  
 	  heaps
@@ -2780,6 +2847,9 @@ Ste_Empty :== STE_Empty
 dummy_decl
 	=: { decl_ident = { id_name = "", id_info = nilPtr }, decl_pos = NoPos, decl_kind = STE_Empty, decl_index = cUndef }
 
+arg_string 0 = "result"
+arg_string arg_nr = toString arg_nr+++". arg"
+
 possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs
 	| switch_port_to_new_syntax False True
 		= abort "possibly_write_expl_imports_of_main_dcl_mod_to_file is only used for portToNewSyntax"
@@ -2791,3 +2861,4 @@ possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs
 			-> (dcl_modules, cs)
 		Yes {si_explicit}
 			-> writeExplImportsToFile "dcl.txt" si_explicit dcl_modules cs
+

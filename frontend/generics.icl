@@ -1172,8 +1172,8 @@ determineMemberTypes module_index ins_index
 		
 		
 	// determine type of the member instance		
-	# (symbol_type, _, hp_type_heaps, _) = 
-		determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No
+	# (symbol_type, _, hp_type_heaps, _, _) = 
+		determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No No
 	# (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
 	# symbol_type = {symbol_type & st_context = st_context}			
 	
