@@ -494,7 +494,7 @@ where
 	defineOtherDclModule :: ModuleIndex DclModule -> BackEnder
 	defineOtherDclModule moduleIndex dclModule
 		| moduleIndex == main_dcl_module_n || moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
-			=	identity
+			=	identity		
 		// otherwise
 			=	defineDclModule moduleIndex dclModule
 
@@ -649,8 +649,6 @@ instance declareVars AlgebraicPattern where
 instance declareVars BasicPattern where
 	declareVars {bp_expr} dvInput
 		=	declareVars bp_expr dvInput
-
-:: ModuleIndex :== Index
 
 class declare a :: ModuleIndex a  -> BackEnder
 
@@ -825,7 +823,6 @@ defineType moduleIndex constructors _ typeIndex {td_name, td_args, td_rhs=AlgTyp
 	=	appBackEnd (BEAlgebraicType flatType constructors) be
 defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordType {rt_constructor, rt_fields}} be
 //	| trace_tn constructorDef.cons_symb
-
 	# (flatType, be)
 		=	convertTypeLhs moduleIndex typeIndex td_args be
 	# (fields, be)
@@ -851,6 +848,8 @@ defineType moduleIndex constructors selectors typeIndex {td_args, td_rhs=RecordT
 						_
 							->	(constructorDef.cons_type,be))
 defineType moduleIndex _ _ typeIndex {td_args, td_rhs=AbstractType _} be
+ 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_args) be
+defineType moduleIndex _ _ typeIndex {td_args, td_rhs=AbstractSynType _ _} be
  	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_args) be
 defineType _ _ _ _ _ be
 	=	be
@@ -2174,8 +2173,8 @@ getVariableSequenceNumber varInfoPtr be
 			-> (sequenceNumber,be)
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
-		vi
-			-> abort "getVariableSequenceNumber" // <<- vi
+//		vi
+//			-> abort "getVariableSequenceNumber" // <<- vi
 
 foldStateWithIndexTwice function n
 	:== foldStateWithIndexTwice 0
