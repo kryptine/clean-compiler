@@ -205,20 +205,21 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 		}
 	# type_defs
 		=	common_defs.[main].com_type_defs
-	# info =
-		{	ri_main = main
-		,	ri_common_defs = common_defs
-		}
 	# (type_funs, bs_state)
-		=	build 0 (size type_defs) type_defs icl_functions info bs_state 
+		=	build 0 (size type_defs) type_defs icl_functions bs_state 
 	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, 
 			bs_state.bs_type_heaps)
 	where
-		build i n type_defs functions info bs_state
+		build i n type_defs functions bs_state
 			| i < n
+				# info =
+					{	ri_main = main
+					,	ri_common_defs = common_defs
+					,	ri_type_var_num = 0
+					}
 				# (functions, bs_state)
 					=	buildTypeFunction type_defs.[i] functions info bs_state
-				=	build (i+1) n type_defs functions info bs_state
+				=	build (i+1) n type_defs functions bs_state
 			// otherwise
 				=	(functions, bs_state)
 
@@ -228,10 +229,8 @@ buildTypeFunction type_def=:{td_fun_index, td_args} functions info bs_state
 	| td_fun_index == NoIndex
 		=	(functions, bs_state)
 	// otherwise
-		# bs_state
-			=	numberTypeVariables td_args info bs_state
 		# (rhs, bs_state)
-			=	reify type_def info bs_state
+			=	numberTypeVarsBeforeRiefy td_args (reify type_def) info bs_state
 		# (new_info_ptr, bs_var_heap) = newPtr VI_Empty bs_state.bs_var_heap
 		# bs_state
 			=	{bs_state & bs_var_heap=bs_var_heap}
@@ -246,15 +245,20 @@ buildTypeFunction type_def=:{td_fun_index, td_args} functions info bs_state
 			=	{functions & [td_fun_index].fun_body=TransformedBody body}
 		=	(functions, bs_state)
 
-numberTypeVariables :: a Info *BuildTypeFunState -> *BuildTypeFunState | numberTypeVars a
-numberTypeVariables x info bs_state
+numberTypeVarsBeforeRiefy :: a Riefier Info *BuildTypeFunState
+	-> (Expression, *BuildTypeFunState) | numberTypeVars a
+numberTypeVarsBeforeRiefy vars riefier info bs_state
 	# bs_type_heaps
 		=	bs_state.bs_type_heaps
-	# (_, th_vars)
-		=	numberTypeVars x (0, bs_type_heaps.th_vars)
+	# (ri_type_var_num, th_vars)
+		=	numberTypeVars vars (info.ri_type_var_num, bs_type_heaps.th_vars)
 	# bs_type_heaps
 		=	{bs_type_heaps & th_vars = th_vars}
-	=	{bs_state & bs_type_heaps = bs_type_heaps}
+	# bs_state
+		=	{bs_state & bs_type_heaps = bs_type_heaps}
+	# (expr, bs_state)
+		=	riefier {info & ri_type_var_num=ri_type_var_num} bs_state
+	=	(expr, bs_state)
 	
 class numberTypeVars a :: a (!Int, !*TypeVarHeap) -> (!Int, !*TypeVarHeap)
 
@@ -390,6 +394,7 @@ function fun_index info bs=:{bs_predefs}
 :: Info =
 	{	ri_main :: !Int
 	,	ri_common_defs :: !{#CommonDefs}
+	,	ri_type_var_num :: !Int
 	}
 
 :: Riefier :== Info -> BMonad Expression
@@ -439,8 +444,8 @@ instance reify TypeRhs where
 
 instance reify (Int, ConsDef) where
 	reify (cons_index, {cons_ident, cons_type, cons_exi_vars})
-		=	numberTypeVariables cons_exi_vars
-		o`	(record PD_CTConsDef
+		=	numberTypeVarsBeforeRiefy cons_exi_vars
+			(record PD_CTConsDef
 				` (function PD__CTToCons ` consSymbol cons_ident cons_index)
 				` cons_type.st_args ` length cons_exi_vars)
 		where
@@ -460,9 +465,8 @@ instance reify FieldSymbol where
 		=	selector fs_index
 		where
 			selector fs_index info=:{ri_main,ri_common_defs} st
-				=	(numberTypeVariables def.sd_exi_vars
-				o`	numberTypeVariables def.sd_type.st_vars
-				o`	(record PD_CTFieldDef
+				=	(numberTypeVarsBeforeRiefy vars
+					(record PD_CTFieldDef
 						` quote def.sd_ident.id_name
 						` length (def.sd_exi_vars)
 						` def.sd_type.st_result))
@@ -471,6 +475,9 @@ instance reify FieldSymbol where
 				def
 					=	ri_common_defs.[ri_main]
 									.com_selector_defs.[fs_index]
+				vars
+					=	[atv_variable \\ {atv_variable} <- def.sd_exi_vars]
+					++	def.sd_type.st_vars
 
 instance reify AType where
 	reify {at_type}
@@ -502,8 +509,7 @@ instance reify Type where
 	reify (TB basic_type)
 		=	reify basic_type
 	reify (TFA vars type)
-		=	numberTypeVariables vars
-		o`	reify type
+		=	numberTypeVarsBeforeRiefy vars (reify type)
 	reify t
 		=	undef //  <<- ("reify", t)
 
