@@ -40,6 +40,7 @@ where
 	convert_groups group_nr groups dcl_functions common_defs fun_defs_and_ci
 		| group_nr == size groups
 			= (groups, fun_defs_and_ci)
+		// otherwise
 			# (group, groups) = groups![group_nr]
 			= convert_groups (inc group_nr) groups dcl_functions common_defs
 				(foldSt (convert_function group_nr dcl_functions common_defs) group.group_members fun_defs_and_ci)
@@ -130,6 +131,7 @@ weightedRefCountOfVariable depth var_info_ptr lvi=:{lvi_count,lvi_var,lvi_depth,
 //					==> (lvi_var, " PUSHED ",lvi_depth)
 	| lvi_count == 0
 		= (True, { lvi & lvi_count = ref_count }, [var_info_ptr : new_vars])
+	// otherwise
 		= (lvi_new, { lvi & lvi_count = lvi_count + ref_count }, new_vars)
 
 class weightedRefCount e :: !RCInfo !e !*RCState -> *RCState
@@ -148,6 +150,7 @@ where
 					  (VI_LetVar lvi, rcs_var_heap) = readPtr var_info_ptr rcs.rcs_var_heap
 					-> { rcs & rcs_var_heap = rcs_var_heap <:= (var_info_ptr, VI_LetVar { lvi & lvi_expression = lvi_expression }) }
 //							 ==> (var_name, var_info_ptr, depth, lvi.lvi_count)
+				// otherwise
 					-> { rcs & rcs_var_heap = rcs.rcs_var_heap <:= (var_info_ptr, VI_LetVar lvi) }
 			_
 				-> rcs
@@ -184,6 +187,7 @@ where
 				# (VI_LetVar {lvi_count,lvi_depth}, var_heap) = readPtr fv_info_ptr var_heap
 				= (var_ptrs, var_heap) 
 //						==> ("remove_variable (lvi_count,lvi_dpeth) ", fv_name, lvi_count, lvi_depth)
+			// otherwise
 				# (var_ptrs, var_heap) = remove_variable (var_ptrs, var_heap) bind
 				= ([var_ptr : var_ptrs], var_heap)
 
@@ -297,6 +301,7 @@ where
 		# (VI_LetVar info=:{lvi_count,lvi_depth}, var_heap) = readPtr var_ptr var_heap
 		| lvi_depth == depth && lvi_count > 0
 			= (collected_vars, var_heap <:= (var_ptr, VI_LetVar {info & lvi_count = max lvi_count var_count}))
+		// otherwise
 			= ([ var : collected_vars], var_heap) 
 	
 	get_ref_count var_ptr var_heap
@@ -327,6 +332,7 @@ checkImportOfDclFunction {cii_main_dcl_module_n, cii_dcl_functions} mod_index fu
 		# {ft_type_ptr} = cii_dcl_functions.[mod_index].[fun_index]
 		  (rcs_imports, rcs_var_heap) = checkImportedSymbol (SK_Function {glob_module=mod_index,glob_object=fun_index}) ft_type_ptr (rcs_imports, rcs_var_heap)
 		= { rcs & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
+	// otherwise
 		= rcs
 checkRecordSelector {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} rcs=:{rcs_imports,rcs_var_heap}
 	| glob_module <> cii_main_dcl_module_n
@@ -337,6 +343,7 @@ checkRecordSelector {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_
 		  (rcs_imports, rcs_var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = cons_index})
 											cons_type_ptr (rcs_imports, rcs_var_heap)
 		= { rcs & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
+	// otherwise
 		= rcs
 	
 
@@ -412,6 +419,7 @@ where
 				| lei.lei_depth == depth
 					# ds = distributeLetsInLetExpression depth var_info_ptr lei ds
 					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, ds)
+				// otherwise
 					-> (Var { var & var_info_ptr = lei.lei_var.fv_info_ptr }, ds)
 			VI_CaseVar var_info_ptr
 				-> (Var { var & var_info_ptr = var_info_ptr }, ds)
@@ -459,6 +467,7 @@ where
 		  ds = foldSt (distribute_lets_in_non_distributed_let depth) let_lazy_binds ds
 		| nr_of_strict_lets == 0
 		    = (let_expr, ds)
+		// otherwise
 		    = case let_expr of
 		    	Let inner_let=:{let_info_ptr=inner_let_info_ptr}
 		    		# (EI_LetType strict_inner_types, ds_expr_heap) = readPtr inner_let_info_ptr ds.ds_expr_heap
@@ -481,6 +490,7 @@ where
 			| lei_count > 0
 //			| not lei_moved && lei_count > 0
 				= distributeLetsInLetExpression depth fv_info_ptr lei { ds & ds_var_heap = ds_var_heap }
+			// otherwise
 				= { ds & ds_var_heap = ds_var_heap }
 					==> ("distribute_lets_in_non_distributed_let (moved or not used)", lei_count, fv_name)
 
@@ -560,6 +570,7 @@ where
 			| lei_count == cv_count 
 				= ([(cv_variable, lei_count, lei_depth) : local_vars ], var_heap <:= (cv_variable, VI_LetExpression { lei & lei_depth = depth}))
 						==> ("mark_local_let_var ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
+			// otherwise
 				= (local_vars, var_heap)
 
 		reset_local_let_var (var_info_ptr, lei_count, lei_depth)  var_heap
@@ -578,6 +589,7 @@ where
 			| depth == lei.lei_depth
 				= (var_heap <:= (cv_variable, VI_LetExpression { lei & lei_count = cv_count, lei_status = LES_Untouched }))
 						==> ("mark_local_let_var_of_pattern_expr ", lei.lei_var.fv_name, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
+			// otherwise
 				= var_heap
 
 		reexamine_local_let_expressions depth {cv_variable, cv_count} ds=:{ds_var_heap}
@@ -585,7 +597,9 @@ where
 				# (VI_LetExpression lei, ds_var_heap) = readPtr cv_variable ds_var_heap
 				| depth == lei.lei_depth
 					= distributeLetsInLetExpression depth cv_variable lei { ds & ds_var_heap = ds_var_heap }
+				// otherwise
 					= { ds & ds_var_heap = ds_var_heap }
+			// otherwise
 				= ds
 
 distributeLetsInLetExpression :: Int VarInfoPtr LetExpressionInfo *DistributeState -> *DistributeState
@@ -605,6 +619,7 @@ buildLetExpr let_vars let_expr (var_heap, expr_heap)
 	# (lazy_binds, lazy_binds_types, var_heap) = foldr build_bind ([], [], var_heap) let_vars
 	| isEmpty lazy_binds
 		= (let_expr, (var_heap, expr_heap))
+	// otherwise
 		= case let_expr of
 			Let inner_let=:{let_info_ptr }
 				# (EI_LetType strict_bind_types, expr_heap) = readPtr let_info_ptr expr_heap
