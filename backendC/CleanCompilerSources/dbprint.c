@@ -398,7 +398,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		PrintSymbol (node->node_symbol, file);
 		FPutS (" [ ",file);
 
-		FPutS (" ",file);
 		{
 			NodeIdRefCountListP node_id_ref_count_elem;
 			
@@ -509,7 +508,18 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 	case GuardNode:
 		FPutS ("Guard ",file);
 		PrintArguments (node->node_arguments,'\n',True,n_leading_spaces,file);
-		break;	
+		
+		if (node->node_node_defs!=NULL){
+			FPutC ('\n', file);
+			print_spaces (n_leading_spaces,file);
+			FPutS ("{\n",file);
+			PrintNodeDefs (node->node_node_defs,n_leading_spaces+4,file);
+			print_spaces (n_leading_spaces,file);
+			FPutS ("}\n", file);
+			print_spaces (n_leading_spaces,file);
+		}
+
+		break;
 	case TupleSelectorsNode:
 		FPutS ("TupleSelectors (",file);
 		PrintArguments (node->node_arguments,',',True,n_leading_spaces,file);
