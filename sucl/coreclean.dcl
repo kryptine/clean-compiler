@@ -5,6 +5,8 @@ definition module coreclean
 from strat import Strategy
 from rule import Rule
 from syntax import TypeSymbIdent,Ident,TypeVar,ExprInfoPtr,VarInfoPtr,SymbKind
+from StdOverloaded import ==,toString
+from StdFile import <<<
 
 // Transitive necessities
 from strat import Substrategy
@@ -13,7 +15,6 @@ from graph import Graph,Node
 from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo
 from general import BITVECT
 from Heap import Ptr,PtrN,HeapN
-from StdOverloaded import ==
 from StdString import String
 
 :: SuclTypeSymbol
@@ -23,6 +24,7 @@ from StdString import String
  | SuclCHAR                 // Etc.
  | SuclREAL
  | SuclBOOL
+ | SuclSTRING
  | SuclDYNAMIC
  | SuclFILE
  | SuclWORLD
@@ -41,6 +43,7 @@ sucltypeheap :: [SuclTypeVariable]
  | SuclChar Char
  | SuclReal Real
  | SuclBool Bool
+ | SuclString String
 
 :: SuclSymbolKind
  = SuclFunction
@@ -57,6 +60,17 @@ instance == SuclTypeSymbol
 instance == SuclTypeVariable
 instance == SuclSymbol
 instance == SuclVariable
+
+instance toString SuclTypeSymbol
+instance <<< SuclTypeSymbol
+instance toString SuclTypeVariable
+instance <<< SuclTypeVariable
+instance toString SuclSymbol
+instance <<< SuclSymbol
+instance toString SuclSymbolKind
+instance <<< SuclSymbolKind
+instance toString SuclVariable
+instance <<< SuclVariable
 
 // Get the type rule and strictness of a built in core clean symbol
 coretyperule :: SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable

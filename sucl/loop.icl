@@ -11,7 +11,7 @@ import rule
 import graph
 import pfun
 import basic
-from general import Yes,No
+from general import Yes,No,--->
 import StdEnv
 
 /*
@@ -341,8 +341,8 @@ startswith _ _  = False
 
 // ==== ATTEMPT TO UNFOLD A REWRITE RULE ====
 
-tryunfold
- :: var                  // The root of the redex
+tryunfold ::
+    var                  // The root of the redex
     (Rule sym pvar)      // The rule to unfold
     (Pfun pvar var)      // The matching from rule's pattern to subject
     (Spine sym var pvar) // The spine returned by the strategy

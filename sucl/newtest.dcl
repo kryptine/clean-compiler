@@ -10,6 +10,9 @@ from spine import Answer,Spine,Subspine
 from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
 from general import Optional
+from StdFile import <<<
+from StdString import toString
+from StdOverloaded import ==
 
 :: Symredresult sym var tsym tvar
    = { srr_task_expression :: Rgraph sym var    // The initial area in canonical form
@@ -20,6 +23,9 @@ from general import Optional
      , srr_function_def    :: FuncDef sym var   // Resulting rewrite rules
      , srr_areas           :: [Rgraph sym var]  // New areas for further symbolic reduction (not necessarily canonical)
      }
+
+instance toString Symredresult sym var tsym tvar | toString sym & toString var & == var
+instance <<< Symredresult sym var tsym tvar | toString sym & <<<,==,toString var
 
 fullsymred ::
     [SuclSymbol]    // Fresh function symbols

@@ -15,14 +15,14 @@ import StdEnv
 mstub = stub "convert"
 
 // Cocl to Sucl for functions
-cts_function
- :: Int                                                 // Index of current module
-    u:{#FunDef}                                          // Function definitions (from ICL)
- -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]//Type rule (derives arity)
-    , [(SuclSymbol,[Bool])]                             // Strict arguments (just main args for now)
-    , [(SuclSymbol,[Rule SuclSymbol SuclVariable])]     // Rewrite rules
-    , [(SuclSymbol,SuclSymbolKind)]                     // Kind of symbol
-    , v:{#FunDef}                                        // Consulted function definitions
+cts_function ::
+    Int                                                     // Index of current module
+    u:{#FunDef}                                             // Function definitions (from ICL)
+ -> ( [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]   // Type rule (derives arity)
+    , [(SuclSymbol,[Bool])]                                 // Strict arguments (just main args for now)
+    , [(SuclSymbol,[Rule SuclSymbol SuclVariable])]         // Rewrite rules
+    , [(SuclSymbol,SuclSymbolKind)]                         // Kind of symbol
+    , v:{#FunDef}                                           // Consulted function definitions
     )
  ,  [u<=v]
 
@@ -145,7 +145,7 @@ convert_atype atype (heap,(graph,rest,srest))
                -> (heap`,graph`,typevar)
                   where [typevar:heap`] = heap
                         graph` = updategraph typevar notimpl graph
-                        notimpl = abort "convert_atype: unknown form of Type"
+                        notimpl = error "convert_atype: unknown form of Type"
 
 // Convert a basic type to a basic type symbol
 convert_btype :: BasicType -> SuclTypeSymbol
@@ -153,10 +153,11 @@ convert_btype BT_Int = SuclINT
 convert_btype BT_Char = SuclCHAR
 convert_btype BT_Real = SuclREAL
 convert_btype BT_Bool = SuclBOOL
+convert_btype (BT_String _) = SuclSTRING
 convert_btype BT_Dynamic = SuclDYNAMIC
 convert_btype BT_File = SuclFILE
 convert_btype BT_World = SuclWORLD
-convert_btype _ = abort "convert: convert_btype: unhandled BasicType constructor"
+convert_btype _ = error "convert: convert_btype: unhandled BasicType constructor"
 
 
 /******************************************************************************
@@ -182,8 +183,10 @@ convert_typedef dcli typedef
 getconstrs dcli (AlgType constrs)
 = map mkalgconstr constrs
   where mkalgconstr defsymb = SuclUser (SK_Constructor (mkglobal dcli defsymb.ds_index))
-getconstrs _ _
-= mstub "getconstrs" "unhandled TypeRhs form"
+getconstrs dcli (SynType at) = [] // FIXME: Make sure synonym types are handled correctly elsewhere
+getconstrs dcli (RecordType rt) = [SuclUser (SK_Constructor (mkglobal dcli rt.rt_constructor.ds_index))]
+getconstrs dcli (AbstractType bitvect) = [] // FIXME: Make sure synonym types are handled correctly elsewhere
+getconstrs dcli (UnknownType) = mstub "getconstrs" "UnknownType constructor not handled"
 
 mkglobal gmod gob = {glob_module = gmod, glob_object = gob}
 
@@ -196,7 +199,7 @@ convert_functionbody :: Int SuclSymbol FunctionBody [FunBinding SuclSymbol SuclV
 convert_functionbody main_dcl_module_n funsym (TransformedBody t) fundefs0 = convert_transformedbody main_dcl_module_n funsym t fundefs0
 convert_functionbody main_dcl_module_n funsym _ fundefs0
  = [(funsym,norule):fundefs0]
-   where norule = abort "convert: convert_functionbody: unexpected FunctionBody constructor"
+   where norule = error "convert: convert_functionbody: unexpected FunctionBody constructor"
 
 convert_transformedbody :: Int SuclSymbol TransformedBody [FunBinding SuclSymbol SuclVariable] -> [FunBinding SuclSymbol SuclVariable]
 convert_transformedbody main_dcl_module_n funsym {tb_args=args,tb_rhs=expression} fundefs0
@@ -228,8 +231,8 @@ heap = map SuclAnonymous [0..]
 convert_expressions main_dcl_module_n bounds exprs (heapseen0,(nodes0,fundefs0,globals0))
  = foldlr (convert_expression main_dcl_module_n bounds) (heapseen0,(nodes0,fundefs0,globals0,[])) exprs
 
-convert_expression
- :: Int                                         // Index of current DCL module
+convert_expression ::
+    Int                                         // Index of current DCL module
     [(VarInfoPtr,Econv_state->Econv_state)]     // Locally bound variables, with the expressions they're bound to, for resolving locally bound variables
     Expression                                  // Expression to convert
     Econv_state                                 // Input expression conversion state
@@ -301,12 +304,33 @@ convert_expression main_dcl_module_n bounds (Case caseinfo) ((heap0,seen0),(node
                BasicPatterns _ branches
                 -> foldlr (convert_basic_branch main_dcl_module_n) ((heap2,seen1),([],fundefs6,[])) branches
                _
-                -> ((heap2,seen1),([],fundefs6,abort "convert: convert_expression: unhandled CasePatterns constructor"))
+                -> ((heap2,seen1),([],fundefs6,error "convert: convert_expression: unhandled CasePatterns constructor"))
          // (0.5) Convert selector
          ((heap2,seen1),(nodes8,fundefs8,globals9,selectorroots))
           = convert_expression main_dcl_module_n bounds caseinfo.case_expr ((heap1,seen0),(nodes7,fundefs7,globals8,[]))
          // (0) Claim root node
          [root:heap1] = heap0
+
+convert_expression main_dcl_module_n bounds (BasicExpr bv bt) ((heap0,seen0),(nodes0,fundefs0,globals0,rest))
+= ((heap1,seen0),(nodes1,fundefs0,globals0,[root:rest]))
+  where [root:heap1] = heap0
+        nodes1 = [(root,(convert_bvalue bv,[])):nodes0]
+
+convert_expression _ _ (Selection _ _ _)      _ = mstub "convert_expression" "Selection constructor not handled"
+convert_expression _ _ (Update _ _ _)         _ = mstub "convert_expression" "Update not handled"
+convert_expression _ _ (RecordUpdate _ _ _)   _ = mstub "convert_expression" "RecordUpdate constructor not handled"
+convert_expression _ _ (TupleSelect _ _ _)    _ = mstub "convert_expression" "TupleSelect constructor not handled"
+convert_expression _ _ (WildCard)             _ = mstub "convert_expression" "WildCard constructor not handled"
+convert_expression _ _ (AnyCodeExpr _ _ _)    _ = mstub "convert_expression" "AnyCodeExpr constructor not handled"
+convert_expression _ _ (ABCCodeExpr _ _)      _ = mstub "convert_expression" "ABCCodeExpr constructor not handled"
+convert_expression _ _ (MatchExpr _ _ _)      _ = mstub "convert_expression" "MatchExpr constructor not handled"
+convert_expression _ _ (FreeVar _)            _ = mstub "convert_expression" "FreeVar constructor not handled"
+convert_expression _ _ (Constant _ _ _ _)     _ = mstub "convert_expression" "Constant constructor not handled"
+convert_expression _ _ (ClassVariable _)      _ = mstub "convert_expression" "ClassVariable constructor not handled"
+convert_expression _ _ (DynamicExpr _)        _ = mstub "convert_expression" "DynamicExpr constructor not handled"
+convert_expression _ _ (TypeCodeExpression _) _ = mstub "convert_expression" "TypeCodeExpression constructor not handled"
+convert_expression _ _ (EE)                   _ = mstub "convert_expression" "EE constructor not handled"
+convert_expression _ _ (NoBind _)             _ = mstub "convert_expression" "NoBind constructor not handled"
 
 convert_algebraic_branch main_dcl_module_n branch ((heap0,seen0),(globals0,fundefs0,alternatives0))
  = ((heap2,seen2),(globals1,fundefs1,alternatives1))
@@ -345,26 +369,35 @@ convert_bound_expr main_dcl_module_n bounds expr ((heap0,seen0),(nodes0,fundefs0
 convert_bvalue :: BasicValue -> SuclSymbol
 convert_bvalue (BVI intrepr) = SuclInt (toInt intrepr)
 //convert_bvalue (BVC charrepr) = SuclChar (fromString charrepr)
+convert_bvalue (BVC charrepr) = mstub "convert_bvalue" "BVC constructor not handled"
 convert_bvalue (BVB bool) = SuclBool bool
 convert_bvalue (BVR realrepr) = SuclReal (toReal realrepr)
-//convert_bvalue (BVS stringrepr) = SuclString (fromString stringrepr)
-convert_bvalue _ = abort "convert: convert_bvalue: unhandled BasicValue constructor"
+convert_bvalue (BVS stringrepr) = SuclString (fromString stringrepr)
+convert_bvalue _ = mstub "convert_bvalue" "unhandled BasicValue constructor"
 
 convert_kind :: DefOrImpFunKind -> SuclSymbolKind
 convert_kind (FK_DefFunction b) = SuclPrimitive // Function from a definition module
 convert_kind (FK_ImpFunction b) = SuclFunction  // Function from a (the) implementation module
 convert_kind  FK_DefMacro       = SuclFunction  // Macro from a definition module
 convert_kind  FK_ImpMacro       = SuclFunction  // Macro from an implementation module
-convert_kind _ = abort "convert: convert_kind: unhandled DefOrImpFunKind constructor"
+convert_kind _ = error "convert: convert_kind: unhandled DefOrImpFunKind constructor"
 
 
 /****************************************************************
 **  Conversion of exported function symbols from cocl to sucl  **
 ****************************************************************/
 
-cts_exports :: {#DclModule} Int -> [SuclSymbol]
-cts_exports dcl_mods main_dcl_module_n
-= map (mk_symbol main_dcl_module_n) (getconversion cFunctionDefs dcl_mods.[main_dcl_module_n])
+cts_exports :: {#DclModule} *PredefinedSymbols Int -> (.PredefinedSymbols,[SuclSymbol])
+cts_exports dcl_mods predefs main_dcl_module_n
+= add_start main_dcl_module_n (predefs,map (mk_symbol main_dcl_module_n) (getconversion cFunctionDefs dcl_mods.[main_dcl_module_n]))
+
+add_start main_dcl_module_n (predefs0,exports)
+= (predefs1,extended_exports)
+  where extended_exports
+        = if (pds_module==main_dcl_module_n && pds_def<>NoIndex)
+             [mk_symbol main_dcl_module_n pds_def:exports]
+             exports
+        ({pds_module,pds_def},predefs1) = predefs0![PD_Start]
 
 mk_symbol :: Int Index -> SuclSymbol
 mk_symbol main_dcl_module_n fundef_index = SuclUser (SK_Function {glob_module=main_dcl_module_n,glob_object=fundef_index})
@@ -392,6 +425,7 @@ getconversion whichtable dcl=:{dcl_conversions=No}
 
 //Sucl to Cocl for function bodies
 stc_funcdefs ::
+    PredefinedSymbol    // Compiler-predefined String symbol
     {#.DclModule}       // DCL for looking up constructor types
     Int                 // Index of current module
     Int                 // Index of first new generated function
@@ -405,28 +439,52 @@ stc_funcdefs ::
     , .{#FunDef}        // Converted function definitions
     )
 
-stc_funcdefs dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs
-= (exprheap1,varheap1,new_fundefs)
+stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs
+= ((exprheap1,varheap1,new_fundefs)<---"convert.stc_funcdefs ends")--->"convert.stc_funcdefs begins"
   where new_fundef_limit = foldr max 0 [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
         (exprheap1,varheap1,new_fundefs)
-        = store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs (createArray new_fundef_limit nofundef))
-        nofundef
-        = mstub "stc_funcdefs" "introduced function symbol without an actual body"
+        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs initialarray)
+        initialarray = {nofundef i\\i<-[0..new_fundef_limit-1]}
+        nofundef funindex
+        = { fun_symb     = noident
+          , fun_arity    = 0            // Can't do undef because it's strict
+          , fun_priority = NoPrio
+          , fun_body     = NoBody
+          , fun_type     = No
+          , fun_pos      = NoPos
+          , fun_index    = funindex
+          , fun_kind     = FK_DefOrImpUnknown
+          , fun_lifted   = 0            // FIXME: what's this supposed to be?
+          , fun_info     = nofuninfo    // Bah. Give me undef any time.
+          }
+        noident
+        = { id_name = "_anonymous_sucl_generated_function_placeholder"
+          , id_info = nilPtr
+          }
+        nofuninfo
+        = { fi_calls       = []         // This is a lie. Undef would be better.
+          , fi_group_index = 0
+          , fi_def_level   = NotALevel
+          , fi_free_vars   = []
+          , fi_local_vars  = []
+          , fi_dynamics    = []
+          , fi_properties  = 0
+          }
 
-copy_oldfuns oldfundefs newfundefs
-= foldlArrayStWithIndex copyone newfundefs oldfundefs
-  where copyone i fundef fundefs
-        = {fundefs & [i]=fundef}
+copy_oldfuns srcfundefs dstfundefs
+= ((id (foldlArrayStWithIndex copyone srcfundefs dstfundefs))<---"convert.copy_oldfuns ends")--->"convert.copy_oldfuns begins"
+  where copyone i srcfundef dstfundefs
+        = ({dstfundefs & [i]=srcfundef} <--- ("convert.copy_oldfuns.copyone "+++toString i+++" ends")) ---> ("convert.copy_oldfuns.copyone "+++toString i+++" begins")
 
-store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [] fundefs0
-= (exprheap0,varheap0,fundefs0)
-store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [srr:srrs] fundefs0
+store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [] fundefs0
+= (exprheap0,varheap0,fundefs0)<---"convert.store_newfuns ends (no more srrs)"
+store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [srr:srrs] fundefs0
 = case srr.srr_assigned_symbol
   of (SuclUser (SK_Function {glob_module=modi,glob_object=funindex}))
       | modi == main_dcl_module_n
-        -> store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap1 varheap1 srrs fundefs1
+        -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap1 varheap1 srrs fundefs1<---"convert.store_newfuns ends (srr in main module)"
            where (exprheap1,varheap1,funbody)
-                 = stc_funcdef dcl_mods exprheap0 varheap0 srr.srr_function_def
+                 = stc_funcdef stringtype dcl_mods exprheap0 varheap0 srr.srr_function_def
                  funinfo
                  = { fi_calls       = collect_calls main_dcl_module_n funbody
                    , fi_group_index = 0
@@ -442,11 +500,11 @@ store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [srr:s
                       (create_fundef (length (arguments srr.srr_typerule)))
                       update_fundef
      _
-      -> store_newfuns dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs fundefs0
+      -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs fundefs0 <--- "convert.store_newfuns ends (srr in other module)"
 
 create_fundef :: .Int Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
 create_fundef funindex arity funbody funinfo fundefs
-= {fundefs & [funindex] = fundef}
+= ({fundefs & [funindex] = fundef} <--- ("convert.create_fundef "+++toString funindex+++" ends")) ---> ("convert.create_fundef "+++toString funindex+++" begins")
   where fundef
         = { fun_symb     = ident
           , fun_arity    = arity
@@ -466,11 +524,12 @@ create_fundef funindex arity funbody funinfo fundefs
 
 update_fundef :: .Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
 update_fundef index newbody newinfo oldfundefs
-= {tmpfundefs & [index] = newfundef}
+= ({tmpfundefs & [index] = newfundef} <--- ("convert.update_fundef "+++toString index+++" ends")) ---> ("convert.update_fundef "+++toString index+++" begins")
   where (oldfundef,tmpfundefs) = oldfundefs![index]
         newfundef = {oldfundef & fun_body = newbody, fun_info = newinfo}
 
 stc_funcdef ::
+    PredefinedSymbol                    // Compiler-predefined String symbol
     {#DclModule}                        // DCL for looking up constructor types
     *ExpressionHeap                     // Fresh expression space
     *(Heap VarInfo)                     // Fresh variable space
@@ -480,14 +539,14 @@ stc_funcdef ::
     , FunctionBody                      // Converted function body
     )
 
-stc_funcdef dcl_mods exprheap0 varheap0 (args,body)
+stc_funcdef stringtype dcl_mods exprheap0 varheap0 (args,body)
 = (exprheap1,varheap2,TransformedBody tb)
   where tb
         = { tb_args = map freevarenv args
           , tb_rhs  = expr
           }
         (exprheap1,varheap2,expr)
-        = convert_funcbody dcl_mods 1 args freevarenv exprheap0 varheap1 body
+        = convert_funcbody stringtype dcl_mods 1 args freevarenv exprheap0 varheap1 body
         (freevarenv,varheap1,patnodes)
         = allocate_freevars 0 noexpr varheap0 args
         noexpr = mstub "std_funcdef" "open variable in rhs but not lhs"
@@ -515,6 +574,7 @@ Converting a function body:
 */
 
 convert_funcbody ::
+    PredefinedSymbol                    // Compiler-predefined String symbol
     {#DclModule}                        // Dcl modules for looking up constructor types
     Level                               // (Lexical?) level for new variables
     [SuclVariable]                      // Nodes from case variables in the environment
@@ -527,7 +587,7 @@ convert_funcbody ::
     , Expression                        // Resulting expression
     )
 
-convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPattern pattern yesbody nobody)
+convert_funcbody stringtype dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPattern pattern yesbody nobody)
 = (exprheap4,varheap3,match_expression)
   where (exprheap1,varheap1,case_expression,default_refcount)
         = convert_matchpatterns dcl_mods build_casebranch patnodes freevarenv exprheap0 varheap0 default_expression pgraph level [proot]
@@ -561,9 +621,9 @@ convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPat
         build_casebranch level` patnodes` freevarenv` exprheap0` varheap0`
         = (exprheap1`,varheap1`,expr`,0)
           where (exprheap1`,varheap1`,expr`)
-                = convert_funcbody dcl_mods level` patnodes` freevarenv` exprheap0` varheap0` yesbody
+                = convert_funcbody stringtype dcl_mods level` patnodes` freevarenv` exprheap0` varheap0` yesbody
         (exprheap4,varheap3,match_failure_expression)
-        = convert_funcbody dcl_mods (level+1) patnodes freevarenv exprheap3 varheap2 nobody
+        = convert_funcbody stringtype dcl_mods (level+1) patnodes freevarenv exprheap3 varheap2 nobody
         (default_expression,match_expression)
         = if (default_refcount==1)
              (match_failure_expression,case_expression)
@@ -571,8 +631,8 @@ convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (MatchPat
         let_expression = Let li
         match_failure_reference = Var default_boundvar
 
-convert_funcbody dcl_mods level patnodes freevarenv exprheap0 varheap0 (BuildGraph srgraph)
-= convert_graph patnodes (FreeVar o freevarenv) level srgraph varheap0 exprheap0
+convert_funcbody stringtype dcl_mods level patnodes freevarenv exprheap0 varheap0 (BuildGraph srgraph)
+= convert_graph stringtype patnodes (FreeVar o freevarenv) level srgraph varheap0 exprheap0
 
 convert_matchpatterns ::
     {#DclModule}                    // DCL modules
@@ -694,10 +754,11 @@ allocate_freevars level freevarenv0 varheap0 [pnode:pnodes]
         freevarenv2 = adjust pnode freevar freevarenv1
 
 convert_constructor :: {#DclModule} SuclSymbol [FreeVar] Expression -> CasePatterns
-convert_constructor dcl_mods (SuclInt  i) [] expr = mkbps BT_Int  (BVI (toString i)) expr
-convert_constructor dcl_mods (SuclChar c) [] expr = mkbps BT_Char (BVC (toString c)) expr
-convert_constructor dcl_mods (SuclReal r) [] expr = mkbps BT_Real (BVR (toString r)) expr
-convert_constructor dcl_mods (SuclBool b) [] expr = mkbps BT_Bool (BVB           b ) expr
+convert_constructor dcl_mods (SuclInt    i) [] expr = mkbps BT_Int    (BVI (toString i)) expr
+convert_constructor dcl_mods (SuclChar   c) [] expr = mkbps BT_Char   (BVC (toString c)) expr
+convert_constructor dcl_mods (SuclReal   r) [] expr = mkbps BT_Real   (BVR (toString r)) expr
+convert_constructor dcl_mods (SuclBool   b) [] expr = mkbps BT_Bool   (BVB           b ) expr
+convert_constructor dcl_mods (SuclString s) [] expr = mkbps (BT_String notype) (BVS s) expr where notype = mstub "convert_constructor" "no argument for basic string type"
 convert_constructor dcl_mods (SuclUser (SK_Constructor consindex)) freevars expr
 = AlgebraicPatterns typedefindex [ap]
   where typedefindex = {glob_module=consmodule,glob_object=consdef.cons_type_index}
@@ -753,10 +814,10 @@ Converting a function body:
 
 :: ExpressionMaker :== SuclVariable -> Expression
 
-convert_graph patnodes mkexpr0 level srgraph varheap0 exprheap0
+convert_graph stringtype patnodes mkexpr0 level srgraph varheap0 exprheap0
 = (exprheap4,varheap1,expression)
   where (exprheap4,refcount,closeds,_,mkexpr1)
-        = convert_graph_node mkexpr sgraph exprheap3 patnodes (const 0) [] mkexpr0 sroot
+        = convert_graph_node stringtype mkexpr sgraph exprheap3 patnodes (const 0) [] mkexpr0 sroot
         sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
         shareds = [(closed,n) \\ closed<-closeds, n<-[refcount closed] | n>1]
         (mkexpr,letbinds,varheap1,exprheap3)
@@ -805,6 +866,7 @@ allocate_shared_variable level (pnode,refcount) (mkexpr,letbinds,varheap0,exprhe
         (exprinfoptr,exprheap1) = newPtr EI_Empty exprheap0
 
 convert_graph_nodes ::
+    PredefinedSymbol                // Compiler-predefined String symbol
     ExpressionMaker                 // Final expression maker
     (Graph SuclSymbol SuclVariable) // Subject graph to transform
     *ExpressionHeap                 // Input expression heap for generated expressions
@@ -820,17 +882,18 @@ convert_graph_nodes ::
     , ExpressionMaker               // Output expression maker
     )
 
-convert_graph_nodes mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 []
+convert_graph_nodes stringtype mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 []
 = (exprheap0,refcount0,closeds0,seen0,mkexpr0)
-convert_graph_nodes mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 [snode:snodes]
+convert_graph_nodes stringtype mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 [snode:snodes]
 = (exprheap2,refcount3,closeds2,seen2,mkexpr2)
   where (exprheap2,refcount1,closeds1,seen2,mkexpr1)
-        = convert_graph_nodes mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 snodes
+        = convert_graph_nodes stringtype mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 snodes
         (exprheap1,refcount2,closeds2,seen1,mkexpr2)
-        = convert_graph_node mkexpr sgraph exprheap0 seen0 refcount1 closeds1 mkexpr1 snode
+        = convert_graph_node stringtype mkexpr sgraph exprheap0 seen0 refcount1 closeds1 mkexpr1 snode
         refcount3 = inccounter snode refcount2
 
 convert_graph_node ::
+    PredefinedSymbol                // Compiler-predefined String symbol
     ExpressionMaker                 // Final expression builder
     (Graph SuclSymbol SuclVariable) // Graph to convert
     *ExpressionHeap                 // Heap from which to allocate new expression info
@@ -846,20 +909,21 @@ convert_graph_node ::
     , ExpressionMaker               // Output expression builder
     )
 
-convert_graph_node mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 snode
+convert_graph_node stringtype mkexpr sgraph exprheap0 seen0 refcount0 closeds0 mkexpr0 snode
 | isMember snode seen0
   = (exprheap0,refcount0,closeds0,seen0,mkexpr0)
 = (exprheap2,refcount1,closeds2,seen2,mkexpr2)
   where seen1 = [snode:seen0]
         (_,(ssym,sargs)) = varcontents sgraph snode  // Must be closed; open nodes already initially in "seen"
         (expr,exprheap1)
-        = convert_graph_symbol ssym (map mkexpr sargs) exprheap0
+        = convert_graph_symbol stringtype ssym (map mkexpr sargs) exprheap0
         (exprheap2,refcount1,closeds1,seen2,mkexpr1)
-        = convert_graph_nodes mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 sargs
+        = convert_graph_nodes stringtype mkexpr sgraph exprheap1 seen1 refcount0 closeds0 mkexpr0 sargs
         mkexpr2 = adjust snode expr mkexpr1
         closeds2 = [snode:closeds1]
 
 convert_graph_symbol ::
+    PredefinedSymbol
     !SuclSymbol
     [Expression]
     *ExpressionHeap
@@ -867,12 +931,13 @@ convert_graph_symbol ::
     , *ExpressionHeap
     )
 
-convert_graph_symbol (SuclInt  i) [] exprheap = (BasicExpr (BVI (toString i)) BT_Int ,exprheap)
-convert_graph_symbol (SuclChar c) [] exprheap = (BasicExpr (BVC (toString c)) BT_Char,exprheap)
-convert_graph_symbol (SuclReal r) [] exprheap = (BasicExpr (BVR (toString r)) BT_Real,exprheap)
-convert_graph_symbol (SuclBool b) [] exprheap = (BasicExpr (BVB           b ) BT_Bool,exprheap)
-convert_graph_symbol (SuclApply arity) [argexpr:argexprs] exprheap = (argexpr @ argexprs,exprheap)
-convert_graph_symbol (SuclUser symbkind) argexprs exprheap0
+convert_graph_symbol stringtype (SuclInt    i) [] exprheap = (BasicExpr (BVI (toString i)) BT_Int   ,exprheap)
+convert_graph_symbol stringtype (SuclChar   c) [] exprheap = (BasicExpr (BVC (toString c)) BT_Char  ,exprheap)
+convert_graph_symbol stringtype (SuclReal   r) [] exprheap = (BasicExpr (BVR (toString r)) BT_Real  ,exprheap)
+convert_graph_symbol stringtype (SuclBool   b) [] exprheap = (BasicExpr (BVB           b ) BT_Bool  ,exprheap)
+convert_graph_symbol stringtype (SuclString s) [] exprheap = (makeStringExpr stringtype s           ,exprheap)
+convert_graph_symbol stringtype (SuclApply arity) [argexpr:argexprs] exprheap = (argexpr @ argexprs,exprheap)
+convert_graph_symbol stringtype (SuclUser symbkind) argexprs exprheap0
 = (App app,exprheap1)
   where app
         = { app_symb = symbident
@@ -889,7 +954,14 @@ convert_graph_symbol (SuclUser symbkind) argexprs exprheap0
           , id_info = nilPtr
           }
         (appinfoptr,exprheap1) = newPtr EI_Empty exprheap0
-convert_graph_symbol _ _ _ = mstub "convert_graph_symbol" "unexpected application form in graph node"
+convert_graph_symbol _ _ _ _ = mstub "convert_graph_symbol" "unexpected application form in graph node"
+
+// Magic from Artem
+makeStringExpr :: !PredefinedSymbol String -> Expression
+makeStringExpr stringtype str
+= BasicExpr (BVS str) (BT_String (TA type_symb []))
+  where {pds_ident, pds_module, pds_def} = stringtype
+        type_symb = MakeTypeSymbIdent { glob_module = pds_module, glob_object = pds_def } pds_ident 0
 
 mkbe bv bt = BasicExpr bv bt
 

@@ -5,6 +5,9 @@ definition module trace
 from spine import Answer
 from history import History,HistoryAssociation,HistoryPattern
 from rule import Rule
+from StdFile import <<<
+from StdOverloaded import ==
+from StdString import toString
 
 // Transitive necessities
 
@@ -295,3 +298,5 @@ foldtransformation
     (.result -> .absresult)
     !.(Transformation sym var pvar)
  -> .subresult
+
+instance <<< Trace sym var pvar | toString sym & <<<,==,toString var

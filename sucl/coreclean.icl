@@ -18,6 +18,7 @@ import syntax
  | SuclCHAR
  | SuclREAL
  | SuclBOOL
+ | SuclSTRING
  | SuclDYNAMIC
  | SuclFILE
  | SuclWORLD
@@ -37,6 +38,7 @@ sucltypeheap =: map SuclANONYMOUS [0..]
  | SuclChar Char
  | SuclReal Real
  | SuclBool Bool
+ | SuclString String
 
 :: SuclSymbolKind
  = SuclFunction
@@ -57,15 +59,41 @@ where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
       (==)  SuclCHAR          SuclCHAR         = True
       (==)  SuclREAL          SuclREAL         = True
       (==)  SuclBOOL          SuclBOOL         = True
+      (==)  SuclSTRING        SuclSTRING       = True
       (==)  SuclDYNAMIC       SuclDYNAMIC      = True
       (==)  SuclFILE          SuclFILE         = True
       (==)  SuclWORLD         SuclWORLD        = True
       (==)  _                 _                = False
 
+instance toString SuclTypeSymbol
+where toString (SuclUSER tsid ) = toString tsid
+      toString (SuclFN   arity) = "Arrow/"+++toString arity
+      toString  SuclINT         = "Int"
+      toString  SuclCHAR        = "Char"
+      toString  SuclREAL        = "Real"
+      toString  SuclBOOL        = "Bool"
+      toString  SuclSTRING      = "String"
+      toString  SuclDYNAMIC     = "Dynamic"
+      toString  SuclFILE        = "File"
+      toString  SuclWORLD       = "World"
+
+instance <<< SuclTypeSymbol
+where (<<<) file tsym = file <<< toString tsym
+
 instance == SuclTypeVariable
 where (==) (SuclANONYMOUS i1) (SuclANONYMOUS i2) = i1 == i2
       (==) (SuclNAMED     p1) (SuclNAMED     p2) = p1 == p2
       (==) _                  _                  = False
+
+instance toString SuclTypeVariable
+where toString (SuclANONYMOUS i) = "V_"+++toString i
+      toString (SuclNAMED     p) = "N_"+++toString p
+
+instance toString TypeVar
+where toString tv = toString tv.tv_info_ptr
+
+instance <<< SuclTypeVariable
+where (<<<) file tvar = file <<< toString tvar
 
 instance == SuclSymbol
 where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
@@ -74,7 +102,43 @@ where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
       (==) (SuclInt   int1 )  (SuclInt   int2 )  = int1  == int2
       (==) (SuclReal  real1)  (SuclReal  real2)  = real1 == real2
       (==) (SuclBool  bool1)  (SuclBool  bool2)  = bool1 == bool2
+      (==) (SuclString str1)  (SuclString str2)  = str1 == str2
       (==) _                  _                  = False
+
+instance toString SuclSymbol
+where toString (SuclUser  sk  ) = toString sk
+      toString (SuclCase  eptr) = "<anonymous lifted case function>"
+      toString (SuclApply int ) = "Apply/"+++toString int
+      toString (SuclInt   int ) = toString int
+      toString (SuclReal  real) = toString real
+      toString (SuclBool  bool) = toString bool
+      toString (SuclString str) = toString str
+
+instance <<< SuclSymbol
+where (<<<) file sym = file <<< toString sym
+
+instance toString SymbKind
+where toString SK_Unknown = "Unknown"
+      toString (SK_Function gi) = "Function "+++toString gi
+      toString (SK_LocalMacroFunction i) = "LocalMacroFunction "+++toString i
+      toString (SK_OverloadedFunction gi) = "OverloadedFunction "+++toString gi
+      toString (SK_Generic gi tk) = "Generic "+++toString gi+++" "+++toString tk
+      toString (SK_Constructor gi) = "Constructor "+++toString gi
+      toString (SK_Macro gi) = "Macro "+++toString gi
+      toString (SK_GeneratedFunction fip i) = "GeneratedFunction "+++toString fip+++" "+++toString i
+      toString SK_TypeCode = "TypeCode"
+
+instance <<< SymbKind
+where (<<<) file sk = file <<< toString sk
+
+instance toString Global a | toString a
+where toString {glob_module,glob_object} = toString glob_module+++"."+++toString glob_object
+
+instance toString Ptr a
+where toString p = "p:"+++toString (ptrToInt p)
+
+instance <<< Ptr a
+where (<<<) file p = file <<< toString p
 
 instance == SymbKind
 where (==) SK_Unknown                       SK_Unknown                      = True
@@ -88,10 +152,25 @@ where (==) SK_Unknown                       SK_Unknown                      = Tr
       (==) SK_TypeCode                      SK_TypeCode                     = True
       (==) _                                _                               = False
 
+instance toString SuclSymbolKind
+where toString SuclFunction    = "SuclFunction"
+      toString SuclConstructor = "SuclConstructor"
+      toString SuclPrimitive   = "SuclPrimitive"
+
+instance <<< SuclSymbolKind
+where (<<<) file ssk = file <<< toString ssk
+
 instance == SuclVariable
 where (==) (SuclAnonymous i1) (SuclAnonymous i2) = i1 == i2
       (==) (SuclNamed     p1) (SuclNamed     p2) = p1 == p2
       (==) _                  _                  = False
+
+instance toString SuclVariable
+where toString (SuclAnonymous i) = "v_"+++toString i
+      toString (SuclNamed     p) = "n_"+++toString p
+
+instance <<< SuclVariable
+where (<<<) file var = file <<< toString var
 
 // Get the type rule and strictness of a built in core clean symbol
 
@@ -117,6 +196,7 @@ coretyperule (SuclInt _) = consttyperule SuclINT
 coretyperule (SuclChar _) = consttyperule SuclCHAR
 coretyperule (SuclReal _) = consttyperule SuclREAL
 coretyperule (SuclBool _) = consttyperule SuclBOOL
+coretyperule (SuclString _) = consttyperule SuclSTRING
 coretyperule (SuclUser _) = abort "coreclean: coretyperule: untyped user symbol"
 coretyperule (SuclCase _) = abort "coreclean: coretyperule: untyped case symbol"
 
@@ -132,6 +212,7 @@ corecomplete SuclINT = const False
 corecomplete SuclCHAR = superset (map (SuclChar o toChar) [0..255]) // 256 alternatives... doubtful is this is useful, but hey...
 corecomplete SuclREAL = const False
 corecomplete SuclBOOL = superset (map SuclBool [False,True])
+corecomplete SuclSTRING = const False
 corecomplete SuclDYNAMIC = const False
 corecomplete SuclFILE = const False
 corecomplete SuclWORLD = const False

@@ -8,6 +8,7 @@ from rule import Rule
 from coreclean import SuclTypeSymbol,SuclTypeVariable,SuclSymbol,SuclSymbolKind,SuclVariable
 from checksupport import DclModule
 from syntax import FunDef,FunType,ExpressionHeap
+from predef import PredefinedSymbols,PredefinedSymbol
 
 // Transitively required stuff
 from newfold import FuncBody
@@ -36,17 +37,21 @@ cts_function
 
 //Cocl to Sucl for exports (function decls from main dcl)
 cts_exports ::
-    {#DclModule}    // List of imported DCL modules
-    Int             // Index of current module
- -> [SuclSymbol]
+    {#DclModule}            // List of imported DCL modules
+    *PredefinedSymbols      // Table of predefined symbols (for looking up the start symbol)
+    Int                     // Index of current module
+ -> ( .PredefinedSymbols    // Consulted predefined symbol table
+    , [SuclSymbol]          // Exported symbols
+    )
 
 //Cocl to Sucl for (algebraic) type specifications
 cts_getconstrs ::
-    {#DclModule}					// Info from used DCL modules
- -> [(SuclTypeSymbol,[SuclSymbol])]	// List of constructor symbols for each type symbol
+    {#DclModule}                    // Info from used DCL modules
+ -> [(SuclTypeSymbol,[SuclSymbol])] // List of constructor symbols for each type symbol
 
 //Sucl to Cocl for function bodies
 stc_funcdefs ::
+    PredefinedSymbol    // Compiler-predefined String symbol
     {#.DclModule}       // DCL for looking up constructor types
     Int                 // Index of current module
     Int                 // Index of first new generated function

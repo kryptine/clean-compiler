@@ -98,8 +98,8 @@ Types
 
 //------------------------------------------------------------------------
 
-makernfstrategy
- :: .(History sym var)                            // History of previous rooted graphs attached to nodes
+makernfstrategy ::
+    .(History sym var)                            // History of previous rooted graphs attached to nodes
     (Strategy sym var pvar (Answer sym var pvar)) // Strategy for a defined node
     .[var]                                        // List of nodes known in RNF (closed pattern nodes of subject rule+strict args)
     var                                           // Root of replacement

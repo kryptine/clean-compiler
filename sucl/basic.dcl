@@ -15,6 +15,7 @@ Basic types and functions.
 */
 
 from general import Optional
+from StdFile import <<<
 import StdOverloaded
 import StdString
 
@@ -72,6 +73,9 @@ foldmap :: (x:res -> w:res`) w:res` -> u:(![(arg,x:res)] -> v:(arg -> w:res`)) |
 // Foldoptional is the standard fold for the optional type.
 foldoptional :: .res .(.t -> .res) !(Optional .t) -> .res
 
+// Force evaluation of first argument to root normal form before returning second
+force :: !.a .b -> .b
+
 // Forget drops a mapped value from a map given by a list.
 forget :: val -> .(![.(val,res)] -> .[(val,res)]) | == val
 
@@ -96,6 +100,12 @@ join :: a ![.[a]] -> .[a]
    is designed for maximum sharing.
 */
 kleene :: !.[symbol] -> .[[symbol]]
+
+// Lazy variant of the predefined abort function
+error :: .String -> .a
+
+// Determine the string representation of a list
+listToString :: [a] -> String | toString a
 
 // Lookup finds a value mapped in a list mapping.
 lookup :: u:([(arg,w:res)] -> v:(arg -> w:res)) | == arg, [v u <= w]
@@ -130,6 +140,9 @@ maptl :: .(x:[.a] -> u:[.a]) !w:[.a] -> v:[.a], [u <= v, w <= x]
 // Map three functions onto a triple.
 maptriple :: x:(.a -> .b) w:(.c -> .d) v:(.e -> .f) -> u:((.a,.c,.e) -> (.b,.d,.f)), [u <= v, u <= w, u <= x]
 
+// String representation of line terminator
+nl :: String
+
 // Pairwith pairs a value with its result under a given function
 pairwith :: .(arg -> .res) arg -> (arg,.res)
 
@@ -156,11 +169,17 @@ relimg :: ![(a,.b)] a -> [.b] | == a
 // `Remap x y mapping' alters the mapping by associating y with x, removing the old values.
 remap :: a b [.(a,b)] -> .[(a,b)] | == a
 
+// A variant of foldl that is strict in its accumulator
+sfoldl :: (.a -> .(.b -> .a)) !.a [.b] -> .a
+
 // `Shorter xs' determines whether a list is shorter than list `xs'.
 shorter :: ![.a] [.b] -> .Bool
 
 // `Showbool b' is the string representation of boolean `b'.
 showbool :: .(!.Bool -> a) | fromBool a
+
+// Determine a string representation of a list
+showlist :: (.elem -> .String) ![.elem] -> String
 
 // `Showoptional showa opt' is the string representation of optional value `opt',
 // where `showa' determines the string representation of the inner value.
@@ -187,3 +206,9 @@ superset :: .[a] -> .(.[a] -> Bool) | == a
 
 // zipwith zips up two lists with a joining function
 zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
+
+// Strict version of --->, which evaluates its lhs first
+(<---) infix :: !.a !b -> .a | <<< b
+
+// Sequential evaluation of left and right arguments
+($) infixr :: !.a .b -> .b

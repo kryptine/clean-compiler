@@ -4,6 +4,7 @@ implementation module graph
 
 import pfun
 import basic
+import general
 import StdEnv
 
 /*
@@ -157,7 +158,30 @@ prefix graph without vars
 >                               = (seen1,'(':showfunc func++concat (map (' ':) repr1)++")"), otherwise
 >                           (seen1,repr1) = foldlr pg (node:seen,[]) args
 >                           (def,(func,args)) = nodecontents graph node
+*/
 
+printgraph :: .(Graph sym var) .[var] -> .[String] | toString sym & toString var & == var
+printgraph graph nodes
+= prntgrph (refcount graph nodes) graph nodes
+
+prntgrph count graph nodes
+= snd (foldlr pg ([],[]) nodes)
+  where pg node (seen,reprs)
+        = (seen2,[repr3:reprs])
+          where repr3
+                = if (not (isMember node seen) && def && count node>1)
+                     (toString node+++":"+++repr2)
+                     repr2
+                (seen2,repr2)
+                = if (isMember node seen || not def)
+                     (seen,toString node)
+                     (if (args==[])
+                         (seen1,toString func)
+                         (seen1,"("+++toString func+++foldr (+++) ")" (map ((+++)" ") repr1)))
+                (seen1,repr1) = foldlr pg ([node:seen],[]) args
+                (def,(func,args)) = varcontents graph node
+
+/*
 >   refcount graph
 >       = foldr rfcnt (const 0)
 >         where rfcnt node count
@@ -396,5 +420,5 @@ mapgraph ::
 mapgraph f (GraphAlias pfun) = GraphAlias (f pfun)
 
 instance == (Graph sym var) | == sym & == var
-where (==) pf1 pf2
-       = pf1 == pf2
+where (==) (GraphAlias pf1) (GraphAlias pf2)
+      = ((pf1 == pf2) <--- "graph.==(Graph) ends") ---> "graph.==(Graph) begins"

@@ -316,3 +316,13 @@ extgraph` :: (Graph sym var) (Rule sym pvar) -> (Pfun pvar var) (Graph sym var) 
 extgraph` sgraph rule
 = extgraph sgraph rgraph (varlist rgraph (arguments rule))
   where rgraph = rulegraph rule
+
+(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | <<< var
+(writeanswer) file No = file <<< "<root-normal-form>" <<< nl
+(writeanswer) file (Yes spine) = file writespine spine <<< nl
+
+(writespine) infixl :: *File (Spine sym var pvar) -> .File | <<< var
+(writespine) file (var,subspine) = file <<< "(" <<< var <<< "," <<< subspine <<< ")"
+
+instance <<< Subspine sym var pvar
+where (<<<) file subspine = file <<< "<subspine>"

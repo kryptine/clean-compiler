@@ -25,7 +25,7 @@ Implementation
 
 //:: Optional t = Absent | Present t
 // Now using Optional type from cocl's general module
-from general import Optional,No,Yes
+from general import Optional,No,Yes,--->
 
 instance == (Optional a) | == a
  where (==) No No = True
@@ -56,15 +56,16 @@ results recursively, and so on.  Duplicates are removed. */
 
 depthfirst :: (res->.[elem]) (elem->res) !.[elem] -> .[res] | == elem
 depthfirst generate process xs
-=   snd (collect xs ([],[]))
-    where collect [] seenrest = seenrest
-          collect [x:xs] (seen,rest)
+= snd (collect xs ([],[]))
+  where collect [] seenrest = seenrest
+        collect [x:xs] seenrest
           | isMember x seen
-          =   collect xs (seen,rest)
-          =   (seen``,[y:rest``])
-              where (seen`,rest``) = collect (generate y) ([x:seen],rest`)
-                    (seen``,rest`) = collect xs           (   seen`,rest)
-                    y = process x
+            = collect xs seenrest
+        = (seen``,[y:rest``])
+          where (seen`,rest``) = collect (generate y) ([x:seen],rest`)
+                (seen``,rest`) = collect xs           (   seen`,rest)
+                y = process x
+                (seen,rest) = seenrest
 
 // `Disjoint xs ys' checks whether xs and ys are disjoint.
 
@@ -89,21 +90,27 @@ foldlm f (l,[m:ms])
           (l``,ms`) = foldlm f (l`,ms)
 
 foldlr :: (.elem -> .((.lrinfo,.rlinfo) -> (.lrinfo,.rlinfo))) !(.lrinfo,.rlinfo) ![.elem] -> (.lrinfo,.rlinfo)
-foldlr f (l,r) []
-    = (l,r)
-foldlr f (l,r) [x:xs]
+foldlr f lr []
+    = lr
+foldlr f lr [x:xs]
     = (l``,r``)
       where (l``,r`) = foldlr f (l`,r) xs
             (l`,r``) = f x (l,r`)
+            (l,r) = lr
 
 foldmap :: (x:res -> w:res`) w:res` -> u:(![(arg,x:res)] -> v:(arg -> w:res`)) | == arg, [v u <= w, v <= x]
 foldmap f d
-=   foldr foldmap` (const d)
-    where foldmap` (x,y) g v = if (x==v) (f y) (g v)
+= foldr foldmap` (const d)
+  where foldmap` xy g v
+        = if (x==v) (f y) (g v)
+          where (x,y) = xy
 
 foldoptional :: .res .(.t -> .res) !(Optional .t) -> .res
 foldoptional no yes No = no
 foldoptional no yes (Yes x) = yes x
+
+force :: !.a .b -> .b
+force x y = y
 
 forget :: val -> .(![.(val,res)] -> .[(val,res)]) | == val
 forget x = filter (neq x o fst)
@@ -159,6 +166,14 @@ kleene symbols
           =   flatten (map appendstrings symbols)
               where appendstrings symbol = map (cons symbol) strings
 
+// Lazy variant of the predefined abort function
+error :: .String -> .a
+error message = abort message
+
+// Determine the string representation of a list
+listToString :: [a] -> String | toString a
+listToString xs = showlist toString xs
+
 lookup :: u:([(arg,w:res)] -> v:(arg -> w:res)) | == arg, [v u <= w]
 lookup = foldmap id (abort "lookup: not found")
 
@@ -211,6 +226,10 @@ maptl f [x:xs] = [x:f xs]
 maptriple :: x:(.a -> .b) w:(.c -> .d) v:(.e -> .f) -> u:((.a,.c,.e) -> (.b,.d,.f)), [u <= v, u <= w, u <= x]
 maptriple f g h = app3 (f,g,h)
 
+// String representation of line terminator
+nl :: String
+nl =: "\n"
+
 partition :: (a -> b) (a -> .c) -> .(!.[a] -> [(b,[.c])]) | == b
 partition f g
 =   h
@@ -227,6 +246,14 @@ relimg rel x` = [y\\(x,y)<-rel|x==x`]
 remap :: a b [.(a,b)] -> .[(a,b)] | == a
 remap x y xys = [(x,y):forget x xys]
 
+// A variant of foldl that is strict in its accumulator
+sfoldl :: (.a -> .(.b -> .a)) !.a [.b] -> .a
+sfoldl f a xxs
+#! a = a
+= case xxs
+  of [] -> a
+     [x:xs] -> sfoldl f (f a x) xs
+
 shorter :: ![.a] [.b] -> .Bool
 shorter []     yys    = False
 shorter [x:xs] []     = True
@@ -234,6 +261,14 @@ shorter [x:xs] [y:ys] = shorter xs ys
 
 showbool :: .(!.Bool -> a) | fromBool a
 showbool = fromBool
+
+showlist :: (.elem -> .String) ![.elem] -> String
+showlist showa xs
+= "["+++inner xs+++"]"
+  where inner [] = ""
+        inner [x:xs] = showa x+++continue xs
+        continue [] = ""
+        continue [x:xs] = ","+++showa x+++continue xs
 
 showoptional :: .(.a -> .String) !(Optional .a) -> String
 showoptional showa No      = "No"
@@ -268,3 +303,15 @@ superset set = isEmpty o (removeMembers set)
 
 zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
+
+// Strict version of --->, which evaluates its lhs first
+(<---) infix :: !.a !b -> .a | <<< b
+(<---) value message = value ---> message
+
+($) infixr :: !.a .b -> .b
+($) x y = y
+
+(writeList) infixl :: !*File [a] -> .File | <<< a
+(writeList) file [] = file
+(writeList) file [x:xs]
+= file <<< x writeList xs

@@ -4,6 +4,7 @@ definition module graph
 
 from pfun import Pfun
 from StdOverloaded import ==
+from StdString import String,toString
 
 // A rule associating a replacement with a pattern
 //:: Rule sym var
@@ -138,6 +139,9 @@ varlist :: .(Graph sym var) !.[var] -> .[var] | == var
 
 // Cannot remember what this one does???
 prefix :: .(Graph sym var) .[var] !.[var] -> .([var],[var]) | == var
+
+// Determine a multiline representation of a graph with multiple roots
+printgraph :: .(Graph sym var) .[var] -> .[String] | toString sym & toString var & == var
 
 // Do reference counting in a graph for the outer bindings.
 // References from case branches are counted once only.

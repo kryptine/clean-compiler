@@ -8,6 +8,8 @@ from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
 from general import Optional
 from StdOverloaded import ==
+from StdFile import <<<
+from StdString import toString
 
 :: FuncDef sym var
    :== ( [var]              // Arguments of function
@@ -37,3 +39,5 @@ fullfold ::
  |  == sym
  &  == var
  &  == pvar
+
+instance <<< FuncBody sym var | toString sym & ==,toString var

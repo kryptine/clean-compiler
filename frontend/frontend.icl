@@ -200,10 +200,10 @@ frontEndInterface opts mod_ident dcl_modules functions_and_macros predef_symbols
 
 // VZ..
 // Select fusion style and do fusion
-	# (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+	# (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)
 		= do_fusion opts.feo_fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
 			array_instances components fun_defs var_heap expression_heap icl_specials list_inferred_types icl_common
-			dcl_mods icl_used_module_numbers predef_symbols error out icl_import global_fun_range icl_instances generic_range
+			dcl_mods icl_used_module_numbers predef_symbols error out icl_import global_fun_range icl_instances generic_range files
 // ..VZ
 	| upToPhase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
@@ -383,16 +383,22 @@ where
 
 do_fusion fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos type_heaps
 			array_instances components fun_defs var_heap expression_heap icl_specials list_inferred_types icl_common
-			dcl_mods icl_used_module_numbers predef_symbols error out icl_import global_fun_range icl_instances generic_range
+			dcl_mods icl_used_module_numbers predef_symbols error out icl_import global_fun_range icl_instances generic_range files
 =	case fusionstyle of
   	FS_offline
 		# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 			= analyseGroups common_defs array_instances main_dcl_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
 	    # (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
  			= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
-	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)
 	FS_online
-		# (fun_defs,var_heap,expression_heap,supercompile_range) = supercompile dcl_mods main_dcl_module_n (fun_defs -*-> "Supercompile") var_heap expression_heap
+		# (opened,logfile,files) = fopen "C:\Vincent\Sucl\supercom.log" FWriteText files
+		| not opened
+		  -> abort "Could not open supercompilation log file"
+		# (fun_defs,var_heap,expression_heap,supercompile_range,predef_symbols,logfile) = supercompile dcl_mods main_dcl_module_n (fun_defs -*-> "Supercompile") var_heap expression_heap predef_symbols logfile
+		# (closed,files) = fclose logfile files
+		| not closed
+		  -> abort "Could not close supercompilation log file"
 		# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "Repartition functions") [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
 		# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error, out)
@@ -404,7 +410,7 @@ do_fusion fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used
 		# var_heap = heaps.hp_var_heap
 		  type_heaps = heaps.hp_type_heaps
 		  expression_heap = heaps.hp_expression_heap
-	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)
 	FS_none
 		#! _ = 0 -*-> "No fusion"
-	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out)
+	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)

@@ -59,3 +59,9 @@ instantiate ::
     ([(pvar,var)],[(pvar,var)],[(pvar,var)])
  -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
 */
+
+(writeHistory) infixl :: *File (History sym var) -> .File | toString sym & toString,== var
+(writeHistory) file history = sfoldl (writeHistoryAssociation) file history
+
+(writeHistoryAssociation) infixl :: *File (HistoryAssociation sym var) -> .File | toString sym & toString,== var
+(writeHistoryAssociation) file ha = file <<< showpair toString (showlist toString) ha <<< nl
