@@ -48,7 +48,7 @@ where
 arrayCopyBegin a s
 	:== copy_elements a r0 0
 where
-	/*2.0
+/*2.0
 	r0=_createArray s
 0.2*/
 //1.3
