@@ -414,8 +414,8 @@ where
 
 instance <<< DynamicPattern
 where
-	(<<<) file {dp_type_patterns_vars,dp_var,dp_rhs,dp_type_code}
-			= writeVarPtrs (file <<< dp_var <<< " :: ")  dp_type_patterns_vars <<<  dp_type_code <<< " = " <<< dp_rhs
+	(<<<) file {dp_var,dp_rhs,dp_type_code}
+			= file <<< dp_var <<< " :: " <<< dp_type_code <<< " = " <<< dp_rhs
 
 writeVarPtrs file []
 	= file
@@ -425,8 +425,7 @@ writeVarPtrs file vars
 		write_var_ptrs file [var]
 			= file <<< var
 		write_var_ptrs file [var : vars]
-			= write_var_ptrs (file <<< var <<< '.') vars
-		
+			= write_var_ptrs (file <<< var <<< '.') vars	
 		
 instance <<< TypeCodeExpression
 where

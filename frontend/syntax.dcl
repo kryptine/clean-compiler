@@ -749,7 +749,7 @@ cNonRecursiveAppl	:== False
 					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					
-					| EI_TypeOfDynamic 			![VarInfoPtr] !TypeCodeExpression				/* Final */
+					| EI_TypeOfDynamic 			!TypeCodeExpression				/* Final */
 					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression				/* Final */
 
 					| EI_TypeCode 		!TypeCodeExpression
@@ -1310,7 +1310,6 @@ instance == OverloadedListType
 ::	DynamicPattern =
 	{	dp_var					:: !FreeVar
 	,	dp_type					:: !ExprInfoPtr
-	,	dp_type_patterns_vars	:: ![VarInfoPtr]			/* filled after type checking */
 	,	dp_type_code			:: !TypeCodeExpression		/* filled after type checking */
 	,	dp_rhs					:: !Expression
 	,	dp_position				:: !Position

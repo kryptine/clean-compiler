@@ -282,7 +282,7 @@ where
 		  (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		  (dynamic_info_ptr, expr_heap) = newPtr (EI_DynamicType type opt_dynamics) expr_heap
 	  	  (act_var, result_expr, expr_heap) = transform_pattern_variable fun_arg opt_var result_expr expr_heap
-	  	  type_case_patterns = [{ dp_var = var_arg, dp_type	= dynamic_info_ptr,	dp_rhs = result_expr, dp_type_patterns_vars = [],
+	  	  type_case_patterns = [{ dp_var = var_arg, dp_type	= dynamic_info_ptr,	dp_rhs = result_expr,
 	  	  							dp_type_code = TCE_Empty, dp_position = pattern_position }]
 		= (buildTypeCase act_var type_case_patterns No type_case_info_ptr cCaseNotExplicit, NoPos, var_store, expr_heap, [dynamic_info_ptr], cs)	
 	transform_pattern_into_cases (AP_WildCard _) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
@@ -830,7 +830,7 @@ where
 	transform_pattern (AP_Dynamic pattern type opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ var_store expr_heap opt_dynamics cs
 		# (var_arg, result_expr, _, var_store, expr_heap, opt_dynamics, cs) = convertSubPattern pattern result_expr NoPos var_store expr_heap opt_dynamics cs
 		  (dynamic_info_ptr, expr_heap) = newPtr (EI_DynamicType type opt_dynamics) expr_heap
-		  pattern = { dp_var = var_arg, dp_type	= dynamic_info_ptr,	dp_rhs = result_expr, dp_type_patterns_vars = [],
+		  pattern = { dp_var = var_arg, dp_type	= dynamic_info_ptr,	dp_rhs = result_expr,
 		  				dp_type_code = TCE_Empty, dp_position = NoPos }
 		  pattern_variables = cons_optional opt_var pattern_variables
 		= case pattern_scheme of
@@ -1736,7 +1736,7 @@ convertSubPattern (AP_Dynamic pattern type opt_var) result_expr pattern_position
 	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	  (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
 	  (dynamic_info_ptr, expr_heap) = newPtr (EI_DynamicType type opt_dynamics) expr_heap
- 	  type_case_patterns = [{ dp_var = var_arg, dp_type = dynamic_info_ptr, dp_rhs = result_expr, dp_type_patterns_vars = [],
+ 	  type_case_patterns = [{ dp_var = var_arg, dp_type = dynamic_info_ptr, dp_rhs = result_expr,
  	  						dp_type_code = TCE_Empty, dp_position = pattern_position }]
 	= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 },
 		buildTypeCase (Var { var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr }) 

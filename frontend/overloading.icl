@@ -1177,24 +1177,24 @@ where
 						  (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_var_heap, var_heap)
 						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  				({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr)
+						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic type_code_expr)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 					EI_Empty
 						# (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_code_info.tci_type_var_heap, var_heap)
 						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  			({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic uni_vars type_code_expr)
+						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic type_code_expr)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 			EI_TempDynamicType No loc_dynamics _ _ expr_ptr {symb_ident}
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCode type_expr
 						# (type_expr, (var_heap, error)) = updateFreeVarsOfTCE symb_ident type_expr (var_heap, error)
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic [] type_expr)
+						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic type_expr)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 					EI_Selection selectors record_var _
 						# (_, var_info_ptr, var_heap, error) = getClassVariable symb_ident record_var var_heap error
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic [] (convert_selectors selectors var_info_ptr))
+						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic (convert_selectors selectors var_info_ptr))
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 			EI_TempDynamicPattern type_vars {dt_global_vars, dt_uni_vars, dt_type} loc_dynamics temp_local_vars _ _ expr_ptr {symb_ident}
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
@@ -1525,7 +1525,7 @@ where
 					// otherwise
 						=	ui
 		# ui = {ui & ui_has_type_codes=ui_has_type_codes} 
-		  (EI_TypeOfDynamic uni_vars type_code, ui_symbol_heap) = readPtr dyn_info_ptr ui.ui_symbol_heap
+		  (EI_TypeOfDynamic type_code, ui_symbol_heap) = readPtr dyn_info_ptr ui.ui_symbol_heap
 		  ui = { ui & ui_symbol_heap = ui_symbol_heap }
 		= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = type_code }, ui)
 	updateExpression group_index (MatchExpr cons_symbol expr) ui
@@ -1613,7 +1613,7 @@ where
 	updateExpression group_index dp=:{dp_type,dp_rhs} ui
 		# (dp_rhs, ui) =  updateExpression group_index dp_rhs ui
 		  (EI_TypeOfDynamicPattern type_pattern_vars type_code, ui_symbol_heap) = readPtr dp_type ui.ui_symbol_heap
-		= ({ dp & dp_rhs = dp_rhs, dp_type_patterns_vars = type_pattern_vars, dp_type_code = type_code }, { ui & ui_symbol_heap = ui_symbol_heap })
+		= ({ dp & dp_rhs = dp_rhs, dp_type_code = type_code }, { ui & ui_symbol_heap = ui_symbol_heap })
 
 instance updateExpression (a,b) | updateExpression a & updateExpression b
 where
