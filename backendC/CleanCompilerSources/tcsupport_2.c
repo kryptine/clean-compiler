@@ -16,12 +16,8 @@
 #include "sizes.h"
 #include "checker.h"
 #include "checksupport.h"
-#include "tctypes.t"
-#include "typechecker.h"
-#include "typechecker2.h"
 #include "typeconv.h"
 #include "tcsupport.h"
-#include "overloading.h"
 #include "scanner.h"
 #include "comparser.h"
 #include "buildtree.h"
@@ -58,25 +54,7 @@ BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars)
 		
 } /* DetermineConsVarsOfTypeCons */
 
-TypeCell SkipIndirectionChain (TypeCell type)
-{
-	MemoryCheck (type);
-	for (; type -> tc_kind == Indirection; type = type -> contents_indirect)
-		MemoryCheck (type);
-	return type;
-}  /* SkipIndirectionChain */
-
 #define SubstitutedType(typeargs) ((typeargs)[-1])
-
-TypeCell SkipTypeSynIndirection (TypeCell type)
-{
-	if (type -> tc_kind == ConstructorType && type -> tc_expanded)
-	{	type = SubstitutedType (type -> contents_tc_args);
-		SkipIndirections (type);
-	}
-	return type;
-
-}  /* SkipTypeSynIndirection */
 
 void PrintNodeSymbol (Node node, int arg_nr, File file)
 {
