@@ -2129,7 +2129,7 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 			0 -> cs
 			_ -> check_it PD_StdGeneric mod_name "" extension cs
 //..AA
-	# cs = case x_needed_modules bitand cNeedStdDynamics of
+	# cs = case x_needed_modules bitand cNeedStdDynamic of
 			0 -> cs
 			_ -> switch_dynamics (check_it PD_StdDynamic mod_name "" extension cs) (switched_off_Clean_feature PD_StdDynamic mod_name " (dynamics are disabled)" extension cs)
 	# cs = case x_needed_modules bitand cNeedStdArray of
@@ -2138,6 +2138,9 @@ check_needed_modules_are_imported mod_name extension cs=:{cs_x={x_needed_modules
 	# cs = case x_needed_modules bitand cNeedStdEnum of
 			0 -> cs
 			_ -> check_it PD_StdEnum mod_name " (needed for [..] expressions)" extension cs
+	# cs = case x_needed_modules bitand cNeedStdStrictLists of
+			0 -> cs
+			_ -> check_it PD_StdStrictLists mod_name " (needed for strict lists)" extension cs
 	= cs
   where
 	check_it pd mod_name explanation extension cs=:{cs_predef_symbols, cs_symbol_table}

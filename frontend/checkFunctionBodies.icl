@@ -56,13 +56,13 @@ cEndWithSelection		:== False
 ::	RecordKind = RK_Constructor | RK_Update | RK_UpdateToConstructor ![AuxiliaryPattern]
 
 get_unboxed_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
-get_unboxed_list_indices_and_decons_u_ident cs=:{cs_predef_symbols}
+get_unboxed_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	# (cons_u_index,cs_predef_symbols)=cs_predef_symbols![PD_cons_u].pds_def
 	# (decons_u_symbol,cs_predef_symbols)=cs_predef_symbols![PD_decons_u]
 	# decons_u_index=decons_u_symbol.pds_def
 	# (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
-	# cs={cs & cs_predef_symbols=cs_predef_symbols}
+	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,decons_u_symbol.pds_ident,cs)
 
 make_unboxed_list type_symbol expr_heap cs
@@ -73,13 +73,13 @@ make_unboxed_list type_symbol expr_heap cs
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_unboxed_tail_strict_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
-get_unboxed_tail_strict_list_indices_and_decons_u_ident cs=:{cs_predef_symbols}
+get_unboxed_tail_strict_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	# (cons_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_cons_uts].pds_def
 	# (decons_uts_symbol,cs_predef_symbols)=cs_predef_symbols![PD_decons_uts]
 	# decons_uts_index=decons_uts_symbol.pds_def
 	# (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
-	# cs={cs & cs_predef_symbols=cs_predef_symbols}
+	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_symbol.pds_ident,cs)
 
 make_unboxed_tail_strict_list type_symbol expr_heap cs
@@ -90,13 +90,13 @@ make_unboxed_tail_strict_list type_symbol expr_heap cs
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_overloaded_list_indices_and_decons_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
-get_overloaded_list_indices_and_decons_ident cs=:{cs_predef_symbols}
+get_overloaded_list_indices_and_decons_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	# (cons_index,cs_predef_symbols)=cs_predef_symbols![PD_cons].pds_def
 	# (decons_symbol,cs_predef_symbols)=cs_predef_symbols![PD_decons]
 	# decons_index=decons_symbol.pds_def
 	# (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
-	# cs={cs & cs_predef_symbols=cs_predef_symbols}
+	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,cons_index,decons_index,nil_index,decons_symbol.pds_ident,cs)
 
 make_overloaded_list type_symbol expr_heap cs
@@ -1105,7 +1105,7 @@ checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_expr_h
 	  (dyn_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input
 	  		{e_state & es_dynamics = [dyn_info_ptr : es_dynamics], es_expr_heap = es_expr_heap, es_dynamic_expr_count = inc es_dynamic_expr_count} e_info cs
 	= (DynamicExpr { dyn_expr = dyn_expr, dyn_opt_type = opt_type, dyn_info_ptr = dyn_info_ptr, dyn_type_code = TCE_Empty /*, dyn_uni_vars = [] */ },
-			free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamics }) 
+			free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamic }) 
 // ... MV
 
 checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
@@ -1237,6 +1237,12 @@ where
 			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdArray})
 				// instead of giving an error message remember that StdArray should have been be imported.
 				//  Error will be given in function check_needed_modules_are_imported
+		| id==cs_predef_symbols.[PD_cons].pds_ident || id==cs_predef_symbols.[PD_decons].pds_ident
+		  || id==cs_predef_symbols.[PD_cons_u].pds_ident || id==cs_predef_symbols.[PD_decons_u].pds_ident
+		  || id==cs_predef_symbols.[PD_cons_uts].pds_ident || id==cs_predef_symbols.[PD_decons_uts].pds_ident
+		  || id==cs_predef_symbols.[PD_nil].pds_ident || id==cs_predef_symbols.[PD_nil_u].pds_ident || id==cs_predef_symbols.[PD_nil_uts].pds_ident
+			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdStrictLists})
+				// instead report that StdStrictLists should be imported in function check_needed_modules_are_imported
 		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })
 	check_id_expression {ste_kind = STE_Variable info_ptr,ste_def_level} is_expr_list free_vars id e_input=:{ei_fun_level} e_state=:{es_expr_heap} e_info cs
 		| ste_def_level < ei_fun_level
@@ -1445,7 +1451,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 
 checkPattern (PE_DynamicPattern pattern type) opt_var p_input accus ps e_info cs=:{cs_x}
 	# (dyn_pat, accus, ps, e_info, cs) = checkPattern pattern No p_input accus ps e_info cs
-	= (AP_Dynamic dyn_pat type opt_var, accus, ps, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamics })
+	= (AP_Dynamic dyn_pat type opt_var, accus, ps, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdDynamic })
 
 checkPattern (PE_Basic basic_value) opt_var p_input accus ps e_info cs
 	= (AP_Basic basic_value opt_var, accus, ps, e_info, cs)

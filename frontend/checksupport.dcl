@@ -15,8 +15,9 @@ cIsADclModule 		:== True
 
 cNeedStdArray	:== 1
 cNeedStdEnum	:== 2
-cNeedStdDynamics:== 4
+cNeedStdDynamic :== 4
 cNeedStdGeneric	:== 8 // AA
+cNeedStdStrictLists :== 16
 
 ::	VarHeap :== Heap VarInfo
 
