@@ -18,10 +18,12 @@ import syntax, check, typesupport
 	}
 
 ::	SpecialInstances =
-	{	si_next_array_member_index			:: !Index
-	,	si_array_instances					:: ![ArrayInstance]
-	,	si_next_TC_member_index				:: !Index
-	,	si_TC_instances						:: ![GlobalTCInstance]
+	{	si_next_array_member_index		:: !Index
+	,	si_array_instances				:: ![ArrayInstance]
+	,	si_list_instances				:: ![ArrayInstance]
+	,	si_tail_strict_list_instances	:: ![ArrayInstance]
+	,	si_next_TC_member_index			:: !Index
+	,	si_TC_instances					:: ![GlobalTCInstance]
 	}
 	
 ::	OverloadingState =
