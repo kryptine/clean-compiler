@@ -352,9 +352,9 @@ refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedListPatterns t
 	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default var_heap
 
 refMarkOfCase free_vars sel def {case_expr,case_guards=DynamicPatterns patterns,case_default,case_explicit} var_heap
-	# (used_free_vars, var_heap) = collectUsedFreeVariables free_vars var_heap
-	  var_heap = parCombine free_vars var_heap
-	  (local_lets, var_heap) = collectOpenLetVars free_vars var_heap
+//	 (used_free_vars, var_heap) = collectUsedFreeVariables free_vars var_heap
+//	  var_heap = parCombine free_vars var_heap
+	# (local_lets, var_heap) = collectOpenLetVars free_vars var_heap
 	  (def, used_lets, var_heap) = refMarkOfDefault case_explicit free_vars sel def case_default local_lets var_heap
 	  (pattern_depth, used_lets, var_heap) = foldSt (ref_mark_of_dynamic_pattern free_vars sel local_lets def) patterns (0, used_lets, var_heap)
 	  var_heap = addRefMarkOfDefault pattern_depth free_vars def used_lets var_heap
@@ -466,6 +466,7 @@ addRefMarkOfDefault pattern_depth free_vars No used_lets var_heap
 	= altCombine pattern_depth free_vars var_heap 
 
 
+/*
 parCombine free_vars var_heap
 	= foldSt (foldSt (par_combine)) free_vars var_heap
 where
@@ -473,6 +474,7 @@ where
 		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous=[prev_ref_count:prev_counts]}, var_heap) = readPtr fv_info_ptr var_heap
 		= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ &
 				occ_ref_count = parCombineRefCount occ_ref_count prev_ref_count , occ_previous = prev_counts })
+*/
 
 caseCombine do_par_combine free_vars var_heap
 	= foldSt (foldSt (case_combine do_par_combine)) free_vars var_heap // (var_heap ---> ("caseCombine", free_vars))
