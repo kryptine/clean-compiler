@@ -478,7 +478,7 @@ cIsALocalVar	:== False
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
-				VI_Default !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_Default !Int | VI_Indirection !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] ![Type] | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo

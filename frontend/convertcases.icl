@@ -89,9 +89,11 @@ where
 		= (TupleSelect tuple_symbol arg_nr expr, ci)
 	convertCases bound_vars group_index common_defs (Case case_expr) ci
 		= convertCasesInCaseExpression bound_vars group_index common_defs cHasNoDefault case_expr ci
+/*
 	convertCases bound_vars group_index common_defs (DynamicExpr dynamik) ci
 		# (dynamik, ci) = convertCases bound_vars group_index common_defs dynamik ci
 		= (DynamicExpr dynamik, ci)
+*/
 	convertCases bound_vars group_index common_defs expr ci
 		= (expr, ci)
 
@@ -110,10 +112,25 @@ where
 cHasNoDefault :== nilPtr
 
 convertDefaultToExpression default_ptr (EI_Default expr type prev_default) bound_vars group_index common_defs ci=:{ci_var_heap}
-	# (act_args, free_typed_vars, expression, ci_var_heap) = copyExpression bound_vars expr ci_var_heap
-	  (fun_symb, ci) = newDefaultFunction free_typed_vars expression type prev_default group_index common_defs { ci & ci_var_heap = ci_var_heap }
+    # ci_var_heap = foldSt (\({fv_info_ptr}, type) -> writePtr fv_info_ptr (VI_BoundVar type)) bound_vars ci_var_heap
+	  (expression, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy expr { cp_free_vars = [], cp_var_heap = ci_var_heap, cp_local_vars = [] }
+	  (act_args, free_typed_vars, ci_var_heap) = foldSt retrieveVariable cp_free_vars ([], [], cp_var_heap)
+	  (fun_symb, ci) = new_default_function free_typed_vars cp_local_vars expression type prev_default group_index common_defs { ci & ci_var_heap = ci_var_heap }
 	= (App { app_symb = fun_symb, app_args = act_args, app_info_ptr = nilPtr }, 
 		{ ci & ci_expr_heap = ci.ci_expr_heap <:= (default_ptr, EI_DefaultFunction fun_symb act_args)})
+where
+	new_default_function free_vars local_vars rhs_expr result_type prev_default group_index common_defs ci
+		# (guarded_exprs, ci) = convertPatternExpression [] [free_vars] group_index common_defs prev_default rhs_expr ci
+		  fun_bodies  = map build_pattern guarded_exprs
+		  arg_types = map (\(_,type) -> type) free_vars
+		  (fun_symb,  (ci_next_fun_nr, ci_new_functions, ci_fun_heap))
+				= newFunction No (BackendBody fun_bodies) local_vars arg_types result_type group_index
+						(ci.ci_next_fun_nr, ci.ci_new_functions, ci.ci_fun_heap)
+		= (fun_symb, { ci & ci_fun_heap = ci_fun_heap, ci_next_fun_nr = ci_next_fun_nr, ci_new_functions = ci_new_functions })
+
+	build_pattern ([ right_patterns : _ ], bb_rhs)
+		= { bb_args = right_patterns, bb_rhs = bb_rhs }
+
 convertDefaultToExpression default_ptr (EI_DefaultFunction fun_symb act_args) bound_vars group_index common_defs ci
 	= (App { app_symb = fun_symb, app_args = act_args, app_info_ptr = nilPtr }, ci)
 
@@ -144,40 +161,35 @@ combineDefaults default_ptr this_default bound_vars guards group_index common_de
 	= (this_default, ci)
 	
 
+::	TypedVariable =
+	{	tv_free_var	:: !FreeVar
+	,	tv_type		:: !AType
+	}
+
+copyExpression :: ![TypedVariable] !Expression !*VarHeap -> (![Expression], ![TypedVariable], ![FreeVar], !Expression, !*VarHeap)
+copyExpression bound_vars expression var_heap
+    # var_heap = foldSt (\{tv_free_var={fv_info_ptr},tv_type} -> writePtr fv_info_ptr (VI_BoundVar tv_type)) bound_vars var_heap
+	  (expression, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy expression { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
+	  (bound_vars, free_typed_vars, var_heap) = foldSt retrieve_variable cp_free_vars ([], [], cp_var_heap)
+	= (bound_vars, free_typed_vars, cp_local_vars, expression, var_heap)
+where
+	retrieve_variable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
+		# (VI_FreeVar name new_ptr count type, var_heap) = readPtr var_info_ptr var_heap
+		= ( [Var { var_name = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
+			[{tv_free_var = { fv_def_level = NotALevel, fv_name = name, fv_info_ptr = new_ptr, fv_count = count }, tv_type = type} : free_typed_vars], var_heap)
+
 retrieveVariable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
 	# (VI_FreeVar name new_ptr count type, var_heap) = readPtr var_info_ptr var_heap
 	= ( [Var { var_name = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
-		[({ fv_def_level = NotALevel, fv_name = name, fv_info_ptr = new_ptr, fv_count = count }, type) :  free_typed_vars], var_heap)
-
-copyCaseExpression bound_vars opt_variable guards_and_default var_heap
-    # var_heap = foldSt (\({fv_name,fv_info_ptr},type) -> writePtr fv_info_ptr (VI_BoundVar type)) bound_vars var_heap
-	  (opt_copied_var, var_heap) = copy_variable opt_variable var_heap
-	  (expression, {cp_free_vars, cp_var_heap}) = copy guards_and_default ({ cp_free_vars = [], cp_var_heap = var_heap }
-				==> ("copyCaseExpression", bound_vars, guards_and_default))
-	  (bound_vars, free_typed_vars, var_heap) = foldSt retrieveVariable cp_free_vars ([], [], cp_var_heap)
-	  (opt_free_var, var_heap) = toOptionalFreeVar opt_copied_var var_heap
-	= (bound_vars, free_typed_vars, opt_free_var, expression, var_heap)
-where
-	copy_variable (Yes (var=:{var_name,var_info_ptr}, var_type)) var_heap
-		# (new_info, var_heap) = newPtr VI_Empty var_heap
-		= (Yes (var_info_ptr, var_type), var_heap <:= (var_info_ptr, VI_FreeVar var_name new_info 0 var_type))
-	copy_variable No var_heap
-		= (No, var_heap)
-
-copyExpression :: ![(FreeVar,AType)] !Expression !*VarHeap -> (![Expression], ![.(FreeVar,AType)], !Expression, !*VarHeap)
-copyExpression bound_vars expression var_heap
-    # var_heap = foldSt (\({fv_name,fv_info_ptr},type) -> writePtr fv_info_ptr (VI_BoundVar type)) bound_vars var_heap
-	  (expression, {cp_free_vars, cp_var_heap}) = copy expression { cp_free_vars = [], cp_var_heap = var_heap }
-	  (bound_vars, free_typed_vars, var_heap) = foldSt retrieveVariable cp_free_vars ([], [], cp_var_heap)
-	= (bound_vars, free_typed_vars, expression, var_heap)
+		[({ fv_def_level = NotALevel, fv_name = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
 
 convertCasesInCaseExpression bound_vars group_index common_defs default_ptr { case_expr, case_guards, case_default, case_ident, case_info_ptr} ci
 	# (case_default, ci) = combineDefaults default_ptr case_default bound_vars case_guards group_index common_defs ci
 	  (case_expr, ci) = convertCases bound_vars group_index common_defs case_expr ci
 	  (EI_CaseTypeAndRefCounts case_type ref_counts, ci_expr_heap) = readPtr case_info_ptr ci.ci_expr_heap
-	  (act_vars, form_vars, opt_free_var, (case_guards, case_default), ci_var_heap)
-			= copyCaseExpression bound_vars (get_variable case_expr case_type.ct_pattern_type) (case_guards,case_default) ci.ci_var_heap
-	  (fun_symb, ci) = newCaseFunction case_ident case_guards case_default case_type opt_free_var form_vars
+	  (act_vars, form_vars, opt_free_var, local_vars, (case_guards, case_default), ci_var_heap)
+			= copy_case_expression bound_vars (get_variable case_expr case_type.ct_pattern_type) (case_guards,case_default) ci.ci_var_heap
+	  (fun_symb, ci) = new_case_function case_ident case_guards case_default case_type opt_free_var form_vars local_vars
 	  							group_index common_defs default_ptr { ci & ci_var_heap = ci_var_heap, ci_expr_heap = ci_expr_heap }
 	= (App { app_symb = fun_symb, app_args = [ case_expr : act_vars ], app_info_ptr = nilPtr }, ci)
 where
@@ -185,6 +197,31 @@ where
 		= Yes (var, pattern_type)
 	get_variable _ _
 		= No
+	
+	copy_case_expression bound_vars opt_variable guards_and_default var_heap
+	    # var_heap = foldSt (\({fv_name,fv_info_ptr},type) -> writePtr fv_info_ptr (VI_BoundVar type)) bound_vars var_heap
+		  (opt_copied_var, var_heap) = copy_variable opt_variable var_heap
+		  (expression, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
+		  (bound_vars, free_typed_vars, var_heap) = foldSt retrieveVariable cp_free_vars ([], [], cp_var_heap)
+		  (opt_free_var, var_heap) = toOptionalFreeVar opt_copied_var var_heap
+		= (bound_vars, free_typed_vars, opt_free_var, cp_local_vars, expression, var_heap)
+
+	copy_variable (Yes (var=:{var_name,var_info_ptr}, var_type)) var_heap
+		# (new_info, var_heap) = newPtr VI_Empty var_heap
+		= (Yes (var_info_ptr, var_type), var_heap <:= (var_info_ptr, VI_FreeVar var_name new_info 0 var_type))
+	copy_variable No var_heap
+		= (No, var_heap)
+
+ 	new_case_function opt_id patterns case_default {ct_result_type,ct_pattern_type,ct_cons_types} opt_var free_vars local_vars
+			group_index common_defs prev_default ci=:{ci_expr_heap}
+		# (default_ptr, ci_expr_heap) = makePtrToDefault case_default ct_result_type prev_default ci_expr_heap
+		  (fun_bodies, ci) = convertPatterns patterns ct_cons_types opt_var [] free_vars default_ptr group_index common_defs { ci & ci_expr_heap = ci_expr_heap }
+		  (fun_bodies, ci) = convertDefault default_ptr opt_var [] free_vars group_index common_defs (fun_bodies, ci)
+		  (fun_symb,  (ci_next_fun_nr, ci_new_functions, ci_fun_heap))
+				= newFunction opt_id (BackendBody fun_bodies) local_vars [ct_pattern_type : [ type \\ (_, type) <- free_vars]] ct_result_type group_index
+						(ci.ci_next_fun_nr, ci.ci_new_functions, ci.ci_fun_heap)
+		= (fun_symb, { ci & ci_fun_heap = ci_fun_heap, ci_next_fun_nr = ci_next_fun_nr, ci_new_functions = ci_new_functions })
+
 
 
 makePtrToDefault (Yes default_expr) type prev_default_ptr expr_heap
@@ -215,31 +252,10 @@ where
 
 	typed_free_var_to_pattern (free_var, type) = FP_Variable free_var
 
-newDefaultFunction free_vars rhs_expr result_type prev_default group_index common_defs ci
-	# (guarded_exprs, ci) = convertPatternExpression [] [free_vars] group_index common_defs prev_default rhs_expr ci
-	  fun_bodies  = map build_pattern guarded_exprs
-	  arg_types = map (\(_,type) -> type) free_vars
-	  (fun_symb,  (ci_next_fun_nr, ci_new_functions, ci_fun_heap))
-			= newFunction No (BackendBody fun_bodies) arg_types result_type group_index
-					(ci.ci_next_fun_nr, ci.ci_new_functions, ci.ci_fun_heap)
-	= (fun_symb, { ci & ci_fun_heap = ci_fun_heap, ci_next_fun_nr = ci_next_fun_nr, ci_new_functions = ci_new_functions })
-where
-	build_pattern ([ right_patterns : _ ], bb_rhs)
-		= { bb_args = right_patterns, bb_rhs = bb_rhs }
 
-newCaseFunction opt_id patterns case_default {ct_result_type,ct_pattern_type,ct_cons_types} opt_var free_vars
-		group_index common_defs prev_default ci=:{ci_expr_heap}
-	# (default_ptr, ci_expr_heap) = makePtrToDefault case_default ct_result_type prev_default ci_expr_heap
-	  (fun_bodies, ci) = convertPatterns patterns ct_cons_types opt_var [] free_vars default_ptr group_index common_defs { ci & ci_expr_heap = ci_expr_heap }
-	  (fun_bodies, ci) = convertDefault default_ptr opt_var [] free_vars group_index common_defs (fun_bodies, ci)
-	  (fun_symb,  (ci_next_fun_nr, ci_new_functions, ci_fun_heap))
-			= newFunction opt_id (BackendBody fun_bodies) [ct_pattern_type : map (\(_,type) -> type) free_vars] ct_result_type group_index
-					(ci.ci_next_fun_nr, ci.ci_new_functions, ci.ci_fun_heap)
-	= (fun_symb, { ci & ci_fun_heap = ci_fun_heap, ci_next_fun_nr = ci_next_fun_nr, ci_new_functions = ci_new_functions })
-
-newFunction :: !(Optional Ident) !FunctionBody ![AType] !AType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
+newFunction :: !(Optional Ident) !FunctionBody ![FreeVar] ![AType] !AType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
 	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
-newFunction opt_id fun_bodies arg_types result_type group_index (ci_next_fun_nr, ci_new_functions, ci_fun_heap)
+newFunction opt_id fun_bodies local_vars arg_types result_type group_index (ci_next_fun_nr, ci_new_functions, ci_fun_heap)
 	# (fun_def_ptr, ci_fun_heap) = newPtr FI_Empty ci_fun_heap
 	  fun_id = getIdent opt_id ci_next_fun_nr
 	  arity = length arg_types
@@ -263,7 +279,7 @@ newFunction opt_id fun_bodies arg_types result_type group_index (ci_next_fun_nr,
 			,	fun_index		= NoIndex
 			,	fun_kind		= FK_Function
 			,	fun_lifted		= 0
-			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index }
+			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}
 	= ({ symb_name = fun_id, symb_kind = SK_GeneratedFunction fun_def_ptr ci_next_fun_nr, symb_arity = arity },
 			(inc ci_next_fun_nr, [fun_def_ptr : ci_new_functions],
@@ -721,25 +737,27 @@ convertRootExpression bound_vars group_index common_defs _ expr ci
 
 ::	CopyInfo =
 	{	cp_free_vars	:: ![(VarInfoPtr,AType)]
+	,	cp_local_vars	:: ![FreeVar]
 	,	cp_var_heap		:: !.VarHeap
 	}
 	
-
 class copy e :: !e !*CopyInfo -> (!e, !*CopyInfo)
 
 instance copy BoundVar
 where
-	copy var=:{var_name,var_info_ptr} cp_info=:{cp_free_vars, cp_var_heap}
-		#! var_info = sreadPtr var_info_ptr cp_var_heap
+	copy var=:{var_name,var_info_ptr} cp_info=:{cp_var_heap}
+		# (var_info, cp_var_heap) = readPtr var_info_ptr cp_var_heap
+		  cp_info = { cp_info & cp_var_heap = cp_var_heap }
 		= case var_info of
 			VI_FreeVar name new_info_ptr count type
-				-> ({ var & var_info_ptr = new_info_ptr }, { cp_free_vars = cp_free_vars,
-							cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
+				-> ({ var & var_info_ptr = new_info_ptr },
+					{ cp_info & cp_var_heap = cp_info.cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
 			VI_LocalVar
-				-> (var, {cp_free_vars = cp_free_vars, cp_var_heap = cp_var_heap})
+				-> (var, cp_info)
 			VI_BoundVar type
-				# (new_info_ptr, cp_var_heap) = newPtr VI_Empty cp_var_heap
-				-> ({ var & var_info_ptr = new_info_ptr }, { cp_free_vars = [ (var_info_ptr, type) : cp_free_vars ],
+				# (new_info_ptr, cp_var_heap) = newPtr VI_Empty cp_info.cp_var_heap
+				-> ({ var & var_info_ptr = new_info_ptr },
+					{ cp_info & cp_free_vars = [ (var_info_ptr, type) : cp_info.cp_free_vars ],
 							cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_name new_info_ptr 1 type) })
 			_
 				-> abort "copy [BoundVar] (convertcases, 612)" <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
@@ -755,10 +773,13 @@ where
 	copy (fun_expr @ exprs) cp_info
 		# ((fun_expr, exprs), cp_info) = copy (fun_expr, exprs) cp_info
 		= (fun_expr @ exprs, cp_info)
-	copy (Let lad=:{let_binds,let_expr}) cp_info=:{cp_var_heap}
-		# ((let_binds,let_expr), cp_info) = copy (let_binds,let_expr)
-			{ cp_info & cp_var_heap = foldSt (\{bind_dst={fv_info_ptr}} -> writePtr fv_info_ptr VI_LocalVar) let_binds cp_var_heap }
+	copy (Let lad=:{let_binds,let_expr}) cp_info=:{cp_var_heap, cp_local_vars}
+		# (cp_local_vars, cp_var_heap) = foldSt bind_let_var let_binds (cp_local_vars, cp_var_heap)
+		# ((let_binds,let_expr), cp_info) = copy (let_binds,let_expr) {cp_info & cp_var_heap = cp_var_heap, cp_local_vars = cp_local_vars }
 		= (Let {lad & let_expr = let_expr, let_binds = let_binds }, cp_info)
+	where
+		bind_let_var {bind_dst} (local_vars, var_heap)
+			= ([bind_dst : local_vars], var_heap <:= (bind_dst.fv_info_ptr, VI_LocalVar))
 	copy (Case case_expr) cp_info
 		# (case_expr, cp_info) = copy case_expr cp_info
 		= (Case case_expr, cp_info)
@@ -783,9 +804,11 @@ where
 	copy (TupleSelect tuple_symbol arg_nr expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
 		= (TupleSelect tuple_symbol arg_nr expr, cp_info)
+/*
 	copy (DynamicExpr dynamik) cp_info
 		# (dynamik, cp_info) = copy dynamik cp_info
 		= (DynamicExpr dynamik, cp_info)
+*/
 	copy EE cp_info
 		= (EE, cp_info)
 	copy expr cp_info
@@ -811,7 +834,7 @@ where
 	copy selector cp_info
 		= (selector, cp_info)
 
-
+/*
 instance copy DynamicExpr
 where
 	copy dynamik=:{dyn_expr,dyn_uni_vars,dyn_type_code} cp_info=:{cp_var_heap}
@@ -842,6 +865,9 @@ copyVarInfo var_info_ptr cp_info=:{cp_free_vars, cp_var_heap}
 			# (new_info_ptr, cp_var_heap) = newPtr VI_Empty cp_var_heap
 			-> (new_info_ptr, { cp_free_vars = [ (var_info_ptr, type) : cp_free_vars ],
 						cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar { id_name = "_t", id_info = nilPtr } new_info_ptr 1 type) })
+
+*/
+
 instance copy Case
 where
 	copy this_case=:{case_expr, case_guards, case_default} cp_info
@@ -856,9 +882,11 @@ where
 	copy (BasicPatterns type patterns) cp_info
 		# (patterns, cp_info) = copy patterns cp_info
 		= (BasicPatterns type patterns, cp_info) 
+/*
 	copy (DynamicPatterns patterns) cp_info
 		# (patterns, cp_info) = copy patterns cp_info
 		= (DynamicPatterns patterns, cp_info) 
+*/
 
 instance copy AlgebraicPattern
 where
@@ -871,7 +899,7 @@ where
 	copy pattern=:{bp_expr} cp_info
 		# (bp_expr, cp_info) = copy bp_expr cp_info
 		= ({ pattern & bp_expr = bp_expr }, cp_info) 
-
+/*
 instance copy DynamicPattern
 where
 	copy pattern=:{dp_var={fv_info_ptr},dp_rhs,dp_type_patterns_vars, dp_type_code} cp_info=:{cp_var_heap}
@@ -880,7 +908,7 @@ where
 				 			<:= (fv_info_ptr, VI_LocalVar) }
 		  (dp_type_code, cp_info) = copy dp_type_code cp_info
 		= ({ pattern & dp_rhs = dp_rhs, dp_type_code = dp_type_code }, cp_info) 
-
+*/
 instance copy [a] | copy a
 where
 	copy l cp_info = mapSt copy l cp_info 
@@ -998,8 +1026,10 @@ where
 		= weightedRefCount dcl_functions common_defs depth (expression, expressions) rc_info
 	weightedRefCount dcl_functions common_defs depth (TupleSelect tuple_symbol arg_nr expr) rc_info
 		= weightedRefCount dcl_functions common_defs depth expr rc_info
+/*
 	weightedRefCount dcl_functions common_defs depth (DynamicExpr {dyn_expr}) rc_info
 		= weightedRefCount dcl_functions common_defs depth dyn_expr rc_info
+*/
 	weightedRefCount dcl_functions common_defs depth (AnyCodeExpr _ _ _) rc_info
 		= rc_info
 	weightedRefCount dcl_functions common_defs depth (ABCCodeExpr _ _) rc_info
@@ -1132,17 +1162,17 @@ instance weightedRefCount App
 where
 	weightedRefCount dcl_functions common_defs depth {app_symb,app_args} rc_info
 		# rc_info = weightedRefCount dcl_functions common_defs depth app_args rc_info
-		= check_import dcl_functions common_defs app_symb.symb_kind rc_info
+		= check_import dcl_functions common_defs app_symb rc_info
 	where
-		check_import dcl_functions common_defs symb_kind=:(SK_Function {glob_module,glob_object}) rc_info=:{rc_imports, rc_var_heap}
+		check_import dcl_functions common_defs {symb_kind=SK_Function {glob_module,glob_object}} rc_info=:{rc_imports, rc_var_heap}
 			= checkImportOfDclFunction dcl_functions common_defs glob_module glob_object rc_info
-		check_import dcl_functions common_defs symb_kind=:(SK_Constructor {glob_module,glob_object}) rc_info=:{rc_imports, rc_var_heap}
+		check_import dcl_functions common_defs {symb_name,symb_kind=symb_kind=:(SK_Constructor {glob_module,glob_object})} rc_info=:{rc_imports, rc_var_heap}
 			| glob_module <> cIclModIndex
 				# {cons_type_ptr} = common_defs.[glob_module].com_cons_defs.[glob_object]
 				  (rc_imports, rc_var_heap) = checkImportedSymbol symb_kind cons_type_ptr (rc_imports, rc_var_heap)
 				= { rc_info & rc_imports = rc_imports, rc_var_heap = rc_var_heap }
 				= rc_info
-		check_import dcl_functions common_defs symb_kind rc_info
+		check_import dcl_functions common_defs _ rc_info
 			= rc_info
 
 
@@ -1272,9 +1302,10 @@ where
 		is_moved LES_Moved	= True
 		is_moved _ 			= False
 
-	distributeLets depth (DynamicExpr dynamik=:{dyn_expr}) dl_info
+/*	distributeLets depth (DynamicExpr dynamik=:{dyn_expr}) dl_info
 		# (dyn_expr, dl_info) = distributeLets depth dyn_expr dl_info
 		= (DynamicExpr { dynamik & dyn_expr = dyn_expr }, dl_info)
+*/
 	distributeLets depth expr=:(TypeCodeExpression _) dl_info
 		= (expr, dl_info)
 	distributeLets depth (AnyCodeExpr in_params out_params code_expr) dl_info=:{di_var_heap}

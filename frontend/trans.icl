@@ -224,16 +224,24 @@ instance consumerRequirements Expression where
 					{ ai & ai_next_var = new_next_var, ai_next_var_of_fun = new_ai_next_var_of_fun, ai_var_heap = ai_var_heap }
 		= consumerRequirements let_expr common_defs ai // XXX why not not_an_unsafe_pattern
 		where
-			init_variables [{bind_dst={fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
-				= init_variables binds (inc ai_next_var) (inc ai_next_var_of_fun)
-					(writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap)
+			init_variables [{bind_dst={fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
+/* Sjaak ... */
+				| fv_count > 0
+					= init_variables binds (inc ai_next_var) (inc ai_next_var_of_fun)
+						(writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap)
+					= init_variables binds ai_next_var ai_next_var_of_fun ai_var_heap
+/* ... Sjaak  */
 			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
 				= (ai_next_var, ai_next_var_of_fun, ai_var_heap)
 				
-			acc_requirements_of_let_binds [ {bind_src, bind_dst={fv_info_ptr}} : binds ] ai_next_var common_defs ai
-				# (bind_var, _, ai) = consumerRequirements bind_src common_defs ai
-		  		  ai_class_subst = unifyClassifications ai_next_var bind_var ai.ai_class_subst
-				= acc_requirements_of_let_binds binds (inc ai_next_var) common_defs { ai & ai_class_subst = ai_class_subst }
+			acc_requirements_of_let_binds [ {bind_src, bind_dst} : binds ] ai_next_var common_defs ai
+/* Sjaak ... */
+				| bind_dst.fv_count > 0
+					# (bind_var, _, ai) = consumerRequirements bind_src common_defs ai
+			  		  ai_class_subst = unifyClassifications ai_next_var bind_var ai.ai_class_subst
+					= acc_requirements_of_let_binds binds (inc ai_next_var) common_defs { ai & ai_class_subst = ai_class_subst }
+					= acc_requirements_of_let_binds binds ai_next_var common_defs ai
+/* ... Sjaak  */
 			acc_requirements_of_let_binds [] ai_next_var _ ai
 				= ai
 				
@@ -412,9 +420,9 @@ instance consumerRequirements DynamicPattern where
 		= consumerRequirements dp_rhs common_defs ai
 
 bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
-//	| fv_count > 0
+	| fv_count > 0
 		= bindPatternVars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
-//		= bindPatternVars vars next_var next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
+		= bindPatternVars vars next_var next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
 bindPatternVars [] next_var next_var_of_fun var_heap
 	= (next_var, next_var_of_fun, var_heap)
 
@@ -1743,13 +1751,21 @@ where
 
 ::	ImportedConstructors	:== [Global Index]
 
-transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap
-	-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
-transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs var_heap type_heaps symbol_heap
+/* Sjaak ... */
+// transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} } !*VarHeap !*TypeHeaps !*ExpressionHeap
+//	-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
+
+transformGroups :: !CleanupInfo !*{! Group} !*{#FunDef} !{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
+		!*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
+			-> (!*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
+/* ... Sjaak */
+
+// transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs var_heap type_heaps symbol_heap
+transformGroups cleanup_info  groups fun_defs cons_args common_defs imported_funs imported_types collected_imports var_heap type_heaps symbol_heap
 	#! (nr_of_funs, fun_defs) = usize fun_defs
-	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
+//	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, imported_types, collected_imports, ti)
-		= transform_groups 0 groups common_defs imported_funs imported_types []
+		= transform_groups 0 groups common_defs imported_funs imported_types collected_imports
 			{ti_fun_defs = fun_defs, ti_instances = createArray nr_of_funs II_Empty,
 				ti_cons_args = cons_args, ti_new_functions = [], ti_fun_heap = newHeap, ti_var_heap = var_heap,
 				ti_symbol_heap = symbol_heap, ti_type_heaps = type_heaps, ti_next_fun_nr = nr_of_funs, ti_cleanup_info = cleanup_info,

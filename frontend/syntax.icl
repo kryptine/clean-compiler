@@ -434,7 +434,7 @@ cIsALocalVar	:== False
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
-				VI_Default !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
+				VI_Default !Int | VI_Indirection !Int | /* used during conversion of dynamics; the Int indiacted the refenrence count */
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] ![Type] | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo
@@ -1332,7 +1332,7 @@ where
 // was	(<<<) file (App {app_symb, app_args})
 //		= file <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
-	(<<<) file (Let {let_binds, let_expr}) = write_binds (file <<< "let " <<< '\n') let_binds <<< "in\n" <<< let_expr
+	(<<<) file (Let {let_info_ptr, let_binds, let_expr}) = write_binds (file <<< "let " <<< ptrToInt let_info_ptr <<< '\n') let_binds <<< "in\n" <<< let_expr
 	where
 		write_binds file []
 			= file
@@ -1516,7 +1516,7 @@ where
 
 instance <<< FreeVar
 where
-	(<<<) file {fv_name,fv_info_ptr} = file <<< fv_name <<< '<' <<< ptrToInt fv_info_ptr <<< '>'
+	(<<<) file {fv_name,fv_info_ptr,fv_count} = file <<< fv_name <<< '.' <<< fv_count <<< '<' <<< ptrToInt fv_info_ptr <<< '>'
 
 instance <<< DynamicType
 where
