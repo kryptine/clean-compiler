@@ -1,5 +1,7 @@
 definition module extract
 
+// $Id$
+
 from rule import Rgraph,Rule
 from graph import Graph,Node
 from general import Optional

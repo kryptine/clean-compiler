@@ -1,5 +1,7 @@
 definition module supercompile
 
+// $Id$
+
 from trans import ImportedConstructors
 from transform import Group
 from checksupport import CommonDefs,VarHeap,DclModule
