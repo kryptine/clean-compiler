@@ -2,8 +2,7 @@ implementation module overloading
 
 import StdEnv
 
-import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, RWSDebug, convertDynamics
-
+import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics // ,RWSDebug
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 
@@ -695,7 +694,7 @@ expressionToTypeCodeExpression (ClassVariable var_info_ptr)			= TCE_TypeTerm var
 /*
 expressionToTypeCodeExpression (Var {var_info_ptr})					= TCE_Var var_info_ptr
 */
-expressionToTypeCodeExpression expr									= abort ("expressionToTypeCodeExpression (overloading.icl)" <<- expr)
+expressionToTypeCodeExpression expr									= abort "expressionToTypeCodeExpression (overloading.icl)" // <<- expr)
 
 generateClassSelection address last_selectors
 	= mapAppend (\(off_set,selector) -> RecordSelection selector off_set) address last_selectors
@@ -1170,11 +1169,10 @@ where
 
 		get_recursive_fun_index :: !Index !SymbKind Int !{# FunDef} -> Index
 		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) main_dcl_module_n fun_defs
-//			| glob_module == cIclModIndex
 			| glob_module == main_dcl_module_n
-				# {fun_info, fun_index} = fun_defs.[glob_object]
+				# {fun_info,fun_index} = fun_defs.[glob_object]
 				| fun_info.fi_group_index == group_index
-					= fun_index 
+					= fun_index
 					= NoIndex
 				= NoIndex
 		get_recursive_fun_index group_index _ main_dcl_module_n fun_defs

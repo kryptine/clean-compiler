@@ -19,8 +19,7 @@ implementation module comparedefimp
 	(see type HeapWithNumber). The same happens with attribute variables and variables in macros/functions.
 */
 
-import syntax, checksupport, compare_constructor, utilities, StdCompare
-import RWSDebug
+import syntax, checksupport, compare_constructor, utilities, StdCompare //, RWSDebug
 
 :: TypesCorrespondState =
 		{	tc_type_vars
@@ -623,9 +622,9 @@ instance t_corresponds TypeRhs where
 		=	return True
 // sanity check ...
 	t_corresponds UnknownType _
-		=	undef <<- "t_corresponds (TypeRhs): dclDef == UnknownType" 
+		=	undef // <<- "t_corresponds (TypeRhs): dclDef == UnknownType" 
 	t_corresponds _ UnknownType
-		=	undef <<- "t_corresponds (TypeRhs): iclDef == UnknownType"
+		=	undef // <<- "t_corresponds (TypeRhs): iclDef == UnknownType"
 // ... sanity check
 	t_corresponds _ _
 		=	return False
@@ -990,7 +989,9 @@ continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_index icl_app_sy
 		 && (implies (not dcl_name_is_loc_dependent) (dcl_function.fun_symb.id_name==icl_function.fun_symb.id_name))
 		// functions that originate from e.g. lambda expressions can correspond although their names differ
 	  where
-		name_is_location_dependent (FK_Function name_is_loc_dependent)
+		name_is_location_dependent (FK_ImpFunction name_is_loc_dependent)
+			= name_is_loc_dependent
+		name_is_location_dependent (FK_DefFunction name_is_loc_dependent)
 			= name_is_loc_dependent
 		name_is_location_dependent _
 		 	= False

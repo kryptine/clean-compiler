@@ -669,6 +669,7 @@ where
 					= (AP_Algebraic cons_symbol cons_def.cons_type_index patterns opt_var, ums)	
 					= (AP_Empty cons_def.cons_symb, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
 							ums_error = checkError cons_def.cons_symb " missing argument(s)" ums_error })
+
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			| mod_index == cons_mod
 				# (cons_def, cons_defs) = cons_defs![cons_index]
@@ -676,7 +677,6 @@ where
 				# ({dcl_common,dcl_conversions}, modules) = modules![cons_mod]
 				  cons_def = dcl_common.com_cons_defs.[cons_index]
 				= (cons_def, convertIndex cons_index (toInt STE_Constructor) dcl_conversions, cons_defs, modules)
-
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			# ({dcl_common,dcl_conversions}, modules) = modules![cons_mod]
 			  cons_def = dcl_common.com_cons_defs.[cons_index]
@@ -703,7 +703,7 @@ checkPatternConstructor _ _ {ste_kind = STE_Empty} ident _  ps e_info cs=:{cs_er
 checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _,ste_index} ident opt_var  ps=:{ps_fun_defs} e_info cs=:{cs_error,cs_x}
 	# ({fun_symb,fun_arity,fun_kind,fun_priority},ps_fun_defs) = ps_fun_defs![ste_index]
 	  ps = { ps & ps_fun_defs = ps_fun_defs }
-	| fun_kind == FK_Macro
+	| case fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
 		| is_expr_list
 			# macro_symbol = { glob_object = MakeDefinedSymbol fun_symb ste_index fun_arity, glob_module = cs_x.x_main_dcl_module_n }
 	 		= (AP_Constant APK_Macro macro_symbol fun_priority, ps, e_info, cs)
@@ -1112,15 +1112,21 @@ where
 		# ({fun_symb,fun_arity,fun_kind,fun_priority}, es_fun_defs) = es_fun_defs![ste_index]
 		# index = { glob_object = ste_index, glob_module = cs_x.x_main_dcl_module_n }
 		| is_called_before ei_fun_index calls
-			| fun_kind == FK_Macro
+			| case fun_kind of FK_DefMacro->True ; FK_ImpMacro->True; _ -> False
 				= (SK_Macro index, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
-//				= (SK_Function index, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
 				# symbol_kind = if ef_is_macro_fun (SK_LocalMacroFunction ste_index) (SK_Function index)
 				= (symbol_kind, fun_arity, fun_priority, cIsAFunction, { e_state & es_fun_defs = es_fun_defs }, e_info, cs)
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (symb_info, { entry & ste_kind = STE_FunctionOrMacro [ ei_fun_index : calls ]})}
 			  e_state = { e_state & es_fun_defs = es_fun_defs, es_calls = [{ fc_index = ste_index, fc_level = ste_def_level} : es_calls ]}
-//			= (if (fun_kind == FK_Macro) (SK_Macro index) (SK_Function index), fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
-			# symbol_kind = if (fun_kind == FK_Macro) (SK_Macro index) (if ef_is_macro_fun (SK_LocalMacroFunction ste_index) (SK_Function index))
+			# symbol_kind = case fun_kind of
+				FK_DefMacro
+					-> SK_Macro index;
+				FK_ImpMacro
+					-> SK_Macro index;
+				_
+					| ef_is_macro_fun
+						-> SK_LocalMacroFunction ste_index
+						-> SK_Function index
 			= (symbol_kind, fun_arity, fun_priority, cIsAFunction, e_state, e_info, cs)
 	where
 		is_called_before caller_index []
@@ -2426,7 +2432,11 @@ where
 	get_calls (STE_FunctionOrMacro [x:xs]) = (x,xs)
 	get_calls ste_kind = abort "get_calls (check.icl)" // <<- ste_kind
 
-	push_error_admin_beautifully {id_name} fun_pos (FK_Function fun_name_is_location_dependent) cs_error
+	push_error_admin_beautifully {id_name} fun_pos (FK_ImpFunction fun_name_is_location_dependent) cs_error
+		| fun_name_is_location_dependent && size id_name>0
+			# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
+			= pushErrorAdmin (newPosition { id_name=beautiful_name, id_info=nilPtr } fun_pos) cs_error
+	push_error_admin_beautifully {id_name} fun_pos (FK_DefFunction fun_name_is_location_dependent) cs_error
 		| fun_name_is_location_dependent && size id_name>0
 			# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
 			= pushErrorAdmin (newPosition { id_name=beautiful_name, id_info=nilPtr } fun_pos) cs_error
@@ -2800,7 +2810,7 @@ checkModule m icl_global_function_range fun_defs n_functions_and_macros_in_dcl_m
 //	# (ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, heaps, cs_predef_symbols, cs_symbol_table, ea_file)
 	= check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_function_range icl_instance_range nr_of_functions n_functions_and_macros_in_dcl_modules optional_pre_def_mod local_defs icl_functions init_dcl_modules cdefs sizes heaps cs
 //	= (ea_ok, icl_mod, dcl_modules, groups, dcl_icl_conversions, cached_functions_and_macros, heaps, cs_predef_symbols, cs_symbol_table, ea_file)
-	
+
 check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cdefs} icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules functions_and_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
 
@@ -2858,7 +2868,6 @@ check_module1 {mod_type,mod_name,mod_imports,mod_imported_objects,mod_defs = cde
 				# (mod_entry, symbol_table) = readPtr mod_symb.pds_ident.id_info symbol_table
 				= case mod_entry.ste_kind of
 					STE_Module _
-//						-> ({ pre_def_symbols & [predef_index] = { mod_symb & pds_module = cIclModIndex, pds_def =  mod_entry.ste_index }}, symbol_table)
 						-> ({ pre_def_symbols & [predef_index] = { mod_symb & pds_module = cs_x.x_main_dcl_module_n, pds_def =  mod_entry.ste_index }}, symbol_table)
 					_
 						-> (pre_def_symbols, symbol_table)
@@ -2939,6 +2948,29 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 			= []
 	= (decls,dcl_modules,cs)
 
+remove_function_conversion_table main_dcl_module_n dcl_modules
+	# (dcl_mod,dcl_modules) = dcl_modules![main_dcl_module_n]
+	= case dcl_mod.dcl_conversions of
+		No
+			-> ({},dcl_modules)
+		(Yes conversion_table)
+			#! size_function_conversions = size conversion_table.[cFunctionDefs]
+			# conversion_table = {e \\ e <-:conversion_table}
+			# (function_conversions,conversion_table) = replace conversion_table cFunctionDefs {n \\ n<-[0..size_function_conversions-1]}
+			# dcl_modules = {dcl_modules & [main_dcl_module_n].dcl_conversions=Yes conversion_table}
+			-> (function_conversions,dcl_modules)
+
+add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n dcl_modules
+	# (dcl_mod,dcl_modules) = dcl_modules![main_dcl_module_n]
+	= case dcl_mod.dcl_conversions of
+		No
+			-> dcl_modules
+		(Yes conversion_table)
+			# conversion_table = {e \\ e <-:conversion_table}
+			# conversion_table = {conversion_table & [cFunctionDefs]=dcl_to_icl_function_conversions}
+			# dcl_modules = {dcl_modules & [main_dcl_module_n].dcl_conversions=Yes conversion_table}
+			-> dcl_modules
+
 check_module2 :: Ident [.ImportedObject] .[Import ImportDeclaration] .ModuleKind !.IndexRange !.IndexRange !Int !Int 
 				(Optional (Module a)) [.Declaration] *{#FunDef} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
 				*{#.Int} *Heaps *CheckState 
@@ -2957,13 +2989,17 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  (dcl_modules, icl_functions, heaps, cs)
 		= check_predefined_module optional_pre_def_mod dcl_modules icl_functions heaps cs
 
+	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
+	  (dcl_to_icl_function_conversions,dcl_modules) = remove_function_conversion_table main_dcl_module_n dcl_modules
+
 	  iinfo = {	ii_modules = dcl_modules, ii_funs_and_macros = icl_functions, ii_next_num = 0, ii_deps = [] }
 	  (iinfo, heaps, cs) = check_dcl_module iinfo heaps cs
 
 	  (_, imported_module_numbers,{ii_modules,ii_funs_and_macros = icl_functions}, heaps, cs) = checkImports mod_imports EndModuleNumbers iinfo heaps cs
-	  
+
+	  ii_modules = add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n ii_modules
+	 
 	  cs = { cs & cs_x.x_needed_modules = 0 }
-	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 	# imported_module_numbers = add_module_n main_dcl_module_n (add_module_n 1 imported_module_numbers)
 //	  ii_modules = print_imported_modules 0 ii_modules
 	  (used_module_numbers,ii_modules) = compute_used_module_numbers imported_module_numbers imported_module_numbers ii_modules
@@ -3143,7 +3179,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 					= ([new_fun_def : new_fun_defs], funs_index_heaps) 
 					= ([], (icl_functions, next_fun_index, heaps))
 		 
-			build_function new_fun_index fun_def=:{fun_symb, fun_arity, fun_index, fun_body = CheckedBody {cb_args}, fun_info} fun_type
+			build_function new_fun_index fun_def=:{fun_symb, fun_index, fun_arity,  fun_body = CheckedBody {cb_args}, fun_info} fun_type
 						(var_heap, type_var_heap, expr_heap)
 				# (tb_args, var_heap) = mapSt new_free_var cb_args var_heap
 				  (app_args, expr_heap) = mapSt new_bound_var tb_args expr_heap
@@ -3152,7 +3188,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 												symb_kind = SK_Function { glob_module = main_dcl_module_n, glob_object = fun_index }},
 								 app_args = app_args,
 								 app_info_ptr = app_info_ptr }
-				= ({ fun_def & fun_index = new_fun_index, fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_type = Yes fun_type,
+				= ({ fun_def & fun_index=new_fun_index, fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_type = Yes fun_type,
 						fun_info = { EmptyFunInfo & fi_calls = [ { fc_index = fun_index, fc_level = cGlobalScope }] }},
 					(var_heap, type_var_heap, expr_heap))
 		
@@ -3444,7 +3480,6 @@ checkDclModule is_on_cycle {mod_name,mod_imports,mod_defs} mod_index modules icl
 	  cs							= addGlobalDefinitionsToSymbolTable dcl_defined cs
 	  cs							= { cs & cs_x.x_needed_modules = 0 }
 	  nr_of_dcl_functions 			= size dcl_mod.dcl_functions
-
 
 	  dcls_explicit	= flatten [[dcls_explicit\\dcls_explicit<-:dcls_explicit] \\ (_,{dcls_explicit})<-imports]
 

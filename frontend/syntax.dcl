@@ -135,7 +135,10 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_Erroneous
 
-::	FunKind	= FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
+::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
+
+::	DefOrImpFunKind = FK_DefFunction !Bool| FK_ImpFunction !Bool | FK_DefMacro | FK_ImpMacro | FK_ImpCaf | FK_DefOrImpUnknown
+
 cNameNotLocationDependent :== False
 cNameLocationDependent :== True
 
@@ -419,7 +422,7 @@ cIsNonCoercible			:== 2
 	,	fun_type		:: !Optional SymbolType
 	,	fun_pos			:: !Position
 	,	fun_index		:: !Int
-	,	fun_kind		:: !FunKind
+	,	fun_kind		:: !DefOrImpFunKind
 	,	fun_lifted		:: !Int
 //	,	fun_type_ptr	:: !TypeVarInfoPtr
 	,	fun_info		:: !FunInfo
@@ -544,8 +547,6 @@ cNonRecursiveAppl	:== False
 //				| SK_RecordSelector !(Global Index)
 				| SK_GeneratedFunction !FunctionInfoPtr !Index
 				| SK_TypeCode
-
-// MW2 moved some type definitions
 
 /*	Some auxiliary type definitions used during fusion. Actually, these definitions
 	should have been given in seperate module. Unfortunately, Clean's module system

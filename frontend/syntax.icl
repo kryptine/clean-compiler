@@ -1,8 +1,6 @@
 implementation module syntax
 
-import StdEnv, compare_constructor
-
-import RWSDebug
+import StdEnv, compare_constructor // ,RWSDebug
 
 import scanner, general, Heap, typeproperties, utilities
 
@@ -76,14 +74,12 @@ where toString {import_module} = toString import_module
 ::	ParsedModule	:== Module  [ParsedDefinition]
 ::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef) IndexRange)
 
-	
 ::	ModuleKind	= MK_Main | MK_Module | MK_System | MK_None
 
 ::	RhsDefsOfType	= ConsList ![ParsedConstructor]
 					| SelectorList !Ident ![ATypeVar] ![ParsedSelector]
 					| TypeSpec !AType
 					| EmptyRhs !BITVECT
-
 
 ::	CollectedDefinitions instance_kind macro_defs =
 	{	def_types 			:: ![TypeDef TypeRhs]
@@ -140,6 +136,9 @@ cIsNotAFunction :== False
 	|	PD_Erroneous
 
 ::	FunKind	= FK_Function !Bool | FK_Macro | FK_Caf | FK_Unknown
+
+::	DefOrImpFunKind = FK_DefFunction !Bool| FK_ImpFunction !Bool | FK_DefMacro | FK_ImpMacro | FK_ImpCaf | FK_DefOrImpUnknown
+
 cNameNotLocationDependent :== False
 cNameLocationDependent :== True
 
@@ -269,8 +268,6 @@ cNameLocationDependent :== True
 						| ID_Record !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Instance !ImportedIdent !Ident !(![Type],![TypeContext])
 
-// MW2 moved some type definitions
-
 cIsImportedLibrary :== True
 cIsImportedObject :== False
 :: ImportedObject =
@@ -396,7 +393,7 @@ cMayBeNonCoercible		:== 4
 	,	fun_type		:: !Optional SymbolType
 	,	fun_pos			:: !Position
 	,	fun_index		:: !Int
-	,	fun_kind		:: !FunKind
+	,	fun_kind		:: !DefOrImpFunKind
 	,	fun_lifted		:: !Int
 //	,	fun_type_ptr	:: !TypeVarInfoPtr
 	,	fun_info		:: !FunInfo
@@ -1563,17 +1560,17 @@ where
 
 instance <<< FunDef
 where
-	(<<<) file {fun_symb,fun_index,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< fun_index <<< ' ' <<< bodies 
-	(<<<) file {fun_symb,fun_index,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
-			<<< fun_index <<< "C " <<< cb_args <<< " = " <<< cb_rhs 
-//			<<< fun_index <<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
-			<<< fun_index <<< "T "  <<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs 
-//			<<< fun_index <<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_symb,fun_index,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
-			<<< fun_index <<< body <<< '\n'
-	(<<<) file {fun_symb,fun_index,fun_body=NoBody,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
-			<<< fun_index <<< "Array function\n"
+	(<<<) file {fun_symb,fun_body=ParsedBody bodies} = file <<< fun_symb <<< '.' <<< ' ' <<< bodies 
+	(<<<) file {fun_symb,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
+			<<< "C " <<< cb_args <<< " = " <<< cb_rhs 
+//			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
+	(<<<) file {fun_symb,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_symb <<< '.'
+			<<< "T "  <<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs 
+//			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
+	(<<<) file {fun_symb,fun_body=BackendBody body,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
+			<<< body <<< '\n'
+	(<<<) file {fun_symb,fun_body=NoBody,fun_type=Yes type} = file <<< type <<< '\n' <<< fun_symb <<< '.'
+			<<< "Array function\n"
 
 instance <<< FunCall
 where

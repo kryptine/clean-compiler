@@ -100,8 +100,6 @@ where
 	get_file_and_line_nr (LinePos filename linenr)
 		= (filename, linenr, No)
 
-class collectFunctions a :: a !*CollectAdmin -> (a, !*CollectAdmin)
-
 addFunctionsRange :: [FunDef] *CollectAdmin -> (IndexRange, *CollectAdmin)
 addFunctionsRange fun_defs ca
 	# (frm, ca)
@@ -118,197 +116,248 @@ addFunctionsRange fun_defs ca
 					, ca_rev_fun_defs = [fun_def : ca.ca_rev_fun_defs]
 				}
 
+class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
+
 instance collectFunctions ParsedExpr
 where
-	collectFunctions (PE_List exprs) ca
-		# (exprs, ca) = collectFunctions exprs ca
+	collectFunctions (PE_List exprs) icl_module ca
+		# (exprs, ca) = collectFunctions exprs icl_module ca
 		= (PE_List exprs, ca)
-	collectFunctions (PE_Bound bound_expr) ca
-		# (bound_expr, ca) = collectFunctions bound_expr ca
+	collectFunctions (PE_Bound bound_expr) icl_module ca
+		# (bound_expr, ca) = collectFunctions bound_expr icl_module ca
 		= (PE_Bound bound_expr, ca)
-	collectFunctions (PE_Lambda lam_ident args res pos) ca
-		# ((args,res), ca) = collectFunctions (args,res) ca
-		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos] ca
+	collectFunctions (PE_Lambda lam_ident args res pos) icl_module ca
+		# ((args,res), ca) = collectFunctions (args,res) icl_module ca
+		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos icl_module] ca
 		= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = range, loc_nodes = [] })
 				(PE_Ident lam_ident), ca)
-	collectFunctions (PE_Record rec_expr type_name fields) ca
-		# ((rec_expr,fields), ca) = collectFunctions (rec_expr,fields) ca
+	collectFunctions (PE_Record rec_expr type_name fields) icl_module ca
+		# ((rec_expr,fields), ca) = collectFunctions (rec_expr,fields) icl_module ca
 		= (PE_Record rec_expr type_name fields, ca)
-	collectFunctions (PE_Tuple exprs) ca
-		# (exprs, ca) = collectFunctions exprs ca
+	collectFunctions (PE_Tuple exprs) icl_module ca
+		# (exprs, ca) = collectFunctions exprs icl_module ca
 		= (PE_Tuple exprs, ca)
-	collectFunctions (PE_Selection is_unique expr selectors) ca
-		# ((expr, selectors), ca) = collectFunctions (expr, selectors) ca
+	collectFunctions (PE_Selection is_unique expr selectors) icl_module ca
+		# ((expr, selectors), ca) = collectFunctions (expr, selectors) icl_module ca
 		= (PE_Selection is_unique expr selectors, ca)
-	collectFunctions (PE_Update expr1 updates expr2) ca
-		# ((expr1, (updates, expr2)), ca) = collectFunctions (expr1, (updates, expr2)) ca
+	collectFunctions (PE_Update expr1 updates expr2) icl_module ca
+		# ((expr1, (updates, expr2)), ca) = collectFunctions (expr1, (updates, expr2)) icl_module ca
 		= (PE_Update expr1 updates expr2, ca)
-	collectFunctions (PE_Case case_ident pattern_expr case_alts) ca
-		# ((pattern_expr,case_alts), ca) = collectFunctions (pattern_expr,case_alts) ca
+	collectFunctions (PE_Case case_ident pattern_expr case_alts) icl_module ca
+		# ((pattern_expr,case_alts), ca) = collectFunctions (pattern_expr,case_alts) icl_module ca
 		= (PE_Case case_ident pattern_expr case_alts, ca)
-	collectFunctions (PE_If if_ident c t e) ca
+	collectFunctions (PE_If if_ident c t e) icl_module ca
 		# true_pattern		= PE_Basic (BVB True)
 		  false_pattern		= PE_WildCard // PE_Basic (BVB False)
 		= collectFunctions (PE_Case if_ident c
 							[ {calt_pattern = true_pattern , calt_rhs = exprToRhs t}
 							, {calt_pattern = false_pattern, calt_rhs = exprToRhs e}
-							]) ca
-	collectFunctions (PE_Let strict locals in_expr) ca
-		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) ca
+							]) icl_module ca
+	collectFunctions (PE_Let strict locals in_expr) icl_module ca
+		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) icl_module ca
 		= (PE_Let strict node_defs in_expr, ca)
-	collectFunctions (PE_Compr gen_kind expr qualifiers) ca
+	collectFunctions (PE_Compr gen_kind expr qualifiers) icl_module ca
 		# (compr, ca)
 			= transformComprehension gen_kind expr qualifiers ca
-		=	collectFunctions compr ca
-	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) ca
+		=	collectFunctions compr icl_module ca
+	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) icl_module ca
 		# (compr, ca)
 			= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
-		=	collectFunctions compr ca
-	collectFunctions (PE_Sequ sequence) ca=:{ca_predefs}
-		= collectFunctions (transformSequence sequence ca_predefs) ca
-	collectFunctions (PE_ArrayDenot exprs) ca=:{ca_predefs}
-		= collectFunctions (transformArrayDenot exprs ca_predefs) ca
-	collectFunctions (PE_Dynamic exprs opt_dyn_type) ca
-		# (exprs, ca) = collectFunctions exprs ca
+		=	collectFunctions compr icl_module ca
+	collectFunctions (PE_Sequ sequence) icl_module ca=:{ca_predefs}
+		= collectFunctions (transformSequence sequence ca_predefs) icl_module ca
+	collectFunctions (PE_ArrayDenot exprs) icl_module ca=:{ca_predefs}
+		= collectFunctions (transformArrayDenot exprs ca_predefs) icl_module ca
+	collectFunctions (PE_Dynamic exprs opt_dyn_type) icl_module ca
+		# (exprs, ca) = collectFunctions exprs icl_module ca
 		= (PE_Dynamic exprs opt_dyn_type, ca)
-	collectFunctions expr ca
+	collectFunctions expr icl_module ca
 		= (expr, ca)
 
 instance collectFunctions [a] | collectFunctions a
 where
-	collectFunctions l ca
-		=	mapSt collectFunctions l ca
+	collectFunctions l icl_module ca
+//		=	mapSt collectFunctions l icl_module ca
+		= map_st l ca
+		where
+			map_st [x : xs] s
+			 	# (x, s) = collectFunctions x icl_module s
+				  (xs, s) = map_st xs s
+				#! s = s
+				= ([x : xs], s)
+			map_st [] s
+			 	= ([], s)
 
 instance collectFunctions (a,b) | collectFunctions a & collectFunctions b
 where
-	collectFunctions (x,y) ca
-		# (x, ca) = collectFunctions x ca
-		  (y, ca) = collectFunctions y ca
+	collectFunctions (x,y) icl_module ca
+		# (x, ca) = collectFunctions x icl_module ca
+		  (y, ca) = collectFunctions y icl_module ca
 		= ((x,y), ca)
 
 instance collectFunctions Qualifier
 where
-	collectFunctions qual=:{qual_generators, qual_filter} ca
-		# ((qual_generators, qual_filter), ca) = collectFunctions (qual_generators, qual_filter) ca
+	collectFunctions qual=:{qual_generators, qual_filter} icl_module ca
+		# ((qual_generators, qual_filter), ca) = collectFunctions (qual_generators, qual_filter) icl_module ca
 		= ({ qual & qual_generators = qual_generators, qual_filter = qual_filter }, ca) 
 
 instance collectFunctions Generator
 where
-	collectFunctions gen=:{gen_pattern,gen_expr} ca
-		# ((gen_pattern,gen_expr), ca) = collectFunctions (gen_pattern,gen_expr) ca
+	collectFunctions gen=:{gen_pattern,gen_expr} icl_module ca
+		# ((gen_pattern,gen_expr), ca) = collectFunctions (gen_pattern,gen_expr) icl_module ca
 		= ({gen & gen_pattern = gen_pattern, gen_expr = gen_expr}, ca)
 
 instance collectFunctions (Optional a) | collectFunctions a
 where
-	collectFunctions (Yes expr) ca
-		# (expr, ca) = collectFunctions expr ca
+	collectFunctions (Yes expr) icl_module ca
+		# (expr, ca) = collectFunctions expr icl_module ca
 		= (Yes expr, ca) 
-	collectFunctions No ca
+	collectFunctions No icl_module ca
 		= (No, ca) 
 
 instance collectFunctions ParsedSelection
 where
-	collectFunctions (PS_Array index_expr) ca
-		# (index_expr, ca) = collectFunctions index_expr ca
+	collectFunctions (PS_Array index_expr) icl_module ca
+		# (index_expr, ca) = collectFunctions index_expr icl_module ca
 		= (PS_Array index_expr, ca)
-	collectFunctions expr ca
+	collectFunctions expr icl_module ca
 		= (expr, ca)
 
 instance collectFunctions CaseAlt
 where
-	collectFunctions calt=:{calt_pattern,calt_rhs} ca
-		# ((calt_pattern,calt_rhs), ca) = collectFunctions (calt_pattern,calt_rhs) ca
+	collectFunctions calt=:{calt_pattern,calt_rhs} icl_module ca
+		# ((calt_pattern,calt_rhs), ca) = collectFunctions (calt_pattern,calt_rhs) icl_module ca
 		= ({calt & calt_pattern = calt_pattern, calt_rhs = calt_rhs}, ca) 
 
 instance collectFunctions (Bind a b) | collectFunctions a & collectFunctions b
 where
-	collectFunctions bind=:{bind_src,bind_dst} ca
-		# ((bind_src,bind_dst), ca) = collectFunctions (bind_src,bind_dst) ca
+	collectFunctions bind=:{bind_src,bind_dst} icl_module ca
+		# ((bind_src,bind_dst), ca) = collectFunctions (bind_src,bind_dst) icl_module ca
 		= ({bind & bind_src = bind_src, bind_dst = bind_dst }, ca)
 
 instance collectFunctions OptGuardedAlts
 where
-	collectFunctions (GuardedAlts guarded_exprs (Yes def_expr)) ca
-		# ((guarded_exprs, def_expr), ca) = collectFunctions (guarded_exprs, def_expr) ca
+	collectFunctions (GuardedAlts guarded_exprs (Yes def_expr)) icl_module ca
+		# ((guarded_exprs, def_expr), ca) = collectFunctions (guarded_exprs, def_expr) icl_module ca
 		= (GuardedAlts guarded_exprs (Yes def_expr), ca)
-	collectFunctions (GuardedAlts guarded_exprs No) ca
-		# (guarded_exprs, ca) = collectFunctions guarded_exprs ca
+	collectFunctions (GuardedAlts guarded_exprs No) icl_module ca
+		# (guarded_exprs, ca) = collectFunctions guarded_exprs icl_module ca
 		= (GuardedAlts guarded_exprs No, ca)
-	collectFunctions (UnGuardedExpr unguarded_expr) ca
-		# (unguarded_expr, ca) = collectFunctions unguarded_expr ca
+	collectFunctions (UnGuardedExpr unguarded_expr) icl_module ca
+		# (unguarded_expr, ca) = collectFunctions unguarded_expr icl_module ca
 		= (UnGuardedExpr unguarded_expr, ca)
 
 instance collectFunctions GuardedExpr
 where
-	collectFunctions alt=:{alt_nodes,alt_guard,alt_expr} ca
+	collectFunctions alt=:{alt_nodes,alt_guard,alt_expr} icl_module ca
 		# ((alt_nodes, (alt_guard, alt_expr)), ca) =
-				collectFunctions (alt_nodes, (alt_guard, alt_expr)) ca
+				collectFunctions (alt_nodes, (alt_guard, alt_expr)) icl_module ca
 		= ({alt & alt_nodes = alt_nodes, alt_guard = alt_guard, alt_expr = alt_expr}, ca)
 
 instance collectFunctions ExprWithLocalDefs
 where
-	collectFunctions expr=:{ewl_nodes, ewl_expr,ewl_locals} ca
-		# ((ewl_nodes, (ewl_expr, ewl_locals)), ca) = collectFunctions (ewl_nodes, (ewl_expr, ewl_locals)) ca
+	collectFunctions expr=:{ewl_nodes, ewl_expr,ewl_locals} icl_module ca
+		# ((ewl_nodes, (ewl_expr, ewl_locals)), ca) = collectFunctions (ewl_nodes, (ewl_expr, ewl_locals)) icl_module ca
 		= ({expr & ewl_nodes = ewl_nodes, ewl_expr = ewl_expr, ewl_locals = ewl_locals}, ca)
 
 instance collectFunctions NodeDefWithLocals
 where
-	collectFunctions node_def=:{ndwl_def, ndwl_locals} ca
-		# (( ndwl_def, ndwl_locals), ca) = collectFunctions (ndwl_def, ndwl_locals) ca
+	collectFunctions node_def=:{ndwl_def, ndwl_locals} icl_module ca
+		# (( ndwl_def, ndwl_locals), ca) = collectFunctions (ndwl_def, ndwl_locals) icl_module ca
 		= ({node_def & ndwl_def = ndwl_def, ndwl_locals = ndwl_locals}, ca)
 
 instance collectFunctions Rhs
 where
-	collectFunctions {rhs_alts, rhs_locals} ca
-		# ((rhs_alts, rhs_locals), ca) = collectFunctions (rhs_alts, rhs_locals) ca
+	collectFunctions {rhs_alts, rhs_locals} icl_module ca
+		# ((rhs_alts, rhs_locals), ca) = collectFunctions (rhs_alts, rhs_locals) icl_module ca
 		= ({rhs_alts = rhs_alts, rhs_locals = rhs_locals}, ca)
 
 instance collectFunctions LocalDefs
 where
-	collectFunctions (LocalParsedDefs locals) ca
+	collectFunctions (LocalParsedDefs locals) icl_module ca
 		# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions locals ca
 		  (node_defs, ca) = collect_functions_in_node_defs node_defs ca
-		  (fun_defs, ca) = collectFunctions fun_defs ca
+		  (fun_defs, ca) = collectFunctions fun_defs icl_module ca
 		  (range, ca) = addFunctionsRange fun_defs ca
 		= (CollectedLocalDefs { loc_functions = range, loc_nodes = node_defs }, ca)
 	where
+		reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
+		reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
+			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+			= (fun_defs, [(No, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
+		reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
+			# prio = if is_infix (Prio NoAssoc 9) NoPrio
+			  fun_arity = length args
+			  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
+			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+			  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
+			= ([ fun : fun_defs ], node_defs, ca)
+		reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
+			= case defs of
+				[PD_Function pos name is_infix args rhs fun_kind : _]
+					| belongsToTypeSpec name1 prio name is_infix
+						# fun_arity = determineArity args type
+						# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
+						  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+						  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type pos
+						-> ([fun : fun_defs], node_defs, ca)
+						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+				[PD_NodeDef pos pattern=:(PE_Ident id)  {rhs_alts,rhs_locals} : defs]
+					| belongsToTypeSpec name1 prio id False
+						# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+						-> (fun_defs, [(type, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
+						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+				_
+					-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
+		reorganiseLocalDefinitions [] ca
+			= ([], [], ca)
+
 		collect_functions_in_node_defs :: [(Optional SymbolType,NodeDef ParsedExpr)] *CollectAdmin -> ([(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
 		collect_functions_in_node_defs [ (node_def_type, bind) : node_defs ] ca
-			# (bind, ca) = collectFunctions bind ca
+			# (bind, ca) = collectFunctions bind icl_module ca
 			  (node_defs, ca) = collect_functions_in_node_defs node_defs ca
 			= ([(node_def_type, bind):node_defs], ca)
 		collect_functions_in_node_defs [] ca
 			= ([], ca)
 // RWS ... +++ remove recollection
-	collectFunctions locals ca
+	collectFunctions locals icl_module ca
 		=	(locals, ca)
 // ... RWS
 
 instance collectFunctions (NodeDef a) | collectFunctions a
 where
-	collectFunctions node_def=:{nd_dst,nd_alts,nd_locals} ca
-		# ((nd_dst,(nd_alts,nd_locals)), ca) = collectFunctions (nd_dst,(nd_alts,nd_locals)) ca
+	collectFunctions node_def=:{nd_dst,nd_alts,nd_locals} icl_module ca
+		# ((nd_dst,(nd_alts,nd_locals)), ca) = collectFunctions (nd_dst,(nd_alts,nd_locals)) icl_module ca
 		= ({ node_def & nd_dst = nd_dst, nd_alts = nd_alts, nd_locals = nd_locals }, ca)
 
 instance collectFunctions Ident
 where
-	collectFunctions e ca
+	collectFunctions e icl_module ca
 		= (e, ca)
+
+instance collectFunctions (ParsedInstance a) | collectFunctions a where
+	collectFunctions inst=:{pi_members} icl_module ca
+		# (pi_members, ca) = collectFunctions pi_members icl_module ca
+		= ({inst & pi_members = pi_members }, ca)
+
+instance collectFunctions FunDef where
+	collectFunctions fun_def=:{fun_body = ParsedBody bodies} icl_module ca
+		# (bodies, ca) = collectFunctions bodies icl_module ca
+		= ({fun_def & fun_body = ParsedBody bodies}, ca)
+
+instance collectFunctions ParsedBody where
+	collectFunctions pb=:{pb_rhs} icl_module ca
+		# (pb_rhs, ca) = collectFunctions pb_rhs icl_module ca
+		= ({ pb & pb_rhs = pb_rhs }, ca)
 
 NoCollectedLocalDefs :== CollectedLocalDefs { loc_functions = { ir_from = 0, ir_to = 0 }, loc_nodes = [] }
 
-// MW was:transformLambda :: Ident [ParsedExpr] ParsedExpr -> FunDef
-transformLambda :: Ident [ParsedExpr] ParsedExpr Position -> FunDef
-// MW was:transformLambda lam_ident args result
-transformLambda lam_ident args result pos
-	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs,
-												ewl_position = NoPos },
-	  			  rhs_locals = NoCollectedLocalDefs }
-// MW4 was:	  lam_body = [{pb_args = args, pb_rhs = lam_rhs }]
+transformLambda :: Ident [ParsedExpr] ParsedExpr Position Bool -> FunDef
+transformLambda lam_ident args result pos icl_module
+	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs, ewl_position = NoPos },
+	  					rhs_locals = NoCollectedLocalDefs }
 	  lam_body = [{pb_args = args, pb_rhs = lam_rhs, pb_position = pos }]
-// MW was:	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No NoPos
-	  fun_def = MakeNewFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
-	= fun_def
+	= MakeNewImpOrDefFunction icl_module lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 
 makeNilExpression :: *CollectAdmin -> (ParsedExpr,*CollectAdmin)
 makeNilExpression ca=:{ca_predefs}
@@ -427,7 +476,6 @@ transformQualifier {qual_generators, qual_filter, qual_position, qual_filename} 
 
 // =array&callArray are misnomers (can also be records)
 transformUpdateQualifier :: ParsedExpr ParsedExpr Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
-//MW3 was:transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position} ca
 transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators, ca)
 		=	mapSt transformGenerator qual_generators ca
@@ -473,7 +521,6 @@ transformComprehension gen_kind expr qualifiers ca
 		  (create_array, ca)
 		  	=	get_predef_id PD__CreateArrayFun ca
 		  (length, ca)
-//MW3 was:		  	=	computeLength qualifiers qual_position ca
 		  	=	computeLength qualifiers qual_position hd_qualifier.qual_filename ca
 		  new_array
 		  	=	PE_List [PE_Ident create_array, length]
@@ -483,8 +530,6 @@ transformComprehension gen_kind expr qualifiers ca
 		  	=	[{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] } : tl_qualifiers]
 		=	transformUpdateComprehension new_array update (PE_Ident c_a) qualifiers ca
 
-//MW3 was:computeLength :: [Qualifier] LineAndColumn *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-//MW3 was:computeLength qualifiers qual_position ca
 computeLength :: [Qualifier] LineAndColumn FileName *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 computeLength qualifiers qual_position qual_filename ca
 	# (fun_ident, ca)
@@ -500,12 +545,6 @@ computeLength qualifiers qual_position qual_filename ca
 	  (inc, ca)
 		=	get_predef_id PD_IncFun ca
 	  new_fun_pos = LinePos qual_filename qual_position.lc_line // MW3++
-/* MW3 was
-	  parsedFunction1
-		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] (exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
-	  parsedFunction2
-		=	MakeNewParsedDef fun_ident [PE_WildCard, PE_Ident i_ident] (exprToRhs (PE_Ident i_ident))
-*/
 	  parsedFunction1
 		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] 
 						(exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
@@ -708,7 +747,7 @@ where
 		# (_, defs, imports, imported_objects, ca)
 			=	reorganiseDefinitions False pdefs 0 0 0 ca
 	  	  (macro_defs, ca)
-	  	  	=	collectFunctions defs.def_macros ca
+	  	  	=	collectFunctions defs.def_macros False ca
 		  (range, ca)
 		  	=	addFunctionsRange macro_defs ca
 		  (pea_ok,ca)
@@ -748,11 +787,11 @@ scanModule mod=:{mod_name,mod_type,mod_defs = pdefs} cached_modules first_new_fu
 
 	  ca = {ca & ca_hash_table=set_hte_mark 1 ca.ca_hash_table}
 
-	  (fun_defs, ca) = collectFunctions fun_defs ca
+	  (fun_defs, ca) = collectFunctions fun_defs True ca
 	  (fun_range, ca) = addFunctionsRange fun_defs ca
-	  (macro_defs, ca) = collectFunctions defs.def_macros ca
+	  (macro_defs, ca) = collectFunctions defs.def_macros True ca
 	  (macro_range, ca) = addFunctionsRange macro_defs ca
-	  (def_instances, ca) = collectFunctions defs.def_instances ca
+	  (def_instances, ca) = collectFunctions defs.def_instances True ca
 
 	  ca = {ca & ca_hash_table=set_hte_mark 0 ca.ca_hash_table}
 
@@ -796,7 +835,7 @@ where
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
 
 	collect_main_dcl_module (Yes mod=:{mod_defs=defs}) dcl_module_n ca
-	 #	(macro_defs, ca)  =	collectFunctions defs.def_macros ca
+	 #	(macro_defs, ca)  = collectFunctions defs.def_macros False ca
 		(range, ca)	=	addFunctionsRange macro_defs ca
 		(pea_ok,ca) =	ca!ca_error.pea_ok
 		mod  = { mod & mod_defs = { defs & def_macros = range }}
@@ -806,24 +845,20 @@ where
 			 =	(True,Yes (MakeEmptyModule mod_name),ca)
 			 =	(True,No,ca)
 
-instance collectFunctions (ParsedInstance a) | collectFunctions a where
-	collectFunctions inst=:{pi_members} ca
-		# (pi_members, ca) = collectFunctions pi_members ca
-		= ({inst & pi_members = pi_members }, ca)
-
-instance collectFunctions FunDef where
-	collectFunctions fun_def=:{fun_body = ParsedBody bodies} ca
-		# (bodies, ca) = collectFunctions bodies ca
-		= ({fun_def & fun_body = ParsedBody bodies}, ca)
-
-instance collectFunctions ParsedBody where
-	collectFunctions pb=:{pb_rhs} ca
-		# (pb_rhs, ca) = collectFunctions pb_rhs ca
-		= ({ pb & pb_rhs = pb_rhs }, ca)
-
-MakeNewFunction name arity body kind prio opt_type pos
-	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
+MakeNewImpOrDefFunction icl_module name arity body kind prio opt_type pos
+	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = fun_kind_to_def_or_imp_fun_kind icl_module kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_index = NoIndex, fun_info = EmptyFunInfo }
+
+fun_kind_to_def_or_imp_fun_kind icl_module (FK_Function b)
+	| icl_module
+		= FK_ImpFunction b
+		= FK_DefFunction b
+fun_kind_to_def_or_imp_fun_kind icl_module FK_Macro
+	| icl_module
+		 = FK_ImpMacro
+		 = FK_DefMacro
+fun_kind_to_def_or_imp_fun_kind icl_module FK_Caf = FK_ImpCaf
+fun_kind_to_def_or_imp_fun_kind icl_module FK_Unknown = FK_DefOrImpUnknown
 
 /* MW3 was
 // +++ position
@@ -862,15 +897,13 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
-//reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index *CollectAdmin -> ([FunDef],CollectedDefinitions (ParsedInstance FunDef) [FunDef], [ParsedImport], [ImportedObject], *CollectAdmin)
 reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject], !*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count ca
-// MW4 was:	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] fun_kind prio No pos
-	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies] fun_kind prio No pos
+	  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies] fun_kind prio No pos
 	| fun_kind == FK_Macro
 		= (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros ]}, imports, imported_objects, ca)
 		= ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
@@ -885,8 +918,7 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  			  (fun_defs, c_defs, imports, imported_objects, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count ca
-// MW4 was:				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
-				  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
+				  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 				| fun_kind == FK_Macro
 					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects, ca)
 					-> ([ fun : fun_defs ], c_defs, imports, imported_objects, ca)
@@ -902,7 +934,7 @@ reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_a
 		| icl_module
 			= (fun_defs, c_defs, imports, imported_objects, postParseError pos "function body expected" ca)
 			= (fun_defs, c_defs, imports, imported_objects, ca)
-		# fun = MakeNewFunction name fun_type.st_arity bodies fun_kind prio (Yes fun_type) pos
+		# fun = MakeNewImpOrDefFunction icl_module name fun_type.st_arity bodies fun_kind prio (Yes fun_type) pos
 		| icl_module
 			= ([fun : fun_defs], c_defs, imports, imported_objects, ca)		  
 			= ([fun : fun_defs], c_defs, imports, imported_objects, postParseError pos "function body not allowed in definition module" ca)		  
@@ -969,7 +1001,7 @@ where
 							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 			  ( mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
 			= ([mem_def : mem_defs], mem_macros, ca)
-			# macro = MakeNewFunction name st_arity bodies FK_Macro prio opt_type pos
+			# macro = MakeNewImpOrDefFunction icl_module name st_arity bodies FK_Macro prio opt_type pos
 			  (mem_defs, mem_macros,ca) = check_symbols_of_class_members defs type_context ca
 			= (mem_defs, [macro : mem_macros], ca)
 	check_symbols_of_class_members [PD_TypeSpec fun_pos fun_name prio No specials : defs] type_context ca
@@ -979,7 +1011,7 @@ where
   					# fun_arity = length args
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
-					  macro = MakeNewFunction name fun_arity bodies FK_Macro prio No pos
+					  macro = MakeNewImpOrDefFunction icl_module name fun_arity bodies FK_Macro prio No pos
 					-> (mem_defs, [macro : mem_macros], ca)
 					-> check_symbols_of_class_members defs type_context (postParseError fun_pos "macro body expected" ca)
 			_
@@ -989,8 +1021,7 @@ where
 		  fun_arity = length args
 		  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
-// MW4 was:		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies] FK_Macro prio No fun_pos
-		  macro = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = fun_pos } : bodies] FK_Macro prio No fun_pos
+		  macro = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = fun_pos } : bodies] FK_Macro prio No fun_pos
 		= (mem_defs, [macro : mem_macros], ca)
 	check_symbols_of_class_members [def : _] type_context ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
@@ -1024,8 +1055,7 @@ where
 		  prio = if is_infix (Prio NoAssoc 9) NoPrio
 		  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  (fun_defs, ca) = collect_member_instances defs ca
-// MW4 was:		  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
-		  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
+		  fun = MakeNewImpOrDefFunction icl_module name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
 		= ([ fun : fun_defs ], ca)
 	collect_member_instances [PD_TypeSpec fun_pos fun_name prio type specials : defs] ca
 		= case defs of
@@ -1034,7 +1064,7 @@ where
  					# fun_arity = determineArity args type
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (fun_defs, ca) = collect_member_instances defs ca
-					  fun = MakeNewFunction name fun_arity bodies fun_kind prio type pos
+					  fun = MakeNewImpOrDefFunction icl_module name fun_arity bodies fun_kind prio type pos
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
@@ -1054,38 +1084,6 @@ reorganiseDefinitions icl_module [def:defs] _ _ _ ca
 reorganiseDefinitions icl_module [] _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [], def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [] }, [], [], ca)
-
-reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[(Optional SymbolType,NodeDef ParsedExpr)],*CollectAdmin)
-reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
-	# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-	= (fun_defs, [(No, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
-reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
-	# prio = if is_infix (Prio NoAssoc 9) NoPrio
-	  fun_arity = length args
-	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-// MW4 was:	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs } : bodies ] fun_kind prio No pos
-	  fun = MakeNewFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
-	= ([ fun : fun_defs ], node_defs, ca)
-reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
-	= case defs of
-		[PD_Function pos name is_infix args rhs fun_kind : _]
-			| belongsToTypeSpec name1 prio name is_infix
-				# fun_arity = determineArity args type
-				# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
-				  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-				  fun = MakeNewFunction name fun_arity bodies fun_kind prio type pos
-				-> ([fun : fun_defs], node_defs, ca)
-				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
-		[PD_NodeDef pos pattern=:(PE_Ident id)  {rhs_alts,rhs_locals} : defs]
-			| belongsToTypeSpec name1 prio id False
-				# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-				-> (fun_defs, [(type, { nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos }) : node_defs], ca)
-				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
-		_
-			-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
-reorganiseLocalDefinitions [] ca
-	= ([], [], ca)
 
 belongsToTypeSpec name prio new_name is_infix :==
 	name == new_name && sameFixity prio is_infix

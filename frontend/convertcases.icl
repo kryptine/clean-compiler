@@ -1,7 +1,6 @@
 implementation module convertcases
 
-import syntax, transform, checksupport, StdCompare, check, utilities, trans, general, RWSDebug
-
+import syntax, transform, checksupport, StdCompare, check, utilities, trans, general // , RWSDebug
 
 ::	*ConversionInfo =
 	{	ci_new_functions 	:: ![FunctionInfoPtr]
@@ -306,7 +305,7 @@ newFunction opt_id fun_bodies local_vars arg_types result_type group_index (ci_n
 			,	fun_type		= Yes fun_type
 			,	fun_pos			= NoPos
 			,	fun_index		= NoIndex
-			,	fun_kind		= FK_Function cNameNotLocationDependent
+			,	fun_kind		= FK_ImpFunction cNameNotLocationDependent
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}
@@ -792,7 +791,7 @@ where
 					{ cp_info & cp_free_vars = [ (var_info_ptr, type) : cp_info.cp_free_vars ],
 							cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_name new_info_ptr 1 type) })
 			_
-				-> abort "copy [BoundVar] (convertcases, 612)" <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
+				-> abort "copy [BoundVar] (convertcases)" //  <<- (var_info ---> (var_name, ptrToInt var_info_ptr))
 
 instance copy Expression
 where

@@ -1,8 +1,7 @@
 implementation module type
 
 import StdEnv
-import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
-import RWSDebug
+import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
 
 ::	TypeInput =
 	{	ti_common_defs	:: !{# CommonDefs }
@@ -1056,7 +1055,6 @@ storeAttribute No type_attribute symbol_heap
 	= symbol_heap
 
 getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Function {glob_module,glob_object}, symb_arity, symb_name} ts
-//	| glob_module == cIclModIndex
 	| glob_module == ti_main_dcl_module_n
 		| glob_object>=size ts.ts_fun_env
 			= abort symb_name.id_name;
@@ -1075,7 +1073,8 @@ getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind 
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
 				-> (fun_type_copy, cons_variables, [], ts)
 			_
-				-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
+				-> abort ("getSymbolType "+++toString symb_name+++toString glob_object)
+//				-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
 		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
 		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]
 			= abort (toString glob_module+++" "+++toString glob_object+++" "+++toString ti_main_dcl_module_n+++" "+++symb_name.id_name);
@@ -1105,7 +1104,8 @@ getSymbolType ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind 
 			  (fun_type_copy,ts) = currySymbolType fun_type_copy symb_arity ts
 			-> (fun_type_copy, cons_variables, [], ts)
 		_
-			-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
+			-> abort ("getSymbolType "+++toString symb_name+++toString glob_object)
+//			-> abort "getSymbolType (type.icl)" ---> (symb_name, glob_object, fun_type)
 getSymbolType ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}, symb_arity} ts
 	# {me_symb, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
 	  (fun_type_copy, cons_variables, ts) = determineSymbolTypeOfFunction me_symb symb_arity me_type me_type_ptr ti_common_defs ts
@@ -1122,7 +1122,7 @@ where
 			VI_Type type _
 				-> type
 			_
-				-> abort ("requirements BoundVar" ---> (var_name <<- var_info))
+				-> abort "requirements BoundVar" // ---> (var_name <<- var_info))
 			, Yes var_expr_ptr, (reqs, ts))
 
 instance requirements App
@@ -2316,8 +2316,8 @@ where
 					,	fun_body		= NoBody
 					,	fun_type		= Yes instance_type
 					,	fun_pos			= me_pos
-					,	fun_index		= member_index
-					,	fun_kind		= FK_Unknown
+					,	fun_index	= member_index
+					,	fun_kind		= FK_DefOrImpUnknown
 					,	fun_lifted		= 0
 					,	fun_info		= EmptyFunInfo
 					}
