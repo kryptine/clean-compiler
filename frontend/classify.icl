@@ -285,6 +285,7 @@ instance consumerRequirements App where
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
 			# ai = aiUnifyClassifications CActive cc ai
 			= consumerRequirements app_args common_defs ai
+/*
 // SPECIAL...
 		# num_specials = case imported_funs.[glob_module].[glob_object].ft_specials of
 			(SP_ContextTypes [sp:_])	-> length sp.spec_types
@@ -299,7 +300,20 @@ instance consumerRequirements App where
 					# ai			= aiUnifyClassifications CActive cc ai	// make args for which specials exist active...
 					= activeArgs (n-1) app_args common_defs ai
 // ...SPECIAL
-			= consumerRequirements app_args common_defs ai
+*/
+// ACTIVATE DICTIONARIES... [SUBSUMES SPECIAL]
+		# num_dicts = length imported_funs.[glob_module].[glob_object].ft_type.st_context
+		| num_dicts > 0 && num_dicts <= length app_args
+			= activeArgs num_dicts app_args common_defs ai
+			with
+				activeArgs 0 app_args common_defs ai
+					= consumerRequirements app_args common_defs ai
+				activeArgs n [app_arg:app_args] common_defs ai
+					# (cc, _, ai)	= consumerRequirements app_arg common_defs ai
+					# ai			= aiUnifyClassifications CActive cc ai
+					= activeArgs (n-1) app_args common_defs ai
+// ...ACTIVATE DICTIONARIES
+		= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object,symb_name}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
 			ai=:{ai_cons_class}
@@ -319,6 +333,12 @@ instance consumerRequirements App where
 	consumerRequirements {app_args} common_defs ai
 		=  not_an_unsafe_pattern (consumerRequirements app_args common_defs ai)
 
+instance <<< TypeContext
+where
+	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
+instance <<< (Ptr a)
+where
+	(<<<) file p = file <<< ptrToInt p
 
 reqs_of_args :: ![ConsClass] !.[Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!.Bool,!*AnalyseInfo)
 reqs_of_args _ [] cumm_arg_class _ ai
@@ -840,7 +860,7 @@ where
 			= (index, var_heap) 
 
 reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![FunctionInfoPtr]  ![Group] !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
-				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses})
+				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses}, !Bool)
 reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n new_functions
 	groups fun_defs var_heap expr_heap fun_heap class_env
 	#! nr_of_groups	= size groups
@@ -851,13 +871,13 @@ reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_modul
 		, stdStrictLists_module_n	= stdStrictLists_module_n
 		}
 	= foldSt (analyse_group consumerAnalysisRO) groups
-				([], fun_defs, var_heap, expr_heap, fun_heap, class_env)
+				([], fun_defs, var_heap, expr_heap, fun_heap, class_env, True)
 where	
-	analyse_group common_defs group (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env)
+	analyse_group common_defs group (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env, same)
 		# {group_members}	= group
 
-		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap)
-				= foldSt initial_cons_class group_members (0, 0, var_heap, class_env, fun_defs, fun_heap)
+		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, old_cons_class)
+				= foldSt initial_cons_class group_members (0, 0, var_heap, class_env, fun_defs, fun_heap, [])
 
 		# ai =
 						{	ai_var_heap						= var_heap
@@ -878,15 +898,15 @@ where
 		  		= ai.ai_cons_class
 		  fun_heap
 		  		= ai.ai_fun_heap
-		  (class_env,fun_heap)
-		  		= foldSt (collect_classifications ai.ai_class_subst) group_members (class_env,fun_heap)
+		  (class_env,fun_heap,same,_)
+		  		= foldSt (collect_classifications ai.ai_class_subst) group_members (class_env,fun_heap,same,reverse old_cons_class)
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap, fun_heap)
 				= foldSt set_case_expr_info (flatten ai_cases_of_vars_for_group)
 					(cleanup_info, class_env, fun_defs, ai.ai_var_heap, expr_heap, fun_heap)
-		= (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env)
+		= (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env, same)
 	  where
 //initial classification...
-		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap)
+		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, old_acc)
 			# (fun_def, fun_defs, fun_heap)			= get_fun_def fun fun_defs fun_heap
 			# (TransformedBody {tb_args,tb_rhs})	= fun_def.fun_body
 			  
@@ -896,8 +916,8 @@ where
 			# (fresh_vars, next_var, var_heap)
 			   										= fresh_variables tb_args 0 next_var var_heap
 			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
-			# (fun_heap,class_env)					= set_fun_class fun fun_class fun_heap class_env
-			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap)
+			# (fun_heap,class_env,old_class)		= set_fun_class` fun fun_class fun_heap class_env
+			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, [old_class:old_acc])
 
 
 		set_fun_class fun fun_class fun_heap class_env
@@ -915,8 +935,30 @@ where
 							= (fun_def_ptr, ti_fun_heap)
 							= lookup_ptr fun new_functions ti_fun_heap
 			# (FI_Function gf, fun_heap)			= readPtr fun_def_ptr fun_heap
-			# fun_heap								= writePtr fun_def_ptr (FI_Function {gf & gf_cons_args = fun_class}) fun_heap
+			# gf									= {gf & gf_cons_args = fun_class}
+			# fun_heap								= writePtr fun_def_ptr (FI_Function gf) fun_heap
 			= (fun_heap,class_env)
+
+		set_fun_class` fun fun_class fun_heap class_env
+			| fun < size class_env
+//				# class_env							= { class_env & [fun] = fun_class}
+				# (old,class_env)					= replace class_env fun fun_class
+				= (fun_heap,class_env,old)
+
+			# (fun_def_ptr,fun_heap)				= lookup_ptr fun new_functions fun_heap
+				with
+					lookup_ptr fun [] ti_fun_heap = abort "drat"
+					lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
+						# (FI_Function {gf_fun_index}, ti_fun_heap)
+								= readPtr fun_def_ptr ti_fun_heap
+						| gf_fun_index == fun
+							= (fun_def_ptr, ti_fun_heap)
+							= lookup_ptr fun new_functions ti_fun_heap
+			# (FI_Function gf, fun_heap)			= readPtr fun_def_ptr fun_heap
+//			# gf									= {gf & gf_cons_args = fun_class}
+			# (old,gf)								= (gf.gf_cons_args, {gf & gf_cons_args = fun_class})
+			# fun_heap								= writePtr fun_def_ptr (FI_Function gf) fun_heap
+			= (fun_heap,class_env,old)
 
 //determine classification...
 		analyse_functions common_defs fun (cfvog_accu, ai, fun_defs)
@@ -957,12 +999,21 @@ where
 			   		}
 			= (cfvog_accu, ai, fun_defs)
 //final classification...
-		collect_classifications class_subst fun (class_env,fun_heap)
+		collect_classifications :: !.{#Int} !Int !*(!*{!ConsClasses},!*FunctionHeap,!Bool,!u:[w:ConsClasses]) -> *(!*{!ConsClasses},!*FunctionHeap,!Bool,!v:[x:ConsClasses]), [w <= x, u <= v];
+		collect_classifications class_subst fun (class_env,fun_heap,same,[old_class:old_acc])
 			# (fun_class,fun_heap,class_env)	= get_fun_class fun fun_heap class_env
 			  fun_class					= determine_classification fun_class class_subst
 			# (fun_heap,class_env)		= set_fun_class fun fun_class fun_heap class_env
-	 		= (class_env,fun_heap)
+	 		= (class_env,fun_heap,same && equalCCs fun_class old_class,old_acc)
 
+		equalCCs l r
+			= equalCCArgs l.cc_args r.cc_args && equalCCBits l.cc_size l.cc_linear_bits r.cc_linear_bits
+		equalCCArgs [] [] = True
+		equalCCArgs [l:ls] [r:rs] = equalCC l r && equalCCArgs ls rs
+		equalCC l r = l == r
+		equalCCBits 0 _ _ = True
+		equalCCBits n [l:ls] [r:rs] = l == r && equalCCBits (dec n) ls rs
+		
 		set_case_expr_info ({case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr},fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
 			# (VI_AccVar _ arg_position, var_heap)				= readPtr var_info_ptr var_heap
