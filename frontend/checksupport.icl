@@ -15,6 +15,7 @@ NotFound		:== -1
 	
 cModuleScope	:== 0
 cGlobalScope	:== 1
+cRankTwoScope	:== 2
 
 cIsNotADclModule 	:== False
 cIsADclModule 		:== True
@@ -34,7 +35,7 @@ cNeedStdGeneric	:== 8 // AA
 
 ::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin, cs_x :: !CheckStateX }
 
-::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int /* TD */, x_is_dcl_module :: !Bool, x_type_var_position :: !Int }
+::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int}
 
 ::	ConversionTable		:== {# .{# Int }}
 
