@@ -53,6 +53,8 @@ where
 						= compare_constructor_lists dcl_conses icl_conses dcl_cons_defs icl_cons_defs comp_st
 					= (False, icl_cons_defs, comp_st)	
 				= (False, icl_cons_defs, comp_st)	
+		compare_constructor_lists [ dcl_cons : dcl_conses ] [] dcl_cons_defs icl_cons_defs comp_st
+			= (False, icl_cons_defs, comp_st)	
 
 	compare_rhs_of_types (SynType dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
 		# (ok, comp_st) = compare dclType iclType comp_st
@@ -1250,4 +1252,5 @@ file_to_true file = code {
           pushB TRUE
   .end
  };
+
 */
