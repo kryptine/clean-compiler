@@ -66,6 +66,7 @@ F a b = b
 
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] -> (.Bool,.File)
 //write_tcl_file :: !Int {#DclModule} CommonDefs !*File [String] _ _ !*TypeHeaps !*PredefinedSymbols -> (.Bool,.File,!*TypeHeaps,!*PredefinedSymbols)
+// write_tcl_file ({#},{!},{#},[{#Char}],CommonDefs,{#}) :: !.Int !{#y:DclModule} CommonDefs !*File [{#Char}] !{!x:GlobalTCType} {#w:Bool} !*TypeHeaps !{#v:PredefinedSymbol} -> (.Bool,.File,.TypeHeaps,{#PredefinedSymbol}), [u <= 
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} common_defs tcl_file directly_imported_dcl_modules global_type_instances ci_type_constructor_used_in_dynamic_patterns type_heaps predefined_symbols
 	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
@@ -87,6 +88,12 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		= collect_type_constructors_in_dynamic_patterns 0 (size global_type_instances) []
 	#! (tcl_file,write_type_info_state)
 		= write_type_info type_constructors_in_dynamic_patterns tcl_file write_type_info_state
+
+	#! (tcl_file,write_type_info_state)
+		= write_type_info (help_20_compiler { dcl_name.id_name\\ {dcl_name} <-: dcl_mods }) tcl_file write_type_info_state
+			with 
+				help_20_compiler :: {#{#Char}} -> {#{#Char}}
+				help_20_compiler l = l
 		
 	#! (type_heaps,_)
 		= f write_type_info_state;	
@@ -95,7 +102,7 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_cons_defs) tcl_file
-		
+				
 	= (True,tcl_file,type_heaps,predefined_symbols) 
 where
 	collect_type_constructors_in_dynamic_patterns :: !Int !Int [TypeSymbIdent] -> [TypeSymbIdent]

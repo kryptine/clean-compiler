@@ -415,7 +415,7 @@ where
 
 instance WriteTypeInfo TypeSymbIdent
 where
-	write_type_info {type_name,type_arity,type_index={glob_module}} tcl_file wtis=:{wtis_predefined_module_def}
+	write_type_info tsi=:{type_name,type_arity,type_index={glob_module}} tcl_file wtis=:{wtis_predefined_module_def}
 		# is_type_without_definition
 			= glob_module == wtis_predefined_module_def
 		# tcl_file
@@ -425,6 +425,17 @@ where
 			= write_type_info type_name tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info type_arity tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info tsi.type_index tcl_file wtis
+		= (tcl_file,wtis)
+	
+instance WriteTypeInfo (Global object) | WriteTypeInfo object
+where
+	write_type_info {glob_object,glob_module} tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info glob_object tcl_file wtis
+		# (tcl_file,wtis)
+			= write_type_info glob_module tcl_file wtis
 		= (tcl_file,wtis)
 
 // basic and structural write_type_info's
