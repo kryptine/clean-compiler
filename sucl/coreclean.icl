@@ -142,7 +142,7 @@ instance toString (Global a) | toString a
 where toString {glob_module,glob_object} = toString glob_module+++"."+++toString glob_object
 
 instance toString (Ptr a)
-where toString p = "p:"+++toString (ptrToInt p)
+where toString p = "p"+++toString (ptrToInt p)
 
 instance <<< (Ptr a)
 where (<<<) file p = file <<< toString p
@@ -173,8 +173,8 @@ where (==) (SuclAnonymous i1) (SuclAnonymous i2) = i1 == i2
       (==) _                  _                  = False
 
 instance toString SuclVariable
-where toString (SuclAnonymous i) = "v_"+++toString i
-      toString (SuclNamed     p) = "n_"+++toString p
+where toString (SuclAnonymous i) = "v"+++toString i
+      toString (SuclNamed     p) = toString p
 
 instance <<< SuclVariable
 where (<<<) file var = file <<< toString var
