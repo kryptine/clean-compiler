@@ -14,20 +14,20 @@ Start world
 	  		\files -> 
 				(let
 				    (ms_paths, ms_files, ms_error) = converFileToListOfStrings "mainPrefs" files stderr
-					ms = CommandLoop No { ms_io = std_io, ms_out = ms_out, ms_error = ms_error, ms_files = ms_files, ms_paths = ms_paths }
+					ms = CommandLoop (init_identifiers newHeap) { ms_io = std_io, ms_out = ms_out, ms_error = ms_error, ms_files = ms_files, ms_paths = ms_paths }
 				in
 					(ms.ms_out, ms.ms_files))) world
 	= fclose ms_out world
 
-CommandLoop proj ms=:{ms_io}
+CommandLoop symbol_heap ms=:{ms_io}
 	# (answer, ms_io)		= freadline (ms_io <<< "> ")
 	  (command, argument)	= SplitAtLayoutChar (dropWhile isSpace (fromString answer))
 	| command == []
-		= CommandLoop proj { ms & ms_io = ms_io}
-		# (ready, proj, ms) = DoCommand command argument proj { ms & ms_io = ms_io}
+		= CommandLoop symbol_heap { ms & ms_io = ms_io}
+		# (ready, symbol_heap, ms) = DoCommand command argument symbol_heap { ms & ms_io = ms_io}
 		| ready
 			= ms
-			= CommandLoop proj ms
+			= CommandLoop symbol_heap ms
 
 ::	MainStateDefs funs funtypes types conses classes instances members selectors =
 	{	msd_funs		:: !funs
@@ -92,38 +92,38 @@ addModule _ mod NoModules
 	,	proj_cache			:: !.DclCache
 	}
 
-empty_cache :: *DclCache
-empty_cache
+empty_cache :: *SymbolTable -> *DclCache
+empty_cache symbol_heap
 	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}}
-	# (predef_symbols, hash_table) = buildPredefinedSymbols newHashTable
+	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
 	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
 
-DoCommand ['c':_] argument proj ms 
+DoCommand ['c':_] argument symbol_heap ms 
 	# (file_name, rest_input) = SplitAtLayoutChar (dropWhile isSpace argument)
-	  (opt_mod,dcl_cache,ms) = compileModule (toString file_name) empty_cache ms
-	= (False, proj, ms)
+	  (opt_mod,dcl_cache,ms) = compileModule (toString file_name) (empty_cache symbol_heap) ms
+	= (False, dcl_cache.hash_table.hte_symbol_heap, ms)
 
-DoCommand ['m':_] argument proj ms 
+DoCommand ['m':_] argument symbol_heap ms 
 	# (file_name, rest_input) = SplitAtLayoutChar (dropWhile isSpace argument)
 	# mod_name = toString file_name
-	# dcl_cache=empty_cache
-  	# (opt_mod, ms) = makeProject { proj_main_module=mod_name,
+	# dcl_cache=empty_cache symbol_heap
+  	# (proj, ms) = makeProject { proj_main_module=mod_name,
   									proj_modules=NoModules,
   									proj_cache=dcl_cache} ms
-	= (False, proj, ms)
+	= (False, proj.proj_cache.hash_table.hte_symbol_heap, ms)
 
-DoCommand ['s':_] argument proj ms=:{ms_io, ms_files} 
+DoCommand ['s':_] argument symbol_heap ms=:{ms_io, ms_files} 
 	# (file_name, rest_input)	= SplitAtLayoutChar (dropWhile isSpace argument)
 	  file_name 				= toString (file_name++['.icl'])
 	  (ok,file,files)			= fopen file_name FReadText ms_files
 	  (lines,file)				= freadlines file
 	  (ok,files)				= fclose file files
-	= (False, proj, {ms & ms_io = ms_io <<< ("file "+++file_name+++" "+++toString (length lines)+++" lines\n") <<< lines <<< "\n", ms_files = files})
+	= (False, symbol_heap, {ms & ms_io = ms_io <<< ("file "+++file_name+++" "+++toString (length lines)+++" lines\n") <<< lines <<< "\n", ms_files = files})
 
-DoCommand ['t':_] argument proj ms=:{ms_files, ms_io}
+DoCommand ['t':_] argument symbol_heap ms=:{ms_files, ms_io}
 	# (file_names, ms_files, ms_io) = converFileToListOfStrings "testfiles" ms_files ms_io
-	# (dcl_cache,ms) = foldSt check_module file_names (empty_cache,{ ms & ms_files = ms_files, ms_io = ms_io })
-	= (False, proj, ms)
+	# (dcl_cache,ms) = foldSt check_module file_names ((empty_cache symbol_heap),{ ms & ms_files = ms_files, ms_io = ms_io })
+	= (False, dcl_cache.hash_table.hte_symbol_heap, ms)
 where
 	check_module file_name (dcl_cache,ms)
 		# ms = {ms & ms_io = ms.ms_io <<< "Compiling " <<< file_name <<< "\n"}
@@ -134,20 +134,14 @@ where
 			_
 				-> (dcl_cache,ms)
 
-DoCommand ['p':_] argument proj ms=:{ms_io, ms_files}
-	# (file_name, rest_input)		= SplitAtLayoutChar (dropWhile isSpace argument)
-	  (predef_symbols, hash_table) 	= buildPredefinedSymbols newHashTable
-	  (mod_ident, hash_table) 		= putIdentInHashTable (toString file_name) IC_Module hash_table
-	= (False, Yes { proj_main_module = mod_ident.boxed_ident.id_name,proj_modules = NoModules,proj_cache=empty_cache }, ms)
+DoCommand ['q':_] argument symbol_heap ms
+	= (True, symbol_heap, ms)
 
-DoCommand ['q':_] argument proj ms
-	= (True, proj, ms)
+DoCommand ['h':_] argument symbol_heap  ms=:{ms_io}
+	= (False, symbol_heap, {ms & ms_io = ms_io <<< "No help available. Sorry.\n"})
 
-DoCommand ['h':_] argument proj  ms=:{ms_io}
-	= (False, proj, {ms & ms_io = ms_io <<< "No help available. Sorry.\n"})
-
-DoCommand command argument proj  ms=:{ms_io}
-	= (False, proj, {ms & ms_io = ms_io <<< toString command <<< "?\n"})
+DoCommand command argument symbol_heap  ms=:{ms_io}
+	= (False, symbol_heap, {ms & ms_io = ms_io <<< toString command <<< "?\n"})
 
 freadlines file
     |   sfend file
@@ -223,7 +217,7 @@ choose_random_module random_n modules
 
 //import MersenneTwister
 
-makeProject :: *Project *MainState -> *(!Optional Project,!*MainState);
+makeProject :: *Project *MainState -> *(!*Project,!*MainState);
 makeProject proj=:{proj_main_module,proj_cache} ms
 	# (main_mod,dcl_cache,ms) = compileModule proj_main_module proj_cache ms
 	# proj = {proj & proj_cache=dcl_cache}
@@ -232,9 +226,9 @@ makeProject proj=:{proj_main_module,proj_cache} ms
 //			# random_numbers = genRandReal 100;
 			# random_numbers = []
 			# (proj_modules,proj,ms) = collect_modules [ mod \\ mod <-: inter_modules ] (ModuleNode main_mod.inter_name NoModules NoModules) random_numbers proj ms
-			-> (Yes { proj & proj_modules = proj_modules }, ms)
+			-> ({ proj & proj_modules = proj_modules }, ms)
 		_
-			-> (Yes proj,ms)
+			-> (proj,ms)
 where
 	collect_modules :: [String] ModuleTree [Real] *Project *MainState -> *(!ModuleTree,!*Project,!*MainState);
 	collect_modules [] collected_modules random_numbers proj ms
