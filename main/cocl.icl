@@ -12,19 +12,17 @@ Start world
 		testArgs
 			=	[
 					// main module			
-					"t.icl"
+					"hello.icl"
 					// list all types
 				,	"-lat"
 					// generate readable abc code
 				,	"-d"
-					// redirect out
-				,	"-RO", "messages.txt"	
-					// redirect errors
-				,	"-RE", "errors.txt"
+					// Supercompilation
+				,	"-SC"
 					// paths
 				,	"-P", testDir +++ ";" +++ clean20Dir +++ "StdEnv" +++ ";" +++ clean20Dir +++ "IOInterface"
 				]
 		testDir
-			=	"e:\\Users\\Ronny\\Develop\\Clean Programs\\"
+			=	"c:\\Vincent\\Sucl\\"
 		clean20Dir
 			=	"e:\\Users\\Ronny\\Develop\\Clean 2.0\\"
