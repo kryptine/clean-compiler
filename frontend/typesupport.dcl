@@ -75,6 +75,8 @@ instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | su
 
 instance <<< TempSymbolType
 
+clearBindings :: ![ATypeVar] !*TypeHeaps -> !*TypeHeaps
+
 removeInequality :: !Int !Int !*Coercions -> .Coercions
 flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
 	// retrieve all numbers from a coercion tree

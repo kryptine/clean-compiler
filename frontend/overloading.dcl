@@ -43,9 +43,7 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	{	tci_next_index			:: !Index
 	,	tci_instances			:: ![GlobalTCInstance]
 	,	tci_type_var_heap		:: !.TypeVarHeap
-// MV ...	
 	,	tci_dcl_modules			:: !{# DclModule}
-// ... MV
 	}
 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap

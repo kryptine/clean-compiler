@@ -860,6 +860,7 @@ cNonRecursiveAppl	:== False
 
 ::	TypeVarInfo  	= TVI_Empty
 					| TVI_Type !Type
+					| TVI_TypeVar !TypeVarInfoPtr // Sjaak: to collect universally quantified type variables
 					| TVI_Forward !TempVarId | TVI_TypeKind !KindInfoPtr
 					| TVI_SignClass !Index !SignClassification !TypeVarInfo | TVI_PropClass !Index !PropClassification !TypeVarInfo
 					| TVI_Attribute TypeAttribute
@@ -876,7 +877,10 @@ cNonRecursiveAppl	:== False
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
 
-::	AttrVarInfo  	= AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId 
+::	AttrVarInfo  	= AVI_Empty
+					| AVI_Attr !TypeAttribute
+					| AVI_AttrVar !AttrVarInfoPtr // Sjaak: to collect universally quantified attribute variables
+					| AVI_Forward !TempAttrId 
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 					| AVI_Used
 					| AVI_Count !Int /* auxiliary used in module typesupport */
@@ -1154,7 +1158,7 @@ cIsNotStrict	:== False
 	{	dyn_expr		:: !Expression
 	,	dyn_opt_type	:: !Optional DynamicType
 	,	dyn_info_ptr	:: !ExprInfoPtr
-	,	dyn_uni_vars	:: ![VarInfoPtr]			/* filled after type checking */
+//	,	dyn_uni_vars	:: ![VarInfoPtr]			/* filled after type checking */
 	,	dyn_type_code	:: !TypeCodeExpression		/* filled after type checking */
 	}	
 
@@ -1167,19 +1171,15 @@ cIsNotStrict	:== False
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| DictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
 
-//::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
-::	TypeCodeExpression = TCE_Empty | TCE_Var !VarInfoPtr /* MV */ | TCE_TypeTerm !VarInfoPtr | TCE_Constructor !Index ![TypeCodeExpression] | TCE_Selector ![Selection] !VarInfoPtr
+::	TypeCodeExpression	= TCE_Empty
+						| TCE_Var 			!VarInfoPtr
+						| TCE_TypeTerm		!VarInfoPtr
+						| TCE_Constructor	!Index			![TypeCodeExpression]
+						| TCE_Selector		![Selection]	!VarInfoPtr
+						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
 
 ::	GlobalTCType = GTT_Basic !BasicType	| GTT_Constructor !TypeSymbIdent !String | GTT_Function
 	
-/*	
-::	PatternExpression =
-	{	guard_pattern 	:: !GuardPattern
-	,	guard_expr		:: !Expression
-	}
-
-::	GuardPattern = BasicPattern !BasicValue | AlgebraicPattern !(Global DefinedSymbol) ![FreeVar] | VariablePattern !FreeVar
-*/
 
 ::	FunctionPattern	= FP_Basic !BasicValue !(Optional FreeVar)
 					| FP_Algebraic !(Global DefinedSymbol) ![FunctionPattern] !(Optional FreeVar)

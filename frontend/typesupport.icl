@@ -62,6 +62,7 @@ where
 		  (at_type, cus) = clean_up cui at_type cus
 		= ({atype & at_attribute = at_attribute, at_type = at_type, at_annotation = AN_None}, cus)
 
+
 attrIsUndefined TA_None = True
 attrIsUndefined _ 		= False
 
@@ -105,6 +106,9 @@ where
 				= (attr, { cus & cus_appears_in_lifted_part = cus_appears_in_lifted_part,
 								cus_error = cus_error })
 			= (TA_Multi, cus)
+	clean_up cui (TA_Var av=:{av_info_ptr}) cus=:{cus_heaps}
+		# (AVI_AttrVar new_info_ptr, th_attrs) = readPtr av_info_ptr cus_heaps.th_attrs
+		= (TA_Var { av & av_info_ptr = new_info_ptr }, { cus & cus_heaps = { cus_heaps & th_attrs = th_attrs }})
 	clean_up cui TA_TempExVar cus
 		= PA_BUG (TA_Multi, cus) (abort "clean_up cui (TA_TempExVar)")
 			
@@ -137,6 +141,26 @@ where
 		| cui.cui_top_level
 			= cleanUpVariable True type qv_number {cus & cus_error = existentialError cus_error}
 			= cleanUpVariable False type qv_number cus
+	clean_up cui (TV tv=:{tv_info_ptr}) cus=:{cus_heaps}
+		# (TVI_TypeVar new_info_ptr, th_vars) = readPtr tv_info_ptr cus_heaps.th_vars
+		= (TV { tv & tv_info_ptr = new_info_ptr }, { cus & cus_heaps = { cus_heaps & th_vars = th_vars }})
+	clean_up cui (TFA vars type) cus=:{cus_heaps}
+		# (new_vars, cus_heaps) = mapSt refresh_var_and_attr vars cus_heaps
+		  (type, cus) = clean_up cui type { cus & cus_heaps = cus_heaps }
+		  cus_heaps = clearBindings vars cus.cus_heaps
+		= (TFA vars type, { cus & cus_heaps = cus_heaps })
+	where	
+		refresh_var_and_attr atv=:{atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+			# (new_info_ptr, th_vars) = newPtr TVI_Empty th_vars
+			  (atv_attribute, th_attrs) = refresh_attr atv_attribute th_attrs
+			= ( { atv & atv_attribute = atv_attribute, atv_variable = { tv & tv_info_ptr = new_info_ptr }},
+			 	{ type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_TypeVar new_info_ptr), th_attrs = th_attrs })
+		where
+			refresh_attr (TA_Var av=:{av_info_ptr}) attr_heap
+				# (new_info_ptr, attr_heap) = newPtr AVI_Empty attr_heap
+				= (TA_Var {av & av_info_ptr = new_info_ptr}, attr_heap <:= (av_info_ptr, AVI_AttrVar new_info_ptr))
+			refresh_attr attr attr_heap
+				= (attr, attr_heap)
 	clean_up cui TE cus
 		= abort "unknown pattern in function clean_up"
 				
@@ -156,6 +180,17 @@ cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
 cleanUpVariable _ type tv_number cus
 	= (type, cus)
 
+clearBindings :: ![ATypeVar] !*TypeHeaps -> !*TypeHeaps
+clearBindings atvs type_heaps	
+	= foldSt clear_binding_of_var_and_attr atvs type_heaps
+where
+	clear_binding_of_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+			= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attr atv_attribute th_attrs }
+
+	clear_attr var=:(TA_Var {av_info_ptr}) attr_heap
+		= attr_heap <:= (av_info_ptr, AVI_Empty)
+	clear_attr attr attr_heap
+		= attr_heap
 
 ::	CleanUpResult :== BITVECT
 

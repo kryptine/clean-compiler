@@ -96,6 +96,11 @@ where
 				| ok
 					-> (True, simplified_type, subst)
 					-> (False, tcv, subst)
+	arraySubst tfa_type=:(TFA vars type) subst
+		# (changed, type, subst) = arraySubst type subst
+		| changed
+			= (changed, TFA vars type, subst)
+			= (False, tfa_type, subst)
 	arraySubst type subst
 		= (False, type, subst)
 
@@ -470,7 +475,7 @@ where
 		# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
 		  (fresh_type, type_heaps)		= freshCopy at_type { type_heaps & th_attrs = th_attrs }
 		= ({ type & at_type = fresh_type, at_attribute = fresh_attribute }, type_heaps)
-		
+
 instance freshCopy Type
 where
 	freshCopy (TV tv) type_heaps
@@ -485,6 +490,7 @@ where
 	freshCopy (TFA vars type) type_heaps
 		# type_heaps = foldSt bind_var_and_attr vars type_heaps
 		  (type, type_heaps) = freshCopy type type_heaps
+		# type_heaps = clearBindings vars type_heaps
 		= (TFA vars type, type_heaps)
 	where
 		bind_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
@@ -617,7 +623,6 @@ freshSymbolType fresh_context_vars st=:{st_vars,st_args,st_result,st_context,st_
 				= vars
 				= [var_id : add_variable new_var_id var_ids]
 	
-// JVG: added type:
 freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap
 	# (av_dem_info, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
@@ -958,8 +963,8 @@ where
 		where
 			bind_var_and_attr {atv_attribute, atv_variable = {tv_info_ptr}} ts=:{ts_var_store, ts_type_heaps}
 				= { ts & ts_var_store = inc ts_var_store, ts_type_heaps = 
-					{ ts_type_heaps & th_vars		= ts_type_heaps.th_vars <:= (tv_info_ptr, TVI_Type (TempQV ts_var_store)),
-										th_attrs	= bind_attr atv_attribute ts_type_heaps.th_attrs }}
+					{ ts_type_heaps & th_vars	= ts_type_heaps.th_vars <:= (tv_info_ptr, TVI_Type (TempV ts_var_store)),
+									  th_attrs	= bind_attr atv_attribute ts_type_heaps.th_attrs }}
 			where
 				bind_attr (TA_Var {av_info_ptr}) attr_heap
 					= attr_heap <:= (av_info_ptr, AVI_Attr TA_TempExVar)
@@ -1069,7 +1074,7 @@ where
 	
 		requirements_of_dynamic_pattern dyn_type dyn_context dyn_expr_ptr type_code_symbol 
 										ti goal_type {dp_var={fv_info_ptr},dp_rhs} (reqs, ts=:{ts_expr_heap, ts_var_heap})
-			# ts_var_heap = ts_var_heap <:= (fv_info_ptr, VI_Type dyn_type No)
+			# ts_var_heap = addToBase fv_info_ptr dyn_type No ts_var_heap
 			  (dp_rhs_type, opt_expr_ptr, (reqs, ts)) = requirements ti dp_rhs (reqs, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
 			  ts_expr_heap = storeAttribute opt_expr_ptr dp_rhs_type.at_attribute ts.ts_expr_heap
 			  type_coercion = { tc_demanded = goal_type, tc_offered = dp_rhs_type, tc_position = CP_Expression dp_rhs, tc_coercible = True }
@@ -1395,13 +1400,13 @@ makeBase _ _ [] [] ts_var_heap
 	= ts_var_heap
 makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr} : vars] [type : types] ts_var_heap
 	| is_rare_name fv_name
-		= makeBase fun_or_cons_ident (arg_nr+1) vars types (bind_type fv_info_ptr type (Yes (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
-		= makeBase fun_or_cons_ident (arg_nr+1) vars types (bind_type fv_info_ptr type No ts_var_heap)
-	where
-		bind_type info_ptr atype=:{at_type = TFA atvs type} _ ts_var_heap 
-			= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type})
-		bind_type info_ptr type optional_position ts_var_heap
-			= ts_var_heap  <:= (info_ptr, VI_Type type optional_position)
+		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type (Yes (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
+		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type No ts_var_heap)
+
+addToBase info_ptr atype=:{at_type = TFA atvs type} _ ts_var_heap 
+	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type})
+addToBase info_ptr type optional_position ts_var_heap
+	= ts_var_heap  <:= (info_ptr, VI_Type type optional_position)
 	
 attributedBasicType (BT_String string_type) ts=:{ts_attr_store}
 	= ({ at_annotation = AN_None, at_attribute = TA_TempVar ts_attr_store, at_type = string_type}, {ts & ts_attr_store = inc ts_attr_store})
@@ -1515,10 +1520,11 @@ where
 		  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap //---> ("^EI_Dynamic No=" +++ toString var_store)
 				-> (inc var_store, type_heaps, var_heap,
 						expr_heap <:= (dyn_ptr, EI_TempDynamicType No tdt_type [context] expr_ptr tc_member_symb), predef_symbols)
-			EI_DynamicTypeWithVars loc_type_vars dt=:{dt_type,dt_global_vars} loc_dynamics
+			EI_DynamicTypeWithVars loc_type_vars dt=:{dt_uni_vars,dt_type,dt_global_vars} loc_dynamics
 				# (fresh_vars, (th_vars, var_store)) = fresh_existential_variables loc_type_vars (type_heaps.th_vars, var_store)
+//					---> ("fresh_dynamic (EI_DynamicTypeWithVars)", dt_uni_vars)
 				  (th_vars, var_store) = fresh_type_variables dt_global_vars (th_vars, var_store)
-				  (tdt_type, type_heaps) = freshCopy dt_type { type_heaps & th_vars = th_vars }
+				  (tdt_type, type_heaps) = freshCopy (add_universal_vars_to_type dt_uni_vars dt_type) { type_heaps & th_vars = th_vars }
 				  (contexts, expr_ptr, type_code_symbol, (var_heap, expr_heap, type_var_heap, predef_symbols))
 				  		= determine_context_and_expr_ptr dt_global_vars (var_heap, expr_heap, type_heaps.th_vars, predef_symbols)
 				-> fresh_local_dynamics loc_dynamics (var_store, { type_heaps & th_vars = type_var_heap }, var_heap,
@@ -1577,6 +1583,10 @@ where
 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
 		= ({tc_class = tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}, (var_heap, type_var_heap))
 
+	add_universal_vars_to_type [] at
+		= at
+	add_universal_vars_to_type uni_vars at=:{at_type}
+		= { at & at_type = TFA uni_vars at_type }
 
 specification_error type type1 err
 	# err = errorHeading "Type error" err
@@ -1760,10 +1770,7 @@ where
 
 	update_instances_of_class common_defs mod_index ins_index (dummy, error, class_instances, type_var_heap, td_infos)
 		#!{ins_class={glob_object={ds_ident={id_name}, ds_index},glob_module},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
-		  id_name = id_name ---> ("update_instances_of_class" +++ id_name +++ " " +++ (toString glob_module) +++ 
-		  	" " +++ toString (size class_instances))	
 		  (mod_instances, class_instances) = replace class_instances glob_module dummy 
-		  id_name = id_name ---> "done"	
 		  (instances, mod_instances) = replace mod_instances ds_index IT_Empty
 		  (error, instances) = insert it_types ins_index mod_index common_defs error instances
 		  (_, mod_instances) = replace mod_instances ds_index instances

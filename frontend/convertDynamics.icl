@@ -390,12 +390,20 @@ where
 	convertDynamics cinp bound_vars default_expr (MatchExpr opt_symb symb expression) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
 		= (MatchExpr opt_symb symb expression, ci)
+/* Sjaak ... */
+	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_type_code}) ci=:{ci_symb_ident}
+		#  (dyn_expr,      ci) 			= convertDynamics cinp bound_vars default_expr dyn_expr ci
+		   (_,dyn_type_code, _, _, ci)	= convertTypecode2 cinp dyn_type_code False [] [] ci
+		= (App {	app_symb		= ci_symb_ident,
+					app_args 		= [dyn_expr, dyn_type_code],
+					app_info_ptr	= nilPtr }, ci)
+
+/* ... Sjaak  */
+/* WAS ...
 	convertDynamics cinp bound_vars default_expr  (DynamicExpr {dyn_expr, dyn_info_ptr, dyn_uni_vars, dyn_type_code}) ci=:{ci_symb_ident}
-//		# (twoTuple_symb, ci) 	= getSymbol (GetTupleConsIndex 2) SK_Constructor 2 ci
 		# (let_binds,     ci) 	= createVariables dyn_uni_vars [] ci
 		  (dyn_expr,      ci) 	= convertDynamics cinp bound_vars default_expr dyn_expr ci
 		  (_,dyn_type_code,_,_,ci) = convertTypecode2 cinp dyn_type_code False [] [] ci
-//		  (_,dyn_type_code, ci) = convertTypecode cinp dyn_type_code ci
 		= case let_binds of
 			[]	-> (App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident, //twoTuple_symb,
 							app_args 		= [dyn_expr, dyn_type_code],
@@ -406,9 +414,9 @@ where
 							let_expr			= App {	app_symb		= ci_symb_ident, //USE_TUPLES twoTuple_symb ci_symb_ident,
 														app_args 		= [dyn_expr, dyn_type_code],
 														app_info_ptr	= nilPtr },
-// MW0							let_info_ptr		= let_info_ptr,}, ci)
 							let_info_ptr		= let_info_ptr,
 							let_expr_position	= NoPos}, ci) 
+*/
 	convertDynamics cinp bound_vars default_expr (TypeCodeExpression type_code) ci
 		= abort "convertDynamics cinp bound_vars default_expr (TypeCodeExpression" //convertTypecode cinp type_code ci
 	convertDynamics cinp bound_vars default_expr EE ci
@@ -426,6 +434,19 @@ where
 	
 
 */
+
+/* Sjaak ... */
+convertTypecode2 cinp (TCE_UniType uni_vars type_code) replace_tc_args binds placeholders_and_tc_args ci
+		# (let_binds,     ci) 	= createVariables uni_vars [] ci
+		  (let_info_ptr,  ci)	= let_ptr ci
+		  (e, type_code_expr, binds, placeholders_and_tc_args, ci)	= convertTypecode2 cinp type_code False [] [] ci
+		= (e, Let {	let_strict_binds	= [],
+					let_lazy_binds		= let_binds,
+					let_expr			= type_code_expr,
+					let_info_ptr		= let_info_ptr,
+					let_expr_position	= NoPos}, binds, placeholders_and_tc_args, ci) 
+/* ... Sjaak */
+
 // ci_placeholders_and_tc_args
 convertTypecode2 cinp=:{cinp_st_args} t=:(TCE_Var var_info_ptr) replace_tc_args binds placeholders_and_tc_args ci
 	#! cinp_st_args

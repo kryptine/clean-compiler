@@ -506,22 +506,17 @@ where
 		where
 			initial_occurrence {fv_name,fv_info_ptr} (subst, type_def_infos, var_heap, expr_heap) 
 				# (var_info, var_heap) = readPtr fv_info_ptr var_heap
-				= case var_info of
-					VI_Type {at_type,at_attribute} _						
-						-> case at_type of
-							TempV tv_number
-								#! is_oberving = has_observing_type type_def_infos subst.[tv_number]
-								-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
-										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
-											occ_observing = is_oberving, occ_bind = OB_Empty }), expr_heap)
-//											 	---> ("initial_occurrence",fv_name, fv_info_ptr, is_oberving)
-							_
-								-> (subst, type_def_infos, var_heap <:= (fv_info_ptr,
-										VI_Occurrence { occ_ref_count = RC_Unused, occ_previous = [],
-											occ_observing = False,  occ_bind = OB_Empty }), expr_heap)
-					_
-						-> abort ("initial_occurrence (refmark.icl)" ---> ((fv_name,fv_info_ptr) ))//<<- var_info))
-					
+				#! occ_observing = has_observing_base_type var_info type_def_infos subst
+				=  (subst, type_def_infos,
+						var_heap <:= (fv_info_ptr, VI_Occurrence {	occ_ref_count = RC_Unused, occ_previous = [],
+																	occ_observing = occ_observing,  occ_bind = OB_Empty }), expr_heap)
+				
+		has_observing_base_type (VI_Type {at_type} _) type_def_infos subst
+			= has_observing_type at_type type_def_infos subst
+		has_observing_base_type (VI_FAType _ {at_type}) type_def_infos subst
+			= has_observing_type at_type type_def_infos subst
+		has_observing_base_type _ type_def_infos subst
+			= abort "has_observing_base_type (refmark.icl)"
 
 		make_shared_vars_non_unique vars coercion_env var_heap expr_heap error
 			= foldl make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error) vars
@@ -555,16 +550,22 @@ where
 		make_selection_non_unique fv {su_multiply} cee
 			= make_shared_occurrences_non_unique fv su_multiply cee
 
+/*
 	has_observing_type type_def_infos TE
 		= True
-	has_observing_type type_def_infos (TB basic_type)
+*/
+	has_observing_type (TB basic_type) type_def_infos subst
 		= True
-	has_observing_type type_def_infos (TempV var_number) 
-		= True
-	has_observing_type type_def_infos (TA {type_index = {glob_object,glob_module}} type_args)
+	has_observing_type (TempV var_number) type_def_infos subst
+		= case subst.[var_number] of
+			TE
+				-> True
+			subst_type
+				-> 	has_observing_type subst_type type_def_infos subst
+	has_observing_type (TA {type_index = {glob_object,glob_module}} type_args) type_def_infos subst
 		# {tdi_properties} = type_def_infos.[glob_module].[glob_object]
-		= foldSt (\ {at_type} ok -> ok && has_observing_type type_def_infos at_type) type_args (tdi_properties bitand cIsHyperStrict <> 0)
-	has_observing_type type_def_infos type
+		= foldSt (\ {at_type} ok -> ok && has_observing_type at_type type_def_infos subst) type_args (tdi_properties bitand cIsHyperStrict <> 0)
+	has_observing_type type type_def_infos subst
 		= False
 
 					
