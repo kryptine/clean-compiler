@@ -32,16 +32,18 @@ predef index ids
 optGuardedAltToRhs :: OptGuardedAlts -> Rhs
 optGuardedAltToRhs optGuardedAlt
 	=	{	rhs_alts	= optGuardedAlt
-		,	rhs_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+		,	rhs_locals	= LocalParsedDefs []
 		}
 
 exprToRhs expr 
 	:==	{	rhs_alts	= UnGuardedExpr
  						{	ewl_nodes	= []
 						,	ewl_expr	= expr
-						,	ewl_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+						,	ewl_locals = LocalParsedDefs []
+//						,	ewl_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
 						}
-		,	rhs_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+//		,	rhs_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }
+		,	rhs_locals	= LocalParsedDefs []
 		}
 
 prefixAndPositionToIdent :: !String !LineAndColumn !*CollectAdmin -> (!Ident, !*CollectAdmin)
@@ -143,29 +145,16 @@ where
 	collectFunctions (PE_Let strict locals in_expr) ca
 		# ((node_defs,in_expr), fun_defs, ca) = collectFunctions (locals,in_expr) ca
 		= (PE_Let strict node_defs in_expr, fun_defs, ca)
-	collectFunctions (PE_Compr gen_kind expr qualifiers) ca=:{ca_predefs}
-		# (expr, expr_fun_defs, ca)
-			=	collectFunctions expr ca
-		# (qualifiers, qualifiers_fun_defs, ca)
-			=	collectFunctions qualifiers ca
-		# (compr, compr_fun_defs, ca)
+	collectFunctions (PE_Compr gen_kind expr qualifiers) ca
+		# (compr, ca)
 			= transformComprehension gen_kind expr qualifiers ca
-		=	(compr, expr_fun_defs ++ qualifiers_fun_defs ++ compr_fun_defs, ca)
+		=	collectFunctions compr ca
 	collectFunctions (PE_Array expr assignments) ca=:{ca_predefs}
 		= collectFunctions (transformArrayUpdate expr assignments ca_predefs) ca
 	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) ca
-// +++ remove recollection		= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
-		# (expr, expr_fun_defs, ca)
-			=	collectFunctions expr ca
-		# (updateExpr, update_expr_fun_defs, ca)
-			=	collectFunctions updateExpr ca
-		# (identExpr, ident_expr_fun_defs, ca)
-			=	collectFunctions identExpr ca
-		# (qualifiers, qualifiers_fun_defs, ca)
-			=	collectFunctions qualifiers ca
-		# (compr, compr_fun_defs, ca)
+		# (compr, ca)
 			= transformUpdateComprehension expr updateExpr identExpr qualifiers ca
-		=	(compr, expr_fun_defs ++ update_expr_fun_defs ++ ident_expr_fun_defs ++ qualifiers_fun_defs ++ compr_fun_defs, ca)
+		=	collectFunctions compr ca
 	collectFunctions (PE_Sequ sequence) ca=:{ca_predefs}
 		= collectFunctions (transformSequence sequence ca_predefs) ca
 	collectFunctions (PE_ArrayDenot exprs) ca=:{ca_predefs}
@@ -438,7 +427,7 @@ transformQualifier {qual_generators, qual_filter, qual_position} ca
 		,	tq_fun_id = qual_fun_id
 		}, ca)
 
-// +++ bug nested updates, callArray is misnomer (can also be record)
+// =array&callArray are misnomers (can also be records)
 transformUpdateQualifier :: ParsedExpr ParsedExpr Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
 transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_position} ca
 	# (transformedGenerators, ca)
@@ -455,8 +444,8 @@ transformUpdateQualifier array callArray {qual_generators, qual_filter, qual_pos
 		,	tq_fun_id = qual_fun_id
 		}, ca)
 
-transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
-transformComprehension gen_kind expr qualifiers ca=:{ca_fun_count}
+transformComprehension :: Bool ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+transformComprehension gen_kind expr qualifiers ca
 	| gen_kind == cIsListGenerator
 		# (transformed_qualifiers, ca)
 		  	=	mapSt transformQualifier qualifiers ca
@@ -470,9 +459,7 @@ transformComprehension gen_kind expr qualifiers ca=:{ca_fun_count}
 		  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
 		  		&	end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
 		  		]
-		  (expr, compr_fun_defs, ca)
-		 	=	makeComprehensions transformed_qualifiers success ca
-		=	(expr, compr_fun_defs, ca)
+		=	makeComprehensions transformed_qualifiers success No ca
 	// gen_kin == cIsArrayGenerator
 		# [hd_qualifier : tl_qualifiers] = qualifiers
 		  qual_position = hd_qualifier.qual_position
@@ -483,47 +470,41 @@ transformComprehension gen_kind expr qualifiers ca=:{ca_fun_count}
 		  index_range
 		  	=	PE_List [PE_Ident frm, PE_Basic (BVI "0")]
 		  index_generator = {gen_kind=cIsListGenerator, gen_pattern=PE_Ident c_i, gen_expr=index_range, gen_position=qual_position}
-		  qualifiers = [{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] } : tl_qualifiers]
-		# (create_array, ca)
+		  (create_array, ca)
 		  	=	get_predef_id PD__CreateArrayFun ca
-		  (length, length_fun_defs, ca)
+		  (length, ca)
 		  	=	computeLength qualifiers qual_position ca
 		  new_array
 		  	=	PE_List [PE_Ident create_array, length]
 		  update
 		  	=	PE_Update (PE_Ident c_a) [PS_Array  (PE_Ident c_i)] expr
-		# (compr, compr_fun_defs, ca)
-			=	transformUpdateComprehension new_array update (PE_Ident c_a) qualifiers ca
-		=	(compr, length_fun_defs ++ compr_fun_defs, ca)
+		  qualifiers
+		  	=	[{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] } : tl_qualifiers]
+		=	transformUpdateComprehension new_array update (PE_Ident c_a) qualifiers ca
 
-computeLength :: [Qualifier] LineAndColumn *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
-computeLength qualifiers qual_position ca=:{ca_fun_count}
-	# next_fun_count = ca_fun_count + 1
-	  ca = {ca & ca_fun_count = next_fun_count}
-	  (fun_ident, ca)
+computeLength :: [Qualifier] LineAndColumn *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+computeLength qualifiers qual_position ca
+	# (fun_ident, ca)
 		=	prefixAndPositionToIdent "c_l" qual_position ca
 	  (tail_ident, ca)
 		=	prefixAndPositionToIdent "c_l_t" qual_position ca
 	  (i_ident, ca)
 		=	prefixAndPositionToIdent "c_l_i" qual_position ca
-	  (list, list_fun_defs, ca)
+	  (list, ca)
 		=	transformComprehension cIsListGenerator (PE_Basic (BVI "0")) qualifiers ca
 	  (cons, ca)
 	  	=	makeConsExpression PE_WildCard (PE_Ident tail_ident) ca
 	  (inc, ca)
 		=	get_predef_id PD_IncFun ca
-	  body
-			  	=	[	{pb_args = [cons, PE_Ident i_ident], pb_rhs = exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]) }
-					,	{pb_args = [PE_WildCard, PE_Ident i_ident], pb_rhs = exprToRhs (PE_Ident i_ident)}
-			  		]
-	  fun_def
-		=	MakeNewFunction fun_ident 2 body FK_Function NoPrio No NoPos
-	= (PE_Let cIsStrict (CollectedLocalDefs {loc_functions = { ir_from = ca_fun_count, ir_to = next_fun_count}, loc_nodes = [] })
-				(PE_List [PE_Ident fun_ident, list, PE_Basic (BVI "0")]),
-			[fun_def : list_fun_defs], ca)
+	  parsedFunction1
+		=	MakeNewParsedDef fun_ident [cons, PE_Ident i_ident] (exprToRhs (PE_List [PE_Ident fun_ident,  PE_Ident tail_ident, PE_List [PE_Ident inc, PE_Ident i_ident]]))
+	  parsedFunction2
+		=	MakeNewParsedDef fun_ident [PE_WildCard, PE_Ident i_ident] (exprToRhs (PE_Ident i_ident))
+	= (PE_Let cIsStrict (LocalParsedDefs [parsedFunction1, parsedFunction2])
+				(PE_List [PE_Ident fun_ident, list, PE_Basic (BVI "0")]), ca)
 
-transformUpdateComprehension :: ParsedExpr ParsedExpr ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
-transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca=:{ca_fun_count, ca_predefs}
+transformUpdateComprehension :: ParsedExpr ParsedExpr ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca
 	# (transformed_first_qualifier, ca)
 	  	=	transformUpdateQualifier identExpr expr qualifier ca
 	  (transformed_rest_qualifiers, ca)
@@ -534,53 +515,48 @@ transformUpdateComprehension expr updateExpr identExpr [qualifier:qualifiers] ca
 	  	// +++ remove hack
 	  	=	this_is_definitely_a_hack (last transformed_qualifiers).tq_continue updateExpr
 			with
-				this_is_definitely_a_hack (PE_List [f, a : arg]) update
-					=	PE_List [f, update : arg]
+				this_is_definitely_a_hack (PE_List [f, a : args]) updateExpr
+					=	PE_List [f, updateExpr : args]
 	  transformed_qualifiers
 	  	=	[	{qual & tq_success = success, tq_end = end}
 	  		\\	qual <- transformed_qualifiers
 	  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
 	  		&	end <- [identExpr : [qual.tq_continue \\ qual <- transformed_qualifiers]]
 	  		]
-	  (expr, compr_fun_defs, ca)
-	 	=	makeComprehensions transformed_qualifiers success ca
-	=	(expr, compr_fun_defs, ca)
+ 	=	makeComprehensions transformed_qualifiers success (Yes identExpr) ca
 
-makeComprehensions :: [TransformedQualifier] ParsedExpr *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
-makeComprehensions [] success ca
-	=	(success, [], ca)
-makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id} : qualifiers] success ca
-	# (success, other_fun_defs, ca)
-		=	makeComprehensions qualifiers success ca
-	  (comprehension, fun_defs, ca)
-	  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id ca
-	=	(comprehension, other_fun_defs ++ fun_defs, ca)
+// +++ rewrite threading
+makeComprehensions :: [TransformedQualifier] ParsedExpr (Optional ParsedExpr) *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+makeComprehensions [] success _ ca
+	=	(success, ca)
+makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id} : qualifiers] success threading ca
+	# (success, ca)
+		=	makeComprehensions qualifiers success threading ca
+  	=	make_list_comprehension tq_generators tq_lhs_args success tq_end tq_filter tq_call tq_fun_id ca
 	where
-		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr (Optional ParsedExpr) ParsedExpr Ident *CollectAdmin -> (ParsedExpr, [FunDef], *CollectAdmin)
-		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident ca=:{ca_fun_count}
-			# next_fun_count = ca_fun_count + 1
-			  ca = {ca & ca_fun_count = next_fun_count}
-			  continue
-				=	PE_List [PE_Ident fun_ident : [generator.tg_rhs_continuation \\ generator <- generators]]
+		make_list_comprehension :: [TransformedGenerator] [ParsedExpr] ParsedExpr ParsedExpr (Optional ParsedExpr) ParsedExpr Ident *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+		make_list_comprehension generators lhsArgs success end optional_filter call_comprehension fun_ident ca
+			# continue
+				=	PE_List (thread (PE_Ident fun_ident) threading [generator.tg_rhs_continuation \\ generator <- generators])
+				with
+					thread ident No args
+						=	[ident : args]
+					thread ident (Yes thread) args
+						=	[ident, thread : args]
 			  failure
 				=	continue
-			  (rhs, fun_defs, ca)
-			  	=	collectFunctions (build_rhs generators success optional_filter failure end) ca
 			  rhs
 			  	=	build_rhs generators success optional_filter failure end
-			  body
-			  	=	[{pb_args = lhsArgs, pb_rhs = rhs }]
-			  fun_def
-			  	=	MakeNewFunction fun_ident (length lhsArgs) body FK_Function NoPrio No NoPos
-			= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = { ir_from = ca_fun_count, ir_to = next_fun_count}, loc_nodes = [] }) call_comprehension,
-					[fun_def : fun_defs], ca)
+			  parsed_def
+			  	=	MakeNewParsedDef fun_ident lhsArgs rhs 
+			= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) call_comprehension, ca)
 
 		build_rhs :: [TransformedGenerator] ParsedExpr (Optional ParsedExpr) ParsedExpr ParsedExpr -> Rhs
 		build_rhs [generator : generators] success optional_filter failure end
 			=	case_with_default generator.tg_case1 generator.tg_case_end_expr generator.tg_case_end_pattern
-					(foldr (case_end end)
+					(foldr (case_end /* end */)
 						(case_with_default generator.tg_case2 generator.tg_element generator.tg_pattern
-							(foldr (case_pattern failure) rhs generators) failure)
+							(foldr (case_pattern /* failure */) rhs generators) failure)
 						generators)
 					end
 			where
@@ -589,11 +565,10 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 							Yes filter
 								->	optGuardedAltToRhs (GuardedAlts [
 										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
-												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= CollectedLocalDefs {loc_functions = {ir_from=0,ir_to=0}, loc_nodes=[] }}}] No)
+												{ewl_nodes	= [], ewl_expr	= success, ewl_locals	= LocalParsedDefs []}}] No)
 							No
 								->	exprToRhs success
 
-	/* +++ avoid code duplication (bug in 2.0 with nested cases)
 		case_end :: TransformedGenerator Rhs -> Rhs
 		case_end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
 			=	single_case tg_case1 tg_case_end_expr tg_case_end_pattern rhs
@@ -601,7 +576,7 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 		case_pattern :: TransformedGenerator Rhs -> Rhs
 		case_pattern {tg_case2, tg_element, tg_pattern} rhs
 			=	single_case tg_case2 tg_element tg_pattern rhs
-	*/
+	/* +++ this introduces code duplication (bug in 2.0 with nested cases)
 		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
 			=	case_with_default tg_case1 tg_case_end_expr tg_case_end_pattern rhs end
@@ -609,6 +584,7 @@ makeComprehensions [{tq_generators, tq_filter, tq_end, tq_call, tq_lhs_args, tq_
 		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
 		case_pattern failure {tg_case2, tg_element, tg_pattern} rhs
 			=	case_with_default tg_case2 tg_element tg_pattern rhs failure
+	*/
 	
 		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
 		single_case case_ident expr pattern rhs
@@ -757,10 +733,13 @@ reorganizeLocalDefinitionsOfFunctions [fun_def : fun_defs] ca
 	  (fun_defs, rhss_fun_defs, ca) = reorganizeLocalDefinitionsOfFunctions fun_defs ca
 	= ([fun_def : fun_defs], rhs_fun_defs ++ rhss_fun_defs, ca) 
 
-
 MakeNewFunction name arity body kind prio opt_type pos
 	:== { fun_symb = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_index = NoIndex, fun_info = EmptyFunInfo }
+
+// +++ position
+MakeNewParsedDef ident args rhs 
+	:==	PD_Function NoPos ident False args rhs FK_Function
 
 collectFunctionBodies :: !Ident !Int !Priority !FunKind ![ParsedDefinition] !*CollectAdmin
 	-> (![ParsedBody], !FunKind, ![ParsedDefinition], !*CollectAdmin)
