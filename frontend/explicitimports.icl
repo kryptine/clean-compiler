@@ -550,6 +550,9 @@ checkExplicitImportCompleteness filename dcls_explicit dcl_modules icl_functions
 	checkCompleteness filename ({dcl_ident, dcl_index, dcl_kind=STE_Imported expl_imp_kind mod_index}, line_nr) ccs 
 		#! ({dcl_common,dcl_functions}, ccs) = ccs!box_ccs.ccs_dcl_modules.[mod_index]
 		   cci = { box_cci = { cci_line_nr = line_nr, cci_filename = filename, cci_expl_imported_ident = dcl_ident }}
+/* XXX
+	this case expression causes the compiler to be not self compilable anymore (12.7.2000). The bug is probably
+	in module refmark. The corresponding continuation function can be compiled
 		= case expl_imp_kind of
 			STE_Type			-> check_completeness dcl_common.com_type_defs.[dcl_index] cci ccs
 			STE_Constructor		-> check_completeness dcl_common.com_cons_defs.[dcl_index] cci ccs
@@ -558,6 +561,23 @@ checkExplicitImportCompleteness filename dcls_explicit dcl_modules icl_functions
 			STE_Member			-> check_completeness dcl_common.com_member_defs.[dcl_index] cci ccs
 			STE_Instance		-> check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
 			STE_DclFunction		-> check_completeness dcl_functions.[dcl_index] cci ccs
+*/
+		= continuation expl_imp_kind dcl_common dcl_functions cci ccs
+	  where
+		continuation STE_Type dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_type_defs.[dcl_index] cci ccs
+		continuation STE_Constructor dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_cons_defs.[dcl_index] cci ccs
+		continuation (STE_Field _) dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_selector_defs.[dcl_index] cci ccs
+		continuation STE_Class dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_class_defs.[dcl_index] cci ccs
+		continuation STE_Member dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_member_defs.[dcl_index] cci ccs
+		continuation STE_Instance dcl_common dcl_functions cci ccs
+			= check_completeness dcl_common.com_instance_defs.[dcl_index] cci ccs
+		continuation STE_DclFunction dcl_common dcl_functions cci ccs
+			= check_completeness dcl_functions.[dcl_index] cci ccs
 	
 	checkCompletenessOfMacro :: !String !Ident !Index !Int *CheckCompletenessStateBox -> *CheckCompletenessStateBox
 	checkCompletenessOfMacro filename dcl_ident dcl_index line_nr ccs
