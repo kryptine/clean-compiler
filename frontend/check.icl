@@ -473,6 +473,22 @@ where
 
 	build_type_subst {bind_src,bind_dst} type_heaps
 		# (_, bind_src, type_heaps) = substitute bind_src type_heaps
+// RWS ...
+/*
+	FIXME: this is a patch for the following incorrect function type (in a dcl module)
+
+
+    f :: a | c a b special
+        a=[], b = Int
+        a=T, b = Char
+
+   The type variable b doesn't occur in f's type, but this is checked in a later
+   phase. Probably it's a better solution to change the order of checking.
+
+*/
+		| isNilPtr bind_dst.tv_info_ptr
+			= type_heaps
+// ... RWS
 		= { type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars}
 
 	build_var_subst var (free_vars, type_var_heap)
