@@ -4155,7 +4155,7 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 				if (!alt->fun_is_guard){
 					Exp switch_arg_exp,new_e,next_e;
 					Alts switch_alt;
-					MatchKind next_m;
+					MatchKind next_m,m2;
 					
 					switch_arg_exp=alt->fun_rhs;
 					if (switch_arg_exp->e_kind!=Argument)
@@ -4164,7 +4164,9 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 					switch_arg_exp=switch_arg_exp->e_args[0];
 					next_e=NULL;
 					new_e=NULL;
-		
+					
+					m2=NoMatch;
+					
 					for_l (switch_alt,alt->fun_switch_alts,fun_next){
 						if (switch_alt->fun_lhs!=NULL){
 							next_m=MatchAlternative (&next_e,&switch_arg_exp,&switch_alt->fun_lhs,switch_alt,1,rootdeps,p,context);
@@ -4180,21 +4182,30 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 
 						switch (next_m){
 							case NoMatch:
+								continue;
 							case PartialInfiniteMatch:
+								if (m2==NoMatch)
+									m2=PartialInfiniteMatch;
 								continue;
 							case InfiniteMatch:
+								if (m2==NoMatch)
+									m2=InfiniteMatch;
 								if (new_e==NULL)
 									new_e=&bottom;
 								break;
 							case PartialMatch:
+								m2=PartialMatch;
 								new_e=TakeContextLub (&new_e,&next_e,p,context);
 								if (new_e->e_kind==Top && new_e->e_deps==NULL)
 									break;
 								continue;
 							case TotalMatch:
 								new_e=TakeContextLub (&new_e,&next_e,p,context);
-								if (switch_alt->fun_has_fail)
+								if (switch_alt->fun_has_fail){
+									m2=PartialMatch;
 									continue;
+								}
+								m2=TotalMatch;
 								break;
 							default:
 								error_in_function ("MatchAlternative");
@@ -4202,6 +4213,10 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 						break;
 					}
 					
+					if (m==PartialMatch)
+						m=CombineWithPartialMatch (m2);
+					else
+						m=m2;
 					*ep=new_e;
 				} else {
 					Exp new_e,next_e,dummy_exp;
@@ -4232,14 +4247,22 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 
 					switch (next_m){
 						case NoMatch:
+							m=NoMatch;
+							break;
 						case PartialInfiniteMatch:
+							m=PartialInfiniteMatch;
 							break;
 						case InfiniteMatch:
 							if (new_e==NULL)
 								new_e=&bottom;
+							if (m==TotalMatch)
+								m=InfiniteMatch;
+							else
+								m=PartialInfiniteMatch;
 							break;
 						case PartialMatch:
 							new_e=TakeContextLub (&new_e,&next_e,p,context);
+							m=PartialMatch;
 							break;
 						case TotalMatch:
 							new_e=TakeContextLub (&new_e,&next_e,p,context);
