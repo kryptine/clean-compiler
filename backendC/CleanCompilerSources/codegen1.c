@@ -207,11 +207,11 @@ void ConvertSymbolToConstructorDandNLabel (LabDef *d_lab,LabDef *n_lab,SymbDef s
 
 	MakeSymbolLabel (d_lab,modname,d_pref,sdef,0);
 
-	*n_lab = *d_lab;
-	n_lab->lab_pref = n_pref;
-	
 	if (modname==NULL && ExportLocalLabels)
-		n_lab->lab_mod = CurrentModule;	
+		d_lab->lab_mod = CurrentModule;	
+
+	*n_lab = *d_lab;
+	n_lab->lab_pref = n_pref;	
 }
 
 void ConvertSymbolToRecordDandNLabel (LabDef *d_lab,LabDef *n_lab,SymbDef sdef)
@@ -225,11 +225,11 @@ void ConvertSymbolToRecordDandNLabel (LabDef *d_lab,LabDef *n_lab,SymbDef sdef)
 
 	MakeSymbolLabel (d_lab,modname,RECORD_D_PREFIX,sdef,0);
 
+	if (modname==NULL && ExportLocalLabels)
+		d_lab->lab_mod = CurrentModule;
+
 	*n_lab = *d_lab;
 	n_lab->lab_pref = RECORD_N_PREFIX;
-
-	if (modname==NULL && ExportLocalLabels)
-		n_lab->lab_mod = CurrentModule;
 }
 
 void ConvertSymbolToKLabel (LabDef *slab,SymbDef sdef)
