@@ -44,3 +44,18 @@ where
 	sr=s1+s2
 	s1=size a
 	s2=length l
+
+arrayCopyBegin a s
+	:== copy_elements a r0 0
+where
+	/*2.0
+	r0=_createArray s
+0.2*/
+//1.3
+	r0=_createArrayc s
+//3.1
+	copy_elements a1 a2 i
+		| i<size a2
+			# (e,a1) = a1![i]
+			= copy_elements a1 {a2 & [i]=e} (i+1)
+			= (a2,a1)
