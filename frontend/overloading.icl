@@ -1746,6 +1746,18 @@ where
 		varToFreeVar {var_name, var_info_ptr} count
 			= {fv_def_level = NotALevel, fv_name = var_name, fv_info_ptr = var_info_ptr, fv_count = count}
 			
+	adjustClassExpression symb_name (Let this_let=:{let_strict_binds, let_lazy_binds, let_expr }) ui
+		# (let_strict_binds, ui) = adjust_let_binds symb_name let_strict_binds ui
+		  (let_lazy_binds, ui) = adjust_let_binds symb_name let_lazy_binds ui
+		  (let_expr, ui) = adjustClassExpression symb_name let_expr ui
+		= (Let { this_let & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, ui)
+	where
+		adjust_let_binds symb_name let_binds ui
+			= mapSt (adjust_let_bind symb_name) let_binds ui
+
+		adjust_let_bind symb_name let_bind=:{lb_src} ui
+			# (lb_src, ui) = adjustClassExpression symb_name lb_src ui
+			= ({let_bind & lb_src = lb_src}, ui)
 
 	adjustClassExpression symb_name  expr ui
 		= (expr, ui)
