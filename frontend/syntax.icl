@@ -740,7 +740,8 @@ cNotVarNumber :== -1
 ::	TypeVarInfo  	= TVI_Empty | TVI_Type !Type | TVI_Forward !TempVarId | TVI_TypeKind !KindInfoPtr
 					| TVI_SignClass !Index !SignClassification !TypeVarInfo | TVI_PropClass !Index !PropClassification !TypeVarInfo
 					| TVI_Attribute TypeAttribute
-					| TVI_CorrespondenceNumber !Int
+					| TVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
+					| TVI_AType !AType /* auxiliary used in module comparedefimp */
 					| TVI_Used /* to adminster that this variable is encountered (in checkOpenTypes) */
 					| TVI_TypeCode !TypeCodeExpression
 					| TVI_FreshTypeVar TypeVar /* auxiliary used during fusion */
@@ -749,6 +750,7 @@ cNotVarNumber :== -1
 ::	TypeVarHeap 	:== Heap TypeVarInfo
 
 ::	AttrVarInfo  	=	AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId
+					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo
 
@@ -857,6 +859,7 @@ cNonUniqueSelection	:== False
 				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr
 				| PE_Tuple ![ParsedExpr]				
 				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
+				| PE_ArrayPattern ![ElemAssignment]
 				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
 				| PE_Selection !Bool !ParsedExpr ![ParsedSelection]

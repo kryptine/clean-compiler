@@ -274,27 +274,6 @@ instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
 						| ID_Record !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Instance !ImportedIdent !Ident !(![Type],![TypeContext])
 
-/* MOVE 
-::	ExplicitImports	:==	(![AtomicImport], ![StructureImport])
-::	AtomicImport	:==	(!Ident, !AtomType)
-::	StructureImport	:==	(!Ident, !StructureInfo, !StructureType, !OptimizeInfo)
-
-::	AtomType		=	AT_Function | AT_Class | AT_Instance | AT_RecordType | AT_AlgType | AT_Type
-
-::	StructureInfo	= SI_DotDot
-					// The .. notation was used for the structure
-					// (currently nothing is known about the elements)
-					| SI_Elements ![Ident] !Bool
-					// list of elements, that were not imported yet.
-					// Bool: the elements were listed explicitly in the structure
-::	StructureType	= ST_AlgType | ST_RecordType | ST_Class
-
-::	IdentWithKind	:==	(!Ident, !STE_Kind)
-::	IdentWithCKind	:==	(!Ident, !ConsequenceKind)
-
-::	OptimizeInfo	:==	(Optional !Index)
-*/
-
 cIsImportedLibrary :== True
 cIsImportedObject :== False
 :: ImportedObject =
@@ -800,7 +779,8 @@ cNonRecursiveAppl	:== False
 					| TVI_Forward !TempVarId | TVI_TypeKind !KindInfoPtr
 					| TVI_SignClass !Index !SignClassification !TypeVarInfo | TVI_PropClass !Index !PropClassification !TypeVarInfo
 					| TVI_Attribute TypeAttribute
-					| TVI_CorrespondenceNumber !Int
+					| TVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
+					| TVI_AType !AType /* auxiliary used in module comparedefimp */
 					| TVI_Used /* to administer that this variable is encountered (in checkOpenTypes) */
 //					| TVI_Clean !Int /* to keep the unique number that has been assigned to this variable during 'clean_up' */
 					| TVI_TypeCode !TypeCodeExpression
@@ -810,6 +790,7 @@ cNonRecursiveAppl	:== False
 ::	TypeVarHeap 	:== Heap TypeVarInfo
 
 ::	AttrVarInfo  	=	AVI_Empty | AVI_Attr !TypeAttribute | AVI_Forward !TempAttrId
+					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo
 ::	AttrVarHeap 	:== Heap AttrVarInfo
 
@@ -914,6 +895,7 @@ cNonUniqueSelection	:== False
 				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr
 				| PE_Tuple ![ParsedExpr]				
 				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
+				| PE_ArrayPattern ![ElemAssignment]
 				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
 				| PE_Selection !Bool !ParsedExpr ![ParsedSelection]
