@@ -862,6 +862,10 @@ where
 			= file <<< bv
 		show_expression file (MatchExpr _ expr)
 			= file <<< "match expression"
+		show_expression file (Let _)
+			= file <<< "(let ... ) or #"
+		show_expression file (RecordUpdate _ _ _)
+			= file <<< "update of record"
 		show_expression file _
 			= file
 		
