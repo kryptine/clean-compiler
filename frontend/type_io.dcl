@@ -22,10 +22,3 @@ instance WriteTypeInfo String
 instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 
 //3.1
 
-// read
-// read
-class ReadTypeInfo a
-where
-	read_type_info :: !*File -> (!Bool,a,!*File)
-	
-instance ReadTypeInfo CommonDefs //,TypeDef TypeRhs, ConsDef

@@ -60,6 +60,8 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		= write_type_info directly_imported_dcl_modules tcl_file
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
+	#! tcl_file
+		= fwritei (size main_dcl_module.dcl_common.com_cons_defs) tcl_file
 	= (True,tcl_file) 
 //---> ("dcl",size main_dcl_module.dcl_common.com_type_defs, "icl", size common_defs.com_type_defs);
 			
