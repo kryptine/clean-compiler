@@ -1639,7 +1639,7 @@ where
 	expand_type_contexts over_info_ptr (subst, expr_heap)
 		# (EI_Overloaded info, expr_heap) = readPtr over_info_ptr expr_heap
 		  (oc_context, subst) = arraySubst info.oc_context subst
-		= (subst, expr_heap <:= (over_info_ptr, EI_Overloaded { info & oc_context = oc_context })) ---> oc_context
+		= (subst, expr_heap <:= (over_info_ptr, EI_Overloaded { info & oc_context = oc_context })) //---> oc_context
 
 	expand_types_of_cases_and_lets [] heap_and_subst
 		= heap_and_subst
