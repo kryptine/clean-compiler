@@ -4,7 +4,6 @@ import coclmain
 
 import StdEnv
 import frontend
-import code from library "backend_library"
 
 Start :: *World -> *World
 Start world
