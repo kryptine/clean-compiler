@@ -126,6 +126,21 @@ convertCasesInBody (TransformedBody body) (Yes type) group_index common_defs cs
 	,	rcs_expr_heap	:: !.ExpressionHeap
 	}
 
+::	LetVarInfo =
+	{	lvi_count		:: !Int
+	,	lvi_depth		:: !Int
+	,	lvi_new			:: !Bool
+	,	lvi_var			:: !Ident
+	,	lvi_expression	:: !Expression	
+	,   lvi_previous	:: ![PreviousLetVarInfo]
+	}
+
+::	PreviousLetVarInfo =
+	{	plvi_count		:: !Int
+	,	plvi_depth		:: !Int
+	,	plvi_new		:: !Bool
+	}
+
 checkImportedSymbol :: SymbKind VarInfoPtr ([SymbKind], *VarHeap) -> ([SymbKind], *VarHeap)
 checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
 	# (type_info, var_heap) = readPtr symb_type_ptr var_heap
@@ -420,6 +435,17 @@ where
 	Case-exprs may require unsharing if the shared expr is used in different alternatives. Of course
 	only if the expr is neither used in the pattern nor in a surrounding expr.
 */
+
+::	LetExpressionStatus	= LES_Untouched | LES_Moved | LES_Updated !Expression
+
+::	LetExpressionInfo =
+	{	lei_count			:: !Int
+	,	lei_depth			:: !Int 
+	,	lei_var				:: !FreeVar 
+	,   lei_expression		:: !Expression
+	,   lei_status			:: !LetExpressionStatus
+	,   lei_type			:: !AType
+	}
 
 ::	DistributeState =
 	{	ds_lets			:: ![VarInfoPtr]

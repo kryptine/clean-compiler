@@ -599,7 +599,7 @@ pIsSafe			:== True
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro !Bool // is_dcl_macro
 
-:: TypeCodeVariableInfo = TCI_TypeTerm | TCI_TypeVar !Expression
+from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 
 ::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
@@ -620,7 +620,7 @@ pIsSafe			:== True
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
 				VI_TypeCodeVariable !TypeCodeVariableInfo |
-				VI_DynamicValueAlias !BoundVar |
+				VI_DynamicValueAlias !DynamicValueAliasInfo |
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
@@ -637,31 +637,7 @@ pIsSafe			:== True
 
 ::	VarInfoPtr	:== Ptr VarInfo
 
-::	LetVarInfo =
-	{	lvi_count		:: !Int
-	,	lvi_depth		:: !Int
-	,	lvi_new			:: !Bool
-	,	lvi_var			:: !Ident
-	,	lvi_expression	:: !Expression	
-	,   lvi_previous	:: ![PreviousLetVarInfo]
-	}
-
-::	PreviousLetVarInfo =
-	{	plvi_count		:: !Int
-	,	plvi_depth		:: !Int
-	,	plvi_new		:: !Bool
-	}
-
-::	LetExpressionStatus	= LES_Untouched | LES_Moved | LES_Updated !Expression
-
-::	LetExpressionInfo =
-	{	lei_count			:: !Int
-	,	lei_depth			:: !Int 
-	,	lei_var				:: !FreeVar 
-	,   lei_expression		:: !Expression
-	,   lei_status			:: !LetExpressionStatus
-	,   lei_type			:: !AType
-	}
+from convertcases import :: LetVarInfo, :: LetExpressionInfo
 
 cNotVarNumber :== -1
 

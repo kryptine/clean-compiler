@@ -5,6 +5,9 @@ definition module convertcases
 
 import syntax, transform
 
+:: LetVarInfo
+:: LetExpressionInfo
+
 convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
 			-> (!ImportedFunctions, !*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)

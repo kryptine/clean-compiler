@@ -17,6 +17,9 @@ import type_io;
 from type_io_common import class toString (..),instance toString GlobalTCType;
 0.2*/
 
+:: TypeCodeVariableInfo = TCI_TypeTerm | TCI_TypeVar !Expression
+:: DynamicValueAliasInfo :== BoundVar
+
 ::	*ConversionState =
 	{	ci_predef_symb		:: !*PredefinedSymbols
 	,	ci_var_heap			:: !*VarHeap
