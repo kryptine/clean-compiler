@@ -1148,7 +1148,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  
 	  new_fun_arity
 	  		= length new_fun_args
-	| SwitchArityChecks (new_fun_arity > 32) False
+	| False // RWS SwitchArityChecks (new_fun_arity > 32) False
 		# ti = { ti & ti_type_heaps = ti_type_heaps, ti_symbol_heap = ti_symbol_heap, ti_fun_defs = ti_fun_defs
 				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos }
 		  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_fun_root.symb_name.id_name <<< "\n"}
