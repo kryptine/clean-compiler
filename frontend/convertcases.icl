@@ -141,6 +141,17 @@ convertCasesInBody (TransformedBody body) (Yes type) group_index common_defs cs
 	,	plvi_new		:: !Bool
 	}
 
+::	RefCountsInCase = 
+	{	rcc_all_variables		:: ![CountedVariable]
+	,	rcc_default_variables	:: ![CountedVariable]
+	,	rcc_pattern_variables	:: ![[CountedVariable]]
+	}
+
+::	CountedVariable =
+	{	cv_variable	:: !VarInfoPtr
+	,	cv_count	:: !Int
+	}
+
 checkImportedSymbol :: SymbKind VarInfoPtr ([SymbKind], *VarHeap) -> ([SymbKind], *VarHeap)
 checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
 	# (type_info, var_heap) = readPtr symb_type_ptr var_heap
@@ -885,6 +896,27 @@ where
 	The actual splitting, the introduction of new functions, and the
 	introduction of calls to these functions is done in convertRootCases.
 */
+:: SplitCase =
+	{	sc_alt_nr	:: CaseAltNr			// the number of the alternative, before which
+											// the case should be split
+	,	sc_call		:: Optional Expression	// call to the function that was introduced for
+											// this split case
+	}
+
+:: NextAlt =
+	{	na_case		:: ExprInfoPtr	// the case_info_ptr of the case
+	,	na_alt_nr	:: CaseAltNr	// the number of the alternative
+	}
+
+:: CaseAltNr :== Int	// the sequence number of the alternative (zero based), the
+						// default alternative is indicated by the number of the last
+						// alternative + 1
+
+:: SplitsInCase =
+	{	sic_next_alt	:: Optional NextAlt	// the alternative of an outer default, to which
+											// control should pass
+	,	sic_splits		:: [SplitCase]		// the positions where this case should be split
+	}
 
 ::	SplitState =
 	{	ss_expr_heap	:: !.ExpressionHeap

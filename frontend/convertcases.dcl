@@ -7,6 +7,8 @@ import syntax, transform
 
 :: LetVarInfo
 :: LetExpressionInfo
+:: RefCountsInCase
+:: SplitsInCase
 
 convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
