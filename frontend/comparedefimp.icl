@@ -32,7 +32,7 @@ where
 			  comp_attr_var_heap = initialyseAttributeVars dcl_type_def.td_attrs icl_type_def.td_attrs comp_attr_var_heap
 			  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 			  (ok, icl_cons_defs, comp_st) = compare_rhs_of_types dcl_type_def.td_rhs icl_type_def.td_rhs dcl_cons_defs icl_cons_defs comp_st
-			| ok && dcl_type_def.td_arity==icl_type_def.td_arity
+			| ok && dcl_type_def.td_arity==icl_type_def.td_arity && dcl_type_def.td_attribute==icl_type_def.td_attribute
 				= (icl_type_defs, icl_cons_defs, comp_st)
 				# comp_error = compareError type_def_error (newPosition icl_type_def.td_ident icl_type_def.td_pos) comp_st.comp_error
 				= (icl_type_defs, icl_cons_defs, { comp_st & comp_error = comp_error })
@@ -1230,7 +1230,6 @@ e_corresponds_app_symb {symb_ident=dcl_symb_name, symb_kind=SK_Constructor dcl_g
 	| dcl_glob_index.glob_module==icl_glob_index.glob_module && dcl_symb_name.id_name==icl_symb_name.id_name
 		= ec_state
 		= give_error icl_symb_name ec_state
-//e_corresponds_app_symb {symb_ident} _ ec_state
 e_corresponds_app_symb {symb_ident,symb_kind} {symb_kind=symb_kind2} ec_state
 	= give_error symb_ident ec_state
 
