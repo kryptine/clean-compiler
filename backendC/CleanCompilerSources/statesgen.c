@@ -3312,8 +3312,10 @@ static int create_new_function_with_more_arguments (NodeP node_p,int determine_n
 		function_symbol_p=function_node_p->node_symbol;
 
 		if (function_symbol_p->symb_kind==definition){
-			if (function_symbol_p->symb_def->sdef_kind==IMPRULE && !(function_symbol_p->symb_def->sdef_rule->rule_mark & RULE_CAF_MASK)){
-				if (function_node_p->node_arity <= function_symbol_p->symb_def->sdef_arity){
+			if (function_symbol_p->symb_def->sdef_kind==IMPRULE){
+				if (!(function_symbol_p->symb_def->sdef_rule->rule_mark & RULE_CAF_MASK) && function_symbol_p->symb_def->sdef_rule->rule_alts->alt_kind==Contractum
+					&& function_node_p->node_arity <= function_symbol_p->symb_def->sdef_arity)
+				{
 					struct type_node *rhs_type_node_p;
 					SymbolP new_function_symbol;
 					SymbDef rule_sdef;
