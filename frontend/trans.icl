@@ -2381,6 +2381,22 @@ transformApplication app=:{app_symb={symb_name,symb_kind = SK_GeneratedFunction 
 		= transformFunctionApplication gf_fun_def gf_instance_info gf_cons_args app extra_args ro { ti & ti_fun_heap = ti_fun_heap }
 transformApplication app [] ro ti
 	= (App app, ti)
+transformApplication app=:{app_symb={symb_name,symb_kind = SK_Constructor cons_index},app_args} extra_args
+			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
+	# {cons_type}			= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
+	# (app_args,extra_args)	= complete_application cons_type.st_arity app_args extra_args
+	= (build_application { app & app_args = app_args } extra_args, ti)
+where
+	complete_application form_arity args []
+		= (args, [])
+	complete_application form_arity args extra_args
+		# arity_diff = min (form_arity - length args) (length extra_args)
+		= (args ++ take arity_diff extra_args, drop arity_diff extra_args)
+
+	build_application app []
+		= App app
+	build_application app extra_args
+		= App app @ extra_args
 transformApplication app extra_args ro ti
 	= (App app @ extra_args, ti)
 
