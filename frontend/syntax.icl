@@ -876,7 +876,7 @@ cNotVarNumber :== -1
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
-			|	TFA [ATypeVar] Type
+			|	TST [ATypeVar] SymbolType		/* Universally quantified types */
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
@@ -1497,18 +1497,16 @@ where
 		= file  <<< consid <<< ' ' <<< strictness <<< ' ' <<< types
 	(<<<) file (arg_type --> res_type)
 		= file <<< arg_type <<< " -> " <<< res_type
-//AA..		
 	(<<<) file TArrow
 		= file <<< "(->)"	
 	(<<<) file (TArrow1 t)
 		= file <<< "(->) " <<< t	
-//..AA		
 	(<<<) file (type :@: types)
 		= file <<< type <<< " @" <<< types
 	(<<<) file (TB tb)
 		= file <<< tb
-	(<<<) file (TFA vars types)
-		= file <<< "A." <<< vars <<< ':' <<< types
+	(<<<) file (TST atvs st)
+		= file <<< "(A. " <<< atvs <<< ": " <<< st <<< ")"
 	(<<<) file (TQV varid)
 		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)

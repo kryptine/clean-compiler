@@ -22,7 +22,14 @@ import genericsupport
 	{	cti_module_index	:: !Index
 	,	cti_type_index		:: !Index
 	,	cti_lhs_attribute	:: !TypeAttribute
+	,	cti_scope			:: !Int // current scope for forall-variables
+	,   cti_arrow_context	:: !ForallContext
 	}
+
+:: ForallContext 
+	= ForallNotAllowed					// forall cannot appear beneath 
+	| ForallAllowed 					// forall may appear at in current context
+	| ForallAllowedOnLhsOfArrow 		// forall may appear at the left hand side of an arrow
 
 class bindTypes type :: !CurrentTypeInfo !type !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 	-> (!type, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
@@ -90,8 +97,8 @@ where
 		# (x, _, ts_ti_cs) = bindTypes cti x ts_ti_cs
 		  (xs, attr, ts_ti_cs) = bindTypes cti xs ts_ti_cs
 		= ([x : xs], attr, ts_ti_cs)
-	
 
+	
 retrieveTypeDefinition :: SymbolPtr !Index !*SymbolTable ![SymbolPtr] -> ((!Index, !Index), !*SymbolTable, ![SymbolPtr])
 retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 	# (entry, symbol_table)	= readPtr type_ptr symbol_table
@@ -124,7 +131,7 @@ where
 			# ({td_arity,td_attribute,td_rhs},type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts_type_defs ts_modules
 			  ts = { ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules }
 			| checkArityOfType type_cons.type_arity td_arity td_rhs
-				# (types, _, ts_ti_cs) = bindTypes cti types (ts, ti, cs)
+				# (types, _, ts_ti_cs) = bindTypes {cti & cti_arrow_context = ForallNotAllowed } types (ts, ti, cs)
 				| type_module == cti_module_index && cti_type_index == type_index
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types, cti_lhs_attribute, ts_ti_cs)
 					= (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types,
@@ -140,32 +147,73 @@ where
 			# ({td_arity,td_attribute,td_rhs},type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts_type_defs ts_modules
 			  ts = { ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules }
 			| checkArityOfType type_cons.type_arity td_arity td_rhs
-				# (types, _, ts_ti_cs) = bindTypes cti types (ts, ti, cs)
+				# (types, _, ts_ti_cs) = bindTypes {cti & cti_arrow_context = ForallNotAllowed } types (ts, ti, cs)
 				| type_module == cti_module_index && cti_type_index == type_index
 					= (TAS { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types strictness, cti_lhs_attribute, ts_ti_cs)
 					= (TAS { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types strictness,
 								determine_type_attribute td_attribute, ts_ti_cs)
 				= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "used with wrong arity" cs.cs_error }))
 			= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_name "undefined" cs.cs_error}))	
-	bindTypes cti (arg_type --> res_type) ts_ti_cs
-		# (arg_type, _, ts_ti_cs) = bindTypes cti arg_type ts_ti_cs
-		  (res_type, _, ts_ti_cs) = bindTypes cti res_type ts_ti_cs
+	bindTypes cti (arg_type --> res_type) ts_ti_cs	
+		# (arg_type, _, ts_ti_cs) = bindTypes (new_cti cti ForallAllowed) arg_type ts_ti_cs
+		  (res_type, _, ts_ti_cs) = bindTypes (new_cti cti ForallAllowedOnLhsOfArrow) res_type ts_ti_cs
 		= (arg_type --> res_type, TA_Multi, ts_ti_cs)
+	where 
+		new_cti cti=:{cti_arrow_context = ForallAllowed} new_arrow_context = {cti & cti_arrow_context = new_arrow_context}
+		new_cti cti=:{cti_arrow_context = ForallAllowedOnLhsOfArrow} new_arrow_context = {cti & cti_arrow_context = new_arrow_context}
+		new_cti cti=:{cti_arrow_context = ForallNotAllowed} new_arrow_context = cti
+
 //AA..
 	bindTypes cti (TArrow1 type) ts_ti_cs
-		# (type, _, ts_ti_cs) = bindTypes cti type ts_ti_cs
+		# new_cti = {cti & cti_arrow_context = case cti.cti_arrow_context of ForallNotAllowed -> ForallNotAllowed; _ -> ForallAllowed }
+		# (type, _, ts_ti_cs) = bindTypes new_cti type ts_ti_cs
 		= (TArrow1 type, TA_Multi, ts_ti_cs)	
 //..AA		
 	bindTypes cti (CV tv :@: types) ts_ti_cs
-		# (tv, type_attr, ts_ti_cs) = bindTypes cti tv ts_ti_cs
-		  (types, _, ts_ti_cs) = bindTypes cti types ts_ti_cs
+		# (tv, type_attr, ts_ti_cs) = bindTypes {cti & cti_arrow_context = ForallNotAllowed} tv ts_ti_cs
+		  (types, _, ts_ti_cs) = bindTypes {cti & cti_arrow_context = ForallNotAllowed} types ts_ti_cs
 		= (CV tv :@: types, type_attr, ts_ti_cs)
 // Sjaak 16-08-01
+/*
 	bindTypes cti (TFA vars type) (ts, ti=:{ti_type_heaps}, cs)
 		# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
 		  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
 		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
 		= (TFA type_vars type, TA_Multi, (ts, ti, { cs & cs_symbol_table = cs_symbol_table }))
+*/
+	bindTypes cti (TST atvs st) (ts, ti, cs)
+		| st.st_arity <> 0
+			= abort "(checktypes.icl) assertion failed: forall type must be curried\n"
+			
+		= case cti.cti_arrow_context ---> "bindTypes forall" of
+		
+			ForallNotAllowed 
+				# cs_error = checkError "forall must be on the left hand side of an arrow" st cs.cs_error
+				-> (TE, TA_Multi, (ts, ti, {cs & cs_error = cs_error}))
+			ForallAllowedOnLhsOfArrow
+				# cs_error = checkError "forall cannot be on the right hand side of an arrow" st cs.cs_error
+				-> (TE, TA_Multi, (ts, ti, {cs & cs_error = cs_error}))
+
+			ForallAllowed								
+				# new_scope = inc cti.cti_scope	
+				# new_cti = { cti & cti_scope = new_scope, cti_arrow_context = ForallAllowedOnLhsOfArrow }
+				
+				# (atvs, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable new_scope atvs [] ti.ti_type_heaps cs
+				# (st_result, _, (ts, ti, cs)) = bindTypes cti st.st_result (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
+				# cs_symbol_table = removeAttributedTypeVarsFromSymbolTable new_scope atvs cs.cs_symbol_table
+					
+				# st = 
+					{ st 
+					& st_vars = [atv_variable \\ {atv_variable} <- atvs]
+					, st_attr_vars = [av \\ {atv_attribute=TA_Var av} <- atvs]
+					, st_result = st_result
+					// RANKN: 
+					// , st_context = ...
+					// , st_attr_vars = ...
+					}
+		
+				-> (TST atvs st, TA_Multi, (ts, ti, { cs & cs_symbol_table = cs_symbol_table }))
+
 // ... Sjaak
 	bindTypes cti type ts_ti_cs
 		= (type, TA_Multi, ts_ti_cs)
@@ -201,7 +249,7 @@ checkTypeDef type_index module_index ts=:{ts_type_defs} ti=:{ti_type_heaps} cs=:
 		  		= addTypeVariablesToSymbolTable cGlobalScope td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
 		  type_def = {	type_def & td_args = type_vars, td_index = type_index, td_attrs = attr_vars, td_attribute = td_attribute }
 		  (td_rhs, (ts, ti, cs)) = check_rhs_of_TypeDef type_def attr_vars
-				{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute }
+				{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute, cti_scope = cGlobalScope, cti_arrow_context = ForallAllowedOnLhsOfArrow}
 					({ ts & ts_type_defs = ts_type_defs },{ ti & ti_type_heaps = ti_type_heaps}, cs)
 		  (td_used_types, cs_symbol_table) = retrieve_used_types ti.ti_used_types cs.cs_symbol_table
 		= ({ ts & ts_type_defs = { ts.ts_type_defs & [type_index] = { type_def & td_rhs = td_rhs, td_used_types = td_used_types }}}, { ti & ti_used_types = [] },
@@ -256,8 +304,10 @@ where
 				= check_selectors (inc field_nr) fields rec_type_index sel_types  rec_type st_vars st_attr_vars exi_vars selector_defs var_heap error
 				= (selector_defs, var_heap, error)
 		where
-			lift_quantifier at=:{at_type = TFA vars type} (type_vars, attr_vars)
-				= ({ at & at_type = type}, foldSt add_var_and_attr vars (type_vars, attr_vars))
+			//lift_quantifier at=:{at_type = TFA vars type} (type_vars, attr_vars)
+			//	= ({ at & at_type = type}, foldSt add_var_and_attr vars (type_vars, attr_vars))
+			lift_quantifier at=:{at_type = TST atvs st} (type_vars, attr_vars)
+				= abort "check_types: RANKN: do not know what to do\n"
 			lift_quantifier at (type_vars, attr_vars)
 				= (at, (type_vars, attr_vars))
 				
@@ -491,32 +541,33 @@ where
 					-> (TA_Multi, oti, { cs & cs_error = checkError var_name "inconsistently attributed (5)" cs.cs_error })
 		check_var_attribute var_attr new_attr oti cs
 			= (var_attr, oti, { cs & cs_error = checkError var_name "inconsistently attributed (6)" cs.cs_error })// ---> (var_attr, new_attr)
-		
-		
-		determine_attribute var_name DAK_Unique new_attr error
-			= case new_attr of
-				 TA_Multi
-				 	-> (TA_Unique, error)
-				 TA_None
-				 	-> (TA_Unique, error)
-				 TA_Unique
-				 	-> (TA_Unique, error)
-				 _
-				 	-> (TA_Unique, checkError var_name "inconsistently attributed (1)" error)
-		determine_attribute var_name dem_attr TA_None error
-			= (TA_Multi, error)
-		determine_attribute var_name dem_attr new_attr error
-			= (new_attr, error)
-
+				
 	check_attribute var_name dem_attr _ this_attr oti cs
 		= (TA_Multi, oti, cs)
+
+	determine_attribute var_name DAK_Unique new_attr error
+		= case new_attr of
+			 TA_Multi
+			 	-> (TA_Unique, error)
+			 TA_None
+			 	-> (TA_Unique, error)
+			 TA_Unique
+			 	-> (TA_Unique, error)
+			 _
+			 	-> (TA_Unique, checkError var_name "inconsistently attributed (1)" error)
+	determine_attribute var_name dem_attr TA_None error
+		= (TA_Multi, error)
+	determine_attribute var_name dem_attr new_attr error
+		= (new_attr, error)
+
+
 
 check_args_of_type_cons :: !Index !Int !DemandedAttributeKind ![AType] ![ATypeVar] !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (![AType], !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 check_args_of_type_cons mod_index scope dem_attr_kind [] _ cot_state
 	= ([], cot_state)
 check_args_of_type_cons mod_index scope dem_attr_kind [arg_type : arg_types] [ {atv_attribute} : td_args ] cot_state
-	# (arg_type, cot_state) = checkOpenAType mod_index scope (new_demanded_attribute dem_attr_kind /* DAK_None */ atv_attribute) arg_type cot_state
+	# (arg_type, cot_state) = checkOpenAType mod_index scope ForallNotAllowed (new_demanded_attribute dem_attr_kind /* DAK_None */ atv_attribute) arg_type cot_state
 	  (arg_types, cot_state) = check_args_of_type_cons mod_index scope dem_attr_kind arg_types td_args cot_state
 	= ([arg_type : arg_types], cot_state)
 
@@ -527,12 +578,12 @@ new_demanded_attribute _ TA_Unique
 new_demanded_attribute dem_attr_kind _
 	= DAK_None /* dem_attr_kind */
 
-checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+checkOpenAType :: !Index !Int !ForallContext !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
+checkOpenAType mod_index scope forall_context dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
 	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs) 
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
-checkOpenAType mod_index scope dem_attr type=:{at_type = GTV var_id=:{tv_name={id_info}}} (ots, oti=:{oti_heaps,oti_global_vars}, cs=:{cs_symbol_table})
+checkOpenAType mod_index scope forall_context dem_attr type=:{at_type = GTV var_id=:{tv_name={id_info}}} (ots, oti=:{oti_heaps,oti_global_vars}, cs=:{cs_symbol_table})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  (type_var, oti_global_vars, th_vars, entry) = retrieve_global_variable var_id entry oti_global_vars oti_heaps.th_vars
 	= ({type & at_type = TV type_var, at_attribute = TA_Multi }, (ots, { oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_global_vars = oti_global_vars },
@@ -557,7 +608,7 @@ where
 			# (var, global_vars, var_heap, ste_previous) = retrieve_global_variable var ste_previous global_vars var_heap
 			= (var, global_vars, var_heap, { entry & ste_previous = ste_previous })
 //
-checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type_name=type_name=:{id_name,id_info}} types, at_attribute}
+checkOpenAType mod_index scope forall_context dem_attr_kind type=:{ at_type=TA type_cons=:{type_name=type_name=:{id_name,id_info}} types, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
@@ -572,7 +623,7 @@ checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type
 			= ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs)) 
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
-checkOpenAType mod_index scope dem_attr type=:{ at_type=TAS type_cons=:{type_name=type_name=:{id_name,id_info}} types strictness, at_attribute}
+checkOpenAType mod_index scope forall_context dem_attr type=:{ at_type=TAS type_cons=:{type_name=type_name=:{id_name,id_info}} types strictness, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
@@ -587,16 +638,22 @@ checkOpenAType mod_index scope dem_attr type=:{ at_type=TAS type_cons=:{type_nam
 			= ({ type & at_type = TAS type_cons types strictness, at_attribute = new_attr} , (ots, oti, cs)) 
 			= (type, (ots, oti, {cs & cs_error = checkError type_name "used with wrong arity" cs.cs_error}))
 		= (type, (ots, oti, {cs & cs_error = checkError type_name "undefined" cs.cs_error}))
-checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_type, at_attribute} cot_state
-	# (arg_type, cot_state) = checkOpenAType mod_index scope DAK_None arg_type cot_state
-	  (result_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None result_type cot_state
+checkOpenAType mod_index scope forall_context dem_attr type=:{at_type = arg_type --> result_type, at_attribute} cot_state
+	# (arg_type, cot_state) = checkOpenAType mod_index scope arg_forall_context DAK_None arg_type cot_state
+	  (result_type, (ots, oti, cs)) = checkOpenAType mod_index scope res_forall_context DAK_None result_type cot_state
 	  (new_attr, oti, cs) = newAttribute dem_attr "-->" at_attribute oti cs
 	= ({ type & at_type = arg_type --> result_type, at_attribute = new_attr }, (ots, oti, cs))
+where
+	res_forall_context = case forall_context of ForallNotAllowed -> ForallNotAllowed; _ -> ForallAllowedOnLhsOfArrow
+	arg_forall_context = case forall_context of ForallNotAllowed -> ForallNotAllowed; _ -> ForallAllowed
+
 //AA..
-checkOpenAType mod_index scope dem_attr type=:{at_type = TArrow1 arg_type, at_attribute} cot_state
-	# (arg_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None arg_type cot_state
+checkOpenAType mod_index scope forall_context dem_attr type=:{at_type = TArrow1 arg_type, at_attribute} cot_state
+	# (arg_type, (ots, oti, cs)) = checkOpenAType mod_index scope arg_forall_context DAK_None arg_type cot_state
 	  (new_attr, oti, cs) = newAttribute dem_attr "TArrow1" at_attribute oti cs
 	= ({ type & at_type = TArrow1 arg_type, at_attribute = new_attr }, (ots, oti, cs))
+where
+	arg_forall_context = case forall_context of ForallNotAllowed -> ForallNotAllowed; _ -> ForallAllowedOnLhsOfArrow	
 //..AA
 /*
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
@@ -605,10 +662,11 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_att
 	  (new_attr, oti, cs) = newAttribute dem_attr ":@:" at_attribute oti cs
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = new_attr }, (ots, oti, cs))
 */
-checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
+checkOpenAType mod_index scope forall_context dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, var_attr, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
-	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
+	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope ForallNotAllowed DAK_None) types (ots, oti, cs)
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = var_attr }, (ots, oti, cs))
+/*
 checkOpenAType mod_index scope dem_attr atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
 	# (vars, (oti, cs)) = mapSt add_universal_var vars  (oti, cs) 
 	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr { atype & at_type = type } (ots, oti, cs)
@@ -630,8 +688,73 @@ where
 		= removeDefinitionFromSymbolTable cGlobalScope av_name (removeDefinitionFromSymbolTable cRankTwoScope tv_name cs_symbol_table)
 	remove_universal_var {atv_variable = {tv_name}} cs_symbol_table
 		= removeDefinitionFromSymbolTable cRankTwoScope tv_name cs_symbol_table
+*/
+checkOpenAType mod_index scope forall_context dem_attr atype=:{at_type = TST atvs st, at_attribute} (ots, oti, cs)
 
-checkOpenAType mod_index scope dem_attr type=:{at_attribute} (ots, oti, cs)
+	| st.st_arity <> 0
+		= abort "assertion failed: forall type must be fully curried\n"
+
+	= case forall_context of
+		ForallNotAllowed 
+			# cs = { cs & cs_error = checkError "illegal usage of universal quantification" "" cs.cs_error }
+			-> ({at_attribute=TA_Multi,at_type=TE}, (ots, oti, cs))
+		ForallAllowedOnLhsOfArrow 
+			# cs = { cs & cs_error = checkError "quantified type cannot be used on the right hand side of an arrow" "" cs.cs_error }
+			-> ({at_attribute=TA_Multi,at_type=TE}, (ots, oti, cs))			
+ 		ForallAllowed  		
+			# new_scope = inc scope
+			
+			# (atvs, (oti, cs)) = mapSt (add_forall_atv new_scope) atvs  (oti, cs) 
+			# tvs = [atv_variable \\ {atv_variable} <- atvs]
+			# avs =	[av \\ {atv_attribute=TA_Var av} <- atvs]		
+
+			# (st_result, (ots, oti, cs)) 	= checkOpenAType mod_index new_scope ForallAllowedOnLhsOfArrow DAK_None st.st_result (ots, oti, cs)
+			# oti = 
+				{ oti 
+				&  oti_all_vars 	= removeMembers oti.oti_all_vars tvs 
+				,  oti_all_attrs 	= removeMembers oti.oti_all_attrs avs 
+				}	
+				
+			# (st_context, cs) 		= mapSt check_context st.st_context cs 
+			# (st_attr_env, cs) 	= mapSt check_attr_ineq st.st_attr_env cs 		
+
+			# cs_symbol_table 		= foldSt (remove_forall_atv new_scope) atvs cs.cs_symbol_table			
+			# cs 					= { cs & cs_symbol_table = cs_symbol_table }
+			
+			# checked_st =
+				{ st 
+				& st_vars 			= tvs
+				, st_attr_vars 		= avs
+				, st_result 		= st_result
+				, st_context 		= st_context
+				, st_attr_env 		= st_attr_env
+				}
+			
+			// FIXME: at_attribute also needs to be updated	
+			-> ( { atype & at_type = TST atvs checked_st }, (ots, oti, cs))
+where
+	add_forall_atv scope atv=:{atv_variable = tv=:{tv_name={id_name,id_info}}, atv_attribute} (oti, cs=:{cs_symbol_table,cs_error})
+		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
+		| ste_kind == STE_Empty || ste_def_level < scope
+			# (new_attr, oti=:{oti_heaps}, cs) = newAttribute DAK_None id_name atv_attribute oti { cs & cs_symbol_table = cs_symbol_table }
+			  (new_var_ptr, th_vars) = newPtr (TVI_Attribute new_attr) oti_heaps.th_vars
+			= ({atv & atv_variable = { tv & tv_info_ptr = new_var_ptr}, atv_attribute = new_attr }, 
+					({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }}, { cs & cs_symbol_table =
+							cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
+									ste_def_level = scope, ste_previous = entry })}))
+			= (atv, (oti, { cs & cs_error = checkError id_name "type variable already undefined" cs_error, cs_symbol_table = cs_symbol_table }))
+
+	remove_forall_atv scope {atv_variable = {tv_name}, atv_attribute = TA_Var {av_name}} cs_symbol_table
+		= removeDefinitionFromSymbolTable cGlobalScope av_name (removeDefinitionFromSymbolTable scope tv_name cs_symbol_table)
+	remove_forall_atv scope {atv_variable = {tv_name}} cs_symbol_table
+		= removeDefinitionFromSymbolTable scope tv_name cs_symbol_table
+
+	check_attr_ineq x cs 
+		= abort "RANKN: check_attr_ineq is not implemented\n"
+	check_context x cs 
+		= abort "RANKN: check_context is not implemented\n"
+		
+checkOpenAType mod_index scope forall_context dem_attr type=:{at_attribute} (ots, oti, cs)
 	# (new_attr, oti, cs) = newAttribute dem_attr "." at_attribute oti cs
 	= ({ type & at_attribute = new_attr}, (ots, oti, cs))
 
@@ -639,11 +762,11 @@ checkOpenTypes mod_index scope dem_attr types cot_state
 	= mapSt (checkOpenType mod_index scope dem_attr) types cot_state
 
 checkOpenType mod_index scope dem_attr type cot_state
-	# ({at_type}, cot_state) = checkOpenAType mod_index scope dem_attr { at_type = type, at_attribute = TA_Multi } cot_state
+	# ({at_type}, cot_state) = checkOpenAType mod_index scope ForallNotAllowed dem_attr { at_type = type, at_attribute = TA_Multi } cot_state
 	= (at_type, cot_state)
 	
-checkOpenATypes mod_index scope types cot_state
-	= mapSt (checkOpenAType mod_index scope DAK_None) types cot_state
+checkOpenATypes mod_index scope forall_context types cot_state
+	= mapSt (checkOpenAType mod_index scope forall_context DAK_None) types cot_state
 
 checkInstanceType :: !Index !(Global DefinedSymbol) !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!InstanceType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
@@ -725,10 +848,9 @@ checkSymbolType :: !Bool !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{
 checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_env} specials type_defs class_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
-	  (st_args, cot_state) = checkOpenATypes mod_index cGlobalScope st_args (ots, oti, cs)
-//	   ---> ("checkSymbolType", st_args))
+	  (st_args, cot_state) = checkOpenATypes mod_index cGlobalScope ForallAllowed st_args (ots, oti, cs)
 	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars}, cs))
-	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state
+	  	= checkOpenAType mod_index cGlobalScope ForallAllowedOnLhsOfArrow DAK_None st_result cot_state
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [] }
 	  (st_context, type_defs, class_defs, modules, heaps, cs) = check_type_contexts is_function st_context mod_index class_defs ots oti cs
 	  (st_attr_env, cs) = mapSt check_attr_inequality st_attr_env cs
@@ -1001,7 +1123,7 @@ where
 		  ots = { ots_type_defs = type_defs, ots_modules = modules }
 		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
 		  (dt_type, ( {ots_type_defs, ots_modules}, {oti_heaps,oti_all_vars,oti_all_attrs, oti_global_vars}, cs))
-		  		= checkOpenAType mod_index scope DAK_Ignore dt_type (ots, oti, cs)
+		  		= checkOpenAType mod_index scope ForallNotAllowed DAK_Ignore dt_type (ots, oti, cs)
 		  th_vars = foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) oti_global_vars oti_heaps.th_vars
 	  	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable scope dt_uni_vars cs.cs_symbol_table
 		| isEmpty oti_all_attrs
@@ -1084,7 +1206,7 @@ where
 		| entry.ste_def_level < scope // cOuterMostLevel
 			# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
-		      (atv_attribute, attr_vars, th_attrs, cs_error) = check_attribute (scope == cRankTwoScope) atv_attribute tv_name.id_name attr_vars th_attrs cs_error
+		      (atv_attribute, attr_vars, th_attrs, cs_error) = check_attribute (scope > cGlobalScope) atv_attribute tv_name.id_name attr_vars th_attrs cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
 			  						stv_info_ptr = tv_info_ptr, stv_count = 0}, ste_def_level = scope /* cOuterMostLevel */, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }

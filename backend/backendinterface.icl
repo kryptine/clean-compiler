@@ -302,8 +302,9 @@ instance collectAttrVars Type where
 		=	collectAttrVars type collect
 	collectAttrVars (_ :@: types) collect
 		=	collectAttrVars types collect
-	collectAttrVars (TFA _ type) collect
-		=	collectAttrVars type collect
+	collectAttrVars (TST atvs {st_args, st_result}) collect
+		// RANKN FIXME : what to do with local forall variables????
+		=	collectAttrVars (st_args, st_result)  collect
 	collectAttrVars _ collect
 		=	collect
 
@@ -320,6 +321,9 @@ instance collectAttrVars AttributeVar where
 instance collectAttrVars [a] | collectAttrVars a where
 	collectAttrVars l collect
 		=	foldSt collectAttrVars l collect
+instance collectAttrVars (a, b) | collectAttrVars a & collectAttrVars b where
+	collectAttrVars (x, y) collect
+		= collectAttrVars y (collectAttrVars x collect)
 
 markAttrVarCollected :: AttributeVar *AttrVarHeap -> *AttrVarHeap
 markAttrVarCollected {av_info_ptr} attrVarHeap

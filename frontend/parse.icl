@@ -2115,6 +2115,24 @@ wantAnnotatedAType pState
 
 tryAnnotatedAType :: !Bool !TypeAttribute ![ATypeVar] !ParseState -> (!Bool, !AType,!ParseState)
 tryAnnotatedAType tryAA attr vars pState
+	| isEmpty vars
+		# (types, pState)		= parseList tryBrackAType pState
+		| isEmpty types 
+			= (False, {at_attribute = attr, at_type = TE}, pState)
+		//| othewrise // types not empty
+			# (token, pState)		= nextToken TypeContext pState
+			| token == ArrowToken						
+				# (rtype, pState)	= wantAType pState
+		  		# atype = make_curry_type attr types rtype
+				= ( True, atype, pState)
+		  	//| otherwise // not arrow
+				# (atype, pState) = convertAAType types attr (tokenBack pState)
+				= (True, atype, pState)
+	//| otherwise // vars not empty	  			
+		# (atype, pState) = wantForallType attr vars pState
+		= (True, atype, pState)
+	
+/* AA commented out:
 	# (types, pState)		= parseList tryBrackAType pState
 	| isEmpty types
 		| isEmpty vars
@@ -2136,12 +2154,30 @@ tryAnnotatedAType tryAA attr vars pState
 	| isEmpty vars
 		= (True, atype, pState)
 		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
+*/
+
 where
 	make_curry_type attr [t1] res_type
 		= {at_attribute = attr, at_type = t1 --> res_type}
 	make_curry_type attr [t1:tr] res_type
 		= {at_attribute = attr, at_type = t1 --> make_curry_type TA_None tr res_type}
 	make_curry_type _ _ _ = abort "make_curry_type: wrong assumption"
+
+wantForallType :: !TypeAttribute [ATypeVar] !ParseState -> (!AType,!ParseState)
+wantForallType attr forall_atvs pState
+	# (st, pState) = want pState // want SymbolType 
+	# st = 
+		{ st 
+		& st_vars = [atv_variable\\{atv_variable} <- forall_atvs]
+		, st_attr_vars = [av \\ {atv_attribute = TA_Var av} <- forall_atvs]
+		, st_result = curry attr st.st_args st.st_result
+		, st_args = []
+		, st_arity = 0 // forall symbol type must always be curried 
+		}
+	= ({at_type=TST forall_atvs st, at_attribute=attr}, pState)
+where
+	curry attr [] res = res // RANKN FIXME: what shall we do with 'attr' and 'res.at_attribute'???
+	curry attr [arg:args] res = { at_attribute = attr, at_type = arg --> curry TA_None args res }  	
 
 tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
 tryBrackSAType pState
@@ -2175,8 +2211,10 @@ wantType pState
 			# (token, pState) = nextToken TypeContext pState
 			= (type, parseError "type" (Yes token) "type" pState)
 	// ~(isEmpty vars)
-		# (type, pState) = wantType pState
-		= (TFA vars type, pState)
+		//# (type, pState) = wantType pState
+		//= (TFA vars type, pState)
+		# (type, pState) = wantForallType TA_None vars pState
+		= (type.at_type, pState)
 
 wantAType :: !ParseState -> (!AType,!ParseState)
 wantAType pState
@@ -2196,6 +2234,24 @@ tryType pState
 tryAType :: !Bool !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
 tryAType tryAA attr pState
 	# (vars , pState)		= optionalUniversalQuantifiedVariables pState
+	| isEmpty vars
+		# (types, pState)		= parseList tryBrackAType pState
+		| isEmpty types
+			= (False, {at_attribute = attr, at_type = TE}, pState)
+		//| otherwise // types not empty	
+			# (token, pState)		= nextToken TypeContext pState
+			| token == ArrowToken
+				# (rtype, pState)	= wantAType pState
+			  	  atype = make_curry_type attr types rtype
+				= ( True, atype, pState)
+			//| otherwise // not arrow	
+				# (atype, pState) = convertAAType types attr (tokenBack pState)
+				= (True, atype, pState)				
+	//| otherwise // vars not empty
+		# (atype, pState) = wantForallType attr vars pState
+		= (True, atype, pState)
+				
+/* AA commented out:	
 	# (types, pState)		= parseList tryBrackAType pState
 	| isEmpty types
 		| isEmpty vars
@@ -2217,6 +2273,9 @@ tryAType tryAA attr pState
 	| isEmpty vars
 		= (True, atype, pState)
 		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
+*/
+
+
 /* PK
 tryFunctionType :: ![AType] !Annotation !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
 tryFunctionType types annot attr pState

@@ -663,10 +663,14 @@ where
 // ... RWS
 		= { type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars}
 
+/*
 	substitue_arg_type at=:{at_type = TFA type_vars type} (was_ok, type_heaps)
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
 		  (ok, new_at, type_heaps) = substitute {at & at_type = type} type_heaps
 		= ({ new_at & at_type = TFA fresh_type_vars new_at.at_type}, (was_ok && ok, type_heaps))
+*/
+	// no special action for TFA: everything is done in substitute
+
 	substitue_arg_type type (was_ok, type_heaps)
 		# (ok, type, type_heaps) = substitute type type_heaps
 		= (type, (was_ok && ok, type_heaps))

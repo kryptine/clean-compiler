@@ -186,15 +186,24 @@ where
 			
 	clean_up cui tv=:(TV _) cus
 		= (tv, cus)
-	clean_up cui (TFA vars type) cus=:{cus_heaps}
-		# (type, cus) = clean_up cui type cus
-		= (TFA vars type, cus)
+
+	clean_up cui (TST atvs st=:{st_args, st_result}) cus
+		# ((st_args,st_result), cus) = clean_up cui (st_args, st_result) cus
+		= (TST atvs {st & st_result = st_result, st_args = st_args}, cus)  
+	
 	clean_up cui type cus
 		= abort ("clean_up Type (typesupport.icl): unknown type " ---> ("clean_up Type", type))
 				
 instance clean_up [a] | clean_up a
 where
 	clean_up cui l cus = mapSt (clean_up cui) l cus
+
+instance clean_up (a, b) | clean_up a & clean_up b
+where
+	clean_up cui (x, y) cus
+		# (x, cus) = clean_up cui x cus
+		# (y, cus) = clean_up cui y cus
+		= ((x, y), cus)
 
 cleanUpVariable _ TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cus_heaps.th_vars
@@ -378,6 +387,7 @@ where
 				_
 					-> (all_vars, var_env)
 
+/*
 	clean_up_arg_type cui at=:{at_type = TFA avars type, at_attribute} (all_exi_vars, cus)
 		# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
 		  (type, cus)			= clean_up cui type cus
@@ -385,13 +395,16 @@ where
 			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, (all_exi_vars, cus))
 			= ({ at & at_type = TFA avars type, at_attribute = at_attribute},
 					(all_exi_vars, { cus & cus_error = existentialError cus.cus_error, cus_exis_vars = [] }))
+*/
+
 	clean_up_arg_type cui at (all_exi_vars, cus)
 		# (at, cus) = clean_up cui at cus
-		  (cus_exis_vars, cus) = cus!cus_exis_vars
+		  (cus_exis_vars, cus) = cus!cus_exis_vars  
 		| isEmpty cus_exis_vars
 			= (at, (all_exi_vars, cus))
-			# (new_exi_vars, all_exi_vars, cus) = foldSt check_existential_var cus_exis_vars ([], all_exi_vars, cus)
-			= ({ at & at_type = TFA new_exi_vars at.at_type }, (all_exi_vars, { cus & cus_exis_vars = [] }))
+			= abort "typesupport.icl: RANKN: clean_up_arg\n"
+			//# (new_exi_vars, all_exi_vars, cus) = foldSt check_existential_var cus_exis_vars ([], all_exi_vars, cus)
+			//= ({ at & at_type = TFA new_exi_vars at.at_type }, (all_exi_vars, { cus & cus_exis_vars = [] }))
 	where
 		check_existential_var (var_number,var_attr) (exi_vars, all_vars, cus)
 			| isMember var_number all_vars
@@ -538,10 +551,13 @@ where
 		  (ct_cons_types, cus) = mapSt (mapSt (clean_up_arg_type cui)) ct_cons_types cus
 		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cus)
 	where
+	
+		/*
 		clean_up_arg_type cui at=:{at_type = TFA avars type, at_attribute} cus
 			# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
 			  (type, cus)			= clean_up cui type cus
 			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, cus)
+		*/
 		clean_up_arg_type cui at cus
 			= clean_up cui at cus
 
@@ -565,6 +581,7 @@ updateExpressionTypes {st_args,st_vars,st_result,st_attr_vars} st_copy type_ptrs
 	  th_vars = bindInstances st_result st_copy.st_result heaps.th_vars
 	= foldSt update_expression_type type_ptrs ({heaps & th_vars = th_vars}, expr_heap)
 where
+	/*
 	bind_instances_in_arg_type { at_type = TFA vars type1 } { at_type = TFA _ type2 } heaps
 		# heaps = foldSt clear_atype_var vars heaps
 		= { heaps & th_vars = bindInstances type1 type2 heaps.th_vars }
@@ -576,6 +593,7 @@ where
 				= attr_heap <:= (av_info_ptr, AVI_Empty)
 			clear_attribute _ attr_heap
 				= attr_heap
+	*/			
 	bind_instances_in_arg_type { at_type } atype2 heaps=:{th_vars}
 		= { heaps & th_vars = bindInstances at_type atype2.at_type th_vars }
 
@@ -621,8 +639,13 @@ instance bindInstances Type
 //..AA
 	bindInstances (TB _) (TB _) type_var_heap
 		= type_var_heap
-	bindInstances (TFA _ type1) (TFA _ type2) type_var_heap
-		= bindInstances type1 type2 type_var_heap
+	//bindInstances (TFA _ type1) (TFA _ type2) type_var_heap
+	//	= bindInstances type1 type2 type_var_heap
+		
+	bindInstances(TST atvs1 st1) (TST atvs2 st2) type_var_heap
+		// FIXME RANKN: st_context, st_attr_env, atvs, st_vars, st_attr_vars ?????
+		= bindInstances st1.st_result st2.st_result type_var_heap	
+		
 	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances (TV l1) (TV l2) type_var_heap)
 
@@ -752,6 +775,11 @@ where
 						-> (ok_type && ok_types, simplified_type, heaps)
 			_
 				-> 	(ok_types, CV type_var :@: types, heaps)
+				
+	substitute (TST atvs st) heaps
+	
+		= abort "substitute (TST st)\n" //(True, TST fresh_st, heaps)			
+				
 	substitute type heaps
 		= (True, type, heaps)
 
@@ -949,8 +977,14 @@ where
 		| equi_vars
 			= equiv types1 types2 heaps
 			= (False, heaps)
-	equiv (TFA vars1 type1) (TFA vars2 type2) heaps
-		= equiv type1 type2 heaps
+	//equiv (TFA vars1 type1) (TFA vars2 type2) heaps
+	//	= equiv type1 type2 heaps
+	
+	equiv (TST atvs1 st1) (TST atvs2 st2) heaps
+		# ok1 = length atvs1 == length atvs2
+		# (ok2, heaps) = equiv st1.st_result st2.st_result heaps	 
+		= (ok1 && ok2, heaps)
+		
 	equiv type1 type2 heaps
 		= (False, heaps)
 
@@ -1329,11 +1363,27 @@ where
 		# (file, opt_opt_beautifulizer) = writeType file opt_beautifulizer (form, t)
 		# file = file <<< ")" 
 		= (file, opt_beautifulizer)	
-//..AA		
+//..AA
+	/*		
 	writeType file opt_beautifulizer (form, TFA vars type)
 		 # (file, opt_beautifulizer) = writeType (file <<< "(A.") opt_beautifulizer (form, vars)
 		 # (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
 		 = (file <<< ")", opt_beautifulizer)
+	*/
+
+	writeType file opt_beautifulizer (form, TST atvs {st_vars, st_args, st_result, st_context, st_attr_env})
+		 # (file, opt_beautifulizer) = writeType (file <<< "(A.") opt_beautifulizer (form, atvs)
+		 # (file, opt_beautifulizer) = writeType (file <<< ": ") opt_beautifulizer (clearProperty form cBrackets, st_result)
+		 # (file, opt_beautifulizer) = case st_context of
+		 	[] -> (file, opt_beautifulizer)
+		 	_ -> writeType (file <<< " | ") opt_beautifulizer (form, st_context) 
+
+		 // RANKN FIXME: add code for writing attr inequalitites
+		 //# (file, opt_beautifulizer) = case st_attr_env of
+		 //	[] -> (file, opt_beautifulizer)
+		 //	_ -> writeType (file <<< ", ") opt_beautifulizer (form, st_attr_env) 
+		 = (file <<< ")", opt_beautifulizer)
+	
 	writeType file opt_beautifulizer (form, TQV varid)
 		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
@@ -1589,8 +1639,10 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 //..AA
 	get_ineqs_of_type (cv :@: args)
 		= get_ineqs_of_atype_list args
-	get_ineqs_of_type (TFA vars type)
-		= get_ineqs_of_type type
+	//get_ineqs_of_type (TFA vars type)
+	//	= get_ineqs_of_type type
+	get_ineqs_of_type (TST atvs st)
+		= abort "typesupport.icl: RANKN: get_ineqs_of_type\n"  // ?? Empty
 	get_ineqs_of_type _
 		= Empty
 
@@ -1783,9 +1835,13 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	anonymize_type (cv :@: args) th_attrs
 		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
 		= (cv :@: args, th_attrs)
-	anonymize_type (TFA vars type) th_attrs
-		# (type, th_attrs) = anonymize_type type th_attrs
-		= (TFA vars type, th_attrs)
+	//anonymize_type (TFA vars type) th_attrs
+	//	# (type, th_attrs) = anonymize_type type th_attrs
+	//	= (TFA vars type, th_attrs)
+	
+	anonymize_type (TST atvs st) th_attrs
+		= abort "RANKN: anonymize type not implemented\n" //(TST atvs st, th_attrs) // FIXME: RANKN
+			
 	anonymize_type x th_attrs
 		= (x, th_attrs)
 
@@ -1994,8 +2050,11 @@ instance performOnTypeVars Type
 //..AA
 	performOnTypeVars f (cv :@: at) st
 		= performOnTypeVars f cv (performOnTypeVars f at st)
-	performOnTypeVars f (TFA vars type) st
-		= performOnTypeVars f type st
+	//performOnTypeVars f (TFA vars type) st
+	//	= performOnTypeVars f type st
+	performOnTypeVars f (TST atvs {st_result}) st
+		// RANKN: shall we perform on st_context as well???
+		= performOnTypeVars f st_result st
 	performOnTypeVars f _ st
 		= st
 
@@ -2044,8 +2103,11 @@ instance performOnAttrVars Type
 //..AA
 	performOnAttrVars f (_ :@: at) st
 		= performOnAttrVars f at st
-	performOnAttrVars f (TFA vars type) st
-		= performOnAttrVars f type st
+	//performOnAttrVars f (TFA vars type) st
+	//	= performOnAttrVars f type st
+	performOnAttrVars f (TST atvs {st_result}) st
+		// RANKN: shall we perform on attr inequalitied as well ???
+		= performOnAttrVars f st_result st
 	performOnAttrVars f _ st
 		= st
 

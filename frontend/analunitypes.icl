@@ -303,8 +303,10 @@ signClassOfType (arg_type --> res_type) sign use_top_sign group_nr ci scs
 	  (res_class, _, scs) = signClassOfType res_type.at_type PositiveSign use_top_sign group_nr ci scs
 	= (sign *+ (arg_class + res_class), BottomSignClass, scs)
 
-signClassOfType (TFA vars type) sign use_top_sign group_nr ci scs
-	= signClassOfType type sign use_top_sign group_nr ci scs
+//signClassOfType (TFA vars type) sign use_top_sign group_nr ci scs
+//	= signClassOfType type sign use_top_sign group_nr ci scs
+signClassOfType (TST atvs {st_result}) sign use_top_sign group_nr ci scs
+	= signClassOfType st_result.at_type sign use_top_sign group_nr ci scs
 
 signClassOfType type _ _ _ _ scs
 	= (BottomSignClass, BottomSignClass, scs)
@@ -554,8 +556,10 @@ where
 	prop_class_of_type_list [] _ _ _ _ cumm_class pcs
 		= (cumm_class, pcs)
 
-propClassOfType (TFA vars type) group_nr ci pcs
-	= propClassOfType type group_nr ci pcs
+//propClassOfType (TFA vars type) group_nr ci pcs
+//	= propClassOfType type group_nr ci pcs
+propClassOfType (TST atvs {st_result}) group_nr ci pcs
+	= propClassOfType st_result.at_type group_nr ci pcs
 
 propClassOfType _ _ _ pcs
 	= (NoPropClass, NoPropClass, pcs)

@@ -3061,11 +3061,18 @@ where
 	expandSynTypes rem_annots common_defs type=:(TAS type_symb types _) ets
 		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
 // Sjaak 240801 ...
+	/*
 	expandSynTypes rem_annots common_defs tfa_type=:(TFA vars type) ets
 		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
 		| changed
 			= (True,TFA vars type, ets)
 			= (False,tfa_type, ets)
+	*/
+	expandSynTypes rem_annots common_defs tfa_type=:(TST atvs st=:{st_args, st_result}) ets
+		# (changed, (st_args, st_result), ets) = expandSynTypes rem_annots common_defs (st_args, st_result) ets	
+		| changed
+			= (True, TST atvs {st & st_args = st_args, st_result = st_result}, ets)
+			= (False, tfa_type, ets)			
 // ... Sjaak
 	expandSynTypes rem_annots common_defs type ets
 		= (False,type, ets)

@@ -392,8 +392,8 @@ where
 					| changed
 						= (True, [t0:ts], subst, ls)
 						= (False, ts0, subst, ls)
-	lift modules cons_vars (TFA vars type) subst ls
-		= abort "lift (TFA) (unitype.icl)"
+	lift modules cons_vars (TST atvs st) subst ls
+		= abort "lift (TST) (unitype.icl)"
 	lift modules cons_vars type subst ls
 		= (False, type, subst, ls)
 

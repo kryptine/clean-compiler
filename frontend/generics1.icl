@@ -2420,7 +2420,7 @@ where
 		#! (curry_st, th)	
 			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th 	
 		
-		#! curry_st = adjust_forall curry_st forall_atvs
+		//#! curry_st = adjust_forall curry_st forall_atvs
 				
 		= ((curry_st, fresh_gatvs), (inc arg_num, th, error))
 			//---> ("build_arg returns", fresh_gatvs, curry_st)		
@@ -2522,7 +2522,8 @@ instance foldType Type where
 		fold_type (TArrow1 t) st = foldType on_type on_atype t st
 		fold_type (_ :@: args) st = foldType on_type on_atype args st
 		fold_type (TB _) st = st
-		fold_type (TFA tvs type) st = foldType on_type on_atype type st
+		fold_type (TST atvs {st_args, st_result, st_context}) st 
+			= foldType on_type on_atype ((st_args, st_result), st_context) st
 		fold_type (GTV _) st = st
 		fold_type (TV _) st = st		
 		fold_type t st = abort "foldType: does not match\n" ---> ("type", t)
@@ -2596,9 +2597,11 @@ instance mapTypeSt Type where
 			#! (args, st) = mapTypeSt on_type_before on_atype_before on_type_after on_atype_after args st
 			= (cv :@: args, st)
 		map_type t=:(TB _) st = (t, st)	
-		map_type (TFA tvs type) st 
-			#! (type, st) = mapTypeSt on_type_before on_atype_before on_type_after on_atype_after type st
-			= (TFA tvs type, st)
+		map_type (TST atvs sym_type=:{st_args, st_result, st_context}) st 
+			#! (((st_args, st_result), st_context), st) 
+				= mapTypeSt on_type_before on_atype_before on_type_after on_atype_after ((st_args, st_result), st_context) st
+			# sym_type = { sym_type & st_args = st_args, st_result = st_result, st_context = st_context }
+			= (TST atvs sym_type, st)
 		map_type t=:(GTV _) st = (t, st)	
 		map_type t=:(TV _) st = (t, st)	
 		map_type t st
@@ -2690,29 +2693,27 @@ where
 	on_type (CV tv=:{tv_info_ptr} :@: args) th=:{th_vars}
 		#! (tv, th) = on_type_var tv th	
 		= (CV tv :@: args, th)
-	on_type (TFA atvs type) th
-		#! (fresh_atvs, th) = mapSt subst_atv atvs th
+	on_type (TST atvs st) th
+		#! (fresh_tvs, th_vars) = mapSt subst_type_var st.st_vars th.th_vars
+		#! (fresh_avs, th_attrs) = mapSt subst_attr_var st.st_attr_vars th.th_attrs
+		#! fresh_st = 
+			{ st 
+			& st_vars = fresh_tvs
+			, st_attr_vars = fresh_avs
+			}
+		# th = {th & th_vars = th_vars, th_attrs = th_attrs}	
+		# (fresh_atvs, th) = mapSt on_atv atvs th
+			with 
+				on_atv {atv_variable, atv_attribute=TA_Var av} th=:{th_attrs, th_vars}
+					# (atv_variable, th) = on_type_var atv_variable th
+					# (av, th) = on_attr_var av th 
+					= ({atv_variable = atv_variable, atv_attribute=TA_Var av}, th)			
+				on_atv {atv_variable, atv_attribute} th
+					# (atv_variable, th) = on_type_var atv_variable th
+					= ({atv_variable = atv_variable, atv_attribute = atv_attribute}, th)			
 		// the variables in the type will be substituted by
 		// the recursive call of mapType 
-		= (TFA fresh_atvs type, th)
-	where
-		subst_atv atv=:{atv_variable, atv_attribute}  th=:{th_vars, th_attrs} 
-			#! (atv_variable, th_vars) = subst_type_var atv_variable th_vars 
-			# (atv_attribute, th_attrs) = subst_attr atv_attribute th_attrs
-			=	( {atv & atv_variable = atv_variable, atv_attribute = atv_attribute}
-				, {th & th_vars = th_vars, th_attrs = th_attrs})
-		subst_attr (TA_Var av=:{av_info_ptr}) th_attrs
-			# (av_info, th_attrs) = readPtr av_info_ptr th_attrs
-			= case av_info of
-				AVI_Empty
-					# (av, th_attrs) = subst_attr_var av th_attrs
-					-> (TA_Var av, th_attrs)
-				AVI_AttrVar av_info_ptr
-					-> (TA_Var {av & av_info_ptr = av_info_ptr}, th_attrs)						   
-		subst_attr TA_Unique th_attrs 
-			= (TA_Unique, th_attrs)
-		subst_attr TA_Multi th_attrs 
-			= (TA_Multi, th_attrs)
+		= (TST fresh_atvs fresh_st, th)
 	on_type type th 
 		= (type, th)
 	
@@ -2761,9 +2762,9 @@ where
 		= case tv_info of
 			TVI_Empty 	-> th
 			_ 			-> (abort "CV tv_info not empty\n") --->(tv, tv_info)			
-	on_type (TFA atvs type) th=:{th_attrs, th_vars}		
-		#! th_attrs = foldSt on_av [av \\ {atv_attribute=TA_Var av} <- atvs] th_attrs
-		#! th_vars = foldSt on_tv [atv_variable\\{atv_variable} <- atvs] th_vars
+	on_type (TST atvs st) th=:{th_attrs, th_vars}		
+		#! th_attrs = foldSt on_av st.st_attr_vars th_attrs
+		#! th_vars = foldSt on_tv st.st_vars th_vars
 		= {th & th_attrs = th_attrs, th_vars = th_vars }
 	where 		
 		on_av av th_attrs 
@@ -2891,9 +2892,9 @@ where
 	clear_type (TV tv) th = clear_type_var tv th	
 	clear_type (GTV tv) th = clear_type_var tv th
 	clear_type (CV tv :@: _) th = clear_type_var tv th
-	clear_type (TFA atvs type) th
-		#! th = foldSt clear_attr [atv_attribute \\ {atv_attribute} <- atvs] th
-		#! th = foldSt clear_type_var [atv_variable \\ {atv_variable} <- atvs] th
+	clear_type (TST atvs st) th
+		#! th = foldSt clear_attr_var st.st_attr_vars th
+		#! th = foldSt clear_type_var st.st_vars th
 		= th
 		 	
 	clear_type _ th = th
@@ -2935,10 +2936,8 @@ where
 	collect_type_var (TV tv) st = add_type_var tv st
 	collect_type_var (GTV tv) st = add_type_var tv st
 	collect_type_var (CV tv :@: _) st = add_type_var tv st
-	collect_type_var (TFA forall_atvs type) (tvs, avs, th_vars) 
-		#! forall_tvs = [atv_variable\\{atv_variable}<-forall_atvs]
-		#! forall_avs = [av \\ {atv_attribute=TA_Var av}<-forall_atvs]
-		= (tvs -- forall_tvs, avs -- forall_avs, th_vars)
+	collect_type_var (TST atvs st) (tvs, avs, th_vars) 
+		= (tvs -- st.st_vars, avs -- st.st_attr_vars, th_vars)
 				//---> ("collectTypeVarsAndAttrVars TFA", tvs, forall_tvs, tvs -- forall_tvs)
 	collect_type_var t st = st
 		

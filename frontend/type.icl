@@ -111,10 +111,22 @@ where
 			= (False, type, subst)
 //..AA					
 
-	arraySubst tfa_type=:(TFA vars type) subst
-		# (changed, type, subst) = arraySubst type subst
+	arraySubst tfa_type=:(TST atvs st) subst
+	
+		# (changed, ((st_args, st_result), st_context), subst) 
+			= arraySubst ((st.st_args, st.st_result), st.st_context) subst
 		| changed
-			= (changed, TFA vars type, subst)
+			# new_st = 
+				{ st 
+				& st_args = st_args
+				, st_result = st_result
+				, st_context = st_context 
+				// RANKN:
+				// , st_vars = ... ???
+				// , st_attr_vars = ... ???
+				// , st_attr_env = ... ???
+				}
+			= (changed, TST atvs new_st, subst)
 			= (False, tfa_type, subst)
 
 	arraySubst type subst
@@ -613,11 +625,55 @@ where
 		# (arg_type, type_heaps) = freshCopy arg_type type_heaps
 		= (TArrow1 arg_type, type_heaps)
 //..AA		
+	/*
 	freshCopy (TFA vars type) type_heaps
 		= freshCopyOfTFAType vars type type_heaps
+	*/	
+	freshCopy (TST atvs st) type_heaps
+		= freshCopyOfTST atvs st type_heaps	
+		
 	freshCopy type type_heaps
 		= (type, type_heaps)
 
+freshCopyOfTST atvs st=:{st_args, st_result, st_context, st_attr_env} type_heaps
+	# (fresh_atvs, type_heaps) = foldSt bind_var_and_attr atvs ([], type_heaps)
+	# (fresh_st_args, type_heaps) = freshCopy st_args type_heaps
+	# (fresh_st_result, type_heaps) = freshCopy st_result type_heaps
+	# type_heaps = foldSt clear_binding_of_var_and_attr fresh_atvs type_heaps	
+	# fresh_st = 
+		{ st 
+		& st_vars = [ atv_variable \\ {atv_variable} <- atvs]
+		, st_attr_vars = [ av \\ {atv_attribute=TA_Var av} <- atvs ]
+		, st_args = fresh_st_args
+		, st_result = fresh_st_result
+		// RANKN
+		// , st_context
+		// , st_attr_env = ...
+		}
+	= (TST fresh_atvs fresh_st, type_heaps) 
+	where
+		bind_var_and_attr atv=:{atv_attribute, atv_variable = tv=:{tv_info_ptr}} (fresh_vars, type_heaps=:{th_vars,th_attrs})
+			# (fresh_vars, th_attrs) = bind_attr atv_attribute atv (fresh_vars, th_attrs)
+			= (fresh_vars, { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (TV tv)), th_attrs = th_attrs })
+
+		bind_attr var=:(TA_Var {av_info_ptr}) atv (fresh_vars, attr_heap)
+			# (av_info, attr_heap) = readPtr av_info_ptr attr_heap
+			= case av_info of
+				AVI_Empty
+					-> ([atv : fresh_vars], attr_heap <:= (av_info_ptr, AVI_Attr var))
+				AVI_Attr (TA_TempVar _)
+					-> ([{ atv & atv_attribute = TA_Multi } : fresh_vars], attr_heap)
+		bind_attr attr atv (fresh_vars, attr_heap)
+			= ([atv : fresh_vars], attr_heap)
+
+		clear_binding_of_var_and_attr {atv_attribute, atv_variable = tv=:{tv_info_ptr}} type_heaps=:{th_vars,th_attrs}
+				= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Empty), th_attrs = clear_attr atv_attribute th_attrs }
+	
+		clear_attr var=:(TA_Var {av_info_ptr}) attr_heap
+			= attr_heap <:= (av_info_ptr, AVI_Empty)
+		clear_attr attr attr_heap
+			= attr_heap
+/*
 freshCopyOfTFAType vars type type_heaps
 	# (fresh_vars, type_heaps) = foldSt bind_var_and_attr vars ([], type_heaps)
 	  (type, type_heaps) = freshCopy type type_heaps
@@ -646,7 +702,7 @@ freshCopyOfTFAType vars type type_heaps
 			= attr_heap <:= (av_info_ptr, AVI_Empty)
 		clear_attr attr attr_heap
 			= attr_heap
-
+*/
 
 freshExistentialVariables type_variables var_store attr_store type_heaps
 	= foldSt fresh_existential_variable type_variables ([], var_store, attr_store, type_heaps) 
@@ -855,16 +911,19 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 			# (arg_types, type_heaps) = mapSt fresh_arg_type arg_types type_heaps
 			= (arg_types, (var_store, attr_store, exis_variables, type_heaps))
 		where
+			/*
 			fresh_arg_type at=:{at_attribute, at_type = TFA vars type} type_heaps
 				# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
 				  (at_type, type_heaps)			= freshCopyOfTFAType vars type { type_heaps & th_attrs = th_attrs }
 				= ({ at &  at_attribute = fresh_attribute, at_type = at_type }, type_heaps)
+			*/
 			fresh_arg_type at type_heaps
 				= freshCopy at type_heaps
 
 		fresh_arg_types (Yes pos) arg_types (var_store, attr_store, exis_variables, type_heaps)
 			= mapSt (fresh_arg_type pos) arg_types (var_store, attr_store, exis_variables, type_heaps)
 		where
+			/*
 			fresh_arg_type pos at=:{at_attribute, at_type = TFA vars type} (var_store, attr_store, exis_variables, type_heaps)
 				# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
 				# (var_store, attr_store, new_exis_variables, bound_attr_vars, type_heaps)
@@ -874,6 +933,7 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 				  							  th_attrs = foldSt clear_binding_of_attr_var bound_attr_vars type_heaps.th_attrs }
 				= ({ at &  at_attribute = fresh_attribute, at_type = fresh_type },
 						(var_store, attr_store, addToExistentialVariables pos new_exis_variables exis_variables, type_heaps))
+			*/
 			fresh_arg_type _ at (var_store, attr_store, exis_variables, type_heaps)
 				# (fresh_at, type_heaps) = freshCopy at type_heaps
 				= (fresh_at, (var_store, attr_store, exis_variables, type_heaps))
@@ -1791,8 +1851,9 @@ makeBase fun_or_cons_ident arg_nr [{fv_name, fv_info_ptr} : vars] [type : types]
 		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type (Yes (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap)
 		= makeBase fun_or_cons_ident (arg_nr+1) vars types (addToBase fv_info_ptr type No ts_var_heap)
 
-addToBase info_ptr atype=:{at_type = TFA atvs type} optional_position ts_var_heap 
-	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type} optional_position)
+// FIXME: RANKN
+//addToBase info_ptr atype=:{at_type = TFA atvs type} optional_position ts_var_heap 
+//	= ts_var_heap  <:= (info_ptr, VI_FAType atvs { atype & at_type = type} optional_position)
 addToBase info_ptr type optional_position ts_var_heap
 	= ts_var_heap  <:= (info_ptr, VI_Type type optional_position)
 	
@@ -1983,8 +2044,9 @@ where
 
 	add_universal_vars_to_type [] at
 		= at
-	add_universal_vars_to_type uni_vars at=:{at_type}
-		= { at & at_type = TFA uni_vars at_type }
+	// FIXME: RANKN	
+	//add_universal_vars_to_type uni_vars at=:{at_type}
+	//	= { at & at_type = TFA uni_vars at_type }
 
 specification_error type type1 err
 	# err = errorHeading "Type error" err

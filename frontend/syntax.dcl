@@ -913,7 +913,7 @@ cNonRecursiveAppl	:== False
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
-			|	TFA [ATypeVar] Type				/* Universally quantified types */
+			|	TST [ATypeVar] SymbolType		/* Universally quantified types */
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar

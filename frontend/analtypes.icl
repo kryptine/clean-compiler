@@ -465,6 +465,7 @@ where
 //			  {uki_kind_heap, uki_error} = unifyKinds tk KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
 			  (tks, is_non_coercible, conds_as) = check_type_list kind_var modules form_tvs types conds_as
 			= (KI_Arrow tk tks, is_non_coercible || (type_props bitand cIsNonCoercible <> 0), conds_as)
+/*
 	analTypes has_root_attr modules form_tvs (TFA vars type) (conds, as=:{as_type_var_heap,as_kind_heap})
 		# (as_type_var_heap, as_kind_heap) = new_local_kind_variables vars as_type_var_heap as_kind_heap
 		= analTypes has_root_attr modules form_tvs type (conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap})
@@ -477,6 +478,37 @@ where
 			new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
 				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 				= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+*/
+	analTypes has_root_attr modules form_tvs (TST atvs {st_vars, st_args, st_result}) (conds, as=:{as_type_var_heap,as_kind_heap})
+		# (as_type_var_heap, as_kind_heap) = new_local_kind_variables st_vars as_type_var_heap as_kind_heap
+		# conds_as = (conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap})
+		# (arg_kinds, arg_propss, conds_as) = anal_types st_args conds_as
+			with 
+				anal_types [] conds_as = ([], [], conds_as)
+				anal_types [type:types] conds_as 
+					# (kind, prop, conds_as) = analTypes has_root_attr modules form_tvs type conds_as 
+					# (kinds, props, conds_as) = anal_types types conds_as 
+					= ([kind:kinds], [prop:props], conds_as)
+		# (res_kind, res_props, conds_as) = analTypes has_root_attr modules form_tvs st_result conds_as
+		# (conds, as=:{as_error,as_kind_heap}) = cons_as
+		# uki = {uki_kind_heap = as_kind_heap, uki_error = as_error}		
+		# uki = foldSt (unifyKinds KI_Const) arg_kinds uki  
+		# uki = unifyKinds res_kind KI_Const uki		
+		# {uki_kind_heap, uki_error} = uki
+		# cons_as = (conds, { as & as_error = uki_error, as_kind_heap = uki_kind_heap})
+		# type_props = foldSt combineCoercionProperties arg_propss res_props 
+		# type_props = if has_root_attr (type_props bitor cIsNonCoercible) type_props		
+		= (KI_Const, type_props, conds_as)
+	where
+		new_local_kind_variables :: [TypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
+		new_local_kind_variables type_vars type_var_heap as_kind_heap
+			= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
+		where
+			new_kind :: !TypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
+			new_kind {tv_info_ptr} (type_var_heap, kind_heap)
+				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+				= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+	
 	analTypes has_root_attr modules form_tvs type conds_as
 		= (KI_Const, cIsHyperStrict, conds_as)
 

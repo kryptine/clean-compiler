@@ -1269,8 +1269,9 @@ where
 
 		add_universal_vars_to_type [] at
 			= at
-		add_universal_vars_to_type uni_vars at=:{at_type}
-			= { at & at_type = TFA uni_vars at_type }
+		// FIXME: RANKN	
+		//add_universal_vars_to_type uni_vars at=:{at_type}
+		//	= { at & at_type = TFA uni_vars at_type }
 
 		
 		convert_local_dynamics loc_dynamics state
@@ -1352,10 +1353,12 @@ where
 				-> (type_code, (tci,var_heap,error))
 			_
 				-> abort ("toTypeCodeExpression (TV)" ---> ((ptrToInt tv_info_ptr, tv_name)))
+	/* FIXME: RANKN
 	toTypeCodeExpression symb_name (TFA vars type) (tci=:{tci_type_var_heap}, var_heap, error)
 		# (new_vars, (tci_type_var_heap, var_heap)) = newTypeVariables vars (tci_type_var_heap, var_heap)
 		  (type_code, tci) = toTypeCodeExpression symb_name type ({tci & tci_type_var_heap = tci_type_var_heap}, var_heap, error)
 		= (TCE_UniType new_vars type_code, tci)
+	*/
 
 instance toTypeCodeExpression AType
 where
