@@ -3,6 +3,7 @@ implementation module supercompile
 // $Id$
 
 import convert
+import expand
 import newtest
 import cli
 import coreclean
@@ -48,7 +49,9 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
      // Do the job!
   #  logfile = logfile <<< "Start fullsymred." <<< nl
   #  symredresults = fullsymred fresh_symbols sucl_module
-  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults." <<< nl) symredresults
+  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults before macro expansion" <<< nl) symredresults
+  #  symredresults = expand_macros suclheap (flip isMember (exports sucl_module)) symredresults
+  #  logfile = sfoldl (<<<) (logfile<<<"All symredresults after macro expansion" <<< nl) symredresults
   #  n_symredresults = length symredresults
   #  logfile = logfile <<< "Number of generated functions: " <<< n_symredresults <<< nl
      // Create and fill new fundef array
@@ -63,5 +66,3 @@ supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression
 = logfile $ (fundefs6,var_heap`,expression_heap`,generated_range,predefs2,logfile0)
 
 mkglobal gmod gob = {glob_module = gmod, glob_object = gob}
-
-showbody (sym,rules) = "("+++toString sym+++","+++listToString rules+++")"
