@@ -308,7 +308,7 @@ beDeclareNodeId number lhsOrRhs name
 beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
 beFlatType
-	:==	beFunction2 BEFlatType
+	:==	beFunction3 BEFlatType
 beNoTypeVars
 	:==	beFunction0 BENoTypeVars
 beTypeVars
@@ -783,7 +783,7 @@ defineTypes moduleIndex constructors selectors types
 
 convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
 convertTypeLhs moduleIndex typeIndex attribute args
-	=	beFlatType (beTypeSymbol typeIndex moduleIndex) (convertTypeVars args)
+	=	beFlatType (beTypeSymbol typeIndex moduleIndex) (convertAttribution attribute) (convertTypeVars args)
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
 convertTypeVars typeVars
@@ -812,7 +812,7 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 				(beConstructorSymbol moduleIndex constructorIndex)
 				(convertSymbolTypeArgs constructorType)
 				be
-	=	appBackEnd (BERecordType moduleIndex flatType constructorTypeNode fields) be
+	=	appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
 	where
 		constructorIndex
 			=	rt_constructor.ds_index
@@ -1358,20 +1358,14 @@ convertAttribution attr
 convertAnnotTypeNode :: AType -> BEMonad BETypeNodeP
 convertAnnotTypeNode {at_type, at_attribute}
 	=	convertTypeNode at_type
-	:-	beAnnotateTypeNode c_annot
-	:-	beAttributeTypeNode c_attrib
-	where
-		c_annot = convertAnnotation AN_None
-		c_attrib = convertAttribution at_attribute
+	:-	beAnnotateTypeNode (convertAnnotation AN_None)
+	:-	beAttributeTypeNode (convertAttribution at_attribute)
 
 convertAnnotAndTypeNode :: Annotation AType -> BEMonad BETypeNodeP
 convertAnnotAndTypeNode at_annotation {at_type, at_attribute}
 	= convertTypeNode at_type
-	:-	beAnnotateTypeNode c_annot
-	:-	beAttributeTypeNode c_attrib
-	where
-		c_annot = convertAnnotation at_annotation
-		c_attrib = convertAttribution at_attribute
+	:-	beAnnotateTypeNode (convertAnnotation at_annotation)
+	:-	beAttributeTypeNode (convertAttribution at_attribute)
 
 convertTypeNode :: Type -> BEMonad BETypeNodeP
 convertTypeNode (TB (BT_String type))

@@ -2733,7 +2733,7 @@ BENoTypeVars (void)
 } /* BENoTypeVars */
 
 BEFlatTypeP
-BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
+BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments)
 {
 	FlatType	flatType;
 	int			i;
@@ -2749,7 +2749,7 @@ BEFlatType (BESymbolP symbol, BETypeVarListP arguments)
 
 	flatType->ft_cons_vars	= NULL;	/* used in PrintType */
 
-	flatType->ft_attribute = NoUniAttr;
+	flatType->ft_attribute = (AttributeKind) attribution;;
 
 	return (flatType);
 } /* BEFlatType */
@@ -2796,7 +2796,7 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 } /* BEAlgebraicType */
 
 void
-BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields)
+BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields)
 {
 	int					nFields;
 	Types				type;
@@ -2843,7 +2843,7 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEF
 	sdef->sdef_type			= type;
 	sdef->sdef_arity		= constructorType->type_node_arity;
 
-	sdef->sdef_boxed_record	= False;
+	sdef->sdef_boxed_record	= is_boxed_record;
 	
 	// +++ change this
 	{
