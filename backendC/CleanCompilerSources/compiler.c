@@ -18,9 +18,7 @@
 	extern DumpProfile ();
 #endif
 
-#ifdef _STANDALONE_
 char *CurrentFilePath;
-#endif
 
 static Bool RemoveExtension (char *name)
 {
@@ -45,9 +43,8 @@ static void ExecCompiler (char *fname,char *output_file_name)
 	ImpMod imod;
 	
 /*	PrintVersion (); */
-	 
+
  	if (fname){	
-#ifdef _STANDALONE_
 		Bool hadext;
 		char *p;
 		
@@ -56,15 +53,14 @@ static void ExecCompiler (char *fname,char *output_file_name)
 		hadext = RemoveExtension (CurrentFilePath);
 
 		for (p=CurrentFilePath; *p!='\0'; ++p)
-# if defined (_MAC_) || defined (_MACUSER_)
+#if defined (_MAC_)
 			if (*p == ':')
-# elif defined (_WINDOWS_) || defined (OS2)
+#elif defined (_WINDOWS_) || defined (OS2)
 			if (*p == '\\')
-# else
+#else
 			if (*p == '/')
-# endif
-				fname = p+1;
 #endif
+				fname = p+1;
 		
 		/* Parse and check */
 		if (! (imod = ParseAndCheckImplementationModule (fname)))
@@ -95,10 +91,8 @@ static void ExecCompiler (char *fname,char *output_file_name)
 #endif
 			CodeGeneration (imod, fname);
 
-#ifdef _STANDALONE_
 		if (hadext)
 			AddExtension (CurrentFilePath);
-#endif
 	} else
 		CmdError ("No source file specified");
 }
@@ -124,11 +118,7 @@ Bool Compile (char *fname,char *output_file_name)
 
 	if (setjmp (ExitEnv)==0){
 		InitCompiler ();
-#ifdef _MACUSER_
-		ExecCompiler (fname,NULL);
-#else
 		ExecCompiler (fname,output_file_name);
-#endif
 	} else
 		CompilerError = True;
 

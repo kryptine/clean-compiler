@@ -13,21 +13,13 @@
 
 #if defined (applec) || (defined (__MWERKS__) && !defined (_X86_)) || defined (__MRC__)
 #	define _MAC_
-#	define _STANDALONE_
 #	define __ppc__
-
-#elif defined (THINK_C)
-#	define _MACUSER_
-#else
-#	define _STANDALONE_
 #endif
 
 #define _DEBUG_
 
 #if defined (_MAC_)
 # include "mac.h"
-#elif defined (_MACUSER_)
-# include "macuser.h"
 #elif defined (_SUN_)
 # include "sun.h"
 #elif defined (OS2)
@@ -56,27 +48,12 @@ extern File FOpenWithFileTime (char *file_name,FileKind kind, char *mode,FileTim
 extern int FDelete (char *fname, FileKind kind);
 extern int FClose (File f);
 
-#ifdef _MACUSER_
-/* const declarations required */
-	extern int FPrintF (File f, const char *fmt,...);
-	extern int FPutS (const char *s, File f);
-	extern size_t FWrite (const void *ptr, size_t size, size_t count, File f);
-#else
 extern int FPutS (char *s, File f);
 extern size_t FWrite (void *ptr, size_t size, size_t count, File f);
-# ifdef _VARARGS_
+#ifdef _VARARGS_
 extern int FPrintF (File f, char *fmt,...);
-# else
+#else
 extern int FPrintF (); /* (File w, char *fmt,...) */
-# endif
-#endif
-
-#if defined (_MACUSER_)
-	extern File StdOut;
-	extern File StdError;
-	extern File StdVerboseH;
-	extern File StdVerboseL;
-	extern File StdListTypes;
 #endif
 
 #ifndef __ppc__

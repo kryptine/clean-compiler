@@ -35,7 +35,6 @@ static void error_in_function (char *m)
 	ErrorInCompiler ("instructions.c",m,"");
 }
 
-#ifdef _STANDALONE_
 /* also defined in project.c, only needed for stand alone compiler */
 
 #define N_DoDebug				0
@@ -77,11 +76,6 @@ static void ConvertOptionsToString (CompilerOptions options,char *optstring)
 	optstring[N_System]               = '0';
 	optstring[NR_OPTIONS]             = '\0';
 }
-#else
-# define N_System				8
-# include "cginterface.t"
-# include "project.h"
-#endif
 
 #define D_PREFIX "d"
 #define N_PREFIX "n"
@@ -3284,9 +3278,6 @@ void GenDepend (char *modname
 #endif
 				)
 {
-#ifndef _STANDALONE_
-	AddDependency (modname);
-#endif
 	put_directive_ (Ddepend);
 	FPrintF (OutFile, "\"%s\"",modname);
 
@@ -3378,10 +3369,7 @@ void InitFileInfo (ImpMod imod)
 	SymbDef start_sdef;
 	
 	start_sdef=imod->im_start;
-	
-#ifndef _STANDALONE_
-	MakeOptionsFromCurrentOptions (& opts);
-#endif
+
 	ConvertOptionsToString (opts,option_string);
 
 	if (imod->im_def_module!=NULL && imod->im_def_module->dm_system_module)
@@ -3389,9 +3377,7 @@ void InitFileInfo (ImpMod imod)
 
 	put_first_directive_ (Dcomp);
 	FPrintF (OutFile, "%d %s", VERSION,option_string);
-#ifndef _STANDALONE_
-	AddVersionAndOptions (VERSION, opts);
-#endif
+
 	put_directive_ (Dcode);
 	FPrintF (OutFile, "%7ld %7ld %7ld", (long) 0, (long) 0, (long) 0);
 	
