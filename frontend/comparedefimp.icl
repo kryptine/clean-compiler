@@ -907,6 +907,11 @@ e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_OverloadedFunction dcl_glob_i
 					ec_state
 	= continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
 													ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_Macro dcl_glob_index}
+					icl_app_symb=:{symb_kind=SK_Macro icl_glob_index}
+					ec_state
+	= continuation_for_possibly_twice_defined_funs dcl_app_symb dcl_glob_index icl_app_symb icl_glob_index
+													ec_state
 e_corresponds_app_symb {symb_name=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index}
 						{symb_name=icl_symb_name, symb_kind=SK_Constructor icl_glob_index}
 						ec_state
