@@ -1435,10 +1435,12 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 
 	| not cs.cs_error.ea_ok
 		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file /* TD */, [])
-	# (imported_module_numbers, dcl_modules)
+	# (imported_module_numbers_of_main_dcl_mod, dcl_modules)
+			= dcl_modules![main_dcl_module_n].dcl_imported_module_numbers
+	  (imported_module_numbers, dcl_modules)
 	  		= foldSt compute_used_module_nrs
 			  		expl_imp_indices
-	  				(addNr main_dcl_module_n (addNr cPredefinedModuleIndex EndNumbers),
+	  				(addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod,
 						dcl_modules)
 
 	  dcl_modules = add_function_conversion_table dcl_to_icl_function_conversions main_dcl_module_n dcl_modules
