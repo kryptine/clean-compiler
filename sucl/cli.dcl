@@ -7,6 +7,7 @@ from strat import Strategy
 from rule import Rule
 from graph import Graph
 from StdOverloaded import ==
+from StdFile import <<<
 
 // Transitive necessities
 
@@ -29,3 +30,5 @@ mkcli ::
     [(SuclTypeSymbol,[SuclSymbol])]
     [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
  -> Cli
+
+instance <<< Cli

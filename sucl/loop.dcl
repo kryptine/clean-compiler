@@ -9,6 +9,8 @@ from history import HistoryAssociation,HistoryPattern
 from rule import Rgraph,Rule
 from graph import Graph
 from StdOverloaded import ==
+from StdFile import <<<
+from StdString import toString
 
 from strat import Substrategy,Subspine   // for Strategy
 from trace import History,Transformation // for Trace
@@ -24,6 +26,9 @@ loop
  |  == sym
  &  == var
  &  == pvar
+ &  toString sym    // Debugging
+ &  toString var    // Debugging
+ &  <<< var         // Debugging
 
 initrule
  :: ![var]

@@ -174,9 +174,10 @@ where (<<<) file srr
              <<< "Task expression: " <<< ((srr.srr_task_expression <--- "newtest.<<<(Symredresult).srr_task_expression ends") ---> "newtest.<<<(Symredresult).srr_task_expression begins") <<< nl
              <<< "Assigned symbol: " <<< toString (srr.srr_assigned_symbol) <<< nl
              <<< "Strictness: " <<< srr.srr_strictness <<< nl
-             <<< "Type rule: ..." <<< nl
+             //<<< "Type rule: ..." <<< nl
              <<< srr.srr_trace <<< nl
-             //<<< "Function definition: ..." <<< nl
+             //<<< "Function definition:" <<< nl
+             //<<< srr.srr_function_def
              <<< "Areas:" <<< nl
              writeareas srr.srr_areas
              <<< "==[END]==" <<< nl
@@ -307,7 +308,7 @@ fullsymred freshsymbols cli
          generate result = (map canonise` (getareas result) <--- "newtest.fullsymred.generate begins") ---> "newtest.fullsymred.generate begins"
          process area = (symredarea foldarea` cli area <--- "newtest.fullsymred.process ends") ---> "newtest.fullsymred.process begins"
 
-         foldarea` = ((id (foldarea (labelarea` o canonise`))) <--- "newtest.fullsymred.foldarea` ends") ---> "newtest.fullsymred.foldarea` begins"
+         foldarea` = ((foldarea (labelarea` o canonise`)) <--- "newtest.fullsymred.foldarea` ends") ---> "newtest.fullsymred.foldarea` begins"
          labelarea` = (labelarea (map getinit results) freshsymbols <--- "newtest.fullsymred.labelarea` ends") ---> "newtest.fullsymred.labelarea` begins"
          canonise` = (canonise (typerule cli) suclheap <--- "newtest.fullsymred.canonise` ends") ---> "newtest.fullsymred.canonise` begins"
 

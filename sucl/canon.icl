@@ -114,9 +114,9 @@ localheap =: [0..]
 
 foldarea :: ((Rgraph sym var) -> sym) (Rgraph sym var) -> Node sym var | == var
 foldarea label rgraph
- = ((id (labelrgraph,foldsingleton single nosingle rgraph)) <--- "canon.foldarea ends") ---> "canon.foldarea begins"
-   where single root sym args = args
-         nosingle = snd (graphvars (rgraphgraph rgraph) [rgraphroot rgraph])
+ = (((labelrgraph<---"canon.foldarea.labelrgraph begins")--->"canon.foldarea.labelrgraph ends",(foldsingleton single nosingle rgraph<---"canon.foldarea.foldsingleton ends")--->"canon.foldarea.foldsingleton begins") <--- "canon.foldarea ends") ---> "canon.foldarea begins"
+   where single root sym args = map (\arg->(arg<---"newfold.foldarea.single.arg begins")--->"newfold.foldarea.single.arg ends") args
+         nosingle = map (\arg->(arg<---"newfold.foldarea.nosingle.arg begins")--->"newfold.foldarea.nosingle.arg ends") (snd (graphvars (rgraphgraph rgraph) [rgraphroot rgraph]))
          labelrgraph = (label rgraph <--- "canon.foldarea.labelrgraph ends") ---> "canon.foldarea.labelrgraph begins"
 
 /*

@@ -440,11 +440,11 @@ stc_funcdefs ::
     , .{#FunDef}        // Converted function definitions
     )
 
-stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs
+stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs oldfundefs0
 = ((exprheap1,varheap1,new_fundefs)<---"convert.stc_funcdefs ends")--->"convert.stc_funcdefs begins"
-  where new_fundef_limit = foldr max 0 [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
+  where new_fundef_limit = foldr max n_oldfundefs [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
         (exprheap1,varheap1,new_fundefs)
-        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs initialarray)
+        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 srrs (copy_oldfuns oldfundefs1 initialarray)
         initialarray = {nofundef i\\i<-[0..new_fundef_limit-1]}
         nofundef funindex
         = { fun_symb     = noident
@@ -471,11 +471,15 @@ stc_funcdefs stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varhe
           , fi_dynamics    = []
           , fi_properties  = 0
           }
+        (n_oldfundefs,oldfundefs1) = usize oldfundefs0
 
-copy_oldfuns srcfundefs dstfundefs
-= ((id (foldlArrayStWithIndex copyone srcfundefs dstfundefs))<---"convert.copy_oldfuns ends")--->"convert.copy_oldfuns begins"
+copy_oldfuns srcfundefs0 dstfundefs0
+= (foldlArrayStWithIndex copyone srcfundefs1 dstfundefs1<---"convert.copy_oldfuns ends")--->sizes
   where copyone i srcfundef dstfundefs
         = ({dstfundefs & [i]=srcfundef} <--- ("convert.copy_oldfuns.copyone "+++toString i+++" ends")) ---> ("convert.copy_oldfuns.copyone "+++toString i+++" begins")
+        (srcsize,srcfundefs1) = usize srcfundefs0
+        (dstsize,dstfundefs1) = usize dstfundefs0
+        sizes = "convert.copy_oldfuns begins (#srcfundefs="+++toString srcsize+++" #dstfundefs="+++toString dstsize+++")"
 
 store_newfuns stringtype dcl_mods main_dcl_module_n firstnewindex exprheap0 varheap0 [] fundefs0
 = (exprheap0,varheap0,fundefs0)<---"convert.store_newfuns ends (no more srrs)"

@@ -11,7 +11,7 @@ import rule
 import graph
 import pfun
 import basic
-from general import Yes,No,--->
+from general import Yes,No
 import StdEnv
 
 /*
@@ -224,11 +224,14 @@ loop
  |  == sym
  &  == var
  &  == pvar
+ &  toString sym    // Debugging
+ &  toString var    // Debugging
+ &  <<< var         // Debugging
 
 loop strategy matchable (initheap,rule)
-= maketrace inithistory initfailinfo initinstdone initstricts initsroot initsubject initheap
-
-  where maketrace history failinfo instdone stricts sroot subject heap
+= result
+  where result = maketrace inithistory initfailinfo initinstdone initstricts initsroot initsubject initheap
+        maketrace history failinfo instdone stricts sroot subject heap
         = Trace stricts (mkrule sargs sroot subject) answer history transf
           where answer = makernfstrategy history (strategy matchable`) rnfnodes sroot subject
                 transf = transform sroot sargs answer maketrace history failinfo instdone stricts sroot subject heap

@@ -110,6 +110,9 @@ fullfold ::
  |  == sym
  &  == var
  &  == pvar
+ &  toString var
+ &  <<< var
+ &  toString sym
 
 fullfold trc foldarea fnsymbol trace
 | recursive ---> "newfold.fullfold begins"
@@ -137,30 +140,36 @@ recurse ::
  |  == sym
  &  == var
  &  == pvar
+ &  toString var
+ &  <<< var
+ &  toString sym
 
 recurse foldarea fnsymbol
-= (f ([],[]) <--- "newfold.recurse ends") ---> "newfold.recurse begins"
-  where f newhisthist (Trace stricts rule answer history (Reduce reductroot trace))
-        | isEmpty pclosed && superset popen ropen
-          = f (newhist`,newhist`) trace
+= ((f--->"newfold.recurse.f begins from newfold.recurse") ([],[]) <--- "newfold.recurse ends") ---> "newfold.recurse begins"
+  where f newhisthist trace
+        | (trace--->trace) $ False
+          = error "shouldn't happen"
+        f newhisthist (Trace stricts rule answer history (Reduce reductroot trace))
+        | (isEmpty (pclosed--->"pclosed for isEmpty")--->"f: Reduce: isEmpty?") && (superset (popen--->"popen for superset") (ropen--->"ropen for superset")--->"f: Reduce: superset?")
+          = ((f--->"newfold.recurse.f begins (from Reduce)") (newhist`,newhist`) trace <--- "newfold.recurse.f ends (valid Reduce)") ---> "f: Reduce"
             where rargs = arguments rule; rroot = ruleroot rule; rgraph = rulegraph rule
-                  (pclosed,popen) = graphvars rgraph rargs
-                  (_,ropen) = graphvars rgraph [rroot]
-                  newhist` = [(rroot,rgraph):newhist]
-                  (newhist,hist) = newhisthist
+                  (pclosed,popen) = graphvars (rgraph--->"rgraph for (pclosed,popen)") (rargs--->"rargs for (pclosed,popen)") ---> "get (pclosed,popen)"
+                  (_,ropen) = graphvars (rgraph--->"rgraph for ropen") [rroot--->"rroot for ropen"] ---> "get ropen"
+                  newhist` = [(rroot,rgraph):newhist--->"newhist"]
+                  (newhist,hist) = newhisthist ---> "get (newhist,hist)"
         f newhisthist (Trace stricts rule answer history (Annotate trace))
         | isEmpty pclosed && superset popen ropen
-          = f (newhist`,hist) trace
+          = ((f--->"newfold.recurse.f begins (from Annotate)") (newhist`,hist) trace <--- "newfold.recurse.f ends (valid Annotate)") ---> "f: Annotate"
             where rargs = arguments rule; rroot = ruleroot rule; rgraph = rulegraph rule
-                  (pclosed,popen) = graphvars rgraph rargs
-                  (_,ropen) = graphvars rgraph [rroot]
+                  (pclosed,popen) = graphvars rgraph rargs ---> "get (pclosed,popen)"
+                  (_,ropen) = graphvars rgraph [rroot] ---> "get ropen"
                   newhist` = [(rroot,rgraph):newhist]
-                  (newhist,hist) = newhisthist
+                  (newhist,hist) = newhisthist ---> "get (newhist,hist)"
         f newhisthist (Trace stricts rule answer history transf)
-        = foldtips foldarea (fnsymbol,arguments rule) (removeDup newhist`,removeDup hist) (Trace stricts rule answer history transf)
+        = ((foldtips--->"newfold.foldtips begins from newfold.recurse") foldarea (fnsymbol,arguments rule) (removeDup newhist`,removeDup hist) (Trace stricts rule answer history transf) <--- "newfold.recurse.f ends (other transformation)") ---> "f: default"
           where rroot = ruleroot rule; rgraph = rulegraph rule
                 newhist` = [(rroot,rgraph):newhist]
-                (newhist,hist) = newhisthist
+                (newhist,hist) = newhisthist ---> "get (newhist,hist)"
 
 
 /*
@@ -182,26 +191,26 @@ foldtips ::
  &  == pvar
 
 foldtips foldarea foldcont
-= ft
+= (ft--->"newfold.foldtips.ft begins from foldtips")<---"newfold.foldtips ends"
   where ft hist trace
         = case transf
           of Stop
-              -> foldoptional exres (pair True o addstrict stricts o mapfst rule2body) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule)
+              -> foldoptional exres (pair True o addstrict stricts o mapfst rule2body) (actualfold deltanodes rnfnodes foldarea (==) foldcont (snd hist) rule) <--- "newfold.foldtips.ft ends (Stop)"
                  where deltanodes = foldoptional [] getdeltanodes answer
                        rnfnodes = foldoptional [ruleroot rule] (const []) answer
              Instantiate yestrace notrace
-              -> ft` (ft hist yestrace) (ft hist notrace)
-                 where ft` (False,yessra) (False,nosra) = exres
+              -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Instantiate.match") hist yestrace) ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Instantiate.fail") hist notrace)
+                 where ft` (False,yessra) (False,nosra) = exres <--- "newfold.foldtips.ft ends (Instantiate/no)"
                        ft` (yesfound,(yesstricts,yesbody,yesareas)) (nofound,(nostricts,nobody,noareas))
-                       = (True,(stricts,matchpattern answer yesbody nobody,yesareas++noareas))
+                       = (True,(stricts,matchpattern answer yesbody nobody,yesareas++noareas)) <--- "newfold.foldtips.ft ends (Instantiate/yes)"
              Reduce reductroot trace
-              -> ft` (ft (fst hist,fst hist) trace)
-                 where ft` (False,sra) = exres
-                       ft` (found,sra) = (True,sra)
+              -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Reduce") (fst hist,fst hist) trace)
+                 where ft` (False,sra) = exres <--- "newfold.foldtips.ft ends (Reduce/no)"
+                       ft` (found,sra) = (True,sra) <--- "newfold.foldtips.ft ends (Reduce/yes)"
              Annotate trace
-              -> ft` (ft hist trace)
-                 where ft` (False,sra) = exres
-                       ft` (found,sra) = (True,sra)
+              -> ft` ((ft--->"newfold.foldtips.ft begins from newfold.foldtips.ft.Annotate") hist trace)
+                 where ft` (False,sra) = exres <--- "newfold.foldtips.ft ends (Annotate/no)"
+                       ft` (found,sra) = (True,sra) <--- "newfold.foldtips.ft ends (Annotate/yes)"
           where (Trace stricts rule answer _ transf) = trace
                 exres = (False,newextract noetrc foldarea trace)
 

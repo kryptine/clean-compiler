@@ -97,20 +97,20 @@ varcontents (GraphAlias pfun) v
 
 graphvars :: .(Graph sym var) !.[var] -> (.[var],.[var]) | == var
 graphvars graph roots
-= graphvars` [] graph roots
+= (graphvars` [] graph roots<---"graph.graphvars ends")--->"graph.graphvars begins"
 
 // Finds bound and free variables in a graph
 // Excludes the variables only reachable through "prune"
 graphvars` :: .[var] .(Graph sym var) .[var] -> (.[var],.[var]) | == var
 graphvars` prune graph roots
-= snd (foldlr ns (prune,([],[])) roots)
-  where ns var (seen,boundfree=:(bound,free))
-        | isMember var seen = (seen,boundfree)
-        | not def           = ([var:seen],(bound,[var:free]))
-                            = (seen`,([var:bound`],free`))
-          where (seen`,(bound`,free`)) = foldlr ns ([var:seen],boundfree) args
+= (snd (foldlr (ns--->"graph.graphvars`.ns begins from graph.graphvars`") (prune,([],[])) roots)<---"graph.graphvars` ends")--->"graph.graphvars` begins"
+  where ns var seenboundfree
+        | isMember var seen = seenboundfree<---"graph.graphvars`.ns ends (already seen)"
+        | not def           = ([var:seen],(bound,[var:free]))<---"graph.graphvars`.ns ends (open variable)"
+                            = (seen`,([var:bound`],free`))<---"graph.graphvars`.ns ends (closed variable)"
+          where (seen`,(bound`,free`)) = foldlr (ns--->"graph.graphvars`.ns begins from graph.graphvars`.ns") ([var:seen],boundfree) args
                 (def,(_,args)) = varcontents graph var
-
+                (seen,boundfree=:(bound,free)) = seenboundfree
 varlist :: .(Graph sym var) !.[var] -> .[var] | == var
 varlist graph roots
 = depthfirst arguments id roots

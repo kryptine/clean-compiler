@@ -314,4 +314,4 @@ zipwith f xs ys = [f x y \\ x<-xs & y<-ys]
 (writeList) infixl :: !*File [a] -> .File | <<< a
 (writeList) file [] = file
 (writeList) file [x:xs]
-= file <<< x writeList xs
+= file <<< x <<< nl writeList xs
