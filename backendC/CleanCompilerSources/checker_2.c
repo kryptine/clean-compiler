@@ -26,10 +26,8 @@
 #include "codegen1.h"
 #include "codegen2.h"
 #include "instructions.h"
-#include "typechecker.h"
 #include "transform.h"
 #include "checksupport.h"
-#include "overloading.h"
 #include "settings.h"
 #include "checker.h"
 #ifdef MOVE_FUNCTIONS_IN_LAMBDAS
