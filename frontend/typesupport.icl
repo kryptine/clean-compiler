@@ -108,6 +108,11 @@ where
 		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
 		  (types, cus) = clean_up cui types cus
 		= (simplifyTypeApplication type types, cus)
+	clean_up cui (TempQCV tempvar :@: types) cus
+		# (type, cus) = cus!cus_var_env.[tempvar]
+		# (TV tv, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
+		  (types, cus) = clean_up cui types cus
+		= (CV tv :@: types, cus)
 	clean_up cui (TempQV qv_number) cus=:{cus_error}
 		# (type, cus) = cus!cus_var_env.[qv_number]
 		| cui.cui_top_level
@@ -973,10 +978,10 @@ where
 			= (file, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TB tb)
 		= (file <<< tb, opt_beautifulizer)
-	writeType file No (form, TQV varid)
-		= (file <<< "E." <<< varid, No)
-	writeType file No (form, TempQV tv_number)
-		= (file  <<< "E." <<< tv_number <<< ' ', No)
+	writeType file opt_beautifulizer (form, TQV varid)
+		= (file <<< "E." <<< varid, opt_beautifulizer)
+	writeType file opt_beautifulizer (form, TempQV tv_number)
+		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TE)
 		= (file <<< "__", opt_beautifulizer)
 	writeType file (Yes beautifulizer) (form, type_variable)
@@ -1012,6 +1017,8 @@ writeBeautifulTypeVar file beautifulizer=:{tvb_visited_typevars, tvb_fresh_vars}
 instance writeType ConsVariable where
 	writeType file No (_, cons_variable)
 		= (file <<< cons_variable, No)
+	writeType file yes_beautifulizer (_, cv=:(TempQCV _))
+		= (file <<< cv, yes_beautifulizer)
 	writeType file yes_beautifulizer=:(Yes beautifulizer=:{tvb_visited_consvars, tvb_fresh_vars}) 
 			(_, cons_variable)
 		= case assoc_list_lookup cons_variable tvb_visited_consvars of
