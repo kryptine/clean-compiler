@@ -105,3 +105,7 @@ cast :: !*a -> *b;
 cast f = code {
 	pop_b 0
  }
+
+ensureCleanSystemFilesExists :: !String !*Files -> (!Bool, !*Files)
+ensureCleanSystemFilesExists _ files = (True, files)
+  // because of dcl file caching the Clean System Files folder should exist always
