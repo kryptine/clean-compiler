@@ -5,8 +5,12 @@ implementation module frontend
 
 // $Id$
 
-import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
-		convertimportedtypes, /*checkKindCorrectness, */ compilerSwitches, analtypes, generics, supercompile
+import analtypes
+import convertDynamics
+import convertimportedtypes
+import postparse
+import supercompile
+import type
 
 SwitchGenerics on off :== off
 
@@ -149,18 +153,22 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 
 	# (type_groups, ti_common_defs, td_infos, icl_common, dcl_mods, type_heaps, error_admin)
 			= partionateAndExpandTypes icl_used_module_numbers main_dcl_module_n icl_common dcl_mods type_heaps error_admin
+				-*-> "Partitionate and expand types"
 	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
 	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
+											-*-> "Analyse type definitions"
 /*
 	  (fun_defs, dcl_mods, th_vars, td_infos, error_admin)
       		= checkKindCorrectness main_dcl_module_n nr_of_chached_functions_and_macros icl_instances ti_common_defs n_cached_dcl_modules fun_defs dcl_mods type_heaps.th_vars td_infos error_admin
 */
 	  (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
+				-*-> "Determine kinds of classes"
 	#! nr_of_icl_functions = icl_mod.icl_instances.ir_from
 	# (fun_defs, dcl_mods, td_infos, th_vars, error_admin)
 			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers global_fun_range
 				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars error_admin
+				-*-> "Check kinds of common definitions and functions"
 
       type_heaps = { type_heaps & th_vars = th_vars }
 	# heaps = { heaps & hp_type_heaps = type_heaps }
@@ -453,15 +461,12 @@ do_fusion opts main_dcl_module_n stdStrictLists_module_n common_defs imported_fu
 		  = abort "Could not close supercompilation log file"
 		# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "Repartition functions") [global_fun_range, icl_instances, icl_specials, generic_range, supercompile_range]
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap}
-		# (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error, out)
+		# (ok, fun_defs, _, _, _, _, _, heaps, predef_symbols, error, out)
 			= typeProgram (components -*-> "Re-typing after supercompilation") main_dcl_module_n fun_defs icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers type_def_infos heaps predef_symbols error out dcl_mods
 		# components = {c\\c<-:components}
 		| not ok
 			= abort "frontend: retyping after supercompilation failed"
 		# {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap} = heaps
-		# var_heap = heaps.hp_var_heap
-		  type_heaps = heaps.hp_type_heaps
-		  expression_heap = heaps.hp_expression_heap
 	    = (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)
 #!	_ = 0 -*-> "No fusion"
 = (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)
