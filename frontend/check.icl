@@ -937,14 +937,13 @@ checkCommonDefinitions opt_icl_info module_index  common modules type_heaps var_
 	  (size_com_selector_defs,com_selector_defs) = usize com_selector_defs
 	  (size_com_cons_defs,com_cons_defs) = usize com_cons_defs
 
-	  {th_vars, th_attrs} = type_heaps
-	  (com_class_defs, com_member_defs, modules, com_type_defs, com_selector_defs, com_cons_defs, th_vars, th_attrs, var_heap, cs_symbol_table)
+	  (com_class_defs, com_member_defs, modules, com_type_defs, com_selector_defs, com_cons_defs, type_heaps, var_heap, cs_symbol_table)
 	  	= createClassDictionaries2 module_index com_class_defs com_member_defs modules com_type_defs com_selector_defs com_cons_defs
-	  		th_vars th_attrs var_heap cs.cs_symbol_table
+	  		type_heaps var_heap cs.cs_symbol_table
 
 	= ({common & com_type_defs = com_type_defs, com_cons_defs = com_cons_defs, com_selector_defs = com_selector_defs, com_class_defs = com_class_defs,
 			com_member_defs = com_member_defs,  com_instance_defs = com_instance_defs, /* AA */ com_generic_defs = com_generic_defs }, modules,
-			{ th_vars = th_vars, th_attrs = th_attrs }, var_heap, { cs & cs_symbol_table = cs_symbol_table })
+			type_heaps, var_heap, { cs & cs_symbol_table = cs_symbol_table })
 
 collectCommonfinitions :: !(CollectedDefinitions ClassInstance a) -> (!*{# Int}, ![Declaration])
 collectCommonfinitions {def_types,def_constructors,def_selectors,def_macros,def_classes,def_members,def_instances, def_generics} 

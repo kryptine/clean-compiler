@@ -262,15 +262,15 @@ where
 	create_class_dictionaries1 :: Index *{#DclModule} *{#u:CommonDefs} *Heaps *SymbolTable -> (.{#DclModule}, {#v:CommonDefs}, .Heaps, .SymbolTable), [u<=v]
 	create_class_dictionaries1
 			module_index dcl_modules oldmodules
-			heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
+			heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps}
 			symbol_table
 		= (new_dcl_modules, newmodules, newheaps, new_symbol_table)
 			where
 				(oldcommons, newmodules) = replace oldmodules module_index newcommons
 				{com_type_defs,com_cons_defs,com_selector_defs,com_class_defs,com_member_defs,com_instance_defs,com_generic_defs} = oldcommons
 				copied_class_defs = {class_def \\ class_def <-: com_class_defs} // Make unique copy
-				(new_com_class_defs, new_com_member_defs, new_dcl_modules, new_com_type_defs, new_com_selector_defs, new_com_cons_defs, new_th_vars, new_th_attrs, new_hp_var_heap, new_symbol_table)
-				=	createClassDictionaries2 module_index copied_class_defs com_member_defs dcl_modules com_type_defs com_selector_defs com_cons_defs th_vars th_attrs hp_var_heap symbol_table
+				(new_com_class_defs, new_com_member_defs, new_dcl_modules, new_com_type_defs, new_com_selector_defs, new_com_cons_defs, new_hp_type_heaps, new_hp_var_heap, new_symbol_table)
+				=	createClassDictionaries2 module_index copied_class_defs com_member_defs dcl_modules com_type_defs com_selector_defs com_cons_defs hp_type_heaps hp_var_heap symbol_table ---> "createClassDictionaries2 call from create_class_dictionaries1@generics.icl"
 				newcommons
 				=	{	com_type_defs = new_com_type_defs,
 						com_cons_defs = new_com_cons_defs,
@@ -280,7 +280,7 @@ where
 						com_instance_defs = com_instance_defs,
 						com_generic_defs = com_generic_defs
 					}
-				newheaps = {hp_var_heap = new_hp_var_heap, hp_expression_heap = hp_expression_heap, hp_type_heaps = {th_vars = new_th_vars, th_attrs = new_th_attrs}}
+				newheaps = {hp_var_heap = new_hp_var_heap, hp_expression_heap = hp_expression_heap, hp_type_heaps = new_hp_type_heaps}
 
 convertInstances :: !*GenericState	
 	-> (![Global Index], !*GenericState)

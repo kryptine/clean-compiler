@@ -1228,8 +1228,7 @@ createClassDictionaries2 ::
 	u3:{#CheckedTypeDef}    // Typedef array to update with dictionary type
 	u4:{#SelectorDef}       // Selectordef array to update with dictionary field selectors
 	u5:{#ConsDef}           // Consdef array to update with dictionary constructor
-	*TypeVarHeap            // Heaps to allocate fresh type variables from
-	*AttrVarHeap            // Heaps to allocate fresh attribute variables from
+	*TypeHeaps              // Heaps to allocate fresh type and attribute variables from
 	*VarHeap                // Heap to allocate fresh variable from
 	*SymbolTable            // Symbol table to store dictionary types, constructors, and field selectors
  ->	( .{#ClassDef}          // Updated array of classes (class_dictionary)
@@ -1238,17 +1237,16 @@ createClassDictionaries2 ::
 	, v3:{#CheckedTypeDef}  // Typedef array updated with dictionary types
 	, v4:{#SelectorDef}     // Selectordef array updated with dictionary field selectors
 	, v5:{#ConsDef}         // Consdef array updated with dictionary constructors
-	, .TypeVarHeap          // Extended heap
-	, .AttrVarHeap          // Extended heap
+	, .TypeHeaps            // Extended type heaps
 	, .VarHeap              // Extended heap
 	, .SymbolTable          // Updated symbol table
 	)
  ,	[u1<=v1, u2<=v2, u3<=v3, u4<=v4, u5<=v5]
 
-createClassDictionaries2 modindex classdefs0 memberdefs0 dcls0 typedefs0 seldefs0 consdefs0 tvheap0 avheap0 vheap0 symboltable0
-= (classdefs1, memberdefs1, dcls1, typedefs1, seldefs1, consdefs1, tvheap1, avheap1, vheap1, symboltable1)
-  where (classdefs1, memberdefs1, typedefs1, consdefs1, seldefs1, symboltable1, vheap1, {th_vars=tvheap1, th_attrs=avheap1}, dcls1)
-        = convert_classdefs get_classdef modindex (classdefs0, memberdefs0, typedefs0, consdefs0, seldefs0, symboltable0, vheap0, {th_vars=tvheap0, th_attrs=avheap0}, dcls0)
+createClassDictionaries2 modindex classdefs0 memberdefs0 dcls0 typedefs0 seldefs0 consdefs0 typeheaps0 vheap0 symboltable0
+= (classdefs1, memberdefs1, dcls1, typedefs1, seldefs1, consdefs1, typeheaps1, vheap1, symboltable1)
+  where (classdefs1, memberdefs1, typedefs1, consdefs1, seldefs1, symboltable1, vheap1, typeheaps1, dcls1)
+        = convert_classdefs get_classdef modindex (classdefs0, memberdefs0, typedefs0, consdefs0, seldefs0, symboltable0, vheap0, typeheaps0, dcls0)
 		get_classdef {glob_module,glob_object} (dcls_a, classdefs_a)
 		= (classdef, (dcls_b, classdefs_b))
 		  where (classdef, _, classdefs_b, dcls_b) = getClassDef glob_object glob_module modindex classdefs_a dcls_a
@@ -1281,7 +1279,7 @@ convert_classdefs ::
 convert_classdefs get_classdef modindex (classdefs0, memberdefs0, typedefs0, consdefs0, seldefs0, symboltable0, varheap0, typeheaps0, env0)
 = (classdefs2, memberdefs1, typedefs5, consdefs5, seldefs5, symboltable1, varheap1, typeheaps1, env1)
   where (classdefs2, memberdefs1, typedefs4, consdefs4, seldefs4, indexes1, symboltable1, varheap1, typeheaps1, env1)
-        = iFoldSt (convert_classdef get_classdef modindex) 0 (dec nclass) (classdefs1, memberdefs0, typedefs3, consdefs3, seldefs3, indexes0, symboltable0, varheap0, typeheaps0, env0)
+        = iFoldSt (convert_classdef get_classdef modindex) 0 nclass (classdefs1, memberdefs0, typedefs3, consdefs3, seldefs3, indexes0, symboltable0, varheap0, typeheaps0, env0)
         (nclass, classdefs1) = usize classdefs0
 		// Some wizardry to prevent copying the array if nothing is to be appended
 		// ... and still make use of input uniqueness and produce output uniqueness
@@ -1637,8 +1635,8 @@ build_context_selector get_contexttype classdef dicttype selectoroffset fieldoff
 	# (contexttype,env) = get_contexttype typecontext env
 	# fieldinfo = (contexttype, [], noattrvars, noattrenv) // Dictionary field doesn't introduce new type variables
 	  with // FIXME: What attribute variables/inequalities do we need?
-	       noattrvars = abort "build_context_selector (checktypes.icl): dictionary context field selector's attribute variables not implemented"
-	       noattrenv = abort "build_context_selector (checktypes.icl): dictionary context field selector's attribute inequalities not implemented"
+	       noattrvars = [] // abort "build_context_selector (checktypes.icl): dictionary context field selector's attribute variables not implemented"
+	       noattrenv = [] // abort "build_context_selector (checktypes.icl): dictionary context field selector's attribute inequalities not implemented"
 	// Create fresh instance of context's type
 	# (selectortype, typeheaps) = build_context_selector_type classdef dicttype contexttype typeheaps
 	// Build the selector
@@ -1849,7 +1847,7 @@ unzip4
 // Resize an array by truncating it or appending elements
 resizeArray :: e Int u:{#e} -> (.{#e}, v:{#e}) | createArray_u,uselect_u,update_u,usize_u e, [u<=v]
 resizeArray defaultelement newsize oldarray0
-= iFoldSt copy_elem 0 (min oldsize newsize-1) (createArray newsize defaultelement, oldarray1)
+= iFoldSt copy_elem 0 (min oldsize newsize) (createArray newsize defaultelement, oldarray1)
   where (oldsize, oldarray1) = usize oldarray0
         copy_elem i (dst, src0)
 		= ({dst & [i] = elem}, src1)
