@@ -2,10 +2,11 @@ definition module classify
 
 import syntax, checksupport, transform
 
-cPassive   				:== -1
-cActive					:== -2
-cAccumulating   		:== -3
-cVarOfMultimatchCase	:== -4
+CUnused					:== -1
+CPassive   				:== -2
+CActive					:== -3
+CAccumulating   		:== -4
+CVarOfMultimatchCase	:== -5
 
 ::	CleanupInfo :== [ExprInfoPtr]
 

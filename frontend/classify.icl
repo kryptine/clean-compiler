@@ -29,9 +29,9 @@ IsAVariable cons_class	:== cons_class >= 0
 combineClasses :: !ConsClass !ConsClass -> ConsClass
 combineClasses cc1 cc2
 	| IsAVariable cc1
-		= cAccumulating
+		= CAccumulating
 	| IsAVariable cc2
-		= cAccumulating
+		= CAccumulating
 		= min cc1 cc2
  
 aiUnifyClassifications cc1 cc2 ai
@@ -118,10 +118,11 @@ where
 ::	ConsClass		:== Int
 */
 
-cPassive   				:== -1
-cActive					:== -2
-cAccumulating   		:== -3
-cVarOfMultimatchCase	:== -4
+CUnused					:== -1
+CPassive   				:== -2
+CActive					:== -3
+CAccumulating   		:== -4
+CVarOfMultimatchCase	:== -5
 
 /*
 	NOTE: ordering of above values is relevant since unification
@@ -171,7 +172,7 @@ where
 				   ai				= { ai & ai_cur_ref_counts.[arg_position] = min (ref_count+1) 2 }
 				-> (temp_var, False, ai)
 			_
-				-> abort ("consumerRequirements" ---> (var_name))
+				-> abort ("consumerRequirements [BoundVar] " ---> (var_name))
 
 instance consumerRequirements Expression where
 	consumerRequirements (Var var) common_defs ai
@@ -180,7 +181,7 @@ instance consumerRequirements Expression where
 		= consumerRequirements app common_defs ai
 	consumerRequirements (fun_expr @ exprs) common_defs ai
 		# (cc_fun, _, ai)			= consumerRequirements fun_expr common_defs ai
-		  ai						= aiUnifyClassifications cActive cc_fun ai
+		  ai						= aiUnifyClassifications CActive cc_fun ai
 		= consumerRequirements exprs common_defs ai
 	consumerRequirements (Let {let_strict_binds, let_lazy_binds,let_expr}) common_defs ai=:{ai_next_var,ai_next_var_of_fun,ai_var_heap}
 		# let_binds					= let_strict_binds ++ let_lazy_binds
@@ -211,39 +212,45 @@ instance consumerRequirements Expression where
 	consumerRequirements (Case case_expr) common_defs ai
 		= consumerRequirements case_expr common_defs ai
 	consumerRequirements (BasicExpr _) _ ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements (MatchExpr _ expr) common_defs ai
 		= consumerRequirements expr common_defs ai
 	consumerRequirements (Selection _ expr selectors) common_defs ai
 		# (cc, _, ai) = consumerRequirements expr common_defs ai
-		  ai = aiUnifyClassifications cActive cc ai
+		  ai = aiUnifyClassifications CActive cc ai
 		  ai = requirementsOfSelectors selectors common_defs ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements (Update expr1 selectors expr2) common_defs ai
 		# (cc, _, ai) = consumerRequirements expr1 common_defs ai
 		  ai = requirementsOfSelectors selectors common_defs ai
 		  (cc, _, ai) = consumerRequirements expr2 common_defs ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements (RecordUpdate cons_symbol expression expressions) common_defs ai
 		# (cc, _, ai) = consumerRequirements expression common_defs ai
 		  (cc, _, ai) = consumerRequirements expressions common_defs ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements (TupleSelect tuple_symbol arg_nr expr) common_defs ai
 		= consumerRequirements expr common_defs ai
-	consumerRequirements (AnyCodeExpr _ _ _) _ ai
-		= (cPassive, False, ai)
-	consumerRequirements (ABCCodeExpr _ _) _ ai
-		= (cPassive, False, ai)
+	consumerRequirements (AnyCodeExpr _ _ _) _ ai=:{ai_cur_ref_counts}
+		#! s							= size ai_cur_ref_counts
+		   twos_array					= createArray s 2
+		   ai							= { ai & ai_cur_ref_counts=twos_array }
+		= (CPassive, False, ai)
+	consumerRequirements (ABCCodeExpr _ _) _ ai=:{ai_cur_ref_counts}
+		#! s							= size ai_cur_ref_counts
+		   twos_array					= createArray s 2
+		   ai							= { ai & ai_cur_ref_counts=twos_array }
+		= (CPassive, False, ai)
 	consumerRequirements (DynamicExpr dynamic_expr) common_defs ai
 		= consumerRequirements dynamic_expr common_defs ai
 	consumerRequirements (TypeCodeExpression _) _ ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements EE _ ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements (NoBind _) _ ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 	consumerRequirements expr _ ai
-		= abort ("consumerRequirements ") // <<- expr)
+		= abort ("consumerRequirements [Expression]" ---> expr)
 
 requirementsOfSelectors selectors common_defs ai
 	= foldSt (reqs_of_selector common_defs) selectors ai
@@ -254,30 +261,35 @@ where
 	reqs_of_selector common_defs (DictionarySelection dict_var _ _ index_expr) ai
 		# (_, _, ai) = consumerRequirements index_expr common_defs ai
 		  (cc_var, _, ai) = consumerRequirements dict_var common_defs ai
-		= aiUnifyClassifications cActive cc_var ai
+		= aiUnifyClassifications CActive cc_var ai
+	// record selection missing?!
 	reqs_of_selector _ _ ai
 		= ai
 			
 instance consumerRequirements App where
-	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
-		| glob_module == main_dcl_module_n//ai_main_dcl_module_n
+	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object}, symb_name}, app_args} 
+			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs})
+			ai=:{ai_cons_class}
+
+		| glob_module == main_dcl_module_n
 			| glob_object < size ai_cons_class
 				#! fun_class = ai_cons_class.[glob_object]
-				= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
+				= reqs_of_args fun_class.cc_args app_args CPassive common_defs ai
 				= consumerRequirements app_args common_defs ai
 
-		| glob_module==stdStrictLists_module_n && (not (isEmpty app_args)) && is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
-//			&& trace_tn ("consumerRequirements "+++symb_name.id_name+++" "+++toString imported_funs.[glob_module].[glob_object].ft_type.st_arity)
+		| glob_module==stdStrictLists_module_n && (not (isEmpty app_args)) 
+				&& is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 			# [app_arg:app_args]=app_args;
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
-			# ai = aiUnifyClassifications cActive cc ai
+			# ai = aiUnifyClassifications CActive cc ai
 			= consumerRequirements app_args common_defs ai
-
 			= consumerRequirements app_args common_defs ai
-	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_name}, app_args} common_defs=:(ConsumerAnalysisRO {main_dcl_module_n}) ai=:{ai_cons_class/*,ai_main_dcl_module_n*/}
+	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object, symb_name}, app_args}
+			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
+			ai=:{ai_cons_class}
 		| glob_object < size ai_cons_class
 			#! fun_class = ai_cons_class.[glob_object]
-			= reqs_of_args fun_class.cc_args app_args cPassive common_defs ai
+			= reqs_of_args fun_class.cc_args app_args CPassive common_defs ai
 			= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_args} common_defs ai
 		=  not_an_unsafe_pattern (consumerRequirements app_args common_defs ai)
@@ -302,7 +314,7 @@ instance consumerRequirements Case where
 		  (ccd, default_is_unsafe, ai) = consumerRequirements case_default common_defs ai
 		  (every_constructor_appears_in_safe_pattern, may_be_active) = inspect_patterns common_defs_parameter has_default case_guards unsafe_bits
 		  safe = (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
-		  ai = aiUnifyClassifications (if may_be_active cActive cVarOfMultimatchCase) cce ai
+		  ai = aiUnifyClassifications (if may_be_active CActive CVarOfMultimatchCase) cce ai
 		  ai = case case_expr of
 				Var {var_info_ptr}
 					| may_be_active
@@ -313,7 +325,7 @@ instance consumerRequirements Case where
 					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns
 						// decons_expr will be optimized to a decons_u Selector in transform
 						# (cc, _, ai) = consumerRequirements app_arg common_defs ai
-						# ai = aiUnifyClassifications cActive cc ai
+						# ai = aiUnifyClassifications CActive cc ai
 						-> ai
 					OverloadedListPatterns _ decons_expr _
 						# (_,_,ai) = consumerRequirements decons_expr common_defs ai
@@ -424,8 +436,11 @@ consumer_requirements_of_guards (OverloadedListPatterns type _ patterns) common_
 bindPatternVars :: !.[FreeVar] !Int !Int !*VarHeap -> (!Int,!Int,!*VarHeap)
 bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
 	| fv_count > 0
-		= bindPatternVars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
-		= bindPatternVars vars next_var next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
+		# var_heap	= writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap
+		= bindPatternVars vars (inc next_var) (inc next_var_of_fun) var_heap
+	// otherwise
+		# var_heap	= writePtr fv_info_ptr (VI_Count 0 False) var_heap
+		= bindPatternVars vars next_var next_var_of_fun var_heap
 bindPatternVars [] next_var next_var_of_fun var_heap
 	= (next_var, next_var_of_fun, var_heap)
 
@@ -434,7 +449,7 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 // reference counting happens independently for each pattern expression
 	#! s = size ai_cur_ref_counts
 	   zero_array = createArray s 0
-	   (_, cc, r_unsafe_bits ,ai) = foldSt (independent_consumer_requirements common_defs) exprs (zero_array, cPassive, [], ai)
+	   (_, cc, r_unsafe_bits ,ai) = foldSt (independent_consumer_requirements common_defs) exprs (zero_array, CPassive, [], ai)
 	= (cc, reverse r_unsafe_bits, ai)
   where	
 	independent_consumer_requirements common_defs expr (zero_array, cc, unsafe_bits_accu, ai=:{ai_cur_ref_counts})
@@ -450,7 +465,8 @@ independentConsumerRequirements exprs common_defs ai=:{ai_cur_ref_counts}
 		#! i1 = dec i
 		   rc1 = src1.[i1]
 		   rc2 = src2_dest.[i1]
-		= unify_ref_count_arrays i1 src1 { src2_dest & [i1]= unify_ref_counts rc1 rc2} 
+		   src2_dest	= { src2_dest & [i1] = unify_ref_counts rc1 rc2 }
+		= unify_ref_count_arrays i1 src1 src2_dest
 
 	// unify_ref_counts outer_ref_count ref_count_in_pattern
 	unify_ref_counts 0 x = if (x==2) 2 0
@@ -469,7 +485,7 @@ instance consumerRequirements (Optional a) | consumerRequirements a where
 	consumerRequirements (Yes x) common_defs ai
 		= consumerRequirements x common_defs ai
 	consumerRequirements No _ ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 
 instance consumerRequirements (!a,!b) | consumerRequirements a & consumerRequirements b where
 	consumerRequirements (x, y) common_defs ai
@@ -483,7 +499,7 @@ instance consumerRequirements [a] | consumerRequirements a where
 		  (ccxs, _, ai) = consumerRequirements xs common_defs ai
 		= (combineClasses ccx ccxs, False, ai)
 	consumerRequirements [] _ ai
-		= (cPassive, False, ai)
+		= (CPassive, False, ai)
 
 instance consumerRequirements (Bind a b) | consumerRequirements a where
 	consumerRequirements {bind_src} common_defs ai
@@ -497,14 +513,20 @@ analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group
 analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdStrictLists_module_n groups fun_defs var_heap expr_heap
 	#! nr_of_funs = size fun_defs + ir_from - ir_to /* Sjaak */
 	   nr_of_groups = size groups
-	# consumerAnalysisRO=ConsumerAnalysisRO {common_defs=common_defs,imported_funs=imported_funs,main_dcl_module_n=main_dcl_module_n,stdStrictLists_module_n=stdStrictLists_module_n}
+	# consumerAnalysisRO=ConsumerAnalysisRO
+		{ common_defs				= common_defs
+		, imported_funs				= imported_funs
+		, main_dcl_module_n			= main_dcl_module_n
+		, stdStrictLists_module_n	= stdStrictLists_module_n
+		}
+	# class_env = createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = [], cc_producer=False}
 	= iFoldSt (analyse_group consumerAnalysisRO) 0 nr_of_groups
-				([], createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = [], cc_producer=False}, groups, fun_defs, var_heap, expr_heap)
+				([], class_env, groups, fun_defs, var_heap, expr_heap)
 where	
 	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 		# ({group_members}, groups) = groups![group_nr]
 		# (nr_of_vars, nr_of_local_vars, var_heap, class_env, fun_defs) = initial_cons_class group_members 0 0 var_heap class_env fun_defs
-		  initial_subst = createArray (nr_of_vars + nr_of_local_vars) cPassive
+		  initial_subst = createArray (nr_of_vars + nr_of_local_vars) CPassive
 		  (ai_cases_of_vars_for_group, ai, fun_defs)
 				 = analyse_functions common_defs group_members []
 						{	ai_var_heap = var_heap,
@@ -562,7 +584,7 @@ where
 			# (VI_AccVar _ arg_position, var_heap) = readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},class_env) = class_env![fun_index]
 			  (aci_linearity_of_patterns, var_heap) = get_linearity_info cc_linear_bits case_guards var_heap
-			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==cActive) && cc_linear_bits!!arg_position
+			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
 				// mark non multimatch cases whose case_expr is an active linear function argument
 				# aci = { aci_params = [], aci_opt_unfolder = No, aci_free_vars=No, aci_linearity_of_patterns = aci_linearity_of_patterns }
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 

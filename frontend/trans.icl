@@ -725,7 +725,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  cc_linear_bits_from_outer_fun	= [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
 	  new_cons_args =
 	  			{ cc_size			= fun_arity
-	  			, cc_args			= repeatn nr_of_lifted_vars cPassive ++ cc_args_from_outer_fun
+	  			, cc_args			= repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun
 	  			, cc_linear_bits	= repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun
 	  			, cc_producer		= False
 	  			}
@@ -1502,7 +1502,7 @@ where
 determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes]
 				[form : forms] input das
 	# das = determine_args linear_bits cons_args (inc prod_index) producers prod_atypes forms input das
-	# producer	= if (cons_arg == cActive) (producers.[prod_index]) PR_Empty
+	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
 	= determine_arg producer prod_atype form prod_index ((linear_bit,cons_arg), input) das
 
 determine_arg
@@ -1567,7 +1567,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 				  			  free_vars_and_types das.das_vars
 		, das_arg_types			= {das_arg_types & [prod_index] = ws_arg_type` }
 		, das_new_linear_bits	= mapAppend (\_ -> True) free_vars_and_types das.das_new_linear_bits
-		, das_new_cons_args		= mapAppend (\_ -> cActive) free_vars_and_types das.das_new_cons_args
+		, das_new_cons_args		= mapAppend (\_ -> CActive) free_vars_and_types das.das_new_cons_args
 		, das_subst				= das_subst
 		, das_type_heaps		= das_type_heaps
 		, das_var_heap			= writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) das.das_var_heap
@@ -1709,7 +1709,7 @@ where
 		  				cc_producer = False}
 		  			, fun_heap, ti_cons_args)
 			No
-				-> ({cc_size = symbol_arity, cc_args = repeatn symbol_arity cPassive,
+				-> ({cc_size = symbol_arity, cc_args = repeatn symbol_arity CPassive,
 						cc_linear_bits = repeatn symbol_arity linear_bit,
 						cc_producer = False}, fun_heap, ti_cons_args)
 
@@ -2045,7 +2045,7 @@ determineProducers _ _ _ [] _ producers _ ti
 	= (producers, [], ti)
 determineProducers is_applied_to_macro_fun [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
 	# (producers, new_args, ti) = determineProducers is_applied_to_macro_fun linear_bits cons_args args (inc prod_index) producers ro ti
- 	| cons_arg == cActive
+ 	| cons_arg == CActive
 		= determine_producer is_applied_to_macro_fun linear_bit arg new_args prod_index producers ro ti
 	= (producers, [arg : new_args], ti)
 where
@@ -2912,7 +2912,7 @@ instance producerRequirements Expression where
 						-> check_app_arguments ca.cc_args ca.cc_linear_bits app_args prs
 	where
 		check_app_arguments [cc_arg:cc_args] [cc_linear_bit:cc_bits] [app_arg:app_args] prs
-			| cc_arg == cActive && cc_linear_bit
+			| cc_arg == CActive && cc_linear_bit
 				# (rec,prs)	= is_recursive_app app_arg prs
 				| rec		= (False,prs)
 				# (safe,prs)= producerRequirements app_arg prs

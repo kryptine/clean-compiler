@@ -57,7 +57,6 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths modtimefunction files
 	| not ok
 		= (No,{},{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
-
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, files)
 		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics hash_table error search_paths modtimefunction files
@@ -342,14 +341,16 @@ where
 			= file <<< "-:"
 	
 	show_accumulating_arguments [ cc : ccs] file
-		| cc == cPassive
+		| cc == CPassive
 			= show_accumulating_arguments ccs (file <<< 'p')
-		| cc == cActive
+		| cc == CActive
 			= show_accumulating_arguments ccs (file <<< 'c')
-		| cc == cAccumulating
+		| cc == CAccumulating
 			= show_accumulating_arguments ccs (file <<< 'a')
-		| cc == cVarOfMultimatchCase
+		| cc == CVarOfMultimatchCase
 			= show_accumulating_arguments ccs (file <<< 'm')
+		| cc == CUnused
+			= show_accumulating_arguments ccs (file <<< 'u')
 			= show_accumulating_arguments ccs (file <<< '?')
 	show_accumulating_arguments [] file
 		= file
