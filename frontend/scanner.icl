@@ -1,7 +1,6 @@
 implementation module scanner
 
 import	StdEnv, compare_constructor, StdCompare, general, compilerSwitches
-import RWSDebug
 
 from utilities import revCharListToString, isSpecialChar
 
@@ -36,9 +35,17 @@ where
 
 instance nextToken ScanState
 where
-	nextToken context (ScanState scan_state)
+	nextToken context (ScanState scan_state=:{ss_scanOptions})
 		# (token,scan_state) = nextToken context scan_state
-		= (token,ScanState scan_state) 
+		= (replaceUnderscoreToken token ((ss_scanOptions bitand ScanOptionUnderscoreIdentsBit) <> 0),
+				ScanState scan_state)
+		where
+			replaceUnderscoreToken :: Token !Bool -> Token
+			replaceUnderscoreToken (UnderscoreIdentToken name) underscoreModule
+				| underscoreModule
+					=	IdentToken name
+			replaceUnderscoreToken token _
+				=	token
 
 instance currentToken ScanState
 where
@@ -68,6 +75,7 @@ where
 	}
 
 ScanOptionUseLayoutBit :== 1
+ScanOptionUnderscoreIdentsBit :== 2
 
 ::	* ScanInput
 	=	Input			Input
@@ -104,6 +112,7 @@ ScanOptionUseLayoutBit :== 1
 
 ::	Token
 	= 	IdentToken ! .String	//		an identifier
+	| 	UnderscoreIdentToken !.String//	an identifier that starts with a '_'
 	|	IntToken !.String		//		an integer
 	|	RealToken !.String		//		a real
 	|	StringToken !.String	//		a string
@@ -609,7 +618,13 @@ Scan c0=:'_' input=:{inp_stream=OldLine i line stream,inp_pos} co //PK ..
 					= scan_underscores (i+1) size line
 					= i
 	| end_i<size && IsIdentChar line.[end_i] co
-		= ScanIdentFast (end_i-i+1) {input & inp_stream=OldLine end_i line stream} co
+		= replaceIdentToken (ScanIdentFast (end_i-i+1) {input & inp_stream=OldLine end_i line stream} co)
+		with
+			replaceIdentToken :: (Token, *state) -> (Token, *state)
+			replaceIdentToken (IdentToken name, s)
+				=	(UnderscoreIdentToken name, s)
+			replaceIdentToken tokenAndState
+				=	tokenAndState
 	| end_i==i
 		= (WildCardToken, input)
 		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
@@ -1280,6 +1295,7 @@ where
 instance toString Token
 where
 	toString (IdentToken id)		= id // qw id
+	toString (UnderscoreIdentToken id)		= id // qw id
 	toString (IntToken id)			= id
 	toString (RealToken id)			= id
 	toString (StringToken id)		= id
@@ -1527,6 +1543,12 @@ setUseLayout b (ScanState ss) = ScanState  (setUseLayout_ b ss)
 
 setUseLayout_ :: !Bool !RScanState -> RScanState
 setUseLayout_ b ss=:{ss_scanOptions} = { ss & ss_scanOptions = if b (ss_scanOptions bitor ScanOptionUseLayoutBit) (ss_scanOptions bitand (bitnot ScanOptionUseLayoutBit)) } // -->> ("uselayout set to ",b)
+
+setUseUnderscoreIdents :: !Bool !ScanState -> ScanState
+setUseUnderscoreIdents b (ScanState ss) = ScanState  (setUseUnderscoreIdents_ b ss)
+
+setUseUnderscoreIdents_ :: !Bool !RScanState -> RScanState
+setUseUnderscoreIdents_ b ss=:{ss_scanOptions} = { ss & ss_scanOptions = if b (ss_scanOptions bitor ScanOptionUnderscoreIdentsBit) (ss_scanOptions bitand (bitnot ScanOptionUnderscoreIdentsBit)) } // -->> ("uselayout set to ",b)
 
 checkOffside :: !FilePosition !Int !Token !RScanState -> (Token,RScanState)
 checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}

@@ -217,13 +217,13 @@ where
 		  (y, pState) = want pState
 		= ((x,y), pState)
 */
-wantIdents :: !Context !IdentClass !ParseState -> (![Ident], !ParseState)
-wantIdents context ident_class pState
-	# (first_name, pState) = want pState
+wantModuleIdents :: !Context !IdentClass !ParseState -> (![Ident], !ParseState)
+wantModuleIdents context ident_class pState
+	# (first_name, pState) = wantModuleName pState
 	  (first_ident, pState) = stringToIdent first_name ident_class pState
 	  (token, pState) = nextToken context pState
 	| token == CommaToken
-		# (rest, pState) = wantIdents context ident_class pState
+		# (rest, pState) = wantModuleIdents context ident_class pState
 		= ([first_ident : rest], pState)
 	= ([first_ident], tokenBack pState)
 
@@ -390,6 +390,8 @@ where
 
 	try_module_name (IdentToken name) mod_type scanState
 		= (True, mod_type, name, scanState) //-->> ("module",name)
+	try_module_name (UnderscoreIdentToken name) mod_type scanState
+		= (True, mod_type, name, setUseUnderscoreIdents True scanState) //-->> ("module",name)
 	try_module_name token mod_type scanState
 		= (False, mod_type, "", tokenBack scanState)
 	
@@ -900,14 +902,14 @@ wantLocals pState
 
 wantImports :: !ParseState -> (![ParsedImport], !ParseState)
 wantImports pState
-	# (names, pState) = wantIdents FunctionContext IC_Module pState
+	# (names, pState) = wantModuleIdents FunctionContext IC_Module pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  pState = wantEndOfDefinition "imports" pState
 	= (map (\name -> { import_module = name, import_symbols = [], import_file_position = LinePos file_name line_nr}) names, pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
-	# (mod_name, pState) = want pState
+	# (mod_name, pState) = wantModuleName pState
 	  (mod_ident, pState) = stringToIdent mod_name IC_Module pState
 	  pState = wantToken GeneralContext "from imports" ImportToken pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
@@ -3250,6 +3252,14 @@ where
 		= case token of
 			IdentToken name -> (name, pState)
 			_				-> ("", parseError "String" (Yes token) "identifier" pState)
+
+wantModuleName :: !*ParseState -> (!{# Char}, !*ParseState)
+wantModuleName pState
+	# (token, pState) = nextToken GeneralContext pState
+	= case token of
+		IdentToken name -> (name, pState)
+		UnderscoreIdentToken name -> (name, pState)
+		_				-> ("", parseError "String" (Yes token) "module name" pState)
 
 tryTypeVar :: !ParseState -> (!Bool, TypeVar, !ParseState)
 tryTypeVar pState

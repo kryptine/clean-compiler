@@ -179,7 +179,7 @@ where
 
 	fill_table_with_hashing tables
 		# (predefs, hash_table) = tables	
-					<<- ("StdArray", IC_Module, PD_StdArray) <<- ("StdEnum", IC_Module, PD_StdEnum) <<- ("StdBool", IC_Module, PD_StdBool)
+					<<- ("_SystemArray", IC_Module, PD_StdArray) <<- ("StdEnum", IC_Module, PD_StdEnum) <<- ("StdBool", IC_Module, PD_StdBool)
 					<<- ("&&", IC_Expression, PD_AndOp) <<- ("||", IC_Expression, PD_OrOp)
 					<<- ("Array", IC_Class, PD_ArrayClass)
 					<<- ("createArray", IC_Expression, PD_CreateArrayFun)

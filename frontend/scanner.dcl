@@ -17,6 +17,7 @@ instance <<< FilePosition
 
 ::	Token
 	= 	IdentToken !.String		//		an identifier
+	| 	UnderscoreIdentToken !.String//	an identifier that starts with a '_'
 	|	IntToken !.String		//		an integer
 	|	RealToken !.String		//		a real
 	|	StringToken !.String	//		a string
@@ -143,6 +144,8 @@ closeScanner :: !ScanState !*Files -> *Files
 setUseLayout :: !Bool !ScanState -> ScanState
 UseLayout :: !ScanState -> (!Bool, !ScanState)
 dropOffsidePosition :: !ScanState -> ScanState
+
+setUseUnderscoreIdents :: !Bool !ScanState -> ScanState
 
 isLhsStartToken :: ! Token -> Bool
 isOffsideToken :: ! Token -> Bool
