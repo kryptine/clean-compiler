@@ -1062,13 +1062,13 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 	# (parse_ok, mod, ca_hash_table, err_file, files) = wantModule cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
 	| parse_ok
-		= scan_dcl_module mod parsed_modules searchPaths modtimefunction files ca
+		= scan_dcl_module dcl_module mod parsed_modules searchPaths modtimefunction files ca
 		= (False, [MakeEmptyModule mod.mod_ident MK_None: parsed_modules],files, ca)
 where
-	scan_dcl_module :: ParsedModule [ScannedModule] !SearchPaths (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
-	scan_dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
+	scan_dcl_module :: Ident ParsedModule [ScannedModule] !SearchPaths (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
+	scan_dcl_module dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
 		# (_, defs, imports, imported_objects,foreign_exports,ca)
-			= reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
+			= reorganiseDefinitionsAndAddTypes dcl_module support_dynamics False pdefs ca
 	  	  (def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=0,ca_rev_fun_defs=[]}
 		  (range, ca) = addFunctionsRange def_macros ca
 		  (rev_fun_defs,ca) = ca!ca_rev_fun_defs
@@ -1089,7 +1089,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 			,	ca_rev_fun_defs	= []
 			,	ca_hash_table	= hash_table
 			}
-	  (fun_defs, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes support_dynamics True pdefs ca
+	  (fun_defs, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes mod_ident support_dynamics True pdefs ca
 
 	  (reorganise_icl_ok, ca) = ca!ca_error.pea_ok
 
@@ -1156,7 +1156,7 @@ where
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
-			# (_, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes support_dynamics False pdefs ca
+			# (_, defs, imports, imported_objects,foreign_exports,ca) =   reorganiseDefinitionsAndAddTypes mod_ident support_dynamics False pdefs ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_ident:cached_modules]
 			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
@@ -1467,10 +1467,18 @@ reorganiseDefinitions icl_module [] _ _ _ _ ca
 			def_instances = [], def_funtypes = [], 
 			def_generics = [], def_generic_cases = []}, [], [], [], ca)
 
-reorganiseDefinitionsAndAddTypes support_dynamics icl_module defs ca
+reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 	| support_dynamics
+		# clean_types_module_ident
+			=	predefined_idents.[PD_CleanTypes]
+		# clean_types_module =
+			{	import_module = clean_types_module_ident
+			,	import_symbols = []
+			,	import_file_position = NoPos
+			}
+		# imports = if (mod_ident == clean_types_module_ident) [] [clean_types_module]
 		# (rev_defs, ca)
-			=	addTypeConstructors defs [] ca
+			=	addTypeConstructors defs [PD_Import imports] ca
 		= reorganiseDefinitions icl_module (reverse rev_defs) 0 0 0 0 ca
 		= reorganiseDefinitions icl_module defs 0 0 0 0 ca
 	where
@@ -1501,6 +1509,7 @@ addTypeConstructor def=:{td_ident, td_attribute, td_attrs, td_args, td_arity, td
 				,	td_attribute = attr
 				,	td_pos = position
 				,	td_used_types = []
+				,	td_fun_index = NoIndex
 				}
 		type_tc_cons cons_ident type_ident args arity position
 			=	{	pc_cons_ident = cons_ident

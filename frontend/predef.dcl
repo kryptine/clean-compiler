@@ -248,7 +248,20 @@ PD_FromThenToU				:== 259
 PD_FromThenToUTS			:== 260
 PD_FromThenToO				:== 261
 
-PD_NrOfPredefSymbols		:== 262
+/* Clean Type introspection */
+PD_CleanTypes				:== 262
+PD_CTTypeDef				:== 263
+PD_CTAlgType				:== 264
+PD_CTRecordType				:== 265
+PD_CTSynType				:== 266
+PD_CTPredefined				:== 267
+PD_CTConsDef				:== 268
+PD__CTToCons				:== 269
+PD_CTFieldDef				:== 270
+
+PD_Dyn__to_TypeCodeConstructor	:== 271
+
+PD_NrOfPredefSymbols		:== 272
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

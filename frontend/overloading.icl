@@ -1300,6 +1300,8 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 		// sanity check ...
 		# type_ident
 			=	types.[type_index].td_ident.id_name
+		# td_fun_index
+			=	types.[type_index].td_fun_index
 		# tc_type_name
 			=	types.[tc_type_index].td_ident.id_name
 		| "TC;" +++ type_ident <> tc_type_name
@@ -1311,7 +1313,15 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 			=	{	symb_ident = ds_ident
 				,	symb_kind = SK_Constructor {glob_module = module_index, glob_object = ds_index}
 				}
-		= GTT_Constructor type_constructor
+		// sanity check ...
+		| td_fun_index == NoIndex
+			=	fatal "toTypeCodeConstructor" ("no function (" +++ type_ident +++ ")")
+		// ... sanity check
+		# type_fun
+			=	{	symb_ident = {ds_ident & id_info = nilPtr} // this is wrong but let's give it a try
+				,	symb_kind = SK_Function {glob_module = module_index, glob_object = td_fun_index}
+				}
+		= GTT_Constructor type_constructor type_fun
 
 fatal :: {#Char} {#Char} -> .a
 fatal function_name message

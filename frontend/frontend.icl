@@ -4,8 +4,8 @@
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
-		convertimportedtypes, compilerSwitches, analtypes, generics1
-
+		convertimportedtypes, compilerSwitches, analtypes, generics1,
+		typereify
 //import coredump
 
 //import print
@@ -51,7 +51,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
   	# symbol_table = hash_table.hte_symbol_heap
   	#! n_cached_dcl_modules=size cached_dcl_modules
   	# (ok, icl_mod, dcl_mods, components, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
-  	  	= checkModule mod global_fun_range mod_functions n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules functions_and_macros predef_symbols (symbol_table -*-> "Checking") error heaps
+  	  	= checkModule support_dynamics mod global_fun_range mod_functions n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules functions_and_macros predef_symbols (symbol_table -*-> "Checking") error heaps
+
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 
 	| not ok
@@ -62,7 +63,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			select_and_remove_icl_functions_from_record :: !*IclModule -> (!.{#FunDef},!.IclModule)
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
-	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_name,icl_import,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
+	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_name,icl_import,icl_imported_objects,
+		icl_type_funs, icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
 	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
@@ -101,6 +103,16 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 //	  ti_common_defs = { ti_common_defs & [main_dcl_module_n] = icl_common }
 //	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
 	  ({com_type_defs}, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
+
+	| support_dynamics && not (sanityCheckTypeFunctions main_dcl_module_n icl_common dcl_mods fun_defs)
+		=	abort "frontend: sanityCheckTypeFunctions failed"
+
+	# hp_var_heap = heaps.hp_var_heap
+	# (fun_defs, predef_symbols, hp_var_heap, type_heaps)
+		=	if support_dynamics
+				(buildTypeFunctions main_dcl_module_n fun_defs ti_common_defs 
+						predef_symbols hp_var_heap type_heaps)
+				(fun_defs, predef_symbols, hp_var_heap, type_heaps)
 	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups com_type_defs main_dcl_module_n td_infos type_heaps.th_vars error_admin
 	# (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
@@ -110,7 +122,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 
       type_heaps = { type_heaps & th_vars = th_vars }
 
-	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap }
+	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap, hp_var_heap=hp_var_heap }
 	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
 		with 
 			dcl_common_defs :: .{#DclModule} -> .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading
@@ -159,7 +171,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 
 	# (fun_def_size, fun_defs) = usize fun_defs
 	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") 
-									(icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges)
+									(icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges ++ icl_type_funs)
 		
 	| options.feo_up_to_phase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
@@ -191,7 +203,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
-	# {dcl_instances,dcl_specials,dcl_gencases} = dcl_mods.[main_dcl_module_n]
+	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]
 	# (start_rule_index,predef_symbols) = get_index_of_start_rule predef_symbols
 		with
 			get_index_of_start_rule predef_symbols
@@ -206,7 +218,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# exported_global_functions = case start_rule_index of
 				NoIndex	-> [icl_exported_global_functions]
 				sri		-> [{ir_from=sri,ir_to=inc sri},icl_exported_global_functions]
-	# exported_functions = exported_global_functions ++  [dcl_instances,dcl_specials,dcl_gencases]
+	# exported_functions = exported_global_functions ++  [dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs]
 	# (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin) 
 		= case options.feo_strip_unused of
 			True -> partitionateFunctions` (fun_defs -*-> "partitionateFunctions`")
@@ -272,7 +284,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 							 icl_common=icl_common, icl_gencases = icl_gencases ++ generic_ranges,
 							 icl_import=icl_import, icl_imported_objects=icl_imported_objects, icl_foreign_exports=icl_foreign_exports,
 							 icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
-							 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time}
+							 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time,
+							 icl_type_funs = icl_type_funs}
 
 			,	fe_dcls = dcl_mods
 			,	fe_components = components

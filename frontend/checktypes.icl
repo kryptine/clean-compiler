@@ -1446,6 +1446,7 @@ where
 			,	td_attribute	= TA_None
 			,	td_pos			= NoPos
 			,	td_used_types	= []
+			,	td_fun_index	= NoIndex
 			}
 		
 		  cons_def = 	

@@ -96,6 +96,7 @@ cConversionTableSize	:== 10
 	,	icl_instances			:: ![IndexRange]
 	,	icl_specials			:: !IndexRange
 	,	icl_gencases			:: ![IndexRange]
+	,	icl_type_funs			:: ![IndexRange]
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
@@ -112,6 +113,7 @@ cConversionTableSize	:== 10
 	,	dcl_macros			:: !IndexRange
 	,	dcl_specials		:: !IndexRange
 	,	dcl_gencases		:: !IndexRange
+	,	dcl_type_funs		:: !IndexRange
 	,	dcl_common			:: !CommonDefs
 	,	dcl_sizes			:: !{# Int}
 	,	dcl_dictionary_info	:: !DictionaryInfo

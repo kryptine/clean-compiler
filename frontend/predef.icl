@@ -132,6 +132,8 @@ predefined_idents
 					[PD_Dyn_TypeCodeConstructor_StrictArray] = i "TypeCodeConstructor_StrictArray",
 					[PD_Dyn_TypeCodeConstructor_UnboxedArray] = i "TypeCodeConstructor_UnboxedArray",
 
+					[PD_Dyn__to_TypeCodeConstructor] = i "_to_TypeCodeConstructor",
+
 					[PD_StdGeneric] = i "StdGeneric",
 					[PD_TypeBimap] = i "Bimap",
 					[PD_ConsBimap] = i "_Bimap",
@@ -213,7 +215,17 @@ predefined_idents
 					[PD_FromThenToSTS]= i "_from_then_to_sts",
 					[PD_FromThenToU]= i "_from_then_to_u",
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
-					[PD_FromThenToO]= i "_from_then_to_o"
+					[PD_FromThenToO]= i "_from_then_to_o",
+
+					[PD_CleanTypes] = i "StdCleanTypes",
+					[PD_CTTypeDef] = i "CTTypeDef",
+					[PD_CTAlgType] = i "CTAlgType",
+					[PD_CTRecordType] = i "CTRecordType",
+					[PD_CTSynType] = i "CTSynType",
+					[PD_CTPredefined] = i "CTPredefined",
+					[PD_CTConsDef] = i "CTConsDef",
+					[PD__CTToCons] = i "CTToCons",
+					[PD_CTFieldDef] = i "CTFieldDef"
 
 		}
 	=: idents
@@ -364,6 +376,8 @@ where
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictArray)
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedArray)
 
+					<<- (local_predefined_idents,	IC_Expression, PD_Dyn__to_TypeCodeConstructor)
+
 					<<- (local_predefined_idents,				IC_Module, 		PD_StdGeneric)
 					<<- (local_predefined_idents,				IC_Type, 		PD_TypeBimap)
 					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsBimap)	
@@ -412,6 +426,16 @@ where
 					<<- (local_predefined_idents,				IC_Expression, 	PD_abort)
 					<<- (local_predefined_idents,				IC_Expression, 	PD_undef)					
 					
+					<<- (local_predefined_idents,				IC_Module, PD_CleanTypes)
+					<<- (local_predefined_idents,				IC_Type, PD_CTTypeDef)
+					<<- (local_predefined_idents,				IC_Expression, PD_CTAlgType)
+					<<- (local_predefined_idents,				IC_Expression, PD_CTRecordType)
+					<<- (local_predefined_idents,				IC_Expression, PD_CTSynType)
+					<<- (local_predefined_idents,				IC_Expression, PD_CTPredefined)
+					<<- (local_predefined_idents,				IC_Type, PD_CTConsDef)
+					<<- (local_predefined_idents,				IC_Expression, PD__CTToCons)
+					<<- (local_predefined_idents,				IC_Type, PD_CTFieldDef)
+
 					<<- (local_predefined_idents,				IC_Expression, PD_Start)
 
 					<<- (local_predefined_idents,	IC_Expression, 	PD_FromS)
