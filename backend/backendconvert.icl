@@ -1237,7 +1237,7 @@ convertRootExpr aliasDummyId (Let {let_expr}) main_dcl_module_n varHeap
 	=	convertRootExpr aliasDummyId let_expr main_dcl_module_n varHeap
 convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n varHeap
 	=	beGuardNode
-			(convertExpr cond main_dcl_module_n varHeap)
+			(convertCondExpr cond main_dcl_module_n varHeap)
 			(convertRhsNodeDefs aliasDummyId then main_dcl_module_n varHeap)
 			(convertRhsStrictNodeIds then varHeap)
 			(convertRootExpr aliasDummyId then main_dcl_module_n varHeap)
@@ -1246,7 +1246,7 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=Y
 			(convertRootExpr aliasDummyId else main_dcl_module_n varHeap)
 convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=No}) main_dcl_module_n varHeap
 		=	beGuardNode
-				(convertExpr cond main_dcl_module_n varHeap)
+				(convertCondExpr cond main_dcl_module_n varHeap)
 				(convertRhsNodeDefs aliasDummyId then main_dcl_module_n varHeap)
 				(convertRhsStrictNodeIds then varHeap)
 				(convertRootExpr aliasDummyId then main_dcl_module_n varHeap)
@@ -1254,6 +1254,19 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=N
 				beNoStrictNodeIds
 				(beNormalNode (beBasicSymbol BEFailSymb) beNoArgs)
 convertRootExpr _ expr main_dcl_module_n varHeap
+	=	convertExpr expr main_dcl_module_n varHeap
+
+convertCondExpr :: Expression Int VarHeap -> BEMonad BENodeP
+convertCondExpr (Conditional {if_cond=cond, if_then=then, if_else=Yes else}) main_dcl_module_n varHeap
+		=	beGuardNode
+				(convertCondExpr cond main_dcl_module_n varHeap)
+				beNoNodeDefs
+				beNoStrictNodeIds
+				(convertCondExpr then main_dcl_module_n varHeap)
+				beNoNodeDefs
+				beNoStrictNodeIds
+				(convertCondExpr else main_dcl_module_n varHeap)
+convertCondExpr expr main_dcl_module_n varHeap
 	=	convertExpr expr main_dcl_module_n varHeap
 
 // RWS +++ rewrite
@@ -1463,8 +1476,10 @@ where
 				=	1
 			arity (Yes {glob_object={ds_arity}})
 				=	ds_arity
+	// this alternative should be deleted (can't occur)
 	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else}) varHeap
 		=	beIfNode (convertExpr cond varHeap) (convertExpr if_then varHeap) (convertExpr else varHeap)
+
 	convertExpr  expr _
 		=	undef <<- ("backendconvert, convertExpr: unknown expression", expr)
 
