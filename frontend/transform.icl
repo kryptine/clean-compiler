@@ -269,8 +269,17 @@ where
 	unfold (MatchExpr opt_tuple cons_symb expr) us
 		# (expr, us) = unfold expr us
 		= (MatchExpr opt_tuple cons_symb expr, us)
+	unfold (DynamicExpr expr) us
+		# (expr, us) = unfold expr us
+		= (DynamicExpr expr, us)
 	unfold expr us
 		= (expr, us)
+
+instance unfold DynamicExpr
+where
+	unfold expr=:{dyn_expr} us
+		# (dyn_expr, us) = unfold dyn_expr us
+		= ({ expr & dyn_expr = dyn_expr }, us)
 
 /* Sjaak ... */
 instance unfold Selection
