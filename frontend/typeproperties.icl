@@ -81,7 +81,7 @@ treeInsert new_key new_el tree=:(BT_Node el left right)
 		= BT_Node el (treeInsert new_key new_el left) right
 		= BT_Node el left (treeInsert new_key new_el right)
 	
-treeRetrieve :: !k !(BinTree (m k)) -> !Optional (m k) | =< k & key m
+treeRetrieve :: !k !(BinTree (m k)) -> Optional (m k) | =< k & key m
 treeRetrieve search_key BT_Empty
 	= No
 treeRetrieve search_key tree=:(BT_Node el left right)
@@ -124,7 +124,7 @@ retrieveSignClassification :: ![SignClassification] !TypeClassification -> Optio
 retrieveSignClassification cons_classes {tc_signs}
 	= treeRetrieve cons_classes tc_signs
 
-addSignClassification :: ![SignClassification] !SignClassification !TypeClassification -> !TypeClassification
+addSignClassification :: ![SignClassification] !SignClassification !TypeClassification -> TypeClassification
 addSignClassification hio_signs sign_class tc=:{tc_signs}
 	= { tc & tc_signs = treeInsert hio_signs { ts_cons_var_signs = hio_signs, ts_type_sign = sign_class } tc_signs }
 
@@ -132,7 +132,7 @@ retrievePropClassification :: ![PropClassification] !TypeClassification -> Optio
 retrievePropClassification cons_classes {tc_props}
 	= treeRetrieve cons_classes tc_props
 
-addPropClassification :: ![PropClassification] !PropClassification !TypeClassification -> !TypeClassification
+addPropClassification :: ![PropClassification] !PropClassification !TypeClassification -> TypeClassification
 addPropClassification hio_props prop_class tc=:{tc_props}
 	= { tc & tc_props = treeInsert hio_props { ts_cons_var_props = hio_props, ts_type_prop = prop_class } tc_props }
 

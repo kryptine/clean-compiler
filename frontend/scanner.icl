@@ -11,7 +11,7 @@ from utilities import revCharListToString, isSpecialChar
 	}
 
 :: ModTimeFunction f
-	:== ({#Char} !f -> *(!{#Char}, !f))
+	:== ({#Char} f -> *(!{#Char}, !f))
 
 // ... RWS
 
@@ -380,7 +380,7 @@ where
 		mark_poistion input = input
 	nextToken _ _ = abort "Scanner: Error in nextToken"
 
-class tokenBack state :: !*state -> !*state
+class tokenBack state :: !*state -> *state
 
 instance tokenBack RScanState
 where
@@ -565,7 +565,7 @@ scan_comment_in_line i fp_col fp_line line tabsize stream inp_filename
 			,	inp_pos	= {fp_line=fp_line, fp_col = fp_col}
 			}
 
-SkipToEndOfLine	:: !Input -> !Input
+SkipToEndOfLine	:: !Input -> Input
 SkipToEndOfLine input=:{inp_stream=OldLine i line stream,inp_pos={fp_line,fp_col}}
 	| i<size line
 		= {input & inp_stream=stream,inp_pos={fp_line=fp_line+1,fp_col=0}}
@@ -1021,7 +1021,7 @@ ScanChar input chars
 	| '\\' == c				= ScanBSChar 0 chars input ScanEndOfChar
 							= ScanEndOfChar 1 [c: chars] input
 
-ScanBSChar :: !Int ![Char] !Input (!Int ![Char] !Input -> (!Token, !Input)) -> (!Token, !Input)
+ScanBSChar :: !Int ![Char] !Input (Int [Char] Input -> (!Token, !Input)) -> (!Token, !Input)
 ScanBSChar n chars input cont
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= cont n chars input

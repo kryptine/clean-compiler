@@ -29,6 +29,6 @@ set_hte_mark :: !Int !*HashTable -> *HashTable
 :: BoxedIdent = {boxed_ident::!Ident}
 
 putIdentInHashTable :: !String !IdentClass !*HashTable -> (!BoxedIdent, !*HashTable)
-putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> !*HashTable
+putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> *HashTable
 
 remove_icl_symbols_from_hash_table :: !*HashTable -> *HashTable

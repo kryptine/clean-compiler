@@ -52,5 +52,5 @@ instance * Sign
 retrieveSignClassification :: ![SignClassification] !TypeClassification -> Optional (TypeSign [SignClassification])
 retrievePropClassification :: ![PropClassification] !TypeClassification -> Optional (TypeProp [PropClassification])
 
-addSignClassification :: ![SignClassification] !SignClassification !TypeClassification -> !TypeClassification
-addPropClassification :: ![PropClassification] !PropClassification !TypeClassification -> !TypeClassification
+addSignClassification :: ![SignClassification] !SignClassification !TypeClassification -> TypeClassification
+addPropClassification :: ![PropClassification] !PropClassification !TypeClassification -> TypeClassification

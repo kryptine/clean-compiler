@@ -113,7 +113,7 @@ mapAppend f [] tail
 	= tail
 
 
-mapAppendSt :: !(.a -> .(.b -> (.c,.b))) ![.a] !u:[.c] !.b -> !(!u:[.c],!.b)
+mapAppendSt :: !(.a -> .(.b -> (.c,.b))) ![.a] !u:[.c] !.b -> (!u:[.c],!.b)
 mapAppendSt f [x : xs] tail s 
 	# (x, s) = f x s
 	  (xs, s) = mapAppendSt f xs tail s

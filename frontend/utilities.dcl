@@ -65,7 +65,7 @@ map2St f l1 l2 st :== map2_st l1 l2 st
 
 app2St :: !(!.(.a -> .(.st -> (.c,.st))),!.(.e -> .(.st -> (.f,.st)))) !(.a,.e) !.st -> (!(.c,.f),!.st)
 
-mapAppendSt :: !(.a -> .(.b -> (.c,.b))) ![.a] !u:[.c] !.b -> !(!u:[.c],!.b)
+mapAppendSt :: !(.a -> .(.b -> (.c,.b))) ![.a] !u:[.c] !.b -> (!u:[.c],!.b)
 
 strictMap :: !(.a -> .b) ![.a] -> [.b]
 

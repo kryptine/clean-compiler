@@ -295,7 +295,7 @@ removeImportsAndLocalsOfModuleFromSymbolTable {dcls_import,dcls_local_for_import
 	# symbol_table = remove_declared_symbols_in_array 0 dcls_import symbol_table
 	= remove_declared_symbols_in_array 0 dcls_local_for_import symbol_table
 where
-	remove_declared_symbols_in_array :: !Int !{!Declaration} !*SymbolTable -> !*SymbolTable
+	remove_declared_symbols_in_array :: !Int !{!Declaration} !*SymbolTable -> *SymbolTable
 	remove_declared_symbols_in_array symbol_index symbols symbol_table
 		| symbol_index<size symbols
 			# symbol = symbols.[symbol_index]

@@ -108,7 +108,7 @@ where
 			#! (boxed_ident, hte_symbol_heap, hte_right) = insert name ident_class hte_mark0 hte_symbol_heap hte_right
 			= (boxed_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
 
-putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> !*HashTable
+putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> *HashTable
 putPredefinedIdentInHashTable predefined_ident=:{id_name} ident_class {hte_symbol_heap,hte_entries,hte_mark}
 	# hash_val = hashValue id_name
 	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty

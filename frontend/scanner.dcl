@@ -10,7 +10,7 @@ import StdEnv, general
 	}
 
 :: ModTimeFunction f
-	:== ({#Char} !f -> *(!{#Char}, !f))
+	:== ({#Char} f -> *(!{#Char}, !f))
 
 // ... RWS
 
@@ -129,7 +129,7 @@ instance <<< FilePosition
 class getFilename state :: !*state -> (!String,!*state)
 instance getFilename ScanState
 
-class tokenBack state :: !*state -> !*state
+class tokenBack state :: !*state -> *state
 instance tokenBack ScanState
 
 class nextToken state :: !ScanContext !*state -> (!Token, !*state)
