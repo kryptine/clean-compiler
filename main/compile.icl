@@ -4,6 +4,7 @@ import StdEnv
 import frontend
 import backendinterface
 import CoclSystemDependent
+import portToNewSyntax
 //import RWSDebug
 
 ::	CoclOptions =
@@ -188,6 +189,18 @@ compileModule options commandLineArgs {dcl_modules,functions_and_macros,predef_s
 			Yes syntaxTree
 				# dcl_modules=syntaxTree.fe_dcls
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
+				# (porting_ok, files)
+					 = switch_port_to_new_syntax 
+							(createPortedFiles options.moduleName options.searchPaths files)
+							(False, files)
+				  error = switch_port_to_new_syntax 
+				  			(case porting_ok of
+				  				True
+				  					-> error
+				  				False
+				  					-> error <<< "Error: couldn't write ported versions of module "
+				  							 <<< options.moduleName <<< '\n')
+				  			error
 				# (success,var_heap,error, files)
 					= backEndInterface outputPath (map appendRedirection commandLineArgs) predef_symbols syntaxTree main_dcl_module_n var_heap error files
 				-> (success,dcl_modules,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,error, files)

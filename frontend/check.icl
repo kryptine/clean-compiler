@@ -3,7 +3,7 @@ implementation module check
 import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
-import explicitimports, comparedefimp, checkFunctionBodies, containers
+import explicitimports, comparedefimp, checkFunctionBodies, containers, portToNewSyntax
 
 cPredefinedModuleIndex 	:== 1
 cUndef :== (-1)
@@ -1444,7 +1444,7 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 
 	  (dcl_modules, cs)
 	  		= switch_port_to_new_syntax
-	  			(write_expl_imports_to_file "icl.txt" imports.si_explicit dcl_modules cs)
+	  			(writeExplImportsToFile "icl.txt" imports.si_explicit dcl_modules cs)
 	  			(dcl_modules, cs)
 	  imports_ikh
 	  		= ikhInsert` False nr_of_modules imports ikhEmpty
@@ -2393,13 +2393,9 @@ Ste_Empty :== STE_Empty
 dummy_decl
 	=: { dcl_ident = { id_name = "", id_info = nilPtr }, dcl_pos = NoPos, dcl_kind = STE_Empty, dcl_index = cUndef }
 
-// BEGIN only for portToNewSyntax
-// BEGIN only for portToNewSyntax
-// BEGIN only for portToNewSyntax
-// BEGIN only for portToNewSyntax
-// BEGIN only for portToNewSyntax
-// BEGIN only for portToNewSyntax
 possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs
+	| switch_port_to_new_syntax False True
+		= abort "possibly_write_expl_imports_of_main_dcl_mod_to_file is only used for portToNewSyntax"
 	#! x_main_dcl_module_n
 			= cs.cs_x.x_main_dcl_module_n
 	= case ikhSearch x_main_dcl_module_n imports_ikh of
@@ -2407,179 +2403,5 @@ possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs
 			// the main dcl module is not part of the currently checked module component
 			-> (dcl_modules, cs)
 		Yes {si_explicit}
-			-> write_expl_imports_to_file "dcl.txt" si_explicit dcl_modules cs
+			-> writeExplImportsToFile "dcl.txt" si_explicit dcl_modules cs
 
-write_expl_imports_to_file file_name si_explicit dcl_modules cs
-	| switch_port_to_new_syntax False True
-		= abort "write_expl_imports_to_file is only used for portToNewSyntax"
-	# (file, cs)
-			= openFile file_name cs
-	  (dcl_modules, file)
-	  		= foldSt (write_expl_import (flatten (map fst si_explicit))) (reverse si_explicit) (dcl_modules, file)
-	= (dcl_modules, closeFile file cs)
-	
-write_expl_import all_expl_imp_decls (declarations, _) (dcl_modules, file)
-	# (declaration_strings, dcl_modules)
-			= mapFilterYesSt (decl_to_opt_string all_expl_imp_decls) (reverse declarations) dcl_modules
-	= (dcl_modules, fwriteNewSyntax declaration_strings file)
-
-// only for portToNewSyntax
-decl_to_opt_string all_expl_imp_decls decl=:{dcl_ident, dcl_index, dcl_kind=STE_Imported ste_kind def_mod_index}
-			dcl_modules
-	= imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index ste_kind def_mod_index
-			dcl_modules
-decl_to_opt_string _ {dcl_ident, dcl_kind=STE_FunctionOrMacro _} dcl_modules
-	= (Yes dcl_ident.id_name, dcl_modules)
-decl_to_opt_string all_expl_imp_decls decl dcl_modules
-	= abort ("decl_to_opt_string failed"--->decl)
-	
-// only for portToNewSyntax
-imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Constructor def_mod_index
-		dcl_modules
-	= (No, dcl_modules)
-imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Member def_mod_index
-		dcl_modules
-	= (No, dcl_modules)
-imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_DclFunction def_mod_index
-		dcl_modules
-	= (Yes dcl_ident.id_name, dcl_modules)
-imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Class def_mod_index
-		dcl_modules
-	= (Yes ("class "+++dcl_ident.id_name+++"(..)"), dcl_modules)
-imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index (STE_Instance _) def_mod_index
-		dcl_modules
-	# ({ins_type}, dcl_modules)
-			 = dcl_modules![def_mod_index].dcl_common.com_instance_defs.[dcl_index]
-	= (Yes ("instance "+++dcl_ident.id_name+++" "+++
-		separated " " (map type_to_string ins_type.it_types)), dcl_modules)
-imported_decl_to_opt_string all_expl_imp_decls dcl_ident dcl_index STE_Type def_mod_index
-		dcl_modules
-	# ({td_rhs}, dcl_modules)
-			 = dcl_modules![def_mod_index].dcl_common.com_type_defs.[dcl_index]
-	  dcl_string
-		  	= ":: "+++(case td_rhs of
-						AlgType constructors
-							-> dcl_ident.id_name+++constructor_bracket def_mod_index all_expl_imp_decls constructors
-						RecordType _
-							-> dcl_ident.id_name+++"{..}"
-						_
-							-> dcl_ident.id_name)
-	= (Yes dcl_string, dcl_modules)
-
-// only for portToNewSyntax
-type_to_string (TA {type_name} _) = possibly_replace_predef_symbols type_name.id_name
-type_to_string (TB type) = toString type
-type_to_string (TV {tv_name}) = tv_name.id_name
-type_to_string x = abort ("bug nr 945 in module check"--->x)
-
-possibly_replace_predef_symbols s
-	| s=="_list"
-		= "[]"
-	| s % (0,5) == "_tuple"
-		= (toString ['(':repeatn ((toInt (s%(6, (size s) - 1))) - 1) ','])+++")"
-	| s=="_array"
-		= "{}"
-	| s=="_!array"
-		= "{!}"
-	| s=="_#array"
-		= "{#}"
-	= s
-
-instance toString BasicType
-  where
-	toString BT_Int = "Int"
-	toString BT_Char = "Char"
-	toString BT_Real = "Real"
-	toString BT_Bool = "Bool"
-	toString BT_Dynamic = "Dynamic"
-	toString BT_File = "File"
-	toString BT_World = "World"
-	toString _ = abort "bug nr 346 in module check"
-
-// only for portToNewSyntax
-separated _ []
-	= ""
-separated separator [h:t]
-	= foldl (\l r->l+++separator+++r) h t
-
-constructor_bracket def_mod_index all_expl_imp_decls constructors
-	# expl_imp_constructor_strings
-			= [ ds_ident.id_name \\ {ds_ident} <- constructors
-				| is_expl_imported_constructor def_mod_index ds_ident all_expl_imp_decls ]
-	| isEmpty expl_imp_constructor_strings
-		= ""
-	= "("+++separated "," expl_imp_constructor_strings+++")"
-	
-// only for portToNewSyntax
-is_expl_imported_constructor def_mod_index ds_ident []
-	= False
-is_expl_imported_constructor def_mod_index ds_ident [{dcl_ident, dcl_kind=STE_Imported STE_Constructor def_mod_index2}:_]
-	| dcl_ident==ds_ident && def_mod_index==def_mod_index2
-		= True
-	// GOTO next alternative
-is_expl_imported_constructor def_mod_index ds_ident [h:t]
-	= is_expl_imported_constructor def_mod_index ds_ident t
-
-fwriteNewSyntax importStrings file
-	| isEmpty importStrings
-		= fwrites "import @#$@@!!" file
-	# with_commas = (map (\s->s+++", ") (butLast importStrings))++[last importStrings+++";"]
-	  lines = split_in_lines 12 with_commas [] []
-	  lines = [hd lines:[["\t":line]\\ line<-tl lines]]
-	  line_strings = [ foldl (+++) " " (line++["\n"]) \\ line<-lines ]
-	= fwrites (foldl (+++) "import" line_strings) file
-  where
- 	max_line_length = 80
-	split_in_lines i [] inner_accu outer_accu
-		# accu = if (isEmpty inner_accu) outer_accu [reverse inner_accu:outer_accu]
-		= reverse accu
-	split_in_lines i [h:t] inner_accu outer_accu
-		# s = size h
-		| s+i>max_line_length
-			| isEmpty inner_accu
-				= split_in_lines (s+i) t [h] outer_accu
-			= split_in_lines (s+cTabWidth) t [h] [inner_accu:outer_accu]
-		= split_in_lines (s+i) t [h:inner_accu] outer_accu
-// only for portToNewSyntax
-
-butLast [] = []
-butLast [x] = []
-butLast [h:t] = [h: butLast t]
-
-// MW: fake..
-openFile file_name cs
-	# world							= bigBang
-	  (ok, newFile, world)			= fopen file_name FWriteText world
-	  cs							= forget world cs
-	  cs = case ok of
-			True	-> cs
-			_		# cs_error = checkError "" ("can't open file \""+++file_name+++" in current directory.") cs.cs_error
-					-> { cs & cs_error=cs_error }
-	= (newFile, cs)
-
-closeFile file cs
-	# world				= bigBang
-	  (ok, world)		= fclose file world
-	= forget world cs
-
-bigBang :: .World
-bigBang = cast 1
-// creates a world from scratch
-
-forget :: !.x !.y -> .y
-forget x y = y
-
-cast :: !.a -> .b
-cast a
-	= code
-		{
-			pop_a 0
-		}
-// ..fake
-// END only for portToNewSyntax
-// END only for portToNewSyntax
-// END only for portToNewSyntax
-// END only for portToNewSyntax
-// END only for portToNewSyntax
-// END only for portToNewSyntax
-// END only for portToNewSyntax

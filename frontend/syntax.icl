@@ -7,9 +7,6 @@ import scanner, general, Heap, typeproperties, utilities
 PA_BUG on off :== on
 switch_import_syntax one_point_three two_point_zero :== one_point_three
 SwitchFusion fuse dont_fuse :== dont_fuse
-switch_port_to_new_syntax port dont_port :== dont_port
-
-cTabWidth :== switch_port_to_new_syntax 4 (abort "cTabWidth is only used for portToNewSyntax")
 
 ::	Ident =
 	{ 	id_name		:: !String
