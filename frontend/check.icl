@@ -816,14 +816,19 @@ checkPattern def_level mod_index (PE_List [exp1, exp2 : exps]) opt_var var_env p
 						  (pattern1, ps, e_info, cs) = build_final_pattern mod_index left_args pattern1 ps e_info cs
 						-> check_patterns def_level mod_index [pattern2,pattern1] arg rest opt_var var_env ps e_info cs
 					| is_infix_constructor prio2
-						| prio1 > prio2
-							# (mid_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index middle var_env ps e_info cs
-						      (pattern, ps, e_info, cs) = buildPattern mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
-						      (left_args, pattern, ps, e_info, cs) = build_left_pattern mod_index left_args prio2 pattern ps e_info cs
-							-> check_infix_pattern def_level mod_index left_args pattern kind2 cons2 prio2 arg rest opt_var var_env ps e_info cs 
-							# (mid_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
-							-> check_infix_pattern def_level mod_index [(kind1, cons1, prio1, left) : left_args]
-							  				mid_pat kind2 cons2 prio2 arg rest No var_env ps e_info cs
+						# optional_prio = determinePriority prio1 prio2
+						-> case optional_prio of
+							Yes priority
+								| priority
+									# (mid_pat, var_env, ps, e_info, cs) = check_pattern def_level mod_index middle var_env ps e_info cs
+								      (pattern, ps, e_info, cs) = buildPattern mod_index kind1 cons1 [left,mid_pat] No ps e_info cs
+								      (left_args, pattern, ps, e_info, cs) = build_left_pattern mod_index left_args prio2 pattern ps e_info cs
+									-> check_infix_pattern def_level mod_index left_args pattern kind2 cons2 prio2 arg rest opt_var var_env ps e_info cs 
+									# (mid_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
+									-> check_infix_pattern def_level mod_index [(kind1, cons1, prio1, left) : left_args]
+									  				mid_pat kind2 cons2 prio2 arg rest No var_env ps e_info cs
+							No
+								-> (AP_Empty ds_ident, var_env, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
 						-> (AP_Empty ds_ident, var_env, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
 					# (right_pat, var_env, ps, e_info, cs) = checkPattern def_level mod_index middle No var_env ps e_info cs
@@ -837,10 +842,15 @@ checkPattern def_level mod_index (PE_List [exp1, exp2 : exps]) opt_var var_env p
 		build_left_pattern mod_index [] _ result_pattern ps e_info cs
 			= ([], result_pattern, ps, e_info, cs)		
 		build_left_pattern mod_index la=:[(kind, cons, priol, left) : left_args] prior result_pattern ps e_info cs
-			| priol > prior
-				# (result_pattern,  ps, e_info, cs) = buildPattern mod_index kind cons [left,result_pattern] No ps e_info cs
-				= build_left_pattern mod_index left_args prior result_pattern ps e_info cs
-				= (la, result_pattern,  ps, e_info, cs)
+			# optional_prio = determinePriority priol prior
+			= case optional_prio of
+				Yes priority
+					| priority
+						# (result_pattern,  ps, e_info, cs) = buildPattern mod_index kind cons [left,result_pattern] No ps e_info cs
+						-> build_left_pattern mod_index left_args prior result_pattern ps e_info cs
+						-> (la, result_pattern,  ps, e_info, cs)
+				No
+					-> (la, result_pattern,  ps, e_info,{ cs & cs_error = checkError cons.glob_object.ds_ident "conflicting priorities" cs.cs_error })
 		
 		build_final_pattern mod_index [] result_pattern ps e_info cs
 			= (result_pattern,  ps, e_info, cs)		
@@ -1161,14 +1171,19 @@ where
 			# (opt_opr, left2, e_state, cs_error) = split_at_operator [re] res e_state cs_error
 			= case opt_opr of
 				Yes (symb2, prio2, is_fun2, right)
-					| prio1 > prio2
-				  		# (middle_exp, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
-						  (new_left, e_state, cs_error) = buildApplication symb1 2 2 is_fun1 [left1,middle_exp] e_state cs_error
-						  (left_appls, new_left, e_state, cs_error) = build_left_operand left_appls prio2 new_left e_state cs_error
-						-> build_operator_expression left_appls new_left (symb2, prio2, is_fun2) right e_state cs_error
-				  		# (middle_exp, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
-						-> build_operator_expression [(symb1, prio1, is_fun1, left1) : left_appls]
-								middle_exp (symb2, prio2, is_fun2) right e_state cs_error
+					# optional_prio = determinePriority prio1 prio2
+					-> case optional_prio of
+						Yes priority
+							| priority
+						  		# (middle_exp, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
+								  (new_left, e_state, cs_error) = buildApplication symb1 2 2 is_fun1 [left1,middle_exp] e_state cs_error
+								  (left_appls, new_left, e_state, cs_error) = build_left_operand left_appls prio2 new_left e_state cs_error
+								-> build_operator_expression left_appls new_left (symb2, prio2, is_fun2) right e_state cs_error
+						  		# (middle_exp, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
+								-> build_operator_expression [(symb1, prio1, is_fun1, left1) : left_appls]
+										middle_exp (symb2, prio2, is_fun2) right e_state cs_error
+						No
+							-> (EE, e_state, checkError symb1.symb_name "conflicting priorities" cs_error)
 				No
 					# (right, e_state, cs_error) = combine_expressions left2 [] 0 e_state cs_error
 					  (result_expr, e_state, cs_error) = buildApplication symb1 2 2 is_fun1 [left1,right] e_state cs_error
@@ -1177,10 +1192,15 @@ where
 		build_left_operand [] _ result_expr e_state cs_error
 			= ([], result_expr, e_state, cs_error)		
 		build_left_operand la=:[(symb, priol, is_fun, left) : left_appls] prior result_expr e_state cs_error
-			| priol > prior
-				# (result_expr, e_state, cs_error) = buildApplication symb 2 2 is_fun [left,result_expr] e_state cs_error
-				= build_left_operand left_appls prior result_expr e_state cs_error
-				= (la, result_expr, e_state, cs_error)
+			# optional_prio = determinePriority priol prior
+			= case optional_prio of
+				Yes priority
+					| priority
+						# (result_expr, e_state, cs_error) = buildApplication symb 2 2 is_fun [left,result_expr] e_state cs_error
+						-> build_left_operand left_appls prior result_expr e_state cs_error
+						-> (la, result_expr, e_state, cs_error)
+				No
+					-> (la, EE, e_state, checkError symb.symb_name "conflicting priorities" cs_error)
 		
 		build_final_expression [] result_expr e_state cs_error
 			= (result_expr, e_state, cs_error)		
@@ -2234,7 +2254,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		  }
 		, icl_sizes
 		, { cs & cs_symbol_table = cs_symbol_table }
-		)->>("conversion_table",conversion_table)
+		)
 
 where
 	add_to_conversion_table first_macro_index decl=:{dcl_ident=dcl_ident=:{id_info},dcl_kind,dcl_index,dcl_pos}
@@ -2294,7 +2314,6 @@ where
 			# (rt_constructor, cs) = redirect_defined_symbol STE_Constructor td_pos rt_constructor cs
 			  (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
 			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ], cs)
-// MW was		add_type_def td=:{td_name, td_pos} new_type_defs cs
 		add_type_def td=:{td_name, td_pos, td_rhs = AbstractType _} new_type_defs cs
 			# cs_error = checkError "definition module" "abstract type not defined in implementation module"
 					(setErrorAdmin (newPosition td_name td_pos) cs.cs_error)

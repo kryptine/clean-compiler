@@ -1216,6 +1216,9 @@ where
 		equal_args_of_tokens (ErrorToken id1)		(ErrorToken id2)		= id1 == id2
 		equal_args_of_tokens _						_						= True
 
+/* Sjaak ... */
+
+/*
 instance < Priority
 where
 	(<) (Prio assoc1 prio1) (Prio assoc2 prio2)
@@ -1227,6 +1230,21 @@ where
 	(<) _ LeftAssoc = True
 	(<) LeftAssoc _ = False
 	(<) _ _ = True
+
+*/
+
+determinePriority :: !Priority !Priority -> Optional Bool
+determinePriority (Prio assoc_left prio_left) (Prio assoc_right prio_right)
+	| prio_left == prio_right
+		= has_priority_over assoc_left assoc_right
+		= Yes (prio_left > prio_right)
+where
+	has_priority_over LeftAssoc 	LeftAssoc 	= Yes True
+	has_priority_over RightAssoc	RightAssoc 	= Yes False
+	has_priority_over _				_			= No
+
+/* Sjaak ... */
+
 			
 instance toString Priority
 where

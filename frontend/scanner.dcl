@@ -151,5 +151,13 @@ instance <<< Token
 
 instance toString Token, Priority
 
-instance < Priority
+
+/* Sjaak ... */
+
+// instance < Priority
+
+determinePriority :: !Priority !Priority -> Optional Bool
+
+/* ... Sjaak */
+
 
