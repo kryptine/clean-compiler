@@ -2843,7 +2843,7 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEF
 	sdef->sdef_type			= type;
 	sdef->sdef_arity		= constructorType->type_node_arity;
 
-	sdef->sdef_boxed_record	= FALSE;
+	sdef->sdef_boxed_record	= False;
 	
 	// +++ change this
 	{
