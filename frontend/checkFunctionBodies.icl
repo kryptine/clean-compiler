@@ -334,7 +334,7 @@ checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index,ei_l
 	  (es_fun_defs, e_info, heaps, cs)
 	  		= checkLocalFunctions ei_mod_index ei_expr_level rhs_locals ei_local_functions_index_offset e_state.es_fun_defs e_info
 	  			{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps, hp_generic_heap = e_state.es_generic_heap } cs
-	  (rhs_expr, free_vars, e_state, e_info, cs) 
+	  (rhs_expr, _, free_vars, e_state, e_info, cs) 
 	  		= check_opt_guarded_alts free_vars rhs_alts { e_input & ei_expr_level = ei_expr_level }
 	  			{ e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap, es_expr_heap = heaps.hp_expression_heap,
 					es_type_heaps = heaps.hp_type_heaps,es_generic_heap=heaps.hp_generic_heap } e_info cs
@@ -347,37 +347,35 @@ where
 	check_opt_guarded_alts free_vars (GuardedAlts guarded_alts default_expr) e_input e_state e_info cs
 		# (let_vars_list, rev_guarded_exprs, last_expr_level, free_vars, e_state, e_info, cs)
 				= check_guarded_expressions free_vars guarded_alts [] [] e_input e_state e_info cs
-		  (default_expr, free_vars, e_state, e_info, cs)
+		  (default_expr, default_expr_position, free_vars, e_state, e_info, cs)
 		  		= check_default_expr free_vars default_expr { e_input & ei_expr_level = last_expr_level } e_state e_info cs
 		  cs = { cs & cs_symbol_table = remove_seq_let_vars e_input.ei_expr_level let_vars_list cs.cs_symbol_table }
-	  	  (_, result_expr, es_expr_heap) = convert_guards_to_cases rev_guarded_exprs default_expr e_state.es_expr_heap
-	  	= (result_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
+	  	  (result_expr, result_expr_position , es_expr_heap) = convert_guards_to_cases rev_guarded_exprs default_expr default_expr_position e_state.es_expr_heap
+	  	= (result_expr, result_expr_position, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 	check_opt_guarded_alts free_vars (UnGuardedExpr unguarded_expr) e_input e_state e_info cs
 		= check_unguarded_expression free_vars unguarded_expr e_input e_state e_info cs
 
 	check_default_expr free_vars (Yes default_expr) e_input e_state e_info cs
-		# (expr, free_vars, e_state, e_info, cs) = check_unguarded_expression free_vars default_expr e_input e_state e_info cs
-		= (Yes expr, free_vars, e_state, e_info, cs)
+		# (expr, expr_position, free_vars, e_state, e_info, cs) = check_unguarded_expression free_vars default_expr e_input e_state e_info cs
+		= (Yes expr, expr_position, free_vars, e_state, e_info, cs)
 	check_default_expr free_vars No e_input e_state e_info cs
-		= (No, free_vars, e_state, e_info, cs)
-		
-	convert_guards_to_cases [(let_binds, guard, expr, guard_ident)] result_expr es_expr_heap
+		= (No, NoPos, free_vars, e_state, e_info, cs)
+	
+	convert_guards_to_cases [(let_binds, guard, expr, expr_position, guard_ident)] result_expr result_expr_position es_expr_heap
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
+		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = expr_position }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
-		  		case_default = result_expr, case_ident = Yes guard_ident,
-				case_explicit = cCaseNotExplicit,
-		  		case_info_ptr = case_expr_ptr, case_default_pos = NoPos }
+		  		case_default = result_expr, case_default_pos = result_expr_position,
+		  		case_ident = Yes guard_ident, case_explicit = cCaseNotExplicit, case_info_ptr = case_expr_ptr }
 		= build_sequential_lets let_binds case_expr NoPos es_expr_heap
-	convert_guards_to_cases [(let_binds, guard, expr, guard_ident) : rev_guarded_exprs] result_expr es_expr_heap
+	convert_guards_to_cases [(let_binds, guard, expr, expr_position, guard_ident) : rev_guarded_exprs] result_expr result_expr_position es_expr_heap
 		# (case_expr_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = NoPos }
+		  basic_pattern = {bp_value = (BVB True), bp_expr = expr, bp_position = expr_position }
 		  case_expr = Case { case_expr = guard, case_guards = BasicPatterns BT_Bool [basic_pattern],
-		  		case_default = result_expr, case_ident = Yes guard_ident,
-				case_explicit = cCaseNotExplicit,
-		  		case_info_ptr = case_expr_ptr, case_default_pos = NoPos }
-		  (_, result_expr, es_expr_heap) = build_sequential_lets let_binds case_expr NoPos es_expr_heap
-		= convert_guards_to_cases rev_guarded_exprs (Yes result_expr) es_expr_heap
+		  		case_default = result_expr, case_default_pos = result_expr_position,
+		  		case_ident = Yes guard_ident, case_explicit = cCaseNotExplicit, case_info_ptr = case_expr_ptr }
+		  (result_expr, result_expr_position, es_expr_heap) = build_sequential_lets let_binds case_expr NoPos es_expr_heap
+		= convert_guards_to_cases rev_guarded_exprs (Yes result_expr) result_expr_position es_expr_heap
 	
 	check_guarded_expressions free_vars [gexpr : gexprs] let_vars_list rev_guarded_exprs e_input e_state e_info cs
 		# (let_vars_list, rev_guarded_exprs, ei_expr_level, free_vars, e_state, e_info, cs)
@@ -394,10 +392,10 @@ where
 		  cs = pushErrorAdmin2 "guard" alt_position cs
 	  	  (guard, free_vars, e_state, e_info, cs) = checkExpression free_vars alt_guard e_input e_state e_info cs
 		  cs = popErrorAdmin cs
-		  (expr, free_vars, e_state, e_info, cs) = check_opt_guarded_alts free_vars alt_expr e_input e_state e_info cs
-	  	= (let_vars_list, [(let_binds, guard, expr, alt_ident) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
+		  (expr, expr_position, free_vars, e_state, e_info, cs) = check_opt_guarded_alts free_vars alt_expr e_input e_state e_info cs
+	  	= (let_vars_list, [(let_binds, guard, expr, expr_position, alt_ident) : rev_guarded_exprs], ei_expr_level, free_vars, e_state, e_info,  cs )
 
-	check_unguarded_expression :: [FreeVar] ExprWithLocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
+	check_unguarded_expression :: [FreeVar] ExprWithLocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,!Position,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_unguarded_expression free_vars {ewl_nodes,ewl_expr,ewl_locals,ewl_position} e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 		# this_expr_level = inc ei_expr_level
 		  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
@@ -409,14 +407,14 @@ where
 		  (expr, free_vars, e_state, e_info, cs)
 				= addArraySelections array_patterns expr free_vars e_input e_state e_info cs
 		  cs = { cs & cs_symbol_table = remove_seq_let_vars rhs_expr_level let_vars_list cs.cs_symbol_table }
-		  (_, seq_let_expr, es_expr_heap) = build_sequential_lets binds expr ewl_position e_state.es_expr_heap
+		  (seq_let_expr, expr_position, es_expr_heap) = build_sequential_lets binds expr ewl_position e_state.es_expr_heap
 	  	  (expr, free_vars, e_state, e_info, cs)
 				= checkRhssAndTransformLocalDefs free_vars loc_defs seq_let_expr e_input { e_state & es_expr_heap = es_expr_heap} e_info cs
 	  	  (es_fun_defs, e_info, heaps, cs)
 	  	  		= checkLocalFunctions ei_mod_index rhs_expr_level ewl_locals ei_local_functions_index_offset e_state.es_fun_defs e_info 
 	  	  		{ hp_var_heap = e_state.es_var_heap, hp_expression_heap = e_state.es_expr_heap, hp_type_heaps = e_state.es_type_heaps,hp_generic_heap=e_state.es_generic_heap } cs
 		  (es_fun_defs,macro_defs,cs_symbol_table) = removeLocalsFromSymbolTable ei_mod_index this_expr_level var_env ewl_locals ei_local_functions_index_offset es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
-	  	= (expr, free_vars, {e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap,
+	  	= (expr, expr_position, free_vars, {e_state & es_fun_defs = es_fun_defs, es_var_heap = heaps.hp_var_heap,
 	  			es_expr_heap = heaps.hp_expression_heap, es_type_heaps = heaps.hp_type_heaps, es_generic_heap=heaps.hp_generic_heap},
 	  		{e_info & ef_macro_defs=macro_defs}, { cs & cs_symbol_table = cs_symbol_table} )
 	
@@ -468,13 +466,13 @@ where
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,es_generic_heap=hp_generic_heap,es_fun_defs = ps_fun_defs }
 		= (src_expr, pattern, accus, free_vars, e_state, e_info, popErrorAdmin cs)
 	
-	build_sequential_lets :: ![(![LetBind],![LetBind])] !Expression !Position !*ExpressionHeap -> (!Position, !Expression, !*ExpressionHeap)
+	build_sequential_lets :: ![(![LetBind],![LetBind])] !Expression !Position !*ExpressionHeap -> (!Expression, !Position, !*ExpressionHeap)
 	build_sequential_lets [] expr let_expr_position expr_heap
-		= (let_expr_position, expr, expr_heap)
+		= (expr, let_expr_position, expr_heap)
 	build_sequential_lets [(strict_binds, lazy_binds) : seq_lets] expr let_expr_position expr_heap
-		# (let_expr_position, let_expr, expr_heap) = build_sequential_lets seq_lets expr let_expr_position expr_heap
+		# (let_expr, let_expr_position, expr_heap) = build_sequential_lets seq_lets expr let_expr_position expr_heap
 	  	  (let_expr, expr_heap) = buildLetExpression strict_binds lazy_binds let_expr let_expr_position expr_heap
-		= (if (isEmpty strict_binds && isEmpty lazy_binds) let_expr_position NoPos, let_expr, expr_heap)
+		= ( let_expr, if (isEmpty strict_binds && isEmpty lazy_binds) let_expr_position NoPos, expr_heap)
 
 checkLocalFunctions :: !Index !Level !LocalDefs !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 												 -> (!.{#FunDef},!.ExpressionInfo,!.Heaps,!.CheckState);
@@ -1022,23 +1020,35 @@ checkExpression free_vars rec=:(PE_Record record opt_type fields) e_input=:{ei_e
 					-> (App { app_symb = rec_cons, app_args = remove_fields exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
 				_
 					# (rec_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars record e_input e_state e_info cs
-					-> case rec_expr of
-						Var {var_info_ptr,var_name}
-							# (var_info, es_var_heap) = readPtr var_info_ptr e_state.es_var_heap
-							  e_state = { e_state & es_var_heap = es_var_heap }
-							-> case var_info of
-								VI_Record fields
-									# (exprs, free_vars, e_state, e_info, cs) 
-											= check_field_exprs free_vars new_fields 0 (RK_UpdateToConstructor fields) e_input e_state e_info cs
-									-> (App { app_symb = rec_cons, app_args = remove_fields exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
-								_ 
-									# (exprs, free_vars, e_state, e_info, cs)
-											= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
-									-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
-						_ 
-							# (exprs, free_vars, e_state, e_info, cs)
+					# (has_exi_vars,e_info) = record_has_exi_vars e_info
+						with
+							record_has_exi_vars e_info
+								| glob_module==ei_mod_index
+									# ({cons_exi_vars}, e_info) = e_info!ef_cons_defs.[ds_index];
+									= (case cons_exi_vars of [] -> False; _ -> True, e_info);
+									# ({cons_exi_vars}, e_info) = e_info!ef_modules.[glob_module].dcl_common.com_cons_defs.[ds_index];
+									= (case cons_exi_vars of [] -> False; _ -> True, e_info);
+					| has_exi_vars
+						-> case rec_expr of
+							Var {var_info_ptr,var_name}
+								# (var_info, es_var_heap) = readPtr var_info_ptr e_state.es_var_heap
+								  e_state = { e_state & es_var_heap = es_var_heap }
+								-> case var_info of
+									VI_Record fields
+										# (exprs, free_vars, e_state, e_info, cs) 
+												= check_field_exprs free_vars new_fields 0 (RK_UpdateToConstructor fields) e_input e_state e_info cs
+										-> (App { app_symb = rec_cons, app_args = remove_fields exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
+									_ 
+										# (exprs, free_vars, e_state, e_info, cs)
+												= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
+										-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
+							_ 
+								# (exprs, free_vars, e_state, e_info, cs)
+										= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
+								-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
+					# (exprs, free_vars, e_state, e_info, cs)
 									= check_field_exprs free_vars new_fields 0 RK_Update e_input e_state e_info cs
-							-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
+					-> (RecordUpdate cons rec_expr exprs, free_vars, e_state, e_info, cs)
 		No
 			-> (EE, free_vars, e_state, e_info, cs)
 where
@@ -1235,6 +1245,15 @@ where
 			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdEnum})
 				// instead of giving an error message remember that StdEnum should have been imported.
 				// Error will be given in function check_needed_modules_are_imported
+		| id==local_predefined_idents.[PD_FromS] || id==local_predefined_idents.[PD_FromTS] || id==local_predefined_idents.[PD_FromSTS]
+		|| id==local_predefined_idents.[PD_FromU] || id==local_predefined_idents.[PD_FromUTS] || id==local_predefined_idents.[PD_FromO]
+		|| id==local_predefined_idents.[PD_FromThenS] || id==local_predefined_idents.[PD_FromThenTS] || id==local_predefined_idents.[PD_FromThenSTS]
+		|| id==local_predefined_idents.[PD_FromThenU] || id==local_predefined_idents.[PD_FromThenUTS] || id==local_predefined_idents.[PD_FromThenO]
+		|| id==local_predefined_idents.[PD_FromToS] || id==local_predefined_idents.[PD_FromToTS] || id==local_predefined_idents.[PD_FromToSTS]
+		|| id==local_predefined_idents.[PD_FromToU] || id==local_predefined_idents.[PD_FromToUTS] || id==local_predefined_idents.[PD_FromToO]
+		|| id==local_predefined_idents.[PD_FromThenToS] || id==local_predefined_idents.[PD_FromThenToTS] || id==local_predefined_idents.[PD_FromThenToSTS]
+		|| id==local_predefined_idents.[PD_FromThenToU] || id==local_predefined_idents.[PD_FromThenToUTS] || id==local_predefined_idents.[PD_FromThenToO]
+			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdStrictLists})
 		# createArray_ident = local_predefined_idents.[PD__CreateArrayFun]
 		  uselect_ident = local_predefined_idents.[PD_UnqArraySelectFun]
 		  update_ident = local_predefined_idents.[PD_ArrayUpdateFun]
