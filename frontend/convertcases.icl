@@ -713,7 +713,8 @@ where
  		# (sign_of_then_part, then_part, ci) = convert_boolean_guard bound_vars group_index common_defs alt ci
  		  (opt_else_part, ci) = convert_to_else_part bound_vars group_index common_defs has_default sign_of_then_part alts case_default ci
 		*/
-		# sign_of_then_part = case alt of {{bp_value=BVB bool} -> bool};
+		# sign_of_then_part = case alt of 
+								{bp_value=BVB bool} -> bool
 		# (opt_else_part, ci) = convert_to_else_part bound_vars group_index common_defs has_default sign_of_then_part alts case_default ci
 		# (sign_of_then_part, then_part, ci) = convert_boolean_case_then_part bound_vars group_index common_defs default_ptr alt opt_else_part has_default ci
 		/**/
