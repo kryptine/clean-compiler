@@ -367,6 +367,8 @@ instance t_corresponds (TypeDef TypeRhs) where
 		= t_corresponds_TypeDef dclDef iclDef
 	  where
 		t_corresponds_TypeDef dclDef iclDef tc_state
+//			| False--->("comparing:", dclDef, iclDef)
+//				= undef
 			# tc_state = { tc_state & tc_visited_syn_types.[dclDef.td_index] = True }
 			  tc_state = init_attr_vars dclDef.td_attrs tc_state 
 			  tc_state = init_attr_vars iclDef.td_attrs tc_state 
@@ -387,7 +389,8 @@ instance t_corresponds (TypeDef TypeRhs) where
 			# (corresponds, tc_state) = t_corresponds dclDef.td_context iclDef.td_context tc_state
 			| not corresponds
 				= (corresponds, tc_state)
-			= t_corresponds dclDef.td_attribute iclDef.td_attribute tc_state
+			# attributes_correspond = (is_TA_Unique dclDef.td_attribute)==(is_TA_Unique iclDef.td_attribute)
+			= (attributes_correspond, tc_state)
 
 		root_has_anonymous_attr (TA_Var lhs_attr_var) syn_type=:(SynType a_type=:{at_attribute=TA_Var rhs_attr_var})
 			= rhs_attr_var.av_info_ptr==lhs_attr_var.av_info_ptr
@@ -399,6 +402,9 @@ instance t_corresponds (TypeDef TypeRhs) where
 		
 		isnt_abstract (AbstractType _) = False
 		isnt_abstract _ = True
+		
+		is_TA_Unique TA_Unique = True
+		is_TA_Unique _ = False
 		
 instance t_corresponds TypeContext where
 	t_corresponds dclDef iclDef
