@@ -3783,7 +3783,8 @@ wantEndLocals pState
 	| ss_useLayout
 		= case token of
 			EndGroupToken	->	pState
-			InToken			->	tokenBack pState	// For let expressions with cases
+			InToken			->	tokenBack (appScanState dropOffsidePosition pState) // PK
+	//		InToken			->	tokenBack pState	// For let expressions with cases
 			_				->	parseError "local definitions" (Yes token) "end of locals with layout" pState
 	// ~ ss_useLayout
 	| token == CurlyCloseToken

@@ -1671,7 +1671,8 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 			  	= (newToken, scanState) // -->> ("new offsides",new_offsides)
 			  	= gen_end_groups (dec n) scanState
 	| token == InToken
-		= (token, { scanState & ss_offsides = tl ss_offsides })
+//		= (token, { scanState & ss_offsides = tl ss_offsides })
+		= (token, scanState) // PK: parser removes offsides
 		= newOffside token scanState
 where
 	newOffside token scanState=:{ss_offsides,ss_scanOptions}
