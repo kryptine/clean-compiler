@@ -4,7 +4,8 @@ definition module graph
 
 from pfun import Pfun
 from StdOverloaded import ==
-from StdString import String,toString
+from cleanversion import String
+from StdString import toString
 
 // A rule associating a replacement with a pattern
 //:: Rule sym var
@@ -98,7 +99,7 @@ Implementation
 */
 
 // The empty graph.
-emptygraph :: Graph .sym .var
+emptygraph :: .Graph sym var
 
 // Assign a node to a variable in a graph.
 updategraph :: var .(Node sym var) !.(Graph sym var) -> .Graph sym var

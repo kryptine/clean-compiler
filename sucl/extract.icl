@@ -80,7 +80,7 @@ actualfold deltanodes rnfnodes foldarea self foldcont hist rule
 = Yes (mkrule rargs rroot rgraph``,areas`)
   where rargs = arguments rule; rroot = ruleroot rule; rgraph = rulegraph rule
 
-        list2 = map (pairwith (findoccs hist rule)) (removeMembers (varlist rgraph [rroot]) (varlist rgraph rargs))
+        list2 = map (pairwith (findoccs hist rule)) (varlist rgraph [rroot]--varlist rgraph rargs)
         // list2: list combining every node with list of every instantiable history graph
 
         list3 = [(rnode,mapping) \\ (rnode,[mapping:_])<-list2]
@@ -120,7 +120,7 @@ findoccs hist rule rnode
         unshared rnode (hroot,hgraph) mapping
         = disjoint inner outer
           where inner = map (lookup mapping) (fst (graphvars hgraph [hroot]))
-                outer = removeMembers (varlist (prunegraph rnode rgraph) [rroot:rargs]) [rnode]
+                outer = varlist (prunegraph rnode rgraph) [rroot:rargs]--[rnode]
 
 /*
 ------------------------------------------------------------------------
@@ -148,8 +148,8 @@ splitrule fold rnfnodes deltanodes rule area
         rgraph` = updategraph aroot (fold area`) rgraph
         area` = mkrgraph aroot agraph`
         agraph` = foldr addnode emptygraph ins
-        ins = removeMembers (varlist agraph [aroot]) outs
-        outs = removeMembers (varlist (prunegraph aroot rgraph) [rroot:rargs++snd (graphvars agraph [aroot])]) [aroot]
+        ins = varlist agraph [aroot]--outs
+        outs = varlist (prunegraph aroot rgraph) [rroot:rargs++snd (graphvars agraph [aroot])]--[aroot]
 
         addnode node = updategraph node (snd (dnc (const "in splitrule") rgraph node))
 
@@ -180,11 +180,11 @@ finishfold foldarea fixednodes singlenodes root graph
         process aroot
         = mkrgraph aroot (foldr addnode emptygraph ins)
           where outs_and_aroot = varlist (prunegraph aroot graph) arearoots++fixednodes
-                ins = [aroot:removeMembers (varlist graph [aroot]) outs_and_aroot]
+                ins = [aroot:varlist graph [aroot]--outs_and_aroot]
         generate area
-        = removeMembers (snd (graphvars agraph [aroot])) fixednodes
+        = snd (graphvars agraph [aroot])--fixednodes
           where aroot = rgraphroot area; agraph = rgraphgraph area
-        arearoots = removeMembers (removeDup [root:singlenodes++singfixargs]) fixednodes
+        arearoots = removeDup [root:singlenodes++singfixargs]--fixednodes
         singfixargs = flatten (map arguments (singlenodes++fixednodes))
 
         arguments node

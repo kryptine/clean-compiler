@@ -1709,7 +1709,7 @@ where
 	where
 		r2={r1 & [s]=el}
 		r1={r0 & [i]=array.[i] \\ i<-[0..s-1]} 	
-		r0 = _createArray (s+1)
+		r0 = undef // _createArray (s+1)
 		s = size array		
 0.2*/
 	copy_array array = {x \\ x <-: array}	
@@ -2118,8 +2118,8 @@ where
 		# (alts, free_vars, gs) =  build_alts (i+1) n type_def_mod cons_def_syms cons_infos gs 		
 		= ([alt:alts], fvs ++ free_vars, gs)
 
-	build_alt :: !Int !Int !Int !DefinedSymbol !DefinedSymbol !*GenericState 
-		-> (AlgebraicPattern, [FreeVar], !*GenericState)
+//	build_alt :: !Int !Int !Int !DefinedSymbol !DefinedSymbol !*GenericState 
+//		-> (AlgebraicPattern, [FreeVar], !*GenericState)
 	build_alt 
 			i n type_def_mod def_symbol=:{ds_ident, ds_arity} cons_info 
 			gs=:{gs_heaps, gs_predefs, gs_main_dcl_module_n}		
@@ -2240,8 +2240,8 @@ where
 		# vars = [var : left_vars ++ right_vars]	
 		= (case_expr, vars, heaps) 
 	
-	build_cons_app :: !Index !DefinedSymbol !*Heaps 
-		-> (!Expression, [FreeVar], !*Heaps)
+//	build_cons_app :: !Index !DefinedSymbol !*Heaps 
+//		-> (!Expression, [FreeVar], !*Heaps)
 	build_cons_app cons_mod def_symbol=:{ds_arity} heaps
 		# names = ["x"  +++ toString k \\ k <- [1..ds_arity]]
 		# (var_exprs, vars, heaps) = buildVarExprs names heaps 
@@ -2308,8 +2308,8 @@ where
 		# (alts, free_vars, gs) = build_alts iso_dir (i+1) n type_def_mod def_symbols arg_vars type_def gs 		
 		= ([alt:alts], fvs ++ free_vars, gs)
 
-	build_alt :: !IsoDirection !Int !Int !Int !DefinedSymbol ![FreeVar] !CheckedTypeDef !*GenericState 
-		-> (AlgebraicPattern, [FreeVar], !*GenericState)
+//	build_alt :: !IsoDirection !Int !Int !Int !DefinedSymbol ![FreeVar] !CheckedTypeDef !*GenericState 
+//		-> (AlgebraicPattern, [FreeVar], !*GenericState)
 	build_alt 
 			iso_dir i n type_def_mod def_symbol=:{ds_ident, ds_arity, ds_index} 
 			fun_arg_vars type_def gs=:{gs_heaps, gs_modules}		
@@ -2329,8 +2329,8 @@ where
 			}
 		= (alg_pattern, cons_arg_vars, {gs & gs_heaps = gs_heaps})
 	
-	build_cons_args :: !IsoDirection ![AType] ![FreeVar] ![FreeVar] !CheckedTypeDef !*GenericState 
-		-> ([!Expression], !*GenericState)
+//	build_cons_args :: !IsoDirection ![AType] ![FreeVar] ![FreeVar] !CheckedTypeDef !*GenericState 
+//		-> ([!Expression], !*GenericState)
 	build_cons_args iso_dir [] [] fun_arg_vars type_def gs = ([], gs) 	
 	build_cons_args	iso_dir [arg_type:arg_types] [cons_arg_var:cons_arg_vars] fun_arg_vars type_def gs
 		# (arg_expr, gs) = build_cons_arg iso_dir arg_type cons_arg_var fun_arg_vars type_def gs
@@ -2403,8 +2403,8 @@ where
 		# (tv, heaps) = buildTypeVar name heaps
 		= (makeAType (TV tv) (TA_Var av), heaps)	
 
-buildIsomapForTypeDef :: !DefinedSymbol !Int !Int !CheckedTypeDef !DefinedSymbol !DefinedSymbol !*GenericState
-	-> (!FunDef, !*GenericState)
+//buildIsomapForTypeDef :: !DefinedSymbol !Int !Int !CheckedTypeDef !DefinedSymbol !DefinedSymbol !*GenericState
+//	-> (!FunDef, !*GenericState)
 buildIsomapForTypeDef	
 		fun_def_sym group_index type_def_mod 
 		type_def=:{td_name, td_index, td_arity, td_pos}
@@ -2497,8 +2497,8 @@ where
 		# (var_expr, gs_heaps) = buildExprForTypeVar type_var arg_type_vars arg_vars gs_predefs gs_heaps 
 		= (var_expr, {gs & gs_heaps = gs_heaps})
 	
-buildInstance :: !DefinedSymbol !Int !ClassInstance !GenericDef !*GenericState
-	-> (!FunDef, !*GenericState)
+//buildInstance :: !DefinedSymbol !Int !ClassInstance !GenericDef !*GenericState
+//	-> (!FunDef, !*GenericState)
 buildInstance 
 		def_sym group_index 
 		instance_def=:{ins_type, ins_generic, ins_pos, ins_ident} 
@@ -2676,8 +2676,8 @@ where
 								= find_in_array (inc index) array el	
 
 
-buildKindConstInstance :: !DefinedSymbol !Int !Index !DefinedSymbol !TypeKind !GenericState
-	-> (!FunDef, !*GenericState)
+//buildKindConstInstance :: !DefinedSymbol !Int !Index !DefinedSymbol !TypeKind !GenericState
+//	-> (!FunDef, !*GenericState)
 buildKindConstInstance 
 		def_sym group_index 
 		generic_module generic_def_sym kind=:(KindArrow kinds) 
@@ -3225,7 +3225,7 @@ buildVarExpr name heaps=:{hp_var_heap, hp_expression_heap}
 	# heaps = { heaps & hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap } 
 	= (var, fv, heaps)
 
-buildVarExprs :: ![String] !*Heaps -> (![Expression], [!FreeVar], !*Heaps)	 		
+//buildVarExprs :: ![String] !*Heaps -> (![Expression], [!FreeVar], !*Heaps)	 		
 buildVarExprs [] heaps = ([], [], heaps)
 buildVarExprs [name:names] heaps 
 	# (expr, var, heaps) = buildVarExpr name heaps

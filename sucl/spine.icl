@@ -8,7 +8,7 @@ import dnc
 import graph
 import pfun
 import basic
-from general import No,Yes
+from general import No,Yes,--->
 import StdEnv
 
 /*
@@ -239,9 +239,10 @@ spinetip spine = spine
 
 spinenodes :: .(Spine sym var pvar) -> [var]
 spinenodes spine
-= foldspine cons [] [] (const id) [] (const []) partial (const []) redex [] spine
+= ((nodes<---"spine.spinenodes ends") ---> ("spine.spinenodes number of spine nodes is "+++toString (length nodes))) ---> "spine.spinenodes begins"
   where partial _ _ _ = id
         redex _ _ = []
+        nodes = foldspine cons [] [] (const id) [] (const []) partial (const []) redex [] spine
 
 ifopen :: result result !.(Answer sym var pvar) -> result
 ifopen open other spine
@@ -317,12 +318,24 @@ extgraph` sgraph rule
 = extgraph sgraph rgraph (varlist rgraph (arguments rule))
   where rgraph = rulegraph rule
 
-(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | <<< var
+(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
 (writeanswer) file No = file <<< "<root-normal-form>" <<< nl
 (writeanswer) file (Yes spine) = file writespine spine <<< nl
 
-(writespine) infixl :: *File (Spine sym var pvar) -> .File | <<< var
+(writespine) infixl :: *File (Spine sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
 (writespine) file (var,subspine) = file <<< "(" <<< var <<< "," <<< subspine <<< ")"
 
-instance <<< Subspine sym var pvar
-where (<<<) file subspine = file <<< "<subspine>"
+instance <<< (Subspine sym var pvar) | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
+where
+/*
+      (<<<) file _ = file <<< "<subspine>"
+*/
+      (<<<) file Cycle = file <<< "Cycle"
+      (<<<) file Delta = file <<< "Delta"
+      (<<<) file (Force argno spine) = file <<< "Force " <<< argno <<< " " writespine spine
+      (<<<) file MissingCase = file <<< "MissingCase"
+      (<<<) file (Open pattern) = file <<< "Open <rgraph>"
+      (<<<) file (Partial rule matching focus spine) = file <<< "Partial {rule=<Rule sym pvar>, matching=<Pfun pvar var>, focus=<pvar>, spine=" writespine spine <<< "}"
+      (<<<) file (Unsafe pattern) = file <<< "Unsafe " writergraph pattern
+      (<<<) file (Redex rule matching) = file <<< "Redex {rule=<Rule sym pvar>, matching=<Pfun pvar var>}"
+      (<<<) file Strict = file <<< "Strict"

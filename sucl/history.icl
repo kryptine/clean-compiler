@@ -6,7 +6,7 @@ import rule
 import graph
 import pfun
 import basic
-from general import Optional,Yes,No
+from general import Optional,Yes,No,--->
 import StdEnv
 
 // A history relates node-ids in the subject graph to patterns
@@ -39,17 +39,17 @@ matchhistory
     (Graph sym var)             // Current subject graph
     var                         // Current application point of strategy
  -> [HistoryPattern sym var]    // Matching history patterns
- |  == sym
- &  == var
+ |  Eq sym
+ &  Eq var
 
 matchhistory hist spinenodes sgraph snode
- = foldr (checkassoc spinenodes sgraph snode) [] hist
+= foldr ((checkassoc--->"history.checkassoc begins from history.matchhistory") spinenodes sgraph snode) [] hist <--- "history.matchhistory ends"
 
 checkassoc spinenodes sgraph snode (var,pats) rest
- = if (isMember var spinenodes) (foldr checkpat rest pats) rest
-   where checkpat pat rest
-         = if (isinstance (hgraph,hroot) (sgraph,snode)) [pat:rest] rest
-           where hgraph = rgraphgraph pat; hroot = rgraphroot pat
+= ((if (isMember var spinenodes) (foldr (checkpat--->"history.checkassoc.checkpat begins from history.checkassoc") rest pats) (rest--->"history.checkassoc history attachment node is not part of the spine nodes")) <--- "history.checkassoc ends") ---> ("history.checkassoc number of history patterns for node is "+++toString (length pats))
+  where checkpat pat rest
+        = (if ((isinstance--->"graph.isinstance begins from history.checkassoc.checkpat") (hgraph,hroot) (sgraph,snode)) [pat:rest] rest) <--- "history.checkassoc.checkpat ends"
+          where hgraph = rgraphgraph pat; hroot = rgraphroot pat
 
 /*
 instantiate ::
@@ -60,8 +60,18 @@ instantiate ::
  -> ([(pvar,var)],[(pvar,var)],[(pvar,var)])
 */
 
+historyToString ::
+    (History sym var)
+ -> String
+ |  toString sym
+ &  toString var
+ &  Eq var
+
+historyToString history
+= showlist (showpair toString (showlist toString)) history
+
 (writeHistory) infixl :: *File (History sym var) -> .File | toString sym & toString,== var
-(writeHistory) file history = sfoldl (writeHistoryAssociation) file history
+(writeHistory) file history = file <<< "<history>" // sfoldl (writeHistoryAssociation) file history
 
 (writeHistoryAssociation) infixl :: *File (HistoryAssociation sym var) -> .File | toString sym & toString,== var
-(writeHistoryAssociation) file ha = file <<< showpair toString (showlist toString) ha <<< nl
+(writeHistoryAssociation) file ha = file <<< "<historyassociation>" // showpair toString (showlist toString) ha <<< nl

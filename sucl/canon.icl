@@ -59,9 +59,9 @@ steps:
 
 */
 
-canonise :: (sym -> Rule tsym tvar) [var2] (Rgraph sym var1) -> Rgraph sym var2 | == var1
-canonise typerule heap rg
- = ((relabel heap o etaexpand typerule o splitrg o relabel localheap) rg <--- "canon.canonise ends") ---> "canon.canonise begins"
+canonise :: (sym -> Int) [var2] (Rgraph sym var1) -> Rgraph sym var2 | == var1
+canonise arity heap rg
+ = ((relabel heap o etaexpand arity o splitrg o relabel localheap) rg <--- "canon.canonise ends") ---> "canon.canonise begins"
 
 /*
 
@@ -75,7 +75,7 @@ canonise typerule heap rg
 splitrg :: (Rgraph sym Int) -> Rgraph sym Int
 splitrg rgraph
  = foldsingleton single rgraph rgraph
-   where single root sym args = mkrgraph root (updategraph root (sym,fst (claim args (removeMembers localheap [root]))) emptygraph)
+   where single root sym args = mkrgraph root (updategraph root (sym,fst (claim args (localheap--[root]))) emptygraph)
 
 /*
 >   uncurry :: (*->rule **** *****) -> rgraph * num -> rgraph * num
@@ -89,12 +89,11 @@ splitrg rgraph
 >             root = rgraphroot rgraph; graph = rgraphgraph rgraph
 */
 
-etaexpand :: (sym->Rule tsym tvar) (Rgraph sym Int) -> Rgraph sym Int
-etaexpand typerule rgraph
+etaexpand :: (sym->Int) (Rgraph sym Int) -> Rgraph sym Int
+etaexpand arity rgraph
  = f (nc root)
    where f (True,(sym,args))
-          = mkrgraph root (updategraph root (sym,fst (claim targs (args++(removeMembers localheap (varlist graph [root]))))) graph)
-            where targs = arguments (typerule sym)
+          = mkrgraph root (updategraph root (sym,take (arity sym) (args++(localheap--(varlist graph [root])))) graph)
          f cont = rgraph
          nc = varcontents graph
          root = rgraphroot rgraph; graph = rgraphgraph rgraph
@@ -115,8 +114,8 @@ localheap =: [0..]
 foldarea :: ((Rgraph sym var) -> sym) (Rgraph sym var) -> Node sym var | == var
 foldarea label rgraph
  = (((labelrgraph<---"canon.foldarea.labelrgraph begins")--->"canon.foldarea.labelrgraph ends",(foldsingleton single nosingle rgraph<---"canon.foldarea.foldsingleton ends")--->"canon.foldarea.foldsingleton begins") <--- "canon.foldarea ends") ---> "canon.foldarea begins"
-   where single root sym args = map (\arg->(arg<---"newfold.foldarea.single.arg begins")--->"newfold.foldarea.single.arg ends") args
-         nosingle = map (\arg->(arg<---"newfold.foldarea.nosingle.arg begins")--->"newfold.foldarea.nosingle.arg ends") (snd (graphvars (rgraphgraph rgraph) [rgraphroot rgraph]))
+   where single root sym args = map (\arg->(arg<---"canon.foldarea.single.arg ends")--->"canon.foldarea.single.arg begins") args
+         nosingle = map (\arg->(arg<---"newfold.foldarea.nosingle.arg ends")--->"newfold.foldarea.nosingle.arg begins") (snd (graphvars (rgraphgraph rgraph) [rgraphroot rgraph]))
          labelrgraph = (label rgraph <--- "canon.foldarea.labelrgraph ends") ---> "canon.foldarea.labelrgraph begins"
 
 /*
@@ -139,18 +138,18 @@ foldarea label rgraph
 >             aroot = rgraphroot area; agraph = rgraphgraph area
 */
 
-labelarea :: [Rgraph sym var] [sym] (Rgraph sym var) -> sym | == sym & == var
-labelarea areas labels rg
- = ((foldmap--->"canon.labelarea uses foldmap") id nolabel ((maketable--->"canon.maketable begins from canon.labelarea") ((areas<---"canon.labelarea.areas ends")--->"canon.labelarea.areas begins") ((labels<---"canon.labelarea.labels ends")--->"canon.labelarea.labels begins")) ((rg<---"canon.labelarea.rg ends")--->"canon.labelarea.rg begins") <--- "canon.labelarea ends") ---> "canon.labelarea begins"
+labelarea :: (sym->Bool) [Rgraph sym var] [sym] (Rgraph sym var) -> sym | == sym & == var
+labelarea reusable areas labels rg
+ = ((foldmap--->"canon.labelarea uses foldmap") id nolabel ((maketable--->"canon.maketable begins from canon.labelarea") reusable ((areas<---"canon.labelarea.areas ends")--->"canon.labelarea.areas begins") ((labels<---"canon.labelarea.labels ends")--->"canon.labelarea.labels begins")) ((rg<---"canon.labelarea.rg ends")--->"canon.labelarea.rg begins") <--- "canon.labelarea ends") ---> "canon.labelarea begins"
    where nolabel = abort "canon: labelarea: no label assigned to area"
 
-maketable :: [Rgraph sym var] [sym] -> [(Rgraph sym var,sym)] | == var
-maketable [] _ = [] <--- "canon.maketable ends empty"
-maketable [area:areas] labels
- = [(((area<---"canon.maketable.area ends")--->"canon.maketable.area begins",(label<---"canon.maketable.label ends")--->"canon.maketable.label begins") <--- "canon.maketable.head ends") ---> "canon.maketable.head begins":(maketable--->"canon.maketable begins from maketable") areas labels`] <--- "canon.maketable ends nonempty"
+maketable :: (sym->Bool) [Rgraph sym var] [sym] -> [(Rgraph sym var,sym)] | == var
+maketable _ [] _ = [] <--- "canon.maketable ends empty"
+maketable reusable [area:areas] labels
+ = [(((area<---"canon.maketable.area ends")--->"canon.maketable.area begins",(label<---"canon.maketable.label ends")--->"canon.maketable.label begins") <--- "canon.maketable.head ends") ---> "canon.maketable.head begins":(maketable--->"canon.maketable begins from maketable") reusable areas labels`] <--- "canon.maketable ends nonempty"
    where (label,labels`) = getlabel (nc aroot) labels
          getlabel (True,(asym,aargs)) labels
-          | not (or (map (fst o nc) aargs))
+          | reusable asym && not (or (map (fst o nc) aargs))
             = (asym,labels)
          getlabel acont [label:labels]
           = (label,labels)

@@ -9,6 +9,9 @@ from coreclean import SuclTypeSymbol,SuclTypeVariable,SuclSymbol,SuclSymbolKind,
 from checksupport import DclModule
 from syntax import FunDef,FunType,ExpressionHeap
 from predef import PredefinedSymbols,PredefinedSymbol
+/*2.0
+from StdArray import Array
+0.2*/
 
 // Transitively required stuff
 from newfold import FuncBody
@@ -16,7 +19,7 @@ from trace import Trace,Transformation
 from spine import Answer,Spine,Subspine
 from history import History,HistoryAssociation,HistoryPattern
 from rule import Rgraph
-from StdString import String
+from cleanversion import String
 from checksupport import CommonDefs,ConversionTable,Declarations
 from syntax import Ident,Priority,FunctionBody,Optional,SymbolType,Position,DefOrImpFunKind,FunInfo,SymbolPtr,TypeVar,AType,AType,TypeContext,AttributeVar,AttrInequality,FunCall,Index,Level,FreeVar,FreeVar,ExprInfoPtr,BITVECT,Ptr,Specials,SymbolTableEntry,TypeVarInfoPtr,TypeAttribute,Annotation,Type,Context,Global,DefinedSymbol,Type,VarInfoPtr,AttrVarInfoPtr,Expression,VarInfoPtr,Ptr,ExprInfo,PtrN,HeapN,PtrN,STE_Kind,TypeVarInfo,VarInfo,AttrVarInfo,CheckedTypeDef,ClassDef,ClassInstance,ConsDef,Declaration,GenericDef,IndexRange,MemberDef,SelectorDef,ATypeVar,DeclarationRecord,GenericClassInfos,GenericType,InstanceType,TypeDef,TypeKind,TypeRhs,GenericClassInfo
 from containers import NumberSet
@@ -44,12 +47,15 @@ cts_exports ::
     , [SuclSymbol]          // Exported symbols
     )
 
-//Cocl to Sucl for (algebraic) type specifications
 cts_getconstrs ::
-    {#DclModule}                    // Info from used DCL modules
- -> [(SuclTypeSymbol,[SuclSymbol])] // List of constructor symbols for each type symbol
+    {#DclModule}    // Info from used DCL modules
+	Int				// Index of current module in DCL module array
+	CommonDefs		// CommonDefs in ICL module (excluding FunDefs)
+ -> [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])]
+                    // List of constructor symbols for each type symbol
 
 //Sucl to Cocl for function bodies
+//1.3
 stc_funcdefs ::
     PredefinedSymbol    // Compiler-predefined String symbol
     {#.DclModule}       // DCL for looking up constructor types
@@ -64,3 +70,20 @@ stc_funcdefs ::
     , .(Heap VarInfo)   // Remaining variable space
     , .{#FunDef}        // Converted function definitions
     )
+//3.1
+/*2.0
+stc_funcdefs ::
+    PredefinedSymbol
+    {#.DclModule}
+    Int
+    Int
+    *ExpressionHeap
+    *(Heap VarInfo)
+    [Symredresult SuclSymbol .SuclVariable a b]
+    *(c FunDef)
+ -> ( .ExpressionHeap
+    , .(Heap VarInfo)
+    , .{#FunDef}
+    )
+ |  Array c FunDef
+0.2*/

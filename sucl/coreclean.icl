@@ -10,6 +10,7 @@ import basic
 import StdCompare
 import syntax
 //import StdEnv
+import general
 
 :: SuclTypeSymbol
  = SuclUSER (Global Index)
@@ -22,6 +23,7 @@ import syntax
  | SuclDYNAMIC
  | SuclFILE
  | SuclWORLD
+ | SuclERROR				// Type error
 
 :: SuclTypeVariable
  = SuclANONYMOUS Int
@@ -63,6 +65,7 @@ where (==) (SuclUSER tsid1 ) (SuclUSER tsid2 ) = tsid1==tsid2
       (==)  SuclDYNAMIC       SuclDYNAMIC      = True
       (==)  SuclFILE          SuclFILE         = True
       (==)  SuclWORLD         SuclWORLD        = True
+      (==)  SuclERROR         SuclERROR        = True
       (==)  _                 _                = False
 
 instance toString SuclTypeSymbol
@@ -76,6 +79,7 @@ where toString (SuclUSER tsid ) = toString tsid
       toString  SuclDYNAMIC     = "Dynamic"
       toString  SuclFILE        = "File"
       toString  SuclWORLD       = "World"
+      toString  SuclERROR       = "Error"
 
 instance <<< SuclTypeSymbol
 where (<<<) file tsym = file <<< toString tsym
@@ -107,7 +111,7 @@ where (==) (SuclUser  id1  )  (SuclUser  id2  )  = id1   == id2
 
 instance toString SuclSymbol
 where toString (SuclUser  sk  ) = toString sk
-      toString (SuclCase  eptr) = "<anonymous lifted case function>"
+      toString (SuclCase  eptr) = "<anonymous lifted case function for expression "+++toString eptr+++">"
       toString (SuclApply int ) = "Apply/"+++toString int
       toString (SuclInt   int ) = toString int
       toString (SuclReal  real) = toString real
@@ -131,13 +135,13 @@ where toString SK_Unknown = "Unknown"
 instance <<< SymbKind
 where (<<<) file sk = file <<< toString sk
 
-instance toString Global a | toString a
+instance toString (Global a) | toString a
 where toString {glob_module,glob_object} = toString glob_module+++"."+++toString glob_object
 
-instance toString Ptr a
+instance toString (Ptr a)
 where toString p = "p:"+++toString (ptrToInt p)
 
-instance <<< Ptr a
+instance <<< (Ptr a)
 where (<<<) file p = file <<< toString p
 
 instance == SymbKind
@@ -197,8 +201,7 @@ coretyperule (SuclChar _) = consttyperule SuclCHAR
 coretyperule (SuclReal _) = consttyperule SuclREAL
 coretyperule (SuclBool _) = consttyperule SuclBOOL
 coretyperule (SuclString _) = consttyperule SuclSTRING
-coretyperule (SuclUser _) = abort "coreclean: coretyperule: untyped user symbol"
-coretyperule (SuclCase _) = abort "coreclean: coretyperule: untyped case symbol"
+coretyperule sym = error ("coreclean: coretyperule: untyped user symbol: "+++toString sym)
 
 consttyperule tsym
  = mkrule [] root (updategraph root (tsym,[]) emptygraph)
@@ -216,3 +219,4 @@ corecomplete SuclSTRING = const False
 corecomplete SuclDYNAMIC = const False
 corecomplete SuclFILE = const False
 corecomplete SuclWORLD = const False
+corecomplete SuclERROR = const False

@@ -39,8 +39,10 @@ fullfold ::
  |  == sym
  &  == var
  &  == pvar
- &  toString var
- &  <<< var
  &  toString sym
+ &  toString var
+ &  toString pvar
+ &  <<< var
+ &  <<< pvar
 
-instance <<< FuncBody sym var | toString sym & ==,toString var
+instance <<< (FuncBody sym var) | toString sym & ==,toString var

@@ -15,6 +15,7 @@ import trans
 supercompile ::
     !{#DclModule}               // dcl_mods
     !Int                        // main_dcl_module_n
+    !CommonDefs                 // common defs in icl module (excluding FunDefs)
     !*{#FunDef}                 // fun_defs
     !*VarHeap                   // var_heap
     !*ExpressionHeap            // expression_heap
@@ -28,14 +29,16 @@ supercompile ::
     ,   !.File                  // Written log file
     )
 
-supercompile dcl_mods main_dcl_module_n fun_defs0 var_heap expression_heap predefs0 logfile0
+//supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0 = error "supercompile.supercompile: blocked for testing"
+supercompile dcl_mods main_dcl_module_n icl_common fun_defs0 var_heap expression_heap predefs0 logfile0
   #  logfile = stderr
      // Determine defined functions
   #  (sucl_typerules,sucl_stricts,sucl_bodies,sucl_kinds,fun_defs1) = cts_function main_dcl_module_n fun_defs0
      // Determine exported functions
   #  (predefs1,sucl_exports) = cts_exports dcl_mods predefs0 main_dcl_module_n
      // Get constructor lists of algebraic types
-  #  sucl_constrs = cts_getconstrs dcl_mods
+  // sucl_constrs :: [(tsym,[(sym,(rule tsym tvar,[Bool]))])]
+  #  sucl_constrs = cts_getconstrs dcl_mods main_dcl_module_n icl_common
      // Build abstract CLI module
   #  sucl_module = mkcli sucl_typerules sucl_stricts sucl_exports sucl_constrs sucl_bodies
   #! logfile = logfile <<< sucl_module

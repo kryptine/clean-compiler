@@ -11,8 +11,11 @@ import rule
 import graph
 import pfun
 import basic
-from general import Yes,No
+from general import Yes,No,--->
 import StdEnv
+
+mstub = stub "loop"
+block func = mstub func "blocked for debugging"
 
 /*
 
@@ -228,18 +231,21 @@ loop
  &  toString var    // Debugging
  &  <<< var         // Debugging
 
+// loop _ _ _ = block "loop"
 loop strategy matchable (initheap,rule)
 = result
   where result = maketrace inithistory initfailinfo initinstdone initstricts initsroot initsubject initheap
         maketrace history failinfo instdone stricts sroot subject heap
-        = Trace stricts (mkrule sargs sroot subject) answer history transf
+        = (Trace stricts currentrule answer history transf ---> ("loop.loop.maketrace rule "+++ruleToString toString currentrule)) ---> ("loop.loop.maketrace history "+++historyToString history)
           where answer = makernfstrategy history (strategy matchable`) rnfnodes sroot subject
-                transf = transform sroot sargs answer maketrace history failinfo instdone stricts sroot subject heap
+                transf = (transform--->"loop.transform begins from loop.loop") sroot sargs answer maketrace history failinfo instdone stricts sroot subject heap
 
                 rnfnodes = removeDup (listselect stricts sargs++fst (graphvars subject sargs))
 
                 matchable` pgraph pnode snode
                 = matchable (failinfo snode) (mkrgraph pnode pgraph)
+
+                currentrule = mkrule sargs sroot subject
 
         inithistory = []
         initfailinfo = const []
@@ -277,14 +283,20 @@ transform
  &  == pvar
 
 transform anode sargs (Yes spine)
-= selectfromtip (spinetip spine)
-  where selectfromtip (nid,Open rgraph) = tryinstantiate nid rgraph anode sargs
-        selectfromtip (nid,Redex rule matching) = tryunfold nid rule matching spine
-        selectfromtip (nid,Strict) = tryannotate nid sargs
-        selectfromtip spine = dostop
+= (selectfromtip--->"loop.transform.selectfromtip begins from loop.transform") (spinetip spine) <--- "loop.transform ends for some spine"
+  where selectfromtip (nid,Open rgraph) = (tryinstantiate--->"loop.tryinstantiate begins from loop.transform.selectfromtip") nid rgraph anode sargs <--- "loop.transform.selectfromtip ends for Open spine"
+        selectfromtip (nid,Redex rule matching) = (tryunfold--->"loop.tryunfold begins from loop.transform.selectfromtip") nid rule matching spine <--- "loop.transform.selectfromtip ends for Redex spine"
+        selectfromtip (nid,Strict) = (tryannotate--->"loop.tryannotate begins from loop.transform.selectfromtip") nid sargs <--- "loop.transform.selectfromtip ends for Strict spine"
+        selectfromtip (nid,Cycle) = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for Cycle spine"
+        selectfromtip (nid,Delta) = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for Delta spine"
+        selectfromtip (nid,Force _ _) = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for Force spine"
+        selectfromtip (nid,MissingCase) = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for MissingCase spine"
+        selectfromtip (nid,Partial _ _ _ _) = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for Partial spine"
+        selectfromtip (nid,Unsafe _) = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for Unsafe spine"
+        //selectfromtip spine = (dostop--->"loop.dostop begins from loop.transform.selectfromtip") <--- "loop.transform.selectfromtip ends for other spine"
 
 transform anode sargs No
-= dostop
+= (dostop--->"loop.dostop begins from loop.transform") <--- "loop.transform ends for no spine"
 
 // ==== ATTEMPT TO INSTANTIATE A FREE VARIABLE WITH A PATTERN ====
 
@@ -298,7 +310,7 @@ tryinstantiate
  &  == pvar
 
 tryinstantiate onode rpattern anode sargs
-= act
+= act <--- "loop.tryinstantiate ends"
   where act continue history failinfo instdone stricts sroot subject heap
         | anode==sroot                                   // Check if strategy applied at root
           && goodorder strictargs sargs subject subject` // Check if order of arguments of rule ok
@@ -325,8 +337,8 @@ goodorder
 
 goodorder stricts sargs subject subject`
 = startswith match match`
-  where match = removeMembers (fst (graphvars subject sargs)) stricts
-        match` = removeMembers (fst (graphvars subject` sargs)) stricts
+  where match = fst (graphvars subject sargs)--stricts
+        match` = fst (graphvars subject` sargs)--stricts
 
 // See if second argument list has the first one as its initial part
 startswith
@@ -355,7 +367,7 @@ tryunfold ::
  &  == pvar
 
 tryunfold redexroot rule matching spine
-= act
+= act <--- "loop.tryunfold ends"
   where act continue history failinfo instdone stricts sroot subject heap
         = Reduce reductroot trace
           where (heap`,sroot`,subject`,matching`)
@@ -373,7 +385,7 @@ tryannotate
  |  == var
 
 tryannotate strictnode sargs
-= act
+= act <--- "loop.tryannotate ends"
   where act continue history failinfo instdone stricts sroot subject heap
         | not instdone && isMember strictnode sargs
         = Annotate trace
@@ -388,5 +400,5 @@ dostop
  :: Action sym var pvar
 
 dostop
-= ds
+= ds <--- "loop.dostop ends"
   where ds continue history failinfo instdone stricts sroot subject heap = Stop

@@ -15,7 +15,7 @@ from graph import Graph,Node
 from syntax import SymbolPtr,SymbolTableEntry,STE_Kind,Index,Level,Global,TypeSymbProperties,SignClassification,PropClassification,TypeVarInfoPtr,TypeVarInfo,ExprInfo,VarInfo
 from general import BITVECT
 from Heap import Ptr,PtrN,HeapN
-from StdString import String
+from cleanversion import String
 
 :: SuclTypeSymbol
  = SuclUSER (Global Index)  // A user-defined type symbol (index into com_type_def array)
@@ -28,6 +28,7 @@ from StdString import String
  | SuclDYNAMIC
  | SuclFILE
  | SuclWORLD
+ | SuclERROR				// Type error
 
 :: SuclTypeVariable
  = SuclANONYMOUS Int
@@ -71,6 +72,9 @@ instance toString SuclSymbolKind
 instance <<< SuclSymbolKind
 instance toString SuclVariable
 instance <<< SuclVariable
+
+instance toString (Ptr a)
+instance <<< (Ptr a)
 
 // Get the type rule and strictness of a built in core clean symbol
 coretyperule :: SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable

@@ -9,6 +9,7 @@ import absmodule
 import rule
 import dnc
 import basic
+import general
 import StdEnv
 
 /*
@@ -123,6 +124,11 @@ Abstype implementation.
 exports :: Cli -> [SuclSymbol]
 exports (CliAlias m) = m.exportedsymbols
 
+// Determine the arity of a core clean symbol
+arity :: Cli SuclSymbol -> Int
+arity (CliAlias m) sym
+= extendfn m.arities (length o arguments o (extendfn m.typerules coretyperule)) sym
+
 /*
 >   typerule (tdefs,(es,as,ts,rs)) = maxtyperule ts
 */
@@ -160,8 +166,9 @@ clistrategy (CliAlias {arities=as,typeconstructors=tcs,typerules=ts,rules=rs}) m
    o checkimport islocal                            // Checks for delta symbols
    o checkconstr (flip isMember (flatten (map snd tcs))) // Checks for constructors
    ) (corestrategy matchable)                       // Checks rules for symbols in the language core (IF, _AP, ...)
-   where islocal rsym=:(SuclUser s) = isMember rsym (map fst rs)
-         islocal rsym = True                        // Symbols in the language core are always completely known
+   where islocal rsym=:(SuclUser s) = isMember rsym (map fst rs)// User-defined symbols can be imported, so they're known if we have a list of rules for them
+         islocal rsym               = True                      // Symbols in the language core (the rest) are always completely known
+                                                                // This includes lifted case symbols; we lifted them ourselves, after all
 
 typearity :: (Rule SuclTypeSymbol SuclTypeVariable) -> Int
 typearity ti = length (arguments ti)
@@ -321,17 +328,17 @@ mkcli ::
     [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]
     [(SuclSymbol,[Bool])]
     [SuclSymbol]
-    [(SuclTypeSymbol,[SuclSymbol])]
+    [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])]
     [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
  -> Cli
 
 mkcli typerules stricts exports constrs bodies
 = CliAlias
   { arities          = map (mapsnd fst) bodies
-  , typeconstructors = constrs
+  , typeconstructors = map (mapsnd (map fst)) constrs
   , exportedsymbols  = exports
-  , typerules        = typerules
-  , stricts          = stricts
+  , typerules        = typerules++flatten ((map (map (mapsnd fst) o snd)) constrs)
+  , stricts          = stricts++flatten ((map (map (mapsnd snd) o snd)) constrs)
   , rules            = map (mapsnd snd) bodies
   }
 

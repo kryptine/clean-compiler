@@ -18,11 +18,12 @@ from typeproperties import TypeClassification
 from scanner import Context,Priority
 from general import BITVECT,Optional
 from Heap import Heap,HeapN,Ptr,PtrN
-from StdString import String
+from cleanversion import String
 
 supercompile ::
     !{#DclModule}               // dcl_mods
     !Int                        // main_dcl_module_n
+    !CommonDefs                 // common defs in icl module (excluding FunDefs)
     !*{#FunDef}                 // fun_defs
     !*VarHeap                   // var_heap
     !*ExpressionHeap            // expression_heap

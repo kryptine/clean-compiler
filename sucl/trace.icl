@@ -263,18 +263,30 @@ foldtransformation ftr reduce annotate stop instantiate abstract knownabstractio
 //      fab (NewAbstraction t) = newabstraction (ftr t)
 //      fab (KnownAbstraction r) = knownabstraction r
 
-instance <<< Trace sym var pvar | toString sym & <<<,==,toString var
-where (<<<) file trace
+instance <<< Trace sym var pvar | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
+where // (<<<) file trace = error "trace.<<<(Trace): blocked for debugging"
+      (<<<) file trace
       = file <<< "Trace:" <<< nl
              <<< "Stricts: " <<< showlist toString stricts <<< nl
-             <<< "Rule: " <<< toString rule <<< nl
-             <<< "Answer:" <<< nl writeanswer answer // <<< getAnswer trace // answer
-             <<< "History:" <<< nl
-             writeHistory history
-             <<< "Transformation:" <<< nl <<< transf
+             // <<< "Rule: " <<< toString rule <<< nl
+             // <<< "Answer:" <<< nl writeanswer answer
+             // <<< "History:" <<< nl
+             // writeHistory history
+             <<< "Transformation:" <<< nl writeTransformation transf
         where (Trace stricts rule answer history transf) = trace
 
-instance <<< Transformation sym var pvar | toString sym & <<<,==,toString var
+(writeTrace) infixl :: *File .(Trace sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
+(writeTrace) file trace
+= file <<< "Trace:" <<< nl
+       <<< "Stricts: " <<< showlist toString stricts <<< nl
+       // <<< "Rule: " <<< ruleToString toString rule <<< nl
+       // <<< "Answer:" <<< nl writeanswer answer
+       // <<< "History:" <<< nl
+       // writeHistory history
+       <<< "Transformation:" <<< nl writeTransformation transf
+  where (Trace stricts rule answer history transf) = trace
+
+instance <<< Transformation sym var pvar | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
 where (<<<) file (Reduce reductroot subtrace) = file <<< "Reduce; root of reduct: " <<< reductroot <<< nl <<< subtrace
       (<<<) file (Annotate subtrace) = file <<< "Annotate" <<< nl <<< subtrace
       (<<<) file Stop = file <<< "Stop" <<< nl
@@ -286,3 +298,21 @@ where (<<<) file (Reduce reductroot subtrace) = file <<< "Reduce; root of reduct
                    <<< "Failing match..." <<< nl
                    <<< notrace
                    <<< "End of failing match." <<< nl
+
+(writeTransformation) infixl :: *File .(Transformation sym var pvar) -> .File | toString sym & ==,toString,<<< var // & ==,toString,<<< pvar
+(writeTransformation) file (Reduce reductroot subtrace)
+                      = file <<< "Reduce; root of reduct: " <<< reductroot <<< nl
+                             writeTrace subtrace
+(writeTransformation) file (Annotate subtrace)
+                      = file <<< "Annotate" <<< nl
+                             writeTrace subtrace
+(writeTransformation) file Stop
+                      = file <<< "Stop" <<< nl
+(writeTransformation) file (Instantiate yestrace notrace)
+                      = file <<< "Instantiate" <<< nl
+                             <<< "Successful match..." <<< nl
+                             // writeTrace yestrace
+                             <<< "End of successful match." <<< nl
+                             <<< "Failing match..." <<< nl
+                             // writeTrace notrace
+                             <<< "End of failing match." <<< nl

@@ -227,7 +227,7 @@ frontEndInterface opts mod_ident dcl_modules functions_and_macros predef_symbols
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps}
 //	  (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	  (dcl_mods, out) = showDclModules dcl_mods out
-//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
 	#! 	fe ={	fe_icl =
 //							 {icl_mod & icl_functions=fun_defs }
@@ -392,10 +392,10 @@ do_fusion fusionstyle main_dcl_module_n common_defs imported_funs dcl_types used
  			= transformGroups cleanup_info main_dcl_module_n (components -*-> "Transform")  fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap
 	    -> (components, fun_defs, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, predef_symbols, error, out, files)
 	FS_online
-		# (opened,logfile,files) = fopen "C:\Vincent\Sucl\supercom.log" FWriteText files
+		# (opened,logfile,files) = fopen "C:\\Vincent\\Sucl\\supercom.log" FWriteText files
 		| not opened
 		  -> abort "Could not open supercompilation log file"
-		# (fun_defs,var_heap,expression_heap,supercompile_range,predef_symbols,logfile) = supercompile dcl_mods main_dcl_module_n (fun_defs -*-> "Supercompile") var_heap expression_heap predef_symbols logfile
+		# (fun_defs,var_heap,expression_heap,supercompile_range,predef_symbols,logfile) = supercompile dcl_mods main_dcl_module_n icl_common (fun_defs -*-> "Supercompile") var_heap expression_heap predef_symbols logfile
 		# (closed,files) = fclose logfile files
 		| not closed
 		  -> abort "Could not close supercompilation log file"

@@ -17,6 +17,7 @@ from graph import Node
 
 :: Cli
 
+arity :: Cli SuclSymbol -> Int
 typerule :: Cli SuclSymbol -> Rule SuclTypeSymbol SuclTypeVariable
 exports :: Cli -> [SuclSymbol]
 complete :: Cli -> [SuclSymbol] -> Bool
@@ -24,11 +25,11 @@ clistrategy :: Cli ((Graph SuclSymbol SuclVariable) SuclVariable var -> Bool) ->
 
 // Build a cli structure
 mkcli ::
-    [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]
-    [(SuclSymbol,[Bool])]
-    [SuclSymbol]
-    [(SuclTypeSymbol,[SuclSymbol])]
-    [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]
+    [(SuclSymbol,Rule SuclTypeSymbol SuclTypeVariable)]                             // Type rules of local and imported functions
+    [(SuclSymbol,[Bool])]                                                           // Strictness information derived from function types
+    [SuclSymbol]                                                                    // Exported symbols
+    [(SuclTypeSymbol,[(SuclSymbol,(Rule SuclTypeSymbol SuclTypeVariable,[Bool]))])] // (Algebraic) types with their constructors, and the constructors' type info
+    [(SuclSymbol,(Int,[Rule SuclSymbol SuclVariable]))]                             // Function bodies with their arities and their rules
  -> Cli
 
 instance <<< Cli
