@@ -795,7 +795,7 @@ GetPrio input
 	| IsDigit c
 		= (error, digitToInt c, input)
 		= (error, defaultPrio , charBack input)
-where defaultPrio = 0
+where defaultPrio = 9
 
 determineStrictness :: !Input -> (!Bool, !Input)
 determineStrictness input
