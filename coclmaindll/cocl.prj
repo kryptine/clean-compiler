@@ -6,7 +6,6 @@ Global
 	CodeGen
 		CheckStacks:	True
 		CheckIndexes:	True
-		TargetProcessor:	CurrentProcessor
 	Application
 		HeapSize:	25165824
 		StackSize:	2097152
@@ -34,15 +33,18 @@ Global
 		GenerateLinkMap:	False
 		LinkResources:	False
 		ResourceSource:	
+		GenerateDLL:	False
+		ExportedNames:	
 	Paths
-		Path:	{Project}\compiler
-		Path:	{Project}\ArgEnvWindows
-		Path:	{Project}\WrapDebug
+		Path:	{Project}\frontend
 		Path:	{Project}\backend
 		Path:	{Project}\backendCModules
 		Path:	{Project}\main
 		Path:	{Project}\main\Windows
 		Path:	{Project}\backend\Windows
+		Path:	{Application}\Libraries\ArgEnvWindows 1.0.3
+	Precompile:	
+	Postlink:	
 MainModule
 	Name:	cocl
 	Dir:	{Project}\main
