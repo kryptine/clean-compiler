@@ -523,6 +523,7 @@ stc_funcdefs ::
     *(Heap VarInfo)     // Fresh variable space
     [Symredresult .SuclSymbol .SuclVariable SuclTypeSymbol SuclTypeVariable]
                         // Function definitions to convert
+//  (SuclSymbol->(Ident,Int))   // Identifier and formal arity of symbol
     *{#FunDef}          // Old function definitions
  -> ( .ExpressionHeap   // Remaining expression space
     , .(Heap VarInfo)   // Remaining variable space
@@ -552,8 +553,8 @@ stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex expr
 = ((exprheap1,varheap1,new_fundefs)<---"convert.stc_funcdefs ends")--->"convert.stc_funcdefs begins"
   where new_fundef_limit = foldr max n_oldfundefs [gi.glob_object+1\\{srr_assigned_symbol = SuclUser (SK_Function gi)}<-srrs | gi.glob_module==main_dcl_module_n]
         {va_heap=varheap1} = varalloc1
-        (exprheap1,varalloc1,new_fundefs)
-        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype (getconsdef dcl_mods main_dcl_module_n icl_common) main_dcl_module_n firstnewindex exprheap0 varalloc0 srrs (copy_oldfuns oldfundefs1 initialarray)
+        (exprheap1,varalloc1,suclinfo1,new_fundefs)
+        = (store_newfuns--->"convert.store_newfuns begins from stc_funcdefs") stringtype suclinfo1 (getconsdef dcl_mods main_dcl_module_n icl_common) main_dcl_module_n firstnewindex exprheap0 varalloc0 srrs suclinfo0 (copy_oldfuns oldfundefs2 initialarray)
         varalloc0 = {va_heap=varheap0,va_id=0}
         initialarray = {nofundef i\\i<-[0..new_fundef_limit-1]}
         nofundef funindex
@@ -582,6 +583,21 @@ stc_funcdefs stringtype dcl_mods main_dcl_module_n icl_common firstnewindex expr
           , fi_properties  = 0
           }
         (n_oldfundefs,oldfundefs1) = usize oldfundefs0
+        suclinfo0 = get_formal_name_and_arity {env_dcls=dcl_mods,env_main=main_dcl_module_n,env_getcommon=getcommon,env_infos=oldinfos}
+        getcommon modindex = if (modindex==main_dcl_module_n) icl_common dcl_mods.[modindex].dcl_common
+        (oldinfos,oldfundefs2) = get_infos oldfundefs1
+
+get_infos :: u:{#FunDef} -> ({(Ident,Int)},v:{#FunDef}), [u<=v]
+get_infos fundefs0
+= copy_infos 0 ((createArray nfundefs (undef,undef)),fundefs1)
+  where (nfundefs,fundefs1) = usize fundefs0
+
+copy_infos n (infos,fundefs0)
+| n<nfundefs
+  = copy_infos (n+1) ({infos & [n]=(fun_symb,fun_arity)},fundefs2)
+= (infos,fundefs1)
+  where ({fun_symb,fun_arity},fundefs2) = fundefs1![n]
+        (nfundefs,fundefs1) = usize fundefs0
 
 getconsdef dcl_mods main_dcl_module_n icl_common {glob_module,glob_object}
 = commondefs.com_cons_defs.[glob_object]
@@ -598,34 +614,43 @@ copy_oldfuns srcfundefs0 dstfundefs0
         (dstsize,dstfundefs1) = usize dstfundefs0
         sizes = "convert.copy_oldfuns begins (#srcfundefs="+++toString srcsize+++" #dstfundefs="+++toString dstsize+++")"
 
-store_newfuns stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 [] fundefs0
-= (exprheap0,varalloc0,fundefs0)<---"convert.store_newfuns ends (no more srrs)"
-store_newfuns stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 [srr:srrs] fundefs0
+store_newfuns stringtype suclinfo getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 [] suclinfo0 fundefs0
+= (exprheap0,varalloc0,suclinfo0,fundefs0)<---"convert.store_newfuns ends (no more srrs)"
+store_newfuns stringtype suclinfo getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 [srr:srrs] suclinfo0 fundefs0
 = case srr.srr_assigned_symbol
-  of (SuclUser (SK_Function {glob_module=modi,glob_object=funindex}))
+  of (SuclUser newsk=:(SK_Function {glob_module=modi,glob_object=funindex}))
       | modi == main_dcl_module_n
-        -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype getconsdef main_dcl_module_n firstnewindex exprheap1 varalloc1 srrs fundefs1<---"convert.store_newfuns ends (srr in main module)"
+        -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype suclinfo getconsdef main_dcl_module_n firstnewindex exprheap1 varalloc1 srrs suclinfo1 fundefs1<---"convert.store_newfuns ends (srr in main module)"
            where (exprheap1,varalloc1,funbody,localvars,_)
-                 = stc_funcdef stringtype getconsdef exprheap0 varalloc0 srr.srr_function_def
+                 = stc_funcdef stringtype suclinfo getconsdef exprheap0 varalloc0 srr.srr_function_def
                  funinfo
-                 = { fi_calls       = collect_calls main_dcl_module_n funbody
-                   , fi_group_index = 0
-                   , fi_def_level   = NotALevel
-                   , fi_free_vars   = []        // Variables bound outside function's scope (such functions must be lifted)
-                   , fi_local_vars  = localvars // Variables bound in Case's and Let's
-                   , fi_dynamics    = []        // Expressions used in dynamics (?)
-                   , fi_properties  = 0
+                 = { fi_calls       = collect_calls main_dcl_module_n funbody ---> "convert.store_newfuns.SuclUser.funinfo requires fi_calls"
+                   , fi_group_index = 0         ---> "convert.store_newfuns.SuclUser.funinfo requires fi_group_index"
+                   , fi_def_level   = NotALevel ---> "convert.store_newfuns.SuclUser.funinfo requires fi_def_level"
+                   , fi_free_vars   = []        ---> "convert.store_newfuns.SuclUser.funinfo requires fi_free_vars"
+                   , fi_local_vars  = localvars ---> "convert.store_newfuns.SuclUser.funinfo requires fi_local_vars"
+                   , fi_dynamics    = []        ---> "convert.store_newfuns.SuclUser.funinfo requires fi_dynamics"
+                   , fi_properties  = 0         ---> "convert.store_newfuns.SuclUser.funinfo requires fi_properties"
                    }
-                 fundefs1 = create_or_update_fundefs funindex funbody funinfo fundefs0
-                 create_or_update_fundefs
+                 fundefs1
+                 = create_or_update_fundefs
+                    (funindex--->("convert.create_or_update_fundefs requires funindex for "+++toString newsk))
+                    (funbody--->("convert.create_or_update_fundefs requires funbody for "+++toString newsk))
+                    (funinfo--->("convert.create_or_update_fundefs requires funinfo for "+++toString newsk))
+                    (fundefs0--->("convert.create_or_update_fundefs requires fundefs0 for "+++toString newsk))
+                 (create_or_update_fundefs,suclinfo1)
                  = if (funindex>=firstnewindex)
-                      (create_fundef srr.srr_arity)
-                      update_fundef
+                      (create_fundef ident srr.srr_arity,adjust newsk (ident,srr.srr_arity) suclinfo0)
+                      (update_fundef,suclinfo0)
+                 ident
+                 = { id_name = "_f"+++toString funindex
+                   , id_info = nilPtr
+                   }
      _
-      -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 srrs fundefs0 <--- "convert.store_newfuns ends (srr in other module)"
+      -> (store_newfuns--->"convert.store_newfuns begins from store_newfuns") stringtype suclinfo getconsdef main_dcl_module_n firstnewindex exprheap0 varalloc0 srrs suclinfo0 fundefs0 <--- "convert.store_newfuns ends (srr in other module)"
 
-create_fundef :: .Int Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
-create_fundef arity funindex funbody funinfo fundefs
+create_fundef :: Ident .Int Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
+create_fundef ident arity funindex funbody funinfo fundefs
 = ({fundefs & [funindex] = fundef} <--- ("convert.create_fundef "+++toString funindex+++" ends")) ---> ("convert.create_fundef "+++toString funindex+++" begins")
   where fundef
         = { fun_symb     = ident
@@ -639,10 +664,6 @@ create_fundef arity funindex funbody funinfo fundefs
           , fun_lifted   = 0   // FIXME: what's this supposed to be?
           , fun_info     = funinfo
           }
-        ident
-        = { id_name = "_anonymous_sucl_generated_function"
-          , id_info = nilPtr
-          }
 
 update_fundef :: .Int FunctionBody FunInfo *{#FunDef} -> .{#FunDef}
 update_fundef index newbody newinfo oldfundefs
@@ -652,6 +673,7 @@ update_fundef index newbody newinfo oldfundefs
 
 stc_funcdef ::
     PredefinedSymbol                    // Compiler-predefined String symbol
+    (SymbKind -> (Ident,Int))           // Identifer and formal arity of symbols
     ((Global Index) -> ConsDef)         // Get constructor definition from environment
     *ExpressionHeap                     // Fresh expression space
     *VarAlloc                           // Fresh variable space
@@ -664,15 +686,15 @@ stc_funcdef ::
     )
 
 // stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body) = block "stc_funcdef"
-stc_funcdef stringtype getconsdef exprheap0 varalloc0 (args,body)
-= (exprheap1,varalloc2,TransformedBody tb,/*tb.tb_args++*/(localvars--->("convert.stc_funcdef.localvars used",localvars)),eips)
-    ---> ("convert.stc_funcdef localvars",tb.tb_args)
+stc_funcdef stringtype suclinfo getconsdef exprheap0 varalloc0 (args,body)
+= (exprheap1,varalloc2,TransformedBody tb,/*tb.tb_args++*/(localvars--->"convert.stc_funcdef.localvars used"),eips)
+    ---> "convert.stc_funcdef"
   where tb
         = { tb_args = map (mkfreevar 0 o varenv) args
           , tb_rhs  = expr
           }
         (exprheap1,varalloc2,expr,localvars,eips)
-        = convert_funcbody stringtype getconsdef 1 args varenv exprheap0 varalloc1 [] [] body
+        = convert_funcbody stringtype suclinfo getconsdef 1 args varenv exprheap0 varalloc1 [] [] body
         (varenv,varalloc1)
         = allocate_vars "_farg" noexpr varalloc0 args
         noexpr = mstub "std_funcdef" "open variable in rhs but not lhs"
@@ -723,6 +745,7 @@ Converting a function body:
 
 convert_funcbody ::
     PredefinedSymbol                        // Compiler-predefined String symbol
+    (SymbKind -> (Ident,Int))               // Identifer and formal arity of symbols
     ((Global Index) -> ConsDef)             // Get constructor definition from environment
     Level                                   // (Lexical?) level for new variables
     [SuclVariable]                          // Nodes from case variables in the environment
@@ -739,15 +762,15 @@ convert_funcbody ::
     , [ExprInfoPtr]                         // List of expression pointers from the function body
     )
 
-convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (MatchPattern pattern yesbody nobody)
+convert_funcbody stringtype suclinfo getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (MatchPattern pattern yesbody nobody)
 = (exprheap3,varalloc3,match_expression,localvars3,eips3)
     ---> ("convert.convert_funcbody localvars",default_freevar)
   where (exprheap3,([match_expression:_],eips1))
         = mk_match_expression (exprheap2,([],eips0))
         (exprheap2,varalloc3,match_failure_expression,localvars1,eips2)
-        = convert_funcbody stringtype getconsdef (level+1) patnodes varenv exprheap1 varalloc2 localvars0 eips1 nobody
+        = convert_funcbody stringtype suclinfo getconsdef (level+1) patnodes varenv exprheap1 varalloc2 localvars0 eips1 nobody
         (exprheap1,varalloc1,case_expression,default_refcount,localvars2,eips3)
-        = convert_matchpatterns getconsdef build_casebranch patnodes varenv exprheap0 varalloc0 mk_default_expression pgraph level localvars1 eips2 [proot]
+        = convert_matchpatterns getconsdef suclinfo build_casebranch patnodes varenv exprheap0 varalloc0 mk_default_expression pgraph level localvars1 eips2 [proot]
 
         pgraph = rgraphgraph pattern
         proot = rgraphroot pattern
@@ -763,7 +786,7 @@ convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0
         build_casebranch level` patnodes` varenv` localvars0` eips0` exprheap0` varalloc0`
         = (exprheap1`,varalloc1`,expr`,0--->("convert.convert_funcbody.build_casebranch.refcount=0"),localvars1`,eips1`)
           where (exprheap1`,varalloc1`,expr`,localvars1`,eips1`)
-                = convert_funcbody stringtype getconsdef level` patnodes` varenv` exprheap0` varalloc0` localvars0` eips0` yesbody
+                = convert_funcbody stringtype suclinfo getconsdef level` patnodes` varenv` exprheap0` varalloc0` localvars0` eips0` yesbody
 
         (mk_default_expression,mk_match_expression,localvars3)
         = if (default_refcount==1)
@@ -798,11 +821,12 @@ convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0
                 (letinfoptr,exprheap`1) = newPtr EI_Empty exprheap`0
                 eips`1 = [letinfoptr:eips`0]
 
-convert_funcbody stringtype getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (BuildGraph srgraph)
-= new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 localvars0 eips0
+convert_funcbody stringtype suclinfo getconsdef level patnodes varenv exprheap0 varalloc0 localvars0 eips0 (BuildGraph srgraph)
+= new_convert_graph stringtype suclinfo patnodes varenv level srgraph varalloc0 exprheap0 localvars0 eips0
 
 convert_matchpatterns ::
     ((Global Index) -> ConsDef)             // Get ConsDef from environment
+    (SymbKind -> (Ident,Int))               // Identifer and formal arity of symbols
     (  Int                                  // Level to assign to free variables
        [SuclVariable]                       // List of pattern nodes
        (SuclVariable->(Ident,VarInfoPtr))   // Assigning FreeVars to variables from the environment
@@ -839,21 +863,22 @@ convert_matchpatterns ::
     , [ExprInfoPtr]                         // List of expression pointers from the function body
     )
 
-convert_matchpatterns getconsdef build_casebranch patnodes varenv exprheap0 varalloc0 mk_default_expression pgraph level localvars0 eips0 []
+convert_matchpatterns getconsdef suclinfo build_casebranch patnodes varenv exprheap0 varalloc0 mk_default_expression pgraph level localvars0 eips0 []
 = (exprheap1,varalloc1,case_expression,refcount,localvars1,eips1)
   where (exprheap1,varalloc1,case_expression,refcount,localvars1,eips1)
         = build_casebranch level patnodes varenv localvars0 eips0 exprheap0 varalloc0
 
-convert_matchpatterns getconsdef build_casebranch0 patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level localvars0 eips0 [pnode:pnodes]
+convert_matchpatterns getconsdef suclinfo build_casebranch0 patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level localvars0 eips0 [pnode:pnodes]
 | pdef
-  = convert_matchpattern getconsdef build_remaining_matcher patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
+  = convert_matchpattern getconsdef suclinfo build_remaining_matcher patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
 = build_remaining_matcher level patnodes0 varenv0 localvars0 eips0 exprheap0 varalloc0
   where (pdef,(psym,pargs)) = varcontents pgraph pnode
         build_remaining_matcher level` patnodes` varenv` localvars` eips` exprheap` varalloc`
-        = convert_matchpatterns getconsdef build_casebranch0 patnodes` varenv` exprheap` varalloc` mk_default_expression pgraph level` localvars` eips` pnodes
+        = convert_matchpatterns getconsdef suclinfo build_casebranch0 patnodes` varenv` exprheap` varalloc` mk_default_expression pgraph level` localvars` eips` pnodes
 
 convert_matchpattern ::
     ((Global Index) -> ConsDef)             // Get ConsDef from environment
+    (SymbKind -> (Ident,Int))               // Identifer and formal arity of symbols
     (  Level                                // Level to assign to free variables
        [SuclVariable]                       // List of pattern nodes
        (SuclVariable->(Ident,VarInfoPtr))   // Assigning FreeVars to variables from the environment
@@ -892,11 +917,11 @@ convert_matchpattern ::
     , [ExprInfoPtr]                         // List of expression pointers from the function body
     )
 
-convert_matchpattern getconsdef build_casebranch patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
+convert_matchpattern getconsdef suclinfo build_casebranch patnodes0 varenv0 exprheap0 varalloc0 mk_default_expression pgraph level pnode psym localvars0 eips0 pargs
 = (exprheap4,varalloc2,case_expression,1+refcount,(freevars--->("convert.convert_matchpattern.freevars used",freevars))++localvars1,[cip,bvip:eips2])
     ---> (("convert.convert_matchpattern localvars",freevars),("refcount",refcount,"->",1+refcount))
   where (exprheap3,varalloc2,branch_expression,refcount,localvars1,eips2)
-        = convert_matchpatterns getconsdef build_casebranch patnodes1 varenv1 exprheap2 varalloc1 mk_default_expression pgraph (level+1) localvars0 eips1 pargs
+        = convert_matchpatterns getconsdef suclinfo build_casebranch patnodes1 varenv1 exprheap2 varalloc1 mk_default_expression pgraph (level+1) localvars0 eips1 pargs
         (cip,exprheap1) = newPtr EI_Empty exprheap0
         (bvip,exprheap2) = newPtr EI_Empty exprheap1
         case_expression
@@ -999,6 +1024,7 @@ Converting a function body:
 
 new_convert_graph ::
     .PredefinedSymbol                       // Predefined type of string representations
+    (SymbKind -> (Ident,Int))               // Identifer and formal arity of symbols
     [.SuclVariable]                         // Variables in the patterns of the surrounding cases
     (SuclVariable -> .(Ident,VarInfoPtr))   // Get information on variables bound in surrounding cases
     .Level                                  // Nesting level for new variables
@@ -1015,7 +1041,7 @@ new_convert_graph ::
     )
  ,  [u <= v]
 
-new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 localvars0 eips0
+new_convert_graph stringtype suclinfo patnodes varenv level srgraph varalloc0 exprheap0 localvars0 eips0
 = ((exprheap4,varalloc1,expression,localvars1,eips4) <--- "convert.new_convert_graph ends") ---> ("convert.new_convert_graph begins with patnodes "+++listToString patnodes)
   where (closeds,_) = graphvars sgraph [sroot]
         sgraph = rgraphgraph srgraph; sroot = rgraphroot srgraph
@@ -1027,7 +1053,7 @@ new_convert_graph stringtype patnodes varenv level srgraph varalloc0 exprheap0 l
         mkunsharedsubexpr uvar (uexprheap,(urest,ueips))
         = (uexprheap,([lookup_unshared uvar:urest],ueips))
         (exprheap4,(exprs,eips1))
-        = foldlr (new_convert_graph_node stringtype sgraph mksubexpr) (exprheap3,([],eips0)) closeds
+        = foldlr (new_convert_graph_node stringtype suclinfo sgraph mksubexpr) (exprheap3,([],eips0)) closeds
         exprmap = zip2 closeds exprs
         lookup_unshared = plookup toString exprmap
         (exprheap3,([rootexpression:_],eips2))
@@ -1092,6 +1118,7 @@ bind_a_variable refcounter level lookup_unshared var (varalloc0,(defaultmksubexp
 
 new_convert_graph_node ::
     .PredefinedSymbol
+    (SymbKind -> (Ident,Int))           // Identifer and formal arity of symbols
     (Graph .SuclSymbol SuclVariable)
     (  SuclVariable
        ( eh1:ExpressionHeap
@@ -1118,16 +1145,17 @@ new_convert_graph_node ::
     )
  ,  [eh0<=eh1,eh0<=eh2,ip0 ip1<=ip2]
 
-new_convert_graph_node stringtype graph mksubexpr var (exprheap0,(rest,eips0))
+new_convert_graph_node stringtype suclinfo graph mksubexpr var (exprheap0,(rest,eips0))
 = ((exprheap2,([expr:rest],eips2)) <--- "convert.new_convert_graph_node ends") ---> "convert.new_convert_graph_node begins"
   where (expr,exprheap1,eips2)
-        = convert_graph_symbol stringtype sym subexprs exprheap0 eips1
+        = convert_graph_symbol stringtype suclinfo sym subexprs exprheap0 eips1
         (exprheap2,(subexprs,eips1))
         = foldlr mksubexpr (exprheap1,([],eips0)) args
         (_,(sym,args)) = varcontents graph var
 
 convert_graph_symbol ::
     PredefinedSymbol
+    (SymbKind -> (Ident,Int))           // Identifer and formal arity of symbols
     !SuclSymbol
     [Expression]
     *ExpressionHeap
@@ -1137,13 +1165,13 @@ convert_graph_symbol ::
     , [ExprInfoPtr]
     )
 
-convert_graph_symbol stringtype (SuclInt    i) [] exprheap eips = (BasicExpr (BVI (toString i)) BT_Int   ,exprheap,eips)
-convert_graph_symbol stringtype (SuclChar   c) [] exprheap eips = (BasicExpr (BVC (toString c)) BT_Char  ,exprheap,eips)
-convert_graph_symbol stringtype (SuclReal   r) [] exprheap eips = (BasicExpr (BVR (toString r)) BT_Real  ,exprheap,eips)
-convert_graph_symbol stringtype (SuclBool   b) [] exprheap eips = (BasicExpr (BVB           b ) BT_Bool  ,exprheap,eips)
-convert_graph_symbol stringtype (SuclString s) [] exprheap eips = (makeStringExpr stringtype s           ,exprheap,eips)
-convert_graph_symbol stringtype (SuclApply arity) [argexpr:argexprs] exprheap eips = (argexpr @ argexprs,exprheap,eips)
-convert_graph_symbol stringtype (SuclUser symbkind) argexprs exprheap0 eips0
+convert_graph_symbol stringtype suclinfo (SuclInt    i) [] exprheap eips = (BasicExpr (BVI (toString i)) BT_Int   ,exprheap,eips)
+convert_graph_symbol stringtype suclinfo (SuclChar   c) [] exprheap eips = (BasicExpr (BVC (toString c)) BT_Char  ,exprheap,eips)
+convert_graph_symbol stringtype suclinfo (SuclReal   r) [] exprheap eips = (BasicExpr (BVR (toString r)) BT_Real  ,exprheap,eips)
+convert_graph_symbol stringtype suclinfo (SuclBool   b) [] exprheap eips = (BasicExpr (BVB           b ) BT_Bool  ,exprheap,eips)
+convert_graph_symbol stringtype suclinfo (SuclString s) [] exprheap eips = (makeStringExpr stringtype s           ,exprheap,eips)
+convert_graph_symbol stringtype suclinfo (SuclApply arity) [argexpr:argexprs] exprheap eips = (argexpr @ argexprs,exprheap,eips)
+convert_graph_symbol stringtype suclinfo (SuclUser symbkind) argexprs exprheap0 eips0
 = (App app,exprheap1,[appinfoptr:eips0])
   where app
         = { app_symb = symbident
@@ -1153,14 +1181,11 @@ convert_graph_symbol stringtype (SuclUser symbkind) argexprs exprheap0 eips0
         symbident
         = { symb_name = ident
           , symb_kind = symbkind
-          , symb_arity = length argexprs    // FIXME: Can this be different from the actual number of function arguments?
+          , symb_arity = arity
           }
-        ident
-        = { id_name = "_anonymous_sucl_generated_function"
-          , id_info = nilPtr
-          }
+        (ident,arity) = suclinfo symbkind
         (appinfoptr,exprheap1) = newPtr EI_Empty exprheap0
-convert_graph_symbol _ _ _ exprheap eips = (mstub "convert_graph_symbol" "unexpected application form in graph node",exprheap,eips)
+convert_graph_symbol _ _ _ _ exprheap eips = (mstub "convert_graph_symbol" "unexpected application form in graph node",exprheap,eips)
 
 // Magic from Artem
 makeStringExpr :: !PredefinedSymbol String -> Expression
@@ -1248,3 +1273,29 @@ where (<<<) file {ap_symbol,ap_vars,ap_expr,ap_position}
 instance toString FreeVar
 where toString {fv_def_level,fv_name,fv_info_ptr,fv_count}
       = "{fv_def_level=" +++ toString fv_def_level +++ ",fv_name=" +++ toString fv_name +++ ",fv_info_ptr=" +++ toString fv_info_ptr +++ ",fv_count=" +++ toString fv_count +++ "}"
+
+:: Environment
+   = { env_getcommon :: Index -> CommonDefs
+     , env_main      :: Index
+     , env_dcls      :: {#DclModule}
+     , env_infos     :: {(Ident,Int)}
+     }
+
+get_formal_name_and_arity :: Environment SymbKind -> (Ident,Int)
+get_formal_name_and_arity env (SK_Constructor {glob_module,glob_object})
+# consdef = (env.env_getcommon glob_module).com_cons_defs.[glob_object]
+= (consdef.cons_symb,consdef.cons_type.st_arity)
+get_formal_name_and_arity env (SK_Function {glob_module,glob_object})
+= if (glob_module==env.env_main)
+     (get_formal_name_and_arity_from_fundef env glob_object)
+     (get_formal_name_and_arity_from_funtype env glob_module glob_object)
+
+get_formal_name_and_arity_from_fundef env funindex
+= env.env_infos.[funindex]
+
+get_formal_name_and_arity_from_funtype env modindex funindex
+# funtype = env.env_dcls.[modindex].dcl_functions.[funindex]
+= (funtype.ft_symb,funtype.ft_arity)
+
+instance toString (a,b) | toString a & toString b
+where toString (x,y) = "("+++toString x+++","+++toString y+++")"
