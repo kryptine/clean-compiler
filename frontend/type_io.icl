@@ -22,12 +22,14 @@ import type_io_common
 //import DebugUtilities;
 F a b :== b;
 
+/*
 class NormaliseTypeDef a 
 where
 	normalise_type_def :: a -> a
-	
-import RWSDebug
+*/	
+//import RWSDebug
 
+/*
 instance NormaliseTypeDef TypeRhs
 where
 	normalise_type_def (AlgType defined_symbols)
@@ -46,7 +48,7 @@ instance NormaliseTypeDef (TypeDef rhs) | NormaliseTypeDef rhs
 where
 	normalise_type_def type_def=:{td_args,td_arity}
 		= type_def
-				
+*/				
 	
 class WriteTypeInfo a 
 where
@@ -54,11 +56,20 @@ where
 	
 instance WriteTypeInfo CommonDefs
 where 
-	write_type_info {com_type_defs,com_cons_defs} tcl_file
+	write_type_info {com_type_defs,com_cons_defs,com_selector_defs} tcl_file
 		# tcl_file
 			= write_type_info com_type_defs tcl_file
 		# tcl_file
  			= write_type_info com_cons_defs tcl_file
+ 		# tcl_file
+ 			= write_type_info com_selector_defs tcl_file
+		= tcl_file
+		
+instance WriteTypeInfo SelectorDef
+where
+	write_type_info {sd_type} tcl_file
+		# tcl_file
+			= write_type_info sd_type tcl_file
 		= tcl_file
 	
 instance WriteTypeInfo ConsDef
@@ -121,11 +132,7 @@ instance WriteTypeInfo TypeDef TypeRhs
 instance WriteTypeInfo (TypeDef TypeRhs)
 0.2*/
 where 
-	write_type_info /*{td_name,td_arity,td_args,td_rhs}*/ type_def tcl_file
-		# {td_name,td_arity,td_args,td_rhs}
-			= normalise_type_def type_def
-	
-		|  F ("TypeDef '" +++ td_name.id_name +++ "'") True
+	write_type_info {td_name,td_arity,td_args,td_rhs} tcl_file
  		#! tcl_file
  			= write_type_info td_name tcl_file
 		#! tcl_file
@@ -164,6 +171,8 @@ where
  		#! tcl_file
  			= fwritec AlgTypeCode tcl_file;
 		
+		# defined_symbols
+			= (sortBy (\{ds_ident={id_name=id_name1}} {ds_ident={id_name=id_name2}} -> id_name1 < id_name2) defined_symbols)
 		# tcl_file
 			= write_type_info defined_symbols tcl_file
 

@@ -1,5 +1,6 @@
 implementation module type_io_common
 
+// common between compiler and static linker
 from StdChar import toChar
 
 // Priority
