@@ -76,7 +76,7 @@ where toString pfun
         where printlink (arg,res) = fromString (toString arg)++['|->']++fromString (toString res)
 
 pfunlist :: (Pfun dom res) -> [(dom,res)]
-pfunlist _ = abort "pfunlist not implemented"
+pfunlist _ = error "pfunlist not implemented"
 
 idpfun :: !.[dom] .(Pfun dom dom) -> Bool | == dom
 idpfun domain pfun

@@ -5,6 +5,8 @@ implementation module trace
 import spine
 import history
 import rule
+import basic
+import syntax
 import StdEnv
 
 /*
@@ -237,7 +239,7 @@ foldtrace reduce annotate stop instantiate trace
         ftf stricts rule answer history (Annotate trace) = annotate stricts rule answer history (ftr trace)
         ftf stricts rule answer history Stop = stop stricts rule answer history
         ftf stricts rule answer history (Instantiate yestrace notrace) = instantiate stricts rule answer history (ftr yestrace) (ftr notrace)
-//      ftf _ _ _ _ (Abstract _) = abort "foldtrace not implemented for abstraction nodes"
+//      ftf _ _ _ _ (Abstract _) = error "foldtrace not implemented for abstraction nodes"
 
 foldtransformation
  :: ((Trace sym var pvar) -> .result)
@@ -260,3 +262,27 @@ foldtransformation ftr reduce annotate stop instantiate abstract knownabstractio
 //      ftf (Abstract as) = abstract (map fab as)
 //      fab (NewAbstraction t) = newabstraction (ftr t)
 //      fab (KnownAbstraction r) = knownabstraction r
+
+instance <<< Trace sym var pvar | toString sym & <<<,==,toString var
+where (<<<) file trace
+      = file <<< "Trace:" <<< nl
+             <<< "Stricts: " <<< showlist toString stricts <<< nl
+             <<< "Rule: " <<< toString rule <<< nl
+             <<< "Answer:" <<< nl writeanswer answer // <<< getAnswer trace // answer
+             <<< "History:" <<< nl
+             writeHistory history
+             <<< "Transformation:" <<< nl <<< transf
+        where (Trace stricts rule answer history transf) = trace
+
+instance <<< Transformation sym var pvar | toString sym & <<<,==,toString var
+where (<<<) file (Reduce reductroot subtrace) = file <<< "Reduce; root of reduct: " <<< reductroot <<< nl <<< subtrace
+      (<<<) file (Annotate subtrace) = file <<< "Annotate" <<< nl <<< subtrace
+      (<<<) file Stop = file <<< "Stop" <<< nl
+      (<<<) file (Instantiate yestrace notrace)
+            = file <<< "Instantiate" <<< nl
+                   <<< "Successful match..." <<< nl
+                   <<< yestrace
+                   <<< "End of successful match." <<< nl
+                   <<< "Failing match..." <<< nl
+                   <<< notrace
+                   <<< "End of failing match." <<< nl

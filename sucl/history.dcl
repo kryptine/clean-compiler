@@ -6,6 +6,7 @@ from rule import Rgraph
 from graph import Graph
 from general import Optional
 from StdOverloaded import ==
+from StdString import toString
 
 // A history relates node-ids in the subject graph to patterns
 :: History sym var
@@ -35,3 +36,6 @@ matchhistory
  -> [HistoryPattern sym var]    // Matching history patterns
  |  == sym
  &  == var
+
+(writeHistory) infixl :: *File (History sym var) -> .File | toString sym & toString,== var
+(writeHistoryAssociation) infixl :: *File (HistoryAssociation sym var) -> .File | toString sym & toString,== var

@@ -3,6 +3,7 @@ implementation module complete
 // $Id$
 
 import graph
+import basic
 import StdEnv
 
 /*
@@ -78,10 +79,11 @@ coveredby complete subject pvarss [svar:svars]
 | complete (map fst3 closeds)
 = and (map covered closeds)
 = coveredby complete subject opens svars
-  where (opens,closeds) = split pvarss
-        covered (sym,repvar`,pvarss`) = coveredby complete subject pvarss` (repvar (repvar` undef) svar++svars)
+  where (opens,closeds) = psplit pvarss
+        covered (sym,repvar`,pvarss`) = coveredby complete subject pvarss` (repvar (repvar` dummyvar) svar++svars)
         (sdef,(ssym,sargs)) = varcontents subject svar
         tmpvalue = (fst (foldr (spl (repvar sargs) ssym) ([],[]) pvarss))
+        dummyvar = abort "complete: error: accessing dummy variable"
 
 repvar pvars svar = map (const svar) pvars
 
@@ -94,7 +96,7 @@ multipatterns with an open pattern are expanded and added as well.
 
 */
 
-split
+psplit
  :: [Pattern sym var]
  -> (   [Pattern sym var]
     ,   [   (   sym
@@ -106,14 +108,14 @@ split
  |  == sym
  &  == var
 
-split [] = ([],[])
-split [(subject,[svar:svars]):svarss]
+psplit [] = ([],[])
+psplit [(subject,[svar:svars]):svarss]
 | not sdef
 = ([(subject,svars):opens`],map add closeds`)
 = (opens,[(ssym,repvar,[(subject,sargs++svars):ins]):closeds])
-  where (opens`,closeds`) = split svarss
+  where (opens`,closeds`) = psplit svarss
         add (sym,repvar,svarss`) = (sym,repvar,[(subject,repvar svar++svars):svarss`])
-        (opens,closeds) = split outs
+        (opens,closeds) = psplit outs
         (ins,outs) = foldr (spl repvar ssym) ([],[]) svarss
         repvar svar = map (const svar) sargs
         (sdef,(ssym,sargs)) = varcontents subject svar

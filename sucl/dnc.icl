@@ -3,6 +3,7 @@ implementation module dnc
 // $Id$
 
 import graph
+import basic
 import StdEnv
 
 // dnc is like varcontents, but can give a more reasonable error message

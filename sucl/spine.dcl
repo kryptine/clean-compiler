@@ -8,6 +8,7 @@ from graph import Graph
 from pfun import Pfun
 from general import Optional
 from StdOverloaded import ==
+from StdFile import <<<
 
 /*
 
@@ -206,3 +207,9 @@ extendhistory
  -> History sym var
  |  == var
  &  == pvar
+
+(writeanswer) infixl :: *File (Answer sym var pvar) -> .File | <<< var
+
+(writespine) infixl :: *File (Spine sym var pvar) -> .File | <<< var
+
+instance <<< Subspine sym var pvar

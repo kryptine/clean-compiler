@@ -11,6 +11,8 @@ import graph
 import basic
 import StdEnv
 
+import general
+
 /*
 
 newfold.lit - New folding function
@@ -110,9 +112,9 @@ fullfold ::
  &  == pvar
 
 fullfold trc foldarea fnsymbol trace
-| recursive
-  = addlhs recurseresult
-= addlhs (newextract trc foldarea trace)
+| recursive ---> "newfold.fullfold begins"
+  = addlhs recurseresult <--- "newfold.fullfold ends (recursive=True)"
+= addlhs (newextract trc foldarea trace) <--- "newfold.fullfold ends (recursive=False)"
   where (recursive,recurseresult) = recurse foldarea fnsymbol trace
         addlhs = mapsnd3 (pair (arguments rule))
         (Trace _ rule _ _ _) = trace
@@ -137,25 +139,28 @@ recurse ::
  &  == pvar
 
 recurse foldarea fnsymbol
-= f ([],[])
-  where f (newhist,hist) (Trace stricts rule answer history (Reduce reductroot trace))
+= (f ([],[]) <--- "newfold.recurse ends") ---> "newfold.recurse begins"
+  where f newhisthist (Trace stricts rule answer history (Reduce reductroot trace))
         | isEmpty pclosed && superset popen ropen
           = f (newhist`,newhist`) trace
             where rargs = arguments rule; rroot = ruleroot rule; rgraph = rulegraph rule
                   (pclosed,popen) = graphvars rgraph rargs
                   (_,ropen) = graphvars rgraph [rroot]
                   newhist` = [(rroot,rgraph):newhist]
-        f (newhist,hist) (Trace stricts rule answer history (Annotate trace))
+                  (newhist,hist) = newhisthist
+        f newhisthist (Trace stricts rule answer history (Annotate trace))
         | isEmpty pclosed && superset popen ropen
           = f (newhist`,hist) trace
             where rargs = arguments rule; rroot = ruleroot rule; rgraph = rulegraph rule
                   (pclosed,popen) = graphvars rgraph rargs
                   (_,ropen) = graphvars rgraph [rroot]
                   newhist` = [(rroot,rgraph):newhist]
-        f (newhist,hist) (Trace stricts rule answer history transf)
+                  (newhist,hist) = newhisthist
+        f newhisthist (Trace stricts rule answer history transf)
         = foldtips foldarea (fnsymbol,arguments rule) (removeDup newhist`,removeDup hist) (Trace stricts rule answer history transf)
           where rroot = ruleroot rule; rgraph = rulegraph rule
                 newhist` = [(rroot,rgraph):newhist]
+                (newhist,hist) = newhisthist
 
 
 /*
@@ -252,24 +257,25 @@ newextract ::
  &  == pvar
 
 newextract trc newname (Trace stricts rule answer history transf)
-| recursive
-  = (stricts,rule2body recrule,recareas)
+| recursive ---> "newfold.newextract begins"
+  = (stricts,rule2body recrule,recareas) <--- "newfold.newextract ends (recursive=True)"
 = case transf
   of Reduce reductroot trace
-      -> newextract trc newname trace
+      -> newextract trc newname trace <--- "newfold.newextract ends (at Reduce transformation)"
      Annotate trace
-      -> newextract trc newname trace
+      -> newextract trc newname trace <--- "newfold.newextract ends (at Annotate transformation)"
      Instantiate yestrace notrace
-      -> (stricts,matchpattern answer yesbody nobody,yesareas++noareas)
+      -> (stricts,matchpattern answer yesbody nobody,yesareas++noareas) <--- "newfold.newextract ends (at Instantiate transformation)"
          where (_,yesbody,yesareas) = newextract trc newname yestrace
                (_,nobody,noareas) = newextract trc newname notrace
      Stop
-      -> (stricts,buildgraph rargs rroot stoprgraph,stopareas)
+      -> (stricts,buildgraph rargs rroot stoprgraph,stopareas) <--- "newfold.newextract ends (at Stop transformation)"
 
   where (recursive,unsafearea)
         = if (isreduce transf)
-             (foldoptional (False,undef) (findspinepart rule transf) answer)
+             (foldoptional (False,dummycontents) (findspinepart rule transf) answer)
              (False,abort "newextract: not a Reduce transformation")
+        dummycontents = abort "newfold: newextract: accessing dummy node contents"
 
         (recrule,recareas) = splitrule newname rnfnodes deltanodes rule unsafearea
         (stoprgraph,stopareas) = finishfold newname rnfnodes deltanodes rroot rgraph
@@ -283,8 +289,12 @@ buildgraph ::
     [var]
     var
     (Graph sym var)
- -> FuncBody sym var
-buildgraph _ _ _ = undef
+ -> FuncBody sym var | == var
+buildgraph args root graph
+= (BuildGraph (mkrgraph root (compilegraph (map (pairwith (snd o varcontents graph)) newnodes))) <--- "newfold.buildgraph ends") ---> "newfold.buildgraph begins"
+  where newnodes = removeMembers closedreplnodes patnodes
+        closedreplnodes = fst (graphvars graph [root])
+        patnodes = varlist graph args
 
 isreduce (Reduce reductroot trace) = True
 isreduce transf = False
@@ -313,7 +323,9 @@ findspinepart rule transf spine
                   = (True,mkrgraph node pattern`)
                 = recursion
         force _ res = res
-        partial rule matching _ (pattern,recursion) = (extgraph` graph rule matching pattern,recursion)
+        partial rule matching _ pr
+        = (extgraph` graph rule matching pattern,recursion)
+          where (pattern,recursion) = pr
         redex rule matching = (extgraph` graph rule matching emptygraph,norecursion)
         stop = (emptygraph,norecursion)
         norecursion = (False,abort "findspinepart: no part of spine found")
@@ -381,3 +393,13 @@ getdeltanodes spine
         force _ nodes = (True,nodes)
         partial _ _ _ nodes = (False,nodes)
         redex _ _ = none
+
+instance <<< FuncBody sym var | toString sym & ==,toString var
+where (<<<) file (MatchPattern pat yesbody nobody)
+      = file <<< "?Match: " <<< pat <<< nl
+             <<< "Match succes:" <<< nl
+             <<< yesbody
+             <<< "Match failure:" <<< nl
+             <<< nobody
+      (<<<) file (BuildGraph rgraph)
+      = file <<< "Build: " <<< toString rgraph <<< nl

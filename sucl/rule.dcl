@@ -3,7 +3,8 @@ definition module rule
 // $Id$
 
 from graph import Graph,Node
-from StdOverloaded import ==
+from StdOverloaded import ==,toString
+from StdFile import <<<
 
 // --- Exported types
 
@@ -16,13 +17,15 @@ from StdOverloaded import ==
 mkrule :: [.var] .var (Graph .sym .var) -> Rule .sym .var
 
 // The arguments of a rule, i.e. the roots of its lhs
-arguments :: !(Rule .sym .var) -> [.var]
+arguments :: !.(Rule sym var) -> [var]
 
 // The root of a rule, i.e. of its rhs
-ruleroot :: !(Rule .sym .var) -> .var
+ruleroot :: !.(Rule sym var) -> var
 
 // The graph part of a rule, i.e. its bindings
-rulegraph :: !(Rule .sym .var) -> Graph .sym .var
+rulegraph :: !.(Rule sym var) -> Graph sym var
+
+instance toString Rule sym var | toString sym & toString var & == var
 
 // --- Functions on rooted graphs
 
@@ -45,3 +48,6 @@ rgraphgraph  :: !.(Rgraph sym var) -> Graph sym var
 mkrgraph     :: .var (Graph .sym .var) -> Rgraph .sym .var
 
 instance == (Rgraph sym var) | == sym & == var
+instance toString (Rgraph sym var) | toString sym & toString var & == var
+instance <<< Rgraph sym var | toString sym & toString var & == var
+instance <<< Rule sym var | toString sym & toString,== var

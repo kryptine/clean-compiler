@@ -5,6 +5,7 @@ implementation module canon
 import rule
 import graph
 import basic
+import general
 import StdEnv
 
 /*
@@ -60,7 +61,7 @@ steps:
 
 canonise :: (sym -> Rule tsym tvar) [var2] (Rgraph sym var1) -> Rgraph sym var2 | == var1
 canonise typerule heap rg
- = (relabel heap o etaexpand typerule o splitrg o relabel localheap) rg
+ = ((relabel heap o etaexpand typerule o splitrg o relabel localheap) rg <--- "canon.canonise ends") ---> "canon.canonise begins"
 
 /*
 
@@ -113,9 +114,10 @@ localheap =: [0..]
 
 foldarea :: ((Rgraph sym var) -> sym) (Rgraph sym var) -> Node sym var | == var
 foldarea label rgraph
- = (label rgraph,foldsingleton single nosingle rgraph)
+ = ((id (labelrgraph,foldsingleton single nosingle rgraph)) <--- "canon.foldarea ends") ---> "canon.foldarea begins"
    where single root sym args = args
          nosingle = snd (graphvars (rgraphgraph rgraph) [rgraphroot rgraph])
+         labelrgraph = (label rgraph <--- "canon.foldarea.labelrgraph ends") ---> "canon.foldarea.labelrgraph begins"
 
 /*
 ------------------------------------------------------------------------
@@ -139,13 +141,13 @@ foldarea label rgraph
 
 labelarea :: [Rgraph sym var] [sym] (Rgraph sym var) -> sym | == sym & == var
 labelarea areas labels rg
- = foldmap id nolabel (maketable areas labels) rg
+ = ((foldmap--->"canon.labelarea uses foldmap") id nolabel ((maketable--->"canon.maketable begins from canon.labelarea") ((areas<---"canon.labelarea.areas ends")--->"canon.labelarea.areas begins") ((labels<---"canon.labelarea.labels ends")--->"canon.labelarea.labels begins")) ((rg<---"canon.labelarea.rg ends")--->"canon.labelarea.rg begins") <--- "canon.labelarea ends") ---> "canon.labelarea begins"
    where nolabel = abort "canon: labelarea: no label assigned to area"
 
 maketable :: [Rgraph sym var] [sym] -> [(Rgraph sym var,sym)] | == var
-maketable [] _ = []
+maketable [] _ = [] <--- "canon.maketable ends empty"
 maketable [area:areas] labels
- = [(area,label):maketable areas labels`]
+ = [(((area<---"canon.maketable.area ends")--->"canon.maketable.area begins",(label<---"canon.maketable.label ends")--->"canon.maketable.label begins") <--- "canon.maketable.head ends") ---> "canon.maketable.head begins":(maketable--->"canon.maketable begins from maketable") areas labels`] <--- "canon.maketable ends nonempty"
    where (label,labels`) = getlabel (nc aroot) labels
          getlabel (True,(asym,aargs)) labels
           | not (or (map (fst o nc) aargs))
