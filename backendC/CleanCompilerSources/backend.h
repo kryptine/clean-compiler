@@ -1,99 +1,99 @@
 /* version info */
 
 // increment this for every release
-# define	kBEVersionCurrent				0x02100400
+# define	kBEVersionCurrent				0x02100401
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not upward compatible (for example when a function is added)
-# define	kBEVersionOldestDefinition		0x02030407
+# define	kBEVersionOldestDefinition		0x02100401
 
 // change this to the same value as kBEVersionCurrent if the new release is
 // not downward compatible (for example when a function is removed)
-# define	kBEVersionOldestImplementation	0x02030407
+# define	kBEVersionOldestImplementation	0x02100401
 
 
 # define	kBEDebug	1
 
 /* pointer types */
 
-Clean (:: CPtr :== Int)
+Clean (:: CPtr (:== Int))
 
 Clean (:: *UWorld :== Int)
 
 typedef struct BackEnd *BackEnd;
-Clean (:: *BackEnd :== CPtr)
+Clean (:: *BackEnd (:== CPtr))
 
 typedef struct symbol *BESymbolP;
-Clean (:: BESymbolP :== CPtr)
+Clean (:: BESymbolP (:== CPtr))
 
 typedef struct type_node *BETypeNodeP;
-Clean (:: BETypeNodeP :== CPtr)
+Clean (:: BETypeNodeP (:== CPtr))
 
 typedef struct type_arg *BETypeArgP;
-Clean (:: BETypeArgP :== CPtr)
+Clean (:: BETypeArgP (:== CPtr))
 
 typedef struct type_alt *BETypeAltP;
-Clean (:: BETypeAltP :== CPtr)
+Clean (:: BETypeAltP (:== CPtr))
 
 typedef struct node *BENodeP;
-Clean (:: BENodeP :== CPtr)
+Clean (:: BENodeP (:== CPtr))
 
 typedef struct arg *BEArgP;
-Clean (:: BEArgP :== CPtr)
+Clean (:: BEArgP (:== CPtr))
 
 typedef struct rule_alt *BERuleAltP;
-Clean (:: BERuleAltP :== CPtr)
+Clean (:: BERuleAltP (:== CPtr))
 
 typedef struct imp_rule *BEImpRuleP;
-Clean (:: BEImpRuleP :== CPtr)
+Clean (:: BEImpRuleP (:== CPtr))
 
 typedef struct type *BETypeP;
-Clean (:: BETypeP :== CPtr)
+Clean (:: BETypeP (:== CPtr))
 
 typedef struct flat_type *BEFlatTypeP;
-Clean (:: BEFlatTypeP :== CPtr)
+Clean (:: BEFlatTypeP (:== CPtr))
 
 typedef struct type_var *BETypeVarP;
-Clean (:: BETypeVarP :== CPtr)
+Clean (:: BETypeVarP (:== CPtr))
 
 typedef struct type_var_list *BETypeVarListP;
-Clean (:: BETypeVarListP :== CPtr)
+Clean (:: BETypeVarListP (:== CPtr))
 
 typedef struct constructor_list *BEConstructorListP;
-Clean (:: BEConstructorListP :== CPtr)
+Clean (:: BEConstructorListP (:== CPtr))
 
 typedef struct field_list *BEFieldListP;
-Clean (:: BEFieldListP :== CPtr)
+Clean (:: BEFieldListP (:== CPtr))
 
 typedef struct node_id *BENodeIdP;
-Clean (:: BENodeIdP :== CPtr)
+Clean (:: BENodeIdP (:== CPtr))
 
 typedef struct node_def *BENodeDefP;
-Clean (:: BENodeDefP :== CPtr)
+Clean (:: BENodeDefP (:== CPtr))
 
 typedef struct strict_node_id *BEStrictNodeIdP;
-Clean (:: BEStrictNodeIdP :== CPtr)
+Clean (:: BEStrictNodeIdP (:== CPtr))
 
 typedef struct parameter *BECodeParameterP;
-Clean (:: BECodeParameterP :== CPtr)
+Clean (:: BECodeParameterP (:== CPtr))
 
 typedef struct code_block *BECodeBlockP;
-Clean (:: BECodeBlockP :== CPtr)
+Clean (:: BECodeBlockP (:== CPtr))
 
 typedef struct string_list *BEStringListP;
-Clean (:: BEStringListP :== CPtr)
+Clean (:: BEStringListP (:== CPtr))
 
 typedef struct node_id_list_element *BENodeIdListP;
-Clean (:: BENodeIdListP :== CPtr)
+Clean (:: BENodeIdListP (:== CPtr))
 
 typedef struct node_id_ref_count_list *BENodeIdRefCountListP;
-Clean (:: BENodeIdRefCountListP :== CPtr)
+Clean (:: BENodeIdRefCountListP (:== CPtr))
 
 typedef struct uni_var_equats *BEUniVarEquations;
-Clean (:: BEUniVarEquations :== CPtr)
+Clean (:: BEUniVarEquations (:== CPtr))
 
 typedef struct attr_kind_list *BEAttributeKindList;
-Clean (:: BEAttributeKindList :== CPtr)
+Clean (:: BEAttributeKindList (:== CPtr))
 
 /* constants */
 /*
@@ -153,12 +153,6 @@ typedef int	BESelectorKind;
 Clean (::BESelectorKind :== Int)
 enum {
 	BESelectorDummy, BESelector, BESelector_U, BESelector_F, BESelector_L, BESelector_N
-};
-
-typedef int	BEUpdateKind;
-Clean (::BEUpdateKind :== Int)
-enum {
-	BEUpdateDummy, BEUpdate, BEUpdate_U
 };
 
 typedef int BESpecialIdentIndex;
@@ -427,14 +421,14 @@ Clean (BETypes :: BETypeP BETypeP BackEnd -> (BETypeP, BackEnd))
 BETypeP BENoTypes (void);
 Clean (BENoTypes :: BackEnd -> (BETypeP, BackEnd))
 
-BEFlatTypeP BEFlatType (BESymbolP symbol, BETypeVarListP arguments);
-Clean (BEFlatType :: BESymbolP BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
+BEFlatTypeP BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments);
+Clean (BEFlatType :: BESymbolP BEAttribution BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
 
 void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
 Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
 
-void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, BEFieldListP fields);
-Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP BEFieldListP BackEnd -> BackEnd)
+void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields);
+Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP Int BEFieldListP BackEnd -> BackEnd)
 
 void BEAbsType (BEFlatTypeP lhs);
 Clean (BEAbsType :: BEFlatTypeP BackEnd -> BackEnd)
