@@ -23,7 +23,11 @@ sucltypeheap :: [SuclTypeVariable]
 sucltypeheap =: map SuclANONYMOUS [0..]
 
 :: SuclSymbol
- = SuclUser Ident
+ = SuclUser SymbolPtr
+ | SuclCase ExprInfoPtr
+ | SuclInt Int
+ | SuclChar Char
+ | SuclBool Bool
 
 :: SuclSymbolKind
  = SuclFunction
@@ -32,3 +36,9 @@ sucltypeheap =: map SuclANONYMOUS [0..]
 
 :: SuclVariable
  = SuclAnonymous Int
+ | SuclNamed VarInfoPtr
+
+instance == SuclVariable
+where (==) (SuclAnonymous i1) (SuclAnonymous i2) = i1 == i2
+      (==) (SuclNamed     p1) (SuclNamed     p2) = p1 == p2
+      (==) _                  _                  = False

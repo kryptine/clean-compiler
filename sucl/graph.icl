@@ -196,6 +196,12 @@ Uses in Miranda:
 
 >   compilegraph :: [(**,(*,[**]))] -> graph * **
 >   compilegraph = foldr (uncurry updategraph) emptygraph
+*/
+
+compilegraph :: ![(var,Node sym var)] -> Graph sym var
+compilegraph nds = foldr (uncurry updategraph) emptygraph nds
+
+/*
 
 `Instance g1 g2' determines whether g2 is an instance of g1.
 Uses in Miranda:
