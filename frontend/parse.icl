@@ -1689,15 +1689,15 @@ where
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
 
-	want_type_rhs parseContext td=:{td_attribute} token=:DefinesColonToken annot pState
+	want_type_rhs parseContext td=:{td_attribute} token=:OpenToken annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
+		# pState = wantToken TypeContext "Abstract type synonym" ColonDefinesToken pState			
 		# name				= td.td_ident.id_name
 		  (atype, pState)	= want pState // Atype
 		# (td_attribute, properties) = determine_properties annot td_attribute
 		  td				= {td & td_rhs = AbstractTypeSpec properties atype, td_attribute=td_attribute}
-		| annot <> AN_None
-			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
+		# pState = wantToken TypeContext "Abstract type synonym" CloseToken pState
 		| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
@@ -2475,8 +2475,6 @@ where
 					#	atypevar = {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}
 					->	(True,atypevar,pState)
 					->	(False,abort "no ATypeVar",pState)
-<<<<<<< parse.icl
-=======
 */
 
 optionalUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
