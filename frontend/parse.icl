@@ -506,7 +506,7 @@ where
 			= (False, abort "name", False, tokenBack pState)
 
 	want_rhs_of_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
-	want_rhs_of_def parseContext (opt_name, args) DoubleColonToken pos pState
+	want_rhs_of_def parseContext (opt_name, []) DoubleColonToken pos pState
 		# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
 		  (tspec, pState) = want pState		//	SymbolType
 		| isDclContext parseContext
