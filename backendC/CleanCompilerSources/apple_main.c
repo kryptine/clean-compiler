@@ -102,6 +102,17 @@ extern int CallCompiler (int argc,char **argv);
 
 char return_error_string[200];
 
+#ifdef CG_PPC_XO
+extern int generate_code_xo (int argc,char **argv,char *return_error_string_p,int *compiler_id_p);
+extern int generate_code_o (int argc,char **argv,char *return_error_string_p,int *compiler_id_p);
+#endif
+
+#ifdef CLEAN2
+int compiler_id=-1;
+#else
+extern int compiler_id;
+#endif
+
 int do_command (char *command)
 {
 	char *p,*(argv[257]);
