@@ -191,3 +191,18 @@ predefined_idents :: {!Ident}
 buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
 
 buildPredefinedModule :: !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
+
+// MV ...
+// changes requires recompile of {static,dynamic}-linker plus all dynamics ever made
+UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"	
+
+DynamicRepresentation_String			:== "DynamicTemp"		
+
+// List-type
+PD_ListType_String				:== "_List"
+PD_ConsSymbol_String			:== "_Cons"
+PD_NilSymbol_String				:== "_Nil"
+
+// Array-type
+PD_UnboxedArray_String			:== "_#Array"
+// ... MV
