@@ -1303,6 +1303,11 @@ where
 	collectVariables (MatchExpr opt_tuple cons_symb expr) free_vars cos
 		# (expr, free_vars, cos) = collectVariables expr free_vars cos
 		= (MatchExpr opt_tuple cons_symb expr, free_vars, cos)
+// MV ..
+	collectVariables (DynamicExpr dynamic_expr=:{dyn_expr}) free_vars cos
+		#! (dyn_expr, free_vars, cos) = collectVariables dyn_expr free_vars cos
+		= (DynamicExpr {dynamic_expr & dyn_expr = dyn_expr}, free_vars, cos);
+// .. MV
 	collectVariables expr free_vars cos
 		= (expr, free_vars, cos)
 
