@@ -72,7 +72,6 @@ where
 				# (gv, st_vars, error) = find gv st_vars error 
 				= (gv, [st_var:st_vars], error)
 				
-
 checkTypeClasses :: !Index !Index !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*TypeHeaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*TypeHeaps, !*CheckState)
 checkTypeClasses class_index module_index class_defs member_defs type_defs modules type_heaps cs=:{cs_symbol_table,cs_error}
@@ -141,7 +140,6 @@ where
 		= (SP_ContextTypes list_of_specials, next_inst_index, all_instances, heaps, cs_error)
 	check_specials mod_index fun_type fun_index SP_None next_inst_index all_instances heaps error
 		= (SP_None, next_inst_index, all_instances, heaps, error)
-
 
 checkSpecialsOfInstances :: !Index !Index ![ClassInstance] !Index ![ClassInstance] ![FunType] {# FunType} *{! [Special] } !*Heaps !*ErrorAdmin
 		-> (!Index, ![ClassInstance], ![FunType], !*{! [Special]}, !*Heaps, !*ErrorAdmin)
@@ -666,7 +664,6 @@ where
 			= (tc_types, checkError ds_ident.id_name "illegal specialization" error)
 			= (tc_types, error)
 
-
 initializeContextVariables :: ![TypeContext] !*VarHeap ->  (![TypeContext], !*VarHeap)
 initializeContextVariables contexts var_heap
 	= mapSt add_variable_to_context contexts var_heap
@@ -675,19 +672,33 @@ where
 		# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		= ({ context & tc_var = new_info_ptr}, var_heap)
 
+ident_for_errors_from_fun_symb_and_fun_kind :: Ident DefOrImpFunKind -> Ident;
+ident_for_errors_from_fun_symb_and_fun_kind {id_name} (FK_ImpFunction fun_name_is_location_dependent)
+	| fun_name_is_location_dependent && size id_name>0
+		# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
+		= { id_name=beautiful_name, id_info=nilPtr }
+ident_for_errors_from_fun_symb_and_fun_kind {id_name} (FK_DefFunction fun_name_is_location_dependent)
+	| fun_name_is_location_dependent && size id_name>0
+		# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
+		= { id_name=beautiful_name, id_info=nilPtr }
+ident_for_errors_from_fun_symb_and_fun_kind fun_symb _
+	= fun_symb
+
 checkFunction :: !Index !Index !Level !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef},!*ExpressionInfo, !*Heaps, !*CheckState);
 checkFunction mod_index fun_index def_level fun_defs
 			e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps} cs=:{cs_error}
 	# (fun_def,fun_defs) = fun_defs![fun_index]
 	# {fun_symb,fun_pos,fun_body,fun_type,fun_kind} = fun_def
-	  cs = { cs & cs_error = push_error_admin_beautifully fun_symb fun_pos fun_kind cs_error }
+	# function_ident_for_errors = ident_for_errors_from_fun_symb_and_fun_kind fun_symb fun_kind
+	# cs = {cs & cs_error = pushErrorAdmin (newPosition function_ident_for_errors fun_pos) cs_error}
+
 	  (fun_type, ef_type_defs, ef_class_defs, ef_modules, hp_var_heap, hp_type_heaps, cs)
 			= check_function_type fun_type mod_index ef_type_defs ef_class_defs ef_modules hp_var_heap hp_type_heaps cs
 	  e_info  = { e_info & ef_type_defs = ef_type_defs, ef_class_defs = ef_class_defs, ef_modules = ef_modules }
 	  e_state = {   es_var_heap = hp_var_heap, es_expr_heap = hp_expression_heap, es_type_heaps = hp_type_heaps,
 	  				es_dynamics = [], es_calls = [], es_fun_defs = fun_defs, es_dynamic_expr_count = 0}
 	  e_input = { ei_expr_level = inc def_level, ei_fun_index = fun_index, ei_fun_level = inc def_level, ei_mod_index = mod_index }
-	  (fun_body, free_vars, e_state, e_info, cs) = checkFunctionBodies fun_body e_input e_state e_info cs
+	  (fun_body, free_vars, e_state, e_info, cs) = checkFunctionBodies fun_body function_ident_for_errors e_input e_state e_info cs
 
 	# {es_fun_defs,es_calls,es_var_heap,es_expr_heap,es_type_heaps,es_dynamics} = e_state
 	  (ef_type_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
@@ -729,17 +740,6 @@ where
 
 	get_calls (STE_FunctionOrMacro [x:xs]) = (x,xs)
 	get_calls ste_kind = abort "get_calls (check.icl)" // <<- ste_kind
-
-	push_error_admin_beautifully {id_name} fun_pos (FK_ImpFunction fun_name_is_location_dependent) cs_error
-		| fun_name_is_location_dependent && size id_name>0
-			# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
-			= pushErrorAdmin (newPosition { id_name=beautiful_name, id_info=nilPtr } fun_pos) cs_error
-	push_error_admin_beautifully {id_name} fun_pos (FK_DefFunction fun_name_is_location_dependent) cs_error
-		| fun_name_is_location_dependent && size id_name>0
-			# beautiful_name = if (id_name.[0]==backslash) "lambda" "comprehension"
-			= pushErrorAdmin (newPosition { id_name=beautiful_name, id_info=nilPtr } fun_pos) cs_error
-	push_error_admin_beautifully fun_symb fun_pos _ cs_error
-		= pushErrorAdmin (newPosition fun_symb fun_pos) cs_error
 
 checkFunctions :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState -> (!*{#FunDef}, !*ExpressionInfo, !*Heaps, !*CheckState)
 checkFunctions mod_index level from_index to_index fun_defs e_info heaps cs
@@ -1656,12 +1656,9 @@ check_module2 mod_name mod_imported_objects mod_imports mod_type icl_global_func
 	  (icl_sizes_without_added_dcl_defs, sizes) = memcpy sizes
 	  (dcl_modules, local_defs, cdefs, icl_sizes, cs)
 	  		= combineDclAndIclModule mod_type init_dcl_modules local_defs cdefs sizes cs
-
 	| not cs.cs_error.ea_ok
 		= (False, abort "evaluated error 1 (check.icl)", {}, {}, No, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
-
 	# icl_common = createCommonDefinitions cdefs
-
 	  (local_defs,dcl_modules,icl_common,cs)
 		= renumber_icl_definitions_as_dcl_definitions mod_type local_defs dcl_modules icl_common {icl_sizes.[i] \\ i<-[0..cMacroDefs-1]} cs
 
@@ -2367,7 +2364,6 @@ updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentN
 		= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
 updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
-
 
 //1.3
 memcpy :: u:(a b) -> (!.(c b),!v:(a b)) | Array a & createArray_u , createArrayc_u , size_u , update_u , uselect_u b & Array c, [u <= v];

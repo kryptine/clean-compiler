@@ -21,5 +21,5 @@ import syntax, checksupport
 	,	ei_mod_index	:: !Index
 	}
 
-checkFunctionBodies :: !FunctionBody !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
+checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
 					-> (FunctionBody,[FreeVar],!.ExpressionState,.ExpressionInfo,!.CheckState);

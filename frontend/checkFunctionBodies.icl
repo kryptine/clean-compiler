@@ -55,12 +55,14 @@ cEndWithSelection		:== False
 
 ::	RecordKind = RK_Constructor | RK_Update | RK_UpdateToConstructor ![AuxiliaryPattern]
 
-checkFunctionBodies :: !FunctionBody !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState -> (FunctionBody,[FreeVar],!.ExpressionState,.ExpressionInfo,!.CheckState);
-checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) e_input=:{ei_expr_level,ei_mod_index}
+checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState -> (FunctionBody,[FreeVar],!.ExpressionState,.ExpressionInfo,!.CheckState);
+checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
+		
 	# (aux_patterns, (var_env, array_patterns), {ps_var_heap, ps_fun_defs}, e_info, cs)
 			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} ([], [])
 							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs 
+
 	  (rhs_expr, free_vars, e_state, e_info, cs)
 	  		= checkRhs [] rhs_alts rhs_locals e_input { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs } e_info cs
 	  (dynamics_in_rhs, e_state)
@@ -104,9 +106,11 @@ where
 	
 	check_function_bodies free_vars fun_args [{pb_args,pb_rhs={rhs_alts,rhs_locals},pb_position} : bodies]
 							e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap,es_fun_defs} e_info cs
+		# cs = pushErrorAdmin (newPosition function_ident_for_errors pb_position) cs
 		# (aux_patterns, (var_env, array_patterns), {ps_var_heap, ps_fun_defs}, e_info, cs)
 				= check_patterns pb_args { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
 					{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
+		# cs = popErrorAdmin cs
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs}
 		  (rhs_expr, free_vars, e_state, e_info, cs) = checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
 		  (rhs_expr, free_vars, e_state=:{es_dynamics=dynamics_in_rhs}, e_info, cs)
@@ -1042,8 +1046,6 @@ where
 		= (SK_Function { glob_object = def_index, glob_module =  ei_mod_index}, st_arity, ft_priority, cIsAFunction,
 				e_state, { e_info & ef_modules = ef_modules }, cs)
 
-
-
 checkPattern :: !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 									-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)
 checkPattern (PE_List [exp]) opt_var p_input accus ps e_info cs=:{cs_symbol_table}
@@ -1274,8 +1276,6 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 checkPattern expr opt_var p_input accus ps e_info cs
 	= abort "checkPattern: do not know how to handle pattern" ---> expr
 
-
-
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkPatternConstructor _ _ {ste_kind = STE_Empty} ident _  ps e_info cs=:{cs_error}
@@ -1334,16 +1334,12 @@ checkBoundPattern {bind_src,bind_dst} opt_var p_input (var_env, array_patterns) 
 	= checkPattern bind_src opt_var p_input (var_env, array_patterns) ps e_info { cs & cs_error = checkError bind_dst "variable expected" cs.cs_error }
 
 
-
-
 checkPatternVariable :: !Level !SymbolTableEntry !Ident !VarInfoPtr !*CheckState -> !*CheckState
 checkPatternVariable def_level entry=:{ste_def_level,ste_kind} ident=:{id_info} var_info cs=:{cs_symbol_table,cs_error}
 	| ste_kind == STE_Empty || def_level > ste_def_level
 		# entry = {ste_kind = STE_Variable var_info, ste_index = NoIndex, ste_def_level = def_level, ste_previous = entry }
 		= { cs & cs_symbol_table = cs_symbol_table <:= (id_info,entry)}
 		= { cs & cs_error = checkError ident "(pattern variable) already defined" cs_error }
-
-
 
 checkIdentPattern :: !Bool !Ident !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)
@@ -1356,8 +1352,6 @@ checkIdentPattern is_expr_list id=:{id_name,id_info} opt_var {pi_def_level, pi_m
 		= (AP_Variable id new_info_ptr opt_var, ([ id : var_env ], array_patterns), { ps & ps_var_heap = ps_var_heap}, e_info, cs)
 		# (pattern, ps, e_info, cs) = checkPatternConstructor pi_mod_index is_expr_list entry id opt_var ps e_info { cs & cs_symbol_table = cs_symbol_table }
 		= (pattern, accus, ps, e_info, cs)
-
-
 
 convertSubPatterns :: [AuxiliaryPattern] Expression Position *(Heap VarInfo) *(Heap ExprInfo) u:[Ptr ExprInfo] *CheckState -> *(!.[FreeVar],!Expression,!Position,!*Heap VarInfo,!*Heap ExprInfo,!u:[Ptr ExprInfo],!*CheckState);
 convertSubPatterns [] result_expr pattern_position var_store expr_heap opt_dynamics cs
