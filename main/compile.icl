@@ -38,8 +38,7 @@ InitialCoclOptions =
 	,	outMode
 			=	FWriteText
 	,	searchPaths
-// RWS, voor Maarten +++			=	{sp_locations = [], sp_paths = []}
-				=	[]
+			=	{sp_locations = [], sp_paths = []}
 	}
 
 compile :: [{#Char}] *Files -> (!Bool, !*Files)
@@ -54,12 +53,10 @@ parseCommandLine [] options
 		prependModulePath options=:{pathName, searchPaths}
 			=	{	options
 				&	moduleName = baseName pathName
-// RWS, voor Maarten +++				,	searchPaths = {searchPaths & sp_paths = [directoryName pathName : searchPaths.sp_paths]}
-				,	searchPaths = [directoryName pathName : searchPaths]
+				,	searchPaths = {searchPaths & sp_paths = [directoryName pathName : searchPaths.sp_paths]}
 				}
 parseCommandLine ["-P", searchPathsString : args] options=:{searchPaths}
-// RWS, voor Maarten +++	=	parseCommandLine args {options & searchPaths = {searchPaths & sp_paths = splitPaths searchPathsString}}
-	=	parseCommandLine args {options & searchPaths = splitPaths searchPathsString}
+	=	parseCommandLine args {options & searchPaths = {searchPaths & sp_paths = splitPaths searchPathsString}}
 parseCommandLine ["-RO", outPath : args] options
 	=	parseCommandLine args {options & outPath = stripQuotes outPath, outMode = FWriteText}
 parseCommandLine ["-RAO", outPath : args] options
@@ -138,7 +135,7 @@ compileModule options commandLineArgs files
 	# (predefSymbols, hashTable) = buildPredefinedSymbols newHashTable
 	  (moduleIdent, hashTable) = putIdentInHashTable options.moduleName IC_Module hashTable
 	# (predefs, _, files, error, io, out, optionalSyntaxTree)
-		=	frontEndInterface moduleIdent options.searchPaths predefSymbols hashTable files error io out
+		=	frontEndInterface FrontEndPhaseAll moduleIdent options.searchPaths predefSymbols hashTable files error io out
 	# (closed, files)
 		=	fclose io files
 	| not closed
