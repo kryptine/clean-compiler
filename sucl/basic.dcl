@@ -218,3 +218,6 @@ zipwith :: (.a .b->.c) ![.a] [.b] -> [.c]
 
 // Write a list of things, each one terminated by a newline
 (writeList) infixl :: !*File [a] -> .File | <<< a
+
+// Prettyprint a list to a file with indent
+printlist :: (elem->String) String [elem] *File -> .File
