@@ -38,7 +38,7 @@ from type_io_common import class toString (..),instance toString GlobalTCType;
 	,	ci_module_id_symbol						:: Expression
 	,	ci_internal_type_id						:: Expression
 	,	ci_module_id							:: Optional LetBind
-	,	ci_type_id								:: !TypeSymbIdent
+	,	ci_type_id								:: !Optional !TypeSymbIdent
 	}
 
 ::	ConversionInput =
@@ -203,78 +203,21 @@ convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_
 
 // new...
 	# ({pds_module=pds_type_id_module, pds_def=pds_type_id_def} , predefined_symbols) = predefined_symbols![PD_TypeID]
-	# {td_name} = common_defs.[pds_type_id_module].com_type_defs.[pds_type_id_def]
 	# ci_type_id
-		= {
-			type_name	= td_name
-		,	type_arity	= 0
-		,	type_index	= { glob_object = pds_type_id_def, glob_module = pds_type_id_module}
-		,	type_prop	= { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }
-		};	
-	
-
-// TE TA !TypeSymbIdent ![AType]
-/*
-MakeTypeSymbIdentMacro type_index name arity
-	:== {	type_name = name, type_arity = arity, type_index = type_index,
-			type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }}
-
-*/
-/*
-::	Global object =
-	{	glob_object	:: !object
-	,	glob_module	:: !Index
-	}
-::	Type	=	TA !TypeSymbIdent ![AType]
-
-::	TypeSymbIdent =
-	{	type_name		:: !Ident
-	,	type_arity		:: !Int
-	,	type_index		:: !Global Index
-	,	type_prop		:: !TypeSymbProperties
-	}
-# ({pds_module=pds_module1, pds_def=pds_def1} , predefined_symbols) = predefined_symbols![PD_DynamicTemp]
-# {td_rhs=RecordType {rt_constructor,rt_fields}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
-
-::	TypeDef type_rhs =
- 	{	td_name			:: !Ident
-	,	td_index		:: !Int
-	,	td_arity		:: !Int
-	,	td_args			:: ![ATypeVar]
-	,	td_attrs		:: ![AttributeVar]
-	,	td_context		:: ![TypeContext]
-	,	td_rhs			:: !type_rhs
-	,	td_attribute	:: !TypeAttribute
-	,	td_pos			:: !Position
-	,	td_used_types	:: ![GlobalIndex]
-	}
-	
-::	*ConversionInfo =
-	{	ci_predef_symb		:: !*PredefinedSymbols
-	,	ci_var_heap			:: !*VarHeap
-	,	ci_expr_heap		:: !*ExpressionHeap
-	,	ci_new_variables 	:: ![FreeVar]
-	,	ci_new_functions 	:: ![FunctionInfoPtr]
-	,	ci_fun_heap			:: !*FunctionHeap
-	,	ci_next_fun_nr		:: !Index
-	
-	//	data needed to generate coercions
-	,	ci_placeholders_and_tc_args				:: [(!BoundVar,Ptr VarInfo)]
-	,	ci_generated_global_tc_placeholders		:: !Bool
-	,	ci_used_tcs								:: [Ptr VarInfo]
-	,	ci_symb_ident							:: SymbIdent
-	,	ci_sel_type_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
-	,	ci_sel_value_field						:: Expression -> Expression  //Optional (!Int,!(Global DefinedSymbol))
-	,	ci_module_id_symbol						:: Expression
-	,	ci_internal_type_id						:: Expression
-	,	ci_module_id							:: Optional LetBind
-	}
-
-*/
-
-
+		= case (pds_type_id_module == NoIndex || pds_type_id_def == NoIndex) of
+			True
+				-> No
+			_
+				# {td_name} = common_defs.[pds_type_id_module].com_type_defs.[pds_type_id_def]
+				# ci_type_id
+					= {
+						type_name	= td_name
+					,	type_arity	= 0
+					,	type_index	= { glob_object = pds_type_id_def, glob_module = pds_type_id_module}
+					,	type_prop	= { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }
+					};
+				-> Yes ci_type_id
 // ...new
-
 						
 	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
@@ -1332,10 +1275,10 @@ let_ptr nr_of_binds ci=:{ci_expr_heap}
 
 // 
 typed_let_ptr :: !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
-typed_let_ptr ci=:{ci_expr_heap,ci_type_id}
+typed_let_ptr ci=:{ci_expr_heap,ci_type_id=Yes ci_type_id2}
 //	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType [toAType (TA ci_type_id [])]) ci_expr_heap
 //	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
-	= let_ptr2 [toAType (TA ci_type_id [])] ci
+	= let_ptr2 [toAType (TA ci_type_id2 [])] ci
 
 let_ptr2 :: [AType] !*ConversionInfo -> (ExprInfoPtr, !*ConversionInfo)
 let_ptr2 let_types ci=:{ci_expr_heap}
