@@ -11,8 +11,9 @@ extern void DPrintNodeId (NodeId nid, File file);
 extern void DPrintNodeIdS (char *s,NodeId nid, File file);
 extern void DPrintOccurrenceKind (OccurrenceKind kind, File file);
 extern void PrintTypeAlt (TypeAlts type_alts, File file, Bool with_equats);
+extern void PrintState (StateS state, File file);
 
-extern void PrintRules (ImpRules rules);
+extern void PrintRules (ImpRules rules,File file);
 
 #ifdef _COMPSTATS_
 extern unsigned long 

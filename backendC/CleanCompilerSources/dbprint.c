@@ -35,7 +35,7 @@ static void PrintUnaryState (StateKind kind, ObjectKind obj, File file)
 		case UnderEval: FPutS ("UnderEval ", file); break;
 	}
 	switch (obj)
-	{	case UnknownObj: FPutS ("???", file); break;
+	{	case UnknownObj: FPutS ("??? ", file); break;
 		case IntObj: FPutS ("Int ", file); break;
 		case BoolObj: FPutS ("Bool ", file); break;
 		case CharObj: FPutS ("Char ", file); break;
@@ -48,12 +48,33 @@ static void PrintUnaryState (StateKind kind, ObjectKind obj, File file)
 	}
 }
 
-static void PrintState (StateS state, File file)
+void PrintState (StateS state, File file)
 {
-	return;
-
-	if (state.state_arity == 1)
-		PrintUnaryState (state.state_kind,state.state_object, file);
+	switch (state.state_type){
+		case TupleState:
+		{
+			int i,arity;
+			
+			arity=state.state_arity;
+			FPrintF (file,"t%d",arity);
+			
+			for (i=0; i<arity; ++i){
+				FPrintF (file," ");
+				PrintState (state.state_tuple_arguments[i],file);
+			}
+			
+			break;
+		}
+		case RecordState:
+			FPutC ('r',file);
+			break;
+		case ArrayState:
+			FPutC ('a',file);
+			break;
+		case SimpleState:
+			PrintUnaryState (state.state_kind,state.state_object, file);
+			break;
+	}
 }
 
 void DPrintOccurrenceKind (OccurrenceKind kind, File file)
@@ -108,8 +129,10 @@ static void DPrintTypeVar (TypeVar tv, Node follow, File file)
 
 static void PrintArgument (Args arg,Bool brackets,int n_leading_spaces,File file)
 {
+	/*
 	PrintState (arg->arg_state, file);
-
+	*/
+	
 	if (arg->arg_node->node_kind==NodeIdNode)
 		DPrintNodeId (arg->arg_node->node_node_id,file);
 	else {
@@ -797,15 +820,15 @@ void PrintImpRule (ImpRules rule,int n_leading_spaces,File file)
 	PrintRuleAlts (rule->rule_alts,n_leading_spaces,file);
 }
 
-void PrintRules (ImpRules rules)
+void PrintRules (ImpRules rules,File file)
 {
 	ImpRuleS *rule;
 
 	for_l (rule,rules,rule_next){
-		PrintImpRule (rule,4,StdOut);
+		PrintImpRule (rule,4,file);
 		
 		if (rule->rule_next!=NULL)
-			FPutC ('\n',StdOut);
+			FPutC ('\n',file);
 	}
 }
 
