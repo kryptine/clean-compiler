@@ -1312,8 +1312,8 @@ where
 					= cleanUpSymbolType exp_fun_type type_contexts case_and_let_exprs coercion_env 
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_expr_heap ts.ts_error
 				| ts_error.ea_ok
-					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_error)
-			  			= check_function_type fun_type tmp_fun_type clean_fun_type defs ts.ts_fun_env attr_var_env ts_type_heaps ts_error
+					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
+			  			= check_function_type fun_type tmp_fun_type clean_fun_type case_and_let_exprs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
 					-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
 					-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_expr_heap = ts_expr_heap, ts_error = ts_error })
 		  	UncheckedType exp_fun_type
@@ -1323,13 +1323,15 @@ where
 				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
 				-> (type_var_env, attr_var_env, { ts & ts_type_heaps = ts_type_heaps, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
 
-	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars} defs fun_env attr_var_env type_heaps error
+	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars} case_and_let_exprs
+				defs fun_env attr_var_env type_heaps expr_heap error
 		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type defs attr_var_env type_heaps
 		| equi
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars
-			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, error)
+			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type fun_type case_and_let_exprs type_heaps expr_heap
+			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
 //					---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
-			= (fun_env, attr_var_env, type_heaps, specification_error clean_fun_type error)
+			= (fun_env, attr_var_env, type_heaps, expr_heap, specification_error clean_fun_type error)
 	where
 		add_lifted_arg_types arity_diff args1 args2
 			| arity_diff > 0
