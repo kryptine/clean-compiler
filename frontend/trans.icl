@@ -2029,7 +2029,7 @@ where
 
 determine_args
 	:: ![Bool] ![ConsClass] !Index !{!Producer} ![Optional SymbolType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
-	-> !*DetermineArgsState
+	-> *DetermineArgsState
 determine_args _ [] prod_index producers prod_atypes forms _ das=:{das_var_heap}
 	# (vars, das_var_heap)	= new_variables forms das_var_heap
 	= {das & das_vars = vars, das_var_heap = das_var_heap}
@@ -2049,7 +2049,7 @@ determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index prod
 
 determine_arg
 	:: !Producer .(Optional SymbolType) !FreeVar .Int !(!(!Bool,!ConsClass),!ReadOnlyTI) !*DetermineArgsState
-	-> !*DetermineArgsState
+	-> *DetermineArgsState
 
 determine_arg PR_Empty _ form=:{fv_name,fv_info_ptr} _ ((linear_bit,cons_arg), _) das=:{das_var_heap}
 	# (new_info_ptr, das_var_heap)	= newPtr VI_Empty das_var_heap

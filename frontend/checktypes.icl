@@ -297,7 +297,7 @@ where
 //				---> ("bind_types_of_constructors", cons_def.cons_symb, exi_vars, cons_type)
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
-			-> !(![AType], ![[ATypeVar]], ![AttrInequality], !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+			-> (![AType], ![[ATypeVar]], ![AttrInequality], !(!*TypeSymbols, !*TypeInfo, !*CheckState))
 		bind_types_of_cons [] cti free_vars attr_env ts_ti_cs
 			= ([], [], attr_env, ts_ti_cs)
 		bind_types_of_cons [type : types] cti free_vars attr_env ts_ti_cs

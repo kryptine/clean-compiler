@@ -274,7 +274,7 @@ where
 			# (dcl_mod, modules) = modules![gi_module]
 			= (dcl_mod.dcl_common.com_generic_defs.[gi_index], generic_defs, modules)
 
-	add_case_to_generic :: !GenericDef !GlobalIndex !*Heaps -> !*Heaps
+	add_case_to_generic :: !GenericDef !GlobalIndex !*Heaps -> *Heaps
 	add_case_to_generic {gen_info_ptr} index heaps=:{hp_generic_heap} 
 		# (info=:{gen_cases}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
 		# info = { info & gen_cases = [index:gen_cases]}

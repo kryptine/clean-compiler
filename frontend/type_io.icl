@@ -500,7 +500,7 @@ where
 // MV ...
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
-openTclFile :: !Bool !String !*Files -> (Optional !.File, !*Files)
+openTclFile :: !Bool !String !*Files -> (Optional .File, !*Files)
 openTclFile False icl_mod_pathname files
 	= (No,files)
 openTclFile compile_for_dynamics icl_mod_pathname files

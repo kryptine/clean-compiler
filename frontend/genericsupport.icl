@@ -52,7 +52,7 @@ getGenericClass gen kind modules generic_heap
 			-> (Yes class_glob, generic_heap)
 
 				 
-lookupGenericClassInfo :: !TypeKind !GenericClassInfos	-> !(Optional GenericClassInfo)
+lookupGenericClassInfo :: !TypeKind !GenericClassInfos	-> (Optional GenericClassInfo)
 lookupGenericClassInfo kind class_infos
 	#! hash_index = case kind of
 		KindConst -> 0
@@ -64,7 +64,7 @@ where
 		| gci.gci_kind == kind 	= Yes gci
 								= lookup kind gcis
 
-addGenericClassInfo :: !GenericClassInfo !GenericClassInfos -> !GenericClassInfos
+addGenericClassInfo :: !GenericClassInfo !GenericClassInfos -> GenericClassInfos
 addGenericClassInfo class_info=:{gci_kind} class_infos
 	#! hash_index = case gci_kind of
 		KindConst -> 0
@@ -76,13 +76,13 @@ addGenericClassInfo class_info=:{gci_kind} class_infos
 //****************************************************************************************
 //	Ident Helpers
 //****************************************************************************************
-makeIdent :: !String -> !Ident
+makeIdent :: !String -> Ident
 makeIdent str = {id_name = str, id_info = nilPtr} 
 
-postfixIdent :: !Ident !String -> !Ident
+postfixIdent :: !Ident !String -> Ident
 postfixIdent {id_name} postfix = makeIdent (id_name +++ postfix)
 
-genericIdentToClassIdent :: !Ident !TypeKind -> !Ident
+genericIdentToClassIdent :: !Ident !TypeKind -> Ident
 genericIdentToClassIdent gen_name kind
 	= postfixIdent gen_name ("_" +++ kind_to_str kind) 
 where
@@ -93,11 +93,11 @@ where
 	kinds_to_str [KindConst:ks] = "s" +++ kinds_to_str ks
 	kinds_to_str [k:ks] = "o" +++ (kind_to_str k) +++ "c" +++ kinds_to_str ks	
 
-genericIdentToMemberIdent :: !Ident !TypeKind -> !Ident
+genericIdentToMemberIdent :: !Ident !TypeKind -> Ident
 genericIdentToMemberIdent gen_name kind
 	= genericIdentToClassIdent gen_name kind
 
-genericIdentToFunIdent :: !Ident !TypeCons -> !Ident
+genericIdentToFunIdent :: !Ident !TypeCons -> Ident
 genericIdentToFunIdent gen_name type_cons
 	= postfixIdent gen_name ("_" +++ type_cons_to_str type_cons)
 where

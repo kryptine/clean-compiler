@@ -1820,7 +1820,7 @@ where
 	bindings introduced in a 'let' are removed.
 */	
 
-class collectVariables a :: !a ![FreeVar] !*CollectState -> !(!a, ![FreeVar],!*CollectState)
+class collectVariables a :: !a ![FreeVar] !*CollectState -> (!a, ![FreeVar],!*CollectState)
 
 cContainsACycle		:== True
 cContainsNoCycle	:== False

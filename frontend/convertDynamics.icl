@@ -35,7 +35,7 @@ from type_io_common import class toString (..),instance toString GlobalTCType;
 	,	ci_module_id_symbol								:: Expression
 	,	ci_internal_type_id								:: Expression
 	,	ci_module_id									:: Optional LetBind
-	,	ci_type_id										:: !Optional !TypeSymbIdent
+	,	ci_type_id										:: !Optional TypeSymbIdent
 	,	ci_type_constructor_used_in_dynamic_patterns	:: !*{#Bool}
 	}
 
@@ -129,8 +129,8 @@ f (Yes tcl_file)
 	= tcl_file;
 0.2*/
 			
-convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional !*File) {# DclModule} !IclModule [String]
-			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional !*File))
+convertDynamicPatternsIntoUnifyAppls :: {! GlobalTCType} !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
+			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
 convertDynamicPatternsIntoUnifyAppls global_type_instances common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	# ({pds_module, pds_def} , predefined_symbols) = predefined_symbols![PD_StdDynamic]
 	#! (dynamic_temp_symb_ident,ci_sel_value_field,ci_sel_type_field,predefined_symbols)

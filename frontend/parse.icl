@@ -375,7 +375,7 @@ where
 		  	= try_module_token MK_System scanState
 			= (False, MK_None, "", tokenBack scanState)
 
-	try_module_token :: !ModuleKind !ScanState -> (!Bool,!ModuleKind!,!String,!ScanState)
+	try_module_token :: !ModuleKind !ScanState -> (!Bool,!ModuleKind,!String,!ScanState)
 	try_module_token mod_type scanState
 		# (token, scanState) = nextToken GeneralContext scanState
 		| token == ModuleToken
@@ -984,7 +984,7 @@ where
 	default_found (GuardedAlts _ No)	= False
 	default_found _						= True
 
-	want_OptExprWithLocals :: !Bool !Token ![NodeDefWithLocals] !RhsDefiningSymbol !ParseState -> (!Optional !ExprWithLocalDefs, !RhsDefiningSymbol, !ParseState)
+	want_OptExprWithLocals :: !Bool !Token ![NodeDefWithLocals] !RhsDefiningSymbol !ParseState -> (!Optional ExprWithLocalDefs, !RhsDefiningSymbol, !ParseState)
 //	want_OptExprWithLocals withExpected DoubleArrowToken nodeDefs pState
 //		= want_OptExprWithLocals True EqualToken nodeDefs (replaceToken EqualToken pState)
 	want_OptExprWithLocals withExpected token nodeDefs definingSymbol pState
@@ -3758,7 +3758,7 @@ wantBeginGroup msg pState
 			_	->	parseError msg (Yes token) "begin group without layout, {," pState
 
 // AA..
-wantKind :: !ParseState -> !(!TypeKind, !ParseState)
+wantKind :: !ParseState -> (!TypeKind, !ParseState)
 wantKind pState
 	| SwitchGenerics False True 
 		= (KindConst, parseErrorSimple "kind" "generics are not supported by this compiler" pState)

@@ -3,7 +3,7 @@
 */
 definition module type_io
 
-openTclFile :: !Bool !String !*Files -> (Optional !.File, !*Files)
+openTclFile :: !Bool !String !*Files -> (Optional .File, !*Files)
 closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
 
 baseName :: {#Char} -> {#Char}

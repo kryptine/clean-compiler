@@ -102,7 +102,7 @@ addFunctionsRange fun_defs ca
 	  	=	ca!ca_fun_count
 	=	({ir_from = frm, ir_to = to}, ca)
 	where
-		add_function :: FunDef !*CollectAdmin -> !*CollectAdmin
+		add_function :: FunDef !*CollectAdmin -> *CollectAdmin
 		add_function fun_def ca=:{ca_fun_count, ca_rev_fun_defs}
 			=	{ca & ca_fun_count = ca.ca_fun_count + 1
 					, ca_rev_fun_defs = [fun_def : ca.ca_rev_fun_defs]

@@ -5,12 +5,12 @@ import syntax, checksupport
 lookupGenericClassInfo :: 
 		!TypeKind 
 		!GenericClassInfos	
-	-> 	!(Optional GenericClassInfo)
+	-> 	(Optional GenericClassInfo)
 
 addGenericClassInfo :: 
 		!GenericClassInfo 
 		!GenericClassInfos 
-	->	!GenericClassInfos
+	->	GenericClassInfos
 
 getGenericClassInfo ::
 	!(Global Index)
@@ -45,8 +45,8 @@ getGenericClass ::
 //****************************************************************************************
 //	Ident Helpers
 //****************************************************************************************
-makeIdent 					:: !String -> !Ident
-postfixIdent 				:: !Ident !String -> !Ident
-genericIdentToClassIdent 	:: !Ident !TypeKind -> !Ident
-genericIdentToMemberIdent 	:: !Ident !TypeKind -> !Ident
-genericIdentToFunIdent 		:: !Ident !TypeCons -> !Ident
+makeIdent 					:: !String -> Ident
+postfixIdent 				:: !Ident !String -> Ident
+genericIdentToClassIdent 	:: !Ident !TypeKind -> Ident
+genericIdentToMemberIdent 	:: !Ident !TypeKind -> Ident
+genericIdentToFunIdent 		:: !Ident !TypeCons -> Ident

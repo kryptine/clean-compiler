@@ -914,7 +914,7 @@ where
 			#! (kind, as_kind_heap) = kindInfoToKind kind_info as_kind_heap 	
 			= (kind, {as & as_kind_heap = as_kind_heap, as_type_var_heap = as_type_var_heap})
 
-		check_kinds_of_generic_vars :: ![TypeKind] !*AnalyseState -> !*AnalyseState
+		check_kinds_of_generic_vars :: ![TypeKind] !*AnalyseState -> *AnalyseState
 		check_kinds_of_generic_vars [gen_kind:gen_kinds] as
 			//| all (\k -> k == gen_kind) gen_kinds
 			  | all ((==) KindConst) [gen_kind:gen_kinds]  // forcing all kind variables be of kind star
@@ -925,7 +925,7 @@ where
 				 	as.as_error
 				 = {as & as_error = as_error}  
 
-	check_kinds_of_gencases :: !Index !{#GenericCaseDef} !*AnalyseState -> !*AnalyseState
+	check_kinds_of_gencases :: !Index !{#GenericCaseDef} !*AnalyseState -> *AnalyseState
 	check_kinds_of_gencases index gencases as
 		| index == size gencases
 			= as

@@ -463,7 +463,7 @@ where
 		build_void = abort "sanity check: no alternatives in a type\n"		
 		
 // build a product of types
-buildProductType :: ![AType] !PredefinedSymbols -> !AType
+buildProductType :: ![AType] !PredefinedSymbols -> AType
 buildProductType types predefs 
 	= listToBin build_pair build_unit types
 where
@@ -471,7 +471,7 @@ where
 	build_unit  = buildPredefTypeApp PD_TypeUNIT [] predefs
 
 // build a sum of types		
-buildSumType :: ![AType] !PredefinedSymbols -> !AType
+buildSumType :: ![AType] !PredefinedSymbols -> AType
 buildSumType types predefs 
 	= listToBin build_either build_void types
 where
@@ -487,7 +487,7 @@ listToBin bin tip xs
 	= bin (listToBin bin tip l) (listToBin bin tip r)
 
 // build application of a predefined type constructor 
-buildPredefTypeApp :: !Int [AType] !PredefinedSymbols -> !AType
+buildPredefTypeApp :: !Int [AType] !PredefinedSymbols -> AType
 buildPredefTypeApp predef_index args predefs
 	# {pds_module, pds_def} = predefs.[predef_index]
 	# pds_ident = predefined_idents.[predef_index]
@@ -1078,7 +1078,7 @@ where
 // build kind indexed classes 
 //****************************************************************************************
 
-buildClasses :: !*GenericState -> !*GenericState
+buildClasses :: !*GenericState -> *GenericState
 buildClasses gs=:{gs_modules, gs_main_module}
 	#! (common_defs=:{com_class_defs, com_member_defs}, gs_modules) = gs_modules ! [gs_main_module]
 	#! num_classes = size com_class_defs
@@ -2032,7 +2032,7 @@ buildGenericCaseBody main_module_index {gc_name,gc_pos} st predefs td_infos modu
 //  convert generic type contexts into normal type contexts
 //****************************************************************************************
 
-convertGenericTypeContexts :: !*GenericState -> !*GenericState
+convertGenericTypeContexts :: !*GenericState -> *GenericState
 convertGenericTypeContexts 
 		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_modules, gs_dcl_modules, gs_error,
 			gs_avarh, gs_tvarh, gs_exprh, gs_varh, gs_genh}
@@ -2490,10 +2490,10 @@ reportWarning name pos msg error=:{ea_file}
 //****************************************************************************************
 //	Type Helpers
 //****************************************************************************************
-makeAType :: !Type !TypeAttribute -> !AType
+makeAType :: !Type !TypeAttribute -> AType
 makeAType type attr = {	at_attribute = attr, at_type = type }
 
-makeATypeVar :: !TypeVar !TypeAttribute -> !ATypeVar
+makeATypeVar :: !TypeVar !TypeAttribute -> ATypeVar
 makeATypeVar tv attr = {atv_variable = tv, atv_attribute = attr}
 
 //----------------------------------------------------------------------------------------
@@ -2744,11 +2744,11 @@ where
 			_  -> abort ("freshSymbolType, invalid av_info\n" ---> av_info)
 		= ( av, {th & th_attrs = th_attrs}) 			 
 
-assertSymbolType :: !SymbolType !*TypeHeaps -> !*TypeHeaps
+assertSymbolType :: !SymbolType !*TypeHeaps -> *TypeHeaps
 assertSymbolType {st_args, st_result, st_context} th
 	= foldType on_type on_atype ((st_args, st_result), st_context) th	
 where
-	on_type :: !Type !*TypeHeaps -> !*TypeHeaps
+	on_type :: !Type !*TypeHeaps -> *TypeHeaps
 	on_type (TV tv) th=:{th_vars}
 		#! (tv_info, th_vars) = readPtr tv.tv_info_ptr th_vars
 		#! th = {th & th_vars = th_vars}
@@ -2778,7 +2778,7 @@ where
 				_ 			-> (abort "TFA tv_info not empty\n") --->(tv, tv_info)					
 	on_type _ th = th
 		
-	on_atype :: !AType !*TypeHeaps -> !*TypeHeaps
+	on_atype :: !AType !*TypeHeaps -> *TypeHeaps
 	on_atype {at_attribute=TA_Var av} th=:{th_attrs}
 		#! (av_info, th_attrs) = readPtr av.av_info_ptr th_attrs
 		#! th = {th & th_attrs = th_attrs}
@@ -3024,7 +3024,7 @@ markAttrVarUsed {av_info_ptr} th_attrs
 		AVI_Used  -> (True, th_attrs)
 		
 
-simplifyTypeApp :: !Type ![AType] -> !Type
+simplifyTypeApp :: !Type ![AType] -> Type
 simplifyTypeApp (TA type_cons=:{type_arity} cons_args) type_args
 	= TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args)
 simplifyTypeApp (TAS type_cons=:{type_arity} cons_args strictness) type_args

@@ -1548,7 +1548,7 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 	  ineqs2 = get_ineqs_of_atype st_result
 	= uniqueBagToList (Pair ineqs1 ineqs2)
   where
-	get_ineqs_of_atype :: !AType -> !.Bag AttrInequality
+	get_ineqs_of_atype :: !AType -> .Bag AttrInequality
 	get_ineqs_of_atype {at_attribute=TA_Var outer_av, at_type=at_type=:TA type_symb_ident type_args}
 		= get_ineqs_of_TA_with_TA_Var outer_av at_type type_symb_ident type_args
 	get_ineqs_of_atype {at_attribute=TA_Var outer_av, at_type=at_type=:TAS type_symb_ident type_args _}
@@ -1669,7 +1669,7 @@ beautifulizeAttributes symbol_type th_attrs
 			 		= foldSt add_unvisited_node descendants (xs, visited)
 			= searchPath xs goal (visited, coer_demanded)
 			
-		add_unvisited_node :: !Int !(![Int], !u:{#Bool}) -> !(![Int], !u:{#Bool})
+		add_unvisited_node :: !Int !(![Int], !u:{#Bool}) -> (![Int], !u:{#Bool})
 		add_unvisited_node candidate (accu, visited)
 			| visited.[candidate]
 				= (accu, visited)
@@ -1851,7 +1851,7 @@ removeInequality offered demanded attr_env_coercions=:{coer_offered, coer_demand
 	  coer_demanded = appCoercionTree (removeNode demanded) offered coer_demanded
 	= { attr_env_coercions & coer_demanded = coer_demanded, coer_offered = coer_offered }
 
-removeNode :: !Int !*CoercionTree -> !.CoercionTree
+removeNode :: !Int !*CoercionTree -> .CoercionTree
 removeNode i1 (CT_Node i2 left right)
 	| i1<i2
 		= CT_Node i2 (removeNode i1 left) right
@@ -1859,7 +1859,7 @@ removeNode i1 (CT_Node i2 left right)
 		= CT_Node i2 left (removeNode i1 right)
 	= rightInsert left right
   where
-	rightInsert :: !*CoercionTree !*CoercionTree -> !.CoercionTree
+	rightInsert :: !*CoercionTree !*CoercionTree -> .CoercionTree
 	rightInsert CT_Empty right
 		= right
 	rightInsert (CT_Node i left right2) right1

@@ -291,7 +291,7 @@ where
 	transform_pattern_into_cases (AP_Empty name) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
 		= (result_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)
 
-	transform_pattern_variable :: !FreeVar !(Optional !(Bind Ident VarInfoPtr)) !Expression !*ExpressionHeap
+	transform_pattern_variable :: !FreeVar !(Optional (Bind Ident VarInfoPtr)) !Expression !*ExpressionHeap
 		-> (!Expression, !Expression, !*ExpressionHeap)
 	transform_pattern_variable {fv_info_ptr,fv_name} (Yes {bind_src,bind_dst}) result_expr expr_heap
 		| bind_dst == fv_info_ptr
@@ -1664,7 +1664,7 @@ checkBoundPattern {bind_src,bind_dst} opt_var p_input (var_env, array_patterns) 
 				-> checkPattern bind_src (Yes { bind_src = bind_dst, bind_dst = new_info_ptr }) p_input (new_var_env, array_patterns) ps e_info cs
 	= checkPattern bind_src opt_var p_input (var_env, array_patterns) ps e_info { cs & cs_error = checkError bind_dst "variable expected" cs.cs_error }
 
-checkPatternVariable :: !Level !SymbolTableEntry !Ident !VarInfoPtr !*CheckState -> !*CheckState
+checkPatternVariable :: !Level !SymbolTableEntry !Ident !VarInfoPtr !*CheckState -> *CheckState
 checkPatternVariable def_level entry=:{ste_def_level,ste_kind} ident=:{id_info} var_info cs=:{cs_symbol_table,cs_error}
 	| ste_kind == STE_Empty || def_level > ste_def_level
 		# entry = {ste_kind = STE_Variable var_info, ste_index = NoIndex, ste_def_level = def_level, ste_previous = entry }

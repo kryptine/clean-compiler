@@ -1737,14 +1737,14 @@ where
 				   },
 				   { ui & ui_local_vars = [cyclic_fv : ui.ui_local_vars]})	
 
-		getSymbol :: !Int !(!(Global !Int) -> !SymbKind) !*UpdateInfo -> (SymbIdent,*UpdateInfo)
+		getSymbol :: !Int !((Global Int) -> SymbKind) !*UpdateInfo -> (SymbIdent,*UpdateInfo)
 		getSymbol index symb_kind ui=:{ui_x}
 			# ({pds_module, pds_def}, ui_x) = ui_x!x_predef_symbols.[index]
 			# pds_ident = predefined_idents.[index]
 			  symbol = { symb_name = pds_ident, symb_kind = symb_kind { glob_module = pds_module, glob_object = pds_def} }
 			= (symbol, { ui & ui_x = ui_x})
 
-		get_constructor :: !Int !*UpdateInfo -> !(!Expression,!*UpdateInfo)
+		get_constructor :: !Int !*UpdateInfo -> (!Expression,!*UpdateInfo)
 		get_constructor index ui=:{ui_x = {x_type_code_info={tci_instances}}}
 			/*
 			** MV

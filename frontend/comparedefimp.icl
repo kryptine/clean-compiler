@@ -354,7 +354,7 @@ where
 		}
 
 :: TypesCorrespondMonad
-		:==	!*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
+		:==	*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
 
 :: ExpressionsCorrespondState =
 		{	ec_icl_correspondences ::	!.{# Int },
@@ -369,7 +369,7 @@ where
 		}
 		
 :: ExpressionsCorrespondMonad
-		:== !*ExpressionsCorrespondState -> *ExpressionsCorrespondState
+		:== *ExpressionsCorrespondState -> *ExpressionsCorrespondState
 
 :: Conversions :== {#Index}
 

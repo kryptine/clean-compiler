@@ -818,7 +818,7 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 				= (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store)
 
 
-		clear_attributes :: [AttributeVar] !*AttrVarHeap -> !*AttrVarHeap
+		clear_attributes :: [AttributeVar] !*AttrVarHeap -> *AttrVarHeap
 		clear_attributes attributes attr_heap
 			= foldSt clear_attribute attributes attr_heap
 		where
