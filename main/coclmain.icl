@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 implementation module coclmain
 
 CoclMainVersion :== 0

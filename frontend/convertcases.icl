@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 implementation module convertcases
 
 import syntax, transform, checksupport, StdCompare, check, utilities, trans, general //, RWSDebug

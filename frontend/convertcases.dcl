@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 definition module convertcases
 
 import syntax, transform, trans

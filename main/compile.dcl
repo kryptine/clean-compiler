@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 definition module compile
 
 from StdFile import Files

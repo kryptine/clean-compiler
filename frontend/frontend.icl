@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,

@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 implementation module mergecases
 
 import syntax, check, StdCompare, utilities; //, RWSDebug

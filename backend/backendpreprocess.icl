@@ -1,3 +1,6 @@
+/*
+	module owner: Ronny Wichers Schreur
+*/
 implementation module backendpreprocess
 
 // assign sequence numbers to all variables in the syntax tree
