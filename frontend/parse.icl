@@ -1,5 +1,5 @@
 implementation module parse
- // cvs test
+
 import StdEnv
 import scanner, syntax, hashtable, utilities, predef
 
@@ -441,8 +441,8 @@ where
 			= (PD_TypeSpec pos name prio No SP_None, wantEndOfDefinition "type defenition (5)" (tokenBack pState))
 	want_rhs_of_def context (No, args) token pos pState
 		# pState			= want_node_def_token pState token
-		  localsExpected	= isNotEmpty args || isGlobalContext context
-  		  (rhs, pState)		= wantRhs isEqualToken localsExpected (tokenBack pState)
+		//  localsExpected	= isNotEmpty args || isGlobalContext context
+		  (rhs, pState)		= wantRhs isEqualToken False (tokenBack pState) // PK localsExpected -> False
 		| isGlobalContext context
  			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
  			= (PD_NodeDef pos (combine_args args) rhs, pState)
@@ -454,7 +454,7 @@ where
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
 	want_rhs_of_def context (Yes (name, False), []) token pos pState
-		| isIclContext context && isLocalContext context && (token == DefinesColonToken || token == EqualToken)
+		| isIclContext context && isLocalContext context && (token == DefinesColonToken || token == EqualToken) && isLowerCaseName name.id_name
 			# (rhs, pState) = wantRhs (\_ -> True) False (tokenBack pState)
 			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 	want_rhs_of_def context (Yes (name, is_infix), args) token pos pState
@@ -633,11 +633,11 @@ where
 			=	case token of
 				BarToken
 					#	pState = parseError "RHS: default alternative" No "root expression instead of guarded expression" pState
-					->	root_expression token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
-				_	->	root_expression token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
+					->	root_expression True token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
+				_	->	root_expression True token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
 		|	token == LetToken True
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
-			=	root_expression token nodeDefs (reverse alts) sep pState
+			=	root_expression True token nodeDefs (reverse alts) sep pState
 		#	(guard, pState)				= wantRhsExpressionT token pState
 			(token, pState)				= nextToken FunctionContext pState
 			(nodeDefs2, token, pState)	= want_LetBefores token pState
@@ -651,37 +651,37 @@ where
 				(nodeDefs, token, pState)	= want_LetBefores token pState
 			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
 		// otherwise
-			#	(expr, pState)				= root_expression token nodeDefs2 [] sep pState
+			#	(expr, pState)				= root_expression True token nodeDefs2 [] sep pState
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr }
 				(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs, token, pState)	= want_LetBefores token pState
 			=	want_FunctionBody token nodeDefs [alt:alts] sep pState
 	want_FunctionBody token nodeDefs alts sep pState
-		=	root_expression token nodeDefs (reverse alts) sep pState
+		=	root_expression localsExpected token nodeDefs (reverse alts) sep pState
 	
-	root_expression :: !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
-	root_expression token nodeDefs [] sep pState
-		#	(expr,pState) = want_OptExprWithLocals token nodeDefs sep pState
+	root_expression :: !Bool !Token ![NodeDefWithLocals] ![GuardedExpr] !(Token -> Bool) !ParseState -> (!OptGuardedAlts, !ParseState)
+	root_expression withExpected token nodeDefs [] sep pState
+		#	(expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
 		=	case expr of
 				Yes expr -> ( UnGuardedExpr expr, pState)
 				No		 -> ( UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs []}
 							, parseError "RHS: root expression" (Yes token) "= <ExprWithLocals>" pState
 							)
-	root_expression token nodeDefs alts sep pState
-		# (expr,pState) = want_OptExprWithLocals token nodeDefs sep pState
+	root_expression withExpected token nodeDefs alts sep pState
+		# (expr,pState) = want_OptExprWithLocals withExpected token nodeDefs sep pState
 		= (GuardedAlts alts expr, pState)
 	
 	default_found (GuardedAlts _ No)	= False
 	default_found _						= True
 
-	want_OptExprWithLocals :: !Token ![NodeDefWithLocals] !(Token -> Bool) !ParseState -> (!Optional !ExprWithLocalDefs, !ParseState)
-	want_OptExprWithLocals DoubleArrowToken nodeDefs sep pState
-		= want_OptExprWithLocals EqualToken nodeDefs sep (replaceToken EqualToken pState)
-	want_OptExprWithLocals token nodeDefs sep pState
+	want_OptExprWithLocals :: !Bool !Token ![NodeDefWithLocals] !(Token -> Bool) !ParseState -> (!Optional !ExprWithLocalDefs, !ParseState)
+	want_OptExprWithLocals withExpected DoubleArrowToken nodeDefs sep pState
+		= want_OptExprWithLocals True EqualToken nodeDefs sep (replaceToken EqualToken pState)
+	want_OptExprWithLocals withExpected token nodeDefs sep pState
 		| sep token
 		# (expr, pState)	= wantExpression cIsNotAPattern pState
 		  pState			= wantEndRootExpression pState
-		  (locals,pState)	= optionalLocals WithToken localsExpected pState
+		  (locals,pState)	= optionalLocals WithToken withExpected pState
 		= ( Yes	{ ewl_nodes		= nodeDefs
 				, ewl_expr		= expr
 				, ewl_locals	= locals
@@ -1326,9 +1326,12 @@ where
 	where
 		want_rest_of_symbol_type :: !Token ![AType] !ParseState -> (SymbolType, !ParseState)
 		want_rest_of_symbol_type ArrowToken types pState
-			# (type, pState) = want pState
-			  (context, pState) = optionalContext pState
-			  (attr_env, pState) = optionalCoercions pState
+			# pState				= case types of
+										[]	-> parseWarning "want SymbolType" "types before -> expected" pState
+										_	-> pState
+			# (type, pState)		= want pState
+			  (context, pState)		= optionalContext pState
+			  (attr_env, pState)	= optionalCoercions pState
 			= (makeSymbolType types type context attr_env, pState)
 		want_rest_of_symbol_type token [] pState
 			= (makeSymbolType [] (MakeAttributedType TE) [] [], parseError "symbol type" (Yes token) "type" pState)
@@ -1721,9 +1724,14 @@ cIsNotAPattern	:== False
 wantExpression :: !Bool !ParseState -> (!ParsedExpr, !ParseState)
 wantExpression is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
-	| is_pattern
-		= wantLhsExpressionT token pState
-		= wantRhsExpressionT token pState
+// PK ... To produce a better error message
+	= case token of
+		CharListToken charList 
+			->	(PE_Empty,  parseError "Expression" No ("List brackets, [ and ], around charlist '"+charList+"'") pState)
+// ... PK
+		_	| is_pattern
+				->	wantLhsExpressionT token pState
+				->	wantRhsExpressionT token pState
 
 wantRhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
 wantRhsExpressionT  token pState
@@ -1731,10 +1739,28 @@ wantRhsExpressionT  token pState
 	| succ
 		# (exprs, pState) = parseList trySimpleRhsExpression pState
 		= (combineExpressions expr exprs, pState)
-		= (PE_Empty,  parseError "RHS expression" (Yes token) "<expression> **" pState)
+		= case token of
+			CharListToken charList
+				-> (PE_Empty,  parseError "RHS expression" No ("List brackets, [ and ], around charlist '"+charList+"'") pState)
+			_	-> (PE_Empty,  parseError "RHS expression" (Yes token) "<expression>" pState)
 
 wantLhsExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
-wantLhsExpressionT  token pState
+wantLhsExpressionT (IdentToken name) pState /* PK: to make a=:C x equivalent to a=:(C x) */
+	| isLowerCaseName name
+		# (id, pState)		= stringToIdent name IC_Expression pState
+		  (token, pState)	= nextToken FunctionContext pState
+	| token == DefinesColonToken 
+		# (token, pState)	= nextToken FunctionContext pState
+		  (expr, pState)	= wantLhsExpressionT2 token pState
+		= (PE_Bound { bind_dst = id, bind_src = expr }, pState)
+	// token <> DefinesColonToken // token back and call to wantLhsExpressionT2 would do also.
+	# (exprs, pState) = parseList trySimpleLhsExpression (tokenBack pState)
+	= (combineExpressions (PE_Ident id) exprs, pState)
+wantLhsExpressionT token pState
+	= wantLhsExpressionT2 token pState
+
+wantLhsExpressionT2  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
+wantLhsExpressionT2 token pState
 	# (succ, expr, pState) = trySimpleLhsExpressionT token pState
 	| succ
 		# (exprs, pState) = parseList trySimpleLhsExpression pState
@@ -1842,13 +1868,17 @@ trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseS
 trySimpleExpressionT (IdentToken name) is_pattern pState
 	| isLowerCaseName name
 	# (id, pState) = stringToIdent name IC_Expression pState
-	  (token, pState) = nextToken FunctionContext pState
-	| token == DefinesColonToken
-		# (succ, expr, pState) = trySimpleExpression is_pattern pState
-		| succ
-			= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
-			= (True, PE_Empty, parseError "simple expression" No "expression" pState)
-		= (True, PE_Ident id, tokenBack pState)
+	| is_pattern
+		# (token, pState) = nextToken FunctionContext pState
+		| token == DefinesColonToken && is_pattern
+			# (succ, expr, pState) = trySimpleExpression is_pattern pState
+			| succ
+				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
+				= (True, PE_Empty, parseError "simple expression" No "expression" pState)
+			// token <> DefinesColonToken
+			= (True, PE_Ident id, tokenBack pState)
+		// not is_pattern
+		= (True, PE_Ident id, pState)
 trySimpleExpressionT (IdentToken name) is_pattern pState
 //	| isUpperCaseName name || ~ is_pattern
 	# (id, pState) = stringToIdent name IC_Expression pState
@@ -1900,7 +1930,6 @@ trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseS
 trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent "\\" pState
 	  (lam_args, pState) 	= wantList "arguments" trySimpleLhsExpression pState
-	//  pState				= wantToken FunctionContext "lambda expression" ArrowToken pState
 	  pState				= want_lambda_sep pState
 	  (exp, pState)			= wantExpression cIsNotAPattern pState
 	= (True, PE_Lambda lam_ident lam_args exp, pState)
@@ -1919,8 +1948,6 @@ trySimpleNonLhsExpressionT (LetToken strict) pState // let! is not supported in 
 	  pState				= wantToken FunctionContext "let expression" InToken pState
 	  (let_expr, pState)	= wantExpression cIsNotAPattern pState
 	= (True, PE_Let strict let_binds let_expr, pState)
-trySimpleNonLhsExpressionT WildCardToken pState
-	= (True, PE_WildCard, pState)
 trySimpleNonLhsExpressionT CaseToken pState
    	# (case_exp, pState)		= wantCaseExp pState
 	= (True, case_exp, pState)
@@ -1964,11 +1991,14 @@ where
 				#	(token, pState)	= nextToken FunctionContext pState
 				->	want_LGraphExpr token acc pState
 			ColonToken
-				#	(token, pState)		= nextToken FunctionContext pState
-					(exp, pState)		= wantRhsExpressionT token pState
+/* PK				#	(token, pState)		= nextToken FunctionContext pState
+					(exp, pState)		= wantRhsExpressionT token pState ... PK */
+				#	(exp, pState)		= wantExpression is_pattern pState
 					pState				= wantToken FunctionContext "list" SquareCloseToken pState
 				->	gen_cons_nodes acc exp pState
 			DotDotToken
+				| is_pattern
+				->	(PE_Empty, parseError "want list expression" No "No dot dot expression in a pattern" pState)
 				| length acc > 2 || isEmpty acc
 				#	(nil_expr, pState)	= makeNilExpression pState
 					pState				= parseError "list expression" No "one or two expressions before .." pState
@@ -1989,6 +2019,8 @@ where
 									-> (PE_Sequ (SQ_FromThenTo e1 e2 exp), pState)
 								_	-> abort "Error 2 in WantListExp"
 			DoubleBackSlashToken
+				| is_pattern
+				->	(PE_Empty, parseError "want list expression" No "No \\\\ expression in a pattern" pState)
 				| length acc == 1
 				->	wantComprehension cIsListGenerator (acc!!0)  pState
 				// otherwise // length acc <> 1
@@ -2601,7 +2633,11 @@ wantEndGroup msg pState
 			_				->	parseError msg (Yes token) "end of group with layout" pState
 	// ~ ss_useLayout
 	| token == CurlyCloseToken
-		= pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == SemicolonToken
+			= pState
+			= tokenBack pState
+// PK		= pState
 	// otherwise // token <> CurlyCloseToken
 		= parseError msg (Yes token) "end of group without layout, }," pState
 
@@ -2830,9 +2866,17 @@ wantUpperCaseName string pState
 		IdentToken name 
 			| isUpperCaseName name
 				-> (name, pState)
-		_
-			-> ("dummy uppercase name", parseError string (Yes token) "upper case ident" pState)
-
+		_	-> ("dummy uppercase name", parseError string (Yes token) "upper case ident" pState)
+/*
+wantNonUpperCaseName :: !String !ParseState -> (!String, !ParseState)
+wantNonUpperCaseName string pState
+	# (token, pState) = nextToken GeneralContext pState
+	= case token of
+		IdentToken name 
+			| ~ (isUpperCaseName name)
+				-> (name, pState)
+		_	-> ("dummy non uppercase name", parseError string (Yes token) "non upper case ident" pState)
+*/
 wantLowerCaseName :: !String !ParseState -> (!String, !ParseState)
 wantLowerCaseName string pState
 	# (token, pState) = nextToken GeneralContext pState
