@@ -1311,7 +1311,8 @@ instance convertRootCases Expression where
 				| has_no_rooted_non_if_cases guard
 					= convert_condition guard ci cs
 					= convertCases ci guard cs
-
+	convertRootCases ci failExpr=:(FailExpr _) cs
+		= (failExpr, cs)
 	convertRootCases ci expr cs
 		= convertCases ci expr cs
 
@@ -1585,6 +1586,10 @@ where
 		  cs
 		  	=	{cs & cs_var_heap=ss_var_heap, cs_expr_heap = ss_expr_heap}
 		= convertNonRootCase ci case_expr cs
+	convertCases ci (FailExpr ident) cs
+		# (failExpr, cs)
+			=	convertNonRootFail ci ident cs
+		= (failExpr, cs)
 	convertCases ci expr cs
 		= (expr, cs)
 
@@ -1619,6 +1624,16 @@ convertDefault ci=:{ci_bound_vars, ci_group_index, ci_common_defs}
 				=	writePtr fv_info_ptr old_fv_info_ptr_value var_heap
 	# cs = { cs & cs_var_heap = cs_var_heap}
 	= (App { app_symb = fun_symb, app_args = act_vars, app_info_ptr = nilPtr }, cs)
+
+convertNonRootFail ci=:{ci_bound_vars, ci_group_index, ci_common_defs} ident cs
+	# result_type
+		=	{	at_attribute = TA_None
+			,	at_type = TV {tv_name = { id_name = "a", id_info = nilPtr }, tv_info_ptr = nilPtr}
+			}
+	# (fun_symb, cs)
+	  	=	new_case_function (Yes ident) result_type (FailExpr ident) [] []
+	  						ci_bound_vars ci_group_index ci_common_defs cs
+	= (App { app_symb = fun_symb, app_args = [], app_info_ptr = nilPtr }, cs)
 
 convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ case_expr, case_ident, case_info_ptr} cs
 	# (is_degenerate, defoult)
