@@ -1131,7 +1131,12 @@ where
 		# file_opt_beautifulizer
 				= case st_arity of
 					0
-						-> writeType file opt_beautifulizer (form, st_result)
+						-> writeType file opt_beautifulizer (bracket_arrow_type st_result.at_type form, st_result)
+							with
+								bracket_arrow_type (_ --> _) form
+									=	setProperty form cBrackets
+								bracket_arrow_type _ form
+									=	form
 					_
 						# (file, opt_beautifulizer)
 								= writeType file opt_beautifulizer (form, st_args)
@@ -1158,6 +1163,7 @@ where
 			| group_var==ai_demanded
 				= grouped group_var [ai_offered:accu] ineqs
 			=[{ ig_offered = accu, ig_demanded = group_var}: grouped ai_demanded [ai_offered] ineqs]
+
 			
 :: InequalityGroup =
 	{	ig_offered	:: ![AttributeVar] 
@@ -1411,14 +1417,14 @@ where
 			| checkProperty form cCommaSeparator
 				= show_elem elem_number (clearProperty form cCommaSeparator) type file_opt_beautifulizer
 			| checkProperty form cArrowSeparator
-				= show_elem elem_number (clearProperty form cArrowSeparator) type file_opt_beautifulizer
+				= show_elem elem_number (clearProperty (clearProperty form cArrowSeparator) cBrackets) type file_opt_beautifulizer
 			| checkProperty form cAndSeparator
 				= show_elem elem_number (clearProperty form cAndSeparator) type file_opt_beautifulizer
 				= show_elem elem_number (setProperty form cBrackets) type file_opt_beautifulizer
 		show_list elem_number form [type : types] file_opt_beautifulizer
 			# (elem_format, seperator)
 					= if (checkProperty form cCommaSeparator) (clearProperty form cCommaSeparator, ",")
-						(if (checkProperty form cArrowSeparator) (clearProperty form cArrowSeparator, " -> ")
+						(if (checkProperty form cArrowSeparator) (setProperty (clearProperty form cArrowSeparator) cBrackets, " -> ")
 							(if (checkProperty form cAndSeparator) (clearProperty form cAndSeparator, " & ")
 								(setProperty form cBrackets, " ")))
 			  (file, opt_beautifulizer)
