@@ -1621,6 +1621,20 @@ where
 		|	annot == AN_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
+/*
+	want_type_rhs parseContext td=:{td_attribute} token=:DefinesColonToken annot pState
+		| isIclContext parseContext
+			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
+		# name				= td.td_name.id_name
+		  (atype, pState)	= want pState // Atype
+		# (td_attribute, properties) = determine_properties annot td_attribute
+		  td				= {td & td_rhs = AbstractTypeSpec properties atype, td_attribute=td_attribute}
+		| annot <> AN_None
+			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
+		| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
+			= (PD_Type td, pState)
+			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
+*/
 	want_type_rhs parseContext td=:{td_attribute} token annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
@@ -2794,7 +2808,10 @@ wantListExp is_pattern pState
 					->	want_list (add_chars (fromString chars) acc) pState
 					with
 						add_chars [] 			acc	= acc
-						add_chars ['\\',c:r]	acc	= add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
+						add_chars ['\\',c1,c2,c3:r] acc
+							| c1>='0' && c1<='7'
+								= add_chars r [PE_Basic (BVC (toString ['\'','\\',c1,c2,c3,'\''])): acc]
+						add_chars ['\\',c:r] acc = add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
 						add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])): acc]
 				_	#	(exp, pState) = (if is_pattern (wantLhsExpressionT token) (wantRhsExpressionT token)) pState
 					->	want_list [exp: acc] pState
