@@ -3,8 +3,9 @@ module main
 import scanner, parse, postparse, check, type, trans, convertcases, utilities, convertDynamics
 
 import StdEnv
-// XXX
-import RWSDebug
+// RWS ...
+import frontend
+// ... RWS
 
 Start world
 	# (std_io, world) = stdio world
@@ -144,6 +145,16 @@ compileModule mod_name ms
 	= (opt_module, ms)
 
 loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_out,ms_paths}
+	# (predef_symbols, hash_table, ms_files, ms_error, ms_io, ms_out, optional_syntax_tree)
+		=	frontEndInterface mod_ident ms_paths predef_symbols hash_table ms_files ms_error ms_io ms_out
+	  ms
+	  	=	{ms & ms_files=ms_files, ms_error=ms_error,ms_io=ms_io,ms_out=ms_out}
+	= case optional_syntax_tree of
+		Yes {fe_icl={icl_functions}, fe_dcls, fe_dclIclConversions, fe_iclDclConversions}
+			->	(Yes (buildInterMod mod_ident fe_dcls icl_functions fe_dclIclConversions fe_iclDclConversions), predef_symbols, hash_table, ms)
+		No
+			->	(No, predef_symbols, hash_table, ms)
+/* RWS
 	# (ok, mod, hash_table, ms_error, predef_symbols, ms_files)
 		= wantModule cWantIclFile mod_ident (hash_table ---> ("Parsing:", mod_ident)) ms_error ms_paths predef_symbols ms_files
 	| not ok
@@ -158,35 +169,52 @@ loadModule mod_ident predef_symbols hash_table ms=:{ms_files,ms_error,ms_io,ms_o
 	| not ok
 		= (No,  predef_symbols, { hash_table & hte_symbol_heap = symbol_table}, { ms & ms_files = ms_files, ms_error = ms_error, ms_io = ms_io })
 	# {icl_functions,icl_instances,icl_specials,icl_common,icl_declared={dcls_import}} = icl_mod
-//	  (components, icl_functions, ms_error) = showComponents components 0 True icl_functions ms_error
+	  (components, icl_functions, ms_error) = showComponents components 0 True icl_functions ms_error
 	  (ok, fun_defs, array_instances, type_code_instances, common_defs, imported_funs, heaps, predef_symbols, ms_error)
 		= typeProgram (components ---> "Typing") icl_functions icl_specials icl_common dcls_import dcl_mods heaps predef_symbols ms_error
 	| not ok
 		= (No,  predef_symbols, { hash_table & hte_symbol_heap = symbol_table}, { ms & ms_files = ms_files, ms_error = ms_error, ms_io = ms_io, ms_out = ms_out })
 
 	# (components, fun_defs) = partitionateFunctions (fun_defs ---> "partitionateFunctions") [ { ir_from = 0, ir_to = nr_of_global_funs }, icl_instances, icl_specials]
-//	  (components, fun_defs, ms_error) = showTypes components 0 fun_defs ms_error
+	  (components, fun_defs, ms_io)		= showTypes components 0 fun_defs ms_io
+	  (components, fun_defs, ms_out)	= showComponents components 0 True fun_defs ms_out
+
+
+	  (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap)
+	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components ---> "convertDynamics") fun_defs predef_symbols
+					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap
+
 	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
 	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
+		 = analyseGroups common_defs (components ---> "Transform") fun_defs var_heap expression_heap
+	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+	  	= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics var_heap type_heaps expression_heap
+/*
+
+	  (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups common_defs (components ---> "Transform") fun_defs heaps.hp_var_heap heaps.hp_expression_heap
-	#!(components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
+	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= transformGroups cleanup_info components fun_defs acc_args common_defs imported_funs var_heap heaps.hp_type_heaps expression_heap
 	  (components, fun_defs, ms_error) = showComponents components 0 True fun_defs ms_error
-//	  (components, fun_defs, ms_error) = showTypes components 0 fun_defs ms_error
+
+*/
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule common_defs dcl_types used_conses var_heap type_heaps
 	  (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule dcl_mods common_defs dcl_types used_conses var_heap type_heaps
+/*
 	  (components, fun_defs, predef_symbols, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertDynamicPatternsIntoUnifyAppls type_code_instances common_defs (components ---> "convertDynamics") fun_defs predef_symbols
 					dcl_types used_conses var_heap type_heaps expression_heap
-//	  (components, fun_defs, ms_out) = showComponents components 0 True fun_defs ms_out
+	  (components, fun_defs, ms_out) = showComponents components 0 True fun_defs ms_out
+*/
 	  (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  		= convertCasesOfFunctionsIntoPatterns components imported_funs common_defs fun_defs dcl_types used_conses var_heap type_heaps expression_heap
+	  		= convertCasesOfFunctionsIntoPatterns components imported_funs common_defs fun_defs dcl_types used_conses
+					var_heap type_heaps expression_heap
 	  (dcl_types, var_heap, type_heaps)
 			= convertImportedTypeSpecifications dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
-//	  (components, fun_defs, ms_out) = showComponents components 0 False fun_defs ms_out
+	  (components, fun_defs, ms_out) = showComponents components 0 False fun_defs ms_out
 	= (Yes (buildInterMod mod_ident dcl_mods fun_defs dcl_icl_conversions),  predef_symbols,
 		{ hash_table & hte_symbol_heap = symbol_table}, { ms & ms_files = ms_files, ms_error = ms_error, ms_io = ms_io, ms_out = ms_out })
-
+*/
 
 makeProject (Yes proj=:{proj_main_module,proj_hash_table,proj_predef_symbols}) ms
 	# (main_mod, proj_predef_symbols, proj_hash_table, ms) = loadModule proj_main_module proj_predef_symbols proj_hash_table ms
@@ -210,13 +238,18 @@ where
 	collect_modules [{id_name} : modules] collected_modules ms
 		= (collected_modules, ms)
 
-buildInterMod name dcl_modules fun_defs dcl_icl_conversions
+buildInterMod name dcl_modules fun_defs dcl_icl_conversions /* RWS ... */ icl_dcl_conversions /* ... RWS */
 	=	{	inter_name					= name
 		,	inter_modules				= { dcl_name \\ {dcl_name} <-: dcl_modules }
 		,	inter_fun_defs				= fun_defs
+/* RWS ...
 		,	inter_icl_dcl_conversions	= build_icl_dcl_conversions (size fun_defs) dcl_icl_conversions
+*/
+		,	inter_icl_dcl_conversions	= icl_dcl_conversions
+/* ... RWS */
 		,	inter_dcl_icl_conversions	= dcl_icl_conversions
 		}
+/* RWS
 where
 	build_icl_dcl_conversions table_size (Yes conversion_table)
 		# dcl_table_size = size conversion_table
@@ -238,7 +271,9 @@ where
 				= fill_empty_positions (inc next_index) table_size (inc next_new_index) { icl_conversions & [next_index] = next_new_index }
 				= fill_empty_positions (inc next_index) table_size next_new_index icl_conversions
 			= icl_conversions
-			
+*/
+
+/* RWS			
 showComponents :: !*{! Group} !Int !Bool !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
 showComponents comps comp_index show_types fun_defs file
 	| comp_index >= size comps
@@ -250,8 +285,6 @@ where
 	show_component [] show_types fun_defs file
 		= (fun_defs, file <<< '\n')
 	show_component [fun:funs] show_types fun_defs file
-		| fun>=size fun_defs
-			= abort ("YYY "+++toString fun+++" "+++toString (size fun_defs))
 		#! fun_def = fun_defs.[fun]
 		| show_types
 			= show_component funs show_types fun_defs (file <<< '\n' <<< fun_def)
@@ -302,7 +335,10 @@ where
 		= (fun_defs, file <<< '\n')
 	show_types [fun:funs] fun_defs file
 		#! fun_def = fun_defs.[fun]
-		= show_types funs fun_defs (file <<< '\n' <<< fun_def.fun_type)
+		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
+		  (Yes ftype) = fun_def.fun_type
+		= show_types funs fun_defs (file <<< fun_def.fun_symb <<< " :: " <:: (properties, ftype) <<< '\n' )
+*/
 
 converFileToListOfStrings file_name files error
 	# (ok, file, files) = fopen file_name FReadText files
