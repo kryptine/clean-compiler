@@ -851,6 +851,9 @@ instance t_corresponds Type where
 		=	t_corresponds dclDef iclDef
 	t_corresponds (GTV dclDef) (GTV iclDef)
 		=	t_corresponds dclDef iclDef
+	t_corresponds (TFA dclVars dclType) (TFA iclVars iclType)
+		=	do (init_atype_vars (dclVars++iclVars))
+		&&&	t_corresponds dclType iclType
 	t_corresponds _ _
 		= return False
 		
