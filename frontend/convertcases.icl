@@ -10,11 +10,11 @@ exactZip [] []
 exactZip [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
 
-::	*ConvertState =
+::	ConvertState =
 	{	ci_new_functions 	:: ![FunctionInfoPtr]
-	,	ci_fun_heap			:: !*FunctionHeap
-	,	ci_var_heap			:: !*VarHeap
-	,	ci_expr_heap		:: !*ExpressionHeap
+	,	ci_fun_heap			:: !.FunctionHeap
+	,	ci_var_heap			:: !.VarHeap
+	,	ci_expr_heap		:: !.ExpressionHeap
 	,	ci_next_fun_nr		:: !Index
 	}
 
