@@ -300,7 +300,7 @@ where
 	initModule :: String String ScanState !*HashTable !*File *Files
 				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
 	initModule file_name modification_time scanState hash_table error files
-		# (succ, mod_type, mod_ident, scanState) = try_module_header iclmodule scanState
+		# (succ, mod_type, mod_name, scanState) = try_module_header iclmodule scanState
 		| succ
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
@@ -308,8 +308,8 @@ where
 										, ps_hash_table = hash_table
 										, ps_support_generics = support_generics
 										}
-			  pState				= verify_name mod_ident id_name file_name pState
-		  	  (mod_ident, pState)	= stringToIdent mod_ident IC_Module pState
+			  pState				= verify_name mod_name id_name file_name pState
+		  	  (mod_ident, pState)	= stringToIdent mod_name IC_Module pState
 		  	  pState				= check_layout_rule pState
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
 			  {ps_scanState,ps_hash_table,ps_error}
@@ -1068,8 +1068,8 @@ wantImports pState
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
-	# (mod_ident, pState) = wantModuleName pState
-	  (mod_ident, pState) = stringToIdent mod_ident IC_Module pState
+	# (mod_name, pState) = wantModuleName pState
+	  (mod_ident, pState) = stringToIdent mod_name IC_Module pState
 	  pState = wantToken GeneralContext "from imports" ImportToken pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  (import_symbols, pState) = wantSequence CommaToken GeneralContext pState
@@ -1139,12 +1139,12 @@ want_2_0_import_declaration token pState
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } (Yes members), pState)
 				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, tokenBack pState)
 			InstanceToken
-				#	(class_ident, pState)	= want pState
+				#	(class_name, pState)	= want pState
 //					(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
 					ii_extended				= False
 					(types, pState)			= wantList "instance types" tryBrackType pState
-					(class_id, pState)		= stringToIdent class_ident IC_Class pState
-					(inst_id, pState)		= stringToIdent class_ident (IC_Instance types) pState
+					(class_id, pState)		= stringToIdent class_name IC_Class pState
+					(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
 					(context, pState)		= optionalContext pState
 				->	(ID_Instance { ii_ident = class_id, ii_extended = ii_extended } inst_id (types,context), pState)
 			IdentToken fun_name
@@ -1306,10 +1306,10 @@ wantClassDefinition parseContext pos pState
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState
-	# (class_ident, pState) = want pState
-	  (pi_class, pState) = stringToIdent class_ident IC_Class pState
+	# (class_name, pState) = want pState
+	  (pi_class, pState) = stringToIdent class_name IC_Class pState
 	  ((pi_types, pi_context), pState) = want_instance_type pState
-	  (pi_ident, pState) = stringToIdent class_ident (IC_Instance pi_types) pState
+	  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
 // AA..
 	# (token, pState) = nextToken TypeContext pState
 /*
@@ -1329,7 +1329,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 	// otherwise // ~ (isIclContext parseContext)
 		| token == CommaToken
 			# (pi_types_and_contexts, pState)	= want_instance_types pState
-			  (idents, pState)		= seqList [stringToIdent class_ident (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
+			  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
 			= (PD_Instances
 //				[	{ pi_class = pi_class, pi_ident = pi_ident, pi_types = type, pi_context = context // voor martin
 				[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
@@ -1476,13 +1476,13 @@ optionalCoercions pState
 				# (more_inequals, pState) = want_inequalities pState
 				= (inequals ++ more_inequals, pState)
 				= (inequals, tokenBack pState)
-		want_attr_inequality (IdentToken var_ident) pState
-			| isLowerCaseName var_ident
-				# (off_ident, pState) = stringToIdent var_ident IC_TypeAttr pState
+		want_attr_inequality (IdentToken var_name) pState
+			| isLowerCaseName var_name
+				# (off_ident, pState) = stringToIdent var_name IC_TypeAttr pState
 				  (token, pState) = nextToken  TypeContext pState
 				| token == LessThanOrEqualToken
-					# (var_ident, pState) = wantLowerCaseName "attribute inequality" pState
-					  (dem_ident, pState) = stringToIdent var_ident IC_TypeAttr pState
+					# (var_name, pState) = wantLowerCaseName "attribute inequality" pState
+					  (dem_ident, pState) = stringToIdent var_name IC_TypeAttr pState
 					  ai_demanded = makeAttributeVar dem_ident
 					= (ai_demanded, [{ ai_demanded = ai_demanded, ai_offered = makeAttributeVar off_ident }], pState)				
 					# (ai_demanded, inequals, pState) = want_attr_inequality token pState
@@ -1860,11 +1860,11 @@ optionalAnnotAndAttrWithPosition pState
 tryAttribute :: !Token !ParseState -> (!Bool, !TypeAttribute, !ParseState)
 tryAttribute DotToken           pState = (True, TA_Anonymous,    pState)
 tryAttribute AsteriskToken      pState = (True, TA_Unique, pState)
-tryAttribute (IdentToken id) pState
-	| isLowerCaseName id
+tryAttribute (IdentToken name) pState
+	| isLowerCaseName name
   	# (token, pState) = nextToken TypeContext pState
 	| ColonToken == token
-		# (ident, pState) = stringToIdent id IC_TypeAttr pState
+		# (ident, pState) = stringToIdent name IC_TypeAttr pState
 		= (True, TA_Var (makeAttributeVar ident), pState)
 		= (False, TA_None, tokenBack (tokenBack pState))
 tryAttribute _	              pState = (False, TA_None, tokenBack pState)
@@ -2573,9 +2573,9 @@ wantLhsExpressionT2 (IdentToken name) pState /* to make a=:C x equivalent to a=:
 		| token == DefinesColonToken 
 			# (token, pState)	= nextToken FunctionContext pState
 			= case token of
-				IdentToken ident
-					| ~ (isLowerCaseName ident)
-						#	(constructor, pState) = stringToIdent ident IC_Expression pState
+				IdentToken name
+					| ~ (isLowerCaseName name)
+						#	(constructor, pState) = stringToIdent name IC_Expression pState
 							(args, pState)	= parseList trySimpleLhsExpression pState
 						->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
 				_	# (succ, expr, pState) = trySimpleLhsExpressionT token pState
@@ -2617,7 +2617,7 @@ trySimpleLhsExpressionT ::  !Token !ParseState -> (!Bool, !ParsedExpr, !ParseSta
 trySimpleLhsExpressionT token pState
 	# (succ, expr, pState) = trySimpleExpressionT token cIsAPattern pState
 	| succ
-		# (token, pState) = nextToken FunctionContext pStates
+		# (token, pState) = nextToken FunctionContext pState
 		= (True, expr, tokenBack pState)
 		= (False, PE_Empty, pState)
 
@@ -2679,8 +2679,8 @@ where
 
 	want_selector (IdentToken name) pState
 		| isUpperCaseName name
-	  		# (field, pState) = want (wantToken FunctionContext "array selector" DotToken pState)
-	  		  (field_id, pState) = stringToIdent field IC_Selector pState
+	  		# (field_name, pState) = want (wantToken FunctionContext "array selector" DotToken pState)
+	  		  (field_id, pState) = stringToIdent field_name IC_Selector pState
 	  		  (type_id, pState) = stringToIdent name IC_Type pState
 			= ([PS_Record field_id (Yes type_id)], pState)
 	  		# (field_id, pState) = stringToIdent name IC_Selector pState
@@ -3305,10 +3305,10 @@ where
 	want_array_elems token pState
 		= ([], parseError "array elements" (Yes token) "<array denotation>" pState)
 	
-	want_record_pattern (IdentToken ident) pState
-		| isUpperCaseName ident
+	want_record_pattern (IdentToken name) pState
+		| isUpperCaseName name
 			# pState = wantToken FunctionContext "record pattern" BarToken pState
-			  (type_id, pState) = stringToIdent ident IC_Type pState
+			  (type_id, pState) = stringToIdent name IC_Type pState
 			  (token, pState) = nextToken FunctionContext pState
 			  (fields, pState) = want_field_assignments cIsAPattern token pState
 			= (PE_Record PE_Empty (Yes type_id) fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
@@ -3316,11 +3316,11 @@ where
 		# (fields, pState) =  want_field_assignments cIsAPattern token pState
 		= (PE_Record PE_Empty No fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
 
-	try_type_specification (IdentToken ident) pState
-		| isUpperCaseName ident || isFunnyIdName ident
+	try_type_specification (IdentToken type_name) pState
+		| isUpperCaseName type_name || isFunnyIdName type_name
 			# (token, pState) = nextToken FunctionContext pState
 			| token == BarToken
-				# (type_id, pState) = stringToIdent ident IC_Type pState
+				# (type_id, pState) = stringToIdent type_name IC_Type pState
 				= (Yes type_id, pState)
 				= (No, tokenBack pState)
 			= (No, pState)
@@ -3514,8 +3514,8 @@ where
 				= ([ field : fields ], pState)
 				= ([ field ], tokenBack pState)
 	where
-		want_field_expression is_pattern ident pState
-			# (field_id, pState) = stringToIdent ident IC_Selector pState
+		want_field_expression is_pattern field_name pState
+			# (field_id, pState) = stringToIdent field_name IC_Selector pState
 			  (token, pState) = nextToken FunctionContext pState
 			| token == EqualToken
 				# (field_expr, pState) = wantExpression is_pattern pState
@@ -3524,12 +3524,12 @@ where
 	want_field_assignments is_pattern token pState
 		= ([], parseError "record or array field assignments" (Yes token) "field name" pState)
 
-	try_field_assignment (IdentToken ident) pState
-		| isLowerCaseName ident
+	try_field_assignment (IdentToken field_name) pState
+		| isLowerCaseName field_name
 			# (token, pState) = nextToken FunctionContext pState
 			| token == EqualToken
 				# (field_expr, pState) = wantExpression cIsNotAPattern pState
-				  (field_id, pState) = stringToIdent ident IC_Selector pState
+				  (field_id, pState) = stringToIdent field_name IC_Selector pState
 				= (True, { bind_src = field_expr, bind_dst = field_id}, pState) 
 				= (False, abort "no field", tokenBack pState)
 			= (False, abort "no field", pState)
