@@ -108,6 +108,7 @@ instance == FunctionOrMacroIndex
 					| SelectorList !Ident ![ATypeVar] ![ParsedSelector]
 					| TypeSpec !AType
 					| EmptyRhs !BITVECT
+					| AbstractTypeSpec !BITVECT !AType
 
 ::	CollectedDefinitions instance_kind def_macros =
 	{	def_types 			:: ![TypeDef TypeRhs]
@@ -417,6 +418,7 @@ cIsImportedObject :== False
 			| SynType !AType
 			| RecordType !RecordType
 			| AbstractType !BITVECT
+			| AbstractSynType !BITVECT !AType
 			| UnknownType
 
 ::	ParsedTypeDef :== TypeDef RhsDefsOfType
@@ -468,7 +470,10 @@ where
 	,	fv_count		:: !Int
 	}
 	
-::	FunCall = FunCall !Index !Level | MacroCall !Index !Index Level;
+::	ModuleIndex:==Index;
+::	DclFunctionIndex:==Index;
+
+::	FunCall = FunCall !Index !Level | MacroCall !ModuleIndex !Index Level | DclFunCall !ModuleIndex !DclFunctionIndex;
 
 /* Sjaak 19-3-2001 ... */
 
@@ -1665,7 +1670,7 @@ where
 			SK_Generic _ kind 
 				->  file <<< app_symb <<< kind <<< ' ' <<< app_args
 			_ 	-> file <<< app_symb <<< ' ' <<< app_args
-	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< " @ " <<< a_exp <<< ')'
+	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< ") @ (" <<< a_exp <<< ')'
 	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
 			= write_binds "" (write_binds "!" (file <<< "let" <<< '\n') let_strict_binds) let_lazy_binds <<< "in\n" <<< let_expr
 	where
@@ -1883,7 +1888,7 @@ where
 	(<<<) file {fun_symb,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
 		= file <<< fun_symb <<< '.' <<< "T "  
 //			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
-			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< " = " <<< tb_rhs <<< '\n'
+			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n\t= " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
 	(<<<) file {fun_symb,fun_body=BackendBody body,fun_type=Yes type} = file // <<< type <<< '\n'
 			<<< fun_symb <<< '.' <<< body <<< '\n'
@@ -1909,6 +1914,8 @@ where
 			= file <<< fc_index <<< '.' <<< fc_level
 	(<<<) file (MacroCall module_index fc_index fc_level)
 			= file <<< "MacroCall "<<< module_index <<<" "<<<fc_index <<< '.' <<< fc_level
+	(<<<) file (DclFunCall module_index fc_index)
+			= file <<< "DclFunCall "<<< module_index <<<" "<<<fc_index
 
 instance <<< FreeVar
 where

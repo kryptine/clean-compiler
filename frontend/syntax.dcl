@@ -107,6 +107,7 @@ instance == FunctionOrMacroIndex
 					| SelectorList !Ident ![ATypeVar] ![ParsedSelector]
 					| TypeSpec !AType
 					| EmptyRhs !BITVECT
+					| AbstractTypeSpec !BITVECT !AType
 
 ::	CollectedDefinitions instance_kind def_macros =
 	{	def_types 			:: ![TypeDef TypeRhs]
@@ -413,6 +414,7 @@ cIsImportedObject :== False
 			| SynType !AType
 			| RecordType !RecordType
 			| AbstractType !BITVECT
+			| AbstractSynType !BITVECT !AType
 			| UnknownType
 
 ::	ParsedTypeDef	:== TypeDef RhsDefsOfType
@@ -490,13 +492,11 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 //	,	fv_expr_ptr		:: !ExprInfoPtr
 	,	fv_count		:: !Int
 	}
-	
-::	FunCall = FunCall !Index !Level | MacroCall !Index !Index Level;
-/*
-	{	fc_level	:: !Level
-	,	fc_index	:: !Index
-	}
-*/
+
+::	ModuleIndex:==Index;
+::	DclFunctionIndex:==Index;
+
+::	FunCall = FunCall !Index !Level | MacroCall !ModuleIndex !Index Level | DclFunCall !ModuleIndex !DclFunctionIndex;
 
 /* Sjaak 19-3-2001 ... */
 
