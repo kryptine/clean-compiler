@@ -393,7 +393,12 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		PrintArguments (node->node_arguments,'\n',True,n_leading_spaces,file);
 		break;		
 	case CaseNode:
-		FPutS ("Case: [ ",file);
+		FPutS ("Case: ",file);
+
+		PrintSymbol (node->node_symbol, file);
+		FPutS (" [ ",file);
+
+		FPutS (" ",file);
 		{
 			NodeIdRefCountListP node_id_ref_count_elem;
 			
