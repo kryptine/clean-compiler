@@ -12,9 +12,6 @@ temporary_import_solution_XXX yes no :== yes
 // and StructureType should then be removed also
 do_temporary_import_solution_XXX :== temporary_import_solution_XXX True False
 
-// MW was cIclModIndex 			:== 0
-
-// MW DclModule
 ::	ExplicitImports	:==	(![AtomicImport], ![StructureImport])
 ::	AtomicImport	:==	(!Ident, !AtomType)
 ::	StructureImport	:==	(!Ident, !StructureInfo, !StructureType, !OptimizeInfo)

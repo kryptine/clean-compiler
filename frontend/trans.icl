@@ -145,6 +145,8 @@ where
 			= (cc, subst)
 	where	
 		skip_indirections cons_var subst
+			| cons_var>=size subst || cons_var<0
+				= abort ("error"->>("cons_var",cons_var))
 			#! redir = subst.[cons_var]
 			| IsAVariable redir
 				= skip_indirections redir subst
@@ -421,29 +423,14 @@ consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
 	bind_pattern_vars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
 		| fv_count > 0
 			= bind_pattern_vars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
-			= bind_pattern_vars vars (inc next_var) next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
+			= bind_pattern_vars vars next_var next_var_of_fun (writePtr fv_info_ptr (VI_Count 0 False) var_heap)
 	bind_pattern_vars [] next_var next_var_of_fun var_heap
 		= (next_var, next_var_of_fun, var_heap)
-/*
-consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
-	# pattern_exprs = [ ap_expr \\ {ap_expr}<-patterns]
-	  pattern_vars = flatten [ filter (\{fv_count}->fv_count>0) ap_vars \\ {ap_vars}<-patterns]
-	  (ai_next_var, ai_next_var_of_fun, ai_var_heap) = bind_pattern_vars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
-	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
-	= independentConsumerRequirements pattern_exprs common_defs ai
-  where
-	bind_pattern_vars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
-		| fv_count > 0
-			= bind_pattern_vars vars (inc next_var) (inc next_var_of_fun) (writePtr fv_info_ptr (VI_AccVar next_var next_var_of_fun) var_heap)
-			= bind_pattern_vars vars (inc next_var) (inc next_var_of_fun) var_heap
-	bind_pattern_vars [] next_var next_var_of_fun var_heap
-		= (next_var, next_var_of_fun, var_heap)
-*/
 consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
 	# pattern_exprs = [ bp_expr \\ {bp_expr}<-patterns]
 	= independentConsumerRequirements pattern_exprs common_defs ai
 consumer_requirements_of_guards (DynamicPatterns dyn_patterns) common_defs ai
-	= abort "compiler bug in trans.icl: consumerRequirements CasePatterns case missing"
+	= abort "compiler bug in trans.icl: consumer_requirements_of_guards DynamicPatterns case missing"
 // XXX was before adding reference counting		= consumerRequirements dyn_patterns ai
 
 instance consumerRequirements BasicPattern where
@@ -523,6 +510,8 @@ where
 */
 	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 		#! {group_members} = groups.[group_nr]
+		| False->>("analyse_group",group_nr)
+			= undef
 		# (nr_of_vars, nr_of_local_vars, var_heap, class_env, fun_defs) = initial_cons_class group_members 0 0 var_heap class_env fun_defs
 		  initial_subst = createArray (nr_of_vars + nr_of_local_vars) cPassive
 		  (ai_cases_of_vars_for_group, ai, fun_defs)
