@@ -1225,34 +1225,35 @@ checkCommonDefinitions opt_icl_info module_index common modules heaps cs
 	  		= checkMemberTypes module_index opt_icl_info com_member_defs com_type_defs com_class_defs modules heaps cs
 	  (com_instance_defs, com_type_defs, com_class_defs, com_member_defs, modules, heaps, cs)
 	  		= checkInstanceDefs module_index common.com_instance_defs com_type_defs com_class_defs com_member_defs modules heaps cs
-//AA..
 	  (com_generic_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 			= checkGenericDefs module_index opt_icl_info common.com_generic_defs com_type_defs com_class_defs modules heaps cs
 	  (com_gencase_defs, com_generic_defs, com_type_defs, modules, heaps, cs)
 			= checkGenericCaseDefs module_index common.com_gencase_defs com_generic_defs com_type_defs modules heaps cs	  
-//..AA
-
+ 	| cs.cs_error.ea_ok
+		# (size_com_type_defs,com_type_defs) = usize com_type_defs
+	 	  (size_com_selector_defs,com_selector_defs) = usize com_selector_defs
+	      (size_com_cons_defs,com_cons_defs) = usize com_cons_defs
+		  {hp_var_heap, hp_type_heaps=hp_type_heaps=:{th_vars} } = heaps
+		  is_dcl = case opt_icl_info of No -> True ; Yes _ -> False
+		  (new_type_defs, new_selector_defs, new_cons_defs,dictionary_info,com_type_defs,com_selector_defs, com_cons_defs, com_class_defs, modules, th_vars, hp_var_heap, cs_symbol_table)
+		  	= createClassDictionaries is_dcl module_index size_com_type_defs size_com_selector_defs size_com_cons_defs
+								  			com_type_defs com_selector_defs com_cons_defs com_class_defs modules th_vars hp_var_heap cs.cs_symbol_table
 	
-	  (size_com_type_defs,com_type_defs) = usize com_type_defs
-	  (size_com_selector_defs,com_selector_defs) = usize com_selector_defs
-	  (size_com_cons_defs,com_cons_defs) = usize com_cons_defs
+		  com_type_defs = array_plus_list com_type_defs new_type_defs
+		  com_selector_defs = array_plus_list com_selector_defs new_selector_defs
+		  com_cons_defs = array_plus_list com_cons_defs new_cons_defs
+		  
+		  common = {common & com_type_defs = com_type_defs, com_cons_defs = com_cons_defs, com_selector_defs = com_selector_defs, com_class_defs = com_class_defs,
+							 com_member_defs = com_member_defs,  com_instance_defs = com_instance_defs, 
+							 com_generic_defs = com_generic_defs, com_gencase_defs = com_gencase_defs}
+		  heaps = {heaps & hp_var_heap=hp_var_heap,hp_type_heaps={hp_type_heaps & th_vars=th_vars}}
+		= (dictionary_info,common, modules,	heaps, { cs & cs_symbol_table = cs_symbol_table })
 
-	  {hp_var_heap, hp_type_heaps=hp_type_heaps=:{th_vars} } = heaps
- 	  is_dcl = case opt_icl_info of No -> True ; Yes _ -> False
-	  (new_type_defs, new_selector_defs, new_cons_defs,dictionary_info,com_type_defs,com_selector_defs, com_cons_defs, com_class_defs, modules, th_vars, hp_var_heap, cs_symbol_table)
-	  	= createClassDictionaries is_dcl module_index size_com_type_defs size_com_selector_defs size_com_cons_defs
-							  			com_type_defs com_selector_defs com_cons_defs com_class_defs modules th_vars hp_var_heap cs.cs_symbol_table
-
-	  com_type_defs = array_plus_list com_type_defs new_type_defs
-	  com_selector_defs = array_plus_list com_selector_defs new_selector_defs
-	  com_cons_defs = array_plus_list com_cons_defs new_cons_defs
-	  
-	  common = {common & com_type_defs = com_type_defs, com_cons_defs = com_cons_defs, com_selector_defs = com_selector_defs, com_class_defs = com_class_defs,
-						 com_member_defs = com_member_defs,  com_instance_defs = com_instance_defs, 
-						 com_generic_defs = com_generic_defs, com_gencase_defs = com_gencase_defs}
-
-	  heaps = {heaps & hp_var_heap=hp_var_heap,hp_type_heaps={hp_type_heaps & th_vars=th_vars}}
-	= (dictionary_info,common, modules,	heaps, { cs & cs_symbol_table = cs_symbol_table })
+		# dictionary_info = { n_dictionary_types=0, n_dictionary_constructors=0, n_dictionary_selectors=0 }
+		  common = {common & com_type_defs = com_type_defs, com_cons_defs = com_cons_defs, com_selector_defs = com_selector_defs, com_class_defs = com_class_defs,
+							 com_member_defs = com_member_defs,  com_instance_defs = com_instance_defs, 
+							 com_generic_defs = com_generic_defs, com_gencase_defs = com_gencase_defs}	
+		= (dictionary_info,common, modules,	heaps, cs)
 		
 collectCommonfinitions :: !(CollectedDefinitions ClassInstance a) -> (!*{# Int}, ![Declaration])
 collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
@@ -1967,9 +1968,16 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 			  			(possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs)
 			  			(dcl_modules, cs)
 
+
+			  (dcls_common_defs, (dcl_modules, cs))
+				= mapSt (createCommonDefinitionsWithinComponent is_on_cycle) mod_indices (dcl_modules, cs)
+
+
 			  (afterwards_info, (expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs))
-				= mapSt (checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set super_components imports_ikh)
-								mod_indices (expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
+				= map2St (checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set super_components imports_ikh)
+								mod_indices dcls_common_defs (expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
+
+
 			| not cs.cs_error.ea_ok
 				-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
 
@@ -2037,19 +2045,50 @@ compute_used_module_nrs (mod_index, _, _) (mod_nr_accu, dcl_modules)
 	= (addNr mod_index (numberSetUnion dcl_imported_module_numbers mod_nr_accu),
 		 dcl_modules)
 
-checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set
-		super_components imports_ikh mod_index
+createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{cs_symbol_table})
+	# (dcl_mod=:{dcl_name}, dcl_modules) = dcl_modules![mod_index]
+	  (mod_entry, cs_symbol_table) = readPtr dcl_name.id_info cs_symbol_table
+	  ({ ste_kind = STE_Module mod, ste_index }) = mod_entry
+	  cs = { cs & cs_symbol_table = cs_symbol_table}
+	# dcl_common = createCommonDefinitions mod.mod_defs
+	#! first_type_index = size dcl_common.com_type_defs		
+	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 dcl_common.com_class_defs first_type_index}
+		with
+			number_class_dictionaries class_index class_defs index_type
+				| class_index < size class_defs
+					# class_defs = { class_defs & [class_index].class_dictionary.ds_index = index_type }
+					= number_class_dictionaries (inc class_index) class_defs (inc index_type)
+					= class_defs
+	| not is_on_cycle
+		= (dcl_common, (dcl_modules, cs))
+		# (dcl_common,dcl_common2) = copy_common_defs dcl_common
+		# dcl_modules = {dcl_modules & [mod_index].dcl_common=dcl_common2}
+		= (dcl_common, (dcl_modules, cs))
+		with
+			copy_common_defs :: !*CommonDefs -> (!*CommonDefs,!*CommonDefs)
+			copy_common_defs {com_type_defs,com_cons_defs,com_selector_defs,com_class_defs,com_member_defs,com_instance_defs,com_generic_defs,com_gencase_defs}
+				# (type_defs1,type_defs2) = arrayCopy com_type_defs
+				# (cons_defs1,cons_defs2) = arrayCopy com_cons_defs
+				# (selector_defs1,selector_defs2) = arrayCopy com_selector_defs
+				# (class_defs1,class_defs2) = arrayCopy com_class_defs
+				# (member_defs1,member_defs2) = arrayCopy com_member_defs
+				# (instance_defs1,instance_defs2) = arrayCopy com_instance_defs
+				# (generic_defs1,generic_defs2) = arrayCopy com_generic_defs
+				# (gencase_defs1,gencase_defs2) = arrayCopy com_gencase_defs
+				= ({com_type_defs=type_defs1,com_cons_defs=cons_defs1,com_selector_defs=selector_defs1,com_class_defs=class_defs1,com_member_defs=member_defs1,com_instance_defs=instance_defs1,com_generic_defs=generic_defs1,com_gencase_defs=gencase_defs1},
+				   {com_type_defs=type_defs2,com_cons_defs=cons_defs2,com_selector_defs=selector_defs2,com_class_defs=class_defs2,com_member_defs=member_defs2,com_instance_defs=instance_defs2,com_generic_defs=generic_defs2,com_gencase_defs=gencase_defs2})
+
+checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set super_components imports_ikh
+		mod_index dcl_common
 		(expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs=:{cs_symbol_table})
 	# ({dcl_name}, dcl_modules) = dcl_modules![mod_index]
 	  (mod_entry, cs_symbol_table) = readPtr dcl_name.id_info cs_symbol_table
-	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	  ({ ste_kind = STE_Module mod, ste_index }) = mod_entry
-	  cs_symbol_table = writePtr dcl_name.id_info { mod_entry & ste_kind = STE_ClosedModule } cs.cs_symbol_table
-	= checkDclModule dcl_imported_module_numbers super_components.[mod_index] imports_ikh component_nr
-  	  				is_on_cycle modules_in_component_set
-  	  				mod ste_index expl_imp_infos dcl_modules icl_functions macro_defs heaps
-  	  				{ cs & cs_symbol_table = cs_symbol_table }
-		
+	  cs = { cs & cs_symbol_table = writePtr dcl_name.id_info { mod_entry & ste_kind = STE_ClosedModule } cs_symbol_table}
+	# {mod_name,mod_defs={def_macro_indices,def_funtypes}} = mod
+	= checkDclModule2 dcl_imported_module_numbers super_components.[mod_index] imports_ikh component_nr is_on_cycle modules_in_component_set
+		 mod_name dcl_common def_macro_indices def_funtypes ste_index expl_imp_infos dcl_modules icl_functions macro_defs heaps cs
+
 renumber_icl_module :: ModuleKind IndexRange IndexRange IndexRange Index Int {#Int} (Optional {#{#Int}}) IndexRange  *{#FunDef}  *CommonDefs  [Declaration]  *{#DclModule} *ErrorAdmin
 												 -> (![IndexRange],![IndexRange], ![IndexRange], !Int,!Index,!IndexRange,!*{#FunDef},!*CommonDefs,![Declaration],!*{#DclModule}, *ErrorAdmin);
 renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules error
@@ -3275,26 +3314,39 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			  (inst_def, instance_defs) = instance_defs![ds_index]
 			  (Yes symbol_type) = inst_def.ft_type
 			= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
-	
 
 checkDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect
 					!(Module (CollectedDefinitions ClassInstance IndexRange)) !Index !*ExplImpInfos !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*Heaps !*CheckState
 				-> (!(!Int,!Index,![FunType]), !(!*ExplImpInfos, !*{#DclModule}, !*{#FunDef},!*{#*{#FunDef}},!*Heaps, !*CheckState))
 checkDclModule dcl_imported_module_numbers super_components imports_ikh component_nr is_on_cycle modules_in_component_set
-		 {mod_name,mod_imports,mod_defs} mod_index expl_imp_info modules icl_functions macro_defs heaps cs
+		 mod=:{mod_name,mod_defs=mod_defs=:{def_macro_indices,def_funtypes}} mod_index expl_imp_info modules icl_functions macro_defs heaps cs
 //	| False--->("checkDclModule", mod_name, mod_index) //, modules.[mod_index].dcl_declared.dcls_local)
 //		= undef
+	# dcl_common = createCommonDefinitions mod_defs
+	#! first_type_index = size dcl_common.com_type_defs		
+	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 dcl_common.com_class_defs first_type_index}
+		with
+			number_class_dictionaries class_index class_defs index_type
+				| class_index < size class_defs
+					# class_defs = { class_defs & [class_index].class_dictionary.ds_index = index_type }
+					= number_class_dictionaries (inc class_index) class_defs (inc index_type)
+					= class_defs
+	= checkDclModule2 dcl_imported_module_numbers super_components imports_ikh component_nr is_on_cycle modules_in_component_set
+		 mod_name dcl_common def_macro_indices def_funtypes mod_index expl_imp_info modules icl_functions macro_defs heaps cs
+
+checkDclModule2 :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect
+					!Ident *CommonDefs !IndexRange ![FunType] !Index !*ExplImpInfos !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*Heaps !*CheckState
+				-> (!(!Int,!Index,![FunType]), !(!*ExplImpInfos, !*{#DclModule}, !*{#FunDef},!*{#*{#FunDef}},!*Heaps, !*CheckState))
+checkDclModule2 dcl_imported_module_numbers super_components imports_ikh component_nr is_on_cycle modules_in_component_set
+		 mod_name dcl_common dcl_macros dcl_funtypes mod_index expl_imp_info modules icl_functions macro_defs heaps cs
 	# (dcl_mod, modules)			= modules![mod_index]
 	  dcl_defined 					= dcl_mod.dcl_declared.dcls_local
-	  dcl_common					= createCommonDefinitions mod_defs
-	  dcl_macros					= mod_defs.def_macro_indices
 	  cs							= addGlobalDefinitionsToSymbolTable dcl_defined cs
 	  (dcls_import_list, modules, cs)
 	  		= addImportedSymbolsToSymbolTable mod_index No modules_in_component_set imports_ikh modules cs
 	  dcls_import					= { el \\ el<-dcls_import_list }
 	  cs							= { cs & cs_x.x_needed_modules = 0 }
 	  nr_of_dcl_functions 			= size dcl_mod.dcl_functions
-	#! main_dcl_module_n = cs.cs_x.x_main_dcl_module_n
 	# (dictionary_info,dcl_common, modules, heaps, cs)
 	  		= checkCommonDefinitions No mod_index dcl_common modules heaps cs
 	# dcl_mod = {dcl_mod & dcl_dictionary_info=dictionary_info}
@@ -3308,7 +3360,7 @@ checkDclModule dcl_imported_module_numbers super_components imports_ikh componen
 
 
 	  (nr_of_dcl_funs_insts_and_specs, rev_function_list, rev_special_defs, com_type_defs, com_class_defs, modules, heaps, cs)
-	  		= checkDclFunctions mod_index nr_of_dcl_functions_and_instances mod_defs.def_funtypes
+	  		= checkDclFunctions mod_index nr_of_dcl_functions_and_instances dcl_funtypes
 	  			dcl_common.com_type_defs dcl_common.com_class_defs modules heaps cs
 
 	  dcl_functions = { function \\ function <- reverse rev_function_list }
