@@ -293,9 +293,46 @@ where
 		  ci = { ci & ci_expr_heap = ci_expr_heap }
 		= case case_guards of
 			(AlgebraicPatterns type algebraic_patterns)
-				#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
-													(zip2 algebraic_patterns ct_cons_types) ci
-				-> (Case {keesje &  case_expr = case_expr, case_guards = AlgebraicPatterns type algebraic_patterns, case_default = this_case_default}, ci)
+// MV DEFAULT ...
+				| not (isNo this_case_default) && any (\algebraic_pattern -> is_case_without_default algebraic_pattern) algebraic_patterns
+					// a default to be moved inwards and a root positioned case not having a default
+					// 
+					// Example:
+					//	loadandrun2 :: ![(!Dynamic, !Dynamic)] !*World -> *World
+					//	loadandrun2 [(f :: BatchProcess i o, input :: i)] world = abort "alt BatchProcess"
+					//	loadandrun2 [(f :: InteractiveProcess i o, input :: i)] world = abort "alt InteractiveProcess" 
+					//	loadandrun2 _ _ = abort "Loader: process and input do not match"
+					//
+					# (Yes old_case_default) = this_case_default
+					# (let_info_ptr,  ci) = let_ptr ci
+					# (default_var, ci) = newVariable "s" (VI_BoundVar {at_attribute=TA_None,at_annotation=AN_None,at_type=TE}) ci
+					# default_fv = varToFreeVar default_var 1
+					# ci
+						= { ci & ci_new_variables = [default_fv : ci.ci_new_variables]}
+					# let_bind = {
+							lb_src = old_case_default
+						,	lb_dst = default_fv
+						, lb_position = NoPos }					
+					# (new_case_default, nested_case_default, ci) 
+						= determine_defaults (Yes (Var default_var)) default_expr ci
+					# algebraic_patterns			
+						= map (patch_defaults new_case_default) algebraic_patterns
+					#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
+														(zip2 algebraic_patterns ct_cons_types) ci
+					# letje
+						= Let {
+							let_strict_binds	= []
+						,	let_lazy_binds		= [let_bind]
+						,	let_expr			= Case {keesje &  case_expr = case_expr, case_guards = AlgebraicPatterns type algebraic_patterns, case_default = new_case_default }
+						,	let_info_ptr		= let_info_ptr
+						,	let_expr_position	= NoPos
+						}		
+					-> (letje,ci)
+			
+					#  (algebraic_patterns, ci) = mapSt (convertDynamicsOfAlgebraicPattern cinp bound_vars nested_case_default)
+														(zip2 algebraic_patterns ct_cons_types) ci
+					-> (Case {keesje &  case_expr = case_expr, case_guards = AlgebraicPatterns type algebraic_patterns, case_default = this_case_default}, ci)
+// ... MV DEFAULT
 			(BasicPatterns type basic_patterns)
 				#  (basic_patterns, ci) = convertDynamics  cinp bound_vars nested_case_default basic_patterns ci
 				-> (Case {keesje &  case_expr = case_expr, case_guards = BasicPatterns type basic_patterns, case_default = this_case_default}, ci)
@@ -306,6 +343,17 @@ where
 				-> (Case {keesje &  case_expr = case_expr, case_guards = NoPattern, case_default = this_case_default}, ci)
 			_
 				-> abort "unexpected value in convertDynamics: 'convertDynamics.CasePatterns'"
+// MV DEFAULT ...
+	where
+		is_case_without_default {ap_expr=Case {case_default=No}}	= True
+		is_case_without_default _									= False
+	
+		patch_defaults this_case_default ap=:{ap_expr=Case keesje=:{case_default=No}} 
+			= { ap & ap_expr = Case {keesje & case_default = this_case_default} }
+		patch_defaults _ expr
+			= expr
+// ... MV DEFAULT
+			
 	convertDynamics cinp bound_vars default_expr (Selection opt_symb expression selections) ci
 		# (expression,ci) = convertDynamics cinp bound_vars default_expr expression ci
 		= (Selection opt_symb expression selections, ci)
