@@ -64,7 +64,7 @@ where
 		compare_records dcl_rec icl_rec dcl_cons_defs icl_cons_defs comp_st
 			# nr_of_dcl_fields = size dcl_rec.rt_fields
 			| nr_of_dcl_fields == size icl_rec.rt_fields && compare_fields nr_of_dcl_fields dcl_rec.rt_fields icl_rec.rt_fields
-//				&& icl_rec.rt_is_boxed_record==dcl_rec.rt_is_boxed_record
+				&& icl_rec.rt_is_boxed_record==dcl_rec.rt_is_boxed_record
 				= compare_constructors True dcl_rec.rt_constructor.ds_index dcl_cons_defs icl_cons_defs comp_st
 				= (False, icl_cons_defs, comp_st)
 		
@@ -876,7 +876,7 @@ instance t_corresponds Bool where
 instance t_corresponds RecordType where
 	t_corresponds dclRecord iclRecord
 		=	t_corresponds dclRecord.rt_constructor dclRecord.rt_constructor
-//		&&&	t_corresponds dclRecord.rt_is_boxed_record dclRecord.rt_is_boxed_record
+		&&&	t_corresponds dclRecord.rt_is_boxed_record dclRecord.rt_is_boxed_record
 		&&& t_corresponds dclRecord.rt_fields iclRecord.rt_fields
 
 instance t_corresponds FieldSymbol where
