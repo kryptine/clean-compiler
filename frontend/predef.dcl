@@ -272,3 +272,5 @@ PD_NilSymbol_String				:== "_Nil"
 // Array-type
 PD_UnboxedArray_String			:== "_#Array"
 // ... MV
+
+DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		
