@@ -3705,7 +3705,7 @@ where
 			= (fun_defs, imported_types, collected_imports, [fun_index : fun_indices_with_abs_syn_types], type_heaps, var_heap)
 			= (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 
-	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#u:FunDef},!*{#{#.(TypeDef .TypeRhs)}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!{#v:FunDef},!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo)), [u <= v]
+	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#FunDef},!*{#{#.(TypeDef .TypeRhs)}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!*{#FunDef},!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo))
 	expand_abstract_syn_types_in_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
 					= fun_defs![fun_index]
