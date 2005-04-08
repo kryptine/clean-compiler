@@ -980,7 +980,9 @@ checkExpression free_vars (PE_Selection selector_kind expr [PS_Array index_expr]
 		= case selector_kind of
 			ParsedNormalSelector
 				-> (PD_ArraySelectFun, NormalSelector)
-			ParsedUniqueSelector _
+			ParsedUniqueSelector False
+				-> (PD_UnqArraySelectFun, NormalSelector)
+			ParsedUniqueSelector True
 				-> (PD_UnqArraySelectFun, NormalSelectorUniqueElementResult)
 	# (glob_select_symb, cs) = getPredefinedGlobalSymbol select_fun PD_StdArray STE_Member 2 cs
 	  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
