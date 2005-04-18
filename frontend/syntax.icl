@@ -88,8 +88,8 @@ where
 
 instance <<< TypeVar
 where
-//	(<<<) file varid = file <<< varid.tv_ident 
-	(<<<) file varid = file <<< varid.tv_ident <<< "<" <<< varid.tv_info_ptr <<< ">"
+	(<<<) file varid = file <<< varid.tv_ident 
+//	(<<<) file varid = file <<< varid.tv_ident <<< "<" <<< varid.tv_info_ptr <<< ">"
 
 instance <<< AttributeVar
 where
