@@ -42,10 +42,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,n_functions_and_macros_in_dcl_modules,hash_table, error, files)
 		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
-	/* JVG: */
+
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
-	/**/
+
 	| not ok
 		= (No,{},{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
   	# symbol_table = hash_table.hte_symbol_heap
@@ -80,9 +80,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 
 //	# dcl_mods = {{dcl_mod & dcl_declared={dcls_import={},dcls_local=[],dcls_local_for_import={},dcls_explicit={}}}\\ dcl_mod<-:dcl_mods}
 
-	# var_heap = heaps.hp_var_heap
-	  gen_heap = heaps.hp_generic_heap
-	  type_heaps = heaps.hp_type_heaps
+	# type_heaps = heaps.hp_type_heaps
 	  fun_defs = icl_functions
 
 	| options.feo_up_to_phase == FrontEndPhaseCheck
@@ -275,6 +273,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	| ok<>ok
 		= abort "";
 */
+
 //	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
@@ -292,11 +291,32 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			,	fe_arrayInstances = array_instances
 			}
 
+	# cached_dcl_macros = clear_group_indices_of_macros cached_dcl_macros
 	= (Yes fe,cached_dcl_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps)
 	where
+		copy_dcl_modules :: !*{#DclModule} -> *(!*{#DclModule},!*{#DclModule})
 		copy_dcl_modules dcl_mods
 			#! nr_of_dcl_mods = size dcl_mods
 			= arrayCopyBegin dcl_mods nr_of_dcl_mods
+
+		clear_group_indices_of_macros :: !*{#*{#FunDef}} -> *{#*{#FunDef}}
+		clear_group_indices_of_macros cached_dcl_macros
+			= clear_group_indices1 0 {} cached_dcl_macros
+		where
+			clear_group_indices1 :: !Int !*{#FunDef} !*{#*{#u:FunDef}} -> *{#*{#FunDef}}
+			clear_group_indices1 i dummy cached_dcl_macros
+				| i==size cached_dcl_macros
+					= cached_dcl_macros
+					# (cached_dcl_macros_i,cached_dcl_macros) = replace cached_dcl_macros i dummy
+					# cached_dcl_macros_i = clear_group_indices2 0 cached_dcl_macros_i
+					# (dummy,cached_dcl_macros) = replace cached_dcl_macros i cached_dcl_macros_i
+					= clear_group_indices1 (i+1) dummy cached_dcl_macros
+
+			clear_group_indices2 j cached_dcl_macros_i
+				| j==size cached_dcl_macros_i
+					= cached_dcl_macros_i
+					# cached_dcl_macros_i = {cached_dcl_macros_i & [j].fun_info.fi_group_index= (-1)}
+					= clear_group_indices2 (j+1) cached_dcl_macros_i	
 
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
