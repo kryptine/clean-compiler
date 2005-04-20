@@ -798,7 +798,7 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 	  							= fresh_arg_types is_appl st_args (ts_var_store, ts_attr_store, ts_exis_variables, type_heaps)
 	  (tst_result, type_heaps)	= freshCopy st_result type_heaps
 	  (tst_context, (type_heaps, ts_var_heap)) 	= freshTypeContexts fresh_context_vars st_context (type_heaps, ts_var_heap)
-	  th_attrs					= clear_attributes st_attr_vars th_attrs
+	  type_heaps = {type_heaps & th_attrs = clear_attributes st_attr_vars type_heaps.th_attrs}
 	  cons_variables			= foldSt (collect_cons_variables_in_tc common_defs) tst_context [] 
 	= ({ tst_args = tst_args, tst_result = tst_result, tst_context = tst_context, tst_attr_env = attr_env, tst_arity = st_arity, tst_lifted = 0 },
 	   { ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = type_heaps, ts_var_heap = ts_var_heap,
