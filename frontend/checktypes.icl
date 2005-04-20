@@ -252,11 +252,11 @@ where
 				# {fs_index} = fields.[field_nr]
 				# (sel_def, selector_defs) = selector_defs![fs_index]
 				  [sel_type : sel_types] = sel_types
-				# (sel_type, (st_vars, st_attr_vars)) = lift_quantifier sel_type (st_vars, st_attr_vars)
+				# (sel_type, (sel_vars, sel_attr_vars)) = lift_quantifier sel_type (st_vars, st_attr_vars)
 				# (st_attr_env, error) = addToAttributeEnviron sel_type.at_attribute rec_type.at_attribute [] error
 				# (new_type_ptr, var_heap) = newPtr VI_Empty var_heap
-				  sd_type = { sel_def.sd_type &  st_arity = 1, st_args = [rec_type], st_result = sel_type, st_vars = st_vars,
-				  				st_attr_vars = st_attr_vars, st_attr_env = st_attr_env }
+				  sd_type = { sel_def.sd_type &  st_arity = 1, st_args = [rec_type], st_result = sel_type,
+				  				st_vars = sel_vars, st_attr_vars = sel_attr_vars, st_attr_env = st_attr_env }
 				  selector_defs = { selector_defs & [fs_index] = { sel_def & sd_type = sd_type, sd_field_nr = field_nr, sd_type_index = rec_type_index,
 				  									sd_type_ptr = new_type_ptr, sd_exi_vars = exi_vars  } }
 				= check_selectors (inc field_nr) fields rec_type_index sel_types  rec_type st_vars st_attr_vars exi_vars selector_defs var_heap error
@@ -298,7 +298,8 @@ where
 		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
 		  (ts, ti, cs) = bind_types_of_constructors cti (inc cons_index) free_vars free_attrs type_lhs conses
 								(ts, ti, { cs & cs_symbol_table = cs_symbol_table }) 
-		  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = free_attrs, st_attr_env = st_attr_env }
+		  attr_vars = add_universal_attr_vars st_args free_attrs
+		  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = attr_vars, st_attr_env = st_attr_env }
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
 		= ({ ts & ts_cons_defs = { ts.ts_cons_defs & [ds_index] =
 				{ cons_def & cons_type = cons_type, cons_index = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
@@ -324,6 +325,19 @@ where
 					
 					= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr}, atv_attribute = stv_attribute } : local_vars],
 							symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
+
+		add_universal_attr_vars [] attr_vars
+			= attr_vars
+		add_universal_attr_vars [{at_type=TFA vars type}:types] attr_vars
+			# attr_vars = foldSt add_attr_var vars attr_vars
+			= add_universal_attr_vars types attr_vars
+		where
+			add_attr_var {atv_attribute=TA_Var av=:{av_info_ptr}} attr_vars
+				= [av : attr_vars]
+			add_attr_var _ attr_vars
+				= attr_vars
+		add_universal_attr_vars [type:types] attr_vars
+			= add_universal_attr_vars types attr_vars
 
 	retrieve_used_types symb_ptrs symbol_table
 		= foldSt retrieve_used_type symb_ptrs ([], symbol_table)
