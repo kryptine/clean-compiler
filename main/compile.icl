@@ -66,8 +66,6 @@ closeTclFile (Yes tcl_file) files
 closeTclFile _ files
 	= (True,files);
 
-
-
 ::	CoclOptions =
 	{	moduleName:: {#Char}
 	,	pathName ::{#Char}
@@ -79,7 +77,6 @@ closeTclFile _ files
 	,	searchPaths:: SearchPaths
 	,	listTypes :: ListTypesOption
 	,	compile_for_dynamics	:: !Bool
-	,	support_generics 		:: !Bool
 	,	compile_with_fusion		:: !Bool
 	,	dump_core				:: !Bool
 	,	strip_unused			:: !Bool
@@ -100,7 +97,6 @@ InitialCoclOptions =
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
 	,	compile_for_dynamics	= False
-	, 	support_generics 		= True	//???
 	,	compile_with_fusion		= False
 	,	dump_core				= False
 	,	strip_unused			= False
