@@ -2073,8 +2073,6 @@ where
 		= (fv, {heaps & hp_var_heap = hp_var_heap})
 
 	build_arg_vars {gen_ident, gen_vars, gen_type} td_args heaps 
-		#! generated_arg_names 
-			= [ gen_ident.id_name +++ atv_variable.tv_ident.id_name \\ {atv_variable} <- td_args]
 		#! (generated_arg_exprs, generated_arg_vars, heaps) 
 			= buildVarExprs 
 				[ gen_ident.id_name +++ atv_variable.tv_ident.id_name \\ {atv_variable} <- td_args] 
