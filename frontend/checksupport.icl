@@ -17,7 +17,7 @@ where
 	toInt STE_Generic				= cGenericDefs
 	toInt STE_GenericCase			= cGenericCaseDefs
 	toInt STE_Member				= cMemberDefs
-	toInt (STE_Instance _)			= cInstanceDefs
+	toInt STE_Instance				= cInstanceDefs
 	toInt STE_DclFunction			= cFunctionDefs
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
 	toInt (STE_DclMacroOrLocalMacroFunction _)= cMacroDefs

@@ -1282,8 +1282,8 @@ where
 		= (inc decl_index, [Declaration { decl_ident = class_ident, decl_pos = class_pos, decl_kind = STE_Class, decl_index = decl_index } : decls]) 
 	member_def_to_dcl {me_ident, me_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration { decl_ident = me_ident, decl_pos = me_pos, decl_kind = STE_Member, decl_index = decl_index } : decls]) 
-	instance_def_to_dcl {ins_class, ins_ident, ins_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance ins_class.glob_object.ds_ident, decl_index = decl_index } : decls])
+	instance_def_to_dcl {ins_ident, ins_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance, decl_index = decl_index } : decls])
 	generic_def_to_dcl {gen_ident, gen_member_ident, gen_type, gen_pos} (decl_index, decls)
 		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
 		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
@@ -1463,7 +1463,7 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 						# class_def = {class_def & class_members=class_members}
 						# cdefs = {cdefs & com_class_defs.[decl_index] =class_def}
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cClassDefs,decl_index]},cdefs)
-					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Instance _, decl_index}) cdefs
+					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Instance, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cInstanceDefs,decl_index]},cdefs)
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Generic, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cGenericDefs,decl_index]},cdefs)
@@ -1888,8 +1888,6 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 		  ({ste_index}, cs_symbol_table) = readPtr import_module.id_info cs_symbol_table
 		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [(ste_index, import_file_position, expl_imp_indices):expl_imp_indices_accu], cs_symbol_table)
 
-	get_expl_imp_symbol imp_decl=:(ID_OldSyntax idents) state
-		= foldSt (get_symbol imp_decl) idents state
 	get_expl_imp_symbol imp_decl state
 		= get_symbol imp_decl (get_ident imp_decl) state
 	where
@@ -1939,23 +1937,7 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 						_	-> True
 			  cs_error
 			  		= fold2St check_whether_module_imports_itself expl_imp_indices mod_indices cs.cs_error
-			  cs_error
-			  		= case switch_import_syntax is_on_cycle False of
-			  			True
-			  				# ident_pos
-			  						= { ip_ident = dcl_name_of_first_mod_in_component, ip_line = 1,
-			  								ip_file = dcl_name_of_first_mod_in_component.id_name }
-			  				  cs_error
-			  						= pushErrorAdmin ident_pos cs_error
-			  				  cs_error
-			  				  		=  checkError  
-				  							"cyclic module dependencies not allowed in conjunction with Clean 1.3 import syntax" ""
-										cs_error
-							-> popErrorAdmin cs_error
-						_
-							-> cs_error
-			  cs
-			  		= { cs & cs_error = cs_error }
+			  cs = { cs & cs_error = cs_error }
 			| not cs.cs_error.ea_ok
 				-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
 			# (expl_imp_infos, dcl_modules, cs)
@@ -2040,9 +2022,7 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 		# (dcls_local_for_import, dcl_modules)
 				= dcl_modules![mod_index].dcl_declared.dcls_local_for_import
 		  (dcl_modules, expl_imp_infos, cs_symbol_table)
-				= foldlArraySt ((switch_import_syntax
-									update_expl_imp_for_marked_symbol
-									update_expl_imp_for_marked_local_symbol) mod_index)
+				= foldlArraySt (update_expl_imp_for_marked_local_symbol mod_index)
 						dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 		= (expl_imp_infos, dcl_modules, cs_symbol_table)
 	
@@ -3090,57 +3070,8 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 		# (not_already_imported, cs)
 				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod cs
 		| not_already_imported
-			# (consequence_declarations, dcl_modules, cs)
-					= switch_import_syntax
-							(add_consequences_to_symbol_table importing_mod declaration dcl_modules cs)
-							([], dcl_modules, cs)
-			= (consequence_declarations++[declaration:decls_accu], dcl_modules, cs)
+			= ([declaration:decls_accu], dcl_modules, cs)
 		= (decls_accu, dcl_modules, cs)
-
-	// this function is for old syntax only
-	add_consequences_to_symbol_table _ (Declaration {decl_kind=STE_FunctionOrMacro _}) dcl_modules cs
-		= ([], dcl_modules, cs)
-	add_consequences_to_symbol_table importing_mod (Declaration {decl_index, decl_kind=STE_Imported ste_kind mod_index}) dcl_modules cs
-		= add_consequences importing_mod decl_index ste_kind mod_index dcl_modules cs
-	  where
-		add_consequences _ decl_index STE_Type mod_index dcl_modules cs
-			# (td=:{td_rhs}, dcl_modules)
-					= dcl_modules![mod_index].dcl_common.com_type_defs.[decl_index]
-			= case td_rhs of
-				RecordType {rt_fields}
-					-> foldlArraySt (add_field importing_mod mod_index) rt_fields ([], dcl_modules, cs)
-				_
-					-> ([], dcl_modules, cs)
-		add_consequences importing_mod decl_index STE_Class mod_index dcl_modules cs
-			# (cd=:{class_members}, dcl_modules)
-					= dcl_modules![mod_index].dcl_common.com_class_defs.[decl_index]
-			= foldlArraySt (add_member importing_mod mod_index) class_members ([], dcl_modules, cs)
-		add_consequences _ decl_index _ mod_index dcl_modules cs
-			= ([], dcl_modules, cs)
-
-		add_field importing_mod mod_index {fs_index} (declarations_accu, dcl_modules, cs)
-			# (sd=:{sd_ident, sd_field, sd_pos}, dcl_modules)
-					= dcl_modules![mod_index].dcl_common.com_selector_defs.[fs_index]
-			  declaration
-					= Declaration { decl_ident = sd_field, decl_pos = sd_pos,
-						decl_kind = STE_Imported (STE_Field sd_ident) mod_index, decl_index = fs_index }
-			  (is_new, cs)
-			  		= add_declaration_to_symbol_table No declaration importing_mod cs
-			| is_new
-				= ([declaration:declarations_accu], dcl_modules, cs)
-			= (declarations_accu, dcl_modules, cs)
-
-		add_member importing_mod mod_index {ds_ident, ds_index} (declarations_accu, dcl_modules, cs)
-			# (sd=:{me_ident, me_pos}, dcl_modules)
-					= dcl_modules![mod_index].dcl_common.com_member_defs.[ds_index]
-			  declaration
-					= Declaration { decl_ident = me_ident, decl_pos = me_pos,
-						decl_kind = STE_Imported STE_Member mod_index, decl_index = ds_index }
-			  (is_new, cs)
-			  		= add_declaration_to_symbol_table No declaration importing_mod cs
-			| is_new
-				= ([declaration:declarations_accu], dcl_modules, cs)
-			= (declarations_accu, dcl_modules, cs)
 
 add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ cs
 	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index cs
@@ -3152,16 +3083,6 @@ updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} {!
 updateExplImpInfo super_components mod_index dcls_import dcls_local_for_import dcl_modules expl_imp_infos cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 	  		= mapSt markExplImpSymbols super_components (expl_imp_infos, cs_symbol_table)
-
-	  cs_symbol_table
-	  		= switch_import_syntax
-	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_local_for_import cs_symbol_table)
-	  			cs_symbol_table
-	  cs_symbol_table
-	  		= switch_import_syntax
-	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_import cs_symbol_table)
-	  			cs_symbol_table
-
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  		= update_expl_imp_for_marked_symbols mod_index dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
@@ -3176,26 +3097,11 @@ updateExplImpInfoForCachedModule super_components mod_index dcls_import dcls_loc
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 	  		= mapSt markExplImpSymbols super_components (expl_imp_infos, cs_symbol_table)
 
-	  dcl_modules13 = dcl_modules
-	  cs_symbol_table13 = cs_symbol_table
-
 	  dcl_modules__cs_symbol_table = mark_belongings_of_expl_imp_symbols dcls_local_for_import (dcl_modules, cs_symbol_table)
 	  (dcl_modules, cs_symbol_table) = mark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table
 
 	  cs_symbol_table = mark_belongings_of_expl_imp_symbols_as_exported dcls_local_for_import cs_symbol_table
 	  cs_symbol_table = mark_belongings_of_expl_imp_symbols_as_exported dcls_import cs_symbol_table
-
-	  cs_symbol_table = switch_import_syntax cs_symbol_table13 cs_symbol_table
-	  dcl_modules = switch_import_syntax dcl_modules13 dcl_modules
-
-	  cs_symbol_table
-	  		= switch_import_syntax
-	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_local_for_import cs_symbol_table)
-	  			cs_symbol_table
-	  cs_symbol_table
-	  		= switch_import_syntax
-	  			(foldlArraySt opt_store_instance_with_class_symbol dcls_import cs_symbol_table)
-	  			cs_symbol_table
 
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  		= update_expl_imp_for_marked_symbols mod_index dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
@@ -3203,13 +3109,9 @@ updateExplImpInfoForCachedModule super_components mod_index dcls_import dcls_loc
 	  		= update_expl_imp_for_marked_symbols mod_index dcls_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 
 	  dcl_modules__cs_symbol_table
-	  		= switch_import_syntax
+	  		= unmark_belongings_of_expl_imp_symbols dcls_local_for_import (dcl_modules, cs_symbol_table)
 	  			(dcl_modules, cs_symbol_table)
-	  			(unmark_belongings_of_expl_imp_symbols dcls_local_for_import (dcl_modules, cs_symbol_table))
-	  (dcl_modules, cs_symbol_table)
-	  		= switch_import_syntax
-	  			dcl_modules__cs_symbol_table
-	  			(unmark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table)
+	  		= unmark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table
 
 	  cs_symbol_table = foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
 	= (expl_imp_infos, dcl_modules, cs_symbol_table)
@@ -3295,7 +3197,7 @@ ste_kind_to_string ste_kind = case ste_kind of
 		-> "STE_Class"
 	STE_Member
 		-> "STE_Member"
-	STE_Instance _
+	STE_Instance
 		-> "STE_Instance"
 	STE_Variable _
 		-> "STE_Variable"
@@ -3330,14 +3232,6 @@ ste_kind_to_string ste_kind = case ste_kind of
 	STE_BelongingSymbol _
 		-> "STE_BelongingSymbol"
 */
-		
-opt_store_instance_with_class_symbol decl=:(Declaration  {decl_kind=STE_Imported (STE_Instance class_ident) _}) cs_symbol_table
-	/* This function is only for old import syntax.
-	   All declared instances for a class have to be collected
-	*/
-	= optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
-opt_store_instance_with_class_symbol _ cs_symbol_table
-	= cs_symbol_table
 
 update_expl_imp_for_marked_symbols mod_index decls (dcl_modules, expl_imp_infos, cs_symbol_table)
 	= foldlArraySt (update_expl_imp_for_marked_symbol mod_index) decls (dcl_modules, expl_imp_infos, cs_symbol_table)

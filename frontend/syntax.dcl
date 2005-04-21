@@ -43,7 +43,7 @@ instance == FunctionOrMacroIndex
 				| STE_Member
 				| STE_Generic			// AA
 				| STE_GenericCase  // AA
-				| STE_Instance !Ident // argument: the class (used in explicitimports (1.3 syntax only))
+				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
@@ -397,7 +397,6 @@ instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
 						| ID_Type !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Record !ImportedIdent !(Optional [ImportedIdent])
 						| ID_Instance !ImportedIdent !Ident !(![Type],![TypeContext])
-						| ID_OldSyntax ![Ident]
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False

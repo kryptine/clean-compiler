@@ -80,21 +80,6 @@ addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_mod
 		  , cs_symbol_table
 		  )
 
-optStoreInstanceWithClassSymbol :: Declaration !Ident !*SymbolTable -> .SymbolTable
-optStoreInstanceWithClassSymbol decl class_ident cs_symbol_table
-	// this function is only for old syntax
-	| switch_import_syntax False True
-		= cs_symbol_table	
-	# (class_ste, cs_symbol_table)
-			= readPtr class_ident.id_info cs_symbol_table
-	= case class_ste.ste_kind of
-		STE_ExplImpComponentNrs component_numbers inst_indices_accu
-			-> writePtr class_ident.id_info 
-					{ class_ste & ste_kind = STE_ExplImpComponentNrs component_numbers [decl:inst_indices_accu]}
-					cs_symbol_table
-		_
-			-> cs_symbol_table
-
 foldlBelongingSymbols f bs st
 	:== case bs of
 			BS_Constructors constructors
@@ -143,7 +128,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						imported_symbols 
 						([], [], visited_modules, expl_imp_info)
 		  (expl_imp_info, cs_error)
-		  		= (switch_import_syntax check_triples check_singles position) successes imported_symbols
+		  		= check_singles position successes imported_symbols
 		  				(expl_imp_info, cs.cs_error)
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= foldSt (solve_belonging position expl_imp_indices_ikh modules_in_component_set importing_mod)
@@ -281,9 +266,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						eii_declaring_modules (bitvectResetAll visited_modules)
 		= case opt_decl of
 			Yes di=:{di_decl, di_instances}
-				| switch_import_syntax 
-					True
-					( case di_decl of
+				| ( case di_decl of
 			  			Declaration {decl_kind}
 			  				-> case decl_kind of
 			  					STE_Imported STE_Member _
@@ -396,15 +379,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= True
 		= is_member belong_ident t
 
-	check_triples position [False, False, False: t1] [imported_symbol, _, _: t2] (expl_imp_info, cs_error)
-		# (expl_imp_info, cs_error)
-				= give_error position imported_symbol (expl_imp_info, cs_error)
-		= check_triples position t1 t2 (expl_imp_info, cs_error)
-	check_triples position [_, _, _: t1] [_, _, _: t2] (expl_imp_info, cs_error)
-		= check_triples position t1 t2 (expl_imp_info, cs_error)
-	check_triples position [] [] (expl_imp_info, cs_error)
-		= (expl_imp_info, cs_error)
-		
 	check_singles position [False: t1] [imported_symbol: t2] (expl_imp_info, cs_error)
 		# (expl_imp_info, cs_error)
 				= give_error position imported_symbol (expl_imp_info, cs_error)
@@ -421,10 +395,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				= pushErrorAdmin (newPosition import_ident position) cs_error
 		  cs_error
 		  		= checkError eii_ident 
-		  			(switch_import_syntax
-		  				"not exported by the specified module"
-		  				("not exported as a "+++impDeclToNameSpaceString ini_imp_decl
-		  				 +++" by the specified module"))
+		  			("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by the specified module")
 		  			cs_error
 		= (expl_imp_info, popErrorAdmin cs_error)
 
@@ -507,7 +478,7 @@ checkExplicitImportCompleteness dcls_explicit dcl_modules icl_functions macro_de
 			= check_completeness dcl_common.com_class_defs.[decl_index] cci ccs
 		continuation STE_Member dcl_common dcl_functions cci ccs
 			= check_completeness dcl_common.com_member_defs.[decl_index] cci ccs
-		continuation (STE_Instance _) dcl_common dcl_functions cci ccs
+		continuation STE_Instance dcl_common dcl_functions cci ccs
 			= check_completeness dcl_common.com_instance_defs.[decl_index] cci ccs
 		continuation STE_DclFunction dcl_common dcl_functions cci ccs
 			= check_completeness dcl_functions.[decl_index] cci ccs
@@ -536,7 +507,7 @@ instance toString STE_Kind where
 	toString STE_Class 					= "class"
 	toString STE_Member 				= "class member"
 	toString STE_Generic 				= "generic"			//AA
-	toString (STE_Instance _)			= "instance"
+	toString STE_Instance				= "instance"
 	toString ste						= "<<unknown symbol kind>>"
 
 check_whether_ident_is_imported :: !Ident !STE_Kind !CheckCompletenessInputBox !*CheckCompletenessStateBox 

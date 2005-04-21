@@ -906,7 +906,7 @@ where
 		STE_Member
 			= file <<< "STE_Member"
 	(<<<) file
-		(STE_Instance _)
+		STE_Instance
 			= file <<< "STE_Instance"
 	(<<<) file
 		(STE_Variable _) 
