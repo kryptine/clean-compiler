@@ -10,7 +10,6 @@ from type_io_common import PredefinedModuleName
 extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
 
 import type_io;
-//import pp;
 
 :: TypeCodeVariableInfo = TCI_TypeVar !Expression | TCI_TypePatternVar !Expression
 :: DynamicValueAliasInfo :== BoundVar
@@ -100,14 +99,13 @@ where
 f (Yes tcl_file)
 	= tcl_file;
 0.2*/
-			
+
 convertDynamicPatternsIntoUnifyAppls :: !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
 convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	#! (dynamic_representation,predefined_symbols)
 		=	create_dynamic_and_selector_idents common_defs predefined_symbols
 
-	#! nr_of_funs = size fun_defs
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
 	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap}))
 			= convert_groups 0 groups dynamic_representation (fun_defs, {	
