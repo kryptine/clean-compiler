@@ -764,7 +764,6 @@ where
 
 tryToMakeNonUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 tryToMakeNonUnique attr coercions=:{coer_demanded}
-	#! s = size coer_demanded
 	| isUnique coer_demanded.[attr]
 //		-?-> (s <= attr, ("tryToMakeNonUnique", s, attr))]
 		= (False, coercions)
