@@ -3448,11 +3448,6 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
   			# gencase_defs = {gencase_defs & [gc_index] = gencase_def} 
   			
 			#! fun_ident = genericIdentToFunIdent gc_ident gc_type_cons
-	 		#! dummy_ds = 
-				{ ds_ident = fun_ident
-				, ds_arity = 0
-				, ds_index = NoIndex
-				}
 		 	#! (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap
 	 		#! fun = 
 	  			{ ft_ident = fun_ident
@@ -3463,7 +3458,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	  			, ft_specials = SP_None
 	  			, ft_type_ptr = var_info_ptr
 	  			}
-  				
+ 
    			= (fun, gencase_defs, hp_var_heap)
    				//---> ("create_gencase_funtypes", gc_ident, gc_type_cons, gc_index, fun_index)
    
