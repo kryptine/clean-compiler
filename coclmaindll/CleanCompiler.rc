@@ -2,10 +2,10 @@
 
 #define VERSION_RES_BIN_NAME         "CleanCompiler.exe\0"
 #define VERSION_RES_BIN_DESCRIPTION  "Clean Compiler\0"
-#define VERSION_RES_STRING           "2.1.1b1\0"
+#define VERSION_RES_STRING           "2.1.1\0"
 #define VERSION_RES_PRODUCT_NAME     "CleanSystem\0"
 #define VERSION_RES_COMPANY_NAME     "Radboud University Nijmegen\0"
-#define VERSION_RES_COPYRIGHT        "Copyright (C) 1987--2004 Radboud University Nijmegen.\0"
+#define VERSION_RES_COPYRIGHT        "Copyright (C) 1987--2005 Radboud University Nijmegen.\0"
 
 //
 // Version resource
