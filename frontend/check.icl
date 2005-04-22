@@ -3110,7 +3110,7 @@ updateExplImpInfoForCachedModule super_components mod_index dcls_import dcls_loc
 
 	  dcl_modules__cs_symbol_table
 	  		= unmark_belongings_of_expl_imp_symbols dcls_local_for_import (dcl_modules, cs_symbol_table)
-	  			(dcl_modules, cs_symbol_table)
+	  (dcl_modules, cs_symbol_table)
 	  		= unmark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table
 
 	  cs_symbol_table = foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
