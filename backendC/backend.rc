@@ -14,7 +14,7 @@
 # define kFileFlags VS_FF_DEBUG | VS_FF_PRERELEASE
 
 # define kFileFlagsMask VS_FF_DEBUG | VS_FF_PRERELEASE
-# define kFileVersionString "2.1.1.b.0"
+# define kFileVersionString "2.1.1.0"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION kFileVersion
@@ -30,14 +30,14 @@ BEGIN
 		BLOCK "040904E4" // Lang=US English, CharSet=Windows Multilual
 		BEGIN
 			VALUE "CompanyName",     "Radboud University Nijmegen\0"
-			VALUE "FileDescription", "backend Shared Library - Beta Version\0"
+			VALUE "FileDescription", "backend Shared Library\0"
 			VALUE "FileVersion",     kFileVersionString  "\0"
 			VALUE "InternalName",    "backend\0"
-			VALUE "LegalCopyright",  "Copyright \251 Radboud University Nijmegen 1999-2004\0"
+			VALUE "LegalCopyright",  "\251 Radboud University Nijmegen 1999-2005\0"
 			VALUE "LegalTrademarks", "\0"
 			VALUE "OriginalFilename","backend.dll\0"
 			VALUE "ProductName",     "Clean System"
-			VALUE "ProductVersion",  "2.1.1.b.0"
+			VALUE "ProductVersion",  "2.1.1.0"
 			VALUE "OLESelfRegister", "\0"
 		END
 	
