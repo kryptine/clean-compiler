@@ -694,13 +694,7 @@ instance t_corresponds (a, b) | t_corresponds a & t_corresponds b where
 		=	t_corresponds a1 a2
 		&&&	t_corresponds b1 b2
 
-
-/*2.0
 instance t_corresponds {# a} | t_corresponds a & Array {#} a
-0.2*/
-//1.3
-instance t_corresponds {# a} | ArrayElem , t_corresponds a
-//3.1
 where 
 	t_corresponds dclArray iclArray
 		# size_dclArray = size dclArray
@@ -708,18 +702,12 @@ where
 			= return False
 			= loop (size_dclArray-1) dclArray iclArray
 	  where
-/*2.0
-		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds a & Array {#} a // 2.0
-0.2*/
-//1.3
-		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds, select_u a
-//3.1
+		loop :: !Int !{# a} !{# a} -> *TypesCorrespondMonad | t_corresponds a & Array {#} a
 		loop i dclArray iclArray
 			| i<0
 				= return True
 				= t_corresponds dclArray.[i] iclArray.[i]
 			&&& loop (i-1) dclArray iclArray
-		
 
 instance t_corresponds (Optional a) | t_corresponds a where 
 	t_corresponds No No

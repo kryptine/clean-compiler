@@ -86,12 +86,7 @@ where
 			= write_type_info cons_exi_vars tcl_file wtis
 		= (tcl_file,wtis)
 			
-//1.3
-instance WriteTypeInfo TypeDef TypeRhs
-//3.1
-/*2.0
 instance WriteTypeInfo (TypeDef TypeRhs)
-0.2*/
 where 
 	write_type_info {td_ident,td_arity,td_args,td_rhs} tcl_file wtis
 		// normalize ...
@@ -433,12 +428,7 @@ where
 	write_type_info i tcl_file wtis
 		= (fwritei i tcl_file,wtis)
 
-//1.3
-instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b
-//3.1
-/*2.0
 instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b
-0.2*/
 where
 	write_type_info unboxed_array tcl_file wtis
 		# s_unboxed_array
