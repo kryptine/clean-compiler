@@ -151,6 +151,8 @@ Bool CallCompiler (int argc, char **argv)
 	DoProfiling=False;
 	DoTimeProfiling=False;
 	DoReuseUniqueNodes=False;
+	DoDescriptors=False;
+	ExportLocalLabels=False;
 
 	StrictDoAnnots			= False;
 	StrictDepth				= 10;/* 8; */
