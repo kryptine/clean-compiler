@@ -15,7 +15,7 @@ NotASelector :== -1
 
 class refMark expr ::  ![[FreeVar]] !Int !(Optional [CountedFreeVar]) !expr !*RMState -> *RMState
 
-// fullRefMark :: ![[FreeVar]] !Int !(Optional [CountedFreeVar]) !expr !*VarHeap -> RMState | refMark expr
+fullRefMark :: ![[FreeVar]] !Int !(Optional [CountedFreeVar]) !expr !*VarHeap -> (!*[FreeVar],!*RMState) | refMark expr
 fullRefMark free_vars sel def expr var_heap
 	# {rms_let_vars,rms_var_heap} = refMark free_vars sel def expr { rms_var_heap = var_heap, rms_let_vars = [] }
 	  rms_var_heap = openLetVars rms_let_vars rms_var_heap
@@ -73,14 +73,16 @@ where
 					_
 						-> ([{cfv_var = fv, cfv_count = occ_ref_count, cfv_is_let = False} : occurrences ], var_heap)
 
-
 markPatternVariables sel list_of_used_pattern_vars var_heap
-	= foldSt (mark_pattern_variables sel) list_of_used_pattern_vars var_heap
+	| sel == NotASelector
+		= markPatternVariables list_of_used_pattern_vars var_heap
+		= foldSt (mark_selected_variable sel) list_of_used_pattern_vars var_heap
 where
-	mark_pattern_variables sel used_pattern_vars var_heap
-		| sel == NotASelector
-			= foldSt mark_variable used_pattern_vars var_heap
-			= mark_selected_variable sel used_pattern_vars var_heap
+	markPatternVariables list_of_used_pattern_vars var_heap
+		= foldSt mark_pattern_variables list_of_used_pattern_vars var_heap
+
+	mark_pattern_variables used_pattern_vars var_heap
+		= foldSt mark_variable used_pattern_vars var_heap
 
 	mark_selected_variable sel [] var_heap
 		= var_heap
@@ -88,18 +90,19 @@ where
 		| sel == pv_arg_nr
 			= mark_variable pv var_heap
 			= mark_selected_variable sel pvs var_heap
-		
+
 	mark_variable {pv_var={fv_ident,fv_info_ptr}} var_heap
-		# (VI_Occurrence old_occ=:{occ_ref_count,occ_observing = (_, expr_ptr)}, var_heap) = readPtr fv_info_ptr var_heap
+		# (VI_Occurrence old_occ=:{occ_ref_count,occ_observing = (_, expr_ptr),occ_pattern_vars}, var_heap) = readPtr fv_info_ptr var_heap
 		= case occ_ref_count ===> ("mark_variable", fv_ident) of
 			RC_Unused
 				# occ_ref_count = RC_Used {rcu_multiply = [], rcu_selectively = [], rcu_uniquely = [expr_ptr]}
-				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
+				# var_heap= var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
+				-> markPatternVariables occ_pattern_vars var_heap
 			RC_Used {rcu_multiply,rcu_uniquely,rcu_selectively}
 				# occ_ref_count = RC_Used { rcu_multiply = collectAllSelections rcu_selectively (rcu_uniquely ++ [expr_ptr : rcu_multiply]),
 							 rcu_selectively = [], rcu_uniquely = [] }
-				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
-
+				# var_heap = var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = occ_ref_count } )
+				-> markPatternVariables occ_pattern_vars var_heap
 
 refMarkOfVariable free_vars sel (VI_Occurrence var_occ) var=:{var_ident, var_info_ptr, var_expr_ptr} rms=:{rms_var_heap}
 	# occ_ref_count = adjust_ref_count sel var_occ.occ_ref_count var_expr_ptr
@@ -110,7 +113,6 @@ where
 	adjust_ref_count sel RC_Unused var_expr_ptr
 		| sel == NotASelector
 			= RC_Used {rcu_multiply = [], rcu_selectively = [], rcu_uniquely = [var_expr_ptr] }
-			# sel_ref = { su_field = sel, su_multiply = [], su_uniquely = [var_expr_ptr] }
 			= RC_Used {rcu_multiply = [], rcu_selectively = [{ su_field = sel, su_multiply = [], su_uniquely = [var_expr_ptr] }],
 						rcu_uniquely = [] }
 	adjust_ref_count sel use=:(RC_Used {rcu_multiply,rcu_uniquely,rcu_selectively}) var_expr_ptr
@@ -178,6 +180,7 @@ where
 		  comb_ref_count = seqCombineRefCount occ_ref_count cfv_count
 		= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = comb_ref_count})
 			===>  ("addSeqRefCounts", fv_ident, cfv_count, occ_ref_count, comb_ref_count)
+
 instance refMark BoundVar
 where
 	refMark free_vars sel _ var rms=:{rms_var_heap}
@@ -674,10 +677,10 @@ makeSharedReferencesNonUnique [] fun_defs coercion_env subst type_def_infos var_
 makeSharedReferencesNonUnique [fun : funs] fun_defs coercion_env subst type_def_infos var_heap expr_heap error
 	# (fun_def, fun_defs) = fun_defs![fun] 
 	# (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
-		= make_shared_references_of_funcion_non_unique fun_def coercion_env subst type_def_infos var_heap expr_heap error
+		= make_shared_references_of_function_non_unique fun_def coercion_env subst type_def_infos var_heap expr_heap error
 	= makeSharedReferencesNonUnique funs fun_defs coercion_env subst type_def_infos var_heap expr_heap error
 where
-	make_shared_references_of_funcion_non_unique {fun_ident, fun_pos, fun_body = TransformedBody {tb_args,tb_rhs},fun_info={fi_local_vars}}
+	make_shared_references_of_function_non_unique {fun_ident, fun_pos, fun_body = TransformedBody {tb_args,tb_rhs},fun_info={fi_local_vars}}
 			coercion_env subst type_def_infos var_heap expr_heap error
 	# variables = tb_args ++ fi_local_vars
 	  (subst, type_def_infos, var_heap, expr_heap) = clear_occurrences variables subst type_def_infos var_heap expr_heap
@@ -708,7 +711,7 @@ where
 		where
 			empty_occurrence {fv_info_ptr} var_heap 
 				= var_heap <:= (fv_info_ptr, VI_Empty)
-				
+
 		has_observing_base_type (VI_Type {at_type} _) type_def_infos subst
 			= has_observing_type at_type type_def_infos subst
 		has_observing_base_type (VI_FAType _ {at_type} _) type_def_infos subst
