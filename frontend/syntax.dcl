@@ -1081,6 +1081,7 @@ instance toString 	KindInfo
 ::	CaseAlt =
 	{	calt_pattern	:: !ParsedExpr
 	,	calt_rhs		:: !Rhs
+	,	calt_position	:: !Position
 	}
 	
 :: LocalDef		:== ParsedDefinition

@@ -53,7 +53,7 @@ tryToMakeNonUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 
 tryToMakeUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 
-uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
+uniquenessErrorVar :: !FreeVar !FunctionBody !String !*ErrorAdmin -> *ErrorAdmin
 
 liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 

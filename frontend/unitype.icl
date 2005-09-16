@@ -26,13 +26,6 @@ FirstAttrVar	:== 3
 	,	pi_deps ::			![Int]
 	}
 
-
-uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
-uniquenessError position mess err=:{ea_file,ea_loc}
-	# ea_file = ea_file <<< "Uniqueness error " <<< hd ea_loc <<< ": \"" <<<  position <<< '\"' <<< mess <<< '\n'
-	= { err & ea_file = ea_file, ea_ok = False}
-
-
 ::	BOOLVECT :== Int
 
 BITINDEX temp_var_id :== temp_var_id >> 5
@@ -1014,3 +1007,169 @@ where
 		= (CT_NonUnique, tree)
 	copy_coercion_tree tree=:CT_Existential
 		= (CT_Existential, tree)
+
+uniquenessErrorVar :: !FreeVar !FunctionBody !String !*ErrorAdmin -> *ErrorAdmin
+uniquenessErrorVar free_var=:{fv_info_ptr} (TransformedBody {tb_args,tb_rhs}) mess err
+	| var_in_free_vars fv_info_ptr tb_args
+		= uniquenessError (CP_Expression (FreeVar free_var)) mess err
+	# position = find_var_position_in_expression fv_info_ptr tb_rhs
+	= case position of
+		LinePos file_name line_n
+			# ea_file = err.ea_file <<< "Uniqueness error " <<< {ip_file=file_name,ip_line=line_n,ip_ident=free_var.fv_ident} <<< '\"' <<< mess <<< '\n'
+			-> { err & ea_file = ea_file, ea_ok = False}
+		FunPos file_name line_n fun_name
+			# ea_file = err.ea_file <<< "Uniqueness error " <<< {ip_file=file_name,ip_line=line_n,ip_ident=free_var.fv_ident} <<< '\"' <<< mess <<< '\n'
+			-> { err & ea_file = ea_file, ea_ok = False}			
+		_
+			-> uniquenessError (CP_Expression (FreeVar free_var)) mess err
+
+uniquenessError :: !CoercionPosition !String !*ErrorAdmin -> *ErrorAdmin
+uniquenessError position mess err=:{ea_file,ea_loc}
+	# ea_file = ea_file <<< "Uniqueness error " <<< hd ea_loc <<< ": \"" <<<  position <<< '\"' <<< mess <<< '\n'
+	= { err & ea_file = ea_file, ea_ok = False}
+
+var_in_free_vars var_ptr []
+	= False
+var_in_free_vars var_ptr [{fv_info_ptr}:vars]
+	= var_ptr==fv_info_ptr || var_in_free_vars var_ptr vars
+
+find_var_position_in_expression var_ptr expr
+	# (found,pos) = find_var_position_in_expression expr
+	| found
+		= pos
+		= NoPos
+where
+	find_var_position_in_expression (App {app_args})
+		= find_var_position_in_expressions app_args
+	find_var_position_in_expression (f @ a)
+		# (found,pos) = find_var_position_in_expression f
+		| found
+			= (True,pos)
+		= find_var_position_in_expressions a
+	find_var_position_in_expression (Selection _ expr selections)
+		# (found,pos) = find_var_position_in_selections selections
+		| found
+			= (True,pos)
+		= find_var_position_in_expression expr
+	find_var_position_in_expression (TupleSelect _ _ expr)
+		= find_var_position_in_expression expr
+	find_var_position_in_expression (MatchExpr _ expr)
+		= find_var_position_in_expression expr
+	find_var_position_in_expression (Update expr1 selections expr2)
+		# (found,pos) = find_var_position_in_expression expr1
+		| found
+			= (True,pos)
+		# (found,pos) = find_var_position_in_selections selections
+		| found
+			= (True,pos)
+		= find_var_position_in_expression expr2
+	find_var_position_in_expression (RecordUpdate _ expr updated_fields)
+		# (found,pos) = find_var_position_in_updated_fields updated_fields
+		| found
+			= (True,pos)
+		= find_var_position_in_expression expr
+	where
+		find_var_position_in_updated_fields [{bind_src}:updated_fields]
+			# (found,pos) = find_var_position_in_expression bind_src
+			| found
+				= (True,pos)
+			= find_var_position_in_updated_fields updated_fields
+		find_var_position_in_updated_fields []
+			= (False,NoPos)
+	find_var_position_in_expression (Let {let_strict_binds,let_lazy_binds,let_expr})
+		# (found,pos) = find_var_position_in_let_binds let_strict_binds
+		| found
+			= (True,pos)
+		# (found,pos) = find_var_position_in_let_binds let_lazy_binds
+		| found
+			= (True,pos)
+		= find_var_position_in_expression let_expr
+	where
+		find_var_position_in_let_binds [{lb_dst={fv_info_ptr},lb_position}:let_binds]
+			| var_ptr==fv_info_ptr
+				= (True,lb_position)
+				= find_var_position_in_let_binds let_binds
+		find_var_position_in_let_binds []
+			= (False,NoPos)
+	find_var_position_in_expression (Case {case_expr,case_guards,case_default})
+		# (found,pos) = find_var_position_in_expression	case_expr
+		| found
+			= (True,pos);
+		# (found,pos) = find_var_position_in_case_guards case_guards
+		| found
+			= (True,pos);
+		= find_var_position_in_case_default case_default
+	where
+		find_var_position_in_case_guards (AlgebraicPatterns _ algebraic_patterns)
+			= find_var_position_in_algebraic_patterns algebraic_patterns
+		find_var_position_in_case_guards (BasicPatterns _ basic_patterns)
+			= find_var_position_in_basic_patterns basic_patterns
+		where
+			find_var_position_in_basic_patterns [{bp_expr}:basic_patterns]
+				# (found,pos) = find_var_position_in_expression bp_expr
+				| found
+					= (True,pos)
+				= find_var_position_in_basic_patterns basic_patterns
+			find_var_position_in_basic_patterns []
+				= (False,NoPos)
+		find_var_position_in_case_guards (OverloadedListPatterns _ _ algebraic_patterns)
+			= find_var_position_in_algebraic_patterns algebraic_patterns
+		find_var_position_in_case_guards (DynamicPatterns dynamic_patterns)
+			= find_var_position_in_dynamic_patterns dynamic_patterns
+		where
+			find_var_position_in_dynamic_patterns [{dp_var,dp_rhs,dp_position}:dynamic_patterns]
+				| var_ptr==dp_var.fv_info_ptr
+					= (True,dp_position)
+				# (found,pos) = find_var_position_in_expression dp_rhs
+				| found
+					= (True,pos)
+				= find_var_position_in_dynamic_patterns dynamic_patterns
+			find_var_position_in_dynamic_patterns []
+				= (False,NoPos)
+		find_var_position_in_case_guards NoPattern
+			= (False,NoPos)
+
+		find_var_position_in_algebraic_patterns [{ap_vars,ap_expr,ap_position}:algebraic_patterns]
+			| var_in_free_vars var_ptr ap_vars
+				= (True,ap_position);
+			# (found,pos) = find_var_position_in_expression ap_expr
+			| found
+				= (True,pos)
+			= find_var_position_in_algebraic_patterns algebraic_patterns
+		find_var_position_in_algebraic_patterns []
+			= (False,NoPos)
+
+		find_var_position_in_case_default (Yes expr)
+			= find_var_position_in_expression expr
+		find_var_position_in_case_default No
+			= (False,NoPos)
+	find_var_position_in_expression (DynamicExpr {dyn_expr})
+		= find_var_position_in_expression dyn_expr
+	find_var_position_in_expression expr
+		= (False,NoPos)
+
+	find_var_position_in_expressions [expr:exprs]
+		# (found,pos) = find_var_position_in_expression expr
+		| found
+			= (True,pos)
+		= find_var_position_in_expressions exprs
+	find_var_position_in_expressions []
+		= (False,NoPos)
+
+	find_var_position_in_selections [RecordSelection _ _:selections]
+		= find_var_position_in_selections selections
+	find_var_position_in_selections [ArraySelection _ _ expr:selections]
+		# (found,pos) = find_var_position_in_expression expr
+		| found
+			= (True,pos)
+		= find_var_position_in_selections selections
+	find_var_position_in_selections [DictionarySelection _ d_selections _ expr:selections]
+		# (found,pos) = find_var_position_in_expression expr
+		| found
+			= (True,pos)
+		# (found,pos) = find_var_position_in_selections d_selections
+		| found
+			= (True,pos)
+		= find_var_position_in_selections selections
+	find_var_position_in_selections []
+		= (False,NoPos)

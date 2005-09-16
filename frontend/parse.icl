@@ -3210,10 +3210,12 @@ wantCaseExp pState
 where
 	tryCaseAlt :: (!RhsDefiningSymbol, !ParseState) -> (!Bool, CaseAlt, (!RhsDefiningSymbol, !ParseState))
 	tryCaseAlt (definingSymbol, pState)
-		# (succ, pattern, pState) = try_pattern pState
+		# (token, pState) = nextToken FunctionContext pState
+		# (fname,linenr,pState) = getFileAndLineNr pState
+		# (succ, pattern, pState) = try_pattern token pState
 		| succ
 			# (rhs, definingSymbol, pState) = wantRhs True definingSymbol pState
-			= (True, { calt_pattern = pattern, calt_rhs = rhs }, (definingSymbol, pState))
+			= (True, { calt_pattern = pattern, calt_rhs = rhs, calt_position=LinePos fname linenr }, (definingSymbol, pState))
 		// otherwise // ~ succ
 			= (False, abort "no case alt", (definingSymbol, pState))
 	
@@ -3221,16 +3223,17 @@ where
 	tryLastCaseAlt definingSymbol pState
 		# (token, pState)	= nextToken FunctionContext pState
 		| isDefiningSymbol definingSymbol token
-			#	pState			= tokenBack pState
-				(rhs, _, pState)
-								= wantRhs True definingSymbol pState
-			= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState)
+			# (fname,linenr,pState) = getFileAndLineNr pState
+			  pState			= tokenBack pState
+			  (rhs, _, pState) = wantRhs True definingSymbol pState
+			= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs, calt_position=LinePos fname linenr }, pState)
 		| token == OtherwiseToken
 			# (token, pState)	= nextToken FunctionContext pState
+			  (fname,linenr,pState) = getFileAndLineNr pState
 			  pState			= tokenBack pState
 			| isDefiningSymbol definingSymbol token
 				# (rhs, _, pState) = wantRhs True definingSymbol pState
-				= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs }, pState)
+				= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs, calt_position=LinePos fname linenr }, pState)
 				= (False, abort "no case alt", pState)
 			= (False, abort "no case alt", tokenBack pState)
 
@@ -3238,9 +3241,9 @@ where
 
 	// FIXME: it would be better if this would use (tryExpression cIsNotPattern)
 	// but there's no function tryExpression available yet
-	try_pattern :: !ParseState -> (!Bool, ParsedExpr, !ParseState)
-	try_pattern pState
-		# (succ, expr, pState) = trySimpleLhsExpression pState
+	try_pattern :: !Token !ParseState -> (!Bool, ParsedExpr, !ParseState)
+	try_pattern token pState
+		# (succ, expr, pState) = trySimpleLhsExpressionT token pState
 		| succ
 			# (succ, expr2, pState) = trySimpleLhsExpression pState
 			| succ

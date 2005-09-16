@@ -146,8 +146,8 @@ where
 		# true_pattern		= PE_Basic (BVB True)
 		  false_pattern		= PE_WildCard // PE_Basic (BVB False)
 		= collectFunctions (PE_Case if_ident c
-							[ {calt_pattern = true_pattern , calt_rhs = exprToRhs t}
-							, {calt_pattern = false_pattern, calt_rhs = exprToRhs e}
+							[ {calt_pattern = true_pattern , calt_rhs = exprToRhs t, calt_position=NoPos}
+							, {calt_pattern = false_pattern, calt_rhs = exprToRhs e, calt_position=NoPos}
 							]) icl_module ca
 	collectFunctions (PE_Let strict locals in_expr) icl_module ca
 		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) icl_module ca
@@ -686,8 +686,8 @@ where
 					# smaller_fun = get_predef_id PD_SmallerFun
 					# (case_ident,ca) = prefixAndPositionToIdent ("g_s"+++toString n) gen_position ca
 					= (PE_Case case_ident (PE_List [ident1,PE_Ident smaller_fun,ident2])
-						[{calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs ident1},
-						 {calt_pattern = PE_WildCard, calt_rhs = exprToRhs ident2}],ca)
+						[{calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs ident1, calt_position=NoPos},
+						 {calt_pattern = PE_WildCard, calt_rhs = exprToRhs ident2, calt_position=NoPos}],ca)
 		= (node_defs,to_exp,ident1,ca)
 
 store_minimum_of_sizes_in_generator :: [ParsedDefinition] ParsedExpr Int TransformedGenerator -> TransformedGenerator;
@@ -948,8 +948,8 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 			= rhs
 		case_with_default case_ident expr expr_is_uselect pattern rhs default_rhs
 			=	exprToRhs (PE_Case case_ident expr
-					[	{calt_pattern = pattern, calt_rhs = rhs}
-					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs}
+					[	{calt_pattern = pattern, calt_rhs = rhs, calt_position=NoPos}
+					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs, calt_position=NoPos}
 					])
 
 	/* +++ remove code duplication (bug in 2.0 with nested cases)

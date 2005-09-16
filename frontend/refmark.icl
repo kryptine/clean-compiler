@@ -669,7 +669,7 @@ emptyOccurrence type_info =
 /*
 emptyObservingOccurrence	=: VI_Occurrence (emptyOccurrence True)
 emptyNonObservingOccurrence =: VI_Occurrence (emptyOccurrence False)
-*/																	
+*/
 makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} !v:TypeDefInfos !*VarHeap !*ExpressionHeap !*ErrorAdmin
 	-> (!u:{# FunDef}, !*Coercions, !w:{! Type},  !v:TypeDefInfos, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 makeSharedReferencesNonUnique [] fun_defs coercion_env subst type_def_infos var_heap expr_heap  error
@@ -680,13 +680,13 @@ makeSharedReferencesNonUnique [fun : funs] fun_defs coercion_env subst type_def_
 		= make_shared_references_of_function_non_unique fun_def coercion_env subst type_def_infos var_heap expr_heap error
 	= makeSharedReferencesNonUnique funs fun_defs coercion_env subst type_def_infos var_heap expr_heap error
 where
-	make_shared_references_of_function_non_unique {fun_ident, fun_pos, fun_body = TransformedBody {tb_args,tb_rhs},fun_info={fi_local_vars}}
+	make_shared_references_of_function_non_unique {fun_ident, fun_pos, fun_body = fun_body =: TransformedBody {tb_args,tb_rhs},fun_info={fi_local_vars}}
 			coercion_env subst type_def_infos var_heap expr_heap error
 	# variables = tb_args ++ fi_local_vars
 	  (subst, type_def_infos, var_heap, expr_heap) = clear_occurrences variables subst type_def_infos var_heap expr_heap
 	  (_, {rms_var_heap}) = fullRefMark [tb_args] NotASelector No /* tb_rhs var_heap */ (tb_rhs ===> ("makeSharedReferencesNonUnique", fun_ident, tb_rhs)) var_heap
 	  position = newPosition fun_ident fun_pos
-	  (coercion_env, var_heap, expr_heap, error) = make_shared_vars_non_unique variables coercion_env rms_var_heap expr_heap
+	  (coercion_env, var_heap, expr_heap, error) = make_shared_vars_non_unique variables fun_body coercion_env rms_var_heap expr_heap
 	  		(setErrorAdmin position error)
 	  var_heap = empty_occurrences variables var_heap
 	= (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
@@ -724,46 +724,40 @@ where
 		get_type _						= abort "has_observing_base_type (refmark.icl)"
 		
 
-		make_shared_vars_non_unique vars coercion_env var_heap expr_heap error
+		make_shared_vars_non_unique vars fun_body coercion_env var_heap expr_heap error
 			= foldl make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error) vars
-
-		make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error)  fv=:{fv_ident,fv_info_ptr}
-			# (VI_Occurrence occ, var_heap) = readPtr fv_info_ptr var_heap
-			= case occ.occ_ref_count of
-				RC_Used {rcu_multiply,rcu_selectively}
-					# (coercion_env, expr_heap, error) = make_shared_occurrences_non_unique fv rcu_multiply (coercion_env, expr_heap, error)
-					  (coercion_env, expr_heap, error) = foldSt (make_selection_non_unique fv) rcu_selectively (coercion_env, expr_heap, error)  
-					-> (coercion_env, var_heap, expr_heap, error)
-				_
-					-> (coercion_env, var_heap, expr_heap, error)
-//						===> ("make_shared_var_non_unique", fv_ident)
-
-		make_shared_occurrences_non_unique fv multiply (coercion_env, expr_heap, error)
-			= foldSt (make_shared_occurrence_non_unique fv) multiply (coercion_env, expr_heap, error) 
-		
-		make_shared_occurrence_non_unique free_var var_expr_ptr (coercion_env, expr_heap, error) 
-			| isNilPtr var_expr_ptr
-				= (coercion_env, expr_heap, error)
-				# (expr_info, expr_heap) = readPtr var_expr_ptr expr_heap
-				= case expr_info of
-					EI_Attribute sa_attr_nr
-						# (succ, coercion_env) = tryToMakeNonUnique sa_attr_nr coercion_env
-						| succ
-								 ===> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr, sa_attr_nr)
-							-> (coercion_env, expr_heap, error)
-							-> (coercion_env, expr_heap, uniquenessError (CP_Expression (FreeVar free_var)) " demanded attribute cannot be offered by shared object" error)
+		where
+			make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error)  fv=:{fv_ident,fv_info_ptr}
+				# (VI_Occurrence occ, var_heap) = readPtr fv_info_ptr var_heap
+				= case occ.occ_ref_count of
+					RC_Used {rcu_multiply,rcu_selectively}
+						# (coercion_env, expr_heap, error) = make_shared_occurrences_non_unique fv rcu_multiply (coercion_env, expr_heap, error)
+						  (coercion_env, expr_heap, error) = foldSt (make_selection_non_unique fv) rcu_selectively (coercion_env, expr_heap, error)  
+						-> (coercion_env, var_heap, expr_heap, error)
 					_
-						-> abort ("make_shared_occurrence_non_unique" ===> ((free_var, var_expr_ptr) )) // <<- expr_info))
+						-> (coercion_env, var_heap, expr_heap, error)
+	//						===> ("make_shared_var_non_unique", fv_ident)
+	
+			make_shared_occurrences_non_unique fv multiply (coercion_env, expr_heap, error)
+				= foldSt (make_shared_occurrence_non_unique fv) multiply (coercion_env, expr_heap, error) 
+			
+			make_shared_occurrence_non_unique free_var var_expr_ptr (coercion_env, expr_heap, error) 
+				| isNilPtr var_expr_ptr
+					= (coercion_env, expr_heap, error)
+					# (expr_info, expr_heap) = readPtr var_expr_ptr expr_heap
+					= case expr_info of
+						EI_Attribute sa_attr_nr
+							# (succ, coercion_env) = tryToMakeNonUnique sa_attr_nr coercion_env
+							| succ
+									 ===> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr, sa_attr_nr)
+								-> (coercion_env, expr_heap, error)
+								-> (coercion_env, expr_heap, uniquenessErrorVar free_var fun_body " demanded attribute cannot be offered by shared object" error)
+						_
+							-> abort ("make_shared_occurrence_non_unique" ===> ((free_var, var_expr_ptr) )) // <<- expr_info))
+	
+			make_selection_non_unique fv {su_multiply} cee
+				= make_shared_occurrences_non_unique fv su_multiply cee
 
-		make_selection_non_unique fv {su_multiply} cee
-			= make_shared_occurrences_non_unique fv su_multiply cee
-
-/*
-	has_observing_type type_def_infos TE
-		= True
-	has_observing_type type_def_infos (TB basic_type)
-		= True
-*/
 	has_observing_type (TB basic_type) type_def_infos subst
 		= True
 	has_observing_type (TempV var_number) type_def_infos subst
