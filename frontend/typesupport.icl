@@ -626,12 +626,12 @@ instance bindInstances Type
 		= bindInstances arg_types1 arg_types2 type_var_heap
 	bindInstances (l1 --> r1) (l2 --> r2) type_var_heap
 		= bindInstances r1 r2 (bindInstances l1 l2 type_var_heap)
-//AA..
-	bindInstances (TArrow1 x1) (TArrow1 x2) type_var_heap
-		= bindInstances x1 x2 type_var_heap
-//..AA
 	bindInstances (TB _) (TB _) type_var_heap
 		= type_var_heap
+	bindInstances TArrow TArrow type_var_heap
+		= type_var_heap
+	bindInstances (TArrow1 x1) (TArrow1 x2) type_var_heap
+		= bindInstances x1 x2 type_var_heap
 	bindInstances (TFA _ type1) (TFA _ type2) type_var_heap
 		= bindInstances type1 type2 type_var_heap
 	bindInstances (CV l1 :@: r1) (CV l2 :@: r2) type_var_heap
