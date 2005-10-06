@@ -18,6 +18,10 @@
 
 #define _DEBUG_
 
+#if ! (defined (_MAC_) || defined (_SUN_))
+# define NEW_APPLY
+#endif
+
 #if defined (_MAC_)
 # include "mac.h"
 #elif defined (_SUN_)
