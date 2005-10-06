@@ -838,7 +838,12 @@ static void GenerateConstructorDescriptorAndFunction (ConstructorList constructo
 
 				if (DoTimeProfiling)
 					GenPL();
-				
+
+#ifdef NEW_APPLY
+				if (arity>=2)
+					GenApplyEntryDirective (arity,&ealab);
+#endif
+
 				GenOAStackLayout (2);
 				GenLabelDefinition (&CurrentAltLabel);
 				
