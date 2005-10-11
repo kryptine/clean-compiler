@@ -215,10 +215,10 @@ cannotUnify t1 t2 position=:(CP_Expression expr) err=:{ea_loc=[ip:_]}
 			# err = pushErrorAdmin { ip & ip_ident.id_name = id_name, ip_line = line } err
 			  err = errorHeading type_error err
 			  err = popErrorAdmin err
-//			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
-//											<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer) <<< '\n' }
-			-> { err & ea_file = err.ea_file <<< " cannot unify " <:: (type_error_format, t1, No) 
-											<<< " with " <:: (type_error_format, t2, No) <<< '\n' }
+			# err = { err & ea_file = err.ea_file <<< " cannot unify types:\n" }
+			# err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t1, No) <<< '\n' }
+			# err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t2, No) <<< '\n' }
+			-> err;
 		_
 			-> cannot_unify t1 t2 position err 
 cannotUnify t1 t2 position err 
@@ -233,17 +233,16 @@ cannot_unify t1 t2 position err
 					-> ea_file <<< "\"" <<< position <<< "\""
 				_
 					-> ea_file
-	  ea_file = ea_file <<< " cannot unify " <:: (type_error_format, t1, No) 
-						<<< " with " <:: (type_error_format, t2, No)
-//	  ea_file = ea_file <<< " cannot unify " <:: (type_error_format, t1, Yes initialTypeVarBeautifulizer) 
-//						<<< " with " <:: (type_error_format, t2, Yes initialTypeVarBeautifulizer)
+
 	  ea_file = case position of
   				CP_Expression _
-	  				-> ea_file <<< " near " <<< position
+	  				-> ea_file <<< " near " <<< position <<< " :"
 	  			_
 	  				-> ea_file
-	= { err & ea_file = ea_file <<< '\n' }
-
+	  ea_file = ea_file <<< " cannot unify types:\n"
+	  ea_file = ea_file <<< " " <:: (type_error_format, t1, No) <<< "\n"
+	  ea_file = ea_file <<< " " <:: (type_error_format, t2, No) <<< "\n"
+	= { err & ea_file = ea_file}
 
 existentialError position=:(CP_Expression expr) err=:{ea_loc=[ip:_]} 
 	= case tryToOptimizePosition expr of
@@ -2080,11 +2079,12 @@ where
 specification_error type type1 err
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cAttributed, form_attr_position = No}
-	= { err & ea_file = err.ea_file <<< " derived type " 	 
-									<:: (format, type, Yes initialTypeVarBeautifulizer) 
-									<<< " conflicts with specified type "
-									<:: (format, type1, Yes initialTypeVarBeautifulizer) 
-									<<< '\n' }
+	# err = { err & ea_file = err.ea_file <<< "derived type conflicts with specified type:" <<< '\n' }
+	# format = { form_properties = cAttributed, form_attr_position = No}
+	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type, Yes initialTypeVarBeautifulizer) <<< '\n' }
+	# format = { form_properties = cAttributed, form_attr_position = No}
+	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type1, Yes initialTypeVarBeautifulizer) <<< '\n' }
+	= err
 
 cleanUpAndCheckFunctionTypes [] _ _ start_index _ defs type_contexts coercion_env attr_partition type_var_env attr_var_env (out, ts)
 	= (out, ts)
