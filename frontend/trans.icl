@@ -3026,7 +3026,7 @@ determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consum
 								  		}
 								-> ([(lb,getArgType fun_type prod_index)],ti)
 		  
-		= (producers, args, lb, ti)	 ---> ("UnusedStrict",lb,arg,fun_type)
+		= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
 	| SwitchUnusedFusion
 		(	ro.ro_transform_fusion 
 		&&	cons_arg == CUnusedStrict 
