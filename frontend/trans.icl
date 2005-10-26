@@ -3034,10 +3034,10 @@ determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consum
 		&&	isStrictVar arg
 		) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		= (producers, args, [], ti)	 ---> ("UnusedMixed",arg,fun_type)
+		= (producers, args, [], ti)	 // ---> ("UnusedMixed",arg,fun_type)
 	| SwitchUnusedFusion (ro.ro_transform_fusion && cons_arg == CUnusedLazy) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		= (producers, args, [], ti)	 ---> ("UnusedLazy",arg,fun_type)
+		= (producers, args, [], ti)	 // ---> ("UnusedLazy",arg,fun_type)
 	#! (producers, new_args, lb, ti) = determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 	= (producers, [arg : new_args], lb, ti)
 where
