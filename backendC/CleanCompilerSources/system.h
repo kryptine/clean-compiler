@@ -70,7 +70,6 @@ extern FileTime FGetFileTime (char *fname, FileKind kind);
 #if defined(WRITE_DCL_MODIFICATION_TIME) && WRITE_DCL_MODIFICATION_TIME
 extern void FWriteFileTime (FileTime file_time,File f);
 #endif
-extern Bool GetOptionsFromIclFile (char *fname, CompilerOptions *opts);
 
 #ifdef _VARARGS_
 	extern void DoError (char *fmt,...);

@@ -151,6 +151,7 @@ Bool CallCompiler (int argc, char **argv)
 	DoProfiling=False;
 	DoTimeProfiling=False;
 	DoReuseUniqueNodes=False;
+	DoFusion=False;
 	DoDescriptors=False;
 	ExportLocalLabels=False;
 
@@ -221,6 +222,8 @@ Bool CallCompiler (int argc, char **argv)
 				DoDescriptors=True;
 			else if (strcmp (argv_i,"-exl") ==0)
 				ExportLocalLabels=True;
+			else if (strcmp (argv_i,"-fusion") == 0)
+				DoFusion=True;
 			else if (strncmp (argv_i, "-sa", 3) == 0){
 				if (!SetStrictOption (argv[i]+3)){
 					CmdError ("unknown flag %s", argv[i]);

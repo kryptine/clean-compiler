@@ -27,6 +27,7 @@ extern Bool DoProfiling;
 extern Bool DoTimeProfiling;
 
 extern Bool DoReuseUniqueNodes;
+extern Bool DoFusion;
 extern Bool OptimizeLazyTupleRecursion;
 extern Bool OptimizeTailCallModuloCons;
 extern Bool WriteModificationTimes;

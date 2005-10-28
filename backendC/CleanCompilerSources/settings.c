@@ -28,6 +28,7 @@ Bool DoProfiling=False; /* no longer used by memory profiler */
 Bool DoTimeProfiling=False;
 
 Bool DoReuseUniqueNodes		= False;
+Bool DoFusion				= False;
 
 Bool OptimizeLazyTupleRecursion=False;
 Bool OptimizeTailCallModuloCons=True;

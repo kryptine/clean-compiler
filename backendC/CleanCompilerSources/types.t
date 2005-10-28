@@ -13,7 +13,7 @@
 #define NIL			0L
 #define Null		0L
 
-#define REALSIZE	2
+#define REALSIZE	2 /*1*/
 #define FILESIZE	2
 
 #define KBYTE		1024L
@@ -44,25 +44,6 @@ typedef enum
 #define SeekEnd
 
 typedef unsigned long SysTime;
-
-#define NR_OPTIONS 9
-
-typedef struct
-{
-	unsigned	opt_code:1,
-				opt_debug:1,
-				opt_inline:1,
-				opt_listalltypes:1,
-				opt_listtypes:1,
-				opt_parallel:1,
-				opt_stacklayout:1,
-				opt_strictnessanalysis:1,
-				opt_typecheck:1,
-				opt_verbose:1,
-				opt_warning:1,
-				opt_system:1,
-				opt_liststricttypes:1;
-} CompilerOptions;
 
 #ifdef _WINDOWS_
 # include <stdarg.h>

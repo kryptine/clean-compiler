@@ -54,8 +54,12 @@ static void error_in_function (char *m)
 */
 #define N_DoWarning				7
 #define N_System				8
+#define N_DoFusion				9
 
-static void ConvertOptionsToString (CompilerOptions options,char *optstring)
+#define MINIMUM_N_OPTIONS 9
+#define N_OPTIONS 10
+
+static void ConvertOptionsToString (char *optstring)
 {
 	optstring[N_DoDebug]              = DoDebug ? '1' : '0';
 	optstring[N_DoReuseUniqueNodes]   = !DoReuseUniqueNodes ? '1' : '0';
@@ -74,7 +78,11 @@ static void ConvertOptionsToString (CompilerOptions options,char *optstring)
 */
 	optstring[N_DoWarning]            = DoWarning ? '1' : '0';
 	optstring[N_System]               = '0';
-	optstring[NR_OPTIONS]             = '\0';
+	if (DoFusion){
+		optstring[N_DoFusion]='1';
+		optstring[N_OPTIONS]='\0';
+	} else
+		optstring[MINIMUM_N_OPTIONS]='\0';
 }
 
 #define D_PREFIX "d"
@@ -681,7 +689,6 @@ static void put_instruction_code (int instruction_code)
 #define Dmodule "module"
 #define Ddepend "depend"
 #define Dcomp "comp"
-#define Dcode "code"
 #define Dstart "start"
 #define Dstring "string"
 #define Dcaf "caf"
@@ -763,7 +770,7 @@ void FillBasicFromB (ObjectKind kind, int boffs, int aoffs, FillKind fkind)
 	put_arguments_nn_b (boffs,aoffs);
 	TreatWaitListAfterFill (aoffs, fkind);
 }
-	
+
 void BuildBasic (ObjectKind obj,SymbValue val)
 {
 	switch (obj){
@@ -3364,22 +3371,18 @@ void GenSelectorDescriptor (Label sellab,char *g_pref)
 
 void InitFileInfo (ImpMod imod)
 {
-	char option_string[NR_OPTIONS+1];
-	CompilerOptions opts;
+	char option_string[N_OPTIONS+1];
 	SymbDef start_sdef;
 	
 	start_sdef=imod->im_start;
 
-	ConvertOptionsToString (opts,option_string);
+	ConvertOptionsToString (option_string);
 
 	if (imod->im_def_module!=NULL && imod->im_def_module->dm_system_module)
 		option_string[N_System]='1';
 
 	put_first_directive_ (Dcomp);
 	FPrintF (OutFile, "%d %s", VERSION,option_string);
-
-	put_directive_ (Dcode);
-	FPrintF (OutFile, "%7ld %7ld %7ld", (long) 0, (long) 0, (long) 0);
 	
 	put_directive_ (Dstart);
 	if (start_sdef!=NULL){
