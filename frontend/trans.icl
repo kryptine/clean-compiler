@@ -2457,7 +2457,8 @@ where
 							,	let_expr			= expr
 							,	let_info_ptr		= new_info_ptr
 							,	let_expr_position	= NoPos
-							},ti) ---> "added strict_let_binds"
+							},ti) // ---> "added strict_let_binds"
+
 	transform_trivial_function :: !.App ![.Expression] ![.Expression] !.ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 	transform_trivial_function app=:{app_symb} app_args extra_args ro ti
 		# (fun_def,ti_fun_defs,ti_fun_heap)		= get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
