@@ -1257,17 +1257,18 @@ getSymbolType pos ti=:{ti_common_defs} { symb_kind = SK_OverloadedFunction {glob
 	# {me_ident, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
 	  (fun_type_copy, ts) = determineSymbolTypeOfFunction pos me_ident n_app_args me_type me_type_ptr ti_common_defs ts
 	= (fun_type_copy, [], ts)
-// AA..	
 getSymbolType pos ti=:{ti_common_defs} symbol=:{symb_ident, symb_kind = SK_Generic gen_glob kind} n_app_args ts
 	# (opt_member_glob, ts_generic_heap) = getGenericMember gen_glob kind ti_common_defs ts.ts_generic_heap
 	# ts = { ts & ts_generic_heap = ts_generic_heap }
 	= case opt_member_glob of
 		No
-			# empty_tst	= {tst_args=[], tst_arity=0, tst_lifted=0, tst_result={at_type=TE,at_attribute=TA_Multi}, tst_context=[], tst_attr_env=[]}
-			# ts_error = checkError ("no generic instances of " +++ toString symb_ident +++ " for kind") kind ts.ts_error
+			# empty_atype={at_type=TE,at_attribute=TA_Multi}
+			  t_args=[empty_atype \\ _ <- [1..n_app_args]]
+			  empty_tst	= {tst_args=t_args, tst_arity=n_app_args, tst_lifted=0, tst_result=empty_atype, tst_context=[], tst_attr_env=[]}
+			  ts_error = checkError ("no generic instances of " +++ toString symb_ident +++ " for kind") kind ts.ts_error
 			-> (empty_tst, [], {ts & ts_error = ts_error})	
-		Yes member_glob -> getSymbolType pos ti {symbol & symb_kind = SK_OverloadedFunction member_glob} n_app_args ts
-// ..AA
+		Yes member_glob
+			-> getSymbolType pos ti {symbol & symb_kind = SK_OverloadedFunction member_glob} n_app_args ts
 
 class requirements a :: !TypeInput !a !(!u:Requirements, !*TypeState) -> (!AType, !Optional ExprInfoPtr, !(!u:Requirements, !*TypeState))
 
