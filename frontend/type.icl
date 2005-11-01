@@ -296,21 +296,23 @@ unifyTypes tv=:(TempV tv_number) attr1 type2 attr2 modules subst heaps
 	# (type1, subst) = subst![tv_number]
 	| isIndirection type1
 		= unifyTypes type1 attr1 type2 attr2 modules subst heaps
-		# (succ, subst) = unify_variable_with_type tv_number type2 subst
-		= (succ, subst, heaps)
-	where	
-		unify_variable_with_type tv_number1 tv=:(TempV tv_number2) subst
+		= unify_variable_with_type tv_number type2 attr2 subst modules heaps
+	where
+		unify_variable_with_type :: Int Type TypeAttribute *{!Type} TypeInput *TypeHeaps -> (!Bool,!*{!Type},!*TypeHeaps)
+		unify_variable_with_type tv_number1 tv=:(TempV tv_number2) attr subst modules heaps
 			# (type2, subst) = subst![tv_number2]
 			| isIndirection type2
-				= unify_variable_with_type tv_number type2 subst
+				= unify_variable_with_type tv_number1 type2 attr subst modules heaps
 			| tv_number1 == tv_number2
-				= (True, subst)
-				= (True, { subst & [tv_number1] = tv})
-		unify_variable_with_type tv_number type subst
+				= (True, subst, heaps)
+				= (True, { subst & [tv_number1] = tv}, heaps)
+		unify_variable_with_type tv_number type attr subst modules heaps
 			| containsTypeVariable tv_number type subst
-				= (False, subst)
-//					---> "unify_variable_with_type"
-				= (True, { subst & [tv_number] = type})
+				# (succ, type, heaps) = tryToExpand type attr modules.ti_common_defs heaps
+				| succ
+					= unify_variable_with_type tv_number type attr subst modules heaps
+					= (False, subst, heaps)
+				= (True, { subst & [tv_number] = type},heaps)
 unifyTypes type attr1 tv=:(TempV _) attr2 modules subst heaps
 	= unifyTypes tv attr2 type attr1 modules subst heaps
 unifyTypes t1=:(TB tb1) attr1 t2=:(TB tb2) attr2 modules subst heaps
