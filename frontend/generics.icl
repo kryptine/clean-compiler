@@ -7,12 +7,8 @@ import checksupport
 import checktypes
 import check
 import analtypes
-/*2.0
+
 from transform import ::Group
-0.2*/
-//1.3
-from transform import Group
-//3.1
 
 // whether to generate CONS 
 // (needed for function that use CONS, like toString) 

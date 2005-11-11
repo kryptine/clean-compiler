@@ -30,13 +30,8 @@ where
 instance WriteTypeInfo CommonDefs, Char, [a] | WriteTypeInfo a
 
 instance WriteTypeInfo StrictnessList
-/*2.0
-instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b 
-0.2*/
 
-//1.3
-instance WriteTypeInfo {#b} | select_u, size_u, WriteTypeInfo b 
-//3.1
+instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b 
 
 instance WriteTypeInfo (a,b) | WriteTypeInfo a & WriteTypeInfo b
 

@@ -1,24 +1,13 @@
 definition module utilities
 // compile with "reuse unique nodes"
 
-/*2.0
-from StdEnv import class Eq, not, class Ord, class IncDec
-0.2*/
-//1.3
-from StdEnv import Eq, not, Ord, IncDec
-//3.1
+from StdClass import class Eq, not, class Ord, class IncDec
 
-import StdMisc, general
+import StdMisc, general, _aconcat
 
-import _aconcat
-   
 /*
 	For Strings
 */
-
-//1.3
-from StdString import String
-//3.1
 
 stringToCharList	:: !String -> [Char]
 charListToString	:: ![Char] -> String
