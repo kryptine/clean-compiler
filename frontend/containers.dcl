@@ -1,13 +1,7 @@
 definition module containers
 
-/*2.0
 from syntax import ::Optional,::StrictnessList,::Annotation
 from StdOverloaded import class toString
-0.2*/
-//1.3
-from syntax import Optional,StrictnessList,Annotation
-from StdOverloaded import toString
-//3.1
 
 :: NumberSet = Numbers !Int !NumberSet | EndNumbers
 

@@ -2,12 +2,7 @@ definition module typesupport
 
 import checksupport, StdCompare
 
-/*2.0
 from unitype import ::Coercions, ::CoercionTree, ::AttributePartition, CT_Empty
-0.2*/
-//1.3
-from unitype import Coercions, CoercionTree, AttributePartition, CT_Empty
-//3.1
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
@@ -26,11 +21,11 @@ cAttributed			:== 1
 cAnnotated			:== 2
 cMarkAttribute		:== 4
 
-:: TypeVarBeautifulizer // MW++
+:: TypeVarBeautifulizer
 
 instance writeType SymbolType, Type, AType, [a] | writeType a
 
-initialTypeVarBeautifulizer :: TypeVarBeautifulizer // MW4++
+initialTypeVarBeautifulizer :: TypeVarBeautifulizer
 
 ::	AttributeEnv	:== {! TypeAttribute }
 ::	VarEnv 			:== {! Type }
@@ -147,31 +142,23 @@ instance removeAnnotations Type, SymbolType
 foldATypeSt on_atype on_type type st :== fold_atype_st type st
   where
 	fold_type_st type=:(TA type_symb_ident args) st
-		#! st
-				= foldSt fold_atype_st args st
+		#! st = foldSt fold_atype_st args st
 		= on_type type st
 	fold_type_st type=:(TAS type_symb_ident args _) st
-		#! st
-				= foldSt fold_atype_st args st
+		#! st = foldSt fold_atype_st args st
 		= on_type type st
 	fold_type_st type=:(l --> r) st
-		#! st
-				= fold_atype_st r (fold_atype_st l st)
+		#! st = fold_atype_st r (fold_atype_st l st)
 		= on_type type st
-//AA..
 	fold_type_st type=:(TArrow1 t) st
 		#! st = fold_atype_st t st
 		= on_type type st	
-//..AA
 	fold_type_st type=:(_ :@: args) st
-		#! st
-				= foldSt fold_atype_st args st
+		#! st = foldSt fold_atype_st args st
 		= on_type type st
 	fold_type_st type st
 		= on_type type st
-	
 	fold_atype_st atype=:{at_type} st
-		#! st
-				= fold_type_st at_type st
+		#! st = fold_type_st at_type st
 		= on_atype atype st
 

@@ -1,12 +1,7 @@
 definition module general
 
-/*2.0
-from StdEnv import instance <<< Int,class <<< (..),instance + Int,class + (..),instance ~ Int,class ~ (..)
-0.2*/
-//1.3
-from StdEnv import <<<, +, ~
-from StdString import String
-//3.1
+from StdFile import instance <<< Int,class <<< (..)
+from StdInt import instance + Int,class + (..),instance ~ Int,class ~ (..)
 
 instance ~ Bool
 
