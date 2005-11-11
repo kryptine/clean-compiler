@@ -684,6 +684,7 @@ static void put_instruction_code (int instruction_code)
 #define Dn_string "n_string"
 #define Ddesc "desc"
 #define Ddescn "descn"
+#define Ddescs "descs"
 #define Ddescexp "descexp"
 #define Drecord "record"
 #define Dmodule "module"
@@ -3191,6 +3192,83 @@ void GenLazyRecordDescriptorAndExport (SymbDef sdef)
 	}
 }
 
+#ifdef NEW_SELECTOR_DESCRIPTORS
+
+static void print_result_descriptor_and_offsets (StateS field_state,int a_pos,int b_pos,int record_a_size,int record_b_size)
+{
+	if (field_state.state_kind!=OnB)
+		FPrintF (OutFile, "_ %d 0 ",(a_pos<=1 && !(a_pos==1 && record_a_size+record_b_size>2)) ? a_pos+1 : a_pos+2);
+	else {
+		char *result_descriptor_name;
+		int offset1,offset2;
+		
+		result_descriptor_name=BasicDescriptors[field_state.state_object].lab_name;
+
+		offset1=record_a_size+b_pos;
+		offset1=(offset1<=1 && !(offset1==1 && record_a_size+record_b_size>2)) ? offset1+1 : offset1+2;
+
+		if (ObjectSizes[field_state.state_object]>1){
+			offset2=record_a_size+b_pos+1;
+			offset2=(offset2==1 && record_a_size+record_b_size<=2) ? offset2+1 : offset2+2;
+		} else
+			offset2=0;
+		
+		FPrintF (OutFile, "%s %d %d ",result_descriptor_name,offset1,offset2);
+	}
+}
+
+void GenFieldSelectorDescriptor (SymbDef sdef,StateS field_state,int a_pos,int b_pos,int record_a_size,int record_b_size)
+{
+	char *name,*record_name;
+	int gc_updates_selector;
+
+	if (!DescriptorNeeded (sdef))
+		return;
+
+	gc_updates_selector=IsSimpleState (field_state);
+
+	name = sdef->sdef_ident->ident_name;
+	record_name=sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
+
+	put_directive_ (gc_updates_selector ? Ddescs : Ddesc);
+	if (sdef->sdef_exported){
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s ",
+			CurrentModule,record_name,name,
+			CurrentModule,record_name,name);
+		if (gc_updates_selector)
+			print_result_descriptor_and_offsets (field_state,a_pos,b_pos,record_a_size,record_b_size);
+		else
+			FPrintF (OutFile, "_hnf 1 0 ");
+	} else if ((sdef->sdef_mark & SDEF_USED_LAZILY_MASK) || gc_updates_selector){
+		if (ExportLocalLabels)
+			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s ",CurrentModule,record_name,name);		
+		else if (DoDebug)
+			FPrintF (OutFile, D_PREFIX "%s.%s ",record_name,name);				
+		else
+			FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
+
+		if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+			if (ExportLocalLabels)
+				FPrintF (OutFile, "e_%s_" N_PREFIX "%s.%s ",CurrentModule,record_name,name);
+			else if (DoDebug)
+				FPrintF (OutFile, N_PREFIX "%s.%s ",record_name,name);
+			else
+				FPrintF (OutFile, N_PREFIX "%u ",sdef->sdef_number);
+		} else
+			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
+
+		if (gc_updates_selector)
+			print_result_descriptor_and_offsets (field_state,a_pos,b_pos,record_a_size,record_b_size);
+		else
+			FPrintF (OutFile, "%s 1 0 ",hnf_lab.lab_name);
+	} else if (DoDebug){
+		FPrintF (OutFile, D_PREFIX "%s %s %s 1 0 ", name, hnf_lab.lab_name,hnf_lab.lab_name);
+	} else
+		FPrintF (OutFile, LOCAL_D_PREFIX "%u %s %s 1 0 ", sdef->sdef_number,hnf_lab.lab_name, hnf_lab.lab_name);
+
+	FPrintF (OutFile, "\"%s.%s\"",record_name,name);
+}
+#else
 void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 {
 	char *name,*record_name;
@@ -3253,6 +3331,7 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 		FPrintF (OutFile, LOCAL_D_PREFIX "%u %s %s %d 0 \"%s.%s\"", sdef->sdef_number,
 			hnf_lab.lab_name, hnf_lab.lab_name, arity,record_name,name);
 }
+#endif
 
 void GenModuleDescriptor (
 #if WRITE_DCL_MODIFICATION_TIME
@@ -3359,6 +3438,17 @@ void GenStart (SymbDef startsymb)
 	}
 }
 
+#ifdef NEW_SELECTOR_DESCRIPTORS
+void GenSelectorDescriptor (Label sellab,int element_n)
+{
+	put_directive_ (Ddescs);
+	FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d _ %d 0 \"%s.%d\"",
+			sellab->lab_name, sellab->lab_post,
+			sellab->lab_pref, sellab->lab_name, sellab->lab_post,
+			element_n+1,
+			sellab->lab_name, sellab->lab_post);
+}
+#else
 void GenSelectorDescriptor (Label sellab,char *g_pref)
 {
 	put_directive_ (Ddesc);
@@ -3368,6 +3458,7 @@ void GenSelectorDescriptor (Label sellab,char *g_pref)
 			g_pref, sellab->lab_name, sellab->lab_post,
 			sellab->lab_name, sellab->lab_post);
 }
+#endif
 
 void InitFileInfo (ImpMod imod)
 {

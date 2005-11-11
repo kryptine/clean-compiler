@@ -969,8 +969,12 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		
 		if (field_def->sdef_exported || ExportLocalLabels)
 			GenExportFieldSelector (field_def);
-				
+
+#ifdef NEW_SELECTOR_DESCRIPTORS
+		GenFieldSelectorDescriptor (field_def,offfieldstate,apos,bpos,tot_a_size,tot_b_size);
+#else
 		GenFieldSelectorDescriptor (field_def,IsSimpleState (offfieldstate));
+#endif
 
 		if (DoTimeProfiling)
 			GenPB (field_def->sdef_ident->ident_name);
@@ -1023,6 +1027,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		
 		GenJsrEval (0);
 
+#ifndef NEW_SELECTOR_DESCRIPTORS
 		if (IsSimpleState (offfieldstate) && offfieldstate.state_kind==OnB && !DoTimeProfiling){
 			LabDef gc_apply_label;
 
@@ -1032,6 +1037,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 			GenOAStackLayout (2);
 			GenFieldLabelDefinition (&gc_apply_label,record_name);
 		}
+#endif
 
 		GenPushRArgB (0, tot_a_size, tot_b_size, bpos + 1, bsize); 
 		GenReplRArgA (tot_a_size, tot_b_size, apos + 1, asize);
@@ -1093,6 +1099,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		if (DoTimeProfiling)
 			GenPE();
 
+#ifndef NEW_SELECTOR_DESCRIPTORS
 		/* generate apply entry for the garbage collector: */
 		if (IsSimpleState (offfieldstate)){
 			LabDef gc_apply_label;
@@ -1120,6 +1127,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 	 			GenRtn (1,0, OnAState);
 			}
 		}
+#endif
 	 }
 }
 
@@ -1946,7 +1954,11 @@ static void GenerateCodeForLazyTupleSelectorEntry (int argnr)
 	LabDef sellab,easellab,descriptor_label;
 
 	BuildLazyTupleSelectorLabel	(&sellab, MaxNodeArity, argnr);
+#ifdef NEW_SELECTOR_DESCRIPTORS
+	GenSelectorDescriptor (&sellab,argnr);
+#else
 	GenSelectorDescriptor (&sellab,g_pref);
+#endif
 
 	easellab = sellab;
 	easellab.lab_pref = ea_pref;
@@ -1967,20 +1979,17 @@ static void GenerateCodeForLazyTupleSelectorEntry (int argnr)
 	GenPopA				(2);
 	GenRtn 				(1,0,OnAState);
 
+#ifndef NEW_SELECTOR_DESCRIPTORS
 	GenOAStackLayout (1);
 	sellab.lab_pref = g_pref;
 	GenLabelDefinition	(&sellab);
 	GenGetNodeArity		(0);
 	GenPushArgNr		(argnr);
 	GenPushArgB			(0);
-#if UPDATE_POP
 	GenUpdatePopA		(0, 1);
-#else
-	GenUpdateA			(0, 1);
-	GenPopA				(1);
-#endif
 	GenRtn 				(1,0,OnAState);
-	
+#endif
+
 	GenOAStackLayout (2);
 	GenLabelDefinition	(&easellab);
 	GenPushArg			(0,1,1);
@@ -1988,22 +1997,12 @@ static void GenerateCodeForLazyTupleSelectorEntry (int argnr)
 	GenKeep (1,0);
 	GenFill (& ind_lab, -2, &indirection_lab, 2, PartialFill);
 	GenKeep (1,0);
-#if UPDATE_POP
 	GenUpdatePopA		(0, 1);
-#else
-	GenUpdateA			(0, 1);
-	GenPopA				(1);
-#endif
 	GenJsrEval			(0);
 	GenGetNodeArity		(0);
 	GenPushArgNr		(argnr);
 	GenPushArgB			(0);
-#if UPDATE_POP
 	GenUpdatePopA		(0, 1);
-#else
-	GenUpdateA			(0, 1);
-	GenPopA				(1);
-#endif
 	GenJmpEvalUpdate();
 }
 
