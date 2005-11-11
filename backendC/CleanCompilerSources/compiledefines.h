@@ -22,3 +22,5 @@
 #define BOXED_RECORDS 1
 
 #define KARBON
+
+#define NEW_SELECTOR_DESCRIPTORS
