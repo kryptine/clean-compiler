@@ -2135,10 +2135,8 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 	#! dcl_specials = dcl_mod.dcl_specials
 	# n_dcl_specials = dcl_specials.ir_to-dcl_specials.ir_from
 
-//AA..
 	# dcl_gencases = dcl_mod.dcl_gencases
 	# n_dcl_gencases = dcl_gencases.ir_to-dcl_gencases.ir_from
-//..AA
 
 	# dcl_type_funs = dcl_mod.dcl_type_funs
 	# n_dcl_type_funs = dcl_type_funs.ir_to-dcl_type_funs.ir_from
@@ -2316,7 +2314,7 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 					= fill_conversion_table_for_type_funs (inc dcl_type_index) dcl_types icl_type_defs type_conversions new_table
 
 checkModule :: !Bool !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
-	-> (!Bool, *IclModule, *{# DclModule}, *{! Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
+	-> (!Bool, *IclModule, *{#DclModule}, *{!Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 
 checkModule support_dynamics {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache 
 	optional_dcl_mod scanned_modules dcl_modules cached_dcl_macros predef_symbols symbol_table err_file heaps
@@ -2326,11 +2324,11 @@ checkModule support_dynamics {mod_defs,mod_ident,mod_type,mod_imports,mod_import
 			0	# (predef_mod,predef_symbols) = buildPredefinedModule predef_symbols
 				-> (Yes predef_mod,predef_symbols)
 			_	-> (No,predef_symbols)
-	# (icl_global_function_range,nr_of_functions,first_inst_index,first_gen_inst_index, local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
+	# (nr_of_functions,first_inst_index,first_gen_inst_index, local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 		= check_module1 mod_defs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
-	# icl_instance_range = {ir_from = first_inst_index, ir_to = first_gen_inst_index/*AA nr_of_functions*/}
-	# icl_generic_range = {ir_from = first_gen_inst_index, ir_to = nr_of_functions} //AA	
-	= check_module2 support_dynamics mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions nr_of_cached_modules optional_pre_def_mod local_defs icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+	# icl_instance_range = {ir_from = first_inst_index, ir_to = first_gen_inst_index}
+	# icl_generic_range = {ir_from = first_gen_inst_index, ir_to = nr_of_functions}
+	= check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 
 check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
@@ -2338,18 +2336,12 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  first_inst_index = length fun_defs
 	  (inst_fun_defs, def_instances) = convert_class_instances cdefs.def_instances first_inst_index	  
 
-// AA..
 	  first_gen_inst_index = first_inst_index + length inst_fun_defs
 	  (gen_inst_fun_defs, def_generic_cases) = convert_generic_instances cdefs.def_generic_cases first_gen_inst_index
-// ..AA	  
 
 	  icl_functions = { next_fun \\ next_fun <- fun_defs ++ inst_fun_defs ++ gen_inst_fun_defs}
 
-	  cdefs = 
-	  	{ cdefs 
-	  	& def_instances = def_instances
-	  	, def_generic_cases = def_generic_cases
-	  	}
+	  cdefs = { cdefs & def_instances = def_instances, def_generic_cases = def_generic_cases }
 	#! nr_of_functions = size icl_functions
 
 	# sizes_and_local_defs = collectCommonfinitions cdefs
@@ -2372,7 +2364,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  							dcl_modules.[i]
 		  						init_new_dcl_modules.[i-size dcl_modules] 
 	  						\\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
-	= (icl_global_function_range,nr_of_functions,first_inst_index,first_gen_inst_index,local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
+	= (nr_of_functions,first_inst_index,first_gen_inst_index,local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 
 	where
 		add_dcl_module_predef_module_and_modules_to_symbol_table (Yes dcl_mod) optional_predef_mod modules mod_index cs
@@ -2502,11 +2494,11 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  		fill_macro_def_array i [dcl_macro_defs:macro_defs] a
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
-check_module2 :: Bool Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int !Int 
-				(Optional (Module a)) [Declaration] *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange) 
+check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int 
+				(Optional (Module a)) [Declaration] Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange)
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
-check_module2 support_dynamics mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_functions nr_of_cached_modules optional_pre_def_mod local_defs icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 		
 	  (copied_dcl_defs, dcl_conversions, dcl_modules, local_defs, cdefs, icl_sizes, cs)
@@ -2526,12 +2518,9 @@ check_module2 support_dynamics mod_ident mod_modification_time mod_imported_obje
 		= (False, abort "evaluated error 2 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 
 
-	# cs_symbol_table
-		=	cs.cs_symbol_table
-	# cs_predef_symbols
-		=	cs.cs_predef_symbols
-	# hp_var_heap
-		=	heaps.hp_var_heap
+	# cs_symbol_table = cs.cs_symbol_table
+	# cs_predef_symbols = cs.cs_predef_symbols
+	# hp_var_heap = heaps.hp_var_heap
 	# (icl_type_fun_range, dcl_modules, icl_functions, icl_common,
 						cs_predef_symbols, hp_var_heap, cs_symbol_table)
 		=	if support_dynamics
@@ -2540,13 +2529,11 @@ check_module2 support_dynamics mod_ident mod_modification_time mod_imported_obje
 					cs_predef_symbols hp_var_heap cs_symbol_table)
 				({ir_from=0,ir_to=0}, dcl_modules, icl_functions, icl_common,
 						cs_predef_symbols, hp_var_heap, cs_symbol_table)
-	# (nr_of_functions, icl_functions)
-		=	usize icl_functions		
-	# cs
-		=	{cs & cs_symbol_table=cs_symbol_table, cs_predef_symbols=cs_predef_symbols}
-	# heaps
-		=	{heaps & hp_var_heap=hp_var_heap}
+	# cs = {cs & cs_symbol_table=cs_symbol_table, cs_predef_symbols=cs_predef_symbols}
+	# heaps = {heaps & hp_var_heap=hp_var_heap}
 
+
+	# (nr_of_functions, icl_functions) = usize icl_functions
 
 	# def_macro_indices=cdefs.def_macro_indices
 	# (icl_global_functions_ranges,icl_instances_ranges, icl_generic_ranges,icl_type_fun_ranges, n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules, error)
@@ -2654,12 +2641,18 @@ check_module2 support_dynamics mod_ident mod_modification_time mod_imported_obje
 		  icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
 										 com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs,
 										 com_generic_defs = e_info.ef_generic_defs, com_instance_defs = class_instances }	  			  
-		  icl_mod		= { 	icl_name = mod_ident, icl_functions = icl_functions, icl_common = icl_common, icl_global_functions = icl_global_functions_ranges,
-		  						icl_instances = icl_instances_ranges, icl_specials = icl_specials, icl_gencases = icl_generic_ranges,
-								icl_import = icl_imported, icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
-								icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-	  			  				icl_modification_time = mod_modification_time,
-	  			  				icl_type_funs = icl_type_fun_ranges}
+
+		  local_function_indices = {ir_from=icl_global_function_range.ir_to+local_functions_index_offset,
+		  							ir_to=def_macro_indices.ir_from}
+		  icl_function_indices = {	ifi_global_function_indices = icl_global_functions_ranges,
+		 							ifi_local_function_indices = local_function_indices,
+		  					  		ifi_instance_indices = icl_instances_ranges, ifi_specials_indices = icl_specials,
+		  				  	 		ifi_gencase_indices = icl_generic_ranges, ifi_type_function_indices = icl_type_fun_ranges }
+
+		  icl_mod	= { icl_name = mod_ident, icl_functions = icl_functions, icl_function_indices = icl_function_indices,
+		  				icl_common = icl_common, icl_import = icl_imported, icl_imported_objects = mod_imported_objects,
+		  				icl_foreign_exports = foreign_exports, icl_used_module_numbers = imported_module_numbers,
+		  				icl_copied_from_dcl = copied_dcl_defs, icl_modification_time = mod_modification_time }
 
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 		  (main_dcl_module, dcl_modules) = dcl_modules![main_dcl_module_n]
@@ -2677,14 +2670,19 @@ check_module2 support_dynamics mod_ident mod_modification_time mod_imported_obje
 		# icl_mod = {icl_mod & icl_functions=icl_functions}
 
 		= (cs_error.ea_ok, icl_mod, dcl_modules, groups, macro_defs, cs_x.x_main_dcl_module_n, heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
-		# icl_common	= { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
-			  	 			  com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs, com_generic_defs = e_info.ef_generic_defs }	  			  
-		  icl_mod		= { icl_name = mod_ident, icl_functions = icl_functions, icl_common = icl_common,
-		  					icl_global_functions = icl_global_functions_ranges, icl_instances = icl_instances_ranges,
-		  					icl_specials = {ir_from = nr_of_functions, ir_to = nr_of_functions}, icl_gencases = icl_generic_ranges,
-							icl_import = icl_imported, icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
-							icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-	    		  			icl_modification_time = mod_modification_time, icl_type_funs = icl_type_fun_ranges}
+		# icl_common = { icl_common & com_type_defs = e_info.ef_type_defs, com_selector_defs = e_info.ef_selector_defs, com_class_defs = e_info.ef_class_defs,
+			  	 					  com_cons_defs = e_info.ef_cons_defs, com_member_defs = e_info.ef_member_defs, com_generic_defs = e_info.ef_generic_defs }
+
+		  icl_function_indices = {	ifi_global_function_indices = icl_global_functions_ranges,
+		 							ifi_local_function_indices = {ir_from=0,ir_to=0},
+		  					  		ifi_instance_indices = icl_instances_ranges,
+		  					  		ifi_specials_indices = {ir_from = nr_of_functions, ir_to = nr_of_functions},
+		  				  	 		ifi_gencase_indices = icl_generic_ranges, ifi_type_function_indices = icl_type_fun_ranges }
+
+		  icl_mod		= { icl_name = mod_ident, icl_functions = icl_functions, icl_function_indices = icl_function_indices,
+		  					icl_common = icl_common, icl_import = icl_imported, icl_imported_objects = mod_imported_objects,
+		  					icl_foreign_exports = foreign_exports, icl_used_module_numbers = imported_module_numbers,
+		  					icl_copied_from_dcl = copied_dcl_defs, icl_modification_time = mod_modification_time }
 		= (False, icl_mod, dcl_modules, {}, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
 	where
 		check_start_rule mod_kind mod_ident icl_global_functions_ranges cs=:{cs_symbol_table,cs_x}

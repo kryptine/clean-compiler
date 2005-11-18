@@ -383,8 +383,9 @@ backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
 
 backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
 backEndConvertModulesH predefs {fe_icl = 
-	fe_icl =: {icl_name, icl_functions, icl_common,icl_global_functions,
-				icl_type_funs, icl_imported_objects,icl_foreign_exports,icl_used_module_numbers, icl_modification_time},
+	fe_icl =: {	icl_name, icl_functions, icl_common,
+				icl_function_indices = {ifi_type_function_indices,ifi_global_function_indices},
+				icl_imported_objects, icl_foreign_exports, icl_used_module_numbers, icl_modification_time},
 	fe_components, fe_dcls, fe_arrayInstances}
 	main_dcl_module_n backEnd
 	// sanity check ...
@@ -445,7 +446,7 @@ backEndConvertModulesH predefs {fe_icl =
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
 	#! backEnd
 		=	declareFunctionSymbols icl_functions functionIndices
-				(icl_type_funs ++ icl_global_functions) (backEnd -*-> "declareFunctionSymbols")
+				(ifi_type_function_indices ++ ifi_global_function_indices) (backEnd -*-> "declareFunctionSymbols")
 	#! backEnd
 		=	declare main_dcl_module_n icl_common (backEnd -*-> "declare (main_dcl_module_n)")
 	#! backEnd
@@ -482,7 +483,7 @@ backEndConvertModulesH predefs {fe_icl =
 					=	[]
 				// otherwise
 					=	flatten [[r.ir_from .. r.ir_to-1]
-									\\ r <- [icl_type_funs!!1]]
+									\\ r <- [ifi_type_function_indices!!1]]
 	# backEnd = bindSpecialIdents predefs icl_used_module_numbers backEnd
 	#! backEnd = removeExpandedTypesFromDclModules fe_dcls icl_used_module_numbers backEnd
 	=	(backEnd -*-> "backend done")

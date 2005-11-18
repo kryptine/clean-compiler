@@ -50,6 +50,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 		= (No,{},{},0,0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
   	# symbol_table = hash_table.hte_symbol_heap
   	#! n_cached_dcl_modules=size cached_dcl_modules
+
+
   	# (ok, icl_mod, dcl_mods, components, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
   	  	= checkModule support_dynamics mod global_fun_range mod_functions n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules functions_and_macros predef_symbols (symbol_table -*-> "Checking") error heaps
 
@@ -63,8 +65,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 			select_and_remove_icl_functions_from_record :: !*IclModule -> (!.{#FunDef},!.IclModule)
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
-	# {icl_global_functions,icl_instances,icl_gencases, icl_specials, icl_common,icl_name,icl_import,icl_imported_objects,
-		icl_type_funs, icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl} = icl_mod
+	# { icl_common,icl_function_indices,icl_name,icl_import,icl_imported_objects,
+		icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl			} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
 	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
@@ -114,8 +116,12 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups com_type_defs main_dcl_module_n td_infos type_heaps.th_vars error_admin
 	# (class_infos, td_infos, th_vars, error_admin)
 			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
+
+	# icl_global_functions=icl_function_indices.ifi_global_function_indices
+
 	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)
-			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers icl_global_functions
+			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers
+				(icl_global_functions++[icl_function_indices.ifi_local_function_indices])
 				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars heaps.hp_expression_heap heaps.hp_generic_heap error_admin
 
       type_heaps = { type_heaps & th_vars = th_vars }
@@ -161,15 +167,19 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs/*icl_functions*/ icl_specials list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
+		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
 
 	| not ok
 		= (No,{},{},0,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 			
+	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices++generic_ranges
+	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 
 	# (fun_def_size, fun_defs) = usize fun_defs
-	# (components, fun_defs) 	= partitionateFunctions (fun_defs -*-> "partitionateFunctions") 
-									(icl_global_functions++icl_instances ++ [icl_specials] ++ icl_gencases ++ generic_ranges ++ icl_type_funs)
+	# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "partitionateFunctions") 
+											(icl_global_functions++icl_function_indices.ifi_instance_indices
+											++[icl_function_indices.ifi_specials_indices
+											  : icl_gencase_indices++icl_function_indices.ifi_type_function_indices])
 		
 	| options.feo_up_to_phase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods n_functions_and_macros_in_dcl_modules main_dcl_module_n
@@ -277,15 +287,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 //	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
-	# 	fe ={	fe_icl =
-//							 {icl_mod & icl_functions=fun_defs }
-							 {icl_functions=fun_defs,icl_global_functions=icl_global_functions,icl_instances=icl_instances,icl_specials=icl_specials,
-							 icl_common=icl_common, icl_gencases = icl_gencases ++ generic_ranges,
-							 icl_import=icl_import, icl_imported_objects=icl_imported_objects, icl_foreign_exports=icl_foreign_exports,
-							 icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
-							 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time,
-							 icl_type_funs = icl_type_funs}
-
+	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
+						 icl_import=icl_import, icl_imported_objects=icl_imported_objects, icl_foreign_exports=icl_foreign_exports,
+						 icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
+						 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
 			,	fe_arrayInstances = array_instances

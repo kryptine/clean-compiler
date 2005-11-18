@@ -13,7 +13,7 @@ cRankTwoScope	:== 2
 cNeedStdArray	:== 1
 cNeedStdEnum	:== 2
 cNeedStdDynamic :== 4
-cNeedStdGeneric	:== 8 // AA
+cNeedStdGeneric	:== 8
 cNeedStdStrictLists :== 16
 
 ::	VarHeap :== Heap VarInfo
@@ -57,8 +57,8 @@ cConversionTableSize	:== 10
 	,	com_class_defs		:: !.{# ClassDef}
 	,	com_member_defs		:: !.{# MemberDef}
 	,	com_instance_defs	:: !.{# ClassInstance}
-	,	com_generic_defs	:: !.{# GenericDef} // AA
-	,	com_gencase_defs 	:: !.{# GenericCaseDef} // AA
+	,	com_generic_defs	:: !.{# GenericDef}
+	,	com_gencase_defs 	:: !.{# GenericCaseDef}
 	}
 
 ::	Declarations = {
@@ -89,14 +89,19 @@ cConversionTableSize	:== 10
 	
 ::	FunDefIndex:==Int
 
+::	IclFunctionIndices =
+	{	ifi_global_function_indices	:: ![IndexRange]
+	,	ifi_local_function_indices	:: !IndexRange
+	,	ifi_instance_indices		:: ![IndexRange]
+	,	ifi_specials_indices		:: !IndexRange
+	,	ifi_gencase_indices			:: ![IndexRange]
+	,	ifi_type_function_indices	:: ![IndexRange]
+	}
+
 ::	IclModule  =
 	{	icl_name				:: !Ident
 	,	icl_functions			:: !.{# FunDef }
-	,	icl_global_functions	:: ![IndexRange]
-	,	icl_instances			:: ![IndexRange]
-	,	icl_specials			:: !IndexRange
-	,	icl_gencases			:: ![IndexRange]
-	,	icl_type_funs			:: ![IndexRange]
+	,	icl_function_indices	:: !IclFunctionIndices
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
 	,	icl_imported_objects	:: ![ImportedObject]
