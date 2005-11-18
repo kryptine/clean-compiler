@@ -100,7 +100,8 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	,	lt_context		::	! ScanContext	// The context of the token
 	}
 
-::	Buffer x
+::	*Buffer x:==SBuffer x
+::	SBuffer x
 	=	Buffer0
 	|	Buffer1 x
 	|	Buffer2 x x
@@ -251,8 +252,8 @@ where
 	getPosition scanState=:{ss_tokenBuffer}
 		| isEmptyBuffer ss_tokenBuffer
 			= getCharPosition scanState
-		# (ltok,_) = get ss_tokenBuffer
-		= (ltok.lt_position, scanState)
+		# (ltok,ss_tokenBuffer) = head ss_tokenBuffer
+		= (ltok.lt_position, {scanState & ss_tokenBuffer=ss_tokenBuffer})
 
 instance getPosition Input
 where
@@ -396,7 +397,8 @@ instance currentToken RScanState
 where currentToken scanState=:{ss_tokenBuffer}
 		| isEmptyBuffer ss_tokenBuffer
 			= (ErrorToken "dummy", scanState)
-			= ((head ss_tokenBuffer).lt_token, scanState)
+			# (ltok,ss_tokenBuffer) = head ss_tokenBuffer
+			= (ltok.lt_token, {scanState & ss_tokenBuffer=ss_tokenBuffer})
 /*
 class insertToken state :: !Token !ScanContext !*state -> *state
 
@@ -1753,11 +1755,11 @@ store x (Buffer1 y)     = Buffer2 x y
 store x (Buffer2 y z)   = Buffer3 x y z
 store x (Buffer3 y z _) = Buffer3 x y z
 
-isEmptyBuffer :: !(Buffer x) -> Bool
+isEmptyBuffer :: !(SBuffer x) -> Bool
 isEmptyBuffer Buffer0 = True
 isEmptyBuffer _       = False
 
-get :: !(Buffer x) -> (x,Buffer x)
+get :: !(Buffer x) -> (x,!Buffer x)
 get  Buffer0        = abort "get from empty buffer"
 get (Buffer1 x)     = (x, Buffer0)
 get (Buffer2 x y)   = (x, Buffer1 y)
@@ -1769,13 +1771,13 @@ pop (Buffer1 x)     = Buffer0
 pop (Buffer2 x y)   = Buffer1 y
 pop (Buffer3 x y z) = Buffer2 y z
 
-head :: !(Buffer x) -> x
+head :: !(Buffer x) -> (x,!Buffer x);
 head  Buffer0			= abort "head of empty buffer"
-head (Buffer1 x)		= x
-head (Buffer2 x _)		= x
-head (Buffer3 x _ _)	= x
+head b=:(Buffer1 x)		= (x,b)
+head b=:(Buffer2 x _)	= (x,b)
+head b=:(Buffer3 x _ _)	= (x,b)
 
-instance <<< (Buffer a) | <<< a
+instance <<< (SBuffer a) | <<< a
 where
 	(<<<) file  Buffer0			= file <<< "Empty buffer"
 	(<<<) file (Buffer1 x)		= file <<< "Buffer1 (" <<< x <<< ")"
