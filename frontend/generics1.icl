@@ -1919,16 +1919,12 @@ where
 		#! (fun=:{fun_body, fun_arity}, fun_defs) = fun_defs ! [fun_index] 		
 		#! fun_ident = genericIdentToFunIdent gc_ident gc_type_cons
 		= case fun_body of 
-			TransformedBody tb	// user defined case				
-				| fun_arity <> st.st_arity						
-					# error = reportError gc_ident gc_pos 
-						("incorrect arity " +++ toString fun_arity +++ ", expected " +++ toString st.st_arity) error
+			TransformedBody tb	// user defined case
+				| fun_arity <> st.st_arity
+					# error = reportError gc_ident gc_pos ("incorrect arity " +++ toString (SwitchGenericInfo (fun_arity-1) fun_arity)
+															+++ ", expected " +++ toString (SwitchGenericInfo (st.st_arity-1) st.st_arity)) error
 					-> (group_index, groups, fun_defs, td_infos, modules, heaps, error)	
-				#! fun = 
-					{ fun 
-					& fun_ident = fun_ident 
-					, fun_type = Yes st
-					}
+				#! fun = { fun & fun_ident = fun_ident , fun_type = Yes st }
 				#! fun_defs = { fun_defs & [fun_index] = fun }		
 				-> (group_index, groups, fun_defs, td_infos, modules, heaps, error)	
 					//---> ("update_icl_function, TransformedBody", fun.fun_ident, fun_index, st)
