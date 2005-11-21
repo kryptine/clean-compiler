@@ -3,7 +3,7 @@ implementation module check
 import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
-import explicitimports, comparedefimp, checkFunctionBodies, containers, portToNewSyntax, compilerSwitches
+import explicitimports, comparedefimp, checkFunctionBodies, containers, compilerSwitches
 import genericsupport
 import typereify
 // import RWSDebug
@@ -1968,20 +1968,12 @@ checkDclComponent components_array super_components expl_imp_indices mod_indices
 			  		// maps the module indices of all modules in the actual component to all explicit
 			  		// imports of that module
 		
-			  (dcl_modules, cs)
-			  		= switch_port_to_new_syntax
-			  			(possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs)
-			  			(dcl_modules, cs)
-
-
 			  (dcls_common_defs, (dcl_modules, cs))
 				= mapSt (createCommonDefinitionsWithinComponent is_on_cycle) mod_indices (dcl_modules, cs)
-
 
 			  (afterwards_info, (expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs))
 				= map2St (checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set super_components imports_ikh)
 								mod_indices dcls_common_defs (expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
-
 
 			| not cs.cs_error.ea_ok
 				-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
@@ -2558,11 +2550,6 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  (imports, (dcl_modules, _, _, cs))
 			= solveExplicitImports expl_imp_indices_ikh modules_in_component_set nr_of_modules
 									(dcl_modules, bitvectCreate nr_of_modules, expl_imp_info.[nr_of_icl_component], cs)
-
-	  (dcl_modules, cs)
-	  		= switch_port_to_new_syntax
-	  			(writeExplImportsToFile "icl.txt" imports.si_explicit dcl_modules cs)
-	  			(dcl_modules, cs)
 
 	  imports_ikh = ikhInsert` False nr_of_modules imports ikhEmpty
 	  		// maps the module indices of all modules in the actual component to all explicit
@@ -3778,18 +3765,3 @@ groupify { dag_nr_of_nodes, dag_get_children } component_numbers nr_of_component
 				= node_to_components![node_nr]
 		= ({ visited_array & [child_component_number] = True }, [child_component_number : visited_list],
 			{ node_to_components & [node_nr] = [child_component_number:current_components] })
-
-arg_string 0 = "result"
-arg_string arg_nr = toString arg_nr+++". arg"
-
-possibly_write_expl_imports_of_main_dcl_mod_to_file imports_ikh dcl_modules cs
-	| switch_port_to_new_syntax False True
-		= abort "possibly_write_expl_imports_of_main_dcl_mod_to_file is only used for portToNewSyntax"
-	#! x_main_dcl_module_n
-			= cs.cs_x.x_main_dcl_module_n
-	= case ikhSearch x_main_dcl_module_n imports_ikh of
-		No
-			// the main dcl module is not part of the currently checked module component
-			-> (dcl_modules, cs)
-		Yes {si_explicit}
-			-> writeExplImportsToFile "dcl.txt" si_explicit dcl_modules cs
