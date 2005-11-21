@@ -1181,7 +1181,6 @@ cIsNotStrict	:== False
 				| RecordUpdate !(Global DefinedSymbol) !Expression ![Bind Expression (Global FieldSymbol)]
 				| TupleSelect !DefinedSymbol !Int !Expression
 				| BasicExpr !BasicValue
-				| WildCard
 				| Conditional !Conditional
 
 				| AnyCodeExpr !(CodeBinding BoundVar) !(CodeBinding FreeVar) ![String]

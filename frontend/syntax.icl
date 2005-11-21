@@ -382,7 +382,6 @@ where
 	(<<<) file (RecordUpdate cons_symbol expression expressions) = file <<< '{' <<< cons_symbol <<< ' ' <<< expression <<< " & " <<< expressions <<< '}'
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
 //	(<<<) file (Lambda vars expr) = file <<< '\\' <<< vars <<< " -> " <<< expr
-	(<<<) file WildCard = file <<< '_'
 	(<<<) file (MatchExpr cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
 	(<<<) file (NoBind _) = file <<< "** NB **"

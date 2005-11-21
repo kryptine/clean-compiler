@@ -454,8 +454,6 @@ where
 		= find_calls fc_info expr fc_state
 	find_calls fc_info (BasicExpr _) fc_state
 		= fc_state
-	find_calls fc_info (WildCard) fc_state
-		= abort "WildCard"
 	find_calls fc_info (Conditional _) fc_state
 		= abort "Conditional"
 	find_calls fc_info (AnyCodeExpr _ _ _) fc_state
