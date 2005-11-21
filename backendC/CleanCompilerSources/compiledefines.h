@@ -21,6 +21,8 @@
 #define STRICT_LISTS 1
 #define BOXED_RECORDS 1
 
+#define NEW_APPLY
+
 #define KARBON
 
 #define NEW_SELECTOR_DESCRIPTORS
