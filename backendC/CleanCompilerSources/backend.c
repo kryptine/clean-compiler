@@ -3709,10 +3709,10 @@ BEInit (int argc)
 	gSpecialIdents [BESpecialIdentUndef]	= &undef_id;
 #endif
 
-	DeltaBId	= Identifier ("StdBool");
+	StdBoolId	= Identifier ("StdBool");
 	AndId	= NULL;
 	OrId	= NULL;
-	gSpecialIdents [BESpecialIdentStdBool]	= &DeltaBId;
+	gSpecialIdents [BESpecialIdentStdBool]	= &StdBoolId;
 	gSpecialIdents [BESpecialIdentAnd]		= &AndId;
 	gSpecialIdents [BESpecialIdentOr]		= &OrId;
 

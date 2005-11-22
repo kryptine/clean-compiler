@@ -2031,7 +2031,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 								
 				if (definition_state_p!=NULL){
 #ifdef FASTER_STRICT_AND_OR
-					if (sdef->sdef_module==DeltaBId->ident_name && node->node_arity==2){
+					if (sdef->sdef_module==StdBoolId->ident_name && node->node_arity==2){
 						if (sdef->sdef_ident==AndId){
 							ArgP arg1,arg2,false_arg;
 							NodeP false_node;

@@ -5,7 +5,7 @@
 #define BITTEST(v,n)	(((BITVECT) v >> n) & ((BITVECT) 1))
 #define TCONS_BIT_NR	31
 
-extern Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId, IfId, FailId, DeltaBId,
+extern Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId, IfId, FailId, StdBoolId,
 			 AndId, OrId, StdArrayId, ArrayFunctionIds [], ArrayId, StrictArrayId, UnboxedArrayId, ArrayClassId;
 #if STRICT_LISTS
 extern Ident StrictListId,UnboxedListId,TailStrictListId,StrictTailStrictListId,UnboxedTailStrictListId;
