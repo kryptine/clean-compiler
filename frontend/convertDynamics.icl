@@ -133,20 +133,9 @@ where
 		  {fun_body, fun_type, fun_info} = fun_def
 		| isEmpty fun_info.fi_dynamics
 			= (fun_defs, ci)
-			
-			// For each function which uses dynamics, a module id is constructed regardless
-			// of its use. In some very specific cases, the let generated here is superfluous.
-			# (TransformedBody fun_body=:{tb_rhs})
-				= fun_body
-			# fun_body
-				= {fun_body & tb_rhs = tb_rhs}
-			# fun_body
-				= TransformedBody fun_body
-			
-			# (unify_subst_var, ci)
-			  	=	newVariable "unify_subst" VI_Empty ci
-			# ci
-				= {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
+
+			# (unify_subst_var, ci) = newVariable "unify_subst" VI_Empty ci
+			# ci = {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
 
 			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
 					cinp_subst_var = unify_subst_var} fun_body ci
