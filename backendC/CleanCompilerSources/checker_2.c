@@ -103,7 +103,7 @@ Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId,
 #ifdef CLEAN2
 	DynamicId,
 #endif
-	DeltaBId, IfId, FailId, AndId, OrId,
+	StdBoolId, IfId, FailId, AndId, OrId,
 	StdArrayId, ArrayFunctionIds [NoArrayFun];
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
@@ -160,8 +160,6 @@ NodeDefs NewNodeDef (NodeId nid,Node node)
 	return new;
 }
 
-static Ident SystemFunctionsId,StdArrayAbortId;
-
 void InitChecker (void)
 {
 	FreeDefs=NIL;
@@ -198,8 +196,7 @@ void InitChecker (void)
 	undef_id = PutStringInHashTable ("undef",SymbolIdTable);
 #endif
 
-	SystemFunctionsId	= PutStringInHashTable ("StdEnum", ModuleIdTable);
-	DeltaBId 			= PutStringInHashTable ("StdBool", ModuleIdTable);
+	StdBoolId 			= PutStringInHashTable ("StdBool", ModuleIdTable);
 	StdArrayId			= PutStringInHashTable ("_SystemArray", ModuleIdTable);
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
@@ -207,9 +204,8 @@ void InitChecker (void)
 #endif
 
  	/* Predefined Array functions */
- 	
- 	StdArrayAbortId						= PutStringInHashTable ("_abortArray", SymbolIdTable);
-	ArrayFunctionIds[CreateArrayFun]	= PutStringInHashTable ("createArray", SymbolIdTable);
+
+ 	ArrayFunctionIds[CreateArrayFun]	= PutStringInHashTable ("createArray", SymbolIdTable);
 	ArrayFunctionIds[UnqArraySelectFun]	= PutStringInHashTable ("uselect", SymbolIdTable);
 	ArrayFunctionIds[ArrayReplaceFun]	= PutStringInHashTable ("replace", SymbolIdTable);
 	ArrayFunctionIds[UnqArraySizeFun]	= PutStringInHashTable ("usize", SymbolIdTable);
