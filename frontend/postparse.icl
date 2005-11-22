@@ -1062,7 +1062,7 @@ where
 		= (pea_ok && import_ok, parsed_modules,files, ca)
 
 scanModule :: !ParsedModule ![Ident] !Bool !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
-	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!Int,!*HashTable, !*File, !*Files)
+	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!*HashTable, !*File, !*Files)
 scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
 	# predefIdents = predefined_idents
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
@@ -1080,8 +1080,6 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  		= scanModules imports parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 
 	  (pea_dcl_ok,optional_dcl_mod,ca) =  collect_main_dcl_module optional_parsed_dcl_mod dcl_module_n ca
-
-	  (n_functions_and_macros_in_dcl_modules,ca) =ca!ca_fun_count
 
 	  modules = case (reverse parsed_modules) of
 						  	[{mod_type=MK_NoMainDcl}:modules]
@@ -1113,7 +1111,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  fun_defs = fun_defs++reverse ca_rev_fun_defs
 	  fun_range = {ir_from=0,ir_to=n_global_functions}
 
-	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,n_functions_and_macros_in_dcl_modules,hash_table, err_file, files)
+	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,hash_table, err_file, files)
 where
 	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
 	scan_main_dcl_module mod_ident MK_Main _ files ca

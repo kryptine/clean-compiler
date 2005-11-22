@@ -267,7 +267,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	if (options.listTypes.lto_listTypesKind == ListTypesInferred)
 				(Yes options.listTypes.lto_showAttributes)
 				No
-	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,n_functions_and_macros_in_dcl_modules,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
+	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
 		= frontEndInterface
 			{feo_up_to_phase=FrontEndPhaseAll
 			,feo_generics=options.compile_with_generics
@@ -291,14 +291,14 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	# var_heap=heaps.hp_var_heap
 	  hp_type_heaps=heaps.hp_type_heaps
 	  attrHeap=hp_type_heaps.th_attrs
-	# (success,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap,error, files)
+	# (success,functions_and_macros,var_heap,attrHeap,error, files)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
 				# (success, var_heap, attrHeap, error, files)
 				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error files
-				-> (success,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
-				// -> (True,functions_and_macros,n_functions_and_macros_in_dcl_modules,var_heap,attrHeap, error, files)
+				-> (success,functions_and_macros,var_heap,attrHeap, error, files)
+				// -> (True,functions_and_macros,var_heap,attrHeap, error, files)
 				with
 					appendRedirection arg
 						= case arg of
@@ -309,7 +309,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 							arg
 								->	arg
 			No
-				-> (False,{},0,var_heap,attrHeap,error, files)
+				-> (False,{},var_heap,attrHeap,error, files)
 		with
 /*
 			outputPath

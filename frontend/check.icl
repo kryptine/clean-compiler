@@ -147,10 +147,8 @@ where
 		#! symbol_table = writePtr id_info entry.ste_previous symbol_table
 		=([tv:gen_vars], symbol_table)
 
-	check_no_generic_vars_in_contexts :: !SymbolType ![TypeVar] !*TypeHeaps !*CheckState
-		-> (!*TypeHeaps, !*CheckState)
+	check_no_generic_vars_in_contexts :: !SymbolType ![TypeVar] !*TypeHeaps !*CheckState -> (!*TypeHeaps, !*CheckState)
 	check_no_generic_vars_in_contexts gen_type gen_vars th=:{th_vars} cs=:{cs_error}
-	
 		#! th_vars = clear_type_vars gen_type.st_vars th_vars
 		#! th_vars = mark_type_vars_used gen_vars th_vars
 		#! (th_vars, cs_error) = check_type_vars_not_used gen_type.st_context th_vars cs_error
@@ -179,7 +177,7 @@ where
 					#! cs_error = checkError tv_ident "context restrictions on generic variables are not allowed" cs_error 
 					-> (th_vars, cs_error)
 				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))	
-							
+						
 checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
 	-> (!*{#GenericCaseDef}, !*{#GenericDef}, !u:{#CheckedTypeDef}, !*{#DclModule},!.Heaps,!.CheckState)
 checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs modules heaps cs
@@ -2305,10 +2303,10 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 					# new_table = {new_table & [dcl_type_fun_index] = icl_type_fun_index}
 					= fill_conversion_table_for_type_funs (inc dcl_type_index) dcl_types icl_type_defs type_conversions new_table
 
-checkModule :: !Bool !ScannedModule !IndexRange ![FunDef] !Int !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
+checkModule :: !Bool !ScannedModule !IndexRange ![FunDef] !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
 	-> (!Bool, *IclModule, *{#DclModule}, *{!Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 
-checkModule support_dynamics {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs n_functions_and_macros_in_dcl_modules dcl_module_n_in_cache 
+checkModule support_dynamics {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs dcl_module_n_in_cache 
 	optional_dcl_mod scanned_modules dcl_modules cached_dcl_macros predef_symbols symbol_table err_file heaps
 	# nr_of_cached_modules = size dcl_modules
 	# (optional_pre_def_mod,predef_symbols)
