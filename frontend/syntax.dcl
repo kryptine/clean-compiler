@@ -462,8 +462,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	tdi_cons_vars		:: ![Int]
 	,	tdi_index_in_group	:: !Index
 	,	tdi_classification	:: !TypeClassification
-	,	tdi_mark			:: !Bool //AA
-	,	tdi_gen_rep 		:: !Optional GenericTypeRep //AA
+	,	tdi_gen_rep 		:: !Optional GenericTypeRep
 	}
 
 // AA..
@@ -1385,7 +1384,7 @@ EmptySymbolTableEntryCAF :: BoxedSymbolTableEntry
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_mark=False, tdi_gen_rep = No }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_gen_rep = No }
 
 MakeTypeVar name	:== { tv_ident = name, tv_info_ptr = nilPtr }
 MakeVar name		:== { var_ident = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
