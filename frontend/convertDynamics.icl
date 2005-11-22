@@ -36,9 +36,6 @@ import type_io;
 	,	cinp_subst_var		:: !BoundVar
 	}
 
-F :: !a .b -> .b
-F a b = b
-
 fatal :: {#Char} {#Char} -> .a
 fatal function_name message
 	=	abort ("convertDynamics, " +++ function_name +++ ": " +++ message)
