@@ -836,10 +836,6 @@ typedef struct {
 	struct symbol_def *	im_start;
 	Bool				im_main;
 	DefMod				im_def_module;
-
-#ifdef SHORT_CLASS_NAMES
-	struct module_info *	im_module_info;
-#endif
 #if IMPORT_OBJ_AND_LIB
 	struct string_list *	im_imported_objs;
 	struct string_list *	im_imported_libs;
@@ -858,10 +854,6 @@ struct def_repr {
 	AbsTypes	dm_abs_types;
 	RuleTypes	dm_rules;
 	Bool		dm_system_module;
-
-#ifdef SHORT_CLASS_NAMES
-	struct module_info *	dm_module_info;
-#endif
 #if WRITE_DCL_MODIFICATION_TIME
 	ModuleFileTime	dm_modification_time;
 #endif
