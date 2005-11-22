@@ -95,11 +95,6 @@ where
 	f write_type_info_state=:{wtis_type_heaps,wtis_type_defs,wtis_var_heap}
 		= (wtis_type_heaps,wtis_type_defs,wtis_var_heap)
 
-/*2.0
-f (Yes tcl_file)
-	= tcl_file;
-0.2*/
-
 convertDynamicPatternsIntoUnifyAppls :: !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
 			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
 convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
@@ -120,8 +115,7 @@ convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n groups fun_de
 		= case tcl_file of
 			No
 				-> (No,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
-			_ 
-				# tcl_file = f tcl_file;
+			Yes tcl_file
 				# (ok,tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
 					= write_tcl_file main_dcl_module_n dcl_mods icl_mod.icl_common tcl_file directly_imported_dcl_modules type_heaps ci_predef_symb 
 									 imported_types ci_var_heap common_defs icl_mod
