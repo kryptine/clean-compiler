@@ -306,13 +306,13 @@ where
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
 		  (st_args, cons_arg_vars, st_attr_env, (ts, ti, cs))
 		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] (ts, { ti & ti_type_heaps = ti_type_heaps }, cs)
-		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
+		  symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
 		  attr_vars = add_universal_attr_vars st_args free_attrs
 		  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = attr_vars, st_attr_env = st_attr_env }
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
 		  cons_def = { cons_def & cons_type = cons_type, cons_index = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
 		  						  cons_type_ptr = new_type_ptr, cons_arg_vars = cons_arg_vars }
-		= ({ ts & ts_cons_defs.[ds_index] = cons_def}, { ti & ti_var_heap = ti_var_heap }, cs)
+		= ({ ts & ts_cons_defs.[ds_index] = cons_def}, { ti & ti_var_heap = ti_var_heap }, { cs & cs_symbol_table=symbol_table })
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 			-> (![AType], ![[ATypeVar]], ![AttrInequality], !(!*TypeSymbols, !*TypeInfo, !*CheckState))
