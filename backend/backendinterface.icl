@@ -49,8 +49,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
-			functionIndices
-				=	flatten [[member \\ member <- group.group_members] \\ group <-: fe_components]
+			functionIndices = flatten [group.group_members \\ group <-: fe_components]
 	# backEndFiles
 		=	0
 	# (backEnd, backEndFiles)
@@ -103,10 +102,10 @@ optionallyPrintFunctionTypes {lto_listTypesKind, lto_showAttributes} typesPath i
 
 printFunctionTypes :: Bool Bool DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *File *BackEnd -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionTypes all attr info components functions attrHeap file backEnd
-	=	foldSt (printFunctionType all attr info) [(index, functions.[index]) \\ (_, index) <- functionIndices] (attrHeap, file, backEnd)
+	=	foldSt (printFunctionType all attr info) functionIndicesAndFunctions (attrHeap, file, backEnd)
 	where
-		functionIndices
-			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: components & componentIndex <- [1..]]
+		functionIndicesAndFunctions
+			=	[(member,functions.[member]) \\ group <-: components, member <- group.group_members]
 
 printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap, *File, *BackEnd) -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionType all attr info (functionIndex, {fun_ident,fun_type=Yes type}) (attrHeap, file, backEnd)
