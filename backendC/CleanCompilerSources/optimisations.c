@@ -1109,7 +1109,7 @@ static int add_n_new_arguments_for_local_function (ArgP arg_p,int n_arguments)
 			} else {
 				arg_node_p->node_node_id->nid_mark |= NID_LIFTED_BY_OPTIMISE;
 				arg_node_p->node_node_id->nid_forward_node_id=NULL;
-				
+								
 				n_arguments=add_n_new_arguments_for_local_function (arg_p->arg_next,n_arguments);
 				
 				if (n_arguments>MAX_N_FUNCTION_ARGUMENTS)
@@ -1134,7 +1134,7 @@ static int add_n_new_arguments_for_local_function (ArgP arg_p,int n_arguments)
 	return n_arguments;
 }
 
-static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,ArgS ***lhs_arg_h,ArgS **rhs_arg_p,StateP arg_state_p,int *arity_p,char *function_name_p,char *end_function_name,int n_arguments)
+static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,ArgS ***lhs_arg_h,ArgS **rhs_arg_p,StateP arg_state_p,int *arity_p,char *function_name_p,char *end_function_name,int *n_arguments_p)
 {
 	NodeIdP arg_node_id;
 	StateP call_state_p;
@@ -1224,12 +1224,12 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 								ArgP new_arg;
 								int new_n_arguments;
 								
-								new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,n_arguments-1);
+								new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,*n_arguments_p-1);
 								
 								if (new_n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 									break;
 									
-								n_arguments=new_n_arguments;
+								*n_arguments_p=new_n_arguments;
 
 								function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 								function_node->node_state=LazyState;
@@ -1241,7 +1241,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 								rhs_arg_p=&new_arg->arg_next;
 
 								function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&function_node->node_arguments,
-																						 function_state_p,arity_p,function_name_p,end_function_name,n_arguments);
+																						 function_state_p,arity_p,function_name_p,end_function_name,n_arguments_p);
 								
 								++arg_state_p;
 								continue;
@@ -1276,12 +1276,12 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						ArgP new_arg;
 						int new_n_arguments;
 						
-						new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,n_arguments-1);
+						new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,*n_arguments_p-1);
 								
 						if (new_n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 							break;
 
-						n_arguments=new_n_arguments;
+						*n_arguments_p=new_n_arguments;
 						
 						tuple_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 						tuple_node->node_state=LazyState;
@@ -1293,7 +1293,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						rhs_arg_p=&new_arg->arg_next;
 						
 						function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&tuple_node->node_arguments,
-																				arg_state_p->state_tuple_arguments,arity_p,function_name_p,end_function_name,n_arguments);
+																				arg_state_p->state_tuple_arguments,arity_p,function_name_p,end_function_name,n_arguments_p);
 
 						++arg_state_p;
 
@@ -1309,12 +1309,12 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						ArgP new_arg;
 						int new_n_arguments;
 						
-						new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,n_arguments-1);
+						new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,*n_arguments_p-1);
 								
 						if (new_n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 							break;
 						
-						n_arguments=new_n_arguments;
+						*n_arguments_p=new_n_arguments;
 
 						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 						function_node->node_state=LazyState;
@@ -1329,7 +1329,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 							init_apply_symb_function_state_p();
 
 						function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&function_node->node_arguments,
-																				 apply_symb_function_state_p,arity_p,function_name_p,end_function_name,n_arguments);
+																				 apply_symb_function_state_p,arity_p,function_name_p,end_function_name,n_arguments_p);
 						
 						++arg_state_p;
 						continue;
@@ -1357,12 +1357,12 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						ArgP new_arg;
 						int new_n_arguments;
 						
-						new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,n_arguments-1);
+						new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,*n_arguments_p-1);
 						
 						if (new_n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 							break;
 						
-						n_arguments=new_n_arguments;
+						*n_arguments_p=new_n_arguments;
 
 						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 						function_node->node_state=LazyState;
@@ -1376,7 +1376,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						rhs_arg_p=&new_arg->arg_next;
 
 						function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&function_node->node_arguments,
-																				 &StrictState,arity_p,function_name_p,end_function_name,n_arguments);
+																				 &StrictState,arity_p,function_name_p,end_function_name,n_arguments_p);
 						
 						++arg_state_p;	
 						continue;
@@ -1389,7 +1389,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 		else if (arg_node->node_kind==SelectorNode && arg_node->node_arity>=SELECTOR_U && arg_state_p->state_type==TupleState){
 			int new_n_arguments;
 
-			new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,n_arguments-1);
+			new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,*n_arguments_p-1);
 			
 			if (new_n_arguments<=MAX_N_FUNCTION_ARGUMENTS){
 				Node selector_node;
@@ -1397,7 +1397,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				StateP selector_arg_state_p;
 				StateS tuple_state,tuple_arg_states[2];
 
-				n_arguments=new_n_arguments;
+				*n_arguments_p=new_n_arguments;
 
 				selector_node=NewSelectorNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 				selector_node->node_state=LazyState;
@@ -1414,8 +1414,8 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
 
 				function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&selector_node->node_arguments,
-																		 selector_arg_state_p,arity_p,function_name_p,end_function_name,n_arguments);
-				
+																		 selector_arg_state_p,arity_p,function_name_p,end_function_name,n_arguments_p);
+
 				++arg_state_p;	
 				continue;
 			}
@@ -1486,7 +1486,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 	}
 	
 	*rhs_arg_p=NULL;
-	
+		
 	return function_name_p;
 }
 
@@ -1545,7 +1545,7 @@ static void create_new_local_function (Node node,StateP function_state_p)
 	arg_p=&node->node_arguments;
 
 	function_name_p = create_arguments_for_local_function (node,&arg_p,&lhs_arg_p,&rhs_root->node_arguments,function_state_p,
-															&function_arity,function_name_p,end_function_name,n_arguments);
+															&function_arity,function_name_p,end_function_name,&n_arguments);
 	
 	if (function_name_p!=NULL)
 		*function_name_p='\0';
