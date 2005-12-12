@@ -2799,6 +2799,8 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  			No
 		  				-> (cs_error, type_heaps)
 		  			Yes specified_symbol_type
+		  				| not cs_error.ea_ok
+							-> (cs_error, type_heaps)
 						# (err_code, type_heaps)
 						 		= symbolTypesCorrespond specified_symbol_type derived_symbol_type type_heaps
 						| err_code==CEC_Ok
