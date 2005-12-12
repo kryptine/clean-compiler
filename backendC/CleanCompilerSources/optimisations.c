@@ -1109,8 +1109,8 @@ static int add_n_new_arguments_for_local_function (ArgP arg_p,int n_arguments)
 			} else {
 				arg_node_p->node_node_id->nid_mark |= NID_LIFTED_BY_OPTIMISE;
 				arg_node_p->node_node_id->nid_forward_node_id=NULL;
-								
-				n_arguments=add_n_new_arguments_for_local_function (arg_p->arg_next,n_arguments);
+							
+				n_arguments=add_n_new_arguments_for_local_function (arg_p->arg_next,n_arguments+1);
 				
 				if (n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 					arg_node_p->node_node_id->nid_mark &= ~NID_LIFTED_BY_OPTIMISE;
