@@ -22,8 +22,8 @@ checkVersion VersionObservedIsTooOld errorFile
 			=	fwrites "Error: the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
-backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*Files -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*Files)
-backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n var_heap attrHeap errorFile files
+backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*File)
+backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n var_heap attrHeap errorFile outFile
 	# (observedCurrent, observedOldestDefinition, observedOldestImplementation)
 		=	BEGetVersion
 	  observedVersion =
@@ -45,7 +45,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# (compatible, errorFile)
 		=	checkVersion (versionCompare expectedVersion observedVersion) errorFile
 	| not compatible
-		=	(False, var_heap, attrHeap, errorFile, files)
+		=	(False, var_heap, attrHeap, errorFile, outFile)
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
@@ -62,14 +62,11 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		=	BEGenerateCode outputFileName backEnd
 	# backEnd
 		=	BECloseFiles backEnd
-	# (attrHeap, files, backEnd)
-		// FIXME: should be type file
-		=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap files backEnd
+	# (attrHeap, outFile, backEnd)
+		=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
 	# backEndFiles
 		=	BEFree backEnd backEndFiles
-	=	(backEndFiles == 0 && success, var_heap, attrHeap, errorFile, files)
-
-import typesupport
+	=	(backEndFiles == 0 && success, var_heap, attrHeap, errorFile, outFile)
 
 :: DictionaryToClassInfo =
 	{	dtci_iclModuleIndex :: Int
@@ -83,22 +80,11 @@ DictionaryToClassInfo iclModuleIndex iclModule dclModules :==
 	,	dtci_dclModules = dclModules
 	}
 
-optionallyPrintFunctionTypes :: ListTypesOption {#Char} DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *Files !*BackEnd -> (*AttrVarHeap, *Files, *BackEnd)
-optionallyPrintFunctionTypes {lto_listTypesKind, lto_showAttributes} typesPath info components functions attrHeap files backEnd
+optionallyPrintFunctionTypes :: ListTypesOption {#Char} DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *File !*BackEnd -> (*AttrVarHeap, *File, *BackEnd)
+optionallyPrintFunctionTypes {lto_listTypesKind, lto_showAttributes} typesPath info components functions attrHeap outFile backEnd
 	| lto_listTypesKind == ListTypesStrictExports || lto_listTypesKind == ListTypesAll
-		# (opened, typesFile, files)
-			=	fopen typesPath FAppendText files
-		| not opened
-			=	abort ("couldn't open types file \"" +++ typesPath +++ "\"\n")
-		# (attrHeap, typesFile, backEnd)
-			=	printFunctionTypes (lto_listTypesKind == ListTypesAll) lto_showAttributes info components functions attrHeap typesFile backEnd
-		# (closed, files)
-			=	fclose typesFile files
-		| not closed
-			=	abort ("couldn't close types file \"" +++ typesPath +++ "\"\n")
-		=	(attrHeap, files, backEnd)
-	// otherwise
-		=	(attrHeap, files, backEnd)
+		=	printFunctionTypes (lto_listTypesKind == ListTypesAll) lto_showAttributes info components functions attrHeap outFile backEnd
+		=	(attrHeap, outFile, backEnd)
 
 printFunctionTypes :: Bool Bool DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *File *BackEnd -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionTypes all attr info components functions attrHeap file backEnd
