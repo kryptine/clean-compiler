@@ -550,6 +550,8 @@ Clean (BEStrictPositions :: Int BackEnd -> (Int, Int, BackEnd))
 
 int BECopyInts  (int cLength, int *ints, int *cleanArray);
 
+int BEGetIntFromArray  (int index, int *ints);
+
 // temporary hack
 void BEDeclareDynamicTypeSymbol (int typeIndex, int moduleIndex);
 Clean (BEDeclareDynamicTypeSymbol :: Int Int BackEnd -> BackEnd)

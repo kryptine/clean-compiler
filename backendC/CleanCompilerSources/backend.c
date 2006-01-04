@@ -3512,6 +3512,12 @@ BECopyInts  (int cLength, int *ints, int *cleanArray)
 	return (!truncate);
 } /* BECopyInts */
 
+int
+BEGetIntFromArray  (int index, int *ints)
+{
+	return ints[index];
+}
+
 static void
 CheckBEEnumTypes (void)
 {
