@@ -526,9 +526,18 @@ void clear_p_at_node_tree (void)
 
 static NodeP reorder_bits (NodeP node)
 {
+#ifdef _WIN64
+	unsigned __int64 n,m;
+	
+	n=(unsigned __int64)node;
+
+	m=n & 0x000ffffffff;
+	n= (m<<32) | ((n^m)>>32);	
+#else
 	unsigned long n,m;
 	
 	n=(long)node;
+#endif
 
 	m=n & 0x000ffffL;
 	n= (m<<16) | ((n^m)>>16);

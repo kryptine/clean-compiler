@@ -47,17 +47,23 @@ typedef unsigned long SysTime;
 
 #ifdef _WINDOWS_
 # include <stdarg.h>
-# define FileTime FILETIME
-# ifdef __MWERKS__
-#	include <x86_prefix.h>
+# ifdef _WIN64
+#  undef _WINDOWS_
+#  include <windows.h>
+#  define FileTime struct _FILETIME
 # else
-#	define _X86_
+#  ifdef __MWERKS__
+# 	include <x86_prefix.h>
+#  else
+# 	define _X86_
+#  endif
+#  include <windef.h>
+#  include <winbase.h>
+#  define FileTime FILETIME
 # endif
-# include <windef.h>
-# include <winbase.h>
 #else
 # if defined (POWER) && defined (KARBON)
-#include <UTCUtils.h>
+#  include <UTCUtils.h>
 typedef UTCDateTime FileTime;
 # else
 typedef unsigned long FileTime;

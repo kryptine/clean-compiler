@@ -2,7 +2,7 @@
 	Clean string
 	============
 */
-typedef struct clean_string {int length; char chars [1]; } *CleanString;
+typedef struct clean_string {size_t length; char chars [1]; } *CleanString;
 
 /*
 	Debugging

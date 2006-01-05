@@ -344,7 +344,7 @@ static unsigned MemUse (void)
 	if (! free_pos)
 		l = (long) (usedblocks-1) * BLOCK_SIZE;
 	else
-		l = (long) (usedblocks-1) * BLOCK_SIZE + ((long) free_pos - (long) SA_store[usedblocks-1]);
+		l = (long) (usedblocks-1) * BLOCK_SIZE + (long) ((size_t) free_pos - (size_t) SA_store[usedblocks-1]);
 
 	return (unsigned) ((l-1) / KBYTE) + 1;
 }
