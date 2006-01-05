@@ -121,6 +121,7 @@
 /EXPORT: BESetMainDclModuleN
 /EXPORT: BEStrictPositions
 /EXPORT: BECopyInts
+/EXPORT: BEGetIntFromArray
 /EXPORT: BEDeclareDynamicTypeSymbol
 /EXPORT: BEDynamicTempTypeSymbol
 /EXPORT: BEInsertForeignExport

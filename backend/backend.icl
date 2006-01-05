@@ -775,12 +775,19 @@ BEStrictPositions a0 a1 = code {
 	ccall BEStrictPositions "I:VII:I"
 }
 // void BEStrictPositions (int functionIndex,int* bits,int** positions);
-
+/*
 BECopyInts :: !Int !Int !Int -> Int;
 BECopyInts a0 a1 a2 = code {
 	ccall BECopyInts "III:I"
 }
+*/
 // int BECopyInts (int cLength,int* ints,int* cleanArray);
+
+BEGetIntFromArray :: !Int !Int -> Int;
+BEGetIntFromArray a0 a1 = code {
+	ccall BEGetIntFromArray "II:I"
+}
+// int BEGetIntFromArray (int index,int* ints);
 
 BEDeclareDynamicTypeSymbol :: !Int !Int !BackEnd -> BackEnd;
 BEDeclareDynamicTypeSymbol a0 a1 a2 = code {
