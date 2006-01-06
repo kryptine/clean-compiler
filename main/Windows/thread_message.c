@@ -48,7 +48,7 @@ void install_compiler_result_handler (void)
 }
 
 int start_compiler_process (CleanString compiler_path,CleanString compiler_directory,CleanString command,
-							int *compiler_thread_id_p,int *compiler_thread_handle_p,int *compiler_process_handle_p)
+							int *compiler_thread_id_p,size_t *compiler_thread_handle_p,size_t *compiler_process_handle_p)
 {
 	PSTR application_name,command_line,env,dir;
 	STARTUPINFO si;
@@ -124,7 +124,7 @@ int get_integers_from_message (int wm_number,int *i1_p,int *i2_p)
 
 #define PM_QS_POSTMESSAGE   ((QS_POSTMESSAGE | QS_HOTKEY | QS_TIMER) << 16)
 
-int get_integers_from_thread_message (int wm_number,int thread_handle,int *i1_p,int *i2_p)
+int get_integers_from_thread_message (int wm_number,size_t thread_handle,int *i1_p,int *i2_p)
 {
 	MSG message;
 	int r;
@@ -156,7 +156,7 @@ int get_integers_from_thread_message (int wm_number,int thread_handle,int *i1_p,
 	return r;
 }
 
-int get_string_from_file_map_and_delete_map (int file_map,CleanString s)
+int get_string_from_file_map_and_delete_map (size_t file_map,CleanString s)
 {
 	int l,i;
 	char *chars,*p;
@@ -178,7 +178,7 @@ int get_string_from_file_map_and_delete_map (int file_map,CleanString s)
 	return 1;
 }
 
-int send_string_to_thread (int thread_id,int process_handle,int wm_number,CleanString s)
+int send_string_to_thread (int thread_id,size_t process_handle,int wm_number,CleanString s)
 {
 	HANDLE file_map,file_map2;
 	char *chars,*p1;
@@ -193,7 +193,7 @@ int send_string_to_thread (int thread_id,int process_handle,int wm_number,CleanS
 	if (l==0 || chars[l-1]!='\0')
 		return 0;
 
-	file_map=CreateFileMapping ((HANDLE)0xFFFFFFFF,NULL,PAGE_READWRITE,0,l,NULL);
+	file_map=CreateFileMapping ((HANDLE)(-1),NULL,PAGE_READWRITE,0,l,NULL);
 	if (file_map==NULL)
 		return 0;
 
