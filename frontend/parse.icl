@@ -598,7 +598,7 @@ where
 		# (type_cons, pState) = get_type_cons type pState
 			with
 				get_type_cons (TA type_symb []) pState
-						= (TypeConsSymb type_symb, pState)							
+					= (TypeConsSymb type_symb, pState)
 				get_type_cons (TA type_symb _) pState
 					# pState = parseError "generic type, no constructor arguments allowed" No " |}" pState
 					= (abort "no TypeCons", pState)
@@ -706,20 +706,6 @@ where
 		where
 			foreign_export_error s pState
 				= (True,PD_Erroneous,tokenBack (parseError "foreign export" No s pState))
-
-/*
-isEqualToken :: !Token -> Bool
-isEqualToken EqualToken			= True
-isEqualToken _					= False
-*/
-/*
-isRhsStartToken :: !ParseContext !Token -> Bool
-isRhsStartToken parseContext EqualToken			= True
-isRhsStartToken parseContext ColonDefinesToken	= isGlobalOrClassOrInstanceDefsContext parseContext
-isRhsStartToken parseContext DefinesColonToken	= True
-isRhsStartToken parseContext DoubleArrowToken	= True // PK
-isRhsStartToken parseContext _					= False
-*/
 
 optionalSpecials :: !ParseState -> (!Specials, !ParseState)
 optionalSpecials pState
