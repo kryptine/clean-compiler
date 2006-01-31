@@ -380,6 +380,10 @@ BESetMainDclModuleN (int main_dcl_module_n_parameter)
 
 static DefMod im_def_module;
 
+static void	DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancestor);
+static BESymbolP CreateDictionarySelectFunSymbol (void);
+static BESymbolP CreateDictionaryUpdateFunSymbol (void);
+
 void
 BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctions, int nTypes, int nConstructors, int nFields)
 {
@@ -428,7 +432,6 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 
 	for (i = 0; i < ArraySize (gLocallyGeneratedFunctions); i++)
 	{
-		static void	DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancestor);
 		BELocallyGeneratedFunctionP	locallyGeneratedFunction;
 
 		locallyGeneratedFunction	= &gLocallyGeneratedFunctions [i];
@@ -438,9 +441,6 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 
 	/* +++ hack */
 	{
-		static BESymbolP CreateDictionarySelectFunSymbol (void);
-		static BESymbolP CreateDictionaryUpdateFunSymbol (void);
-
 		gBEState.be_dictionarySelectFunSymbol	= CreateDictionarySelectFunSymbol ();
 		gBEState.be_dictionaryUpdateFunSymbol	= CreateDictionaryUpdateFunSymbol ();
 	}
