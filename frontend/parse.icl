@@ -852,14 +852,6 @@ where
 	ExprWithLocals		=	[ LetBefore ] sep RootExpression endOfDefinition [ LocalFunctionDefs ]
 */
 
-
-isRhsStartToken :: !ParseContext !Token -> Bool
-isRhsStartToken parseContext EqualToken			= True
-isRhsStartToken parseContext ColonDefinesToken	= isGlobalOrClassOrInstanceDefsContext parseContext
-isRhsStartToken parseContext DefinesColonToken	= True
-isRhsStartToken parseContext DoubleArrowToken	= True // PK
-isRhsStartToken parseContext _					= False
-
 :: RhsDefiningSymbol
 	=	RhsDefiningSymbolExact Token
 	|	RhsDefiningSymbolCase			// '->' or '='
