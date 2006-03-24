@@ -1235,7 +1235,7 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 		positionToLineNumber (LinePos _ lineNumber)
 			=	lineNumber
 		positionToLineNumber _
-			=	-1
+			=	0
 
 beautifyAttributes :: SymbolType -> BEMonad SymbolType
 beautifyAttributes st
