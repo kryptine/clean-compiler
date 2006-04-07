@@ -122,6 +122,7 @@ BEDefineImportedObjsAndLibs
 BESetMainDclModuleN
 BEStrictPositions
 BECopyInts
+BEGetIntFromArray
 BEDeclareDynamicTypeSymbol
 BEDynamicTempTypeSymbol
 BEInsertForeignExport
