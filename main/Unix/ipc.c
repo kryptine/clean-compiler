@@ -13,7 +13,12 @@
 	Clean string
 	============
 */
-typedef struct clean_string {int length; char chars [1]; } *CleanString;
+
+#ifdef _WIN64
+typedef struct clean_string {__int64 length; char chars [1]; } *CleanString;
+#else
+typedef struct clean_string {long length; char chars [1]; } *CleanString;
+#endif
 
 # define Clean(ignore)
 # include "ipc.h"
