@@ -8,7 +8,7 @@ import ipc
 from filesystem import ensureDirectoryExists
 
 import code from "cDirectory.o"
-import code from "ipc.o"
+import code from "ipc_c.o"
 
 PathSeparator
 	:==	':'
