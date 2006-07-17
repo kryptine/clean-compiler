@@ -3236,6 +3236,10 @@ where
 		= case av_info of
 			AVI_Attr a -> (a, th_attrs)
 			AVI_Empty -> (attr, th_attrs) 
+	subst_attr (TA_RootVar {av_info_ptr}) th_attrs
+		# (av_info, th_attrs) = readPtr av_info_ptr th_attrs 
+		= case av_info of
+			AVI_Attr a -> (a, th_attrs)
 	subst_attr TA_Multi th = (TA_Multi, th)
 	subst_attr TA_Unique th = (TA_Unique, th)
 
@@ -3668,7 +3672,7 @@ foldExpr f EE st
 foldExpr f expr st 
 	= abort "generic.icl: foldExpr does not match\n"//f expr st
 		---> ("foldExpr does not match", expr)
-
+/*
 //-----------------------------------------------------------------------------
 // map expression applies a function to each node of an expression
 // recursively:
@@ -3778,6 +3782,7 @@ where
 		= ({pat & dp_rhs = dp_rhs}, st) 
 
 mapExprSt f expr st = f expr st		
+*/
 
 // needed for collectCalls
 instance == FunCall where (==) (FunCall x _) (FunCall y _) = x == y
