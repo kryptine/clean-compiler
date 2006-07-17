@@ -906,7 +906,6 @@ where
 		| ok
 			= equiv atype1.at_type atype2.at_type { heaps & th_attrs = th_attrs }
 			= (False, { heaps & th_attrs = th_attrs })
-
 	where
 		equi_attrs attr=:(TA_Var {av_info_ptr}) (TA_TempVar av_number) attr_var_heap
 			# (av_info, attr_var_heap) = readPtr av_info_ptr attr_var_heap
@@ -1751,27 +1750,25 @@ flattenCoercionTree tree
 
 anonymizeAttrVars :: !SymbolType ![AttrInequality] !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_inequalities th_attrs
-	# th_attrs
-	  		= countAttrVars st th_attrs
-	  th_attrs
-	  		= foldSt markUsedAttrVars st_attr_env th_attrs
-	  th_attrs
-	  		= foldSt mark_once_occurring_implicit_attr_var implicit_inequalities th_attrs
-	  (st_args, th_attrs)
-	  		= mapSt anonymize_atype st_args th_attrs
-	  (st_result, th_attrs)
-	  		= anonymize_atype st_result th_attrs
+	# th_attrs = countAttrVars st th_attrs
+	  th_attrs = foldSt markUsedAttrVars st_attr_env th_attrs
+	  th_attrs = foldSt mark_once_occurring_implicit_attr_var implicit_inequalities th_attrs
+	  (st_args, th_attrs) = mapSt anonymize_atype st_args th_attrs
+	  (st_result, th_attrs) = anonymize_atype st_result th_attrs
 	= ({ st & st_args = st_args, st_result = st_result }, th_attrs)
   where
 	anonymize_atype atype=:{at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
 		# (at_type, th_attrs)	= anonymize_type at_type th_attrs
 		  (avi, th_attrs)		= readPtr av_info_ptr th_attrs
 		= case avi of
-			AVI_Count c
-				// this attribute variable doesn't occur in the attribute inequalities
-				| c <= 1
-					-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
-					-> ({ atype & at_type = at_type }, th_attrs)
+			AVI_CountMany
+				-> ({ atype & at_type = at_type }, th_attrs)
+			AVI_CountZero
+				-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
+			AVI_CountOne
+				-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
+			AVI_CountVar _
+				-> ({ atype & at_type = at_type, at_attribute = TA_Anonymous }, th_attrs)
 			AVI_Attr TA_None
 				-> ({ atype & at_type = at_type, at_attribute = TA_None }, th_attrs)
 			_
@@ -1790,11 +1787,9 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 		# (l, th_attrs) = anonymize_atype l th_attrs
 		  (r, th_attrs) = anonymize_atype r th_attrs
 		= (l --> r, th_attrs)
-//AA..
 	anonymize_type (TArrow1 type) th_attrs
 		# (type, th_attrs) = anonymize_atype type th_attrs
 		= (TArrow1 type, th_attrs)
-//..AA		
 	anonymize_type (cv :@: args) th_attrs
 		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
 		= (cv :@: args, th_attrs)
@@ -1808,39 +1803,51 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	// for all attribute variables: set the attrVarInfo to (AVI_count c) where c is the number of
 	// occurences in of that attribute variable in the SymbolType (excluding inequalities)
 	countAttrVars {st_attr_vars, st_args, st_result} th_attrs
-		# th_attrs
-				= foldSt (\av=:{av_info_ptr} th_attrs -> writePtr av_info_ptr (AVI_Count 0) th_attrs)
+		# th_attrs = foldSt (\av=:{av_info_ptr} th_attrs -> writePtr av_info_ptr AVI_CountZero th_attrs)
 						st_attr_vars th_attrs
 		= foldSt count_attr_vars_of_atype st_args (count_attr_vars_of_atype st_result th_attrs)
 	where
 		count_attr_vars_of_atype {at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
-			# (AVI_Count c, th_attrs) = readPtr av_info_ptr th_attrs
-			| isTypeVar at_type
-				| c > 0
-					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c + 1)) th_attrs)
-					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c - 1)) th_attrs)
-				| c > 0
-					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (c + 1)) th_attrs)
-					= count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_Count (~c + 1)) th_attrs)
-		where
-			isTypeVar (TV _)	= True 
-			isTypeVar (GTV _)	= True
-			isTypeVar (TQV _)	= True
-			isTypeVar _			= False
-			
+			# (av_info,th_attrs) = readPtr av_info_ptr th_attrs
+			= case av_info of
+				AVI_CountZero
+					-> case at_type of
+						TV {tv_info_ptr}
+							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
+						GTV {tv_info_ptr}
+							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
+						TQV {tv_info_ptr}
+							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
+						_
+							-> count_attr_vars_of_type at_type (writePtr av_info_ptr AVI_CountOne th_attrs)
+				AVI_CountVar previous_tv_info_ptr
+					-> case at_type of
+						TV {tv_info_ptr}
+							| tv_info_ptr==previous_tv_info_ptr
+								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
+						GTV {tv_info_ptr}
+							| tv_info_ptr==previous_tv_info_ptr
+								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
+						TQV {tv_info_ptr}
+							| tv_info_ptr==previous_tv_info_ptr
+								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
+						_
+							-> count_attr_vars_of_type at_type (writePtr av_info_ptr AVI_CountMany th_attrs)
+				AVI_CountOne
+					-> count_attr_vars_of_type at_type (writePtr av_info_ptr AVI_CountMany th_attrs)
+				AVI_CountMany
+					-> count_attr_vars_of_type at_type th_attrs
 		count_attr_vars_of_atype {at_type} th_attrs
 			= count_attr_vars_of_type at_type th_attrs
-	
+
 		count_attr_vars_of_type (TA _ args) th_attrs
 			= foldSt count_attr_vars_of_atype args th_attrs
 		count_attr_vars_of_type (TAS _ args _) th_attrs
 			= foldSt count_attr_vars_of_atype args th_attrs
 		count_attr_vars_of_type (l --> r) th_attrs
 			= count_attr_vars_of_atype l (count_attr_vars_of_atype r th_attrs)
-//AA..
 		count_attr_vars_of_type (TArrow1 t) th_attrs
 			= count_attr_vars_of_atype t th_attrs
-//..AA
 		count_attr_vars_of_type (_ :@: args) th_attrs
 			= foldSt count_attr_vars_of_atype args th_attrs
 		count_attr_vars_of_type _ th_attrs
@@ -1855,7 +1862,7 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	mark_once_occurring_implicit_attr_var {ai_offered={av_info_ptr}} th_attrs
 		# (avi, th_attrs) = readPtr av_info_ptr th_attrs
 		= case avi of
-			AVI_Count 1
+			AVI_CountOne
 				-> writePtr av_info_ptr (AVI_Attr TA_None) th_attrs
 			_
 				-> th_attrs

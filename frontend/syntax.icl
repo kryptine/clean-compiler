@@ -813,7 +813,10 @@ where
 	(<<<) file (AVI_Forward temp_attr_id) = file <<< "AVI_Forward " <<< temp_attr_id 
 	(<<<) file (AVI_CorrespondenceNumber n) = file <<< "AVI_CorrespondenceNumber " <<< n
 	(<<<) file AVI_Used					= file <<< "AVI_Used"
-	(<<<) file (AVI_Count n) 			= file <<< "AVI_Count " <<< n
+	(<<<) file AVI_CountZero 			= file <<< "AVI_CountZero"
+	(<<<) file AVI_CountOne 			= file <<< "AVI_CountOne"
+	(<<<) file AVI_CountMany 			= file <<< "AVI_CountMany"
+	(<<<) file (AVI_CountVar _) 		= file <<< "AVI_CountVar"
 	(<<<) file (AVI_SequenceNumber n) 	= file <<< "AVI_SequenceNumber " <<< n
 	(<<<) file AVI_Collected 			= file <<< "AVI_Collected"
 

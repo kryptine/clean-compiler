@@ -964,7 +964,12 @@ cNonRecursiveAppl	:== False
 					| AVI_Forward !TempAttrId 
 					| AVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
 					| AVI_Used
-					| AVI_Count !Int /* auxiliary used in module typesupport */
+					/* auxiliary constructors used in anonymizeAttrVars in module typesupport: */
+					| AVI_CountZero
+					| AVI_CountOne
+					| AVI_CountMany
+					| AVI_CountVar !TypeVarInfoPtr
+					/* */
 					| AVI_SequenceNumber !Int // RWS
 					| AVI_Collected // RWS
 
