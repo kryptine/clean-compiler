@@ -28,7 +28,7 @@ ensureCleanSystemFilesExists path env
 
 import thread_message;
 
-import code from "thread_message.obj";
+import code from "c_thread_message.";
 
 set_compiler_id :: !Int -> Int
 set_compiler_id compiler_id = code {
