@@ -5,7 +5,7 @@ import StdEnv
 import ArgEnv
 
 // import for filesystem
-import code from "cDirectory.obj",  library "directory_library" // Windows
+import code from "cDirectory.",  library "directory_library" // Windows
 from filesystem import ensureDirectoryExists
 
 PathSeparator
