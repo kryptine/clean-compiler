@@ -1,15 +1,10 @@
 definition module portToNewSyntax
 
 from StdMisc import abort
-//1.3
-from StdFile import Files
-from StdString import String
-from scanner import SearchPaths
-//3.1
-/*2.0
+
 from StdFile import :: Files
 from scanner import :: SearchPaths
-0.2*/
+
 import checksupport
 
 switch_port_to_new_syntax port dont_port :== port
