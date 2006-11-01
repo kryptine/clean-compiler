@@ -11,7 +11,10 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 
 import type_io;
 
-:: TypeCodeVariableInfo = TCI_TypeVar !Expression | TCI_TypePatternVar !Expression
+:: TypeCodeVariableInfo = TCI_TypeVar !Expression
+						| TCI_TypePatternVar !Expression
+						| TCI_SelectionsTypePatternVar ![(Expression,[Selection])]
+
 :: DynamicValueAliasInfo :== BoundVar
 
 ::	*ConversionState =
@@ -182,31 +185,37 @@ instance convertDynamics TransformedBody where
 //				=	writePtr fv_info_ptr (VI_TypeCodeVariable TCI_TypeTerm) var_heap
 
 			collect_global_type_pattern_var :: FreeVar ([LetBind], BoundVar, *ConversionState) -> ([LetBind], BoundVar, *ConversionState)
-			collect_global_type_pattern_var {fv_info_ptr} (l, subst, ci)
-				# (var_info, ci_var_heap)
-					=	readPtr fv_info_ptr ci.ci_var_heap
-				# ci
-					=	{ci & ci_var_heap = ci_var_heap}
-				=	case var_info of
-						VI_TypeCodeVariable (TCI_TypePatternVar tpv)
-							# (bind_global_tpv_symb, ci) 
-								=	getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
-							# type_code
-								=	{var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-							# (unify_subst_var, ci)
-							  	=	newVariable "gtpv_subst" VI_Empty ci
-							  unify_subst_fv
-							  	=	varToFreeVar unify_subst_var 1
-							# let_bind
-								= { lb_src = App {	app_symb		= bind_global_tpv_symb,
-													app_args 		= [tpv, Var type_code, Var unify_subst_var],
-													app_info_ptr	= nilPtr }
-								,	lb_dst =  varToFreeVar subst 1
-								,	lb_position = NoPos
-								}
-							->	([let_bind:l], unify_subst_var, ci)
-						_
-							->	(l, subst, ci)
+			collect_global_type_pattern_var {fv_info_ptr} (let_binds, subst, ci)
+			  #	(var_info, ci_var_heap) = readPtr fv_info_ptr ci.ci_var_heap
+				ci = {ci & ci_var_heap = ci_var_heap}
+			  =	case var_info of
+					VI_TypeCodeVariable (TCI_TypePatternVar tpv)
+						# type_code = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+						-> bind_global_type_pattern_var tpv type_code let_binds subst ci
+					VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)
+						-> collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst ci
+					_
+						-> (let_binds, subst, ci)
+			where
+				bind_global_type_pattern_var tpv type_code let_binds subst ci
+				  #	(bind_global_tpv_symb, ci)
+						= getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
+					(unify_subst_var, ci) = newVariable "gtpv_subst" VI_Empty ci
+					let_bind
+						= { lb_src = App {	app_symb		= bind_global_tpv_symb,
+											app_args 		= [tpv, type_code, Var unify_subst_var],
+											app_info_ptr	= nilPtr }
+						,	lb_dst =  varToFreeVar subst 1
+						,	lb_position = NoPos }
+				  =	([let_bind:let_binds], unify_subst_var, ci)
+
+				collect_global_type_pattern_var_selections [(tpv,selections):tc_selections] fv_info_ptr let_binds subst ci
+				  #	dictionary = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+					type_code = Selection NormalSelector dictionary selections
+					(let_binds,subst,ci) = bind_global_type_pattern_var tpv type_code let_binds subst ci
+				  =	collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst ci
+				collect_global_type_pattern_var_selections [] fv_info_ptr let_binds subst ci
+				  =	(let_binds,subst,ci)
 
 			share_init_subst :: BoundVar [LetBind] Expression *ConversionState
 					-> (Expression, *ConversionState)
@@ -551,40 +560,30 @@ convertPatternTypeCode cinp tce ci
 	=	(type_code, binds, ci)
 
 convertTypeCode :: !Bool !ConversionInput !TypeCodeExpression (!Bool, ![LetBind], !*ConversionState)
-										-> (!Expression, (!Bool, ![LetBind], !*ConversionState))
+											-> (!Expression, !(!Bool, ![LetBind], !*ConversionState))
 convertTypeCode pattern _ (TCE_Var var_info_ptr) (has_var, binds, ci=:{ci_var_heap})
-	# (var_info, ci_var_heap)
-		=	readPtr var_info_ptr ci_var_heap
-	  ci
-	  	=	{ci & ci_var_heap = ci_var_heap}
+	# (var_info, ci_var_heap) = readPtr var_info_ptr ci_var_heap
+	  ci =  {ci & ci_var_heap = ci_var_heap}
 	=	case var_info of
 			VI_TypeCodeVariable (TCI_TypeVar tv)
 				->	(tv, (has_var, binds, ci))
 			VI_TypeCodeVariable (TCI_TypePatternVar tpv)
 				->	(tpv, (True, binds, ci))
 			_
-				# (expr, ci)
-					=	createTypePatternVariable ci
-				# ci
-					=	{ci & ci_var_heap
-						=	writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
+				# (expr, ci) = createTypePatternVariable ci
+				# ci = {ci & ci_var_heap = writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
 				->	(expr, (True, binds, ci))
 convertTypeCode pattern _ (TCE_TypeTerm var_info_ptr) (has_var, binds, ci=:{ci_var_heap})
-	# (var_info, ci_var_heap)
-		=	readPtr var_info_ptr ci_var_heap
-	  ci
-	  	=	{ci & ci_var_heap = ci_var_heap}
+	# (var_info, ci_var_heap) = readPtr var_info_ptr ci_var_heap
+	  ci = {ci & ci_var_heap = ci_var_heap}
 	=	case var_info of
 			VI_TypeCodeVariable (TCI_TypeVar tv)
 				->	(tv, (has_var, binds, ci))
 			VI_TypeCodeVariable (TCI_TypePatternVar tpv)
 				->	(tpv, (True, binds, ci))
 			_
-				# (expr, ci)
-					=	createTypePatternVariable ci
-				# ci
-					=	{ci & ci_var_heap
-						=	writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
+				# (expr, ci) = createTypePatternVariable ci
+				# ci = {ci & ci_var_heap = writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
 				->	(expr, (True, binds, ci))
 
 convertTypeCode pattern cinp (TCE_App t arg) (has_var, binds, ci)
@@ -720,9 +719,24 @@ convertTypeCode pattern cinp (TCE_UnqType type) (has_var, binds, ci)
 			app_info_ptr	= nilPtr}, (has_var, binds, ci))
 
 convertTypeCode pattern cinp (TCE_Selector selections var_info_ptr) st
-	# (var, st)		
-		=	convertTypeCode pattern cinp (TCE_Var var_info_ptr) st
-	=	(Selection NormalSelector var selections, st)
+  #	(has_var, binds, ci) = st
+	(var_info, ci_var_heap) = readPtr var_info_ptr ci.ci_var_heap
+	ci = {ci & ci_var_heap = ci_var_heap}
+  =	case var_info of
+		VI_TypeCodeVariable (TCI_TypeVar tv)
+			-> abort "convertTypeCode TCE_Selector"
+		VI_TypeCodeVariable (TCI_TypePatternVar tpv)
+			-> abort "convertTypeCode TCE_Selector"
+		VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)
+			# (var, ci) = createTypePatternVariable ci
+			  tc_selections = [(var,selections):tc_selections]
+			  ci = {ci & ci_var_heap = writePtr var_info_ptr (VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)) ci.ci_var_heap}
+		  	-> (var, (True, binds, ci))
+		_
+			# (var, ci) = createTypePatternVariable ci
+			  tc_selections = [(var,selections)]
+			  ci = {ci & ci_var_heap = writePtr var_info_ptr (VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)) ci.ci_var_heap}
+			-> (var, (True, binds, ci))
 
 createTypePatternVariable :: !*ConversionState -> (!Expression, !*ConversionState)
 createTypePatternVariable ci
