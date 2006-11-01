@@ -20,7 +20,7 @@ import genericsupport, compilerSwitches, type_io_common
 
 ::	ReducedContexts = 
 	{	rcs_class_context			:: !ReducedContext
-	,	rcs_constraints_contexts	:: ![ReducedContexts]
+	,	rcs_constraints_contexts	:: ![ClassApplication]
 	}
 
 ::	TypeCodeInstance =
@@ -116,7 +116,7 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 reduceContexts :: !ReduceInfo ![TypeContext] !*ReduceState -> (![ClassApplication], !*ReduceState)
 reduceContexts info tcs rs_state
 	=	mapSt (try_to_reduce_context info) tcs rs_state
-where		
+where
 	try_to_reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ClassApplication, !*ReduceState)
 	try_to_reduce_context info tc rs_state=:{rs_predef_symbols, rs_new_contexts}
 		| context_is_reducible tc rs_predef_symbols
@@ -203,14 +203,15 @@ where
 			= ({ rcs_class_context = { rc_class = class_symb, rc_inst_module = NoIndex, rc_inst_members = {}, rc_types = tc_types, rc_red_contexts = [] },
 				rcs_constraints_contexts = constraints }, rs_state)
 
-	reduce_contexts_in_constraints :: !ReduceInfo ![Type] ![TypeVar] ![TypeContext] *ReduceState -> *([ReducedContexts],*ReduceState)
+	reduce_contexts_in_constraints :: !ReduceInfo ![Type] ![TypeVar] ![TypeContext] *ReduceState
+		-> *([ClassApplication],*ReduceState)
 	reduce_contexts_in_constraints info types class_args [] rs_state
-		= ([], rs_state)
+		= ([],rs_state)
 	reduce_contexts_in_constraints info types class_args class_context rs_state=:{rs_type_heaps=rs_type_heaps=:{th_vars}}
 		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
 		  (instantiated_context, rs_type_heaps) = fresh_contexts class_context { rs_type_heaps & th_vars = th_vars }
 		# rs_state = {rs_state & rs_type_heaps=rs_type_heaps}
-		= mapSt (reduce_context info) instantiated_context rs_state
+		= mapSt (reduce_any_context info) instantiated_context rs_state
 
 	find_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
 	find_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps coercion_env
@@ -536,7 +537,7 @@ where
 	reduce_TC_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ClassApplication, !*ReduceTCState)
 	reduce_TC_context defs type_code_class tc_type rtcs_state
 		= reduce_tc_context defs type_code_class tc_type rtcs_state
-	where							
+	where
 		reduce_tc_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ClassApplication, !*ReduceTCState)
 		reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
 			# rtcs_error
@@ -767,7 +768,8 @@ tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os d
 	| os.os_error.ea_ok
 		# (contexts, os_var_heap) = foldSt add_spec_contexts ocs (contexts, os.os_var_heap)
 		  (contexts, os_type_heaps) = remove_super_classes contexts os.os_type_heaps
-		  ({ hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap}, dict_types, os_error) = foldSt (convert_dictionaries defs contexts) reduced_contexts
+		  ({ hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap}, dict_types, os_error)
+		  	= foldSt (convert_dictionaries defs contexts) reduced_contexts
 		  					({ hp_var_heap = os_var_heap, hp_expression_heap = os.os_symbol_heap, hp_type_heaps = os_type_heaps,hp_generic_heap=os.os_generic_heap}, [], os.os_error)
 		= (contexts, coercion_env, type_pattern_vars, dict_types, { os & os_type_heaps = hp_type_heaps, os_symbol_heap = hp_expression_heap, os_var_heap = hp_var_heap, os_generic_heap = hp_generic_heap, os_error = os_error} )
 		= ([], coercion_env, type_pattern_vars, [], os)
@@ -877,14 +879,14 @@ convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_OverloadedFunctio
 	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_ptr, inst_expr)}, ptrs, error)
 where
 	adjust_member_application defs contexts {me_ident,me_offset,me_class} (CA_Instance red_contexts) class_exprs heaps_and_ptrs
-		# ({glob_module,glob_object}, red_contexts) = find_instance_of_member me_class me_offset red_contexts
-		  (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts heaps_and_ptrs
+		# ({glob_module,glob_object}, red_contexts_appls) = find_instance_of_member me_class me_offset red_contexts
+		  (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts_appls heaps_and_ptrs
 		  class_exprs = exprs ++ class_exprs
 		= (EI_Instance { glob_module = glob_module, glob_object = { ds_ident = me_ident, ds_arity = length class_exprs, ds_index = glob_object }} class_exprs,
 			 heaps_and_ptrs)
 	adjust_member_application  defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
-		  {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
+		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
 		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
 				({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
@@ -893,17 +895,19 @@ where
 		= (EI_TypeCode (TCE_Constructor tci_constructor (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
 	adjust_member_application defs contexts _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
-	
+
+	find_instance_of_member :: (Global Int) Int ReducedContexts -> ((Global Int),[ClassApplication])
 	find_instance_of_member me_class me_offset { rcs_class_context = {rc_class, rc_inst_module, rc_inst_members, rc_red_contexts}, rcs_constraints_contexts}
 		| rc_class.glob_module == me_class.glob_module && rc_class.glob_object.ds_index == me_class.glob_object
 			= ({ glob_module = rc_inst_module, glob_object = rc_inst_members.[me_offset].ds_index }, rc_red_contexts)
 			= find_instance_of_member_in_constraints me_class me_offset rcs_constraints_contexts
 	where
-		find_instance_of_member_in_constraints me_class me_offset [ rcs=:{rcs_constraints_contexts} : rcss ]
+		find_instance_of_member_in_constraints me_class me_offset [ CA_Instance rcs=:{rcs_constraints_contexts} : rcss ]
 			= find_instance_of_member me_class me_offset {rcs & rcs_constraints_contexts = rcs_constraints_contexts ++ rcss}
+		find_instance_of_member_in_constraints me_class me_offset [ _ : rcss ]
+			= find_instance_of_member_in_constraints me_class me_offset rcss
 		find_instance_of_member_in_constraints me_class me_offset []
 			= abort "Error in module overloading: find_instance_of_member_in_constraints\n"
-// AA..	
 convertOverloadedCall defs contexts symbol=:{symb_ident, symb_kind = SK_Generic gen_glob kind} expr_ptr class_appls (heaps, expr_info_ptrs, error)
 	#! (opt_member_glob, hp_generic_heap) = getGenericMember gen_glob kind defs heaps.hp_generic_heap
 	#! heaps = { heaps & hp_generic_heap = hp_generic_heap }
@@ -912,8 +916,6 @@ convertOverloadedCall defs contexts symbol=:{symb_ident, symb_kind = SK_Generic 
 			# error = checkError ("no generic instances of " +++ toString symb_ident +++ " for kind") kind error
 			-> (heaps, expr_info_ptrs, error)	
  		Yes member_glob -> convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls (heaps, expr_info_ptrs, error)  				
-// ..AA
-
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCode} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
 	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs, error)
@@ -922,9 +924,14 @@ convertOverloadedCall defs contexts {symb_ident} expr_info_ptr appls (heaps,ptrs
 	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_Context class_expressions)}, ptrs, error)
 
 
-expressionToTypeCodeExpression (TypeCodeExpression texpr) 			= texpr
-expressionToTypeCodeExpression (ClassVariable var_info_ptr)			= TCE_TypeTerm var_info_ptr
-expressionToTypeCodeExpression expr									= abort "expressionToTypeCodeExpression (overloading.icl)" // <<- expr)
+expressionToTypeCodeExpression (TypeCodeExpression texpr)
+	= texpr
+expressionToTypeCodeExpression (ClassVariable var_info_ptr)
+	= TCE_TypeTerm var_info_ptr
+expressionToTypeCodeExpression (Selection NormalSelector (ClassVariable var_info_ptr) selectors)
+	= TCE_Selector (init selectors) var_info_ptr
+expressionToTypeCodeExpression expr
+	= abort "expressionToTypeCodeExpression (overloading.icl)"
 
 generateClassSelection address last_selectors
 	= mapAppend (\(off_set,selector) -> RecordSelection selector off_set) address last_selectors
@@ -955,7 +962,7 @@ where
 		= (TypeCodeExpression (TCE_Constructor tci_constructor (map expressionToTypeCodeExpression exprs)), heaps_and_ptrs)
 
 	convert_reduced_contexts_to_expression defs contexts {rcs_class_context,rcs_constraints_contexts} heaps_and_ptrs
-		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_reduced_contexts_to_expression defs contexts) rcs_constraints_contexts heaps_and_ptrs
+		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_class_appl_to_expression defs contexts) rcs_constraints_contexts heaps_and_ptrs
 		= convert_reduced_context_to_expression defs contexts rcs_class_context rcs_exprs heaps_and_ptrs
 	where
 		convert_reduced_context_to_expression :: {#CommonDefs} [TypeContext] ReducedContext [Expression] *(*Heaps,[Ptr ExprInfo]) -> *(Expression,*(*Heaps,[Ptr ExprInfo]))
@@ -1033,9 +1040,9 @@ determineContextAddress contexts defs this_context type_heaps
 	= look_up_context_and_address this_context contexts defs type_heaps
 where
 	look_up_context_and_address :: !TypeContext ![TypeContext] !{#CommonDefs} !*TypeHeaps -> (TypeContext, [(Int, Global DefinedSymbol)], !*TypeHeaps)
-	look_up_context_and_address context []  defs type_heaps
+	look_up_context_and_address this_context []  defs type_heaps
 		= abort "look_up_context_and_address (overloading.icl)"
-	look_up_context_and_address this_context [tc : tcs] defs type_heaps 
+	look_up_context_and_address this_context [tc : tcs] defs type_heaps
 		#! (may_be_addres, type_heaps) = determine_address this_context tc [] defs type_heaps
 		= case may_be_addres of
 			Yes address
@@ -1260,7 +1267,7 @@ where
 			= TCE_TypeTerm var_info_ptr
 		convert_selectors selectors var_info_ptr
 			= TCE_Selector (init selectors) var_info_ptr
-		
+
 newTypeVariables uni_vars heaps
 	= mapSt new_type_variable uni_vars heaps
 where			
