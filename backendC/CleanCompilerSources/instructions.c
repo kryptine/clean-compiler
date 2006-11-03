@@ -2757,9 +2757,12 @@ void GenFieldNodeEntryDirective (int arity,Label label,Label label2,char *record
 		else
 			FPutS (empty_lab.lab_name, OutFile);
 		
-		if (label2){
+		if (label2!=NULL){
 			FPutC (' ', OutFile);
-			GenFieldLabel (label2,record_name);
+			if (label2==&empty_lab)
+				FPutS (empty_lab.lab_name, OutFile);				
+			else
+				GenFieldLabel (label2,record_name);
 		}
 	}
 }
