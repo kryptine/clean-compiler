@@ -1009,7 +1009,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 				ea_label_p=&newealab;
 			} else
 				ea_label_p=&ealab;
-		} else if (field_def->sdef_returnsnode)
+		} else if (field_def->sdef_returnsnode || (IsSimpleState (demfieldstate) && demfieldstate.state_kind==LazyRedirection))
 			ea_label_p=&empty_lab;
 		else
 			ea_label_p=NULL;
