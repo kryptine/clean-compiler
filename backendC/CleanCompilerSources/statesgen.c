@@ -1159,6 +1159,12 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 			for_l (fields,def->sdef_type->type_fields,fl_next)
 				ExamineTypesAndLhsOfSymbolDefinition (fields->fl_symbol->symb_def);
 
+			if (def->sdef_boxed_record){
+				def->sdef_calledwithrootnode = True;
+				def->sdef_returnsnode = True;
+				return;
+			}
+
 			rootstate = def->sdef_record_state;
 			break;
 		}
@@ -1717,7 +1723,7 @@ static Bool ArgsInAStrictContext (StateP arg_state_p,Args argn, int local_scope)
 #if BOXED_RECORDS
 		if (record_sdef->sdef_boxed_record){
 			StateS boxed_record_state;
-				
+			
 			SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
 			if (DetermineStrictArgContext (arg, boxed_record_state,local_scope))
 				parallel = True;			

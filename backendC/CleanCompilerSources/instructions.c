@@ -643,6 +643,8 @@ enum {
 #define Ijmp_eval "jmp_eval"
 #define Ijmp_eval_upd "jmp_eval_upd"
 #define Ijmp_ap "jmp_ap"
+#define Ijmp_ap_upd "jmp_ap_upd"
+#define Ijmp_upd "jmp_upd"
 
 #define Ihalt "halt"
 
@@ -2211,6 +2213,18 @@ void GenJmpAp (int n_args)
 	put_arguments_n_b (n_args);
 }
 
+void GenJmpApUpd (int n_args)
+{
+	put_instruction_b (jmp_ap_upd);
+	put_arguments_n_b (n_args);
+}
+
+void GenJmpUpd (Label tolab)
+{
+	put_instruction_b (jmp_upd);
+	GenLabel (tolab);
+}
+
 void GenPopA (int nr)
 {
 	if (nr > 0){
@@ -2660,7 +2674,7 @@ void GenApplyEntryDirective (int arity,Label label)
 }
 #endif
 
-void GenLazyRecordNodeEntryDirective (int arity,Label label)
+void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
 		put_directive_b (n);
@@ -2670,6 +2684,11 @@ void GenLazyRecordNodeEntryDirective (int arity,Label label)
 			GenLabel (label);
 		else
 			FPutS (empty_lab.lab_name, OutFile);
+
+		if (label2){
+			FPutC (' ', OutFile);
+			GenLabel (label2);
+		}
 
 #ifdef MEMORY_PROFILING_WITH_N_STRING
 		if (DoProfiling && arity>=0 && !DoParallel){

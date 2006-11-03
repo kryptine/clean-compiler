@@ -890,7 +890,7 @@ static void GenerateConstructorDescriptorAndFunction (ConstructorList constructo
 
 static void GenLazyRecordEntry (SymbDef rdef)
 {
-	LabDef record_label,d_label;
+	LabDef record_label,d_label,ea_label,*ea_label_p;
 	States argstates;
 	int asp,bsp,arity;
 	int maxasize,asize,bsize;
@@ -902,20 +902,35 @@ static void GenLazyRecordEntry (SymbDef rdef)
 	arity = asp;
 
 	ConvertSymbolToRecordDandNLabel (&d_label,&CurrentAltLabel,rdef);
-	
-	if (rdef->sdef_exported)
-		GenExportEaEntry (rdef);
 
+	if (rdef->sdef_boxed_record){
+		if (rdef->sdef_exported){
+			GenExportEaEntry (rdef);
+			MakeSymbolLabel (&ea_label,CurrentModule,ea_pref,rdef,0);
+		} else {
+			MakeSymbolLabel (&ea_label,NULL,ea_pref,rdef,0);		
+		}
+		ea_label_p=&ea_label;
+	} else
+		ea_label_p=NULL;
+	
 	if (DoTimeProfiling)
 		GenPB (rdef->sdef_ident->ident_name);
 
 	GenLazyRecordDescriptorAndExport (rdef);
 
-	GenLazyRecordNodeEntryDirective (arity,&d_label);
+	GenLazyRecordNodeEntryDirective (arity,&d_label,ea_label_p);
 
 	GenOAStackLayout (1);
 	GenLabelDefinition (&CurrentAltLabel);
 	GenPushNode (ReduceError,asp);
+
+	if (ea_label_p!=NULL){
+		GenOAStackLayout (arity+1);
+		if (DoTimeProfiling)
+			GenPN();
+		GenLabelDefinition (&ea_label);
+	}
 
 	asize=0;
 	bsize=0;
@@ -1399,10 +1414,15 @@ Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef roo
 			}
 #endif
 		} else if (function_state_p[-1].state_kind==StrictRedirection || function_state_p[-1].state_kind==LazyRedirection){
+#ifdef JMP_UPD
+			GenDAStackLayout (arity);
+			GenJmpUpd (ealab);
+#else
 			CallEvalArgsEntry (arity,function_state_p,1,0,ealab);
 			GenFillFromA (0, 1, ReleaseAndFill);
 			GenPopA (1);
 			GenRtn (1,0,OnAState);
+#endif
 		}
 	} else {
 		int asize, bsize;
@@ -1560,10 +1580,19 @@ Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args
 			}
 #	endif
 		} else if (function_state_p[-1].state_kind==StrictRedirection || function_state_p[-1].state_kind==LazyRedirection){
+#ifdef JMP_UPD
+			if (args_b_size==0){
+				GenDAStackLayout (args_a_size);
+				GenJmpUpd (ealab);	
+			} else {
+#endif
 			CallEvalArgsEntryUnboxed (args_a_size,args_b_size,call_node_p->node_arguments,function_state_p,1,0,ealab);
 			GenFillFromA (0, 1, ReleaseAndFill);
 			GenPopA (1);
 			GenRtn (1,0,OnAState);
+#ifdef JMP_UPD
+			}
+#endif
 		}
 	} else {
 		int asize, bsize;

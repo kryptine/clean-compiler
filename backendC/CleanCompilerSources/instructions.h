@@ -90,6 +90,8 @@ void GenJsrEval (int offset);
 void GenJsrAp (int n_args);
 void GenJmpEval (void);
 void GenJmpAp (int n_args);
+void GenJmpApUpd (int n_args);
+void GenJmpUpd (Label tolab);
 void GenPopA (int nr);
 void GenPopB (int nr);
 
@@ -162,7 +164,7 @@ void GenApplyEntryDirective (int arity,Label label);
 #ifdef NEW_APPLY
 void GenApplyEntryDirective (int arity,Label label);
 #endif
-void GenLazyRecordNodeEntryDirective (int arity,Label label);
+void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2);
 void GenFieldNodeEntryDirective (int arity, Label label, Label label2,char *record_name);
 void GenConstructorDescriptorAndExport (SymbDef sdef);
 void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef);
