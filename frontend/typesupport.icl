@@ -406,7 +406,9 @@ where
 					TE
 						-> (exi_vars, all_vars, cus)
 					_
-						-> (exi_vars, all_vars, { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
+						# (TV var, cus) = cus!cus_var_env.[var_number]
+						-> ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ], all_vars,
+							{ cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
 				# (TV var, cus) = cus!cus_var_env.[var_number]
 				= ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ],
 						[var_number : all_vars], { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }})
