@@ -91,6 +91,7 @@ static void ConvertOptionsToString (char *optstring)
 #define L_PREFIX "l"
 
 #define EA_PREFIX "ea"
+#define EU_PREFIX "eu"
 #define S_PREFIX "s"
 
 #define R_PREFIX "r"
@@ -2561,6 +2562,14 @@ void GenExportEaEntry (SymbDef sdef)
 	if (sdef->sdef_calledwithrootnode){
 		put_directive_ (Dexport);
 		FPrintF (OutFile,"e_%s_" EA_PREFIX "%s",CurrentModule,sdef->sdef_ident->ident_name);
+	}
+}
+
+void GenExportEuEntry (SymbDef sdef)
+{
+	if (sdef->sdef_calledwithrootnode){
+		put_directive_ (Dexport);
+		FPrintF (OutFile,"e_%s_" EU_PREFIX "%s",CurrentModule,sdef->sdef_ident->ident_name);
 	}
 }
 

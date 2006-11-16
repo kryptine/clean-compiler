@@ -145,6 +145,7 @@ void GenExportRecord (SymbDef sdef);
 void GenExportFieldSelector (SymbDef sdef);
 void GenExportStrictAndEaEntry (SymbDef sdef);
 void GenExportEaEntry (SymbDef sdef);
+void GenExportEuEntry (SymbDef sdef);
 
 void GenDAStackLayout (int asize);
 void GenDStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p);

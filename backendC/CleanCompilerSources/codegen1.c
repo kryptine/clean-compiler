@@ -51,6 +51,7 @@ char d_pref[] 	= "d";
 char n_pref[] 	= "n";
 
 char ea_pref[]	= "ea";
+char eu_pref[]	= "eu";
 char l_pref[] 	= "l";
 char s_pref[] 	= "s";
 
@@ -890,7 +891,7 @@ static void GenerateConstructorDescriptorAndFunction (ConstructorList constructo
 
 static void GenLazyRecordEntry (SymbDef rdef)
 {
-	LabDef record_label,d_label,ea_label,*ea_label_p;
+	LabDef record_label,d_label,eu_label,*eu_label_p;
 	States argstates;
 	int asp,bsp,arity;
 	int maxasize,asize,bsize;
@@ -905,31 +906,31 @@ static void GenLazyRecordEntry (SymbDef rdef)
 
 	if (rdef->sdef_boxed_record){
 		if (rdef->sdef_exported){
-			GenExportEaEntry (rdef);
-			MakeSymbolLabel (&ea_label,CurrentModule,ea_pref,rdef,0);
+			GenExportEuEntry (rdef);
+			MakeSymbolLabel (&eu_label,CurrentModule,eu_pref,rdef,0);
 		} else {
-			MakeSymbolLabel (&ea_label,NULL,ea_pref,rdef,0);		
+			MakeSymbolLabel (&eu_label,NULL,eu_pref,rdef,0);		
 		}
-		ea_label_p=&ea_label;
+		eu_label_p=&eu_label;
 	} else
-		ea_label_p=NULL;
+		eu_label_p=NULL;
 	
 	if (DoTimeProfiling)
 		GenPB (rdef->sdef_ident->ident_name);
 
 	GenLazyRecordDescriptorAndExport (rdef);
 
-	GenLazyRecordNodeEntryDirective (arity,&d_label,ea_label_p);
+	GenLazyRecordNodeEntryDirective (arity,&d_label,eu_label_p);
 
 	GenOAStackLayout (1);
 	GenLabelDefinition (&CurrentAltLabel);
 	GenPushNode (ReduceError,asp);
 
-	if (ea_label_p!=NULL){
+	if (eu_label_p!=NULL){
 		GenOAStackLayout (arity+1);
 		if (DoTimeProfiling)
 			GenPN();
-		GenLabelDefinition (&ea_label);
+		GenLabelDefinition (&eu_label);
 	}
 
 	asize=0;
