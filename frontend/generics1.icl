@@ -379,7 +379,7 @@ where
 		= (GTSVar tv, st)  
 	convert {at_type=TB _} st
 		= (GTSAppCons KindConst [], st)  
-	convert {at_type=type} (modules, td_infos, heaps, error) 
+	convert {at_type=type} (modules, td_infos, heaps, error)
 		# error = reportError ident pos ("can not build generic representation for this type", type) error
 		= (GTSE, (modules, td_infos, heaps, error))
 
@@ -519,11 +519,14 @@ where
 		= (GTSE, (modules, td_infos, heaps, error))
 		
 	build_alt td_ident td_pos cons_def_sym=:{ds_index} {ci_cons_info} (modules, td_infos, heaps, error)
-		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[ds_index]	
-		# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)	
-		# prod_type = build_prod_type args		
-		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type		
-		= (type, st)		
+		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
+		| isEmpty cons_exi_vars
+			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)	
+			# prod_type = build_prod_type args		
+			# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type		
+			= (type, st)
+			# error = reportError td_ident td_pos "cannot build a generic representation of an existential type" error
+			= (GTSE, (modules, td_infos, heaps, error))
 
 	build_prod_type :: [GenTypeStruct] -> GenTypeStruct
 	build_prod_type types 
