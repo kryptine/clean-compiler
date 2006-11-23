@@ -929,7 +929,7 @@ expressionToTypeCodeExpression (TypeCodeExpression texpr)
 expressionToTypeCodeExpression (ClassVariable var_info_ptr)
 	= TCE_TypeTerm var_info_ptr
 expressionToTypeCodeExpression (Selection NormalSelector (ClassVariable var_info_ptr) selectors)
-	= TCE_Selector (init selectors) var_info_ptr
+	= TCE_Selector selectors var_info_ptr
 expressionToTypeCodeExpression expr
 	= abort "expressionToTypeCodeExpression (overloading.icl)"
 
