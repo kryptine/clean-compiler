@@ -1,6 +1,6 @@
 implementation module set_return_code;
 
-import code from "set_return_code_c.o";
+import code from "set_return_code.obj";
 
 import StdString;
 import StdDebug;

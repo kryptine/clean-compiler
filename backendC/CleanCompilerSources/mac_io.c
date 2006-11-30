@@ -1164,6 +1164,11 @@ void FWriteFileTime (FileTime file_time,File f)
 }
 
 #endif
+
+Bool GetOptionsFromIclFile (char *fname, CompilerOptions *opts)
+{
+	return False;
+} /* GetOptionsFromIclFile */
 	
 void DoError (char *fmt, ...)
 {	va_list args;
