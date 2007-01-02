@@ -1966,22 +1966,19 @@ where
 
 	unfold_pattern_macro mod_index macro_ident _ extra_args (Var {var_ident,var_info_ptr}) ums=:{ums_var_heap, ums_error}
 		| not (isEmpty extra_args)
-			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too much arguments for pattern macro" ums_error })
+			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
 		# (VI_Pattern pattern, ums_var_heap) = readPtr var_info_ptr ums_var_heap
 		= (pattern, { ums & ums_var_heap = ums_var_heap})
-	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb,app_args}) ums
-		= unfold_application  mod_index macro_ident opt_var extra_args app_symb app_args ums
+	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb={symb_kind=SK_Constructor {glob_module,glob_object},symb_ident},app_args})
+						ums=:{ums_cons_defs,ums_modules,ums_error}
+		# (cons_def, cons_index, ums_cons_defs, ums_modules) = get_cons_def mod_index glob_module glob_object ums_cons_defs ums_modules
+		| cons_def.cons_type.st_arity == length app_args+length extra_args
+			# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
+			  cons_symbol = { glob_object = MakeDefinedSymbol symb_ident cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
+			= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
+			= (AP_Empty cons_def.cons_ident, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
+					ums_error = checkError cons_def.cons_ident "wrong number of arguments" ums_error })
 	where
-		unfold_application  mod_index macro_ident opt_var extra_args {symb_kind=SK_Constructor {glob_module,glob_object},symb_ident} app_args
-										ums=:{ums_cons_defs, ums_modules,ums_error}
-				# (cons_def, cons_index, ums_cons_defs, ums_modules) = get_cons_def mod_index glob_module glob_object ums_cons_defs ums_modules
-				| cons_def.cons_type.st_arity == length app_args+length extra_args
-					# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
-					  cons_symbol = { glob_object = MakeDefinedSymbol symb_ident cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
-					= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
-					= (AP_Empty cons_def.cons_ident, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
-							ums_error = checkError cons_def.cons_ident "wrong number of arguments" ums_error })
-
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			| mod_index == cons_mod
 				# (cons_def, cons_defs) = cons_defs![cons_index]
@@ -1989,10 +1986,9 @@ where
 				# ({dcl_common}, modules) = modules![cons_mod]
 				  cons_def = dcl_common.com_cons_defs.[cons_index]
 				= (cons_def, cons_index, cons_defs, modules)
-
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv) ums=:{ums_error}
 		| not (isEmpty extra_args)
-			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too much arguments for pattern macro" ums_error })
+			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
 		= (AP_Basic bv opt_var, ums)
 	unfold_pattern_macro mod_index macro_ident opt_var _ expr ums=:{ums_error}
 		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
