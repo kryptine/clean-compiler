@@ -4267,10 +4267,7 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 						case InfiniteMatch:
 							if (new_e==NULL)
 								new_e=&bottom;
-							if (m==TotalMatch)
-								m=InfiniteMatch;
-							else
-								m=PartialInfiniteMatch;
+							m=PartialMatch;
 							break;
 						case PartialMatch:
 							new_e=TakeContextLub (&new_e,&next_e,p,context);
