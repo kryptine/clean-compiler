@@ -1,7 +1,5 @@
 definition module thread_message;
-//1.3
-from StdString import String;
-//3.1
+
 get_message_number :: Int;
 // int get_message_number ();
 get_current_thread_id :: Int;

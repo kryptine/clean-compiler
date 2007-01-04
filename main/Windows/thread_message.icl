@@ -1,9 +1,5 @@
 implementation module thread_message;
 
-//1.3
-from StdString import String;
-//3.1
-
 get_message_number :: Int;
 get_message_number  = code {
 	ccall get_message_number ":I"
