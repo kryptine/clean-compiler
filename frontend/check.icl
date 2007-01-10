@@ -2870,6 +2870,8 @@ checkForeignExportedFunctionTypes error_admin [{fe_fd_index}:icl_foreign_exports
 
 		check_foreign_export_type (TB BT_Int)
 			= True
+		check_foreign_export_type (TB BT_Real)
+			= True
 		check_foreign_export_type (TAS {type_arity,type_index={glob_object,glob_module}} arguments strictness)
 			= glob_module==cPredefinedModuleIndex && glob_object==PD_Arity2TupleTypeIndex+(type_arity-2)
 				&& first_n_are_strict type_arity strictness && check_foreign_export_types arguments
