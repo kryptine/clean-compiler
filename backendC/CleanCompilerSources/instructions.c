@@ -3676,6 +3676,9 @@ static void print_foreign_export_type (TypeNode type)
 		if (symbol_p->symb_kind==int_type){
 			FPrintF (OutFile,"I");
 			return;
+		} else if (symbol_p->symb_kind==real_type){
+			FPrintF (OutFile,"R");
+			return;
 		} else if (symbol_p->symb_kind==tuple_type){
 			TypeArgs type_arg_p;
 			
