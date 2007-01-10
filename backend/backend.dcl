@@ -1,9 +1,5 @@
 definition module backend;
 
-//1.3
-from StdString import String;
-//3.1
-
 :: CPtr (:== Int);
 :: *UWorld :== Int;
 :: *BackEnd (:== CPtr);
