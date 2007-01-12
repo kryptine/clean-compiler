@@ -32,7 +32,7 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 
 frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
-frontEndInterface options mod_ident search_paths cached_dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
+frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
 // 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
 	# (ok, mod, hash_table, error, files)
 		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths modtimefunction files
@@ -53,7 +53,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 
 
   	# (ok, icl_mod, dcl_mods, components, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
-  	  	= checkModule support_dynamics mod global_fun_range mod_functions dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules functions_and_macros predef_symbols (symbol_table -*-> "Checking") error heaps
+  	  	= checkModule support_dynamics mod global_fun_range mod_functions dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules cached_dcl_macros predef_symbols (symbol_table -*-> "Checking") error heaps
 
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 
@@ -220,7 +220,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules functions_an
 					= (pds_def, predef_symbols)
 					= (NoIndex, predef_symbols)
 
-	# (error_admin,fun_defs) = checkForeignExportedFunctionTypes error_admin icl_foreign_exports fun_defs	
+	# (error_admin,predef_symbols,fun_defs)
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predef_symbols fun_defs	
 	
 	# [icl_exported_global_functions,icl_not_exported_global_functions:_] = icl_global_functions
 	# exported_global_functions = case start_rule_index of

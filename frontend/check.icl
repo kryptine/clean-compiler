@@ -2851,15 +2851,16 @@ checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,p
 checkForeignExports [] icl_global_functions_ranges fun_defs cs
 	= ([],fun_defs,cs)
 
-checkForeignExportedFunctionTypes :: !*ErrorAdmin ![ForeignExport] !*{#FunDef} -> (!*ErrorAdmin,!*{#FunDef})
-checkForeignExportedFunctionTypes error_admin [{fe_fd_index}:icl_foreign_exports] fun_defs
-	# error_admin = if (check_foreign_export_type st_result.at_type)
-						error_admin
-						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin)
-	# error_admin = if (check_foreign_export_types st_args)
-						error_admin
-						(checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in argument type for foreign exported function" error_admin)
-	= checkForeignExportedFunctionTypes error_admin icl_foreign_exports fun_defs2
+checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !p:PredefinedSymbols !*{#FunDef}
+												  -> (!*ErrorAdmin,!p:PredefinedSymbols,!*{#FunDef})
+checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admin predefined_symbols fun_defs
+	| not (check_foreign_export_type st_result.at_type)
+		# error_admin = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predefined_symbols fun_defs2
+	| not (check_foreign_export_types st_args)
+		# error_admin = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in argument type for foreign exported function" error_admin
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predefined_symbols fun_defs2
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predefined_symbols fun_defs2
 	where
 		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fe_fd_index]
 
@@ -2872,13 +2873,20 @@ checkForeignExportedFunctionTypes error_admin [{fe_fd_index}:icl_foreign_exports
 			= True
 		check_foreign_export_type (TB BT_Real)
 			= True
+		check_foreign_export_type (TB (BT_String _))
+			= True
+		check_foreign_export_type (TA {type_index={glob_module,glob_object},type_arity} [{at_type=TB BT_Char}])
+			| predefined_symbols.[PD_UnboxedArrayType].pds_def==glob_object &&
+			  predefined_symbols.[PD_UnboxedArrayType].pds_module==glob_module
+			  = True
+			  = False			
 		check_foreign_export_type (TAS {type_arity,type_index={glob_object,glob_module}} arguments strictness)
 			= glob_module==cPredefinedModuleIndex && glob_object==PD_Arity2TupleTypeIndex+(type_arity-2)
 				&& first_n_are_strict type_arity strictness && check_foreign_export_types arguments
 		check_foreign_export_type _
 			= False
-checkForeignExportedFunctionTypes error_admin [] fun_defs
-	= (error_admin,fun_defs)
+checkForeignExportedFunctionTypes [] error_admin predefined_symbols fun_defs
+	= (error_admin,predefined_symbols,fun_defs)
 
 check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_modules}}
 	# cs = case x_needed_modules bitand cNeedStdGeneric of
