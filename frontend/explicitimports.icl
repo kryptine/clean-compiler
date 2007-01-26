@@ -21,27 +21,26 @@ implies a b :== not a || b
 
 markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable) -> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
 markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
-	#! nr_of_expl_imp_symbols = size expl_imp_info.[component_nr]
-	   (new_symbols, expl_imp_info, cs_symbol_table) = iFoldSt (mark_symbol component_nr) 0 nr_of_expl_imp_symbols ([], expl_imp_info, cs_symbol_table)
+	#  (expl_imp_info_from_component,expl_imp_info) = replace expl_imp_info component_nr {}
+	#! nr_of_expl_imp_symbols = size expl_imp_info_from_component
+	#  (new_symbols, expl_imp_info_from_component, cs_symbol_table) = iFoldSt (mark_symbol component_nr) 0 nr_of_expl_imp_symbols ([], expl_imp_info_from_component, cs_symbol_table)
+	   expl_imp_info = {expl_imp_info & [component_nr] = expl_imp_info_from_component}
 	= (new_symbols, (expl_imp_info, cs_symbol_table))
   where
-	mark_symbol component_nr i (changed_symbols_accu, expl_imp_info, cs_symbol_table)
-		# (eii_ident, expl_imp_info) = do_a_lot_just_to_read_an_array component_nr i expl_imp_info
+	mark_symbol component_nr i (changed_symbols_accu, expl_imp_info_from_component, cs_symbol_table)
+		# (eii, expl_imp_info_from_component) = replace expl_imp_info_from_component i TemporarilyFetchedAway
+		  (eii_ident, eii) = get_eei_ident eii
+		  expl_imp_info_from_component = { expl_imp_info_from_component & [i] = eii }
 		  (ste, cs_symbol_table) = readPtr eii_ident.id_info cs_symbol_table
 		  cai = { cai_component_nr = component_nr, cai_index = i }
 		= case ste.ste_kind of
 			STE_ExplImpComponentNrs component_nrs _
 				# new_ste_kind = STE_ExplImpComponentNrs [cai:component_nrs] []
 				  cs_symbol_table = writePtr eii_ident.id_info { ste & ste_kind = new_ste_kind } cs_symbol_table
-				-> (changed_symbols_accu, expl_imp_info, cs_symbol_table)
+				-> (changed_symbols_accu, expl_imp_info_from_component, cs_symbol_table)
 			_
 				# new_ste = { ste & ste_kind = STE_ExplImpComponentNrs [cai] [], ste_previous = ste }
-				-> ([eii_ident:changed_symbols_accu], expl_imp_info, writePtr eii_ident.id_info new_ste cs_symbol_table)
-
-	do_a_lot_just_to_read_an_array component_nr i expl_imp_info
-		# (eii, expl_imp_info) = replaceTwoDimArrElt component_nr i TemporarilyFetchedAway expl_imp_info
-		  (eii_ident, eii) = get_eei_ident eii
-		= (eii_ident, { expl_imp_info & [component_nr, i] = eii })
+				-> ([eii_ident:changed_symbols_accu], expl_imp_info_from_component, writePtr eii_ident.id_info new_ste cs_symbol_table)
 
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
@@ -255,7 +254,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				# cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
 				  cs_error = checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error 
 				-> (No, (popErrorAdmin cs_error, cs_symbol_table))
-		
+
 	search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod
 			ini=:{ini_symbol_nr} (decls_accu, belonging_accu, visited_modules, expl_imp_info)
 		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info)
