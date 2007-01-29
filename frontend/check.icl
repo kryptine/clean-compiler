@@ -871,6 +871,17 @@ where
 		= ([x : xs], s1,s2)
 	map_st2 [] s1 s2
 	 	= ([], s1,s2)
+
+mapY2St f l s :== map_y2_st l s
+where
+	map_y2_st [x : xs] s
+	 	# (x, y, s) = f x s
+		  (xs, ys, s) = map_y2_st xs s
+		#! s = s
+		= ([x : xs], [y : ys], s)
+	map_y2_st [] s
+		#! s = s
+	 	= ([], [], s)
 	
 checkAndCollectTypesOfContextsOfSpecials :: [TypeContext] *PredefinedSymbols *ErrorAdmin -> (![[Type]],!*PredefinedSymbols,!*ErrorAdmin);
 checkAndCollectTypesOfContextsOfSpecials type_contexts predef_symbols error
@@ -1802,18 +1813,16 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 	  		// module i is imported by components with _component_ numbers super_components.[i]
 	  components_array
 	  		= gimme_a_strict_array_type { component \\ component <- components }
-	  (expl_imp_symbols_and_indices_in_components, (dcl_modules, cs_symbol_table))
-	   		= mapSt (get_expl_imp_symbols_of_component imports_of_icl_mod) components (dcl_modules, cs_symbol_table)
-	  (expl_imp_symbols_in_components, expl_imp_indices)
-	  		= unzip expl_imp_symbols_and_indices_in_components
+	  (expl_imp_symbols_in_components, expl_imp_indices, (dcl_modules, cs_symbol_table))
+	   		= mapY2St (get_expl_imp_symbols_of_component imports_of_icl_mod) components (dcl_modules, cs_symbol_table)
+
 	  expl_imp_infos
 	  		= { { ExplImpInfo expl_imp_symbol ikhEmpty
 	  			  \\ expl_imp_symbol <- expl_imp_symbols_in_component
 	  			}
 	  			\\ expl_imp_symbols_in_component<-expl_imp_symbols_in_components }
 	  		// eii_declaring_modules will be updated later
-	  cs
-	  		= { cs & cs_symbol_table = cs_symbol_table }
+	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	  nr_of_icl_component
 	  		= component_numbers.[index_of_icl_module]
 	  (_, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
@@ -1859,8 +1868,8 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 				= foldSt (get_expl_imp_symbols_of_module imports_of_icl_mod) component ([], 0, [], dcl_modules, cs_symbol_table)
 		  cs_symbol_table
 				= foldSt restoreHeap expl_imp_symbols cs_symbol_table
-		= ((reverse expl_imp_symbols, reverse expl_imp_indices), (dcl_modules, cs_symbol_table))
-		
+		= (reverse expl_imp_symbols, reverse expl_imp_indices, (dcl_modules, cs_symbol_table))
+
 	get_expl_imp_symbols_of_module imports_of_icl_mod mod_index (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, dcl_modules, cs_symbol_table)
 		#! siz = size dcl_modules
 		# (mod_imports, dcl_modules, cs_symbol_table)
