@@ -122,13 +122,11 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
   where
 	solve_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set importing_mod
 			(imported_mod, position, imported_symbols) (dcl_modules, visited_modules, expl_imp_info, cs)
-		# (successes, (decl_accu, unsolved_belonging, visited_modules, expl_imp_info))
-				= mapSt (search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod)
-						imported_symbols 
-						([], [], visited_modules, expl_imp_info)
-		  (expl_imp_info, cs_error)
-		  		= check_singles position successes imported_symbols
-		  				(expl_imp_info, cs.cs_error)
+		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
+				= foldSt (search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod)
+						imported_symbols
+						([],[], [], visited_modules, expl_imp_info)
+		  (expl_imp_info,cs_error) = report_not_exported_symbol_errors not_exported_symbols position expl_imp_info cs.cs_error
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= foldSt (solve_belonging position expl_imp_indices_ikh modules_in_component_set importing_mod)
 		  				unsolved_belonging
@@ -255,8 +253,11 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				  cs_error = checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error 
 				-> (No, (popErrorAdmin cs_error, cs_symbol_table))
 
+	search_expl_imp_symbol :: (IntKeyHashtable [(Int,a,[ImportNrAndIdents])]) {#Int} Int Int ImportNrAndIdents
+									*([ImportNrAndIdents],[Declaration],[(Declaration,ImportNrAndIdents,Int)],*{#Int},*{!*ExplImpInfo})
+							-> ([ImportNrAndIdents],[Declaration],[(Declaration,ImportNrAndIdents,Int)],*{#Int},*{!*ExplImpInfo})
 	search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set importing_mod imported_mod
-			ini=:{ini_symbol_nr} (decls_accu, belonging_accu, visited_modules, expl_imp_info)
+			ini=:{ini_symbol_nr} (not_exported_symbols,decls_accu, belonging_accu, visited_modules, expl_imp_info)
 		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info)
 				= replace expl_imp_info ini_symbol_nr TemporarilyFetchedAway
 		  (opt_decl, path, eii_declaring_modules, visited_modules)
@@ -286,12 +287,12 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 					  			Yes _
 					  				-> [(di_decl, ini, imported_mod):belonging_accu]
 					  new_eii = ExplImpInfo eii_ident new_eii_declaring_modules
-					-> (True, ([di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
-								{ expl_imp_info & [ini_symbol_nr] = new_eii }))
+					-> (not_exported_symbols,[di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
+								{ expl_imp_info & [ini_symbol_nr] = new_eii })
 				// otherwise GOTO next alternative
 			_
 				# eii = ExplImpInfo eii_ident eii_declaring_modules
-				-> (False, (decls_accu, belonging_accu, visited_modules, { expl_imp_info & [ini_symbol_nr] = eii }))
+				-> ([ini:not_exported_symbols],decls_accu, belonging_accu, visited_modules, { expl_imp_info & [ini_symbol_nr] = eii })
 
 	depth_first_search expl_imp_indices_ikh modules_in_component_set
 			imported_mod imported_symbol belong_nr belong_ident path eii_declaring_modules visited_modules
@@ -378,25 +379,14 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= True
 		= is_member belong_ident t
 
-	check_singles position [False: t1] [imported_symbol: t2] (expl_imp_info, cs_error)
-		# (expl_imp_info, cs_error)
-				= give_error position imported_symbol (expl_imp_info, cs_error)
-		= check_singles position t1 t2 (expl_imp_info, cs_error)
-	check_singles position [_:t1] [_:t2] (expl_imp_info, cs_error)
-		= check_singles position t1 t2 (expl_imp_info, cs_error)
-	check_singles position [] [] (expl_imp_info, cs_error)
-		= (expl_imp_info, cs_error)
-		
-	give_error position {ini_symbol_nr, ini_imp_decl} (expl_imp_info, cs_error)
-		# (eii_ident, expl_imp_info)
-				= do_a_lot_just_to_read_an_array_2 ini_symbol_nr expl_imp_info
-		  cs_error
-				= pushErrorAdmin (newPosition import_ident position) cs_error
-		  cs_error
-		  		= checkError eii_ident 
-		  			("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by the specified module")
-		  			cs_error
-		= (expl_imp_info, popErrorAdmin cs_error)
+	report_not_exported_symbol_errors [{ini_symbol_nr,ini_imp_decl}:not_exported_symbols] position expl_imp_info cs_error
+		# (eii_ident, expl_imp_info) = do_a_lot_just_to_read_an_array_2 ini_symbol_nr expl_imp_info
+		  cs_error = popErrorAdmin (checkError eii_ident 
+									("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by the specified module")
+									(pushErrorAdmin (newPosition import_ident position) cs_error))
+		= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info cs_error
+	report_not_exported_symbol_errors [] position expl_imp_info cs_error
+		= (expl_imp_info,cs_error)
 
 	do_a_lot_just_to_read_an_array_2 i expl_imp_info
 		# (eii, expl_imp_info) = replace expl_imp_info i TemporarilyFetchedAway
