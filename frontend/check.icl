@@ -3125,7 +3125,7 @@ where
 			mark_belongings_of_expl_imp_symbol decl=:(Declaration {decl_ident={id_info}}) (dcl_modules, cs_symbol_table)
 				# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
 				= case ste of
-					({ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices})
+					({ste_kind=STE_ExplImpComponentNrs component_numbers})
 						# (all_belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
 						-> (dcl_modules, foldlBelongingSymbols mark_belonging_symbol all_belonging_symbols cs_symbol_table)
 						where
@@ -3156,7 +3156,7 @@ where
 			unmark_belongings_of_expl_imp_symbol decl=:(Declaration {decl_ident={id_info}}) (dcl_modules, cs_symbol_table)
 				# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
 				= case ste of
-					({ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices})
+					({ste_kind=STE_ExplImpComponentNrs component_numbers})
 						# (all_belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
 						-> (dcl_modules, foldlBelongingSymbols unmark_belonging_symbol all_belonging_symbols cs_symbol_table)
 						where
@@ -3249,7 +3249,7 @@ update_expl_imp_for_marked_local_symbol mod_index decl=:(Declaration {decl_ident
 where
 	updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
-	updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices}
+	updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers}
 				dcl_modules expl_imp_infos cs_symbol_table
 		= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  where

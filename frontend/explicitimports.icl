@@ -34,18 +34,18 @@ markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
 		  (ste, cs_symbol_table) = readPtr eii_ident.id_info cs_symbol_table
 		  cai = { cai_component_nr = component_nr, cai_index = i }
 		= case ste.ste_kind of
-			STE_ExplImpComponentNrs component_nrs _
-				# new_ste_kind = STE_ExplImpComponentNrs [cai:component_nrs] []
+			STE_ExplImpComponentNrs component_nrs
+				# new_ste_kind = STE_ExplImpComponentNrs [cai:component_nrs]
 				  cs_symbol_table = writePtr eii_ident.id_info { ste & ste_kind = new_ste_kind } cs_symbol_table
 				-> (changed_symbols_accu, expl_imp_info_from_component, cs_symbol_table)
 			_
-				# new_ste = { ste & ste_kind = STE_ExplImpComponentNrs [cai] [], ste_previous = ste }
+				# new_ste = { ste & ste_kind = STE_ExplImpComponentNrs [cai], ste_previous = ste }
 				-> ([eii_ident:changed_symbols_accu], expl_imp_info_from_component, writePtr eii_ident.id_info new_ste cs_symbol_table)
 
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
-updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers inst_indices} dcl_modules expl_imp_infos cs_symbol_table
-	= foldSt (addExplImpInfo mod_index decl inst_indices) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
+updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers} dcl_modules expl_imp_infos cs_symbol_table
+	= foldSt (addExplImpInfo mod_index decl []) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
 updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 

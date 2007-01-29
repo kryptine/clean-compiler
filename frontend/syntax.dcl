@@ -59,10 +59,9 @@ instance == FunctionOrMacroIndex
 				| STE_DictField !SelectorDef
 				| STE_Called ![FunctionOrMacroIndex] /* used during macro expansion to indicate that this function is called */
 				| STE_ExplImpSymbol !Int
-				| STE_ExplImpComponentNrs ![ComponentNrAndIndex] ![Declaration]
+				| STE_ExplImpComponentNrs ![ComponentNrAndIndex]
 					/*	stores the numbers of all module components that import the symbol from
-						the "actual" dcl module. Further for each class all encountered
-						instances are accumulated.
+						the "actual" dcl module.
 					*/
 				| STE_BelongingSymbol !Int
 				
