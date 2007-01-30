@@ -3260,7 +3260,7 @@ where
 					= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
 			  (all_belongs, dcl_modules) = getBelongingSymbols decl dcl_modules
 			  di_belonging = nsFromTo (nrOfBelongingSymbols all_belongs)
-			  di = { di_decl = decl, di_instances = [], di_belonging = di_belonging }
+			  di = { di_decl = decl, di_belonging = di_belonging }
 			  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
 			= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
 	updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
