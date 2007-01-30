@@ -45,18 +45,18 @@ markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
 		-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
 updateExplImpForMarkedSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers} dcl_modules expl_imp_infos cs_symbol_table
-	= foldSt (addExplImpInfo mod_index decl []) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
+	= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
 updateExplImpForMarkedSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
-addExplImpInfo :: !Index Declaration ![Declaration] !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
+addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
 			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
-addExplImpInfo mod_index decl instances { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
+addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
 	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
 			= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
 	  (di_belonging, dcl_modules, cs_symbol_table)
 	  		= get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
-	  di = { di_decl = decl, di_instances = instances, di_belonging = di_belonging }
+	  di = { di_decl = decl, di_belonging = di_belonging }
 	  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
 	= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
   where
@@ -265,7 +265,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						ini_symbol_nr cUndef stupid_ident [importing_mod]
 						eii_declaring_modules (bitvectResetAll visited_modules)
 		= case opt_decl of
-			Yes di=:{di_decl, di_instances}
+			Yes di=:{di_decl}
 				| ( case di_decl of
 			  			Declaration {decl_kind}
 			  				-> case decl_kind of
@@ -278,7 +278,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			  		)
 					# new_eii_declaring_modules
 					  		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index 
-					  					{di_decl = di_decl, di_instances = [], di_belonging=EndNumbers} eei_dm)
+					  					{di_decl = di_decl, di_belonging=EndNumbers} eei_dm)
 					  				path eii_declaring_modules
 					  new_belonging_accu
 					  		= case getBelongingSymbolsFromID ini.ini_imp_decl of
@@ -287,7 +287,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 					  			Yes _
 					  				-> [(di_decl, ini, imported_mod):belonging_accu]
 					  new_eii = ExplImpInfo eii_ident new_eii_declaring_modules
-					-> (not_exported_symbols,[di_decl:di_instances++decls_accu], new_belonging_accu, visited_modules,
+					-> (not_exported_symbols,[di_decl:decls_accu], new_belonging_accu, visited_modules,
 								{ expl_imp_info & [ini_symbol_nr] = new_eii })
 				// otherwise GOTO next alternative
 			_

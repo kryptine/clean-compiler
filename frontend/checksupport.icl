@@ -517,8 +517,8 @@ instance <<< ExplImpInfo
 
 instance <<< DeclarationInfo
   where
-	(<<<) file {di_decl, di_instances}
-		= file <<< di_decl <<< di_instances
+	(<<<) file {di_decl}
+		= file <<< di_decl
 
 import_ident :: Ident
 import_ident =: { id_name = "import", id_info = nilPtr }

@@ -77,7 +77,6 @@ cConversionTableSize	:== 10
 
 ::	DeclarationInfo =
 	{	di_decl			::	!Declaration
-	,	di_instances	::	![Declaration]
 	,	di_belonging	::	!NumberSet
 	}
 
