@@ -64,11 +64,14 @@ instance == FunctionOrMacroIndex
 						the "actual" dcl module.
 					*/
 				| STE_BelongingSymbol !Int
+				| STE_ExplImpSymbolNotImported !ModuleN
 				
 				| STE_UsedType !Index !STE_Kind
 					/* used during binding of types to mark types that have been applied. The first  */
 				| STE_BelongingSymbolExported
 				| STE_BelongingSymbolForExportedSymbol
+
+::	ModuleN:==Int
 
 ::	Declaration = Declaration !DeclarationRecord
 

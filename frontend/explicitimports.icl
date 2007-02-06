@@ -164,8 +164,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 					(search_belonging need_all position eii_ident decl expl_imp_indices_ikh modules_in_component_set
 							imported_mod ini_symbol_nr importing_mod)
 					belongs_set (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
-		  expl_imp_info
-		  		= { expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules }
+		  expl_imp_info = { expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules }
 		= (decls_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 		
 	search_belonging need_all position eii_ident decl expl_imp_indices_ikh modules_in_component_set imported_mod ini_symbol_nr importing_mod
@@ -499,26 +498,33 @@ instance toString STE_Kind where
 	toString STE_Instance				= "instance"
 	toString ste						= "<<unknown symbol kind>>"
 
-check_whether_ident_is_imported :: !Ident !STE_Kind !CheckCompletenessInputBox !*CheckCompletenessStateBox 
+check_whether_ident_is_imported :: !Ident !Int !Int !STE_Kind !CheckCompletenessInputBox !*CheckCompletenessStateBox 
 								-> *CheckCompletenessStateBox
-check_whether_ident_is_imported ident wanted_ste_kind cci ccs=:{box_ccs=box_ccs=:{ccs_symbol_table}}
-	#! (ste=:{ste_kind}, ccs_symbol_table) = readPtr ident.id_info ccs_symbol_table
-	   ccs = { ccs & box_ccs = { box_ccs & ccs_symbol_table = ccs_symbol_table } }
-	| is_imported ste_kind wanted_ste_kind
+check_whether_ident_is_imported ident module_n symbol_index wanted_ste_kind cci ccs=:{box_ccs=box_ccs=:{ccs_symbol_table}}
+	#! (ste=:{ste_kind,ste_index}, ccs_symbol_table) = readPtr ident.id_info ccs_symbol_table
+	   ccs = { ccs & box_ccs = {box_ccs & ccs_symbol_table = ccs_symbol_table } }
+	| ste_index==symbol_index && is_imported_or_not_and_already_reported ste_kind wanted_ste_kind module_n
 		= ccs
 	#! (ccs=:{box_ccs=box_ccs=:{ccs_symbol_table, ccs_error, ccs_heap_changes_accu}}) = ccs
 	   {box_cci={cci_import_position}} = cci
 	   ccs_error = checkErrorWithIdentPos (newPosition { id_name="import", id_info=nilPtr } cci_import_position)
 	   				(" "+++toString wanted_ste_kind+++" "+++toString ident.id_name+++" not imported") ccs_error
 	   // pretend that the unimported symbol was imported to prevent doubling error mesages
-	   ccs_symbol_table = writePtr ident.id_info { ste & ste_kind = wanted_ste_kind, ste_previous = ste } ccs_symbol_table
+	   ccs_symbol_table = writePtr ident.id_info { ste & ste_kind = STE_ExplImpSymbolNotImported module_n, ste_previous = ste } ccs_symbol_table
 	= { ccs & box_ccs = { box_ccs & ccs_error = ccs_error, ccs_symbol_table = ccs_symbol_table, 
 									ccs_heap_changes_accu = [ident.id_info:ccs_heap_changes_accu] }}
   where
-	is_imported (STE_Imported ste_kind _) wanted_ste_kind
-		= ste_kind==wanted_ste_kind
-	is_imported ste_kind wanted_ste_kind
-		= ste_kind==wanted_ste_kind
+	is_imported_or_not_and_already_reported :: !STE_Kind !STE_Kind !Int -> Bool
+	is_imported_or_not_and_already_reported (STE_Imported ste_kind ste_module_n) wanted_ste_kind module_n
+		= ste_kind==wanted_ste_kind && ste_module_n==module_n
+	is_imported_or_not_and_already_reported ste_kind wanted_ste_kind module_n
+		| ste_kind==wanted_ste_kind 
+			= cci.box_cci.cci_main_dcl_module_n==module_n
+			= case ste_kind of
+				STE_ExplImpSymbolNotImported ste_module_n
+					-> ste_module_n==module_n
+				_
+					-> False
 
 class check_completeness x :: !x !CheckCompletenessInputBox !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
 
@@ -528,9 +534,9 @@ instance check_completeness App where
 		  (check_completeness app_args cci ccs)
 	
 instance check_completeness AlgebraicPattern where
-	check_completeness {ap_symbol, ap_expr} cci ccs
+	check_completeness {ap_symbol={glob_module,glob_object={ds_ident,ds_index}}, ap_expr} cci ccs
 		= check_completeness ap_expr cci
-		  (check_whether_ident_is_imported ap_symbol.glob_object.ds_ident STE_Constructor cci ccs)
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Constructor cci ccs)
 
 instance check_completeness AType where
 	check_completeness {at_type} cci ccs
@@ -576,9 +582,9 @@ instance check_completeness ClassDef where
 		= check_completeness class_context cci ccs
 		
 instance check_completeness ClassInstance where
-	check_completeness {ins_class, ins_type} cci ccs
+	check_completeness {ins_class={glob_module,glob_object={ds_ident,ds_index}}, ins_type} cci ccs
 		= check_completeness ins_type cci
-		  (check_whether_ident_is_imported ins_class.glob_object.ds_ident STE_Class cci ccs)
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Class cci ccs)
 
 instance check_completeness ConsDef
   where
@@ -622,9 +628,9 @@ instance check_completeness Expression where
 		= ccs
 	check_completeness (ABCCodeExpr _ _) _ ccs
 		= ccs
-	check_completeness (MatchExpr constructor expression) cci ccs
+	check_completeness (MatchExpr {glob_module,glob_object={ds_ident,ds_index}} expression) cci ccs
 		= check_completeness expression cci
-		  (check_whether_ident_is_imported constructor.glob_object.ds_ident STE_Constructor cci ccs)
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Constructor cci ccs)
 	check_completeness (FreeVar _) _ ccs
 		= ccs
 	check_completeness (DynamicExpr dynamicExpr) cci ccs
@@ -685,10 +691,10 @@ instance check_completeness (Optional x) | check_completeness x where
 		= ccs
 
 instance check_completeness Selection where
-	check_completeness (RecordSelection {glob_object,glob_module} _) cci ccs
-		#! ({dcl_common}, ccs)	= ccs!box_ccs.ccs_dcl_modules.[glob_module]	// the selector's filed has to be looked up
-		   ({sd_field}) = dcl_common.com_selector_defs.[glob_object.ds_index]
-		= check_whether_ident_is_imported sd_field ste_field cci ccs
+	check_completeness (RecordSelection {glob_object={ds_index},glob_module} _) cci ccs
+		#! ({dcl_common}, ccs)	= ccs!box_ccs.ccs_dcl_modules.[glob_module]	// the selector's field has to be looked up
+		   ({sd_field}) = dcl_common.com_selector_defs.[ds_index]
+		= check_whether_ident_is_imported sd_field glob_module ds_index ste_field cci ccs
 	check_completeness (ArraySelection _ _ index_expr) cci ccs
 		= check_completeness index_expr cci ccs
 	check_completeness (DictionarySelection _ selections _ index_expr) cci ccs
@@ -702,8 +708,8 @@ instance check_completeness SelectorDef where
 instance check_completeness SymbIdent where
 	check_completeness {symb_ident, symb_kind} cci ccs
 		= case symb_kind of
-			SK_Constructor _
-				-> check_whether_ident_is_imported symb_ident STE_Constructor cci ccs
+			SK_Constructor {glob_module,glob_object}
+				-> check_whether_ident_is_imported symb_ident glob_module glob_object STE_Constructor cci ccs
 			SK_Function global_index			
 				-> check_completeness_for_function symb_ident global_index cci ccs
   			SK_DclMacro global_index
@@ -712,14 +718,14 @@ instance check_completeness SymbIdent where
 				-> check_completeness_for_local_dcl_macro symb_ident global_index cci ccs
 			SK_LocalMacroFunction function_index
 				-> check_completeness_for_local_macro_function symb_ident function_index cci ccs
-			SK_OverloadedFunction global_index
-				-> check_whether_ident_is_imported symb_ident STE_Member cci ccs
+			SK_OverloadedFunction {glob_module,glob_object}
+				-> check_whether_ident_is_imported symb_ident glob_module glob_object STE_Member cci ccs
   	  where
 		check_completeness_for_function symb_ident {glob_object,glob_module} cci ccs
 			| glob_module<>cci.box_cci.cci_main_dcl_module_n
 				// the function that is referred from within a macro is a DclFunction
 				// -> must be global -> has to be imported
-				= check_whether_ident_is_imported symb_ident (STE_FunctionOrMacro []) cci ccs
+				= check_whether_ident_is_imported symb_ident glob_module glob_object (STE_FunctionOrMacro []) cci ccs
 			// otherwise the function was defined locally in a macro
 			// it is not a consequence, but it's type and body are consequences !
 			#! (already_visited, ccs) = ccs!box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
@@ -731,7 +737,7 @@ instance check_completeness SymbIdent where
 
 		check_completeness_for_macro symb_ident global_index cci ccs
 			| global_index.glob_module<>cci.box_cci.cci_main_dcl_module_n
-				= check_whether_ident_is_imported symb_ident (STE_DclMacroOrLocalMacroFunction []) cci ccs
+				= check_whether_ident_is_imported symb_ident global_index.glob_module global_index.glob_object (STE_DclMacroOrLocalMacroFunction []) cci ccs
 				= check_completeness_for_local_dcl_macro symb_ident global_index cci ccs
 
 		check_completeness_for_local_dcl_macro symb_ident {glob_module,glob_object} cci ccs
@@ -774,12 +780,12 @@ instance check_completeness TransformedBody where
 		= check_completeness tb_rhs cci ccs
 
 instance check_completeness Type where
-	check_completeness (TA {type_ident} arguments) cci ccs
+	check_completeness (TA {type_ident,type_index={glob_module,glob_object}} arguments) cci ccs
 		= check_completeness arguments cci
-		  (check_whether_ident_is_imported type_ident STE_Type cci ccs)
-	check_completeness (TAS {type_ident} arguments _) cci ccs
+		  (check_whether_ident_is_imported type_ident glob_module glob_object STE_Type cci ccs)
+	check_completeness (TAS {type_ident,type_index={glob_module,glob_object}} arguments _) cci ccs
 		= check_completeness arguments cci
-		  (check_whether_ident_is_imported type_ident STE_Type cci ccs)
+		  (check_whether_ident_is_imported type_ident glob_module glob_object STE_Type cci ccs)
 	check_completeness (l --> r) cci ccs
 		= check_completeness l cci
 		  (check_completeness r cci ccs)
@@ -789,12 +795,12 @@ instance check_completeness Type where
 		= ccs
 
 instance check_completeness TypeContext where
-	check_completeness {tc_class=TCClass class_symb, tc_types} cci ccs
+	check_completeness {tc_class=TCClass {glob_module,glob_object={ds_ident,ds_index}}, tc_types} cci ccs
 		= check_completeness tc_types cci
-		  (check_whether_ident_is_imported class_symb.glob_object.ds_ident STE_Class cci ccs)
-	check_completeness {tc_class=TCGeneric {gtc_generic}, tc_types} cci ccs
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Class cci ccs)
+	check_completeness {tc_class=TCGeneric {gtc_generic={glob_module,glob_object={ds_ident,ds_index}}}, tc_types} cci ccs
 		= check_completeness tc_types cci
-		  (check_whether_ident_is_imported gtc_generic.glob_object.ds_ident STE_Generic cci ccs)
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Generic cci ccs)
 	
 
 instance check_completeness (TypeDef TypeRhs) where
