@@ -4,6 +4,7 @@ import StdEnv
 import syntax, checksupport, check, typesupport, utilities,
 		compilerSwitches // , RWSDebug
 import genericsupport
+from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,ClassNameSpaceN
 
 ::	TypeSymbols = 
 	{	ts_type_defs		:: !.{# CheckedTypeDef}
@@ -100,16 +101,35 @@ where
 
 retrieveTypeDefinition :: SymbolPtr !Index !*SymbolTable ![SymbolPtr] -> ((!Index, !Index), !*SymbolTable, ![SymbolPtr])
 retrieveTypeDefinition type_ptr mod_index symbol_table used_types
-	# (entry, symbol_table)	= readPtr type_ptr symbol_table
-	= case entry of
-		({ste_kind = this_kind =: STE_Imported STE_Type decl_index, ste_def_level, ste_index})
-			-> ((ste_index, decl_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType decl_index this_kind }), [type_ptr : used_types])
-		({ste_kind = this_kind =: STE_Type, ste_def_level, ste_index})
+	# (entry=:{ste_kind,ste_def_level,ste_index}, symbol_table)	= readPtr type_ptr symbol_table
+	= case ste_kind of
+		this_kind=:(STE_Imported STE_Type ste_mod_index)
+			-> ((ste_index, ste_mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), [type_ptr : used_types])
+		this_kind=:STE_Type
 			| ste_def_level == cGlobalScope
 				-> ((ste_index, mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType mod_index this_kind }), [type_ptr : used_types])
 				-> ((NotFound, mod_index), symbol_table, used_types)
-		({ste_kind = STE_UsedType mod_index _, ste_def_level, ste_index})
+		STE_UsedType mod_index _
 			-> ((ste_index, mod_index), symbol_table, used_types)
+		this_kind=:(STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
+			| uqt_mod_index==mod_index && uqt_index==ste_index
+				-> ((ste_index, mod_index),symbol_table, used_types) 
+				-> retrieve_type_definition orig_kind
+		with
+			retrieve_type_definition (STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
+				| uqt_mod_index==mod_index && uqt_index==ste_index
+					= ((ste_index, mod_index),symbol_table, used_types) 
+					= retrieve_type_definition orig_kind
+			retrieve_type_definition (STE_Imported STE_Type ste_mod_index)
+				= ((ste_index, ste_mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), used_types)
+			retrieve_type_definition STE_Type
+				| ste_def_level == cGlobalScope
+					= ((ste_index, mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType mod_index this_kind }), used_types)
+					= ((NotFound, mod_index), symbol_table, used_types)
+			retrieve_type_definition (STE_UsedType mod_index _)
+				= ((ste_index, mod_index), symbol_table, used_types)
+			retrieve_type_definition _
+				= ((NotFound, mod_index), symbol_table, used_types)
 		_
 			-> ((NotFound, mod_index), symbol_table, used_types)
 
@@ -157,25 +177,70 @@ where
 		# (arg_type, _, ts_ti_cs) = bindTypes cti arg_type ts_ti_cs
 		  (res_type, _, ts_ti_cs) = bindTypes cti res_type ts_ti_cs
 		= (arg_type --> res_type, TA_Multi, ts_ti_cs)
-//AA..
 	bindTypes cti (TArrow1 type) ts_ti_cs
 		# (type, _, ts_ti_cs) = bindTypes cti type ts_ti_cs
 		= (TArrow1 type, TA_Multi, ts_ti_cs)	
-//..AA		
 	bindTypes cti (CV tv :@: types) ts_ti_cs
 		# (tv, type_attr, ts_ti_cs) = bindTypes cti tv ts_ti_cs
 		  (types, _, ts_ti_cs) = bindTypes cti types ts_ti_cs
 		= (CV tv :@: types, type_attr, ts_ti_cs)
-// Sjaak 16-08-01
 	bindTypes cti (TFA vars type) (ts, ti=:{ti_type_heaps}, cs)
 		# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
 		  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
 		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
 		= (TFA type_vars type, TA_Multi, (ts, ti, { cs & cs_symbol_table = cs_symbol_table }))
-// ... Sjaak
+	bindTypes cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} type=:(TQualifiedIdent module_id type_name types)
+					(ts=:{ts_type_defs,ts_modules}, ti, cs)
+		# (found,{decl_kind,decl_ident=type_ident,decl_index=type_index},cs) = search_qualified_ident module_id type_name TypeNameSpaceN cs
+		| not found
+			= (TE, TA_Multi, (ts, ti, cs))
+			= case decl_kind of
+				STE_Imported STE_Type type_module
+					# ({td_arity,td_attribute,td_rhs},type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts_type_defs ts_modules
+					  ts = { ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules }
+					  (cs_symbol_table, ti_used_types) = add_qualified_type_to_used_types type_ident.id_info type_module type_index cs.cs_symbol_table ti.ti_used_types
+					  cs = {cs & cs_symbol_table = cs_symbol_table}
+					  ti = { ti & ti_used_types = ti_used_types }					  
+					# type_cons = MakeNewTypeSymbIdent type_ident (length types)
+					| checkArityOfType type_cons.type_arity td_arity td_rhs
+						# (types, _, ts_ti_cs) = bindTypes cti types (ts, ti, cs)
+						| type_module == cti_module_index && cti_type_index == type_index
+							-> (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types, cti_lhs_attribute, ts_ti_cs)
+							-> (TA { type_cons & type_index = { glob_object = type_index, glob_module = type_module}} types,
+										determine_type_attribute td_attribute, ts_ti_cs)
+						-> (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_ident "used with wrong arity" cs.cs_error }))
+				_
+					-> (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError (module_id.id_name+++"@"+++type_name) "not imported" cs.cs_error}))
+		where
+			add_qualified_type_to_used_types symbol_table_ptr type_module type_index symbol_table used_types
+				# (entry=:{ste_kind,ste_index}, symbol_table) = readPtr symbol_table_ptr symbol_table
+				= case ste_kind of
+					STE_UsedQualifiedType mod_index decl_index next_kind
+						 | (mod_index==type_module && decl_index==type_index) || qualified_type_occurs next_kind ste_index type_module type_index
+						 	-> (symbol_table, used_types)
+						 	# entry = {entry & ste_kind = STE_UsedQualifiedType type_module type_index ste_kind }
+						 	-> (writePtr symbol_table_ptr entry symbol_table, used_types)
+					STE_UsedType ste_module next_kind
+						 | (ste_module==type_module && ste_index==type_index) || qualified_type_occurs next_kind ste_index type_module type_index
+						 	-> (symbol_table, used_types)
+						 	# entry = {entry & ste_kind = STE_UsedQualifiedType type_module type_index ste_kind }
+						 	-> (writePtr symbol_table_ptr entry symbol_table, used_types)
+					_
+						 	# entry = {entry & ste_kind = STE_UsedQualifiedType type_module type_index ste_kind }
+						 	-> (writePtr symbol_table_ptr entry symbol_table, [symbol_table_ptr:used_types])
+
+			qualified_type_occurs (STE_UsedQualifiedType mod_index decl_index next_kind) ste_index type_module type_index
+				| mod_index==type_module && decl_index==type_index
+					= True
+					= qualified_type_occurs next_kind ste_index type_module type_index
+			qualified_type_occurs (STE_UsedType ste_module next_kind) ste_index type_module type_index
+				 | ste_module==type_module && ste_index==type_index
+				 	= True
+					= qualified_type_occurs next_kind ste_index type_module type_index
+			qualified_type_occurs _ _ _ _
+				= False
 	bindTypes cti type ts_ti_cs
 		= (type, TA_Multi, ts_ti_cs)
-	
 
 addToAttributeEnviron :: !TypeAttribute !TypeAttribute ![AttrInequality] !*ErrorAdmin -> (![AttrInequality],!*ErrorAdmin)
 addToAttributeEnviron TA_Multi _ attr_env error
@@ -349,11 +414,21 @@ where
 
 	retrieve_used_types symb_ptrs symbol_table
 		= foldSt retrieve_used_type symb_ptrs ([], symbol_table)
-	where		
+	where
 		retrieve_used_type symb_ptr (used_types, symbol_table)
-			# (ste=:{ste_kind=STE_UsedType decl_index orig_kind,ste_index}, symbol_table) = readPtr symb_ptr symbol_table
-			= ([{gi_module = decl_index, gi_index = ste_index} : used_types], symbol_table <:= (symb_ptr, { ste & ste_kind = orig_kind }))
-	
+			# (ste=:{ste_kind,ste_index}, symbol_table) = readPtr symb_ptr symbol_table
+			# (orig_kind,used_types) = retrieve_used_types_of_ident ste_kind ste_index used_types 
+			= (used_types, symbol_table <:= (symb_ptr, { ste & ste_kind = orig_kind }))
+
+		retrieve_used_types_of_ident (STE_UsedType mod_index orig_kind) ste_index used_types
+			# used_types = [{gi_module = mod_index, gi_index = ste_index} : used_types]
+			= retrieve_used_types_of_ident orig_kind ste_index used_types
+		retrieve_used_types_of_ident (STE_UsedQualifiedType mod_index decl_index orig_kind) ste_index used_types
+			# used_types = [{gi_module = mod_index, gi_index = decl_index} : used_types]
+			= retrieve_used_types_of_ident orig_kind ste_index used_types
+		retrieve_used_types_of_ident orig_kind ste_index used_types
+			= (orig_kind,used_types)
+
 CS_Checked	:== 1
 CS_Checking	:== 0
 
@@ -607,7 +682,6 @@ checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type
 		  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
 		| x_check_dynamic_types && checkAbstractType type_module td_rhs
 			= (type, (ots, oti, {cs & cs_error = checkError type_ident "(abstract type) not permitted in a dynamic type" cs.cs_error}))
-
 			| checkArityOfType type_cons.type_arity td_arity td_rhs
 				# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 				  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr_kind types td_args (ots, oti, cs)
@@ -674,6 +748,27 @@ where
 	remove_universal_var {atv_variable = {tv_ident}} cs_symbol_table
 		= removeDefinitionFromSymbolTable cRankTwoScope tv_ident cs_symbol_table
 
+checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TQualifiedIdent module_id type_name types, at_attribute}
+		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table,cs_x={x_check_dynamic_types}})
+	# (found,{decl_kind,decl_ident=type_ident,decl_index=type_index},cs) = search_qualified_ident module_id type_name TypeNameSpaceN cs
+	| not found
+		= (type, (ots, oti, cs))
+		= case decl_kind of
+			STE_Imported STE_Type type_module
+				# id_name = type_name
+				# type_cons = MakeNewTypeSymbIdent type_ident (length types)
+				# ({td_arity,td_args,td_attribute,td_rhs},type_index,ots_type_defs,ots_modules) = getTypeDef type_index type_module mod_index ots_type_defs ots_modules
+				  ots = { ots & ots_type_defs = ots_type_defs, ots_modules = ots_modules }
+				| x_check_dynamic_types && checkAbstractType type_module td_rhs
+					-> (type, (ots, oti, {cs & cs_error = checkError type_ident "(abstract type) not permitted in a dynamic type" cs.cs_error}))
+				| checkArityOfType type_cons.type_arity td_arity td_rhs
+					# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
+					  (types, (ots, oti, cs)) = check_args_of_type_cons mod_index scope dem_attr_kind types td_args (ots, oti, cs)
+					  (new_attr, oti, cs) = newAttribute (new_demanded_attribute dem_attr_kind td_attribute) id_name at_attribute oti cs
+					-> ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs))
+					-> (type, (ots, oti, {cs & cs_error = checkError type_ident "used with wrong arity" cs.cs_error}))
+			_
+				-> (type, (ots, oti, {cs & cs_error = checkError (module_id.id_name+++"@"+++type_name) "not imported" cs.cs_error}))
 checkOpenAType mod_index scope dem_attr type=:{at_attribute} (ots, oti, cs)
 	# (new_attr, oti, cs) = newAttribute dem_attr "." at_attribute oti cs
 	= ({ type & at_attribute = new_attr}, (ots, oti, cs))
@@ -866,15 +961,14 @@ where
 checkTypeContext ::  !Index !TypeContext !(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!TypeContext,!(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkTypeContext mod_index tc=:{tc_class, tc_types} (class_defs, ots, oti, cs)
-	# (tc_class, (class_defs, ots, cs=:{cs_error})) = check_context_class tc_class (class_defs, ots, cs)
+	# (tc_class, (class_defs, ots, cs=:{cs_error})) = check_context_class tc_class tc_types (class_defs, ots, cs)
 	| cs_error.ea_ok
 		# (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
 		# cs = check_context_types tc_class tc_types cs
 		= ({tc & tc_class = tc_class, tc_types = tc_types}, (class_defs, ots, oti, cs))
 		= ({tc & tc_types = []}, (class_defs, ots, oti, cs))
 where
-
-	check_context_class (TCClass cl) (class_defs, ots, cs) 
+	check_context_class (TCClass cl) tc_types (class_defs, ots, cs)
 		# (entry, cs_symbol_table) = readPtr cl.glob_object.ds_ident.id_info cs.cs_symbol_table
 	  	# cs = { cs & cs_symbol_table = cs_symbol_table }
 		# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
@@ -882,17 +976,32 @@ where
 			# (class_def, class_index, class_defs, ots_modules) = getClassDef class_index class_module mod_index class_defs ots.ots_modules
 		  	# ots = { ots & ots_modules = ots_modules }
 			| class_def.class_arity == cl.glob_object.ds_arity			
-				# checked_class =  
-					{ cl 
+				# checked_class =
+					{ cl
 					& glob_module = class_module
 					, glob_object = {cl.glob_object & ds_index = class_index}
-					}			
+					}
 				= (TCClass checked_class, (class_defs, ots, cs)) 
 				# cs_error = checkError cl.glob_object.ds_ident	"class used with wrong arity" cs.cs_error
 				= (TCClass cl, (class_defs, ots, {cs & cs_error = cs_error}))
 			# cs_error = checkError cl.glob_object.ds_ident	"class undefined" cs.cs_error	
-			= (TCClass cl, (class_defs, ots, {cs & cs_error = cs_error}))					 
-	check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) (class_defs, ots, cs) 			
+			= (TCClass cl, (class_defs, ots, {cs & cs_error = cs_error}))
+	check_context_class tc_class=:(TCQualifiedIdent module_id class_name) tc_types (class_defs, ots, cs)
+		# (found,{decl_kind,decl_ident=type_ident,decl_index=class_index},cs) = search_qualified_ident module_id class_name ClassNameSpaceN cs
+		| not found
+			= (tc_class, (class_defs, ots, cs))
+			= case decl_kind of
+				STE_Imported STE_Class class_module
+					# ({class_ident,class_arity}, class_index, class_defs, ots_modules) = getClassDef class_index class_module mod_index class_defs ots.ots_modules
+				  	# ots = { ots & ots_modules = ots_modules }
+					| class_arity == length tc_types
+						# checked_class = { glob_object = MakeDefinedSymbol class_ident class_index class_arity, glob_module = class_module }
+						-> (TCClass checked_class, (class_defs, ots, cs)) 
+						# cs_error = checkError (module_id.id_name+++"@"+++class_name) "class used with wrong arity" cs.cs_error
+						-> (tc_class, (class_defs, ots, {cs & cs_error = cs_error}))
+				_
+					-> (tc_class, (class_defs, ots, {cs & cs_error = checkError (module_id.id_name+++"@"+++class_name) "class undefined" cs.cs_error}))
+	check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types (class_defs, ots, cs) 			
 	  	# gen_ident = gtc_generic.glob_object.ds_ident	
 		# (entry, cs_symbol_table) = readPtr gen_ident.id_info cs.cs_symbol_table
 	  	# cs = { cs & cs_symbol_table = cs_symbol_table }

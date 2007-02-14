@@ -132,8 +132,7 @@ checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_posit
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
 	# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} ([], [])
-							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs 
-
+							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
 	  (rhs_expr, free_vars, e_state, e_info, cs)
 	  		= checkRhs [] rhs_alts rhs_locals e_input { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs } e_info cs
 	  (expr_with_array_selections, free_vars, e_state=:{es_var_heap,es_dynamics=dynamics_in_rhs}, e_info, cs)
@@ -501,6 +500,9 @@ where
 			PE_Ident id
 				# (expr, free_vars, e_state, e_info, cs) = checkIdentExpression cIsInExpressionList free_vars id e_input e_state e_info cs
  				-> ([expr : exprs], free_vars, e_state, e_info, cs)
+			PE_QualifiedIdent module_id ident_name
+				# (expr, free_vars, e_state, e_info, cs) = checkQualifiedIdentExpression free_vars module_id ident_name cIsInExpressionList e_input e_state e_info cs
+ 				-> ([expr : exprs], free_vars, e_state, e_info, cs)
  			_
 				# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
  				-> ([expr : exprs], free_vars, e_state, e_info, cs)
@@ -513,7 +515,7 @@ where
 	build_expression [Constant symb _ (Prio _ _) _ , _: _] e_state cs_error
 		= (EE, e_state, checkError symb.symb_ident first_argument_of_infix_operator_missing cs_error)
 	build_expression [Constant symb arity _ is_fun] e_state cs_error
-		= buildApplication symb arity 0 is_fun [] e_state cs_error
+		= buildApplicationWithoutArguments symb is_fun e_state cs_error
 	build_expression [expr] e_state cs_error
 		= (expr, e_state, cs_error)
 	build_expression [expr : exprs] e_state cs_error
@@ -530,12 +532,12 @@ where
 				-> (left_expr, e_state, cs_error)
 	where
 		split_at_operator left [Constant symb arity NoPrio is_fun : exprs] e_state cs_error
-			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
+			# (appl_exp, e_state, cs_error) = buildApplicationWithoutArguments symb is_fun e_state cs_error
 			= split_at_operator [appl_exp : left] exprs e_state cs_error
 		split_at_operator left [Constant symb arity (Prio _ _) is_fun] e_state cs_error
 			= (No, left, e_state, checkError symb.symb_ident "second argument of infix operator missing" cs_error)
 		split_at_operator left [Constant symb arity prio is_fun] e_state cs_error
-			# (appl_exp, e_state, cs_error) = buildApplication symb arity 0 is_fun [] e_state cs_error
+			# (appl_exp, e_state, cs_error) = buildApplicationWithoutArguments symb is_fun e_state cs_error
 			= (No, [appl_exp : left], e_state, cs_error)
 		split_at_operator left [expr=:(Constant symb arity prio is_fun) : exprs] e_state cs_error
 			= (Yes (symb, arity, prio, is_fun, exprs), left, e_state, cs_error)
@@ -547,8 +549,7 @@ where
 		combine_expressions [first_expr] args arity e_state cs_error
 			= case first_expr of
 				Constant symb form_arity _ is_fun
-					# (app_exp, e_state, cs_error) = buildApplication symb form_arity arity is_fun args e_state cs_error
-					-> (app_exp, e_state, cs_error)
+					-> buildApplication symb form_arity arity is_fun args e_state cs_error
 				_
 					| arity == 0
 						-> (first_expr, e_state, cs_error)
@@ -1118,8 +1119,9 @@ where
 
 checkExpression free_vars (PE_Ident id) e_input e_state e_info cs
 	= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
+checkExpression free_vars (PE_QualifiedIdent module_id ident_name) e_input e_state e_info cs
+	= checkQualifiedIdentExpression free_vars module_id ident_name cIsNotInExpressionList e_input e_state e_info cs
 checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_state e_info cs=:{cs_symbol_table}
-	//= checkIdentExpression cIsNotInExpressionList free_vars id e_input e_state e_info cs
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	= check_generic_expr free_vars entry id kind e_input e_state e_info {cs & cs_symbol_table = cs_symbol_table}
 	where 
@@ -1197,17 +1199,16 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			= (generic_defs, {e_state & es_generic_heap = es_generic_heap}) 									 
 
 checkExpression free_vars expr e_input e_state e_info cs
-	= abort "checkExpression (checkFunctionBodies.icl, line 868)" // <<- expr
+	= abort "checkExpression (checkFunctionBodies.icl)" // <<- expr
 
 checkIdentExpression :: !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
-	-> (!Expression, ![FreeVar], !*ExpressionState, !u:ExpressionInfo, !*CheckState)
+									-> (!Expression, ![FreeVar], !*ExpressionState,!u:ExpressionInfo,!*CheckState)
 checkIdentExpression is_expr_list free_vars id=:{id_info} e_input e_state e_info cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	= check_id_expression entry is_expr_list free_vars id e_input e_state e_info { cs & cs_symbol_table = cs_symbol_table }
 where
 	check_id_expression :: !SymbolTableEntry !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
-		-> (!Expression, ![FreeVar], !*ExpressionState, !u:ExpressionInfo, !*CheckState)
-
+														 -> (!Expression, ![FreeVar], !*ExpressionState,!u:ExpressionInfo,!*CheckState)
 	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error,cs_predef_symbols,cs_x}
 		# local_predefined_idents = predefined_idents
 		# from_ident = local_predefined_idents.[PD_From]
@@ -1262,8 +1263,12 @@ where
 		  symbol = { symb_ident = id, symb_kind = symb_kind }
   		| is_expr_list
 			= (Constant symbol arity priority is_a_function, free_vars, e_state, e_info, cs)
-			# (app_expr, e_state, cs_error) = buildApplication symbol arity 0 is_a_function [] e_state cs.cs_error
-			= (app_expr, free_vars, e_state, e_info, { cs & cs_error = cs_error })
+		| is_a_function
+			# (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+			# app_expr = App { app_symb = symbol , app_args = [], app_info_ptr = new_info_ptr }
+			= (app_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)	
+			# app_expr = App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
+			= (app_expr, free_vars, e_state, e_info, cs)
 
 	determine_info_of_symbol :: !SymbolTableEntry !SymbolPtr !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 		-> (!SymbKind, !Int, !Priority, !Bool, !*ExpressionState, !u:ExpressionInfo,!*CheckState)
@@ -1315,9 +1320,6 @@ where
 		= (kind, arity, priority, is_fun, e_state, { e_info & ef_modules = ef_modules }, cs)
 	where
 		ste_kind_to_symbol_kind :: !STE_Kind !Index !Index !DclModule -> (!SymbKind, !Int, !Priority, !Bool);
-		ste_kind_to_symbol_kind STE_DclFunction def_index mod_index {dcl_functions}
-			# {ft_type={st_arity},ft_priority} = dcl_functions.[def_index]
-			= (SK_Function { glob_object = def_index, glob_module = mod_index }, st_arity, ft_priority, cIsAFunction)
 		ste_kind_to_symbol_kind STE_Member def_index mod_index {dcl_common={com_member_defs}}
 			# {me_type={st_arity},me_priority} = com_member_defs.[def_index]
 			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority, cIsAFunction)
@@ -1342,18 +1344,6 @@ where
 			# e_state = { e_state & es_calls = [DclFunCall ei_mod_index ste_index : es_calls ]}
 			= (kind, st_arity, ft_priority, cIsAFunction, e_state, e_info, cs)
 
-	is_called_before caller_index []
-		= False
-	is_called_before caller_index [called_index : calls]
-		= caller_index == called_index || is_called_before caller_index calls
-
-	dcl_fun_is_called_before ste_index mod_index []
-		= False
-	dcl_fun_is_called_before ste_index mod_index [DclFunCall dcl_fun_mod_index dcl_fun_index:calls]
-		= (ste_index==dcl_fun_index && mod_index==dcl_fun_mod_index) || dcl_fun_is_called_before ste_index mod_index calls
-	dcl_fun_is_called_before ste_index mod_index [_:calls]
-		= dcl_fun_is_called_before ste_index mod_index calls
-
 	convert_DefOrImpFunKind_to_icl_SymbKind FK_Macro index fi_properties
 		= SK_IclMacro index.glob_object;
 	convert_DefOrImpFunKind_to_icl_SymbKind _ index fi_properties
@@ -1361,12 +1351,106 @@ where
 			= SK_LocalMacroFunction index.glob_object
 			= SK_Function index
 
-	convert_DefOrImpFunKind_to_dcl_SymbKind FK_Macro index fi_properties
-		= SK_DclMacro index;
-	convert_DefOrImpFunKind_to_dcl_SymbKind _ index fi_properties
-		| fi_properties bitand FI_IsMacroFun <> 0
-			= SK_LocalDclMacroFunction index
-			= SK_Function index
+checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_input=:{ei_fun_index,ei_mod_index} e_state e_info cs
+	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id ident_name ExpressionNameSpaceN cs
+	| not found
+		= (EE, free_vars, e_state, e_info, cs)
+		= case decl_kind of
+			STE_Imported STE_DclFunction mod_index
+				# ({ft_type={st_arity},ft_priority}, e_info) = e_info!ef_modules.[mod_index].dcl_functions.[decl_index]
+				# kind = SK_Function { glob_object = decl_index, glob_module = mod_index }
+				# symbol = { symb_ident = decl_ident, symb_kind = kind }
+				# (app_expr, e_state) = build_application_or_constant_for_function symbol st_arity ft_priority e_state
+				| not e_info.ef_is_macro_fun || dcl_fun_is_called_before decl_index mod_index e_state.es_calls
+					-> (app_expr, free_vars, e_state, e_info, cs)
+					# e_state = { e_state & es_calls = [DclFunCall mod_index decl_index : e_state.es_calls ]}
+					-> (app_expr, free_vars, e_state, e_info, cs)
+			STE_Imported STE_Constructor mod_index
+				# ({cons_type={st_arity},cons_priority}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
+				# kind = SK_Constructor { glob_object = decl_index, glob_module = mod_index }
+				# symbol = { symb_ident = decl_ident, symb_kind = kind }
+				# app_expr = build_application_or_constant_for_constructor symbol st_arity cons_priority
+				-> (app_expr, free_vars, e_state, e_info, cs)
+			STE_Imported STE_Member mod_index
+				# ({me_type={st_arity},me_priority}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_member_defs.[decl_index]
+				# kind = SK_OverloadedFunction { glob_object = decl_index, glob_module = mod_index }
+				# symbol = { symb_ident = decl_ident, symb_kind = kind }
+				# (app_expr, e_state) = build_application_or_constant_for_function symbol st_arity me_priority e_state
+				-> (app_expr, free_vars, e_state, e_info, cs)
+			STE_Imported (STE_DclMacroOrLocalMacroFunction _) mod_index
+				# (macro_def,e_info) = e_info!ef_macro_defs.[mod_index,decl_index]
+				# {fun_ident,fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=macro_def 
+				# index = { glob_object = decl_index, glob_module = mod_index }
+				# symbol_kind = convert_DefOrImpFunKind_to_dcl_SymbKind fun_kind index fi_properties
+				# (e_state,cs) = add_call e_state decl_ident.id_info cs
+					with
+						add_call e_state=:{es_calls} symbol_table_ptr cs
+							# (entry=:{ste_kind,ste_index,ste_def_level},cs_symbol_table) = readPtr symbol_table_ptr cs.cs_symbol_table
+							# cs = {cs & cs_symbol_table=cs_symbol_table}
+							= case ste_kind of
+								/* also imported unqualified */
+								STE_Imported (STE_DclMacroOrLocalMacroFunction calls) ste_mod_index
+							 		| ste_index==decl_index && ste_mod_index==mod_index
+										| is_called_before ei_fun_index calls
+											-> (e_state,cs)
+											# entry = {entry & ste_kind = STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]}
+											# cs = {cs & cs_symbol_table = writePtr symbol_table_ptr entry cs_symbol_table}
+											-> ({e_state & es_calls = [MacroCall ste_mod_index ste_index ste_def_level : es_calls ]},cs)
+								/* also imported unqualified */
+								STE_DclMacroOrLocalMacroFunction calls
+							 		| ste_index==decl_index && mod_index==ei_mod_index
+										| is_called_before ei_fun_index calls
+											-> (e_state,cs)
+											# entry = {entry & ste_kind = STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]}
+											# cs = {cs & cs_symbol_table = writePtr symbol_table_ptr entry cs_symbol_table}
+											-> ({e_state & es_calls = [MacroCall ei_mod_index ste_index ste_def_level : es_calls ]},cs)
+								_
+									| macro_is_called_before decl_index mod_index es_calls
+										-> (e_state,cs)
+										-> ({ e_state & es_calls = [MacroCall mod_index decl_index (-1) : es_calls ]},cs)
+
+						macro_is_called_before decl_index mod_index []
+							= False
+						macro_is_called_before decl_index mod_index [MacroCall macro_mod_index macro_index level:calls]
+							= (decl_index==macro_index && mod_index==macro_mod_index && level==(-1)) || macro_is_called_before decl_index mod_index calls
+						macro_is_called_before decl_index mod_index [_:calls]
+							= macro_is_called_before decl_index mod_index calls
+				# symbol = { symb_ident = decl_ident, symb_kind = symbol_kind }
+				# (app_expr, e_state) = build_application_or_constant_for_function symbol fun_arity fun_priority e_state
+				-> (app_expr, free_vars, e_state, e_info, cs)
+			_
+				-> (EE, free_vars, e_state, e_info, { cs & cs_error = checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error })
+	where
+		build_application_or_constant_for_function symbol arity priority e_state
+	  		| is_expr_list
+				= (Constant symbol arity priority cIsAFunction, e_state)
+				# (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+				# app = { app_symb = symbol , app_args = [], app_info_ptr = new_info_ptr }
+				= (App app, { e_state & es_expr_heap = es_expr_heap })
+
+		build_application_or_constant_for_constructor symbol arity priority
+	  		| is_expr_list
+				= Constant symbol arity priority cIsNotAFunction
+				= App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
+
+convert_DefOrImpFunKind_to_dcl_SymbKind FK_Macro index fi_properties
+	= SK_DclMacro index;
+convert_DefOrImpFunKind_to_dcl_SymbKind _ index fi_properties
+	| fi_properties bitand FI_IsMacroFun <> 0
+		= SK_LocalDclMacroFunction index
+		= SK_Function index
+
+is_called_before caller_index []
+	= False
+is_called_before caller_index [called_index : calls]
+	= caller_index == called_index || is_called_before caller_index calls
+
+dcl_fun_is_called_before ste_index mod_index []
+	= False
+dcl_fun_is_called_before ste_index mod_index [DclFunCall dcl_fun_mod_index dcl_fun_index:calls]
+	= (ste_index==dcl_fun_index && mod_index==dcl_fun_mod_index) || dcl_fun_is_called_before ste_index mod_index calls
+dcl_fun_is_called_before ste_index mod_index [_:calls]
+	= dcl_fun_is_called_before ste_index mod_index calls
 
 checkPattern :: !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 									-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)
@@ -1374,6 +1458,8 @@ checkPattern (PE_List [exp]) opt_var p_input accus ps e_info cs=:{cs_symbol_tabl
 	= case exp of
 		PE_Ident ident
 			-> checkIdentPattern cIsNotInExpressionList ident opt_var p_input accus ps e_info cs
+		PE_QualifiedIdent module_id ident_name
+			-> checkQualifiedIdentPattern cIsNotInExpressionList module_id ident_name opt_var p_input accus ps e_info cs
 		_
 			-> checkPattern exp opt_var p_input accus ps e_info cs
 
@@ -1397,13 +1483,15 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 						  (right_pat, accus, ps, e_info, cs) = check_pattern right p_input accus ps e_info cs
 						-> check_infix_pattern [] left_arg kind constant prio [right_pat] rest
 									opt_var p_input accus ps e_info cs
-						-> (AP_Empty ds_ident, accus, ps, e_info,
+						-> (AP_Empty ds_ident.id_name, accus, ps, e_info,
 								{ cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
 					-> check_patterns [mid_pat : left] right rest opt_var p_input accus ps e_info cs
 
 		check_pattern (PE_Ident id) p_input accus ps e_info cs
 			= checkIdentPattern cIsInExpressionList id No p_input accus ps e_info cs
+		check_pattern (PE_QualifiedIdent module_id ident_name) p_input accus ps e_info cs
+			= checkQualifiedIdentPattern cIsInExpressionList module_id ident_name No p_input accus ps e_info cs
 		check_pattern expr p_input accus ps e_info cs
 			= checkPattern expr No p_input accus ps e_info cs
 		
@@ -1442,8 +1530,8 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 									-> check_infix_pattern [(kind1, cons1, prio1, left) : left_args]
 									  				middle_pat kind2 cons2 prio2 [arg_pat] rest No p_input accus ps e_info cs
 							No
-								-> (AP_Empty ds_ident, accus, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
-						-> (AP_Empty ds_ident, accus, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
+								-> (AP_Empty ds_ident.id_name, accus, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
+						-> (AP_Empty ds_ident.id_name, accus, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
 					-> check_infix_pattern left_args left kind1 cons1 prio1 [inf_cons_pat : middle] [arg : rest] opt_var p_input accus ps e_info cs 
 
@@ -1477,7 +1565,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 												  _ -> False)
 						# (pattern, ps, e_info, cs) = buildPattern mod_index kind constant args opt_var ps e_info cs
 						-> (pattern, ps, e_info, cs)
-						-> (AP_Empty ds_ident, ps, e_info, { cs & cs_error = checkError ds_ident "used with wrong arity" cs.cs_error})
+						-> (AP_Empty ds_ident.id_name, ps, e_info, { cs & cs_error = checkError ds_ident "used with wrong arity" cs.cs_error})
 				_
 					| nr_of_args == 0
 						-> (first_expr, ps, e_info, cs)
@@ -1513,7 +1601,10 @@ checkPattern (PE_Record record opt_type fields) opt_var p_input=:{pi_mod_index, 
 			  (patterns, ps_var_heap) = bind_opt_record_variable opt_var pi_is_node_pattern patterns new_fields ps.ps_var_heap
 			-> (AP_Algebraic record_symbol type_index patterns opt_var, (var_env, array_patterns), { ps & ps_var_heap = ps_var_heap }, e_info, cs)
 		No
-			-> (AP_Empty (hd fields).bind_dst, accus, ps, e_info, cs)
+			# id_name = case (hd fields).bind_dst of
+							FieldName {id_name} -> id_name
+							QualifiedFieldName module_id field_name -> module_id.id_name+++"@"+++field_name
+			-> (AP_Empty id_name, accus, ps, e_info, cs)
 where
 
 	check_field_pattern p_input=:{pi_def_level} {bind_src = PE_Empty, bind_dst = {glob_object={fs_var}}} 
@@ -1559,6 +1650,8 @@ checkPattern (PE_Bound bind) opt_var p_input accus ps e_info cs
 
 checkPattern (PE_Ident id) opt_var p_input accus ps e_info cs
 	= checkIdentPattern cIsNotInExpressionList id opt_var p_input accus ps e_info cs
+checkPattern (PE_QualifiedIdent module_id ident_name) opt_var p_input accus ps e_info cs
+	= checkQualifiedIdentPattern cIsNotInExpressionList module_id ident_name opt_var p_input accus ps e_info cs
 
 checkPattern PE_WildCard opt_var p_input accus ps e_info cs
 	= (AP_WildCard No, accus, ps, e_info, cs)
@@ -1613,13 +1706,27 @@ checkMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_priority} 
 			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
 					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
 			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
-			= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
-		= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError fun_ident "not allowed in a pattern" cs_error })
+			= (AP_Empty ident.id_name, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
+		= (AP_Empty ident.id_name, ps, e_info, { cs & cs_error = checkError fun_ident "not allowed in a pattern" cs_error })
+
+checkQualifiedMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_priority} macro_mod_index mod_index is_dcl_macro is_expr_list ste_index module_name ident_name opt_var ps e_info cs=:{cs_error}
+	| case fun_kind of FK_Macro->True; _ -> False
+		| is_expr_list
+			# macro_symbol = { glob_object = MakeDefinedSymbol fun_ident ste_index fun_arity, glob_module = macro_mod_index }
+	 		= (AP_Constant (APK_Macro is_dcl_macro) macro_symbol fun_priority, ps, e_info, cs)
+		| fun_arity == 0
+			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
+					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
+			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
+			# name=module_name+++"@"+++ident_name
+			= (AP_Empty name, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
+		# name=module_name+++"@"+++ident_name
+		= (AP_Empty name, ps, e_info, { cs & cs_error = checkError name "not allowed in a pattern" cs_error })
 
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkPatternConstructor _ _ {ste_kind = STE_Empty} ident _  ps e_info cs=:{cs_error}
-	= (AP_Empty ident, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
+	= (AP_Empty ident.id_name, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
 checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _,ste_index} ident opt_var ps e_info cs=:{cs_x}
 	# (macro,ps) = ps!ps_fun_defs.[ste_index]
 	= checkMacroPatternConstructor macro cs_x.x_main_dcl_module_n mod_index False is_expr_list ste_index ident opt_var ps e_info cs
@@ -1650,6 +1757,42 @@ where
 		= (id_index, import_mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
 	determine_pattern_symbol mod_index id_index id_kind id_name cons_defs modules error
 		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError id_name "constructor expected" error)
+
+checkQualifiedPatternConstructor :: !STE_Kind !Index !Ident !{#Char} !{#Char} !Index !Bool !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
+	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
+checkQualifiedPatternConstructor STE_Empty _ decl_ident module_name ident_name _ _ _  ps e_info cs=:{cs_error}
+	# name=module_name+++"@"+++ident_name
+	= (AP_Empty name, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
+checkQualifiedPatternConstructor (STE_FunctionOrMacro _) ste_index decl_ident module_name ident_name mod_index is_expr_list opt_var ps e_info cs=:{cs_x}
+	# (macro,ps) = ps!ps_fun_defs.[ste_index]
+	= checkQualifiedMacroPatternConstructor macro cs_x.x_main_dcl_module_n mod_index False is_expr_list ste_index module_name ident_name opt_var ps e_info cs
+checkQualifiedPatternConstructor (STE_DclMacroOrLocalMacroFunction _) ste_index decl_ident module_name ident_name mod_index is_expr_list opt_var ps e_info cs=:{cs_x}
+	# (macro,e_info) = e_info!ef_macro_defs.[mod_index,ste_index]
+	= checkQualifiedMacroPatternConstructor macro mod_index mod_index True is_expr_list ste_index module_name ident_name opt_var ps e_info cs
+checkQualifiedPatternConstructor (STE_Imported (STE_DclMacroOrLocalMacroFunction _) macro_module_index) ste_index decl_ident module_name ident_name mod_index is_expr_list opt_var ps e_info cs
+	# (macro,e_info) = e_info!ef_macro_defs.[macro_module_index,ste_index]
+	= checkQualifiedMacroPatternConstructor macro macro_module_index mod_index True is_expr_list ste_index module_name ident_name opt_var ps e_info cs
+checkQualifiedPatternConstructor ste_kind ste_index decl_ident module_name ident_name mod_index is_expr_list opt_var ps
+		e_info=:{ef_cons_defs,ef_modules} cs=:{cs_error}
+	# (cons_index, cons_module, cons_arity, cons_priority, cons_type_index, ef_cons_defs, ef_modules, cs_error)
+			= determine_pattern_symbol mod_index ste_index ste_kind module_name ident_name ef_cons_defs ef_modules cs_error
+	  e_info = { e_info & ef_cons_defs = ef_cons_defs, ef_modules = ef_modules }
+	  cons_symbol = { glob_object = MakeDefinedSymbol decl_ident cons_index cons_arity, glob_module = cons_module }
+   	| is_expr_list
+		= (AP_Constant (APK_Constructor cons_type_index) cons_symbol cons_priority, ps, e_info, { cs & cs_error = cs_error })
+	| cons_arity == 0
+		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = cs_error })
+		= (AP_Algebraic cons_symbol cons_type_index [] opt_var, ps, e_info, { cs & cs_error = checkError ident_name "constructor arguments are missing" cs_error })
+where
+	determine_pattern_symbol mod_index id_index STE_Constructor module_name ident_name cons_defs modules error
+		# ({cons_type={st_arity},cons_priority, cons_type_index}, cons_defs) = cons_defs![id_index]
+		= (id_index, mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
+	determine_pattern_symbol mod_index id_index (STE_Imported STE_Constructor import_mod_index) module_name ident_name cons_defs modules error
+		# ({dcl_common},modules) = modules![import_mod_index]
+		  {cons_type={st_arity},cons_priority, cons_type_index} = dcl_common.com_cons_defs.[id_index]
+		= (id_index, import_mod_index, st_arity, cons_priority, cons_type_index, cons_defs, modules, error)
+	determine_pattern_symbol mod_index id_index id_kind module_name ident_name cons_defs modules error
+		= (id_index, NoIndex, 0, NoPrio, NoIndex, cons_defs, modules, checkError (module_name+++"@"+++ident_name) "constructor expected" error)
 
 checkBoundPattern {bind_src,bind_dst} opt_var p_input (var_env, array_patterns) ps e_info cs=:{cs_symbol_table}
 	| isLowerCaseName bind_dst.id_name
@@ -1684,6 +1827,17 @@ checkIdentPattern is_expr_list id=:{id_name,id_info} opt_var {pi_def_level, pi_m
 		= (AP_Variable id new_info_ptr opt_var, ([ id : var_env ], array_patterns), { ps & ps_var_heap = ps_var_heap}, e_info, cs)
 		# (pattern, ps, e_info, cs) = checkPatternConstructor pi_mod_index is_expr_list entry id opt_var ps e_info { cs & cs_symbol_table = cs_symbol_table }
 		= (pattern, accus, ps, e_info, cs)
+
+checkQualifiedIdentPattern is_expr_list module_id ident_name opt_var {pi_mod_index} accus ps e_info cs
+	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id ident_name ExpressionNameSpaceN cs
+	| not found
+		= (AP_Empty (module_id.id_name+++"@"+++ident_name), accus, ps, e_info, cs)
+		= case decl_kind of
+			STE_Imported _ _
+				# (pattern, ps, e_info, cs) = checkQualifiedPatternConstructor decl_kind decl_index decl_ident module_id.id_name ident_name pi_mod_index is_expr_list opt_var ps e_info cs
+				-> (pattern, accus, ps, e_info, cs)
+			_
+				-> (AP_Empty (module_id.id_name+++"@"+++ident_name), accus, ps, e_info, { cs & cs_error = checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error })
 
 convertSubPatterns :: [AuxiliaryPattern] Expression Position *(Heap VarInfo) *(Heap ExprInfo) u:[Ptr ExprInfo] *CheckState -> *(!.[FreeVar],!Expression,!Position,!*Heap VarInfo,!*Heap ExprInfo,!u:[Ptr ExprInfo],!*CheckState);
 convertSubPatterns [] result_expr pattern_position var_store expr_heap opt_dynamics cs
@@ -1954,7 +2108,7 @@ unfoldPatternMacro macro=:{fun_body=TransformedBody {tb_args,tb_rhs}} mod_index 
 		  ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
 		  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_ident opt_var extra_args tb_rhs ums
 		= (pattern, { ps & ps_var_heap = ums_var_heap}, ums_modules, ums_cons_defs, ums_error)
-		= (AP_Empty macro.fun_ident, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "sharing not allowed" error)
+		= (AP_Empty macro.fun_ident.id_name, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "sharing not allowed" error)
 where
 	no_sharing [{fv_count} : args]
 		= fv_count <= 1 && no_sharing args
@@ -1966,7 +2120,7 @@ where
 
 	unfold_pattern_macro mod_index macro_ident _ extra_args (Var {var_ident,var_info_ptr}) ums=:{ums_var_heap, ums_error}
 		| not (isEmpty extra_args)
-			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
+			= (AP_Empty macro_ident.id_name, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
 		# (VI_Pattern pattern, ums_var_heap) = readPtr var_info_ptr ums_var_heap
 		= (pattern, { ums & ums_var_heap = ums_var_heap})
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb={symb_kind=SK_Constructor {glob_module,glob_object},symb_ident},app_args})
@@ -1976,8 +2130,8 @@ where
 			# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
 			  cons_symbol = { glob_object = MakeDefinedSymbol symb_ident cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
 			= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
-			= (AP_Empty cons_def.cons_ident, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
-					ums_error = checkError cons_def.cons_ident "wrong number of arguments" ums_error })
+			= (AP_Empty cons_def.cons_ident.id_name, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
+					ums_error = checkError cons_def.cons_ident "incorrect number of arguments" ums_error })
 	where
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
 			| mod_index == cons_mod
@@ -1988,12 +2142,12 @@ where
 				= (cons_def, cons_index, cons_defs, modules)
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv) ums=:{ums_error}
 		| not (isEmpty extra_args)
-			= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
+			= (AP_Empty macro_ident.id_name, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
 		= (AP_Basic bv opt_var, ums)
 	unfold_pattern_macro mod_index macro_ident opt_var _ expr ums=:{ums_error}
-		= (AP_Empty macro_ident, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
+		= (AP_Empty macro_ident.id_name, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
 unfoldPatternMacro macro mod_index all_macro_args opt_var ps=:{ps_var_heap} modules cons_defs error
-	= (AP_Empty macro.fun_ident, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "illegal macro in pattern" error)
+	= (AP_Empty macro.fun_ident.id_name, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "illegal macro in pattern" error)
 
 checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_state e_info cs
 	| isEmpty selectors
@@ -2002,56 +2156,43 @@ checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_stat
 		# (selector, free_vars, e_state, e_info, cs) = check_selector cEndWithSelection free_vars selector e_input e_state e_info cs
 		  (selectors, free_vars, e_state, e_info, cs) = checkSelectors end_with_update free_vars selectors e_input e_state e_info cs
 		= ([ selector : selectors ], free_vars, e_state, e_info, cs)
-where		
+where
 	check_selector _ free_vars (PS_Record selector=:{id_info,id_name} opt_type) e_input=:{ei_mod_index} e_state
 			e_info=:{ef_selector_defs, ef_modules} cs=:{cs_symbol_table}
 		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-		# selectors = retrieveSelectorIndexes ei_mod_index entry 
+		# selectors = retrieveSelectorIndexes ei_mod_index entry
 		  (field_module, field_index, field_nr, ef_selector_defs, ef_modules, cs)
-		  		= get_field_nr ei_mod_index selector opt_type selectors ef_selector_defs ef_modules { cs & cs_symbol_table = cs_symbol_table }
+		  		= get_field_nr ei_mod_index opt_type selectors id_name ef_selector_defs ef_modules { cs & cs_symbol_table = cs_symbol_table }
 		= (RecordSelection { glob_object = MakeDefinedSymbol selector field_index 1, glob_module = field_module } field_nr, free_vars, e_state,
 								{e_info & ef_selector_defs = ef_selector_defs, ef_modules = ef_modules }, cs)
-	where					
-		get_field_nr :: !Index !Ident !(Optional Ident) ![Global Index] !u:{#SelectorDef} !v:{# DclModule} !*CheckState
-				-> (!Index, !Index, !Index, u:{#SelectorDef}, v:{#DclModule}, !*CheckState)
-		get_field_nr mod_index sel_id _ [] selector_defs modules cs=:{cs_error}
-			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError id_name "selector not defined" cs_error })
-		get_field_nr mod_index sel_id (Yes type_id=:{id_info}) selectors selector_defs modules cs=:{cs_symbol_table,cs_error}
-			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-			# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type mod_index
-			| type_index <> NotFound
-				# (selector_index, selector_offset, selector_defs, modules)
-						= determine_selector mod_index type_module type_index selectors selector_defs modules
-				| selector_offset <> NoIndex
-					= (type_module, selector_index, selector_offset, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table })
-					= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table,
-								cs_error = checkError id_name "selector not defined" cs_error })
-				= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table,
-						cs_error = checkError type_id "type not defined" cs_error })
-		get_field_nr mod_index sel_id No [{glob_object,glob_module}] selector_defs modules cs
-			| mod_index == glob_module
-				# (selector_offset,selector_defs) = selector_defs![glob_object].sd_field_nr
-				= (glob_module, glob_object, selector_offset, selector_defs, modules, cs)
-				# (selector_offset,modules) = modules![glob_module].dcl_common.com_selector_defs.[glob_object].sd_field_nr
-				= (glob_module, glob_object, selector_offset, selector_defs, modules, cs)
-		get_field_nr mod_index sel_id No _  selector_defs modules cs=:{cs_error}
-			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError sel_id "ambiguous selector specified" cs_error })
 
-		determine_selector :: !Index !Index !Index ![Global Index] !u:{# SelectorDef} !v:{# DclModule} -> (!Int, !Int, !u:{# SelectorDef}, !v:{# DclModule})
-		determine_selector mod_index type_mod_index type_index [] selector_defs modules
-			= (NoIndex, NoIndex, selector_defs, modules)
-		determine_selector mod_index type_mod_index type_index [{glob_module, glob_object} : selectors] selector_defs modules
-			| type_mod_index == glob_module
-				| type_mod_index == mod_index
-					# (selector_def,selector_defs) = selector_defs![glob_object]
-					| selector_def.sd_type_index == type_index
-						= (glob_object, selector_def.sd_field_nr, selector_defs, modules)
-						= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
-					# (selector_def, modules) = modules![glob_module].dcl_common.com_selector_defs.[glob_object]
-					| selector_def.sd_type_index == type_index
-						= (glob_object, selector_def.sd_field_nr, selector_defs, modules)
-						= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
-				= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
+	check_selector _ free_vars (PS_QualifiedRecord module_id field_name opt_type) e_input=:{ei_mod_index} e_state
+			e_info cs=:{cs_symbol_table}
+		# (entry, symbol_table) = readPtr module_id.id_info cs_symbol_table
+		# cs = {cs & cs_symbol_table=symbol_table}
+		= case entry.ste_kind of
+			STE_ModuleQualifiedImports sorted_qualified_imports
+				# selectors = retrieve_qualified_selector_indices field_name sorted_qualified_imports
+				# {ef_selector_defs, ef_modules}=e_info
+				  (field_module, field_index, field_nr, ef_selector_defs, ef_modules, cs)
+			  		= get_field_nr ei_mod_index opt_type selectors field_name ef_selector_defs ef_modules cs
+				  selector = {id_name=field_name,id_info=nilPtr}
+				-> (RecordSelection { glob_object = MakeDefinedSymbol selector field_index 1, glob_module = field_module } field_nr, free_vars, e_state,
+													{e_info & ef_selector_defs = ef_selector_defs, ef_modules = ef_modules }, cs)
+			STE_ClosedModule
+				-> not_imported_error cs
+			STE_Module _
+				-> not_imported_error cs
+			_
+				# selector = {id_name=field_name,id_info=nilPtr}
+				-> (RecordSelection {glob_object = MakeDefinedSymbol selector NoIndex 1,glob_module = NoIndex}
+									NoIndex, free_vars, e_state, e_info,
+					{cs & cs_error = checkError module_id "not defined" cs.cs_error })
+	where
+		not_imported_error cs
+			# selector = {id_name=field_name,id_info=nilPtr}
+			= (RecordSelection {glob_object = MakeDefinedSymbol selector NoIndex 1,glob_module = NoIndex} NoIndex,
+				free_vars, e_state, e_info, {cs & cs_error = checkError (module_id.id_name+++"@"+++field_name) "not imported" cs.cs_error })
 
 	check_selector end_with_update free_vars (PS_Array index_expr) e_input e_state e_info cs
 		| end_with_update
@@ -2060,16 +2201,68 @@ where
 			# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
 			= checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
 
+get_field_nr :: !Index !OptionalRecordName ![Global Index] !{#Char} !u:{#SelectorDef} !v:{# DclModule} !*CheckState
+		-> (!Index, !Index, !Index, u:{#SelectorDef}, v:{#DclModule}, !*CheckState)
+get_field_nr mod_index _ [] id_name selector_defs modules cs=:{cs_error}
+	= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError id_name "selector not defined" cs_error })
+get_field_nr mod_index (RecordNameIdent type_id=:{id_info}) selectors id_name selector_defs modules cs=:{cs_symbol_table,cs_error}
+	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+	# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type mod_index
+	| type_index <> NotFound
+		# (selector_index, selector_offset, selector_defs, modules)
+				= determine_selector mod_index type_module type_index selectors selector_defs modules
+		| selector_offset <> NoIndex
+			= (type_module, selector_index, selector_offset, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table })
+			= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table,
+						cs_error = checkError id_name "selector not defined" cs_error })
+		= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_symbol_table = cs_symbol_table,
+				cs_error = checkError type_id "type not defined" cs_error })
+get_field_nr mod_index (RecordNameQualifiedIdent module_id record_name) selectors id_name selector_defs modules cs
+	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id record_name TypeNameSpaceN cs
+	| not found
+		= (NoIndex, NoIndex, NoIndex, selector_defs, modules, cs)
+		= case decl_kind of
+			STE_Imported STE_Type type_mod_index
+				# (selector_index, selector_offset, selector_defs, modules)
+					= determine_selector mod_index type_mod_index decl_index selectors selector_defs modules
+				| selector_offset <> NoIndex
+					-> (type_mod_index, selector_index, selector_offset, selector_defs, modules, cs)
+					-> (NoIndex, NoIndex, NoIndex, selector_defs, modules,
+						{cs & cs_error = checkError id_name "selector not defined" cs.cs_error })
+			_
+				-> (NoIndex, NoIndex, NoIndex, selector_defs, modules,
+					{cs & cs_error = checkError (module_id.id_name+++"@"+++record_name) "type not defined" cs.cs_error} )
+get_field_nr mod_index NoRecordName [{glob_object,glob_module}] id_name selector_defs modules cs
+	| mod_index == glob_module
+		# (selector_offset,selector_defs) = selector_defs![glob_object].sd_field_nr
+		= (glob_module, glob_object, selector_offset, selector_defs, modules, cs)
+		# (selector_offset,modules) = modules![glob_module].dcl_common.com_selector_defs.[glob_object].sd_field_nr
+		= (glob_module, glob_object, selector_offset, selector_defs, modules, cs)
+get_field_nr mod_index NoRecordName _  id_name selector_defs modules cs=:{cs_error}
+	= (NoIndex, NoIndex, NoIndex, selector_defs, modules, { cs & cs_error = checkError id_name "ambiguous selector specified" cs_error })
 
+determine_selector :: !Index !Index !Index ![Global Index] !u:{# SelectorDef} !v:{# DclModule} -> (!Int, !Int, !u:{# SelectorDef}, !v:{# DclModule})
+determine_selector mod_index type_mod_index type_index [] selector_defs modules
+	= (NoIndex, NoIndex, selector_defs, modules)
+determine_selector mod_index type_mod_index type_index [{glob_module, glob_object} : selectors] selector_defs modules
+	| type_mod_index == glob_module
+		| type_mod_index == mod_index
+			# (selector_def,selector_defs) = selector_defs![glob_object]
+			| selector_def.sd_type_index == type_index
+				= (glob_object, selector_def.sd_field_nr, selector_defs, modules)
+				= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
+			# (selector_def, modules) = modules![glob_module].dcl_common.com_selector_defs.[glob_object]
+			| selector_def.sd_type_index == type_index
+				= (glob_object, selector_def.sd_field_nr, selector_defs, modules)
+				= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
+		= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 
 checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
 	# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
 	  (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
 	= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
 
-
-
-checkFields :: !Index ![FieldAssignment] !(Optional Ident) !u:ExpressionInfo !*CheckState
+checkFields :: !Index ![FieldAssignment] !OptionalRecordName !u:ExpressionInfo !*CheckState
 	-> (!Optional ((Global DefinedSymbol), Index, [Bind ParsedExpr (Global FieldSymbol)]), !u:ExpressionInfo, !*CheckState)
 checkFields mod_index field_ass opt_type e_info=:{ef_selector_defs,ef_type_defs,ef_modules} cs
 	# (ok, field_ass, cs) = check_fields field_ass cs
@@ -2082,19 +2275,38 @@ checkFields mod_index field_ass opt_type e_info=:{ef_selector_defs,ef_type_defs,
 				# (field_exprs, cs_error) = check_and_rearrange_fields type_mod_index 0 rt_fields field_ass cs.cs_error
 				-> (Yes ({ glob_object = rt_constructor, glob_module = type_mod_index }, td_index, field_exprs), e_info, { cs & cs_error = cs_error })
 			Yes _
-				# (Yes type_ident) = opt_type
+				# (RecordNameIdent type_ident) = opt_type
 				-> (No, e_info, { cs & cs_error = checkError type_ident "not a record constructor" cs.cs_error })
 			No
 				-> (No, e_info, cs)
 		= (No, e_info, cs)
 where
-	check_fields [ bind=:{bind_dst} : field_ass ] cs=:{cs_symbol_table,cs_error}
-		# (entry, cs_symbol_table) = readPtr bind_dst.id_info cs_symbol_table
+	check_fields [ bind=:{bind_dst=bind_dst=:FieldName field_ident} : field_ass ] cs=:{cs_symbol_table,cs_error}
+		# (entry, cs_symbol_table) = readPtr field_ident.id_info cs_symbol_table
 		# fields = retrieveSelectorIndexes mod_index entry 
 		| isEmpty fields
-			= (False, [], { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError bind_dst "not defined as a record field" cs_error })
+			= (False, [], { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError field_ident "not defined as a record field" cs_error })
 			# (ok, field_ass, cs) = check_fields field_ass { cs & cs_symbol_table = cs_symbol_table }
 			= (ok, [{bind & bind_dst = (bind_dst, fields)} : field_ass], cs)
+	check_fields [ bind=:{bind_dst=bind_dst=:QualifiedFieldName module_id field_name} : field_ass ] cs=:{cs_symbol_table}
+		# (entry, symbol_table) = readPtr module_id.id_info cs_symbol_table
+		# cs = {cs & cs_symbol_table=symbol_table}
+		= case entry.ste_kind of
+			STE_ModuleQualifiedImports sorted_qualified_imports
+				# fields = retrieve_qualified_selector_indices field_name sorted_qualified_imports
+				| isEmpty fields
+					-> not_imported_error cs
+					# (ok, field_ass, cs) = check_fields field_ass cs
+					-> (ok, [{bind & bind_dst = (bind_dst, fields)} : field_ass], cs)
+			STE_ClosedModule
+				-> not_imported_error cs
+			STE_Module _
+				-> not_imported_error cs
+			_
+				-> (False, [], { cs & cs_error = checkError module_id "not defined" cs.cs_error })
+		where
+			not_imported_error cs
+				= (False, [], { cs & cs_error = checkError (module_id.id_name+++"@"+++field_name) "not defined as a record field" cs.cs_error })
 	check_fields [] cs
 		= (True, [], cs)
 
@@ -2105,7 +2317,7 @@ where
 	try_to_get_unique_field [ _ : fields ]
 		= try_to_get_unique_field fields
 	
-	determine_record_type mod_index (Yes type_id=:{id_info}) _ selector_defs type_defs modules cs=:{cs_symbol_table, cs_error}
+	determine_record_type mod_index (RecordNameIdent type_id=:{id_info}) _ selector_defs type_defs modules cs=:{cs_symbol_table, cs_error}
 		# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 		# (type_index, type_mod_index) = retrieveGlobalDefinition entry STE_Type mod_index
 		| type_index <> NotFound
@@ -2115,7 +2327,22 @@ where
 				# (type_def, modules) = modules![type_mod_index].dcl_common.com_type_defs.[type_index]
 				= (Yes (type_def, type_mod_index), selector_defs, type_defs, modules, { cs & cs_symbol_table = cs_symbol_table })
 			= (No, selector_defs, type_defs, modules, { cs & cs_error = checkError type_id "not defined" cs_error, cs_symbol_table = cs_symbol_table})
-	determine_record_type mod_index No fields selector_defs type_defs modules cs=:{cs_error}
+
+	determine_record_type mod_index (RecordNameQualifiedIdent module_id record_name) _ selector_defs type_defs modules cs
+		# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id record_name TypeNameSpaceN cs
+		| not found
+			= (No, selector_defs, type_defs, modules, cs)
+			= case decl_kind of
+				STE_Imported STE_Type type_mod_index
+					| type_mod_index==mod_index
+					 	# (type_def, type_defs) = type_defs![decl_index]
+					 	-> (Yes (type_def, type_mod_index), selector_defs, type_defs, modules, cs)
+						# (type_def, modules) = modules![type_mod_index].dcl_common.com_type_defs.[decl_index]
+						-> (Yes (type_def, type_mod_index), selector_defs, type_defs, modules, cs)
+				_
+					-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError (module_id.id_name+++"@"+++record_name) "not imported" cs.cs_error })
+
+	determine_record_type mod_index NoRecordName fields selector_defs type_defs modules cs=:{cs_error}
 		# succ = try_to_get_unique_field fields
 		= case succ of
 			Yes {glob_module, glob_object}
@@ -2130,7 +2357,7 @@ where
 			No
 				-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError "could not determine the type of this record" "" cs.cs_error })
 
-	check_and_rearrange_fields :: !Int !Int !{#FieldSymbol} ![Bind ParsedExpr (Ident,[Global .Int])] !*ErrorAdmin -> (![Bind ParsedExpr .(Global FieldSymbol)],!.ErrorAdmin);
+	check_and_rearrange_fields :: !Int !Int !{#FieldSymbol} ![Bind ParsedExpr (FieldNameOrQualifiedFieldName,[Global .Int])] !*ErrorAdmin -> (![Bind ParsedExpr .(Global FieldSymbol)],!.ErrorAdmin);
 	check_and_rearrange_fields mod_index field_index fields field_ass cs_error
 		| field_index < size fields
 			# (field_expr, field_ass) = look_up_field mod_index fields.[field_index] field_ass
@@ -2302,6 +2529,15 @@ buildApplication symbol form_arity act_arity is_fun args e_state=:{es_expr_heap}
 			= (app, e_state, checkError symbol.symb_ident "used with too many arguments" error)
 			= (app, e_state, error)
 
+buildApplicationWithoutArguments :: !SymbIdent !Bool !*ExpressionState !*ErrorAdmin -> (!Expression,!*ExpressionState,!*ErrorAdmin)
+buildApplicationWithoutArguments symbol is_fun e_state error
+	| is_fun
+		# (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+		# app = App { app_symb = symbol , app_args = [], app_info_ptr = new_info_ptr }
+		= (app, { e_state & es_expr_heap = es_expr_heap }, error)
+		# app = App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
+		= (app, e_state, error)
+
 buildPattern mod_index (APK_Constructor type_index) cons_ident args opt_var ps e_info cs
 	= (AP_Algebraic cons_ident type_index args opt_var, ps, e_info, cs)
 buildPattern mod_index (APK_Macro is_dcl_macro) {glob_module,glob_object} args opt_var ps e_info=:{ef_modules,ef_macro_defs,ef_cons_defs} cs=:{cs_error}
@@ -2393,7 +2629,7 @@ allocate_free_var ident var_heap
 newVarId name = { id_name = name, id_info = nilPtr }
 
 
-
+retrieveSelectorIndexes :: Int !SymbolTableEntry -> [(Global Int)]
 retrieveSelectorIndexes mod_index {ste_kind = STE_Selector selector_list, ste_index, ste_previous }
 	= map (adjust_mod_index mod_index) selector_list
 where
@@ -2404,6 +2640,10 @@ where
 retrieveSelectorIndexes mod_index off_kind
 	= []
 
+retrieve_qualified_selector_indices field_name sorted_qualified_imports
+	=  [{glob_module=type_mod_index,glob_object=decl_index} \\
+		{decl_kind=STE_Imported (STE_Field selector) type_mod_index,decl_index}
+		<- search_qualified_imports field_name sorted_qualified_imports FieldNameSpaceN]
 
 
 instance <<< FieldSymbol

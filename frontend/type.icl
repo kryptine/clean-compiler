@@ -2222,20 +2222,22 @@ ste_kind_to_string s
 			-> "STE_???"
 */
 
-typeProgram ::!{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![Declaration] !{# DclModule} !NumberSet !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File !{# DclModule} 
-	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos, !*Heaps, !*PredefinedSymbols, !*File, !*File)
-typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports modules used_module_numbers td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap} predef_symbols file out dcl_modules
+typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![([Declaration], Int, Position)] !{# DclModule} !NumberSet
+																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
+	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
+typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports icl_qualified_imports dcl_modules used_module_numbers
+	td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap} predef_symbols file out
 
 	#! fun_env_size = size fun_defs
 
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
-	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: modules } & [main_dcl_module_n] = icl_defs }
-	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: modules }	  
+	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: dcl_modules } & [main_dcl_module_n] = icl_defs }
+	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }	  
 
-//	  type_def_sizes =  [ size com_type_defs \\ {com_type_defs} <-: ti_common_defs ]
-      class_def_sizes = [ size com_class_defs \\ {com_class_defs} <-: ti_common_defs ]
-      class_instances = { {  IT_Empty \\ i <- [0 .. dec size] } \\ size <- class_def_sizes }
-	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos 
+	  class_instances = { {  IT_Empty \\ i <- [0 .. dec (size com_class_defs)] } \\ {com_class_defs} <-: ti_common_defs }
+	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos
+	  state = collect_qualified_imported_instances icl_qualified_imports ti_common_defs state
+
 	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
@@ -2262,7 +2264,11 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 //				---> ("typeProgram", array_inst_types)
 where
 	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
-		= foldSt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
+		= foldlArraySt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
+
+	collect_qualified_imported_instances icl_qualified_imports common_defs state
+		= foldSt (\ (declarations,_,_) state -> foldSt (collect_imported_instance common_defs) declarations state)
+				  icl_qualified_imports state
 
 	collect_imported_instance common_defs (Declaration {decl_kind = STE_Imported STE_Instance mod_index, decl_index }) state
 		= update_instances_of_class common_defs mod_index decl_index state
@@ -2282,6 +2288,22 @@ where
 		  (error, type_var_heap, td_infos)
 					= check_types_of_instances ins_pos common_defs glob_module ds_index it_types (error, type_var_heap, td_infos)
 		= (dummy, error, class_instances, type_var_heap, td_infos)
+	where
+		insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
+		insert ins_types new_ins_index new_ins_module modules error IT_Empty
+			=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
+		insert ins_types new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
+			#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
+			# cmp = ins_types =< it_types
+			| cmp == Smaller
+				# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
+				= (error, IT_Node ins it_less it_greater)
+			| cmp == Greater
+				# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
+				= (error, IT_Node ins it_less it_greater)
+			| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
+				= (error, IT_Node ins it_less it_greater)
+				= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
 
 	check_types_of_instances ins_pos common_defs class_module class_index types state
 		# {class_arity,class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
@@ -2335,20 +2357,6 @@ where
 					| neg_signs bitand 1 == 0
 						= check_sign type (neg_signs >> 1) (dec arg_nr) error
 						= checkError type " all arguments of an instance type should have a non-negative sign" error
-			
-	insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
-	insert ins_types new_ins_index new_ins_module modules error IT_Empty
-		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
-	insert ins_types new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
-		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-		# cmp = ins_types =< it_types
-		| cmp == Smaller
-			# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
-			= (error, IT_Node ins it_less it_greater)
-		| cmp == Greater
-			# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
-			= (error, IT_Node ins it_less it_greater)
-			= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
 
 	type_instances list_inferred_types ir_from ir_to class_instances ti funs_and_state
 		| ir_from == ir_to
@@ -2403,7 +2411,7 @@ where
 		  	{ os_type_heaps, os_var_heap, os_symbol_heap, os_generic_heap, os_predef_symbols, os_special_instances, os_error })
 		  		= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
 		  			{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap, os_generic_heap = ts.ts_generic_heap,
-		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances } modules
+		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances } dcl_modules
 		  //ts = {ts & ts_generic_heap = os_generic_heap}
 		| not os_error.ea_ok
 			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = os_type_heaps,

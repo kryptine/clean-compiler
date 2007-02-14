@@ -65,7 +65,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 			select_and_remove_icl_functions_from_record :: !*IclModule -> (!.{#FunDef},!.IclModule)
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
-	# { icl_common,icl_function_indices,icl_name,icl_import,icl_imported_objects,
+	# { icl_common,icl_function_indices,icl_name,icl_import,icl_qualified_imports,icl_imported_objects,
 		icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl			} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
@@ -167,7 +167,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common [a\\a<-:icl_import] dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out dcl_mods
+		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -289,8 +289,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
-						 icl_import=icl_import, icl_imported_objects=icl_imported_objects, icl_foreign_exports=icl_foreign_exports,
-						 icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
+						 icl_import=icl_import, icl_qualified_imports=icl_qualified_imports, icl_imported_objects=icl_imported_objects,
+						 icl_foreign_exports=icl_foreign_exports,icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
 						 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components

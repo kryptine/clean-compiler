@@ -362,8 +362,8 @@ where
 		# ({ste_kind,ste_previous}, symbol_table)
 				= readPtr id_info symbol_table
 		= case ste_kind of
-			STE_Field field_id
-				# symbol_table = removeFieldFromSelectorDefinition field_id NoIndex decl_index symbol_table
+			STE_Field selector_id
+				# symbol_table = removeFieldFromSelectorDefinition selector_id NoIndex decl_index symbol_table
 				| ste_previous.ste_def_level == scope
 					-> symbol_table <:= (id_info, ste_previous.ste_previous)
 					-> symbol_table <:= (id_info, ste_previous)

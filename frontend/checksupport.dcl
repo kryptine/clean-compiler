@@ -103,6 +103,7 @@ cConversionTableSize	:== 10
 	,	icl_function_indices	:: !IclFunctionIndices
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
+	,	icl_qualified_imports	:: ![([Declaration], ModuleN, Position)]
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet

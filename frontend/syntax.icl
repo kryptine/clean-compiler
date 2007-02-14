@@ -517,6 +517,11 @@ where
 	(<<<) file (PS_Array index_expr)	= file <<< '[' <<< index_expr <<< ']'
 	(<<<) file PS_Erroneous				= file <<< "Erroneous selector" // PK
 
+instance <<< FieldNameOrQualifiedFieldName
+where
+	(<<<) file (FieldName ident) = file <<< ident
+	(<<<) file (QualifiedFieldName module_ident field_name) = file <<< module_ident <<< '@' <<< field_name
+
 instance <<< CaseAlt
 where
 	(<<<) file {calt_pattern,calt_rhs} = file <<< calt_pattern <<< " -> " <<< calt_rhs

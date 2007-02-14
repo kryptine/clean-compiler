@@ -110,6 +110,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 ::	Token
 	= 	IdentToken ! .String	//		an identifier
 	| 	UnderscoreIdentToken !.String//	an identifier that starts with a '_'
+	| 	QualifiedIdentToken !String !.String	//	a qualified identifier
 	|	IntToken !.String		//		an integer
 	|	RealToken !.String		//		a real
 	|	StringToken !.String	//		a string
@@ -773,32 +774,75 @@ new_exp_char c	 = isSpace c
 
 ScanIdentFast :: !Int !Input !ScanContext -> (!Token, !Input)
 ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
-	# end_i = ScanIdentCharsInString i line co
+	# (end_i,qualified) = ScanIdentCharsInString i line co
 		with
-			ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> Int
+			ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> (!Int,!Bool)
 			ScanIdentCharsInString i line co
-				| i<size line && IsIdentChar line.[i] co
-					= ScanIdentCharsInString (i+1) line co
-					= i
-	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
-	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-	= CheckReserved co (line % (i-n,end_i-1)) input
+				| i<size line
+					| IsIdentChar line.[i] co
+						= ScanIdentCharsInString (i+1) line co
+						= (i,line.[i]=='@')
+					= (i,False)
+	| not qualified
+		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+		= CheckReservedIdent co (line % (i-n,end_i-1)) input
+	# i2=end_i+1
+	| i2==size line
+		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+		= CheckReservedIdent co (line % (i-n,end_i-1)) input
+	# c=line.[i2]
+	| IsIdentChar c co
+		# module_name = line % (i-n,end_i-1)
+		# end_i = ScanIdentCharsInString (i2+1) line co
+			with
+				ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> Int
+				ScanIdentCharsInString i line co
+					| i<size line && IsIdentChar line.[i] co
+						= ScanIdentCharsInString (i+1) line co
+						= i
+		# ident_name = line % (i2,end_i-1)
+		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+		= (QualifiedIdentToken module_name ident_name,input)
+	| isSpecialChar c
+		# module_name = line % (i-n,end_i-1)
+		# end_i = ScanSpecialCharsInString (i2+1) line
+			with
+				ScanSpecialCharsInString :: !Int !{#Char} -> Int
+				ScanSpecialCharsInString i line
+					| i<size line && isSpecialChar line.[i]
+						= ScanSpecialCharsInString (i+1) line
+						= i
+		# ident_name = line % (i2,end_i-1)
+		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+		= (QualifiedIdentToken module_name ident_name,input)
+		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+		= CheckReservedIdent co (line % (i-n,end_i-1)) input
 
 ScanOperator :: !Int !Input ![Char] !ScanContext -> (!Token, !Input)
 ScanOperator n input token co
 	#  (eof, c, input)		= ReadNormalChar input
-	| eof					= CheckReserved co (revCharListToString n token) input
+	| eof					= CheckReservedOperator (revCharListToString n token) input
 	| isSpecialChar c		= ScanOperator (n + 1) input [c:token] co
-							= CheckReserved co (revCharListToString n token) (charBack input)
+							= CheckReservedOperator (revCharListToString n token) (charBack input)
 
-CheckReserved :: !ScanContext !String !Input -> (!Token, !Input)
-CheckReserved GeneralContext    s i = CheckGeneralContext s i
-CheckReserved TypeContext       s i = CheckTypeContext s i
-CheckReserved FunctionContext	s i = CheckFunctContext s i
-CheckReserved CodeContext		s i = CheckCodeContext s i
-CheckReserved GenericContext	s i = CheckGenericContext s i
+CheckReservedIdent :: !ScanContext !String !Input -> (!Token, !Input)
+CheckReservedIdent GeneralContext   s i = CheckGeneralContext s i
+CheckReservedIdent TypeContext      s i = CheckTypeContext s i
+CheckReservedIdent FunctionContext	s i = CheckFunctContext s i
+CheckReservedIdent CodeContext		s i = CheckCodeContext s i
+CheckReservedIdent GenericContext	s i = CheckGenericContext s i
 
-CheckGeneralContext	:: !String !Input -> (!Token, !Input)
+CheckReservedOperator :: !String !Input -> (!Token, !Input)
+CheckReservedOperator "!"  input =	(ExclamationToken, input)
+CheckReservedOperator "*/" input =	(ErrorToken "Unexpected end of comment, */", input)
+CheckReservedOperator s    input =	(IdentToken s, input)
+
+CheckGeneralContext :: !String !Input -> (!Token, !Input)
 CheckGeneralContext s input
  = case s of
 	"module"     		-> (ModuleToken		, input)
@@ -819,8 +863,6 @@ CheckEveryContext s input
 	"generic" 	->	(GenericToken		, input)
 	"derive"	-> 	(DeriveToken		, input)
 	"otherwise"	->	(OtherwiseToken		, input)
-	"!"			->	(ExclamationToken	, input)
-	"*/"		->	(ErrorToken "Unexpected end of comment, */", input)
 	"infixr"	#	(error, n, input) = GetPrio  input
 				->	case error of
 						Yes err -> (ErrorToken err						, input)  //-->> ("Error token generated: "+err)
@@ -1424,6 +1466,8 @@ where
 	toString EndOfFileToken				= "end of file"
 	toString (ErrorToken id)			= "Scanner error: " + id
 
+	toString (QualifiedIdentToken module_name ident_name) = module_name+++"@"+++ident_name
+
 	toString GenericToken				= "generic"	
 	toString DeriveToken				= "derive"	
 	toString GenericOpenToken			= "{|"
@@ -1451,6 +1495,8 @@ where
 		equal_args_of_tokens (LetToken l1)			(LetToken l2)			= l1 == l2
 		equal_args_of_tokens (SeqLetToken l1)		(SeqLetToken l2)		= l1 == l2
 		equal_args_of_tokens (ErrorToken id1)		(ErrorToken id2)		= id1 == id2
+		equal_args_of_tokens (QualifiedIdentToken module_name1 ident_name1) (QualifiedIdentToken module_name2 ident_name2)
+			= ident_name1==ident_name2 && module_name1==module_name2
 		equal_args_of_tokens _						_						= True
 
 /* Sjaak ... */

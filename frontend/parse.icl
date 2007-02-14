@@ -1081,7 +1081,9 @@ wantImports pState
 	# (names, pState) = wantModuleIdents FunctionContext IC_Module pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  pState = wantEndOfDefinition "imports" pState
-	= (map (\name -> { import_module = name, import_symbols = [], import_file_position = LinePos file_name line_nr}) names, pState)
+	  position = LinePos file_name line_nr
+	= ([ { import_module = name, import_symbols = [], import_file_position = position, import_qualified = False }
+			\\ name<-names], pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
@@ -1089,9 +1091,28 @@ wantFromImports pState
 	  (mod_ident, pState) = stringToIdent mod_name IC_Module pState
 	  pState = wantToken GeneralContext "from imports" ImportToken pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
-	  (import_symbols, pState) = wantSequence CommaToken GeneralContext pState
+	  (token, pState) = nextToken GeneralContext pState
+	| case token of IdentToken "qualified" -> True ; _ -> False
+		# (import_symbols, pState) = wantImportDeclarations pState
+		  pState = wantEndOfDefinition "from imports" pState
+		= ( { import_module = mod_ident, import_symbols = import_symbols,
+			  import_file_position = LinePos file_name line_nr, import_qualified = True }, pState)
+	# (import_symbols, pState) = wantImportDeclarationsT token pState
 	  pState = wantEndOfDefinition "from imports" pState
-	= ( { import_module = mod_ident, import_symbols = import_symbols, import_file_position = LinePos file_name line_nr }, pState)
+	= ( { import_module = mod_ident, import_symbols = import_symbols,
+		  import_file_position = LinePos file_name line_nr, import_qualified = False }, pState)
+where
+	wantImportDeclarations pState
+		# (token, pState) = nextToken GeneralContext pState
+		= wantImportDeclarationsT token pState
+
+	wantImportDeclarationsT token pState
+		# (first, pState) = wantImportDeclarationT token pState
+		  (token, pState) = nextToken GeneralContext pState
+		| token == CommaToken
+			# (rest, pState) = wantImportDeclarations pState
+			= ([first : rest], pState)
+			= ([first], tokenBack pState)
 
 instance want ImportedObject where
 	want pState
@@ -1117,74 +1138,77 @@ instance want ImportDeclaration
 where
 	want pState
 		# (token, pState) = nextToken GeneralContext pState
-		= case token of
-			DoubleColonToken
-				# (name, pState)				= wantConstructorName "import type" pState
-				  (type_id, pState)				= stringToIdent name IC_Type pState
-				  (ii_extended, token, pState)	= optional_extension_with_next_token pState
-				| token == OpenToken
-				  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
-				  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } (Yes conses), pState)
-				| token == CurlyOpenToken
-				  	#	(fields, pState) = want_names (wantLowerCaseName "import record fields") (IC_Field type_id) CurlyCloseToken pState
-				  	->	(ID_Record { ii_ident = type_id, ii_extended = ii_extended } (Yes fields), pState)
-				  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } No, tokenBack pState)
-			ClassToken
-				# (name, pState)				= want pState
-				  (class_id, pState)			= stringToIdent name IC_Class pState
-				  (ii_extended, token, pState)	= optional_extension_with_next_token pState
-				| token == OpenToken
-				  	#	(members, pState)			= want_names want IC_Expression CloseToken pState
-				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } (Yes members), pState)
-				  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, tokenBack pState)
-			InstanceToken
-				#	(class_name, pState)	= want pState
-//					(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
-					ii_extended				= False
-					(types, pState)			= wantList "instance types" tryBrackType pState
-					(class_id, pState)		= stringToIdent class_name IC_Class pState
-					(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
-					(context, pState)		= optionalContext pState
-				->	(ID_Instance { ii_ident = class_id, ii_extended = ii_extended } inst_id (types,context), pState)
-			IdentToken fun_name
-				#	(fun_id, pState)		= stringToIdent fun_name IC_Expression pState
-					(ii_extended, pState)	= optional_extension pState
-				->	(ID_Function { ii_ident = fun_id, ii_extended = ii_extended }, pState)
-			token
-				#	(fun_id, pState)		= stringToIdent "dummy" IC_Expression pState
-				->	( ID_Function { ii_ident = fun_id, ii_extended = False }
-					, parseError "from import" (Yes token) "imported item" pState
-					)
-	where				
-		want_names want_fun ident_kind close_token pState
-			# (token, pState) = nextToken FunctionContext pState
-			| token == DotDotToken
-				= ([], wantToken FunctionContext "import declaration" close_token pState)
-				= want_list_of_names want_fun ident_kind close_token (tokenBack pState)
+		= wantImportDeclarationT token pState
 
-		want_list_of_names want_fun ident_kind close_token pState
-			# (name, pState) = want_fun pState
-			  (name_id, pState)	= stringToIdent name ident_kind pState
-			  (ii_extended, token, pState) = optional_extension_with_next_token pState
-			| token == CommaToken
-				# (names, pState) = want_list_of_names want_fun ident_kind close_token pState
-				= ([{ ii_ident = name_id, ii_extended = ii_extended } : names], pState)
-			| token == close_token
-				= ([{ ii_ident = name_id, ii_extended = ii_extended }], pState)
-				= ([{ ii_ident = name_id, ii_extended = ii_extended }], parseError "ImportDeclaration" (Yes token) ")" pState)
-			
-		optional_extension pState
+wantImportDeclarationT token pState
+	= case token of
+		DoubleColonToken
+			# (name, pState)				= wantConstructorName "import type" pState
+			  (type_id, pState)				= stringToIdent name IC_Type pState
+			  (ii_extended, token, pState)	= optional_extension_with_next_token pState
+			| token == OpenToken
+			  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
+			  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } (Yes conses), pState)
+			| token == CurlyOpenToken
+			  	#	(fields, pState) = want_names (wantLowerCaseName "import record fields") (IC_Field type_id) CurlyCloseToken pState
+			  	->	(ID_Record { ii_ident = type_id, ii_extended = ii_extended } (Yes fields), pState)
+			  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } No, tokenBack pState)
+		ClassToken
+			# (name, pState)				= want pState
+			  (class_id, pState)			= stringToIdent name IC_Class pState
+			  (ii_extended, token, pState)	= optional_extension_with_next_token pState
+			| token == OpenToken
+			  	#	(members, pState)			= want_names want IC_Expression CloseToken pState
+			  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } (Yes members), pState)
+			  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, tokenBack pState)
+		InstanceToken
+			#	(class_name, pState)	= want pState
+//				(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
+				ii_extended				= False
+				(types, pState)			= wantList "instance types" tryBrackType pState
+				(class_id, pState)		= stringToIdent class_name IC_Class pState
+				(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
+				(context, pState)		= optionalContext pState
+			->	(ID_Instance { ii_ident = class_id, ii_extended = ii_extended } inst_id (types,context), pState)
+		IdentToken fun_name
+			#	(fun_id, pState)		= stringToIdent fun_name IC_Expression pState
+				(ii_extended, pState)	= optional_extension pState
+			->	(ID_Function { ii_ident = fun_id, ii_extended = ii_extended }, pState)
+		token
+			#	(fun_id, pState)		= stringToIdent "dummy" IC_Expression pState
+			->	( ID_Function { ii_ident = fun_id, ii_extended = False }
+				, parseError "from import" (Yes token) "imported item" pState
+				)
+where				
+	want_names want_fun ident_kind close_token pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == DotDotToken
+			= ([], wantToken FunctionContext "import declaration" close_token pState)
+			= want_list_of_names want_fun ident_kind close_token (tokenBack pState)
+
+	want_list_of_names want_fun ident_kind close_token pState
+		# (name, pState) = want_fun pState
+		  (name_id, pState)	= stringToIdent name ident_kind pState
+		  (ii_extended, token, pState) = optional_extension_with_next_token pState
+		| token == CommaToken
+			# (names, pState) = want_list_of_names want_fun ident_kind close_token pState
+			= ([{ ii_ident = name_id, ii_extended = ii_extended } : names], pState)
+		| token == close_token
+			= ([{ ii_ident = name_id, ii_extended = ii_extended }], pState)
+			= ([{ ii_ident = name_id, ii_extended = ii_extended }], parseError "ImportDeclaration" (Yes token) ")" pState)
+		
+	optional_extension pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == DotDotToken
+			= (True, pState)
+			= (False, tokenBack pState)			
+		
+	optional_extension_with_next_token pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == DotDotToken
 			# (token, pState) = nextToken FunctionContext pState
-			| token == DotDotToken
-				= (True, pState)
-				= (False, tokenBack pState)			
-			
-		optional_extension_with_next_token pState
-			# (token, pState) = nextToken FunctionContext pState
-			| token == DotDotToken
-				# (token, pState) = nextToken FunctionContext pState
-				= (True, token, pState)
-				= (False, token, pState)
+			= (True, token, pState)
+			= (False, token, pState)
 
 /*
 	Classes and instances
@@ -1430,19 +1454,23 @@ where
 						-> (True, TCGeneric gen_type_context, pState)
 					_ 
 						# pState = tokenBack pState
-						# (ident, pState) = stringToIdent name IC_Class pState			
+						# (ident, pState) = stringToIdent name IC_Class pState
 			 			# class_global_ds = { glob_object = MakeDefinedSymbol ident NoIndex (-1), glob_module = NoIndex }
 						-> (True, TCClass class_global_ds, pState)
-			_ 
+			QualifiedIdentToken module_name ident_name
+				# (module_ident, pState) = stringToIdent module_name IC_Module pState
+				-> (True, TCQualifiedIdent module_ident ident_name, pState)
+			_
 				-> (False, abort "no tc_class", tokenBack pState)
 	
 	build_context types length_types (TCClass class_global_ds=:{glob_object}) pState
 		# tc_class = TCClass {class_global_ds & glob_object = {glob_object & ds_arity = length_types}}
 		= ({ tc_class = tc_class, tc_var = nilPtr, tc_types = types}, pState)
+	build_context types length_types tc_class=:(TCQualifiedIdent module_name ident_name) pState
+		= ({ tc_class = tc_class, tc_var = nilPtr, tc_types = types}, pState)
 	build_context types 1 (TCGeneric gtc=:{gtc_generic=gtc_generic=:{glob_object}}) pState
 		# gtc = { gtc & gtc_generic = {gtc_generic & glob_object = {glob_object & ds_arity = 1}}} 
 		= ({ tc_class = TCGeneric gtc, tc_var = nilPtr, tc_types = types }, pState)
-
 	build_context types length_types tc_class=:(TCGeneric _) pState
 		# pState = parseErrorSimple "type context" "generic class can have only one class argument" pState					
 		= (abort "No TypeContext", pState)
@@ -1571,6 +1599,7 @@ where
 			,	gc_kind = KindError
 			}
 		= (derive_def, pState) 
+
 	get_type_cons :: Type !*ParseState -> (TypeCons, !*ParseState)	
 	get_type_cons (TA type_symb []) pState 
 		= (TypeConsSymb type_symb, pState)
@@ -1979,6 +2008,13 @@ where
 			  (context, pState) = optionalContext (tokenBack pState)
 			  (attr_env, pState) = optionalCoercions pState
 			= (makeSymbolType [] type context attr_env, pState)
+		want_rest_of_symbol_type token [{sp_type=type=:{at_type = TQualifiedIdent module_ident type_name [] },sp_annotation} : types] pState
+			# pState = warnIfStrictAnnot sp_annotation pState
+			# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
+		 	# type = { type & at_type = TQualifiedIdent module_ident type_name atypes }
+			  (context, pState) = optionalContext (tokenBack pState)
+			  (attr_env, pState) = optionalCoercions pState
+			= (makeSymbolType [] type context attr_env, pState)
 		want_rest_of_symbol_type token types pState
 			= (makeSymbolType [] (MakeAttributedType TE) [] [], parseError "symbol type" (Yes token) "->" pState) -->> types
 
@@ -2230,14 +2266,14 @@ where
 		= (TA { sym & type_arity = length types } types, pState)
 	convert_list_of_types (TV tv) types pState
 		= (CV tv :@: types, pState)
-//AA..
 	convert_list_of_types TArrow [type1, type2]	pState
 		= (type1 --> type2, pState)
 	convert_list_of_types TArrow [type1] pState
 		= (TArrow1 type1, pState)
 	convert_list_of_types (TArrow1 type1) [type2] pState
 		= (type1 --> type2, pState)
-//..AA
+	convert_list_of_types (TQualifiedIdent module_ident type_name []) types pState
+		= (TQualifiedIdent module_ident type_name types, pState)
 	convert_list_of_types _ types pState
 		= (TE, parseError "Type" No "ordinary type variable" pState)
 // ... Sjaak
@@ -2400,6 +2436,11 @@ trySimpleTypeT CurlyOpenToken attr pState
 trySimpleTypeT StringTypeToken attr pState
 	# type = makeStringType
 	= (True, {at_attribute = attr, at_type = type}, pState)
+trySimpleTypeT (QualifiedIdentToken module_name ident_name) attr pState
+	| not (isLowerCaseName ident_name)
+		# (module_id, pState) = stringToIdent module_name IC_Module pState
+		# type = TQualifiedIdent module_id ident_name []
+		= (True, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT token attr pState
 	# (bt, pState) = try token pState
 	= case bt of
@@ -2644,13 +2685,13 @@ where
 
 wantSelectors :: Token *ParseState -> *(![ParsedSelection], !*ParseState)
 wantSelectors token pState
-			# (selector, pState) = want_selector token pState
-			  (token, pState) = nextToken FunctionContext pState
-			| token == DotToken
-				# (token, pState) = nextToken FunctionContext pState
-				  (selectors, pState) = wantSelectors token pState
-				= (selector ++ selectors, pState)
-				= (selector, tokenBack pState)
+	# (selector, pState) = want_selector token pState
+	  (token, pState) = nextToken FunctionContext pState
+	| token == DotToken
+		# (token, pState) = nextToken FunctionContext pState
+		  (selectors, pState) = wantSelectors token pState
+		= (selector ++ selectors, pState)
+		= (selector, tokenBack pState)
 where
 	want_selector :: !Token !*ParseState -> *(![ParsedSelection], !*ParseState)
 	want_selector SquareOpenToken pState
@@ -2666,17 +2707,36 @@ where
 					# (selectors, pState) = want_array_selectors pState
 					= ([selector : selectors], pState)
 					= ([selector], tokenBack pState)
-
 	want_selector (IdentToken name) pState
 		| isUpperCaseName name
-	  		# (field_name, pState) = want (wantToken FunctionContext "array selector" DotToken pState)
-	  		  (field_id, pState) = stringToIdent field_name IC_Selector pState
-	  		  (type_id, pState) = stringToIdent name IC_Type pState
-			= ([PS_Record field_id (Yes type_id)], pState)
-	  		# (field_id, pState) = stringToIdent name IC_Selector pState
-			= ([PS_Record field_id No], pState)
+			# pState = wantToken FunctionContext "record selector" DotToken pState
+			  (type_id, pState) = stringToIdent name IC_Type pState
+			= want_field_after_record_type (RecordNameIdent type_id) pState
+			# (selector_id, pState) = stringToIdent name IC_Selector pState
+			= ([PS_Record selector_id NoRecordName], pState)
+	want_selector (QualifiedIdentToken module_name ident_name) pState
+		| isUpperCaseName ident_name
+	  		# pState = wantToken FunctionContext "record selector" DotToken pState
+	  		  (module_id, pState) = stringToIdent module_name IC_Module pState
+			= want_field_after_record_type (RecordNameQualifiedIdent module_id ident_name) pState
+	  		# (module_id, pState) = stringToIdent module_name IC_Module pState
+			= ([PS_QualifiedRecord module_id ident_name NoRecordName], pState)
 	want_selector token pState
 		= ([PS_Erroneous], parseError "simple RHS expression" (Yes token) "<selector>" pState)
+
+	want_field_after_record_type record_name pState
+		# (token, pState) = nextToken GeneralContext pState
+		= case token of
+			IdentToken field_name
+				| isLowerCaseName field_name
+					# (selector_id, pState) = stringToIdent field_name IC_Selector pState
+					-> ([PS_Record selector_id record_name], pState)
+			QualifiedIdentToken module_name field_name
+				| isLowerCaseName field_name
+			  		# (module_id, pState) = stringToIdent module_name IC_Module pState
+					-> ([PS_QualifiedRecord module_id field_name record_name], pState)
+			_
+				-> ([PS_Erroneous], parseError "record field" (Yes token) "lower case ident" pState)
 
 trySimpleExpression :: !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 trySimpleExpression is_pattern pState
@@ -2777,6 +2837,10 @@ trySimpleExpressionT (CharToken char) is_pattern pState
 	= (True, PE_Basic (BVC char), pState)
 trySimpleExpressionT (RealToken real) is_pattern pState
 	= (True, PE_Basic (BVR real), pState)
+trySimpleExpressionT (QualifiedIdentToken module_name ident_name) is_pattern pState
+	| not is_pattern || not (isLowerCaseName ident_name)
+		# (module_id, pState) = stringToIdent module_name IC_Module pState
+		= (True, PE_QualifiedIdent module_id ident_name, pState)
 trySimpleExpressionT token is_pattern pState
 	| is_pattern
 		| token == WildCardToken
@@ -3280,19 +3344,17 @@ wantRecordOrArrayExp is_pattern pState
 		= (PE_ArrayDenot [], pState)		
 		# (opt_type, pState) = try_type_specification token pState
 		= case opt_type of
-			Yes _
-				-> want_record opt_type pState
-			_
+			NoRecordName
 				# (succ, field, pState) = try_field_assignment token pState
 				| succ
 					# (token, pState) = nextToken FunctionContext pState
 					| token == CommaToken
 						# (token, pState) = nextToken FunctionContext pState
 						  (fields, pState) = want_field_assignments cIsNotAPattern token pState
-						-> (PE_Record PE_Empty No [ field : fields ], wantToken FunctionContext "record or array" CurlyCloseToken pState)
+						-> (PE_Record PE_Empty NoRecordName [ field : fields ], wantToken FunctionContext "record or array" CurlyCloseToken pState)
 					| token == CurlyCloseToken
-						-> (PE_Record PE_Empty No [ field ], pState)
-						-> (PE_Record PE_Empty No [ field ], parseError "record or array" (Yes token) "}" pState)
+						-> (PE_Record PE_Empty NoRecordName [ field ], pState)
+						-> (PE_Record PE_Empty NoRecordName [ field ], parseError "record or array" (Yes token) "}" pState)
 				# (expr, pState) = wantRhsExpressionT token pState
 				  (token, pState) = nextToken FunctionContext pState
 				| token == AndToken
@@ -3302,6 +3364,8 @@ wantRecordOrArrayExp is_pattern pState
 					-> wantArrayComprehension expr pState
 				# (elems, pState) = want_array_elems token pState
 				-> (PE_ArrayDenot [expr : elems], pState)
+			opt_type
+				-> want_record opt_type pState
 where
 	want_array_elems CurlyCloseToken pState
 		= ([], pState)
@@ -3319,23 +3383,38 @@ where
 			  (type_id, pState) = stringToIdent name IC_Type pState
 			  (token, pState) = nextToken FunctionContext pState
 			  (fields, pState) = want_field_assignments cIsAPattern token pState
-			= (PE_Record PE_Empty (Yes type_id) fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
+			= (PE_Record PE_Empty (RecordNameIdent type_id) fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState)
+	want_record_pattern (QualifiedIdentToken module_name record_name) pState
+		| isUpperCaseName record_name
+			# pState = wantToken FunctionContext "record pattern" BarToken pState
+			  (module_id, pState) = stringToIdent module_name IC_Module pState
+			  (token, pState) = nextToken FunctionContext pState
+			  (fields, pState) = want_field_assignments cIsAPattern token pState
+			= (PE_Record PE_Empty (RecordNameQualifiedIdent module_id record_name) fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
 	want_record_pattern token pState
 		# (fields, pState) =  want_field_assignments cIsAPattern token pState
-		= (PE_Record PE_Empty No fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
+		= (PE_Record PE_Empty NoRecordName fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
 
 	try_type_specification (IdentToken type_name) pState
 		| isUpperCaseName type_name || isFunnyIdName type_name
 			# (token, pState) = nextToken FunctionContext pState
 			| token == BarToken
 				# (type_id, pState) = stringToIdent type_name IC_Type pState
-				= (Yes type_id, pState)
-				= (No, tokenBack pState)
-			= (No, pState)
+				= (RecordNameIdent type_id, pState)
+				= (NoRecordName, tokenBack pState)
+			= (NoRecordName, pState)
+	try_type_specification (QualifiedIdentToken module_name record_name) pState
+		| isUpperCaseName record_name || isFunnyIdName record_name
+			# (token, pState) = nextToken FunctionContext pState
+			| token == BarToken
+				# (module_ident, pState) = stringToIdent module_name IC_Module pState
+				= (RecordNameQualifiedIdent module_ident record_name, pState)
+				= (NoRecordName, tokenBack pState)
+			= (NoRecordName, pState)
 	try_type_specification _ pState
-		= (No, pState)
+		= (NoRecordName, pState)
 
-	want_updates :: !(Optional Ident) Token ParseState -> ([NestedUpdate], ParseState)
+	want_updates :: !OptionalRecordName Token ParseState -> ([NestedUpdate], ParseState)
 	want_updates type token pState
 		# (updates, pState)
 			= parse_updates token pState
@@ -3362,7 +3441,7 @@ where
 				= ({nu_selectors = selectors, nu_update_expr = expr}, pState)
 				= ({nu_selectors = selectors, nu_update_expr = PE_Empty}, parseError "field assignment" (Yes token) "=" pState)
 
-	transform_record_or_array_update :: !(Optional Ident) ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
+	transform_record_or_array_update :: !OptionalRecordName ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
 	transform_record_or_array_update type expr updates level pState
 		| is_record_update sortedUpdates
 			=	transform_record_update type expr groupedUpdates level pState
@@ -3380,7 +3459,15 @@ where
 							smaller_selector :: ParsedSelection ParsedSelection -> Bool
 							smaller_selector (PS_Record ident1 _) (PS_Record ident2 _)
 								=	ident1.id_name < ident2.id_name
+							smaller_selector (PS_Record ident1 _) (PS_QualifiedRecord _ field_name2 _)
+								=	ident1.id_name < field_name2
 							smaller_selector (PS_Record _ _) _
+								=	True
+							smaller_selector (PS_QualifiedRecord _ field_name1 _) (PS_QualifiedRecord _ field_name2 _)
+								=	field_name1 < field_name2
+							smaller_selector (PS_QualifiedRecord _ field_name1 _) (PS_Record ident2 _)
+								=	field_name1 < ident2.id_name
+							smaller_selector (PS_QualifiedRecord _ _ _) _
 								=	True
 							smaller_selector _ _
 								=	False
@@ -3396,6 +3483,8 @@ where
 							equal_selectors :: [ParsedSelection] [ParsedSelection] -> Bool
 							equal_selectors [PS_Record ident1 _ ,_ : _] [PS_Record ident2 _ ,_: _]
 								=	ident1.id_name == ident2.id_name
+							equal_selectors [PS_QualifiedRecord _ field_name1 _ ,_ : _] [PS_QualifiedRecord _ field_name2 _ ,_: _]
+								=	field_name1 == field_name2
 							equal_selectors _ _
 								=	False
 		
@@ -3406,10 +3495,12 @@ where
 
 			is_record_select (PS_Record _ _)
 				=	True
+			is_record_select (PS_QualifiedRecord _ _ _)
+				=	True
 			is_record_select _
 				=	False
 
-			transform_record_update :: (Optional Ident) ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
+			transform_record_update :: OptionalRecordName ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
 			transform_record_update record_type expr groupedUpdates level pState
 				=	(updateExpr, pState2)
 				where
@@ -3422,47 +3513,54 @@ where
 					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
 					//  (id is ident to shared expression that's being updated)
 
-					transform_update :: !Int [NestedUpdate] (Optional Ident,Optional Ident,ParseState) -> (FieldAssignment, !(!Optional Ident,!Optional Ident,ParseState))
+					transform_update :: !Int [NestedUpdate] (Optional Ident,OptionalRecordName,ParseState) -> (FieldAssignment, !(!Optional Ident,OptionalRecordName,ParseState))
 					transform_update _ [{nu_selectors=[PS_Record fieldIdent field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
 						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
-						= ({bind_dst = fieldIdent, bind_src = nu_update_expr},(shareIdent,record_type,pState))
+						= ({bind_dst = FieldName fieldIdent, bind_src = nu_update_expr},(shareIdent,record_type,pState))
+					transform_update _ [{nu_selectors=[PS_QualifiedRecord module_id field_name field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
+						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
+						= ({bind_dst = QualifiedFieldName module_id field_name, bind_src = nu_update_expr},(shareIdent,record_type,pState))
 					transform_update level updates=:[{nu_selectors=[PS_Record fieldIdent field_record_type : _]} : _] (optionalIdent,record_type,pState)
 						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
-						# (shareIdent, pState)
-							=	make_ident optionalIdent level pState
-						  select
-						  	=	PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
+						  (shareIdent, pState) = make_ident optionalIdent level pState
+						  select = PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
 						  (update_expr, pState)
-						  	=	transform_record_or_array_update No select (map sub_update updates) (level+1) pState
-						=	({bind_dst = fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
-						where
-							make_ident :: (Optional Ident) !Int ParseState -> (Ident, ParseState)
-							make_ident (Yes ident) _ pState
-								=	(ident, pState)
-							make_ident No level pState
-								=	internalIdent ("s" +++ toString level +++ ";") pState
-
-							sub_update :: NestedUpdate -> NestedUpdate
-							sub_update update=:{nu_selectors}
-								=	{update & nu_selectors = tl nu_selectors}
+						  	=	transform_record_or_array_update NoRecordName select (map sub_update updates) (level+1) pState
+						= ({bind_dst = FieldName fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
+					transform_update level updates=:[{nu_selectors=[PS_QualifiedRecord module_id field_name field_record_type : _]} : _] (optionalIdent,record_type,pState)
+						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
+						  (shareIdent, pState) = make_ident optionalIdent level pState
+						  select = PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_QualifiedRecord module_id field_name final_record_type]
+						  (update_expr, pState)
+						  	=	transform_record_or_array_update NoRecordName select (map sub_update updates) (level+1) pState
+						= ({bind_dst = QualifiedFieldName module_id field_name, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
 					transform_update _ _ (_, record_type,pState)
-						# pState
-							=	parseError "record or array" No "field assignments mixed with array assignments not" pState
-						=	({bind_dst = errorIdent, bind_src = PE_Empty}, (No,record_type,pState))
+						# pState = parseError "record or array" No "field assignments mixed with array assignments not" pState
+						=	({bind_dst = FieldName errorIdent, bind_src = PE_Empty}, (No,record_type,pState))
 
-					build_update :: !(Optional Ident) !(Optional Ident) !ParsedExpr ![FieldAssignment] -> ParsedExpr
+					make_ident :: (Optional Ident) !Int ParseState -> (Ident, ParseState)
+					make_ident (Yes ident) _ pState
+						=	(ident, pState)
+					make_ident No level pState
+						=	internalIdent ("s" +++ toString level +++ ";") pState
+
+					sub_update :: NestedUpdate -> NestedUpdate
+					sub_update update=:{nu_selectors}
+						=	{update & nu_selectors = tl nu_selectors}
+
+					build_update :: !OptionalRecordName !(Optional Ident) !ParsedExpr ![FieldAssignment] -> ParsedExpr
 					build_update record_type No expr assignments
 						=	PE_Record expr record_type assignments
 					build_update record_type (Yes ident) expr assignments
 						=	PE_Let False (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
 									(PE_Record (PE_Ident ident) record_type assignments)
 					
-					check_field_and_record_types :: (Optional Ident) (Optional Ident) ParseState -> (!Optional Ident,!ParseState);
-					check_field_and_record_types No record_type pState
+					check_field_and_record_types :: OptionalRecordName OptionalRecordName ParseState -> (!OptionalRecordName,!ParseState);
+					check_field_and_record_types NoRecordName record_type pState
 						= (record_type,pState);
-					check_field_and_record_types field_record_type=:(Yes _) No pState
+					check_field_and_record_types field_record_type=:(RecordNameIdent _) NoRecordName pState
 						= (field_record_type,pState);
-					check_field_and_record_types (Yes field_record_type_name) record_type=:(Yes record_type_name) pState
+					check_field_and_record_types (RecordNameIdent field_record_type_name) record_type=:(RecordNameIdent record_type_name) pState
 						| field_record_type_name==record_type_name
 							= (record_type,pState);
 							# error_message = "record type in update: "+++field_record_type_name.id_name+++" where "+++record_type_name.id_name+++" was"
@@ -3505,32 +3603,33 @@ where
 								  			(PE_Tuple [PE_Ident element_id, PE_Ident array_id])
 								  			(PE_Selection (ParsedUniqueSelector True) expr (reverse [PS_Array (PE_Ident index_id) : initial_selectors]))
 								  (updated_element, pState)
-									= transform_record_update No
+									= transform_record_update NoRecordName
 										(PE_Ident element_id)
 										[[{nu_selectors=(reverse record_selectors), nu_update_expr=update_expr}]] (level+1) pState
 								=	(PE_Let False
 										(LocalParsedDefs [index_def, select_def])
 										(PE_Update (PE_Ident array_id) (reverse [PS_Array (PE_Ident index_id) : initial_selectors]) updated_element), pState)
 
-	want_field_assignments is_pattern token=:(IdentToken ident) pState
-		| isLowerCaseName ident
-			# (field, pState) = want_field_expression is_pattern ident pState
-			  (token, pState) = nextToken FunctionContext pState
-			| token == CommaToken
-				# (token, pState) = nextToken FunctionContext pState
-				  (fields, pState) = want_field_assignments is_pattern token pState 
-				= ([ field : fields ], pState)
-				= ([ field ], tokenBack pState)
-	where
-		want_field_expression is_pattern field_name pState
+	want_field_assignments is_pattern token=:(IdentToken field_name) pState
+		| isLowerCaseName field_name
 			# (field_id, pState) = stringToIdent field_name IC_Selector pState
-			  (token, pState) = nextToken FunctionContext pState
-			| token == EqualToken
-				# (field_expr, pState) = wantExpression is_pattern pState
-				= ({ bind_src = field_expr, bind_dst = field_id}, pState)
-				= ({ bind_src = PE_Empty, bind_dst = field_id}, tokenBack pState)
+			= want_more_field_assignments (FieldName field_id) is_pattern pState
+	want_field_assignments is_pattern token=:(QualifiedIdentToken module_name field_name) pState
+		| isLowerCaseName field_name
+			# (module_id, pState) = stringToIdent module_name IC_Module pState
+			= want_more_field_assignments (QualifiedFieldName module_id field_name) is_pattern pState
 	want_field_assignments is_pattern token pState
 		= ([], parseError "record or array field assignments" (Yes token) "field name" pState)
+
+	want_more_field_assignments field_name_or_qualified_field_name is_pattern pState
+		# (field_expr, pState) = want_field_expression is_pattern pState
+		  field = { bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
+		#  (token, pState) = nextToken FunctionContext pState
+		| token == CommaToken
+			# (token, pState) = nextToken FunctionContext pState
+			  (fields, pState) = want_field_assignments is_pattern token pState 
+			= ([ field : fields ], pState)
+			= ([ field ], tokenBack pState)
 
 	try_field_assignment (IdentToken field_name) pState
 		| isLowerCaseName field_name
@@ -3538,12 +3637,28 @@ where
 			| token == EqualToken
 				# (field_expr, pState) = wantExpression cIsNotAPattern pState
 				  (field_id, pState) = stringToIdent field_name IC_Selector pState
-				= (True, { bind_src = field_expr, bind_dst = field_id}, pState) 
+				= (True, { bind_src = field_expr, bind_dst = FieldName field_id}, pState) 
+				= (False, abort "no field", tokenBack pState)
+			= (False, abort "no field", pState)
+	try_field_assignment (QualifiedIdentToken module_name field_name) pState
+		| isLowerCaseName field_name
+			# (token, pState) = nextToken FunctionContext pState
+			| token == EqualToken
+				# (field_expr, pState) = wantExpression cIsNotAPattern pState
+				  (module_id, pState) = stringToIdent module_name IC_Module pState
+				= (True, { bind_src = field_expr, bind_dst = QualifiedFieldName module_id field_name}, pState) 
 				= (False, abort "no field", tokenBack pState)
 			= (False, abort "no field", pState)
 	try_field_assignment _ pState
 		= (False, abort "no field", pState)
-			
+
+	want_field_expression is_pattern pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == EqualToken
+			= wantExpression is_pattern pState
+			= (PE_Empty, tokenBack pState)
+
+	want_record :: !OptionalRecordName !ParseState -> (!ParsedExpr,!ParseState)		
 	want_record type pState
 		# (token1, pState) = nextToken FunctionContext pState
   		  (token2, pState) = nextToken FunctionContext pState
@@ -3552,14 +3667,14 @@ where
 			= (PE_Record PE_Empty type fields, wantToken FunctionContext "record" CurlyCloseToken pState)
 			= want_record_update type token1 (tokenBack pState)
 	where
-		want_record_update :: !(Optional Ident) !Token !ParseState -> (!ParsedExpr, !ParseState)
+		want_record_update :: !OptionalRecordName !Token !ParseState -> (!ParsedExpr, !ParseState)
 		want_record_update type token pState
 			# (expr,  pState)	= wantRhsExpressionT token pState
 			  pState			= wantToken FunctionContext "record update" AndToken pState
 			  (token, pState)	= nextToken FunctionContext pState
 			= want_update type expr token pState
 
-	want_update :: !(Optional Ident) !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
+	want_update :: !OptionalRecordName !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
 	want_update type expr token pState
 		# (position, pState) = getPosition pState
 		  (updates, pState)	= want_updates type token pState
@@ -3590,7 +3705,7 @@ where
 				=	PE_UpdateComprehension expr update_expr ident_expr qualifiers
 
 	want_record_or_array_update token expr pState
-		= want_update No expr token pState
+		= want_update NoRecordName expr token pState
 
 	want_array_assignments is_pattern pState
 		# (assign, pState) = want_array_assignment is_pattern pState

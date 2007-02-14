@@ -48,10 +48,11 @@ instance == FunctionOrMacroIndex
 				| STE_TypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
-				| STE_Imported !STE_Kind !Index
+				| STE_Imported !STE_Kind !ModuleN
 				| STE_DclFunction
 				| STE_Module !(Module (CollectedDefinitions ClassInstance IndexRange))
 				| STE_ClosedModule
+				| STE_ModuleQualifiedImports !SortedQualifiedImports
 				| STE_Empty
 					/* for creating class dictionaries */
 				| STE_DictType !CheckedTypeDef
@@ -64,14 +65,19 @@ instance == FunctionOrMacroIndex
 						the "actual" dcl module.
 					*/
 				| STE_BelongingSymbol !Int
-				| STE_ExplImpSymbolNotImported !ModuleN
-				
-				| STE_UsedType !Index !STE_Kind
-					/* used during binding of types to mark types that have been applied. The first  */
+				| STE_ExplImpSymbolNotImported !ModuleN !STE_Kind
+				| STE_ImportedQualified !Declaration !STE_Kind
+
+				| STE_UsedType !ModuleN !STE_Kind
+					/* used during binding of types to mark types that have been applied. */
+				| STE_UsedQualifiedType !ModuleN !Index !STE_Kind
 				| STE_BelongingSymbolExported
 				| STE_BelongingSymbolForExportedSymbol
 
-::	ModuleN:==Int
+::	ModuleN:==Int;
+
+::	SortedQualifiedImports	= SortedQualifiedImports !Declaration !SortedQualifiedImports !SortedQualifiedImports
+							| EmptySortedQualifiedImports
 
 ::	Declaration = Declaration !DeclarationRecord
 
@@ -383,6 +389,7 @@ cNameLocationDependent :== True
 	{	import_module		:: !Ident
 	,	import_symbols		:: ![from_symbol]
 	,	import_file_position:: !Position	// for error messages
+	,	import_qualified	:: !Bool
 	}
 
 instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
@@ -600,7 +607,7 @@ pIsSafe			:== True
 		| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
 		| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
 		| AP_WildCard !OptionalVariable
-		| AP_Empty !Ident
+		| AP_Empty !{#Char}
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro !Bool // is_dcl_macro
 
@@ -874,6 +881,7 @@ cNonRecursiveAppl	:== False
 //AA: class in a type context is either normal class or a generic class
 :: TCClass 	= TCClass 		!(Global DefinedSymbol) // Normal class
 			| TCGeneric 	!GenericTypeContext		// Generic class
+			| TCQualifiedIdent !Ident !String
 
 :: GenericTypeContext = 
 	{ gtc_generic 	:: !(Global DefinedSymbol)
@@ -911,6 +919,8 @@ cNonRecursiveAppl	:== False
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
+
+			|	TQualifiedIdent !Ident !String ![AType]
 
 			|	TE
 
@@ -1102,8 +1112,8 @@ instance toString 	KindInfo
 				| PE_Basic !BasicValue
 				| PE_Bound !BoundExpr
 				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr !Position
-				| PE_Tuple ![ParsedExpr]				
-				| PE_Record !ParsedExpr !(Optional Ident) ![FieldAssignment]
+				| PE_Tuple ![ParsedExpr]
+				| PE_Record !ParsedExpr !OptionalRecordName ![FieldAssignment]
 				| PE_ArrayPattern ![ElemAssignment]
 				| PE_UpdateComprehension !ParsedExpr !ParsedExpr !ParsedExpr ![Qualifier]
 				| PE_ArrayDenot ![ParsedExpr]
@@ -1118,6 +1128,8 @@ instance toString 	KindInfo
 				| PE_WildCard
 				| PE_Field !ParsedExpr !(Global FieldSymbol) /* Auxiliary, used during checking */
 
+				| PE_QualifiedIdent !Ident !String
+
 				| PE_ABC_Code ![String] !Bool
 				| PE_Any_Code !(CodeBinding Ident) !(CodeBinding Ident) ![String]
 
@@ -1128,9 +1140,17 @@ instance toString 	KindInfo
 				
 				| PE_Empty
 
-::	ParsedSelection	= PS_Record !Ident !(Optional Ident)
+::	ParsedSelection	= PS_Record !Ident !OptionalRecordName
+					| PS_QualifiedRecord !ModuleIdent !String !OptionalRecordName
 					| PS_Array  !ParsedExpr
 					| PS_Erroneous
+
+::	OptionalRecordName
+	= NoRecordName
+	| RecordNameIdent !Ident
+	| RecordNameQualifiedIdent !ModuleIdent !String
+	
+::	ModuleIdent:==Ident
 
 ::	GeneratorKind = IsListGenerator | IsOverloadedListGenerator | IsArrayGenerator
 			
@@ -1158,8 +1178,10 @@ instance toString 	KindInfo
 
 ::	BoundExpr	:== Bind ParsedExpr Ident
 
-::	FieldAssignment :== Bind ParsedExpr Ident
+::	FieldAssignment :== Bind ParsedExpr FieldNameOrQualifiedFieldName
 
+::	FieldNameOrQualifiedFieldName = FieldName !Ident | QualifiedFieldName !Ident !String
+ 
 ::	ElemAssignment :== Bind ParsedExpr [ParsedExpr]
 
 
@@ -1359,7 +1381,8 @@ cNotALineNumber :== -1
 
 instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
-			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
+			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b,
+			 FieldNameOrQualifiedFieldName, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,

@@ -23,6 +23,7 @@ instance <<< FilePosition
 ::	Token
 	= 	IdentToken !.String		//		an identifier
 	| 	UnderscoreIdentToken !.String//	an identifier that starts with a '_'
+	| 	QualifiedIdentToken !String !.String	//	a qualified identifier
 	|	IntToken !.String		//		an integer
 	|	RealToken !.String		//		a real
 	|	StringToken !.String	//		a string

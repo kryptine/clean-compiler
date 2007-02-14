@@ -349,6 +349,11 @@ where
 	collectFunctions e icl_module ca
 		= (e, ca)
 
+instance collectFunctions FieldNameOrQualifiedFieldName
+where
+	collectFunctions e icl_module ca
+		= (e, ca)
+
 instance collectFunctions (ParsedInstance a) | collectFunctions a where
 	collectFunctions inst=:{pi_members} icl_module ca
 		# (pi_members, ca) = collectFunctions pi_members icl_module ca
@@ -997,7 +1002,7 @@ transformArrayDenot exprs
 scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool Bool (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
 scanModules [] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	= (True, parsed_modules,files, ca)
-scanModules [{import_module,import_symbols,import_file_position} : mods] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+scanModules [{import_module,import_file_position} : mods] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	| in_cache import_module cached_modules
 		= scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	# (found_module,mod_type) = try_to_find import_module parsed_modules
@@ -1454,6 +1459,7 @@ reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 			{	import_module = clean_types_module_ident
 			,	import_symbols = []
 			,	import_file_position = NoPos
+			,	import_qualified = False
 			}
 		# imports = if (mod_ident == clean_types_module_ident) [] [clean_types_module]
 		= reorganiseDefinitions icl_module [PD_Import imports : defs] 0 0 0 0 ca
