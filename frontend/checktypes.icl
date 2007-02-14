@@ -70,7 +70,7 @@ where
 			= checkError var "uniqueness attribute not allowed" error
 		check_attr_of_type_var attr _ error
 			= error
-	
+
 		to_root_attr (TA_Var var)
 			= TA_RootVar var
 		to_root_attr attr
@@ -325,7 +325,7 @@ where
 			  (local_vars, cs_symbol_table) = foldSt retrieve_local_vars free_vars ([], cs.cs_symbol_table)
 			  (attr_env, cs_error) = addToAttributeEnviron type_attr cti.cti_lhs_attribute attr_env cs.cs_error
 			= ([type : types], [local_vars : local_vars_list], attr_env, (ts, ti , { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
-		where 
+		where
 			retrieve_local_vars tv=:{tv_ident={id_info}} (local_vars, symbol_table)
 				# (ste=:{ste_kind = STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count }}, symbol_table) = readPtr id_info symbol_table
 				| stv_count == 0
@@ -1235,25 +1235,6 @@ where
 					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error}))
 			= (atv, ({ heaps & th_vars = th_vars },
 					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_ident.id_name "type variable already defined" cs_error}))
-/*
-	check_attribute :: !TypeAttribute !TypeAttribute !String !*ErrorAdmin
-		-> (!TypeAttribute, !*ErrorAdmin)
-	check_attribute TA_Multi root_attr name error
-		= (TA_Multi, error)
-	check_attribute TA_None root_attr name error
-		= (TA_Multi, error)
-	check_attribute TA_Unique root_attr name error
-		= (TA_Unique, error)
-	check_attribute TA_Anonymous root_attr name error
-		= case root_attr of
-			TA_Var var
-				-> (TA_RootVar var, error)
-			_
-				-> (PA_BUG (TA_RootVar (abort "SwitchUniquenessBug is on")) root_attr, error)
-	check_attribute attr root_attr name error
-		= (TA_Multi, checkError name "specified attribute not allowed" error)
-*/
-	
 
 	check_attribute :: !TypeAttribute !TypeAttribute !String !*AttrVarHeap !*ErrorAdmin
 		-> (!TypeAttribute, !*AttrVarHeap, !*ErrorAdmin)
@@ -1270,7 +1251,6 @@ where
 			TA_Unique
 				# (attr_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 				-> (TA_Var { var & av_info_ptr = attr_info_ptr}, attr_var_heap, error)
-//				-> (PA_BUG (TA_RootVar (abort "SwitchUniquenessBug is on")) root_attr, error)
 	check_attribute attr root_attr name attr_var_heap error
 		= (TA_Multi, attr_var_heap, checkError name "specified attribute not allowed" error)
 
