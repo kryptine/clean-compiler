@@ -473,6 +473,9 @@ Clean (BEDeclareType:: Int Int String BackEnd -> BackEnd)
 void BEDeclareFunction (CleanString name, int arity, int functionIndex, int ancestor);
 Clean (BEDeclareFunction :: String Int Int Int BackEnd -> BackEnd)
 
+void BEStartFunction (int functionIndex);
+Clean (BEDeclareFunction :: Int BackEnd -> BackEnd)
+
 BERuleAltP BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock);
 Clean (BECodeAlt:: Int BENodeDefP BENodeP BECodeBlockP BackEnd -> (BERuleAltP, BackEnd))
 

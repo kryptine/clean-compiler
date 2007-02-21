@@ -2504,6 +2504,12 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	}
 } /* DeclareFunctionC */
 
+void BEStartFunction (int functionIndex)
+{
+	gBEState.be_icl.beicl_module->im_start
+		= gBEState.be_modules[main_dcl_module_n].bem_functions[functionIndex].symb_def;
+}
+
 void
 BEDeclareFunction (CleanString name, int arity, int functionIndex, int ancestor)
 {

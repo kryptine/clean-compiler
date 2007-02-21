@@ -96,6 +96,7 @@
 /EXPORT: BETypeVar
 /EXPORT: BEDeclareType
 /EXPORT: BEDeclareFunction
+/EXPORT: BEStartFunction
 /EXPORT: BECodeAlt
 /EXPORT: BEString
 /EXPORT: BEStrings
