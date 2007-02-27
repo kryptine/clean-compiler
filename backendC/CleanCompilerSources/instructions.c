@@ -3683,9 +3683,18 @@ static void print_foreign_export_type (TypeNode type)
 			TypeNode type_node_p;
 
 			type_node_p=type->type_node_arguments->type_arg_node;
-			if (!type_node_p->type_node_is_var && type_node_p->type_node_symbol->symb_kind==char_type){
-				FPrintF (OutFile,"S");
-				return;
+			if (!type_node_p->type_node_is_var){
+				switch (type_node_p->type_node_symbol->symb_kind){
+					case char_type:
+						FPrintF (OutFile,"S");
+						return;
+					case int_type:
+						FPrintF (OutFile,"Ai");
+						return;
+					case real_type:
+						FPrintF (OutFile,"Ar");
+						return;
+				}
 			}
 		} else if (symbol_p->symb_kind==tuple_type){
 			TypeArgs type_arg_p;

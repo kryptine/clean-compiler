@@ -15,7 +15,6 @@ isMainModule :: ModuleKind -> Bool
 isMainModule MK_Main	= True
 isMainModule _ 			= False
 
-// AA: new implementation of generics ...
 checkGenericDefs :: !Index !(Optional (CopiedDefinitions, Int)) !*{#GenericDef} !*{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
 	-> (!*{#GenericDef}, !*{#CheckedTypeDef}, !*{#ClassDef}, !*{#DclModule}, !*Heaps, !*CheckState)
 checkGenericDefs mod_index opt_icl_info gen_defs type_defs class_defs modules heaps cs 	
@@ -291,10 +290,6 @@ where
 	check_star_case _ _ _ heaps cs 
 		= (heaps, cs)
 				
-								
-// ... AA: new implementation of generics
-
-				
 checkTypeClasses :: !Index !(Optional (CopiedDefinitions, Int)) !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*Heaps, !*CheckState)
 checkTypeClasses module_index opt_icl_info class_defs member_defs type_defs modules heaps=:{hp_type_heaps} cs
@@ -445,7 +440,6 @@ where
 	,	is_modules			:: !.{# DclModule}
 	}
 
-// AA..
 checkInstanceDefs :: !Index !*{#ClassInstance} !u:{#CheckedTypeDef} !u:{#ClassDef} !u:{#MemberDef} !u:{#DclModule} !*Heaps !*CheckState
 	-> (!.{#ClassInstance},!u:{#CheckedTypeDef},!u:{#ClassDef},!u:{#MemberDef}, !u:{#DclModule},!.Heaps,!.CheckState)
 checkInstanceDefs mod_index instance_defs type_defs class_defs member_defs modules heaps=:{hp_type_heaps} cs
@@ -596,6 +590,7 @@ getMemberDef mem_mod mem_index mod_index member_defs modules
 		# (dcl_mod,modules) = modules![mem_mod]
 		= (dcl_mod.dcl_common.com_member_defs.[mem_index], member_defs, modules)
 
+/*
 getGenericDef :: !(Global DefinedSymbol) !Int !u:{#GenericDef} !v:{#DclModule} -> (!GenericDef,!u:{#GenericDef},!v:{#DclModule})
 getGenericDef {glob_module, glob_object={ds_ident, ds_index}} mod_index generic_defs modules
 	| glob_module == mod_index
@@ -603,6 +598,7 @@ getGenericDef {glob_module, glob_object={ds_ident, ds_index}} mod_index generic_
 		= (generic_def, generic_defs, modules)
 		# (dcl_mod, modules) = modules![glob_module]
 		= (dcl_mod.dcl_common.com_generic_defs.[ds_index], generic_defs, modules)
+*/
 
 instantiateTypes :: ![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] !SpecialSubstitution ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
 	-> (![TypeVar], ![AttributeVar], ![AType], ![TypeContext], ![AttrInequality], ![SpecialSubstitution], !*TypeHeaps, !*ErrorAdmin)
@@ -771,11 +767,9 @@ getTypeDef :: !Index !(Global Index) !v:{#CheckedTypeDef} !w:{#DclModule}
 		-> (!CheckedTypeDef, !v:{#CheckedTypeDef}, !w:{#DclModule})
 getTypeDef x_main_dcl_module_n {glob_module,glob_object} type_defs modules
 	| glob_module==x_main_dcl_module_n
-		# (type_def, type_defs)
-				= type_defs![glob_object]
+		# (type_def, type_defs) = type_defs![glob_object]
 		= (type_def, type_defs, modules)
-	# (type_def, modules)
-			= modules![glob_module].dcl_common.com_type_defs.[glob_object]
+	# (type_def, modules) = modules![glob_module].dcl_common.com_type_defs.[glob_object]
 	= (type_def, type_defs, modules)
 		
 determineTypesOfInstances :: !Index !Index !*{#ClassInstance} !*{# ClassDef} !*{# MemberDef} 
@@ -823,12 +817,10 @@ where
 			=  ([], [], member_defs, modules, type_heaps, var_heap, cs_error)
 			# class_member = class_members.[mem_offset]
 			  ({me_ident,me_type,me_priority,me_class_vars}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
-			  cs_error
-			  		= pushErrorAdmin (newPosition class_ident ins_pos) cs_error
+			  cs_error = pushErrorAdmin (newPosition class_ident ins_pos) cs_error
 			  (instance_type, new_ins_specials, type_heaps, Yes (modules, _), cs_error)
 			  		= determineTypeOfMemberInstance me_type me_class_vars ins_type ins_specials type_heaps (Yes (modules, {}, cUndef)) cs_error
-			  cs_error
-			  		= popErrorAdmin cs_error
+			  cs_error = popErrorAdmin cs_error
 			  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			  inst_def = MakeNewFunctionType me_ident me_type.st_arity me_priority instance_type ins_pos new_ins_specials new_info_ptr
 			  (inst_symbols, memb_inst_defs, member_defs, modules, type_heaps, var_heap, cs_error)
@@ -1327,9 +1319,6 @@ where
 	macro_def_to_dcl decl_index (defs, fun_defs)
 		# ({fun_ident, fun_pos}, fun_defs) = fun_defs![decl_index]
 		= ([Declaration { decl_ident = fun_ident, decl_pos = fun_pos, decl_kind = STE_DclMacroOrLocalMacroFunction [], decl_index = decl_index } : defs], fun_defs)
-
-gimme_a_lazy_array_type :: !u:{.a} -> v:{.a}, [u<=v]
-gimme_a_lazy_array_type a = a
 
 gimme_a_strict_array_type :: !u:{!.a} -> v:{!.a}, [u<=v]
 gimme_a_strict_array_type a = a
@@ -2883,10 +2872,14 @@ checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admi
 			= True
 		check_foreign_export_type (TB (BT_String _))
 			= True
-		check_foreign_export_type (TA {type_index={glob_module,glob_object},type_arity} [{at_type=TB BT_Char}])
+		check_foreign_export_type (TA {type_index={glob_module,glob_object},type_arity} [{at_type=TB basic_type}])
 			| predefined_symbols.[PD_UnboxedArrayType].pds_def==glob_object &&
 			  predefined_symbols.[PD_UnboxedArrayType].pds_module==glob_module
-			  = True
+			  = case basic_type of
+					BT_Char -> True
+					BT_Int -> True
+					BT_Real -> True
+					_ -> False
 			  = False			
 		check_foreign_export_type (TAS {type_arity,type_index={glob_object,glob_module}} arguments strictness)
 			= glob_module==cPredefinedModuleIndex && glob_object==PD_Arity2TupleTypeIndex+(type_arity-2)
