@@ -539,18 +539,15 @@ symbolTypesCorrespond symbol_type_1 symbol_type_2 type_heaps=:{th_vars, th_attrs
 		= { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}
 
 init_symbol_type_vars symbol_type_1 symbol_type_2 tc_state
-	# tc_state = init_attr_vars (symbol_type_1.st_attr_vars++symbol_type_2.st_attr_vars)
-								tc_state
-	  tc_state = init_type_vars (symbol_type_1.st_vars++symbol_type_2.st_vars) tc_state
+	# tc_state = init_attr_vars symbol_type_1.st_attr_vars symbol_type_2.st_attr_vars tc_state
+	  tc_state = init_type_vars symbol_type_1.st_vars symbol_type_2.st_vars tc_state
 	= tc_state
 
-init_type_vars type_vars tc_state=:{tc_type_vars}
-	# tc_type_vars = init_type_vars` type_vars tc_type_vars
-	= { tc_state & tc_type_vars = tc_type_vars }
+init_type_vars type_vars1 type_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn_heap}}
+	# hwn_heap = foldSt init_type_var type_vars1 hwn_heap
+	# hwn_heap = foldSt init_type_var type_vars2 hwn_heap
+	= { tc_state & tc_type_vars = {tc_type_vars & hwn_heap = hwn_heap}}
   where
-	init_type_vars` type_vars tc_type_vars=:{hwn_heap}
-		# hwn_heap = foldSt init_type_var type_vars hwn_heap
-		= { tc_type_vars & hwn_heap = hwn_heap }
 	init_type_var {tv_info_ptr} heap
 		= writePtr tv_info_ptr TVI_Empty heap
 	
@@ -729,8 +726,7 @@ instance t_corresponds (TypeDef TypeRhs) where
 		t_corresponds_TypeDef dclDef iclDef tc_state
 //			| False--->("comparing:", dclDef, iclDef)
 //				= undef
-			# tc_state = init_attr_vars dclDef.td_attrs tc_state 
-			  tc_state = init_attr_vars iclDef.td_attrs tc_state 
+			# tc_state = init_attr_vars dclDef.td_attrs iclDef.td_attrs tc_state 
 			  tc_state = init_atype_vars dclDef.td_args tc_state
 			  tc_state = init_atype_vars iclDef.td_args tc_state
 			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, (dclDef.td_context, dclDef.td_attribute)))
@@ -780,18 +776,16 @@ instance t_corresponds AType where
 instance t_corresponds TypeAttribute where
 	t_corresponds TA_Unique TA_Unique
 		=	return True
-	t_corresponds TA_Multi TA_Multi
-		=	return True
+	t_corresponds TA_Multi icl
+		= case icl of
+			TA_Multi-> return True
+			TA_None	-> return True
+			_		-> return False
 	t_corresponds (TA_Var dclDef) (TA_Var iclDef)
 		=	t_corresponds dclDef iclDef
 	t_corresponds (TA_RootVar dclDef) (TA_RootVar iclDef)
 		= t_corresponds dclDef iclDef
 	t_corresponds TA_None icl
-		= case icl of
-			TA_Multi-> return True
-			TA_None	-> return True
-			_		-> return False
-	t_corresponds TA_Multi icl
 		= case icl of
 			TA_Multi-> return True
 			TA_None	-> return True
@@ -927,7 +921,7 @@ instance t_corresponds AttrInequality where
 
 instance t_corresponds ClassDef where
 	t_corresponds dclDef iclDef
-		=	do (init_type_vars (dclDef.class_args++iclDef.class_args))
+		=	do (init_type_vars dclDef.class_args iclDef.class_args)
 		&&&	equal dclDef.class_ident iclDef.class_ident
 		&&&	t_corresponds dclDef.class_args iclDef.class_args
 		&&&	t_corresponds dclDef.class_context iclDef.class_context
@@ -935,8 +929,8 @@ instance t_corresponds ClassDef where
 
 instance t_corresponds MemberDef where
 	t_corresponds dclDef iclDef
-		=	do (init_type_vars (dclDef.me_type.st_vars++iclDef.me_type.st_vars))
-		&&&	do (init_attr_vars (dclDef.me_type.st_attr_vars++iclDef.me_type.st_attr_vars))
+		=	do (init_type_vars dclDef.me_type.st_vars iclDef.me_type.st_vars)
+		&&&	do (init_attr_vars dclDef.me_type.st_attr_vars iclDef.me_type.st_attr_vars)
 		&&& equal dclDef.me_ident iclDef.me_ident
 		&&&	equal dclDef.me_offset iclDef.me_offset
 		&&&	equal dclDef.me_priority iclDef.me_priority
@@ -947,10 +941,8 @@ instance t_corresponds ClassInstance where
 		= t_corresponds` dclDef.ins_type iclDef.ins_type
 	  where
 		t_corresponds` dclDef iclDef tc_state
-			# tc_state
-					= init_attr_vars (dclDef.it_attr_vars++iclDef.it_attr_vars) tc_state
-			  tc_state
-			  		= init_type_vars (dclDef.it_vars++iclDef.it_vars) tc_state
+			# tc_state = init_attr_vars dclDef.it_attr_vars iclDef.it_attr_vars tc_state
+			  tc_state = init_type_vars dclDef.it_vars iclDef.it_vars tc_state
 			  (corresponds, tc_state)
 			  		=  t_corresponds dclDef.it_types iclDef.it_types tc_state
 			| not corresponds
@@ -1254,10 +1246,10 @@ continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_module_index dcl
 		name_is_location_dependent _
 		 	= False
 
-init_attr_vars attr_vars tc_state=:{tc_attr_vars}
-	# hwn_heap = foldSt init_attr_var attr_vars tc_attr_vars.hwn_heap
-	  tc_attr_vars = { tc_attr_vars & hwn_heap = hwn_heap }
-	= { tc_state & tc_attr_vars = tc_attr_vars }
+init_attr_vars attr_vars1 attr_vars2 tc_state=:{tc_attr_vars=tc_attr_vars=:{hwn_heap}}
+	# hwn_heap = foldSt init_attr_var attr_vars1 hwn_heap
+	# hwn_heap = foldSt init_attr_var attr_vars2 hwn_heap
+	= { tc_state & tc_attr_vars = { tc_attr_vars & hwn_heap = hwn_heap } }
   where
 	init_attr_var {av_info_ptr} attr_heap
 		= writePtr av_info_ptr AVI_Empty attr_heap
