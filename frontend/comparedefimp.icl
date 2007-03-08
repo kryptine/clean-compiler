@@ -727,8 +727,7 @@ instance t_corresponds (TypeDef TypeRhs) where
 //			| False--->("comparing:", dclDef, iclDef)
 //				= undef
 			# tc_state = init_attr_vars dclDef.td_attrs iclDef.td_attrs tc_state 
-			  tc_state = init_atype_vars dclDef.td_args tc_state
-			  tc_state = init_atype_vars iclDef.td_args tc_state
+			  tc_state = init_atype_vars dclDef.td_args iclDef.td_args tc_state
 			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, (dclDef.td_context, dclDef.td_attribute)))
 			 				(iclDef.td_args, (iclDef.td_rhs, (iclDef.td_context, iclDef.td_attribute))) tc_state
 instance t_corresponds TypeContext where
@@ -834,7 +833,7 @@ instance t_corresponds Type where
 	t_corresponds (GTV dclDef) (GTV iclDef)
 		=	t_corresponds dclDef iclDef
 	t_corresponds (TFA dclVars dclType) (TFA iclVars iclType)
-		=	do (init_atype_vars (dclVars++iclVars))
+		=	do (init_atype_vars dclVars iclVars)
 		&&&	t_corresponds dclType iclType
 	t_corresponds _ _
 		= return False
@@ -887,22 +886,21 @@ instance t_corresponds FieldSymbol where
 
 instance t_corresponds ConsDef where
 	t_corresponds dclDef iclDef
-		=	do (init_atype_vars (dclDef.cons_exi_vars++iclDef.cons_exi_vars))
+		=	do (init_atype_vars dclDef.cons_exi_vars iclDef.cons_exi_vars)
 		&&&	t_corresponds dclDef.cons_type iclDef.cons_type
 		&&& equal dclDef.cons_ident iclDef.cons_ident
 		&&& equal dclDef.cons_priority iclDef.cons_priority
 
 instance t_corresponds SelectorDef where
 	t_corresponds dclDef iclDef
-		=	do (init_atype_vars (dclDef.sd_exi_vars++iclDef.sd_exi_vars))
+		=	do (init_atype_vars dclDef.sd_exi_vars iclDef.sd_exi_vars)
 		&&&	t_corresponds dclDef.sd_type iclDef.sd_type
 		&&& equal dclDef.sd_field_nr iclDef.sd_field_nr
 
-init_atype_vars atype_vars
-					tc_state=:{tc_type_vars}
-	# type_heap = foldSt init_type_var atype_vars tc_type_vars.hwn_heap
-	  tc_type_vars = { tc_type_vars & hwn_heap = type_heap }
-	= { tc_state & tc_type_vars = tc_type_vars }
+init_atype_vars atype_vars1 atype_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn_heap}}
+	# type_heap = foldSt init_type_var atype_vars1 hwn_heap
+	# type_heap = foldSt init_type_var atype_vars2 hwn_heap
+	= {tc_state & tc_type_vars = {tc_type_vars & hwn_heap = type_heap}}
   where
 	init_type_var {atv_variable} type_heap = writePtr atv_variable.tv_info_ptr TVI_Empty type_heap
 
