@@ -10,11 +10,11 @@ cModuleScope	:== 0
 cGlobalScope	:== 1
 cRankTwoScope	:== 2
 
-cNeedStdArray	:== 1
-cNeedStdEnum	:== 2
-cNeedStdDynamic :== 4
-cNeedStdGeneric	:== 8
-cNeedStdStrictLists :== 16
+cStdArrayImportMissing	:== 1
+cStdEnumImportMissing	:== 2
+cNeedStdDynamic 		:== 4
+cNeedStdGeneric			:== 8
+cNeedStdStrictLists		:== 16
 
 ::	VarHeap :== Heap VarInfo
 

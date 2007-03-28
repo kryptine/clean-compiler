@@ -130,6 +130,7 @@ checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState 
 	-> (!FunctionBody, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
+
 	# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} ([], [])
 							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
@@ -138,10 +139,10 @@ checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_posit
 	  (expr_with_array_selections, free_vars, e_state=:{es_var_heap,es_dynamics=dynamics_in_rhs}, e_info, cs)
 			= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
+	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	  (cb_args, es_var_heap) = mapSt determine_function_arg aux_patterns es_var_heap
 	  (rhss, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
-	  		= check_function_bodies free_vars cb_args bodies e_input { e_state & es_dynamics = [], es_var_heap = es_var_heap } e_info
-	  								{ cs & cs_symbol_table = cs_symbol_table }
+	  		= check_function_bodies free_vars cb_args bodies e_input { e_state & es_dynamics = [], es_var_heap = es_var_heap } e_info cs
 	  (rhs, position, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
 	  		= transform_patterns_into_cases aux_patterns cb_args expr_with_array_selections pb_position es_var_heap es_expr_heap
 	  										dynamics_in_rhs cs
@@ -1217,7 +1218,7 @@ where
 		  from_then_to_ident = local_predefined_idents.[PD_FromThenTo]
 
 		| id==from_ident || id==from_then_ident || id==from_to_ident || id==from_then_to_ident
-			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdEnum})
+			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cStdEnumImportMissing})
 				// instead of giving an error message remember that StdEnum should have been imported.
 				// Error will be given in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_FromS] || id==local_predefined_idents.[PD_FromTS] || id==local_predefined_idents.[PD_FromSTS]
@@ -1234,7 +1235,7 @@ where
 		  update_ident = local_predefined_idents.[PD_ArrayUpdateFun]
 		  usize_ident = local_predefined_idents.[PD_UnqArraySizeFun]
 		| id==createArray_ident || id==uselect_ident || id==update_ident || id==usize_ident
-			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdArray})
+			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cStdArrayImportMissing})
 				// instead of giving an error message remember that StdArray should have been be imported.
 				//  Error will be given in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_cons] || id==local_predefined_idents.[PD_decons]

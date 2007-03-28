@@ -2902,12 +2902,12 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 	# cs = case x_needed_modules bitand cNeedStdDynamic of
 			0 -> cs
 			_ -> check_it PD_StdDynamic mod_ident "" extension cs
-	# cs = case x_needed_modules bitand cNeedStdArray of
+	# cs = case x_needed_modules bitand cStdArrayImportMissing of
 			0 -> cs
-			_ -> check_it PD_StdArray mod_ident " (needed for array denotations)" extension cs
-	# cs = case x_needed_modules bitand cNeedStdEnum of
+			_ -> missing_import_error PD_StdArray mod_ident " (needed for array denotations)" extension cs
+	# cs = case x_needed_modules bitand cStdEnumImportMissing of
 			0 -> cs
-			_ -> check_it PD_StdEnum mod_ident " (needed for [..] expressions)" extension cs
+			_ -> missing_import_error PD_StdEnum mod_ident " (needed for [..] expressions)" extension cs
 	# cs = case x_needed_modules bitand cNeedStdStrictLists of
 			0 -> cs
 			_ -> check_it PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
@@ -2920,13 +2920,17 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 		= case ste_kind of
 			STE_ClosedModule
 				-> cs
-			_ 
-				# error_location = { ip_ident = mod_ident, ip_line = 1, ip_file = mod_ident.id_name+++extension}
-				  cs_error = pushErrorAdmin error_location cs.cs_error
-				  cs_error = checkError pds_ident ("not imported"+++explanation) cs_error
-				  cs_error = popErrorAdmin cs_error
-				-> { cs & cs_error = cs_error }
-				
+			_
+				-> missing_import_error pd mod_ident explanation extension cs
+
+	missing_import_error pd mod_ident explanation extension cs
+		# pds_ident = predefined_idents.[pd]
+		  error_location = { ip_ident = mod_ident, ip_line = 1, ip_file = mod_ident.id_name+++extension}
+		  cs_error = pushErrorAdmin error_location cs.cs_error
+		  cs_error = checkError pds_ident ("not imported"+++explanation) cs_error
+		  cs_error = popErrorAdmin cs_error
+		= { cs & cs_error = cs_error }
+
 // MV ...
 	switched_off_Clean_feature pd mod_ident explanation extension cs=:{cs_symbol_table}
  		# ident = predefined_idents.[pd]	
