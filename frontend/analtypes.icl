@@ -3,13 +3,6 @@ implementation module analtypes
 import StdEnv
 import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes //, RWSDebug
 
-/*
-::	TypeGroup =
-	{	tg_number	:: !Int
-	,	tg_members	:: ![GlobalIndex]
-	}
-*/	
-
 ::	TypeGroups :== [[GlobalIndex]]
 
 ::	PartitioningInfo = 
@@ -123,7 +116,7 @@ where
 					-> (No, type_defs, type_heaps, error)
 
 		try_to_expand_synonym_type_in_main_dcl main_dcl_module_index {gi_module,gi_index} (type_defs, main_dcl_type_defs, type_heaps, error)
-			| main_dcl_module_index == main_dcl_module_index && gi_index < size main_dcl_type_defs
+			| gi_module == main_dcl_module_index && gi_index < size main_dcl_type_defs
 				# (td=:{td_rhs,td_attribute,td_ident,td_pos}, main_dcl_type_defs) = main_dcl_type_defs![gi_index]
 				= case td_rhs of
 					SynType type
@@ -591,7 +584,7 @@ where
 		anal_rhs_of_type_def modules _ (SynType type) conds_as
 			# (type_kind, cv_props, (conds, as=:{as_kind_heap, as_error})) = analTypes True /* cDummyBool */ modules [] type.at_type conds_as
 			  {uki_kind_heap, uki_error} = unifyKinds type_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
-			= (cv_props, (conds, { as & as_kind_heap = as_kind_heap, as_error = as_error }))
+			= (cv_props, (conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
 
 	determine_kinds {gi_module,gi_index} (kind_heap, td_infos)
 		# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module,gi_index]
@@ -1086,19 +1079,24 @@ checkLeftRootAttributionOfTypeDef common_defs {gi_module,gi_index} (td_infos, th
 		= (td_infos, th_vars, error)
 		
 isUniqueTypeRhs common_defs mod_index (AlgType constructors) state
-	= one_constructor_is_unique common_defs mod_index constructors state
+	= has_unique_constructor constructors common_defs mod_index state
 isUniqueTypeRhs common_defs mod_index (SynType rhs) state
 	= isUnique common_defs rhs state
-isUniqueTypeRhs common_defs mod_index (RecordType {rt_constructor}) state
-	= one_constructor_is_unique common_defs mod_index [rt_constructor] state
+isUniqueTypeRhs common_defs mod_index (RecordType {rt_constructor={ds_index}}) state
+	= constructor_is_unique mod_index ds_index common_defs state
 isUniqueTypeRhs common_defs mod_index _ state
 	= (False, state)
 
-one_constructor_is_unique common_defs mod_index [] state
-	= (False, state)
-one_constructor_is_unique common_defs mod_index [{ds_index}:constructors] state
-	# {cons_type}
-			= common_defs.[mod_index].com_cons_defs.[ds_index]
+has_unique_constructor [{ds_index}:constructors] common_defs mod_index state
+	# (is_unique,state) = constructor_is_unique mod_index ds_index common_defs state
+	| is_unique
+		= (True,state);
+		= has_unique_constructor constructors common_defs mod_index state
+has_unique_constructor [] common_defs mod_index state
+	= (False,state)
+
+constructor_is_unique mod_index index common_defs state
+	# {cons_type} = common_defs.[mod_index].com_cons_defs.[index]
 	  (uniqueness_of_args, state)
 	  		= mapSt (isUnique common_defs) cons_type.st_args state
 	= (or uniqueness_of_args, state)
