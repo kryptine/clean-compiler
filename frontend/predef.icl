@@ -503,8 +503,8 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
-buildPredefinedModule :: !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
-buildPredefinedModule pre_def_symbols 
+buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
+buildPredefinedModule support_dynamics pre_def_symbols 
 	# type_var_ident = predefined_idents.[PD_TypeVar_a0]
 	  string_ident = predefined_idents.[PD_StringType]
 	  unb_array_ident = predefined_idents.[PD_UnboxedArrayType]
@@ -538,14 +538,14 @@ buildPredefinedModule pre_def_symbols
 
 	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_ident MaxTupleArity [array_def,strict_def,unboxed_def] [] pre_def_symbols
 	  alias_dummy_type = make_identity_fun_type alias_dummy_ident type_var
-	  (class_def, member_def, pre_def_symbols) = make_TC_class_def pre_def_symbols
+	  (def_classes, def_members) = make_predefined_classes_and_members support_dynamics 
 	= ({ mod_ident = pre_mod_ident, mod_modification_time = "", mod_type = MK_System, mod_imports = [],mod_foreign_exports=[], mod_imported_objects = [],
 		 mod_defs = {
 			def_types = [string_def, list_def,strict_list_def,unboxed_list_def,tail_strict_list_def,strict_tail_strict_list_def,unboxed_tail_strict_list_def,overloaded_list_def : type_defs],
 						def_constructors = [cons_def,strict_cons_def,unboxed_cons_def,tail_strict_cons_def,strict_tail_strict_cons_def,unboxed_tail_strict_cons_def,overloaded_cons_def,
 											nil_def,strict_nil_def,unboxed_nil_def,tail_strict_nil_def,strict_tail_strict_nil_def,unboxed_tail_strict_nil_def,overloaded_nil_def : cons_defs],
-						def_selectors = [], def_classes = [class_def],
-			def_macro_indices= { ir_from = 0, ir_to = 0 },def_macros=[],def_members = [member_def], def_funtypes = [alias_dummy_type], def_instances = [], 
+						def_selectors = [], def_classes = def_classes,
+			def_macro_indices= { ir_from = 0, ir_to = 0 },def_macros=[],def_members = def_members, def_funtypes = [alias_dummy_type], def_instances = [], 
 			def_generics = [], def_generic_cases = []}}, pre_def_symbols)
 where
 
@@ -569,29 +569,31 @@ where
 				# nr_of_vars = dec nr_of_vars
 				# var_ident = predefined_idents.[PD_TypeVar_a0 + nr_of_vars]
 				= make_type_vars nr_of_vars [MakeTypeVar var_ident : type_vars] pre_def_symbols
-		
-	make_TC_class_def pre_def_symbols
-		# tc_class_name = predefined_idents.[PD_TypeCodeClass]
-		  type_var_ident = predefined_idents.[PD_TypeVar_a0]
-		  tc_member_name = predefined_idents.[PD_TypeCodeMember]
-		
-		  class_var = MakeTypeVar type_var_ident
 
-		  me_type = { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_arity = 0,
-					  st_result = { at_attribute = TA_None, at_type = TV class_var },
-					  st_context = [ {tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name, ds_arity = 1, ds_index = NoIndex }},
-					   				tc_types = [ TV class_var ], tc_var = nilPtr}],
-					  st_attr_vars = [], st_attr_env = [] }
-
-		  member_def = { me_ident = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,
-						 me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
-		
-		  class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
-		  				class_members = {{ds_ident = tc_member_name, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
-						class_dictionary = { ds_ident = { tc_class_name & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos
-					  }
-
-		= (class_def, member_def, pre_def_symbols)
+	make_predefined_classes_and_members support_dynamics
+		| not support_dynamics
+			= ([], []);
+			# tc_class_name = predefined_idents.[PD_TypeCodeClass]
+			  type_var_ident = predefined_idents.[PD_TypeVar_a0]
+			  tc_member_name = predefined_idents.[PD_TypeCodeMember]
+			
+			  class_var = MakeTypeVar type_var_ident
+	
+			  me_type = { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_arity = 0,
+						  st_result = { at_attribute = TA_None, at_type = TV class_var },
+						  st_context = [ {tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name, ds_arity = 1, ds_index = NoIndex }},
+						   				tc_types = [ TV class_var ], tc_var = nilPtr}],
+						  st_attr_vars = [], st_attr_env = [] }
+	
+			  tc_member_def = { me_ident = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,
+								me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+			
+			  tc_class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
+			  				   class_members = {{ds_ident = tc_member_name, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
+							   class_dictionary = { ds_ident = { tc_class_name & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos
+							 }
+	
+			= ([tc_class_def], [tc_member_def])
 
 // MW..
 	make_identity_fun_type alias_dummy_id type_var

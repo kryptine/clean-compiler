@@ -272,7 +272,7 @@ predefined_idents :: {!Ident}
 
 buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
 
-buildPredefinedModule :: !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
+buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
 
 // MV ...
 // changes requires recompile of {static,dynamic}-linker plus all dynamics ever made
