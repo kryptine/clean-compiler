@@ -1164,7 +1164,7 @@ standardTupleSelectorType pos {ds_index} arg_nr {ti_common_defs} ts
 	= freshSymbolType (Yes pos) cWithFreshContextVars { cons_type & st_args = [cons_type.st_result], st_result = cons_type.st_args !! arg_nr } ti_common_defs ts
 
 standardRhsConstructorType pos index mod arity {ti_common_defs} ts
-	# {cons_ident, cons_type=ct=:{st_vars,st_attr_vars}, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
+	# {cons_type=ct=:{st_vars,st_attr_vars}, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
 	  (st_vars, st_attr_vars) = foldSt add_vars_and_attr cons_exi_vars (st_vars, st_attr_vars)
 	  cons_type = { ct & st_vars = st_vars, st_attr_vars = st_attr_vars }
 	  (fresh_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars cons_type ti_common_defs ts
@@ -1178,10 +1178,8 @@ where
 		= [ avar : attr_variables ]
 	add_attr_var attr attr_variables
 		= attr_variables
-	
-//		 ---> ("standardRhsConstructorType", cons_ident, fresh_type)
 
-standardLhsConstructorType pos index mod arity {ti_common_defs} ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
+standardLhsConstructorType pos index mod {ti_common_defs} ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
 	# {cons_ident, cons_type, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
 	  (new_exis_variables, ts_var_store, ts_attr_store, ts_type_heaps) = freshExistentialVariables cons_exi_vars ts_var_store ts_attr_store ts_type_heaps
 //	  	-?-> (not (isEmpty cons_exi_vars), ("standardLhsConstructorType", cons_exi_vars, cons_type))
@@ -1665,7 +1663,7 @@ where
 		# cp = CP_Expression expression
 		  (rhs, ts) = standardRhsConstructorType cp ds_index glob_module ds_arity ti ts	
 		  (expression_type, opt_expr_ptr, reqs_ts) = requirements ti expression (reqs, ts)
-		  (lhs_args, reqs_ts) = determine_record_type cp ds_index glob_module ds_arity ti expression expression_type opt_expr_ptr reqs_ts
+		  (lhs_args, reqs_ts) = determine_record_type cp ds_index glob_module ti expression expression_type opt_expr_ptr reqs_ts
 		  (reqs, ts) = requirements_of_fields ti expression expressions rhs.tst_args lhs_args reqs_ts
 //		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr lhs_result.at_attribute ts.ts_expr_heap }
 //		  coercion = { tc_demanded = lhs_result, tc_offered = expression_type, tc_position = CP_Expression expression, tc_coercible = True }
@@ -1689,7 +1687,7 @@ where
 			  coercion = { tc_demanded = dem_field_type, tc_offered = expr_type, tc_position = CP_Expression bind_src, tc_coercible = True }
 			= ({ reqs & req_type_coercions = [ coercion : reqs.req_type_coercions ]}, ts)
 		
-		determine_record_type cp cons_index mod_index arity ti (Var var) expression_type opt_expr_ptr (reqs, ts=:{ts_var_heap})
+		determine_record_type cp cons_index mod_index ti (Var var) expression_type opt_expr_ptr (reqs, ts=:{ts_var_heap})
 			# (type_info, ts_var_heap) = getTypeInfoOfVariable var ts_var_heap
 			  ts = { ts & ts_var_heap = ts_var_heap}
 			= case type_info of
@@ -1700,12 +1698,12 @@ where
 					| cons_index==constructor_index && mod_index==module_index
 					 	-> (arg_types, (reqs, ts))
 				_
-					-> new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr (reqs, ts)
-		determine_record_type cp cons_index mod_index arity ti _ expression_type opt_expr_ptr reqs_ts
-			= new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr reqs_ts
+					-> new_lhs_constructor_type cp cons_index mod_index ti expression_type opt_expr_ptr (reqs, ts)
+		determine_record_type cp cons_index mod_index ti _ expression_type opt_expr_ptr reqs_ts
+			= new_lhs_constructor_type cp cons_index mod_index ti expression_type opt_expr_ptr reqs_ts
 
-		new_lhs_constructor_type cp cons_index mod_index arity ti expression_type opt_expr_ptr (reqs, ts)
-			# (lhs, ts) = standardLhsConstructorType cp cons_index mod_index arity ti ts
+		new_lhs_constructor_type cp cons_index mod_index ti expression_type opt_expr_ptr (reqs, ts)
+			# (lhs, ts) = standardLhsConstructorType cp cons_index mod_index ti ts
 			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr lhs.tst_result.at_attribute ts.ts_expr_heap }
 	  		  coercion = { tc_demanded = lhs.tst_result, tc_offered = expression_type, tc_position = cp, tc_coercible = True }
 		 	  req_type_coercions = [ coercion : reqs.req_type_coercions ]
@@ -1744,7 +1742,7 @@ where
 					pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_OverloadedConsSymbol)
 			= requirements ti expr reqs_ts
 			# cp = CP_Expression expr
-			  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ds_arity ti ts	
+			  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ti ts	
 			  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
 			  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
 			  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
@@ -2432,30 +2430,18 @@ where
 		| not ts.ts_error.ea_ok
 			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
-		| isEmpty over_info 
-			# ts_type_heaps = ts.ts_type_heaps
-			  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
-									tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
-			# (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
-			  		= updateDynamics comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
-			= (	type_error || not ts_error.ea_ok, 
-				os_predef_symbols, os_special_instances, out,
-				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
-						ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
-					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap  },
-					  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
-			# ts_type_heaps = ts.ts_type_heaps
-			  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
-									tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
-			  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
-			  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
-			  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
-			= (	type_error || not ts_error.ea_ok,
-				os_predef_symbols, os_special_instances, out,
-				{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
-						ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
-					  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
-					  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
+		# ts_type_heaps = ts.ts_type_heaps
+		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
+								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
+		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
+		  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
+		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
+		= (	type_error || not ts_error.ea_ok,
+			os_predef_symbols, os_special_instances, out,
+			{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
+					ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
+				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
+				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
 
 	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (ts_fun_env, coercions)
 		# (env_type, ts_fun_env) = ts_fun_env![fun]

@@ -1089,39 +1089,6 @@ getClassVariable symb var_info_ptr var_heap error
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), overloadingError symb error)
 
-updateDynamics :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
-	-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
-updateDynamics funs type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-	| error.ea_ok
-		= update_dynamics funs type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-		= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)	
-where
-	update_dynamics [] type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-		= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap,  error, predef_symbols)
-	update_dynamics [fun:funs] type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-		# (fun_def, fun_defs) = fun_defs![fun]
-		# {fun_body,fun_ident,fun_info} = fun_def
-		# {fi_group_index, fi_dynamics, fi_local_vars} = fun_info
-		| isEmpty fi_dynamics
-			= update_dynamics funs type_pattern_vars fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-		  	# (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
-		  			= convertDynamicTypes fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
-		  	  (TransformedBody tb) = fun_body
-			  (tb_rhs,ui)
-		  	  	= updateExpression fi_group_index tb.tb_rhs
-					{ ui_instance_calls = [], ui_symbol_heap = symbol_heap, ui_fun_defs = fun_defs, ui_local_vars = fi_local_vars,
-					  ui_fun_env = fun_env, ui_var_heap = var_heap, ui_error = error,
-					  ui_has_type_codes = False,
-					  ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
-			# { ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error,
-		  	  			 ui_x = {x_type_code_info, x_predef_symbols = predef_symbols}}
-				= ui
-
-		 	  fun_def = { fun_def & fun_body = TransformedBody {tb & tb_rhs = tb_rhs}, fun_info = { fun_info &  fi_local_vars = ui_local_vars}}		 	  
-			= update_dynamics funs type_pattern_vars ({ ui_fun_defs & [fun] = fun_def })
-				 ui_fun_env ui_symbol_heap x_type_code_info ui_var_heap ui_error predef_symbols
-				 
-
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
@@ -1141,7 +1108,6 @@ where
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			 
-//			  (tb_rhs, {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}})
 			  (tb_rhs, ui)
 			  		= updateExpression fun_info.fi_group_index tb_rhs {  ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
 			  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
@@ -1392,7 +1358,7 @@ where
 	,	x_predef_symbols	:: !.{#PredefinedSymbol}
 	,	x_main_dcl_module_n :: !Int
 	}
-	
+
 class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
 
 instance updateExpression Expression
@@ -1504,6 +1470,7 @@ where
 				= foldSt (examine_calls_bind) let_lazy_binds (examine_calls_in_expr let_expr ui)
 			examine_calls_in_expr _ ui
 				= ui
+
 			examine_calls_bind {lb_src,lb_dst} ui=:{ui_local_vars}
 				= examine_calls_in_expr lb_src { ui & ui_local_vars = [lb_dst : ui_local_vars ]}
 
@@ -1687,13 +1654,6 @@ where
 
 	adjustClassExpression symb_ident  expr ui
 		= (expr, ui)
-
-let_ptr nr_of_binds ui=:{ui_symbol_heap}
-	# (expr_info_ptr, ui_symbol_heap) = newPtr (EI_LetType (repeatn nr_of_binds empty_attributed_type)) ui_symbol_heap
-	= (expr_info_ptr, {ui &  ui_symbol_heap = ui_symbol_heap})
-where 
-	empty_attributed_type :: AType
-	empty_attributed_type = { at_attribute = TA_Multi, at_type = TE }
 
 class equalTypes a :: !a !a !*TypeVarHeap -> (!Bool, !*TypeVarHeap)
 
