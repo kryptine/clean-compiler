@@ -3,7 +3,7 @@
 */
 implementation module convertcases
 
-import syntax, transform, checksupport, StdCompare, check, utilities, trans, general; //, RWSDebug
+import syntax, transform, StdCompare, check, utilities, trans, general; //, RWSDebug
 
 // exactZip fails when its arguments are of unequal length
 exactZip` :: ![.a] ![.b] -> [(.a,.b)]
@@ -1231,22 +1231,6 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_force_next_alt} kees=:{case_info_ptr,
 			=	False 	->> (toString (ptrToInt case_info_ptr) +++ " doesn't jumps " +++ toString kees.case_explicit)
 nextAlts si kees=:{case_default} ss
 	=	findSplitCases si case_default ss ->> ("nextAlts no outerdefault" +++ toString kees.case_explicit)
-
-newFunction :: !(Optional Ident) !FunctionBody ![FreeVar] ![AType] !AType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
-	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
-newFunction opt_id fun_bodies local_vars arg_types result_type group_index state
-	=	newFunctionWithType opt_id fun_bodies local_vars fun_type group_index state
-	where
-	  (_,fun_type) = removeAnnotations
-		{	st_vars			= []
-		,	st_args			= arg_types
-		,	st_args_strictness=NotStrict
-		,	st_arity		= length arg_types // -*-> ("newFunction", fun_id.id_name)
-		,	st_result		= result_type
-		,	st_context		= []
-		,	st_attr_vars	= []
-		,	st_attr_env		= []
-		}
 
 newFunctionWithType :: !(Optional Ident) !FunctionBody ![FreeVar] !SymbolType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
 	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
