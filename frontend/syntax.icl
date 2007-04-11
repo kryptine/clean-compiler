@@ -387,7 +387,6 @@ where
 	(<<<) file (NoBind _) = file <<< "** NB **"
 	(<<<) file (DynamicExpr {dyn_expr,dyn_type_code})     = file <<< "dynamic " <<< dyn_expr <<< " :: " <<< dyn_type_code 
 //	(<<<) file (DynamicExpr {dyn_expr,dyn_uni_vars,dyn_type_code})     = writeVarPtrs (file <<< "dynamic " <<< dyn_expr <<< " :: dyn_uni_vars") dyn_uni_vars <<< "dyn_type_code=" <<< dyn_type_code 
-//	(<<<) file (TypeCase type_case)      = file <<< type_case
 	(<<<) file (TypeCodeExpression type_code)      = file <<< type_code
 	(<<<) file (Constant symb _ _ _)         = file <<<  "** Constant **" <<< symb
 
@@ -404,12 +403,6 @@ instance <<< LetBind
 where
 	(<<<) file {lb_dst, lb_src}
 		= file <<< lb_dst <<< " = " <<< lb_src <<< "\n"
-
-instance <<< TypeCase
-where
-	(<<<) file {type_case_dynamic,type_case_patterns,type_case_default}
-			= file <<< "typecase " <<< type_case_dynamic <<< "of\n" <<<
-				type_case_patterns <<< type_case_default
 
 instance <<< DynamicPattern
 where
