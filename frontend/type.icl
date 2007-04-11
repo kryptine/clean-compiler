@@ -3,7 +3,7 @@ implementation module type
 import StdEnv
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
 import compilerSwitches
-import genericsupport // AA
+import genericsupport
 
 ::	TypeInput =
 	{	ti_common_defs	:: !{# CommonDefs }
@@ -720,7 +720,7 @@ freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_s
 //		---> ("freshAlgebraicType", alg_type, cons_types)
 where
 	fresh_symbol_types [{ap_symbol={glob_object},ap_expr}] cons_defs var_store attr_store type_heaps all_exis_variables
-		# {cons_type = ct=:{st_args,st_attr_env,st_result}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
+		# {cons_type = ct=:{st_args,st_attr_env,st_result}, cons_exi_vars} = cons_defs.[glob_object.ds_index]
 		  (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
 //		  	-?-> (not (isEmpty cons_exi_vars), ("fresh_symbol_types", cons_exi_vars, ct))
 	  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
@@ -731,7 +731,7 @@ where
 	fresh_symbol_types [{ap_symbol={glob_object},ap_expr} : patterns] cons_defs var_store attr_store type_heaps all_exis_variables
 		# (cons_types, result_type, attr_env, var_store, attr_store, type_heaps, all_exis_variables)
 				= fresh_symbol_types patterns cons_defs var_store attr_store type_heaps all_exis_variables
-		  {cons_type = ct=:{st_args,st_attr_env}, cons_index, cons_exi_vars} = cons_defs.[glob_object.ds_index]
+		  {cons_type = ct=:{st_args,st_attr_env}, cons_exi_vars} = cons_defs.[glob_object.ds_index]
 		  (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
 //		  	-?-> (not (isEmpty cons_exi_vars), ("fresh_symbol_types", cons_exi_vars, ct))
 		  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
@@ -1760,11 +1760,8 @@ where
 	requirements _ (ABCCodeExpr _ _) (reqs, ts)
 		# (fresh_v, ts) = freshAttributedVariable ts
 		= (fresh_v, No, (reqs, ts))
-	
 	requirements _ expr reqs_ts
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
-
-import StdDebug
 
 :: Box a = { box :: !a}
 
