@@ -672,7 +672,7 @@ pIsSafe			:== True
 		| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
 		| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
 		| AP_WildCard !OptionalVariable
-		| AP_Empty !{#Char}
+		| AP_Empty
 
 :: AP_Kind = APK_Constructor !Index | APK_Macro !Bool // is_dcl_macro
 

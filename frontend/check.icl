@@ -3693,8 +3693,8 @@ where
 		= file <<< symbol
 	(<<<) file (AP_WildCard _)
 		= file <<< '_'
-	(<<<) file (AP_Empty ident)
-		= file <<< "<?" <<< ident <<< "?>"
+	(<<<) file AP_Empty
+		= file <<< "<?>"
 
 instance <<< Priority
 where

@@ -287,7 +287,7 @@ where
 		= (buildTypeCase act_var type_case_patterns No type_case_info_ptr cCaseNotExplicit, NoPos, var_store, expr_heap, [dynamic_info_ptr], cs)	
 	transform_pattern_into_cases (AP_WildCard _) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
 		= (result_expr, pattern_position, var_store, expr_heap, opt_dynamics, cs)	
-	transform_pattern_into_cases (AP_Empty name) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
+	transform_pattern_into_cases AP_Empty fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
 		= (EE, pattern_position, var_store, expr_heap, opt_dynamics, cs)
 
 	transform_pattern_variable :: !FreeVar !(Optional (Bind Ident VarInfoPtr)) !Expression !*ExpressionHeap
@@ -874,7 +874,7 @@ where
 		# (new_info_ptr, var_store) = newPtr VI_Empty var_store
 		= transform_pattern (AP_Variable (newVarId "wc") new_info_ptr No) patterns pattern_scheme pattern_variables defaul
 							result_expr case_name pos var_store expr_heap opt_dynamics cs
-	transform_pattern (AP_Empty name) patterns pattern_scheme pattern_variables defaul result_expr _ pos var_store expr_heap opt_dynamics cs
+	transform_pattern AP_Empty patterns pattern_scheme pattern_variables defaul result_expr _ pos var_store expr_heap opt_dynamics cs
 		= (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 
 
@@ -1484,7 +1484,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 						  (right_pat, accus, ps, e_info, cs) = check_pattern right p_input accus ps e_info cs
 						-> check_infix_pattern [] left_arg kind constant prio [right_pat] rest
 									opt_var p_input accus ps e_info cs
-						-> (AP_Empty ds_ident.id_name, accus, ps, e_info,
+						-> (AP_Empty, accus, ps, e_info,
 								{ cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
 					-> check_patterns [mid_pat : left] right rest opt_var p_input accus ps e_info cs
@@ -1531,8 +1531,8 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 									-> check_infix_pattern [(kind1, cons1, prio1, left) : left_args]
 									  				middle_pat kind2 cons2 prio2 [arg_pat] rest No p_input accus ps e_info cs
 							No
-								-> (AP_Empty ds_ident.id_name, accus, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
-						-> (AP_Empty ds_ident.id_name, accus, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
+								-> (AP_Empty, accus, ps, e_info, { cs & cs_error = checkError ds_ident "conflicting priorities" cs.cs_error })
+						-> (AP_Empty, accus, ps, e_info, { cs & cs_error = checkError ds_ident "arguments of constructor are missing" cs.cs_error })
 				_
 					-> check_infix_pattern left_args left kind1 cons1 prio1 [inf_cons_pat : middle] [arg : rest] opt_var p_input accus ps e_info cs 
 
@@ -1566,7 +1566,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 												  _ -> False)
 						# (pattern, ps, e_info, cs) = buildPattern mod_index kind constant args opt_var ps e_info cs
 						-> (pattern, ps, e_info, cs)
-						-> (AP_Empty ds_ident.id_name, ps, e_info, { cs & cs_error = checkError ds_ident "used with wrong arity" cs.cs_error})
+						-> (AP_Empty, ps, e_info, { cs & cs_error = checkError ds_ident "used with wrong arity" cs.cs_error})
 				_
 					| nr_of_args == 0
 						-> (first_expr, ps, e_info, cs)
@@ -1605,7 +1605,7 @@ checkPattern (PE_Record record opt_type fields) opt_var p_input=:{pi_mod_index, 
 			# id_name = case (hd fields).bind_dst of
 							FieldName {id_name} -> id_name
 							QualifiedFieldName module_id field_name -> module_id.id_name+++"@"+++field_name
-			-> (AP_Empty id_name, accus, ps, e_info, cs)
+			-> (AP_Empty, accus, ps, e_info, cs)
 where
 
 	check_field_pattern p_input=:{pi_def_level} {bind_src = PE_Empty, bind_dst = {glob_object={fs_var}}} 
@@ -1707,8 +1707,8 @@ checkMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_priority} 
 			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
 					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
 			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
-			= (AP_Empty ident.id_name, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
-		= (AP_Empty ident.id_name, ps, e_info, { cs & cs_error = checkError fun_ident "not allowed in a pattern" cs_error })
+			= (AP_Empty, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
+		= (AP_Empty, ps, e_info, { cs & cs_error = checkError fun_ident "not allowed in a pattern" cs_error })
 
 checkQualifiedMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_priority} macro_mod_index mod_index is_dcl_macro is_expr_list ste_index module_name ident_name opt_var ps e_info cs=:{cs_error}
 	| case fun_kind of FK_Macro->True; _ -> False
@@ -1720,14 +1720,14 @@ checkQualifiedMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_p
 					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
 			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
 			# name=module_name+++"@"+++ident_name
-			= (AP_Empty name, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
+			= (AP_Empty, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
 		# name=module_name+++"@"+++ident_name
-		= (AP_Empty name, ps, e_info, { cs & cs_error = checkError name "not allowed in a pattern" cs_error })
+		= (AP_Empty, ps, e_info, { cs & cs_error = checkError name "not allowed in a pattern" cs_error })
 
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkPatternConstructor _ _ {ste_kind = STE_Empty} ident _  ps e_info cs=:{cs_error}
-	= (AP_Empty ident.id_name, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
+	= (AP_Empty, ps, e_info, { cs & cs_error = checkError ident "not defined" cs_error })
 checkPatternConstructor mod_index is_expr_list {ste_kind = STE_FunctionOrMacro _,ste_index} ident opt_var ps e_info cs=:{cs_x}
 	# (macro,ps) = ps!ps_fun_defs.[ste_index]
 	= checkMacroPatternConstructor macro cs_x.x_main_dcl_module_n mod_index False is_expr_list ste_index ident opt_var ps e_info cs
@@ -1763,7 +1763,7 @@ checkQualifiedPatternConstructor :: !STE_Kind !Index !Ident !{#Char} !{#Char} !I
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkQualifiedPatternConstructor STE_Empty _ decl_ident module_name ident_name _ _ _  ps e_info cs=:{cs_error}
 	# name=module_name+++"@"+++ident_name
-	= (AP_Empty name, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
+	= (AP_Empty, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
 checkQualifiedPatternConstructor (STE_FunctionOrMacro _) ste_index decl_ident module_name ident_name mod_index is_expr_list opt_var ps e_info cs=:{cs_x}
 	# (macro,ps) = ps!ps_fun_defs.[ste_index]
 	= checkQualifiedMacroPatternConstructor macro cs_x.x_main_dcl_module_n mod_index False is_expr_list ste_index module_name ident_name opt_var ps e_info cs
@@ -1832,13 +1832,13 @@ checkIdentPattern is_expr_list id=:{id_name,id_info} opt_var {pi_def_level, pi_m
 checkQualifiedIdentPattern is_expr_list module_id ident_name opt_var {pi_mod_index} accus ps e_info cs
 	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id ident_name ExpressionNameSpaceN cs
 	| not found
-		= (AP_Empty (module_id.id_name+++"@"+++ident_name), accus, ps, e_info, cs)
+		= (AP_Empty, accus, ps, e_info, cs)
 		= case decl_kind of
 			STE_Imported _ _
 				# (pattern, ps, e_info, cs) = checkQualifiedPatternConstructor decl_kind decl_index decl_ident module_id.id_name ident_name pi_mod_index is_expr_list opt_var ps e_info cs
 				-> (pattern, accus, ps, e_info, cs)
 			_
-				-> (AP_Empty (module_id.id_name+++"@"+++ident_name), accus, ps, e_info, { cs & cs_error = checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error })
+				-> (AP_Empty, accus, ps, e_info, { cs & cs_error = checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error })
 
 convertSubPatterns :: [AuxiliaryPattern] Expression Position *(Heap VarInfo) *(Heap ExprInfo) u:[Ptr ExprInfo] *CheckState -> *(!.[FreeVar],!Expression,!Position,!*Heap VarInfo,!*Heap ExprInfo,!u:[Ptr ExprInfo],!*CheckState);
 convertSubPatterns [] result_expr pattern_position var_store expr_heap opt_dynamics cs
@@ -1907,7 +1907,7 @@ convertSubPattern (AP_WildCard opt_var) result_expr pattern_position var_store e
  	# ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
 	= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0  }, result_expr, pattern_position,
 		var_store, expr_heap, opt_dynamics, cs)
-convertSubPattern (AP_Empty _) result_expr pattern_position var_store expr_heap opt_dynamics cs
+convertSubPattern AP_Empty result_expr pattern_position var_store expr_heap opt_dynamics cs
 	= convertSubPattern (AP_WildCard No) EE pattern_position var_store expr_heap opt_dynamics cs
 
 checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals,nd_position} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
@@ -2109,7 +2109,7 @@ unfoldPatternMacro macro=:{fun_body=TransformedBody {tb_args,tb_rhs}} mod_index 
 		  ums = { ums_var_heap = fold2St bind_var tb_args macro_args ps_var_heap, ums_modules = modules, ums_cons_defs = cons_defs, ums_error = error }
 		  (pattern, {ums_var_heap,ums_modules,ums_cons_defs,ums_error}) = unfold_pattern_macro mod_index macro.fun_ident opt_var extra_args tb_rhs ums
 		= (pattern, { ps & ps_var_heap = ums_var_heap}, ums_modules, ums_cons_defs, ums_error)
-		= (AP_Empty macro.fun_ident.id_name, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "sharing not allowed" error)
+		= (AP_Empty, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "sharing not allowed" error)
 where
 	no_sharing [{fv_count} : args]
 		= fv_count <= 1 && no_sharing args
@@ -2121,7 +2121,7 @@ where
 
 	unfold_pattern_macro mod_index macro_ident _ extra_args (Var {var_ident,var_info_ptr}) ums=:{ums_var_heap, ums_error}
 		| not (isEmpty extra_args)
-			= (AP_Empty macro_ident.id_name, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
+			= (AP_Empty, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
 		# (VI_Pattern pattern, ums_var_heap) = readPtr var_info_ptr ums_var_heap
 		= (pattern, { ums & ums_var_heap = ums_var_heap})
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (App {app_symb={symb_kind=SK_Constructor {glob_module,glob_object},symb_ident},app_args})
@@ -2131,7 +2131,7 @@ where
 			# (patterns, ums) = mapSt (unfold_pattern_macro mod_index macro_ident No []) app_args { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules }
 			  cons_symbol = { glob_object = MakeDefinedSymbol symb_ident cons_index cons_def.cons_type.st_arity, glob_module = glob_module }	
 			= (AP_Algebraic cons_symbol cons_def.cons_type_index (patterns++extra_args) opt_var, ums)	
-			= (AP_Empty cons_def.cons_ident.id_name, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
+			= (AP_Empty, { ums & ums_cons_defs = ums_cons_defs, ums_modules = ums_modules,
 					ums_error = checkError cons_def.cons_ident "incorrect number of arguments" ums_error })
 	where
 		get_cons_def mod_index cons_mod cons_index cons_defs modules
@@ -2143,12 +2143,12 @@ where
 				= (cons_def, cons_index, cons_defs, modules)
 	unfold_pattern_macro mod_index macro_ident opt_var extra_args (BasicExpr bv) ums=:{ums_error}
 		| not (isEmpty extra_args)
-			= (AP_Empty macro_ident.id_name, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
+			= (AP_Empty, { ums & ums_error = checkError macro_ident "too many arguments for pattern macro" ums_error })
 		= (AP_Basic bv opt_var, ums)
 	unfold_pattern_macro mod_index macro_ident opt_var _ expr ums=:{ums_error}
-		= (AP_Empty macro_ident.id_name, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
+		= (AP_Empty, { ums & ums_error = checkError macro_ident "illegal rhs for a pattern macro" ums_error })
 unfoldPatternMacro macro mod_index all_macro_args opt_var ps=:{ps_var_heap} modules cons_defs error
-	= (AP_Empty macro.fun_ident.id_name, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "illegal macro in pattern" error)
+	= (AP_Empty, { ps & ps_var_heap = ps_var_heap}, modules, cons_defs, checkError macro.fun_ident "illegal macro in pattern" error)
 
 checkSelectors end_with_update free_vars [ selector : selectors ] e_input e_state e_info cs
 	| isEmpty selectors
