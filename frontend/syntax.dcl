@@ -907,7 +907,7 @@ cNonRecursiveAppl	:== False
 	,	cons_type			:: !SymbolType
 	,	cons_arg_vars		:: ![[ATypeVar]]
 	,	cons_priority		:: !Priority
-	,	cons_index			:: !Index
+	,	cons_number			:: !Index
 	,	cons_type_index		:: !Index
 	,	cons_exi_vars		:: ![ATypeVar]
 	,	cons_type_ptr		:: !VarInfoPtr
@@ -1199,8 +1199,7 @@ instance toString 	KindInfo
 				| PE_DynamicPattern !ParsedExpr !DynamicType
 				| PE_Dynamic !ParsedExpr !(Optional DynamicType)
 				
-				| PE_Generic !Ident !TypeKind	/* AA: For generics, kind indexed identifier */
-				
+				| PE_Generic !Ident !TypeKind	/* AA: For generics, kind indexed identifier */				
 				| PE_Empty
 
 ::	ParsedSelection	= PS_Record !Ident !OptionalRecordName
@@ -1478,7 +1477,7 @@ ParsedSelectorToSelectorDef sd_type_index ps :==
 				    st_attr_env = [], st_attr_vars = [] }}
 
 ParsedConstructorToConsDef pc :==
-	{	cons_ident = pc.pc_cons_ident, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_index = NoIndex, cons_type_index = NoIndex,
+	{	cons_ident = pc.pc_cons_ident, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_number = NoIndex, cons_type_index = NoIndex,
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_args_strictness=pc.pc_args_strictness, st_result = MakeAttributedType TE, 
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr, cons_arg_vars = [] }

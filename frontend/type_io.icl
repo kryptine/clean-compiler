@@ -60,7 +60,7 @@ where
 	
 instance WriteTypeInfo ConsDef
 where 
-	write_type_info {cons_ident,cons_type,cons_arg_vars,cons_priority,cons_index,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
+	write_type_info {cons_ident,cons_type,cons_arg_vars,cons_priority,cons_number,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
  		// normalize ...
  		# (th_vars,wtis)
  			= sel_type_var_heap wtis
@@ -78,7 +78,7 @@ where
 		# (tcl_file,wtis)
 			= write_type_info cons_arg_vars tcl_file wtis
 		# (tcl_file,wtis)
-			= write_type_info cons_index tcl_file wtis
+			= write_type_info cons_number tcl_file wtis
 						
 		# (tcl_file,wtis)
 			= write_type_info cons_type_index tcl_file wtis

@@ -688,7 +688,7 @@ where
 		= (fun, heaps)
 
 	build_cons_dsc group_index type_def_info_ds field_dsc_dss cons_info_ds cons_ds (modules, heaps)
-		# ({cons_ident, cons_type, cons_priority,cons_index}, modules)	
+		# ({cons_ident, cons_type, cons_priority,cons_number}, modules)	
 			= modules! [td_module].com_cons_defs.[cons_ds.ds_index]  		
 		# name_expr 			 = makeStringExpr cons_ident.id_name
 		# arity_expr 			 = makeIntExpr cons_type.st_arity
@@ -697,7 +697,7 @@ where
 		# (type_expr, heaps) 	 = make_type_expr cons_type heaps 			
 		# (field_exprs, heaps)   = mapSt (\x st->buildFunApp main_module_index x [] st) field_dsc_dss heaps
 		# (fields_expr, heaps)   =  makeListExpr field_exprs predefs heaps 
-		# cons_index_expr		 = makeIntExpr cons_index
+		# cons_index_expr		 = makeIntExpr cons_number
 		# (body_expr, heaps) 
 			= buildPredefConsApp PD_CGenericConsDescriptor 
 				[ name_expr 

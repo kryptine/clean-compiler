@@ -375,7 +375,7 @@ where
 		  attr_vars = add_universal_attr_vars st_args free_attrs
 		  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = attr_vars, st_attr_env = st_attr_env }
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
-		  cons_def = { cons_def & cons_type = cons_type, cons_index = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
+		  cons_def = { cons_def & cons_type = cons_type, cons_number = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
 		  						  cons_type_ptr = new_type_ptr, cons_arg_vars = cons_arg_vars }
 		= ({ ts & ts_cons_defs.[ds_index] = cons_def}, { ti & ti_var_heap = ti_var_heap }, { cs & cs_symbol_table=symbol_table })
 	where
@@ -1570,7 +1570,7 @@ where
 			,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = first_n_strict nr_of_fields, st_result = rec_type,
 								    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
 			,	cons_priority	= NoPrio
-			,	cons_index		= 0
+			,	cons_number		= 0
 			,	cons_type_index	= index_type
 			,	cons_exi_vars	= []
 			,	cons_arg_vars	= []
