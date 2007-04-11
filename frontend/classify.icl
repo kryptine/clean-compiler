@@ -6,7 +6,7 @@ implementation module classify
 SwitchMultimatchClassification multi no_multi	:== multi
 SwitchNewOld new old							:== new
 
-import syntax, checksupport, transform
+import syntax, transform
 import StdStrictLists
 
 ::	CleanupInfo :== [ExprInfoPtr]

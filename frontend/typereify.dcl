@@ -5,8 +5,7 @@ definition module typereify
 
 from syntax import
 	::Ident, ::FunDef, ::IndexRange, ::TypeHeaps,
-	::SymbolTable, ::SymbolTableEntry, ::Heap
-from checksupport import
+	::SymbolTable, ::SymbolTableEntry, ::Heap,
 	::DclModule, ::CommonDefs, ::VarHeap, ::VarInfo
 from predef import
 	::PredefinedSymbols, ::PredefinedSymbol

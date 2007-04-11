@@ -1,6 +1,6 @@
 definition module classify
 
-import syntax, checksupport, transform
+import syntax, transform
 
 CUnusedLazy				:== -1
 CUnusedStrict			:== -2

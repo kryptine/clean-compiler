@@ -3,9 +3,8 @@
 */
 implementation module typereify
 
-import checksupport
+import syntax
 import typesupport
-// import StdDebug
 
 typeFunName :: Ident -> {#Char}
 typeFunName {id_name}
