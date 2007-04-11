@@ -16,8 +16,6 @@ cNeedStdDynamic 		:== 4
 cNeedStdGeneric			:== 8
 cNeedStdStrictLists		:== 16
 
-::	VarHeap :== Heap VarInfo
-
 ::	Heaps =
 	{	hp_var_heap			::!.VarHeap
 	,	hp_expression_heap	::!.ExpressionHeap
@@ -50,23 +48,6 @@ cMacroDefs				:== 9
 
 cConversionTableSize	:== 10
 
-::	CommonDefs =
-	{	com_type_defs 		:: !.{# CheckedTypeDef}
-	,	com_cons_defs		:: !.{# ConsDef}
-	,	com_selector_defs	:: !.{# SelectorDef}
-	,	com_class_defs		:: !.{# ClassDef}
-	,	com_member_defs		:: !.{# MemberDef}
-	,	com_instance_defs	:: !.{# ClassInstance}
-	,	com_generic_defs	:: !.{# GenericDef}
-	,	com_gencase_defs 	:: !.{# GenericCaseDef}
-	}
-
-::	Declarations = {
-		dcls_import	::!{!Declaration}
-	,	dcls_local		::![Declaration]
-	,	dcls_local_for_import ::!{!Declaration}
-	}
-
 ::	*ExplImpInfos :== *{!*{!*ExplImpInfo}}
 
 ::	ExplImpInfo
@@ -79,59 +60,6 @@ cConversionTableSize	:== 10
 	{	di_decl			::	!Declaration
 	,	di_belonging	::	!NumberSet
 	}
-
-::	CopiedDefinitions =
-	{	copied_type_defs	:: {#Bool}
-	,	copied_class_defs	:: {#Bool}
-	,	copied_generic_defs :: {#Bool}
-	}
-	
-::	FunDefIndex:==Int
-
-::	IclFunctionIndices =
-	{	ifi_global_function_indices	:: ![IndexRange]
-	,	ifi_local_function_indices	:: !IndexRange
-	,	ifi_instance_indices		:: ![IndexRange]
-	,	ifi_specials_indices		:: !IndexRange
-	,	ifi_gencase_indices			:: ![IndexRange]
-	,	ifi_type_function_indices	:: ![IndexRange]
-	}
-
-::	IclModule  =
-	{	icl_name				:: !Ident
-	,	icl_functions			:: !.{# FunDef }
-	,	icl_function_indices	:: !IclFunctionIndices
-	,	icl_common				:: !.CommonDefs
-	,	icl_import				:: !{!Declaration}
-	,	icl_qualified_imports	:: ![([Declaration], ModuleN, Position)]
-	,	icl_imported_objects	:: ![ImportedObject]
-	,	icl_foreign_exports		:: ![ForeignExport]
-	,	icl_used_module_numbers :: !NumberSet
-	,	icl_copied_from_dcl 	:: !CopiedDefinitions
-	,	icl_modification_time	:: !{#Char}
-	}
-
-:: ForeignExport = {fe_fd_index :: !FunDefIndex, fe_stdcall :: !Bool}
-
-::	DclModule =
-	{	dcl_name			:: !Ident
-	,	dcl_functions		:: !{# FunType }
-	,	dcl_instances		:: !IndexRange
-	,	dcl_macros			:: !IndexRange
-	,	dcl_specials		:: !IndexRange
-	,	dcl_gencases		:: !IndexRange
-	,	dcl_type_funs		:: !IndexRange
-	,	dcl_common			:: !CommonDefs
-	,	dcl_sizes			:: !{# Int}
-	,	dcl_dictionary_info	:: !DictionaryInfo
-	,	dcl_declared		:: !Declarations
-	,	dcl_macro_conversions :: !Optional {#Index}
-	,	dcl_module_kind		:: !ModuleKind
-	,	dcl_modification_time:: !{#Char}
-	,	dcl_imported_module_numbers :: !NumberSet
-	}
-
-::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
 class Erroradmin state
 where

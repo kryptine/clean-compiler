@@ -5,6 +5,8 @@ import StdEnv
 import scanner, general, typeproperties, Heap
 import IndexType
 
+from containers import ::NumberSet
+
 ::	Ident =
 	{ 	id_name		:: !String
 	,	id_info 	:: !SymbolPtr
@@ -120,6 +122,65 @@ instance == FunctionOrMacroIndex
 	
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
+::	FunDefIndex:==Int
+
+::	IclFunctionIndices =
+	{	ifi_global_function_indices	:: ![IndexRange]
+	,	ifi_local_function_indices	:: !IndexRange
+	,	ifi_instance_indices		:: ![IndexRange]
+	,	ifi_specials_indices		:: !IndexRange
+	,	ifi_gencase_indices			:: ![IndexRange]
+	,	ifi_type_function_indices	:: ![IndexRange]
+	}
+
+::	IclModule  =
+	{	icl_name				:: !Ident
+	,	icl_functions			:: !.{# FunDef }
+	,	icl_function_indices	:: !IclFunctionIndices
+	,	icl_common				:: !.CommonDefs
+	,	icl_import				:: !{!Declaration}
+	,	icl_qualified_imports	:: ![([Declaration], ModuleN, Position)]
+	,	icl_imported_objects	:: ![ImportedObject]
+	,	icl_foreign_exports		:: ![ForeignExport]
+	,	icl_used_module_numbers :: !NumberSet
+	,	icl_copied_from_dcl 	:: !CopiedDefinitions
+	,	icl_modification_time	:: !{#Char}
+	}
+
+::	DclModule =
+	{	dcl_name			:: !Ident
+	,	dcl_functions		:: !{# FunType }
+	,	dcl_instances		:: !IndexRange
+	,	dcl_macros			:: !IndexRange
+	,	dcl_specials		:: !IndexRange
+	,	dcl_gencases		:: !IndexRange
+	,	dcl_type_funs		:: !IndexRange
+	,	dcl_common			:: !CommonDefs
+	,	dcl_sizes			:: !{# Int}
+	,	dcl_dictionary_info	:: !DictionaryInfo
+	,	dcl_declared		:: !Declarations
+	,	dcl_macro_conversions :: !Optional {#Index}
+	,	dcl_module_kind		:: !ModuleKind
+	,	dcl_modification_time:: !{#Char}
+	,	dcl_imported_module_numbers :: !NumberSet
+	}
+
+:: ForeignExport = {fe_fd_index :: !FunDefIndex, fe_stdcall :: !Bool}
+
+::	CopiedDefinitions =
+	{	copied_type_defs	:: {#Bool}
+	,	copied_class_defs	:: {#Bool}
+	,	copied_generic_defs :: {#Bool}
+	}
+
+::	Declarations = {
+		dcls_import	::!{!Declaration}
+	,	dcls_local		::![Declaration]
+	,	dcls_local_for_import ::!{!Declaration}
+	}
+
+::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
+
 ::	RhsDefsOfType	= ConsList ![ParsedConstructor]
 					| SelectorList !Ident ![ATypeVar] !Bool /*is_boxed_record*/ ![ParsedSelector]
 					| TypeSpec !AType
@@ -136,8 +197,19 @@ instance == FunctionOrMacroIndex
 	,	def_members			:: ![MemberDef]
 	,	def_funtypes		:: ![FunType]
 	,	def_instances		:: ![instance_kind]
-	,	def_generics		:: ![GenericDef] // AA
-	, 	def_generic_cases 	:: ![GenericCaseDef]	 // AA	
+	,	def_generics		:: ![GenericDef]
+	, 	def_generic_cases 	:: ![GenericCaseDef]
+	}
+
+::	CommonDefs =
+	{	com_type_defs 		:: !.{# CheckedTypeDef}
+	,	com_cons_defs		:: !.{# ConsDef}
+	,	com_selector_defs	:: !.{# SelectorDef}
+	,	com_class_defs		:: !.{# ClassDef}
+	,	com_member_defs		:: !.{# MemberDef}
+	,	com_instance_defs	:: !.{# ClassInstance}
+	,	com_generic_defs	:: !.{# GenericDef}
+	,	com_gencase_defs 	:: !.{# GenericCaseDef}
 	}
 
 ::	LocalDefs	= LocalParsedDefs [ParsedDefinition]
@@ -191,9 +263,9 @@ cIsNotAFunction :== False
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_ForeignExport !Ident !{#Char} !Int !Bool /* if stdcall */
-	|	PD_Generic GenericDef // AA
-	| 	PD_GenericCase GenericCaseDef // AA	
-	|	PD_Derive [GenericCaseDef] // AA
+	|	PD_Generic GenericDef
+	| 	PD_GenericCase GenericCaseDef
+	|	PD_Derive [GenericCaseDef]
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -379,12 +451,6 @@ cNameLocationDependent :== True
 	,	ins_pos			:: !Position
 	}
 
-/*
-::	Export =
-	{	export_class	:: Ident
-	,	export_types	:: [Type]
-	}
-*/
 ::	Import from_symbol =
 	{	import_module		:: !Ident
 	,	import_symbols		:: ![from_symbol]
@@ -420,9 +486,9 @@ cIsImportedObject :== False
 	,	rt_fields		:: !{# FieldSymbol}
 	,	rt_is_boxed_record :: !Bool
 	}
-	
+
 ::	FieldSymbol =
-	{	fs_ident			:: !Ident
+	{	fs_ident		:: !Ident
 	,	fs_var			:: !Ident
 	,	fs_index		:: !Index
 	}
@@ -449,7 +515,7 @@ cIsAnalysed				:== 4
 NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}	
 
 ::	TypeDef type_rhs =
- 	{	td_ident			:: !Ident
+	{	td_ident		:: !Ident
 	,	td_index		:: !Int
 	,	td_arity		:: !Int
 	,	td_args			:: ![ATypeVar]
@@ -506,9 +572,8 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 
 ::	FreeVar =
 	{	fv_def_level	:: !Level
-	,	fv_ident			:: !Ident
+	,	fv_ident		:: !Ident
 	,	fv_info_ptr		:: !VarInfoPtr
-//	,	fv_expr_ptr		:: !ExprInfoPtr
 	,	fv_count		:: !Int
 	}
 
@@ -652,6 +717,7 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 
 ::	ArgumentPosition :== Int
 
+::	VarHeap :== Heap VarInfo
 ::	VarInfoPtr	:== Ptr VarInfo
 
 from convertcases import :: LetVarInfo, :: LetExpressionInfo,
@@ -844,7 +910,6 @@ cNonRecursiveAppl	:== False
 	,	cons_index			:: !Index
 	,	cons_type_index		:: !Index
 	,	cons_exi_vars		:: ![ATypeVar]
-//	,	cons_exi_attrs		:: ![AttributeVar]
 	,	cons_type_ptr		:: !VarInfoPtr
 	,	cons_pos			:: !Position
 	}
@@ -854,7 +919,6 @@ cNonRecursiveAppl	:== False
 	,	sd_field		:: !Ident
 	,	sd_type			:: !SymbolType
 	,	sd_exi_vars		:: ![ATypeVar]
-//	,	sd_exi_attrs	:: ![AttributeVar]
 	,	sd_field_nr		:: !Int
 	,	sd_type_index	:: !Int
 	,	sd_type_ptr		:: !VarInfoPtr
@@ -919,7 +983,6 @@ cNonRecursiveAppl	:== False
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
-
 			|	TQualifiedIdent !Ident !String ![AType]
 
 			|	TE
@@ -1193,12 +1256,6 @@ cIsNotStrict	:== False
 		|	NormalSelectorUniqueElementResult
 		|	UniqueSelector			// !
 
-/*
-::	SelectorKind	= SEK_Normal | SEK_First | SEK_Next | SEK_Last
-
-::	ArraySelector	= DictionarySelection !(Global DefinedSymbol) !Int !Expression
-					| SelectorInstance !(Global DefinedSymbol)
-*/
 ::	Expression	= Var !BoundVar 
 				| App !App
 				| (@) infixl 9  !Expression ![Expression]
@@ -1220,9 +1277,8 @@ cIsNotStrict	:== False
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
 
 				| DynamicExpr !DynamicExpr
-//				| TypeCase !TypeCase
-
 				| TypeCodeExpression !TypeCodeExpression
+
 				| EE 
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
@@ -1238,14 +1294,11 @@ cIsNotStrict	:== False
 
 ::	Case =
 	{	case_expr		:: !Expression
-//	,	case_guards		:: ![PatternExpression]
 	,	case_guards		:: !CasePatterns
 	,	case_default	:: !Optional Expression
 	,	case_ident		:: !Optional Ident
 	,	case_info_ptr	:: !ExprInfoPtr
-// RWS ...
 	,	case_explicit	:: !Bool
-// ... RWS
 	,	case_default_pos:: !Position
 	}
 
@@ -1268,20 +1321,6 @@ cIsNotStrict	:== False
 	,	if_then		:: !Expression
 	,	if_else		:: !Optional Expression
 	}
-
-/*
-::	Conditional =
-	{	if_cond		:: !Condition
-	,	if_then		:: !Expression
-	,	if_else		:: !Optional Expression
-	}
-
-
-::	Condition =
-	{	con_positive 	:: !Bool
-	,	con_expression	:: !Expression
-	}
-*/
 
 ::	DynamicExpr =
 	{	dyn_expr		:: !Expression
@@ -1332,13 +1371,6 @@ instance == OverloadedListType
 	{	bp_value	:: !BasicValue
 	,	bp_expr		:: !Expression
 	,	bp_position	:: !Position
-	}
-
-::	TypeCase =
-	{	type_case_dynamic	:: !Expression 
-	,	type_case_patterns 	:: ![DynamicPattern]
-	,	type_case_default	:: !Optional Expression
-	,	type_case_info_ptr	:: !ExprInfoPtr
 	}
 	
 ::	DynamicPattern =
