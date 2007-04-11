@@ -1620,13 +1620,6 @@ where
 							{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
   	updateExpression group_index selection ui
 		= (selection, ui)
-
-instance updateExpression TypeCase
-where
-	updateExpression group_index type_case=:{type_case_dynamic,type_case_patterns,type_case_default} ui
-		# ((type_case_dynamic,(type_case_patterns,type_case_default)), ui) = updateExpression group_index
-				(type_case_dynamic,(type_case_patterns,type_case_default)) ui
-		= ({ type_case & type_case_dynamic = type_case_dynamic, type_case_patterns = type_case_patterns, type_case_default = type_case_default }, ui)
 	
 instance updateExpression DynamicPattern
 where
