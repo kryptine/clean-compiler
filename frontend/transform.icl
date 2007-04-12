@@ -7,7 +7,7 @@ import syntax, check, StdCompare, utilities, mergecases; //, RWSDebug
 	,	ls_x 			:: !.LiftStateX
 	,	ls_expr_heap	:: !.ExpressionHeap
 	}
-	
+
 ::	LiftStateX = {
 		x_fun_defs :: !.{#FunDef},
 		x_macro_defs :: !.{#.{#FunDef}},
@@ -86,6 +86,9 @@ where
 	lift (DynamicExpr expr) ls
 		# (expr, ls) = lift expr ls
 		= (DynamicExpr expr, ls)
+	lift (TypeSignature type_function expr) ls
+		# (expr, ls) = lift expr ls
+		= (TypeSignature type_function expr, ls)
 	lift expr ls
 		= (expr, ls)
 
@@ -432,6 +435,9 @@ where
 	unfold (DynamicExpr expr) ui us
 		# (expr, us) = unfold expr ui us
 		= (DynamicExpr expr, us)
+	unfold (TypeSignature type_function expr) ui us
+		# (expr, us) = unfold expr ui us
+		= (TypeSignature type_function expr, us)
 	unfold expr ui us
 		= (expr, us)
 
@@ -469,6 +475,7 @@ where
 	unfold fv=:{fv_info_ptr,fv_ident} ui us=:{us_var_heap}
 		# (new_info_ptr, us_var_heap) = newPtr VI_Empty us_var_heap
 		= ({ fv & fv_info_ptr = new_info_ptr }, { us & us_var_heap = writePtr fv_info_ptr (VI_Variable fv_ident new_info_ptr) us_var_heap })
+
 instance unfold App
 where
 	unfold app=:{app_symb={symb_kind}, app_args, app_info_ptr} ui us
@@ -1234,6 +1241,8 @@ where
 		= has_no_curried_macro_Expression expr
 	has_no_curried_macro_Expression (MatchExpr cons_ident expr)
 		= has_no_curried_macro_Expression expr
+	has_no_curried_macro_Expression (TypeSignature _ expr)
+		= has_no_curried_macro_Expression expr
 	has_no_curried_macro_Expression expr
 		= True
 
@@ -1609,6 +1618,9 @@ where
 	expand (DynamicExpr dyn) ei
 		# (dyn, ei) = expand dyn ei
 		= (DynamicExpr dyn, ei)
+	expand (TypeSignature type_function expr) ei
+		# (expr, ei) = expand expr ei
+		= (TypeSignature type_function expr, ei)
 	expand expr ei
 		= (expr, ei)
 
@@ -2011,6 +2023,9 @@ where
 	collectVariables (DynamicExpr dynamic_expr) free_vars dynamics cos
 		# (dynamic_expr, free_vars, dynamics, cos) = collectVariables dynamic_expr free_vars dynamics cos
 		= (DynamicExpr dynamic_expr, free_vars, dynamics, cos);
+	collectVariables (TypeSignature type_function expr) free_vars dynamics cos
+		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
+		= (TypeSignature type_function expr, free_vars, dynamics, cos);
 	collectVariables expr free_vars dynamics cos
 		= (expr, free_vars, dynamics, cos)
 

@@ -1758,6 +1758,15 @@ where
 	requirements _ (ABCCodeExpr _ _) (reqs, ts)
 		# (fresh_v, ts) = freshAttributedVariable ts
 		= (fresh_v, No, (reqs, ts))
+	requirements ti (TypeSignature make_fresh_type_function expr) (reqs, ts)
+		# {ts_var_store,ts_attr_store} = ts
+		  (type,ts_var_store,ts_attr_store) = make_fresh_type_function ts_var_store ts_attr_store
+		  ts = {ts & ts_var_store=ts_var_store,ts_attr_store=ts_attr_store}
+		  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
+		  new_coercion = {tc_demanded=type, tc_offered=e_type, tc_position=CP_Expression expr, tc_coercible=True}
+		  reqs = { reqs & req_type_coercions = [new_coercion : reqs.req_type_coercions ] }
+		  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr type.at_attribute ts.ts_expr_heap }
+		= (type, No, (reqs, ts))
 	requirements _ expr reqs_ts
 		= (abort ("Error in requirements\n" ---> expr), No, reqs_ts)
 

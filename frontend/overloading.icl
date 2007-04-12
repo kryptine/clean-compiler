@@ -1521,6 +1521,8 @@ where
 	updateExpression group_index (TupleSelect symbol argn_nr expr) ui
 		# (expr, ui) = updateExpression group_index expr ui
 		= (TupleSelect symbol argn_nr expr, ui)
+	updateExpression group_index (TypeSignature _ expr) ui
+		= updateExpression group_index expr ui
 	updateExpression group_index expr ui
 		= (expr, ui)
 

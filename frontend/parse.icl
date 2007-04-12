@@ -3145,10 +3145,10 @@ tail_strict_cons_and_nil_symbol_index HeadUnboxed = (PD_cons_uts,PD_nil_uts)
 	(List and Array) Comprehensions
 */
 
-wantArrayComprehension :: !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
-wantArrayComprehension exp pState
+wantArrayComprehension :: !ArrayKind !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
+wantArrayComprehension array_kind exp pState
 	# (qualifiers, pState) = wantQualifiers pState
-	= (PE_ArrayCompr exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
+	= (PE_ArrayCompr array_kind exp qualifiers, wantToken FunctionContext "array comprehension" CurlyCloseToken pState)
 
 wantListComprehension :: !Int !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
 wantListComprehension head_strictness exp pState
@@ -3322,8 +3322,8 @@ buildNodeDef lhsExpr rhsExpr
 
 wantRecordOrArrayExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantRecordOrArrayExp is_pattern pState
-	# (token, pState) = nextToken FunctionContext pState
 	| is_pattern
+		# (token, pState) = nextToken FunctionContext pState
 		| token == SquareOpenToken
 			# (elems, pState) =  want_array_assignments cIsAPattern pState
 			= (PE_ArrayPattern elems, wantToken FunctionContext "array selections in pattern" CurlyCloseToken pState)
@@ -3332,41 +3332,61 @@ wantRecordOrArrayExp is_pattern pState
 		// otherwise // is_pattern && token <> SquareOpenToken
 			= want_record_pattern token pState
 	// otherwise // ~ is_pattern
-	| token == CurlyCloseToken
-		= (PE_ArrayDenot [], pState)		
-		# (opt_type, pState) = try_type_specification token pState
-		= case opt_type of
-			NoRecordName
-				# (succ, field, pState) = try_field_assignment token pState
-				| succ
-					# (token, pState) = nextToken FunctionContext pState
-					| token == CommaToken
+	# pState=appScanState setNoNewOffsideForSeqLetBit pState
+	# (token, pState) = nextToken FunctionContext pState
+	# pState=appScanState clearNoNewOffsideForSeqLetBit pState
+	= case token of
+		ExclamationToken
+			-> want_array_elems StrictArray pState
+		SeqLetToken False
+			-> want_array_elems UnboxedArray pState
+		CurlyCloseToken
+			-> (PE_ArrayDenot OverloadedArray [], pState)
+		_
+			# (opt_type, pState) = try_type_specification token pState
+			-> case opt_type of
+				NoRecordName
+					# (succ, field, pState) = try_field_assignment token pState
+					| succ
 						# (token, pState) = nextToken FunctionContext pState
-						  (fields, pState) = want_field_assignments cIsNotAPattern token pState
-						-> (PE_Record PE_Empty NoRecordName [ field : fields ], wantToken FunctionContext "record or array" CurlyCloseToken pState)
-					| token == CurlyCloseToken
-						-> (PE_Record PE_Empty NoRecordName [ field ], pState)
-						-> (PE_Record PE_Empty NoRecordName [ field ], parseError "record or array" (Yes token) "}" pState)
-				# (expr, pState) = wantRhsExpressionT token pState
-				  (token, pState) = nextToken FunctionContext pState
-				| token == AndToken
-					# (token, pState) = nextToken FunctionContext pState
-					-> want_record_or_array_update token expr pState
-				| token == DoubleBackSlashToken
-					-> wantArrayComprehension expr pState
-				# (elems, pState) = want_array_elems token pState
-				-> (PE_ArrayDenot [expr : elems], pState)
-			opt_type
-				-> want_record opt_type pState
+						| token == CommaToken
+							# (token, pState) = nextToken FunctionContext pState
+							  (fields, pState) = want_field_assignments cIsNotAPattern token pState
+							-> (PE_Record PE_Empty NoRecordName [ field : fields ], wantToken FunctionContext "record or array" CurlyCloseToken pState)
+						| token == CurlyCloseToken
+							-> (PE_Record PE_Empty NoRecordName [ field ], pState)
+							-> (PE_Record PE_Empty NoRecordName [ field ], parseError "record or array" (Yes token) "}" pState)
+					# (expr, pState) = wantRhsExpressionT token pState
+					  (token, pState) = nextToken FunctionContext pState
+					| token == AndToken
+						# (token, pState) = nextToken FunctionContext pState
+						-> want_record_or_array_update token expr pState
+					| token == DoubleBackSlashToken
+						-> wantArrayComprehension OverloadedArray expr pState
+					# (elems, pState) = want_more_array_elems token pState
+					-> (PE_ArrayDenot OverloadedArray [expr : elems], pState)
+				opt_type
+					-> want_record opt_type pState
 where
-	want_array_elems CurlyCloseToken pState
+	want_array_elems array_kind pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == CurlyCloseToken
+			= (PE_ArrayDenot array_kind [], pState)
+			# (expr, pState) = wantRhsExpressionT token pState
+			  (token, pState) = nextToken FunctionContext pState
+			| token == DoubleBackSlashToken
+				= wantArrayComprehension array_kind expr pState
+				# (elems, pState) = want_more_array_elems token pState
+				= (PE_ArrayDenot array_kind [expr:elems], pState)
+
+	want_more_array_elems CurlyCloseToken pState
 		= ([], pState)
-	want_array_elems CommaToken pState
+	want_more_array_elems CommaToken pState
 		# (elem, pState) = wantExpression cIsNotAPattern pState
 		  (token, pState) = nextToken FunctionContext pState
-		  (elems, pState) = want_array_elems token pState
+		  (elems, pState) = want_more_array_elems token pState
 		= ([elem : elems], pState)
-	want_array_elems token pState
+	want_more_array_elems token pState
 		= ([], parseError "array elements" (Yes token) "<array denotation>" pState)
 	
 	want_record_pattern (IdentToken name) pState

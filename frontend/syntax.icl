@@ -397,6 +397,7 @@ where
 	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< info_ptr
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
+	(<<<) file (TypeSignature array_kind expr) = file <<< "TypeSignature " <<< '(' <<< expr <<< ')'
 	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
 	
 instance <<< LetBind
@@ -480,7 +481,7 @@ where
 	(<<<) file (PE_Record PE_Empty _ fields) = file <<< '{' <<< fields <<< '}'
 	(<<<) file (PE_Record rec _ fields) = file <<< '{' <<< rec <<< " & " <<< fields <<< '}'
 	(<<<) file (PE_ListCompr _ _ expr quals) = file <<< '[' <<< expr <<< " \\ " <<< quals <<< ']'
-	(<<<) file (PE_ArrayCompr expr quals) = file <<< '{' <<< expr <<< " \\ " <<< quals <<< '}'
+	(<<<) file (PE_ArrayCompr _ expr quals) = file <<< '{' <<< expr <<< " \\ " <<< quals <<< '}'
 	(<<<) file (PE_Sequ seq) = file <<< '[' <<< seq <<< ']'
 	(<<<) file PE_Empty = file <<< "** E **"
 	(<<<) file (PE_Ident symb) = file <<< symb

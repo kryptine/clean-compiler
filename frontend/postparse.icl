@@ -155,19 +155,22 @@ where
 	collectFunctions (PE_ListCompr predef_cons_index predef_nil_index expr qualifiers) icl_module ca
 		# (compr, ca) = transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
 		= collectFunctions compr icl_module ca
-	collectFunctions (PE_ArrayCompr expr qualifiers) icl_module ca
-		# (compr, ca) = transformArrayComprehension expr qualifiers ca
+	collectFunctions (PE_ArrayCompr array_kind expr qualifiers) icl_module ca
+		# (compr, ca) = transformArrayComprehension array_kind expr qualifiers ca
 		=	collectFunctions compr icl_module ca
 	collectFunctions (PE_UpdateComprehension expr updateExpr identExpr qualifiers) icl_module ca
 		# (compr, ca) = transformUpdateComprehension [expr] [updateExpr] [identExpr] identExpr qualifiers ca
 		= collectFunctions compr icl_module ca
 	collectFunctions (PE_Sequ sequence) icl_module ca
 		= collectFunctions (transformSequence sequence) icl_module ca
-	collectFunctions (PE_ArrayDenot exprs) icl_module ca
-		= collectFunctions (transformArrayDenot exprs) icl_module ca
+	collectFunctions (PE_ArrayDenot array_kind exprs) icl_module ca
+		= collectFunctions (transformArrayDenot array_kind exprs) icl_module ca
 	collectFunctions (PE_Dynamic exprs opt_dyn_type) icl_module ca
 		# (exprs, ca) = collectFunctions exprs icl_module ca
 		= (PE_Dynamic exprs opt_dyn_type, ca)
+	collectFunctions (PE_TypeSignature array_kind expr) icl_module ca
+		# (expr, ca) = collectFunctions expr icl_module ca
+		= (PE_TypeSignature array_kind expr,ca)
 	collectFunctions expr icl_module ca
 		= (expr, ca)
 
@@ -753,7 +756,7 @@ transformUpdateQualifier :: [ParsedExpr] [ParsedExpr] Qualifier *CollectAdmin ->
 transformUpdateQualifier array callArray {qual_generators,qual_let_defs,qual_filter, qual_position, qual_filename} ca
 	# (transformedGenerators,index_generator,ca) = transformGenerators qual_generators qual_filename No ca
 	= CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_let_defs qual_filter qual_position qual_filename ca
-	
+
 CreateTransformedQualifierFromTransformedGenerators transformedGenerators array callArray qual_let_defs qual_filter qual_position qual_filename ca
 	# (qual_fun_id, ca) = prefixAndPositionToIdent "cu" qual_position ca
 	=	({	tq_generators = transformedGenerators
@@ -781,13 +784,13 @@ transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
 	  		]
 	= makeComprehensions transformed_qualifiers success [] ca
 
-transformArrayComprehension :: ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-transformArrayComprehension expr qualifiers ca
+transformArrayComprehension :: ArrayKind ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
+transformArrayComprehension array_kind expr qualifiers ca
 	# [hd_qualifier:_] = qualifiers
 	  qual_position = hd_qualifier.qual_position
 	  (c_i_ident_exp, ca) = prefixAndPositionToIdentExp "c_i" qual_position ca
 	  (c_a_ident_exp, ca) = prefixAndPositionToIdentExp "c_a" qual_position ca
-	  create_array = get_predef_id PD__CreateArrayFun
+	  create_array_expr = predef_ident_expr PD__CreateArrayFun
 	| same_index_for_update_and_array_generators qualifiers
 		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0))), gen_position=qual_position}
 		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
@@ -795,17 +798,20 @@ transformArrayComprehension expr qualifiers ca
 			# {qual_generators,qual_let_defs,qual_filter,qual_position,qual_filename} = hd_qualifier
 			# qual_generators = [index_generator : qual_generators]
 			# (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
-			# new_array = PE_List [PE_Ident create_array,size_exp]
+			# new_array = PE_List [create_array_expr,size_exp]
+			  new_array = cast_array_kind array_kind new_array
 			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
 			= makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier] ca
 
 			# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
-			# new_array = PE_List [PE_Ident create_array,length]
+			# new_array = PE_List [create_array_expr,length]
+			  new_array = cast_array_kind array_kind new_array
 			  qualifiers = [{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] }]
 			= transformUpdateComprehension [new_array] [update] [c_a_ident_exp] c_a_ident_exp qualifiers ca
 
 		# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
-		# new_array = PE_List [PE_Ident create_array,length]
+		# new_array = PE_List [create_array_expr,length]
+		  new_array = cast_array_kind array_kind new_array
 		# inc = get_predef_id PD_IncFun
 		  new_array_and_index =	[new_array,PE_Basic (BVInt 0)]
 		  update = [PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
@@ -993,11 +999,15 @@ transformArrayUpdate expr updates
 		update updateIdent {bind_src=value, bind_dst=index} expr
 			=	updateIdent ` expr ` index ` value
 
-transformArrayDenot :: [ParsedExpr] -> ParsedExpr
-transformArrayDenot exprs
+transformArrayDenot :: ArrayKind [ParsedExpr] -> ParsedExpr
+transformArrayDenot array_kind exprs
+	# create_array_call=cast_array_kind array_kind (predef_ident_expr PD__CreateArrayFun ` length exprs)
 	=	transformArrayUpdate
-			(predef_ident_expr PD__CreateArrayFun ` length exprs)
+			create_array_call
 			[{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+
+cast_array_kind OverloadedArray array_expr = array_expr
+cast_array_kind array_kind array_expr = PE_TypeSignature array_kind array_expr
 
 scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool Bool (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
 scanModules [] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca

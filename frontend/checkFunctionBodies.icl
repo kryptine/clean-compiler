@@ -1199,6 +1199,29 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 */
 			= (generic_defs, {e_state & es_generic_heap = es_generic_heap}) 									 
 
+checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
+	# (expr,free_vars,e_state,e_info,cs) = checkExpression free_vars expr e_input e_state e_info cs
+	  predef_array_index = case array_kind of
+								UnboxedArray -> PD_UnboxedArrayType
+								StrictArray -> PD_StrictArrayType
+	  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[predef_array_index]
+	#! strict_array_ident = predefined_idents.[predef_array_index]
+	# type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }
+	  strict_array_type_symb_ident = {type_ident=strict_array_ident,type_arity=1,type_index={glob_module=pds_module,glob_object=pds_def},type_prop=type_prop}
+	  expr = TypeSignature (make_fresh_strict_array_type strict_array_type_symb_ident) expr
+	= (expr,free_vars,e_state,e_info,cs)
+	where
+		make_fresh_strict_array_type strict_array_type_symb_ident var_store attr_store
+			# element_type_var=TempV var_store
+			  var_store=var_store+1
+			  element_type_attr_var = TA_TempVar attr_store
+			  attr_store=attr_store+1
+			  array_type_attr_var = TA_TempVar attr_store
+			  attr_store=attr_store+1
+			  element_type = {at_attribute = element_type_attr_var, at_type = element_type_var}
+			  strict_array_type = {at_attribute = array_type_attr_var, at_type = TA strict_array_type_symb_ident [element_type]}
+			= (strict_array_type,var_store,attr_store)
+
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl)" // <<- expr
 
