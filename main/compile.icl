@@ -165,7 +165,7 @@ parseCommandLine [arg1=:"-strip":args] options
 	= parseCommandLine args {options & strip_unused = True}
 parseCommandLine ["-generics":args] options
 	// enable generics
-	= parseCommandLine args (SwitchGenerics {options & compile_with_generics = True} options)
+	= parseCommandLine args {options & compile_with_generics = True}
 parseCommandLine ["-lattr":args] options
 	= parseCommandLine args {options & listTypes.lto_showAttributes = False}
 parseCommandLine ["-lt":args] options
@@ -275,6 +275,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			,feo_dump_core=options.dump_core
 			,feo_strip_unused=options.strip_unused
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
+
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
 		= closeTclFile tcl_file files
