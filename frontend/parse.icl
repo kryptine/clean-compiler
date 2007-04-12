@@ -1519,8 +1519,6 @@ optionalCoercions pState
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition parseContext pos pState
-	| SwitchGenerics False True 
-		= (PD_Erroneous, parseErrorSimple "generic definition" "generics are not supported by this compiler" pState)
 	| not pState.ps_support_generics
 		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
@@ -1557,8 +1555,6 @@ wantGenericDefinition parseContext pos pState
 			
 wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveDefinition parseContext pos pState
-	| SwitchGenerics False True 
-		= (PD_Erroneous, parseErrorSimple "generic definition" "generics are not supported by this compiler" pState)
 	| not pState.ps_support_generics
 		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
@@ -1730,7 +1726,7 @@ where
 				= (PD_Type td, tokenBack pState)
 				# name = td.td_ident.id_name
 				= (PD_Type  { td & td_rhs = EmptyRhs cAllBitsClear}, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
-	
+
 	verify_annot_attr :: !Annotation !TypeAttribute !String !ParseState -> ParseState
 	verify_annot_attr annot attr name pState
 		| annot <> AN_None
@@ -1759,7 +1755,6 @@ where
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
-// MW 			  (token, pState) = nextToken TypeContext pState
 			  (token, pState) = nextToken GeneralContext pState
 			  (cons_list, pState) = want_constructor_list exi_vars token pState
 			= ([cons : cons_list], pState)
@@ -1836,7 +1831,6 @@ warnAnnotAndOptionalAttr pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
 			= (False,TA_None,tokenBack (tokenBack pState))
-// Sjaak  (_   , attr, pState)  = optional_attribute token pState
 		# (_   , attr, pState)  = tryAttribute token pState
 		# pState = parseWarning "" "! ignored" pState
 		= (True, attr, pState)
@@ -1851,7 +1845,6 @@ optionalAnnotAndAttr pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
 			= (False,AN_None,TA_None,tokenBack (tokenBack pState))
-// Sjaak  (_   , attr, pState)  = optional_attribute token pState
 		# (_   , attr, pState)  = tryAttribute token pState
 		= (True, AN_Strict, attr, pState)
 	| otherwise // token <> ExclamationToken
@@ -1866,7 +1859,6 @@ optionalAnnotAndAttrWithPosition pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
 			= (False,NoAnnot,TA_None,tokenBack (tokenBack pState))
-// Sjaak  (_   , attr, pState)  = optional_attribute token pState
 		# (position,pState) = getPosition pState
 		# (_   , attr, pState)  = tryAttribute token pState
 		= (True, StrictAnnotWithPosition position, attr, pState)
@@ -3946,8 +3938,6 @@ wantBeginGroup msg pState
 // AA..
 wantKind :: !ParseState -> (!TypeKind, !ParseState)
 wantKind pState
-	| SwitchGenerics False True 
-		= (KindConst, parseErrorSimple "kind" "generics are not supported by this compiler" pState)
 	| not pState.ps_support_generics
 		= (KindConst, parseErrorSimple "kind" "to enable generics use -generics command line flag" pState)
 	# (token, pState) = nextToken TypeContext pState

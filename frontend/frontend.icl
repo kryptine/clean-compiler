@@ -133,17 +133,13 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 			dcl_common_defs dcl_mods
 				=	{dcl_common \\ {dcl_common} <-: dcl_mods }
 
-	#! (ti_common_defs, components, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin) = 
-		SwitchGenerics
-			(case options.feo_generics of
-				True -> 
-					convertGenerics
-							main_dcl_module_n icl_used_module_numbers ti_common_defs components fun_defs td_infos 
-							heaps hash_table predef_symbols dcl_mods error_admin
-				False -> 
-					(ti_common_defs, components, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
-			)
-			(ti_common_defs, components, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)	
+	#! (ti_common_defs, components, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+		= case options.feo_generics of
+			True
+				-> convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs components fun_defs
+									td_infos heaps hash_table predef_symbols dcl_mods error_admin
+			False
+				-> (ti_common_defs, components, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
 	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
 		with 
 			copied_ti_common_defs :: .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
@@ -195,12 +191,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
 	#  (stdStrictLists_module_n,predef_symbols) = get_StdStrictLists_module_n predef_symbols
-	  	with
-	  		get_StdStrictLists_module_n predef_symbols
-	  			# (pre_mod,predef_symbols) = predef_symbols![PD_StdStrictLists]
-				| pre_mod.pds_def<>NoIndex
-					= (pre_mod.pds_def,predef_symbols)
-					= (-1,predef_symbols)
+
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
 		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
 
@@ -212,19 +203,13 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]
-	# (start_rule_index,predef_symbols) = get_index_of_start_rule predef_symbols
-		with
-			get_index_of_start_rule predef_symbols
-				# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
-				| pds_def <> NoIndex && pds_module == main_dcl_module_n
-					= (pds_def, predef_symbols)
-					= (NoIndex, predef_symbols)
+	# (start_function_index,predef_symbols) = get_index_of_start_rule main_dcl_module_n predef_symbols
 
 	# (error_admin,predef_symbols,fun_defs)
 		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predef_symbols fun_defs	
 	
 	# [icl_exported_global_functions,icl_not_exported_global_functions:_] = icl_global_functions
-	# exported_global_functions = case start_rule_index of
+	# exported_global_functions = case start_function_index of
 				NoIndex	-> [icl_exported_global_functions]
 				sri		-> [{ir_from=sri,ir_to=inc sri},icl_exported_global_functions]
 	# exported_functions = exported_global_functions ++  [dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs]
@@ -248,7 +233,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 	# (components,fun_defs,files) = case options.feo_dump_core of
 //		True
-//			-> dumpCore components start_rule_index exported_global_functions icl_mod dcl_mods.[main_dcl_module_n] fun_defs acc_args def_min def_max files
+//			-> dumpCore components start_function_index exported_global_functions icl_mod dcl_mods.[main_dcl_module_n] fun_defs acc_args def_min def_max files
 		_
 			-> (components,fun_defs,files)
 
@@ -324,6 +309,18 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 					# cached_dcl_macros_i = {cached_dcl_macros_i & [j].fun_info.fi_group_index= (-1)}
 					= clear_group_indices2 (j+1) cached_dcl_macros_i	
 
+		get_StdStrictLists_module_n predef_symbols
+  			# (pre_mod,predef_symbols) = predef_symbols![PD_StdStrictLists]
+			| pre_mod.pds_def<>NoIndex
+				= (pre_mod.pds_def,predef_symbols)
+				= (-1,predef_symbols)
+
+		get_index_of_start_rule main_dcl_module_n predef_symbols
+			# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
+			| pds_def <> NoIndex && pds_module == main_dcl_module_n
+				= (pds_def, predef_symbols)
+				= (NoIndex, predef_symbols)
+
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
 	= createArray size {  ste_index = NoIndex, ste_def_level = -1, ste_kind = STE_Empty, ste_previous = abort "PreviousPlaceholder"}
@@ -351,7 +348,7 @@ showMacrosInModule dcl_index (macro_defs,file)
 			# (macro,macro_defs) = macro_defs![dcl_index,macro_index]
 			= (macro_defs, file <<< macro_index <<< macro <<< '\n')
 
-showComponents :: !*{! Group} !Int !Bool !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
+showComponents :: !u:{! Group} !Int !Bool !*{# FunDef} !*File  -> (!u:{! Group}, !*{# FunDef},!*File)
 showComponents comps comp_index show_types fun_defs file
 	| comp_index >= size comps
 		= (comps, fun_defs, file)
