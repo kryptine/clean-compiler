@@ -11,8 +11,6 @@ import StdEnv
 
 ::	Optional x = Yes !x | No
 
-::	Choice a b  = Either a | Or b
-
 cMAXINT :== 2147483647
 
 ::	BITVECT :== Int

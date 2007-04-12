@@ -25,8 +25,6 @@ instance <<< [a] | <<< a
 
 hasOption :: (Optional x) -> Bool
 
-::	Choice a b  = Either a | Or b
-
 (--->) infix :: .a !b -> .a | <<< b
 (<---) infix :: !.a !b -> .a | <<< b
 traceValue :: !String !String .a -> .a
