@@ -91,7 +91,7 @@ where
 				= (dcl_modules, type_defs, marks,type_def_infos)
 
 	expand_synonym_types_of_groups main_dcl_module_index pi_groups (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
-		| not error.ea_ok
+		| error.ea_ok
 			= foldSt (expand_synonym_types_of_group main_dcl_module_index) pi_groups (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 			= (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 
