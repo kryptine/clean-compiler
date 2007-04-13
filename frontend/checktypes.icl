@@ -341,10 +341,15 @@ where
 				= [av : attr_vars]
 			add_attr_var attr attr_vars
 				= attr_vars
-				
 	check_rhs_of_TypeDef {td_rhs = SynType type} _ cti ts_ti_cs
 		# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
 		= (SynType type, ts_ti_cs)
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:NewType cons} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} ts_ti_cs
+		# type_lhs = { at_attribute = cti_lhs_attribute,
+				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
+									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+		  ts_ti_cs = bind_types_of_constructor cti -2 [ atv_variable \\ {atv_variable} <- td_args] attr_vars type_lhs cons ts_ti_cs
+		= (td_rhs, ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs = AbstractSynType properties type} _ cti ts_ti_cs
 		# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
 		= (AbstractSynType properties type, ts_ti_cs)
@@ -380,7 +385,7 @@ where
 		= ({ ts & ts_cons_defs.[ds_index] = cons_def}, { ti & ti_var_heap = ti_var_heap }, { cs & cs_symbol_table=symbol_table })
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
-			-> (![AType], ![[ATypeVar]], ![AttrInequality], !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+									  -> (![AType], ![[ATypeVar]], ![AttrInequality],!(!*TypeSymbols, !*TypeInfo, !*CheckState))
 		bind_types_of_cons [] cti free_vars attr_env ts_ti_cs
 			= ([], [], attr_env, ts_ti_cs)
 		bind_types_of_cons [type : types] cti free_vars attr_env ts_ti_cs
@@ -529,7 +534,7 @@ checkArityOfType act_arity form_arity (SynType _)
 checkArityOfType act_arity form_arity _
 	= form_arity >= act_arity
 
-checkAbstractType type_index(AbstractType _)			= type_index <> cPredefinedModuleIndex 
+checkAbstractType type_index (AbstractType _)			= type_index <> cPredefinedModuleIndex 
 checkAbstractType type_index (AbstractSynType _ _)		= type_index <> cPredefinedModuleIndex 
 checkAbstractType _ _									= False
 

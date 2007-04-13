@@ -1915,6 +1915,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 	  		= { ti_common_defs = ro.ro_common_defs
 	  		  , ti_functions = ro.ro_imported_funs
 			  ,	ti_main_dcl_module_n = ro.ro_main_dcl_module_n
+			  , ti_expand_newtypes = True
 			  }
 	// AA: Dummy generic dictionary does not unify with corresponding class dictionary.
 	// Make it unify
@@ -1987,6 +1988,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  		= { ti_common_defs			= ro.ro_common_defs
 	  		  , ti_functions			= ro.ro_imported_funs
 			  ,	ti_main_dcl_module_n	= ro.ro_main_dcl_module_n
+			  , ti_expand_newtypes = True
 			  }
 	# (succ, das_subst, das_type_heaps)
 	  		= unify application_type arg_type type_input das_subst das_type_heaps
@@ -3911,6 +3913,11 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 				| glob_module == ets.ets_main_dcl_module_n
 					-> (changed,ta_type, ets)
 					-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
+		NewType {ds_index}
+			# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
+			# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute arg_type rem_annots attribute ets.ets_type_heaps
+			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
+			-> (True,type,ets)
 		_
 			#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 			# ta_type = if changed
@@ -3924,9 +3931,8 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 where
 	bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets_type_heaps
 		# ets_type_heaps = bind_attr td_attribute attribute ets_type_heaps
-		  ets_type_heaps = (fold2St bind_var_and_attr td_args types ets_type_heaps)
-		  (type, ets_type_heaps) = substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
-		= (type, ets_type_heaps)
+		  ets_type_heaps = fold2St bind_var_and_attr td_args types ets_type_heaps
+		= substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
 		where
 			bind_var_and_attr {	atv_attribute = TA_Var {av_info_ptr},  atv_variable = {tv_info_ptr} } {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}
 				= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }

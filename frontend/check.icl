@@ -1455,6 +1455,8 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 								# rt_constructor = {rt_constructor & ds_index=icl_to_dcl_index_table.[cConstructorDefs,rt_constructor.ds_index]}
 								# rt_fields = {{field & fs_index=icl_to_dcl_index_table.[cSelectorDefs,field.fs_index]} \\ field <-: rt_fields}
 								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields,rt_is_boxed_record=rt_is_boxed_record}}
+							renumber_type_def td=:{td_rhs = NewType cons}
+								= { td & td_rhs = NewType {cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} }
 							renumber_type_def td
 								= td
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Constructor, decl_index}) cdefs
@@ -1639,6 +1641,10 @@ where
 			# new_cons_defs = if (dcl_cons_index==(-1)) new_cons_defs [ com_cons_defs.[dcl_cons_index] : new_cons_defs ]
 			# (rt_fields, cs) = redirect_field_symbols td_pos rt_fields cs
 			= ([ { td & td_rhs =  RecordType { rt & rt_constructor = rt_constructor, rt_fields = rt_fields }} : new_type_defs ],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+		add_type_def td=:{td_pos, td_rhs = NewType cons} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs		
+			# (dcl_cons_index,cons,(conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_symbol STE_Constructor td_pos cons (conversion_table,icl_sizes,icl_decl_symbols,cs)
+			# new_cons_defs = if (dcl_cons_index==(-1)) new_cons_defs [ com_cons_defs.[dcl_cons_index] : new_cons_defs ]
+			= ([ { td & td_rhs = NewType cons} : new_type_defs ],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td=:{td_ident, td_pos, td_rhs = AbstractType _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 			# cs_error = checkError "abstract type not defined in implementation module" ""
 					(setErrorAdmin (newPosition td_ident td_pos) cs.cs_error)
@@ -2703,7 +2709,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 			  solved_imports = { si_explicit=[], si_qualified_explicit=[], si_implicit=[] }			  	
 			  imports_ikh = ikhInsert` False cPredefinedModuleIndex solved_imports ikhEmpty
 			  (deferred_stuff, (_, modules, macro_and_fun_defs, macro_defs, heaps, cs))
-			  		= checkDclModule EndNumbers [] imports_ikh cUndef False cDummyArray support_dynamics mod ste_index cDummyArray modules macro_and_fun_defs macro_defs heaps cs
+			  		= checkPredefinedDclModule EndNumbers [] imports_ikh cUndef False cDummyArray support_dynamics mod ste_index cDummyArray modules macro_and_fun_defs macro_defs heaps cs
 			  (modules, heaps, cs)
 					= checkInstancesOfDclModule cPredefinedModuleIndex deferred_stuff (modules, heaps, cs)
 			  ({dcl_declared={dcls_import,dcls_local,dcls_local_for_import}}, modules) = modules![ste_index]
@@ -3392,10 +3398,10 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			  (Yes symbol_type) = inst_def.ft_type
 			= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
 
-checkDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect !Bool
-					!(Module (CollectedDefinitions ClassInstance IndexRange)) !Index !*ExplImpInfos !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*Heaps !*CheckState
-				-> (!(!Int,!Index,![FunType]), !(!*ExplImpInfos, !*{#DclModule}, !*{#FunDef},!*{#*{#FunDef}},!*Heaps, !*CheckState))
-checkDclModule dcl_imported_module_numbers components_importing_module imports_ikh component_nr is_on_cycle modules_in_component_set support_dynamics
+checkPredefinedDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect !Bool
+							!(Module (CollectedDefinitions ClassInstance IndexRange)) !Index !*ExplImpInfos !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*Heaps !*CheckState
+						-> (!(!Int,!Index,![FunType]), !(!*ExplImpInfos, !*{#DclModule}, !*{#FunDef},!*{#*{#FunDef}},!*Heaps, !*CheckState))
+checkPredefinedDclModule dcl_imported_module_numbers components_importing_module imports_ikh component_nr is_on_cycle modules_in_component_set support_dynamics
 		 mod=:{mod_ident,mod_defs=mod_defs=:{def_macro_indices,def_funtypes}} mod_index expl_imp_info modules icl_functions macro_defs heaps cs
 	# dcl_common = createCommonDefinitions mod_defs
 	#! first_type_index = size dcl_common.com_type_defs		

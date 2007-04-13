@@ -331,19 +331,19 @@ where
 			| changed
 				= (True, arg_type0 --> res_type, subst, ls)
 				= (False, type, subst, ls)
+	lift modules cons_vars type=:(TA cons_id cons_args) subst ls=:{ls_type_heaps}
+		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}
+	lift modules cons_vars type=:(TAS cons_id cons_args _) subst ls=:{ls_type_heaps}
+		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}			
 //AA..
 	lift modules cons_vars type=:(TArrow1 arg_type) subst ls
 		# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type subst ls
 		| changed 
 			= (True, TArrow1 arg_type, subst, ls)
 			= (False, type, subst, ls)	
-//..AA				
-	lift modules cons_vars type=:(TA cons_id cons_args) subst ls=:{ls_type_heaps}
-		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
-		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}			
-	lift modules cons_vars type=:(TAS cons_id cons_args _) subst ls=:{ls_type_heaps}
-		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
-		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}			
+//..AA
 	lift modules cons_vars type=:(TempCV temp_var :@: types) subst ls
 		# (changed, var_type, subst, ls) = liftTempTypeVariable modules cons_vars temp_var subst ls
 		  (changed_types, types, subst, ls) = lift_list modules cons_vars types subst ls
@@ -1113,6 +1113,8 @@ where
 			find_var_position_in_basic_patterns []
 				= (False,NoPos)
 		find_var_position_in_case_guards (OverloadedListPatterns _ _ algebraic_patterns)
+			= find_var_position_in_algebraic_patterns algebraic_patterns
+		find_var_position_in_case_guards (NewTypePatterns _ algebraic_patterns)
 			= find_var_position_in_algebraic_patterns algebraic_patterns
 		find_var_position_in_case_guards (DynamicPatterns dynamic_patterns)
 			= find_var_position_in_dynamic_patterns dynamic_patterns

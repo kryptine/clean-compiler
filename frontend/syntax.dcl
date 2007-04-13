@@ -184,6 +184,7 @@ instance == FunctionOrMacroIndex
 ::	RhsDefsOfType	= ConsList ![ParsedConstructor]
 					| SelectorList !Ident ![ATypeVar] !Bool /*is_boxed_record*/ ![ParsedSelector]
 					| TypeSpec !AType
+					| NewTypeCons !ParsedConstructor
 					| EmptyRhs !BITVECT
 					| AbstractTypeSpec !BITVECT !AType
 
@@ -496,6 +497,7 @@ cIsImportedObject :== False
 ::	TypeRhs	= AlgType ![DefinedSymbol]
 			| SynType !AType
 			| RecordType !RecordType
+			| NewType !DefinedSymbol
 			| AbstractType !BITVECT
 			| AbstractSynType !BITVECT !AType
 			| UnknownType
@@ -669,12 +671,13 @@ pIsSafe			:== True
 		= AP_Algebraic !(Global DefinedSymbol) !Index [AuxiliaryPattern] OptionalVariable
 		| AP_Variable !Ident !VarInfoPtr OptionalVariable
 		| AP_Basic !BasicValue OptionalVariable
+		| AP_NewType !(Global DefinedSymbol) !Index AuxiliaryPattern OptionalVariable
 		| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
 		| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
 		| AP_WildCard !OptionalVariable
 		| AP_Empty
 
-:: AP_Kind = APK_Constructor !Index | APK_Macro !Bool // is_dcl_macro
+:: AP_Kind = APK_Constructor !Index | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
 
 from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 
@@ -760,6 +763,7 @@ cNonRecursiveAppl	:== False
 				| SK_OverloadedFunction !(Global Index)
 				| SK_GeneratedFunction !FunctionInfoPtr !Index
 				| SK_Constructor !(Global Index)
+				| SK_NewTypeConstructor !GlobalIndex
 				| SK_Generic !(Global Index) !TypeKind
 				| SK_TypeCode
 
@@ -907,7 +911,7 @@ cNonRecursiveAppl	:== False
 	,	cons_type			:: !SymbolType
 	,	cons_arg_vars		:: ![[ATypeVar]]
 	,	cons_priority		:: !Priority
-	,	cons_number			:: !Index
+	,	cons_number			:: !Index // -2 for newtype constructor
 	,	cons_type_index		:: !Index
 	,	cons_exi_vars		:: ![ATypeVar]
 	,	cons_type_ptr		:: !VarInfoPtr
@@ -1277,7 +1281,7 @@ cIsNotStrict	:== False
 
 				| MatchExpr !(Global DefinedSymbol) !Expression
 				| FreeVar FreeVar 
-				| Constant !SymbIdent !Int !Priority !Bool	/* auxiliary clause used during checking */
+				| Constant !SymbIdent !Int !Priority		/* auxiliary clause used during checking */
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
 
 				| DynamicExpr !DynamicExpr
@@ -1337,6 +1341,7 @@ cIsNotStrict	:== False
 
 ::	CasePatterns= AlgebraicPatterns !(Global Index) ![AlgebraicPattern]
 				| BasicPatterns !BasicType [BasicPattern]
+				| NewTypePatterns !(Global Index) ![AlgebraicPattern]
 				| DynamicPatterns [DynamicPattern]						/* auxiliary */
 				| OverloadedListPatterns !OverloadedListType !Expression ![AlgebraicPattern]
 				| NoPattern											/* auxiliary */

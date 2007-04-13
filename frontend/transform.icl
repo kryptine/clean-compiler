@@ -172,6 +172,9 @@ where
 		# (patterns, ls) = lift patterns ls
 		# (decons_expr, ls) = lift decons_expr ls
 		= (OverloadedListPatterns type decons_expr patterns, ls)
+	lift (NewTypePatterns type patterns) ls
+		# (patterns, ls) = lift patterns ls
+		= (NewTypePatterns type patterns, ls)
 	lift (DynamicPatterns patterns) ls
 		# (patterns, ls) = lift patterns ls
 		= (DynamicPatterns patterns, ls)
@@ -689,6 +692,9 @@ where
 		# (patterns, us) = unfold patterns ui us
 		# (decons_expr, us) = unfold decons_expr ui us
 		= (OverloadedListPatterns type decons_expr patterns, us)
+	unfold (NewTypePatterns type patterns) ui us
+		# (patterns, us) = unfold patterns ui us
+		= (NewTypePatterns type patterns, us)
 	unfold (DynamicPatterns patterns) ui us
 		# (patterns, us) = unfold patterns ui us
 		= (DynamicPatterns patterns, us)
@@ -1202,11 +1208,6 @@ where
 		where
 			has_no_curried_macro_CasePatterns (AlgebraicPatterns type patterns)
 				= has_no_curried_macro_AlgebraicPatterns patterns
-			where
-				has_no_curried_macro_AlgebraicPatterns [{ap_expr}:patterns]
-					= has_no_curried_macro_Expression ap_expr && has_no_curried_macro_AlgebraicPatterns patterns
-				has_no_curried_macro_AlgebraicPatterns []
-					= True
 			has_no_curried_macro_CasePatterns (BasicPatterns type patterns)
 				= has_no_curried_macro_BasicPatterns patterns
 			where
@@ -1214,6 +1215,8 @@ where
 					= has_no_curried_macro_Expression bp_expr && has_no_curried_macro_BasicPatterns patterns
 				has_no_curried_macro_BasicPatterns []
 					= True
+			has_no_curried_macro_CasePatterns (NewTypePatterns type patterns)
+				= has_no_curried_macro_AlgebraicPatterns patterns
 			has_no_curried_macro_CasePatterns (DynamicPatterns patterns)
 				= has_no_curried_macro_DynamicPatterns patterns
 			where
@@ -1221,6 +1224,11 @@ where
 					= has_no_curried_macro_Expression dp_rhs && has_no_curried_macro_DynamicPatterns patterns
 				has_no_curried_macro_DynamicPatterns []
 					= True
+
+			has_no_curried_macro_AlgebraicPatterns [{ap_expr}:patterns]
+				= has_no_curried_macro_Expression ap_expr && has_no_curried_macro_AlgebraicPatterns patterns
+			has_no_curried_macro_AlgebraicPatterns []
+				= True
 
 			has_no_curried_macro_OptionalExpression (Yes expr)
 				= has_no_curried_macro_Expression expr
@@ -1670,6 +1678,8 @@ where
 							=	[BasicPatterns basicType [pattern] \\ pattern <- patterns]
 						split_patterns (OverloadedListPatterns  overloaded_list_type decons_expr patterns)
 							=	[OverloadedListPatterns overloaded_list_type decons_expr [pattern] \\ pattern <- patterns]
+						split_patterns (NewTypePatterns index patterns)
+							=	[NewTypePatterns index [pattern] \\ pattern <- patterns]
 						split_patterns (DynamicPatterns patterns)
 							=	[DynamicPatterns [pattern] \\ pattern <- patterns]
 						split_patterns NoPattern
@@ -1700,6 +1710,9 @@ where
 	expand (OverloadedListPatterns type decons_expr patterns) ei
 		# (patterns, ei) = expand patterns ei
 		= (OverloadedListPatterns type decons_expr patterns, ei) 
+	expand (NewTypePatterns type patterns) ei
+		# (patterns, ei) = expand patterns ei
+		= (NewTypePatterns type patterns, ei) 
 	expand (DynamicPatterns patterns) ei
 		# (patterns, ei) = expand patterns ei
 		= (DynamicPatterns patterns, ei) 
@@ -2088,6 +2101,9 @@ where
 	collectVariables (OverloadedListPatterns type decons_expr patterns) free_vars dynamics cos
 		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
 		= (OverloadedListPatterns type decons_expr patterns, free_vars, dynamics, cos)
+	collectVariables (NewTypePatterns type patterns) free_vars dynamics cos
+		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
+		= (NewTypePatterns type patterns, free_vars, dynamics, cos)
 	collectVariables (DynamicPatterns patterns) free_vars dynamics cos
 		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
 		= (DynamicPatterns patterns, free_vars, dynamics, cos)

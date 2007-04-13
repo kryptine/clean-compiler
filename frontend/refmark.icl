@@ -372,6 +372,9 @@ where
 refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedListPatterns type _ patterns, case_explicit, case_default} rms 
 	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default rms 
 
+refMarkOfCase free_vars sel def {case_expr, case_guards=NewTypePatterns type patterns, case_explicit, case_default} rms 
+	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default rms 
+
 refMarkOfCase free_vars sel def {case_expr, case_guards=DynamicPatterns patterns,case_default,case_explicit} rms=:{rms_var_heap}
 	# (def, all_closed_let_vars, rms) = refMarkOfDefault case_explicit free_vars sel def case_expr case_default [] { rms & rms_var_heap = rms_var_heap }
 	  (pattern_depth, all_closed_let_vars, rms) = foldSt (ref_mark_of_dynamic_pattern free_vars sel def case_expr) patterns (0, all_closed_let_vars, rms)

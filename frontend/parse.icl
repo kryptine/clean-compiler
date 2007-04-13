@@ -1651,7 +1651,7 @@ wantTypeDef ::  !ParseContext !Position !ParseState -> (ParsedDefinition, !Parse
 wantTypeDef parseContext pos pState
 	# (type_lhs, annot, pState)	= want_type_lhs pos pState
 	  (token, pState)			= nextToken TypeContext pState
-	  (def, pState)				= want_type_rhs parseContext type_lhs token annot pState
+	  (def, pState)				= want_type_rhs token parseContext type_lhs annot pState
   	  pState					= wantEndOfDefinition "type definition (6)" pState
   	= (def, pState)
 where
@@ -1664,8 +1664,8 @@ where
 		  (contexts, pState)		= optionalContext pState
 		= (MakeTypeDef ident args (ConsList []) attr contexts pos, annot, pState)
 
-	want_type_rhs :: !ParseContext !ParsedTypeDef !Token !Annotation !ParseState -> (ParsedDefinition, !ParseState)
-	want_type_rhs parseContext td=:{td_ident,td_attribute} EqualToken annot pState
+	want_type_rhs :: !Token !ParseContext !ParsedTypeDef !Annotation !ParseState -> (ParsedDefinition, !ParseState)
+	want_type_rhs EqualToken parseContext td=:{td_ident,td_attribute} annot pState
 		# name					= td_ident.id_name
 		  pState				= verify_annot_attr annot td_attribute name pState
 		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
@@ -1695,7 +1695,7 @@ where
 				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
 				=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
 
-	want_type_rhs parseContext td=:{td_attribute} ColonDefinesToken annot pState // type Macro
+	want_type_rhs ColonDefinesToken parseContext td=:{td_attribute} annot pState // type synonym
 		# name				= td.td_ident.id_name
 		  pState			= verify_annot_attr annot td_attribute name pState
 		  (atype, pState)	= want pState // Atype
@@ -1704,7 +1704,18 @@ where
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
 
-	want_type_rhs parseContext td=:{td_attribute} token=:OpenToken annot pState
+	want_type_rhs DefinesColonToken parseContext td=:{td_ident,td_attribute} annot pState
+		# name					= td_ident.id_name
+		  pState				= verify_annot_attr annot td_attribute name pState
+		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
+		  (token, pState)		= nextToken GeneralContext pState
+		  (condef, pState)		= want_newtype_constructor exi_vars token pState
+		  td					= { td & td_rhs = NewTypeCons condef }
+		| annot == AN_None
+	 		= (PD_Type td, pState)
+	 		= (PD_Type td, parseError "New type" No ("No lhs strictness annotation for the new type "+name) pState)
+
+	want_type_rhs token=:OpenToken parseContext td=:{td_attribute} annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
 		# pState = wantToken TypeContext "Abstract type synonym" ColonDefinesToken pState			
@@ -1717,7 +1728,7 @@ where
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
 
-	want_type_rhs parseContext td=:{td_attribute} token annot pState
+	want_type_rhs token parseContext td=:{td_attribute} annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
 			| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
@@ -1747,11 +1758,7 @@ where
 
 	want_constructor_list :: ![ATypeVar] !Token !ParseState -> (.[ParsedConstructor],ParseState)
 	want_constructor_list exi_vars token pState
-		# token = basic_type_to_constructor token
-		# (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
-		  (pc_arg_types, pState) = parseList tryBrackSAType pState
-		  cons = { pc_cons_ident = pc_cons_ident, pc_arg_types = atypes_from_satypes pc_arg_types, pc_args_strictness=strictness_from_satypes pc_arg_types, pc_cons_arity = length pc_arg_types,
-		  			pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+		# (cons,pState) = want_constructor exi_vars token pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
@@ -1760,31 +1767,51 @@ where
 			= ([cons : cons_list], pState)
 		// otherwise
 			= ([cons], tokenBack pState)
-	where
-		want_cons_name_and_prio :: !Token !ParseState -> (Ident, !Priority, !Position, !ParseState)
-		want_cons_name_and_prio tok=:(IdentToken name) pState
-			# (ident, pState) = stringToIdent name IC_Expression pState
-		 	  (fname, linenr, pState) = getFileAndLineNr pState
-		  	  (token, pState) = nextToken TypeContext pState
-		  	  (prio,  pState) = optionalPriority cIsNotInfix token pState
-		  	| isLowerCaseName name
-				= (ident, prio, LinePos fname linenr, parseError "Algebraic type: constructor definitions" (Yes tok) "constructor name" pState)
-				= (ident, prio, LinePos fname linenr, pState)
-		want_cons_name_and_prio OpenToken pState
-			# (name, pState) = wantConstructorName "infix constructor" pState
-		 	  (fname, linenr, pState) = getFileAndLineNr pState
-			  (ident, pState) = stringToIdent name IC_Expression pState
-		      (token, pState) = nextToken TypeContext (wantToken TypeContext "type: constructor and prio" CloseToken pState)
-			  (prio, pState) = optionalPriority cIsInfix token pState
+
+	want_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)
+	want_constructor exi_vars token pState
+		# token = basic_type_to_constructor token
+		# (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
+		  (pc_arg_types, pState) = parseList tryBrackSAType pState
+		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = atypes_from_satypes pc_arg_types, pc_args_strictness=strictness_from_satypes pc_arg_types,
+		  			pc_cons_arity = length pc_arg_types, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+		= (cons,pState)
+
+	want_newtype_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)
+	want_newtype_constructor exi_vars token pState
+		# token = basic_type_to_constructor token
+		  (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
+		  (succ, pc_arg_type, pState) = trySimpleType TA_Anonymous pState
+		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = [pc_arg_type], pc_args_strictness = NotStrict,
+		  			pc_cons_arity = 1, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+		| succ
+			= (cons,pState)
+			= (cons,parseError "newtype definition" No "type" pState)
+
+	want_cons_name_and_prio :: !Token !ParseState -> (Ident, !Priority, !Position, !ParseState)
+	want_cons_name_and_prio tok=:(IdentToken name) pState
+		# (ident, pState) = stringToIdent name IC_Expression pState
+	 	  (fname, linenr, pState) = getFileAndLineNr pState
+	  	  (token, pState) = nextToken TypeContext pState
+	  	  (prio,  pState) = optionalPriority cIsNotInfix token pState
+	  	| isLowerCaseName name
+			= (ident, prio, LinePos fname linenr, parseError "Algebraic or new type: constructor definitions" (Yes tok) "constructor name" pState)
 			= (ident, prio, LinePos fname linenr, pState)
-		want_cons_name_and_prio DotToken pState
-			# (token,pState)	= nextToken GeneralContext pState
-			= case token of
-				IdentToken name
-					| isFunnyIdName name -> want_cons_name_and_prio (IdentToken ("."+name)) pState
-				_	-> (erroneousIdent, NoPrio, NoPos, parseError "Algebraic type: constructor list" (Yes DotToken) "constructor name" (tokenBack pState))
-		want_cons_name_and_prio token pState
-			= (erroneousIdent, NoPrio, NoPos, parseError "Algebraic type: constructor list" (Yes token) "constructor name" pState)
+	want_cons_name_and_prio OpenToken pState
+		# (name, pState) = wantConstructorName "infix constructor" pState
+	 	  (fname, linenr, pState) = getFileAndLineNr pState
+		  (ident, pState) = stringToIdent name IC_Expression pState
+	      (token, pState) = nextToken TypeContext (wantToken TypeContext "type: constructor and prio" CloseToken pState)
+		  (prio, pState) = optionalPriority cIsInfix token pState
+		= (ident, prio, LinePos fname linenr, pState)
+	want_cons_name_and_prio DotToken pState
+		# (token,pState)	= nextToken GeneralContext pState
+		= case token of
+			IdentToken name
+				| isFunnyIdName name -> want_cons_name_and_prio (IdentToken ("."+name)) pState
+			_	-> (erroneousIdent, NoPrio, NoPos, parseError "Algebraic or new type: constructor list" (Yes DotToken) "constructor name" (tokenBack pState))
+	want_cons_name_and_prio token pState
+		= (erroneousIdent, NoPrio, NoPos, parseError "Algebraic or new type: constructor list" (Yes token) "constructor name" pState)
 
 	basic_type_to_constructor IntTypeToken		= IdentToken "Int"
 	basic_type_to_constructor CharTypeToken		= IdentToken "Char"

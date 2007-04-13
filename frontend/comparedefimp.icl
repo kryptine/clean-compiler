@@ -73,7 +73,15 @@ where
 				= True
 				# field_nr = dec field_nr
 				= dcl_fields.[field_nr].fs_index == icl_fields.[field_nr].fs_index && compare_fields field_nr dcl_fields icl_fields
-
+	compare_rhs_of_types (NewType dclConstructor) (NewType iclConstructor) dcl_cons_defs icl_cons_defs comp_st
+		| dclConstructor.ds_index<>iclConstructor.ds_index
+			= (False, icl_cons_defs, comp_st)
+		# dcl_cons_def = dcl_cons_defs.[dclConstructor.ds_index]
+		  (icl_cons_def, icl_cons_defs) = icl_cons_defs![iclConstructor.ds_index]
+		# (ok, comp_st) = compare_cons_def_types True icl_cons_def dcl_cons_def comp_st
+		= (ok, icl_cons_defs, comp_st)
+	compare_rhs_of_types (AbstractType _) (NewType _) dcl_cons_defs icl_cons_defs comp_st
+		= (False, icl_cons_defs, comp_st)
 	compare_rhs_of_types (AbstractType _) icl_type dcl_cons_defs icl_cons_defs comp_st
 		= (True, icl_cons_defs, comp_st)
 	compare_rhs_of_types (AbstractSynType _ dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
@@ -81,11 +89,15 @@ where
 		= (ok, icl_cons_defs, comp_st)
 	compare_rhs_of_types dcl_type icl_type dcl_cons_defs icl_cons_defs comp_st
 		= (False, icl_cons_defs, comp_st)
-	
-	compare_constructors do_compare_result_types cons_index dcl_cons_defs icl_cons_defs comp_st=:{comp_type_var_heap}
+
+	compare_constructors do_compare_result_types cons_index dcl_cons_defs icl_cons_defs comp_st
 		# dcl_cons_def = dcl_cons_defs.[cons_index]
 		  (icl_cons_def, icl_cons_defs) = icl_cons_defs![cons_index]
-		  dcl_cons_type = dcl_cons_def.cons_type
+		  (ok, comp_st) = compare_cons_def_types do_compare_result_types icl_cons_def dcl_cons_def comp_st
+		= (ok, icl_cons_defs, comp_st)
+
+	compare_cons_def_types do_compare_result_types icl_cons_def dcl_cons_def comp_st=:{comp_type_var_heap}
+		# dcl_cons_type = dcl_cons_def.cons_type
 		  icl_cons_type = icl_cons_def.cons_type
 		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars icl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
@@ -93,10 +105,9 @@ where
 		| dcl_cons_def.cons_priority == icl_cons_def.cons_priority
 			| ok && do_compare_result_types
 				# (ok, comp_st) = compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
-				= (ok, icl_cons_defs, comp_st)
-				= (ok, icl_cons_defs, comp_st)
-			= (False, icl_cons_defs, comp_st)
-
+				= (ok, comp_st)
+				= (ok, comp_st)
+			= (False, comp_st)
 
 compareClassDefs :: !{#Int} {#Bool} !{# ClassDef} !{# MemberDef} !u:{# ClassDef} !v:{# MemberDef} !*CompareState
 	-> (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
@@ -857,10 +868,14 @@ instance t_corresponds TypeRhs where
 		=	t_corresponds dclType iclType
 	t_corresponds (RecordType dclRecord) (RecordType iclRecord)
 		=	t_corresponds dclRecord iclRecord
+	t_corresponds (AbstractType _) (NewType _)
+		=	return False
 	t_corresponds (AbstractType _) _
 		=	return True
 	t_corresponds (AbstractSynType _ dclType) (SynType iclType)
 		=	t_corresponds dclType iclType
+	t_corresponds (NewType dclConstructor) (NewType iclConstructor)
+		=	t_corresponds dclConstructor iclConstructor
 
 // sanity check ...
 	t_corresponds UnknownType _

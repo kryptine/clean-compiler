@@ -306,6 +306,7 @@ where
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
 	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< decons_expr <<< " " <<< patterns
+	(<<<) file (NewTypePatterns type patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
 
 instance <<< CheckedAlternative
@@ -388,7 +389,7 @@ where
 	(<<<) file (DynamicExpr {dyn_expr,dyn_type_code})     = file <<< "dynamic " <<< dyn_expr <<< " :: " <<< dyn_type_code 
 //	(<<<) file (DynamicExpr {dyn_expr,dyn_uni_vars,dyn_type_code})     = writeVarPtrs (file <<< "dynamic " <<< dyn_expr <<< " :: dyn_uni_vars") dyn_uni_vars <<< "dyn_type_code=" <<< dyn_type_code 
 	(<<<) file (TypeCodeExpression type_code)      = file <<< type_code
-	(<<<) file (Constant symb _ _ _)         = file <<<  "** Constant **" <<< symb
+	(<<<) file (Constant symb _ _)         = file <<<  "** Constant **" <<< symb
 
 	(<<<) file (ABCCodeExpr code_sequence do_inline)      = file <<< (if do_inline "code inline\n" "code\n") <<< code_sequence
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
@@ -685,9 +686,10 @@ where
 
 instance <<< RhsDefsOfType
 where
+	(<<<) file (TypeSpec type) = file <<< type
 	(<<<) file (ConsList cons_defs) = file <<< cons_defs
 	(<<<) file (SelectorList _ _ _ sel_defs) = file <<< sel_defs
-	(<<<) file (TypeSpec type) = file <<< type
+	(<<<) file (NewTypeCons cons_def) = file <<< cons_def
 	(<<<) file _ = file
 
 instance <<< ParsedConstructor

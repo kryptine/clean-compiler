@@ -5,14 +5,6 @@ implementation module mergecases
 
 import syntax, check, StdCompare, utilities
 
-/*
-cContainsFreeVars 	:== True
-cContainsNoFreeVars :== False
-
-cMacroIsCalled 		:== True
-cNoMacroIsCalled 	:== False
-*/
-
 class GetSetPatternRhs a
 where
 	get_pattern_rhs :: !a -> Expression
@@ -41,7 +33,7 @@ mergeCases expr_and_pos [] var_heap symbol_heap error
 mergeCases (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
 	# ((let_expr, _), var_heap, symbol_heap, error) = mergeCases (let_expr, NoPos) exprs var_heap symbol_heap error
 	= ((Let {lad & let_expr = let_expr}, pos), var_heap,symbol_heap, error)
-mergeCases (case_expr=:(Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No, case_explicit}), case_pos)
+mergeCases (Case first_case=:{case_expr = Var {var_info_ptr}, case_default = No, case_explicit}, case_pos)
 			[(expr, expr_pos) : exprs] var_heap symbol_heap error
 	| not case_explicit
 		# (split_result, var_heap, symbol_heap) = split_case var_info_ptr expr var_heap symbol_heap
@@ -71,7 +63,7 @@ where
 								-> (Yes cees, var_heap, symbol_heap)
 								-> (No, var_heap, symbol_heap) 
 						No
-							-> (No, var_heap, symbol_heap) 
+							-> (No, var_heap, symbol_heap)
 				BasicPatterns type [basic_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr basic_pattern.bp_expr var_heap symbol_heap
 					-> case split_result of
@@ -95,7 +87,19 @@ where
 								-> (Yes cees, var_heap, symbol_heap)
 								-> (No, var_heap, symbol_heap) 	
 						No
-							-> (No, var_heap, symbol_heap) 
+							-> (No, var_heap, symbol_heap)
+				NewTypePatterns type [newtype_pattern]
+					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr newtype_pattern.ap_expr var_heap symbol_heap
+					-> case split_result of
+						Yes split_case
+							| not split_case.case_explicit
+								# (cees,symbol_heap) = push_expression_into_guards_and_default
+														( \ guard_expr -> { this_case & case_guards = NewTypePatterns type [{ newtype_pattern & ap_expr = guard_expr }] } )
+															split_case symbol_heap
+								-> (Yes cees, var_heap, symbol_heap)
+								-> (No, var_heap, symbol_heap) 
+						No
+							-> (No, var_heap, symbol_heap)
 				DynamicPatterns [dynamic_pattern]
 /*	Don't merge dynamic cases, as a work around for the following case
 		apply :: Dynamic Dynamic -> Int
@@ -175,6 +179,9 @@ where
 		push_expression_into_guards split_case=:{case_guards=OverloadedListPatterns type decons_expr patterns} symbol_heap
 			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
 			= ({split_case & case_guards=OverloadedListPatterns type decons_expr new_patterns},symbol_heap)
+		push_expression_into_guards split_case=:{case_guards=NewTypePatterns type patterns} symbol_heap
+			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
+			= ({split_case & case_guards=NewTypePatterns type new_patterns},symbol_heap)
 		push_expression_into_guards split_case=:{case_guards=DynamicPatterns patterns} symbol_heap
 			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
 			= ({split_case & case_guards=DynamicPatterns new_patterns},symbol_heap)
@@ -236,6 +243,9 @@ where
 	push_let_expression_into_guards lad (OverloadedListPatterns type decons_expr patterns) var_heap expr_heap
 		# (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
 		= (OverloadedListPatterns type decons_expr patterns, var_heap, expr_heap)
+	push_let_expression_into_guards lad (NewTypePatterns type patterns) var_heap expr_heap
+		# (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
+		= (NewTypePatterns type patterns, var_heap, expr_heap)
 	push_let_expression_into_guards lad (DynamicPatterns patterns) var_heap expr_heap
 		# (patterns, var_heap, expr_heap) = push_let_expression_into_dynamic_pattern lad patterns var_heap expr_heap
 		= (DynamicPatterns patterns, var_heap, expr_heap)
@@ -281,6 +291,11 @@ where
 				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
 			_
 				-> (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+	merge_guards guards=:(NewTypePatterns type1 patterns1) (NewTypePatterns type2 patterns2) var_heap symbol_heap error
+		| type1 == type2
+			# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
+			= (NewTypePatterns type1 merged_patterns, var_heap, symbol_heap, error) 
+			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 	merge_guards guards=:(DynamicPatterns  patterns1) (DynamicPatterns  patterns2) var_heap symbol_heap error
 		# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
 		= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error) 
@@ -401,7 +416,7 @@ where
 	incompatible_patterns_in_case_error error
 		= checkError "" "incompatible patterns in case" error
 
-mergeCases (case_expr=:(Case first_case=:{case_default, case_default_pos, case_explicit}), case_pos) [expr : exprs] var_heap symbol_heap error
+mergeCases (Case first_case=:{case_default, case_default_pos, case_explicit}, case_pos) [expr : exprs] var_heap symbol_heap error
 	| not case_explicit
 		= case case_default of
 			Yes default_expr
@@ -412,7 +427,7 @@ mergeCases (case_expr=:(Case first_case=:{case_default, case_default_pos, case_e
 				# ((default_expr, pos), var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
 				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = pos }, case_pos),
 					var_heap, symbol_heap, error)
-mergeCases expr_and_pos _ var_heap symbol_heap error
+mergeCases expr_and_pos=:(_,pos) _ var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
 
 isOverloaded (OverloadedList _ _ _ _)

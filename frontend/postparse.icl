@@ -1292,6 +1292,13 @@ where
 		= ([cons : conses], next_cons_index)
 	determine_symbols_of_conses [] next_cons_index
 		= ([], next_cons_index)
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = NewTypeCons cons_def=:{pc_cons_ident,pc_cons_arity}} : defs] cons_count sel_count mem_count type_count ca
+	# cons_symb = { ds_ident = pc_cons_ident, ds_arity = pc_cons_arity, ds_index = cons_count }
+	  cons_count = inc cons_count
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	  type_def = { type_def & td_rhs = NewType cons_symb }
+	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors] }
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_ident, td_rhs = SelectorList rec_cons_id exivars is_boxed_record sel_defs, td_pos } : defs] cons_count sel_count mem_count type_count ca
 	# (sel_syms, new_count) = determine_symbols_of_selectors sel_defs sel_count
 	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs (inc cons_count) new_count mem_count (type_count+1) ca

@@ -24,9 +24,10 @@ class unify a :: !a !a !TypeInput !*{! Type} !*TypeHeaps -> (!Bool, !*{! Type}, 
 instance unify AType
 
 ::	TypeInput =
-	{	ti_common_defs	:: !{# CommonDefs }
+	! {	ti_common_defs	:: !{# CommonDefs }
 	,	ti_functions	:: !{# {# FunType }}
 	,	ti_main_dcl_module_n :: !Int
+	,	ti_expand_newtypes :: !Bool
 	}
 
 class arraySubst type :: !type !u:{!Type} -> (!Bool,!type, !u:{! Type})

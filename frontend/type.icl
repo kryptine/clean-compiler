@@ -6,9 +6,10 @@ import compilerSwitches
 import genericsupport
 
 ::	TypeInput =
-	{	ti_common_defs	:: !{# CommonDefs }
+	! {	ti_common_defs	:: !{# CommonDefs }
 	,	ti_functions	:: !{# {# FunType }}
 	,	ti_main_dcl_module_n :: !Int
+	,	ti_expand_newtypes :: !Bool
 	}
 
 ::	TypeState =
@@ -308,7 +309,7 @@ unifyTypes tv=:(TempV tv_number) attr1 type2 attr2 modules subst heaps
 				= (True, { subst & [tv_number1] = tv}, heaps)
 		unify_variable_with_type tv_number type attr subst modules heaps
 			| containsTypeVariable tv_number type subst
-				# (succ, type, heaps) = tryToExpand type attr modules.ti_common_defs heaps
+				# (succ, type, heaps) = tryToExpandInUnify type attr modules heaps
 				| succ
 					= unify_variable_with_type tv_number type attr subst modules heaps
 					= (False, subst, heaps)
@@ -342,10 +343,10 @@ unifyTypes TArrow attr1 TArrow attr2 modules subst heaps
 unifyTypes (TArrow1 t1) attr1 (TArrow1 t2) attr2 modules subst heaps
 	= unify t1 t2 modules subst heaps	
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
-	# (_, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
+	# (_, type2, heaps) = tryToExpandInUnify type2 attr2 modules heaps
 	= unifyTypeApplications cons_var attr1 types type2 attr2 modules subst heaps
 unifyTypes type1 attr1 (cons_var :@: types) attr2 modules subst heaps
-	# (_, type1, heaps) = tryToExpand type1 attr1 modules.ti_common_defs heaps
+	# (_, type1, heaps) = tryToExpandInUnify type1 attr1 modules heaps
 	= unifyTypeApplications cons_var attr2 types type1 attr1 modules subst heaps
 unifyTypes t1=:(TempQV qv_number1) attr1 t2=:(TempQV qv_number2) attr2 modules subst heaps
 	= (qv_number1 == qv_number2, subst, heaps)
@@ -354,18 +355,48 @@ unifyTypes (TempQV qv_number) attr1 type attr2 modules subst heaps
 unifyTypes type attr1 (TempQV qv_number1) attr2 modules subst heaps
 	= (False, subst, heaps)
 unifyTypes type1 attr1 type2 attr2 modules subst heaps
-	# (succ1, type1, heaps) = tryToExpand type1 attr1 modules.ti_common_defs heaps
-	  (succ2, type2, heaps) = tryToExpand type2 attr2 modules.ti_common_defs heaps
+	# (succ1, type1, heaps) = tryToExpandInUnify type1 attr1 modules heaps
+	  (succ2, type2, heaps) = tryToExpandInUnify type2 attr2 modules heaps
 	| succ1 || succ2
 		= unifyTypes type1 attr1 type2 attr2 modules subst heaps
 		= (False, subst, heaps)
 
 expandAndUnifyTypes t1 attr1 t2 attr2 modules subst heaps
-	# (succ1, t1, heaps) = tryToExpand t1 attr1 modules.ti_common_defs heaps
-	  (succ2, t2, heaps) = tryToExpand t2 attr2 modules.ti_common_defs heaps
+	# (succ1, t1, heaps) = tryToExpandInUnify t1 attr1 modules heaps
+	  (succ2, t2, heaps) = tryToExpandInUnify t2 attr2 modules heaps
 	| succ1 || succ2
 		= unifyTypes t1 attr1 t2 attr2 modules subst heaps
 		= (False, subst, heaps)
+
+tryToExpandInUnify :: !Type !TypeAttribute !TypeInput !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
+tryToExpandInUnify type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr type_input type_heaps
+	#! type_def = type_input.ti_common_defs.[glob_module].com_type_defs.[glob_object]
+	= case type_def.td_rhs of
+		SynType {at_type}
+			# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps)
+		NewType {ds_index}
+			| type_input.ti_expand_newtypes
+				# {cons_type={st_args=[{at_type}:_]}} = type_input.ti_common_defs.[glob_module].com_cons_defs.[ds_index];
+				# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+				-> (True, expanded_type, type_heaps)
+		_
+			-> (False, type, type_heaps)
+tryToExpandInUnify type=:(TAS {type_index={glob_object,glob_module}} type_args _) type_attr type_input type_heaps
+	#! type_def = type_input.ti_common_defs.[glob_module].com_type_defs.[glob_object]
+	= case type_def.td_rhs of
+		SynType {at_type}
+			# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps)
+		NewType {ds_index}
+			| type_input.ti_expand_newtypes
+				# {cons_type={st_args=[{at_type}:_]}} = type_input.ti_common_defs.[glob_module].com_cons_defs.[ds_index];
+				# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+				-> (True, expanded_type, type_heaps)
+		_
+			-> (False, type, type_heaps)
+tryToExpandInUnify type type_attr modules type_heaps
+	= (False, type, type_heaps)
 
 tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
 tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr ti_common_defs type_heaps
@@ -1231,6 +1262,9 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 getSymbolType pos ti {symb_kind = SK_Constructor {glob_module,glob_object}} n_app_args ts
 	# (fresh_cons_type, ts) = standardRhsConstructorType pos glob_object glob_module n_app_args ti ts
 	= (fresh_cons_type, [], ts) 
+getSymbolType pos ti {symb_kind = SK_NewTypeConstructor {gi_module,gi_index}} n_app_args ts
+	# (fresh_cons_type, ts) = standardRhsConstructorType pos gi_index gi_module n_app_args ti ts
+	= (fresh_cons_type, [], ts) 
 getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_LocalMacroFunction glob_object, symb_ident} n_app_args ts
 	| glob_object>=size ts.ts_fun_env
 		= abort symb_ident.id_name;
@@ -1392,6 +1426,17 @@ where
 			= (reverse used_cons_types,({ reqs & req_type_coercions = type_coercions,req_attr_coercions = new_attr_env ++ reqs.req_attr_coercions,
 												 req_overloaded_calls = [app_info_ptr : reqs.req_overloaded_calls ] },
 										{ ts & ts_expr_heap = ts_expr_heap }))
+
+		requirements_of_guarded_expressions (NewTypePatterns alg_type patterns) ti=:{ti_common_defs} match_expr pattern_type opt_pattern_ptr
+						goal_type (reqs, ts)
+			# (cons_types, result_type, new_attr_env,td_rhs,ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
+			  ts_var_heap = update_case_variable match_expr td_rhs cons_types alg_type ts.ts_var_heap
+			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, { ts & ts_var_heap = ts_var_heap } )
+			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
+			  (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
+			= (reverse used_cons_types,  ({ reqs & req_type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = position,
+					tc_coercible = True} : reqs.req_type_coercions],
+						req_attr_coercions = new_attr_env ++ reqs.req_attr_coercions }, { ts & ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap }))
 
 		requirements_of_guarded_expressions (DynamicPatterns dynamic_patterns) ti match_expr pattern_type opt_pattern_ptr goal_type reqs_ts
 			# dyn_type = { at_type = TB BT_Dynamic, at_attribute = TA_Multi }
@@ -1747,7 +1792,7 @@ where
 			  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
 			  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
 			  ts = { ts & ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap }
-			| ds_arity<>1
+			| ds_arity>1 // ds_arity == -2 for newtype
 				# tuple_type = MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex+(ds_arity-2), glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType+(ds_arity-2)] ds_arity
 				= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique }, No, (reqs, ts))
 				= ( hd tst_args, No, (reqs, ts))
@@ -2246,7 +2291,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_fun_defs=fun_defs }
-	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n }
+	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n, ti_expand_newtypes = False }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [] }
 	# (type_error, predef_symbols, special_instances, out, ts) = type_components list_inferred_types 0 comps class_instances ti (False, predef_symbols, special_instances, out, ts)
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env ts.ts_fun_defs

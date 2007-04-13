@@ -193,7 +193,9 @@ where
 		# (sign_class, _, scs) = signClassOfType at_type PositiveSign DontUSeTopSign group_nr ci scs
 		= (sign_class, scs)
 	sign_class_of_type_def module_index (RecordType {rt_constructor}) group_nr ci scs
-		= sign_class_of_type_conses module_index [rt_constructor] group_nr ci BottomSignClass scs
+		= sign_class_of_type_cons module_index rt_constructor group_nr ci BottomSignClass scs
+	sign_class_of_type_def module_index (NewType constructor) group_nr ci scs
+		= sign_class_of_type_cons module_index constructor group_nr ci BottomSignClass scs
 	sign_class_of_type_def _ (AbstractType properties) _ _ scs
 		| properties bitand cIsNonCoercible == 0
 			= (PostiveSignClass, scs)
@@ -202,12 +204,17 @@ where
 		| properties bitand cIsNonCoercible == 0
 			= (PostiveSignClass, scs)
 			= (TopSignClass, scs)
+
 	sign_class_of_type_conses module_index [{ds_index}:conses] group_nr ci cumm_sign_class scs
 		#! cons_def = ci.[module_index].com_cons_defs.[ds_index]
 		#  (cumm_sign_class, scs) = sign_class_of_type_of_list cons_def.cons_type.st_args group_nr ci cumm_sign_class scs
 		= sign_class_of_type_conses module_index conses group_nr ci cumm_sign_class scs
 	sign_class_of_type_conses module_index [] _ _ cumm_sign_class scs
 		= (cumm_sign_class, scs)
+
+	sign_class_of_type_cons module_index {ds_index} group_nr ci cumm_sign_class scs
+		#! cons_def = ci.[module_index].com_cons_defs.[ds_index]
+		= sign_class_of_type_of_list cons_def.cons_type.st_args group_nr ci cumm_sign_class scs
 
 	sign_class_of_type_of_list [] _ _ cumm_sign_class scs
 		= (cumm_sign_class, scs)
@@ -468,7 +475,9 @@ where
 		# (prop_class, _, pcs) = propClassOfType at_type group_nr ci pcs
 		= (prop_class, pcs)
 	prop_class_of_type_def module_index (RecordType {rt_constructor}) group_nr ci pcs
-		= prop_class_of_type_conses module_index [rt_constructor] group_nr ci NoPropClass pcs
+		= prop_class_of_type_cons module_index rt_constructor group_nr ci NoPropClass pcs
+	prop_class_of_type_def module_index (NewType constructor) group_nr ci pcs
+		= prop_class_of_type_cons module_index constructor group_nr ci NoPropClass pcs
 	prop_class_of_type_def _ (AbstractType properties) _ _ pcs
 		= (PropClass, pcs)
 	prop_class_of_type_def _ (AbstractSynType properties _) _ _ pcs
@@ -480,6 +489,10 @@ where
 		= prop_class_of_type_conses module_index conses group_nr ci cumm_prop_class pcs
 	prop_class_of_type_conses module_index [] _ _ cumm_prop_class pcs
 		= (cumm_prop_class, pcs)
+
+	prop_class_of_type_cons module_index {ds_index} group_nr ci cumm_prop_class pcs
+		#! cons_def = ci.[module_index].com_cons_defs.[ds_index]
+		= prop_class_of_type_of_list cons_def.cons_type.st_args group_nr ci cumm_prop_class pcs
 
 	prop_class_of_type_of_list [] _ _ cumm_prop_class pcs
 		= (cumm_prop_class, pcs)

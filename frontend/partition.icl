@@ -464,7 +464,7 @@ where
 		= find_calls fc_info expr fc_state
 	find_calls fc_info (FreeVar _) fc_state
 		= abort "FreeVar"
-	find_calls fc_info (Constant _ _ _ _) fc_state
+	find_calls fc_info (Constant _ _ _) fc_state
 		= abort "Constant"
 	find_calls fc_info (ClassVariable _) fc_state
 		= abort "ClassVariable"

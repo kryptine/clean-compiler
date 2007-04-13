@@ -157,15 +157,15 @@ where
 		# (argtype, cus) = clean_up cui argtype cus
 		  (restype, cus) = clean_up cui restype cus
 		=  (argtype --> restype, cus)
+	clean_up cui t=:(TB _) cus
+		=  (t, cus)
 //AA..
 	clean_up cui (TArrow1 argtype) cus
 		# (argtype, cus) = clean_up cui argtype cus
 		=  (TArrow1 argtype, cus)
 	clean_up cui t=:TArrow cus
 		=  (t, cus)
-//..AA		
-	clean_up cui t=:(TB _) cus
-		=  (t, cus)
+//..AA
 	clean_up cui (TempCV tempvar :@: types) cus
 		# (type, cus) = cus!cus_var_env.[tempvar]
 		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
@@ -510,7 +510,6 @@ where
 
 	update_expression_types :: !CleanUpInput ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
 	update_expression_types cui expr_ptrs expr_heap cus
-//		= (expr_heap, cus)
 		= foldSt (update_expression_type cui) expr_ptrs (expr_heap, cus)
 
 	update_expression_type cui expr_ptr (expr_heap, cus)
@@ -1614,7 +1613,7 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 		= Empty
 	get_ineqs_of_atype_list [a_type:a_types]
 		= Pair (get_ineqs_of_atype a_type) (get_ineqs_of_atype_list a_types)
-			
+
 beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 beautifulizeAttributes symbol_type th_attrs
 	# (nr_of_attr_vars, rev_all_attr_vars, th_attrs)
@@ -1626,17 +1625,12 @@ beautifulizeAttributes symbol_type th_attrs
 	  (_, attr_env_coercions)
 	  		= foldSt removeRedundancy all_int_inequalities
 	  				(createArray nr_of_attr_vars False, attr_env_coercions)
-	  implicit_inequalities
-	  		= getImplicitAttrInequalities symbol_type
+	  implicit_inequalities = getImplicitAttrInequalities symbol_type
 	  (implicit_int_inequalities, th_attrs)
 	  		= mapSt pointers_to_int implicit_inequalities th_attrs
-	  attr_env_coercions
-	  		= foldSt remove_inequality implicit_int_inequalities attr_env_coercions
-	  st_attr_env
-	  		= coercionsToAttrEnv {el \\ el<-reverse rev_all_attr_vars } attr_env_coercions
-	  (symbol_type, th_attrs)
-	  		= anonymizeAttrVars { symbol_type & st_attr_env = st_attr_env } implicit_inequalities th_attrs
-	= (symbol_type, th_attrs)
+	  attr_env_coercions = foldSt remove_inequality implicit_int_inequalities attr_env_coercions
+	  st_attr_env = coercionsToAttrEnv {el \\ el<-reverse rev_all_attr_vars } attr_env_coercions
+	= anonymizeAttrVars { symbol_type & st_attr_env = st_attr_env } implicit_inequalities th_attrs
   where
 	pointers_to_int {ai_offered, ai_demanded} th_attrs
 		# (AVI_Attr (TA_TempVar offered), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
@@ -1690,13 +1684,12 @@ beautifulizeAttributes symbol_type th_attrs
 			| visited.[candidate]
 				= (accu, visited)
 			= ([candidate:accu], visited)
-		
+
 assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
 assignNumbersToAttrVars {st_attr_vars, st_args, st_result, st_attr_env} th_attrs
-	# th_attrs
-			= foldSt initializeToAVI_Empty st_attr_vars th_attrs
+	# th_attrs = foldSt initializeToAVI_Empty st_attr_vars th_attrs
 	  (nr_of_attr_vars, attr_vars, th_attrs)
-	  		= performOnAttrVars assign_number_to_unencountered_attr_var (st_args, st_result)
+			= performOnAttrVars assign_number_to_unencountered_attr_var (st_args, st_result)
 	  				(0, [], th_attrs)
 	| fst (foldSt hasnt_got_a_number st_attr_env (False, th_attrs))
 		= abort "sanity check nr 834 in module typesupport failed"

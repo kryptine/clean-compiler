@@ -72,6 +72,9 @@ typeCodeInDynamicError err=:{ea_ok}
 	  err = {err & ea_ok=ea_ok}
 	= { err & ea_file = err.ea_file <<< "TC context not allowed in dynamic" <<< '\n' }
 
+cycleAfterRemovingNewTypeConstructorsError ident err
+	# err = errorHeading "Error" err
+	= { err & ea_file = err.ea_file <<< (" cycle in definition of '" +++ toString ident +++ "' after removing newtype constructors") <<< '\n' }
 
 /*
 	As soon as all overloaded variables in an type context are instantiated, context reduction is carried out.
@@ -1363,6 +1366,8 @@ class updateExpression e :: !Index !e !*UpdateInfo -> (!e, !*UpdateInfo)
 
 instance updateExpression Expression
 where
+	updateExpression group_index (App {app_symb={symb_kind=SK_NewTypeConstructor _},app_args=[arg]}) ui
+		= updateExpression group_index arg ui
 	updateExpression group_index (App app=:{app_symb=symb=:{symb_kind,symb_ident},app_args,app_info_ptr}) ui
 		# (app_args, ui) = updateExpression group_index app_args ui
 		| isNilPtr app_info_ptr
@@ -1481,10 +1486,13 @@ where
 		# ((expr, exprs), ui) = updateExpression group_index (expr, exprs) ui
 		= (expr @ exprs, ui)
 	updateExpression group_index (Let lad=:{let_lazy_binds, let_strict_binds, let_expr}) ui
+		# ui = set_aliases_for_binds_that_will_become_aliases let_lazy_binds ui
 		# (let_lazy_binds, ui)		= updateExpression group_index let_lazy_binds ui
 		# (let_strict_binds, ui)	= updateExpression group_index let_strict_binds ui
 		# (let_expr, ui)			= updateExpression group_index let_expr ui
 		= (Let {lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}, ui)
+	updateExpression group_index case_expr=:(Case {case_guards=NewTypePatterns _ _}) ui
+		= remove_NewTypePatterns_case_and_update_expression case_expr group_index ui
 	updateExpression group_index (Case kees=:{case_expr,case_guards,case_default}) ui
 		# ((case_expr,(case_guards,case_default)), ui) = updateExpression group_index (case_expr,(case_guards,case_default)) ui
 		= (Case { kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, ui)
@@ -1515,16 +1523,97 @@ where
 		  (EI_TypeOfDynamic type_code, ui_symbol_heap) = readPtr dyn_info_ptr ui.ui_symbol_heap
 		  ui = { ui & ui_symbol_heap = ui_symbol_heap }
 		= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = type_code }, ui)
-	updateExpression group_index (MatchExpr cons_symbol expr) ui
-		# (expr, ui) = updateExpression group_index expr ui
-		= (MatchExpr cons_symbol expr, ui)
+	updateExpression group_index (MatchExpr cons_symbol=:{glob_object={ds_arity}} expr) ui
+		| ds_arity <> -2
+			# (expr, ui) = updateExpression group_index expr ui
+			= (MatchExpr cons_symbol expr, ui)
+			// newtype constructor
+			= updateExpression group_index expr ui
 	updateExpression group_index (TupleSelect symbol argn_nr expr) ui
 		# (expr, ui) = updateExpression group_index expr ui
 		= (TupleSelect symbol argn_nr expr, ui)
 	updateExpression group_index (TypeSignature _ expr) ui
 		= updateExpression group_index expr ui
+	updateExpression group_index expr=:(Var {var_info_ptr}) ui
+		# (var_info,var_heap) = readPtr var_info_ptr ui.ui_var_heap
+		# ui = { ui & ui_var_heap = var_heap }
+		= case var_info of
+			VI_Alias var2
+				# (var_info2,var_heap) = readPtr var2.var_info_ptr ui.ui_var_heap
+				# ui = { ui & ui_var_heap = var_heap }
+				-> skip_aliases var_info2 var2 var_info_ptr ui 
+			_
+				-> (expr,ui)
+	where
+		skip_aliases var_info2=:(VI_Alias var3) var2 var_info_ptr1 ui=:{ui_var_heap}
+			# ui = set_alias_and_detect_cycle var_info_ptr1 var3 ui
+			| var3.var_info_ptr==var_info_ptr1
+				= (Var var2,ui)
+				# (var_info3,var_heap) = readPtr var3.var_info_ptr ui.ui_var_heap
+				# ui = { ui & ui_var_heap = var_heap }
+				= skip_aliases var_info3 var3 var2.var_info_ptr ui
+		skip_aliases var_info2 var2 var_info ui
+			= (Var var2,ui)
 	updateExpression group_index expr ui
 		= (expr, ui)
+
+set_alias_and_detect_cycle info_ptr var ui
+	| info_ptr<>var.var_info_ptr
+		= { ui & ui_var_heap = writePtr info_ptr (VI_Alias var) ui.ui_var_heap }
+	# (var_info,var_heap) = readPtr info_ptr ui.ui_var_heap
+	# ui = { ui & ui_var_heap = var_heap }
+	= case var_info of
+		VI_Alias var
+			| var.var_info_ptr==info_ptr // to prevent repeating cycle error
+				-> ui
+		_
+			# ui = { ui & ui_var_heap = writePtr info_ptr (VI_Alias var) ui.ui_var_heap }
+			-> {ui & ui_error = cycleAfterRemovingNewTypeConstructorsError var.var_ident ui.ui_error}
+
+remove_NewTypePatterns_case_and_update_expression :: !Expression !Index !*UpdateInfo -> (!Expression,!*UpdateInfo)
+remove_NewTypePatterns_case_and_update_expression (Case {case_guards=NewTypePatterns type [{ap_symbol,ap_vars=[ap_var=:{fv_info_ptr}],ap_expr,ap_position}],
+													case_expr, case_default, case_explicit, case_info_ptr}) group_index ui
+	# ap_expr = add_case_default ap_expr case_default
+	# ap_expr = if case_explicit
+					(mark_case_explicit ap_expr)
+					ap_expr
+	# (case_expr,ui) = updateExpression group_index case_expr ui
+	= case case_expr of
+		Var var
+			# ui = set_alias_and_detect_cycle fv_info_ptr var ui
+			-> updateExpression group_index ap_expr ui
+		case_expr
+			# (ap_expr,ui) = updateExpression group_index ap_expr ui
+			# let_bind = {lb_dst = ap_var, lb_src = case_expr, lb_position = ap_position}
+			# (EI_CaseType {ct_pattern_type}, ui_symbol_heap) = readPtr case_info_ptr ui.ui_symbol_heap
+//			# (let_info_ptr, ui_symbol_heap) = newPtr (EI_LetType [ct_pattern_type]) ui_symbol_heap
+			# let_info_ptr = case_info_ptr
+			# ui_symbol_heap = writePtr case_info_ptr (EI_LetType [ct_pattern_type]) ui_symbol_heap
+			# ui = { ui & ui_symbol_heap = ui_symbol_heap }
+			# let_expr = Let {	let_strict_binds = [], let_lazy_binds = [let_bind], let_expr = ap_expr,
+								let_info_ptr = let_info_ptr, let_expr_position = ap_position }
+			-> (let_expr,ui)
+	where
+		mark_case_explicit (Case case_=:{case_explicit})
+			= Case {case_ & case_explicit=True}
+		mark_case_explicit (Let let_=:{let_expr})
+			= Let {let_ & let_expr=mark_case_explicit let_expr}
+		mark_case_explicit expr
+			= expr
+
+		add_case_default expr No
+			= expr
+		add_case_default expr (Yes default_expr)
+			= add_default expr default_expr
+		where
+			add_default (Case kees=:{case_default=No,case_explicit=False}) default_expr
+				= Case { kees & case_default = Yes default_expr }
+			add_default (Case kees=:{case_default=Yes case_default_expr,case_explicit=False}) default_expr
+				= Case { kees & case_default = Yes (add_default case_default_expr default_expr)}
+			add_default (Let lad=:{let_expr}) default_expr
+				= Let { lad & let_expr = add_default let_expr default_expr }
+			add_default expr _
+				= expr
 
 instance updateExpression LetBind
 where
@@ -1606,6 +1695,50 @@ instance updateExpression [e] | updateExpression e
 where
 	updateExpression group_index l ui
 		= mapSt (updateExpression group_index) l ui
+
+set_aliases_for_binds_that_will_become_aliases :: ![LetBind] !*UpdateInfo -> *UpdateInfo
+set_aliases_for_binds_that_will_become_aliases [] ui
+	= ui
+set_aliases_for_binds_that_will_become_aliases [{lb_dst={fv_info_ptr},lb_src}:let_binds] ui
+	# ui = make_alias_if_expression_will_become_var lb_src fv_info_ptr ui
+	= set_aliases_for_binds_that_will_become_aliases let_binds ui
+where
+	make_alias_if_expression_will_become_var (Var var) fv_info_ptr ui
+		= set_alias_and_detect_cycle fv_info_ptr var ui
+	make_alias_if_expression_will_become_var (App {app_symb={symb_kind=SK_NewTypeConstructor _},app_args=[arg]}) fv_info_ptr ui
+		= skip_newtypes_and_make_alias_if_var arg fv_info_ptr ui
+	make_alias_if_expression_will_become_var (MatchExpr {glob_object={ds_arity = -2}} expr) fv_info_ptr ui
+		= skip_newtypes_and_make_alias_if_var expr fv_info_ptr ui
+	make_alias_if_expression_will_become_var expr=:(Case {case_guards=NewTypePatterns _ _}) fv_info_ptr ui
+		= skip_newtypes_and_make_alias_if_var expr fv_info_ptr ui
+	make_alias_if_expression_will_become_var _ fv_info_ptr ui
+		= ui
+
+	skip_newtypes_and_make_alias_if_var expr fv_info_ptr ui
+		= case skip_newtypes expr of
+			Var var
+				-> set_alias_and_detect_cycle fv_info_ptr var ui
+			_
+				-> ui
+	where
+		skip_newtypes (App {app_symb={symb_kind=SK_NewTypeConstructor _},app_args=[arg]})
+			= skip_newtypes arg 
+		skip_newtypes (MatchExpr {glob_object={ds_arity = -2}} expr)
+			= skip_newtypes expr
+		skip_newtypes expr=:(Case {case_guards=NewTypePatterns type [{ap_symbol,ap_vars=[ap_var=:{fv_info_ptr}],ap_expr}],case_expr})
+			= case skip_newtypes case_expr of
+				Var case_var
+					-> case skip_newtypes ap_expr of
+						Var rhs_var
+							| rhs_var.var_info_ptr==fv_info_ptr
+								-> case_expr
+								-> ap_expr
+						_
+							-> expr 
+				_
+					-> expr
+		skip_newtypes expr
+			= expr
 
 adjustClassExpressions symb_ident exprs tail_exprs ui
 	= mapAppendSt (adjustClassExpression symb_ident) exprs tail_exprs ui

@@ -7,7 +7,7 @@ import syntax, checksupport, checktypes, check, typesupport, utilities, analunit
 
 ::	PartitioningInfo = 
 	{	pi_marks			:: !.{# .{# Int}}
-	,	pi_type_defs		:: !.{# .{# CheckedTypeDef}}
+	,	pi_type_defs		:: ! {# {# CheckedTypeDef}}
 	,	pi_type_def_infos	:: !.TypeDefInfos
 	,	pi_next_num 		:: !Int
 	,	pi_next_group_num	:: !Int
@@ -19,19 +19,20 @@ import syntax, checksupport, checktypes, check, typesupport, utilities, analunit
 cNotPartitionated	:== -1
 cChecking 			:== -1
 
-partionateAndExpandTypes :: !NumberSet !Index !*CommonDefs !*{#DclModule} !*TypeHeaps !*ErrorAdmin
-	-> (!TypeGroups, !*{# CommonDefs}, !*TypeDefInfos, !*CommonDefs, !*{#DclModule}, !*TypeHeaps, !*ErrorAdmin)
-partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{com_type_defs,com_class_defs} dcl_modules type_heaps error
+partionateAndExpandTypes :: !NumberSet !Index		   !*CommonDefs !*{#DclModule} !*TypeHeaps !*ErrorAdmin
+	-> (!TypeGroups, !*{# CommonDefs}, !*TypeDefInfos, !*CommonDefs,!*{#DclModule},!*TypeHeaps,!*ErrorAdmin)
+partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{com_type_defs,com_cons_defs,com_class_defs} dcl_modules type_heaps error
 	#! nr_of_modules = size dcl_modules
-//	#! nr_of_types_in_icl_mod = size com_type_defs - size com_class_defs
 	#! n_exported_dictionaries = size dcl_modules.[main_dcl_module_index].dcl_common.com_class_defs
 	#! index_of_first_not_exported_type_or_dictionary = size dcl_modules.[main_dcl_module_index].dcl_common.com_type_defs
 	#! n_exported_icl_types = index_of_first_not_exported_type_or_dictionary - n_exported_dictionaries
 	#! n_types_without_not_exported_dictionaries = size com_type_defs - (size com_class_defs - n_exported_dictionaries)
-	# (dcl_type_defs, dcl_modules, new_type_defs, new_marks, type_def_infos)
-		= copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules (com_type_defs, dcl_modules)
 
-	  pi = {pi_marks = new_marks, pi_type_defs = new_type_defs, pi_type_def_infos = type_def_infos, 
+	# (dcl_type_defs,dcl_modules) = dcl_modules![main_dcl_module_index].dcl_common.com_type_defs
+	# (dcl_modules, type_defs, new_marks, type_def_infos)
+		= create_type_defs_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules (com_type_defs, dcl_modules)
+
+	  pi = {pi_marks = new_marks, pi_type_defs = type_defs, pi_type_def_infos = type_def_infos, 
 			pi_next_num = 0, pi_deps = [], pi_next_group_num = 0, pi_groups = [], pi_error = error }
 
 	  {pi_error,pi_groups,pi_type_defs,pi_type_def_infos} = iFoldSt partionate_type_defs 0 nr_of_modules pi
@@ -49,106 +50,197 @@ partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{
 						# (_, pi) = partitionateTypeDef {gi_module = module_index, gi_index = type_index} pi
 						= pi
 						= pi
-	| not pi_error.ea_ok
-		# (icl_type_defs, type_defs) = replace pi_type_defs main_dcl_module_index dcl_type_defs
-		  (dcl_modules, common_defs) = update_modules_and_create_commondefs used_module_numbers type_defs nr_of_modules dcl_modules
-		= (reverse pi_groups, common_defs, pi_type_def_infos, {icl_common & com_type_defs = icl_type_defs }, dcl_modules, type_heaps, pi_error)
 
-		# (type_defs, dcl_type_defs, type_heaps, error)
-				= foldSt (expand_synonym_types_of_group main_dcl_module_index) pi_groups (pi_type_defs, dcl_type_defs, type_heaps, pi_error)
-		  (icl_type_defs, type_defs) = replace type_defs main_dcl_module_index dcl_type_defs
-		  (dcl_modules, common_defs) = update_modules_and_create_commondefs used_module_numbers type_defs nr_of_modules dcl_modules
-		= (reverse pi_groups, common_defs, pi_type_def_infos, {icl_common & com_type_defs = icl_type_defs}, dcl_modules, type_heaps, error)
+	# icl_type_defs = pi_type_defs.[main_dcl_module_index]
+
+	  icl_type_defs = { icl_type_def \\ icl_type_def <-: icl_type_defs}
+	  new_type_defs = { {} \\ module_n <- [0..nr_of_modules-1] }
+	  icl_cons_defs = com_cons_defs
+	  new_cons_defs = { {} \\ module_n <- [0..nr_of_modules-1] }
+
+	  (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+			= expand_synonym_types_of_groups main_dcl_module_index pi_groups
+					(new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, pi_error)
+
+	  icl_common = {icl_common & com_type_defs = icl_type_defs, com_cons_defs = icl_cons_defs}
+	  (dcl_modules, common_defs) = update_modules_and_create_commondefs used_module_numbers new_type_defs new_cons_defs nr_of_modules dcl_modules
+	= (reverse pi_groups, common_defs, pi_type_def_infos, icl_common, dcl_modules, type_heaps, error)
 where
-	copy_type_defs_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules  (icl_type_defs, dcl_modules)
-		# type_defs 		= { {}	\\ module_nr <- [1..nr_of_modules] }
-		  marks				= { {}	\\ module_nr <- [1..nr_of_modules] }
-	  	  type_def_infos	= { {}	\\ module_nr <- [1..nr_of_modules] }
-		= iFoldSt (copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries) 0 nr_of_modules
-				(icl_type_defs, dcl_modules, type_defs, marks, type_def_infos)
+	create_type_defs_marks_and_infos :: NumberSet Int Int Int (*{#CheckedTypeDef},*{#DclModule}) -> (!*{#DclModule},!*{#*{#CheckedTypeDef}},!*{#*{#Int}},!*TypeDefInfos)
+	create_type_defs_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules  (icl_type_defs, dcl_modules)
+		# type_defs 		= { {}	\\ module_nr <- [0..nr_of_modules-1] }
+		  marks				= { {}	\\ module_nr <- [0..nr_of_modules-1] }
+	  	  type_def_infos	= { {}	\\ module_nr <- [0..nr_of_modules-1] }
+		= iFoldSt (create_type_defs_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries icl_type_defs)
+				0 nr_of_modules (dcl_modules, type_defs, marks, type_def_infos)
 	where
-		copy_type_def_and_create_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries module_index 
-						(icl_type_defs, dcl_modules, type_defs, marks, type_def_infos)
+		create_type_defs_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries icl_type_defs module_index
+						(dcl_modules, type_defs, marks, type_def_infos)
 			| inNumberSet module_index used_module_numbers
 				# ({com_type_defs,com_class_defs}, dcl_modules) = dcl_modules![module_index].dcl_common
 				| module_index == main_dcl_module_index
-					= ( { type_def \\ type_def <-: com_type_defs }, dcl_modules, { type_defs & [module_index] = icl_type_defs },
+					= ( dcl_modules,
+							{ type_defs			& [module_index] = icl_type_defs },
 							{ marks				& [module_index] = createArray n_types_without_not_exported_dictionaries cNotPartitionated },
 							{ type_def_infos	& [module_index] = createArray n_types_without_not_exported_dictionaries EmptyTypeDefInfo })
 					# nr_of_types = size com_type_defs - size com_class_defs
-					= (	icl_type_defs, dcl_modules,  { type_defs & [module_index] = { type_def \\ type_def <-: com_type_defs }},
+					= (	dcl_modules,
+							{ type_defs			& [module_index] = com_type_defs },
 							{ marks				& [module_index] = createArray nr_of_types cNotPartitionated },
 							{ type_def_infos	& [module_index] = createArray nr_of_types EmptyTypeDefInfo })
-				= (icl_type_defs, dcl_modules, type_defs, marks,type_def_infos)
+				= (dcl_modules, type_defs, marks,type_def_infos)
 
-	expand_synonym_types_of_group main_dcl_module_index group_members (type_defs, main_dcl_type_defs, type_heaps, error)
-		= foldSt (expand_synonym_type main_dcl_module_index) group_members (type_defs, main_dcl_type_defs, type_heaps, error)
-	where		
-		expand_synonym_type main_dcl_module_index gi=:{gi_module,gi_index} (type_defs, main_dcl_type_defs, type_heaps, error)
-			# (td=:{td_rhs,td_attribute}, type_defs) = type_defs![gi_module, gi_index]
-			= case td_rhs of
-				SynType type
-					# (opt_type, type_defs, type_heaps, error)
-						= try_to_expand_synonym_type (newPosition td.td_ident td.td_pos) type td_attribute (type_defs, type_heaps, error)
-					-> case opt_type of
-						Yes type
-							# type_defs = { type_defs & [gi_module, gi_index] = { td & td_rhs = SynType type}}
-							-> try_to_expand_synonym_type_in_main_dcl main_dcl_module_index gi (type_defs, main_dcl_type_defs, type_heaps, error)
-						No
-							-> (type_defs, main_dcl_type_defs, type_heaps, error)
-				_
-					-> (type_defs, main_dcl_type_defs, type_heaps, error)
+	expand_synonym_types_of_groups main_dcl_module_index pi_groups (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+		| not error.ea_ok
+			= foldSt (expand_synonym_types_of_group main_dcl_module_index) pi_groups (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+			= (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 
-		try_to_expand_synonym_type pos type=:{at_type = TA {type_index={glob_object,glob_module}} types} attribute (type_defs, type_heaps, error)
-			= try_to_expand_synonym_type_for_TA glob_object glob_module types pos type attribute type_defs type_heaps error
-		try_to_expand_synonym_type pos type=:{at_type = TAS {type_index={glob_object,glob_module}} types _} attribute (type_defs, type_heaps, error)
-			= try_to_expand_synonym_type_for_TA glob_object glob_module types pos type attribute type_defs type_heaps error
-		try_to_expand_synonym_type pos type attribute (type_defs, type_heaps, error)
-			= (No, type_defs, type_heaps, error)
-
-		try_to_expand_synonym_type_for_TA glob_object glob_module types pos type attribute type_defs type_heaps error
-			# (used_td=:{td_rhs}, type_defs) = type_defs![glob_module, glob_object]
-			= case td_rhs of
-				SynType {at_type}
-					# ( subst_rhs, type_heaps) = substituteType used_td.td_attribute attribute used_td.td_args types at_type type_heaps
-					-> (Yes {type & at_type = subst_rhs }, type_defs, type_heaps, error)
-				_
-					-> (No, type_defs, type_heaps, error)
-
-		try_to_expand_synonym_type_in_main_dcl main_dcl_module_index {gi_module,gi_index} (type_defs, main_dcl_type_defs, type_heaps, error)
-			| gi_module == main_dcl_module_index && gi_index < size main_dcl_type_defs
-				# (td=:{td_rhs,td_attribute,td_ident,td_pos}, main_dcl_type_defs) = main_dcl_type_defs![gi_index]
+	expand_synonym_types_of_group main_dcl_module_index group_members (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+		= foldSt (expand_synonym_type main_dcl_module_index) group_members (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+	where
+		expand_synonym_type main_dcl_module_index gi=:{gi_module,gi_index} (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+			| gi_module<>main_dcl_module_index
+				= expand_synonym_type_not_in_icl_module main_dcl_module_index gi (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+				# (td=:{td_rhs,td_attribute}, icl_type_defs) = icl_type_defs![gi_index]
 				= case td_rhs of
 					SynType type
-						# (opt_type, type_defs, type_heaps, error)
-							= try_to_expand_synonym_type (newPosition td_ident td_pos) type td_attribute (type_defs, type_heaps, error)
+						# (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+							= try_to_expand_synonym_type type td_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
 						-> case opt_type of
 							Yes type
-								-> (type_defs, { main_dcl_type_defs & [gi_index] = { td & td_rhs = SynType type}}, type_heaps, error)
+								# icl_type_defs = { icl_type_defs & [gi_index] = { td & td_rhs = SynType type}}
+								| gi_index < size dcl_modules.[main_dcl_module_index].dcl_common.com_type_defs
+									-> expand_synonym_type_not_in_icl_module main_dcl_module_index gi (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+									-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 							No
-								-> (type_defs, main_dcl_type_defs, type_heaps, error)
+								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+					NewType {ds_index}
+						-> expand_new_type_rhs gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
 					_
-						-> (type_defs, main_dcl_type_defs, type_heaps, error)
-				=  (type_defs, main_dcl_type_defs, type_heaps, error)
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 
-	update_modules_and_create_commondefs used_module_numbers type_defs nr_of_modules dcl_modules
+		expand_synonym_type_not_in_icl_module main_dcl_module_index gi=:{gi_module,gi_index} (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+			| size new_type_defs.[gi_module]==0
+				# (td=:{td_rhs,td_attribute}, dcl_modules) = dcl_modules![gi_module].dcl_common.com_type_defs.[gi_index]
+				= case td_rhs of
+					SynType type
+						# (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+							= try_to_expand_synonym_type type td_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+						-> case opt_type of
+							Yes type
+								# (com_type_defs,dcl_modules) = dcl_modules![gi_module].dcl_common.com_type_defs
+								# new_module_type_defs = { { type_def \\ type_def<-:com_type_defs} & [gi_index] = { td & td_rhs = SynType type}}
+								# new_type_defs = {new_type_defs & [gi_module] = new_module_type_defs}
+								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+							No
+								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+					NewType {ds_index}
+						-> expand_new_type_rhs gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+					_
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+				# (td=:{td_rhs,td_attribute}, new_type_defs) = new_type_defs![gi_module,gi_index]
+				= case td_rhs of
+					SynType type
+						# (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+							= try_to_expand_synonym_type type td_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+						-> case opt_type of
+							Yes type
+								# new_type_defs = {new_type_defs & [gi_module,gi_index] = { td & td_rhs = SynType type}}
+								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+							No
+								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+					NewType {ds_index}
+						-> expand_new_type_rhs gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+					_
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+
+		expand_new_type_rhs gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+			| gi_module<>main_dcl_module_index
+				= expand_new_type_rhs_not_in_icl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+				# (cons_type,icl_cons_defs) = icl_cons_defs![constructor_index].cons_type
+				  (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+					= try_to_expand_new_type_constructor_arg cons_type new_type_defs icl_type_defs type_heaps dcl_modules
+				= case opt_type of
+					Yes type
+						# icl_cons_defs = {icl_cons_defs & [constructor_index].cons_type.st_args = [type]}
+						| constructor_index < size dcl_modules.[main_dcl_module_index].dcl_common.com_cons_defs
+							-> expand_new_type_rhs_not_in_icl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+						 	-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+					No
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+
+		expand_new_type_rhs_not_in_icl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+			| size new_cons_defs.[gi_module]==0
+				# (cons_type,dcl_modules) = dcl_modules![gi_module].dcl_common.com_cons_defs.[constructor_index].cons_type
+				  (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+					= try_to_expand_new_type_constructor_arg cons_type new_type_defs icl_type_defs type_heaps dcl_modules
+				= case opt_type of
+					Yes type
+						# (com_cons_defs,dcl_modules) = dcl_modules![gi_module].dcl_common.com_cons_defs
+						# new_module_cons_defs = { { cons_def \\ cons_def<-:com_cons_defs} & [constructor_index].cons_type.st_args = [type]}
+						# new_cons_defs = {new_cons_defs & [gi_module] = new_module_cons_defs}
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+					No
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+				# (cons_type,new_cons_defs) = new_cons_defs![gi_module,constructor_index].cons_type
+				  (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+					= try_to_expand_new_type_constructor_arg cons_type new_type_defs icl_type_defs type_heaps dcl_modules
+				= case opt_type of
+					Yes type
+						# new_cons_defs = {new_cons_defs & [gi_module,constructor_index].cons_type.st_args = [type]}
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+					No
+						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+
+		try_to_expand_new_type_constructor_arg {st_args=[type=:{at_attribute}]} new_type_defs icl_type_defs type_heaps dcl_modules
+			= try_to_expand_synonym_type type at_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+
+		try_to_expand_synonym_type type=:{at_type = TA {type_index={glob_object,glob_module}} types} attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			= try_to_expand_synonym_type_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+		try_to_expand_synonym_type type=:{at_type = TAS {type_index={glob_object,glob_module}} types _} attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			= try_to_expand_synonym_type_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+		try_to_expand_synonym_type type attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			= (No, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+
+		try_to_expand_synonym_type_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+			| glob_module==main_dcl_module_index
+				# ({td_rhs,td_attribute,td_args}, icl_type_defs) = icl_type_defs![glob_object]
+				= try_to_expand td_rhs td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
+			| size new_type_defs.[glob_module]==0
+				# ({td_rhs,td_attribute,td_args}, dcl_modules) = dcl_modules![glob_module].dcl_common.com_type_defs.[glob_object]
+				= try_to_expand td_rhs td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
+				# ({td_rhs,td_attribute,td_args}, new_type_defs) = new_type_defs![glob_module,glob_object]
+				= try_to_expand td_rhs td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
+		where
+			try_to_expand (SynType {at_type}) td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
+				# (subst_rhs, type_heaps) = substituteType td_attribute attribute td_args types at_type type_heaps
+				= (Yes {type & at_type = subst_rhs }, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			try_to_expand _ td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
+				= (No, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+
+	update_modules_and_create_commondefs :: NumberSet *{*{#CheckedTypeDef}} *{#*{#ConsDef}} Int *{#DclModule} -> (!*{#DclModule},!*{#CommonDefs})
+	update_modules_and_create_commondefs used_module_numbers new_type_defs new_cons_defs nr_of_modules dcl_modules
 		# (arbitrary_value_for_initializing, dcl_modules) = dcl_modules![0].dcl_common
 		  initial_common_defs = createArray nr_of_modules arbitrary_value_for_initializing 
-		= iFoldSt (copy_commondefs_and_adjust_type_defs used_module_numbers type_defs) 0 nr_of_modules (dcl_modules, initial_common_defs)
-	where		  
-		copy_commondefs_and_adjust_type_defs used_module_numbers type_defs module_index (dcl_modules, common_defs)
+		= iFoldSt (copy_commondefs_and_adjust_type_defs used_module_numbers new_type_defs new_cons_defs) 0 nr_of_modules (dcl_modules, initial_common_defs)
+	where
+		copy_commondefs_and_adjust_type_defs used_module_numbers new_type_defs new_cons_defs module_index (dcl_modules, common_defs)
 			| inNumberSet module_index used_module_numbers
 				# (dcl_module=:{dcl_common}, dcl_modules) = dcl_modules![module_index]
-				  dcl_common = { dcl_common & com_type_defs = type_defs.[module_index]}
-				= ({ dcl_modules & [module_index] = { dcl_module & dcl_common = dcl_common }}, { common_defs & [module_index] = dcl_common })
+				| size new_type_defs.[module_index]<>0
+					| size new_cons_defs.[module_index]<>0
+						# dcl_common = { dcl_common & com_type_defs = new_type_defs.[module_index], com_cons_defs = new_cons_defs.[module_index]}
+						= ({ dcl_modules & [module_index].dcl_common = dcl_common}, { common_defs & [module_index] = dcl_common })
+						# dcl_common = { dcl_common & com_type_defs = new_type_defs.[module_index]}
+						= ({ dcl_modules & [module_index].dcl_common = dcl_common}, { common_defs & [module_index] = dcl_common })
+					| size new_cons_defs.[module_index]<>0
+						# dcl_common = { dcl_common & com_cons_defs = new_cons_defs.[module_index]}
+						= ({ dcl_modules & [module_index].dcl_common = dcl_common}, { common_defs & [module_index] = dcl_common })
+						= (dcl_modules, { common_defs & [module_index] = dcl_common })
 				= (dcl_modules, common_defs)
-//				# (dcl_common, dcl_modules) = dcl_modules![module_index].dcl_common
-//				= (dcl_modules, { common_defs & [module_index] = dcl_common })
-//					---> ("update_modules_and_create_commondefs", module_index)
 
-		
 partitionateTypeDef gi=:{gi_module,gi_index} pi=:{pi_type_defs}
-	# ({td_ident,td_pos,td_used_types}, pi) = pi!pi_type_defs.[gi_module].[gi_index]
+	# {td_ident,td_pos,td_used_types} = pi_type_defs.[gi_module].[gi_index]
 	  pi = push_on_dep_stack gi pi
 	  (min_dep, pi) = foldSt visit_type td_used_types (cMAXINT, pi)
 	= try_to_close_group gi min_dep pi
@@ -167,10 +259,10 @@ where
 		#! my_mark = pi_marks.[gi_module].[gi_index]
 		| (ldep == cMAXINT || ldep == my_mark)
 			# (pi_deps, group_members)	= close_group this_type pi_deps []
-			  (reorganised_group_members, pi_marks, pi_type_defs, pi_error)	= check_cyclic_type_defs group_members [] pi_marks pi_type_defs pi_error
+			  (reorganised_group_members, pi_marks, pi_error) = check_cyclic_type_defs group_members pi_type_defs [] pi_marks pi_error
 			  pi_type_def_infos = update_type_def_infos pi_next_group_num reorganised_group_members group_members pi_type_def_infos
 			= (cMAXINT, { pi &	pi_marks = pi_marks, pi_deps = pi_deps, pi_next_group_num = inc pi_next_group_num, pi_error = pi_error,
-								pi_type_defs = pi_type_defs, pi_type_def_infos = pi_type_def_infos,
+								pi_type_def_infos = pi_type_def_infos,
 								pi_groups =  [reorganised_group_members : pi_groups ]})
 //								---> ("try_to_close_group", reorganised_group_members, group_members)
 			= (min my_mark ldep, pi)
@@ -180,26 +272,27 @@ where
 				= (tds, [td : group])
 				= close_group first_type tds [td : group]
 
-	check_cyclic_type_defs tds group marks type_defs error
-		= foldSt check_cyclic_type_def tds (group, marks, type_defs, error)
+	check_cyclic_type_defs tds type_defs group marks error
+		= foldSt check_cyclic_type_def tds (group, marks, error)
 	where
-		check_cyclic_type_def td=:{gi_module,gi_index} (group, marks, typedefs, error)
+		check_cyclic_type_def td=:{gi_module,gi_index} (group, marks, error)
 			# (mark, marks) = marks![gi_module,gi_index]
-			# ({td_ident,td_pos,td_used_types,td_rhs}, typedefs) = typedefs![gi_module].[gi_index]
+			# {td_ident,td_pos,td_used_types,td_rhs} = type_defs.[gi_module].[gi_index]
 			| mark == cChecking
-				= (group, marks, typedefs, typeSynonymError td_ident "cyclic dependency between type synonyms" error)
+				= (group, marks, typeSynonymError td_ident "cyclic dependency between type synonyms" error)
 			| mark < cMAXINT
-				| is_synonym_type td_rhs
+				| is_synonym_or_new_type td_rhs
 					# marks = { marks & [gi_module,gi_index] = cChecking }
 					  error = pushErrorAdmin (newPosition td_ident td_pos) error
-					  (group, marks, typedefs, error) = check_cyclic_type_defs td_used_types [td : group] marks typedefs error
+					  (group, marks, error) = check_cyclic_type_defs td_used_types type_defs [td : group] marks error
 					  error = popErrorAdmin error
-					= (group, { marks & [gi_module,gi_index] = cMAXINT }, typedefs, error)
-					= ([td : group], { marks & [gi_module,gi_index] = cMAXINT }, typedefs, error)
-				= (group, marks, typedefs, error)
+					= (group, { marks & [gi_module,gi_index] = cMAXINT }, error)
+					= ([td : group], { marks & [gi_module,gi_index] = cMAXINT }, error)
+				= (group, marks, error)
 
-		is_synonym_type (SynType _)	= True
-		is_synonym_type td_rhs		= False
+	is_synonym_or_new_type (SynType _)	= True
+	is_synonym_or_new_type (NewType _)	= True
+	is_synonym_or_new_type _			= False
 
 	update_type_def_infos group_nr group_members tds type_def_infos
 		# (_, type_def_infos) = foldSt (update_type_def_info group_nr group_members) tds (0, type_def_infos)
@@ -349,7 +442,7 @@ where
 	where
 		has_root_attr (TA_RootVar _)	= True
 		has_root_attr _ 				= False
-		
+
 instance analTypes TypeVar
 where
 	analTypes has_root_attr modules form_tvs {tv_info_ptr}  (conds=:{con_var_binds}, as=:{as_type_var_heap, as_kind_heap})
@@ -476,14 +569,23 @@ where
 
 cDummyBool :== False
 
-analTypesOfConstructor modules cons_defs [{ds_index}:conses] (conds, as=:{as_type_var_heap,as_kind_heap})
+analTypesOfConstructors modules cons_defs [cons:conses] (conds, as=:{as_type_var_heap,as_kind_heap})
+	# (cons_properties,conds_as) = anal_types_of_constructor modules cons_defs cons (conds, as)
+	  (other_properties, conds_as) = analTypesOfConstructors modules cons_defs conses conds_as
+	= (combineTypeProperties cons_properties other_properties, conds_as)
+analTypesOfConstructors _ _ [] conds_as
+	= (cIsHyperStrict, conds_as)
+
+analTypesOfConstructor modules cons_defs cons (conds, as)
+	# (cons_properties,conds_as) = anal_types_of_constructor modules cons_defs cons (conds, as)
+	= (combineTypeProperties cons_properties cIsHyperStrict,conds_as)
+
+anal_types_of_constructor modules cons_defs {ds_index} (conds, as=:{as_type_var_heap,as_kind_heap})
 	# {cons_exi_vars,cons_type} = cons_defs.[ds_index ]
 	  (coercible, as_type_var_heap, as_kind_heap) = new_local_kind_variables cons_exi_vars (as_type_var_heap, as_kind_heap)
 	  (cons_properties, conds_as) = anal_types_of_cons modules cons_type.st_args cons_type.st_args_strictness 0
 			(conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap })
-	  (other_properties, conds_as) = analTypesOfConstructor modules cons_defs conses conds_as
-	  properties = combineTypeProperties cons_properties other_properties
-	= (if coercible properties (properties bitor cIsNonCoercible), conds_as)
+	= (if coercible cons_properties (cons_properties bitor cIsNonCoercible), conds_as)
 where
 	new_local_kind_variables :: [ATypeVar] !(!*TypeVarHeap,!*KindHeap) -> (!Bool,!*TypeVarHeap,!*KindHeap)
 	new_local_kind_variables td_args (type_var_heap, as_kind_heap)
@@ -497,7 +599,7 @@ where
 
 		is_not_a_variable (TA_RootVar var)	= False
 		is_not_a_variable attr				= True
-			
+
 	anal_types_of_cons modules [] args_strictness strictness_index conds_as
 		= (cIsHyperStrict, conds_as)
 	anal_types_of_cons modules [type : types] args_strictness strictness_index conds_as
@@ -509,9 +611,6 @@ where
 							(combineCoercionProperties cv_props other_type_props)
 		= (cons_props, (conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
 //			---> ("anal_types_of_cons", type)
-
-analTypesOfConstructor _ _ [] conds_as
-	= (cIsHyperStrict, conds_as)
 
 isATopConsVar cv		:== cv < 0
 encodeTopConsVar cv		:== dec (~cv)
@@ -578,13 +677,15 @@ where
 		= (combineTypeProperties group_properties type_properties, conds, {as & as_error = popErrorAdmin as.as_error })
 	where
 		anal_rhs_of_type_def modules com_cons_defs (AlgType conses) conds_as
-			= analTypesOfConstructor modules com_cons_defs conses conds_as
+			= analTypesOfConstructors modules com_cons_defs conses conds_as
 		anal_rhs_of_type_def modules com_cons_defs (RecordType {rt_constructor}) conds_as
-			= analTypesOfConstructor modules com_cons_defs [rt_constructor] conds_as
+			= analTypesOfConstructor modules com_cons_defs rt_constructor conds_as
 		anal_rhs_of_type_def modules _ (SynType type) conds_as
 			# (type_kind, cv_props, (conds, as=:{as_kind_heap, as_error})) = analTypes True /* cDummyBool */ modules [] type.at_type conds_as
 			  {uki_kind_heap, uki_error} = unifyKinds type_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
 			= (cv_props, (conds, { as & as_kind_heap = uki_kind_heap, as_error = uki_error }))
+		anal_rhs_of_type_def modules com_cons_defs (NewType cons) conds_as
+			= analTypesOfConstructor modules com_cons_defs cons conds_as
 
 	determine_kinds {gi_module,gi_index} (kind_heap, td_infos)
 		# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module,gi_index]
@@ -1083,6 +1184,8 @@ isUniqueTypeRhs common_defs mod_index (AlgType constructors) state
 isUniqueTypeRhs common_defs mod_index (SynType rhs) state
 	= isUnique common_defs rhs state
 isUniqueTypeRhs common_defs mod_index (RecordType {rt_constructor={ds_index}}) state
+	= constructor_is_unique mod_index ds_index common_defs state
+isUniqueTypeRhs common_defs mod_index (NewType {ds_index}) state
 	= constructor_is_unique mod_index ds_index common_defs state
 isUniqueTypeRhs common_defs mod_index _ state
 	= (False, state)
