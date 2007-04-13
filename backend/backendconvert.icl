@@ -2081,7 +2081,7 @@ foldStateWithIndex function n
 markExports :: DclModule {#ClassDef} {#CheckedTypeDef} {#ClassDef} {#CheckedTypeDef} -> BackEnder
 markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_defs,com_class_defs}} dclClasses dclTypes iclClasses iclTypes
 	=	foldStateWithIndex (beExportType False) (size com_type_defs)
-	o	foldStateWithIndex beExportConstructor (size com_cons_defs)
+	o	foldStateWithIndex export_constructor (size com_cons_defs)
 	o	foldStateWithIndex (beExportField False) (size com_selector_defs)
 	o	foldStateWithIndex (exportDictionary iclClasses iclTypes) (size com_class_defs)
 	o	foldStateWithIndex beExportFunction (size dcl_functions)
@@ -2101,3 +2101,8 @@ markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_
 				exportDictionaryField :: FieldSymbol -> BackEnder
 				exportDictionaryField {fs_index}
 					=	beExportField True fs_index
+
+		export_constructor constructor_index
+			| com_cons_defs.[constructor_index].cons_number <> -2
+				= beExportConstructor constructor_index
+				= \ bs=:{bes_backEnd} -> bs
