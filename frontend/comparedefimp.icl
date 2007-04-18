@@ -104,8 +104,7 @@ where
 		  (ok, comp_st) = compare (dcl_cons_type.st_args,dcl_cons_type.st_args_strictness) (icl_cons_type.st_args,icl_cons_type.st_args_strictness) comp_st
 		| dcl_cons_def.cons_priority == icl_cons_def.cons_priority
 			| ok && do_compare_result_types
-				# (ok, comp_st) = compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
-				= (ok, comp_st)
+				= compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
 				= (ok, comp_st)
 			= (False, comp_st)
 
@@ -217,7 +216,7 @@ where
 		= (True, comp_st)
 	compare _ _ comp_st
 		= (False, comp_st)
-		
+
 instance compare Type
 where
 	compare (TA dclIdent dclArgs) (TA iclIdent iclArgs) comp_st
@@ -1191,9 +1190,7 @@ e_corresponds_VarInfoPtr ident dclPtr iclPtr ec_state=:{ec_var_heap}
 	The problem: also different symbols can correspond with each other, because for macros
 	all local functions (also lambda functions) will be generated twice.
 */
-e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_Function dcl_glob_index} 
-					icl_app_symb=:{symb_kind=SK_Function icl_glob_index}
-					ec_state
+e_corresponds_app_symb {symb_ident, symb_kind=SK_Function dcl_glob_index} {symb_kind=SK_Function icl_glob_index} ec_state
 	#! main_dcl_module_n = ec_state.ec_main_dcl_module_n
 	| dcl_glob_index.glob_module==main_dcl_module_n && icl_glob_index.glob_module==main_dcl_module_n
 		| dcl_glob_index.glob_object<>icl_glob_index.glob_object
@@ -1202,21 +1199,17 @@ e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_Function dcl_glob
 	| dcl_glob_index<>icl_glob_index
 		= give_error symb_ident ec_state
 	= ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_OverloadedFunction dcl_glob_index} 
-					icl_app_symb=:{symb_kind=SK_OverloadedFunction icl_glob_index}
-					ec_state
+e_corresponds_app_symb {symb_ident, symb_kind=SK_OverloadedFunction dcl_glob_index} {symb_kind=SK_OverloadedFunction icl_glob_index} ec_state
 	| dcl_glob_index<>icl_glob_index
 		= give_error symb_ident ec_state
 	= ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_ident, symb_kind=SK_Generic dcl_glob_index dcl_kind} 
-					icl_app_symb=:{symb_kind=SK_Generic icl_glob_index icl_kind}
-					ec_state
+e_corresponds_app_symb {symb_ident, symb_kind=SK_Generic dcl_glob_index dcl_kind} {symb_kind=SK_Generic icl_glob_index icl_kind} ec_state
 	| dcl_glob_index<>icl_glob_index || dcl_kind <> icl_kind
 		= give_error symb_ident ec_state
 	= ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_IclMacro icl_index} ec_state
 	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
-e_corresponds_app_symb dcl_app_symb=:{symb_ident,symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_DclMacro icl_glob_index} ec_state
+e_corresponds_app_symb {symb_ident,symb_kind=SK_DclMacro dcl_glob_index} {symb_kind=SK_DclMacro icl_glob_index} ec_state
 	| dcl_glob_index==icl_glob_index
 		= ec_state
 		= give_error symb_ident ec_state
@@ -1224,6 +1217,10 @@ e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalDclMacroFunction dcl_glo
 	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
 e_corresponds_app_symb {symb_ident=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index} {symb_ident=icl_symb_name, symb_kind=SK_Constructor icl_glob_index} ec_state
 	| dcl_glob_index.glob_module==icl_glob_index.glob_module && dcl_symb_name.id_name==icl_symb_name.id_name
+		= ec_state
+		= give_error icl_symb_name ec_state
+e_corresponds_app_symb {symb_ident=dcl_symb_name, symb_kind=SK_NewTypeConstructor dcl_glob_index} {symb_ident=icl_symb_name, symb_kind=SK_NewTypeConstructor icl_glob_index} ec_state
+	| dcl_glob_index.gi_module==icl_glob_index.gi_module && dcl_symb_name.id_name==icl_symb_name.id_name
 		= ec_state
 		= give_error icl_symb_name ec_state
 e_corresponds_app_symb {symb_ident,symb_kind} {symb_kind=symb_kind2} ec_state
