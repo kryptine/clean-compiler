@@ -1014,6 +1014,9 @@ instance checkMacro CasePatterns where
 		# (patterns, ea)
 			=	checkMacro topLevel patterns ea	
 		=	(BasicPatterns type patterns, ea)
+	checkMacro topLevel (NewTypePatterns type patterns) ea
+		# (patterns, ea) = checkMacro topLevel patterns ea	
+		= (NewTypePatterns type patterns, ea)
 	checkMacro topLevel (DynamicPatterns patterns) ea
 		# (patterns, ea)
 			=	checkMacro topLevel patterns ea	
