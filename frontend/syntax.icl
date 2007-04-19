@@ -730,7 +730,7 @@ instance <<< (Module a) | <<< a
 where
 	(<<<) file {mod_ident,mod_type,mod_defs} = file <<< mod_type <<< mod_ident <<< mod_defs
 
-instance <<< (CollectedDefinitions a b) | <<< a & <<< b
+instance <<< (CollectedDefinitions a) | <<< a
 where
 	(<<<) file {def_types,def_constructors,def_selectors,def_macros,def_classes,def_members,def_instances}
 		= file

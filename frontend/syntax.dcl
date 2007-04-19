@@ -33,7 +33,7 @@ instance toString Ident
 
 instance == FunctionOrMacroIndex
 
-::	STE_BoundTypeVariable	= { stv_count :: !Int, stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr }
+::	STE_BoundTypeVariable	= { stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr }
 
 ::	STE_Kind	= STE_FunctionOrMacro ![FunctionOrMacroIndex]
 				| STE_DclMacroOrLocalMacroFunction ![FunctionOrMacroIndex]
@@ -52,7 +52,7 @@ instance == FunctionOrMacroIndex
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
 				| STE_Imported !STE_Kind !ModuleN
 				| STE_DclFunction
-				| STE_Module !(Module (CollectedDefinitions ClassInstance IndexRange))
+				| STE_Module !(Module (CollectedDefinitions ClassInstance))
 				| STE_ClosedModule
 				| STE_ModuleQualifiedImports !SortedQualifiedImports
 				| STE_Empty
@@ -118,7 +118,7 @@ instance == FunctionOrMacroIndex
 	}
 
 ::	ParsedModule	:== Module  [ParsedDefinition]
-::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef) IndexRange)
+::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef))
 	
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
@@ -188,7 +188,7 @@ instance == FunctionOrMacroIndex
 					| EmptyRhs !BITVECT
 					| AbstractTypeSpec !BITVECT !AType
 
-::	CollectedDefinitions instance_kind def_macros =
+::	CollectedDefinitions instance_kind =
 	{	def_types 			:: ![TypeDef TypeRhs]
 	,	def_constructors	:: ![ConsDef]
 	,	def_selectors		:: ![SelectorDef]
@@ -909,7 +909,6 @@ cNonRecursiveAppl	:== False
 ::	ConsDef =
 	{	cons_ident			:: !Ident
 	,	cons_type			:: !SymbolType
-	,	cons_arg_vars		:: ![[ATypeVar]]
 	,	cons_priority		:: !Priority
 	,	cons_number			:: !Index // -2 for newtype constructor
 	,	cons_type_index		:: !Index
@@ -1492,7 +1491,7 @@ ParsedConstructorToConsDef pc :==
 	{	cons_ident = pc.pc_cons_ident, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_number = NoIndex, cons_type_index = NoIndex,
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_args_strictness=pc.pc_args_strictness, st_result = MakeAttributedType TE, 
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
-		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr, cons_arg_vars = [] }
+		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
 ParsedInstanceToClassInstance pi members :==
  	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 

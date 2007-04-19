@@ -1128,7 +1128,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 
 	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,hash_table, err_file, files)
 where
-	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef) [FunDef])),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
+	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef))),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
 	scan_main_dcl_module mod_ident MK_Main _ files ca
 		= (True, No,NoIndex,[MakeEmptyModule mod_ident MK_NoMainDcl], cached_modules,files, ca)
 	scan_main_dcl_module mod_ident MK_None _ files ca
@@ -1235,7 +1235,7 @@ where
 		# (strictness_index,strictness,strictness_list) = add_next_not_strict strictness_index strictness strictness_list
 		= add_strictness_for_arguments fields strictness_index strictness strictness_list
 
-reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef) [FunDef], ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
+reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef), ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count type_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args

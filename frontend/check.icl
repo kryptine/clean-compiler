@@ -1205,7 +1205,7 @@ instance < FunDef
 where
 	(<) fd1 fd2 = fd1.fun_ident.id_name < fd2.fun_ident.id_name
 
-createCommonDefinitions :: (CollectedDefinitions ClassInstance a) -> .CommonDefs;
+createCommonDefinitions :: (CollectedDefinitions ClassInstance) -> .CommonDefs;
 createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generics,def_generic_cases}
 	=	{	com_type_defs		= { type \\ type <- def_types }
 		,	com_cons_defs		= { cons \\ cons <- def_constructors }
@@ -1262,7 +1262,7 @@ checkCommonDefinitions opt_icl_info module_index common modules heaps cs
 							 com_generic_defs = com_generic_defs, com_gencase_defs = com_gencase_defs}	
 		= (dictionary_info,common, modules,	heaps, cs)
 		
-collectCommonfinitions :: !(CollectedDefinitions ClassInstance a) -> (!*{# Int}, ![Declaration])
+collectCommonfinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
 collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
 	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
 	# sizes = createArray cConversionTableSize 0
@@ -1500,7 +1500,7 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 				# com_selector_defs=reorder_and_enlarge_array com_selector_defs n_dictionary_selectors icl_to_dcl_index_table.[cSelectorDefs]
 					 				{sd_ident=dummy_ident,sd_field=dummy_ident,sd_type=dummy_symbol_type,sd_exi_vars=[],sd_field_nr=0,sd_type_index=0,sd_type_ptr=nilPtr,sd_pos=NoPos}
 				# com_cons_defs=reorder_and_enlarge_array com_cons_defs n_dictionary_constructors icl_to_dcl_index_table.[cConstructorDefs]
-									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_arg_vars=[],cons_priority=NoPrio,cons_number= -1,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}					
+									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_priority=NoPrio,cons_number= -1,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}					
 				# com_class_defs=reorder_array com_class_defs icl_to_dcl_index_table.[cClassDefs]
 				# com_member_defs=reorder_array com_member_defs icl_to_dcl_index_table.[cMemberDefs]
 				# com_instance_defs=reorder_array com_instance_defs icl_to_dcl_index_table.[cInstanceDefs]
@@ -1522,8 +1522,8 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 			# new_array=createArray (size array+n_extra_elements) dummy_element
 			= {new_array & [index_array.[i]] = e \\ e<-:array & i<-[0..]}
 
-combineDclAndIclModule ::			 ModuleKind *{#DclModule}  [Declaration] (CollectedDefinitions a b)  *{#Int}   *CheckState
-	-> (!CopiedDefinitions,!Optional {#{#Int}},!*{#DclModule},![Declaration],!CollectedDefinitions a b, !*{#Int}, !*CheckState);
+combineDclAndIclModule ::			 ModuleKind *{#DclModule}  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
+	-> (!CopiedDefinitions,!Optional {#{#Int}},!*{#DclModule},![Declaration],!CollectedDefinitions a, !*{#Int}, !*CheckState);
 combineDclAndIclModule MK_Main modules icl_decl_symbols icl_definitions icl_sizes cs
 	= ({ copied_type_defs = {}, copied_class_defs = {}, copied_generic_defs = {}}, No, modules, icl_decl_symbols, icl_definitions, icl_sizes, cs)
 combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
@@ -2492,7 +2492,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
 check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int 
-				(Optional (Module a)) [Declaration] Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance IndexRange)
+				(Optional (Module a)) [Declaration] Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance)
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
 check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
@@ -3402,7 +3402,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
 
 checkPredefinedDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect !Bool
-							!(Module (CollectedDefinitions ClassInstance IndexRange)) !Index !*ExplImpInfos !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*Heaps !*CheckState
+							!(Module (CollectedDefinitions ClassInstance)) !Index !*ExplImpInfos !*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*Heaps !*CheckState
 						-> (!(!Int,!Index,![FunType]), !(!*ExplImpInfos, !*{#DclModule}, !*{#FunDef},!*{#*{#FunDef}},!*Heaps, !*CheckState))
 checkPredefinedDclModule dcl_imported_module_numbers components_importing_module imports_ikh component_nr is_on_cycle modules_in_component_set support_dynamics
 		 mod=:{mod_ident,mod_defs=mod_defs=:{def_macro_indices,def_funtypes}} mod_index expl_imp_info modules icl_functions macro_defs heaps cs

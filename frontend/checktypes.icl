@@ -83,8 +83,7 @@ where
 		# (var_def, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case var_def.ste_kind of
-			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count}
-				# cs = { cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, { var_def & ste_kind = STE_BoundTypeVariable { bv & stv_count = inc stv_count }})}
+			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr}
 				-> ({ tv & tv_info_ptr = stv_info_ptr}, stv_attribute, (ts, ti, cs))
 			_
 				-> (tv, TA_Multi, (ts, ti, { cs & cs_error = checkError var_id "undefined" cs.cs_error }))
@@ -374,35 +373,26 @@ where
 		# (cons_def, ts) = ts!ts_cons_defs.[ds_index]
 		# (exi_vars, (ti_type_heaps, cs))
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
-		  (st_args, cons_arg_vars, st_attr_env, (ts, ti, cs))
+		  (st_args, st_attr_env, (ts, ti, cs))
 		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] (ts, { ti & ti_type_heaps = ti_type_heaps }, cs)
 		  symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
 		  attr_vars = add_universal_attr_vars st_args free_attrs
 		  cons_type = { cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_attr_vars = attr_vars, st_attr_env = st_attr_env }
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
 		  cons_def = { cons_def & cons_type = cons_type, cons_number = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
-		  						  cons_type_ptr = new_type_ptr, cons_arg_vars = cons_arg_vars }
+		  						  cons_type_ptr = new_type_ptr }
 		= ({ ts & ts_cons_defs.[ds_index] = cons_def}, { ti & ti_var_heap = ti_var_heap }, { cs & cs_symbol_table=symbol_table })
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
-									  -> (![AType], ![[ATypeVar]], ![AttrInequality],!(!*TypeSymbols, !*TypeInfo, !*CheckState))
+									  -> (![AType], ![AttrInequality],!(!*TypeSymbols, !*TypeInfo, !*CheckState))
 		bind_types_of_cons [] cti free_vars attr_env ts_ti_cs
-			= ([], [], attr_env, ts_ti_cs)
+			= ([], attr_env, ts_ti_cs)
 		bind_types_of_cons [type : types] cti free_vars attr_env ts_ti_cs
-			# (types, local_vars_list, attr_env, ts_ti_cs)
+			# (types, attr_env, ts_ti_cs)
 					= bind_types_of_cons types cti free_vars attr_env ts_ti_cs
 			  (type, type_attr, (ts, ti, cs)) = bindTypes cti type ts_ti_cs
-			  (local_vars, cs_symbol_table) = foldSt retrieve_local_vars free_vars ([], cs.cs_symbol_table)
 			  (attr_env, cs_error) = addToAttributeEnviron type_attr cti.cti_lhs_attribute attr_env cs.cs_error
-			= ([type : types], [local_vars : local_vars_list], attr_env, (ts, ti , { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
-		where
-			retrieve_local_vars tv=:{tv_ident={id_info}} (local_vars, symbol_table)
-				# (ste=:{ste_kind = STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr, stv_count }}, symbol_table) = readPtr id_info symbol_table
-				| stv_count == 0
-					= (local_vars, symbol_table)
-					
-					= ([{ atv_variable = { tv & tv_info_ptr = stv_info_ptr}, atv_attribute = stv_attribute } : local_vars],
-							symbol_table <:= (id_info, { ste & ste_kind = STE_BoundTypeVariable { bv & stv_count = 0}}))
+			= ([type : types], attr_env, (ts, ti , { cs & cs_error = cs_error }))
 
 		add_universal_attr_vars [] attr_vars
 			= attr_vars
@@ -1288,7 +1278,7 @@ where
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
 		      (atv_attribute, attr_vars, th_attrs, cs_error) = check_attribute (scope == cRankTwoScope) atv_attribute tv_ident.id_name attr_vars th_attrs cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr, stv_count = 0}, ste_def_level = scope /* cOuterMostLevel */, ste_previous = entry })
+			  						stv_info_ptr = tv_info_ptr}, ste_def_level = scope /* cOuterMostLevel */, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
 					(attr_vars, heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }))
@@ -1343,7 +1333,7 @@ where
 		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
 		      (atv_attribute, th_attrs, cs_error) = check_attribute atv_attribute root_attr tv_ident.id_name th_attrs cs_error
 			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr, stv_count = 0  }, ste_def_level = cGlobalScope /* cOuterMostLevel */, ste_previous = entry })
+			  						stv_info_ptr = tv_info_ptr }, ste_def_level = cGlobalScope /* cOuterMostLevel */, ste_previous = entry })
 			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }
 			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
 					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error}))
@@ -1578,7 +1568,6 @@ where
 			,	cons_number		= 0
 			,	cons_type_index	= index_type
 			,	cons_exi_vars	= []
-			,	cons_arg_vars	= []
 			,	cons_type_ptr	= cons_type_ptr
 			,	cons_pos		= NoPos
 			}
