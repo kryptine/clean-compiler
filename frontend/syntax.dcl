@@ -709,7 +709,6 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
-				VI_Defined /* for marking type code variables during overloading */ | VI_LocallyDefined |
 // MdM
 				VI_CPSExprVar !CheatCompiler /* a pointer to a variable in CleanProverSystem is stored here, using a cast */
 // ... MdM
