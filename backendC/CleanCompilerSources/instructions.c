@@ -1092,11 +1092,24 @@ static void GenABStackElems (StateS state)
 		
 		switch (state.state_type){
 			case TupleState:
-				argstates = state.state_tuple_arguments;
+				argstates = state.state_tuple_arguments;			
+				FPutC ('(', OutFile);
+				if (state.state_arity>0){
+					GenABStackElems (argstates[0]);
+					for (arity=1; arity < state.state_arity; arity++){
+						FPutC (',', OutFile);
+						GenABStackElems (argstates[arity]);
+					}
+				}
+				FPutC (')', OutFile);
 				break;
 			case RecordState:
 				argstates = state.state_record_arguments;
-				break;
+				FPutC ('(', OutFile);
+				for (arity=0; arity < state.state_arity; arity++)
+					GenABStackElems (argstates[arity]);
+				FPutC (')', OutFile);
+				return;
 			case ArrayState:
 				FPutC ('a', OutFile);
 				return;
@@ -1104,9 +1117,20 @@ static void GenABStackElems (StateS state)
 				error_in_function ("GenABStackElems");
 				return;
 		}
-		for (arity=0; arity < state.state_arity; arity++)
-			GenABStackElems (argstates[arity]);
 	}
+}
+
+static void GenABStackElemsOfRecord (StateS state)
+{
+	if (state.state_type==RecordState){
+		int arity;
+		States argstates;
+
+		argstates = state.state_record_arguments;
+		for (arity=0; arity < state.state_arity; ++arity)
+			GenABStackElems (argstates[arity]);
+	} else
+		GenABStackElems (state);
 }
 
 void GenDStackLayout (int asize,int bsize,Args fun_args)
@@ -2829,8 +2853,8 @@ void GenRecordDescriptor (SymbDef sdef)
 	}
 
 	recstate = sdef->sdef_record_state;
-	
-	GenABStackElems (recstate);
+
+	GenABStackElemsOfRecord (recstate);
 
 	DetermineSizeOfState (recstate,&asize,&bsize);
 	
@@ -2868,7 +2892,8 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	FPutC ('l', OutFile);
 	FPutC ('R', OutFile);
 
-	GenABStackElems (tuple_state);
+	GenABStackElemsOfRecord (tuple_arguments_state[0]);
+	GenABStackElems (tuple_arguments_state[1]);
 
 	DetermineSizeOfState (tuple_state,&asize,&bsize);
 	
