@@ -630,7 +630,7 @@ transformGenerators [generator:generators] qual_filename index_generator ca
 	# (transformed_generator,index_generator,index_argument_n,ca) = transformGenerator generator qual_filename index_generator ca
 	| index_argument_n>0
 		# (transformed_generators,index_generator,ca) = transformGenerators generators qual_filename index_generator ca		
-		# (node_defs,size_exp,_,ca) = compute_minimum_of_sizes index_generator generator.gen_position ca
+		# (node_defs,size_exp,_,ca) = compute_minimum_of_sizes index_generator generator.gen_position qual_filename ca
 		# transformed_generator = store_minimum_of_sizes_in_generator node_defs size_exp index_argument_n transformed_generator
 		= ([transformed_generator:transformed_generators],index_generator,ca)
 		# (transformed_generators,index_generator,ca) = transformGenerators generators qual_filename index_generator ca
@@ -644,12 +644,12 @@ transformGeneratorsAndReturnSize [generator:generators] qual_filename index_gene
 	| index_argument_n>0
 		# (transformed_generators,index_generator,_,ca) = transformGeneratorsAndReturnSize generators qual_filename index_generator size_exp ca		
 
-		# (node_defs,size_exp,ident,ca) = compute_minimum_of_sizes index_generator generator.gen_position ca
+		# (node_defs,size_exp,ident,ca) = compute_minimum_of_sizes index_generator generator.gen_position qual_filename ca
 		# (node_defs,size_exp) = case size_exp of
 									PE_Ident _
 										-> (node_defs,size_exp)
 									_
-										-> (node_defs++[PD_NodeDef NoPos ident (exprToRhs size_exp)],ident)
+										-> (node_defs++[PD_NodeDef (LinePos qual_filename generator.gen_position.lc_line) ident (exprToRhs size_exp)],ident)
 		# transformed_generator = store_minimum_of_sizes_in_generator node_defs size_exp index_argument_n transformed_generator
 
 		# inc = get_predef_id PD_IncFun
@@ -662,8 +662,8 @@ transformGeneratorsAndReturnSize [generator:generators] qual_filename index_gene
 transformGeneratorsAndReturnSize [] qual_filename index_generator size_exp ca
 	= ([],index_generator,size_exp,ca)
 
-compute_minimum_of_sizes :: IndexGenerator LineAndColumn *CollectAdmin -> *(![ParsedDefinition],!ParsedExpr,!ParsedExpr,!*CollectAdmin);
-compute_minimum_of_sizes (Yes (i,sizes)) gen_position ca
+compute_minimum_of_sizes :: IndexGenerator LineAndColumn String *CollectAdmin -> *(![ParsedDefinition],!ParsedExpr,!ParsedExpr,!*CollectAdmin);
+compute_minimum_of_sizes (Yes (i,sizes)) gen_position qual_filename ca
 	= compute_minimum (reverse sizes) 1 ca
 where
 	compute_minimum [(node_defs,exp,ident)] n ca
@@ -676,25 +676,27 @@ where
 				minimum ident1=:(PE_Ident _) ident2=:(PE_Ident _) ca
 					= minimum_of_idents ident1 ident2 ca
 				minimum exp1 ident2=:(PE_Ident _) ca
-					# node_def1 = PD_NodeDef NoPos ident1 (exprToRhs exp1)
+					# node_def1 = PD_NodeDef (LinePos qual_filename gen_position.lc_line) ident1 (exprToRhs exp1)
 					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
 					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def1]) min_exp,ca)
 				minimum ident1=:(PE_Ident _) exp2 ca
-					# node_def2 = PD_NodeDef NoPos ident2 (exprToRhs exp2)
+					# node_def2 = PD_NodeDef (LinePos qual_filename gen_position.lc_line) ident2 (exprToRhs exp2)
 					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
 					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def2]) min_exp,ca)
 				minimum exp1 exp2 ca
-					# node_def1 = PD_NodeDef NoPos ident1 (exprToRhs exp1)
-					# node_def2 = PD_NodeDef NoPos ident2 (exprToRhs exp2)
+					# pos = LinePos qual_filename gen_position.lc_line
+					# node_def1 = PD_NodeDef pos ident1 (exprToRhs exp1)
+					# node_def2 = PD_NodeDef pos ident2 (exprToRhs exp2)
 					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
 					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def1,node_def2]) min_exp,ca)
 				
 				minimum_of_idents ident1 ident2 ca
 					# smaller_fun = get_predef_id PD_SmallerFun
 					# (case_ident,ca) = prefixAndPositionToIdent ("g_s"+++toString n) gen_position ca
+					# pos = LinePos qual_filename gen_position.lc_line
 					= (PE_Case case_ident (PE_List [ident1,PE_Ident smaller_fun,ident2])
-						[{calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs ident1, calt_position=NoPos},
-						 {calt_pattern = PE_WildCard, calt_rhs = exprToRhs ident2, calt_position=NoPos}],ca)
+						[{calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs ident1, calt_position=pos},
+						 {calt_pattern = PE_WildCard, calt_rhs = exprToRhs ident2, calt_position=pos}],ca)
 		= (node_defs,to_exp,ident1,ca)
 
 store_minimum_of_sizes_in_generator :: [ParsedDefinition] ParsedExpr Int TransformedGenerator -> TransformedGenerator;
@@ -950,7 +952,7 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
 			# new_node={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node:ewl_nodes]}}
-		case_with_default case_ident expr expr_is_uselect=:True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
+		case_with_default case_ident expr True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
 			# new_node1={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 			# new_node2={ndwl_strict=True,ndwl_def={bind_src=ident2_exp,bind_dst=ident2_exp},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node1,new_node2:ewl_nodes]}}
@@ -1378,7 +1380,7 @@ where
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
 	check_symbols_of_class_members [] type_context ca
 		= ([], [], ca)
-	
+
 	reorganise_member_defs :: [MemberDef] Index -> ([DefinedSymbol], [MemberDef], Index)
 	reorganise_member_defs mem_defs first_mem_index
 		# mem_defs = sort mem_defs
@@ -1423,7 +1425,6 @@ where
 	    = ([], ca)	
 reorganiseDefinitions icl_module [PD_Instances class_instances : defs] cons_count sel_count mem_count type_count ca
 	= reorganiseDefinitions icl_module ([PD_Instance class_instance \\ class_instance <- class_instances] ++ defs) cons_count sel_count mem_count type_count ca
-// AA ..
 reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count mem_count type_count ca
 	# 	(fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
@@ -1444,13 +1445,10 @@ reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count
 	#! inst = { gc & gc_body = GCB_FunDef fun } 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
-
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca
 	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	#! c_defs = { c_defs & def_generic_cases = derive_defs ++ c_defs.def_generic_cases}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
-// .. AA
-	
 reorganiseDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	= (fun_defs, c_defs, new_imports ++ imports, imported_objects,foreign_exports, ca)
