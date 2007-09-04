@@ -3833,6 +3833,12 @@ static Bool ReduceDepExpression (Exp e, Path p, Context context)
 	for (i = 0; i < arity; i++){
 		if (ReduceInContext (& e->e_args[i], p, NewSimpleContext (HnfStrict, context->context_speculative)))
 			return True;
+		/*	JvG: if an argument is be equal to e (for example: let x=x*x in x),
+			and ReduceInContext runs out of fuel, e will be updated with Top,
+			and the rest of the arguments will no longer be valid */
+		if (e->e_kind!=Dep)
+			return e->e_kind==Bottom;
+		/**/
 	}
 	
 	SortExpOfKind (e, Dep);
