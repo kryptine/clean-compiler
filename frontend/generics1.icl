@@ -201,7 +201,7 @@ where
 			= td_infos
 			#! (td_infos1, td_infos) = replace td_infos n {}
 			#! td_infos1 = clear_td_infos 0 td_infos1
-			#! (_, td_infos) = replace td_infos n td_infos1
+			#! td_infos = {td_infos & [n]=td_infos1}
 			= clear_modules (inc n) td_infos 
 			
 	clear_td_infos n td_infos 			
@@ -406,13 +406,10 @@ where
 // because bimaps for types not containing generic variables are indentity bimaps
 simplifyStructOfGenType :: ![TypeVar] !GenTypeStruct !*Heaps -> (!GenTypeStruct, !*Heaps)
 simplifyStructOfGenType gvars type heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}} 
-	| True
-		#! th_vars = foldSt mark_type_var gvars th_vars
-		#! (type, th_vars) = simplify type th_vars
-		#! th_vars = foldSt clear_type_var gvars th_vars 
-		= (type, { heaps & hp_type_heaps = { hp_type_heaps & th_vars = th_vars}})
-	| otherwise
-		= (type, heaps)			
+	#! th_vars = foldSt mark_type_var gvars th_vars
+	#! (type, th_vars) = simplify type th_vars
+	#! th_vars = foldSt clear_type_var gvars th_vars 
+	= (type, { heaps & hp_type_heaps = { hp_type_heaps & th_vars = th_vars}})
 where
 	simplify t=:(GTSAppCons KindConst [])  st
 		= (t, st)
@@ -421,7 +418,7 @@ where
 		# actual_arity = length args
 		# (contains_gen_vars, st) = occurs_list args st
 		| formal_arity == actual_arity && not contains_gen_vars
-			= (GTSAppCons KindConst [], st)
+			= (GTSAppConsBimapKindConst, st)
 		| otherwise
 			# (args, st) = mapSt simplify args st
 			=(GTSAppCons kind args, st)
@@ -1425,11 +1422,20 @@ where
 		#! num_gen_vars = length gen_vars
 		#! tvs = st_vars -- gen_vars
 		#! kinds = drop num_gen_vars gen_var_kinds
-		#! (bimap_contexts, gs_varh) = zipWithSt build_context tvs kinds gs_varh 
+		#! (bimap_contexts, gs_varh) = build_contexts tvs kinds gs_varh 
 		
 		#! gs = {gs & gs_varh = gs_varh, gs_genh = gs_genh}
 		= ({gen_type & st_context = st_context ++ bimap_contexts}, gs)
 	where
+		build_contexts [] [] st 
+			= ([], st)
+		build_contexts [x:xs] [KindConst:kinds] st
+			= build_contexts xs kinds st
+		build_contexts [x:xs] [kind:kinds] st
+			# (z, st) = build_context x kind st
+			# (zs, st) = build_contexts xs kinds st
+			= ([z:zs], st) 
+
 		build_context tv kind gs_varh
 			#! (var_info_ptr, gs_varh) = newPtr VI_Empty gs_varh
 			#! {pds_module, pds_def} = gs_predefs . [PD_GenericBimap]
@@ -2126,6 +2132,9 @@ where
 			= zipWithSt build_bimap_expr non_gen_vars kinds heaps
 		where
 			// build application of generic bimap for a specific kind
+			build_bimap_expr non_gen_var KindConst heaps
+				#! (expr, heaps) = buildPredefFunApp PD_bimapId [] predefs heaps		
+				= ((non_gen_var, expr), heaps)
 			build_bimap_expr non_gen_var kind heaps
 				# (generic_info_expr, heaps) = build_generic_info_expr heaps
 				#! (expr, heaps) 
@@ -2424,6 +2433,10 @@ where
 
 		= (expr, (td_infos, heaps, error))
 
+	specialize GTSAppConsBimapKindConst (td_infos, heaps, error)
+		# (expr, heaps) = buildPredefFunApp PD_bimapId [] predefs heaps		
+		= (expr, (td_infos, heaps, error))
+		
 	specialize type (td_infos, heaps, error)
 		#! error = reportError gen_ident gen_pos "cannot specialize " error 
 		= (EE, (td_infos, heaps, error))

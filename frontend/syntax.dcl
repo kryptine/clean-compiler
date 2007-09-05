@@ -43,8 +43,8 @@ instance == FunctionOrMacroIndex
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
-				| STE_Generic			// AA
-				| STE_GenericCase  // AA
+				| STE_Generic
+				| STE_GenericCase
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -342,7 +342,6 @@ cNameLocationDependent :== True
 	,	ai_offered	:: !AttributeVar
 	}
 
-
 ::	DefinedSymbol = 
 	{	ds_ident		:: !Ident
 	,	ds_arity		:: !Int
@@ -372,8 +371,6 @@ cNameLocationDependent :== True
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}
-
-// AA ... 
 
 :: GenericDef = 
 	{	gen_ident		:: !Ident		// the generics name in IC_Class 
@@ -429,12 +426,9 @@ cNameLocationDependent :== True
 	,	gt_vars			:: ![TypeVar]			// generic arguments
 	,	gt_arity		:: !Int					// number of generic arguments	
 	}
-	
 
 //getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
 //addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
-
-// ... AA
 
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
@@ -549,6 +543,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	| GTSAppVar TypeVar [GenTypeStruct] 
 	| GTSVar TypeVar
 	| GTSArrow GenTypeStruct GenTypeStruct	// needed for simplifying bimaps
+	| GTSAppConsBimapKindConst				// needed for simplifying bimaps
  	| GTSCons DefinedSymbol GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
  	| GTSObject DefinedSymbol GenTypeStruct
