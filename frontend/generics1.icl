@@ -721,10 +721,15 @@ where
 			# prio_expr = makeIntExpr prio		
 			= buildPredefConsApp PD_CGenConsPrio [assoc_expr, prio_expr] predefs heaps 
 
-		make_type_expr {st_args, st_result} heaps		
-			# (arg_exprs, heaps) = mapSt make_expr1 st_args heaps		
+		make_type_expr {st_vars, st_args, st_result} heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
+			# (_,th_vars) = foldSt (\ {tv_info_ptr} (n, th_vars) -> (n+1, writePtr tv_info_ptr (TVI_GenTypeVarNumber n) th_vars)) st_vars (0,th_vars)
+			# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
+			# (arg_exprs, heaps) = mapSt make_expr1 st_args heaps
 			# (result_expr, heaps) = make_expr1 st_result heaps
-			= curry arg_exprs result_expr heaps  
+			# {hp_type_heaps=type_heaps=:{th_vars}} = heaps
+			# th_vars = foldSt (\ {tv_info_ptr} th_vars -> writePtr tv_info_ptr TVI_Empty th_vars) st_vars th_vars
+			# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
+			= curry arg_exprs result_expr heaps
 		where
 		
 			curry [] result_expr heaps 
@@ -755,18 +760,18 @@ where
 				# (arg_expr, heaps) = make_expr1 type heaps 
 				# (arrow_expr, heaps) = make_type_cons "(->)" heaps
 				= make_app arrow_expr arg_expr heaps
-			make_expr (CV {tv_ident} :@: arg_types) heaps
+			make_expr (CV {tv_info_ptr} :@: arg_types) heaps
 				# (arg_exprs, heaps) = mapSt make_expr1 arg_types heaps
-				# (tv_expr, heaps) = make_type_var tv_ident.id_name heaps					
+				# (tv_expr, heaps) = make_type_var tv_info_ptr heaps
 				= make_apps tv_expr arg_exprs heaps
 			make_expr (TB bt) heaps
 				= make_type_cons (toString bt) heaps	
-			make_expr (TV {tv_ident}) heaps 
-				= make_type_var tv_ident.id_name heaps 
-			make_expr (GTV {tv_ident}) heaps 
-				= make_type_var tv_ident.id_name heaps 
-			make_expr (TQV {tv_ident}) heaps 
-				= make_type_var tv_ident.id_name heaps
+			make_expr (TV {tv_info_ptr}) heaps 
+				= make_type_var tv_info_ptr heaps 
+			make_expr (GTV {tv_info_ptr}) heaps
+				= make_type_var tv_info_ptr heaps 
+			make_expr (TQV {tv_info_ptr}) heaps 
+				= make_type_var tv_info_ptr heaps
 			make_expr TE heaps
 				= make_type_cons "<error>" heaps	 
 			make_expr _ heaps 
@@ -781,10 +786,14 @@ where
 			make_type_cons name heaps
 				# name_expr = makeStringExpr name
 				= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
-			make_type_var name heaps
-				# name_expr = makeStringExpr name
-				= buildPredefConsApp PD_CGenTypeVar [name_expr] predefs heaps									
+
+			make_type_var tv_info_ptr heaps
+				#! type_var_n = case sreadPtr tv_info_ptr heaps.hp_type_heaps.th_vars of
+									TVI_GenTypeVarNumber n -> n
+				= buildPredefConsApp PD_CGenTypeVar [makeIntExpr type_var_n] predefs heaps									
+
 			make_arrow x y heaps = buildPredefConsApp PD_CGenTypeArrow [x, y] predefs heaps
+
 			make_app x y heaps = buildPredefConsApp PD_CGenTypeApp [x, y] predefs heaps 	 
 
 	build_field_dsc group_index cons_dsc_ds field_dsc_ds {fs_ident, fs_index} (modules, heaps)
