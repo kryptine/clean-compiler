@@ -444,8 +444,10 @@ where
 instance <<< SelectorKind
 where
  	(<<<) file NormalSelector = file <<< "."
- 	(<<<) file NormalSelectorUniqueElementResult = file <<< "!*"
  	(<<<) file UniqueSelector = file <<< "!"
+ 	(<<<) file UniqueSelectorUniqueElementResult = file <<< "!*"
+ 	(<<<) file UniqueSingleArraySelector = file <<< "!"
+ 	(<<<) file UniqueSingleArraySelectorUniqueElementResult = file <<< "!*"
 
 instance <<< Selection
 where

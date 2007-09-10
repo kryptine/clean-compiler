@@ -1253,8 +1253,10 @@ cIsNotStrict	:== False
 
 ::	SelectorKind
 		=	NormalSelector
-		|	NormalSelectorUniqueElementResult
 		|	UniqueSelector			// !
+		|	UniqueSelectorUniqueElementResult
+		|	UniqueSingleArraySelector
+		|	UniqueSingleArraySelectorUniqueElementResult
 
 ::	Expression	= Var !BoundVar 
 				| App !App

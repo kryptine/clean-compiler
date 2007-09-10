@@ -1594,8 +1594,7 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=N
 convertRootExpr aliasDummyId (Case kees=:{case_expr, case_guards}) main_dcl_module_n
 	=	beSwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var (defaultCase kees) main_dcl_module_n)
 	where
-		var
-			=	caseVar case_expr
+		var = caseVar case_expr
 
 		defaultCase {case_default=Yes defaul} 
 			=	DefaultCase defaul
@@ -1728,7 +1727,9 @@ where
 		where
 			addKinds NormalSelector selections
 				=	[(BESelector, selection) \\ selection <- selections]
-			addKinds NormalSelectorUniqueElementResult selections
+			addKinds UniqueSingleArraySelector selections
+				=	[(BESelector, selection) \\ selection <- selections]
+			addKinds UniqueSingleArraySelectorUniqueElementResult selections
 				=	[(BESelector, selection) \\ selection <- selections]
 			addKinds _ [selection]
 				=	[(BESelector_U, selection)]
@@ -1818,7 +1819,7 @@ where
 
 	convertSelections :: (BEMonad BENodeP) [(BESelectorKind, Selection)] -> (BEMonad BENodeP)
 	convertSelections expression selections
-		=	foldl (convertSelection) expression selections
+		=	foldl convertSelection expression selections
 	
 	convertSelection :: (BEMonad BENodeP) (BESelectorKind, Selection) -> (BEMonad BENodeP)
 	convertSelection expression (kind, RecordSelection {glob_object={ds_index}, glob_module} _)

@@ -1019,9 +1019,9 @@ checkExpression free_vars (PE_Selection selector_kind expr [PS_Array index_expr]
 			ParsedNormalSelector
 				-> (PD_ArraySelectFun, NormalSelector)
 			ParsedUniqueSelector False
-				-> (PD_UnqArraySelectFun, NormalSelector)
+				-> (PD_UnqArraySelectFun, UniqueSingleArraySelector/*NormalSelector*/)
 			ParsedUniqueSelector True
-				-> (PD_UnqArraySelectFun, NormalSelectorUniqueElementResult)
+				-> (PD_UnqArraySelectFun, UniqueSingleArraySelectorUniqueElementResult)
 	# (glob_select_symb, cs) = getPredefinedGlobalSymbol select_fun PD_StdArray STE_Member 2 cs
 	  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
 	= (Selection selector_kind expr [selector], free_vars, e_state, e_info, cs)
@@ -2592,7 +2592,7 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  (glob_select_symb, selector_kind, cs)
 		  		= case dimension of
 		  			1	# (unq_select_symb, cs) = getPredefinedGlobalSymbol PD_UnqArraySelectFun PD_StdArray STE_Member 2 cs
-		  				-> (unq_select_symb, NormalSelector, cs)
+		  				-> (unq_select_symb, UniqueSingleArraySelector, cs)
 		  			_	# (select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
 		  				-> (select_symb, UniqueSelector, cs)
 		  e_state
