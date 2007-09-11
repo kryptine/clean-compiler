@@ -336,7 +336,7 @@ where
 unfoldVariable :: !BoundVar UnfoldInfo !*UnfoldState -> (!Expression, !*UnfoldState)
 unfoldVariable var=:{var_ident,var_info_ptr} ui us
 	# (var_info, us) = readVarInfo var_info_ptr us
-	= case var_info of 
+	= case var_info of
 		VI_Expression expr
 			-> (expr, us)
 		VI_Variable var_ident var_info_ptr
@@ -925,7 +925,7 @@ unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {
 	# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=size_fun_defs}
 	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_opt_type_heaps = No,us_cleanup_info = [], us_local_macro_functions = copied_local_functions }
 	# (result_expr,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold tb_rhs {ui_handle_aci_free_vars = RemoveThem} us
-	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap}	
+	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap}
 	# fi_calls = update_calls fi_calls us_local_macro_functions
 	# (new_functions,us_local_macro_functions,es) = copy_local_functions_of_macro us_local_macro_functions [] es
 	# {es_symbol_heap,es_symbol_table,es_fun_defs,es_new_fun_def_numbers} = es
@@ -1784,8 +1784,18 @@ retrieveRefCounts free_vars var_heap
 
 retrieveRefCount :: FreeVar *VarHeap -> (!FreeVar,!.VarHeap)
 retrieveRefCount fv=:{fv_info_ptr} var_heap
-	# (VI_Count count _, var_heap) = readPtr fv_info_ptr var_heap
-	= ({ fv & fv_count = count }, var_heap)
+	# (info, var_heap) = readPtr fv_info_ptr var_heap
+	= case info of
+		VI_Count count _
+			-> ({ fv & fv_count = count }, var_heap)
+		VI_RefFromTupleSel0 count
+			-> ({ fv & fv_count = count }, var_heap)		
+		VI_RefFromArrayUpdate count _
+			-> ({ fv & fv_count = count }, var_heap)
+		VI_RefFromArrayUpdateOfTupleElem2 count _
+			-> ({ fv & fv_count = count }, var_heap)
+		VI_RefFromArrayUpdateToTupleSelector2 count _ _
+			-> ({ fv & fv_count = count }, var_heap)
 
 /*
 	'clearCount' initialises the 'fv_info_ptr' field of each 'FreeVar'
@@ -1907,16 +1917,38 @@ where
 			  (collected_binds, free_vars, dynamics, cos) = collect_variables_in_binds all_binds [] free_vars dynamics cos
 			| isEmpty collected_binds
 				= (let_expr, free_vars, dynamics, cos)
-			 	# (let_strict_bind_types,let_lazy_bind_types,let_strict_binds,let_lazy_binds) = split_binds collected_binds
-						  	with
-				  				split_binds :: ![(Bool, AType, LetBind)] -> (!*[AType],!*[AType],!*[LetBind],!*[LetBind])
-								split_binds []
-									= ([],[],[],[])
-								split_binds [(strict, t, b):xs]
-									# (st,lt,sb,lb) = split_binds xs
-									| strict
-										= ([t:st],lt,[b:sb],lb)
-										= (st,[t:lt],sb,[b:lb])
+			 	# (let_strict_bind_types,let_lazy_bind_types,let_strict_binds,let_lazy_binds,cos_var_heap) = split_binds collected_binds cos.cos_var_heap
+				  	with
+		  				split_binds :: ![(Bool, AType, LetBind)] !*VarHeap -> (!*[AType],!*[AType],!*[LetBind],!*[LetBind],!*VarHeap)
+						split_binds [] var_heap
+							= ([],[],[],[],var_heap)
+						split_binds [(strict, t, b=:{lb_dst={fv_info_ptr},lb_src=Selection UniqueSelector expr selections}) : xs] var_heap
+							| unique_result_selection selections fv_info_ptr var_heap
+								# (st,lt,sb,lb,var_heap) = split_binds xs var_heap
+								# b = {b & lb_src = Selection UniqueSelectorUniqueElementResult expr selections}
+								| strict
+									= ([t:st],lt,[b:sb],lb,var_heap)
+									= (st,[t:lt],sb,[b:lb],var_heap)
+						split_binds [(strict, t, b=:{lb_dst={fv_info_ptr},lb_src=Selection UniqueSingleArraySelector expr selections}) : xs] var_heap
+							| unique_result_selection selections fv_info_ptr var_heap
+								# (st,lt,sb,lb,var_heap) = split_binds xs var_heap
+								# b = {b & lb_src = Selection UniqueSingleArraySelectorUniqueElementResult expr selections}
+								| strict
+									= ([t:st],lt,[b:sb],lb,var_heap)
+									= (st,[t:lt],sb,[b:lb],var_heap)
+						split_binds [(strict, t, b):xs] var_heap
+							# (st,lt,sb,lb,var_heap) = split_binds xs var_heap
+							| strict
+								= ([t:st],lt,[b:sb],lb,var_heap)
+								= (st,[t:lt],sb,[b:lb],var_heap)
+
+						unique_result_selection selections fv_info_ptr var_heap
+							= case sreadPtr fv_info_ptr var_heap of
+								VI_RefFromArrayUpdateOfTupleElem2 _ update_selections
+									-> same_selections selections update_selections
+								_
+									-> False
+				# cos = {cos & cos_var_heap=cos_var_heap}
 				# let_info = case let_info of
 					EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 					_				-> let_info
@@ -1995,16 +2027,36 @@ where
 					= collect_variables_in_binds binds collected_binds free_vars dynamics cos
 					# cos = {cos & cos_error=report_unused_strict_binds binds cos.cos_error}
 					= (collected_binds, free_vars, dynamics, cos)
-		
+
 			examine_reachable_binds :: !Bool ![v:(.a,.b,w:LetBind)] !x:[y:(.a,.b,z:LetBind)] ![.FreeVar] ![.(Ptr ExprInfo)] !*CollectState -> *(!Bool,![v0:(.a,.b,w0:LetBind)],!x0:[y0:(.a,.b,z0:LetBind)],![FreeVar],![(Ptr ExprInfo)],!*CollectState), [v <= v0,w <= w0,x <= x0,y <= y0,z <= z0]
 			examine_reachable_binds bind_found [bind=:(is_strict, type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
 				# (bind_found, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds bind_found binds collected_binds free_vars dynamics cos
-				# (VI_Count count is_global, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
+				# (info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
 				# cos = { cos & cos_var_heap = cos_var_heap }
-				| count > 0
-					# (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-					= (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
-					= (bind_found, [bind : binds], collected_binds, free_vars, dynamics, cos)
+				= case info of
+					VI_Count count _
+						| count > 0
+							#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
+							-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+							-> (bind_found, [bind : binds], collected_binds, free_vars, dynamics, cos)
+					VI_RefFromTupleSel0 count
+						#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
+						-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+					VI_RefFromArrayUpdate count selectors
+						-> case lb_src of
+							TupleSelect tuple_symbol 1 (Var var)
+								# (var, free_vars, dynamics, cos) = collectUpdateVarTupleSelect2Var var fv_info_ptr count selectors free_vars dynamics cos
+								#  lb_src = TupleSelect tuple_symbol 1 (Var var)
+								-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+							_
+								#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
+								-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+					VI_RefFromArrayUpdateOfTupleElem2 count _
+						#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
+						-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+					VI_RefFromArrayUpdateToTupleSelector2 count selectors array_var_info_ptr
+						-> abort "examine_reachable_binds VI_RefFromArrayUpdateToTupleSelector2"
+
 			examine_reachable_binds bind_found [] collected_binds free_vars dynamics cos
 				= (bind_found, [], collected_binds, free_vars, dynamics, cos)
 
@@ -2021,12 +2073,23 @@ where
 	collectVariables (Selection is_unique expr selectors) free_vars dynamics cos
 		# ((expr, selectors), free_vars, dynamics, cos) = collectVariables (expr, selectors) free_vars dynamics cos
 		= (Selection is_unique expr selectors, free_vars, dynamics, cos)
+	collectVariables (Update (Var var) selectors expr2) free_vars dynamics cos
+		# (var, free_vars, dynamics, cos) = collectUpdateVar var selectors free_vars dynamics cos
+		# ((expr2, selectors), free_vars, dynamics, cos) = collectVariables (expr2, selectors) free_vars dynamics cos
+		= (Update (Var var) selectors expr2, free_vars, dynamics, cos)
+	collectVariables (Update (TupleSelect tuple_symbol 1 (Var var)) selectors expr2) free_vars dynamics cos
+		# (var, free_vars, dynamics, cos) = collectUpdateTupleSelect2Var var selectors free_vars dynamics cos
+		# ((expr2, selectors), free_vars, dynamics, cos) = collectVariables (expr2, selectors) free_vars dynamics cos
+		= (Update (TupleSelect tuple_symbol 1 (Var var)) selectors expr2, free_vars, dynamics, cos)
 	collectVariables (Update expr1 selectors expr2) free_vars dynamics cos
 		# (((expr1, expr2), selectors), free_vars, dynamics, cos) = collectVariables ((expr1, expr2), selectors) free_vars dynamics cos
 		= (Update expr1 selectors expr2, free_vars, dynamics, cos)
 	collectVariables (RecordUpdate cons_symbol expression expressions) free_vars dynamics cos
 		# ((expression, expressions), free_vars, dynamics, cos) = collectVariables (expression, expressions) free_vars dynamics cos
 		= (RecordUpdate cons_symbol expression expressions, free_vars, dynamics, cos)
+	collectVariables (TupleSelect symbol 0 (Var var)) free_vars dynamics cos
+		# (var, free_vars, dynamics, cos) = collectTupleSelect0Var var free_vars dynamics cos
+		= (TupleSelect symbol 0 (Var var), free_vars, dynamics, cos)
 	collectVariables (TupleSelect symbol argn_nr expr) free_vars dynamics cos
 		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
 		= (TupleSelect symbol argn_nr expr, free_vars, dynamics, cos)
@@ -2153,16 +2216,154 @@ where
 		# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
 		  cos = { cos & cos_var_heap = cos_var_heap }
 		= case var_info of
-			VI_Alias alias
-				#  (original, free_vars, dynamics, cos) = collectVariables alias free_vars dynamics cos
-				-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
 			VI_Count count is_global
 				| count > 0 || is_global
 					-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
 					-> (var, [{fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics,
 								{ cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
+			VI_Alias alias
+				#  (original, free_vars, dynamics, cos) = collectVariables alias free_vars dynamics cos
+				-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
+			VI_RefFromTupleSel0 count
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+			VI_RefFromArrayUpdate count _
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+			VI_RefFromArrayUpdateToTupleSelector2 count _ array_var_info_ptr
+				# cos_var_heap = remove_VI_RefFromArrayUpdateOfTupleElem2 array_var_info_ptr cos_var_heap
+				# cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
+			VI_RefFromArrayUpdateOfTupleElem2 count _
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
 			_
-				-> abort "collectVariables [BoundVar] (transform, 1227)"  //---> (var_info ,var_ident, ptrToInt var_info_ptr)
+				-> abort "collectVariables [BoundVar] (transform)"  //---> (var_info ,var_ident, ptrToInt var_info_ptr)
+
+collectTupleSelect0Var var=:{var_ident,var_info_ptr,var_expr_ptr} free_vars dynamics cos=:{cos_var_heap}
+	# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
+	  cos = { cos & cos_var_heap = cos_var_heap }
+	= case var_info of
+		VI_Count count is_global
+			| count > 0 || is_global
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
+				-> (var, [{fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics,
+							{ cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromTupleSel0 1) cos.cos_var_heap })
+		VI_Alias alias
+			#  (original, free_vars, dynamics, cos) = collectVariables alias free_vars dynamics cos
+			-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
+		VI_RefFromTupleSel0 count
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromTupleSel0 (inc count)) cos.cos_var_heap })			
+		VI_RefFromArrayUpdate count _
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+		VI_RefFromArrayUpdateToTupleSelector2 count _ array_var_info_ptr
+			# cos_var_heap = remove_VI_RefFromArrayUpdateOfTupleElem2 array_var_info_ptr cos_var_heap
+			# cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
+		VI_RefFromArrayUpdateOfTupleElem2 count selectors
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 (inc count) selectors) cos.cos_var_heap })
+
+remove_VI_RefFromArrayUpdateOfTupleElem2 array_var_info_ptr var_heap
+	# (array_var_info, var_heap) = readPtr array_var_info_ptr var_heap
+	= case array_var_info of
+		VI_RefFromArrayUpdateOfTupleElem2 count _
+			-> writePtr array_var_info_ptr (VI_Count count False) var_heap
+		_
+			-> var_heap
+
+collectUpdateVar :: !BoundVar ![Selection] ![FreeVar] ![DynamicPtr] !*CollectState -> (!BoundVar, ![FreeVar],![DynamicPtr],!*CollectState)
+collectUpdateVar var=:{var_ident,var_info_ptr,var_expr_ptr} update_selectors free_vars dynamics cos=:{cos_var_heap}
+	# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
+	= case var_info of
+		VI_Count count is_global
+			| count > 0 || is_global
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos_var_heap })
+				-> (var, [{fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics,
+							{ cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdate 1 update_selectors) cos_var_heap })
+		VI_Alias alias
+			# (original, free_vars, dynamics, cos) = collectUpdateVar alias update_selectors free_vars dynamics { cos & cos_var_heap = cos_var_heap }
+			-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
+		VI_RefFromTupleSel0 count
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+		VI_RefFromArrayUpdate count selectors
+			| same_selections selectors update_selectors
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdate (inc count) update_selectors) cos_var_heap })
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
+		VI_RefFromArrayUpdateToTupleSelector2 count selectors array_var_info_ptr
+			# cos_var_heap = remove_VI_RefFromArrayUpdateOfTupleElem2 array_var_info_ptr cos_var_heap
+			# cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })			
+		VI_RefFromArrayUpdateOfTupleElem2 count _
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+
+collectUpdateTupleSelect2Var :: !BoundVar ![Selection] ![FreeVar] ![DynamicPtr] !*CollectState -> (!BoundVar, ![FreeVar],![DynamicPtr],!*CollectState)
+collectUpdateTupleSelect2Var var=:{var_ident,var_info_ptr,var_expr_ptr} update_selectors free_vars dynamics cos=:{cos_var_heap}
+	# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
+	= case var_info of
+		VI_Count count is_global
+			| count > 0 || is_global
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos_var_heap })
+				-> (var, [{fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics,
+							{ cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 1 update_selectors) cos_var_heap })
+		VI_Alias alias
+			# (original, free_vars, dynamics, cos) = collectUpdateTupleSelect2Var alias update_selectors free_vars dynamics { cos & cos_var_heap = cos_var_heap }
+			-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
+		VI_RefFromTupleSel0 count
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 (inc count) update_selectors) cos_var_heap })
+		VI_RefFromArrayUpdate count _
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
+		VI_RefFromArrayUpdateToTupleSelector2 count selectors array_var_info_ptr
+			# cos_var_heap = remove_VI_RefFromArrayUpdateOfTupleElem2 array_var_info_ptr cos_var_heap
+			# cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap			
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })			
+		VI_RefFromArrayUpdateOfTupleElem2 count selectors
+			| same_selections selectors update_selectors
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 (inc count) update_selectors) cos_var_heap })
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
+
+collectUpdateVarTupleSelect2Var :: !BoundVar !VarInfoPtr !Int ![Selection] ![FreeVar] ![DynamicPtr] !*CollectState -> (!BoundVar, ![FreeVar],![DynamicPtr],!*CollectState)
+collectUpdateVarTupleSelect2Var var=:{var_ident,var_info_ptr,var_expr_ptr} array_var_info_ptr count update_selectors free_vars dynamics cos=:{cos_var_heap}
+	# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
+	= case var_info of
+		VI_Count count is_global
+			| count > 0 || is_global
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos_var_heap })
+				# cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 1 update_selectors) cos_var_heap
+				# cos_var_heap = writePtr array_var_info_ptr (VI_RefFromArrayUpdateToTupleSelector2 count update_selectors var_info_ptr) cos_var_heap
+				# cos = { cos & cos_var_heap = cos_var_heap}
+				-> (var, [{fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars ], dynamics, cos)
+		VI_Alias alias
+			# (original, free_vars, dynamics, cos) = collectUpdateVarTupleSelect2Var alias array_var_info_ptr count update_selectors free_vars dynamics { cos & cos_var_heap = cos_var_heap }
+			-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
+		VI_RefFromTupleSel0 count
+			# cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 (inc count) update_selectors) cos_var_heap
+			# cos_var_heap = writePtr array_var_info_ptr (VI_RefFromArrayUpdateToTupleSelector2 count update_selectors var_info_ptr) cos_var_heap
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap})
+		VI_RefFromArrayUpdate count _
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
+		VI_RefFromArrayUpdateToTupleSelector2 count selectors array_var_info_ptr
+			# cos_var_heap = remove_VI_RefFromArrayUpdateOfTupleElem2 array_var_info_ptr cos_var_heap
+			# cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
+		VI_RefFromArrayUpdateOfTupleElem2 count selectors
+			| same_selections selectors update_selectors
+				# cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdateOfTupleElem2 (inc count) update_selectors) cos_var_heap
+				# cos_var_heap = writePtr array_var_info_ptr (VI_RefFromArrayUpdateToTupleSelector2 count update_selectors var_info_ptr) cos_var_heap
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap})
+				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
+
+same_selections [ArraySelection array_select1 _ index_expr1:selections1] [ArraySelection array_select2 _ index_expr2:selections2]
+	= equal_index index_expr1 index_expr2 && same_selections selections1 selections2
+where
+	equal_index (Var {var_info_ptr=var_info_ptr1}) (Var {var_info_ptr=var_info_ptr2})
+		= var_info_ptr1==var_info_ptr2
+	equal_index (BasicExpr (BVInt i1)) (BasicExpr (BVInt i2))
+		= i1==i2
+	equal_index _ _
+		= False
+same_selections [RecordSelection {glob_module=m1,glob_object={ds_index=i1}} f1:selections1] [RecordSelection {glob_module=m2,glob_object={ds_index=i2}} f2:selections2]
+	= f1==f2 && m1==m2 && i1==i2 && same_selections selections1 selections2
+same_selections [] []
+	= True
+same_selections selections update_selections
+	= False
 
 instance <<< (Ptr a)
 where

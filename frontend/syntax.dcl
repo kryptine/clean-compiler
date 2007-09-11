@@ -558,7 +558,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 ::	TypeDefInfos :== {# .{# TypeDefInfo}}
 
 ::	FunType =
-	{	ft_ident			:: !Ident
+	{	ft_ident		:: !Ident
 	,	ft_arity		:: !Int
 	,	ft_priority		:: !Priority
 	,	ft_type			:: !SymbolType
@@ -685,9 +685,14 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
+				VI_Ref !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
+				VI_RefFromTupleSel0 !Int |
+				VI_RefFromArrayUpdate !Int ![Selection] |
+				VI_RefFromArrayUpdateToTupleSelector2 !Int ![Selection] !VarInfoPtr |
+				VI_RefFromArrayUpdateOfTupleElem2 !Int ![Selection] |
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
