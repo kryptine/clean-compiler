@@ -3352,7 +3352,7 @@ wantRecordOrArrayExp is_pattern pState
 	| is_pattern
 		# (token, pState) = nextToken FunctionContext pState
 		| token == SquareOpenToken
-			# (elems, pState) =  want_array_assignments cIsAPattern pState
+			# (elems, pState) =  want_array_assignments pState
 			= (PE_ArrayPattern elems, wantToken FunctionContext "array selections in pattern" CurlyCloseToken pState)
 		| token == CurlyCloseToken
 			= (PE_Empty, parseError "record or array pattern" No "Array denotation not" pState)
@@ -3746,19 +3746,19 @@ where
 	want_record_or_array_update token expr pState
 		= want_update NoRecordName expr token pState
 
-	want_array_assignments is_pattern pState
-		# (assign, pState) = want_array_assignment is_pattern pState
+	want_array_assignments pState
+		# (assign, pState) = want_array_assignment pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
 			# pState = wantToken FunctionContext "array assignments" SquareOpenToken pState
-			  (assigns, pState) = want_array_assignments is_pattern pState 
+			  (assigns, pState) = want_array_assignments pState 
 			= ([ assign : assigns ], pState)
 			= ([ assign ], tokenBack pState)
 	where
 		want_array_assignment is_pattern pState
 			# (index_exprs, pState) = want_index_exprs pState
 			  pState = wantToken FunctionContext "array assignment" EqualToken pState
-			  (pattern_exp, pState) = wantExpression is_pattern pState
+			  (pattern_exp, pState) = wantExpression cIsAPattern pState
 			= ({bind_dst = index_exprs, bind_src = pattern_exp}, pState)
 
 		want_index_exprs pState
