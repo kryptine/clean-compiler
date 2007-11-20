@@ -69,6 +69,8 @@ where
 		check_attr_of_type_var TA_Unique (TV var) error
 			// the case "TA_Var" is catched by check_type_attribute
 			= checkError var "uniqueness attribute not allowed" error
+		check_attr_of_type_var TA_Anonymous (CV tv :@: types) error
+			= checkError tv "attribute variable not allowed" error
 		check_attr_of_type_var attr _ error
 			= error
 
@@ -704,12 +706,10 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = arg_type --> result_typ
 	  (result_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None result_type cot_state
 	  (new_attr, oti, cs) = newAttribute dem_attr "-->" at_attribute oti cs
 	= ({ type & at_type = arg_type --> result_type, at_attribute = new_attr }, (ots, oti, cs))
-//AA..
 checkOpenAType mod_index scope dem_attr type=:{at_type = TArrow1 arg_type, at_attribute} cot_state
 	# (arg_type, (ots, oti, cs)) = checkOpenAType mod_index scope DAK_None arg_type cot_state
 	  (new_attr, oti, cs) = newAttribute dem_attr "TArrow1" at_attribute oti cs
 	= ({ type & at_type = TArrow1 arg_type, at_attribute = new_attr }, (ots, oti, cs))
-//..AA
 /*
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, _, (oti, cs)) = checkTypeVar scope DAK_None tv TA_Multi (oti, cs)
