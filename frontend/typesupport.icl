@@ -303,9 +303,9 @@ existentialError err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< "existential type variable appears in the derived type specification\n" }
 
-liftedError var err
+liftedError type_var err
 	# err = errorHeading "Type error" err
-	= { err & ea_file = err.ea_file <<< "type variable of type of lifted argument " <<< var <<< " appears in the specified type\n" }
+	= { err & ea_file = err.ea_file <<< "type variable " <<< type_var <<< " of type of lifted argument appears in the specified type\n" }
 
 startRuleError mess err
 	# err = errorHeading "Type error" err
