@@ -434,7 +434,6 @@ notContextDependent token
 	SquareCloseToken	-> True
 	SemicolonToken		-> True
 	CommaToken			-> True
-	ExclamationToken	-> True
 	ClassToken			-> True
 	InstanceToken		-> True
 	OtherwiseToken		-> True
