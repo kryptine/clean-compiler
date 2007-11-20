@@ -3755,7 +3755,7 @@ where
 			= ([ assign : assigns ], pState)
 			= ([ assign ], tokenBack pState)
 	where
-		want_array_assignment is_pattern pState
+		want_array_assignment pState
 			# (index_exprs, pState) = want_index_exprs pState
 			  pState = wantToken FunctionContext "array assignment" EqualToken pState
 			  (pattern_exp, pState) = wantExpression cIsAPattern pState
