@@ -1909,11 +1909,9 @@ where
 		| fun_index < size dcl_functions
 			#! (symbol_type, heaps) = fresh_symbol_type symbol_type heaps			
 			#! (fun, dcl_functions) = dcl_functions ! [fun_index]
-			#! fun = 
-				{ fun 
-				& ft_ident = genericIdentToFunIdent gc_ident gc_type_cons
-				, ft_type = symbol_type
-				}
+			#! fun = { fun	& ft_ident = genericIdentToFunIdent gc_ident gc_type_cons
+							, ft_type = symbol_type
+							, ft_arity = symbol_type.st_arity }
 			#! dcl_functions = { dcl_functions & [fun_index] = fun}
 			= (dcl_functions, heaps)
 				//---> ("update dcl function", fun.ft_ident, fun_index, symbol_type)  
