@@ -771,13 +771,18 @@ where
 				-> 	has_observing_type subst_type type_def_infos subst
 	has_observing_type (TA {type_index = {glob_object,glob_module}} type_args) type_def_infos subst
 		# {tdi_properties} = type_def_infos.[glob_module].[glob_object]
-		= foldSt (\ {at_type} ok -> ok && has_observing_type at_type type_def_infos subst) type_args (tdi_properties bitand cIsHyperStrict <> 0)
+		= tdi_properties bitand cIsHyperStrict <> 0 && args_have_observing_type type_args type_def_infos subst
 	has_observing_type (TAS {type_index = {glob_object,glob_module}} type_args _) type_def_infos subst
 		# {tdi_properties} = type_def_infos.[glob_module].[glob_object]
-		= foldSt (\ {at_type} ok -> ok && has_observing_type at_type type_def_infos subst) type_args (tdi_properties bitand cIsHyperStrict <> 0)
+		= tdi_properties bitand cIsHyperStrict <> 0 && args_have_observing_type type_args type_def_infos subst
 	has_observing_type type type_def_infos subst
 		= False
-					
+
+	args_have_observing_type [{at_type}:type_args] type_def_infos subst
+		= has_observing_type at_type type_def_infos subst && args_have_observing_type type_args type_def_infos subst
+	args_have_observing_type [] type_def_infos subst
+		= True
+
 instance <<< ReferenceCount
 where
 	(<<<) file RC_Unused = file
