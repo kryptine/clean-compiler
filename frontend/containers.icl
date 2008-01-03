@@ -351,6 +351,25 @@ first_n_are_strict n (StrictList s l)
 		# m=(1<<n)-1
 		= s bitand m==m
 
+remove_first_n :: !Int !StrictnessList -> StrictnessList
+remove_first_n 0 s
+	= s
+remove_first_n _ NotStrict
+	= NotStrict
+remove_first_n n (Strict s)
+	| n<32
+		= Strict (((s>>1) bitand 0x7fffffff)>>(n-1))
+		= NotStrict
+remove_first_n n (StrictList s l)
+	| n<32
+		# s2=case l of
+				Strict s -> s
+				StrictList s _ -> s
+				NotStrict -> 0
+		# s=(((s>>1) bitand 0x7fffffff)>>(n-1)) bitor (s2<<(32-n))
+		= StrictList s (remove_first_n n l)
+		= remove_first_n (n-32) l
+
 screw :== 80
 
 :: IntKey :== Int
