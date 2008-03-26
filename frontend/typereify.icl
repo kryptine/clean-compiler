@@ -67,6 +67,8 @@ instance isTypeSynonym TypeRhs where
 		=	False
 	isTypeSynonym (AbstractSynType _ _)
 		=	False
+	isTypeSynonym (NewType _)
+		=	False
 
 add_dcl_type_fun_types :: TypeSymbIdent Int *{#DclModule} *VarHeap *SymbolTable
 							-> (*{#DclModule}, *VarHeap, *SymbolTable)
