@@ -263,7 +263,6 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					break;
 				case ArrayState:
 					GenBuildArray (asp-source_a_index);
-					++asp;
 			}
 			GenUpdatePopA (0,asp);
 			GenPopB (bsp);
@@ -626,7 +625,7 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 
 			asp+=result_a_size-a_size;
 			bsp+=result_b_size-b_size;
-			
+
 			RedirectResultAndReturn (asp,bsp,asp,bsp,root->node_state,resultstate,result_a_size,result_b_size);
 		} else
 			GenJmpAp (n_apply_args);
