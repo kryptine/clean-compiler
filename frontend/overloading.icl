@@ -1106,8 +1106,8 @@ where
 			# (fun_def, fun_defs) = fun_defs![fun_index]  
 			  (CheckedType st=:{st_context}, fun_env) = fun_env![fun_index]
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
-			  (rev_variables, var_heap) = foldSt determine_class_argument st_context ([], var_heap)
 			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
+			  (rev_variables,var_heap,error) = foldSt determine_class_argument st_context ([],var_heap,error)
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			 
@@ -1134,7 +1134,7 @@ where
 				mark_type_codes _ info
 					=	info
 
-	determine_class_argument {tc_class, tc_var} (variables, var_heap)
+	determine_class_argument {tc_class, tc_var} (variables,var_heap,error)
 		# (var_info, var_heap) = readPtr tc_var var_heap
 		= case var_info of 
 			VI_ForwardClassVar var_info_ptr
@@ -1142,14 +1142,17 @@ where
 				-> case var_info of
 					VI_Empty
 						# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-						-> ([var_info_ptr : variables], var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0))
+						-> ([var_info_ptr : variables],var_heap <:= (var_info_ptr, VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0),error)
+					VI_ClassVar _ _ _
+						# error = errorHeading "Overloading error" error
+						  error = {error & ea_file = error.ea_file <<< " a type context occurs multiple times in the specified type\n" }
+						-> ([var_info_ptr : variables],var_heap,error)
 					_
 						-> abort ("determine_class_argument 1 (overloading.icl)")  //<<- var_info)
 
 			VI_Empty
 				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
-				  var_heap	= var_heap
-				-> ([tc_var : variables], var_heap <:= (tc_var, VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0))
+				-> ([tc_var : variables],var_heap <:= (tc_var, VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0),error)
 			_
 				-> abort ("determine_class_argument 2 (overloading.icl)") // <<- var_info)
 
