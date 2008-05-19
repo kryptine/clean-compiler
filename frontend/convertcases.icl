@@ -1295,26 +1295,47 @@ is_guard_case [{bp_value=BVB False,bp_expr},{bp_value=BVB True,bp_expr=true_expr
 	= is_then_or_else bp_expr && is_then_or_else true_expr
 is_guard_case [{bp_value=BVB False,bp_expr}:patterns] case_default False case_expr
 	= then_part_exists_and_has_no_rooted_case patterns case_default
-	where
-		then_part_exists_and_has_no_rooted_case [ alt=:{bp_value=BVB sign_of_alt,bp_expr} : alts ] case_default
-			| sign_of_alt
-				= has_no_rooted_case bp_expr
-				= then_part_exists_and_has_no_rooted_case alts case_default
-		then_part_exists_and_has_no_rooted_case [ ] No
-			= False
-		then_part_exists_and_has_no_rooted_case [ ] (Yes then_expr)
-			= False // only when the first alt cannot fail use: has_no_rooted_case then_expr
 is_guard_case _ _ _ _
 	= False
 
 has_no_rooted_case (Case {case_guards=BasicPatterns BT_Bool patterns, case_default,case_explicit,case_expr})
-	= is_guard_case patterns case_default case_explicit case_expr
+	= is_nested_guard_case patterns case_default case_explicit case_expr
 has_no_rooted_case (Case {case_explicit})
 	= case_explicit
 has_no_rooted_case (Let {let_expr})
 	= has_no_rooted_case let_expr
 has_no_rooted_case _
 	= True
+
+then_part_exists_and_has_no_rooted_case [ alt=:{bp_value=BVB sign_of_alt,bp_expr} : alts ] case_default
+	| sign_of_alt
+		= has_no_rooted_case bp_expr
+		= then_part_exists_and_has_no_rooted_case alts case_default
+then_part_exists_and_has_no_rooted_case [ ] No
+	= False
+then_part_exists_and_has_no_rooted_case [ ] (Yes then_expr)
+	= False // only when the first alt cannot fail use: has_no_rooted_case then_expr
+
+is_nested_guard_case [{bp_value=BVB True,bp_expr},{bp_value=BVB False,bp_expr=false_expr}] (Yes _) False case_expr
+	= is_then_or_else bp_expr && is_then_or_else false_expr
+is_nested_guard_case [{bp_value=BVB True,bp_expr},{bp_value=BVB False,bp_expr=else_expr}] No True case_expr
+	= boolean_case_is_if case_expr bp_expr else_expr
+
+is_nested_guard_case [{bp_value=BVB True,bp_expr}] case_default False case_expr
+	= has_no_rooted_case bp_expr && case case_default of Yes _ -> True; No-> False
+is_nested_guard_case [{bp_value=BVB True,bp_expr=then_expr},{bp_value=BVB False,bp_expr=else_expr}] No False case_expr
+	= has_no_rooted_case then_expr && has_no_rooted_case else_expr 
+is_nested_guard_case [{bp_value=BVB True,bp_expr}:patterns] case_default False case_expr
+	= has_no_rooted_case bp_expr && is_nested_guard_case patterns case_default False case_expr 
+
+is_nested_guard_case [{bp_value=BVB True,bp_expr=then_expr}] (Yes else_expr) True case_expr
+	= boolean_case_is_if case_expr then_expr else_expr
+is_nested_guard_case [{bp_value=BVB False,bp_expr},{bp_value=BVB True,bp_expr=true_expr}] (Yes _) False case_expr
+	= is_then_or_else bp_expr && is_then_or_else true_expr
+is_nested_guard_case [{bp_value=BVB False,bp_expr}:patterns] case_default False case_expr
+	= then_part_exists_and_has_no_rooted_case patterns case_default
+is_nested_guard_case _ _ _ _
+	= False
 
 is_then_or_else (Case {case_expr,case_guards,case_default})
 	= is_if_case case_expr case_guards case_default
