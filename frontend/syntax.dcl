@@ -391,9 +391,7 @@ cNameLocationDependent :== True
 
 :: GenericInfo = 
 	{	gen_classes		:: !GenericClassInfos
-	,	gen_cases		:: ![GlobalIndex] 
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
-	, 	gen_star_case	:: !GlobalIndex 	// general case for kind-star types
 	}
 :: GenericInfoPtr :== Ptr GenericInfo	
 :: GenericHeap :== Heap GenericInfo

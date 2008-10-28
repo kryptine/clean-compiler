@@ -61,9 +61,7 @@ where
 	alloc_gen_info gen_def heaps=:{hp_generic_heap}
 		# initial_info = 
 			{ gen_classes = createArray 32 []
-			, gen_cases = []
 			, gen_var_kinds = []
-			, gen_star_case = {gi_module=NoIndex, gi_index=NoIndex}
 			}
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
@@ -211,12 +209,6 @@ where
 			, gc_type_cons = gc_type_cons
 			}
 		#! gen_case_defs = { gen_case_defs & [index] = case_def }
-				
-		#! (generic_def, generic_defs, modules) = get_generic_def generic_gi mod_index generic_defs modules
-		#! gindex = {gi_module=mod_index,gi_index=index}
-		#! heaps = add_case_to_generic generic_def gindex heaps 		
-	
-		#! (heaps, cs) = check_star_case gc_type_cons generic_def gindex heaps cs 
 			
 		#! (cs=:{cs_x}) = popErrorAdmin cs	
 		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
@@ -269,32 +261,6 @@ where
 			_	->	//abort "--------------" ---> ("STE_Kind", ste.ste_kind)			
 					( {gi_module=NoIndex,gi_index = NoIndex}
 					, {cs & cs_error = checkError id_name "generic undefined" cs.cs_error})
-
-	get_generic_def :: !GlobalIndex !Int !u:{#GenericDef} !v:{#DclModule} -> (!GenericDef,!u:{#GenericDef},!v:{#DclModule})
-	get_generic_def {gi_module, gi_index} mod_index generic_defs modules
-		| gi_module == mod_index
-			# (generic_def, generic_defs) = generic_defs![gi_index]
-			= (generic_def, generic_defs, modules)
-			# (dcl_mod, modules) = modules![gi_module]
-			= (dcl_mod.dcl_common.com_generic_defs.[gi_index], generic_defs, modules)
-
-	add_case_to_generic :: !GenericDef !GlobalIndex !*Heaps -> *Heaps
-	add_case_to_generic {gen_info_ptr} index heaps=:{hp_generic_heap} 
-		# (info=:{gen_cases}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
-		# info = { info & gen_cases = [index:gen_cases]}
-		= { heaps & hp_generic_heap = writePtr gen_info_ptr info hp_generic_heap} 
-								
-	check_star_case :: !TypeCons !GenericDef !GlobalIndex !*Heaps !*CheckState -> (!*Heaps, !*CheckState)
-	check_star_case (TypeConsVar _) {gen_ident, gen_info_ptr} index heaps=:{hp_generic_heap} cs=:{cs_error} 
-		# (info=:{gen_star_case}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
-		| gen_star_case.gi_module <> NoIndex
-			# cs_error = checkError gen_ident "general kind-* case is already defined" cs_error 
-			= ({ heaps & hp_generic_heap = hp_generic_heap}, {cs & cs_error = cs_error})   
-			# info = { info & gen_star_case = index }
-			# hp_generic_heap = writePtr gen_info_ptr info hp_generic_heap	
-			= ({ heaps & hp_generic_heap = hp_generic_heap}, {cs & cs_error = cs_error}) 
-	check_star_case _ _ _ heaps cs 
-		= (heaps, cs)
 				
 checkTypeClasses :: !Index !(Optional (CopiedDefinitions, Int)) !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*Heaps, !*CheckState)

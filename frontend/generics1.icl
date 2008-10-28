@@ -224,11 +224,7 @@ where
 			
 	clear_generic_def _ generic_def=:{gen_ident,gen_info_ptr} heaps=:{hp_generic_heap}
 		#! (gen_info, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
-		#! gen_info = 
-			{ gen_info 
-			& gen_cases = []
-			, gen_classes = createArray 32 []
-			}	
+		#! gen_info = { gen_info & gen_classes = createArray 32 [] }
 		#! hp_generic_heap = writePtr gen_info_ptr gen_info hp_generic_heap
 		= (generic_def, {heaps & hp_generic_heap = hp_generic_heap})
 		
