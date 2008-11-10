@@ -101,13 +101,13 @@ predefined_idents
 					[PD_Dyn_DynamicTemp] = i DynamicRepresentation_String,
 
 					[PD_Dyn_TypeCode] = i "TypeCode",
+					[PD_Dyn_UnificationEnvironment] = i "_UnificationEnvironment",
 					[PD_Dyn_TypeScheme] = i "TypeScheme",
 					[PD_Dyn_TypeApp] = i "TypeApp",
 					[PD_Dyn_TypeVar] = i "TypeVar",
 					[PD_Dyn_TypeCons] = i "TypeCons",
 					[PD_Dyn_TypeUnique] = i "TypeUnique",
 					[PD_Dyn__TypeFixedVar] = i "_TypeFixedVar",
-					[PD_Dyn_UnificationEnvironment] = i "_UnificationEnvironment",
 					[PD_Dyn_initial_unification_environment] = i "_initial_unification_environment",
 					[PD_Dyn_bind_global_type_pattern_var] = i "_bind_global_type_pattern_var",
 					[PD_Dyn_unify] = i "_unify",
@@ -260,6 +260,13 @@ init_identifiers heap world
 					= (heap,world)
 	= (heap,world)
 
+put_predefined_idents_in_hash_table :: !Int !Int !IdentClass !{!Ident} !*HashTable -> *HashTable
+put_predefined_idents_in_hash_table index last_index table_kind local_predefined_idents hash_table
+	| index<=last_index
+		# hash_table = putPredefinedIdentInHashTable predefined_idents.[index] table_kind hash_table
+		= put_predefined_idents_in_hash_table (index+1) last_index table_kind local_predefined_idents hash_table
+		= hash_table
+
 buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
 buildPredefinedSymbols hash_table=:{hte_symbol_heap}
 	# predef_symbol_table = createArray PD_NrOfPredefSymbols { pds_module = NoIndex, pds_def = NoIndex }
@@ -314,18 +321,7 @@ where
 					<<- (local_predefined_idents, IC_Expression, PD_UnqArraySizeFun)
 
 					<<- (local_predefined_idents, IC_Module, PD_StdStrictLists)
-					<<- (local_predefined_idents, IC_Expression, PD_cons)
-					<<- (local_predefined_idents, IC_Expression, PD_decons)
-					<<- (local_predefined_idents, IC_Expression, PD_nil)
-
-					<<- (local_predefined_idents, IC_Expression, PD_cons_u)
-					<<- (local_predefined_idents, IC_Expression, PD_decons_u)
-					<<- (local_predefined_idents, IC_Expression, PD_nil_u)
-
-					<<- (local_predefined_idents, IC_Expression, PD_cons_uts)
-					<<- (local_predefined_idents, IC_Expression, PD_decons_uts)
-					<<- (local_predefined_idents, IC_Expression, PD_nil_uts)
-
+		# hash_table = put_predefined_idents_in_hash_table PD_cons PD_nil_uts IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents, IC_Class, PD_ListClass)
 					<<- (local_predefined_idents, IC_Class, PD_UListClass)
 					<<- (local_predefined_idents, IC_Class, PD_UTSListClass)
@@ -341,135 +337,44 @@ where
 					<<- (local_predefined_idents, IC_Expression, PD_FromThenTo)
 					
 					<<- (local_predefined_idents,	IC_Class, PD_TypeCodeClass)
+
 					<<- (local_predefined_idents,	IC_Module, PD_StdDynamic)
 
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_DynamicTemp)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_TypeCode)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeScheme)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeApp)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeVar)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCons)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeUnique)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn__TypeFixedVar)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_UnificationEnvironment)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_unify)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_initial_unification_environment)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_normalise)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_bind_global_type_pattern_var)
-
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorInt)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorChar)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorReal)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorBool)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorDynamic)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorFile)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructorWorld)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_Arrow)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_List)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictList)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedList)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_TailStrictList)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictTailStrictList)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_Tuple)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_LazyArray)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_StrictArray)
-					<<- (local_predefined_idents,	IC_Expression, PD_Dyn_TypeCodeConstructor_UnboxedArray)
-
+		# hash_table = put_predefined_idents_in_hash_table PD_Dyn_TypeScheme PD_Dyn_TypeCodeConstructor_UnboxedArray IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn__to_TypeCodeConstructor)
 
-					<<- (local_predefined_idents,				IC_Module, 		PD_StdGeneric)
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeBimap)
-					<<- (local_predefined_idents,				IC_Expression, 	PD_ConsBimap)	
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeUNIT)
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsUNIT)
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeEITHER)
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsLEFT)
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsRIGHT)
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypePAIR)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsPAIR)
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeCONS)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsCONS)
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeFIELD)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsFIELD)					
-					<<- (local_predefined_idents,				IC_Type, 		PD_TypeOBJECT)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_ConsOBJECT)
-					<<- (local_predefined_idents,				IC_Type, 		PD_GenericInfo)					
-					<<- (local_predefined_idents,				IC_Expression,	PD_NoGenericInfo)
-					<<- (local_predefined_idents,				IC_Expression,	PD_GenericConsInfo)
-					<<- (local_predefined_idents,				IC_Expression,	PD_GenericFieldInfo)
-					<<- (local_predefined_idents,				IC_Expression,	PD_GenericTypeInfo)
-					<<- (local_predefined_idents,				IC_Type,		PD_TGenericConsDescriptor)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericConsDescriptor)
-					<<- (local_predefined_idents,				IC_Type,		PD_TGenericFieldDescriptor)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericFieldDescriptor)
-					<<- (local_predefined_idents,				IC_Type,		PD_TGenericTypeDefDescriptor)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenericTypeDefDescriptor)
-					<<- (local_predefined_idents,				IC_Type,		PD_TGenConsPrio)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsNoPrio)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsPrio)
-					<<- (local_predefined_idents,				IC_Type,		PD_TGenConsAssoc)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsAssocNone)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsAssocLeft)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenConsAssocRight)
-					<<- (local_predefined_idents,				IC_Type,		PD_TGenType)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeCons)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeVar)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeArrow)
-					<<- (local_predefined_idents,				IC_Expression,	PD_CGenTypeApp)
-											
-					<<- (local_predefined_idents,				IC_Generic,		PD_GenericBimap)	
-					<<- (local_predefined_idents,				IC_Expression,	PD_bimapId)
-					<<- (local_predefined_idents,				IC_Type,		PD_TypeGenericDict)
-									
-					<<- (local_predefined_idents,				IC_Module, 		PD_StdMisc)
-					<<- (local_predefined_idents,				IC_Expression, 	PD_abort)
-					<<- (local_predefined_idents,				IC_Expression, 	PD_undef)					
-					
-					<<- (local_predefined_idents,				IC_Module, PD_CleanTypes)
-					<<- (local_predefined_idents,				IC_Type, PD_CTTypeDef)
-					<<- (local_predefined_idents,				IC_Expression, PD_CTAlgType)
-					<<- (local_predefined_idents,				IC_Expression, PD_CTRecordType)
-					<<- (local_predefined_idents,				IC_Expression, PD_CTSynType)
-					<<- (local_predefined_idents,				IC_Expression, PD_CTPredefined)
-					<<- (local_predefined_idents,				IC_Type, PD_CTConsDef)
-					<<- (local_predefined_idents,				IC_Expression, PD__CTToCons)
-					<<- (local_predefined_idents,				IC_Type, PD_CTFieldDef)
-
-					<<- (local_predefined_idents,				IC_Expression, PD_Start)
-
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromSTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromU)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromUTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromO)
-
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenSTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenU)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenUTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenO)
-
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToSTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToU)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToUTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromToO)
-
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToSTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToU)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToUTS)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_FromThenToO)
-
+					<<- (local_predefined_idents,	IC_Module, 		PD_StdGeneric)
+		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict IC_Type local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
+					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)	
 		# bimap_type = local_predefined_idents.[PD_TypeBimap]
 		# hash_table = hash_table 
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_from)
+									
+					<<- (local_predefined_idents,	IC_Module, 		PD_StdMisc)
+
+					<<- (local_predefined_idents,	IC_Expression, 	PD_abort)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_undef)					
+					
+					<<- (local_predefined_idents,	IC_Module, PD_CleanTypes)
+
+					<<- (local_predefined_idents,	IC_Type, PD_CTTypeDef)
+					<<- (local_predefined_idents,	IC_Expression, PD_CTAlgType)
+					<<- (local_predefined_idents,	IC_Expression, PD_CTRecordType)
+					<<- (local_predefined_idents,	IC_Expression, PD_CTSynType)
+					<<- (local_predefined_idents,	IC_Expression, PD_CTPredefined)
+					<<- (local_predefined_idents,	IC_Type, PD_CTConsDef)
+					<<- (local_predefined_idents,	IC_Expression, PD__CTToCons)
+					<<- (local_predefined_idents,	IC_Type, PD_CTFieldDef)
+
+					<<- (local_predefined_idents,	IC_Expression, PD_Start)
+
+		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
+
 		= hash_table
 
 MakeTupleConsSymbIndex arity 	:== arity - 2 + (PD_Arity2TupleSymbol-FirstConstructorPredefinedSymbolIndex)

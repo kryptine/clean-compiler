@@ -9,6 +9,14 @@ import syntax, hashtable
 		pds_def		:: !Index
 	}
 
+init_identifiers :: !*SymbolTable !*World -> (!*SymbolTable,!*World)
+
+predefined_idents :: {!Ident}
+
+buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
+
+buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
+
 cPredefinedModuleIndex :== 1
 
 PD_StringTypeIndex :== 0
@@ -135,22 +143,24 @@ PD_TypeCodeClass			:== 161
 // dynamic module
 PD_StdDynamic				:== 162
 // dynamic type
-PD_Dyn_DynamicTemp			:== 163
-// type code
-PD_Dyn_TypeCode				:== 164
-PD_Dyn_TypeScheme			:== 165
-PD_Dyn_TypeApp				:== 166
-PD_Dyn_TypeVar				:== 167
-PD_Dyn_TypeCons				:== 168
-PD_Dyn_TypeUnique			:== 169
-PD_Dyn__TypeFixedVar		:== 170
-// unification
-PD_Dyn_UnificationEnvironment			:== 171
+PD_Dyn_DynamicTemp				:== 163
+// type code (type)
+PD_Dyn_TypeCode					:== 164
+// unification (type)
+PD_Dyn_UnificationEnvironment	:== 165
+// type code (expressions)
+PD_Dyn_TypeScheme			:== 166
+PD_Dyn_TypeApp				:== 167
+PD_Dyn_TypeVar				:== 168
+PD_Dyn_TypeCons				:== 169
+PD_Dyn_TypeUnique			:== 170
+PD_Dyn__TypeFixedVar		:== 171
+// unification (expressions)
 PD_Dyn_initial_unification_environment	:== 172
 PD_Dyn_bind_global_type_pattern_var		:== 173
 PD_Dyn_unify							:== 174
 PD_Dyn_normalise						:== 175
-// predefined type code constructor
+// predefined type code constructor (expressions)
 PD_Dyn_TypeCodeConstructorInt						:==	176
 PD_Dyn_TypeCodeConstructorChar						:== 177
 PD_Dyn_TypeCodeConstructorReal						:== 178
@@ -172,53 +182,56 @@ PD_Dyn_TypeCodeConstructor_UnboxedArray				:== 193
 
 /* Generics */
 PD_StdGeneric				:== 194
-
+// Generics types
 PD_TypeBimap				:== 195
-PD_ConsBimap				:== 196
-PD_map_to					:== 197
-PD_map_from					:== 198
-PD_TypeUNIT					:== 199
-PD_ConsUNIT					:== 200
-PD_TypeEITHER				:== 201
-PD_ConsLEFT					:== 202
-PD_ConsRIGHT				:== 203
-PD_TypePAIR					:== 204
-PD_ConsPAIR					:== 205
+PD_TypeUNIT					:== 196
+PD_TypeEITHER				:== 197
+PD_TypePAIR					:== 198
 // for constructor info
-PD_TypeCONS					:== 206
-PD_ConsCONS					:== 207
-PD_TypeFIELD				:== 208
-PD_ConsFIELD				:== 209
-PD_TypeOBJECT				:== 210
-PD_ConsOBJECT				:== 211
-PD_GenericInfo				:== 212
-PD_NoGenericInfo			:== 213
-PD_GenericConsInfo			:== 214
-PD_GenericFieldInfo			:== 215
-PD_GenericTypeInfo			:== 216
-PD_TGenericConsDescriptor 	:== 217
-PD_CGenericConsDescriptor 	:== 218
-PD_TGenericFieldDescriptor 	:== 219
-PD_CGenericFieldDescriptor 	:== 220
-PD_TGenericTypeDefDescriptor :== 221
-PD_CGenericTypeDefDescriptor :== 222
-PD_TGenConsPrio				:== 223
-PD_CGenConsNoPrio			:== 224
-PD_CGenConsPrio				:== 225
-PD_TGenConsAssoc			:== 226
-PD_CGenConsAssocNone		:== 227
-PD_CGenConsAssocLeft		:== 228
-PD_CGenConsAssocRight		:== 229
-PD_TGenType					:== 230
-PD_CGenTypeCons				:== 231
-PD_CGenTypeVar				:== 232
-PD_CGenTypeArrow			:== 233
-PD_CGenTypeApp				:== 234
+PD_TypeCONS					:== 199
+PD_TypeFIELD				:== 200
+PD_TypeOBJECT				:== 201
+PD_GenericInfo				:== 202
+PD_TGenericConsDescriptor 	:== 203
+PD_TGenericFieldDescriptor 	:== 204
+PD_TGenericTypeDefDescriptor :== 205
+PD_TGenConsPrio				:== 206
+PD_TGenConsAssoc			:== 207
+PD_TGenType					:== 208
 
-PD_GenericBimap				:== 235
+PD_TypeGenericDict 			:== 209
+// Generics fields
+PD_map_to					:== 210
+PD_map_from					:== 211
+// Generics expressions
+PD_ConsBimap				:== 212
+PD_ConsUNIT					:== 213
+PD_ConsLEFT					:== 214
+PD_ConsRIGHT				:== 215
+PD_ConsPAIR					:== 216
+// for constructor info
+PD_ConsCONS					:== 217
+PD_ConsFIELD				:== 218
+PD_ConsOBJECT				:== 219
+PD_NoGenericInfo			:== 220
+PD_GenericConsInfo			:== 221
+PD_GenericFieldInfo			:== 222
+PD_GenericTypeInfo			:== 223
+PD_CGenericConsDescriptor 	:== 224
+PD_CGenericFieldDescriptor 	:== 225
+PD_CGenericTypeDefDescriptor :== 226
+PD_CGenConsNoPrio			:== 227
+PD_CGenConsPrio				:== 228
+PD_CGenConsAssocNone		:== 229
+PD_CGenConsAssocLeft		:== 230
+PD_CGenConsAssocRight		:== 231
+PD_CGenTypeCons				:== 232
+PD_CGenTypeVar				:== 233
+PD_CGenTypeArrow			:== 234
+PD_CGenTypeApp				:== 235
+
 PD_bimapId					:== 236
-
-PD_TypeGenericDict 			:== 237
+PD_GenericBimap				:== 237
 
 PD_FromS					:== 238
 PD_FromTS					:== 239
@@ -266,15 +279,6 @@ PD_NrOfPredefSymbols		:== 272
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
 
-init_identifiers :: !*SymbolTable !*World -> (!*SymbolTable,!*World)
-
-predefined_idents :: {!Ident}
-
-buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
-
-buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
-
-// MV ...
 // changes requires recompile of {static,dynamic}-linker plus all dynamics ever made
 UnderscoreSystemDynamicModule_String	:== "_SystemDynamic"	
 
@@ -285,6 +289,5 @@ PD_NilSymbol_String				:== "_Nil"
 
 // Array-type
 PD_UnboxedArray_String			:== "_#Array"
-// ... MV
 
 DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		
