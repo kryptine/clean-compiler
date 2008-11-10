@@ -3500,86 +3500,21 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_Dyn_DynamicTemp			mod_index STE_Type
 				<=< adjustPredefSymbol PD_Dyn_TypeCode				mod_index STE_Type
-				<=< adjustPredefSymbol PD_Dyn_TypeScheme 			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_TypeVar				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_TypeCons				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_TypeApp				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_TypeUnique			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn__TypeFixedVar			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_Dyn_UnificationEnvironment				mod_index STE_Type
-				<=< adjustPredefSymbol PD_Dyn_initial_unification_environment		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_bind_global_type_pattern_var	mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_unify					mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_normalise				mod_index STE_DclFunction
-
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorInt		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorChar		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorReal		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorBool		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorDynamic	mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorFile		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructorWorld		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_Arrow		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_List		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_StrictList		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_UnboxedList		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_TailStrictList		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_StrictTailStrictList		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_Tuple		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_LazyArray		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_StrictArray		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn_TypeCodeConstructor_UnboxedArray		mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn__to_TypeCodeConstructor		mod_index STE_DclFunction)
-
+				<=< adjustPredefSymbol PD_Dyn_UnificationEnvironment	mod_index STE_Type
+				<=< adjust_predef_symbols PD_Dyn_TypeScheme PD_Dyn__TypeFixedVar mod_index STE_Constructor
+				<=< adjust_predef_symbols PD_Dyn_initial_unification_environment PD_Dyn_normalise mod_index STE_DclFunction
+				<=< adjust_predef_symbols PD_Dyn_TypeCodeConstructorInt PD_Dyn_TypeCodeConstructor_UnboxedArray mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_Dyn__to_TypeCodeConstructor	mod_index STE_DclFunction)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
 		# type_bimap = predefined_idents.[PD_TypeBimap]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjustPredefSymbol PD_TypeBimap				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsBimap				mod_index STE_Constructor				
+				<=< adjust_predef_symbols PD_TypeBimap PD_TypeGenericDict mod_index STE_Type
 				<=< adjustPredefSymbol PD_map_to				mod_index (STE_Field type_bimap)
-				<=< adjustPredefSymbol PD_map_from				mod_index (STE_Field type_bimap)				
-				<=< adjustPredefSymbol PD_TypeUNIT				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsUNIT				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypePAIR				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsPAIR				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypeEITHER			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsLEFT				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_ConsRIGHT				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypeCONS				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsCONS				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypeFIELD				mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsFIELD				mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TypeOBJECT			mod_index STE_Type
-				<=< adjustPredefSymbol PD_ConsOBJECT			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_GenericInfo			mod_index STE_Type
-				<=< adjustPredefSymbol PD_NoGenericInfo			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_GenericConsInfo		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_GenericFieldInfo		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_GenericTypeInfo		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TGenericConsDescriptor mod_index STE_Type
-				<=< adjustPredefSymbol PD_CGenericConsDescriptor mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TGenericFieldDescriptor mod_index STE_Type
-				<=< adjustPredefSymbol PD_CGenericFieldDescriptor mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TGenericTypeDefDescriptor mod_index STE_Type
-				<=< adjustPredefSymbol PD_CGenericTypeDefDescriptor mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TGenConsPrio 			mod_index STE_Type
-				<=< adjustPredefSymbol PD_CGenConsNoPrio 		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_CGenConsPrio 			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TGenConsAssoc 		mod_index STE_Type
-				<=< adjustPredefSymbol PD_CGenConsAssocNone 	mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_CGenConsAssocLeft 	mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_CGenConsAssocRight 	mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_TGenType 				mod_index STE_Type
-				<=< adjustPredefSymbol PD_CGenTypeCons 			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_CGenTypeVar 			mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_CGenTypeArrow 		mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_CGenTypeApp 			mod_index STE_Constructor
-
+				<=< adjustPredefSymbol PD_map_from				mod_index (STE_Field type_bimap)
+				<=< adjust_predef_symbols PD_ConsBimap PD_CGenTypeApp mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index STE_Generic
 				<=< adjustPredefSymbol PD_bimapId				mod_index STE_DclFunction				
-				<=< adjustPredefSymbol PD_TypeGenericDict		mod_index STE_Type				
 				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
 		| pre_mod.pds_def == mod_index
