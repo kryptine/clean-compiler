@@ -3554,7 +3554,6 @@ CheckBEEnumTypes (void)
 	Assert (bool_denot					== BEBoolDenot);
 	Assert (char_denot					== BECharDenot);
 	Assert (real_denot					== BERealDenot);
-	Assert (Nr_Of_Basic_Denots			== BENrOfBasicDenots);
 	Assert (string_denot				== BEStringDenot);
 	Assert (fun_type					== BEFunType);
 	Assert (array_type					== BEArrayType);
