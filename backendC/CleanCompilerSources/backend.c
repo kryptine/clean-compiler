@@ -3269,6 +3269,8 @@ AddExtension (char *name)
 File rules_file;
 #endif
 
+struct clean_string_128 { size_t length; char chars[128]; } clean_error_string;
+
 int
 BEGenerateCode (CleanString outputFile)
 {
@@ -3276,8 +3278,17 @@ BEGenerateCode (CleanString outputFile)
 	ImpRule	rule;
 	Bool	hadExtension;
 
+	clean_error_string.length=0;
+
 	if (CompilerError)
 		return False;
+
+	if (setjmp (ExitEnv)!=0){
+		ExitEnv_valid=0;
+		return False;
+	}
+
+	ExitEnv_valid=1;	
 
 	// RemoveSpecialArrayFunctionsFromSymbolList (&gBEState.be_icl.beicl_module->im_symbols);
 
@@ -3324,8 +3335,15 @@ BEGenerateCode (CleanString outputFile)
 	fclose (rules_file);
 #endif
 
+	ExitEnv_valid=0;
+
 	return (!CompilerError);
 } /* BEGenerateCode */
+
+CleanString BEGetError (void)
+{
+	return (CleanString)&clean_error_string;
+}
 
 void
 BEExportType (int isDictionary, int typeIndex)
@@ -3689,6 +3707,8 @@ BackEnd
 BEInit (int argc)
 {
 	Assert (!gBEState.be_initialised);
+
+	ExitEnv_valid=0;
 
 	CurrentPhase	= "Back End";
 	CurrentModule	= "<unknown module>";
