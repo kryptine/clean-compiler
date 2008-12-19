@@ -587,6 +587,22 @@ BEBindSpecialFunction (BESpecialIdentIndex index, int functionIndex, int moduleI
 		*gSpecialIdents [index]	= functionSymbol->symb_def->sdef_ident;
 } /* BEBindSpecialFunction */
 
+extern SymbDefP special_types[]; /* defined in statesgen */
+
+void BEBindSpecialType (int special_type_n,int type_index,int module_index)
+{
+	SymbolP		type_symbol_p;
+	BEModuleP	module;
+
+	module	= &gBEState.be_modules [module_index];
+	type_symbol_p = module->bem_types [type_index];
+
+	if (type_symbol_p->symb_kind==definition)
+		special_types[special_type_n] = type_symbol_p->symb_def;
+	else
+		special_types[special_type_n] = NULL;
+}
+
 BESymbolP
 BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
 {
@@ -1964,6 +1980,29 @@ BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNode
 
 	return (caseNode);
 } /* BECaseNode */
+
+BENodeP BEOverloadedCaseNode (BENodeP case_node,BENodeP equal_node,BENodeP from_integer_node)
+{
+	NodeP overloaded_case_node;
+	ArgP equal_arg,from_integer_arg;
+	
+	overloaded_case_node = ConvertAllocType (NodeS);
+	overloaded_case_node->node_kind = OverloadedCaseNode;
+
+	overloaded_case_node->node_node = case_node;
+
+	equal_arg = ConvertAllocType (ArgS);
+	equal_arg->arg_node = equal_node;
+
+	from_integer_arg = ConvertAllocType (ArgS);
+	from_integer_arg->arg_node = from_integer_node;
+
+	from_integer_arg->arg_next = NULL;
+	equal_arg->arg_next = from_integer_arg;
+	overloaded_case_node->node_arguments = equal_arg;
+
+	return overloaded_case_node;
+}
 
 BENodeP
 BEDefaultNode (BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node)
@@ -3568,10 +3607,12 @@ CheckBEEnumTypes (void)
 	Assert (procid_type					== BEProcIdType);
 	Assert (redid_type					== BERedIdType);
 	Assert (Nr_Of_Basic_Types			== BENrOfBasicTypes);
+	Assert (rational_denot				== BERationalDenot);
 	Assert (int_denot					== BEIntDenot);
 	Assert (bool_denot					== BEBoolDenot);
 	Assert (char_denot					== BECharDenot);
 	Assert (real_denot					== BERealDenot);
+	Assert (integer_denot				== BEIntegerDenot);
 	Assert (string_denot				== BEStringDenot);
 	Assert (fun_type					== BEFunType);
 	Assert (array_type					== BEArrayType);
@@ -3782,6 +3823,9 @@ BEInit (int argc)
 	gBEState.be_initialised	= True;
 
 	im_def_module = NULL;
+
+	special_types[0]=NULL;
+	special_types[1]=NULL;
 
 	return ((BackEnd) &gBEState);
 } /* BEInit */

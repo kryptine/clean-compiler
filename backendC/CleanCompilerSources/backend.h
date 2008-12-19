@@ -127,7 +127,7 @@ enum {
 	BEIntType, BEBoolType, BECharType, BERealType,
 	BEFileType, BEStringType, BEWorldType, BEProcIdType,
 	BERedIdType,
-	BENrOfBasicTypes,
+	BERationalDenot,
 
 	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot, BEIntegerDenot,
 
@@ -194,6 +194,9 @@ Clean (BEBindSpecialModule :: BESpecialIdentIndex Int BackEnd -> BackEnd)
 
 void BEBindSpecialFunction (BESpecialIdentIndex index, int functionIndex, int moduleIndex);
 Clean (BEBindSpecialFunction :: BESpecialIdentIndex Int Int BackEnd -> BackEnd)
+
+void BEBindSpecialType (int special_type_n,int type_index,int module_index);
+Clean (BEBindSpecialType :: Int Int Int BackEnd -> BackEnd)
 
 BESymbolP BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex);
 Clean (BESpecialArrayFunctionSymbol :: BEArrayFunKind Int Int BackEnd -> (BESymbolP, BackEnd))
@@ -334,6 +337,9 @@ Clean (BESwitchNode :: BENodeIdP BEArgP BackEnd -> (BENodeP, BackEnd))
 
 BENodeP BECaseNode (int symbolArity, BESymbolP symbol, BENodeDefP nodeDefs, BEStrictNodeIdP strictNodeIds, BENodeP node);
 Clean (BECaseNode :: Int BESymbolP BENodeDefP BEStrictNodeIdP BENodeP BackEnd -> (BENodeP, BackEnd))
+
+BENodeP BEOverloadedCaseNode (BENodeP case_node,BENodeP equal_node,BENodeP from_integer_node);
+Clean (BEOverloadedCaseNode :: BENodeP BENodeP BENodeP BackEnd -> (BENodeP, BackEnd))
 
 void BEEnterLocalScope (void);
 Clean (BEEnterLocalScope :: BackEnd -> BackEnd)
