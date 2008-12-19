@@ -3502,8 +3502,8 @@ void GenStart (SymbDef startsymb)
 		GenOAStackLayout (0);
 
 		FPrintF (OutFile, "\n__%s_%s", CurrentModule,start_function_name);
-		
-		if (arity!=0){
+
+		if (arity!=0 || strcmp (start_function_name,"main")==0){
 			put_instruction_b (buildI);
 			put_arguments_n_b (65536l);
 		}
