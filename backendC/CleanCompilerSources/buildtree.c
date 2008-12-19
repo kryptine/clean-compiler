@@ -434,19 +434,6 @@ NewImpRule (unsigned line_number,TypeAlts typeAlternative,NodeP rule_root)
 	return impRule;
 } /* NewImpRule */
 
-ImpRules
-NewRule (unsigned line_number,TypeAlts typeAlternative,NodeP rule_root, ScopeP scope)
-{
-	ImpRules	impRule;
-	
-	impRule	= NewImpRule (line_number, typeAlternative, rule_root);
-
-	*(scope->sc_rulesP)	= impRule;
-	scope->sc_rulesP		= &impRule->rule_next;
-	
-	return (impRule);
-} /* NewRule */
-
 RuleAltP
 NewRuleAlt (void)
 {

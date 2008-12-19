@@ -20,23 +20,6 @@ typedef enum
 	kArrowAlternativeKind				/* '->' */
 } RuleAltKind;
 
-STRUCT (scope, Scope)
-{
-	ImpRules		*sc_rulesP;
-
-	ImpRule			sc_rule;
-
-	RuleAlts		*sc_altP;
-	Symbol			sc_ruleSymbol;
-	RuleAltKind		sc_altKind;
-
-	NodeDefP		*sc_nodeDefsP;
-	NodeDefP		*sc_firstNodeDefP;
-	int				sc_scopeMask;
-
-	StrictNodeIdP	*sc_strictDefsP;
-};
-
 extern Args NewArgument (NodeP pattern);
 extern NodeP NewNode (SymbolP symb, Args args, int arity);
 extern NodeP NewIfNode (void);
@@ -61,7 +44,6 @@ extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arit
 #endif
 
 extern	NodeP NewIntNode (int value);
-extern	ImpRules NewRule (unsigned line_number, TypeAlts typeAlternative, NodeP rule_root, ScopeP scope);
 
 extern NodeIdP NewNodeId (IdentP nid);
 extern StrictNodeIdP NewStrictNodeId (NodeIdP node_id, StrictNodeIdP next);
