@@ -33,7 +33,7 @@ typedef enum
 		{abcFile = 1, iclFile, dclFile, dumpFile, statFile,
 		 stasFile, helpFile, applFile, assFile, sunAssFile,
 		 obj00File, obj20File, obj81File,
-		 otherFile,miraFile,miraExpFile
+		 otherFile, hsFile
 		} FileKind;
 
 #define EndOfFile		((int) -1)

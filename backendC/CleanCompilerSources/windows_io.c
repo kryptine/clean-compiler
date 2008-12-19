@@ -33,6 +33,8 @@ char *GetFileExtension (FileKind kind)
 			return ".icl";
 		case dclFile:
 			return ".dcl";
+		case hsFile:
+			return ".hs";
 		case dumpFile:
 			return ".dmp";
 		case statFile:
@@ -250,6 +252,8 @@ File FOpen (char *fname,FileKind kind,char *mode)
 		res=findfilepath (fname,dclFile,path);
 		if (!res)
 			res=findfilepath (fname,iclFile,path);
+		if (!res)
+			res=findfilepath (fname,hsFile,path);
 
 		if (res){
 			char *p,*after_last_slash;
