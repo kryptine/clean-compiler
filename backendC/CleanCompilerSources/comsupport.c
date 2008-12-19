@@ -44,6 +44,7 @@ unsigned CurrentLine;
 Symbol CurrentSymbol;
 Bool CompilerError;
 
+int ExitEnv_valid=0;
 jmp_buf ExitEnv;
 
 char	*OutName = (char *) NIL;
@@ -334,10 +335,10 @@ void FatalCompError (char *mod, char *proc, char *mess)
 		}
 	}
 # endif
-	exit (1);
-#else
-	longjmp (ExitEnv, 1);
+	if (!ExitEnv_valid)
+		exit (1);
 #endif
+	longjmp (ExitEnv, 1);
 }
 
 void PrintSymbol (Symbol symbol, File file)
@@ -653,6 +654,10 @@ void ExitCompiler (void)
 	OutName	 = (char *) NIL;
 }
 
+#ifdef CLEAN2
+extern struct clean_string_128 { size_t length; char chars[128]; } clean_error_string;
+#endif
+
 #ifdef _DEBUG_
 
 void ErrorInCompiler (char *mod, char *proc, char *msg)
@@ -663,6 +668,12 @@ void ErrorInCompiler (char *mod, char *proc, char *msg)
 		FPrintF (StdError,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);
 
 #ifdef CLEAN2
+	if (CurrentModule!=NULL)
+		sprintf (clean_error_string.chars,"Error in compiler while compiling %s.icl: Module %s, Function %s, \"%s\"\n",CurrentModule,mod,proc,msg);
+	else
+		sprintf (clean_error_string.chars,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);	
+	clean_error_string.length = strlen (clean_error_string.chars);
+
 # ifdef _MAC_
 	{
 		FILE *f;
@@ -676,8 +687,10 @@ void ErrorInCompiler (char *mod, char *proc, char *msg)
 			fclose (f);
 		}
 	}
-# endif
 	exit (1);
+# endif
+	if (ExitEnv_valid)
+		longjmp (ExitEnv, 1);
 #endif
 }
 

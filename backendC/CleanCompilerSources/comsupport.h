@@ -30,6 +30,7 @@ extern char *OutName, *InName;
 
 extern unsigned CurrentLine;
 
+extern int ExitEnv_valid;
 extern File OpenedFile;
 
 extern jmp_buf ExitEnv;
