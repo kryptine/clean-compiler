@@ -3606,7 +3606,6 @@ CheckBEEnumTypes (void)
 	Assert (world_type					== BEWorldType);
 	Assert (procid_type					== BEProcIdType);
 	Assert (redid_type					== BERedIdType);
-	Assert (Nr_Of_Basic_Types			== BENrOfBasicTypes);
 	Assert (rational_denot				== BERationalDenot);
 	Assert (int_denot					== BEIntDenot);
 	Assert (bool_denot					== BEBoolDenot);
