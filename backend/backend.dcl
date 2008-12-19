@@ -314,7 +314,7 @@ BEIntDenot:==10;
 BEBoolDenot:==11;
 BECharDenot:==12;
 BERealDenot:==13;
-BENrOfBasicDenots:==14;
+BEIntegerDenot:==14;
 BEStringDenot:==15;
 BEFunType:==16;
 BEArrayType:==17;

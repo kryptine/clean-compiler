@@ -129,8 +129,7 @@ enum {
 	BERedIdType,
 	BENrOfBasicTypes,
 
-	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot,
-	BENrOfBasicDenots,
+	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot, BEIntegerDenot,
 
 	BEStringDenot,
 	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEListType, BETupleType, BEEmptyType,
@@ -165,7 +164,6 @@ enum {
 typedef int BESpecialIdentIndex;
 Clean (::BESpecialIdentIndex :== Int)
 enum {
-	/* StdMisc */
 	BESpecialIdentStdMisc, BESpecialIdentAbort, BESpecialIdentUndef,
 	BESpecialIdentStdBool, BESpecialIdentAnd, BESpecialIdentOr,
 
