@@ -110,7 +110,6 @@ typedef struct constructor_list
 	TypeNode					cl_constructor;
 	FieldList					cl_fields;
 	StateP						cl_state_p; /* for constructors, union met cl_fields ? */
-	TypeVarList					cl_exist_quant_typevars;
 	struct constructor_list *	cl_next;
 
 } * ConstructorList;
