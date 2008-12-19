@@ -58,9 +58,13 @@ typedef enum {
 	int_type, bool_type, char_type, real_type,
 	file_type, string_type,world_type, procid_type,
 	redid_type,
-	Nr_Of_Basic_Types,		
+#ifdef CLEAN2
+	rational_denot,
+#else
+	Nr_Of_Basic_Types,
+#endif
 	int_denot, bool_denot, char_denot, real_denot,
-	Nr_Of_Basic_Denots,
+/*	Nr_Of_Basic_Denots, */ integer_denot,
 	string_denot,
 	fun_type, array_type, strict_array_type, unboxed_array_type, list_type, tuple_type, empty_type,
 #ifdef CLEAN2
@@ -74,6 +78,10 @@ typedef enum {
 	definition, newsymbol, instance_symb, empty_symbol, field_symbol_list,
 	erroneous_symb
 } SymbKind;
+
+#ifdef CLEAN2
+# define Nr_Of_Basic_Types rational_denot
+#endif
 
 STRUCT (state,State){
 	union {
@@ -396,8 +404,9 @@ STRUCT (if_node_contents,IfNodeContents){
 #define node_else_node_id_ref_counts node_contents.contents_if->if_else_u.u_node_id_ref_counts
 
 typedef enum {
-	IfNode, NormalNode, SelectorNode, NodeIdNode, UpdateNode, MatchNode,						/* normal nodes */
-	SwitchNode, CaseNode, DefaultNode, PushNode, GuardNode, TupleSelectorsNode, FillUniqueNode	/* nodes in codegen */
+	IfNode, NormalNode, SelectorNode, NodeIdNode, UpdateNode, MatchNode,
+	SwitchNode, CaseNode, DefaultNode, PushNode, GuardNode, OverloadedCaseNode,
+	TupleSelectorsNode, FillUniqueNode
 } NodeKind;
 
 #define SELECTOR_U 2
