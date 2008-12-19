@@ -24,7 +24,6 @@
 # include	"statesgen.h"
 # include	"comparser.h"
 # include	"buildtree.h"
-# include	"comprehensions.h"
 # include	"settings.h"
 # include	"checksupport.h"
 
@@ -196,8 +195,6 @@ InitParser (void)
 	FailSymbol		= NewSymbol (fail_symb);
 	AllSymbol		= NewSymbol (all_symb);
 	EmptyTypeSymbol	= NewSymbol (empty_type);
-
-	InitialiseEnumFunctionIds ();
 
 	clear_p_at_node_tree();
 } /* InitParser */

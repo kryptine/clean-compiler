@@ -120,15 +120,6 @@ extern	SymbolP	TupleTypeSymbols [];
 IdentP UseArrayFunctionId (ArrayFunKind kind);
 void InitialiseEnumFunctionIds (void);
 
-typedef enum {
-	FromEnumFun, FromThenEnumFun, FromToEnumFun, FromThenToEnumFun,
-	IncEnumFun, DecEnumFun, MinusEnumFun, LessThanEqEnumFun,
-	NoEnumFun
-} EnumFunKind;
-IdentP EnumFunctionId (EnumFunKind kind);
-IdentP UseEnumFunctionId (EnumFunKind kind);
-
-
 extern unsigned import_system_functions, import_system_array_functions;
 
 void clear_p_at_node_tree (void);

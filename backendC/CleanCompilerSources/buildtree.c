@@ -577,35 +577,3 @@ UseArrayFunctionId (ArrayFunKind kind)
 	return (ArrayFunctionIds [kind]);
 } /* UseArrayFunctionId */
 #endif
-
-static IdentP EnumFunctionIds [NoEnumFun];
-
-void
-InitialiseEnumFunctionIds (void)
-{
-	EnumFunctionIds [FromEnumFun]		= PutStringInHashTable (kFromPrefix,		SymbolIdTable);
-	EnumFunctionIds [FromThenEnumFun]	= PutStringInHashTable (kFromThenPrefix,	SymbolIdTable);
-	EnumFunctionIds [FromToEnumFun]		= PutStringInHashTable (kFromToPrefix,		SymbolIdTable);
-	EnumFunctionIds [FromThenToEnumFun]	= PutStringInHashTable (kFromThenToPrefix,	SymbolIdTable);
-	EnumFunctionIds [MinusEnumFun]		= PutStringInHashTable ("_minus",			SymbolIdTable);
-	EnumFunctionIds [LessThanEqEnumFun]	= PutStringInHashTable ("_lteq",			SymbolIdTable);
-	EnumFunctionIds [IncEnumFun]		= PutStringInHashTable ("inc",				SymbolIdTable);
-	EnumFunctionIds [DecEnumFun]		= PutStringInHashTable ("dec",				SymbolIdTable);
-} /* InitialiseEnumFunctionIds */
-
-#ifndef CLEAN2
-IdentP
-UseEnumFunctionId (EnumFunKind kind)
-{
-	if (import_system_functions == 0)
-		import_system_functions	= gCurrentToken.lineNumber;
-
-	return (EnumFunctionIds [kind]);
-} /* UseEnumFunctionId */
-#endif
-
-IdentP
-EnumFunctionId (EnumFunKind kind)
-{
-	return (EnumFunctionIds [kind]);
-} /* UseEnumFunctionId */
