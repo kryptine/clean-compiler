@@ -31,64 +31,69 @@ static void set_node_id_scope_numbers (NodeDefP node_defs,int local_scope)
 
 static void set_root_scope_numbers (NodeP node_p,int local_scope)
 {
-/* RWS added switch nodes */
-	switch (node_p->node_kind)
-	{
+	switch (node_p->node_kind){
 		case IfNode:
-			{
-				int new_local_scope;
-				ArgP arg_p;
-		
-				node_p->node_if_scope=scope;
+		{
+			int new_local_scope;
+			ArgP arg_p;
+	
+			node_p->node_if_scope=scope;
 
-				new_local_scope=scope+2;
-				scope+=3;
-		
-				arg_p=node_p->node_arguments;
-				set_root_scope_numbers (arg_p->arg_node,local_scope);
-				
-				++scope;
-				arg_p=arg_p->arg_next;
-				set_root_scope_numbers (arg_p->arg_node,new_local_scope);
-				set_node_id_scope_numbers (node_p->node_then_node_defs,new_local_scope);	
-				
-				++scope;
-				arg_p=arg_p->arg_next;
-				set_root_scope_numbers (arg_p->arg_node,new_local_scope);
-				set_node_id_scope_numbers (node_p->node_else_node_defs,new_local_scope);
-			}
+			new_local_scope=scope+2;
+			scope+=3;
+	
+			arg_p=node_p->node_arguments;
+			set_root_scope_numbers (arg_p->arg_node,local_scope);
+			
+			++scope;
+			arg_p=arg_p->arg_next;
+			set_root_scope_numbers (arg_p->arg_node,new_local_scope);
+			set_node_id_scope_numbers (node_p->node_then_node_defs,new_local_scope);	
+			
+			++scope;
+			arg_p=arg_p->arg_next;
+			set_root_scope_numbers (arg_p->arg_node,new_local_scope);
+			set_node_id_scope_numbers (node_p->node_else_node_defs,new_local_scope);
+
 			break;
+		}
 		case SwitchNode:
-			{
-				ArgP arg_p;
-				int old_scope;
-				
-				old_scope=scope;
-				
-				for_l (arg_p,node_p->node_arguments,arg_next){
-					NodeP node_p;
+		{
+			ArgP arg_p;
+			int old_scope;
+			
+			old_scope=scope;
+			
+			for_l (arg_p,node_p->node_arguments,arg_next){
+				NodeP node_p;
 
-					scope=old_scope;
+				scope=old_scope;
 
-					node_p=arg_p->arg_node;
-					if (node_p->node_kind==CaseNode){
-						NodeP case_alt_node_p;
-						
-						case_alt_node_p=node_p->node_arguments->arg_node;
-	/*	Cedewarrior bug	if (case_alt_node_p->node_kind==PushNode) */
-						if (node_p->node_arguments->arg_node->node_kind==PushNode)
-							set_root_scope_numbers (case_alt_node_p->node_arguments->arg_next->arg_node, local_scope);
-						else
-							set_root_scope_numbers (node_p->node_arguments->arg_node, local_scope);
-					} else if (node_p->node_kind==DefaultNode){
+				node_p=arg_p->arg_node;
+				if (node_p->node_kind==CaseNode){
+					NodeP case_alt_node_p;
+					
+					case_alt_node_p=node_p->node_arguments->arg_node;
+/*	Cedewarrior bug	if (case_alt_node_p->node_kind==PushNode) */
+					if (node_p->node_arguments->arg_node->node_kind==PushNode)
+						set_root_scope_numbers (case_alt_node_p->node_arguments->arg_next->arg_node, local_scope);
+					else
 						set_root_scope_numbers (node_p->node_arguments->arg_node, local_scope);
-					} else
-						ErrorInCompiler ("set_scope_numbers.c", "set_root_scope_numbers", "");
+				} else if (node_p->node_kind==DefaultNode){
+					set_root_scope_numbers (node_p->node_arguments->arg_node, local_scope);
 
-					set_node_id_scope_numbers (node_p->node_node_defs,local_scope);
-				}
+				} else if (node_p->node_kind==OverloadedCaseNode){
+					node_p=node_p->node_node;
+					set_root_scope_numbers (node_p->node_arguments->arg_node, local_scope);
+
+				} else
+					ErrorInCompiler ("set_scope_numbers.c", "set_root_scope_numbers", "");
+
+				set_node_id_scope_numbers (node_p->node_node_defs,local_scope);
 			}
+
 			break;
+		}
 		case GuardNode:
 		{	
 			int old_scope;

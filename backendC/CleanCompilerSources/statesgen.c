@@ -420,7 +420,7 @@ static void GenResultStatesOfLazyFields (SymbDef sdef)
 	
 	for (i=0, fields = rectype->type_fields; fields; i++, fields = fields->fl_next){
 		TypeNode field_type_node = fields->fl_type;
-		
+
 		if (field_type_node->type_node_annotation!=StrictAnnot){
 			if (field_type_node->type_node_is_var || field_type_node->type_node_symbol->symb_kind==apply_symb)
 				SetUnaryState (&fields->fl_state, LazyRedirection, UnknownObj);
@@ -570,6 +570,10 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 	}
 }
 
+#ifdef CLEAN2
+SymbDefP special_types[2];
+#endif
+
 void GenerateStatesForRecords (Symbol symbols)
 {
 	Symbol symb;
@@ -609,6 +613,11 @@ void GenerateStatesForRecords (Symbol symbols)
 				}
 			}
 		}
+
+#ifdef CLEAN2
+	if (special_types[0]!=NULL)
+		BasicSymbolStates[integer_denot] = special_types[0]->sdef_record_state;
+#endif
 }
 
 /*
@@ -2034,7 +2043,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				}
 
 				definition_state_p = GetStateOfArguments (sdef,node->node_arity);
-								
+
 				if (definition_state_p!=NULL){
 #ifdef FASTER_STRICT_AND_OR
 					if (sdef->sdef_module==StdBoolId->ident_name && node->node_arity==2){
@@ -2117,7 +2126,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 			}
 			default:
 				if (rootsymb->symb_kind < Nr_Of_Predef_Types){
-					node->node_state =  BasicSymbolStates [rootsymb->symb_kind];
+					node->node_state = BasicSymbolStates [rootsymb->symb_kind];
 					node->node_state.state_kind = demanded_state.state_kind;
 				}
 				break;
@@ -2385,6 +2394,15 @@ static void DetermineStatesSwitchRootNode (Node root_node, StateS demstate, int 
 				DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node,&node->node_node_defs,demstate,local_scope);
 		} else if (node->node_kind==DefaultNode){
 			DetermineStatesOfRootNodeAndDefs (node->node_arguments->arg_node,&node->node_node_defs,demstate,local_scope);
+		} else if (node->node_kind==OverloadedCaseNode){
+			NodeP case_node_p;
+
+			DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+			if (ShouldDecrRefCount)
+				DecrRefCountCopiesOfArg (node->node_arguments->arg_next IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+
+			case_node_p=node->node_node;
+			DetermineStatesOfRootNodeAndDefs (case_node_p->node_arguments->arg_node,&case_node_p->node_node_defs,demstate,local_scope);
 		} else
 			error_in_function ("DetermineStatesSwitchRootNode");
 	}
@@ -2785,6 +2803,8 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 					DetermineStatesOfNodeAndDefs (case_alt_node_p,arg_node_p->node_node_defs,demstate,local_scope);
 			} else if (arg_node_p->node_kind==DefaultNode){
 				DetermineStatesOfNodeAndDefs (arg_node_p->node_arguments->arg_node,arg_node_p->node_node_defs,demstate,local_scope);
+			} else if (arg_node_p->node_kind==OverloadedCaseNode){
+				DetermineStatesOfNodeAndDefs (arg_node_p->node_node->node_arguments->arg_node,arg_node_p->node_node->node_node_defs,demstate,local_scope);
 			} else
 				error_in_function ("DetermineStatesOfNodeAndDefs");
 		}
@@ -3160,6 +3180,8 @@ static NodeP add_argument_to_switch_node (NodeP rhs_root_p,NodeIdP new_node_id_p
 				node_h=&(*node_h)->node_arguments->arg_next->arg_node;
 		} else if (node_p->node_kind==DefaultNode){
 			node_h=&node_p->node_arguments->arg_node;
+		} else if (node_p->node_kind==OverloadedCaseNode){
+			node_h=&node_p->node_node->node_arguments->arg_node;
 		} else
 			error_in_function ("add_argument_to_switch_node");
 
@@ -3680,8 +3702,7 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 
 	root_node=*node_p;
 
-	switch (root_node->node_kind)
-	{
+	switch (root_node->node_kind){
 		case SwitchNode:
 		{
 			ArgP arg_p;
@@ -3697,9 +3718,8 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 					case_alt_node_p=node->node_arguments->arg_node;
 					case_last=&node->node_node_defs;
 /*	Codewarrior bug			if (case_alt_node_p->node_kind==PushNode){ */
-					if (node->node_arguments->arg_node->node_kind==PushNode){
+					if (node->node_arguments->arg_node->node_kind==PushNode)
 						case_last=CollectSharedNodeIdsInRootNode (&case_alt_node_p->node_arguments->arg_next->arg_node, parent_node_id, case_last);
-					}
 					else
 						case_last=CollectSharedNodeIdsInRootNode (&node->node_arguments->arg_node, parent_node_id, case_last);
 					*case_last=NULL;
@@ -3709,6 +3729,22 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 					default_last=&node->node_node_defs;
 					default_last=CollectSharedNodeIdsInRootNode (&node->node_arguments->arg_node, parent_node_id, default_last);
 					*default_last=NULL;
+				} else if (node->node_kind==OverloadedCaseNode){
+					NodeP case_node_p;
+					NodeDefs *case_last;
+					ArgP arg;
+
+					arg=node->node_arguments;
+					arg->arg_state=LazyState;
+					last = CollectSharedNodeIdsInNode (&arg->arg_node,parent_node_id,last);
+					arg=arg->arg_next;
+					arg->arg_state=LazyState;
+					last = CollectSharedNodeIdsInNode (&arg->arg_node,parent_node_id,last);
+
+					case_node_p=node->node_node;
+					case_last=&case_node_p->node_node_defs;
+					case_last=CollectSharedNodeIdsInRootNode (&case_node_p->node_arguments->arg_node, parent_node_id, case_last);
+					*case_last=NULL;
 				} else
 					error_in_function ("CollectSharedNodeIdsInRootNode");
 			}
@@ -3765,11 +3801,11 @@ static void CollectSharedAndAnnotatedNodesInRhs (NodeS **root_p,NodeDefS **defs_
 			if ((imp_rule_p->rule_mark & RULE_LAMBDA_FUNCTION_MASK) && 
 				root_node->node_symbol->symb_def->sdef_arity==root_node->node_arity &&
 				imp_rule_p->rule_alts->alt_next==NULL
-	# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 				&& ! (imp_rule_p->rule_alts->alt_rhs_root->node_kind==SwitchNode ||
 					  imp_rule_p->rule_alts->alt_rhs_root->node_kind==GuardNode ||
 					  imp_rule_p->rule_alts->alt_rhs_root->node_kind==IfNode)
-	# endif
+# endif
 				)
 			{
 				ArgP call_arg_p,lhs_arg_p;
@@ -3905,8 +3941,7 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 				node_id->nid_node->node_annotation=StrictAnnot;
 	}
 	
-	switch (node->node_kind) 
-	{
+	switch (node->node_kind){
 		case IfNode:
 		{
 			ArgS *arg;
@@ -3938,6 +3973,11 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 						AnnotateStrictNodeIds (node->node_arguments->arg_node,node->node_strict_node_ids,&node->node_node_defs);
 				} else if (node->node_kind==DefaultNode){
 					AnnotateStrictNodeIds (node->node_arguments->arg_node,node->node_strict_node_ids,&node->node_node_defs);
+				} else if (node->node_kind==OverloadedCaseNode){
+					NodeP case_node_p;
+					
+					case_node_p=node->node_node;
+					AnnotateStrictNodeIds (case_node_p->node_arguments->arg_node,case_node_p->node_strict_node_ids,&case_node_p->node_node_defs);
 				} else
 					error_in_function ("AnnotateStrictNodeIds");
 			}
@@ -4091,6 +4131,16 @@ static void reset_states_and_ref_count_copies_of_root_node (NodeP node_p)
 			} else if (node_p->node_kind==DefaultNode){
 				reset_states_and_ref_count_copies_of_root_node (node_p->node_arguments->arg_node);
 				reset_states_and_ref_count_copies_of_node_defs (node_p->node_node_defs);
+			} else if (node_p->node_kind==OverloadedCaseNode){
+				NodeP case_node_p;
+
+				case_node_p=node_p->node_node;
+												
+				reset_states_and_ref_count_copies_of_root_node (case_node_p->node_arguments->arg_node);
+				reset_states_and_ref_count_copies_of_node_defs (case_node_p->node_node_defs);
+
+				reset_states_and_ref_count_copies_of_node (node_p->node_arguments->arg_node);
+				reset_states_and_ref_count_copies_of_node (node_p->node_arguments->arg_next->arg_node);
 			} else
 				error_in_function ("reset_states_and_ref_count_copies_of_root_node");
 		}
@@ -4200,5 +4250,6 @@ void InitStatesGen (void)
 	SetUnaryState (& BasicSymbolStates[tuple_type], StrictOnA, TupleObj);
 #ifdef CLEAN2
 	SetUnaryState (& BasicSymbolStates[dynamic_type], StrictOnA, DynamicObj);
+	SetUnaryState (& BasicSymbolStates[rational_denot], StrictOnA, UnknownObj);
 #endif
 }

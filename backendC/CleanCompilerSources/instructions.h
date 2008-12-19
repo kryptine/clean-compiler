@@ -27,6 +27,7 @@ void PushBasicOnB (ObjectKind state, int offset);
 void UpdateBasic (int size, int srcoffset, int dstoffset);
 
 void CallFunction (Label label, SymbDef def, Bool isjsr, Node root);
+void CallFunction1 (Label label, SymbDef def, StateS root_state, Args fun_args, int arity);
 
 void CallArrayFunction (SymbDef def,Bool isjsr,StateP node_state_p);
 
@@ -66,6 +67,9 @@ void GenBuildU (Label symblab,int a_size,int b_size,Label contlab);
 void GenBuildArray (int argoffset);
 void GenBuildString (SymbValue val);
 
+void GenPushZ (SymbValue val);
+void GenPushZR (SymbValue val);
+
 void GenBuildFieldSelector (Label symblab,Label contlab,char *record_name,int arity);
 void GenFillFieldSelector (Label symblab,Label contlab,char *record_name,int arity,int offset,FillKind fkind);
 
@@ -91,6 +95,7 @@ void GenJsrAp (int n_args);
 void GenJmpEval (void);
 void GenJmpAp (int n_args);
 void GenJmpApUpd (int n_args);
+void GenJmpNotEqZ (SymbValue val,Label tolab);
 void GenJmpUpd (Label tolab);
 void GenPopA (int nr);
 void GenPopB (int nr);
@@ -168,6 +173,7 @@ void GenApplyEntryDirective (int arity,Label label);
 void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2);
 void GenFieldNodeEntryDirective (int arity, Label label, Label label2,char *record_name);
 void GenConstructorDescriptorAndExport (SymbDef sdef);
+void GenConstructor0DescriptorAndExport (SymbDef sdef,int constructor_n);
 void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef);
 void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef);
 #if OPTIMIZE_LAZY_TUPLE_RECURSION

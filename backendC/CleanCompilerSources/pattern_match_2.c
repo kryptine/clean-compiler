@@ -776,7 +776,7 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 			node_id_ref_count_list_sorted=0;
 
 			for (arg=node->node_arguments; arg!=NULL; arg=arg->arg_next)
-				if (arg->arg_node->node_kind!=CaseNode)
+				if (arg->arg_node->node_kind!=CaseNode && arg->arg_node->node_kind!=OverloadedCaseNode)
 					break;
 			
 			default_may_fail=1;
@@ -853,6 +853,9 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 				arg_node=arg->arg_node;
 
 				switch (arg_node->node_kind){
+					case OverloadedCaseNode:
+						arg_node = arg_node->node_node;
+						/* no break */
 					case CaseNode:
 					{
 						int case_may_fail;

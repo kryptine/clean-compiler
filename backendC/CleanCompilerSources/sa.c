@@ -2136,6 +2136,11 @@ static void InitNode (Node node)
 					
 					InitNode (case_alt_node_p);
 					InitNodeDefs (node_p->node_node_defs);
+				} else if (node_p->node_kind==OverloadedCaseNode){
+					node_p=node_p->node_node;
+					InitNode (node_p->node_arguments->arg_node);
+					InitNodeDefs (node_p->node_node_defs);
+
 				} else if (node_p->node_kind==DefaultNode){
 					InitNode (node_p->node_arguments->arg_node);
 					InitNodeDefs (node_p->node_node_defs);
@@ -2683,7 +2688,12 @@ static void convert_switch_node (NodeP switch_node_p,Alts fun_alt_p)
 			}
 		} else if (node_p->node_kind==DefaultNode){
 			case_alt_node_p=node_p->node_arguments->arg_node;
-			case_alt_p->fun_lhs=NULL;			
+			case_alt_p->fun_lhs=NULL;
+		} else if (node_p->node_kind==OverloadedCaseNode){
+			node_p=node_p->node_node;
+			case_alt_node_p=node_p->node_arguments->arg_node;
+			case_alt_p->fun_lhs=&top;
+
 		} else
 			error_in_function ("convert_switch_node");
 

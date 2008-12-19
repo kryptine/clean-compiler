@@ -32,3 +32,5 @@ extern void ConvertTypeToState (TypeNode type,States state,StateKind kind);
 extern int optimise_strict_tuple_result_functions;
 
 extern PolyList UserDefinedArrayFunctions;
+
+extern SymbDefP special_types[];

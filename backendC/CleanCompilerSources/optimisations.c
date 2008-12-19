@@ -497,9 +497,9 @@ static Node copy_root_node (Node old)
 
 			case_node_arg_p=case_node_p->node_arguments;
 
-			new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
-
 			if (case_node_p->node_kind==CaseNode){
+				new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
+
 				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs,NULL);
 				
 				if (case_node_arg_p->arg_node->node_kind==PushNode){
@@ -570,9 +570,49 @@ static Node copy_root_node (Node old)
 					new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
 				}
 			} else if (case_node_p->node_kind==DefaultNode){
+				new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
+
 				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs,NULL);
 				copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
 				new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
+
+			} else if (case_node_p->node_kind==OverloadedCaseNode){
+				NodeP new_overloaded_case_node_p;
+				ArgP new_overloaded_case_node_arg2_p;
+
+				new_overloaded_case_node_arg2_p=CompAllocType (ArgS);
+				new_overloaded_case_node_arg2_p->arg_state=LazyState;
+
+				new_overloaded_case_node_arg2_p->arg_next=NULL;
+				new_case_node_arg_p->arg_next=new_overloaded_case_node_arg2_p;
+
+				new_case_node_arg_p->arg_node=copy_node (case_node_arg_p->arg_node,False);
+				new_overloaded_case_node_arg2_p->arg_node=copy_node (case_node_arg_p->arg_next->arg_node,False);
+
+				case_node_p=case_node_p->node_node;
+				new_overloaded_case_node_p=new_case_node_p;
+
+				new_case_node_p = CompAllocType (NodeS);
+				*new_case_node_p = *case_node_p;
+
+				new_overloaded_case_node_p->node_node = new_case_node_p;
+				
+				new_case_node_arg_p=CompAllocType (ArgS);
+				new_case_node_arg_p->arg_state=LazyState;
+				
+				new_case_node_p->node_arguments=new_case_node_arg_p;
+				new_case_node_arg_p->arg_next=NULL;
+
+				case_node_arg_p=case_node_p->node_arguments;
+
+				new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
+
+				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs,NULL);
+
+				copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
+				new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
+
+
 			} else
 				error_in_function ("copy_root_node");
 
@@ -3086,6 +3126,23 @@ static void optimise_root_node (NodeP node,NodeDefP node_defs,FreeUniqueNodeIdsP
 					optimise_root_node (case_alt_node_p,case_node->node_node_defs,case_f_node_ids);
 
 					set_global_reference_counts (case_node);
+
+				} else if (case_node->node_kind==OverloadedCaseNode){
+					NodeP case_alt_node_p;
+					FreeUniqueNodeIdsP case_f_node_ids;
+					
+					case_node=case_node->node_node;
+					
+					case_f_node_ids=f_node_ids;
+					
+					case_alt_node_p=case_node->node_arguments->arg_node;
+
+					set_local_reference_counts (case_node);
+
+					optimise_root_node (case_alt_node_p,case_node->node_node_defs,case_f_node_ids);
+
+					set_global_reference_counts (case_node);
+
 				} else
 					error_in_function ("optimise_root_node");
 			}
@@ -3609,10 +3666,21 @@ static void ReorderNodeDefinitionsAndDetermineUsedEntries (NodeDefs *def_p,Node 
 			error_in_function ("ReorderNodeDefinitionsAndDetermineUsedEntries");
 		
 		for_l (arg,root->node_arguments,arg_next){
-			if (arg->arg_node->node_kind!=CaseNode && arg->arg_node->node_kind!=DefaultNode)
-				error_in_function ("ReorderNodeDefinitionsAndDetermineUsedEntries");
+			if (arg->arg_node->node_kind==OverloadedCaseNode){
+				NodeP overloaded_case_node_p,case_node_p;
 				
-			ReorderNodeDefinitionsAndDetermineUsedEntries (&arg->arg_node->node_node_defs,arg->arg_node->node_arguments->arg_node);
+				overloaded_case_node_p=arg->arg_node;
+				MarkDependentNodeDefs (overloaded_case_node_p->node_arguments->arg_node);
+				MarkDependentNodeDefs (overloaded_case_node_p->node_arguments->arg_next->arg_node);
+
+				case_node_p=overloaded_case_node_p->node_node;
+				ReorderNodeDefinitionsAndDetermineUsedEntries (&case_node_p->node_node_defs,case_node_p->node_arguments->arg_node);
+			} else {
+				if (arg->arg_node->node_kind!=CaseNode && arg->arg_node->node_kind!=DefaultNode && arg->arg_node->node_kind!=OverloadedCaseNode)
+					error_in_function ("ReorderNodeDefinitionsAndDetermineUsedEntries");
+				
+				ReorderNodeDefinitionsAndDetermineUsedEntries (&arg->arg_node->node_node_defs,arg->arg_node->node_arguments->arg_node);
+			}
 		}
 		
 		return;
@@ -3621,7 +3689,7 @@ static void ReorderNodeDefinitionsAndDetermineUsedEntries (NodeDefs *def_p,Node 
 		ReorderNodeDefinitionsAndDetermineUsedEntries (&root->node_node_defs,root->node_arguments->arg_next->arg_node);		
 		return;
 	}
-
+	
 	reordered_defs_p=&reordered_defs;
 
 	MarkNodeDefsWithProperty (*def_p,&IsObservedDef);
@@ -3847,6 +3915,18 @@ static void determine_then_else_ref_counts (NodeP node)
 
 					set_global_reference_counts (case_node);
 					--node->node_node_id->nid_refcount;
+				
+				} else  if (case_node->node_kind==OverloadedCaseNode){
+					case_node=case_node->node_node;
+					
+					++node->node_node_id->nid_refcount;
+					set_local_reference_counts (case_node);
+
+					determine_then_else_ref_counts (case_node->node_arguments->arg_node);
+
+					set_global_reference_counts (case_node);
+					--node->node_node_id->nid_refcount;
+				
 				} else
 					error_in_function ("determine_then_else_ref_counts");
 			}
