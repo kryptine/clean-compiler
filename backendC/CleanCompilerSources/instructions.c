@@ -551,6 +551,8 @@ enum {
 #define IpushI "pushI"
 #define IpushC "pushC"
 #define IpushR "pushR"
+#define IpushZR "pushZR"
+#define IpushZ "pushZ"
 
 #define IpushD "pushD"
 
@@ -644,6 +646,7 @@ enum {
 #define Ijmp_eval "jmp_eval"
 #define Ijmp_eval_upd "jmp_eval_upd"
 #define Ijmp_ap "jmp_ap"
+#define Ijmp_not_eqZ "jmp_not_eqZ"
 #define Ijmp_ap_upd "jmp_ap_upd"
 #define Ijmp_upd "jmp_upd"
 
@@ -687,6 +690,7 @@ static void put_instruction_code (int instruction_code)
 #define Dnu "nu"
 #define Dn_string "n_string"
 #define Ddesc "desc"
+#define Ddesc0 "desc0"
 #define Ddescn "descn"
 #define Ddescs "descs"
 #define Ddescexp "descexp"
@@ -1260,6 +1264,11 @@ void CallFunction (Label label, SymbDef def, Bool isjsr, Node root)
 		CallArrayFunction (def,isjsr,&root->node_state);
 	else
 		CallFunction2 (label, def, isjsr, root->node_state, root->node_arguments, root->node_arity);
+}
+
+void CallFunction1 (Label label, SymbDef def, StateS root_state, Args fun_args, int arity)
+{
+	CallFunction2 (label, def, True, root_state, fun_args, arity);
 }
 
 static void GenArraySize (Label elemdesc, int asize, int bsize)
@@ -2018,6 +2027,18 @@ void GenBuildString (SymbValue val)
 	FPrintF (OutFile, "%s", val.val_string);
 }
 
+void GenPushZ (SymbValue val)
+{
+	put_instruction_ (IpushZ);
+	FPrintF (OutFile, "%s", val.val_string);
+}
+
+void GenPushZR (SymbValue val)
+{
+	put_instruction_ (IpushZR);
+	FPrintF (OutFile, "%s", val.val_string);
+}
+
 static void GenFieldLabel (Label label,char *record_name)
 {
 	SymbDef def;
@@ -2242,6 +2263,13 @@ void GenJmpApUpd (int n_args)
 {
 	put_instruction_b (jmp_ap_upd);
 	put_arguments_n_b (n_args);
+}
+
+void GenJmpNotEqZ (SymbValue val,Label tolab)
+{
+	put_instruction_ (Ijmp_not_eqZ);
+	FPrintF (OutFile, "%s ", val.val_string);
+	GenLabel (tolab);
 }
 
 void GenJmpUpd (Label tolab)
@@ -2828,6 +2856,26 @@ void GenConstructorDescriptorAndExport (SymbDef sdef)
 		FPrintF (OutFile, LOCAL_D_PREFIX "%u %s %s %d 0 \"%s\"",
 			sdef->sdef_number, hnf_lab.lab_name, add_argument_label->lab_name,
 			sdef->sdef_arity, name);
+	}
+}
+
+void GenConstructor0DescriptorAndExport (SymbDef sdef,int constructor_n)
+{
+	char *name;
+
+	name = sdef->sdef_ident->ident_name;
+
+	if (sdef->sdef_exported || ExportLocalLabels){
+		put_directive_ (Dexport);
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s",CurrentModule,name);
+		put_directive_ (Ddesc0);
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s %d \"%s\"",CurrentModule, name, constructor_n , name);
+	} else if (DoDebug){
+		put_directive_ (Ddesc0);
+		FPrintF (OutFile, D_PREFIX "%s %d \"%s\"",name, constructor_n, name);
+	} else {
+		put_directive_ (Ddesc0);
+		FPrintF (OutFile, LOCAL_D_PREFIX "%u %d \"%s\"",sdef->sdef_number, constructor_n, name);
 	}
 }
 
@@ -3442,15 +3490,18 @@ void GenStart (SymbDef startsymb)
 {
 	if (startsymb->sdef_module == CurrentModule){
 		int arity;
-		
+		char *start_function_name;
+
 		arity = startsymb->sdef_arity;
 		startsymb->sdef_mark |= SDEF_USED_LAZILY_MASK;
+
+		start_function_name=startsymb->sdef_ident->ident_name;
 		
 		put_directive_ (Dexport);
-		FPrintF (OutFile, "__%s_Start", CurrentModule);
+		FPrintF (OutFile, "__%s_%s",CurrentModule,start_function_name);
 		GenOAStackLayout (0);
 
-		FPrintF (OutFile, "\n__%s_Start", CurrentModule);
+		FPrintF (OutFile, "\n__%s_%s", CurrentModule,start_function_name);
 		
 		if (arity!=0){
 			put_instruction_b (buildI);
@@ -3460,15 +3511,15 @@ void GenStart (SymbDef startsymb)
 		put_instruction_b (build);
 		
 		if (startsymb->sdef_exported)
-			FPrintF (OutFile, "e_%s_" D_PREFIX "Start",CurrentModule);
+			FPrintF (OutFile, "e_%s_" D_PREFIX "%s",CurrentModule,start_function_name);
 		else if (ExportLocalLabels)
 			if (DoParallel)
-				FPrintF (OutFile,"e_%s_" D_PREFIX "Start.%u",CurrentModule,startsymb->sdef_number);
+				FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u",CurrentModule,start_function_name,startsymb->sdef_number);
 			else
-				FPutS (empty_lab.lab_name, OutFile);		
+				FPutS (empty_lab.lab_name, OutFile);
 		else if (DoDebug){
 			if (DoParallel)
-				FPrintF (OutFile, D_PREFIX "Start.%u",startsymb->sdef_number);
+				FPrintF (OutFile, D_PREFIX "%s.%u",start_function_name,startsymb->sdef_number);
 			else
 				FPutS (empty_lab.lab_name, OutFile);
 		} else {
@@ -3481,13 +3532,18 @@ void GenStart (SymbDef startsymb)
 		put_arguments__n__b (arity);
 
 		if (startsymb->sdef_exported)
-			FPrintF (OutFile, "e_%s_" N_PREFIX "Start",CurrentModule);
+			FPrintF (OutFile, "e_%s_" N_PREFIX "%s",CurrentModule,start_function_name);
 		else if (ExportLocalLabels)
-			FPrintF (OutFile, "e_%s_" N_PREFIX "Start.%u",CurrentModule,startsymb->sdef_number);
+			FPrintF (OutFile, "e_%s_" N_PREFIX "%s.%u",CurrentModule,start_function_name,startsymb->sdef_number);
 		else if (DoDebug)
-			FPrintF (OutFile, N_PREFIX "Start.%u",startsymb->sdef_number);
+			FPrintF (OutFile, N_PREFIX "%s.%u",start_function_name,startsymb->sdef_number);
 		else
 			FPrintF (OutFile, N_PREFIX "%u",startsymb->sdef_number);
+
+		if (arity==0 && strcmp (start_function_name,"main")==0){
+			GenJsrEval (0);
+			GenJsrAp (1);
+		}
 		
 		GenDAStackLayout (1);
 		put_instruction_b (jmp);
@@ -3534,7 +3590,7 @@ void InitFileInfo (ImpMod imod)
 	
 	put_directive_ (Dstart);
 	if (start_sdef!=NULL){
-		FPrintF (OutFile, "__%s_Start",start_sdef->sdef_module);
+		FPrintF (OutFile, "__%s_%s",start_sdef->sdef_module,start_sdef->sdef_ident->ident_name);
 	} else
 		FPutS ("_nostart_", OutFile);
 }
