@@ -42,9 +42,7 @@ extern NodeP NewNode (SymbolP symb, Args args, int arity);
 extern NodeP NewIfNode (void);
 extern NodeP NewSelectorNode (SymbolP symb, Args args, int arity);
 extern NodeP NewNodeIdNode (NodeIdP node_id);
-extern NodeP NewApplyNode (NodeP function_node, Args args, int arity);
 extern NodeP NewUpdateNode (SymbolP symb,Args args,int arity);
-extern NodeP NewIdentifierNode (IdentP ident, Args args, int arity);
 extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arity);
 # define	NewNormalNode(symb, args, arity)	NewNodeByKind (NormalNode, (symb), (args), (arity))
 # define	NewRecordNode(symb, args, arity)	NewNodeByKind (RecordNode, (symb), (args), (arity))
@@ -79,7 +77,6 @@ extern TypeNode NewTypeVarNode (TypeVar node_id,Annotation annot, AttributeKind 
 extern RuleTypes NewRuleType (TypeAlts type_alt, unsigned line_nr);
 
 extern NodeP NewSelectNode (SymbolP selectSymbol, NodeIdP selectId, int arity);
-extern NodeP NewScopeNode (NodeP node, NodeDefP node_defs,ImpRuleS *imp_rules);
 extern NodeIdP BuildSelect (NodeP node, NodeDefs **node_defs_p);
 extern NodeIdP BuildSelectors (NodeP pattern, NodeP node, NodeDefs **node_defs_p);
 

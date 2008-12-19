@@ -397,8 +397,6 @@ STRUCT (if_node_contents,IfNodeContents){
 
 typedef enum {
 	IfNode, NormalNode, SelectorNode, NodeIdNode, UpdateNode, MatchNode,						/* normal nodes */
-	RecordNode, IdentNode, ApplyNode, ScopeNode,												/* nodes in parser and checker */
-	IndirectionNode,																			/* nodes in optimise_lambda */
 	SwitchNode, CaseNode, DefaultNode, PushNode, GuardNode, TupleSelectorsNode, FillUniqueNode	/* nodes in codegen */
 } NodeKind;
 
@@ -443,10 +441,6 @@ STRUCT (node,Node){
 			struct node_id_ref_count_list *	u_node_id_ref_counts;
 #endif
 		} su_u;
-		struct {
-			struct node_def *			scope_node_defs;
-			struct imp_rule *			scope_imp_rules;
-		} su_scope;												/* for ScopeNode */
 #if STRICT_LISTS
 		struct {
 			SymbolP						push_symbol;
@@ -492,9 +486,6 @@ STRUCT (node,Node){
 #define node_else_rules				node_contents.contents_if->if_else_rules
 #define node_else_strict_node_ids	node_contents.contents_if->if_else_strict_node_ids
 #define node_if_scope				node_contents.contents_if->if_local_scope
-
-#define node_scope_node_defs		node_su.su_scope.scope_node_defs
-#define node_scope_imp_rules		node_su.su_scope.scope_imp_rules
 
 #if STRICT_LISTS
 # define node_push_symbol			node_su.su_push.push_symbol

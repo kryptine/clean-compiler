@@ -284,28 +284,6 @@ NewUpdateNode (SymbolP symb, Args args, int arity)
 } /* NewUpdateNode */
 
 NodeP
-NewIdentifierNode (IdentP ident, Args args, int arity)
-{
-	NodeP node;
-	
-	node				= NewNodeByKind (IdentNode,  NIL, args, arity);
-	node->node_ident	= ident;
-
-	return (node);
-} /* NewIdentifierNode */
-
-NodeP
-NewApplyNode (NodeP function_node, Args args, int arity)
-{
-	NodeP node;
-
-	node			= NewNodeByKind (ApplyNode,  NIL, args, arity);
-	node->node_node	= function_node;
-
-	return (node);
-} /* NewApplyNode */
-
-NodeP
 NewIfNode (void)
 {
 	NodeP node;
@@ -341,24 +319,6 @@ NewSelectNode (SymbolP selectSymbol, NodeIdP selectId, int arity)
 
 	return (NewNode (selectSymbol, selectArg, arity));
 } /* NewSelectNode */
-
-NodeP
-NewScopeNode (NodeP node, NodeDefP node_defs,ImpRuleS *imp_rules)
-{
-	struct node *sc_node;
-	
-	sc_node=CompAllocType (struct node);
-
-	sc_node->node_kind=ScopeNode;
-	sc_node->node_annotation=NoAnnot;
-	sc_node->node_node=node;
-	sc_node->node_scope_node_defs=node_defs;
-	sc_node->node_scope_imp_rules=imp_rules;	
-	sc_node->node_arguments=NULL;
-	sc_node->node_arity=0;
-	
-	return sc_node;
-} /* NewScopeNode */
 
 NodeDefs
 NewNodeDefinition (NodeIdP nid, NodeP node)
