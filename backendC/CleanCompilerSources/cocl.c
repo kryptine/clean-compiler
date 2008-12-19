@@ -154,6 +154,7 @@ Bool CallCompiler (int argc, char **argv)
 	DoFusion=False;
 	DoDescriptors=False;
 	ExportLocalLabels=False;
+	AddStrictnessToExportedFunctionTypes=False;
 
 	StrictDoAnnots			= False;
 	StrictDepth				= 10;/* 8; */
@@ -224,6 +225,8 @@ Bool CallCompiler (int argc, char **argv)
 				ExportLocalLabels=True;
 			else if (strcmp (argv_i,"-fusion") == 0)
 				DoFusion=True;
+			else if (strcmp (argv_i,"-seft") == 0)
+				AddStrictnessToExportedFunctionTypes=True;
 			else if (strncmp (argv_i, "-sa", 3) == 0){
 				if (!SetStrictOption (argv[i]+3)){
 					CmdError ("unknown flag %s", argv[i]);
