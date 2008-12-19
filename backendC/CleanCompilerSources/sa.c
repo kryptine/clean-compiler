@@ -3105,6 +3105,43 @@ static void UpdateStateInfosWithStrictInfos (TypeAlts rule, unsigned arity, Stri
 	/* the result has no sense at the moment */	
 }
 
+static void update_exported_function_state_info_with_strict_info (TypeNode node, StrictInfo *s)
+{
+	Bool is_strict_annotated, is_strict, is_tuple;
+
+	is_strict_annotated = node->type_node_annotation==StrictAnnot;
+	is_tuple = IsTupleInfo (s);
+	is_strict = (is_tuple ? GetTupleStrictKind (s) : GetStrictKind (s, 0)) != NotStrict;
+
+	if (!is_strict_annotated && is_strict)
+		node->type_node_annotation=StrictAnnot;
+
+	if (is_tuple && (is_strict || is_strict_annotated)){
+		unsigned	arity,i;
+		TypeArgs	args;
+
+		arity = s->strict_arity;
+		args  = node->type_node_arguments;
+
+		for (i = 0; i < arity; i++, args = args->type_arg_next)
+			update_exported_function_state_info_with_strict_info (args->type_arg_node,&GetTupleInfo (s,i));
+	}
+}
+
+static void update_exported_function_type_state_infos_with_strict_infos (TypeAlts rule, unsigned arity, StrictInfo *strict_args)
+{
+	unsigned	i;
+	TypeArgs	args;
+
+	if (! rule)
+		return;
+
+	args = rule->type_alt_lhs->type_node_arguments;
+
+	for (i = 0; i < arity; i++, args = args->type_arg_next)
+		update_exported_function_state_info_with_strict_info (args->type_arg_node,&strict_args[i]);
+}
+
 Bool IsListArg (Fun *f, unsigned n)
 {
 	TypeArgs	args;
@@ -3574,12 +3611,17 @@ static void update_function_strictness (SymbDef sdef)
 		strict_added = False;
 		warning      = False;
 		UpdateStateInfosWithStrictInfos (rule, arity, f->fun_strictargs, &f->fun_strictresult,&strict_added, &warning);
-	
-		if (strict_added && sdef->sdef_exported){
-			if (DoListStrictTypes && ! DoListAllTypes)
-				PrintType (sdef, rule);
-			else
-				export_warning = True;
+
+		if (sdef->sdef_exported){
+			if (strict_added){
+				if (DoListStrictTypes && ! DoListAllTypes)
+					PrintType (sdef, rule);
+				else
+					export_warning = True;
+			}
+			
+			if (AddStrictnessToExportedFunctionTypes && sdef->sdef_dcl_icl!=NULL)
+				update_exported_function_type_state_infos_with_strict_infos (sdef->sdef_dcl_icl->sdef_rule_type->rule_type_rule, arity, f->fun_strictargs);
 		}
 	
 		if (warning && (StrictAllWarning || StrictChecks))

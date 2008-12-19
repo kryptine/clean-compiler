@@ -22,6 +22,7 @@ extern Bool DoDescriptors;			/* not generated in abc file */
 extern Bool ListOptimizations;
 
 extern Bool ExportLocalLabels;
+extern Bool AddStrictnessToExportedFunctionTypes;
 
 extern Bool DoProfiling;
 extern Bool DoTimeProfiling;
